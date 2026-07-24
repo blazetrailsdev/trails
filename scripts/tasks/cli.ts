@@ -366,11 +366,22 @@ function inGitTasks(): void {
 // the same repo but on a feature branch.
 function git(
   args: string[],
-  opts: { silent?: boolean; cwd?: string; env?: NodeJS.ProcessEnv } = {},
+  opts: {
+    silent?: boolean;
+    cwd?: string;
+    env?: NodeJS.ProcessEnv;
+    // Pipe stderr while leaving stdin inherited. `silent` also pipes stderr but
+    // detaches stdin, which breaks commands that may prompt (credentials).
+    // Used for `commit`, whose pre-commit hook writes the markdownlint
+    // diagnostics we need to capture and re-surface on failure.
+    captureStderr?: boolean;
+  } = {},
 ): string {
   return execFileSync("git", ["-C", opts.cwd ?? TASKS_DIR, ...args], {
     encoding: "utf8",
-    stdio: opts.silent ? ["ignore", "pipe", "pipe"] : ["inherit", "pipe", "inherit"],
+    stdio: opts.silent
+      ? ["ignore", "pipe", "pipe"]
+      : ["inherit", "pipe", opts.captureStderr ? "pipe" : "inherit"],
     ...(opts.env ? { env: { ...process.env, ...opts.env } } : {}),
   }).trim();
 }
@@ -892,6 +903,20 @@ export class MutatorEarlyExit extends Error {
   }
 }
 
+// markdownlint-cli2 (run by the tasks repo's pre-commit hook) prints one line
+// per violation on stderr:
+//   <path>:<line>[:<col>] MD###/<rule-name> <description> [Context: "..."]
+// Its progress chatter ("Finding:", "Linting:", "Summary:") goes to stdout, so
+// matching this shape on stderr picks out exactly the actionable diagnostics.
+const MARKDOWNLINT_VIOLATION = /^\S+:\d+(?::\d+)?\s+MD\d{3}\/\S+\s+\S/;
+
+export function extractMarkdownlintViolations(stderr: string): string[] {
+  return stderr
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => MARKDOWNLINT_VIOLATION.test(l));
+}
+
 // Pull-rebase → run mutator → commit → push, retrying once on
 // non-fast-forward. `mutator` is run inside each attempt so a rebased
 // index file is re-read between tries. Throws (and asks caller to
@@ -1047,7 +1072,11 @@ export function commitAndPush(opts: {
         // below (and, before the pre-read sync took the lock, occasionally
         // pushing a clobbered EMPTY commit before we could reset it away). The
         // CLI owns its own push; silence the hook's.
-        git(["commit", "-q", "-m", opts.message], { cwd, env: { RFCS_NO_AUTOPUSH: "1" } });
+        git(["commit", "-q", "-m", opts.message], {
+          cwd,
+          captureStderr: true,
+          env: { RFCS_NO_AUTOPUSH: "1" },
+        });
       } catch (e) {
         // Atomic rollback: a throw between the file write and the commit (a
         // prettier crash in formatFiles, a failed `git add`/`commit`, etc.)
@@ -1066,6 +1095,31 @@ export function commitAndPush(opts: {
           earlyExit = e;
           break;
         }
+        // A pre-commit markdownlint rejection is DETERMINISTIC — the body text
+        // is invalid, and retrying (the natural response to the `git commit`
+        // stack trace this used to surface, which reads exactly like the
+        // transient push-contention race) can never succeed. Print the offending
+        // `file:line rule` lines as the last thing on the way out, and exit via
+        // the early-exit sentinel so the lock's `finally` still runs and the
+        // top-level handler doesn't append a git stack trace after them. The
+        // rollback above already removed the staged/written file, so no partial
+        // commit is left behind.
+        const violations = extractMarkdownlintViolations(
+          String((e as { stderr?: unknown }).stderr ?? ""),
+        );
+        if (violations.length > 0) {
+          console.error(
+            `error: markdownlint rejected the commit — the markdown body is invalid.\n` +
+              `  This is NOT the transient push race: retrying will fail identically.\n` +
+              `  Nothing was committed or pushed; fix the body below and re-run.\n` +
+              violations.map((v) => `  ${v}`).join("\n"),
+          );
+          earlyExit = new MutatorEarlyExit(1);
+          break;
+        }
+        // Any other commit failure (a validate.mjs rejection, a prettier crash,
+        // a genuine git error) still carries the piped hook output on `.stderr`,
+        // which the top-level handler prints before the stack.
         throw e;
       }
       // Never push an empty commit. A concurrent `reset --hard` in this shared

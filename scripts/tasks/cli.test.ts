@@ -42,6 +42,7 @@ import {
   prLocDelta,
   uncheckedCheckboxes,
   commitAndPush,
+  extractMarkdownlintViolations,
   depCyclePath,
   editFrontmatter,
   finalize,
@@ -1427,6 +1428,73 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(seen).not.toContain("push");
     expect(seen.filter((l) => l === "reset").length).toBe(1);
     expect(seen.filter((l) => l === "clean").length).toBe(1);
+  });
+
+  // Verbatim markdownlint-cli2 output for a `--body-file` body that wraps a PR
+  // reference to column 0 (`#4869 ...` → MD018) and pastes an unlabelled fence
+  // (MD040) — the two rules a `tasks new` body actually tripped. The chatter
+  // interleaved around it is what used to bury the real cause.
+  const MARKDOWNLINT_STDERR = [
+    "markdownlint-cli2 v0.18.1 (markdownlint v0.38.0)",
+    "Finding: rfcs/0025-x/stories/s.md !node_modules/**",
+    "Linting: 1 file(s)",
+    'rfcs/0025-x/stories/s.md:31:1 MD018/no-missing-space-atx No space after hash on atx style heading [Context: "#4869 (which fixed"]',
+    'rfcs/0025-x/stories/s.md:44 MD040/fenced-code-language Fenced code blocks should have a language specified [Context: "```"]',
+    "Summary: 2 error(s)",
+  ].join("\n");
+
+  it("extracts only the rule violations from markdownlint's chatter", () => {
+    expect(extractMarkdownlintViolations(MARKDOWNLINT_STDERR)).toEqual([
+      'rfcs/0025-x/stories/s.md:31:1 MD018/no-missing-space-atx No space after hash on atx style heading [Context: "#4869 (which fixed"]',
+      'rfcs/0025-x/stories/s.md:44 MD040/fenced-code-language Fenced code blocks should have a language specified [Context: "```"]',
+    ]);
+  });
+
+  it("exits with the markdownlint violations, not a git commit stack trace", () => {
+    const { seen, exit, lockDir } = setup();
+    const errors: string[] = [];
+    vi.spyOn(console, "error").mockImplementation((...a: unknown[]) => {
+      errors.push(a.map(String).join(" "));
+    });
+    const NEW_FILE = "/some/new-story.md";
+    const worktree = new Set<string>();
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      seen.push(label);
+      if (label === "diff-tree") return "story.md" as never;
+      if (label === "clean") worktree.delete(args[args.length - 1]);
+      // The pre-commit hook's markdownlint gate rejects the body; git surfaces
+      // the hook's output on stderr and exits non-zero.
+      if (label === "commit") throw pushError(MARKDOWNLINT_STDERR);
+      return "" as never;
+    });
+    expect(
+      () =>
+        commitAndPush({
+          message: "new: 0025-x/s",
+          fileToStage: NEW_FILE,
+          createdPath: NEW_FILE,
+          mutator: () => worktree.add(NEW_FILE),
+          raceMessage: "lost the race, retry",
+          raceExitCode: 99,
+        }),
+      // Non-zero, and NOT the race exit code — a retry can never succeed here.
+    ).toThrow("exit 1");
+    expect(exit).toHaveBeenCalledWith(1);
+    // The last thing printed is the actionable `file:line rule` diagnostic,
+    // and it explicitly disclaims the transient push race.
+    const last = errors[errors.length - 1];
+    expect(last).toContain("MD018/no-missing-space-atx");
+    expect(last).toContain("rfcs/0025-x/stories/s.md:31:1");
+    expect(last).toContain("MD040/fenced-code-language");
+    expect(last).toMatch(/NOT the transient push race/);
+    expect(last).not.toContain("lost the race, retry");
+    // Nothing pushed, nothing left behind: the created file is rolled back and
+    // the lock released.
+    expect(seen).not.toContain("push");
+    expect(worktree.size).toBe(0);
+    expect(existsSync(join(lockDir, "tasks-cli.lock"))).toBe(false);
   });
 
   it("surfaces the underlying error (with stack) when a mutator throws, never a bare exit", () => {
