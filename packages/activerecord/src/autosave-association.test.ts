@@ -496,22 +496,39 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   }
   fixtures([]);
 
+  class UnvalidatedClient extends Base {
+    declare name: string | null;
+    declare client_of: number | null;
+
+    static {
+      this._tableName = "companies";
+      this.attribute("name", "string");
+      this.attribute("client_of", "integer");
+    }
+  }
+
   function makeModels() {
-    class HmaFirm extends Base {
+    class AutosaveFirm extends Base {
       declare name: string | null;
-      declare clients: AssociationProxy<HmaClient>;
+      declare clients: AssociationProxy<AutosaveClient>;
+      declare unvalidatedClients: AssociationProxy<UnvalidatedClient>;
 
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
         this.hasMany("clients", {
           autosave: true,
-          className: "HmaClient",
+          className: "AutosaveClient",
+          foreignKey: "client_of",
+        });
+        this.hasMany("unvalidatedClients", {
+          autosave: true,
+          className: "UnvalidatedClient",
           foreignKey: "client_of",
         });
       }
     }
-    class HmaClient extends Base {
+    class AutosaveClient extends Base {
       declare name: string | null;
       declare client_of: number | null;
 
@@ -522,56 +539,42 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
         this.validates("name", { presence: true });
       }
     }
-    registerModel("HmaFirm", HmaFirm);
-    registerModel("HmaClient", HmaClient);
-    return { Company: HmaFirm, Client: HmaClient };
+    registerModel("AutosaveFirm", AutosaveFirm);
+    registerModel("AutosaveClient", AutosaveClient);
+    return { AutosaveFirm, AutosaveClient };
   }
 
   it("invalid adding", async () => {
-    const { Company, Client } = makeModels();
-    const company = await Company.create({ name: "Acme" });
-    const badClient = new Client({ name: "" });
+    const { AutosaveFirm, AutosaveClient } = makeModels();
+    const company = await AutosaveFirm.create({ name: "Acme" });
+    const badClient = new AutosaveClient({ name: "" });
     cacheAssoc(company, "clients", [badClient]);
     const saved = await company.save();
     expect(saved).toBe(false);
   });
 
   it("invalid adding before save", async () => {
-    const { Company, Client } = makeModels();
-    const company = new Company({ name: "Acme" });
-    const badClient = new Client({ name: "" });
+    const { AutosaveFirm, AutosaveClient } = makeModels();
+    const company = new AutosaveFirm({ name: "Acme" });
+    const badClient = new AutosaveClient({ name: "" });
     cacheAssoc(company, "clients", [badClient]);
     const saved = await company.save();
     expect(saved).toBe(false);
   });
 
   it("adding unsavable association", async () => {
-    const { Company, Client } = makeModels();
-    const company = await Company.create({ name: "Acme" });
-    const badClient = new Client({ name: "" });
+    const { AutosaveFirm, AutosaveClient } = makeModels();
+    const company = await AutosaveFirm.create({ name: "Acme" });
+    const badClient = new AutosaveClient({ name: "" });
     cacheAssoc(company, "clients", [badClient]);
     const saved = await company.save();
     expect(saved).toBe(false);
   });
 
   it("invalid adding with validate false", async () => {
-    const { Company } = makeModels();
-    class UnvalidatedClient extends Base {
-      declare name: string | null;
-      declare client_of: number | null;
-
-      static {
-        this._tableName = "companies";
-        this.attribute("name", "string");
-        this.attribute("client_of", "integer");
-      }
-    }
+    const { AutosaveFirm } = makeModels();
     registerModel("UnvalidatedClient", UnvalidatedClient);
-    Associations.hasMany.call(Company, "unvalidatedClients", {
-      autosave: true,
-      foreignKey: "client_of",
-    });
-    const company = await Company.create({ name: "Acme" });
+    const company = await AutosaveFirm.create({ name: "Acme" });
     const client = new UnvalidatedClient({ name: "" });
     cacheAssoc(company, "unvalidatedClients", [client]);
     const saved = await company.save();
@@ -580,9 +583,9 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
 
   it("valid adding with validate false", async () => {
-    const { Company, Client } = makeModels();
-    const company = await Company.create({ name: "Acme" });
-    const client = new Client({ name: "Valid" });
+    const { AutosaveFirm, AutosaveClient } = makeModels();
+    const company = await AutosaveFirm.create({ name: "Acme" });
+    const client = new AutosaveClient({ name: "Valid" });
     cacheAssoc(company, "clients", [client]);
     const saved = await company.save();
     expect(saved).toBe(true);
@@ -590,17 +593,17 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
 
   it("circular autosave does not validate children", async () => {
-    const { Company, Client } = makeModels();
-    const company = await Company.create({ name: "Acme" });
+    const { AutosaveFirm, AutosaveClient } = makeModels();
+    const company = await AutosaveFirm.create({ name: "Acme" });
     // No cached associations — saving should succeed without loading children
     const saved = await company.save();
     expect(saved).toBe(true);
   });
 
   it("parent should save children record with foreign key validation set in before save callback", async () => {
-    const { Company, Client } = makeModels();
-    const company = new Company({ name: "Acme" });
-    const client = new Client({ name: "Alice" });
+    const { AutosaveFirm, AutosaveClient } = makeModels();
+    const company = new AutosaveFirm({ name: "Acme" });
+    const client = new AutosaveClient({ name: "Alice" });
     cacheAssoc(company, "clients", [client]);
     const saved = await company.save();
     expect(saved).toBe(true);
@@ -608,10 +611,10 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
 
   it("parent should not get saved with duplicate children records", async () => {
-    const { Company, Client } = makeModels();
-    const company = await Company.create({ name: "Acme" });
-    const c1 = new Client({ name: "Alice" });
-    const c2 = new Client({ name: "Alice" });
+    const { AutosaveFirm, AutosaveClient } = makeModels();
+    const company = await AutosaveFirm.create({ name: "Acme" });
+    const c1 = new AutosaveClient({ name: "Alice" });
+    const c2 = new AutosaveClient({ name: "Alice" });
     cacheAssoc(company, "clients", [c1, c2]);
     const saved = await company.save();
     expect(saved).toBe(true);
@@ -620,18 +623,18 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
 
   it("invalid build", async () => {
-    const { Company, Client } = makeModels();
-    const company = await Company.create({ name: "Acme" });
-    const client = new Client({ name: "" });
+    const { AutosaveFirm, AutosaveClient } = makeModels();
+    const company = await AutosaveFirm.create({ name: "Acme" });
+    const client = new AutosaveClient({ name: "" });
     cacheAssoc(company, "clients", [client]);
     const saved = await company.save();
     expect(saved).toBe(false);
   });
 
   it("adding before save", async () => {
-    const { Company, Client } = makeModels();
-    const company = new Company({ name: "Acme" });
-    const client = new Client({ name: "Bob" });
+    const { AutosaveFirm, AutosaveClient } = makeModels();
+    const company = new AutosaveFirm({ name: "Acme" });
+    const client = new AutosaveClient({ name: "Bob" });
     cacheAssoc(company, "clients", [client]);
     const saved = await company.save();
     expect(saved).toBe(true);
@@ -640,10 +643,10 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
 
   it("assign ids", async () => {
-    const { Company, Client } = makeModels();
-    const company = await Company.create({ name: "Apple" });
-    const c1 = await Client.create({ name: "First" });
-    const c2 = await Client.create({ name: "Second" });
+    const { AutosaveFirm, AutosaveClient } = makeModels();
+    const company = await AutosaveFirm.create({ name: "Apple" });
+    const c1 = await AutosaveClient.create({ name: "First" });
+    const c2 = await AutosaveClient.create({ name: "Second" });
 
     const proxy = association(company, "clients");
     await proxy.setIds([c1.id as number, c2.id as number]);
@@ -900,9 +903,9 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
 
   it("build before save", async () => {
-    const { Company, Client } = makeModels();
-    const company = new Company({ name: "Acme" });
-    const client = new Client({ name: "Built" });
+    const { AutosaveFirm, AutosaveClient } = makeModels();
+    const company = new AutosaveFirm({ name: "Acme" });
+    const client = new AutosaveClient({ name: "Built" });
     cacheAssoc(company, "clients", [client]);
     await company.save();
     expect(company.isNewRecord()).toBe(false);
@@ -910,10 +913,10 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
 
   it("build many before save", async () => {
-    const { Company, Client } = makeModels();
-    const company = new Company({ name: "Acme" });
-    const c1 = new Client({ name: "A" });
-    const c2 = new Client({ name: "B" });
+    const { AutosaveFirm, AutosaveClient } = makeModels();
+    const company = new AutosaveFirm({ name: "Acme" });
+    const c1 = new AutosaveClient({ name: "A" });
+    const c2 = new AutosaveClient({ name: "B" });
     cacheAssoc(company, "clients", [c1, c2]);
     await company.save();
     expect(c1.isNewRecord()).toBe(false);
@@ -921,34 +924,34 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
 
   it("build via block before save", async () => {
-    const { Company, Client } = makeModels();
-    const company = await Company.create({ name: "Acme" });
-    await Client.create({ name: "Summit", client_of: company.id });
-    await Client.create({ name: "Microsoft", client_of: company.id });
+    const { AutosaveFirm, AutosaveClient } = makeModels();
+    const company = await AutosaveFirm.create({ name: "Acme" });
+    await AutosaveClient.create({ name: "Summit", client_of: company.id });
+    await AutosaveClient.create({ name: "Microsoft", client_of: company.id });
     const newClient = (company as any).clients.build({}, (client: any) => {
-      client.name = "Another Client";
+      client.name = "Another AutosaveClient";
     }) as Base;
     expect((company as any).clients.loaded).toBeFalsy();
     company.name += "-changed";
     expect(await company.save()).toBeTruthy();
     expect(newClient.isPersisted()).toBeTruthy();
-    expect(Number(await Client.where({ client_of: company.id }).count())).toBe(3);
+    expect(Number(await AutosaveClient.where({ client_of: company.id }).count())).toBe(3);
   });
 
   it("build many via block before save", async () => {
-    const { Company, Client } = makeModels();
-    const company = await Company.create({ name: "Acme" });
-    await Client.create({ name: "Summit", client_of: company.id });
-    await Client.create({ name: "Microsoft", client_of: company.id });
+    const { AutosaveFirm, AutosaveClient } = makeModels();
+    const company = await AutosaveFirm.create({ name: "Acme" });
+    await AutosaveClient.create({ name: "Summit", client_of: company.id });
+    await AutosaveClient.create({ name: "Microsoft", client_of: company.id });
     (company as any).clients.build(
-      [{ name: "Another Client" }, { name: "Another Client II" }],
+      [{ name: "Another AutosaveClient" }, { name: "Another AutosaveClient II" }],
       (client: any) => {
         client.name = "changed";
       },
     );
     company.name += "-changed";
     expect(await company.save()).toBeTruthy();
-    expect(Number(await Client.where({ client_of: company.id }).count())).toBe(4);
+    expect(Number(await AutosaveClient.where({ client_of: company.id }).count())).toBe(4);
   });
 
   it("collection-proxy build without load autosaves built children (Slot B)", async () => {
@@ -959,8 +962,8 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     // followed by `pirate.save` persists the child. `_loadedAssociation`
     // treats non-empty `proxy.target` as cached data without flipping
     // proxy `loaded` (matches Rails' @_was_loaded ephemeral semantics).
-    const { Company, Client } = makeModels();
-    const company = new Company({ name: "Acme" });
+    const { AutosaveFirm, AutosaveClient } = makeModels();
+    const company = new AutosaveFirm({ name: "Acme" });
     const built = (company as any).clients.build({ name: "ProxyBuilt" }) as Base;
     expect(built.isNewRecord()).toBe(true);
     await company.save();
@@ -969,32 +972,32 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
 
   it("replace on new object", async () => {
-    const { Company, Client } = makeModels();
-    const company = new Company({ name: "Acme" });
-    const c1 = new Client({ name: "Old" });
+    const { AutosaveFirm, AutosaveClient } = makeModels();
+    const company = new AutosaveFirm({ name: "Acme" });
+    const c1 = new AutosaveClient({ name: "Old" });
     cacheAssoc(company, "clients", [c1]);
     await company.save();
     expect(c1.isNewRecord()).toBe(false);
-    const c2 = new Client({ name: "New" });
+    const c2 = new AutosaveClient({ name: "New" });
     cacheAssoc(company, "clients", [c2]);
     await company.save();
     expect(c2.isNewRecord()).toBe(false);
   });
 
   it("replace on duplicated object", async () => {
-    const { Company, Client } = makeModels();
-    const original = await Company.create({ name: "New Firm" });
+    const { AutosaveFirm, AutosaveClient } = makeModels();
+    const original = await AutosaveFirm.create({ name: "New Firm" });
     const firm = original.dup();
-    const existing = await Client.create({ name: "Summit", client_of: original.id });
-    const fresh = new Client({ name: "New Client" });
+    const existing = await AutosaveClient.create({ name: "Summit", client_of: original.id });
+    const fresh = new AutosaveClient({ name: "New AutosaveClient" });
     cacheAssoc(firm, "clients", [existing, fresh]);
     expect(await firm.save()).toBeTruthy();
-    expect(Number(await Client.where({ client_of: firm.id }).count())).toBe(2);
+    expect(Number(await AutosaveClient.where({ client_of: firm.id }).count())).toBe(2);
   });
 
   it("should not load the associated model", async () => {
-    const { Company } = makeModels();
-    const company = await Company.create({ name: "Acme" });
+    const { AutosaveFirm } = makeModels();
+    const company = await AutosaveFirm.create({ name: "Acme" });
     // No cached associations — save should not trigger loading
     const saved = await company.save();
     expect(saved).toBe(true);
@@ -2373,8 +2376,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
       activerecord: {
         errors: {
           models: {
-            // Rails keys this on `person/references`; the owner here is a
-            // bespoke stand-in, so the i18n key follows its underscored name.
             "index_errors_person/references": { format: "%{message}" },
           },
         },
@@ -2398,25 +2399,25 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
       }
       class IndexErrorsPerson extends Base {
         declare name: string | null;
+        declare references: AssociationProxy<IndexErrorsReference>;
 
         static {
           this._tableName = "people";
           this.attribute("name", "string");
+          this.hasMany("references", {
+            autosave: true,
+            indexErrors: true,
+            className: "IndexErrorsReference",
+            foreignKey: "person_id",
+          });
         }
       }
-      const Person = IndexErrorsPerson;
       registerModel("IndexErrorsPerson", IndexErrorsPerson);
       registerModel("IndexErrorsReference", IndexErrorsReference);
-      Associations.hasMany.call(Person, "references", {
-        autosave: true,
-        indexErrors: true,
-        className: "IndexErrorsReference",
-        foreignKey: "person_id",
-      });
 
       const refValid = new IndexErrorsReference({ favorite: true, job_id: 1 });
       const refInvalid = new IndexErrorsReference({ favorite: false });
-      const p = new Person({});
+      const p = new IndexErrorsPerson({});
       cacheAssoc(p, "references", [refValid, refInvalid]);
 
       expect(await refValid.isValid()).toBe(true);
@@ -2432,8 +2433,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     I18n.storeTranslations("en", {
       activerecord: {
         attributes: {
-          // Rails keys this on `person`; the owner here is a bespoke stand-in,
-          // so the i18n key follows its underscored name.
           base_errors_person: { reference: "Super reference" },
           reference: { base: "" },
         },
@@ -2457,23 +2456,24 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
       }
       class BaseErrorsPerson extends Base {
         declare name: string | null;
+        declare reference: BaseErrorsReference | null;
+        declare loadHasOne: (name: "reference") => Promise<BaseErrorsReference | null>;
 
         static {
           this._tableName = "people";
           this.attribute("name", "string");
           this.validates("reference", { presence: true });
+          this.hasOne("reference", {
+            autosave: true,
+            className: "BaseErrorsReference",
+            foreignKey: "person_id",
+          });
         }
       }
-      const Person = BaseErrorsPerson;
       registerModel("BaseErrorsPerson", BaseErrorsPerson);
       registerModel("BaseErrorsReference", BaseErrorsReference);
-      Associations.hasOne.call(Person, "reference", {
-        autosave: true,
-        className: "BaseErrorsReference",
-        foreignKey: "person_id",
-      });
 
-      const p = new Person({});
+      const p = new BaseErrorsPerson({});
       expect(await p.isValid()).toBe(false);
       expect(p.errors.fullMessages).toEqual(["Super reference can't be blank"]);
 
@@ -2569,11 +2569,10 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         });
       }
     }
-    const Person = ContextPerson;
     registerModel("ContextPerson", ContextPerson);
     registerModel("ContextReference", ContextReference);
 
-    const person = await Person.create({ first_name: "cool" });
+    const person = await ContextPerson.create({ first_name: "cool" });
     // Change to "nah" — still valid because on:create validator doesn't run in :update context
     person.first_name = "nah";
     expect(await person.isValid()).toBe(true);
@@ -2612,11 +2611,10 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         this.hasMany("widgets", { autosave: true, foreignKey: "author_id" });
       }
     }
-    const Owner = WidgetOwner;
     registerModel("Widget", Widget);
     registerModel("WidgetOwner", WidgetOwner);
 
-    const owner = await Owner.create({ name: "Alice" });
+    const owner = await WidgetOwner.create({ name: "Alice" });
     // Create a persisted, unchanged widget with a blank status
     const widget = await Widget.create({ name: "", author_id: owner.id });
     cacheAssoc(owner, "widgets", [widget]);
@@ -2687,24 +2685,25 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         });
       }
     }
-    class ProfileUser extends Base {
+    class AutosaveProfileUser extends Base {
       declare name: string | null;
+      declare profile: Profile | null;
+      declare loadHasOne: (name: "profile") => Promise<Profile | null>;
 
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasOne("profile", {
+          autosave: true,
+          foreignKey: "author_id",
+          className: "Profile",
+        });
       }
     }
-    const User = ProfileUser;
     registerModel("Profile", Profile);
-    registerModel("ProfileUser", ProfileUser);
-    Associations.hasOne.call(User, "profile", {
-      autosave: true,
-      foreignKey: "author_id",
-      className: "Profile",
-    });
+    registerModel("AutosaveProfileUser", AutosaveProfileUser);
 
-    const user = await User.create({ name: "Test" });
+    const user = await AutosaveProfileUser.create({ name: "Test" });
     const profile = new Profile({ name: "Hello" });
     cacheAssoc(user, "profile", profile);
     user.name = "trigger save";
@@ -2946,27 +2945,28 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         });
       }
     }
-    class ProfileUser extends Base {
+    class DuplicateCallbackProfileUser extends Base {
       declare name: string | null;
+      declare profile: Profile | null;
+      declare loadHasOne: (name: "profile") => Promise<Profile | null>;
 
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasOne("profile", {
+          autosave: true,
+          foreignKey: "author_id",
+          className: "Profile",
+        });
       }
     }
-    const User = ProfileUser;
     registerModel("Profile", Profile);
-    registerModel("ProfileUser", ProfileUser);
-    Associations.hasOne.call(User, "profile", {
-      autosave: true,
-      foreignKey: "author_id",
-      className: "Profile",
-    });
+    registerModel("DuplicateCallbackProfileUser", DuplicateCallbackProfileUser);
     // Calling addAutosaveAssociationCallbacks a second time must not duplicate callbacks
-    const reflection = (User as any)._reflectOnAssociation("profile");
-    addAutosaveAssociationCallbacks(User, reflection);
+    const reflection = (DuplicateCallbackProfileUser as any)._reflectOnAssociation("profile");
+    addAutosaveAssociationCallbacks(DuplicateCallbackProfileUser, reflection);
 
-    const user = await User.create({ name: "Test" });
+    const user = await DuplicateCallbackProfileUser.create({ name: "Test" });
     const profile = new Profile({ name: "Hello" });
     profile.name = "Changed";
     cacheAssoc(user, "profile", profile);
@@ -3636,24 +3636,25 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
         this.attribute("author_id", "integer");
       }
     }
-    class ProfileUser extends Base {
+    class DisabledProfileUser extends Base {
       declare name: string | null;
+      declare profile: Profile | null;
+      declare loadHasOne: (name: "profile") => Promise<Profile | null>;
 
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasOne("profile", {
+          autosave: false,
+          foreignKey: "author_id",
+          className: "Profile",
+        });
       }
     }
-    const User = ProfileUser;
     registerModel("Profile", Profile);
-    registerModel("ProfileUser", ProfileUser);
-    Associations.hasOne.call(User, "profile", {
-      autosave: false,
-      foreignKey: "author_id",
-      className: "Profile",
-    });
+    registerModel("DisabledProfileUser", DisabledProfileUser);
 
-    const user = await User.create({ name: "test" });
+    const user = await DisabledProfileUser.create({ name: "test" });
     const profile = new Profile({ name: "Unsaved" });
     cacheAssoc(user, "profile", profile);
     user.name = "trigger save";
@@ -3727,7 +3728,6 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
 
   it("autosave new record with after create callback and habtm association", async () => {
     registerModel(PostWithAfterCreateCallback);
-    // Comment belongsTo post (counter cache) resolves "Post" at save time.
     registerModel(CanonicalPost);
     registerModel(CanonicalComment);
     registerModel(CanonicalCategory);
