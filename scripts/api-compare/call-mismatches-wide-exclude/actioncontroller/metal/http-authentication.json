@@ -2,6 +2,13 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/http-authentication.ts",
+    "rubyName": "auth_scheme",
+    "call": "first",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/http-authentication.ts",
     "rubyName": "authenticate",
     "call": "call",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -74,6 +81,13 @@
     "tsFile": "metal/http-authentication.ts",
     "rubyName": "validate_digest_response",
     "call": "call",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/http-authentication.ts",
+    "rubyName": "validate_nonce",
+    "call": "first",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

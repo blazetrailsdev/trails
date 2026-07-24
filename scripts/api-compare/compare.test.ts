@@ -193,8 +193,20 @@ describe("significantMissingCalls", () => {
     }
     expect(WIDE_SIGNIFICANT_CALLS.has("super")).toBe(false);
     // Names with a real JS call form must stay significant — suppressing them
-    // would hide a genuinely dropped call.
-    for (const call of ["delete", "merge", "fetch", "assign_attributes"]) {
+    // would hide a genuinely dropped call. `size`/`empty?`/`first`/`last` look
+    // like plain Array/property idioms but on a Relation receiver are real
+    // query-triggering methods (count/exists?/performFirst/performLast), so the
+    // wide gate must keep watching them.
+    for (const call of [
+      "delete",
+      "merge",
+      "fetch",
+      "assign_attributes",
+      "size",
+      "empty?",
+      "first",
+      "last",
+    ]) {
       expect(WIDE_SIGNIFICANT_CALLS.has(call)).toBe(true);
     }
   });

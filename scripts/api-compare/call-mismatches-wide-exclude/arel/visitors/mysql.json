@@ -3,6 +3,13 @@
     "package": "arel",
     "tsFile": "visitors/mysql.ts",
     "rubyName": "build_subselect",
+    "call": "last",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "arel",
+    "tsFile": "visitors/mysql.ts",
+    "rubyName": "build_subselect",
     "call": "sql",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

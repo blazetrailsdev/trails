@@ -107,6 +107,13 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
+    "rubyName": "concise_options",
+    "call": "first",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "conditional_options",
     "call": "slice",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails schema_definitions.rb:254-256 is `options.slice(:if_exists, :if_not_exists)`; trails schema-definitions.ts:675-680 picks the two keys explicitly."

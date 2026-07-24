@@ -66,7 +66,21 @@
     "package": "activerecord",
     "tsFile": "relation/batches.ts",
     "rubyName": "batch_on_unloaded_relation",
+    "call": "empty?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/batches.ts",
+    "rubyName": "batch_on_unloaded_relation",
     "call": "except",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/batches.ts",
+    "rubyName": "batch_on_unloaded_relation",
+    "call": "last",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -143,6 +157,13 @@
     "package": "activerecord",
     "tsFile": "relation/batches.ts",
     "rubyName": "ensure_valid_options_for_batching!",
+    "call": "empty?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/batches.ts",
+    "rubyName": "ensure_valid_options_for_batching!",
     "call": "find",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -172,6 +193,13 @@
     "tsFile": "relation/batches.ts",
     "rubyName": "ensure_valid_options_for_batching!",
     "call": "schema_cache",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/batches.ts",
+    "rubyName": "ensure_valid_options_for_batching!",
+    "call": "size",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

@@ -31,6 +31,13 @@
     "package": "activerecord",
     "tsFile": "associations/association-scope.ts",
     "rubyName": "add_constraints",
+    "call": "empty?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/association-scope.ts",
+    "rubyName": "add_constraints",
     "call": "eval_scope",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -45,6 +52,13 @@
     "package": "activerecord",
     "tsFile": "associations/association-scope.ts",
     "rubyName": "add_constraints",
+    "call": "first",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/association-scope.ts",
+    "rubyName": "add_constraints",
     "call": "includes_values",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -53,6 +67,13 @@
     "tsFile": "associations/association-scope.ts",
     "rubyName": "add_constraints",
     "call": "joins!",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/association-scope.ts",
+    "rubyName": "add_constraints",
+    "call": "last",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -116,6 +137,13 @@
     "tsFile": "associations/association-scope.ts",
     "rubyName": "get_bind_values",
     "call": "join_id_for",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/association-scope.ts",
+    "rubyName": "get_bind_values",
+    "call": "last",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

@@ -93,6 +93,13 @@
   {
     "package": "activesupport",
     "tsFile": "callbacks.ts",
+    "rubyName": "normalize_callback_params",
+    "call": "first",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "callbacks.ts",
     "rubyName": "reset_callbacks",
     "call": "clear",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -130,6 +137,13 @@
     "tsFile": "callbacks.ts",
     "rubyName": "run_callbacks",
     "call": "final?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "callbacks.ts",
+    "rubyName": "run_callbacks",
+    "call": "first",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

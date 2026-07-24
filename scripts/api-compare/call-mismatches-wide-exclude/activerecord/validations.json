@@ -5,5 +5,12 @@
     "rubyName": "custom_validation_context?",
     "call": "exclude?",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails validations.rb:77-79 uses `[:create, :update].exclude?(validation_context)`; trails validations.ts:168-171 inlines the two !== comparisons."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "validations.ts",
+    "rubyName": "valid?",
+    "call": "empty?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

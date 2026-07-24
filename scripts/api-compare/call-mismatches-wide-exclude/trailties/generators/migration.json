@@ -16,6 +16,13 @@
   {
     "package": "trailties",
     "tsFile": "generators/migration.ts",
+    "rubyName": "current_migration_number",
+    "call": "first",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/migration.ts",
     "rubyName": "migration_template",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

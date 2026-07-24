@@ -45,6 +45,13 @@
     "package": "actiondispatch",
     "tsFile": "http/cache.ts",
     "rubyName": "merge_and_normalize_cache_control!",
+    "call": "empty?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/cache.ts",
+    "rubyName": "merge_and_normalize_cache_control!",
     "call": "merge!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

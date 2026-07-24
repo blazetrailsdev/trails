@@ -2,6 +2,13 @@
   {
     "package": "activerecord",
     "tsFile": "insert-all.ts",
+    "rubyName": "configure_on_duplicate_update_logic",
+    "call": "empty?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "insert-all.ts",
     "rubyName": "execute",
     "call": "many?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -24,6 +31,13 @@
     "package": "activerecord",
     "tsFile": "insert-all.ts",
     "rubyName": "initialize",
+    "call": "empty?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "insert-all.ts",
+    "rubyName": "initialize",
     "call": "except",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -32,6 +46,13 @@
     "tsFile": "insert-all.ts",
     "rubyName": "initialize",
     "call": "find_unique_index_for",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "insert-all.ts",
+    "rubyName": "initialize",
+    "call": "first",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -89,6 +110,13 @@
     "rubyName": "resolve_attribute_alias",
     "call": "attribute_alias",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails insert_all.rb:125-127 calls `model.attribute_alias(attribute)`; trails insert-all.ts:401-404 reads `model._attributeAliases` directly."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "insert-all.ts",
+    "rubyName": "resolve_attribute_aliases",
+    "call": "first",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",

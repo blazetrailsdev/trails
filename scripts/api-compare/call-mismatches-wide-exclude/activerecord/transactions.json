@@ -156,6 +156,13 @@
   {
     "package": "activerecord",
     "tsFile": "transactions.ts",
+    "rubyName": "has_transactional_callbacks?",
+    "call": "empty?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "transactions.ts",
     "rubyName": "restore_transaction_record_state",
     "call": "composite_primary_key?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

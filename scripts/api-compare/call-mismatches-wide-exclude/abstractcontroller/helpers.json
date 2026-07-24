@@ -80,6 +80,13 @@
     "package": "abstractcontroller",
     "tsFile": "helpers.ts",
     "rubyName": "helper_method",
+    "call": "first",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "helpers.ts",
+    "rubyName": "helper_method",
     "call": "join",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

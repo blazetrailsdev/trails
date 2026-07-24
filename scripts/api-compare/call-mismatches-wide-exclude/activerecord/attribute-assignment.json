@@ -17,6 +17,13 @@
     "package": "activerecord",
     "tsFile": "attribute-assignment.ts",
     "rubyName": "execute_callstack_for_multiparameter_attributes",
+    "call": "empty?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-assignment.ts",
+    "rubyName": "execute_callstack_for_multiparameter_attributes",
     "call": "join",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -38,6 +45,13 @@
     "package": "activerecord",
     "tsFile": "attribute-assignment.ts",
     "rubyName": "execute_callstack_for_multiparameter_attributes",
+    "call": "size",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-assignment.ts",
+    "rubyName": "execute_callstack_for_multiparameter_attributes",
     "call": "values",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -45,7 +59,21 @@
     "package": "activerecord",
     "tsFile": "attribute-assignment.ts",
     "rubyName": "extract_callstack_for_multiparameter_attributes",
+    "call": "empty?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-assignment.ts",
+    "rubyName": "extract_callstack_for_multiparameter_attributes",
     "call": "find_parameter_position",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-assignment.ts",
+    "rubyName": "extract_callstack_for_multiparameter_attributes",
+    "call": "first",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -60,6 +88,13 @@
     "tsFile": "attribute-assignment.ts",
     "rubyName": "extract_callstack_for_multiparameter_attributes",
     "call": "type_cast_attribute_value",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-assignment.ts",
+    "rubyName": "find_parameter_position",
+    "call": "first",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

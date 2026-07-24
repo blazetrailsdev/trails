@@ -23,6 +23,13 @@
   {
     "package": "activemodel",
     "tsFile": "serializers/json.ts",
+    "rubyName": "from_json",
+    "call": "first",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "serializers/json.ts",
     "rubyName": "serializable_add_includes",
     "call": "flat_map",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

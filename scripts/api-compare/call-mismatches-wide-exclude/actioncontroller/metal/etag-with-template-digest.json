@@ -75,5 +75,12 @@
     "rubyName": "pick_template_for_etag",
     "call": "find_all",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails etag_with_template_digest.rb:49-53 resolves the template via `lookup_context.find_all(action_name, _prefixes).first&.virtual_path`; trails etag-with-template-digest.ts:60-66 falls back to `controller.actionName` directly — there is no ActionView lookup-context layer in trails, so find_all/first never appear. Omission (missing template-resolver fallback) tracked in story actionpack-omissions-from-wide-verify."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/etag-with-template-digest.ts",
+    "rubyName": "pick_template_for_etag",
+    "call": "first",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]
