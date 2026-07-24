@@ -334,7 +334,11 @@ function resetDefaultAttributes(this: AnyClass): void {
  * @internal
  * Mirrors: ActiveRecord::Attributes::ClassMethods#resolve_type_name
  */
-function resolveTypeName(this: AnyClass, name: string, options?: Record<string, unknown>): Type {
+export function resolveTypeName(
+  this: AnyClass,
+  name: string,
+  options?: Record<string, unknown>,
+): Type {
   return typeLookup(name, {
     ...options,
     adapter: adapterNameFrom(this as unknown as AdapterNameSource),

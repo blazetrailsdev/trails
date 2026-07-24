@@ -87,6 +87,7 @@ import * as ReadonlyAttributes from "./readonly-attributes.js";
 import {
   defineAttribute as _defineAttribute,
   _defaultAttributes as _arDefaultAttributes,
+  resolveTypeName as _resolveTypeName,
 } from "./attributes.js";
 import * as Timestamp from "./timestamp.js";
 import * as TouchLater from "./touch-later.js";
@@ -1576,6 +1577,8 @@ export class Base extends Model {
   declare static initializeGeneratedModules: typeof _initializeGeneratedModules;
   declare static _generatedAttributeMethods?: GeneratedAttributeMethods;
   declare static _defaultAttributes: typeof _arDefaultAttributes;
+  /** @internal */
+  declare static resolveTypeName: typeof _resolveTypeName;
 
   // Mirrors: ActiveRecord::ModelSchema::ClassMethods
   declare static columnNames: typeof ModelSchema.columnNames;
@@ -4822,6 +4825,7 @@ extend(Base, {
   initializeGeneratedModules: _initializeGeneratedModules,
   generateAliasAttributes: _generateAliasAttributes,
   _defaultAttributes: _arDefaultAttributes,
+  resolveTypeName: _resolveTypeName,
 });
 // AttributeMethods class method — gates association/attribute names that would
 // clash with an Active Record instance method (Rails: dangerous_attribute_method?).

@@ -338,9 +338,9 @@ export function resolveAttributeName(this: AttributeHostInternals, name: string)
 export function resolveTypeName(
   this: AttributeHostInternals,
   name: string,
-  _options?: Record<string, unknown>,
+  options?: Record<string, unknown>,
 ): Type {
-  return typeRegistry.lookup(name);
+  return typeRegistry.lookup(name, options);
 }
 
 /**

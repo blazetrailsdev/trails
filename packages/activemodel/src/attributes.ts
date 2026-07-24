@@ -99,6 +99,13 @@ export interface AttributeOptions {
    */
   userProvidedDefault?: boolean;
   limit?: number | null;
+  /**
+   * PG type modifiers, forwarded to the registry as Rails' `**options` are:
+   * `attribute :tags, :string, array: true` / `:my_range, :string, range: true`
+   * (postgresql_adapter.rb:1166-1167 register them via `add_modifier`).
+   */
+  array?: boolean;
+  range?: boolean;
 }
 
 /** @internal */
@@ -107,6 +114,7 @@ export function attribute(
     _attributeDefinitions: Map<string, AttributeDefinition>;
     prototype: object;
     _cachedDefaultAttributes?: AttributeSet | null;
+    resolveTypeName(name: string, options?: Record<string, unknown>): Type;
   },
   name: string,
   // Mirrors Rails' `attribute(name, type = nil, **options)`: the type is
@@ -135,7 +143,7 @@ export function attribute(
   const type = typeProvided
     ? typeName instanceof Type
       ? typeName
-      : typeRegistry.lookup(typeName as string)
+      : this.resolveTypeName(typeName as string, typeOptions(options))
     : (existing?.type ?? typeRegistry.lookup("value"));
   // Preserve the existing defaultValue when no default is explicitly provided,
   // matching Rails' PendingType behavior: with_type only changes the type and
@@ -210,6 +218,28 @@ export function attribute(
 }
 
 /**
+ * Mirrors: ActiveModel::Attributes::ClassMethods#define_method_attribute=
+ *
+ * In Rails this generates a `canonical_name=` writer via code evaluation.
+ * Trails installs writers via Object.defineProperty in `attribute()`, so no
+ * code generation is required here. The method exists for API-compare parity
+ * and to expose the AttrNames accessor-method computation that Rails uses
+ * to derive the writer method name.
+ *
+ * @internal Rails-private helper.
+ */
+export function defineMethodAttribute(
+  canonicalName: string,
+  _options?: { owner?: unknown; as?: string },
+): void {
+  // Writers are already installed by attribute() via Object.defineProperty.
+  // Compute and expose the method name the same way Rails would, for callers
+  // that inspect the name (e.g. alias generation paths).
+  const { methodName } = AttrNames.defineAttributeAccessorMethod(canonicalName, true);
+  void methodName;
+}
+
+/**
  * Concrete mixin host for `ActiveModel::Attributes`. Rails ships
  * `Attributes` as a module included into a model; in TS this class is
  * the canonical instance-side surface. `Model` composes the same
@@ -262,26 +292,14 @@ export class Attributes {
   }
 }
 
-/**
- * Mirrors: ActiveModel::Attributes::ClassMethods#define_method_attribute=
- *
- * In Rails this generates a `canonical_name=` writer via code evaluation.
- * Trails installs writers via Object.defineProperty in `attribute()`, so no
- * code generation is required here. The method exists for API-compare parity
- * and to expose the AttrNames accessor-method computation that Rails uses
- * to derive the writer method name.
- *
- * @internal Rails-private helper.
- */
-export function defineMethodAttribute(
-  canonicalName: string,
-  _options?: { owner?: unknown; as?: string },
-): void {
-  // Writers are already installed by attribute() via Object.defineProperty.
-  // Compute and expose the method name the same way Rails would, for callers
-  // that inspect the name (e.g. alias generation paths).
-  const { methodName } = AttrNames.defineAttributeAccessorMethod(canonicalName, true);
-  void methodName;
+function typeOptions(options?: AttributeOptions): Record<string, unknown> | undefined {
+  const {
+    default: _default,
+    virtual: _virtual,
+    userProvidedDefault: _userProvidedDefault,
+    ...rest
+  } = options ?? {};
+  return Object.keys(rest).length > 0 ? (rest as Record<string, unknown>) : undefined;
 }
 
 // ---------------------------------------------------------------------------

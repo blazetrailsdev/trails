@@ -348,7 +348,7 @@ describe("CustomPropertiesTest", () => {
   it.skipIf(adapterType !== "postgres")("array types can be specified", () => {
     class Klass extends OverloadedType {
       static {
-        this.attribute("my_array", "string", { limit: 50, array: true } as any);
+        this.attribute("my_array", "string", { limit: 50, array: true });
         this.attribute("my_int_array", "integer", { array: true } as any);
       }
     }
@@ -361,7 +361,7 @@ describe("CustomPropertiesTest", () => {
   it.skipIf(adapterType !== "postgres")("range types can be specified", () => {
     class Klass extends OverloadedType {
       static {
-        this.attribute("my_range", "string", { limit: 50, range: true } as any);
+        this.attribute("my_range", "string", { limit: 50, range: true });
         this.attribute("my_int_range", "integer", { range: true } as any);
       }
     }

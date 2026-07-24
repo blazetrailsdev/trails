@@ -12,8 +12,9 @@ import type { Ship } from "./ship.js";
 import type { SpecialContract } from "./contract.js";
 import type { SpecialProject } from "./project.js";
 // vendor/rails/activerecord/test/models/developer.rb
-import { StringType, typeRegistry } from "@blazetrails/activemodel";
+import { StringType } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
+import * as Type from "../../type.js";
 import type { Relation } from "../../relation.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
@@ -578,7 +579,7 @@ export class DeveloperName extends StringType {
   }
 }
 
-typeRegistry.register("developer_name", () => new DeveloperName());
+Type.register("developer_name", DeveloperName);
 
 export class AttributedDeveloper extends Base {
   declare name: unknown;

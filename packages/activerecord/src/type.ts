@@ -77,6 +77,7 @@ _registry.register("json", Json, { override: false });
 _registry.register("string", StringType, { override: false });
 _registry.register("text", Text, { override: false });
 _registry.register("time", Time, { override: false });
+_registry.register("value", ValueType, { override: false });
 
 /** Mirrors Rails' `ActiveRecord::Type.registry` (attr_accessor getter). */
 export function registry(): AdapterSpecificRegistry {
