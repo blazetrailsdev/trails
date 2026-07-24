@@ -31,6 +31,7 @@ import {
   ValueTooLong,
 } from "../../errors.js";
 import { AbstractMysqlAdapter } from "../../connection-adapters/abstract-mysql-adapter.js";
+import { rebuildCanonicalTables } from "../../test-helpers/canonical-schema.js";
 import { Result } from "../../result.js";
 
 // Fabricated-error translate_exception checks. These don't touch a live
@@ -247,29 +248,16 @@ describeIfMysql("Mysql2Adapter (trails extensions)", () => {
     // Mirrors adapter_test.rb: a zero-row SELECT must still report its
     // columns from the field descriptors, not collapse to an empty Result.
     // Rails runs this against the canonical `subscribers` fixture table; the
-    // describeIfMysql suite does not bootstrap the canonical schema, so seed
-    // the real `subscribers` table with its exact schema.rb shape (id: false;
-    // nick/name/id/books_count/update_count; unique index on nick) before the
-    // probe rather than inventing a scratch table name.
-    await adapter.executeMutation("DROP TABLE IF EXISTS `subscribers`");
-    await adapter.executeMutation(
-      "CREATE TABLE `subscribers` (" +
-        "`nick` VARCHAR(255) NOT NULL, " +
-        "`name` VARCHAR(255), " +
-        "`id` INT, " +
-        "`books_count` INT NOT NULL DEFAULT 0, " +
-        "`update_count` INT NOT NULL DEFAULT 0, " +
-        "UNIQUE KEY `index_subscribers_on_nick` (`nick`)" +
-        ") ENGINE=InnoDB",
-    );
-    try {
-      const result = await adapter.execQuery("SELECT * FROM subscribers WHERE 1=0");
-      expect(result).toBeInstanceOf(Result);
-      expect(result.rows).toEqual([]);
-      expect(result.columns).toEqual(["nick", "name", "id", "books_count", "update_count"]);
-    } finally {
-      await adapter.executeMutation("DROP TABLE IF EXISTS `subscribers`");
-    }
+    // describeIfMysql suite does not bootstrap the canonical schema, so lay the
+    // canonical table through the canonical loader rather than hand-rolling its
+    // DDL. It is left in place afterwards on purpose: this suite shares the
+    // per-worker database with every other file, and dropping a canonical table
+    // here is exactly the shape drift `repairWorkerSchema` has to clean up.
+    await rebuildCanonicalTables(adapter, ["subscribers"]);
+    const result = await adapter.execQuery("SELECT * FROM subscribers WHERE 1=0");
+    expect(result).toBeInstanceOf(Result);
+    expect(result.rows).toEqual([]);
+    expect(result.columns).toEqual(["nick", "name", "id", "books_count", "update_count"]);
   });
 
   it("database timezone changes synced to connection (extended re-sync paths)", async () => {
