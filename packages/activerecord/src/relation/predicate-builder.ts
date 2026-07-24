@@ -378,38 +378,33 @@ export class PredicateBuilder {
   }
 
   /**
-   * Build a composite-key predicate. For `cols.length > 1`:
+   * Build a composite-key predicate:
    *
    *   (c1 = v11 AND c2 = v12) OR (c1 = v21 AND c2 = v22) OR ...
    *
-   * For `cols.length === 1` (degenerate composite): a single
-   * `c IN (v1, v2, ...)` predicate — matching Rails' one-element-key
-   * collapse (predicate_builder.rb:87-90).
-   *
-   * The Rails analog is `where({[col1, col2] => [[v1, v2], ...]})`,
-   * handled by the Array-key branch of `expand_from_hash`
-   * (predicate_builder.rb:87-98). JS object keys can't be arrays, so we
-   * expose the composite shape as a separate method (and a matching
-   * `Relation#where(cols, tuples)` overload) — but the body is only an
-   * adapter: it zips `cols` with each tuple into the plain-hash shape and
-   * delegates to `buildFromHash` / `groupingQueries`, so dot-notation
-   * splitting, associated-table re-rooting, bind construction and the
-   * grouping tree all come from the shared Rails code path.
+   * The Rails analog is `where({[c1, c2] => [[v1, v2], ...]})`, handled by
+   * the Array-key branch of `expand_from_hash` (predicate_builder.rb:87-98).
+   * JS object keys can't be arrays, so the composite shape is a separate
+   * method (with a matching `Relation#where(cols, tuples)` overload) — but
+   * only as an adapter: it zips `cols` with each tuple into the plain-hash
+   * shape and delegates, so dot-notation splitting, associated-table
+   * re-rooting, bind construction and the grouping tree are all inherited
+   * from that branch rather than re-implemented. `cols.length === 1` takes
+   * the same route and lands on a single `IN (...)`, matching Rails'
+   * one-element-key collapse (predicate_builder.rb:87-90).
    *
    * Tuples containing `null` / `undefined` are filtered out: SQL
-   * tuple-equality semantics treat any null component as a non-match
-   * (Arel's `Attribute#eq(null)` would emit `IS NULL`, which is
-   * different). After filtering, an empty tuple list returns `null`
-   * — caller short-circuits via `Relation#none()`.
+   * tuple-equality treats any null component as a non-match, whereas
+   * `Attribute#eq(null)` would emit `IS NULL`. Filtering everything returns
+   * `null`, which the caller short-circuits via `Relation#none()`. Caller
+   * bugs — empty `cols`, non-array `tuples`, non-array tuple, arity
+   * mismatch — raise ArgumentError instead, since silently dropping them
+   * would collapse into that same `null` → `none()` and hide the bug.
    *
-   * Throws on caller bugs: empty `cols`, non-array tuple, or tuple
-   * arity mismatch (silent filtering would mask real issues by
-   * collapsing them into `null` → `none()`).
-   *
-   * Remaining shape deviation: `buildComposite` must return ONE node,
-   * so a single surviving tuple — which Rails' `grouping_queries` returns
-   * as flat, separately addressable predicates — is wrapped in a
-   * `Grouping`. Multi-tuple output is Rails' tree verbatim.
+   * Deviation: `buildComposite` must return ONE node, so a single surviving
+   * tuple — which `grouping_queries` returns as flat, separately addressable
+   * predicates — is wrapped in a `Grouping`. Multi-tuple output is Rails'
+   * tree verbatim.
    *
    * Mirrors: ActiveRecord::PredicateBuilder#expand_from_hash, Array-key
    * branch (predicate_builder.rb:87-98).
@@ -419,62 +414,31 @@ export class PredicateBuilder {
       throw argumentError("PredicateBuilder.buildComposite: empty column list");
     }
     if (!Array.isArray(tuples)) {
-      // Surface as ArgumentError instead of letting the for-of /
-      // .filter() below throw a bare TypeError on null / object /
-      // non-iterable inputs.
       throw argumentError(
         `PredicateBuilder.buildComposite: tuples must be an array, got ${tuples === null ? "null" : typeof tuples}`,
       );
     }
-    // Validate shape/arity loudly — silently dropping malformed
-    // tuples would turn caller bugs into `null` (→ `none()`), which
-    // is hard to debug. Tagged as ArgumentError so callers can catch
-    // consistently with other query-method validation throws.
-    for (const t of tuples) {
-      if (!Array.isArray(t)) {
+    for (const tuple of tuples) {
+      if (!Array.isArray(tuple)) {
         throw argumentError(
-          `PredicateBuilder.buildComposite: tuple must be an array, got ${typeof t}`,
+          `PredicateBuilder.buildComposite: tuple must be an array, got ${typeof tuple}`,
         );
       }
-      if (t.length !== cols.length) {
+      if (tuple.length !== cols.length) {
         throw argumentError(
-          `PredicateBuilder.buildComposite: tuple arity ${t.length} does not match column count ${cols.length} (cols=[${cols.join(", ")}])`,
+          `PredicateBuilder.buildComposite: tuple arity ${tuple.length} does not match column count ${cols.length} (cols=[${cols.join(", ")}])`,
         );
       }
     }
-    // Filter null/undefined-bearing tuples (SQL tuple-equality
-    // semantics — see method docstring).
     const validTuples = tuples.filter((t) => t.every((v) => v !== null && v !== undefined));
     if (validTuples.length === 0) return null;
-    // Single-column degenerate case. Rails' array-key branch collapses a
-    // one-element key itself (`key.is_a?(Array) && key.size == 1` →
-    // `key = key.first; value = value.flatten`, predicate_builder.rb:87-90),
-    // which lands on `self[key, values]` → ArrayHandler → a single
-    // `IN (...)`. Delegating through buildFromHash reproduces that exactly,
-    // including the dot-notation split and the typed binds ArrayHandler
-    // builds (a bare `attribute.in(values)` would inline untyped `Casted`
-    // literals instead).
     if (cols.length === 1) {
       return this.buildFromHash({ [cols[0]]: validTuples.map((t) => t[0]) })[0];
     }
-    // Multi-column: zip each tuple against `cols` and delegate, exactly as
-    // Rails' Array-key branch does (`expand_from_hash(key.zip(ids_set).to_h)`
-    // per tuple, then `grouping_queries`, predicate_builder.rb:92-98). Going
-    // through buildFromHash means dot-notation splitting
-    // (convert_dot_notation_to_hash) and the `Hash && !has_column?`
-    // re-rooting into the associated table's builder are inherited rather
-    // than re-implemented here, so fixes to expand_from_hash apply to the
-    // composite form automatically. Bind construction is likewise inherited:
-    // `build` routes scalars to BasicObjectHandler, which wraps them in a
-    // QueryAttribute (= bind param) rather than an inlined `Casted` literal.
     const queryGroups = validTuples.map((tuple) =>
       this.buildFromHash(Object.fromEntries(cols.map((col, i) => [col, tuple[i]]))),
     );
     const nodes = this.groupingQueries(queryGroups);
-    // `buildComposite` must return ONE node, but grouping_queries returns
-    // the lone group's predicates flat (multiple where-clause entries). Only
-    // that single-group case needs re-wrapping; the multi-group case is
-    // already Rails' single `Grouping(Or(...))`.
     return nodes.length === 1 ? nodes[0] : new Nodes.Grouping(nodes.reduce((l, r) => l.and(r)));
   }
 

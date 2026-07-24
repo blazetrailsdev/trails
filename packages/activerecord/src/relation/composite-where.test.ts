@@ -198,6 +198,34 @@ describe("Relation#where — composite-key form", () => {
     expect(sql).not.toMatch(/OR/);
   });
 
+  it("multi-tuple composite builds Rails' grouping_queries tree: one Grouping wrapping an n-ary Or of And chains", () => {
+    // buildComposite delegates to grouping_queries
+    // (predicate_builder.rb:154-162), so the tree is Rails' verbatim:
+    // Grouping(Or([And([eq, eq]), And([eq, eq])])) — the per-tuple Grouping
+    // an earlier hand-rolled version added is not part of that shape.
+    const rel = (CpkBook as any).all();
+    const node: any = rel.predicateBuilder.buildComposite(
+      ["author_id", "id"],
+      [
+        [1, 100],
+        [2, 200],
+      ],
+    );
+    expect(node.constructor.name).toBe("Grouping");
+    expect(node.expr.constructor.name).toBe("Or");
+    expect(node.expr.children.map((c: any) => c.constructor.name)).toEqual(["And", "And"]);
+  });
+
+  it("composite tuple values dereference a record to its id (predicate_builder.rb:58)", async () => {
+    // Delegating through `build` inherits Rails' `value = value.id if
+    // value.respond_to?(:id)`, which the hand-rolled buildBindAttribute path
+    // skipped — a record used to be bound whole.
+    const author: any = await (CpkAuthor as any).create({ name: "deref" });
+    await CpkBook.create({ id: [author.id, 100], title: "by-record" });
+    const matched = await (CpkBook as any).where(["author_id", "id"], [[author, 100]]).toArray();
+    expect(matched.map((r: any) => r.title)).toEqual(["by-record"]);
+  });
+
   it("Relation#where(single array arg) routes to the sanitized-conditions form, not composite", () => {
     // A single all-strings array is Rails' `where(["sql fragment"])` form, not
     // the two-argument composite `where(cols, tuples)`, so it must sanitize
