@@ -1,7 +1,7 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
 import os from "os";
-import { DEFAULT_FORKS } from "./packages/activerecord/src/test-helpers/ar-db-forks-default.js";
+import { resolveForkCount } from "./packages/activerecord/src/test-helpers/ar-db-forks-default.js";
 
 // AR_DB_FORKS (read in test-setup-worker-db.ts) requests a vitest worker
 // count; TEST_FORKS below is the effective one — the request clamped to the
@@ -87,20 +87,18 @@ const SQLITE_DRIVER_TESTS = [
   "packages/activerecord/src/sqlite-adapter.test.ts",
 ];
 
-const _parsedForks = parseInt(process.env.TRAILS_TEST_FORKS ?? process.env.AR_DB_FORKS ?? "", 10);
 // Clamp to vitest's own host-derived ceiling (numCpus - 1): while the root
 // maxForks cap was a per-project no-op, that ceiling is what every run
 // actually used, and the suite's timeouts are tuned to it — on the 4-vCPU CI
 // runner, honoring a fork count above it (AR_DB_FORKS=8, as CI used to set)
 // oversubscribes PG enough to push the full-DB schema-dump tests past their
 // 5s timeout. The env vars can only lower the cap, never raise it past the
-// host. Duplicated (not imported) from ar-db-slots.ts because the config is
-// loaded before any workspace package is built — see ar-db-forks-default.ts.
+// host. The precedence + clamp itself is shared with ar-db-slots.ts's
+// workerForkCount() via the dependency-free ar-db-forks-default.ts (the config
+// is loaded before any workspace package is built, so it cannot import the
+// activesupport-backed module directly); only the host-core reading differs.
 const _hostForkCap = Math.max(os.availableParallelism() - 1, 1);
-const TEST_FORKS = Math.min(
-  Number.isFinite(_parsedForks) && _parsedForks > 0 ? _parsedForks : DEFAULT_FORKS,
-  _hostForkCap,
-);
+const TEST_FORKS = resolveForkCount(process.env, _hostForkCap);
 
 const alias = {
   "@blazetrails/activesupport/message-verifier": path.resolve(
