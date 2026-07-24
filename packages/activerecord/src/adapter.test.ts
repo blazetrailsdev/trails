@@ -577,9 +577,6 @@ describe("AdapterForeignKeyTest", () => {
   });
   afterAll(async () => {
     if (adapterType === "sqlite") {
-      // Hand both names back in their canonical TEST_SCHEMA shape: the bespoke
-      // FK-carrying tables above replaced the boot-laid ones, and a later file
-      // in the same worker reading them would otherwise trip repairWorkerSchema.
       await rebuildCanonicalTables(Base.connection, ["fk_test_has_pk", "fk_test_has_fk"]);
       return;
     }
