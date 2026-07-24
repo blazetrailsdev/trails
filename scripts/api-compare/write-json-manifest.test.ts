@@ -90,18 +90,36 @@ describe("writeJsonManifest", () => {
     expect(JSON.parse(fs.readFileSync(out, "utf8"))).toEqual(SAMPLE);
   });
 
-  it("defers formatting until flush inside a batch, then formats every path", () => {
+  it("buffers writes in memory until flush, then formats every path", () => {
     const a = tmpManifest();
     const b = tmpManifest();
     beginManifestBatch();
     writeJsonManifest(a, SAMPLE);
     writeJsonManifest(b, SAMPLE);
-    // Bytes are on disk immediately, but unformatted until the batch flushes.
-    expect(prettierCheck(a)).toBe(false);
-    expect(prettierCheck(b)).toBe(false);
+    // Nothing touches disk until the batch flushes.
+    expect(fs.existsSync(a)).toBe(false);
+    expect(fs.existsSync(b)).toBe(false);
     flushManifestBatch();
     expect(prettierCheck(a)).toBe(true);
     expect(prettierCheck(b)).toBe(true);
+  });
+
+  it("leaves the tracked file untouched when a batch is abandoned before flush", () => {
+    const out = tmpManifest();
+    fs.writeFileSync(out, "sentinel\n");
+    beginManifestBatch();
+    writeJsonManifest(out, SAMPLE);
+    // A throw between begin and flush must not churn the committed bytes.
+    expect(fs.readFileSync(out, "utf8")).toBe("sentinel\n");
+    flushManifestBatch();
+    expect(prettierCheck(out)).toBe(true);
+  });
+
+  it("leaves no temp files beside a committed manifest", () => {
+    const out = tmpManifest();
+    writeJsonManifest(out, SAMPLE);
+    const strays = fs.readdirSync(path.dirname(out)).filter((f) => f.includes(".tmp."));
+    expect(strays).toEqual([]);
   });
 
   it("batches to output byte-identical to the immediate path", () => {
