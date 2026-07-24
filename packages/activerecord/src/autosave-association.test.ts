@@ -540,6 +540,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
       }
     }
     registerModel("AutosaveFirm", AutosaveFirm);
+    registerModel("UnvalidatedClient", UnvalidatedClient);
     registerModel("AutosaveClient", AutosaveClient);
     return { AutosaveFirm, AutosaveClient };
   }
@@ -573,7 +574,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
 
   it("invalid adding with validate false", async () => {
     const { AutosaveFirm } = makeModels();
-    registerModel("UnvalidatedClient", UnvalidatedClient);
     const company = await AutosaveFirm.create({ name: "Acme" });
     const client = new UnvalidatedClient({ name: "" });
     cacheAssoc(company, "unvalidatedClients", [client]);
