@@ -97,14 +97,22 @@ export function gateFromWrapper(name: string, featureArg?: string | null): TestG
  *
  * Recognizes the adapter idiom in the suite — `adapterType === "mysql"` /
  * `adapterType !== "sqlite"` — anywhere in the expression, and feature
- * predicates — `adapterSupports("x")`. A compound guard mixing the two (e.g.
- * `adapterType === "sqlite" || !adapterSupports("insert_returning")`, the
- * De-Morgan'd skip form of Rails' `if supports_insert_returning? &&
- * !current_adapter?(:SQLite3Adapter)`) yields BOTH an adapter set and a feature
- * set, mirroring how the Ruby extractor derives adapters from `current_adapter?`
- * and features from `supports_X?` as independent dimensions. Anything with
- * neither resolves to a `guards: ["unknown"]` gate so the comparison knows the
- * test is conditional without inventing an adapter set.
+ * predicates — `adapterSupports("x")`. How a compound mixing the two resolves
+ * depends on the adapter term's polarity, mirroring the Ruby extractor's
+ * `mixed` rule:
+ *   - EXCLUSION (`adapterType === "sqlite" || !adapterSupports("insert_returning")`,
+ *     the De-Morgan'd skip form of Rails' `if supports_insert_returning? &&
+ *     !current_adapter?(:SQLite3Adapter)`) → the run condition is the pure
+ *     conjunction `!sqlite && insert_returning?`, so BOTH the adapter exclusion
+ *     `[mysql,postgresql]` and the feature set are sound and emitted.
+ *   - POSITIVE (`adapterType !== "mysql" || !adapterSupports("expression_index")`)
+ *     → mixing a positive adapter set with a feature is unsound (the run-on set
+ *     differs under `&&` vs `||`), so the adapter set is DROPPED and only the
+ *     feature set survives — exactly as Ruby drops a positive `adapter_syms` set
+ *     whenever the condition also carries a feature or guard.
+ * Anything with neither adapter nor feature resolves to a `guards: ["unknown"]`
+ * gate so the comparison knows the test is conditional without inventing an
+ * adapter set.
  *
  * Source is `"test"` (per-test inline guard) — the TS analog of the Ruby
  * extractor's `"body-skip"`, distinct from a named `"wrapper"` suite.
@@ -149,15 +157,12 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
   const guards: string[] = [];
   if (/isMaria[Dd]b\b/.test(text)) guards.push("mariadb");
 
-  // A POSITIVE adapter set mixed with a guard isn't sound (the run-on set
-  // depends on whether the compound is `&&` or `||`) — drop it and keep the
-  // guard, mirroring the Ruby extractor's `mixed` rule in
-  // `gate_from_run_condition`. An adapter EXCLUSION stays: in the standard skip
-  // idiom `skipIf(adapterType === "x" || guard)` the run condition is the pure
-  // conjunction `!x && !guard`, which Ruby likewise keeps as
-  // adapters-minus-x + guard.
+  // The `mixed` rule (see the docstring): a POSITIVE adapter set is unsound and
+  // must be dropped once the compound also carries a feature or guard; an
+  // adapter EXCLUSION composes soundly and stays. Mirrors `gate_from_run_condition`.
+  const mixed = adapterIsPositive && (guards.length > 0 || featureMatches.length > 0);
   const gate: TestGate = { source: ["test"] };
-  if (adapters && !(guards.length && adapterIsPositive)) gate.adapters = adapters;
+  if (adapters && !mixed) gate.adapters = adapters;
   if (featureMatches.length) gate.features = sortedUnique(featureMatches);
   if (guards.length) gate.guards = guards;
   if (!gate.adapters && !gate.features && !gate.guards) gate.guards = ["unknown"];
