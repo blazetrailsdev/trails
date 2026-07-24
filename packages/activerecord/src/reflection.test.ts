@@ -33,6 +33,12 @@ import { Customer } from "./test-helpers/models/customer.js";
 import { Organization } from "./test-helpers/models/organization.js";
 import { Author } from "./test-helpers/models/author.js";
 import { Hotel as CanonicalHotel } from "./test-helpers/models/hotel.js";
+import { Department } from "./test-helpers/models/department.js";
+import { Chef } from "./test-helpers/models/chef.js";
+import { Firm, Client } from "./test-helpers/models/company.js";
+import { Sponsor } from "./test-helpers/models/sponsor.js";
+import { Category } from "./test-helpers/models/category.js";
+import { Edge } from "./test-helpers/models/edge.js";
 import { ShardedComment } from "./test-helpers/models/sharded.js";
 
 import { UnknownPrimaryKey, NameError } from "./errors.js";
@@ -43,23 +49,28 @@ fixtures(["topics"]);
 
 describe("ReflectionTest", () => {
   function makeModels() {
-    class Author extends Base {
+    class RfAuthor extends Base {
       declare name: string | null;
+      declare books: AssociationProxy<RfBook>;
 
       static {
         this.attribute("name", "string");
+        this.hasMany("books", { className: "RfBook" });
+        this.hasOne("profile", { className: "RfProfile" });
       }
     }
-    class Book extends Base {
+    class RfBook extends Base {
       declare title: string | null;
       declare author_id: number | null;
 
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
+        this.belongsTo("author", { className: "RfAuthor" });
+        this.hasMany("chapters", { className: "RfChapter" });
       }
     }
-    class Chapter extends Base {
+    class RfChapter extends Base {
       declare title: string | null;
       declare book_id: number | null;
 
@@ -68,14 +79,10 @@ describe("ReflectionTest", () => {
         this.attribute("book_id", "integer");
       }
     }
-    Associations.belongsTo.call(Book, "author", {});
-    Associations.hasMany.call(Author, "books", {});
-    Associations.hasOne.call(Author, "profile", {});
-    Associations.hasMany.call(Book, "chapters", {});
-    registerModel(Author);
-    registerModel(Book);
-    registerModel(Chapter);
-    return { Author, Book, Chapter };
+    registerModel(RfAuthor);
+    registerModel(RfBook);
+    registerModel(RfChapter);
+    return { Author: RfAuthor, Book: RfBook, Chapter: RfChapter };
   }
 
   it("scope chain does not interfere with hmt with polymorphic case", async () => {
@@ -403,14 +410,14 @@ describe("ReflectionTest", () => {
     expect(ref!.macro).toBe("hasOne");
   });
   it("has many through reflection", () => {
-    class Subscriber extends Base {
+    class RfSubscriber extends Base {
       declare name: string | null;
-      declare subscriptions: AssociationProxy<Subscription>;
+      declare subscriptions: AssociationProxy<RfSubscription>;
       declare subBooks: AssociationProxy<Base>;
 
       static {
         this.attribute("name", "string");
-        this.hasMany("subscriptions", {});
+        this.hasMany("subscriptions", { className: "RfSubscription" });
         this.hasMany("subBooks", {
           through: "subscriptions",
           source: "subBook",
@@ -418,7 +425,7 @@ describe("ReflectionTest", () => {
         });
       }
     }
-    class Subscription extends Base {
+    class RfSubscription extends Base {
       declare subscriber_id: number | null;
       declare book_id: number | null;
       declare subBook: SubBook | null;
@@ -440,10 +447,10 @@ describe("ReflectionTest", () => {
         this.attribute("title", "string");
       }
     }
-    registerModel("Subscriber", Subscriber);
-    registerModel("Subscription", Subscription);
+    registerModel("RfSubscriber", RfSubscriber);
+    registerModel("RfSubscription", RfSubscription);
     registerModel("SubBook", SubBook);
-    const ref = reflectOnAssociation(Subscriber, "subBooks");
+    const ref = reflectOnAssociation(RfSubscriber, "subBooks");
     expect(ref).toBeInstanceOf(ThroughReflection);
     expect((ref as ThroughReflection).through).toBe("subscriptions");
     expect((ref as ThroughReflection).source).toBe("subBook");
@@ -451,30 +458,10 @@ describe("ReflectionTest", () => {
   });
 
   it("has and belongs to many reflection", () => {
-    class Category extends Base {
-      declare name: string | null;
-      declare habtmPosts: AssociationProxy<HabtmPost>;
-
-      static {
-        this.attribute("name", "string");
-        this.hasAndBelongsToMany("habtmPosts", {
-          className: "HabtmPost",
-        });
-      }
-    }
-    class HabtmPost extends Base {
-      declare title: string | null;
-
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    registerModel("Category", Category);
-    registerModel("HabtmPost", HabtmPost);
+    expect(reflectOnAssociation(Category, "posts")!.macro).toBe("hasAndBelongsToMany");
     const refs = reflectOnAllAssociations(Category, "hasAndBelongsToMany");
     expect(refs.length).toBeGreaterThanOrEqual(1);
-    expect(refs[0].macro).toBe("hasAndBelongsToMany");
-    expect(refs[0].name).toBe("habtmPosts");
+    expect(refs[0].name).toBe("posts");
   });
   it("columns are returned in the order they were declared", () => {
     const columnNames = CanonicalTopic.columns().map((c: { name: string }) => c.name);
@@ -552,93 +539,94 @@ describe("ReflectionTest", () => {
   });
 
   it("irregular reflection class name", async () => {
-    class Person extends Base {
+    class RfPerson extends Base {
       declare name: string | null;
+      declare addresses: AssociationProxy<RfAddress>;
 
       static {
         this.attribute("name", "string");
+        this.hasMany("addresses", { className: "RfAddress" });
       }
     }
-    class Address extends Base {
+    class RfAddress extends Base {
       declare street: string | null;
 
       static {
         this.attribute("street", "string");
       }
     }
-    registerModel("Person", Person);
-    registerModel("Address", Address);
-    Associations.hasMany.call(Person, "addresses", { className: "Address" });
-    const ref = reflectOnAssociation(Person, "addresses");
-    expect(ref!.klass).toBe(Address);
+    registerModel("RfPerson", RfPerson);
+    registerModel("RfAddress", RfAddress);
+    const ref = reflectOnAssociation(RfPerson, "addresses");
+    expect(ref!.klass).toBe(RfAddress);
   });
   it("reflection klass with same demodularized different modularized name", async () => {
-    class NestedUser extends Base {
+    class RfNestedUser extends Base {
       declare name: string | null;
 
       static {
         this.attribute("name", "string");
       }
     }
-    class AdminUser extends Base {
+    class RfAdminUser extends Base {
       declare name: string | null;
-      declare user: NestedUser | null;
-      declare loadHasOne: (name: "user") => Promise<NestedUser | null>;
+      declare user: RfNestedUser | null;
+      declare loadHasOne: (name: "user") => Promise<RfNestedUser | null>;
 
       static {
         this.attribute("name", "string");
-        this.hasOne("user", { className: "Nested::User" });
+        this.hasOne("user", { className: "RfNested::User" });
       }
     }
-    registerModel("Nested::User", NestedUser);
-    registerModel("Admin::User", AdminUser);
-    const ref = reflectOnAssociation(AdminUser, "user");
-    expect(ref!.klass).toBe(NestedUser);
+    registerModel("RfNested::User", RfNestedUser);
+    registerModel("RfAdmin::User", RfAdminUser);
+    const ref = reflectOnAssociation(RfAdminUser, "user");
+    expect(ref!.klass).toBe(RfNestedUser);
   });
   it("reflection klass with same modularized name", async () => {
-    class NestedNestedUser extends Base {
+    class RfNestedNestedUser extends Base {
       declare name: string | null;
-      declare nestedUsers: AssociationProxy<NestedNestedUser>;
+      declare nestedUsers: AssociationProxy<RfNestedNestedUser>;
 
       static {
         this.attribute("name", "string");
-        this.hasMany("nestedUsers", {});
+        this.hasMany("nestedUsers", { className: "RfNestedNestedUser" });
       }
     }
-    registerModel("NestedUser", NestedNestedUser);
-    const ref = reflectOnAssociation(NestedNestedUser, "nestedUsers");
-    expect(ref!.klass).toBe(NestedNestedUser);
+    registerModel("RfNestedNestedUser", RfNestedNestedUser);
+    const ref = reflectOnAssociation(RfNestedNestedUser, "nestedUsers");
+    expect(ref!.klass).toBe(RfNestedNestedUser);
   });
   it("reflect on all autosave associations", () => {
-    class Ship extends Base {
+    class RfShip extends Base {
       declare name: string | null;
-      declare parts: AssociationProxy<Part>;
-      declare crews: AssociationProxy<Crew>;
+      declare parts: AssociationProxy<RfPart>;
+      declare crews: AssociationProxy<RfCrew>;
 
       static {
         this.attribute("name", "string");
-        this.hasMany("parts", { autosave: true });
-        this.hasMany("crews", {});
+        this.hasMany("parts", { autosave: true, className: "RfPart" });
+        this.hasMany("crews", { className: "RfCrew" });
       }
     }
-    class Part extends Base {
+    class RfPart extends Base {
       declare ship_id: number | null;
 
       static {
         this.attribute("ship_id", "integer");
       }
     }
-    class Crew extends Base {
+    class RfCrew extends Base {
       declare ship_id: number | null;
 
       static {
         this.attribute("ship_id", "integer");
       }
     }
-    registerModel("Ship", Ship);
-    registerModel("Part", Part);
-    registerModel("Crew", Crew);
-    const autosaved = reflectOnAllAutosaveAssociations(Ship);
+    registerModel("RfShip", RfShip);
+    registerModel("RfPart", RfPart);
+    registerModel("RfCrew", RfCrew);
+    const autosaved = reflectOnAllAutosaveAssociations(RfShip);
     expect(autosaved).toHaveLength(1);
     expect(autosaved[0].name).toBe("parts");
   });
@@ -663,67 +651,30 @@ describe("ReflectionTest", () => {
     expect(specialRef.associationPrimaryKey).toBe("isbn");
   });
   it("association primary key raises when missing primary key", () => {
-    class NoPkModel extends Base {
-      static {
-        this._primaryKey = "";
-      }
-    }
-    class Owner extends Base {
-      declare no_pk_model_id: number | null;
+    const reflection = createReflection(
+      "hasMany",
+      "edge",
+      null,
+      {},
+      Author,
+    ) as AssociationReflection;
+    expect(() => reflection.associationPrimaryKey).toThrow(UnknownPrimaryKey);
 
-      static {
-        this.attribute("no_pk_model_id", "integer");
+    class ThroughSub extends ThroughReflection {
+      get sourceReflection(): AssociationReflection {
+        return reflection;
       }
     }
-    registerModel("NoPkModel", NoPkModel);
-    registerModel("Owner", Owner);
-    Associations.belongsTo.call(Owner, "noPkModel", {});
-    const ref = reflectOnAssociation(Owner, "noPkModel") as AssociationReflection;
-    expect(() => ref.associationPrimaryKey).toThrow(UnknownPrimaryKey);
+    const through = new ThroughSub(reflection);
+    expect(() => through.associationPrimaryKey).toThrow(UnknownPrimaryKey);
   });
   it("active record primary key raises when missing primary key", () => {
-    class NoPkOwner extends Base {
-      declare targets: AssociationProxy<Target>;
-
-      static {
-        this._primaryKey = "";
-        this.hasMany("targets", {});
-      }
-    }
-    class Target extends Base {}
-    registerModel("NoPkOwner", NoPkOwner);
-    registerModel("Target", Target);
-    const ref = reflectOnAssociation(NoPkOwner, "targets") as AssociationReflection;
-    expect(() => ref.activeRecordPrimaryKey).toThrow(UnknownPrimaryKey);
+    const reflection = createReflection("hasMany", "author", null, {}, Edge);
+    expect(() => (reflection as AssociationReflection).activeRecordPrimaryKey).toThrow(
+      UnknownPrimaryKey,
+    );
   });
   it("foreign type", () => {
-    class Sponsor extends Base {
-      declare sponsorable_id: number | null;
-      declare sponsorable_type: string | null;
-      declare sponsor_club_id: number | null;
-      declare sponsorable: Base | null;
-      declare thing: Base | null;
-      declare sponsorClub: Base | null;
-      declare loadBelongsTo: ((name: "sponsorable") => Promise<Base | null>) &
-        ((name: "thing") => Promise<Base | null>) &
-        ((name: "sponsorClub") => Promise<Base | null>);
-
-      static {
-        this.attribute("sponsorable_id", "integer");
-        this.attribute("sponsorable_type", "string");
-        this.attribute("sponsor_club_id", "integer");
-        this.belongsTo("sponsorable", { polymorphic: true });
-        this.belongsTo("thing", {
-          polymorphic: true,
-          foreignType: "sponsorable_type",
-          foreignKey: "sponsorable_id",
-        });
-        this.belongsTo("sponsorClub", {
-          foreignKey: "sponsor_club_id",
-        });
-      }
-    }
-    registerModel("Sponsor", Sponsor);
     const polyRef = reflectOnAssociation(Sponsor, "sponsorable");
     expect(polyRef!.foreignType).toBe("sponsorable_type");
     const thingRef = reflectOnAssociation(Sponsor, "thing");
@@ -732,115 +683,59 @@ describe("ReflectionTest", () => {
     expect(normalRef!.foreignType).toBeNull();
   });
   it("default association validation", () => {
-    class Owner extends Base {
-      declare name: string | null;
-
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Pet extends Base {
-      declare owner_id: number | null;
-
-      static {
-        this.attribute("owner_id", "integer");
-      }
-    }
-    registerModel("Owner", Owner);
-    registerModel("Pet", Pet);
-    Associations.hasMany.call(Owner, "pets", {});
-    const ref = reflectOnAssociation(Owner, "pets") as AssociationReflection;
-    expect(ref.validate).toBe(true);
+    expect(createReflection("hasMany", "clients", null, {}, Firm).validate).toBe(true);
+    expect(createReflection("hasOne", "client", null, {}, Firm).validate).toBe(false);
+    expect(createReflection("belongsTo", "client", null, {}, Firm).validate).toBe(false);
   });
   it("always validate association if explicit", () => {
-    class Owner extends Base {
-      declare name: string | null;
-
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Pet extends Base {
-      declare owner_id: number | null;
-
-      static {
-        this.attribute("owner_id", "integer");
-      }
-    }
-    registerModel("Owner", Owner);
-    registerModel("Pet", Pet);
-    Associations.hasMany.call(Owner, "pets", { validate: true });
-    const ref = reflectOnAssociation(Owner, "pets") as AssociationReflection;
-    expect(ref.validate).toBe(true);
+    expect(createReflection("hasOne", "client", null, { validate: true }, Firm).validate).toBe(
+      true,
+    );
+    expect(createReflection("belongsTo", "client", null, { validate: true }, Firm).validate).toBe(
+      true,
+    );
+    expect(createReflection("hasMany", "clients", null, { validate: true }, Firm).validate).toBe(
+      true,
+    );
   });
   it("validate association if autosave", () => {
-    class Owner extends Base {
-      declare name: string | null;
-
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Pet extends Base {
-      declare owner_id: number | null;
-
-      static {
-        this.attribute("owner_id", "integer");
-      }
-    }
-    registerModel("Owner", Owner);
-    registerModel("Pet", Pet);
-    Associations.hasMany.call(Owner, "pets", { autosave: true });
-    const ref = reflectOnAssociation(Owner, "pets") as AssociationReflection;
-    expect(ref.validate).toBe(true);
+    expect(createReflection("hasOne", "client", null, { autosave: true }, Firm).validate).toBe(
+      true,
+    );
+    expect(createReflection("belongsTo", "client", null, { autosave: true }, Firm).validate).toBe(
+      true,
+    );
+    expect(createReflection("hasMany", "clients", null, { autosave: true }, Firm).validate).toBe(
+      true,
+    );
   });
   it("never validate association if explicit", () => {
-    class Owner extends Base {
-      declare name: string | null;
-
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Pet extends Base {
-      declare owner_id: number | null;
-
-      static {
-        this.attribute("owner_id", "integer");
-      }
-    }
-    registerModel("Owner", Owner);
-    registerModel("Pet", Pet);
-    Associations.hasMany.call(Owner, "pets", { validate: false, autosave: true });
-    const ref = reflectOnAssociation(Owner, "pets") as AssociationReflection;
-    expect(ref.validate).toBe(false);
+    expect(
+      createReflection("hasOne", "client", null, { autosave: true, validate: false }, Firm)
+        .validate,
+    ).toBe(false);
+    expect(
+      createReflection("belongsTo", "client", null, { autosave: true, validate: false }, Firm)
+        .validate,
+    ).toBe(false);
+    expect(
+      createReflection("hasMany", "clients", null, { autosave: true, validate: false }, Firm)
+        .validate,
+    ).toBe(false);
   });
   it.skip("symbol for class name", () => {
     // UNPORTED: Ruby Symbol type for className has no JS equivalent.
   });
   it("class for class name", () => {
-    class Firm extends Base {
-      declare name: string | null;
-
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Client extends Base {
-      declare name: string | null;
-
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("Firm", Firm);
-    registerModel("Client", Client);
     expect(() =>
-      Associations.hasMany.call(Firm, "clients", {
-        // @ts-expect-error className must be a string, not a class
-        className: Client,
-      }),
-    ).toThrow(/expecting a string/);
+      createReflection(
+        "hasMany",
+        "clients",
+        null,
+        { className: Client as unknown as string },
+        Firm,
+      ),
+    ).toThrow(/A class was passed to `:className` but we are expecting a string\./);
   });
   it("class for source type", () => {
     class NsTag extends Base {
@@ -947,41 +842,11 @@ describe("ReflectionTest", () => {
     expect(ref!.joinTable).toBe("product_categories");
   });
   it("includes accepts strings", async () => {
-    class Hotel extends Base {
-      declare name: string | null;
-
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Department extends Base {
-      declare hotel_id: number | null;
-      declare name: string | null;
-
-      static {
-        this.attribute("hotel_id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    class Chef extends Base {
-      declare department_id: number | null;
-      declare name: string | null;
-
-      static {
-        this.attribute("department_id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("Hotel", Hotel);
-    registerModel("Department", Department);
-    registerModel("Chef", Chef);
-    Associations.hasMany.call(Hotel, "departments", { foreignKey: "hotel_id" });
-    Associations.hasMany.call(Department, "chefs", { foreignKey: "department_id" });
-    const hotel = await Hotel.create({ name: "Grand" });
-    const dept = await Department.create({ hotel_id: hotel.id, name: "Kitchen" });
-    await Chef.create({ department_id: dept.id, name: "Gordon" });
+    const hotel = await CanonicalHotel.create({});
+    const dept = await Department.create({ hotel_id: hotel.id });
+    await Chef.create({ department_id: dept.id });
     // includes should accept string association names
-    const hotels = await Hotel.all().includes("departments");
+    const hotels = await CanonicalHotel.all().includes("departments");
     expect(hotels).toHaveLength(1);
   });
   it("reflect on association accepts symbols", () => {
@@ -1329,26 +1194,26 @@ describe("ReflectionTest", () => {
   });
 
   it("reflection klass with same demodularized name", async () => {
-    class Project extends Base {
+    class RfProject extends Base {
       declare name: string | null;
-      declare tasks: AssociationProxy<Task>;
+      declare tasks: AssociationProxy<RfTask>;
 
       static {
         this.attribute("name", "string");
-        this.hasMany("tasks", {});
+        this.hasMany("tasks", { className: "RfTask" });
       }
     }
-    class Task extends Base {
+    class RfTask extends Base {
       declare title: string | null;
 
       static {
         this.attribute("title", "string");
       }
     }
-    registerModel("Project", Project);
-    registerModel("Task", Task);
-    const ref = reflectOnAssociation(Project, "tasks");
-    expect(ref!.klass).toBe(Task);
+    registerModel("RfProject", RfProject);
+    registerModel("RfTask", RfTask);
+    const ref = reflectOnAssociation(RfProject, "tasks");
+    expect(ref!.klass).toBe(RfTask);
   });
 
   it("aggregation reflection", () => {
@@ -1581,42 +1446,12 @@ describe("ReflectionTest", () => {
   });
 
   it("includes accepts symbols", async () => {
-    class Hotel extends Base {
-      declare name: string | null;
-
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Department extends Base {
-      declare hotel_id: number | null;
-      declare name: string | null;
-
-      static {
-        this.attribute("hotel_id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    class Chef extends Base {
-      declare department_id: number | null;
-      declare name: string | null;
-
-      static {
-        this.attribute("department_id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("Hotel", Hotel);
-    registerModel("Department", Department);
-    registerModel("Chef", Chef);
-    Associations.hasMany.call(Hotel, "departments", { foreignKey: "hotel_id" });
-    Associations.hasMany.call(Department, "chefs", { foreignKey: "department_id" });
-    const hotel = await Hotel.create({ name: "Grand" });
-    const dept = await Department.create({ hotel_id: hotel.id, name: "Kitchen" });
-    const chef = await Chef.create({ department_id: dept.id, name: "Gordon" });
+    const hotel = await CanonicalHotel.create({});
+    const dept = await Department.create({ hotel_id: hotel.id });
+    const chef = await Chef.create({ department_id: dept.id });
     // includes should accept a nested association hash (Rails `[departments: :chefs]`)
     // and actually preload the nested association onto the loaded records.
-    const hotels = await Hotel.all().includes({ departments: "chefs" });
+    const hotels = await CanonicalHotel.all().includes({ departments: "chefs" });
     expect(hotels).toHaveLength(1);
     const departments = hotels[0].association("departments").target as Base[];
     expect(departments).toHaveLength(1);
@@ -1640,19 +1475,21 @@ describe("ReflectionTest", () => {
         this.attribute("id", "integer");
       }
     }
-    class Comment extends Base {
+    class RfComment extends Base {
       declare blog_post_id: number | null;
+      declare blogPost: BlogPost | null;
+      declare loadBelongsTo: (name: "blogPost") => Promise<BlogPost | null>;
 
       static {
         this.attribute("id", "integer");
         this.attribute("blog_post_id", "integer");
+        this.belongsTo("blogPost", { className: "BlogPost" });
       }
     }
     registerModel(BlogPost);
-    registerModel(Comment);
-    Associations.belongsTo.call(Comment, "blogPost", { className: "BlogPost" });
+    registerModel(RfComment);
 
-    const ref = reflectOnAssociation(Comment, "blogPost")!;
+    const ref = reflectOnAssociation(RfComment, "blogPost")!;
     expect(ref.foreignKey).toBe("blog_post_id");
     // BelongsTo with composite PK target should infer "id" from [:blog_id, :id]
     expect(ref.associationPrimaryKey).toBe("id");
@@ -1692,13 +1529,6 @@ describe("ReflectionTest", () => {
   });
 
   it("using query constraints warns about changing behavior", () => {
-    class Firm extends Base {
-      static {
-        this.attribute("id", "integer");
-      }
-    }
-    registerModel(Firm);
-
     expect(() =>
       Associations.hasMany.call(Firm, "clients", {
         queryConstraints: ["firm_id", "firm_name"],

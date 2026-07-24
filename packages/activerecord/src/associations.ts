@@ -273,6 +273,26 @@ function frameworkBase(model: typeof Base): typeof Base | null {
 }
 
 /**
+ * Throw when a bespoke class is registered under a name a canonical model
+ * already owns. The registry is global and never torn down between tests, so
+ * such a shadow silently poisons every later test that resolves the name as an
+ * association target (a wrong value, not an error). Fires only when the name is
+ * in the canonical autoload index AND the class differs, so re-registering the
+ * canonical class itself (self-registration or autoload fault-in) still passes.
+ * @internal
+ */
+function guardCanonicalNameShadow(name: string, model: typeof Base): void {
+  const canonical = canonicalModelAutoloadIndex?.get(name);
+  if (canonical && canonical !== model) {
+    throw new Error(
+      `registerModel(${JSON.stringify(name)}, …) would shadow the canonical model of the ` +
+        `same name in the global registry, poisoning every later test that resolves it as an ` +
+        `association target. Use the canonical model, or a distinct non-canonical name.`,
+    );
+  }
+}
+
+/**
  * Register a model class for association resolution.
  *
  * Three forms:
@@ -310,6 +330,7 @@ export function registerModel(
   }
   if (typeof nameOrModel === "string") {
     if (!model) throw new Error("registerModel(name, model) requires a model class");
+    guardCanonicalNameShadow(nameOrModel, model);
     modelRegistry.set(nameOrModel, model);
     model._modelsByName.set(nameOrModel, model);
     // Attach registry key so counter-cache pending-map lookup can match it.
@@ -318,6 +339,7 @@ export function registerModel(
     model._registryKeys = keys;
     flushPendingCounterCacheColumns(model);
   } else {
+    guardCanonicalNameShadow(nameOrModel.name, nameOrModel);
     modelRegistry.set(nameOrModel.name, nameOrModel);
     nameOrModel._modelsByName.set(nameOrModel.name, nameOrModel);
     // A namespaced model carries its Ruby module path via `static moduleName`;
