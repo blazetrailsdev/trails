@@ -758,7 +758,7 @@ export function attributesBuilder(this: SchemaHost): AttributeSetBuilder {
  */
 export function columns(this: SchemaHost): any[] {
   const ownColumns = ownSchemaMemo(this, "_columns");
-  if (ownColumns) return ownColumns;
+  if (ownColumns != null) return ownColumns;
   this._columns = Object.values(columnsHash.call(this as unknown as typeof Base));
   return this._columns;
 }
