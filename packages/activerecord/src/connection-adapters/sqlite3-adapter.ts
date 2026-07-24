@@ -12,6 +12,7 @@ import type { AdapterName } from "./abstract-adapter.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { SQLite3AdapterOptions, SQLite3Config } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
+import { isRubyTruthy } from "../ruby-truthy.js";
 import { SchemaCreation as SQLite3SchemaCreation } from "./sqlite3/schema-creation.js";
 import { TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema-definitions.js";
 import {
@@ -1512,7 +1513,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     options: { mode?: string; header?: boolean } = {},
   ): string[] {
     const args: string[] = [];
-    if (options.mode) args.push(`-${options.mode}`);
+    if (isRubyTruthy(options.mode)) args.push(`-${options.mode}`);
     if (options.header) args.push("-header");
     args.push(config?.database ?? ":memory:");
     return args;

@@ -194,16 +194,16 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     options: { includePassword?: boolean } = {},
   ): Record<string, string> {
     const env: Record<string, string> = {};
-    if (config.username) env.PGUSER = String(config.username);
-    if (config.host) env.PGHOST = String(config.host);
-    if (config.port) env.PGPORT = String(config.port);
-    if (config.password != null && options.includePassword) {
+    if (isRubyTruthy(config.username)) env.PGUSER = String(config.username);
+    if (isRubyTruthy(config.host)) env.PGHOST = String(config.host);
+    if (isRubyTruthy(config.port)) env.PGPORT = String(config.port);
+    if (isRubyTruthy(config.password) && options.includePassword) {
       env.PGPASSWORD = String(config.password);
     }
-    if (config.sslmode) env.PGSSLMODE = String(config.sslmode);
-    if (config.sslcert) env.PGSSLCERT = String(config.sslcert);
-    if (config.sslkey) env.PGSSLKEY = String(config.sslkey);
-    if (config.sslrootcert) env.PGSSLROOTCERT = String(config.sslrootcert);
+    if (isRubyTruthy(config.sslmode)) env.PGSSLMODE = String(config.sslmode);
+    if (isRubyTruthy(config.sslcert)) env.PGSSLCERT = String(config.sslcert);
+    if (isRubyTruthy(config.sslkey)) env.PGSSLKEY = String(config.sslkey);
+    if (isRubyTruthy(config.sslrootcert)) env.PGSSLROOTCERT = String(config.sslrootcert);
     const variables = config.variables as Record<string, unknown> | undefined;
     if (variables) {
       // Rails: PGOPTIONS = variables.filter_map { "-c name=value" unless :default }

@@ -20,6 +20,14 @@ describe("AbstractMysqlAdapter.dbconsole option keys", () => {
     expect(args).toContain("--password=secret");
     expect(args).not.toContain("-p");
   });
+
+  it("keeps Ruby-truthy empty-string and zero config values", () => {
+    const args = AbstractMysqlAdapter.dbconsole({ host: "", username: "", port: 0, socket: "" });
+    expect(args).toContain("--host=");
+    expect(args).toContain("--user=");
+    expect(args).toContain("--port=0");
+    expect(args).toContain("--socket=");
+  });
 });
 
 describe("AbstractSQLite3Adapter.dbconsole option keys", () => {
@@ -32,6 +40,13 @@ describe("AbstractSQLite3Adapter.dbconsole option keys", () => {
   it("omits the flags when mode/header are absent", () => {
     expect(AbstractSQLite3Adapter.dbconsole({ database: "db.sqlite3" })).toEqual(["db.sqlite3"]);
   });
+
+  it("keeps a Ruby-truthy empty-string mode", () => {
+    expect(AbstractSQLite3Adapter.dbconsole({ database: "db.sqlite3" }, { mode: "" })).toEqual([
+      "-",
+      "db.sqlite3",
+    ]);
+  });
 });
 
 describe("PostgreSQLAdapter.dbconsole option keys", () => {
@@ -42,6 +57,18 @@ describe("PostgreSQLAdapter.dbconsole option keys", () => {
     expect(PostgreSQLAdapter.dbconsole(config, { includePassword: true }).PGPASSWORD).toBe(
       "secret",
     );
+  });
+
+  it("exports Ruby-truthy empty-string and zero config values", () => {
+    const env = PostgreSQLAdapter.dbconsole({ username: "", host: "", port: 0 });
+    expect(env.PGUSER).toBe("");
+    expect(env.PGHOST).toBe("");
+    expect(env.PGPORT).toBe("0");
+  });
+
+  it("skips a false password even when includePassword is set", () => {
+    const env = PostgreSQLAdapter.dbconsole({ password: false }, { includePassword: true });
+    expect(env.PGPASSWORD).toBeUndefined();
   });
 
   it("builds PGOPTIONS from variables, dropping only :default (not the bare string default)", () => {

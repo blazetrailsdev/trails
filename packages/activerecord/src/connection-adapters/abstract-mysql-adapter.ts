@@ -15,6 +15,7 @@ import {
   returningColumnValues as mysqlReturningColumnValues,
 } from "./mysql/database-statements.js";
 import { Result } from "../result.js";
+import { isRubyTruthy } from "../ruby-truthy.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type { AdapterName } from "./abstract-adapter.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
@@ -1322,17 +1323,17 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     options: Record<string, unknown> = {},
   ): string[] {
     const args: string[] = ["mysql"];
-    if (config.host) args.push(`--host=${config.host}`);
-    if (config.port) args.push(`--port=${config.port}`);
-    if (config.socket) args.push(`--socket=${config.socket}`);
-    if (config.username) args.push(`--user=${config.username}`);
-    if (config.sslCa) args.push(`--ssl-ca=${config.sslCa}`);
-    if (config.sslCert) args.push(`--ssl-cert=${config.sslCert}`);
-    if (config.sslKey) args.push(`--ssl-key=${config.sslKey}`);
+    if (isRubyTruthy(config.host)) args.push(`--host=${config.host}`);
+    if (isRubyTruthy(config.port)) args.push(`--port=${config.port}`);
+    if (isRubyTruthy(config.socket)) args.push(`--socket=${config.socket}`);
+    if (isRubyTruthy(config.username)) args.push(`--user=${config.username}`);
+    if (isRubyTruthy(config.sslCa)) args.push(`--ssl-ca=${config.sslCa}`);
+    if (isRubyTruthy(config.sslCert)) args.push(`--ssl-cert=${config.sslCert}`);
+    if (isRubyTruthy(config.sslKey)) args.push(`--ssl-key=${config.sslKey}`);
     // Rails: --password=… only with include_password; otherwise -p prompts.
-    if (config.password && options.includePassword) {
+    if (isRubyTruthy(config.password) && options.includePassword) {
       args.push(`--password=${config.password}`);
-    } else if (config.password && String(config.password) !== "") {
+    } else if (isRubyTruthy(config.password) && String(config.password) !== "") {
       args.push("-p");
     }
     if (config.database) args.push(config.database as string);
