@@ -15,6 +15,8 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "../test-helpers/models/cpk.js";
+import { Post } from "../test-helpers/models/post.js";
+import { Comment } from "../test-helpers/models/comment.js";
 
 describe("Relation#where — composite-key form", () => {
   // Rails creates the CPK rows inline with `Cpk::Book.create!` — no cpk
@@ -23,7 +25,7 @@ describe("Relation#where — composite-key form", () => {
   fixtures([]);
 
   beforeAll(() => {
-    [CpkBook, CpkOrder, CpkAuthor, CpkChapter].forEach((m) => registerModel(m));
+    [CpkBook, CpkOrder, CpkAuthor, CpkChapter, Post, Comment].forEach((m) => registerModel(m));
   });
 
   it("compiles `where(['c1','c2'], [[v1a,v1b], [v2a,v2b]])` to OR-of-AND of column equalities", async () => {
@@ -135,6 +137,40 @@ describe("Relation#where — composite-key form", () => {
     expect(rhs?.constructor?.name).toBe("BindParam");
     expect(rhs?.value?.name).toBe("author_id");
     expect(rhs?.value?.constructor?.name).toBe("QueryAttribute");
+  });
+
+  it("qualified composite cols bind through the joined table's type, not the base table's", () => {
+    const rel = (Post as any).all();
+    const node: any = rel.predicateBuilder.buildComposite(
+      ["posts.id", "comments.post_id"],
+      [[1, "2"]],
+    );
+    const [left, right] = node.expr.children;
+    expect(right.left.relation.name).toBe("comments");
+    const bind = right.right.value;
+    expect(bind.name).toBe("post_id");
+    expect(bind.valueForDatabase).toBe(2);
+    expect(left.left.relation.name).toBe("posts");
+  });
+
+  it("qualified single-column composite resolves its IN(...) attribute on the joined table", () => {
+    const rel = (Post as any).all();
+    const node: any = rel.predicateBuilder.buildComposite(["comments.post_id"], [[1], [2]]);
+    expect(node.left.relation.name).toBe("comments");
+    expect(node.left.name).toBe("post_id");
+  });
+
+  it("qualified composite cols match rows through a join", async () => {
+    const post: any = await (Post as any).create({ title: "joined", body: "b", author_id: 1 });
+    const other: any = await (Post as any).create({ title: "unjoined", body: "b", author_id: 1 });
+    await (Comment as any).create({ post_id: post.id, body: "c" });
+    await (Comment as any).create({ post_id: other.id, body: "c2" });
+
+    const rows = await (Post as any)
+      .joins("comments")
+      .where(["posts.id", "comments.post_id"], [[post.id, post.id]])
+      .toArray();
+    expect(rows.map((r: any) => r.title)).toEqual(["joined"]);
   });
 
   it("single-column composite uses IN(...) (not OR-chain) for compactness", () => {
