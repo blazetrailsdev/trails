@@ -50,9 +50,8 @@ describe("comparePinKeys", () => {
     expect(comparePinKeys(bang, bang)).toBe(0);
   });
 
-  it("sorts a manifest the same way regardless of locale collation", () => {
-    const keys = ["permit!", "permit_all", "permitted?", "Permit"];
-    const sorted = keys
+  it("puts uppercase before lowercase, unlike ICU's case-insensitive primary strength", () => {
+    const sorted = ["permit!", "permit_all", "permitted?", "Permit"]
       .map((rubyName) => pin({ rubyName }))
       .sort(comparePinKeys)
       .map((p) => p.rubyName);
@@ -126,6 +125,19 @@ describe("pinPairs", () => {
     expect(next.find((p) => p.rubyName === "save")!.digest).toBe("new1");
     // querying.rb was not selected → its pin stays at the old digest.
     expect(next.find((p) => p.rubyName === "find")!.digest).toBe("old2");
+  });
+
+  it("emits the same manifest order for any input order (no reseed churn)", () => {
+    // The manifest is regenerated from whatever order the artifact lists
+    // records in; a permuted artifact must not reorder committed pins.
+    const names = ["permit!", "permit_all", "permitted?", "Permit", "save"];
+    const records = names.map((rubyName, i) => record({ rubyName, digest: `${i}00000000000000` }));
+    const forward = pinPairs(records, [], { all: true }).map(keyOf);
+    const reversed = pinPairs([...records].reverse(), [], { all: true }).map(keyOf);
+    expect(reversed).toEqual(forward);
+    // Array#sort with no comparator is code-unit order — the emitted order
+    // must match it exactly.
+    expect(forward).toEqual([...forward].sort());
   });
 });
 
