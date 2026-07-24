@@ -183,6 +183,15 @@ export class LazyAttributeHash {
     return this.has(key);
   }
 
+  get(name: string): Attribute {
+    if (this.delegate.has(name)) return this.delegate.get(name)!;
+    return this.assignDefault(name);
+  }
+
+  set(name: string, attr: Attribute): void {
+    this.delegate.set(name, attr);
+  }
+
   deepDup(): LazyAttributeHash {
     const copy = new LazyAttributeHash(
       this.types,
@@ -263,15 +272,6 @@ export class LazyAttributeHash {
       ...this.types.keys(),
     ]);
     return [...allKeys];
-  }
-
-  get(name: string): Attribute {
-    if (this.delegate.has(name)) return this.delegate.get(name)!;
-    return this.assignDefault(name);
-  }
-
-  set(name: string, attr: Attribute): void {
-    this.delegate.set(name, attr);
   }
 
   has(name: string): boolean {

@@ -326,6 +326,14 @@ export class Error {
     return true;
   }
 
+  equals(other: Error): boolean {
+    if (!(other instanceof Error)) return false;
+    const a = this.attributesForHash();
+    const b = other.attributesForHash();
+    if (a[0] !== b[0] || a[1] !== b[1] || a[2] !== b[2]) return false;
+    return optionsEqual(a[3], b[3]);
+  }
+
   /**
    * Identity tuple used by `==` and `hash`. Mirrors Rails
    * `attributes_for_hash` (activemodel/lib/active_model/error.rb:204-206):
@@ -352,14 +360,6 @@ export class Error {
    */
   dupWithBase(newBase: ModelBase): Error {
     return new Error(newBase, this.attribute, this.type, deepDup(this.options), this.rawType);
-  }
-
-  equals(other: Error): boolean {
-    if (!(other instanceof Error)) return false;
-    const a = this.attributesForHash();
-    const b = other.attributesForHash();
-    if (a[0] !== b[0] || a[1] !== b[1] || a[2] !== b[2]) return false;
-    return optionsEqual(a[3], b[3]);
   }
 
   inspect(): string {
