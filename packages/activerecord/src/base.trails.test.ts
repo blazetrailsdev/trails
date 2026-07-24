@@ -408,6 +408,27 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
     expect(Company.columnNames()).toContain("rating");
   });
 
+  it("a subclass that ignores every column memoizes and serves an empty columns list", () => {
+    class Company extends Base {
+      static override tableName = "companies";
+      static {
+        this.inheritanceColumn = "type";
+      }
+    }
+    class Firm extends Company {
+      static {
+        registerSubclass(this);
+        this.ignoredColumns = Company.columnNames();
+      }
+    }
+    const cols = Firm.columns();
+    expect(cols).toEqual([]);
+    // Pins that a legitimately empty column list is memoized and served on the
+    // next read (same instance), not recomputed — the sentinel the `!= null`
+    // memo read distinguishes from an absent (`undefined`) memo.
+    expect(Firm.columns()).toBe(cols);
+  });
+
   it("an STI subclass's own columns memo is rebuilt when the base re-reflects", async () => {
     class Company extends Base {
       static override tableName = "companies";
