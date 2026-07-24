@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { slotPoolSize, workerForkCount } from "./ar-db-slots.js";
+import { DEFAULT_FORKS, slotPoolSize, workerForkCount } from "./ar-db-slots.js";
 
 const ENV_KEYS = ["AR_DB_FORKS", "AR_DB_SLOTS"] as const;
 
@@ -23,9 +23,9 @@ describe("ar-db-slots", () => {
   }
 
   describe("workerForkCount", () => {
-    it("defaults to 1 when AR_DB_FORKS is unset", () => {
+    it("defaults to the shared default fork count when AR_DB_FORKS is unset", () => {
       setEnv(undefined);
-      expect(workerForkCount()).toBe(1);
+      expect(workerForkCount()).toBe(DEFAULT_FORKS);
     });
 
     it("reads AR_DB_FORKS", () => {
@@ -35,12 +35,20 @@ describe("ar-db-slots", () => {
 
     it("clamps to at least 1", () => {
       setEnv("0");
-      expect(workerForkCount()).toBe(1);
+      expect(workerForkCount()).toBe(DEFAULT_FORKS);
+      expect(workerForkCount()).toBeGreaterThanOrEqual(1);
     });
 
-    it("treats a non-numeric value as single-worker", () => {
+    it("treats a non-numeric value as the default fork count", () => {
       setEnv("auto");
-      expect(workerForkCount()).toBe(1);
+      expect(workerForkCount()).toBe(DEFAULT_FORKS);
+    });
+
+    it("reads the effective count vitest.config.ts republishes", () => {
+      // vitest.config.ts overwrites AR_DB_FORKS with the host-clamped count,
+      // so a request of 8 on a 4-vCPU runner arrives here as 3.
+      setEnv("3");
+      expect(workerForkCount()).toBe(3);
     });
   });
 

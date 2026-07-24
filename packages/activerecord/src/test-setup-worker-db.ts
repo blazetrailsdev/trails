@@ -21,9 +21,10 @@
  * (e.g. hot-module reloading in vitest watch mode) returns the same slot
  * without opening a second connection or consuming an additional lock.
  *
- * AR_DB_FORKS: vitest worker count (default: 1). The advisory-slot pool is
- * sized separately with headroom — see test-helpers/ar-db-slots.ts (override
- * with AR_DB_SLOTS).
+ * AR_DB_FORKS: requested vitest worker count; the effective count is that
+ * request clamped to the host's numCpus - 1. The advisory-slot pool is sized
+ * separately, with headroom over the effective count — see
+ * test-helpers/ar-db-slots.ts (override with AR_DB_SLOTS).
  */
 
 import pg from "pg";
@@ -58,14 +59,15 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// The pool is sized at AR_DB_FORKS + headroom (ar-db-slots.ts), so exhaustion
-// means more workers ran concurrently than AR_DB_FORKS promises — name both
-// numbers so that reads as a worker-cap bug, not a schema-setup regression.
+// The pool is sized at the effective fork count + headroom (ar-db-slots.ts),
+// so exhaustion means more workers ran concurrently than that count promises —
+// name both numbers so that reads as a worker-cap bug, not a schema-setup
+// regression.
 function slotExhaustionMessage(fn: string, lockKind: string, slots: number): string {
   return (
     `${fn}: all ${slots} ${lockKind} slots are held after ` +
     `${SLOT_RETRY_ATTEMPTS} attempts (${(SLOT_RETRY_ATTEMPTS * SLOT_RETRY_DELAY_MS) / 1000}s) ` +
-    `with AR_DB_FORKS=${workerForkCount()} (slot pool = forks + headroom, see ` +
+    `with ${workerForkCount()} effective forks (slot pool = forks + headroom, see ` +
     `test-helpers/ar-db-slots.ts). More than ${workerForkCount()} workers are competing: ` +
     `check that the vitest worker cap is honored (root-level poolOptions in ` +
     `vitest.config.ts), increase AR_DB_SLOTS, or check for stuck workers.`
