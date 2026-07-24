@@ -810,3 +810,62 @@ describe("Ruby extractor method source lines", () => {
     expect(lines["Foo#qux"]).toEqual(["classMethods", 7]);
   });
 });
+
+describe("Ruby extractor option-key const expansion", () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+  // Returns a map of "<fqn>#<method>" -> the method's expanded option_keys.
+  function optionKeys(fixtures: Record<string, string>): Record<string, string[] | undefined> {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "optkeys-rb-"));
+    try {
+      for (const [rel, src] of Object.entries(fixtures)) {
+        const p = path.join(dir, rel);
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, src);
+      }
+      const rels = JSON.stringify(Object.keys(fixtures));
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        JSON.parse(${JSON.stringify(rels)}).each do |rel|
+          ex.process_file(File.join(${JSON.stringify(dir)}, rel), ${JSON.stringify(dir)})
+        end
+        out = {}
+        (ex.classes.to_a + ex.modules.to_a).each do |fqn, info|
+          (info[:instanceMethods] + info[:classMethods]).each do |m|
+            out["#{fqn}##{m[:name]}"] = m[:option_keys]
+          end
+        end
+        puts JSON.generate(out)
+      `;
+      const stdout = execFileSync("ruby", ["-e", driver], { encoding: "utf-8" });
+      return JSON.parse(stdout);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it("binds a leading :: option-key const to the top level, not a nested const", () => {
+    const r = optionKeys({
+      "abs_opt.rb": `
+        module Foo
+          KEYS = [:top_a, :top_b]
+        end
+
+        module Bar
+          module Foo
+            KEYS = [:nested_a, :nested_b]
+          end
+
+          class Rel
+            def build(options = {})
+              options.assert_valid_keys(::Foo::KEYS)
+            end
+          end
+        end
+      `,
+    });
+    expect(r["Bar::Rel#build"]).toEqual(["top_a", "top_b"]);
+  });
+});
