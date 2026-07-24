@@ -1013,7 +1013,8 @@ describe("BasicsTest", () => {
 
   it("equality of relation and collection proxy", async () => {
     const car = await Car.create({});
-    await association(car, "bulbs").create({});
+    association(car, "bulbs").build({});
+    await car.save();
 
     const bulbsOfCar = Bulb.where({ car_id: car.id });
     const proxyResults = await association(car, "bulbs");
@@ -1026,7 +1027,8 @@ describe("BasicsTest", () => {
 
   it("equality of relation and association relation", async () => {
     const car = await Car.create({});
-    await association(car, "bulbs").create({});
+    association(car, "bulbs").build({});
+    await car.save();
 
     const bulbsOfCar = Bulb.where({ car_id: car.id });
     // Rails: assert_equal bulbs_of_car, car.bulbs.includes(:car)
@@ -1042,7 +1044,8 @@ describe("BasicsTest", () => {
 
   it("equality of collection proxy and association relation", async () => {
     const car = await Car.create({});
-    await association(car, "bulbs").create({});
+    association(car, "bulbs").build({});
+    await car.save();
 
     // Rails: assert_equal car.bulbs, car.bulbs.includes(:car)
     // CollectionProxy and includes-chain produce the same underlying rows

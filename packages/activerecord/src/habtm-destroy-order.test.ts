@@ -30,8 +30,6 @@ describe("HabtmDestroyOrderTest", () => {
 
   it("not destroying a student with lessons leaves student<=>lesson association intact", async () => {
     // test a normal before_destroy doesn't destroy the habtm joins
-    // `resetCallbacks` restores Student's destroy callbacks afterwards, matching
-    // the `ensure Student.reset_callbacks(:destroy)` in the Rails test.
     await resetCallbacks(Student, "destroy", async () => {
       // add a before destroy to student
       Student.beforeDestroy(async (r: any) => {
