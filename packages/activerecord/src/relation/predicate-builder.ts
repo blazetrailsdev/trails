@@ -52,7 +52,7 @@ export class PredicateBuilder {
     this.rangeHandler = new RangeHandler((attribute, v) => {
       // Resolve the type once so sign detection and the cast below agree —
       // single source, like Rails' `build_bind_attribute` (predicate_builder.rb:67-69).
-      const type = this.table.type(attribute.name) as BoundType;
+      const type: BoundType = this.table.type(attribute.name);
       const sentinel = this.unboundableSentinel(attribute.name, v, type);
       if (sentinel) return sentinel;
       return type.cast(v);
@@ -319,11 +319,7 @@ export class PredicateBuilder {
     // `OID::Array#force_equality?` is `value.is_a?(::Array)` — a Ruby Set is not
     // an Array, so a Set on an array column force-equalizes in neither Rails nor
     // here. Normalizing Set→Array first would spuriously trip force-equality.
-    if ((this.table.type(attribute.name) as BoundType).isForceEquality?.(value) === true) {
-      // Rails emits a bind for force-equality types:
-      // `attribute.eq(build_bind_attribute(attribute.name, value))`. The bind
-      // value (e.g. a `Range`) serializes to its pg literal string via the
-      // adapter's `typeCast` in the bind path (`type_casted_binds`).
+    if (this.table.type(attribute.name).isForceEquality?.(value) === true) {
       return attribute.eq(this.buildBindAttribute(attribute.name, value));
     }
     // Normalize Set → Array before dispatch so every code path (custom handlers,
@@ -378,13 +374,12 @@ export class PredicateBuilder {
     const klass = this.table.klass as { _normalizations?: Map<string, unknown> } | null;
     const normalizations = klass?._normalizations;
     if (!normalizations || !normalizations.has(columnName)) return value;
-    return (this.table.type(columnName) as BoundType).cast(value);
+    return this.table.type(columnName).cast(value);
   }
 
   buildRangePredicate(attribute: Nodes.Attribute, range: Range): Nodes.Node {
-    // Same force-equality precedence `build` applies (predicate_builder.rb:57-69):
-    // a PG range column force-equalizes rather than expanding into BETWEEN.
-    if ((this.table.type(attribute.name) as BoundType).isForceEquality?.(range) === true) {
+    // Same force-equality precedence `build` applies (predicate_builder.rb:57-69).
+    if (this.table.type(attribute.name).isForceEquality?.(range) === true) {
       return attribute.eq(this.buildBindAttribute(attribute.name, range));
     }
     return this.rangeHandler.call(attribute, range);
