@@ -8,8 +8,7 @@
     "skipLibCheck": true,
     "allowJs": true,
     "resolveJsonModule": true,
-    "isolatedModules": true,
-    "types": ["vitest/globals"]
+    "isolatedModules": true
   },
   "include": ["**/*.ts", "**/*.mjs"]
 }
