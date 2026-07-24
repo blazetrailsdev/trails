@@ -22,13 +22,13 @@ describe("FieldOrderedValuesTest", () => {
     const order = [3, 4, 1];
     const posts = Post.inOrderOf("id", order);
 
-    expect((await posts.toArray()).map((p: any) => Number(p.id))).toEqual(order);
+    expect((await posts).map((p: any) => Number(p.id))).toEqual(order);
   });
 
   it("in order of empty", async () => {
     const posts = Post.inOrderOf("id", []);
 
-    expect(await posts.toArray()).toEqual([]);
+    expect(await posts).toEqual([]);
   });
 
   it("in order of with enums values", async () => {
@@ -39,10 +39,10 @@ describe("FieldOrderedValuesTest", () => {
 
     const order = ["written", "published", "proposed"];
     let books = Book.inOrderOf("status", order);
-    expect((await books.toArray()).map((b: any) => b.status)).toEqual(order);
+    expect((await books).map((b: any) => b.status)).toEqual(order);
 
     books = Book.inOrderOf("status", order);
-    expect((await books.toArray()).map((b: any) => b.status)).toEqual(order);
+    expect((await books).map((b: any) => b.status)).toEqual(order);
   });
 
   it("in order of with enums keys", async () => {
@@ -55,7 +55,7 @@ describe("FieldOrderedValuesTest", () => {
     const order = [statuses.written, statuses.published, statuses.proposed];
     const books = Book.inOrderOf("status", order);
 
-    expect((await books.toArray()).map((book: any) => statuses[book.status])).toEqual(order);
+    expect((await books).map((book: any) => statuses[book.status])).toEqual(order);
   });
 
   it("in order of expression", async () => {
@@ -65,7 +65,7 @@ describe("FieldOrderedValuesTest", () => {
       order.map((id) => id * 2),
     );
 
-    expect((await posts.toArray()).map((p: any) => Number(p.id))).toEqual(order);
+    expect((await posts).map((p: any) => Number(p.id))).toEqual(order);
   });
 
   it("in order of with string column", async () => {
@@ -76,19 +76,19 @@ describe("FieldOrderedValuesTest", () => {
 
     const order = ["hardcover", "paperback", "ebook"];
     let books = Book.inOrderOf("format", order);
-    expect((await books.toArray()).map((b: any) => b.format)).toEqual(order);
+    expect((await books).map((b: any) => b.format)).toEqual(order);
 
     books = Book.inOrderOf("format", order);
-    expect((await books.toArray()).map((b: any) => b.format)).toEqual(order);
+    expect((await books).map((b: any) => b.format)).toEqual(order);
   });
 
   it("in order of after regular order", async () => {
     const order = [3, 4, 1];
     let posts = Post.where({ type: "Post" }).order("type").inOrderOf("id", order);
-    expect((await posts.toArray()).map((p: any) => Number(p.id))).toEqual(order);
+    expect((await posts).map((p: any) => Number(p.id))).toEqual(order);
 
     posts = Post.where({ type: "Post" }).order("type").inOrderOf("id", order);
-    expect((await posts.toArray()).map((p: any) => Number(p.id))).toEqual(order);
+    expect((await posts).map((p: any) => Number(p.id))).toEqual(order);
   });
 
   it("in order of with nil", async () => {
@@ -99,10 +99,10 @@ describe("FieldOrderedValuesTest", () => {
 
     const order = ["ebook", null, "paperback"];
     let books = Book.inOrderOf("format", order);
-    expect((await books.toArray()).map((b: any) => b.format)).toEqual(order);
+    expect((await books).map((b: any) => b.format)).toEqual(order);
 
     books = Book.inOrderOf("format", order);
-    expect((await books.toArray()).map((b: any) => b.format)).toEqual(order);
+    expect((await books).map((b: any) => b.format)).toEqual(order);
   });
 
   it("in order of with associations", async () => {

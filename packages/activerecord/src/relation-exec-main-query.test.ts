@@ -20,7 +20,7 @@ describe("RelationTest", () => {
 
   it("find in empty array", async () => {
     const authors = Author.all().where({ id: [] });
-    expect(await authors.toArray()).toEqual([]);
+    expect(await authors).toEqual([]);
   });
 
   it("contradiction where-clause issues no query", async () => {

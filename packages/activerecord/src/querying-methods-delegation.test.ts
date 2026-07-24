@@ -40,7 +40,7 @@ describe("Base static query delegations", () => {
     await Topic.create({ title: "Alice" });
 
     const rel = Topic.select("title");
-    const results = await rel.toArray();
+    const results = await rel;
     expect(results.length).toBe(1);
   });
 

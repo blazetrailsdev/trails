@@ -539,7 +539,7 @@ describe("DefaultScopingTest", () => {
   it("additional conditions are ANDed with the default scope", async () => {
     const scope = DeveloperCalledJamis.where({ name: "David" });
     expect((scope as any)._whereClause.ast.children.length).toBe(2);
-    expect(await scope.toArray()).toEqual([]);
+    expect(await scope).toEqual([]);
   });
 
   it("additional conditions in a scope are ANDed with the default scope", async () => {
@@ -601,7 +601,7 @@ describe("DefaultScopingTest", () => {
   it("unscope eager load", async () => {
     const expected = names(await Developer.all());
     const received = Developer.eagerLoad("projects").select("id").unscope("eagerLoad", "select");
-    const rows = await received.toArray();
+    const rows = await received;
     expect(names(rows)).toEqual(expected);
     expect((rows[0] as any).projects.loaded).toBe(false);
   });
@@ -609,7 +609,7 @@ describe("DefaultScopingTest", () => {
   it("unscope preloads", async () => {
     const expected = names(await Developer.all());
     const received = Developer.preload("projects").select("id").unscope("preload", "select");
-    const rows = await received.toArray();
+    const rows = await received;
     expect(names(rows)).toEqual(expected);
     expect((rows[0] as any).projects.loaded).toBe(false);
   });

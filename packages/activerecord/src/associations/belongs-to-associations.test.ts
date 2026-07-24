@@ -1290,7 +1290,7 @@ describe("BelongsToAssociationsTest", () => {
 
     expect((await topic.reload()).readAttribute("replies_count")).toBe(5);
 
-    const reply = (await topic.replies.toArray())[0];
+    const reply = (await topic.replies)[0];
     await reply.destroy();
     expect((await topic.reload()).readAttribute("replies_count")).toBe(4);
 
@@ -1308,7 +1308,7 @@ describe("BelongsToAssociationsTest", () => {
 
     expect((await topic.reload()).readAttribute("replies_count")).toBe(5);
 
-    const reply = (await topic.replies.toArray())[0];
+    const reply = (await topic.replies)[0];
     const replyClone = await Reply.find(reply.id!);
 
     await reply.destroy();

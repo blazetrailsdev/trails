@@ -330,7 +330,7 @@ describe("EagerAssociationTest", () => {
   });
   it("eager loaded has many association without primary key", async () => {
     const pirate = pirates("blackbeard");
-    const mateysList: Matey[] = await pirate.mateys.toArray();
+    const mateysList: Matey[] = await pirate.mateys;
     const eagerLoaded = await Pirate.eagerLoad("mateys").where({ id: pirate.id }).first();
     expect(mateysList.length).toBeGreaterThan(0);
     const mateyAttrs = (m: any) => ({
@@ -628,13 +628,13 @@ describe("EagerAssociationTest", () => {
     await Tagging.create({ taggable_type: "Post", taggable_id: post2.id, tag_id: tag.id });
 
     const tagWithIncludes = await OrderedTag.includes("taggedPosts").find(tag.id);
-    const taggings = await tagWithIncludes.orderedTaggings.toArray();
+    const taggings = await tagWithIncludes.orderedTaggings;
     const taggableTitles: string[] = [];
     for (const tagging of taggings) {
       const taggable = (await tagging.loadBelongsTo("taggable")) as Post;
       taggableTitles.push(taggable.title);
     }
-    const taggedPostTitles = (await tagWithIncludes.taggedPosts.toArray()).map((p: any) => p.title);
+    const taggedPostTitles = (await tagWithIncludes.taggedPosts).map((p: any) => p.title);
     expect(taggedPostTitles).toEqual(taggableTitles);
   });
   it("eager has many through multiple with order", async () => {
@@ -655,11 +655,11 @@ describe("EagerAssociationTest", () => {
     const tag1WithIncludes = tagsWithIncludes[0];
     const tag2WithIncludes = tagsWithIncludes[tagsWithIncludes.length - 1];
 
-    expect((await tag1WithIncludes.taggedPosts.toArray()).map((p: any) => p.title)).toEqual([
+    expect((await tag1WithIncludes.taggedPosts).map((p: any) => p.title)).toEqual([
       post2.title,
       post1.title,
     ]);
-    expect((await tag2WithIncludes.taggedPosts.toArray()).map((p: any) => p.title)).toEqual([
+    expect((await tag2WithIncludes.taggedPosts).map((p: any) => p.title)).toEqual([
       post1.title,
       post2.title,
     ]);
@@ -811,12 +811,12 @@ describe("EagerAssociationTest", () => {
     });
   });
   it("preload has many using primary key", async () => {
-    const expected = (await (await Firm.first())!.clientsUsingPrimaryKey.toArray()).sort(
+    const expected = (await (await Firm.first())!.clientsUsingPrimaryKey).sort(
       (a: any, b: any) => Number(a.id) - Number(b.id),
     );
     const firm = await Firm.includes("clientsUsingPrimaryKey").first();
     await assertNoQueries(false, async () => {
-      const actual = (await firm!.clientsUsingPrimaryKey.toArray()).sort(
+      const actual = (await firm!.clientsUsingPrimaryKey).sort(
         (a: any, b: any) => Number(a.id) - Number(b.id),
       );
       expect(actual.map((c: any) => c.id)).toEqual(expected.map((c: any) => c.id));
@@ -824,15 +824,15 @@ describe("EagerAssociationTest", () => {
   });
 
   it("include has many using primary key", async () => {
-    const expected = (await (await Firm.find(1)).clientsUsingPrimaryKey.toArray()).sort(
-      (a: any, b: any) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0),
+    const expected = (await (await Firm.find(1)).clientsUsingPrimaryKey).sort((a: any, b: any) =>
+      a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
     );
     const firm = await Firm.all()
       .includes("clientsUsingPrimaryKey")
       .order("clients_using_primary_keys_companies.name")
       .find(1);
     await assertNoQueries(false, async () => {
-      const actual = await firm.clientsUsingPrimaryKey.toArray();
+      const actual = await firm.clientsUsingPrimaryKey;
       expect(actual.map((c: any) => c.id)).toEqual(expected.map((c: any) => c.id));
     });
   });
@@ -845,7 +845,7 @@ describe("EagerAssociationTest", () => {
       client = await Client.preload("accounts").find(c.id);
     });
     await assertNoQueries(false, async () => {
-      expect(await client.accounts.toArray()).toHaveLength(0);
+      expect(await client.accounts).toHaveLength(0);
     });
   });
   it("preloading empty belongs to polymorphic", async () => {
@@ -2114,7 +2114,7 @@ describe("EagerAssociationTest", () => {
     expect(sql).toMatch(/LEFT OUTER JOIN.*categories_posts/);
     expect(sql).toMatch(/LEFT OUTER JOIN.*categories[^_]/);
 
-    const loaded = await rel.toArray();
+    const loaded = await rel;
     const welcome = loaded.find((p) => p.id === posts("welcome").id)!;
     const thinking = loaded.find((p) => p.id === posts("thinking").id)!;
     expect(await (welcome as any).categories.length()).toBe(2);
@@ -2784,7 +2784,7 @@ describe("EagerAssociationTest", () => {
     const posts = ShardedBlogPost.where({ blog_id: blogIds }).includes("comments");
 
     const sqls = await captureSql(async () => {
-      const loaded = (await posts.toArray()) as Base[];
+      const loaded = (await posts) as Base[];
       // Exercise the public reader (Rails: `posts.map(&:comments)`); the size
       // is the post count (3), populated from the preload, not a fresh query.
       const commentsCollection = await Promise.all(

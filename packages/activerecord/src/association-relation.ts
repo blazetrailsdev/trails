@@ -245,8 +245,8 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    * explicit `equals` method.
    */
   async equals(other: Relation<T> | T[]): Promise<boolean> {
-    const ours = await this.toArray();
-    const theirs = Array.isArray(other) ? other : await other.toArray();
+    const ours = await this;
+    const theirs = Array.isArray(other) ? other : await other;
     if (ours.length !== theirs.length) return false;
     for (let i = 0; i < ours.length; i++) {
       if (!ours[i].isEqual(theirs[i])) return false;

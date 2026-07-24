@@ -120,7 +120,7 @@ describe("NestedThroughAssociationsTest", () => {
   it("has many through has many with has many through source reflection", async () => {
     const general = tags("general");
     const david = authors("david");
-    const davidTags = await david.tags.toArray();
+    const davidTags = await david.tags;
     expect(davidTags.map((t) => t.id)).toEqual([general.id, general.id]);
   });
 
@@ -179,7 +179,7 @@ describe("NestedThroughAssociationsTest", () => {
   it("has many through has one with has one through source reflection", async () => {
     const founding = memberTypes("founding");
     const groucho = members("groucho");
-    const result = await groucho.nestedMemberTypes.toArray();
+    const result = await groucho.nestedMemberTypes;
     expect(result.map((t) => t.id)).toEqual([founding.id]);
   });
 
@@ -205,7 +205,7 @@ describe("NestedThroughAssociationsTest", () => {
   it("has many through has one through with has one source reflection", async () => {
     const mustache = sponsors("moustache_club_sponsor_for_groucho");
     const groucho = members("groucho");
-    const result = await groucho.nestedSponsors.toArray();
+    const result = await groucho.nestedSponsors;
     expect(result.map((s) => s.id)).toEqual([mustache.id]);
   });
 
@@ -230,7 +230,7 @@ describe("NestedThroughAssociationsTest", () => {
     const grouchoDetails = memberDetails("groucho");
     const otherDetails = memberDetails("some_other_guy");
     const groucho = members("groucho");
-    const result = await groucho.organizationMemberDetails.toArray();
+    const result = await groucho.organizationMemberDetails;
     const sortedIds = result.map((d) => d.id).sort((a: any, b: any) => Number(a) - Number(b));
     expect(sortedIds).toEqual(
       [grouchoDetails.id, otherDetails.id].sort((a: any, b: any) => Number(a) - Number(b)),
@@ -272,7 +272,7 @@ describe("NestedThroughAssociationsTest", () => {
     const grouchoDetails = memberDetails("groucho");
     const otherDetails = memberDetails("some_other_guy");
     const groucho = members("groucho");
-    const result = await groucho.organizationMemberDetails_2.toArray();
+    const result = await groucho.organizationMemberDetails_2;
     const sortedIds = result.map((d) => d.id).sort((a: any, b: any) => Number(a) - Number(b));
     expect(sortedIds).toEqual(
       [grouchoDetails.id, otherDetails.id].sort((a: any, b: any) => Number(a) - Number(b)),
@@ -316,7 +316,7 @@ describe("NestedThroughAssociationsTest", () => {
     const general = categories("general");
     const cooking = categories("cooking");
     const bob = authors("bob");
-    const result = await bob.postCategories.toArray();
+    const result = await bob.postCategories;
     const sortedIds = result.map((c) => c.id).sort((a: any, b: any) => Number(a) - Number(b));
     expect(sortedIds).toEqual(
       [general.id, cooking.id].sort((a: any, b: any) => Number(a) - Number(b)),
@@ -415,7 +415,7 @@ describe("NestedThroughAssociationsTest", () => {
   it("has many through has many through with belongs to source reflection", async () => {
     const general = tags("general");
     const david = authors("david");
-    const result = await david.taggingTags.toArray();
+    const result = await david.taggingTags;
     expect(result.map((t: any) => t.id)).toEqual([general.id, general.id]);
   });
 
@@ -440,7 +440,7 @@ describe("NestedThroughAssociationsTest", () => {
     const welcomeGeneral = taggings("welcome_general");
     const thinkingGeneral = taggings("thinking_general");
     const davidWelcomeGeneral = categorizations("david_welcome_general");
-    const result = await davidWelcomeGeneral.postTaggings.toArray();
+    const result = await davidWelcomeGeneral.postTaggings;
     const sortedIds = result.map((t) => t.id).sort((a: any, b: any) => Number(a) - Number(b));
     expect(sortedIds).toEqual(
       [welcomeGeneral.id, thinkingGeneral.id].sort((a: any, b: any) => Number(a) - Number(b)),
@@ -537,7 +537,7 @@ describe("NestedThroughAssociationsTest", () => {
   it("distinct has many through a has many through association on source reflection", async () => {
     const david = authors("david");
     const general = tags("general");
-    const result = await david.distinctTags.toArray();
+    const result = await david.distinctTags;
     expect(result.map((t) => t.id)).toEqual([general.id]);
   });
 
@@ -545,7 +545,7 @@ describe("NestedThroughAssociationsTest", () => {
     const david = authors("david");
     const luke = subscribers("first");
     const davidSub = subscribers("second");
-    const result = await david.distinctSubscribers.toArray();
+    const result = await david.distinctSubscribers;
     const nicksSorted = result.map((s: any) => s.nick).sort();
     expect(nicksSorted).toEqual([luke, davidSub].map((s: any) => s.nick).sort());
   });
@@ -557,7 +557,7 @@ describe("NestedThroughAssociationsTest", () => {
     const otherByBob = posts("other_by_bob");
     const otherByMary = posts("other_by_mary");
 
-    const similarPosts = await bob.similarPosts.toArray();
+    const similarPosts = await bob.similarPosts;
     const sortedIds = similarPosts.map((p) => p.id).sort((a: any, b: any) => Number(a) - Number(b));
     expect(sortedIds).toEqual(
       [miscByBob.id, miscByMary.id, otherByBob.id, otherByMary.id].sort(
@@ -602,13 +602,13 @@ describe("NestedThroughAssociationsTest", () => {
     const davidUnicyclist = references("david_unicyclist");
     const davidAuthor = authors("david");
 
-    const agentsPosts = await david.agentsPosts.toArray();
+    const agentsPosts = await david.agentsPosts;
     const sortedIds = agentsPosts.map((p) => p.id).sort((a: any, b: any) => Number(a) - Number(b));
     expect(sortedIds).toEqual(
       [welcome.id, authorless.id].sort((a: any, b: any) => Number(a) - Number(b)),
     );
 
-    const agentsPostsAuthors = await davidUnicyclist.agentsPostsAuthors.toArray();
+    const agentsPostsAuthors = await davidUnicyclist.agentsPostsAuthors;
     expect(agentsPostsAuthors.map((a) => a.id)).toEqual([davidAuthor.id]);
 
     const refsResult = await Reference.joins("agentsPostsAuthors").where({
@@ -622,7 +622,7 @@ describe("NestedThroughAssociationsTest", () => {
     const michael = people("michael");
     const susan = people("susan");
 
-    const agents = await unicyclist.agents.toArray();
+    const agents = await unicyclist.agents;
     const sortedIds = agents.map((p) => p.id).sort((a: any, b: any) => Number(a) - Number(b));
     expect(sortedIds).toEqual(
       [michael.id, susan.id].sort((a: any, b: any) => Number(a) - Number(b)),
@@ -637,7 +637,7 @@ describe("NestedThroughAssociationsTest", () => {
     const specialRating = ratings("special_comment_rating");
     const subSpecialRating = ratings("sub_special_comment_rating");
 
-    const ratingsResult = await stiComments.specialCommentsRatings.toArray();
+    const ratingsResult = await stiComments.specialCommentsRatings;
     const sortedIds = ratingsResult
       .map((r) => r.id)
       .sort((a: any, b: any) => Number(a) - Number(b));
@@ -658,7 +658,7 @@ describe("NestedThroughAssociationsTest", () => {
     const stiComments = posts("sti_comments");
     const specialRatingTagging = taggings("special_comment_rating");
 
-    const taggingsResult = await stiComments.specialCommentsRatingsTaggings.toArray();
+    const taggingsResult = await stiComments.specialCommentsRatingsTaggings;
     expect(taggingsResult.map((t) => t.id)).toEqual([specialRatingTagging.id]);
 
     const scope = Post.joins("specialCommentsRatingsTaggings").where({ id: stiComments.id });
@@ -686,7 +686,7 @@ describe("NestedThroughAssociationsTest", () => {
   it("nested has many through with conditions on through associations", async () => {
     const bob = authors("bob");
     const blue = tags("blue");
-    const result = await bob.miscPostFirstBlueTags.toArray();
+    const result = await bob.miscPostFirstBlueTags;
     expect(result.map((t) => t.id)).toEqual([blue.id]);
   });
 
@@ -711,7 +711,7 @@ describe("NestedThroughAssociationsTest", () => {
   it("nested has many through with conditions on source associations", async () => {
     const bob = authors("bob");
     const blue = tags("blue");
-    const result = await bob.miscPostFirstBlueTags_2.toArray();
+    const result = await bob.miscPostFirstBlueTags_2;
     expect(result.map((t) => t.id)).toEqual([blue.id]);
   });
 
@@ -727,7 +727,7 @@ describe("NestedThroughAssociationsTest", () => {
       [, , author] = await Author.includes("miscPostFirstBlueTags_2").order("authors.id");
     });
     await assertNoQueries(false, async () => {
-      const preloaded = await author.miscPostFirstBlueTags_2.toArray();
+      const preloaded = await author.miscPostFirstBlueTags_2;
       expect(preloaded.map((t) => t.id)).toEqual([blue.id]);
     });
   });
@@ -739,8 +739,8 @@ describe("NestedThroughAssociationsTest", () => {
       miscPostFirstBlueTags_2: {},
     }).order("authors.id");
     await assertNoQueries(false, async () => {
-      const firstPost = (await author.posts.toArray())[0];
-      const preloaded = await firstPost.firstBlueTags_2.toArray();
+      const firstPost = (await author.posts)[0];
+      const preloaded = await firstPost.firstBlueTags_2;
       expect(preloaded.map((t) => t.id)).toEqual([blue.id]);
     });
   });
@@ -757,7 +757,7 @@ describe("NestedThroughAssociationsTest", () => {
     const nsa = organizations("nsa");
     const general = categories("general");
 
-    const essayCategories = await nsa.authorEssayCategories.toArray();
+    const essayCategories = await nsa.authorEssayCategories;
     expect(essayCategories.map((c) => c.id)).toEqual([general.id]);
 
     const orgsResult = await Organization.joins("authorEssayCategories").where({
@@ -848,7 +848,7 @@ describe("NestedThroughAssociationsTest", () => {
     const preloadedIds = ((preloaded.association("orderedPostComments").target ?? []) as any[]).map(
       (c: any) => c.id,
     );
-    const originalIds = (await original.orderedPostComments.toArray()).map((c: any) => c.id);
+    const originalIds = (await original.orderedPostComments).map((c: any) => c.id);
     expect(originalIds).toEqual(preloadedIds);
   });
 });

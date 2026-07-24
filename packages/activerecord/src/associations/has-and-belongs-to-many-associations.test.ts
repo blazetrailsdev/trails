@@ -268,11 +268,11 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("has and belongs to many", async () => {
     const david = await Developer.find(1);
-    expect((await david.projects.toArray()).length).toBeGreaterThan(0);
+    expect((await david.projects).length).toBeGreaterThan(0);
     expect(await david.projects.size()).toBe(2);
 
     const activeRecord = await Project.find(1);
-    const devs = await activeRecord.developers.toArray();
+    const devs = await activeRecord.developers;
     expect(devs.length).toBe(3);
     expect(devs.map((d) => d.id)).toContain(david.id);
   });
@@ -371,15 +371,15 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
     await newProject.reload();
     expect(await newProject.developers.size()).toBe(amountOfDevelopers);
-    expect((await newProject.developers.toArray()).map((d) => d.id)).toEqual(devs.map((d) => d.id));
+    expect((await newProject.developers).map((d) => d.id)).toEqual(devs.map((d) => d.id));
   });
 
   it("habtm distinct order preserved", async () => {
     const activeRecord = projects("active_record");
     const expected = [developers("poor_jamis").id, developers("jamis").id, developers("david").id];
-    const nonUnique = (await activeRecord.nonUniqueDevelopers.toArray()).map((d) => d.id);
+    const nonUnique = (await activeRecord.nonUniqueDevelopers).map((d) => d.id);
     expect(nonUnique).toEqual(expected);
-    const unique = (await activeRecord.developers.toArray()).map((d) => d.id);
+    const unique = (await activeRecord.developers).map((d) => d.id);
     expect(unique).toEqual(expected);
   });
 
@@ -423,7 +423,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(devel.isNewRecord()).toBe(false);
     expect(proj2.isNewRecord()).toBe(false);
     const found = (await Developer.findBy({ name: "Marcel" })) as Developer;
-    const projs = await found.projects.toArray();
+    const projs = await found.projects;
     expect(projs.map((p) => p.id)).toContain(proj2.id);
   });
 
@@ -432,7 +432,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const proj = await devel.projects.create({ name: "Projekt" });
     expect(proj.isPersisted()).toBe(true);
     const fresh = await Developer.find(1);
-    const projs = await fresh.projects.toArray();
+    const projs = await fresh.projects;
     expect(projs.map((p) => p.id)).toContain(proj.id);
   });
 
@@ -516,9 +516,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("removing associations on destroy", async () => {
     const david = await DeveloperWithBeforeDestroyRaise.find(1);
-    expect((await david.projects.toArray()).length).toBeGreaterThan(0);
+    expect((await david.projects).length).toBeGreaterThan(0);
     await david.destroy();
-    expect((await david.projects.toArray()).length).toBe(0);
+    expect((await david.projects).length).toBe(0);
     const joins = await Base.connection.execute(
       "SELECT * FROM developers_projects WHERE developer_id = 1",
     );
@@ -566,7 +566,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it("destroy all", async () => {
     const david = await Developer.find(1);
     await david.projects.reload();
-    expect((await david.projects.toArray()).length).toBeGreaterThan(0);
+    expect((await david.projects).length).toBeGreaterThan(0);
 
     const projectCountBefore = Number(await Project.count());
     await david.projects.destroyAll();
@@ -576,14 +576,14 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       `SELECT * FROM developers_projects WHERE developer_id = ${david.id}`,
     );
     expect(joins.length).toBe(0);
-    expect((await david.projects.toArray()).length).toBe(0);
+    expect((await david.projects).length).toBe(0);
     expect(await (await david.projects.reload()).size()).toBe(0);
   });
 
   it("destroy associations destroys multiple associations", async () => {
     const george = (await Parrot.findBy({ name: "Curious George" })) as Parrot;
-    expect((await george.pirates.toArray()).length).toBeGreaterThan(0);
-    expect((await george.treasures.toArray()).length).toBeGreaterThan(0);
+    expect((await george.pirates).length).toBeGreaterThan(0);
+    expect((await george.treasures).length).toBeGreaterThan(0);
 
     const pirateBefore = (await Pirate.all()).length;
     const treasureBefore = (await Treasure.all()).length;
@@ -669,7 +669,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it("find with merged options", async () => {
     const activeRecord = projects("active_record");
     expect(await activeRecord.limitedDevelopers.size()).toBe(1);
-    expect((await activeRecord.limitedDevelopers.toArray()).length).toBe(1);
+    expect((await activeRecord.limitedDevelopers).length).toBe(1);
     expect((await (activeRecord.limitedDevelopers as any).limit(null).toArray()).length).toBe(3);
   });
 
@@ -699,12 +699,12 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("dynamic find all should respect readonly access", async () => {
     const activeRecord = projects("active_record");
-    for (const d of await activeRecord.readonlyDevelopers.toArray()) {
+    for (const d of await activeRecord.readonlyDevelopers) {
       if (await d.isValid()) {
         await expect((d as any).saveBang()).rejects.toThrow(ReadOnlyRecord);
       }
     }
-    for (const d of await activeRecord.readonlyDevelopers.toArray()) {
+    for (const d of await activeRecord.readonlyDevelopers) {
       (d as any).isReadonly();
     }
   });
@@ -728,7 +728,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("find in association with options", async () => {
     const activeRecord = projects("active_record");
-    const devs = await activeRecord.developers.toArray();
+    const devs = await activeRecord.developers;
     expect(devs.length).toBe(3);
     const poorJamis = developers("poor_jamis");
     const first = (await activeRecord.developers.where("salary < 10000").first()) as Developer;
@@ -745,7 +745,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const actionController = projects("action_controller");
     await david.projects.clear();
     await david.projects.push(actionController);
-    expect((await david.projects.toArray()).length).toBe(1);
+    expect((await david.projects).length).toBe(1);
   });
 
   it("replace with new", async () => {
@@ -754,7 +754,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const actionController = projects("action_controller");
     const newProj = await Project.create({ name: "ActionWebSearch" });
     await david.projects.push(actionController, newProj);
-    const projs = await david.projects.toArray();
+    const projs = await david.projects;
     expect(projs.length).toBe(2);
     expect(projs.map((p) => p.id)).not.toContain((await Project.find(1)).id);
   });
@@ -765,20 +765,20 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const newProj = new Project({ name: "ActionWebSearch" });
     await newDeveloper.projects.concat(actionController, newProj);
     await newDeveloper.save();
-    expect((await newDeveloper.projects.toArray()).length).toBe(2);
+    expect((await newDeveloper.projects).length).toBe(2);
   });
 
   it("consider type", async () => {
     const developer = (await Developer.all())[0];
     const specialProject = await SpecialProject.create({ name: "Special Project" });
 
-    const otherProject = (await developer.projects.toArray())[0];
+    const otherProject = (await developer.projects)[0];
     await developer.specialProjects.push(specialProject);
     const fresh = await Developer.find(developer.id);
 
-    const projs = await fresh.projects.toArray();
+    const projs = await fresh.projects;
     expect(projs.map((p) => p.id)).toContain(specialProject.id);
-    const specials = await fresh.specialProjects.toArray();
+    const specials = await fresh.specialProjects;
     expect(specials.map((p) => p.id)).toContain(specialProject.id);
     expect(specials.map((p) => p.id)).not.toContain(otherProject.id);
   });
@@ -789,7 +789,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       name: "omg",
     });
     const fresh = await Developer.find(developer.id);
-    const specials = await fresh.symSpecialProjects.toArray();
+    const specials = await fresh.symSpecialProjects;
     expect(specials.map((p) => p.id)).toContain(sp.id);
   });
 
@@ -807,7 +807,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("updating attributes on non rich associations", async () => {
     const technology = await Category.find(2);
-    const welcome = (await technology.posts.toArray())[0];
+    const welcome = (await technology.posts)[0];
     welcome.title = "Something else";
     expect(await (welcome as any).saveBang()).toBeTruthy();
   });
@@ -817,13 +817,13 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     for (const o of await technology.selectTestingPosts.reload()) {
       expect((o as any).attributes).toHaveProperty("correctness_marker");
     }
-    const first = (await technology.selectTestingPosts.toArray())[0] as any;
+    const first = (await technology.selectTestingPosts)[0] as any;
     expect(first.attributes).toHaveProperty("correctness_marker");
   });
 
   it("habtm selects all columns by default", async () => {
     const david = developers("david");
-    const first = (await david.projects.toArray())[0];
+    const first = (await david.projects)[0];
     expect(Object.keys((first as any).attributes).sort()).toEqual(
       Project.columnNames().slice().sort(),
     );
@@ -880,14 +880,14 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("find scoped grouped", async () => {
     const general = await Category.find(1);
-    expect((await general.postsGroupedByTitle.toArray()).length).toBe(5);
+    expect((await general.postsGroupedByTitle).length).toBe(5);
     const technology = await Category.find(2);
-    expect((await technology.postsGroupedByTitle.toArray()).length).toBe(1);
+    expect((await technology.postsGroupedByTitle).length).toBe(1);
   });
 
   it("find scoped grouped having", async () => {
     const activeRecord = projects("active_record");
-    const groups = await activeRecord.wellPaidSalaryGroups.toArray();
+    const groups = await activeRecord.wellPaidSalaryGroups;
     expect(groups.length).toBe(2);
     expect(groups.every((g: any) => Number(g.salary) > 10000)).toBe(true);
   });
@@ -937,7 +937,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     await developer.projects.setIds([activeRecord.id, actionController.id] as any);
     await (developer as any).save();
     await developer.reload();
-    expect((await developer.projects.toArray()).length).toBe(2);
+    expect((await developer.projects).length).toBe(2);
     const ids = [...((await (developer as any).projectIds) as number[])]
       .map(Number)
       .sort((a, b) => a - b);
@@ -951,7 +951,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     await developer.projects.setIds([activeRecord.id, null, actionController.id, ""] as any);
     await (developer as any).save();
     await developer.reload();
-    expect((await developer.projects.toArray()).length).toBe(2);
+    expect((await developer.projects).length).toBe(2);
     const ids = [...((await (developer as any).projectIds) as number[])]
       .map(Number)
       .sort((a, b) => a - b);
@@ -975,7 +975,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("has many through polymorphic has manys works", async () => {
     const redbeard = (await Pirate.findBy({ catchphrase: "Avast!" })) as Pirate;
-    const prices = (await redbeard.treasureEstimates.toArray()).map((e: any) => e.price);
+    const prices = (await redbeard.treasureEstimates).map((e: any) => e.price);
     expect(new Set(prices)).toEqual(new Set(["$10.00", "$20.00"]));
   });
 
@@ -1097,7 +1097,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const dev = new Developer({});
     const proxy = dev.projects;
     await assertNoQueries(false, async () => {
-      expect(await proxy.toArray()).toEqual([]);
+      expect(await proxy).toEqual([]);
       expect(await (proxy as any).where({ title: "omg" }).toArray()).toEqual([]);
       expect(await proxy.count()).toBe(0);
     });
@@ -1167,7 +1167,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     // `sharedComputers: ["laptop"]` association label on `david` into a
     // computers_developers join row — exercised by the data assertion below.
     const david = developers("david");
-    const sharedComputers = await david.sharedComputers.toArray();
+    const sharedComputers = await david.sharedComputers;
     expect((sharedComputers[0] as any).id).toBe((computers("laptop") as any).id);
   });
 
@@ -1230,7 +1230,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const preloadedDeveloper = await Developer.preload({
       projects: "salariedDevelopers",
     }).first();
-    const preloadedProjects = await preloadedDeveloper!.projects.toArray();
+    const preloadedProjects = await preloadedDeveloper!.projects;
     const preloadedFirstProject = preloadedProjects.find(
       (p: Project) => (p as any).id === (firstProject as any).id,
     );

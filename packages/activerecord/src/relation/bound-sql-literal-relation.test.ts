@@ -38,8 +38,8 @@ describe("bound SQL literal with Relation bind value", () => {
 
     expect(relation.toSql()).toContain("IN (SELECT");
 
-    const expected = sortedIds(await approved.toArray());
-    expect(sortedIds(await relation.toArray())).toEqual(expected);
+    const expected = sortedIds(await approved);
+    expect(sortedIds(await relation)).toEqual(expected);
     expect(expected.length).toBeGreaterThan(0);
   });
 
@@ -50,8 +50,8 @@ describe("bound SQL literal with Relation bind value", () => {
 
     expect(relation.toSql()).toContain("IN (SELECT");
 
-    const expected = sortedIds(await approved.toArray());
-    expect(sortedIds(await relation.toArray())).toEqual(expected);
+    const expected = sortedIds(await approved);
+    expect(sortedIds(await relation)).toEqual(expected);
     expect(expected.length).toBeGreaterThan(0);
   });
 
@@ -63,7 +63,7 @@ describe("bound SQL literal with Relation bind value", () => {
     // build_bound_sql_literal reduces the model to its id_for_database
     // (query_methods.rb:1707-1709) before the value reaches the quoter.
     expect(relation.toSql()).toContain(String(first));
-    const rows = await relation.toArray();
+    const rows = await relation;
     expect(rows.map((r) => Number(r.id))).toEqual([first]);
   });
 
@@ -72,7 +72,7 @@ describe("bound SQL literal with Relation bind value", () => {
     const topics = await Topic.where({ approved: true });
     const relation = Topic.where("id IN (?)", topics);
 
-    expect(sortedIds(await relation.toArray())).toEqual(ids);
+    expect(sortedIds(await relation)).toEqual(ids);
     expect(ids.length).toBeGreaterThan(0);
   });
 

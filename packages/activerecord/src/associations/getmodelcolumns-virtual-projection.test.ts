@@ -39,9 +39,7 @@ describe("getModelColumns virtual-attribute eager projection", () => {
     for (const sql of eagerSqls) expect(sql).not.toContain("metadata");
 
     expect(firm.id).toBe(companies("first_firm").id);
-    const clients = await (
-      firm as Firm & { clients: { toArray(): Promise<unknown[]> } }
-    ).clients.toArray();
+    const clients = await (firm as Firm & { clients: { toArray(): Promise<unknown[]> } }).clients;
     expect((clients as { id: number }[]).map((c) => c.id)).toEqual([companies("first_client").id]);
   });
 });

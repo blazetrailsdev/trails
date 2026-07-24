@@ -182,7 +182,7 @@ describe("CascadedEagerLoadingTest", () => {
     // `posts_authors`/`posts_authors_join` re-emitted for the eager spec.
     const sql = rel.toSql();
     expect(sql).not.toMatch(/posts_authors/);
-    const loaded = await rel.toArray();
+    const loaded = await rel;
     // INNER JOIN semantics (manual join wins): only authors reachable through a
     // post that has a comment. The single deduped `posts`/`comments` joins drive
     // the eager hydration with no fan-out duplication from an extra alias.
@@ -207,9 +207,9 @@ describe("CascadedEagerLoadingTest", () => {
       .joins("categorizations")
       .includes({ posts: "comments" }, "authors");
     expect(await categories.count()).toBe(4);
-    expect((await categories.toArray()).length).toBe(4);
+    expect((await categories).length).toBe(4);
     expect(await categories.distinct().count()).toBe(3);
-    const uniqIds = new Set((await categories.toArray()).map((c) => c.id));
+    const uniqIds = new Set((await categories).map((c) => c.id));
     expect(uniqIds.size).toBe(3);
   });
 
@@ -220,7 +220,7 @@ describe("CascadedEagerLoadingTest", () => {
       .where("categorizations.id is not null")
       .references("categorizations");
     expect(await categories.count()).toBe(3);
-    expect((await categories.toArray()).length).toBe(3);
+    expect((await categories).length).toBe(3);
   });
 
   it("cascaded eager association loading with twice includes edge cases", async () => {
@@ -230,14 +230,14 @@ describe("CascadedEagerLoadingTest", () => {
       .where("posts.id is not null")
       .references("posts");
     expect(await categories.count()).toBe(3);
-    expect((await categories.toArray()).length).toBe(3);
+    expect((await categories).length).toBe(3);
   });
 
   it("eager association loading with join for count", async () => {
     const authorsRel = Author.all().joins("specialPosts").includes("posts", "categorizations");
     await authorsRel.count();
     await assertQueriesCount(3, false, async () => {
-      await authorsRel.toArray();
+      await authorsRel;
     });
   });
 

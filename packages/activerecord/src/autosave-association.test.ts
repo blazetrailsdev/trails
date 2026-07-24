@@ -345,7 +345,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     await proxy.create({ name: "parrots_0" });
     await proxy.create({ name: "parrots_1" });
 
-    const parrots = await proxy.toArray();
+    const parrots = await proxy;
     expect(parrots.some((p) => isMarkedForDestruction(p))).toBe(false);
     for (const p of parrots) markForDestruction(p);
 
@@ -356,7 +356,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     expect(Number(await Parrot.count())).toBe(before);
 
     const reloaded = await Pirate.find(pirate.id!);
-    expect((await association(reloaded, "parrots").toArray()).length).toBe(0);
+    expect((await association(reloaded, "parrots")).length).toBe(0);
   });
 
   it("should skip validation on habtm if marked for destruction", async () => {
@@ -366,7 +366,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     await proxy.create({ name: "parrots_0" });
     await proxy.create({ name: "parrots_1" });
 
-    const parrots = await proxy.toArray();
+    const parrots = await proxy;
     for (const p of parrots) p.name = "";
     expect(await pirate.isValid()).toBe(false);
 
@@ -388,7 +388,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     expect(validatedIds).toEqual([]);
 
     const reloaded = await Pirate.find(pirate.id!);
-    expect((await association(reloaded, "parrots").toArray()).length).toBe(0);
+    expect((await association(reloaded, "parrots")).length).toBe(0);
   });
 
   it("should skip validation on habtm if destroyed", async () => {
@@ -449,7 +449,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const proxy = association(pirate, "parrots");
     await proxy.create({ name: "parrots_1" });
 
-    for (const p of await proxy.toArray()) markForDestruction(p);
+    for (const p of await proxy) markForDestruction(p);
     expect(await pirate.save()).toBe(true);
 
     // The join record is already gone — saving again issues no queries.
@@ -464,8 +464,8 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     await proxy.create({ name: "parrots_0" });
     await proxy.create({ name: "parrots_1" });
 
-    const before = (await proxy.toArray()).map((p) => p.id).sort();
-    for (const p of await proxy.toArray()) markForDestruction(p);
+    const before = (await proxy).map((p) => p.id).sort();
+    for (const p of await proxy) markForDestruction(p);
 
     // Mirror Rails: override the parrots association's `destroy` to raise after
     // running the real destroy, so the whole save transaction rolls back.
@@ -478,7 +478,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     await expect(pirate.save()).rejects.toThrow("Oh noes!");
 
     const reloaded = await Pirate.find(pirate.id!);
-    const after = (await association(reloaded, "parrots").toArray()).map((p) => p.id).sort();
+    const after = (await association(reloaded, "parrots")).map((p) => p.id).sort();
     expect(after).toEqual(before);
   });
 });
@@ -637,7 +637,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     const proxy = association(company, "clients");
     await proxy.setIds([c1.id as number, c2.id as number]);
 
-    const clients = await proxy.toArray();
+    const clients = await proxy;
     expect(clients).toHaveLength(2);
     const ids = clients.map((c) => c.id).sort();
     expect(ids).toEqual([c1.id, c2.id].sort());
@@ -689,14 +689,14 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     const orderAgreements = [a1.id, a2.id];
 
     const proxy = association(order, "orderAgreements");
-    expect(await proxy.toArray()).toHaveLength(0);
+    expect(await proxy).toHaveLength(0);
 
     await proxy.setIds(orderAgreements as number[]);
     await order.save();
     await order.reload();
 
     expect(await order.orderAgreementIds).toEqual(orderAgreements);
-    const loadedAgreements = await association(order, "orderAgreements").toArray();
+    const loadedAgreements = await association(order, "orderAgreements");
     expect(loadedAgreements).toHaveLength(2);
     expect(loadedAgreements.map((a) => a.id)).toContain(a2.id);
   });
@@ -763,14 +763,14 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     const bookIds = [b1.id, b2.id];
 
     const proxy = association(order, "books");
-    expect(await proxy.toArray()).toHaveLength(0);
+    expect(await proxy).toHaveLength(0);
 
     await proxy.setIds(bookIds as number[][]);
     await order.save();
     await order.reload();
 
     expect(await order.bookIds).toEqual(bookIds);
-    const loadedBooks = await association(order, "books").toArray();
+    const loadedBooks = await association(order, "books");
     expect(loadedBooks).toHaveLength(2);
     const loadedTitles = loadedBooks.map((b) => b.title);
     expect(loadedTitles).toContain("First");

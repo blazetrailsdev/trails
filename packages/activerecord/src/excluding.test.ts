@@ -93,7 +93,7 @@ describe("ExcludingTest", () => {
     const relation = post.comments;
 
     const records = await Comment.excluding(relation);
-    const postComments = await post.comments.toArray();
+    const postComments = await post.comments;
 
     expect(records.length).toBeGreaterThan(0);
     expect(postComments.length).toBeGreaterThan(0);
@@ -106,7 +106,7 @@ describe("ExcludingTest", () => {
     const relation = await post.comments.load();
 
     const records = await Comment.excluding(relation);
-    const postComments = await post.comments.toArray();
+    const postComments = await post.comments;
 
     expect(records.length).toBeGreaterThan(0);
     expect(postComments.length).toBeGreaterThan(0);
@@ -118,7 +118,7 @@ describe("ExcludingTest", () => {
     const post = posts("welcome");
 
     const assertNoExcludes = async (relation: Relation<Post>) => {
-      expect(ids(await relation.toArray())).toContain(post.id);
+      expect(ids(await relation)).toContain(post.id);
       expect(await relation.count()).toBe(await Post.count());
     };
 

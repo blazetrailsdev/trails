@@ -426,7 +426,7 @@ describe("WhereChainTest", () => {
       .where({ body: "world" })
       .rewhere({ body: "hullo" });
     const expected = Post.where({ body: "hullo" });
-    expect(ids(await relation.toArray())).toEqual(ids(await expected.toArray()));
+    expect(ids(await relation)).toEqual(ids(await expected));
   });
 
   it("rewhere with multiple overwriting conditions", async () => {
@@ -434,7 +434,7 @@ describe("WhereChainTest", () => {
       .where({ type: "StiPost" })
       .rewhere({ body: "hullo", type: "Post" });
     const expected = Post.where({ body: "hullo", type: "Post" });
-    expect(ids(await relation.toArray())).toEqual(ids(await expected.toArray()));
+    expect(ids(await relation)).toEqual(ids(await expected));
   });
 
   it("rewhere with one overwriting condition and one unrelated", async () => {
@@ -442,7 +442,7 @@ describe("WhereChainTest", () => {
       .where({ type: "Post" })
       .rewhere({ body: "hullo" });
     const expected = Post.where({ body: "hullo", type: "Post" });
-    expect(ids(await relation.toArray())).toEqual(ids(await expected.toArray()));
+    expect(ids(await relation)).toEqual(ids(await expected));
   });
 
   it("rewhere with alias condition", async () => {
@@ -450,7 +450,7 @@ describe("WhereChainTest", () => {
       .where({ text: "world" })
       .rewhere({ text: "hullo" });
     const expected = Post.where({ text: "hullo" });
-    expect(ids(await relation.toArray())).toEqual(ids(await expected.toArray()));
+    expect(ids(await relation)).toEqual(ids(await expected));
   });
 
   it("rewhere with nested condition", async () => {
@@ -461,13 +461,13 @@ describe("WhereChainTest", () => {
     const expected = Post.leftJoins("comments").where({
       "comments.id": comments("does_it_hurt").id,
     });
-    expect(ids(await relation.toArray())).toEqual(ids(await expected.toArray()));
+    expect(ids(await relation)).toEqual(ids(await expected));
   });
 
   it("rewhere with polymorphic association", async () => {
     const relation = Essay.where({ writer: authors("david") }).rewhere({ writer: humans("steve") });
     const expected = Essay.where({ writer: humans("steve") });
-    expect(ids(await relation.toArray())).toEqual(ids(await expected.toArray()));
+    expect(ids(await relation)).toEqual(ids(await expected));
   });
 
   it("rewhere with range", async () => {
@@ -475,7 +475,7 @@ describe("WhereChainTest", () => {
       commentsCount: new Range(3, 5),
     });
     const expected = Post.where({ commentsCount: new Range(3, 5) });
-    expect(ids(await relation.toArray())).toEqual(ids(await expected.toArray()));
+    expect(ids(await relation)).toEqual(ids(await expected));
   });
 
   it("rewhere with infinite upper bound range", async () => {
@@ -483,7 +483,7 @@ describe("WhereChainTest", () => {
       commentsCount: new Range(3, 5),
     });
     const expected = Post.where({ commentsCount: new Range(3, 5) });
-    expect(ids(await relation.toArray())).toEqual(ids(await expected.toArray()));
+    expect(ids(await relation)).toEqual(ids(await expected));
   });
 
   it("rewhere with infinite lower bound range", async () => {
@@ -491,7 +491,7 @@ describe("WhereChainTest", () => {
       commentsCount: new Range(3, 5),
     });
     const expected = Post.where({ commentsCount: new Range(3, 5) });
-    expect(ids(await relation.toArray())).toEqual(ids(await expected.toArray()));
+    expect(ids(await relation)).toEqual(ids(await expected));
   });
 
   it("rewhere with infinite range", async () => {
@@ -499,12 +499,12 @@ describe("WhereChainTest", () => {
       commentsCount: new Range(3, 5),
     });
     const expected = Post.where({ commentsCount: new Range(3, 5) });
-    expect(ids(await relation.toArray())).toEqual(ids(await expected.toArray()));
+    expect(ids(await relation)).toEqual(ids(await expected));
   });
 
   it("rewhere with nil", async () => {
     const relation = Post.where({ commentsCount: 16 }).rewhere(null);
     const expected = Post.all();
-    expect(ids(await relation.toArray())).toEqual(ids(await expected.toArray()));
+    expect(ids(await relation)).toEqual(ids(await expected));
   });
 });

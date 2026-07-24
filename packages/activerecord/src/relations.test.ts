@@ -218,8 +218,8 @@ describe("RelationTest", () => {
     const topicsRel = Topic.all();
     expect(topicsRel.isLoaded).toBe(false);
     expect((topicsRel as any).loaded).toBe(false);
-    const arr1 = await topicsRel.toArray();
-    const arr2 = await topicsRel.toArray();
+    const arr1 = await topicsRel;
+    const arr2 = await topicsRel;
     expect(arr1).toHaveLength(5);
     expect(arr2).toHaveLength(5);
     expect(topicsRel.isLoaded).toBe(true);
@@ -259,8 +259,8 @@ describe("RelationTest", () => {
 
   it("reload", async () => {
     const topicsRel = Topic.all();
-    const arr1 = await topicsRel.toArray();
-    const arr2 = await topicsRel.toArray();
+    const arr1 = await topicsRel;
+    const arr2 = await topicsRel;
     expect(arr1).toHaveLength(5);
     expect(topicsRel.isLoaded).toBe(true);
 
@@ -273,7 +273,7 @@ describe("RelationTest", () => {
 
   it("finding with subquery", async () => {
     const relation = Topic.where({ approved: true });
-    const direct = await relation.toArray();
+    const direct = await relation;
     const fromSubquery = await Topic.select("*").from(relation);
     expect(fromSubquery.map((t) => t.id).sort()).toEqual(direct.map((t) => t.id).sort());
     const fromSubqueryNamed = await Topic.select("subquery.*").from(relation);
@@ -285,7 +285,7 @@ describe("RelationTest", () => {
   it("finding with subquery with binds", async () => {
     const post = await Post.first();
     const commentRel = Comment.where({ post_id: post!.id });
-    const direct = await commentRel.toArray();
+    const direct = await commentRel;
     const fromSubquery = await Comment.select("*").from(commentRel);
     expect(fromSubquery.map((c) => c.id).sort()).toEqual(direct.map((c) => c.id).sort());
     const fromSubqueryNamed = await Comment.select("subquery.*").from(commentRel);
@@ -307,9 +307,7 @@ describe("RelationTest", () => {
       .joins("INNER JOIN posts ON posts.id = comments.post_id")
       .select("comments.id")
       .order("comments.id");
-    expect((await relation.toArray()).map((c) => c.id)).toEqual(
-      (await subquery.toArray()).map((c) => c.id),
-    );
+    expect((await relation).map((c) => c.id)).toEqual((await subquery).map((c) => c.id));
   });
 
   it("pluck with from includes original table name", async () => {
@@ -330,9 +328,7 @@ describe("RelationTest", () => {
       .joins("INNER JOIN posts ON posts.id = comments.post_id")
       .select("comments.id")
       .order("comments.id");
-    expect((await relation.toArray()).map((c) => c.id)).toEqual(
-      (await subquery.toArray()).map((c) => c.id),
-    );
+    expect((await relation).map((c) => c.id)).toEqual((await subquery).map((c) => c.id));
   });
 
   it("pluck with from includes quoted original table name", async () => {
@@ -353,9 +349,7 @@ describe("RelationTest", () => {
       .joins("INNER JOIN posts ON posts.id = comments.post_id")
       .select("comments.id")
       .order("comments.id");
-    expect((await relation.toArray()).map((c) => c.id)).toEqual(
-      (await subquery.toArray()).map((c) => c.id),
-    );
+    expect((await relation).map((c) => c.id)).toEqual((await subquery).map((c) => c.id));
   });
 
   it("pluck with subquery in from uses original table name", async () => {
@@ -374,8 +368,8 @@ describe("RelationTest", () => {
       "type",
       "post_count",
     );
-    const relCounts = (await relation.toArray()).map((r: any) => r.post_count).sort();
-    const subCounts = (await subquery.toArray()).map((r: any) => r.post_count).sort();
+    const relCounts = (await relation).map((r: any) => r.post_count).sort();
+    const subCounts = (await subquery).map((r: any) => r.post_count).sort();
     expect(subCounts).toEqual(relCounts);
   });
 
@@ -388,7 +382,7 @@ describe("RelationTest", () => {
     // dynamic reader on the loaded record. COUNT() is a bigint on PG/MariaDB
     // while average() yields a number, so coerce both to Number for comparison
     // (Rails compares BigDecimal == Integer loosely).
-    const relCounts = (await relation.toArray()).map((r: any) => Number(r.post_count)).sort();
+    const relCounts = (await relation).map((r: any) => Number(r.post_count)).sort();
     const subValues = [...((await subquery) as Map<unknown, number>).values()].map(Number).sort();
     expect(subValues).toEqual(relCounts);
   });
@@ -398,8 +392,8 @@ describe("RelationTest", () => {
     const subquery = Comment.from(
       `(${await relation.toSql()}) ${Comment.tableName}_grouped`,
     ).select("type", "post_count");
-    const relCounts = (await relation.toArray()).map((r: any) => r.post_count).sort();
-    const subCounts = (await subquery.toArray()).map((r: any) => r.post_count).sort();
+    const relCounts = (await relation).map((r: any) => r.post_count).sort();
+    const subCounts = (await subquery).map((r: any) => r.post_count).sort();
     expect(subCounts).toEqual(relCounts);
   });
 
@@ -408,7 +402,7 @@ describe("RelationTest", () => {
     const subquery = Comment.from(`(${await relation.toSql()}) ${Comment.tableName}_grouped`)
       .group("type")
       .average("post_count");
-    const relCounts = (await relation.toArray()).map((r: any) => Number(r.post_count)).sort();
+    const relCounts = (await relation).map((r: any) => Number(r.post_count)).sort();
     const subValues = [...((await subquery) as Map<unknown, number>).values()].map(Number).sort();
     expect(subValues).toEqual(relCounts);
   });
@@ -417,7 +411,7 @@ describe("RelationTest", () => {
     const relation = Comment.includes("post")
       .where({ "posts.type": "Post" })
       .order(Symbol.for("id"));
-    const expected = (await relation.toArray()).map((c) => c.id);
+    const expected = (await relation).map((c) => c.id);
     expect((await Comment.select("*").from(relation)).map((c) => c.id)).toEqual(expected);
     expect((await Comment.select("subquery.*").from(relation)).map((c) => c.id)).toEqual(expected);
     expect((await Comment.select("a.*").from(relation, "a")).map((c) => c.id)).toEqual(expected);
@@ -446,7 +440,7 @@ describe("RelationTest", () => {
 
   it("finding with subquery with eager loading in where", async () => {
     const relation = Comment.includes("post").where({ "posts.type": "Post" });
-    const expected = (await relation.toArray()).map((c) => Number(c.id)).sort((a, b) => a - b);
+    const expected = (await relation).map((c) => Number(c.id)).sort((a, b) => a - b);
     expect(
       (await Comment.where({ id: relation })).map((c) => Number(c.id)).sort((a, b) => a - b),
     ).toEqual(expected);
@@ -583,7 +577,7 @@ describe("RelationTest", () => {
 
   it("finding with desc order with string", async () => {
     const topicsRel = Topic.order({ id: "desc" });
-    const arr = await topicsRel.toArray();
+    const arr = await topicsRel;
     expect(arr).toHaveLength(5);
     expect(arr.map((t) => t.id)).toEqual([
       topics("fifth").id,
@@ -596,7 +590,7 @@ describe("RelationTest", () => {
 
   it("finding with asc order with string", async () => {
     const topicsRel = Topic.order({ id: "asc" });
-    const arr = await topicsRel.toArray();
+    const arr = await topicsRel;
     expect(arr).toHaveLength(5);
     expect(arr.map((t) => t.id)).toEqual([
       topics("first").id,
@@ -859,7 +853,7 @@ describe("RelationTest", () => {
   it("find with preloaded associations", async () => {
     const posts1 = await Post.preload("comments").order("posts.id");
     const firstPost = posts1.find((p) => Number(p.id) === 1)!;
-    const firstComments = await firstPost.comments.toArray();
+    const firstComments = await firstPost.comments;
     expect(firstComments.length).toBeGreaterThan(0);
 
     const posts2 = await Post.preload("author").order("posts.id");
@@ -879,7 +873,7 @@ describe("RelationTest", () => {
 
   it("find with included associations", async () => {
     const posts1 = await Post.includes("comments").order("posts.id");
-    const firstComments = await posts1[0].comments.toArray();
+    const firstComments = await posts1[0].comments;
     expect(firstComments.length).toBeGreaterThan(0);
 
     const posts2 = await Post.includes("author").order("posts.id");
@@ -957,7 +951,7 @@ describe("RelationTest", () => {
       .where({ title: "Uhuu" });
     const resultPosts = await PostWithPreloadDefaultScope.all().merge(postRel);
     expect(resultPosts).toHaveLength(1);
-    const preloadedReaders = await resultPosts[0].readers.toArray();
+    const preloadedReaders = await resultPosts[0].readers;
     expect(preloadedReaders).toHaveLength(1);
     expect(Number(preloadedReaders[0].post_id)).toBe(Number(post.id));
 
@@ -965,7 +959,7 @@ describe("RelationTest", () => {
     const postRel2 = PostWithIncludesDefaultScope.includes("readers").where({ title: "Uhuu" });
     const resultPosts2 = await PostWithIncludesDefaultScope.all().merge(postRel2);
     expect(resultPosts2).toHaveLength(1);
-    const includedReaders = await resultPosts2[0].readers.toArray();
+    const includedReaders = await resultPosts2[0].readers;
     expect(includedReaders).toHaveLength(1);
     expect(Number(includedReaders[0].post_id)).toBe(Number(post.id));
   });
@@ -973,12 +967,12 @@ describe("RelationTest", () => {
   it("loading with one association", async () => {
     const allPosts = await Post.preload("comments");
     const post = allPosts.find((p) => Number(p.id) === 1)!;
-    const postComments = await post.comments.toArray();
+    const postComments = await post.comments;
     expect(postComments).toHaveLength(2);
     expect(postComments.map((c: any) => c.id)).toContain(comments("greetings").id);
 
     const post2 = await Post.where({ title: "Welcome to the weblog" }).preload("comments").first();
-    const post2Comments = await post2!.comments.toArray();
+    const post2Comments = await post2!.comments;
     expect(post2Comments).toHaveLength(2);
     expect(post2Comments.map((c: any) => c.id)).toContain(comments("greetings").id);
 
@@ -1103,7 +1097,7 @@ describe("RelationTest", () => {
       .where({ name: david.name })
       .where({ name: "Santiago" })
       .where({ id: david.id });
-    expect(await relation.toArray()).toEqual([]);
+    expect(await relation).toEqual([]);
   });
 
   it("multi where ands queries", () => {
@@ -1119,7 +1113,7 @@ describe("RelationTest", () => {
       (memo, param) => memo.where(param),
       Author.unscoped(),
     );
-    expect(await relation.toArray()).toEqual([]);
+    expect(await relation).toEqual([]);
   });
 
   it("typecasting where with array", async () => {
@@ -1133,15 +1127,15 @@ describe("RelationTest", () => {
   it("find all using where with relation", async () => {
     const david = authors("david");
     const rel1 = Author.where({ id: Author.where({ id: david.id }) });
-    expect((await rel1.toArray()).map((a) => a.id)).toEqual([david.id]);
+    expect((await rel1).map((a) => a.id)).toEqual([david.id]);
 
     const rel2 = Author.where("id in (?)", Author.where({ id: david.id }).select("id"));
-    expect((await rel2.toArray()).map((a) => a.id)).toEqual([david.id]);
+    expect((await rel2).map((a) => a.id)).toEqual([david.id]);
 
     const rel3 = Author.where("id in (:author_ids)", {
       author_ids: Author.where({ id: david.id }).select("id"),
     });
-    expect((await rel3.toArray()).map((a) => a.id)).toEqual([david.id]);
+    expect((await rel3).map((a) => a.id)).toEqual([david.id]);
   });
 
   it("find all using where with relation with bound values", async () => {
@@ -1161,7 +1155,7 @@ describe("RelationTest", () => {
   it("find all using where with relation and alternate primary key", async () => {
     const coolFirst = minivans("cool_first");
     const rel = Minivan.where({ minivan_id: Minivan.where({ name: coolFirst.name }) });
-    expect((await rel.toArray()).map((m) => m.minivan_id)).toEqual([coolFirst.minivan_id]);
+    expect((await rel).map((m) => m.minivan_id)).toEqual([coolFirst.minivan_id]);
   });
 
   it("find all using where with relation with no selects and composite primary key raises", async () => {
@@ -1186,7 +1180,7 @@ describe("RelationTest", () => {
     const david = authors("david");
     const subquery = Author.where({ id: david.id });
     const rel = Author.where({ id: subquery });
-    expect((await rel.toArray()).map((a) => a.id)).toEqual([david.id]);
+    expect((await rel).map((a) => a.id)).toEqual([david.id]);
     expect((subquery as any)._selectColumns ?? []).toHaveLength(0);
   });
 
@@ -1195,13 +1189,13 @@ describe("RelationTest", () => {
     const rel = Author.where({
       id: Author.joins("INNER JOIN posts ON posts.author_id = authors.id").where({ id: david.id }),
     });
-    expect((await rel.toArray()).map((a) => a.id)).toEqual([david.id]);
+    expect((await rel).map((a) => a.id)).toEqual([david.id]);
   });
 
   it("find all using where with relation with select to build subquery", async () => {
     const david = authors("david");
     const rel = Author.where({ name: Author.where({ id: david.id }).select("name") });
-    expect((await rel.toArray()).map((a) => a.id)).toEqual([david.id]);
+    expect((await rel).map((a) => a.id)).toEqual([david.id]);
   });
 
   it("last", async () => {
@@ -1271,19 +1265,19 @@ describe("RelationTest", () => {
   it("size with eager loading and custom order", async () => {
     const postsRel = Post.includes("comments").order("comments.id");
     expect(await postsRel.size()).toBe(11);
-    expect((await postsRel.toArray()).length).toBe(11);
+    expect((await postsRel).length).toBe(11);
   });
 
   it("size with eager loading and custom select and order", async () => {
     const postsRel = Post.includes("comments").order("comments.id").select("type");
     expect(await postsRel.size()).toBe(11);
-    expect((await postsRel.toArray()).length).toBe(11);
+    expect((await postsRel).length).toBe(11);
   });
 
   it("size with eager loading and custom order and distinct", async () => {
     const postsRel = Post.includes("comments").order("comments.id").distinct();
     expect(await postsRel.size()).toBe(11);
-    expect((await postsRel.toArray()).length).toBe(11);
+    expect((await postsRel).length).toBe(11);
   });
 
   it("size with eager loading and manual distinct select and custom order", () => {
@@ -1315,7 +1309,7 @@ describe("RelationTest", () => {
 
     const bestPosts = postsRel.where({ commentsCount: 0 });
     await bestPosts.load();
-    expect((await bestPosts.toArray()).length).toBe(6);
+    expect((await bestPosts).length).toBe(6);
   });
 
   it("size with limit", async () => {
@@ -1325,7 +1319,7 @@ describe("RelationTest", () => {
 
     const bestPosts = postsRel.where({ commentsCount: 0 });
     await bestPosts.load();
-    expect((await bestPosts.toArray()).length).toBe(6);
+    expect((await bestPosts).length).toBe(6);
   });
 
   it("size with zero limit", async () => {
@@ -1471,10 +1465,10 @@ describe("RelationTest", () => {
   it("to a should dup target", async () => {
     const postsRel = Post.all();
     const originalSize = await postsRel.size();
-    const arr = await postsRel.toArray();
+    const arr = await postsRel;
     const removed = arr.pop()!;
     expect(await postsRel.size()).toBe(originalSize);
-    expect((await postsRel.toArray()).map((p) => p.id)).toContain(removed.id);
+    expect((await postsRel).map((p) => p.id)).toContain(removed.id);
   });
 
   it("build", () => {
@@ -1880,10 +1874,10 @@ describe("RelationTest", () => {
 
   it("except", async () => {
     const relation = Post.where({ author_id: 1 }).order("id ASC").limit(1);
-    expect((await relation.toArray()).map((p) => p.id)).toEqual([posts("welcome").id]);
+    expect((await relation).map((p) => p.id)).toEqual([posts("welcome").id]);
 
     const authorPosts = relation.except("order", "limit");
-    const authorPostsArr = (await authorPosts.toArray()).sort(
+    const authorPostsArr = (await authorPosts).sort(
       (a: Post, b: Post) => Number(a.id) - Number(b.id),
     );
     const directPosts = (await Post.where({ author_id: 1 })).sort(
@@ -1894,20 +1888,20 @@ describe("RelationTest", () => {
 
   it("except with unrecognized key is a no-op", async () => {
     const relation = Post.where({ author_id: 1 }).order("id ASC").limit(1);
-    const baseline = (await relation.toArray()).map((p) => p.id);
+    const baseline = (await relation).map((p) => p.id);
 
     // Rails' `values.except(*skips)` silently ignores unknown keys; the widened
     // skip type lets `except("bogus")` typecheck without a cast.
     const unchanged = relation.except("bogus");
-    expect((await unchanged.toArray()).map((p) => p.id)).toEqual(baseline);
+    expect((await unchanged).map((p) => p.id)).toEqual(baseline);
   });
 
   it("only", async () => {
     const relation = Post.where({ author_id: 1 }).order("id ASC").limit(1);
-    expect((await relation.toArray()).map((p) => p.id)).toEqual([posts("welcome").id]);
+    expect((await relation).map((p) => p.id)).toEqual([posts("welcome").id]);
 
     const authorPosts = relation.only("where");
-    const authorPostsArr = (await authorPosts.toArray()).sort(
+    const authorPostsArr = (await authorPosts).sort(
       (a: Post, b: Post) => Number(a.id) - Number(b.id),
     );
     const directPosts = (await Post.where({ author_id: 1 })).sort(
@@ -1916,7 +1910,7 @@ describe("RelationTest", () => {
     expect(authorPostsArr.map((p) => p.id)).toEqual(directPosts.map((p) => p.id));
 
     const allPosts = relation.only("order");
-    const allArr = await allPosts.toArray();
+    const allArr = await allPosts;
     expect(allArr.map((p) => p.id)).toEqual((await Post.order("id ASC")).map((p) => p.id));
   });
 
@@ -1983,7 +1977,7 @@ describe("RelationTest", () => {
   it("intersection with array", async () => {
     const relation = Author.where({ name: "David" });
     const railsAuthor = await relation.first();
-    const arr = await relation.toArray();
+    const arr = await relation;
     expect(arr.some((a) => a.id === railsAuthor!.id)).toBe(true);
   });
 
@@ -2015,8 +2009,8 @@ describe("RelationTest", () => {
     const post = await Post.first();
     const havingThenWhere = Post.having({ id: post!.id }).where({ title: post!.title }).group("id");
     const whereThenHaving = Post.where({ title: post!.title }).having({ id: post!.id }).group("id");
-    expect((await havingThenWhere.toArray()).map((p) => p.id)).toEqual([post!.id]);
-    expect((await whereThenHaving.toArray()).map((p) => p.id)).toEqual([post!.id]);
+    expect((await havingThenWhere).map((p) => p.id)).toEqual([post!.id]);
+    expect((await whereThenHaving).map((p) => p.id)).toEqual([post!.id]);
   });
 
   it("multiple where and having clauses", async () => {
@@ -2026,7 +2020,7 @@ describe("RelationTest", () => {
       .having({ id: post!.id })
       .where({ title: post!.title })
       .group("id");
-    expect((await havingThenWhere.toArray()).map((p) => p.id)).toEqual([post!.id]);
+    expect((await havingThenWhere).map((p) => p.id)).toEqual([post!.id]);
   });
 
   it("grouping by column with reserved name", async () => {
@@ -2225,14 +2219,14 @@ describe("RelationTest", () => {
     const filtered = rel.where({ approved: false });
     // Original relation should still be loaded
     expect(rel.isLoaded).toBe(true);
-    expect(await rel.toArray()).not.toHaveLength(0);
-    const filteredRecords = await filtered.toArray();
+    expect(await rel).not.toHaveLength(0);
+    const filteredRecords = await filtered;
     expect(Array.isArray(filteredRecords)).toBe(true);
   });
 
   it("loaded relations cannot be mutated by single value methods", async () => {
     const rel = Topic.all();
-    await rel.toArray();
+    await rel;
     expect(rel.isLoaded).toBe(true);
     const limited = rel.limit(1);
     expect(rel.isLoaded).toBe(true);
@@ -2243,7 +2237,7 @@ describe("RelationTest", () => {
     const rel = Topic.all();
     await rel.load();
     const merged = rel.merge(Topic.where({ approved: false }));
-    expect(await rel.toArray()).not.toHaveLength(0);
+    expect(await rel).not.toHaveLength(0);
     expect(merged).not.toBe(rel);
   });
 
@@ -2290,7 +2284,7 @@ describe("RelationTest", () => {
 
   it("already-loaded relations don't perform a new query in #inspect", async () => {
     const relation = Post.limit(2);
-    await relation.toArray();
+    await relation;
     const str = relation.inspect();
     expect(str).toContain("id: 1");
     expect(str).toContain("id: 2");
@@ -2314,7 +2308,7 @@ describe("RelationTest", () => {
 
   it("already-loaded relations don't perform a new query in #pretty_print", async () => {
     const relation = Post.limit(2);
-    await relation.toArray();
+    await relation;
     const str = relation.inspect();
     expect(typeof str).toBe("string");
   });
@@ -2370,7 +2364,7 @@ describe("RelationTest", () => {
     // Rails asserts `assert_equal relation, relation.load` (relations_test.rb:2193) —
     // equality, not identity. `load` returns a then-less view of the same relation.
     expect(loaded).toEqual(relation);
-    const arr = await relation.toArray();
+    const arr = await relation;
     expect(arr).toHaveLength(11);
   });
 
@@ -2429,8 +2423,8 @@ describe("RelationTest", () => {
     const p0 = Post.where({ author_id: 0 });
     const p1 = Post.where({ author_id: 1, commentsCount: 1 });
 
-    expect((await p0.toArray()).map((p) => p.id)).toEqual([posts("authorless").id]);
-    expect((await p1.toArray()).map((p) => p.id)).toEqual([posts("thinking").id]);
+    expect((await p0).map((p) => p.id)).toEqual([posts("authorless").id]);
+    expect((await p1).map((p) => p.id)).toEqual([posts("thinking").id]);
 
     const commentsResult = await Comment.merge(p0)
       .unscope({ where: "author_id" })
@@ -2459,7 +2453,7 @@ describe("RelationTest", () => {
     const postsByMary = await Post.where({ author_id: mary.id }).order("id");
 
     const unscoped = Post.where({ author_id: mary.id }).order("id").unscope({ where: "author_id" });
-    const unscopedArr = await unscoped.toArray();
+    const unscopedArr = await unscoped;
     expect(unscopedArr.length).toBeGreaterThan(postsByMary.length);
   });
 
@@ -2471,13 +2465,13 @@ describe("RelationTest", () => {
     let commentsRel = Comment.joins("INNER JOIN posts ON posts.id = comments.post_id").where({
       "posts.id": thinkingId,
     });
-    expect((await commentsRel.toArray()).map((c) => c.id)).toEqual([doesItHurtId]);
+    expect((await commentsRel).map((c) => c.id)).toEqual([doesItHurtId]);
 
     commentsRel = commentsRel.where({ id: greetingsId });
-    expect(await commentsRel.toArray()).toHaveLength(0);
+    expect(await commentsRel).toHaveLength(0);
 
     const unscoped = commentsRel.unscope({ where: "posts.id" });
-    expect((await unscoped.toArray()).map((c) => c.id)).toEqual([greetingsId]);
+    expect((await unscoped).map((c) => c.id)).toEqual([greetingsId]);
   });
 
   it("unscope with table name qualified hash", () => {
@@ -2518,7 +2512,7 @@ describe("RelationTest", () => {
 
   it("relation join method", async () => {
     const post = await Post.first();
-    const commentBodies = (await post!.comments.toArray()).map((c: any) => c.body);
+    const commentBodies = (await post!.comments).map((c: any) => c.body);
     expect(commentBodies.join(",")).toContain("Thank you");
   });
 

@@ -11,39 +11,29 @@
  * no such method — `Model.where(...)` is enumerated directly — so this keeps the
  * trails surface faithful and removes an un-Rails-like ceremony.
  *
- * Matching is gated three ways, each closing a way the rewrite could change
+ * Matching is gated two ways, each closing a way the rewrite could change
  * behavior:
  *
  *  1. **Directly-awaited position.** `await x.toArray()` and `await x` resolve
  *     identically only when `x` is awaited, so looser positions
  *     (`return x.toArray()`, `.then(...)` chains) are NOT matched.
  *
- *  2. **Receiver is a call to a relation-spawning query method** —
- *     `Model.where(...).toArray()`, `rel.order(...).toArray()`,
- *     `Model.all().toArray()`. This is the crux of soundness. `stripThenable()`
- *     deletes `.then` from a relation *instance in place* (`load`/`reload`/
- *     `presence`/`records`/`destroyAll` all run it, and `inBatches` yields
- *     stripped instances), so a reused binding — or any *cached/memoized*
- *     relation — may silently have lost its `.then`; `await` on it resolves to
- *     the object, not the array. A Rails QueryMethod (`where`/`all`/`order`/…)
- *     always `spawn()`s a *fresh, unstripped* relation, so only a member call
- *     whose method name is in `SPAWN_METHODS` is provably still a thenable.
- *     Everything else is left alone: bare identifiers, `this`, `super`, member
- *     reads, parenthesized expressions, and — critically — call expressions that
- *     return a *cached* relation rather than a fresh spawn, namely the
- *     association accessor `association(record, name)` / `record.association(name)`
- *     (returns the memoized `_proxySelf` proxy, which `reload`/`clear`/`push`
- *     strip in place) and named scopes (arbitrary method names, some memoized on
- *     the proxy). An allowlist is deliberate here: a missing spawn name only
- *     leaves a `.toArray()` unconverted (cheap), whereas mistaking a cached
- *     accessor for a fresh spawn is a wrong fix (expensive).
- *
- *  3. **Receiver's static type is a thenable** (exposes `then`). A non-relation
+ *  2. **Receiver's static type is a thenable** (exposes `then`). A non-relation
  *     `.toArray()` accessor (raw query `Result`, ActiveModel `Errors`,
  *     `OrderedHash`, view-path/streaming-body wrappers) or a then-stripped
  *     `LoadedRelation` (`Omit<R, "then">`, the return type of `load`/`reload`)
  *     lacks `then`; awaiting it would not resolve to the array, so its
  *     `.toArray()` is load-bearing. (Skipped when type info is unavailable.)
+ *
+ * The receiver's *syntactic* shape is no longer gated: identifier bindings
+ * (`await davids` for a `const davids = Author.where(...)`), member reads, and
+ * cached association accessors are all matched, not just fresh query-method
+ * spawns. The old call-expression-only narrowing (PR #4281) worked around
+ * `stripThenable` deleting `.then` from a relation *instance in place*, which
+ * left reused/memoized bindings un-awaitable while still typing as thenable.
+ * PR #4968 made `stripThenable` return a then-less `Proxy` view and leave the
+ * original binding awaitable, so every thenable-typed binding resolves to its
+ * array under `await` again — the thenable-type gate alone is now sufficient.
  *
  * For an autofixing rule a missed warning is cheap; a wrong fix is not.
  *
@@ -65,89 +55,6 @@ const TRANSPARENT_TYPES = new Set([
   "TSTypeAssertion",
   "TSSatisfiesExpression",
 ]);
-
-/**
- * @internal
- * Rails `QueryMethods` (plus the relation-returning entry points `all`/`unscoped`
- * and the spawn helper `merge`) — every one `spawn()`s a brand-new relation, so a
- * call to one is guaranteed to yield a fresh, never-`stripThenable`'d thenable.
- * Names are the camelCase trails spellings; the static `Model.where(...)` and the
- * instance `rel.where(...)` forms share the same method name. Deliberately
- * EXCLUDES `association`, named scopes, `reload`, `load`, etc. — those return a
- * cached/stripped relation or a non-thenable. Conservative by design: omissions
- * only cost a missed (cheap) warning.
- */
-const SPAWN_METHODS = new Set([
-  "all",
-  "unscoped",
-  "scoping",
-  "merge",
-  "spawn",
-  "where",
-  "rewhere",
-  "whereNot",
-  "not",
-  "and",
-  "or",
-  "order",
-  "reorder",
-  "reverseOrder",
-  "inOrderOf",
-  "group",
-  "regroup",
-  "having",
-  "select",
-  "reselect",
-  "distinct",
-  "distinctOn",
-  "limit",
-  "offset",
-  "includes",
-  "preload",
-  "eagerLoad",
-  "references",
-  "joins",
-  "leftOuterJoins",
-  "leftJoins",
-  "from",
-  "lock",
-  "readonly",
-  "none",
-  "strictLoading",
-  "unscope",
-  "extending",
-  "optimizerHints",
-  "annotate",
-  "with",
-  "withRecursive",
-  "createWith",
-  "excluding",
-  "without",
-  "associated",
-  "missing",
-  "only",
-  "except",
-]);
-
-/**
- * @internal
- * True when `objectNode` is a call to a relation-spawning query method —
- * `Model.where(...)`, `rel.order(...)`, `Model.all()`. Only a member call whose
- * property is in `SPAWN_METHODS` qualifies; a bare function call
- * (`association(...)`), a cached accessor (`record.association(...)`), or a named
- * scope is rejected because it may return a `stripThenable`'d instance.
- */
-function isFreshSpawnCall(objectNode) {
-  if (objectNode.type !== "CallExpression") return false;
-  let callee = objectNode.callee;
-  if (callee.type === "ChainExpression") callee = callee.expression;
-  return (
-    callee.type === "MemberExpression" &&
-    !callee.computed &&
-    callee.property.type === "Identifier" &&
-    SPAWN_METHODS.has(callee.property.name)
-  );
-}
 
 /**
  * @internal
@@ -215,14 +122,9 @@ const rule = {
         if (property.type !== "Identifier" || property.name !== "toArray") return;
         // `.toArray(arg)` is not the relation accessor — leave it alone.
         if (node.arguments.length !== 0) return;
-        // Only a call to a relation-spawning query method is a provably-fresh,
-        // unstripped relation — `Model.where(...).toArray()`,
-        // `rel.order(...).toArray()`. A reused binding (`davids.toArray()`),
-        // `this`/`super`, or a cached accessor (`association(record, name)`,
-        // named scopes) may have had its `.then` deleted in place by
-        // `stripThenable` (run by load/reload/presence/records/destroyAll and
-        // inBatches), so `await` on it would not resolve to the array. See header.
-        if (!isFreshSpawnCall(callee.object)) return;
+        // `await super` is a syntax error, so stripping `.toArray()` off a
+        // `super.toArray()` receiver would emit uncompilable code — skip it.
+        if (callee.object.type === "Super") return;
         // Only flag the directly-awaited position — the one spot where the
         // suffix is provably redundant for a thenable.
         if (!isDirectlyAwaited(node)) return;

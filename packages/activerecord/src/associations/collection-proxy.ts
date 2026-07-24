@@ -399,7 +399,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     thisArg?: unknown,
   ): Promise<boolean> {
     if (!fn) return !(await this.isEmpty());
-    const records = await this.toArray();
+    const records = await this;
     return records.some(fn as (v: T, i: number, a: T[]) => unknown, thisArg);
   }
 
@@ -2976,7 +2976,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // nullified FK makes a reload return nothing. Only the non-through path
       // needs this; the through branch returns early after a full reset, so its
       // `toArray()` load is avoided entirely.
-      const records = await this.toArray();
+      const records = await this;
       // Honor the association's `:dependent` like Rails `delete_all` (nil arg):
       // `dependent == :destroy` collapses to `:delete_all`, so
       // destroy/delete/delete_all bulk-DELETE the child rows while
@@ -3346,7 +3346,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#destroy_all
    */
   async destroyAll(): Promise<T[]> {
-    const records = await this.toArray();
+    const records = await this;
     await this.destroy(...records);
     this._invalidateAssociationIds();
     return records;
@@ -3509,9 +3509,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const allStrings = columns.every((c) => typeof c === "string");
     if (allStrings && (this._isThrough || this._targetLoaded)) {
       const stringCols = columns;
-      const records = (this._isThrough ? await this.toArray() : this._target).filter(
-        (r) => !r.isNewRecord(),
-      );
+      const records = (this._isThrough ? await this : this._target).filter((r) => !r.isNewRecord());
       if (stringCols.length === 1) {
         return records.map((r) => r._readAttribute(stringCols[0]));
       }
@@ -3533,9 +3531,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const allStrings = columns.every((c) => typeof c === "string");
     if (allStrings && (this._isThrough || this._targetLoaded)) {
       const stringCols = columns;
-      const records = (this._isThrough ? await this.toArray() : this._target).filter(
-        (r) => !r.isNewRecord(),
-      );
+      const records = (this._isThrough ? await this : this._target).filter((r) => !r.isNewRecord());
       if (records.length === 0) return null;
       if (stringCols.length === 1) return records[0]._readAttribute(stringCols[0]);
       return stringCols.map((c) => records[0]._readAttribute(c));

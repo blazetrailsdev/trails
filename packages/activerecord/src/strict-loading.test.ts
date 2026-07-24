@@ -103,7 +103,7 @@ describe("StrictLoadingTest", () => {
     developer!.strictLoadingBang(false);
     expect(developer!.isStrictLoading()).toBe(false);
 
-    await association(developer!, "auditLogs").toArray();
+    await association(developer!, "auditLogs");
 
     developer!.strictLoadingBang(true, { mode: "n_plus_one_only" });
     expect(developer!.isStrictLoadingNPlusOneOnly()).toBe(true);
@@ -121,14 +121,14 @@ describe("StrictLoadingTest", () => {
     developer!.strictLoadingBang(true, { mode: "n_plus_one_only" });
     expect(developer!.isStrictLoading()).toBe(true);
 
-    const projects = await association(developer!, "projects").toArray();
+    const projects = await association(developer!, "projects");
 
     expect(projects.every((p) => p.isStrictLoading())).toBe(true);
     await expect(
       (projects[projects.length - 1] as any).association("firm").loadTarget(),
     ).rejects.toThrow(StrictLoadingViolationError);
 
-    const projectsExt = await association(developer!, "projectsExtendedByName").toArray();
+    const projectsExt = await association(developer!, "projectsExtendedByName");
     expect(projectsExt.every((p) => p.isStrictLoading())).toBe(true);
     await expect(
       (projectsExt[projectsExt.length - 1] as any).association("firm").loadTarget(),
@@ -149,7 +149,7 @@ describe("StrictLoadingTest", () => {
 
     // Does not raise when a belongs_to association (:ship) loads its has_many (:parts)
     const loadedShip = (await (developer as any).association("ship").loadTarget()) as Ship;
-    const parts = await association(loadedShip, "parts").toArray();
+    const parts = await association(loadedShip, "parts");
 
     // strict_loading is not enabled on the belongs_to target
     expect(loadedShip.isStrictLoading()).toBe(false);
@@ -384,7 +384,7 @@ describe("StrictLoadingTest", () => {
       const devs = await Developer.all().includes("auditLogs");
 
       for (const d of devs) {
-        await association(d, "auditLogs").toArray();
+        await association(d, "auditLogs");
       }
 
       // Reload and re-access
@@ -393,7 +393,7 @@ describe("StrictLoadingTest", () => {
       }
 
       for (const d of devs) {
-        await association(d, "auditLogs").toArray();
+        await association(d, "auditLogs");
       }
     });
   });
@@ -405,11 +405,11 @@ describe("StrictLoadingTest", () => {
       await AuditLog.create({ developer_id: dev0!.id, message: "M" });
 
       const dev = (await Developer.all().includes("auditLogs").first())!;
-      await association(dev, "auditLogs").toArray();
+      await association(dev, "auditLogs");
 
       await dev.reload();
 
-      await association(dev, "auditLogs").toArray();
+      await association(dev, "auditLogs");
     });
   });
 
@@ -815,7 +815,7 @@ describe("StrictLoadingTest", () => {
       logged = true;
     });
     try {
-      await association(developer!, "auditLogs").toArray();
+      await association(developer!, "auditLogs");
       expect(logged).toBe(true);
     } finally {
       Notifications.unsubscribe(sub);
@@ -890,7 +890,7 @@ describe("StrictLoadingFixturesTest", () => {
       expect(fixtureZine.isStrictLoading()).toBe(false);
 
       // The fixture-loaded record does NOT raise when accessing the association.
-      await association(fixtureZine, "interests").toArray();
+      await association(fixtureZine, "interests");
 
       // A freshly-queried record IS strict and DOES raise.
       const fresh = await StrictZine.find(strictZines("going_out").id);

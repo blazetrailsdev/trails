@@ -65,7 +65,7 @@ describe("CalculationsTest", () => {
     expect(accounts.isLoaded).toBe(false);
     expect(await accounts.sum("accounts.credit_limit")).toBe(318);
 
-    await accounts.toArray();
+    await accounts;
     expect(accounts.isLoaded).toBe(true);
     expect(await accounts.sum("accounts.credit_limit")).toBe(318);
   });
@@ -82,7 +82,7 @@ describe("CalculationsTest", () => {
     ]);
     expect(await accounts.count()).toEqual(expected);
 
-    await accounts.toArray();
+    await accounts;
     expect(await accounts.count()).toEqual(expected);
   });
 
@@ -998,7 +998,7 @@ describe("CalculationsTest", () => {
 
   it("async pluck on loaded relation", async () => {
     const relation = Topic.order("id");
-    await relation.toArray();
+    await relation;
     const ids = (await relation.pluck("id")).map(Number);
     expect(ids).toEqual([1, 2, 3, 4, 5]);
   });
@@ -1197,7 +1197,7 @@ describe("CalculationsTest", () => {
   it("ids for a composite primary key on loaded relation", async () => {
     const book = cpkBooks("cpk_great_author_first_book");
     const relation = CpkBook.where({ title: book.title });
-    const records = await relation.toArray();
+    const records = await relation;
     expect(relation.isLoaded).toBe(true);
     expect(records[0].title).toBe(book.title);
   });
@@ -1522,7 +1522,7 @@ describe("CalculationsTest", () => {
     expect(t.isLoaded).toBe(false);
     const before = (await t.pluck("topics.id")).map(Number);
     expect(before).toEqual([1, 3]);
-    await t.toArray();
+    await t;
     expect(t.isLoaded).toBe(true);
     const after = (await t.pluck("topics.id")).map(Number);
     expect(after).toEqual(before);
@@ -1653,7 +1653,7 @@ describe("CalculationsTest", () => {
   it("pick loaded relation", async () => {
     const companies = await Company.order("id").limit(3);
     const rel = Company.order("id").limit(3);
-    await rel.toArray();
+    await rel;
     const name = await rel.pick("name");
     expect(name).toBe("37signals");
     void companies;
@@ -1661,14 +1661,14 @@ describe("CalculationsTest", () => {
 
   it("pick loaded relation multiple columns", async () => {
     const rel = Company.order("id").limit(3);
-    await rel.toArray();
+    await rel;
     const result = (await rel.pick("id", "name")) as [unknown, string];
     expect([Number(result[0]), result[1]]).toEqual([1, "37signals"]);
   });
 
   it("pick loaded relation sql fragment", async () => {
     const rel = Company.order("name").limit(3);
-    await rel.toArray();
+    await rel;
     const name = await rel.pick(arelSql("DISTINCT name"));
     expect(name).toBe("37signals");
   });
@@ -1676,7 +1676,7 @@ describe("CalculationsTest", () => {
   it("pick loaded relation aliased attribute", async () => {
     // Rails: pick(:new_name) uses aliasAttribute new_name→name.
     const rel = Company.order("id").limit(3);
-    await rel.toArray();
+    await rel;
     const name = await rel.pick("name");
     expect(name).toBe("37signals");
   });

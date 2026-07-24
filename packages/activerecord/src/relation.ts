@@ -2264,7 +2264,7 @@ export class Relation<T extends Base> {
    */
   async isAny(pattern?: EnumerablePattern<T>): Promise<boolean> {
     if (this._isEmptyRelation()) return false;
-    if (pattern !== undefined) return (await this.toArray()).some(this._patternMatcher(pattern));
+    if (pattern !== undefined) return (await this).some(this._patternMatcher(pattern));
     if (this._loaded) return this._records.length > 0;
     return this.exists();
   }
@@ -2306,7 +2306,7 @@ export class Relation<T extends Base> {
   async _countMatching(pattern: EnumerablePattern<T>, limit: number): Promise<number> {
     const matches = this._patternMatcher(pattern);
     let count = 0;
-    for (const record of await this.toArray()) {
+    for (const record of await this) {
       if (matches(record) && ++count === limit) break;
     }
     return count;
@@ -2355,7 +2355,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#length
    */
   async length(): Promise<number> {
-    const records = await this.toArray();
+    const records = await this;
     return records.length;
   }
 
@@ -2365,7 +2365,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#reject (Ruby Enumerable)
    */
   async reject(fn: (record: T) => boolean): Promise<T[]> {
-    const records = await this.toArray();
+    const records = await this;
     return records.filter((r) => !fn(r));
   }
 
@@ -2377,7 +2377,7 @@ export class Relation<T extends Base> {
    * Mirrors: Enumerable#detect / #find (via Relation#include Enumerable)
    */
   async detect(fn: (record: T, index: number, all: T[]) => unknown): Promise<T | undefined> {
-    const records = await this.toArray();
+    const records = await this;
     return records.find(fn);
   }
 
@@ -2391,7 +2391,7 @@ export class Relation<T extends Base> {
    * Mirrors: Enumerable#sort_by (via Relation#include Enumerable)
    */
   async sortBy(key: (record: T) => any): Promise<T[]> {
-    const records = await this.toArray();
+    const records = await this;
     return records
       .map((record, index) => ({ record, index, sortKey: key(record) }))
       .sort((a, b) => {
@@ -2424,7 +2424,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#load
    */
   async load(): Promise<LoadedRelation<this>> {
-    await this.toArray();
+    await this;
     return stripThenable(this);
   }
 
@@ -2897,7 +2897,7 @@ export class Relation<T extends Base> {
    * Async iterator support — allows `for await (const record of relation)`.
    */
   async *[Symbol.asyncIterator](): AsyncIterableIterator<T> {
-    const records = await this.toArray();
+    const records = await this;
     for (const record of records) {
       yield record;
     }
@@ -4518,7 +4518,7 @@ export class Relation<T extends Base> {
    * Mirrors: Enumerable#group_by (used on ActiveRecord::Relation)
    */
   async groupByColumn(keyOrFn: string | ((record: T) => unknown)): Promise<Record<string, T[]>> {
-    const records = await this.toArray();
+    const records = await this;
     const result: Record<string, T[]> = {};
     for (const record of records) {
       const key =
@@ -4537,7 +4537,7 @@ export class Relation<T extends Base> {
    * Mirrors: Enumerable#index_by (used on ActiveRecord::Relation)
    */
   async indexBy(keyOrFn: string | ((record: T) => unknown)): Promise<Record<string, T>> {
-    const records = await this.toArray();
+    const records = await this;
     const result: Record<string, T> = {};
     for (const record of records) {
       const key =
@@ -5932,7 +5932,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#extract_associated
    */
   async extractAssociated(name: string): Promise<Base[]> {
-    const records = await this.toArray();
+    const records = await this;
     const results: Base[] = [];
     for (const record of records) {
       const associated = await (record as any)[name]();
@@ -5981,7 +5981,7 @@ export class Relation<T extends Base> {
     if (id === undefined || (typeof id === "object" && id !== null && attrs === undefined)) {
       // update(attrs) form — update all matching records
       const updates = (id ?? {}) as Record<string, unknown>;
-      const records = await this.toArray();
+      const records = await this;
       for (const record of records) {
         await record.update(updates);
       }
@@ -6000,7 +6000,7 @@ export class Relation<T extends Base> {
   async updateBang(id?: unknown, attrs?: Record<string, unknown>): Promise<T | T[]> {
     if (id === undefined || (typeof id === "object" && id !== null && attrs === undefined)) {
       const updates = (id ?? {}) as Record<string, unknown>;
-      const records = await this.toArray();
+      const records = await this;
       for (const record of records) {
         await record.updateBang(updates);
       }
@@ -6204,8 +6204,8 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#==
    */
   async equals(other: Relation<T>): Promise<boolean> {
-    const a = await this.toArray();
-    const b = await other.toArray();
+    const a = await this;
+    const b = await other;
     if (a.length !== b.length) return false;
     return a.every((rec, i) => rec.isEqual(b[i]));
   }
@@ -6287,7 +6287,7 @@ export class Relation<T extends Base> {
    */
   async isNone(pattern?: EnumerablePattern<T>): Promise<boolean> {
     if (this._isEmptyRelation()) return true;
-    if (pattern !== undefined) return !(await this.toArray()).some(this._patternMatcher(pattern));
+    if (pattern !== undefined) return !(await this).some(this._patternMatcher(pattern));
     return this.isEmpty();
   }
 
@@ -6339,7 +6339,7 @@ export class Relation<T extends Base> {
       this._limitValue !== null ||
       !this._havingClause.isEmpty()
     ) {
-      const records = await this.toArray();
+      const records = await this;
       return records.some((r) => r.isEqual(record));
     }
     // Unloaded fast path: probe existence by primary key. Composite-PK models

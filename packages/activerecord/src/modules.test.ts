@@ -163,7 +163,7 @@ describe("ModulesTest", () => {
     Base.storeFullStiClass = true;
     try {
       const collection = await ShopCollection.first();
-      expect(await collection!.products.toArray()).not.toEqual([]);
+      expect(await collection!.products).not.toEqual([]);
       let error: unknown;
       try {
         await collection!.destroy();
@@ -181,7 +181,7 @@ describe("ModulesTest", () => {
     Base.storeFullStiClass = true;
     try {
       const product = await ShopProduct.first();
-      expect(await product!.variants.toArray()).not.toEqual([]);
+      expect(await product!.variants).not.toEqual([]);
       let error: unknown;
       try {
         await product!.destroy();

@@ -94,7 +94,7 @@ describe("AssociationRelation", () => {
     const scope = proxy
       .where({ name: "A" })
       .order("id") as unknown as AssociationRelation<ShipPart>;
-    const records = await scope.toArray();
+    const records = await scope;
     expect(records.length).toBe(2);
     expect(await scope.equals(records)).toBe(true);
     expect(await scope.equals([])).toBe(false);
@@ -113,7 +113,7 @@ describe("AssociationRelation", () => {
     await proxy.create({ name: "P1" });
 
     const scope = proxy.where({}) as unknown as AssociationRelation<ShipPart>;
-    const [part] = await scope.toArray();
+    const [part] = await scope;
     expect((part as any)._associationCache("ship")?.target).toBe(ship);
   });
 });

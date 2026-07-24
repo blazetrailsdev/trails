@@ -24,7 +24,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const relation = Post.where("title = ?", value);
       expect(relation.toSql()).toBe(`SELECT "posts".* FROM "posts" WHERE (title = ${expected})`);
       if (match === 0) {
-        expect(await relation.toArray()).toHaveLength(0);
+        expect(await relation).toHaveLength(0);
       } else {
         expect(await relation.count()).toBe(match);
       }

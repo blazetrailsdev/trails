@@ -43,7 +43,7 @@ describe("HMT Slot E — nested-through advanced", () => {
     // distinctTags deduplicates by tag PK, so we get exactly one row.
     const david = authors("david");
     const general = tags("general");
-    const result = await david.distinctTags.toArray();
+    const result = await david.distinctTags;
     expect(result.length).toBe(1);
     expect(result[0].id).toBe(general.id);
   });
@@ -121,7 +121,7 @@ describe("HMT Slot E — nested-through advanced", () => {
     const david = authors("david");
     const before = await Tagging.where({ taggable_type: "Post" }).count();
     await david.save();
-    const tags = await david.tags.toArray();
+    const tags = await david.tags;
     expect(tags.length).toBeGreaterThan(0);
     const after = await Tagging.where({ taggable_type: "Post" }).count();
     expect(after).toBe(before);

@@ -114,8 +114,8 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   });
 
   it("to a on disable joins through", async () => {
-    const normalComments = await association(author, "comments").toArray();
-    const noJoinsComments = await association(author, "noJoinsComments").toArray();
+    const normalComments = await association(author, "comments");
+    const noJoinsComments = await association(author, "noJoinsComments");
     const normalIds = normalComments.map((c: any) => c.id).sort(sortIds);
     const noJoinsIds = noJoinsComments.map((c: any) => c.id).sort(sortIds);
     expect(noJoinsIds).toEqual(normalIds);
@@ -137,16 +137,16 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
 
   it("empty on disable joins through", async () => {
     const emptyAuthor = await Author.find(authors("bob").id);
-    const normal = await association(emptyAuthor, "comments").toArray();
-    const noJoins = await association(emptyAuthor, "noJoinsComments").toArray();
+    const normal = await association(emptyAuthor, "comments");
+    const noJoins = await association(emptyAuthor, "noJoinsComments");
     expect(normal).toEqual([]);
     expect(noJoins).toEqual([]);
   });
 
   it("empty on disable joins through using custom foreign key", async () => {
     const emptyAuthor = await Author.find(authors("bob").id);
-    const normal = await association(emptyAuthor, "commentsWithForeignKey").toArray();
-    const noJoins = await association(emptyAuthor, "noJoinsCommentsWithForeignKey").toArray();
+    const normal = await association(emptyAuthor, "commentsWithForeignKey");
+    const noJoins = await association(emptyAuthor, "noJoinsCommentsWithForeignKey");
     expect(normal).toEqual([]);
     expect(noJoins).toEqual([]);
   });
@@ -176,8 +176,8 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
 
   it("to a on disable joins with multiple scopes", async () => {
     const expectedIds = [rating1.id, rating2.id].sort(sortIds);
-    const normalRatings = await association(author, "goodRatings").toArray();
-    const noJoinsRatings = await association(author, "noJoinsGoodRatings").toArray();
+    const normalRatings = await association(author, "goodRatings");
+    const noJoinsRatings = await association(author, "noJoinsGoodRatings");
     expect(normalRatings.map((r: any) => r.id)).toEqual(expectedIds);
     expect(noJoinsRatings.map((r: any) => r.id)).toEqual(expectedIds);
   });
@@ -206,8 +206,8 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   });
 
   it("polymophic disable joins through ordering", async () => {
-    const normalMembers = await association(author, "orderedMembers").toArray();
-    const noJoinsMembers = await association(author, "noJoinsOrderedMembers").toArray();
+    const normalMembers = await association(author, "orderedMembers");
+    const noJoinsMembers = await association(author, "noJoinsOrderedMembers");
     expect(normalMembers.map((m: any) => m.id)).toEqual([member2.id, member.id]);
     expect(noJoinsMembers.map((m: any) => m.id)).toEqual([member2.id, member.id]);
   });
@@ -265,7 +265,7 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   });
 
   it("order applied in double join", async () => {
-    const noJoinsMembers = await association(author, "noJoinsMembers").toArray();
+    const noJoinsMembers = await association(author, "noJoinsMembers");
     expect(noJoinsMembers.map((m: any) => m.id)).toEqual([member2.id, member.id]);
   });
 

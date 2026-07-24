@@ -23,7 +23,7 @@ describe("has_and_belongs_to_many", () => {
   it("loads associated records through a join table", async () => {
     // `david` joins both projects via the `developers_projects` join table.
     const david = developers("david");
-    const projectList = await association<CanonicalProject>(david, "projects").toArray();
+    const projectList = await association<CanonicalProject>(david, "projects");
     expect(projectList).toHaveLength(2);
     const names = projectList.map((p) => p.name).sort();
     expect(names).toEqual(["Active Controller", "Active Record"]);
@@ -34,7 +34,7 @@ describe("has_and_belongs_to_many", () => {
     // join table, so it resolves to the alphabetical default
     // ("developers" + "projects" -> "developers_projects").
     const activeRecord = projects("active_record");
-    const devs = await association<CanonicalDeveloper>(activeRecord, "developers").toArray();
+    const devs = await association<CanonicalDeveloper>(activeRecord, "developers");
     expect(devs.length).toBeGreaterThan(0);
     expect(devs.map((d) => d.name)).toContain("David");
   });

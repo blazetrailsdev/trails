@@ -1549,8 +1549,8 @@ describe("FinderTest", () => {
   it("find on a scope does not perform statement caching", async () => {
     await Post.create({ title: "scope-test" });
     const scope = Post.where({ title: "scope-test" });
-    const r1 = await scope.toArray();
-    const r2 = await scope.toArray();
+    const r1 = await scope;
+    const r2 = await scope;
     expect(r1.length).toBe(r2.length);
   });
 
