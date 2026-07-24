@@ -62,6 +62,12 @@ let _currentAdapterResolver: (() => AdapterNameSource) | undefined;
 
 export interface AdapterNameSource {
   connectionDbConfig: () => { adapter?: string } | undefined;
+  // trails-only: a model may carry a directly-assigned adapter instead of an
+  // established connection (`Base._adapter`, base.ts). Rails has no analogue —
+  // every model resolves through a pool — so this field has no counterpart in
+  // `adapter_name_from`; it is read first because a per-model adapter overrides
+  // whatever pool the class would otherwise inherit from Base.
+  _adapter?: { adapterName?: string } | null;
 }
 
 _registry.register("big_integer", BigIntegerType, { override: false });
@@ -130,6 +136,10 @@ export function defaultValue(): Type {
  */
 export function adapterNameFrom(model: AdapterNameSource): AdapterName {
   let configAdapter: string | undefined;
+  // See AdapterNameSource: a directly-assigned adapter is the model's
+  // connection, and no pool (hence no db_config) exists for it.
+  const directAdapterName = model._adapter?.adapterName;
+  if (directAdapterName) return adapterNameFromConfig(directAdapterName);
   try {
     configAdapter = model.connectionDbConfig()?.adapter;
   } catch (error) {

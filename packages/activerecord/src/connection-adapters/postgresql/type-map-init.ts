@@ -19,6 +19,10 @@ import {
 import * as ArType from "../../type.js";
 
 import { Date as OidDate } from "./oid/date.js";
+import { DateTime as OidDateTime } from "./oid/date-time.js";
+import { Enum } from "./oid/enum.js";
+import { LegacyPoint } from "./oid/legacy-point.js";
+import { Vector } from "./oid/vector.js";
 import { DecimalWithoutScale } from "../../type/decimal-without-scale.js";
 import { HashLookupTypeMap } from "../../type/hash-lookup-type-map.js";
 import { Json as ArJson } from "../../type/json.js";
@@ -42,21 +46,27 @@ import { TimestampWithTimeZone } from "./oid/timestamp-with-time-zone.js";
 import { Uuid } from "./oid/uuid.js";
 import { Xml } from "./oid/xml.js";
 
-// Mirrors: postgresql_adapter.rb:1168-1185. Deviation: registered for all
-// adapters, not `adapter: :postgresql` — PG-only tests declare these on models
-// whose connectionDbConfig() raises, so adapterNameFrom degrades to "sqlite"
-// and a scoped registration would read as Unknown type. Tracked separately.
-ArType.register("bit", Bit, { override: false });
-ArType.register("bit_varying", BitVarying, { override: false });
-ArType.register("cidr", Cidr, { override: false });
-ArType.register("hstore", Hstore, { override: false });
-ArType.register("inet", Inet, { override: false });
-ArType.register("interval", Interval, { override: false });
-ArType.register("jsonb", Jsonb, { override: false });
-ArType.register("money", Money, { override: false });
-ArType.register("point", Point, { override: false });
-ArType.register("uuid", Uuid, { override: false });
-ArType.register("xml", Xml, { override: false });
+// Mirrors: postgresql_adapter.rb:1168-1185. The `add_modifier` lines above
+// them (array/range) have no counterpart yet — trails has no registry
+// modifiers, and `attribute(..., array: true)` does not route through them.
+ArType.register("bit", Bit, { adapter: "postgres" });
+ArType.register("bit_varying", BitVarying, { adapter: "postgres" });
+ArType.register("binary", Bytea, { adapter: "postgres" });
+ArType.register("cidr", Cidr, { adapter: "postgres" });
+ArType.register("date", OidDate, { adapter: "postgres" });
+ArType.register("datetime", OidDateTime, { adapter: "postgres" });
+ArType.register("decimal", Decimal, { adapter: "postgres" });
+ArType.register("enum", Enum, { adapter: "postgres" });
+ArType.register("hstore", Hstore, { adapter: "postgres" });
+ArType.register("inet", Inet, { adapter: "postgres" });
+ArType.register("interval", Interval, { adapter: "postgres" });
+ArType.register("jsonb", Jsonb, { adapter: "postgres" });
+ArType.register("money", Money, { adapter: "postgres" });
+ArType.register("point", Point, { adapter: "postgres" });
+ArType.register("legacy_point", LegacyPoint, { adapter: "postgres" });
+ArType.register("uuid", Uuid, { adapter: "postgres" });
+ArType.register("vector", Vector, { adapter: "postgres" });
+ArType.register("xml", Xml, { adapter: "postgres" });
 
 /**
  * Mirrors: PostgreSQLAdapter.extract_limit — `$1.to_i if sql_type =~ /\((.*)\)/`.
