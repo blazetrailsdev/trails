@@ -417,15 +417,11 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
     }
     class Firm extends Company {
       static {
-        registerSubclass(this);
         this.ignoredColumns = Company.columnNames();
       }
     }
     const cols = Firm.columns();
     expect(cols).toEqual([]);
-    // Pins that a legitimately empty column list is memoized and served on the
-    // next read (same instance), not recomputed — the sentinel the `!= null`
-    // memo read distinguishes from an absent (`undefined`) memo.
     expect(Firm.columns()).toBe(cols);
   });
 
