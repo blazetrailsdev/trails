@@ -1,20 +1,36 @@
-import { getOs } from "@blazetrails/activesupport";
-import { afterEach, describe, expect, it } from "vitest";
+import { osAdapterConfig, registerOsAdapter } from "@blazetrails/activesupport";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_FORKS, slotPoolSize, workerForkCount } from "./ar-db-slots.js";
 
-// The clamp workerForkCount() applies, recomputed here from the same adapter
-// so expectations hold on any host (CI runners have far fewer cores than a
-// dev box, and the requests below deliberately exceed small hosts).
-const HOST_CAP = Math.max(getOs().availableParallelism() - 1, 1);
-const capped = (n: number): number => Math.min(n, HOST_CAP);
+// workerForkCount() clamps to the host's cores - 1, so every expectation below
+// would otherwise depend on the machine running it (a 4-vCPU CI runner clamps
+// where a dev box does not). Pin the core count through the OS adapter instead
+// and vary it explicitly in the clamp tests.
+let cores = 64;
+const HOST_CORES = 64;
 
 const ENV_KEYS = ["AR_DB_FORKS", "AR_DB_SLOTS"] as const;
 
 describe("ar-db-slots", () => {
+  beforeAll(() => {
+    registerOsAdapter("ar-db-slots-test", {
+      tmpdir: () => "/tmp",
+      platform: () => "linux",
+      cwd: () => "/",
+      availableParallelism: () => cores,
+    });
+    osAdapterConfig.adapter = "ar-db-slots-test";
+  });
+
+  afterAll(() => {
+    osAdapterConfig.adapter = null;
+  });
+
   const saved = new Map<string, string | undefined>();
   for (const k of ENV_KEYS) saved.set(k, process.env[k]);
 
   afterEach(() => {
+    cores = HOST_CORES;
     for (const k of ENV_KEYS) {
       const v = saved.get(k);
       if (v === undefined) delete process.env[k];
@@ -32,43 +48,53 @@ describe("ar-db-slots", () => {
   describe("workerForkCount", () => {
     it("defaults to the shared default fork count when AR_DB_FORKS is unset", () => {
       setEnv(undefined);
-      expect(workerForkCount()).toBe(capped(DEFAULT_FORKS));
+      expect(workerForkCount()).toBe(DEFAULT_FORKS);
     });
 
     it("reads AR_DB_FORKS", () => {
       setEnv("8");
-      expect(workerForkCount()).toBe(capped(8));
+      expect(workerForkCount()).toBe(8);
     });
 
     it("clamps to at least 1", () => {
       setEnv("0");
-      expect(workerForkCount()).toBe(capped(DEFAULT_FORKS));
+      expect(workerForkCount()).toBe(DEFAULT_FORKS);
       expect(workerForkCount()).toBeGreaterThanOrEqual(1);
     });
 
     it("treats a non-numeric value as the default fork count", () => {
       setEnv("auto");
-      expect(workerForkCount()).toBe(capped(DEFAULT_FORKS));
+      expect(workerForkCount()).toBe(DEFAULT_FORKS);
     });
 
-    it("sees the host-clamped count vitest.config.ts republishes", () => {
-      // No republish any more: the clamp is applied here, against the OS
-      // adapter, so an oversized request never escapes as a worker count.
-      setEnv("1024");
-      expect(workerForkCount()).toBe(HOST_CAP);
-      expect(workerForkCount()).toBeGreaterThan(0);
+    it("clamps the request to the host's core count minus one", () => {
+      cores = 4;
+      setEnv("8");
+      expect(workerForkCount()).toBe(3);
+    });
+
+    it("clamps the default fork count on a small host", () => {
+      cores = 2;
+      setEnv(undefined);
+      expect(workerForkCount()).toBe(1);
+    });
+
+    it("never clamps below 1, even on a single-core host", () => {
+      cores = 1;
+      setEnv("8");
+      expect(workerForkCount()).toBe(1);
     });
   });
 
   describe("slotPoolSize", () => {
     it("adds headroom over the worker count", () => {
       setEnv("2");
-      expect(slotPoolSize()).toBe(capped(2) + 2);
+      expect(slotPoolSize()).toBe(4);
     });
 
     it("keeps headroom at the CI fork count of 8", () => {
       setEnv("8");
-      expect(slotPoolSize()).toBe(capped(8) + 2);
+      expect(slotPoolSize()).toBe(10);
     });
 
     it("has headroom even for a single worker", () => {
@@ -83,12 +109,18 @@ describe("ar-db-slots", () => {
 
     it("ignores a non-positive AR_DB_SLOTS override", () => {
       setEnv("4", "0");
-      expect(slotPoolSize()).toBe(capped(4) + 2);
+      expect(slotPoolSize()).toBe(6);
     });
 
     it("clamps an undersized override up to workers + 1", () => {
       setEnv("8", "4");
-      expect(slotPoolSize()).toBe(Math.max(4, capped(8) + 1));
+      expect(slotPoolSize()).toBe(9);
+    });
+
+    it("tracks the clamped worker count, not the request", () => {
+      cores = 4;
+      setEnv("8");
+      expect(slotPoolSize()).toBe(5);
     });
 
     it("is always strictly greater than the worker count", () => {

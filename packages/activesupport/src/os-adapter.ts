@@ -2,8 +2,8 @@
  * OS adapter — mirrors the Rails adapter pattern.
  *
  * Exposes the few runtime surfaces higher-level packages need (`tmpdir`,
- * `platform`, `cwd`, `availableParallelism`) so they can avoid importing `node:os` / `process`
- * directly.
+ * `platform`, `cwd`, `availableParallelism`) so they can avoid importing
+ * `node:os` / `process` directly.
  */
 
 export interface OsAdapter {
