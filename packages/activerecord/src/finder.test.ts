@@ -15,6 +15,7 @@ import { sql as arelSql } from "@blazetrails/arel";
 
 import { fixtures } from "./test-helpers/fixtures.js";
 import { postFixtureData } from "./test-helpers/fixtures/posts.js";
+import { Account } from "./test-helpers/models/account.js";
 import "./test-helpers/canonical-model-index.js";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 import { adapterType } from "./test-adapter.js";
@@ -1502,8 +1503,11 @@ describe("FinderTest", () => {
 // FinderTest2 — additional coverage for finder_test.rb
 // ==========================================================================
 describe("FinderTest", () => {
-  const { posts } = fixtures(["posts"]);
+  const { posts, topics, accounts } = fixtures(["posts", "topics", "accounts", "companies"]);
   registerModel(CanonicalPost);
+  registerModel("Topic", CanonicalTopic);
+  registerModel(Account);
+  registerModel(CanonicalCompany);
   const Post = CanonicalPost;
   const rid = (r: unknown) => (r as { id: number }).id;
 
@@ -1513,8 +1517,20 @@ describe("FinderTest", () => {
   });
 
   it("find with nil inside set passed for one attribute", async () => {
-    const results = await Post.where({ title: [posts("welcome").title, null] });
-    expect(results.map(rid)).toEqual([rid(posts("welcome"))]);
+    const clientOf = (
+      await CanonicalCompany.where({
+        client_of: [2, 1, null],
+        name: ["37signals", "Summit", "Microsoft"],
+      }).order("client_of DESC")
+    ).map((r) => (r as { client_of: bigint | number | null }).client_of);
+
+    expect(clientOf).toContain(null);
+    expect(
+      clientOf
+        .filter((c) => c != null)
+        .map(Number)
+        .sort(),
+    ).toEqual([1, 2]);
   });
 
   it("find_by with associations", async () => {
@@ -1553,11 +1569,12 @@ describe("FinderTest", () => {
   });
 
   it("find by on relation with large number", async () => {
-    expect(await Post.where("1=1").findBy({ id: 999999999 })).toBeNull();
-    const found = await Post.where({ id: [rid(posts("welcome")), 999999999] }).findBy({
-      id: rid(posts("welcome")),
+    const huge = 9999999999999999999999999999999n;
+    expect(await CanonicalTopic.where("1=1").findBy({ id: huge })).toBeNull();
+    const found = await CanonicalTopic.where({ id: [rid(topics("first")), huge] }).findBy({
+      id: rid(topics("first")),
     });
-    expect(rid(found)).toBe(rid(posts("welcome")));
+    expect(rid(found)).toBe(rid(topics("first")));
   });
 
   // Rails: test "find_by! raises RecordNotFound if the record is missing"
@@ -1575,14 +1592,20 @@ describe("FinderTest", () => {
   });
 
   it("implicit order set to primary key", async () => {
-    await assertQueriesMatch(
-      new RegExp(`ORDER BY ${escapeRegExp(quoteTableName("posts.id"))} DESC LIMIT`, "i"),
-      undefined,
-      false,
-      async () => {
-        await Post.last();
-      },
-    );
+    const oldImplicitOrderColumn = CanonicalTopic.implicitOrderColumn;
+    CanonicalTopic.implicitOrderColumn = "id";
+    try {
+      await assertQueriesMatch(
+        new RegExp(`ORDER BY ${escapeRegExp(quoteTableName("topics.id"))} DESC LIMIT`, "i"),
+        undefined,
+        false,
+        async () => {
+          await CanonicalTopic.last();
+        },
+      );
+    } finally {
+      CanonicalTopic.implicitOrderColumn = oldImplicitOrderColumn;
+    }
   });
 
   it("joins dont clobber id", async () => {
@@ -1612,10 +1635,10 @@ describe("FinderTest", () => {
   });
 
   it("find by one attribute with several options", async () => {
-    const found = await Post.order("id DESC")
-      .where(`id != ${rid(posts("welcome"))}`)
-      .findBy({ title: posts("thinking").title });
-    expect(rid(found)).toBe(rid(posts("thinking")));
+    const found = await Account.order("id DESC")
+      .where("id != ?", rid(accounts("rails_core_account")))
+      .findBy({ credit_limit: 50 });
+    expect(rid(found)).toBe(rid(accounts("unknown")));
   });
 });
 
