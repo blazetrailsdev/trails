@@ -157,7 +157,7 @@ const SIGNIFICANT_CALLS = new Set([
 // justified by the non-call construct it becomes. Names that DO have a JS call form
 // — `delete` (Map#delete), `merge` (Object.assign is a call; there is no operator),
 // `fetch` — are deliberately absent: suppressing them would hide a real dropped call.
-const WIDE_NO_JS_CALL_FORM = new Set([
+export const WIDE_NO_JS_CALL_FORM = new Set([
   "to_s", // template literal / implicit String() coercion — `${x}`
   "each", // for...of loop — no .forEach callee
   "empty?", // `.length === 0` / `.size === 0`
@@ -172,7 +172,7 @@ const WIDE_NO_JS_CALL_FORM = new Set([
 // significant, except `super` (which the module-mixin port structurally drops —
 // see the SIGNIFICANT_CALLS comment above) and the WIDE_NO_JS_CALL_FORM names
 // (whose faithful port is a non-call construct, so no alias can ever match).
-const WIDE_SIGNIFICANT_CALLS: { has(value: string): boolean } = {
+export const WIDE_SIGNIFICANT_CALLS: { has(value: string): boolean } = {
   has: (value) => value !== "super" && !WIDE_NO_JS_CALL_FORM.has(value),
 };
 
