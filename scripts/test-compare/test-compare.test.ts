@@ -4,6 +4,7 @@ import {
   compareFileResults,
   isAssertionCountMismatch,
   parseMinExtra,
+  rubyToConventionTs,
   type ConventionFileResult,
 } from "./test-compare.js";
 
@@ -120,5 +121,22 @@ describe("assertionKindMismatch", () => {
     expect(assertionKindMismatch(["assert_equal"], ["toBeTruthy"], true)).toBe(null);
     expect(assertionKindMismatch(undefined, ["toBeTruthy"], false)).toBe(null);
     expect(assertionKindMismatch(["assert_equal"], undefined, false)).toBe(null);
+  });
+});
+
+describe("rubyToConventionTs", () => {
+  it("aliases railtie/railties path segments to trailtie/trailties", () => {
+    // Trails renames the Railtie concept; a ported `railtie_test.rb` lives at
+    // `trailtie.test.ts`, so the mapping must alias to credit the port.
+    expect(rubyToConventionTs("railtie_test.rb", "activemodel")).toBe("trailtie.test.ts");
+    expect(rubyToConventionTs("railties/railtie_test.rb", "trailties")).toBe(
+      "trailties/trailtie.test.ts",
+    );
+  });
+
+  it("leaves unaliased paths unchanged apart from kebab-casing", () => {
+    expect(rubyToConventionTs("relation/where_test.rb", "activerecord")).toBe(
+      "relation/where.test.ts",
+    );
   });
 });
