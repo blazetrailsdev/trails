@@ -116,3 +116,42 @@ describe("Type.lookup under a non-sqlite configuration", () => {
     expect(lookup("foo")).not.toBeInstanceOf(AdapterType);
   });
 });
+
+// The wiring the #5181 review asked for: `attribute()` on an AR model must go
+// through ActiveRecord's resolve_type_name (attributes.rb:296-298), so the
+// declaring model's adapter selects the registration. Before Base.resolveTypeName
+// was wired this resolved against ActiveModel's adapter-blind typeRegistry and
+// every model got the generic string type.
+describe("attribute() resolves through the declaring model's adapter", () => {
+  const originalConnectionDbConfig = (Base as unknown as { connectionDbConfig: unknown })
+    .connectionDbConfig;
+
+  afterEach(() => {
+    (Base as unknown as { connectionDbConfig: unknown }).connectionDbConfig =
+      originalConnectionDbConfig;
+  });
+
+  function modelForAdapter(adapter: string): typeof Base {
+    class AdapterScoped extends Base {}
+    (
+      AdapterScoped as unknown as { connectionDbConfig: () => { adapter: string } }
+    ).connectionDbConfig = () => ({ adapter });
+    return AdapterScoped as unknown as typeof Base;
+  }
+
+  it("picks the mysql2 string registration for a mysql2 model", () => {
+    const model = modelForAdapter("mysql2");
+    model.attribute("mystring", "string");
+
+    const type = model.resolveTypeName("string");
+    expect(type.cast(true)).toBe("1");
+    expect(model._defaultAttributes().getAttribute("mystring").type.cast(true)).toBe("1");
+  });
+
+  it("leaves a sqlite3 model on the generic string registration", () => {
+    const model = modelForAdapter("sqlite3");
+    model.attribute("mystring", "string");
+
+    expect(model._defaultAttributes().getAttribute("mystring").type.cast(true)).toBe("t");
+  });
+});

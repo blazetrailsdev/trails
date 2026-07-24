@@ -15,8 +15,8 @@ import {
   StringType,
   TimeType,
   Type,
-  typeRegistry,
 } from "@blazetrails/activemodel";
+import * as ArType from "../../type.js";
 
 import { Date as OidDate } from "./oid/date.js";
 import { DecimalWithoutScale } from "../../type/decimal-without-scale.js";
@@ -42,21 +42,28 @@ import { TimestampWithTimeZone } from "./oid/timestamp-with-time-zone.js";
 import { Uuid } from "./oid/uuid.js";
 import { Xml } from "./oid/xml.js";
 
-// Rails registers PG's :interval type into the AM type registry so that
-// `attribute :col, :interval` resolves on AR-PG models. Mirror that here
-// as a module side-effect — AR-side type.ts already does the same for
-// the built-in AR types (date/datetime/time/text/json).
-typeRegistry.register("interval", () => new Interval());
-typeRegistry.register("hstore", () => new Hstore());
-typeRegistry.register("jsonb", () => new Jsonb());
-typeRegistry.register("money", () => new Money());
-typeRegistry.register("inet", () => new Inet());
-typeRegistry.register("cidr", () => new Cidr());
-typeRegistry.register("bit", () => new Bit());
-typeRegistry.register("bit_varying", () => new BitVarying());
-typeRegistry.register("xml", () => new Xml());
-typeRegistry.register("point", () => new Point());
-typeRegistry.register("uuid", () => new Uuid());
+// Mirrors: postgresql_adapter.rb:1168-1185, which registers these under
+// `adapter: :postgresql`. These live in ActiveRecord's registry (not
+// ActiveModel's) now that AR models resolve `attribute` names through
+// ActiveRecord::Type.
+//
+// Deviation: registered for all adapters rather than `adapter: "postgres"`.
+// Several PG-only tests declare `attribute(..., "interval" | "uuid")` on models
+// carrying a per-model adapter, where `connectionDbConfig()` raises
+// ConnectionNotEstablished and `Type.adapterNameFrom` degrades to "sqlite" — an
+// adapter-scoped registration would turn those into "Unknown type". Narrowing
+// these to :postgresql is tracked separately.
+ArType.register("bit", Bit, { override: false });
+ArType.register("bit_varying", BitVarying, { override: false });
+ArType.register("cidr", Cidr, { override: false });
+ArType.register("hstore", Hstore, { override: false });
+ArType.register("inet", Inet, { override: false });
+ArType.register("interval", Interval, { override: false });
+ArType.register("jsonb", Jsonb, { override: false });
+ArType.register("money", Money, { override: false });
+ArType.register("point", Point, { override: false });
+ArType.register("uuid", Uuid, { override: false });
+ArType.register("xml", Xml, { override: false });
 
 /**
  * Mirrors: PostgreSQLAdapter.extract_limit — `$1.to_i if sql_type =~ /\((.*)\)/`.

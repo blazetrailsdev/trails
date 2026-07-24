@@ -5,9 +5,9 @@ import {
   ValueType,
   IntegerType,
   Type,
-  typeRegistry,
   isDecoratorReplay,
 } from "@blazetrails/activemodel";
+import { lookup as arTypeLookup } from "./type.js";
 import { dangerousAttributeMethods } from "./attribute-methods.js";
 import { getOrCreateModuleCarrier } from "./module-carrier.js";
 import { isDangerousClassMethod, isRelationInstanceMethod } from "./scoping/named.js";
@@ -44,13 +44,13 @@ function inferSubtype(values: Iterable<EnumValue>): string {
 /**
  * Build the ValueType instance backing an enum subtype's cast/serialize.
  * Mirrors Rails passing the column's real `Type::Value` into `EnumType.new`:
- * resolve the declared subtype name through the shared type registry so
+ * resolve the declared subtype name through ActiveRecord's registry so
  * float/decimal/datetime/etc. columns delegate to their actual type. Falls
  * back to IntegerType only for names the registry doesn't know.
  */
 function subtypeInstance(subtype: string): ValueType<unknown> {
   try {
-    return typeRegistry.lookup(subtype) as ValueType<unknown>;
+    return arTypeLookup(subtype) as ValueType<unknown>;
   } catch {
     return new IntegerType();
   }
