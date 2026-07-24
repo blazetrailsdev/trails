@@ -21,6 +21,13 @@ export interface RailsColumnOptions {
   array?: boolean;
   default?: string;
   polymorphic?: boolean;
+  /**
+   * True when the option list contained a `**splat` (e.g. `**default_zero`)
+   * whose keys the parser cannot resolve — the captured options are incomplete,
+   * so option-level comparison must be suppressed rather than report a
+   * divergence on evidence we know is partial.
+   */
+  dynamicOptions?: boolean;
 }
 
 export interface RailsTable {
@@ -149,6 +156,10 @@ function splitArgs(args: string): string[] {
 function parseOptions(args: string[]): RailsColumnOptions {
   const options: RailsColumnOptions = {};
   for (const arg of args) {
+    if (/^\s*\*\*/.test(arg)) {
+      options.dynamicOptions = true;
+      continue;
+    }
     const kv = /^\s*([a-z_]+):\s*(.+)$/.exec(arg);
     if (!kv) continue;
     const [, key, rawValue] = kv as unknown as [string, string, string];
