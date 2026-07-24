@@ -19,10 +19,10 @@ import {
 } from "@blazetrails/activemodel";
 export { Type } from "@blazetrails/activemodel";
 import { AdapterSpecificRegistry } from "./type/adapter-specific-registry.js";
-import type {
-  AdapterName,
-  AbstractAdapter as DatabaseAdapter,
-} from "./connection-adapters/abstract-adapter.js";
+import { ConnectionNotEstablished } from "./errors.js";
+import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
+import { adapterNameFromConfig } from "./connection-adapters/abstract-adapter.js";
+
 import { Date } from "./type/date.js";
 import { DateTime } from "./type/date-time.js";
 import { Time } from "./type/time.js";
@@ -58,7 +58,11 @@ export const Value = ValueType;
 
 let _registry = new AdapterSpecificRegistry();
 let _defaultValue: Type | undefined;
-let _currentAdapterResolver: (() => AdapterName) | undefined;
+let _currentAdapterResolver: (() => AdapterNameSource) | undefined;
+
+export interface AdapterNameSource {
+  connectionDbConfig: () => { adapter?: string } | undefined;
+}
 
 _registry.register("big_integer", BigIntegerType, { override: false });
 _registry.register("binary", BinaryType, { override: false });
@@ -92,8 +96,7 @@ export function setRegistry(r: AdapterSpecificRegistry): void {
   _defaultValue = undefined;
 }
 
-// Called by Base to wire the real connection adapter into type lookups.
-export function setCurrentAdapterResolver(resolver: () => AdapterName): void {
+export function setCurrentAdapterResolver(resolver: () => AdapterNameSource): void {
   _currentAdapterResolver = resolver;
 }
 
@@ -124,20 +127,27 @@ export function defaultValue(): Type {
  *
  * Mirrors: ActiveRecord::Type.adapter_name_from
  */
-export function adapterNameFrom(model: { connection?: unknown }): AdapterName {
-  return (
-    ((model.connection as DatabaseAdapter | null | undefined)?.adapterName as
-      | AdapterName
-      | undefined) ?? "sqlite"
-  );
+export function adapterNameFrom(model: AdapterNameSource): AdapterName {
+  let configAdapter: string | undefined;
+  try {
+    configAdapter = model.connectionDbConfig()?.adapter;
+  } catch (error) {
+    // Deviation: Rails lets `connection_db_config`'s ConnectionNotEstablished
+    // propagate. trails resolves adapter names during module load and during
+    // `attribute()` declarations that run before `establishConnection`, so an
+    // unconfigured model degrades to the default adapter instead of raising.
+    // Narrowed on purpose: any other error is a real bug and must not be masked.
+    if (!(error instanceof ConnectionNotEstablished)) throw error;
+    return "sqlite";
+  }
+  return adapterNameFromConfig(configAdapter);
 }
 
 // currentAdapterName is private in Rails — exposed here for api:compare parity only.
-// When Base wires setCurrentAdapterResolver(), it reads the real connection adapter.
 /** @internal */
-export function currentAdapterName(getBase?: () => { connection?: unknown }): AdapterName {
-  if (getBase) return adapterNameFrom(getBase());
-  return _currentAdapterResolver?.() ?? "sqlite";
+export function currentAdapterName(): AdapterName {
+  const base = _currentAdapterResolver?.();
+  return base ? adapterNameFrom(base) : "sqlite";
 }
 
 // Override ActiveModel's type registry with AR-specific types so that

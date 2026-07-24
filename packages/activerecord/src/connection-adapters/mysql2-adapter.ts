@@ -135,10 +135,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     super.initializeTypeMap(m);
     m.registerType(/char/i, undefined, (sqlType) => {
       const limit = this.extractLimit(sqlType);
-      return Type.lookup("string", { adapter: "mysql2", limit });
+      return Type.lookup("string", { adapter: "mysql", limit });
     });
-    m.registerType(/^enum/i, Type.lookup("string", { adapter: "mysql2" }));
-    m.registerType(/^set/i, Type.lookup("string", { adapter: "mysql2" }));
+    m.registerType(/^enum/i, Type.lookup("string", { adapter: "mysql" }));
+    m.registerType(/^set/i, Type.lookup("string", { adapter: "mysql" }));
   }
 
   // Cached liveness state — true until a failure is observed (ping fail,
@@ -2300,18 +2300,18 @@ dirtiesQueryCache(Mysql2Adapter, "execQuery", "execute");
 // (not the ActiveModel default `"t"`/`"f"`) so a boolean assigned to a string
 // column round-trips as 1/0; `initializeTypeMap` resolves char/varchar/enum/set
 // through `Type.lookup(:string, adapter: :mysql2)`.
-Type.register("immutable_string", null, { adapter: "mysql2" }, (_symbol, args?) => {
+Type.register("immutable_string", null, { adapter: "mysql" }, (_symbol, args?) => {
   return new ImmutableStringType({
     trueString: "1",
     falseString: "0",
     ...((args as Record<string, unknown>) ?? {}),
   });
 });
-Type.register("string", null, { adapter: "mysql2" }, (_symbol, args?) => {
+Type.register("string", null, { adapter: "mysql" }, (_symbol, args?) => {
   return new StringType({
     trueString: "1",
     falseString: "0",
     ...((args as Record<string, unknown>) ?? {}),
   });
 });
-Type.register("unsigned_integer", UnsignedInteger, { adapter: "mysql2" });
+Type.register("unsigned_integer", UnsignedInteger, { adapter: "mysql" });

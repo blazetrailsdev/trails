@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { register, lookup, registry, setRegistry, AdapterSpecificRegistry } from "./type.js";
+import {
+  register,
+  lookup,
+  registry,
+  setRegistry,
+  adapterNameFrom,
+  AdapterSpecificRegistry,
+} from "./type.js";
+import { Base } from "./base.js";
 import { Type } from "@blazetrails/activemodel";
 
 class ArgType extends Type<unknown> {
@@ -49,8 +57,9 @@ describe("TypeTest", () => {
   });
 
   it("lookup defaults to the current adapter", () => {
+    const currentAdapter = adapterNameFrom(Base);
     register("foo", ArgType, { override: false });
-    register("foo", PgArgType, { adapter: "sqlite" });
+    register("foo", PgArgType, { adapter: currentAdapter });
 
     expect(lookup("foo")).toBeInstanceOf(PgArgType);
   });

@@ -34,7 +34,7 @@ import {
   type AttributeOptions,
   type TransactionalCallbackConditions,
 } from "@blazetrails/activemodel";
-import "./type.js"; // Register AR type overrides into AM's type registry
+import { setCurrentAdapterResolver } from "./type.js";
 import { Table, UpdateManager, DeleteManager, Nodes, sql as arelSql } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
@@ -5199,6 +5199,8 @@ _setGlobalIdModelFinder((name: string) => {
   }
   return undefined;
 });
+
+setCurrentAdapterResolver(() => Base);
 
 // Wire Base into DatabaseTasks so migrationConnection() works synchronously
 // without waiting for an async method to capture _baseClass first.
