@@ -1410,9 +1410,6 @@ describe("SelectManagerTest", () => {
       expect(mgr.whereSql()?.value).toBe('WHERE "users"."id" = 10 AND "users"."id" = 11');
     });
 
-    // Rails swaps `Table.engine.lease_connection.visitor` for the duration of the
-    // test; RFC 0007 deleted that global, so the PostgreSQL visitor is selected
-    // through `whereSql`'s `engine` argument instead — the only remaining path.
     it("handles database-specific statements", () => {
       const pgEngine = {
         connection: { visitor: new Visitors.PostgreSQL(fakeRecordConnection) },
