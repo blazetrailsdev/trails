@@ -22,8 +22,6 @@ describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
     await setupSecondPool();
   });
 
-  // `setupSecondPool` drops the arunit2-only tables from the shared primary
-  // database; restore them so sibling files see the canonical schema.
   afterAll(async () => {
     await teardownSecondPool();
   });

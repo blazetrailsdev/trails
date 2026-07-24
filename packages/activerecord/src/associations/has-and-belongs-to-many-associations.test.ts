@@ -1196,8 +1196,6 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(await (professor as any).courses.count()).toBe(1);
   });
 
-  // `setupSecondPool` drops the arunit2-only tables from the shared primary
-  // database; restore them so sibling files see the canonical schema.
   afterAll(async () => {
     if (isSqliteRun()) await teardownSecondPool();
   });

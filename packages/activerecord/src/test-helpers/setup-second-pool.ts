@@ -69,12 +69,9 @@ export async function setupSecondPool(): Promise<void> {
 }
 
 /**
- * Undoes `setupSecondPool`'s primary-database surgery.
- *
- * Rails' two-database split is per-process and disappears with the process;
- * ours shares one primary database with every sibling suite in the worker, so
- * the `arunit2`-only tables dropped above must be put back or later files
- * (which never touch `courses`/`colleges`) observe a drifted schema.
+ * Undoes `setupSecondPool`'s primary-database surgery: Rails' two-database
+ * split dies with the process, but ours shares one primary database with every
+ * sibling suite in the worker, so the dropped tables must be put back.
  *
  * @internal
  */
@@ -84,5 +81,6 @@ export async function teardownSecondPool(): Promise<void> {
     "courses",
     "professors",
     "courses_professors",
+    "entrants",
   ]);
 }
