@@ -2088,6 +2088,32 @@ export async function loadCanonicalSchema(adapter: DatabaseAdapter): Promise<voi
 }
 
 /**
+ * Map of referenced table -> tables whose definition declares a foreign key into
+ * it. Built by replaying each table's block against a probe TableDefinition that
+ * records `foreignKey` calls and discards columns, so the edges come from the
+ * one declaration site rather than a hand-maintained second list.
+ */
+let _dependents: Map<string, string[]> | null = null;
+
+async function foreignKeyDependents(): Promise<Map<string, string[]>> {
+  if (_dependents) return _dependents;
+  const dependents = new Map<string, string[]>();
+  for (const def of await buildCanonicalRegistry()) {
+    const probe = {
+      column: () => {},
+      foreignKey: (toTable: string) => {
+        const children = dependents.get(toTable) ?? [];
+        children.push(def.name);
+        dependents.set(toTable, children);
+      },
+    } as unknown as TableDefinition;
+    def.fn(new TableBuilder(probe, "sqlite", COLUMN_TYPE_MAP_SQLITE, null, null));
+  }
+  _dependents = dependents;
+  return dependents;
+}
+
+/**
  * Drop and recreate a named subset of canonical tables, restoring each to its
  * full canonical shape — the `create_table`-based equivalent of
  * `defineSchema({ …subset }, { dropExisting: true })`. Test files use it as an
@@ -2108,6 +2134,18 @@ export async function rebuildCanonicalTables(
     // intentional (mirrors the sibling ensureCanonicalTables throw below).
     // eslint-disable-next-line blazetrails/rails-error-parity
     throw new Error(`rebuildCanonicalTables: unknown canonical table(s): ${unknown.join(", ")}`);
+  }
+  // A table nobody asked for still has to be rebuilt when it holds a foreign key
+  // into one that was: MySQL refuses to drop a table a live FK points at, and PG
+  // would cascade the constraint away silently.
+  const dependents = await foreignKeyDependents();
+  const queue = [...wanted];
+  for (const name of queue) {
+    for (const child of dependents.get(name) ?? []) {
+      if (wanted.has(child)) continue;
+      wanted.add(child);
+      queue.push(child);
+    }
   }
   const defs = registry.filter((d) => wanted.has(d.name));
   if (defs.length === 0) return;
