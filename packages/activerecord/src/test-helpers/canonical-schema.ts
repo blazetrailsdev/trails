@@ -2140,12 +2140,18 @@ export interface FkSafeDropPlan {
  *
  * FKs are read only for tables that currently exist, and by default only for
  * the tables being dropped: finding inbound FKs means introspecting every
- * *other* live table (hundreds, for the canonical schema), so that scan is
- * skipped unless the drop set itself reported at least one foreign key. On an
- * FK-free database this costs exactly what it did before. The trade-off is
- * deliberate and one-sided: a drop set whose tables hold no FK of their own but
- * are pointed at from outside is not detected — pass `scanInbound` to force the
- * scan when a caller knows that shape is possible.
+ * *other* live table (hundreds, for the canonical schema), so that scan runs
+ * only when `scanInbound` is passed or the drop set reported a foreign key —
+ * *any* foreign key, counted before self-loops and out-of-set targets are
+ * filtered out, because the signal wanted there is the weak "this database uses
+ * foreign keys at all", not "these tables constrain each other". On an FK-free
+ * database this costs exactly what it did before.
+ *
+ * That default is a cheap heuristic, not a guarantee: a drop set whose tables
+ * hold no FK of their own but are pointed at from outside is precisely what it
+ * misses. Any caller that has to be *right* about inbound FKs — as
+ * {@link rebuildCanonicalTables} does — must pass `scanInbound` and pay for the
+ * scan rather than rely on it.
  *
  * @internal
  */
@@ -2272,9 +2278,15 @@ export async function rebuildCanonicalTables(
   const defs = registry.filter((d) => wanted.has(d.name));
   if (defs.length === 0) return;
   const { ss, typeMap } = await prepareSchema(adapter);
+  // `scanInbound` is not optional here: this helper exists as the shield against
+  // a sibling test that left a stray foreign key pointing at a canonical table,
+  // which is exactly the shape fkSafeDropPlan's default heuristic cannot see —
+  // the dropped table holds no FK of its own, so nothing would trigger the scan.
+  // The scan costs one FK introspection per live table not being rebuilt.
   const plan = await fkSafeDropPlan(
     ss,
     defs.map((d) => d.name),
+    { scanInbound: true },
   );
   // An FK reaching in from a table nobody asked for (or one closing a cycle)
   // has no drop order that works; drop the constraint itself first. The

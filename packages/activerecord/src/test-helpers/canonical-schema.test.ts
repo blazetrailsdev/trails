@@ -96,13 +96,12 @@ describe("rebuildCanonicalTables", () => {
 
       // A test-added FK from a table outside the rebuild set: no drop order can
       // work around it, so the rebuild has to drop the constraint itself.
-      await sqlite.addForeignKey("lessons_students", "fk_test_has_pk", {
-        column: "lesson_id",
-        primaryKey: "pk_id",
-      });
+      // `authors` declares no FK of its own, so nothing about the rebuilt set
+      // hints that an inbound FK might exist — the rebuild has to go looking.
+      await sqlite.addForeignKey("lessons_students", "authors", { column: "lesson_id" });
       expect(await sqlite.foreignKeys("lessons_students")).toHaveLength(1);
 
-      await rebuildCanonicalTables(adapter, ["fk_test_has_pk"]);
+      await rebuildCanonicalTables(adapter, ["authors"]);
       expect(await sqlite.foreignKeys("lessons_students")).toEqual([]);
       expect(await dumpSchema(adapter)).toBe(canonical);
     } finally {
