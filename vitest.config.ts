@@ -428,6 +428,7 @@ export default defineConfig({
             "scripts/schema-compare/*.test.ts",
             "scripts/parity/**/*.test.ts",
             "scripts/strip-asany.test.ts",
+            "scripts/rails-file-structure-mixins.test.ts",
             "scripts/test-deps/*.test.ts",
             "scripts/tasks/*.test.ts",
             "scripts/test-compare/*.test.ts",

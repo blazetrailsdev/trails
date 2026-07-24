@@ -28,6 +28,7 @@ import { rubyMethodToTs, rubyFileToTs } from "./api-compare/conventions.js";
 import { writeJsonManifest } from "./api-compare/write-json-manifest.js";
 import { mergeBySourceLine } from "./api-compare/source-order.js";
 import { operatorSpelling } from "./api-compare/operator-order-spelling.js";
+import { resolveMixinParent } from "./rails-file-structure-mixins.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -197,6 +198,13 @@ for (const [pkg, rubyPkg] of Object.entries<any>(railsApi.packages)) {
     fqns.add(fqn);
   };
 
+  // fqn → class host, so a `Foo::InstanceMethods` / `Foo::ClassMethods` mixin
+  // module can find the CLASS it is mixed into (see visitModules).
+  const classByFqn = new Map<string, RubyEntity>();
+  for (const host of Object.values<RubyEntity>(rubyPkg.classes ?? {})) {
+    classByFqn.set(host.fqn, host);
+  }
+
   // Ruby classes port to TS classes: instance + static members live in the
   // class container keyed by the fqn's last segment (`Arel::Nodes::Casted` →
   // `Casted`). Ruby modules port to top-level `this`-typed / mixin functions
@@ -227,9 +235,33 @@ for (const [pkg, rubyPkg] of Object.entries<any>(railsApi.packages)) {
   const visitModules = (entities: Record<string, RubyEntity>) => {
     for (const host of Object.values(entities)) {
       if (!host.file) continue;
-      // Modules port to top-level functions, which have no staticness — every
-      // entry stays bare regardless of whether Ruby declared it on the module
-      // or its singleton.
+      // A `Foo::InstanceMethods` / `Foo::ClassMethods` module whose PARENT is a
+      // CLASS is a mixin flattened onto that class's TS port (Rails
+      // `include`/`extend`), NOT a standalone module ported to top-level
+      // functions. Its order lands on the class container so it is enforced
+      // rather than dropped into `functions` (which no class body reads) — see
+      // resolveMixinParent. The methods append AFTER the class's own members
+      // (the class defines its body, then includes the mixin), and
+      // `ClassMethods` entries become `static` since `extend` promotes them to
+      // singleton methods.
+      const mixin = resolveMixinParent(host.fqn, (fqn) => classByFqn.has(fqn));
+      if (mixin) {
+        for (const m of mergeBySourceLine(
+          tagStatic(host.instanceMethods, false),
+          tagStatic(host.classMethods, true),
+        )) {
+          const file = m.file ?? host.file;
+          noteClass(file, mixin.className, mixin.parentFqn);
+          const b = bucketFor(file, mixin.className);
+          const isStatic = mixin.extendsSingleton || m.isStatic;
+          const opCandidates = isStatic ? undefined : operatorSpelling(mixin.parentFqn, m.name);
+          pushMethod(b.names, b.seen, m.name, isStatic, opCandidates);
+        }
+        continue;
+      }
+      // Standalone modules port to top-level functions, which have no
+      // staticness — every entry stays bare regardless of whether Ruby declared
+      // it on the module or its singleton.
       for (const m of mergeBySourceLine(
         tagStatic(host.instanceMethods, false),
         tagStatic(host.classMethods, true),
