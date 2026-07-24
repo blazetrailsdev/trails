@@ -553,8 +553,24 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // postgresql_adapter.rb:326 — so both adapters agree, down to the same
     // `isRubyTruthy` guard: a Ruby-truthy `username` (including "") overwrites
     // `user`, while `username: false` does not.
-    const { username: railsUsername, ...mysqlDriverConfig } = mysqlConfig as typeof mysqlConfig & {
+    //
+    // `socket` is the same class of deviation. Rails' database.yml spells a
+    // Unix socket `socket` (config.example.yml:18-19) and the Ruby gem reads
+    // `:socket` natively, but node-mysql2's option is `socketPath` — and it
+    // ignores the unknown key, so an unmapped `socket` connects over TCP
+    // instead of failing. There is no Rails guard to inherit here, so the
+    // precedence deliberately matches `username` above: a Ruby-truthy `socket`
+    // overwrites an explicit `socketPath` and is deleted from the hash.
+    // `socket: ""` therefore maps (Ruby-truthy), which lands on mysql2 as a
+    // falsy `socketPath` and so falls back to host/port — the same outcome as
+    // a blank socket in Rails.
+    const {
+      username: railsUsername,
+      socket: railsSocket,
+      ...mysqlDriverConfig
+    } = mysqlConfig as typeof mysqlConfig & {
       username?: string;
+      socket?: string;
     };
     // No compact/allowlist here, unlike PostgreSQLAdapter (which mirrors
     // postgresql_adapter.rb:322-331). Rails hands mysql2 the residual config
@@ -565,6 +581,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._poolConfig = {
       ...mysqlDriverConfig,
       ...(isRubyTruthy(railsUsername) ? { user: railsUsername } : {}),
+      ...(isRubyTruthy(railsSocket) ? { socketPath: railsSocket } : {}),
       flags: resolvedFlags,
       strict,
       waitTimeout,

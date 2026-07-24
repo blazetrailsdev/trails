@@ -135,14 +135,14 @@ describe("buildAdapterArg", () => {
       });
     });
 
-    it("remaps socket to socketPath for mysql and omits host", () => {
+    it("forwards socket untouched for mysql and omits host", () => {
       const [config] = buildAdapterArg("mysql2", {
         adapter: "mysql2",
         database: "db",
         socket: "/var/run/mysqld/mysqld.sock",
       }) as [Record<string, unknown>];
-      expect(config.socketPath).toBe("/var/run/mysqld/mysqld.sock");
-      expect(config.socket).toBeUndefined();
+      expect(config.socket).toBe("/var/run/mysqld/mysqld.sock");
+      expect(config.socketPath).toBeUndefined();
       expect(config.host).toBeUndefined();
     });
 
@@ -152,11 +152,10 @@ describe("buildAdapterArg", () => {
         database: "db",
         socket: "",
       }) as [Record<string, unknown>];
-      expect(config.socketPath).toBeUndefined();
       expect(config.host).toBe("localhost");
     });
 
-    it("does not remap socketPath when already set for mysql", () => {
+    it("leaves an explicit socketPath alone for mysql", () => {
       const [config] = buildAdapterArg("mysql2", {
         adapter: "mysql2",
         database: "db",

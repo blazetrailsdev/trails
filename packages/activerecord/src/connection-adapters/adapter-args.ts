@@ -207,18 +207,14 @@ export function buildAdapterArg(
   // spelling and the adapter constructor maps it to the driver-native `user`.
   const { adapter: _a, url: _u, ...rest } = configuration;
   const adapterConfig: Record<string, unknown> = { ...rest };
-  // mysql2 uses `socketPath`; database.yml uses `socket`. Normalise here so
-  // all callers benefit, not just the DatabaseTasks path.
+  // `socket` is deliberately NOT remapped here, for the same reason as
+  // `username` above: this layer used to strip it before the adapter saw it,
+  // shadowing the constructor entirely. Mysql2Adapter#constructor owns the
+  // single `socket` -> `socketPath` mapping; forward Rails' spelling untouched.
   if (normalized === "mysql") {
-    if (
-      adapterConfig.socket !== undefined &&
-      adapterConfig.socket !== "" &&
-      adapterConfig.socketPath === undefined
-    ) {
-      adapterConfig.socketPath = adapterConfig.socket;
-      delete adapterConfig.socket;
-    }
-    if (adapterConfig.host === undefined && !adapterConfig.socketPath) {
+    // The host default must still look at BOTH spellings — a `socket`-only
+    // config is socket-bound even though `socketPath` is not set yet.
+    if (adapterConfig.host === undefined && !adapterConfig.socketPath && !adapterConfig.socket) {
       adapterConfig.host = "localhost";
     }
   } else if (adapterConfig.host === undefined) {

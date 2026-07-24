@@ -192,12 +192,10 @@ export function mysqlSettings(read: EnvReader = getEnv): ServerSettings {
  * it directly, and `Mysql2Adapter` / `PostgreSQLAdapter` map it to the
  * driver-native `user` when building their driver config.
  *
- * The socket still straddles: Rails' config key is `socket`, while mysql2's
- * driver option is `socketPath`. Emitting only one spelling fails *silently* —
- * mysql2 ignores unknown keys, so a `socket`-only config falls back to TCP
- * rather than raising.
+ * The socket is likewise Rails' canonical `socket` alone: `Mysql2Adapter` maps
+ * it to mysql2's `socketPath` when building its driver config.
  *
- * `password` and the socket keys are omitted when unset so the drivers apply
+ * `password` and `socket` are omitted when unset so the drivers apply
  * their own defaults — a literal `undefined` is not the same as absent.
  */
 export function driverConfig(settings: ServerSettings): Record<string, unknown> {
@@ -208,7 +206,7 @@ export function driverConfig(settings: ServerSettings): Record<string, unknown> 
     username: user,
     database,
     ...(password === undefined ? {} : { password }),
-    ...(socket === undefined ? {} : { socket, socketPath: socket }),
+    ...(socket === undefined ? {} : { socket }),
   };
 }
 
