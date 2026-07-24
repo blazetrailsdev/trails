@@ -426,14 +426,6 @@ describe("SchemaAdapter TM delegation", () => {
     // The model runs on `Base.connection`; spy on that same adapter — it's what
     // TM dispatches `withinNewTransaction` against.
     const testAdapter = Base.connection;
-    // Re-lay canonical `items` (drop-and-recreate, mirroring schema.rb's
-    // `create_table :items`) to prime the signature cache. `items` is a
-    // boot-owned canonical table, so it is not torn down here (the describe's
-    // afterAll clears rows; the boot schema owns/restores the shape).
-    // eslint-disable-next-line blazetrails/require-table-teardown
-    await testAdapter.createTable("items", { force: true }, (t) => {
-      t.column("name", "string");
-    });
     const realAdapter = Base.connection;
     const spy = vi.spyOn(realAdapter, "withinNewTransaction");
     class Item extends Base {
@@ -454,14 +446,6 @@ describe("SchemaAdapter TM delegation", () => {
     const { SavepointTransaction, RealTransaction } =
       await import("./connection-adapters/abstract/transaction.js");
     const testAdapter = Base.connection;
-    // Re-lay canonical `items` (drop-and-recreate, mirroring
-    // schema.rb's `create_table :items`) to prime the signature cache.
-    // `items` is a boot-owned canonical table, so it is not torn down here (the
-    // describe's afterAll clears rows; the boot schema owns/restores the shape).
-
-    await testAdapter.createTable("items", { force: true }, (t) => {
-      t.column("name", "string");
-    });
     class Item extends Base {
       static {
         this.attribute("id", "integer");
@@ -501,14 +485,6 @@ describe("SchemaAdapter TM delegation", () => {
     // in favour of pool-per-connection isolation (tested by the E1 safety-net
     // in with-transactional-fixtures.test.ts). Wrapper deleted entirely in E4.
     const testAdapter = Base.connection;
-    // Re-lay canonical `items` (drop-and-recreate, mirroring
-    // schema.rb's `create_table :items`) to prime the signature cache.
-    // `items` is a boot-owned canonical table, so it is not torn down here (the
-    // describe's afterAll clears rows; the boot schema owns/restores the shape).
-
-    await testAdapter.createTable("items", { force: true }, (t) => {
-      t.column("name", "string");
-    });
     class Item extends Base {
       static {
         this.attribute("id", "integer");
@@ -565,14 +541,6 @@ describe("SchemaAdapter TM delegation", () => {
 
   it("manual beginTransaction/commit pair delegates inner state unconditionally", async () => {
     const testAdapter = Base.connection;
-    // Re-lay canonical `items` (drop-and-recreate, mirroring
-    // schema.rb's `create_table :items`) to prime the signature cache.
-    // `items` is a boot-owned canonical table, so it is not torn down here (the
-    // describe's afterAll clears rows; the boot schema owns/restores the shape).
-
-    await testAdapter.createTable("items", { force: true }, (t) => {
-      t.column("name", "string");
-    });
     class Item extends Base {
       static {
         this.attribute("id", "integer");
