@@ -19,10 +19,6 @@ import {
 import * as ArType from "../../type.js";
 
 import { Date as OidDate } from "./oid/date.js";
-import { DateTime as OidDateTime } from "./oid/date-time.js";
-import { Enum } from "./oid/enum.js";
-import { LegacyPoint } from "./oid/legacy-point.js";
-import { Vector } from "./oid/vector.js";
 import { DecimalWithoutScale } from "../../type/decimal-without-scale.js";
 import { HashLookupTypeMap } from "../../type/hash-lookup-type-map.js";
 import { Json as ArJson } from "../../type/json.js";
@@ -31,11 +27,14 @@ import { Bit } from "./oid/bit.js";
 import { BitVarying } from "./oid/bit-varying.js";
 import { Bytea } from "./oid/bytea.js";
 import { Cidr } from "./oid/cidr.js";
+import { DateTime as OidDateTime } from "./oid/date-time.js";
 import { Decimal } from "./oid/decimal.js";
+import { Enum } from "./oid/enum.js";
 import { Hstore } from "./oid/hstore.js";
 import { Inet } from "./oid/inet.js";
 import { Interval } from "./oid/interval.js";
 import { Jsonb } from "./oid/jsonb.js";
+import { LegacyPoint } from "./oid/legacy-point.js";
 import { Macaddr } from "./oid/macaddr.js";
 import { Money } from "./oid/money.js";
 import { Oid } from "./oid/oid.js";
@@ -44,10 +43,11 @@ import { SpecializedString } from "./oid/specialized-string.js";
 import { Timestamp } from "./oid/timestamp.js";
 import { TimestampWithTimeZone } from "./oid/timestamp-with-time-zone.js";
 import { Uuid } from "./oid/uuid.js";
+import { Vector } from "./oid/vector.js";
 import { Xml } from "./oid/xml.js";
 
-// Mirrors: postgresql_adapter.rb:1168-1185. The `add_modifier` lines above
-// them (array/range) have no counterpart yet — trails has no registry
+// Mirrors: postgresql_adapter.rb:1168-1185. The two `add_modifier` lines that
+// open that block (array/range) are unported: trails has no registry
 // modifiers, and `attribute(..., array: true)` does not route through them.
 ArType.register("bit", Bit, { adapter: "postgres" });
 ArType.register("bit_varying", BitVarying, { adapter: "postgres" });
