@@ -5,11 +5,13 @@ import {
   applyBaseline,
   compareSchemas,
   isFatal,
+  loadRailsTables,
   normalizeRailsDefault,
   optionMismatches,
   optionRegressions,
   partitionFindings,
   readBaseline,
+  SCHEMA_FILES,
   unresolvedCallSites,
 } from "./compare.js";
 import { TEST_SCHEMA } from "../../packages/activerecord/src/test-helpers/test-schema.js";
@@ -211,6 +213,19 @@ describe("parseSchemaRb", () => {
     expect([...table.columns.keys()]).toEqual(["name", "tag"]);
     expect(table.columns.get("tag")!.options.default).toBe('"#hash"');
   });
+
+  it("gathers a create_table whose parenthesised args wrap across lines", () => {
+    const tables = parse(
+      `create_table(:measurements_toronto, id: false, force: true,
+                    options: "PARTITION OF measurements FOR VALUES IN (1)")
+       create_table :after, force: true do |t|
+         t.string :name
+       end`,
+    );
+    expect(tables.has("measurements_toronto")).toBe(true);
+    // The continuation must not swallow the table that follows it.
+    expect([...tables.get("after")!.columns.keys()]).toEqual(["name"]);
+  });
 });
 
 describe("compareSchemas", () => {
@@ -269,6 +284,41 @@ describe("compareSchemas", () => {
     const findings = compareSchemas({ accounts: { firm_name: "string" } }, rails);
     expect(verdicts(findings)).toEqual(["UNPORTED-COLUMN:accounts.credit_limit"]);
     expect(findings.every((f) => !isFatal(f))).toBe(true);
+  });
+
+  it("records the source file a matched table came from", () => {
+    const sources = new Map([["accounts", ["postgresql_specific_schema.rb"]]]);
+    const findings = compareSchemas(
+      { accounts: { firm_name: "string", region_id: "integer" } },
+      rails,
+      sources,
+    );
+    expect(findings.find((f) => f.verdict === "INVENTED-COLUMN")?.source).toBe(
+      "postgresql_specific_schema.rb",
+    );
+  });
+
+  it("suppresses shape and unported findings for an ambiguous multi-source table", () => {
+    // credit_limit is absent from TEST_SCHEMA and firm_name's type diverges;
+    // both are phantom for a table whose columns differ by adapter.
+    const findings = compareSchemas(
+      { accounts: { firm_name: "integer" } },
+      rails,
+      new Map([["accounts", ["mysql2_specific_schema.rb", "postgresql_specific_schema.rb"]]]),
+      new Set(["accounts"]),
+    );
+    expect(findings).toEqual([]);
+  });
+
+  it("still flags a truly-invented column on an ambiguous table", () => {
+    // A column real on no adapter variant (union) is a genuine invention.
+    const findings = compareSchemas(
+      { accounts: { firm_name: "string", made_up: "string" } },
+      rails,
+      new Map([["accounts", ["mysql2_specific_schema.rb", "postgresql_specific_schema.rb"]]]),
+      new Set(["accounts"]),
+    );
+    expect(verdicts(findings)).toEqual(["INVENTED-COLUMN:accounts.made_up"]);
   });
 });
 
@@ -529,5 +579,50 @@ describe("against the vendored schema.rb", () => {
     // Ratchet: this number may fall as debt is paid off, never rise.
     const baseline = await readBaseline();
     expect(baseline.tables.length + baseline.columns.length).toBeLessThanOrEqual(91);
+  });
+});
+
+// The adapter-specific companions (postgresql_specific_schema.rb et al.) declare
+// further canonical tables; a TEST_SCHEMA table mirroring one must not be
+// flagged invented, and their create_table forms must resolve too.
+describe("against the adapter-specific companion schemas", () => {
+  it("resolves every create_table call site across all five sources", async () => {
+    const { unresolved } = await loadRailsTables();
+    expect(unresolved).toEqual([]);
+  });
+
+  it("treats a PG-only companion table as canonical and records its source", async () => {
+    const { tables, sources } = await loadRailsTables();
+    expect(tables.has("uuid_children")).toBe(true);
+    expect(sources.get("uuid_children")).toEqual(["postgresql_specific_schema.rb"]);
+  });
+
+  it("keeps a create_table whose parenthesised args wrap across physical lines", async () => {
+    const { tables } = await loadRailsTables();
+    expect(tables.has("measurements_toronto")).toBe(true);
+    expect(tables.has("measurements_concepcion")).toBe(true);
+  });
+
+  it("keeps a schema.rb table authoritative over a same-named companion", async () => {
+    // schema.rb leads, so a table it declares keeps that source, is never
+    // mislabelled adapter-scoped, and is not treated as ambiguous.
+    const { sources, ambiguous } = await loadRailsTables();
+    expect(SCHEMA_FILES[0]).toBe("schema.rb");
+    expect(sources.get("accounts")).toEqual(["schema.rb"]);
+    expect(ambiguous.has("accounts")).toBe(false);
+  });
+
+  it("marks a table declared by several companions ambiguous and unions its columns", async () => {
+    // `defaults` is declared in every companion with different columns; Rails
+    // loads exactly one variant per adapter, so we cannot pick one — the table
+    // is canonical (a superset) but ambiguous.
+    const { tables, sources, ambiguous } = await loadRailsTables();
+    expect(sources.get("defaults")!.length).toBeGreaterThan(1);
+    expect(sources.get("defaults")).not.toContain("schema.rb");
+    expect(ambiguous.has("defaults")).toBe(true);
+    const columns = tables.get("defaults")!.columns;
+    // Union: a column absent from MySQL and one absent from PG both survive.
+    expect(columns.has("char3")).toBe(true); // t.text :char3 — not in MySQL
+    expect(columns.has("char2_concatenated")).toBe(true); // MySQL only, not in PG
   });
 });
