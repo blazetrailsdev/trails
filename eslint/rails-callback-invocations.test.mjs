@@ -12,15 +12,20 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 const MANIFEST_FIXTURE = path.join(__dirname, ".tmp-rails-callback-invocations.test.json");
 const EXCLUDE_FIXTURE = path.join(__dirname, ".tmp-rails-callback-invocations-exclude.test.json");
 
+// Manifest keys are file-qualified `<repo-rel path>#<method>` so a requirement
+// only lands on the specific ported method whose Rails source fires the
+// callback — a same-named method in another file is not constrained.
+const srcRel = "packages/activerecord/src/persistence.ts";
 const manifest = {
   methods: {
-    destroy: ["destroy"],
-    createOrUpdate: ["save"],
-    initWithAttributes: ["find", "initialize"],
+    [`${srcRel}#destroy`]: ["destroy"],
+    [`${srcRel}#createOrUpdate`]: ["save"],
+    [`${srcRel}#initWithAttributes`]: ["find", "initialize"],
   },
 };
 
 const excludedRel = "packages/activerecord/src/grandfathered.ts";
+manifest.methods[`${excludedRel}#destroy`] = ["destroy"];
 
 fs.writeFileSync(MANIFEST_FIXTURE, JSON.stringify(manifest, null, 2));
 fs.writeFileSync(EXCLUDE_FIXTURE, JSON.stringify([`${excludedRel}#destroy`], null, 2));
@@ -85,6 +90,12 @@ tester.run("rails-callback-invocations", rule, {
       filename: excludedFile,
       code: `export function destroy(this: any) { return this._reallyDestroy(); }\n`,
     },
+    // File-scoped lookup: a same-named method in a different in-scope file has
+    // no `<rel>#destroy` entry, so it is not constrained despite firing nothing.
+    {
+      filename: path.join(REPO_ROOT, "packages/activerecord/src/relation.ts"),
+      code: `export function destroy(this: any) { return this._reallyDestroy(); }\n`,
+    },
     // Out-of-scope package — rule does not apply.
     {
       filename: outOfScopeFile,
@@ -116,7 +127,7 @@ tester.run("rails-callback-invocations", rule, {
 // so removing it could never be forced. This reads the real committed files
 // (not the tmp fixtures) to keep them honest.
 describe("rails-callback-invocations baseline", () => {
-  const manifestNames = new Set(
+  const manifestKeys = new Set(
     Object.keys(
       JSON.parse(fs.readFileSync(path.join(__dirname, "rails-callback-invocations.json"), "utf8"))
         .methods,
@@ -126,16 +137,17 @@ describe("rails-callback-invocations baseline", () => {
     fs.readFileSync(path.join(__dirname, "rails-callback-invocations-exclude.json"), "utf8"),
   );
 
-  it("every entry is `<packages/activerecord/src path>#<manifest method>`", () => {
+  it("every entry is a file-qualified `<packages/activerecord/src path>#<manifest method>` key", () => {
     for (const entry of baseline) {
-      const [rel, method] = entry.split("#");
+      const [rel] = entry.split("#");
       expect(entry, `entry "${entry}" must be path#method`).toContain("#");
       expect(rel, `entry "${entry}" path out of scope`).toMatch(
         /^packages\/activerecord\/src\/.+\.ts$/,
       );
-      expect(manifestNames, `entry "${entry}" names a method not in the manifest`).toContain(
-        method,
-      );
+      // The manifest is now file-qualified, so the whole entry must be a live
+      // manifest key — a stale `<rel>#<method>` the manifest no longer emits
+      // could never be reached, defeating the shrink-only ratchet.
+      expect(manifestKeys, `entry "${entry}" is not a live manifest key`).toContain(entry);
     }
   });
 

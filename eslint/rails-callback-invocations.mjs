@@ -5,6 +5,11 @@
  * firing them. Scoped (via eslint.config.mjs) to `packages/activerecord/src/**`
  * excluding `*.test.ts`.
  *
+ * Manifest entries are file-qualified (`<repo-rel path>#<method>`): a callback
+ * requirement sourced from one Rails class only lands on the specific ported
+ * method whose Rails source fires `_run_<event>_callbacks`, not on every
+ * same-named method across the package.
+ *
  * For every function/method whose name matches a manifest entry, the rule
  * collects the string-literal event arguments of every `runCallbacks(...)` /
  * `runAllCallbacks(...)` call in its body (the TS equivalents of Rails'
@@ -131,7 +136,7 @@ const rule = {
 
     const check = (fnNode, name, reportNode) => {
       if (!name) return;
-      const required = manifest[name];
+      const required = manifest[`${rel}#${name}`];
       if (!required || required.length === 0) return;
       if (exclude.has(`${rel}#${name}`)) return;
       const fired = eventsFired(fnNode, sourceCode);
