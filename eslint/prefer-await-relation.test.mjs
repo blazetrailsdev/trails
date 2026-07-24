@@ -44,9 +44,10 @@ tester.run("prefer-await-relation", rule, {
     // `super` — `await super` is a syntax error, so a `super.toArray()` receiver
     // is left alone rather than rewritten to uncompilable code.
     { code: "class R extends B { async f() { return await super.toArray(); } }" },
-    // reload() returns a then-stripped LoadedRelation whose `.toArray()` is
-    // load-bearing — proven left alone by the thenable-type gate under `pnpm
-    // lint` (no type info here, so it degrades to permissive; see header).
+    // No `reload().toArray()` case here: reload() returns a then-stripped
+    // LoadedRelation whose `.toArray()` is load-bearing, but that exclusion is
+    // the thenable-type gate's job — untestable without type info, so it is
+    // exercised by `pnpm lint` over the real codebase (see header), not here.
   ],
   invalid: [
     // Awaited identifier binding — the widened receiver gate now reports these
@@ -98,7 +99,7 @@ tester.run("prefer-await-relation", rule, {
       errors: [{ messageId: "preferAwait" }],
       output: "async function f(Post: any) { return await Post.all(); }",
     },
-    // longer chain, still a call-expression receiver
+    // longer chain off a query-method call
     {
       code: "async function f(rel: any) { await rel.order('id').limit(1).toArray(); }",
       errors: [{ messageId: "preferAwait" }],
