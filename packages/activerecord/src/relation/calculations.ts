@@ -535,13 +535,7 @@ async function groupedAggregate(
   const groupKeyAliases = groupNodes.map(
     (n, i) => new Nodes.As(n, new Nodes.SqlLiteral(aliases[i])),
   );
-  // Rails aliases the aggregate as `column_alias_for("#{operation} #{column_name}")`
-  // — e.g. `sum_credit_limit`, `count_all` — so order("sum_credit_limit desc")
-  // can reference it (calculations.rb:537). A raw Arel node keeps "val".
-  const aggAlias =
-    typeof column === "string"
-      ? columnAliasFor(`${fn} ${column.toLowerCase()}`.replace(/\*/g, "all"))
-      : "val";
+  const aggAlias = aggregateAliasFor(fn, column);
   const manager = table.project(...groupKeyAliases, aggNode.as(aggAlias));
   // Rails `calculate` (calculations.rb:217-238) folds the eager JoinDependency
   // into `joins_values` via `apply_join_dependency` before dispatching to the
@@ -686,7 +680,8 @@ async function groupedCompositeAssoc(
   const groupNodes = fkCols.map((c) => groupColumnToArel(c, table));
   const aggNode = buildAggNode(rel, fn, column, rel._isDistinct);
   const projections = groupNodes.map((n, i) => new Nodes.As(n, new Nodes.SqlLiteral(aliases[i])));
-  const manager = table.project(...projections, aggNode.as("val"));
+  const aggAlias = aggregateAliasFor(fn, column);
+  const manager = table.project(...projections, aggNode.as(aggAlias));
   // Rails `calculate` (calculations.rb:217-238) folds the eager JoinDependency
   // into `joins_values` via `apply_join_dependency` before dispatching to the
   // grouped calculation, regardless of key arity. Fold it into the shared
@@ -718,7 +713,7 @@ async function groupedCompositeAssoc(
   const [withCtes, ctedBinds] = prependCtes(rel, rawSql, managerBinds);
   const sql =
     isBigintColumn(rel, fn, column) && needsBigintCast(rel)
-      ? `SELECT ${aliases.map((a) => `"${a}"`).join(", ")}, CAST("val" AS TEXT) AS "val" FROM (${withCtes}) AS "_bigint_agg"`
+      ? wrapBigintAgg(withCtes, aliases, aggAlias)
       : withCtes;
   const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
   const queryResult = await rel
@@ -750,7 +745,7 @@ async function groupedCompositeAssoc(
   for (const row of rows) {
     const vals = aliases.map((a) => row[a]);
     const record = vals.every((v) => v != null) ? (byKey.get(keyOf(vals)) ?? null) : null;
-    result.set(record, aggOf(row.val));
+    result.set(record, aggOf(row[aggAlias]));
   }
   return result;
 }
@@ -1369,6 +1364,20 @@ export class ColumnAliasTracker {
 // ---------------------------------------------------------------------------
 // Private helpers (mirrors Rails' ActiveRecord::Calculations private methods)
 // ---------------------------------------------------------------------------
+
+/**
+ * The alias Rails' `execute_grouped_calculation` gives the aggregate column:
+ * `column_alias_tracker.alias_for("#{operation} #{column_name.to_s.downcase}")`
+ * (calculations.rb:536) — `count_all`, `sum_credit_limit`, … — which is what
+ * makes `order("count_all desc")` resolvable. Rails does not special-case
+ * foreign-key arity, so both grouped arms alias through here. A raw Arel node
+ * has no name to build an alias from and keeps the internal "val".
+ * @internal
+ */
+function aggregateAliasFor(fn: AggFn, column: string | Nodes.Node): string {
+  if (typeof column !== "string") return "val";
+  return columnAliasFor(`${fn} ${column.toLowerCase()}`.replace(/\*/g, "all"));
+}
 
 /** @internal */
 function columnAliasFor(field: string): string {
