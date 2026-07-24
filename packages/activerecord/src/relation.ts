@@ -610,7 +610,13 @@ export class Relation<T extends Base> {
       // PredicateBuilder currency); spread them into the clause exactly as
       // buildWhereClause spreads buildFromHash's result, so a single tuple stays
       // flat (`WHERE c1 = ? AND c2 = ?`, no wrapping Grouping) like Rails.
-      const nodes = this.predicateBuilder.buildComposite(cols, tuples);
+      //
+      // Thread the join-dependency fallback (Rails' block to `build_where_clause`
+      // / `predicate_builder.rb:71-73`) so a qualified col naming a manual-join
+      // table binds through the joined model's column type.
+      const block = (name: string) =>
+        this.lookupTableKlassFromJoinDependencies(name) as typeof Base | null;
+      const nodes = this.predicateBuilder.buildComposite(cols, tuples, block);
       if (nodes.length === 0) return this._clone().noneBang();
       const rel = this._clone();
       rel._whereClause.predicates.push(...nodes);
@@ -827,7 +833,12 @@ export class Relation<T extends Base> {
           "Relation#whereNot(cols, tuples): composite-key form requires a tuples argument as an array of arrays",
         );
       }
-      const nodes = this.predicateBuilder.buildComposite(conditions as string[], tuples);
+      // Thread the join-dependency fallback (see `where`'s composite branch)
+      // so a qualified col naming a manual-join table binds through the joined
+      // model's type rather than the generic `TypeCasterConnection`.
+      const block = (name: string) =>
+        this.lookupTableKlassFromJoinDependencies(name) as typeof Base | null;
+      const nodes = this.predicateBuilder.buildComposite(conditions as string[], tuples, block);
       // Empty/all-filtered → NOT (no rows) = ALL rows = no predicate added
       // (matches Rails' `where.not(...)` no-op for empty hashes).
       if (nodes.length > 0) {
