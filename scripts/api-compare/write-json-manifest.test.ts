@@ -166,10 +166,6 @@ describe("manifest emitters", () => {
     }
   });
 
-  // The committed baseline passes `prettier --check` today only by luck — it
-  // is a flat array of long paths prettier won't collapse. Round-tripping the
-  // real data through the helper proves the emitter now reproduces the tracked
-  // bytes exactly, which --check alone cannot show.
   it("reproduces the committed expected-fixtures-exclude.json byte-identically", () => {
     const tracked = path.join(REPO_ROOT, "eslint/expected-fixtures-exclude.json");
     const committed = fs.readFileSync(tracked, "utf8");
