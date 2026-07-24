@@ -15,7 +15,6 @@
  * Output: eslint/test-fixture-parity-exclude.json (committed).
  * Run via `pnpm fixture-parity-baseline:refresh`.
  */
-// fs/path bare per convention; sync fs acceptable in a one-shot CLI generator.
 import * as path from "path";
 import { writeJsonManifest } from "./api-compare/write-json-manifest.js";
 

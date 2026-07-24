@@ -106,11 +106,6 @@ describe("manifest emitters", () => {
     }
   });
 
-  // The ratchet/exclude generators share the same churn trap as the manifests:
-  // their outputs pass `prettier --check` today only because the current entries
-  // are long path strings prettier won't collapse. Routing them through
-  // writeJsonManifest keeps the single formatting code path; guard against a
-  // regression back to raw `JSON.stringify` + writeFileSync.
   it("ratchet/exclude generators emit via writeJsonManifest", () => {
     const generators = [
       "generate-no-explicit-any-allowlist.ts",
@@ -119,10 +114,8 @@ describe("manifest emitters", () => {
     ];
     for (const name of generators) {
       const src = fs.readFileSync(path.join(REPO_ROOT, "scripts", name), "utf8");
-      expect(src, `${name} must import writeJsonManifest`).toMatch(/\bwriteJsonManifest\b/);
-      expect(src, `${name} must not write JSON with writeFileSync`).not.toMatch(
-        /writeFileSync\s*\([^)]*JSON\.stringify/,
-      );
+      expect(src, `${name} must emit via writeJsonManifest`).toMatch(/\bwriteJsonManifest\b/);
+      expect(src, `${name} must not hand-format JSON`).not.toMatch(/JSON\.stringify/);
     }
   });
 });
