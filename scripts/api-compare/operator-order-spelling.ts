@@ -11,7 +11,7 @@
  *
  * A name-only GLOBAL map is unsafe: `[]` ports to `get` in `Arel::Table` /
  * `ActiveModel::Errors` / `LazyAttributeHash`, but to `getAttribute` in
- * `ActiveModel::AttributeSet` — where `get` (attribute-set.ts:63/296) is instead
+ * `ActiveModel::AttributeSet` — where `get` (attribute-set.ts) is instead
  * a non-Rails Map-compat invention. Mapping `[]`→`get` globally would promote
  * that invention into Rails' `[]` slot (tried and reverted in #5030). So the
  * table is keyed per Ruby fqn: each (fqn, operator) resolves to the spelling
@@ -37,47 +37,47 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // under `module ActiveModel`, so its fqn is NOT nested under `AttributeSet`.
   "ActiveModel::LazyAttributeHash": { "[]": ["get"], "[]=": ["set"] },
   // attribute_set.rb:16 `def [](name)` → attribute-set.ts `getAttribute` (NOT the
-  // Map-compat `get` invention at attribute-set.ts:296). `[]=` (attribute_set.rb:20)
-  // stays UNMAPPED: attribute-set.ts:302 `set` accepts a bare value and wraps it in
+  // Map-compat `get` invention in attribute-set.ts). `[]=` (attribute_set.rb:20)
+  // stays UNMAPPED: attribute-set.ts `set` accepts a bare value and wraps it in
   // an `Attribute`, so it is the Map-compat sibling of `get`, not the `[]=` port.
   "ActiveModel::AttributeSet": { "[]": ["getAttribute"] },
-  // attribute.rb:115 `def ==(other)` → attribute.ts:222 `equals`.
+  // attribute.rb:115 `def ==(other)` → attribute.ts `equals`.
   "ActiveModel::Attribute": { "==": ["equals"] },
-  // type/value.rb:121 `def ==(other)` → type/value.ts:222 `equals`.
+  // type/value.rb:121 `def ==(other)` → type/value.ts `equals`.
   "ActiveModel::Type::Value": { "==": ["equals"] },
-  // error.rb:190 `def ==(other)` → error.ts:357 `equals`.
+  // error.rb:190 `def ==(other)` → error.ts `equals`.
   "ActiveModel::Error": { "==": ["equals"] },
-  // naming.rb:151 `delegate :==, :===, :<=>, …, to: :name` → naming.ts:371 `equals`
-  // and :386 `compare`. `===` / `=~` share that line but have no TS member, so they
+  // naming.rb:151 `delegate :==, :===, :<=>, …, to: :name` → naming.ts `equals`
+  // and `compare`. `===` / `=~` share that line but have no TS member, so they
   // stay unmapped.
   "ActiveModel::Name": { "==": ["equals"], "<=>": ["compare"] },
-  // association_relation.rb:14 `def ==(other)` → association-relation.ts:247 `equals`.
+  // association_relation.rb:14 `def ==(other)` → association-relation.ts `equals`.
   "ActiveRecord::AssociationRelation": { "==": ["equals"] },
-  // reflection.rb:440 `def ==(other_aggregation)` → reflection.ts:608 `equals`
+  // reflection.rb:440 `def ==(other_aggregation)` → reflection.ts `equals`
   // (on `MacroReflection`, declared reflection.rb:369).
   "ActiveRecord::Reflection::MacroReflection": { "==": ["equals"] },
-  // relation/from_clause.rb:21 `def ==(other)` → relation/from-clause.ts:32 `equals`.
+  // relation/from_clause.rb:21 `def ==(other)` → relation/from-clause.ts `equals`.
   "ActiveRecord::Relation::FromClause": { "==": ["equals"] },
   // connection_adapters/mysql/type_metadata.rb:18 `def ==(other)` →
-  // connection-adapters/mysql/type-metadata.ts:40 `equals`.
+  // connection-adapters/mysql/type-metadata.ts `equals`.
   "ActiveRecord::ConnectionAdapters::MySQL::TypeMetadata": { "==": ["equals"] },
   // connection_adapters/postgresql/type_metadata.rb:20 `def ==(other)` →
-  // connection-adapters/postgresql/type-metadata.ts:37 `equals`.
+  // connection-adapters/postgresql/type-metadata.ts `equals`.
   "ActiveRecord::ConnectionAdapters::PostgreSQL::TypeMetadata": { "==": ["equals"] },
   // connection_adapters/postgresql/utils.rb:30 `def ==(o)` →
-  // connection-adapters/postgresql/utils.ts:32 `Name#equals`.
+  // connection-adapters/postgresql/utils.ts `Name#equals`.
   "ActiveRecord::ConnectionAdapters::PostgreSQL::Name": { "==": ["equals"] },
   // connection_adapters/statement_pool.rb:23 `def [](key)` / :31 `def []=(sql, stmt)`
-  // → connection-adapters/statement-pool.ts:44 `get` / :53 `set`.
+  // → connection-adapters/statement-pool.ts `get` / `set`.
   "ActiveRecord::ConnectionAdapters::StatementPool": { "[]": ["get"], "[]=": ["set"] },
   // encryption/properties.rb:20 `delegate :[], to: :data` / :50 `def []=(key, value)`
-  // → encryption/properties.ts:23 `get` / :27 `set`.
+  // → encryption/properties.ts `get` / `set`.
   "ActiveRecord::Encryption::Properties": { "[]": ["get"], "[]=": ["set"] },
-  // result.rb:148 `def [](idx)` → result.ts:177 `at` (Result declares no `at` in
+  // result.rb:148 `def [](idx)` → result.ts `at` (Result declares no `at` in
   // Ruby, so the name is free).
   "ActiveRecord::Result": { "[]": ["at"] },
-  // result.rb:58 `def ==(other)` / :80 `def [](column)` → result.ts:73 `equals` /
-  // :52 `get` on `IndexedRow`.
+  // result.rb:58 `def ==(other)` / :80 `def [](column)` → result.ts `IndexedRow#equals`
+  // / `IndexedRow#get`.
   "ActiveRecord::Result::IndexedRow": { "==": ["equals"], "[]": ["get"] },
 };
 

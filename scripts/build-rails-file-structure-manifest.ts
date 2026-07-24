@@ -327,18 +327,6 @@ for (const k of Object.keys(manifest.files).sort()) {
 }
 const final: Manifest = { files: sortedFiles };
 
-// Every package has been visited, so an operator entry that never resolved names
-// a class/operator the Ruby extract does not have — a dead entry that silently
-// enforces nothing.
-const deadOperatorEntries = unusedOperatorSpellings();
-if (deadOperatorEntries.length > 0) {
-  console.warn(
-    `[build-rails-file-structure-manifest] ${deadOperatorEntries.length} dead OPERATOR_SPELLING_BY_FQN ` +
-      `entr${deadOperatorEntries.length === 1 ? "y" : "ies"} (fqn/operator absent from the Ruby API): ` +
-      `${deadOperatorEntries.join(", ")} — fix the fqn or drop the entry.`,
-  );
-}
-
 writeJsonManifest(OUT, final);
 const fileCount = Object.keys(final.files).length;
 const nameCount = Object.values(final.files).reduce(
@@ -346,3 +334,20 @@ const nameCount = Object.values(final.files).reduce(
   0,
 );
 console.log(`Wrote ${OUT} — ${fileCount} files (${nameCount} ordered names)`);
+
+// Every package has been visited, so an operator entry that never resolved names a
+// class/operator the Ruby extract does not have. Unlike a last-segment collision
+// (which follows from Rails' own structure and only warns), a dead entry is always
+// a bug in a table WE maintain: it enforces nothing and reports nothing, which is
+// how the `ActiveModel::AttributeSet::LazyAttributeHash` key survived. Fail after
+// the manifest is written, so the emitted order is still correct/usable and the
+// failure is purely the signal.
+const deadOperatorEntries = unusedOperatorSpellings();
+if (deadOperatorEntries.length > 0) {
+  throw new Error(
+    `[build-rails-file-structure-manifest] ${deadOperatorEntries.length} dead ` +
+      `OPERATOR_SPELLING_BY_FQN entr${deadOperatorEntries.length === 1 ? "y" : "ies"} ` +
+      `(fqn/operator absent from the Ruby API): ${deadOperatorEntries.join(", ")} — ` +
+      `fix the fqn or drop the entry (scripts/api-compare/operator-order-spelling.ts).`,
+  );
+}
