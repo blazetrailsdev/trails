@@ -378,7 +378,7 @@ export class PredicateBuilder {
   }
 
   /**
-   * Build a composite-key predicate:
+   * Build the composite-key predicates for `where(cols, tuples)`:
    *
    *   (c1 = v11 AND c2 = v12) OR (c1 = v21 AND c2 = v22) OR ...
    *
@@ -392,6 +392,16 @@ export class PredicateBuilder {
    * re-implemented. `cols.length === 1` takes the same route and lands on a
    * single `IN (...)`, matching Rails' one-element-key collapse
    * (predicate_builder.rb:87-90).
+   *
+   * Returns a `Node[]`, the native `PredicateBuilder` currency — the caller
+   * pushes them straight into the WhereClause, exactly as `build_where_clause`
+   * spreads `build_from_hash`'s result (query-methods.ts:1059). That is what
+   * makes the output byte-for-byte Rails: `grouping_queries` returns a single
+   * group's predicates *flat* (`queries.one? → queries.first`), so one
+   * surviving tuple yields `[c1 = ?, c2 = ?]` → `WHERE c1 = ? AND c2 = ?` with
+   * no wrapping `Grouping`/parens, while multiple tuples collapse to the single
+   * `[Grouping(Or([And, ...]))]` node. An all-filtered/empty result is `[]`,
+   * which the caller turns into `Relation#none()`.
    *
    * Deviation: it delegates via `buildFromHash`, not `expand_from_hash`, so
    * `convert_dot_notation_to_hash` is re-applied per tuple and a qualified
@@ -407,21 +417,15 @@ export class PredicateBuilder {
    *
    * Tuples containing `null` / `undefined` are filtered out: SQL
    * tuple-equality treats any null component as a non-match, whereas
-   * `Attribute#eq(null)` would emit `IS NULL`. Filtering everything returns
-   * `null`, which the caller short-circuits via `Relation#none()`. Caller
-   * bugs — empty `cols`, non-array `tuples`, non-array tuple, arity
-   * mismatch — raise ArgumentError instead, since silently dropping them
-   * would collapse into that same `null` → `none()` and hide the bug.
-   *
-   * Deviation: `buildComposite` must return ONE node, so a single surviving
-   * tuple — which `grouping_queries` returns as flat, separately addressable
-   * predicates — is wrapped in a `Grouping`. Multi-tuple output is Rails'
-   * tree verbatim.
+   * `Attribute#eq(null)` would emit `IS NULL`. Caller bugs — empty `cols`,
+   * non-array `tuples`, non-array tuple, arity mismatch — raise ArgumentError
+   * instead, since silently dropping them would collapse into that same empty
+   * → `none()` and hide the bug.
    *
    * Mirrors: ActiveRecord::PredicateBuilder#expand_from_hash, Array-key
    * branch (predicate_builder.rb:87-98).
    */
-  buildComposite(cols: string[], tuples: unknown[][]): Nodes.Node | null {
+  buildComposite(cols: string[], tuples: unknown[][]): Nodes.Node[] {
     if (cols.length === 0) {
       throw argumentError("PredicateBuilder.buildComposite: empty column list");
     }
@@ -443,14 +447,14 @@ export class PredicateBuilder {
       }
     }
     const validTuples = tuples.filter((t) => t.every((v) => v !== null && v !== undefined));
-    if (validTuples.length === 0) return null;
+    if (validTuples.length === 0) return [];
     if (cols.length === 1) {
-      return andReduceToOneNode(this.buildFromHash({ [cols[0]]: validTuples.map((t) => t[0]) }));
+      return this.buildFromHash({ [cols[0]]: validTuples.map((t) => t[0]) });
     }
     const queryGroups = validTuples.map((tuple) =>
       this.buildFromHash(Object.fromEntries(cols.map((col, i) => [col, tuple[i]]))),
     );
-    return andReduceToOneNode(this.groupingQueries(queryGroups));
+    return this.groupingQueries(queryGroups);
   }
 
   registerHandler(
@@ -599,20 +603,6 @@ function extractAggregateAttr(object: unknown, attr: string, tryBang: boolean): 
     );
   }
   return object;
-}
-
-/**
- * Collapse an expansion's predicates into the single node `buildComposite`
- * has to return. `buildFromHash` / `groupingQueries` both yield a `Node[]`
- * whose entries are ANDed by the where clause, and either can exceed one
- * entry for a single key — a `composed_of` key with a multi-column mapping
- * expands to one predicate per mapped column (buildFromHashAggregate). So
- * fold with `and` rather than indexing, which would silently drop the rest.
- */
-function andReduceToOneNode(nodes: Nodes.Node[]): Nodes.Node {
-  return nodes.length === 1
-    ? nodes[0]
-    : new Nodes.Grouping(nodes.reduce((left, right) => left.and(right)));
 }
 
 function describeAggregateValue(object: unknown): string {

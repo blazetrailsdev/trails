@@ -606,9 +606,15 @@ export class Relation<T extends Base> {
       }
       const cols = conditionsOrSql as string[];
       const tuples = rest[0] as unknown[][];
-      const node = this.predicateBuilder.buildComposite(cols, tuples);
-      if (node === null) return this._clone().noneBang();
-      return this._clone().whereBang(node);
+      // buildComposite returns the WhereClause predicates directly (the native
+      // PredicateBuilder currency); spread them into the clause exactly as
+      // buildWhereClause spreads buildFromHash's result, so a single tuple stays
+      // flat (`WHERE c1 = ? AND c2 = ?`, no wrapping Grouping) like Rails.
+      const nodes = this.predicateBuilder.buildComposite(cols, tuples);
+      if (nodes.length === 0) return this._clone().noneBang();
+      const rel = this._clone();
+      rel._whereClause.predicates.push(...nodes);
+      return rel;
     }
     return this._clone().whereBang(
       conditionsOrSql as Record<string, unknown> | string | Nodes.Node | null,
@@ -821,14 +827,16 @@ export class Relation<T extends Base> {
           "Relation#whereNot(cols, tuples): composite-key form requires a tuples argument as an array of arrays",
         );
       }
-      const node = this.predicateBuilder.buildComposite(conditions as string[], tuples);
-      // null = empty/all-filtered → NOT (no rows) = ALL rows = no
-      // predicate added (matches Rails' `where.not(...)` no-op for
-      // empty hashes).
-      if (node !== null) {
-        // Rails builds the positive predicate and inverts it (WhereClause#invert
-        // → node.invert): `IN` → `NOT IN`, a grouped tuple-OR → `NOT (...)`.
-        rel._whereClause.predicates.push(node.invert());
+      const nodes = this.predicateBuilder.buildComposite(conditions as string[], tuples);
+      // Empty/all-filtered → NOT (no rows) = ALL rows = no predicate added
+      // (matches Rails' `where.not(...)` no-op for empty hashes).
+      if (nodes.length > 0) {
+        // Rails builds the positive predicates as a WhereClause and inverts the
+        // whole clause (`build_where_clause(...).invert`): one predicate flips
+        // in place (`IN` → `NOT IN`, `Grouping(Or)` → `NOT (...)`), while a flat
+        // multi-predicate single tuple ANDs then negates → `NOT (c1 = ? AND
+        // c2 = ?)` — the same shape as inverting the hash-key `where.not`.
+        rel._whereClause.predicates.push(...new WhereClause(nodes).invert().predicates);
       }
       return rel;
     }
@@ -4766,8 +4774,9 @@ export class Relation<T extends Base> {
               ...self.predicateBuilder.buildFromHash({ [cursorArr[0]]: ids }),
             );
           } else {
-            const node = self.predicateBuilder.buildComposite(cursorArr, tuples);
-            if (node) batchRel._whereClause.predicates.push(node);
+            batchRel._whereClause.predicates.push(
+              ...self.predicateBuilder.buildComposite(cursorArr, tuples),
+            );
           }
           if (load) {
             (batchRel as any)._records = batchRows;

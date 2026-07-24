@@ -85,10 +85,10 @@ describe("Relation#where — composite-key form", () => {
     expect(matched.map((r: any) => r.title).sort()).toEqual(["a", "b"]);
   });
 
-  it("PredicateBuilder.buildComposite returns null on empty input (caller short-circuits with none())", async () => {
+  it("PredicateBuilder.buildComposite returns [] on empty input (caller short-circuits with none())", async () => {
     const rel = (CpkBook as any).all();
-    const node = rel.predicateBuilder.buildComposite(["author_id", "id"], []);
-    expect(node).toBeNull();
+    const nodes = rel.predicateBuilder.buildComposite(["author_id", "id"], []);
+    expect(nodes).toEqual([]);
   });
 
   it("PredicateBuilder.buildComposite throws on empty column list", () => {
@@ -130,25 +130,41 @@ describe("Relation#where — composite-key form", () => {
     // instances (carrying `name` / `type`), not raw literals or
     // Casted nodes.
     const rel = (CpkBook as any).all();
-    const node: any = rel.predicateBuilder.buildComposite(["author_id", "id"], [[1, 100]]);
-    // Single-tuple path returns Grouping(And([eq, eq])). Arel wraps
-    // QueryAttribute in BindParam at `attribute.eq()`, so the Eq's
-    // right-hand side is BindParam(QueryAttribute(name, value, type)).
-    const and = node.expr;
-    const firstEq = and.children[0];
-    const rhs = firstEq.right;
+    const nodes: any = rel.predicateBuilder.buildComposite(["author_id", "id"], [[1, 100]]);
+    // Single-tuple path returns the predicates flat ([eq, eq]), like Rails'
+    // grouping_queries. Arel wraps QueryAttribute in BindParam at
+    // `attribute.eq()`, so the first Eq's right-hand side is
+    // BindParam(QueryAttribute(name, value, type)).
+    const rhs = nodes[0].right;
     expect(rhs?.constructor?.name).toBe("BindParam");
     expect(rhs?.value?.name).toBe("author_id");
     expect(rhs?.value?.constructor?.name).toBe("QueryAttribute");
   });
 
+  it("single-tuple composite returns flat predicates (no wrapping Grouping/parens) — Rails grouping_queries one? path", () => {
+    // grouping_queries returns a single group's predicates flat
+    // (`queries.one? → queries.first`, predicate_builder.rb:155-156), so one
+    // surviving tuple is [c1 = ?, c2 = ?] — two addressable predicates, NOT a
+    // Grouping. The emitted SQL therefore has no wrapping parens, byte-for-byte
+    // Rails' `where({[c1,c2] => [[v1,v2]]})`.
+    const rel = (CpkBook as any).all();
+    const nodes: any = rel.predicateBuilder.buildComposite(["author_id", "id"], [[1, 100]]);
+    expect(nodes.map((n: any) => n.constructor.name)).toEqual(["Equality", "Equality"]);
+    const sql = (CpkBook as any)
+      .all()
+      .where(["author_id", "id"], [[1, 100]])
+      .toSql();
+    expect(sql).toMatch(/WHERE "cpk_books"\."author_id" = 1 AND "cpk_books"\."id" = 100/);
+    expect(sql).not.toMatch(/\(/);
+  });
+
   it("qualified composite cols bind through the joined table's type, not the base table's", () => {
     const rel = (Post as any).all();
-    const node: any = rel.predicateBuilder.buildComposite(
+    const nodes: any = rel.predicateBuilder.buildComposite(
       ["posts.id", "comments.post_id"],
       [[1, "2"]],
     );
-    const [left, right] = node.expr.children;
+    const [left, right] = nodes;
     expect(right.left.relation.name).toBe("comments");
     const bind = right.right.value;
     expect(bind.name).toBe("post_id");
@@ -158,7 +174,7 @@ describe("Relation#where — composite-key form", () => {
 
   it("qualified single-column composite resolves its IN(...) attribute on the joined table", () => {
     const rel = (Post as any).all();
-    const node: any = rel.predicateBuilder.buildComposite(["comments.post_id"], [[1], [2]]);
+    const node: any = rel.predicateBuilder.buildComposite(["comments.post_id"], [[1], [2]])[0];
     expect(node.left.relation.name).toBe("comments");
     expect(node.left.name).toBe("post_id");
   });
@@ -169,7 +185,7 @@ describe("Relation#where — composite-key form", () => {
     // integer column stayed a string and never became a bind (breaking
     // compileWithBinds / prepared-statement caching).
     const rel = (Post as any).all();
-    const node: any = rel.predicateBuilder.buildComposite(["comments.post_id"], [["1"], ["2"]]);
+    const node: any = rel.predicateBuilder.buildComposite(["comments.post_id"], [["1"], ["2"]])[0];
     expect(node.constructor.name).toBe("HomogeneousIn");
     expect(node.castedValues).toEqual([1, 2]);
     const sql = (Post as any).all().where(node).toSql();
@@ -191,7 +207,7 @@ describe("Relation#where — composite-key form", () => {
 
   it("single-column composite uses IN(...) (not OR-chain) for compactness", () => {
     const rel = (CpkBook as any).all();
-    const node = rel.predicateBuilder.buildComposite(["author_id"], [[1], [2], [3]]);
+    const node = rel.predicateBuilder.buildComposite(["author_id"], [[1], [2], [3]])[0];
     // The HomogeneousIn node renders as `author_id IN (?, ?, ?)`, which
     // `toSql` substitutes to `IN (1, 2, 3)`; an OR-chain would render as
     // `author_id = 1 OR author_id = 2 OR author_id = 3`.
@@ -207,13 +223,17 @@ describe("Relation#where — composite-key form", () => {
     // Grouping(Or([And([eq, eq]), And([eq, eq])])) — the per-tuple Grouping
     // an earlier hand-rolled version added is not part of that shape.
     const rel = (CpkBook as any).all();
-    const node: any = rel.predicateBuilder.buildComposite(
+    // Multiple tuples collapse to grouping_queries' single node: one
+    // Grouping(Or([And, And])), returned as a length-1 array.
+    const nodes: any = rel.predicateBuilder.buildComposite(
       ["author_id", "id"],
       [
         [1, 100],
         [2, 200],
       ],
     );
+    expect(nodes).toHaveLength(1);
+    const node = nodes[0];
     expect(node.constructor.name).toBe("Grouping");
     expect(node.expr.constructor.name).toBe("Or");
     expect(node.expr.children.map((c: any) => c.constructor.name)).toEqual(["And", "And"]);
@@ -232,15 +252,20 @@ describe("Relation#where — composite-key form", () => {
   it("single-column composite over a composed_of key keeps every mapped column's predicate", () => {
     // An aggregate key expands to one predicate per mapped column
     // (expand_from_hash's aggregated_with? branch, predicate_builder.rb:124-141),
-    // so the delegation returns a multi-node array for a single key. Folding
-    // with `and` — rather than taking [0] — is what keeps city/country from
-    // being silently dropped alongside street.
+    // so the delegation returns a multi-node array for a single key. Returning
+    // them all (Node[]) — rather than collapsing to [0] — is what keeps
+    // city/country from being silently dropped alongside street, and the caller
+    // spreads every predicate into the WhereClause.
     const rel = (Customer as any).all();
-    const node: any = rel.predicateBuilder.buildComposite(
+    const nodes: any = rel.predicateBuilder.buildComposite(
       ["address"],
       [[new Address("Funny Street", "Scary Town", "Loony Land")]],
     );
-    const sql = (Customer as any).all().where(node).toSql();
+    expect(nodes).toHaveLength(3);
+    const sql = (Customer as any)
+      .all()
+      .where(["address"], [[new Address("Funny Street", "Scary Town", "Loony Land")]])
+      .toSql();
     expect(sql).toMatch(/address_street/);
     expect(sql).toMatch(/address_city/);
     expect(sql).toMatch(/address_country/);
