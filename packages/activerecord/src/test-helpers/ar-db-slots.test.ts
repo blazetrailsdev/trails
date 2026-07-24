@@ -1,5 +1,6 @@
+import os from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
-import { slotPoolSize, workerForkCount } from "./ar-db-slots.js";
+import { DEFAULT_FORKS, slotPoolSize, workerForkCount } from "./ar-db-slots.js";
 
 const ENV_KEYS = ["AR_DB_FORKS", "AR_DB_SLOTS"] as const;
 
@@ -23,9 +24,9 @@ describe("ar-db-slots", () => {
   }
 
   describe("workerForkCount", () => {
-    it("defaults to 1 when AR_DB_FORKS is unset", () => {
+    it("defaults to the shared default fork count when AR_DB_FORKS is unset", () => {
       setEnv(undefined);
-      expect(workerForkCount()).toBe(1);
+      expect(workerForkCount()).toBe(DEFAULT_FORKS);
     });
 
     it("reads AR_DB_FORKS", () => {
@@ -35,12 +36,22 @@ describe("ar-db-slots", () => {
 
     it("clamps to at least 1", () => {
       setEnv("0");
-      expect(workerForkCount()).toBe(1);
+      expect(workerForkCount()).toBe(DEFAULT_FORKS);
+      expect(workerForkCount()).toBeGreaterThanOrEqual(1);
     });
 
-    it("treats a non-numeric value as single-worker", () => {
+    it("treats a non-numeric value as the default fork count", () => {
       setEnv("auto");
-      expect(workerForkCount()).toBe(1);
+      expect(workerForkCount()).toBe(DEFAULT_FORKS);
+    });
+
+    // The value this process was started with, before any setEnv() below.
+    const inherited = saved.get("AR_DB_FORKS");
+
+    it("sees the host-clamped count vitest.config.ts republishes", () => {
+      expect(inherited).toBeDefined();
+      expect(Number(inherited)).toBeLessThanOrEqual(Math.max(os.availableParallelism() - 1, 1));
+      expect(Number(inherited)).toBeGreaterThan(0);
     });
   });
 

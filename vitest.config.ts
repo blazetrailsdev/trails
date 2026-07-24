@@ -1,16 +1,20 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
 import os from "os";
+import { DEFAULT_FORKS } from "./packages/activerecord/src/test-helpers/ar-db-slots.js";
 
-// AR_DB_FORKS (read in test-setup-worker-db.ts) sets the vitest worker count
-// via TEST_FORKS below. The advisory-lock slot pool is sized SEPARATELY, with
-// headroom over the worker count — see test-helpers/ar-db-slots.ts (slots =
+// AR_DB_FORKS (read in test-setup-worker-db.ts) requests a vitest worker
+// count; TEST_FORKS below is the effective one — the request clamped to the
+// host ceiling — and is republished as AR_DB_FORKS. The advisory-lock slot
+// pool is sized SEPARATELY, with headroom over that effective count — see
+// test-helpers/ar-db-slots.ts (slots =
 // workers + headroom, or an explicit AR_DB_SLOTS override). TRAILS_TEST_FORKS
 // caps the vitest worker count so that concurrent local worktrees don't
-// saturate the machine. Precedence: TRAILS_TEST_FORKS > AR_DB_FORKS > 6,
-// all capped by the host ceiling below. Raise with TRAILS_TEST_FORKS=N for a
-// solo full run; the live AR DB jobs (postgres-tests, mysql-tests,
-// maria-tests) set AR_DB_FORKS=3, which is that ceiling on the 4-vCPU runner.
+// saturate the machine. Precedence: TRAILS_TEST_FORKS > AR_DB_FORKS >
+// DEFAULT_FORKS, all capped by the host ceiling. Raise with TRAILS_TEST_FORKS=N
+// for a solo full run; the live AR DB jobs (postgres-tests, mysql-tests,
+// maria-tests) set neither, so both the worker count and the slot pool follow
+// the runner's vCPU count with no workflow edit when that shape changes.
 //
 // Historical note: those jobs used to set AR_DB_FORKS=8, but the per-project
 // `maxForks` was a vitest-3 no-op, so every CI run actually ran at vitest's
@@ -89,14 +93,19 @@ const _parsedForks = parseInt(process.env.TRAILS_TEST_FORKS ?? process.env.AR_DB
 // actually used, and the suite's timeouts are tuned to it — on the 4-vCPU CI
 // runner, honoring a fork count above it (AR_DB_FORKS=8, as CI used to set)
 // oversubscribes PG enough to push the full-DB schema-dump tests past their
-// 5s timeout. The env vars can only
-// lower the cap, never raise it past the host. The advisory-slot pool still
-// sizes from AR_DB_FORKS (ar-db-slots.ts), so it can only over-provision.
+// 5s timeout. The env vars can only lower the cap, never raise it past the
+// host.
 const _hostForkCap = Math.max(os.availableParallelism() - 1, 1);
 const TEST_FORKS = Math.min(
-  Number.isFinite(_parsedForks) && _parsedForks > 0 ? _parsedForks : 6,
+  Number.isFinite(_parsedForks) && _parsedForks > 0 ? _parsedForks : DEFAULT_FORKS,
   _hostForkCap,
 );
+// Republish the effective count so ar-db-slots.ts sizes the slot pool from the
+// workers that actually start. The clamp lives only here because package
+// sources may not import `node:os` (browser compat) and the os-adapter exposes
+// no `availableParallelism`. Runs in the vitest parent before globalSetup and
+// before any worker forks; workers inherit the parent env.
+process.env.AR_DB_FORKS = String(TEST_FORKS);
 
 const alias = {
   "@blazetrails/activesupport/message-verifier": path.resolve(
