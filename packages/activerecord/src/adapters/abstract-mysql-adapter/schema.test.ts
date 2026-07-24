@@ -1,9 +1,19 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/schema_test.rb
  */
-import { describe, it, beforeEach, afterEach, expect } from "vitest";
+import { describe, it, beforeEach, afterEach, afterAll, expect } from "vitest";
 import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
 import { Base } from "../../base.js";
+import { rebuildCanonicalTables } from "../../test-helpers/canonical-schema.js";
+
+async function restoreCanonicalOnPlainAdapter(names: readonly string[]): Promise<void> {
+  const restorer = new Mysql2Adapter(MYSQL_TEST_URL);
+  try {
+    await rebuildCanonicalTables(restorer, names);
+  } finally {
+    await restorer.close();
+  }
+}
 
 describeIfMysql("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -12,6 +22,9 @@ describeIfMysql("Mysql2Adapter", () => {
   });
   afterEach(async () => {
     await adapter.close();
+  });
+  afterAll(async () => {
+    await restoreCanonicalOnPlainAdapter(["posts"]);
   });
 
   describe("SchemaTest", () => {
@@ -190,6 +203,9 @@ describeIfMysql("MySQLAnsiQuotesTest", () => {
     // with a secondary TypeError here.
     await ansi?.close();
     ansi = undefined;
+  });
+  afterAll(async () => {
+    await restoreCanonicalOnPlainAdapter(["students", "lessons_students", "topics"]);
   });
 
   it("primary key method with ansi quotes", async () => {
