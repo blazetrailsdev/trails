@@ -998,15 +998,18 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   }
   fixtures([]);
 
+  beforeAll(() => {
+    registerModel(CanonicalFirm);
+    registerModel(Account);
+    registerModel(Eye);
+    registerModel(Iris);
+    registerModel(IrisWithReadOnlyForeignKey);
+  });
+
   // Rails' Firm declares `has_one :account, foreign_key: "firm_id",
   // dependent: :destroy, validate: true` (test/models/company.rb) — validated
   // but NOT autosaved. A new child still persists on owner.save via the
   // unconditionally-registered has_one autosave callback.
-  beforeAll(() => {
-    registerModel(CanonicalFirm);
-    registerModel(Account);
-  });
-
   function makeModels() {
     return { Firm: CanonicalFirm, Account };
   }
@@ -1326,9 +1329,6 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     expect(child.isNewRecord()).toBe(false);
   });
   it("callbacks on child when parent autosaves child twice", async () => {
-    registerModel(Eye);
-    registerModel(Iris);
-    registerModel(IrisWithReadOnlyForeignKey);
     const eye = new Eye();
     cacheAssoc(eye, "iris", new Iris());
     await eye.saveBang();
@@ -1445,9 +1445,6 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     expect(owner.isNewRecord()).toBe(false);
   });
   it("callbacks on child when child autosaves parent twice", async () => {
-    registerModel(Eye);
-    registerModel(Iris);
-    registerModel(IrisWithReadOnlyForeignKey);
     const iris = new Iris();
     cacheAssoc(iris, "eye", new Eye());
     await iris.saveBang();
@@ -1802,9 +1799,9 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
 
   it("mark for destruction is ignored without autosave true", async () => {
     // `ShipWithoutNestedAttributes has_many :parts` is declared without
-    // autosave, so the marked part is still validated — Rails' callback closes
-    // over the reflection at registration time and never re-registers
-    // (define_non_cyclic_method's `method_defined?` guard).
+    // autosave, so `mark_for_destruction` is ignored: the part is still
+    // validated as an ordinary new child and its blank name invalidates the
+    // ship. Only an autosave association skips validating a marked child.
     const ship = new ShipWithoutNestedAttributes({ name: "The Black Flag" });
     const part = ship.parts.build();
     markForDestruction(part);

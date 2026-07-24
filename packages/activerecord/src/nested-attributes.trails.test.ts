@@ -15,6 +15,7 @@ import { Category } from "./test-helpers/models/category.js";
 import { Categorization } from "./test-helpers/models/categorization.js";
 import { Pirate } from "./test-helpers/models/pirate.js";
 import { Parrot } from "./test-helpers/models/parrot.js";
+import { Ship } from "./test-helpers/models/ship.js";
 
 // Dynamic column reads/writes (FK/counter-cache columns and the generated
 // `*Attributes=` setters vary per model and are not statically declared), kept
@@ -133,5 +134,27 @@ describe("nested attributes flush path alias resolution (trails-only)", () => {
 
     const reloaded = await Parrot.find(readAttr(parrot, "id"));
     expect(readAttr(reloaded, "name")).toBe("Renamed");
+  });
+});
+
+describe("nested attributes save wrapper argument forwarding (trails-only)", () => {
+  fixtures({
+    pirates: [Pirate, {}],
+    ships: [Ship, {}],
+  });
+
+  // `acceptsNestedAttributesFor` wraps `save` to flush pending nested
+  // attributes. The wrapper is invisible in Rails (the flush happens inside the
+  // ordinary save), so it must be argument-transparent: dropping its options
+  // silently re-enabled validations for every model that accepts nested
+  // attributes.
+  it("forwards save options through the nested-attributes save wrapper", async () => {
+    Pirate.acceptsNestedAttributesFor("ship");
+
+    const pirate = await Pirate.createBang({ catchphrase: "Arr" });
+    pirate.catchphrase = "";
+
+    expect(await pirate.save({ validate: false })).toBe(true);
+    expect((await Pirate.find(readAttr(pirate, "id"))).catchphrase).toBe("");
   });
 });
