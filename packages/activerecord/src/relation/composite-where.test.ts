@@ -154,7 +154,10 @@ describe("Relation#where — composite-key form", () => {
       .all()
       .where(["author_id", "id"], [[1, 100]])
       .toSql();
-    expect(sql).toMatch(/WHERE "cpk_books"\."author_id" = 1 AND "cpk_books"\."id" = 100/);
+    // Quote-agnostic (backtick on MySQL/MariaDB, double-quote elsewhere): the
+    // point is the two equalities are ANDed flat, with NO wrapping parens.
+    const col = (name: string) => `["\`]?cpk_books["\`]?\\.["\`]?${name}["\`]?`;
+    expect(sql).toMatch(new RegExp(`WHERE ${col("author_id")} = 1 AND ${col("id")} = 100`));
     expect(sql).not.toMatch(/\(/);
   });
 
