@@ -1534,8 +1534,9 @@ describe("FinderTest", () => {
   });
 
   it("finder with offset string", async () => {
-    const sql = Post.all().offset(1).toSql();
-    expect(sql).toContain("OFFSET");
+    // Rails passes the offset as a string here; trails types `offset()` as
+    // number, so the cast is what keeps the string path under test.
+    await expect(Post.offset("3" as unknown as number)).resolves.toBeDefined();
   });
 
   it("find on a scope does not perform statement caching", async () => {
@@ -1574,8 +1575,14 @@ describe("FinderTest", () => {
   });
 
   it("implicit order set to primary key", async () => {
-    const sql = Post.all().toSql();
-    expect(sql).toContain("SELECT");
+    await assertQueriesMatch(
+      new RegExp(`ORDER BY ${escapeRegExp(quoteTableName("posts.id"))} DESC LIMIT`, "i"),
+      undefined,
+      false,
+      async () => {
+        await Post.last();
+      },
+    );
   });
 
   it("joins dont clobber id", async () => {
