@@ -145,18 +145,16 @@ describe("test-connection-env", () => {
     expect(withDatabase(settings, "other")).toEqual({ ...settings, database: "other" });
   });
 
-  it("driverConfig emits Rails' username and both spellings of the socket", () => {
-    // The credential is Rails' `username` alone — the adapters map it to the
-    // driver-native `user`. The socket still straddles: mysql2 reads
-    // `socketPath` and IGNORES `socket`, so emitting one spelling silently
-    // falls back to TCP instead of failing.
+  it("driverConfig emits Rails' username and socket spellings only", () => {
+    // Both keys are Rails' canonical spelling — the adapters map them to the
+    // driver-native `user` / `socketPath`.
     const config = driverConfig(
       mysqlSettings(reader({ MYSQL_USER: "u", MYSQL_PASSWORD: "p", MYSQL_SOCK: "/tmp/m.sock" })),
     );
     expect(config.username).toBe("u");
     expect(config).not.toHaveProperty("user");
     expect(config.socket).toBe("/tmp/m.sock");
-    expect(config.socketPath).toBe("/tmp/m.sock");
+    expect(config).not.toHaveProperty("socketPath");
   });
 
   it("driverConfig omits password and socket entirely when unset", () => {
