@@ -27,6 +27,7 @@ import { fileURLToPath } from "url";
 import { rubyMethodToTs, rubyFileToTs } from "./api-compare/conventions.js";
 import { writeJsonManifest } from "./api-compare/write-json-manifest.js";
 import { mergeBySourceLine } from "./api-compare/source-order.js";
+import { operatorSpelling } from "./api-compare/operator-order-spelling.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -105,17 +106,16 @@ const ORDER_ONLY_CANDIDATES: Record<string, string[]> = {
   "nil?": ["isNil", "nil"],
   hash: ["hash"],
   "eql?": ["isEql", "eql"],
-  // Ruby OPERATORS are deliberately NOT mapped. Unlike the three universal
-  // predicates above — each with one canonical trails spelling — operator
+  // Ruby OPERATORS (`[]`, `==`, `<=>`, …) are NOT resolved here. Unlike the three
+  // universal predicates above — each with one canonical trails spelling — operator
   // ports are class-specific and ambiguous, so a name-only global map is unsafe:
   // `[]` ports to `get` in `Arel::Table` / `ActiveModel::Errors` /
   // `LazyAttributeHash` but to `getAttribute` in `ActiveModel::AttributeSet`,
   // where `get` is instead a non-Rails Map-compat helper (attribute_set.rb:16
-  // `[]` → `getAttribute` at attribute-set.ts:298; the `get` at :63 has no Rails
-  // counterpart). Mapping `[]`→`get` would promote that invention into Rails'
-  // `[]` slot. `==` / `<=>` similarly vary (`equals` / `isEqualTo` / `compare`).
-  // Such operator ports — rare — sort after the mapped block; if one becomes a
-  // real fidelity gap, the RAILS_STRUCTURE_REPORT class-level surface flags it.
+  // `[]` → `getAttribute` at attribute-set.ts:289; the `get` at :296 has no Rails
+  // counterpart). They are instead resolved PER-CLASS by `operatorSpelling`
+  // (operator-order-spelling.ts), keyed (fqn, operator)→spelling; an operator a
+  // class doesn't list there stays unmapped and sorts after the mapped block.
 };
 
 // Append TS candidate names for a Ruby method onto `list`, deduping against
@@ -135,8 +135,17 @@ const ORDER_ONLY_CANDIDATES: Record<string, string[]> = {
 // trails also has an invented instance `get engine()`; a bare `engine` entry let
 // that invention be repositioned against the class accessor's slot. Entries in
 // the `functions` bucket stay bare — top-level functions have no staticness.
-const pushMethod = (list: string[], seen: Set<string>, name: string, isStatic: boolean) => {
-  const candidates = rubyMethodToTs(name) ?? ORDER_ONLY_CANDIDATES[name];
+// `operatorCandidates` (when supplied by a caller that knows the container's
+// Ruby fqn) resolves a class-specific operator spelling; it takes lowest
+// precedence so a real `rubyMethodToTs` mapping always wins.
+const pushMethod = (
+  list: string[],
+  seen: Set<string>,
+  name: string,
+  isStatic: boolean,
+  operatorCandidates?: string[],
+) => {
+  const candidates = rubyMethodToTs(name) ?? ORDER_ONLY_CANDIDATES[name] ?? operatorCandidates;
   if (!candidates || candidates.length === 0) return;
   for (const ts of candidates) {
     const entry = isStatic ? `static ${ts}` : ts;
@@ -215,7 +224,10 @@ for (const [pkg, rubyPkg] of Object.entries<any>(railsApi.packages)) {
         const file = m.file ?? host.file;
         noteClass(file, className, host.fqn);
         const b = bucketFor(file, className);
-        pushMethod(b.names, b.seen, m.name, m.isStatic);
+        // Instance operators (`[]`, `==`, …) resolve to a class-specific TS
+        // spelling keyed by the Ruby fqn; static methods have no operator ports.
+        const opCandidates = m.isStatic ? undefined : operatorSpelling(host.fqn, m.name);
+        pushMethod(b.names, b.seen, m.name, m.isStatic, opCandidates);
       }
     }
   };
