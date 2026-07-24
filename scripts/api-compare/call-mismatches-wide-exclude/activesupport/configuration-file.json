@@ -17,13 +17,6 @@
     "package": "activesupport",
     "tsFile": "configuration-file.ts",
     "rubyName": "parse",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "configuration-file.ts",
-    "rubyName": "parse",
     "call": "load",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }

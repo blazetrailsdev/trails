@@ -10,13 +10,6 @@
     "package": "actionview",
     "tsFile": "helpers/tag-helper.ts",
     "rubyName": "build_tag_values",
-    "call": "concat",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actionview",
-    "tsFile": "helpers/tag-helper.ts",
-    "rubyName": "build_tag_values",
     "call": "each",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

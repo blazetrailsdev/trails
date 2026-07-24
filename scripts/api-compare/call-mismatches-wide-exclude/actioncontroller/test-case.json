@@ -45,13 +45,6 @@
     "package": "actioncontroller",
     "tsFile": "test-case.ts",
     "rubyName": "assign_parameters",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "test-case.ts",
-    "rubyName": "assign_parameters",
     "call": "query_string",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

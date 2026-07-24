@@ -10,13 +10,6 @@
     "package": "activemodel",
     "tsFile": "translation.ts",
     "rubyName": "human_attribute_name",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "translation.ts",
-    "rubyName": "human_attribute_name",
     "call": "present?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

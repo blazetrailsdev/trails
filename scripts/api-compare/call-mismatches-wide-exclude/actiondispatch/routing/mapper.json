@@ -38,13 +38,6 @@
     "package": "actiondispatch",
     "tsFile": "routing/mapper.ts",
     "rubyName": "add_route",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/mapper.ts",
-    "rubyName": "add_route",
     "call": "match?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -123,13 +116,6 @@
     "tsFile": "routing/mapper.ts",
     "rubyName": "apply_common_behavior_for",
     "call": "nested",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/mapper.ts",
-    "rubyName": "canonical_action?",
-    "call": "include?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -562,13 +548,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "routing/mapper.ts",
-    "rubyName": "name_for_action",
-    "call": "select",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/mapper.ts",
     "rubyName": "namespace",
     "call": "delete",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -794,13 +773,6 @@
     "package": "actiondispatch",
     "tsFile": "routing/mapper.ts",
     "rubyName": "resource",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/mapper.ts",
-    "rubyName": "resource",
     "call": "post",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -858,13 +830,6 @@
     "tsFile": "routing/mapper.ts",
     "rubyName": "resources",
     "call": "collection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/mapper.ts",
-    "rubyName": "resources",
-    "call": "include?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -1026,13 +991,6 @@
     "tsFile": "routing/mapper.ts",
     "rubyName": "set_member_mappings_for_resource",
     "call": "get",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/mapper.ts",
-    "rubyName": "set_member_mappings_for_resource",
-    "call": "include?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

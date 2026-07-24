@@ -66,13 +66,6 @@
     "package": "activerecord",
     "tsFile": "tasks/sqlite-database-tasks.ts",
     "rubyName": "structure_dump",
-    "call": "any?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/sqlite-database-tasks.ts",
-    "rubyName": "structure_dump",
     "call": "concat",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -102,13 +95,6 @@
     "tsFile": "tasks/sqlite-database-tasks.ts",
     "rubyName": "structure_dump",
     "call": "run_cmd",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/sqlite-database-tasks.ts",
-    "rubyName": "structure_dump",
-    "call": "select",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

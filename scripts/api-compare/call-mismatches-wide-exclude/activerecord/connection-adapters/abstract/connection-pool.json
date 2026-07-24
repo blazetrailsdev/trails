@@ -31,13 +31,6 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "checkout",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "checkout",
     "call": "lock",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -103,13 +96,6 @@
     "rubyName": "complete",
     "call": "connection_handler",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "connected?",
-    "call": "any?",
-    "reason": "Verified equivalent: Rails connection_pool.rb:427-429 `@connections.any?(&:connected?)` is ported as `_connections.some((conn) => conn.isConnected())` — JS Array#some is the any? analogue; the extractor has no some→any? mapping."
   },
   {
     "package": "activerecord",
@@ -249,13 +235,6 @@
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "pin_connection!",
     "call": "context",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "pin_connection!",
-    "call": "include?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

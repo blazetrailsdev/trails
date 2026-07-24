@@ -10,13 +10,6 @@
     "package": "actiondispatch",
     "tsFile": "journey/router.ts",
     "rubyName": "find_routes",
-    "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "journey/router.ts",
-    "rubyName": "find_routes",
     "call": "find_all",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -25,13 +18,6 @@
     "tsFile": "journey/router.ts",
     "rubyName": "match_head_routes",
     "call": "empty?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "journey/router.ts",
-    "rubyName": "match_head_routes",
-    "call": "select",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

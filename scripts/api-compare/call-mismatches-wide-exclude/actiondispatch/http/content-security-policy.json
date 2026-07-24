@@ -58,13 +58,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "http/content-security-policy.ts",
-    "rubyName": "nonce_directive?",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/content-security-policy.ts",
     "rubyName": "plugin_types",
     "call": "first",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -116,13 +109,6 @@
     "tsFile": "http/content-security-policy.ts",
     "rubyName": "validate",
     "call": "flatten",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/content-security-policy.ts",
-    "rubyName": "validate",
-    "call": "include?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

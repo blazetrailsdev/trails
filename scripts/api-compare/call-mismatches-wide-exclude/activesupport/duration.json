@@ -45,13 +45,6 @@
     "package": "activesupport",
     "tsFile": "duration.ts",
     "rubyName": "initialize",
-    "call": "any?",
-    "reason": "Converged (RFC 0032): trails duration.ts constructor computes the variable flag via `VARIABLE_PARTS.some((part) => this.parts[part] !== 0)` — `Array#some` is the JS spelling of Ruby's `any?`; the extractor does not map the name."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "duration.ts",
-    "rubyName": "initialize",
     "call": "include?",
     "reason": "Converged (RFC 0032): Rails iterates parts and asks `VARIABLE_PARTS.include?(part)`; trails inverts the loop (`VARIABLE_PARTS.some(...)` over the fixed parts record), so membership is the iteration itself — no include? call exists to match."
   },

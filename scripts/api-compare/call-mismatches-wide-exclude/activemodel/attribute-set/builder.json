@@ -9,13 +9,6 @@
   {
     "package": "activemodel",
     "tsFile": "attribute-set/builder.ts",
-    "rubyName": "assign_default_value",
-    "call": "key?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-set/builder.ts",
     "rubyName": "deep_dup",
     "call": "transform_values",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

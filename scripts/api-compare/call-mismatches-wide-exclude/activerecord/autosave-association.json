@@ -9,13 +9,6 @@
   {
     "package": "activerecord",
     "tsFile": "autosave-association.ts",
-    "rubyName": "association_foreign_key_changed?",
-    "call": "all?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "autosave-association.ts",
     "rubyName": "association_valid?",
     "call": "any?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -39,13 +32,6 @@
     "tsFile": "autosave-association.ts",
     "rubyName": "association_valid?",
     "call": "reflection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "autosave-association.ts",
-    "rubyName": "association_valid?",
-    "call": "select",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -81,13 +67,6 @@
     "tsFile": "autosave-association.ts",
     "rubyName": "compute_primary_key",
     "call": "composite_primary_key?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "autosave-association.ts",
-    "rubyName": "compute_primary_key",
-    "call": "include?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

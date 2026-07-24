@@ -23,13 +23,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "testing/assertions/response.ts",
-    "rubyName": "generate_response_message",
-    "call": "concat",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/assertions/response.ts",
     "rubyName": "location_if_redirected",
     "call": "location",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

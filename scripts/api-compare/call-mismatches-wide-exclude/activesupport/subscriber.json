@@ -9,13 +9,6 @@
   {
     "package": "activesupport",
     "tsFile": "subscriber.ts",
-    "rubyName": "call",
-    "call": "index",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "subscriber.ts",
     "rubyName": "detach_from",
     "call": "delete",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -25,13 +18,6 @@
     "tsFile": "subscriber.ts",
     "rubyName": "detach_from",
     "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "subscriber.ts",
-    "rubyName": "publish_event",
-    "call": "index",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

@@ -31,13 +31,6 @@
     "package": "trailties",
     "tsFile": "generators/rails/encryption-key-file/encryption-key-file-generator.ts",
     "rubyName": "ignore_key_file",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "trailties",
-    "tsFile": "generators/rails/encryption-key-file/encryption-key-file-generator.ts",
-    "rubyName": "ignore_key_file",
     "call": "log",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

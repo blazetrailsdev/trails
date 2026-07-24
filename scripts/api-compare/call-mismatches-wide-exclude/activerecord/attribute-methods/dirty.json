@@ -9,13 +9,6 @@
   {
     "package": "activerecord",
     "tsFile": "attribute-methods/dirty.ts",
-    "rubyName": "_touch_row",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods/dirty.ts",
     "rubyName": "attribute_before_last_save",
     "call": "original_value",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -53,13 +46,6 @@
     "tsFile": "attribute-methods/dirty.ts",
     "rubyName": "attribute_in_database",
     "call": "to_s",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods/dirty.ts",
-    "rubyName": "attribute_names_for_partial_inserts",
-    "call": "reject",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

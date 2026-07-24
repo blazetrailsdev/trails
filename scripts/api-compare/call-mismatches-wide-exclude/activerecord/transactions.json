@@ -226,13 +226,6 @@
   {
     "package": "activerecord",
     "tsFile": "transactions.ts",
-    "rubyName": "transaction_include_any_action?",
-    "call": "any?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "transactions.ts",
     "rubyName": "with_transaction_returning_status",
     "call": "transaction_open?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

@@ -86,13 +86,6 @@
   {
     "package": "activerecord",
     "tsFile": "associations/preloader/association.ts",
-    "rubyName": "load_records",
-    "call": "select",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/preloader/association.ts",
     "rubyName": "run",
     "call": "associate_records_to_owner",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

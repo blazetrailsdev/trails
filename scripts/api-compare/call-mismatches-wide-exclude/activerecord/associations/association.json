@@ -135,13 +135,6 @@
   {
     "package": "activerecord",
     "tsFile": "associations/association.ts",
-    "rubyName": "foreign_key_for?",
-    "call": "all?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/association.ts",
     "rubyName": "initialize",
     "call": "check_validity!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

@@ -128,13 +128,6 @@
   {
     "package": "activesupport",
     "tsFile": "callbacks.ts",
-    "rubyName": "normalize_callback_params",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "callbacks.ts",
     "rubyName": "prepend",
     "call": "each",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

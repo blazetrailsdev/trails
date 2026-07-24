@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "encryption/extended-deterministic-queries.ts",
-    "rubyName": "additional_values_for",
-    "call": "collect",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/extended-deterministic-queries.ts",
     "rubyName": "install_support",
     "call": "include",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -81,13 +74,6 @@
     "tsFile": "encryption/extended-deterministic-queries.ts",
     "rubyName": "process_encrypted_query_argument",
     "call": "last",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/extended-deterministic-queries.ts",
-    "rubyName": "scope_for_create",
-    "call": "all?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

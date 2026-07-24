@@ -9,13 +9,6 @@
   {
     "package": "activerecord",
     "tsFile": "attribute-methods.ts",
-    "rubyName": "_has_attribute?",
-    "call": "key?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods.ts",
     "rubyName": "_touch_row",
     "call": "attribute_changed?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -184,13 +177,6 @@
   {
     "package": "activerecord",
     "tsFile": "attribute-methods.ts",
-    "rubyName": "attribute_method?",
-    "call": "key?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods.ts",
     "rubyName": "attribute_names_for_partial_inserts",
     "call": "attribute_changed?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -290,13 +276,6 @@
     "package": "activerecord",
     "tsFile": "attribute-methods.ts",
     "rubyName": "dangerous_attribute_method?",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "dangerous_attribute_method?",
     "call": "to_s",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -312,13 +291,6 @@
     "tsFile": "attribute-methods.ts",
     "rubyName": "dangerous_attribute_methods",
     "call": "to_s",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "dangerous_class_method?",
-    "call": "include?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -445,13 +417,6 @@
     "tsFile": "attribute-methods.ts",
     "rubyName": "has_attribute?",
     "call": "attribute_aliases",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "has_attribute?",
-    "call": "key?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

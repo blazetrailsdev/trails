@@ -38,13 +38,6 @@
     "package": "activerecord",
     "tsFile": "testing/query-assertions.ts",
     "rubyName": "assert_queries_match",
-    "call": "select",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "testing/query-assertions.ts",
-    "rubyName": "assert_queries_match",
     "call": "size",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

@@ -9,13 +9,6 @@
   {
     "package": "activerecord",
     "tsFile": "counter-cache.ts",
-    "rubyName": "counter_cache_column?",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "counter-cache.ts",
     "rubyName": "destroy_row",
     "call": "each",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

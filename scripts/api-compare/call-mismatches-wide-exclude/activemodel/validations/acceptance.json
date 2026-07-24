@@ -2,13 +2,6 @@
   {
     "package": "activemodel",
     "tsFile": "validations/acceptance.ts",
-    "rubyName": "acceptable_option?",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "validations/acceptance.ts",
     "rubyName": "initialize",
     "call": "merge!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

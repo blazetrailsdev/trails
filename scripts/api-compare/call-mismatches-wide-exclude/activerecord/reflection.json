@@ -101,13 +101,6 @@
     "package": "activerecord",
     "tsFile": "reflection.ts",
     "rubyName": "derive_fk_query_constraints",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "reflection.ts",
-    "rubyName": "derive_fk_query_constraints",
     "call": "size",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

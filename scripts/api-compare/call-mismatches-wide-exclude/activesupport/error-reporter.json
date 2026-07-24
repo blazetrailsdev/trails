@@ -38,13 +38,6 @@
     "package": "activesupport",
     "tsFile": "error-reporter.ts",
     "rubyName": "report",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "error-reporter.ts",
-    "rubyName": "report",
     "call": "join",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
