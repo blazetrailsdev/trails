@@ -286,7 +286,7 @@ describe("jsEnumerableAliases", () => {
   it("maps the core Ruby Enumerable names to their JS analogues", () => {
     expect(jsEnumerableAliases("any?")).toContain("some");
     expect(jsEnumerableAliases("all?")).toContain("every");
-    expect(jsEnumerableAliases("include?")).toContain("includes");
+    expect(jsEnumerableAliases("include?")).toContain("has");
     expect(jsEnumerableAliases("select")).toContain("filter");
   });
 

@@ -20,8 +20,11 @@ export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
   ["all?", ["every"]],
   ["none?", ["some", "every"]],
   ["one?", ["filter"]],
-  ["include?", ["includes", "has"]],
-  ["member?", ["includes", "has"]],
+  // `includes` is omitted here on purpose: it is now a naming-convention
+  // candidate for these two (CONTAINMENT_PREDICATE_ALIASES in conventions.ts),
+  // and conventions.test.ts fails on an alias the conventions already produce.
+  ["include?", ["has"]],
+  ["member?", ["has"]],
   ["key?", ["has"]],
   ["has_key?", ["has"]],
   ["select", ["filter"]],
