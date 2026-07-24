@@ -22,13 +22,13 @@
 
 import Database from "better-sqlite3";
 import FakeTimers from "@sinonjs/fake-timers";
-import { readFileSync, mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, mkdtempSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname, basename } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import type { CanonicalQuery } from "../../canonical/query-types.js";
-import { Base, modelRegistry } from "@blazetrails/activerecord";
-import { Visitors } from "@blazetrails/arel";
+import { assertPackagesBuilt } from "./assert-packages-built.js";
+import type { Visitors } from "@blazetrails/arel";
 
 function usage(): never {
   process.stderr.write(
@@ -81,25 +81,6 @@ function describe(v: unknown): string {
   return name ?? typeof v;
 }
 
-function assertBuilt(): void {
-  // All four packages contribute to the AR query surface; if any dist/ is
-  // missing, model load will fail with a cryptic module-not-found error.
-  // Check all four up-front with a clear hint.
-  const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const missing: string[] = [];
-  for (const pkg of ["activesupport", "activemodel", "arel", "activerecord"]) {
-    const dist = resolve(scriptDir, `../../../../packages/${pkg}/dist/index.js`);
-    if (!existsSync(dist)) missing.push(`@blazetrails/${pkg}`);
-  }
-  if (missing.length > 0) {
-    process.stderr.write(`parity ar_dump (trails): missing dist/ for ${missing.join(", ")}\n`);
-    process.stderr.write(
-      `Run: pnpm --filter @blazetrails/activesupport --filter @blazetrails/activemodel --filter @blazetrails/arel --filter @blazetrails/activerecord build\n`,
-    );
-    process.exit(1);
-  }
-}
-
 async function main(): Promise<void> {
   const {
     fixtureDir: fixtureDirRaw,
@@ -120,7 +101,7 @@ async function main(): Promise<void> {
     }
   }
 
-  assertBuilt();
+  assertPackagesBuilt("parity ar_dump (trails)");
 
   const frozenTs = frozenAt ?? DEFAULT_FROZEN_AT;
   const frozenMs = new Date(frozenTs).getTime();
@@ -130,6 +111,13 @@ async function main(): Promise<void> {
 
   const tmpDir = mkdtempSync(join(tmpdir(), "parity-ar-node-"));
   const clock = FakeTimers.install({ now: frozenMs, toFake: ["Date"] });
+
+  // Imported dynamically, after assertPackagesBuilt() — static imports would resolve
+  // (and fail) at module load, replacing the "missing dist/" hint with a bare
+  // module-not-found. Specifiers are package names, not dist paths, so Node ESM
+  // dedupes them with the fixture models' own imports to one module instance.
+  const { getFsAsync, getPathAsync } = await import("@blazetrails/activesupport");
+  const { Base, modelRegistry } = await import("@blazetrails/activerecord");
 
   try {
     // 1. Apply schema.sql to a fresh temp SQLite file.
@@ -150,7 +138,19 @@ async function main(): Promise<void> {
     //    process-global registry. Without this eager access Relation#toSql()
     //    would use the default generic visitor since it never touches
     //    Base.adapter itself, producing incorrect boolean/date literals.
-    await Base.establishConnection(dbPath);
+    //
+    //    The sqlite3 adapter resolves the database path through the *sync*
+    //    `getFs()`, whose node auto-registration is async-only under pure ESM —
+    //    warm the registry first or it throws "No filesystem adapter configured".
+    await getFsAsync();
+    await getPathAsync();
+    //
+    //    The config must be an explicit adapter/database hash, mirroring the
+    //    Rails side's `establish_connection adapter: "sqlite3", database: ...`.
+    //    A bare path string resolves as an *environment name*
+    //    (`resolve_config_for_connection`), failing with "the `<path>` database
+    //    is not configured for the `development` environment".
+    await Base.establishConnection({ adapter: "sqlite3", database: dbPath });
     void Base.adapter; // trigger _wireArelVisitor so the correct Arel visitor is active
     // Regression coverage: fixtures ar-09/ar-11/ar-19/ar-29 each produce a
     // distinct wrong literal under the generic visitor (TRUE/FALSE, FOR UPDATE)
@@ -207,12 +207,13 @@ async function main(): Promise<void> {
         // paramSql/binds are informational-only; wrap the entire extraction so any
         // unexpected visitor or bind-processing error falls back to sql / empty binds.
         try {
-          // Use the adapter-wired dialect visitor (e.g. Visitors.SQLite for SQLite)
-          // so boolean literals, DISTINCT, etc. match the actual execution dialect.
-          const adapterVisitor = (Base.adapter as { arelVisitor?: unknown }).arelVisitor;
-          const visitorCtor =
-            adapterVisitor != null ? (adapterVisitor as object).constructor : Visitors.ToSql;
-          const visitor = new (visitorCtor as new () => InstanceType<typeof Visitors.ToSql>)();
+          // The connection's own visitor, so literals and quoting match the
+          // execution dialect. Not `arelVisitor` — that is the *factory* method
+          // (abstract-adapter.ts:1715, Rails' `arel_visitor`); `visitor` is the
+          // instance it built at connect time.
+          const visitor = (Base.adapter as { visitor?: InstanceType<typeof Visitors.ToSql> })
+            .visitor;
+          if (visitor == null) throw new Error("connection has no Arel visitor");
           const [ps, bs] = (
             visitor as unknown as { compileWithBinds(node: unknown): [string, unknown[]] }
           ).compileWithBinds((manager as { ast: unknown }).ast);
@@ -235,11 +236,26 @@ async function main(): Promise<void> {
             return String(v);
           };
 
-          // Build a consistent paramSql where ONLY Date values become `?`; all
-          // other bind values are re-inlined using the visitor's quoting rules.
-          // This keeps `? count = binds.length` and matches adapter-specific rendering.
+          // Build a consistent paramSql where ONLY datetime values become `?`;
+          // all other bind values are re-inlined using the visitor's quoting
+          // rules. This keeps `? count = binds.length` and matches
+          // adapter-specific rendering.
+          //
+          // trails' Time analogue is Temporal, not JS Date (the adapter's
+          // `quote` rejects a Date outright), so the datetime probe is
+          // `epochMilliseconds` — carried by Temporal.Instant and
+          // Temporal.ZonedDateTime alike.
+          const epochMsOf = (v: unknown): number | null => {
+            if (v instanceof Date) return v.getTime();
+            if (v != null && typeof v === "object" && "epochMilliseconds" in v) {
+              const ms = (v as { epochMilliseconds: unknown }).epochMilliseconds;
+              if (typeof ms === "number") return ms;
+            }
+            return null;
+          };
+
           let placeholderIdx = 0;
-          const dateBind: Date[] = [];
+          const dateBind: number[] = [];
           let mismatch = false;
           const processedParamSql = ps.replace(/\?/g, () => {
             if (placeholderIdx >= resolvedBinds.length) {
@@ -247,8 +263,9 @@ async function main(): Promise<void> {
               return "?";
             }
             const v = resolvedBinds[placeholderIdx++];
-            if (v instanceof Date) {
-              dateBind.push(v);
+            const epochMs = epochMsOf(v);
+            if (epochMs !== null) {
+              dateBind.push(epochMs);
               return "?";
             }
             return quoteBindValue(v);
@@ -262,7 +279,7 @@ async function main(): Promise<void> {
             binds = [];
           } else {
             paramSql = processedParamSql.trim();
-            binds = dateBind.map((b) => b.toISOString());
+            binds = dateBind.map((ms) => new Date(ms).toISOString());
           }
         } catch {
           paramSql = sqlStr;
