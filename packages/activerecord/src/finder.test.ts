@@ -1501,38 +1501,29 @@ describe("FinderTest", () => {
 // FinderTest2 — additional coverage for finder_test.rb
 // ==========================================================================
 describe("FinderTest", () => {
-  fixtures([]);
-
-  class Post extends Base {
-    static {
-      this.tableName = "posts";
-      this.attribute("title", "string", { default: "" });
-      this.attribute("body", "string", { default: "" });
-    }
-  }
+  const { posts } = fixtures(["posts"]);
+  registerModel(CanonicalPost);
+  const Post = CanonicalPost;
 
   it("find by empty in condition", async () => {
-    await Post.create({ title: "a" });
     const results = await Post.where({ title: [] });
     expect(results.length).toBe(0);
   });
 
   it("find with nil inside set passed for one attribute", async () => {
-    await Post.create({ title: "a" });
-    const results = await Post.where({ title: ["a", null] });
-    expect(Array.isArray(results)).toBe(true);
+    const results = await Post.where({ title: [posts("welcome").title, null] });
+    expect(results.map((r: any) => r.id)).toEqual([posts("welcome").id]);
   });
 
   it("find_by with associations", async () => {
-    await Post.create({ title: "unique-title" });
-    const found = await Post.findBy({ title: "unique-title" });
+    const found = await Post.findBy({ title: posts("welcome").title });
     expect(found).not.toBeNull();
+    expect((found as any).id).toBe(posts("welcome").id);
   });
 
   it("first have determined order by default", async () => {
-    await Post.create({ title: "a" });
     const first = await Post.first();
-    expect(first).not.toBeNull();
+    expect((first as any).id).toBe(posts("welcome").id);
   });
 
   it("find without primary key", async () => {
@@ -1541,30 +1532,29 @@ describe("FinderTest", () => {
   });
 
   it("finder with offset string", async () => {
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
     const sql = Post.all().offset(1).toSql();
     expect(sql).toContain("OFFSET");
   });
 
   it("find on a scope does not perform statement caching", async () => {
-    await Post.create({ title: "scope-test" });
-    const scope = Post.where({ title: "scope-test" });
+    const scope = Post.where({ title: posts("welcome").title });
     const r1 = await scope;
     const r2 = await scope;
     expect(r1.length).toBe(r2.length);
   });
 
   it("find_by on a scope does not perform statement caching", async () => {
-    await Post.create({ title: "findby-scope" });
-    const r1 = await Post.findBy({ title: "findby-scope" });
-    const r2 = await Post.findBy({ title: "findby-scope" });
+    const r1 = await Post.findBy({ title: posts("welcome").title });
+    const r2 = await Post.findBy({ title: posts("welcome").title });
     expect(r1?.id).toBe(r2?.id);
   });
 
   it("find by on relation with large number", async () => {
-    const result = await Post.findBy({ id: 999999999 });
-    expect(result).toBeNull();
+    expect(await Post.where("1=1").findBy({ id: 999999999 })).toBeNull();
+    const found = await Post.where({ id: [posts("welcome").id, 999999999] }).findBy({
+      id: posts("welcome").id,
+    });
+    expect((found as any).id).toBe(posts("welcome").id);
   });
 
   // Rails: test "find_by! raises RecordNotFound if the record is missing"
@@ -1582,20 +1572,18 @@ describe("FinderTest", () => {
   });
 
   it("implicit order set to primary key", async () => {
-    await Post.create({ title: "pk-order" });
     const sql = Post.all().toSql();
     expect(sql).toContain("SELECT");
   });
 
   it("joins dont clobber id", async () => {
-    const p = await Post.create({ title: "join-test" });
-    expect(p.id).toBeTruthy();
+    const first = await Post.where(`posts.id = ${posts("welcome").id}`).first();
+    expect((first as any).id).toBe(posts("welcome").id);
   });
 
   it("named bind variables with quotes", async () => {
-    await Post.create({ title: "it's quoted" });
-    const results = await Post.where({ title: "it's quoted" });
-    expect(results.length).toBe(1);
+    const results = await Post.where({ title: posts("authorless").title });
+    expect(results.map((r: any) => r.id)).toEqual([posts("authorless").id]);
   });
 
   it("find by one attribute bang with blank defined", async () => {
@@ -1603,40 +1591,35 @@ describe("FinderTest", () => {
   });
 
   it("select rows", async () => {
-    await Post.create({ title: "row1" });
     const results = await Post.all();
-    expect(results.length).toBe(1);
+    expect(results.length).toBe(11);
   });
 
+  // Rails creates a row here on purpose: the point is that `where(id: nil)`
+  // still finds nothing afterwards.
   it("find ignores previously inserted record", async () => {
-    const p = await Post.create({ title: "first" });
-    await Post.create({ title: "second" });
-    const found = await Post.find(p.id);
-    expect(found.id).toBe(p.id);
+    await Post.create({ title: "test", body: "it out", author_id: 0 });
+    expect(await Post.where({ id: null })).toEqual([]);
   });
 
   it("find by one attribute with several options", async () => {
-    await Post.create({ title: "opt1" });
-    const found = await Post.findBy({ title: "opt1" });
-    expect(found).not.toBeNull();
+    const found = await Post.order("id DESC")
+      .where(`id != ${posts("welcome").id}`)
+      .findBy({ title: posts("thinking").title });
+    expect((found as any).id).toBe(posts("thinking").id);
   });
 });
 
 describe("FinderTest", () => {
-  fixtures([]);
+  fixtures(["topics"]);
+  registerModel("Topic", CanonicalTopic);
 
   // Rails: test_find_with_array_of_ids
   // Rails: test_find_raises_record_not_found
   // Rails: test_find_by_with_conditions
   // Rails: test_find_by_returns_nil
   it("find_by returns nil if the record is missing", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "Alice" });
-    const found = await Topic.findBy({ title: "Nobody" });
+    const found = await CanonicalTopic.findBy({ title: "Nobody" });
     expect(found).toBeNull();
   });
 
