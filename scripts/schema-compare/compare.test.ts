@@ -5,6 +5,10 @@ import {
   applyBaseline,
   compareSchemas,
   isFatal,
+  normalizeRailsDefault,
+  optionMismatches,
+  optionRegressions,
+  partitionFindings,
   readBaseline,
   unresolvedCallSites,
 } from "./compare.js";
@@ -268,6 +272,154 @@ describe("compareSchemas", () => {
   });
 });
 
+describe("compareSchemas column options", () => {
+  const detailFor = (findings: Finding[], column: string) =>
+    findings.find((f) => f.verdict === "OPTION" && f.column === column)?.detail ?? "";
+
+  const rails = parse(
+    `create_table :widgets, force: true do |t|
+       t.string   :name, null: false, limit: 1024
+       t.integer  :count, default: 0
+       t.decimal  :price, precision: 8, scale: 2
+       t.string   :cover, default: "hard"
+       t.datetime :stamp, precision: 0
+       t.integer  :spread, **default_zero
+     end`,
+  );
+
+  it("flags a diverging null as a non-fatal option warning", () => {
+    const findings = compareSchemas({ widgets: { name: { type: "string", limit: 1024 } } }, rails);
+    expect(verdicts(findings)).toContain("OPTION:widgets.name");
+    expect(detailFor(findings, "name")).toContain("null: schema.rb false, TEST_SCHEMA true");
+    expect(findings.every((f) => !isFatal(f))).toBe(true);
+  });
+
+  it("flags a diverging limit", () => {
+    const findings = compareSchemas({ widgets: { name: { type: "string", null: false } } }, rails);
+    expect(detailFor(findings, "name")).toContain("limit: schema.rb 1024, TEST_SCHEMA —");
+  });
+
+  it("flags a diverging default", () => {
+    const findings = compareSchemas({ widgets: { count: "integer" } }, rails);
+    expect(detailFor(findings, "count")).toContain("default: schema.rb 0, TEST_SCHEMA none");
+  });
+
+  it("flags diverging precision and scale", () => {
+    const findings = compareSchemas(
+      { widgets: { price: { type: "decimal", precision: 8 } } },
+      rails,
+    );
+    expect(detailFor(findings, "price")).toContain("scale: schema.rb 2, TEST_SCHEMA —");
+  });
+
+  it("normalises a quoted Rails default before comparing", () => {
+    const agree = compareSchemas(
+      { widgets: { cover: { type: "string", default: "hard" } } },
+      rails,
+    );
+    expect(agree.some((f) => f.verdict === "OPTION" && f.column === "cover")).toBe(false);
+  });
+
+  it("agrees when every option matches", () => {
+    expect(
+      compareSchemas(
+        { widgets: { name: { type: "string", null: false, limit: 1024 } } },
+        rails,
+      ).some((f) => f.verdict === "OPTION"),
+    ).toBe(false);
+  });
+
+  it("suppresses option comparison when the Rails options are a **splat", () => {
+    const findings = compareSchemas({ widgets: { spread: "integer" } }, rails);
+    expect(findings.some((f) => f.verdict === "OPTION")).toBe(false);
+  });
+
+  it("tolerates precision: null paired with a function default", () => {
+    const stamps = parse(
+      `create_table :clocks, force: true do |t|
+         t.datetime :at, default: -> { "CURRENT_TIMESTAMP" }
+       end`,
+    );
+    const findings = compareSchemas(
+      {
+        clocks: { at: { type: "datetime", precision: null, defaultFunction: "CURRENT_TIMESTAMP" } },
+      },
+      stamps,
+    );
+    expect(findings.some((f) => f.verdict === "OPTION")).toBe(false);
+  });
+});
+
+describe("normalizeRailsDefault", () => {
+  it("reads nil and an omitted default as none", () => {
+    expect(normalizeRailsDefault(undefined)).toBe("none");
+    expect(normalizeRailsDefault("nil")).toBe("none");
+  });
+
+  it("collapses a lambda default to a function tag", () => {
+    expect(normalizeRailsDefault(`-> { "CURRENT_TIMESTAMP" }`)).toBe("fn");
+  });
+
+  it("unquotes string, numeric, and boolean literals", () => {
+    expect(normalizeRailsDefault(`"hard"`)).toBe('"hard"');
+    expect(normalizeRailsDefault("0")).toBe("0");
+    expect(normalizeRailsDefault("false")).toBe("false");
+  });
+});
+
+describe("optionRegressions", () => {
+  const findings: Finding[] = [
+    { verdict: "OPTION", table: "t", column: "a", detail: "" },
+    { verdict: "OPTION", table: "t", column: "b", detail: "" },
+    { verdict: "SHAPE", table: "t", column: "c", detail: "" },
+  ];
+
+  it("stays report-only while the count is within the ceiling", () => {
+    expect(optionRegressions(findings, 2)).toEqual([]);
+  });
+
+  it("turns every option finding fatal once the ceiling is exceeded", () => {
+    expect(optionRegressions(findings, 1).map((f) => f.column)).toEqual(["a", "b"]);
+    expect(optionRegressions(findings, 0).map((f) => f.column)).toEqual(["a", "b"]);
+  });
+});
+
+describe("partitionFindings", () => {
+  const findings: Finding[] = [
+    { verdict: "INVENTED-TABLE", table: "t", detail: "" },
+    { verdict: "SHAPE", table: "t", column: "a", detail: "" },
+    { verdict: "UNPORTED-COLUMN", table: "t", column: "b", detail: "" },
+    { verdict: "OPTION", table: "t", column: "c", detail: "" },
+    { verdict: "OPTION", table: "t", column: "d", detail: "" },
+  ];
+
+  it("keeps OPTION findings out of the shape-warning bucket", () => {
+    const { shape } = partitionFindings(findings, 2);
+    expect(shape.map((f) => f.column)).toEqual(["a", "b"]);
+  });
+
+  it("routes OPTION findings to the soft bucket while within the ceiling", () => {
+    const { option, optionFatal } = partitionFindings(findings, 2);
+    expect(option.map((f) => f.column)).toEqual(["c", "d"]);
+    expect(optionFatal).toEqual([]);
+  });
+
+  it("moves OPTION findings to the fatal bucket once the ceiling is exceeded", () => {
+    const { option, optionFatal } = partitionFindings(findings, 1);
+    expect(option).toEqual([]);
+    expect(optionFatal.map((f) => f.column)).toEqual(["c", "d"]);
+  });
+});
+
+describe("optionMismatches", () => {
+  it("treats an omitted Rails null as nullable", () => {
+    expect(optionMismatches({}, "string")).toEqual([]);
+    expect(optionMismatches({}, { type: "string", null: false })).toEqual([
+      "null: schema.rb true, TEST_SCHEMA false",
+    ]);
+  });
+});
+
 describe("unresolvedCallSites", () => {
   it("returns nothing when every call site resolved", () => {
     expect(
@@ -367,6 +519,10 @@ describe("against the vendored schema.rb", () => {
     const findings = compareSchemas(TEST_SCHEMA, railsTables);
     const { regressions } = applyBaseline(findings, await readBaseline());
     expect(verdicts(regressions)).toEqual([]);
+  });
+
+  it("keeps column-option divergences at or below the committed ceiling", () => {
+    expect(optionRegressions(compareSchemas(TEST_SCHEMA, railsTables))).toEqual([]);
   });
 
   it("holds the invention baseline at or below its committed size", async () => {
