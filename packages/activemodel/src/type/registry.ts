@@ -12,6 +12,17 @@ import { ImmutableStringType } from "./immutable-string.js";
 import { BinaryType } from "./binary.js";
 import { TimeType } from "./time.js";
 
+/**
+ * Mirrors the block ActiveModel::Type::Registry#register builds —
+ * `proc { |_, *args| klass.new(*args) }` (registry.rb:16) — so `lookup`
+ * can forward the caller's options the way `lookup(symbol, ...)` does.
+ */
+export type TypeOptions = { precision?: number; scale?: number; limit?: number } & Record<
+  string,
+  unknown
+>;
+export type TypeFactory = (name: string, options?: TypeOptions) => Type;
+
 export class TypeRegistry {
   /**
    * Mirrors: ActiveModel::Type::Registry's `@registrations` ivar
@@ -21,31 +32,31 @@ export class TypeRegistry {
    *
    * @internal Rails-private storage.
    */
-  protected registrationsMap = new Map<string, () => Type>();
+  protected registrationsMap = new Map<string, TypeFactory>();
 
   constructor() {
-    this.register("string", () => new StringType());
-    this.register("integer", () => new IntegerType());
-    this.register("float", () => new FloatType());
-    this.register("boolean", () => new BooleanType());
-    this.register("date", () => new DateType());
-    this.register("datetime", () => new DateTimeType());
-    this.register("decimal", () => new DecimalType());
-    this.register("big_integer", () => new BigIntegerType());
-    this.register("immutable_string", () => new ImmutableStringType());
-    this.register("value", () => new ValueType());
-    this.register("binary", () => new BinaryType());
-    this.register("time", () => new TimeType());
+    this.register("string", (_name, options) => new StringType(options));
+    this.register("integer", (_name, options) => new IntegerType(options));
+    this.register("float", (_name, options) => new FloatType(options));
+    this.register("boolean", (_name, options) => new BooleanType(options));
+    this.register("date", (_name, options) => new DateType(options));
+    this.register("datetime", (_name, options) => new DateTimeType(options));
+    this.register("decimal", (_name, options) => new DecimalType(options));
+    this.register("big_integer", (_name, options) => new BigIntegerType(options));
+    this.register("immutable_string", (_name, options) => new ImmutableStringType(options));
+    this.register("value", (_name, options) => new ValueType(options));
+    this.register("binary", (_name, options) => new BinaryType(options));
+    this.register("time", (_name, options) => new TimeType(options));
   }
 
-  register(name: string, factory: () => Type): void {
+  register(name: string, factory: TypeFactory): void {
     this.registrations.set(name, factory);
   }
 
-  lookup(name: string): Type {
+  lookup(name: string, options?: TypeOptions): Type {
     const factory = this.registrations.get(name);
     if (!factory) throw new ArgumentError(`Unknown type: ${name}`);
-    return factory();
+    return factory(name, options);
   }
 
   /**
@@ -55,7 +66,7 @@ export class TypeRegistry {
    *
    * @internal Rails-private helper.
    */
-  protected get registrations(): Map<string, () => Type> {
+  protected get registrations(): Map<string, TypeFactory> {
     return this.registrationsMap;
   }
 }

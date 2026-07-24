@@ -99,6 +99,13 @@ export interface AttributeOptions {
    */
   userProvidedDefault?: boolean;
   limit?: number | null;
+  /**
+   * PG type modifiers, forwarded to the registry as Rails' `**options` are:
+   * `attribute :tags, :string, array: true` / `:my_range, :string, range: true`
+   * (postgresql_adapter.rb:1166-1167 register them via `add_modifier`).
+   */
+  array?: boolean;
+  range?: boolean;
 }
 
 /** @internal */
