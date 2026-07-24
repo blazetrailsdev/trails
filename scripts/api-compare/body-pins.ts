@@ -35,9 +35,15 @@
  * insensitive to indentation, blank lines, and comments — only a change to the
  * code the body runs moves it.
  *
+ * Adopted policy: ORGANIC until first release. The manifest ships empty; pins
+ * grow via convergence/port stories that pin the pairs they verify (`--pin
+ * <file>` plus a `reason`). The whole-surface `--pin-all` floor is deferred to
+ * the first release. See CONTRIBUTING.md "Body pins".
+ *
  * Usage:
  *   tsx body-pins.ts --pin <ruby-file>   # pin/re-pin all pairs in one Ruby file
  *   tsx body-pins.ts --pin-all           # pin/re-pin every matched pair (floor)
+ *   tsx body-pins.ts --prune             # drop pins whose pair no longer matches
  *   tsx body-pins.ts                      # list pin/unpinned counts (no writes)
  *
  * (Run `pnpm api:compare` first so output/body-hashes.json is fresh.)
@@ -200,6 +206,14 @@ export function pinPairs(
   return sortPins([...byKey.values()]);
 }
 
+// Drop pins whose pair no longer resolves (the STALE set the gate fails on).
+// Hand-deleting them from a manifest seeded at the `--pin-all` floor means
+// editing a ~9k-entry generated file, so removals get a command instead.
+export function prunePins(records: BodyHashRecord[], pins: BodyPin[]): BodyPin[] {
+  const current = currentDigests(records);
+  return sortPins(pins.filter((p) => current.has(keyOf(p))));
+}
+
 export async function readJson<T>(file: string): Promise<T> {
   return JSON.parse(await fs.readFile(file, "utf-8")) as T;
 }
@@ -243,6 +257,16 @@ async function main(args: string[]): Promise<number> {
         "`API_COMPARE_FORCE=1 pnpm api:compare`.\n",
     );
     return 1;
+  }
+
+  if (args.includes("--prune")) {
+    const next = prunePins(artifact.hashes, pins);
+    await saveManifest(next);
+    console.log(
+      `Wrote ${path.relative(ROOT_DIR, MANIFEST_PATH)}: dropped ${pins.length - next.length} ` +
+        `stale pin(s), ${next.length} remaining`,
+    );
+    return 0;
   }
 
   const pinAll = args.includes("--pin-all");

@@ -90,6 +90,49 @@ CI runs `tsx scripts/api-compare/conventions-doc.ts --check` and fails if it
 drifts, so it is always current — never hand-edit it, change the rule in
 `conventions.ts` instead.
 
+### Body pins (source-hash pinning)
+
+`scripts/api-compare/body-pins.json` records, per name-matched pair, the
+normalized digest of the vendored Rails body the TS method was ported against.
+`pnpm api:pins` (CI: `Body-pins gate`) then reports **DRIFT** when a bump to
+`vendor/rails` changes a pinned body, and **STALE** when a pinned method is
+removed or renamed.
+
+**Floor policy: organic until first release.** `body-pins.json` ships empty for
+now — we do **not** seed the `--pin-all` whole-surface floor before a release.
+Until then, pins grow organically: convergence and port stories pin the pairs
+they verify. Each pin is a real "a human verified this TS port matches this
+exact vendored Rails body" claim, recorded via `--pin`:
+
+```sh
+API_COMPARE_FORCE=1 pnpm api:compare   # refresh output/body-hashes.json
+pnpm tsx scripts/api-compare/body-pins.ts --pin activerecord/lib/active_record/relation.rb
+```
+
+Run that as the **last step of any convergence/port story**, once the port is
+verified faithful against `vendor/rails`, and set the entry's `reason` to the
+story id or PR that verified it. Re-pinning preserves an existing `reason`. When
+a Rails bump reports drift, re-verify the port against the new upstream body
+before re-pinning — never re-pin to silence the gate.
+
+At the **first release** we seed the whole-surface floor —
+`pnpm api:pins:all` runs `--pin-all`, pinning every remaining matched pair at
+the released digest so a later `vendor/rails` bump surfaces every changed body.
+A floor pin carries no `reason` (it is only a "this is what we shipped" claim,
+weaker than a verified port); organic pins made before then keep theirs.
+
+When the gate fails:
+
+- **DRIFT** — the vendored body changed. Re-verify the port, then re-pin that
+  file with `--pin`.
+- **STALE** — the pinned method was removed or renamed upstream (or the TS side
+  no longer name-matches). Once you have confirmed the pair is genuinely gone,
+  `pnpm tsx scripts/api-compare/body-pins.ts --prune` drops every unresolved pin
+  so the removal doesn't require hand-editing the manifest (relevant mainly once
+  the release floor exists). `--prune` never touches a drifted pin.
+- **PARTIAL scope** — the artifact was built with a `--package` filter; rebuild
+  with `API_COMPARE_FORCE=1 pnpm api:compare` before pinning or gating.
+
 Secondary signal: `pnpm test:types` — Vitest typecheck suites in
 `packages/*/dx-tests/` that pin the public type contract and encode DX gaps
 as assertions. When a gap closes, the assertion flips. A dedicated
