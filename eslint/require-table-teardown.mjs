@@ -109,7 +109,7 @@
  * rule cares about the operation, not what it's invoked on. Returns null for
  * dynamic/computed callees (`recv[fn](...)`).
  */
-function calledName(callee) {
+export function calledName(callee) {
   if (callee.type === "Identifier") return callee.name;
   if (callee.type !== "MemberExpression") return null;
   if (callee.computed || callee.property.type !== "Identifier") return null;
@@ -122,7 +122,7 @@ function calledName(callee) {
  * (`` `foo` ``) both qualify; a template with an interpolation (`` `${s}.foo` ``)
  * does not — its table name can't be matched statically, so it's skipped.
  */
-function staticString(node) {
+export function staticString(node) {
   if (!node) return null;
   if (node.type === "Literal" && typeof node.value === "string") return node.value;
   if (node.type === "TemplateLiteral" && node.expressions.length === 0) {
@@ -165,7 +165,7 @@ const NAME_RE = /^\s*(`|"|')?([\w.]+)\1?/;
  * `expect(...).toContain` does not. Receiver-agnostic, like every other name
  * the rule matches. Extend this set if a new execution sink appears.
  */
-const SQL_SINKS = new Set([
+export const SQL_SINKS = new Set([
   "exec",
   "execute",
   "executeMutation",
@@ -198,7 +198,7 @@ function rawCreateNames(text, endIsDynamic) {
  * at a trailing `CASCADE`/`RESTRICT`, statement terminator, or a non-static
  * (interpolated) name.
  */
-function rawDropNames(text) {
+export function rawDropNames(text) {
   const names = [];
   DROP_TABLE_RE.lastIndex = 0;
   let m;
