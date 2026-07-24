@@ -7125,10 +7125,16 @@ describe("HasManyAssociationsTest", () => {
 
     // Mirror Rails' OR-of-AND tuple-form assertion (adapter-agnostic on the
     // identifier quoting): each deleted row is scoped by its full composite key
-    // `(blog_id = .. AND id = ..)`, the two rows joined by OR.
+    // `blog_id = .. AND id = ..`, the two joined by OR inside ONE pair of
+    // parens. That single outer Grouping is `grouping_queries`' shape
+    // (predicate_builder.rb:154-161) — Rails' own `query_constraints` regex has
+    // no per-tuple parens.
     const col = (name: string) => `["\`]?sharded_comments["\`]?\\.["\`]?${name}["\`]?`;
-    const tuple = `\\(${col("blog_id")} = .*? AND ${col("id")} = .*?\\)`;
-    const expectation = new RegExp(`DELETE.*WHERE.*${tuple} OR ${tuple}`, "i");
+    const queryConstraints = `${col("blog_id")} = .* AND ${col("id")} = .*`;
+    const expectation = new RegExp(
+      `DELETE.*WHERE.* \\(${queryConstraints} OR ${queryConstraints}\\)`,
+      "i",
+    );
     const deleteSql = sqls.find((s) => /DELETE/i.test(s));
     expect(deleteSql).toBeDefined();
     expect(deleteSql).toMatch(expectation);
