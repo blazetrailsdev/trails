@@ -1,7 +1,7 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { Base } from "../base.js";
 import type { Relation } from "../relation.js";
-import { ScopeRegistry } from "../scoping.js";
+import { ScopeRegistry, isScopeAttributes as baseIsScopeAttributes } from "../scoping.js";
 
 /**
  * Manages evaluating and applying default scopes.
@@ -191,6 +191,25 @@ export function unscoped<T extends typeof Base, R>(
     return rel.scoping(block);
   }
   return rel;
+}
+
+/**
+ * Are there attributes associated with this scope? Rails' third arm,
+ * `respond_to?(:default_scope)`, covers only the method-form override
+ * (`def self.default_scope`) — the `default_scope { }` macro is private, so it
+ * registers in `defaultScopes` instead.
+ *
+ * Mirrors: ActiveRecord::Scoping::Default::ClassMethods#scope_attributes?
+ */
+export function isScopeAttributes(this: {
+  currentScope?: unknown;
+  defaultScopes?: DefaultScope[];
+}): boolean {
+  return (
+    baseIsScopeAttributes.call(this) ||
+    (this.defaultScopes?.length ?? 0) > 0 ||
+    hasDefaultScopeOverride(this)
+  );
 }
 
 /**
