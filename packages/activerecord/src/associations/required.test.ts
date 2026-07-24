@@ -7,6 +7,7 @@ import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { MigrationContext } from "../migration.js";
 import { fixtures } from "../test-helpers/fixtures.js";
+import { rebuildCanonicalTables } from "../test-helpers/canonical-schema.js";
 
 describe("RequiredAssociationsTest", () => {
   fixtures([]);
@@ -20,6 +21,7 @@ describe("RequiredAssociationsTest", () => {
   });
   afterAll(async () => {
     await ctx.dropTable("children", "parents", { ifExists: true });
+    await rebuildCanonicalTables(Base.connection, ["children"]);
   });
 
   it("belongs_to associations can be optional by default", async () => {
