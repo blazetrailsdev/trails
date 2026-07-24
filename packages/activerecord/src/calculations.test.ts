@@ -681,9 +681,11 @@ describe("CalculationsTest", () => {
   it("should group by summed field through association and having", async () => {
     const rc = companies("rails_core");
     const firm = (await Company.where({ id: rc.id }).first())! as any;
-    const c = (await firm.companies.group("name").sum("id")) as Map<unknown, number>;
-    // Companies under rails_core: Leetsoft (id=7) and Jadedpixel (id=8)
-    expect(Number(c.get("Leetsoft"))).toBe(7);
+    const c = (await firm.companies.group("name").having("sum(id) > 7").sum("id")) as Map<
+      unknown,
+      number
+    >;
+    expect(c.get("Leetsoft")).toBeUndefined();
     expect(Number(c.get("Jadedpixel"))).toBe(8);
   });
 
