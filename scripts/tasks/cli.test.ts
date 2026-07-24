@@ -1430,10 +1430,6 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(seen.filter((l) => l === "clean").length).toBe(1);
   });
 
-  // Verbatim markdownlint-cli2 output for a `--body-file` body that wraps a PR
-  // reference to column 0 (`#4869 ...` → MD018) and pastes an unlabelled fence
-  // (MD040) — the two rules a `tasks new` body actually tripped. The chatter
-  // interleaved around it is what used to bury the real cause.
   const MARKDOWNLINT_STDERR = [
     "markdownlint-cli2 v0.18.1 (markdownlint v0.38.0)",
     "Finding: rfcs/0025-x/stories/s.md !node_modules/**",
@@ -1464,37 +1460,55 @@ describe("commitAndPush (git mutation flow)", () => {
       seen.push(label);
       if (label === "diff-tree") return "story.md" as never;
       if (label === "clean") worktree.delete(args[args.length - 1]);
-      // The pre-commit hook's markdownlint gate rejects the body; git surfaces
-      // the hook's output on stderr and exits non-zero.
       if (label === "commit") throw pushError(MARKDOWNLINT_STDERR);
       return "" as never;
     });
-    expect(
-      () =>
-        commitAndPush({
-          message: "new: 0025-x/s",
-          fileToStage: NEW_FILE,
-          createdPath: NEW_FILE,
-          mutator: () => worktree.add(NEW_FILE),
-          raceMessage: "lost the race, retry",
-          raceExitCode: 99,
-        }),
-      // Non-zero, and NOT the race exit code — a retry can never succeed here.
+    expect(() =>
+      commitAndPush({
+        message: "new: 0025-x/s",
+        fileToStage: NEW_FILE,
+        createdPath: NEW_FILE,
+        mutator: () => worktree.add(NEW_FILE),
+        raceMessage: "lost the race, retry",
+        raceExitCode: 99,
+      }),
     ).toThrow("exit 1");
     expect(exit).toHaveBeenCalledWith(1);
-    // The last thing printed is the actionable `file:line rule` diagnostic,
-    // and it explicitly disclaims the transient push race.
     const last = errors[errors.length - 1];
     expect(last).toContain("MD018/no-missing-space-atx");
     expect(last).toContain("rfcs/0025-x/stories/s.md:31:1");
     expect(last).toContain("MD040/fenced-code-language");
     expect(last).toMatch(/NOT the transient push race/);
     expect(last).not.toContain("lost the race, retry");
-    // Nothing pushed, nothing left behind: the created file is rolled back and
-    // the lock released.
     expect(seen).not.toContain("push");
     expect(worktree.size).toBe(0);
     expect(existsSync(join(lockDir, "tasks-cli.lock"))).toBe(false);
+  });
+
+  it("re-raises a commit failure that carries no markdownlint violations", () => {
+    const { seen } = setup();
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      seen.push(label);
+      if (label === "diff-tree") return "story.md" as never;
+      if (label === "commit") throw pushError("validate: story frontmatter is invalid");
+      return "" as never;
+    });
+    let thrown: unknown;
+    try {
+      commitAndPush({
+        message: "test",
+        fileToStage: "/some/file.md",
+        mutator: () => {},
+        raceMessage: "no",
+        raceExitCode: 99,
+      });
+    } catch (e) {
+      thrown = e;
+    }
+    expect((thrown as { stderr?: string })?.stderr).toContain("story frontmatter is invalid");
+    expect(seen).not.toContain("push");
   });
 
   it("surfaces the underlying error (with stack) when a mutator throws, never a bare exit", () => {

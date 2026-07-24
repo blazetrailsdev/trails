@@ -370,10 +370,6 @@ function git(
     silent?: boolean;
     cwd?: string;
     env?: NodeJS.ProcessEnv;
-    // Pipe stderr while leaving stdin inherited. `silent` also pipes stderr but
-    // detaches stdin, which breaks commands that may prompt (credentials).
-    // Used for `commit`, whose pre-commit hook writes the markdownlint
-    // diagnostics we need to capture and re-surface on failure.
     captureStderr?: boolean;
   } = {},
 ): string {
@@ -903,12 +899,7 @@ export class MutatorEarlyExit extends Error {
   }
 }
 
-// markdownlint-cli2 (run by the tasks repo's pre-commit hook) prints one line
-// per violation on stderr:
-//   <path>:<line>[:<col>] MD###/<rule-name> <description> [Context: "..."]
-// Its progress chatter ("Finding:", "Linting:", "Summary:") goes to stdout, so
-// matching this shape on stderr picks out exactly the actionable diagnostics.
-const MARKDOWNLINT_VIOLATION = /^\S+:\d+(?::\d+)?\s+MD\d{3}\/\S+\s+\S/;
+const MARKDOWNLINT_VIOLATION = /^.+?:\d+(?::\d+)?\s+MD\d{3}\/\S+\s+\S/;
 
 export function extractMarkdownlintViolations(stderr: string): string[] {
   return stderr
@@ -1095,15 +1086,6 @@ export function commitAndPush(opts: {
           earlyExit = e;
           break;
         }
-        // A pre-commit markdownlint rejection is DETERMINISTIC — the body text
-        // is invalid, and retrying (the natural response to the `git commit`
-        // stack trace this used to surface, which reads exactly like the
-        // transient push-contention race) can never succeed. Print the offending
-        // `file:line rule` lines as the last thing on the way out, and exit via
-        // the early-exit sentinel so the lock's `finally` still runs and the
-        // top-level handler doesn't append a git stack trace after them. The
-        // rollback above already removed the staged/written file, so no partial
-        // commit is left behind.
         const violations = extractMarkdownlintViolations(
           String((e as { stderr?: unknown }).stderr ?? ""),
         );
@@ -1117,9 +1099,6 @@ export function commitAndPush(opts: {
           earlyExit = new MutatorEarlyExit(1);
           break;
         }
-        // Any other commit failure (a validate.mjs rejection, a prettier crash,
-        // a genuine git error) still carries the piped hook output on `.stderr`,
-        // which the top-level handler prints before the stack.
         throw e;
       }
       // Never push an empty commit. A concurrent `reset --hard` in this shared
