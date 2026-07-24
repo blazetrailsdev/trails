@@ -30,15 +30,11 @@ describe("DispatchContaminationTest", () => {
   });
 
   it("is threadsafe when implementing superclass fallback", () => {
-    // Rails races two threads through one DummyVisitor, using a CyclicBarrier
-    // inside an overridden `send` to force both to fail dispatch on
-    // DummySubNode at the same instant, then asserts both still resolve to the
-    // DummySuperNode handler (42). JS is single-threaded and has no
-    // interruptible dispatch, so the barrier/thread machinery has no analogue
-    // here. What is portable — and what the race guards — is that the
-    // corrective write lands on the shared per-class cache, so a second
-    // visitor observing the corrected entry resolves to the same handler as
-    // the first that resolved it by ancestor fallthrough.
+    // Rails' thread/CyclicBarrier machinery has no analogue: JS is
+    // single-threaded and dispatch is not interruptible. The portable core of
+    // the race is that the corrective write lands on the shared per-class
+    // cache, so a second visitor resolves the same handler the first resolved
+    // by ancestor fallthrough.
     class DummySuperNode {}
     class DummySubNode extends DummySuperNode {}
 
