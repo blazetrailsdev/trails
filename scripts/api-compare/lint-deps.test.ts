@@ -5,6 +5,7 @@ import * as path from "path";
 import * as ts from "typescript";
 import {
   collectDirectImports,
+  collectImportAliases,
   collectTaintedSymbols,
   isImportFromPackage,
   methodUsesDepImport,
@@ -203,6 +204,79 @@ describe("methodUsesDepImport — collectRefs mode", () => {
   });
 });
 
+describe("methodUsesDepImport — import-alias resolution", () => {
+  const AM = "@blazetrails/activemodel";
+
+  it("records an aliased identifier under its exported name", () => {
+    const sf = makeSourceFile(`
+      import { Attribute as ModelAttribute } from "${AM}";
+      function foo() { return new ModelAttribute(); }
+    `);
+    const node = firstMethod(sf);
+    const aliasMap = collectImportAliases(sf, AM);
+    const refs = new Set<string>();
+    methodUsesDepImport(
+      node,
+      new Set(["ModelAttribute"]),
+      new Set(),
+      "activemodel",
+      sf,
+      node,
+      undefined,
+      refs,
+      aliasMap,
+    );
+    expect(refs.has("Attribute")).toBe(true);
+    expect(refs.has("ModelAttribute")).toBe(false);
+  });
+
+  it("records the aliased class name for a static access base", () => {
+    const sf = makeSourceFile(`
+      import { Attribute as AMAttribute } from "${AM}";
+      function foo() { return AMAttribute.withCastValue("a", 1, null); }
+    `);
+    const node = firstMethod(sf);
+    const aliasMap = collectImportAliases(sf, AM);
+    const refs = new Set<string>();
+    methodUsesDepImport(
+      node,
+      new Set(["AMAttribute"]),
+      new Set(),
+      "activemodel",
+      sf,
+      node,
+      undefined,
+      refs,
+      aliasMap,
+    );
+    expect(refs.has("Attribute")).toBe(true);
+    expect(refs.has("AMAttribute")).toBe(false);
+  });
+
+  it("still records the leaf for a non-aliased namespace-style member access", () => {
+    const sf = makeSourceFile(`
+      import { Nodes } from "@blazetrails/arel";
+      function foo() { return new Nodes.OuterJoin(); }
+    `);
+    const node = firstMethod(sf);
+    const aliasMap = collectImportAliases(sf, "@blazetrails/arel");
+    const refs = new Set<string>();
+    methodUsesDepImport(
+      node,
+      new Set(["Nodes"]),
+      new Set(),
+      "arel",
+      sf,
+      node,
+      undefined,
+      refs,
+      aliasMap,
+    );
+    expect(refs.has("OuterJoin")).toBe(true);
+    expect(refs.has("Nodes")).toBe(false);
+  });
+});
+
 describe("methodUsesDepImport — lint-deps-ignore annotation", () => {
   it("opt-out comment above method marks as covered", () => {
     const sf = makeSourceFile(`
@@ -318,7 +392,7 @@ describe("collectTaintedSymbols — transitive dep usage", () => {
       `,
     });
     const program = programFor(dir);
-    const tainted = collectTaintedSymbols(program, dir, pkg, [], "activesupport");
+    const { tainted } = collectTaintedSymbols(program, dir, pkg, [], "activesupport");
     const helperSf = program.getSourceFiles().find((sf) => sf.fileName.endsWith("helper.ts"))!;
     const consumerSf = program.getSourceFiles().find((sf) => sf.fileName.endsWith("consumer.ts"))!;
     const checker = program.getTypeChecker();
@@ -374,7 +448,7 @@ describe("collectTaintedSymbols — transitive dep usage", () => {
       `,
     });
     const program = programFor(dir);
-    const tainted = collectTaintedSymbols(program, dir, pkg, [], "activesupport");
+    const { tainted } = collectTaintedSymbols(program, dir, pkg, [], "activesupport");
     const checker = program.getTypeChecker();
     for (const f of ["a.ts", "b.ts", "c.ts"]) {
       const sf = program.getSourceFiles().find((s) => s.fileName.endsWith(f))!;
@@ -395,7 +469,7 @@ describe("collectTaintedSymbols — transitive dep usage", () => {
       `,
     });
     const program = programFor(dir);
-    const tainted = collectTaintedSymbols(program, dir, pkg, [], "activesupport");
+    const { tainted } = collectTaintedSymbols(program, dir, pkg, [], "activesupport");
     expect(tainted.size).toBe(0);
   });
 
@@ -408,7 +482,7 @@ describe("collectTaintedSymbols — transitive dep usage", () => {
       `,
     });
     const program = programFor(dir);
-    const tainted = collectTaintedSymbols(program, dir, pkg, [], "activemodel");
+    const { tainted } = collectTaintedSymbols(program, dir, pkg, [], "activemodel");
     const sf = program.getSourceFiles().find((s) => s.fileName.endsWith("helper.ts"))!;
     const stmt = sf.statements.find((s): s is ts.VariableStatement => ts.isVariableStatement(s))!;
     const decl = stmt.declarationList.declarations[0];
@@ -427,7 +501,7 @@ describe("collectTaintedSymbols — transitive dep usage", () => {
       `,
     });
     const program = programFor(dir);
-    const tainted = collectTaintedSymbols(program, dir, pkg, [], "arel");
+    const { tainted } = collectTaintedSymbols(program, dir, pkg, [], "arel");
     expect(tainted.size).toBe(0);
   });
 
@@ -444,7 +518,7 @@ describe("collectTaintedSymbols — transitive dep usage", () => {
       `,
     });
     const program = programFor(dir);
-    const tainted = collectTaintedSymbols(program, dir, pkg, [], "activesupport");
+    const { tainted } = collectTaintedSymbols(program, dir, pkg, [], "activesupport");
     const checker = program.getTypeChecker();
     const consumerSf = program.getSourceFiles().find((sf) => sf.fileName.endsWith("consumer.ts"))!;
     const importedNames = collectDirectImports(consumerSf, pkg);
@@ -463,5 +537,41 @@ describe("collectTaintedSymbols — transitive dep usage", () => {
       refs,
     );
     expect(refs.has("executionContextId")).toBe(true);
+  });
+
+  it("inherits a wrapper's alias-resolved refs through taint", () => {
+    const pkg = "@blazetrails/activemodel";
+    const dir = writePkg({
+      "helper.ts": `
+        import { Attribute as ModelAttribute } from "${pkg}";
+        export function isActiveModelAttribute(v: unknown) { return v instanceof ModelAttribute; }
+      `,
+      "consumer.ts": `
+        import { isActiveModelAttribute } from "./helper.js";
+        export function visit(v: unknown) { return isActiveModelAttribute(v); }
+      `,
+    });
+    const program = programFor(dir);
+    const { tainted, taintedRefs } = collectTaintedSymbols(program, dir, pkg, [], "activemodel");
+    const checker = program.getTypeChecker();
+    const consumerSf = program.getSourceFiles().find((sf) => sf.fileName.endsWith("consumer.ts"))!;
+    const fn = consumerSf.statements.find((s): s is ts.FunctionDeclaration =>
+      ts.isFunctionDeclaration(s),
+    )!;
+    const refs = new Set<string>();
+    methodUsesDepImport(
+      fn,
+      collectDirectImports(consumerSf, pkg),
+      new Set(),
+      "activemodel",
+      consumerSf,
+      fn,
+      { checker, taintedSymbols: tainted, taintedRefs },
+      refs,
+    );
+    // The consumer reaches ActiveModel::Attribute only through the wrapper, so
+    // it inherits `Attribute` (not the wrapper identifier).
+    expect(refs.has("Attribute")).toBe(true);
+    expect(refs.has("isActiveModelAttribute")).toBe(false);
   });
 });
