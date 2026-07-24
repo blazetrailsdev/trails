@@ -2100,8 +2100,15 @@ export async function rebuildCanonicalTables(
   const defs = registry.filter((d) => wanted.has(d.name));
   if (defs.length === 0) return;
   const { ss, typeMap } = await prepareSchema(adapter);
-  // Drop in reverse registry order (FK-referencing tables before their targets),
-  // then recreate forward so targets exist first.
+  // Drop in reverse registry order, then recreate in forward registry order.
+  // Registry order is roughly alphabetical, NOT topological, so reversing it
+  // does not order referencers before their targets (`lessons_students` is
+  // registered before `students`, so the reverse loop drops the target first).
+  // That is safe only because the canonical registry declares no foreign keys
+  // at all — no `addForeignKey` / `t.foreignKey` anywhere in this file — so no
+  // drop order can violate a persisted constraint. If a canonical table ever
+  // gains an FK, this loop must be made genuinely FK-safe (topological drop, or
+  // dropping with FK checks suspended) before that table can be rebuilt here.
   for (const def of [...defs].reverse()) {
     await ss.dropTable(def.name, { ifExists: true });
   }
