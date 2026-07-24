@@ -10,6 +10,7 @@ import { Substitute } from "../statement-cache.js";
 import { PolymorphicArrayValue } from "./predicate-builder/polymorphic-array-value.js";
 import { argumentError } from "./query-methods.js";
 import type { TableMetadata } from "../table-metadata.js";
+import type { Base } from "../base.js";
 
 /**
  * The shape `table.type` answers with. Rails' single source
@@ -123,6 +124,11 @@ export class PredicateBuilder {
         ).predicateBuilder;
         nodes.push(...assocPb.expandFromHash(value));
       } else if (this.table.isAssociatedWith(key)) {
+        // No fallback here on purpose: this branch is gated by
+        // `isAssociatedWith(key)` (a direct reflection), matching Rails'
+        // `elsif table.associated_with?(key)` which calls `associated_table(key)`
+        // with NO block (predicate_builder.rb:107) — the join-dependency
+        // resolver only matters when a key is NOT a direct reflection.
         const assocNodes = this.buildFromHashAssociation(
           this.table.associatedTable(key),
           key,
@@ -425,7 +431,11 @@ export class PredicateBuilder {
    * Mirrors: ActiveRecord::PredicateBuilder#expand_from_hash, Array-key
    * branch (predicate_builder.rb:87-98).
    */
-  buildComposite(cols: string[], tuples: unknown[][]): Nodes.Node[] {
+  buildComposite(
+    cols: string[],
+    tuples: unknown[][],
+    fallback?: (name: string) => typeof Base | null,
+  ): Nodes.Node[] {
     if (cols.length === 0) {
       throw argumentError("PredicateBuilder.buildComposite: empty column list");
     }
@@ -448,11 +458,33 @@ export class PredicateBuilder {
     }
     const validTuples = tuples.filter((t) => t.every((v) => v !== null && v !== undefined));
     if (validTuples.length === 0) return [];
+    // Thread the join-dependency fallback through the per-tuple `buildFromHash`
+    // so a qualified col (`"contracts.metadata"`) naming a table that only
+    // exists as a join (`.joins(...)`, an alias) — not a direct reflection —
+    // resolves against the joined model (`lookup_table_klass_from_join_dependencies`,
+    // predicate_builder.rb:71-73). Without it the dotted key falls to a bare
+    // `Table` + generic `TypeCasterConnection`, so the bind is typed by the raw
+    // column type instead of the joined model's.
+    //
+    // Threading it UNIFORMLY across the single- and multi-column branches is a
+    // deliberate extension, not Rails-mirroring: qualified composite columns
+    // have no faithful Rails behavior to match (see this method's docstring —
+    // Rails' Array-key branch at predicate_builder.rb:93-96 recurses via
+    // `expand_from_hash(key.zip(ids_set).to_h)`, which neither re-applies
+    // `convert_dot_notation_to_hash` NOR forwards `&block`, so Rails emits a
+    // broken bare `"contracts.metadata"` attribute on the base table for either
+    // arity). The trails extension (#5186) already resolves REFLECTIONS in the
+    // multi-column branch by routing each tuple through `buildFromHash` (the
+    // "qualified composite cols bind through the joined table's type" test), so
+    // threading `fallback` there too keeps join-only tables consistent with both
+    // reflections and the single-column path — matching Rails' block-loss on
+    // recursion would instead resolve reflections but silently drop join-only
+    // tables to the generic caster, an arbitrary split.
     if (cols.length === 1) {
-      return this.buildFromHash({ [cols[0]]: validTuples.map((t) => t[0]) });
+      return this.buildFromHash({ [cols[0]]: validTuples.map((t) => t[0]) }, fallback);
     }
     const queryGroups = validTuples.map((tuple) =>
-      this.buildFromHash(Object.fromEntries(cols.map((col, i) => [col, tuple[i]]))),
+      this.buildFromHash(Object.fromEntries(cols.map((col, i) => [col, tuple[i]])), fallback),
     );
     return this.groupingQueries(queryGroups);
   }

@@ -18,6 +18,8 @@ import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "../test-helpers/models
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Customer, Address } from "../test-helpers/models/customer.js";
+import { Company } from "../test-helpers/models/company.js";
+import { Contract } from "../test-helpers/models/contract.js";
 
 describe("Relation#where — composite-key form", () => {
   // Rails creates the CPK rows inline with `Cpk::Book.create!` — no cpk
@@ -26,8 +28,8 @@ describe("Relation#where — composite-key form", () => {
   fixtures([]);
 
   beforeAll(() => {
-    [CpkBook, CpkOrder, CpkAuthor, CpkChapter, Post, Comment, Customer].forEach((m) =>
-      registerModel(m),
+    [CpkBook, CpkOrder, CpkAuthor, CpkChapter, Post, Comment, Customer, Company, Contract].forEach(
+      (m) => registerModel(m),
     );
   });
 
@@ -173,6 +175,42 @@ describe("Relation#where — composite-key form", () => {
     expect(bind.name).toBe("post_id");
     expect(bind.valueForDatabase).toBe(2);
     expect(left.left.relation.name).toBe("posts");
+  });
+
+  it("qualified composite col naming a join-only table binds through that table's model type", () => {
+    // A qualified col naming a table that exists only as a join-dependency
+    // (`contracts` reached via `Comment.joins({ company: "contracts" })`) — NOT
+    // a direct reflection on the base model — must still re-root on the joined
+    // model so the bind is typed by that model's column type. Rails threads
+    // `lookup_table_klass_from_join_dependencies` as the `associated_table`
+    // block (predicate_builder.rb:71-73); `buildComposite` mirrors that.
+    //
+    // `contracts.metadata` is `t.string` in the DB but Contract overrides it to
+    // `attribute("metadata", "json")`. Resolved through the join-dependency
+    // fallback, the bind uses that model type and JSON-serializes the value
+    // (`"x"` → `'"x"'`); without the fallback it falls to a bare Table with a
+    // generic `TypeCasterConnection` (klass === null), which reads the raw
+    // string column type and leaves it unquoted (`x`).
+    const rel: any = (Comment as any)
+      .joins({ company: "contracts" })
+      .where(["comments.id", "contracts.metadata"], [[1, "x"]]);
+    let eq: any;
+    const walk = (n: any) => {
+      if (!n || typeof n !== "object") return;
+      if (n.right?.value?.name === "metadata") eq = n;
+      for (const k of ["expr", "left", "right", "children"]) {
+        const c = n[k];
+        if (Array.isArray(c)) c.forEach(walk);
+        else if (c) walk(c);
+      }
+    };
+    rel._whereClause.predicates.forEach(walk);
+    // Attribute re-rooted onto the join-only `contracts` table…
+    expect(eq.left.relation.name).toBe("contracts");
+    // …and the bind is typed by Contract's `attribute("metadata", "json")`
+    // override (JSON-serialized, quoted), not the raw DB `t.string` column the
+    // generic `TypeCasterConnection` would have used (unquoted `x`).
+    expect(eq.right.value.valueForDatabase).toBe('"x"');
   });
 
   it("qualified single-column composite resolves its IN(...) attribute on the joined table", () => {

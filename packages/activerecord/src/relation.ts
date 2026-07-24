@@ -610,7 +610,15 @@ export class Relation<T extends Base> {
       // PredicateBuilder currency); spread them into the clause exactly as
       // buildWhereClause spreads buildFromHash's result, so a single tuple stays
       // flat (`WHERE c1 = ? AND c2 = ?`, no wrapping Grouping) like Rails.
-      const nodes = this.predicateBuilder.buildComposite(cols, tuples);
+      //
+      // Thread the join-dependency fallback (Rails' block to `build_where_clause`
+      // / `predicate_builder.rb:71-73`) so a qualified col naming a manual-join
+      // table binds through the joined model's column type.
+      const nodes = this.predicateBuilder.buildComposite(
+        cols,
+        tuples,
+        this.joinDependencyFallback(),
+      );
       if (nodes.length === 0) return this._clone().noneBang();
       const rel = this._clone();
       rel._whereClause.predicates.push(...nodes);
@@ -827,7 +835,14 @@ export class Relation<T extends Base> {
           "Relation#whereNot(cols, tuples): composite-key form requires a tuples argument as an array of arrays",
         );
       }
-      const nodes = this.predicateBuilder.buildComposite(conditions as string[], tuples);
+      // Thread the join-dependency fallback (see `where`'s composite branch)
+      // so a qualified col naming a manual-join table binds through the joined
+      // model's type rather than the generic `TypeCasterConnection`.
+      const nodes = this.predicateBuilder.buildComposite(
+        conditions as string[],
+        tuples,
+        this.joinDependencyFallback(),
+      );
       // Empty/all-filtered → NOT (no rows) = ALL rows = no predicate added
       // (matches Rails' `where.not(...)` no-op for empty hashes).
       if (nodes.length > 0) {
@@ -7253,6 +7268,15 @@ export class Relation<T extends Base> {
   /** @internal */
   private lookupTableKlassFromJoinDependencies(tableName: string): unknown {
     return _qm.lookupTableKlassFromJoinDependencies.call(this as any, tableName);
+  }
+
+  // The `associated_table` block Rails threads from `build_where_clause`
+  // (`predicate_builder.rb:71-73`): resolves a table name that exists only as a
+  // join-dependency (a manual join, an alias) — not a direct reflection — to its
+  // model, so a qualified col binds through that model's column type. Shared by
+  // `where` / `whereNot`'s composite branches.
+  private joinDependencyFallback(): (name: string) => typeof Base | null {
+    return (name) => this.lookupTableKlassFromJoinDependencies(name) as typeof Base | null;
   }
 
   /** @internal */
