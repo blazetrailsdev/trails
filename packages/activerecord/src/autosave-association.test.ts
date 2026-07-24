@@ -23,12 +23,14 @@ import {
   Firm as CanonicalFirm,
 } from "./test-helpers/models/company.js";
 import { Project } from "./test-helpers/models/project.js";
+import { Account } from "./test-helpers/models/account.js";
 import { Pirate as CanonicalPirate } from "./test-helpers/models/pirate.js";
-import { Ship as CanonicalShip } from "./test-helpers/models/ship.js";
+import { Ship as CanonicalShip, ShipWithoutNestedAttributes } from "./test-helpers/models/ship.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { ShipPart } from "./test-helpers/models/ship-part.js";
 import { Parrot as CanonicalParrot } from "./test-helpers/models/parrot.js";
 import { Bird as CanonicalBird } from "./test-helpers/models/bird.js";
+import { Eye, Iris, IrisWithReadOnlyForeignKey } from "./test-helpers/models/eye.js";
 import { Invoice } from "./test-helpers/models/invoice.js";
 import { LineItem } from "./test-helpers/models/line-item.js";
 import {
@@ -996,36 +998,20 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   }
   fixtures([]);
 
+  beforeAll(() => {
+    registerModel(CanonicalFirm);
+    registerModel(Account);
+    registerModel(Eye);
+    registerModel(Iris);
+    registerModel(IrisWithReadOnlyForeignKey);
+  });
+
+  // Rails' Firm declares `has_one :account, foreign_key: "firm_id",
+  // dependent: :destroy, validate: true` (test/models/company.rb) — validated
+  // but NOT autosaved. A new child still persists on owner.save via the
+  // unconditionally-registered has_one autosave callback.
   function makeModels() {
-    class Firm extends Base {
-      declare name: string | null;
-      declare account: Account | null;
-      declare loadHasOne: (name: "account") => Promise<Account | null>;
-
-      static {
-        this._tableName = "companies";
-        this.attribute("name", "string");
-        // Mirrors Rails' Firm `has_one :account, foreign_key: "firm_id",
-        // validate: true` (test/models/company.rb:78) — validate but NOT
-        // autosave. A new child still persists on owner.save via the
-        // unconditionally-registered has_one autosave callback.
-        this.hasOne("account", { foreignKey: "firm_id", validate: true });
-      }
-    }
-    class Account extends Base {
-      declare credit_limit: number | null;
-      declare firm_id: number | null;
-
-      static {
-        this._tableName = "accounts";
-        this.attribute("credit_limit", "integer");
-        this.attribute("firm_id", "integer");
-        this.validates("credit_limit", { presence: true });
-      }
-    }
-    registerModel("Firm", Firm);
-    registerModel("Account", Account);
-    return { Firm, Account };
+    return { Firm: CanonicalFirm, Account };
   }
 
   it("should save parent but not invalid child", async () => {
@@ -1342,65 +1328,19 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     expect(log).toContain("child_after_save");
     expect(child.isNewRecord()).toBe(false);
   });
-  // Mirrors Rails' Eye (has_one :iris) / Iris (belongs_to :eye) fixtures with
-  // no explicit foreign_key, so the inverse is inferred and the mutual
-  // hasOne-autosave / belongsTo-autosave pair forms a save cycle.
-  function makeEyeIris() {
-    class Eye extends Base {
-      static _tableName = "companies";
-    }
-    class Iris extends Base {
-      declare firm_id: number | null;
-      declare eye: Eye | null;
-      declare loadBelongsTo: (name: "eye") => Promise<Eye | null>;
-
-      static _tableName = "accounts";
-      static {
-        this.attribute("firm_id", "integer");
-        this.beforeValidation(function (rec: any) {
-          rec.beforeValidationCount = (rec.beforeValidationCount ?? 0) + 1;
-        });
-        this.beforeCreate(function (rec: any) {
-          rec.beforeCreateCount = (rec.beforeCreateCount ?? 0) + 1;
-        });
-        this.beforeSave(function (rec: any) {
-          rec.beforeSaveCount = (rec.beforeSaveCount ?? 0) + 1;
-        });
-        this.afterValidation(function (rec: any) {
-          rec.afterValidationCount = (rec.afterValidationCount ?? 0) + 1;
-        });
-        this.afterCreate(function (rec: any) {
-          rec.afterCreateCount = (rec.afterCreateCount ?? 0) + 1;
-        });
-        this.afterSave(function (rec: any) {
-          rec.afterSaveCount = (rec.afterSaveCount ?? 0) + 1;
-        });
-        this.belongsTo("eye", { autosave: true, className: "Eye", foreignKey: "firm_id" });
-      }
-    }
-    registerModel("Eye", Eye);
-    registerModel("Iris", Iris);
-    Associations.hasOne.call(Eye, "iris", {
-      autosave: true,
-      className: "Iris",
-      foreignKey: "firm_id",
-    });
-    return { Eye, Iris };
-  }
   it("callbacks on child when parent autosaves child twice", async () => {
-    const { Eye, Iris } = makeEyeIris();
     const eye = new Eye();
     cacheAssoc(eye, "iris", new Iris());
-    await eye.save();
+    await eye.saveBang();
     const iris2 = new Iris();
     cacheAssoc(eye, "iris", iris2);
-    await eye.save();
-    expect((iris2 as any).beforeValidationCount).toBe(1);
-    expect((iris2 as any).beforeCreateCount).toBe(1);
-    expect((iris2 as any).beforeSaveCount).toBe(1);
-    expect((iris2 as any).afterValidationCount).toBe(1);
-    expect((iris2 as any).afterCreateCount).toBe(1);
-    expect((iris2 as any).afterSaveCount).toBe(1);
+    await eye.saveBang();
+    expect(iris2.beforeValidationCallbacksCounter).toBe(1);
+    expect(iris2.beforeCreateCallbacksCounter).toBe(1);
+    expect(iris2.beforeSaveCallbacksCounter).toBe(1);
+    expect(iris2.afterValidationCallbacksCounter).toBe(1);
+    expect(iris2.afterCreateCallbacksCounter).toBe(1);
+    expect(iris2.afterSaveCallbacksCounter).toBe(1);
   });
   it("callbacks on child when parent autosaves polymorphic child with inverse of", async () => {
     const log: string[] = [];
@@ -1505,19 +1445,18 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     expect(owner.isNewRecord()).toBe(false);
   });
   it("callbacks on child when child autosaves parent twice", async () => {
-    const { Eye, Iris } = makeEyeIris();
     const iris = new Iris();
     cacheAssoc(iris, "eye", new Eye());
-    await iris.save();
+    await iris.saveBang();
     const eye2 = new Eye();
     cacheAssoc(iris, "eye", eye2);
-    await iris.save();
-    expect((iris as any).beforeValidationCount).toBe(2);
-    expect((iris as any).beforeCreateCount).toBe(1);
-    expect((iris as any).beforeSaveCount).toBe(2);
-    expect((iris as any).afterValidationCount).toBe(2);
-    expect((iris as any).afterCreateCount).toBe(1);
-    expect((iris as any).afterSaveCount).toBe(2);
+    await iris.saveBang();
+    expect(iris.beforeValidationCallbacksCounter).toBe(2);
+    expect(iris.beforeCreateCallbacksCounter).toBe(1);
+    expect(iris.beforeSaveCallbacksCounter).toBe(2);
+    expect(iris.afterValidationCallbacksCounter).toBe(2);
+    expect(iris.afterCreateCallbacksCounter).toBe(1);
+    expect(iris.afterSaveCallbacksCounter).toBe(2);
   });
   it("callbacks on child when polymorphic child with inverse of autosaves parent", async () => {
     const log: string[] = [];
@@ -1599,30 +1538,15 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     record.association(name).setTarget(value as any);
   }
 
+  beforeAll(() => {
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalShip);
+    registerModel(ShipPart);
+    registerModel(ShipWithoutNestedAttributes);
+  });
+
   function makeModels() {
-    class Pirate extends Base {
-      declare catchphrase: string | null;
-
-      static {
-        this._tableName = "pirates";
-        this.attribute("catchphrase", "string");
-      }
-    }
-    class Ship extends Base {
-      declare name: string | null;
-      declare pirate_id: number | null;
-
-      static {
-        this._tableName = "ships";
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-        this.validates("name", { presence: true });
-      }
-    }
-    registerModel("Pirate", Pirate);
-    registerModel("Ship", Ship);
-    Associations.hasOne.call(Pirate, "ship", { autosave: true });
-    return { Pirate, Ship };
+    return { Pirate: CanonicalPirate, Ship: CanonicalShip };
   }
 
   it("should still work without an associated model", async () => {
@@ -1666,38 +1590,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   });
 
   it("should automatically save bang the associated model if it sets the inverse record", async () => {
-    class Pirate extends Base {
-      declare catchphrase: string | null;
-
-      static {
-        this._tableName = "pirates";
-        this.attribute("catchphrase", "string");
-      }
-    }
-    class Ship extends Base {
-      declare name: string | null;
-      declare pirate_id: number | null;
-
-      static {
-        this._tableName = "ships";
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-        this.validates("name", { presence: true });
-      }
-    }
-    registerModel("Pirate", Pirate);
-    registerModel("Ship", Ship);
-    Associations.hasOne.call(Pirate, "ship", {
-      autosave: true,
-      className: "Ship",
-      foreignKey: "pirate_id",
-      inverseOf: "pirate",
-    });
-    Associations.belongsTo.call(Ship, "pirate", {
-      className: "Pirate",
-      foreignKey: "pirate_id",
-      inverseOf: "ship",
-    });
+    const { Pirate, Ship } = makeModels();
     const pirate = new Pirate({ catchphrase: "Savvy?" });
     const ship = new Ship({ name: "Black Pearl" });
     setBelongsTo(ship, "pirate", pirate, {
@@ -1773,24 +1666,18 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   });
 
   it("should still allow to bypass validations on the associated model", async () => {
-    const { Pirate } = makeModels();
-    class FlexShip extends Base {
-      declare name: string | null;
-      declare pirate_id: number | null;
-
-      static {
-        this._tableName = "ships";
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-      }
-    }
-    registerModel("FlexShip", FlexShip);
-    Associations.hasOne.call(Pirate, "flexShip", { autosave: true });
+    const { Pirate, Ship } = makeModels();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = new FlexShip({ name: "" });
-    cacheAssoc(pirate, "flexShip", ship);
-    const saved = await pirate.save();
+    const ship = await Ship.create({ name: "Nights Dirty Lightning", pirate_id: pirate.id });
+    cacheAssoc(pirate, "ship", ship);
+
+    pirate.catchphrase = "";
+    ship.name = "";
+    const saved = await pirate.save({ validate: false });
     expect(saved).toBe(true);
+
+    expect((await Pirate.find(pirate.id)).catchphrase).toBe("");
+    expect((await Ship.find(ship.id)).name).toBe("");
   });
 
   it("should allow to bypass validations on associated models at any depth", async () => {
@@ -1911,39 +1798,15 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   });
 
   it("mark for destruction is ignored without autosave true", async () => {
-    // Declare the has_one with autosave:false once (as Rails' `Pirate has_one
-    // :ship` is declared without autosave), rather than re-declaring over an
-    // autosave:true association: Rails' callback closes over the reflection at
-    // registration time and never re-registers (define_non_cyclic_method's
-    // `method_defined?` guard), so a re-declaration would not take effect.
-    class Pirate extends Base {
-      declare catchphrase: string | null;
+    // `ShipWithoutNestedAttributes has_many :parts` is declared without
+    // autosave, so `mark_for_destruction` is ignored: the part is still
+    // validated as an ordinary new child and its blank name invalidates the
+    // ship. Only an autosave association skips validating a marked child.
+    const ship = new ShipWithoutNestedAttributes({ name: "The Black Flag" });
+    const part = ship.parts.build();
+    markForDestruction(part);
 
-      static {
-        this._tableName = "pirates";
-        this.attribute("catchphrase", "string");
-      }
-    }
-    class Ship extends Base {
-      declare name: string | null;
-      declare pirate_id: number | null;
-
-      static {
-        this._tableName = "ships";
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-      }
-    }
-    registerModel("Pirate", Pirate);
-    registerModel("Ship", Ship);
-    Associations.hasOne.call(Pirate, "ship", { autosave: false });
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    markForDestruction(ship);
-    cacheAssoc(pirate, "ship", ship);
-    await pirate.save();
-    // Without autosave: true, the mark is ignored
-    expect(ship.isDestroyed()).toBe(false);
+    expect(await ship.isValid()).toBe(false);
   });
 
   it("recognises inverse polymorphic association changes with same foreign key", async () => {
@@ -2361,30 +2224,13 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
   }
   fixtures([]);
 
+  beforeAll(() => {
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalShip);
+  });
+
   function makeModels() {
-    class Pirate extends Base {
-      declare catchphrase: string | null;
-
-      static {
-        this._tableName = "pirates";
-        this.attribute("catchphrase", "string");
-        this.validates("catchphrase", { presence: true });
-      }
-    }
-    class Ship extends Base {
-      declare name: string | null;
-      declare pirate_id: number | null;
-
-      static {
-        this._tableName = "ships";
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-      }
-    }
-    registerModel("Pirate", Pirate);
-    registerModel("Ship", Ship);
-    Associations.belongsTo.call(Ship, "pirate", { autosave: true });
-    return { Pirate, Ship };
+    return { Pirate: CanonicalPirate, Ship: CanonicalShip };
   }
 
   it("should still work without an associated model", async () => {
