@@ -187,17 +187,17 @@ describe("Relation#where — composite-key form", () => {
     //
     // `contracts.metadata` is `t.string` in the DB but Contract overrides it to
     // `attribute("metadata", "json")`. Resolved through the join-dependency
-    // fallback, the bind uses that model type and JSON-serializes the object;
-    // without the fallback it falls to a bare Table with a generic
-    // `TypeCasterConnection` (klass === null), which reads the raw string column
-    // type and stringifies the object as `[object Object]`.
+    // fallback, the bind uses that model type and JSON-serializes the value
+    // (`"x"` → `'"x"'`); without the fallback it falls to a bare Table with a
+    // generic `TypeCasterConnection` (klass === null), which reads the raw
+    // string column type and leaves it unquoted (`x`).
     const rel: any = (Comment as any)
       .joins({ company: "contracts" })
-      .where(["comments.id", "contracts.metadata"], [[1, { foo: "bar" }]]);
-    let bind: unknown;
+      .where(["comments.id", "contracts.metadata"], [[1, "x"]]);
+    let eq: any;
     const walk = (n: any) => {
       if (!n || typeof n !== "object") return;
-      if (n.value?.name === "metadata") bind = n.value.valueForDatabase;
+      if (n.right?.value?.name === "metadata") eq = n;
       for (const k of ["expr", "left", "right", "children"]) {
         const c = n[k];
         if (Array.isArray(c)) c.forEach(walk);
@@ -205,7 +205,12 @@ describe("Relation#where — composite-key form", () => {
       }
     };
     rel._whereClause.predicates.forEach(walk);
-    expect(bind).toBe('{"foo":"bar"}');
+    // Attribute re-rooted onto the join-only `contracts` table…
+    expect(eq.left.relation.name).toBe("contracts");
+    // …and the bind is typed by Contract's `attribute("metadata", "json")`
+    // override (JSON-serialized, quoted), not the raw DB `t.string` column the
+    // generic `TypeCasterConnection` would have used (unquoted `x`).
+    expect(eq.right.value.valueForDatabase).toBe('"x"');
   });
 
   it("qualified single-column composite resolves its IN(...) attribute on the joined table", () => {
