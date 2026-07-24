@@ -27,9 +27,7 @@ import { tmpdir } from "node:os";
 import { join, resolve, dirname, basename } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { CanonicalQuery } from "../../canonical/query-types.js";
-import { Base, modelRegistry } from "@blazetrails/activerecord";
-import { Visitors } from "@blazetrails/arel";
-import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
+import type { Visitors } from "@blazetrails/arel";
 
 function usage(): never {
   process.stderr.write(
@@ -94,9 +92,7 @@ function assertBuilt(): void {
   }
   if (missing.length > 0) {
     process.stderr.write(`parity ar_dump (trails): missing dist/ for ${missing.join(", ")}\n`);
-    process.stderr.write(
-      `Run: pnpm --filter @blazetrails/activesupport --filter @blazetrails/activemodel --filter @blazetrails/arel --filter @blazetrails/activerecord build\n`,
-    );
+    process.stderr.write("Run: pnpm build\n");
     process.exit(1);
   }
 }
@@ -132,6 +128,13 @@ async function main(): Promise<void> {
   const tmpDir = mkdtempSync(join(tmpdir(), "parity-ar-node-"));
   const clock = FakeTimers.install({ now: frozenMs, toFake: ["Date"] });
 
+  // Imported dynamically, after assertBuilt() — static imports would resolve
+  // (and fail) at module load, replacing the "missing dist/" hint with a bare
+  // module-not-found. Specifiers are package names, not dist paths, so Node ESM
+  // dedupes them with the fixture models' own imports to one module instance.
+  const { getFsAsync, getPathAsync } = await import("@blazetrails/activesupport");
+  const { Base, modelRegistry } = await import("@blazetrails/activerecord");
+
   try {
     // 1. Apply schema.sql to a fresh temp SQLite file.
     const dbPath = join(tmpDir, "query.db");
@@ -152,20 +155,17 @@ async function main(): Promise<void> {
     //    would use the default generic visitor since it never touches
     //    Base.adapter itself, producing incorrect boolean/date literals.
     //
-    //    The sqlite3 adapter resolves the database path through
-    //    ActiveSupport's filesystem adapter *synchronously* (`getFs()` in
-    //    `prepareDatabasePath`), but the Node adapter's auto-registration is
-    //    async-only under pure ESM. Warm the registry first so the sync
-    //    lookup hits the cache instead of throwing "No filesystem adapter
-    //    configured".
+    //    The sqlite3 adapter resolves the database path through the *sync*
+    //    `getFs()`, whose node auto-registration is async-only under pure ESM —
+    //    warm the registry first or it throws "No filesystem adapter configured".
     await getFsAsync();
     await getPathAsync();
     //
     //    The config must be an explicit adapter/database hash, mirroring the
     //    Rails side's `establish_connection adapter: "sqlite3", database: ...`.
-    //    A bare path string is resolved as an *environment name* (Rails'
-    //    `resolve_config_for_connection`), which fails with "the `<path>`
-    //    database is not configured for the `development` environment".
+    //    A bare path string resolves as an *environment name*
+    //    (`resolve_config_for_connection`), failing with "the `<path>` database
+    //    is not configured for the `development` environment".
     await Base.establishConnection({ adapter: "sqlite3", database: dbPath });
     void Base.adapter; // trigger _wireArelVisitor so the correct Arel visitor is active
     // Regression coverage: fixtures ar-09/ar-11/ar-19/ar-29 each produce a
@@ -223,12 +223,10 @@ async function main(): Promise<void> {
         // paramSql/binds are informational-only; wrap the entire extraction so any
         // unexpected visitor or bind-processing error falls back to sql / empty binds.
         try {
-          // Use the connection's own visitor (e.g. Visitors.SQLite for SQLite)
-          // so boolean literals, DISTINCT, etc. match the actual execution
-          // dialect — and so quoting resolves through the real connection, the
-          // way `Node#to_sql` does. `arelVisitor()` is the *factory* method
-          // (abstract-adapter.ts:1715, mirroring Rails' `arel_visitor`);
-          // `visitor` is the instance it built at connect time.
+          // The connection's own visitor, so literals and quoting match the
+          // execution dialect. Not `arelVisitor` — that is the *factory* method
+          // (abstract-adapter.ts:1715, Rails' `arel_visitor`); `visitor` is the
+          // instance it built at connect time.
           const visitor = (Base.adapter as { visitor?: InstanceType<typeof Visitors.ToSql> })
             .visitor;
           if (visitor == null) throw new Error("connection has no Arel visitor");
@@ -262,14 +260,12 @@ async function main(): Promise<void> {
           // trails' Time analogue is Temporal, not JS Date (the adapter's
           // `quote` rejects a Date outright), so the datetime probe is
           // `epochMilliseconds` — carried by Temporal.Instant and
-          // Temporal.ZonedDateTime alike — with `instanceof Date` kept for any
-          // bind that never reaches a Temporal-typed attribute.
+          // Temporal.ZonedDateTime alike.
           const epochMsOf = (v: unknown): number | null => {
             if (v instanceof Date) return v.getTime();
             if (v != null && typeof v === "object" && "epochMilliseconds" in v) {
               const ms = (v as { epochMilliseconds: unknown }).epochMilliseconds;
               if (typeof ms === "number") return ms;
-              if (typeof ms === "bigint") return Number(ms);
             }
             return null;
           };

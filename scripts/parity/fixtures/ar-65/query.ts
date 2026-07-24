@@ -1,9 +1,8 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Order } from "./models.js";
 
-// Ruby `Time.now` — read through `Date.now()` so the parity runner's frozen
-// clock pins it deterministically (Temporal.Now.instant() carries sub-millisecond
-// hrtime precision that no clock freeze reaches).
+// Ruby `Time.now`. Built from `Date.now()`, not `Temporal.Now.instant()`:
+// only the former is pinned by the runner's frozen clock.
 export default Order.where({
   created_at: Temporal.Instant.fromEpochMilliseconds(Date.now()),
 });

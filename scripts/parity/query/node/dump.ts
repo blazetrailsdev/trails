@@ -139,6 +139,15 @@ async function main(): Promise<void> {
   // module-evaluation time (e.g. a translated `1.week.ago` analog).
   const clock = FakeTimers.install({ now: frozenMs, toFake: ["Date"] });
 
+  // Imported dynamically, after assertArelBuilt() — a static import would
+  // resolve (and fail) at module load, replacing the "run pnpm build" hint with
+  // a bare module-not-found. Specifiers are the package names, not dist paths,
+  // so Node ESM dedupes them with the fixture's own `@blazetrails/arel` import
+  // to one module instance — that is what makes `Arel::Table.engine` visible to
+  // the fixture's nodes.
+  const { getFsAsync, getPathAsync } = await import("@blazetrails/activesupport");
+  const { Base } = await import("@blazetrails/activerecord");
+
   try {
     // 1. Apply schema.sql to a fresh temp SQLite file. We don't currently hand
     //    the DB to the fixture, but applying the schema keeps the pipeline
@@ -151,40 +160,21 @@ async function main(): Promise<void> {
       db.close();
     }
 
-    // 2. Establish a real SQLite connection through trails AR. Mirrors the
-    //    Rails side's `establish_connection adapter: "sqlite3"`: importing
-    //    `@blazetrails/activerecord` sets `Arel::Table.engine` to a
-    //    Base-backed engine (base.ts, mirroring
-    //    `on_load(:active_record) { Arel::Table.engine = self }`), so both
-    //    `Node#toSql()` and `TreeManager#toSql()` resolve
-    //    `engine.connection.visitor` to the sqlite3 adapter's visitor — one
-    //    that carries real `quoteTableName`/`quoteColumnName`/`quote`.
-    //    A hand-rolled `{ connection: { visitor } }` stub cannot: RFC 0007
-    //    deleted the connection-less quoters, so a visitor built with no
-    //    connection dies on the first `quoteTableName` (to-sql.ts:1665-1667).
+    // 2. Establish a real SQLite connection, mirroring the Rails side's
+    //    `establish_connection adapter: "sqlite3"`. Importing activerecord is
+    //    what points `Arel::Table.engine` at Base, so `Node#toSql()` and
+    //    `TreeManager#toSql()` resolve `engine.connection.visitor` to the
+    //    sqlite3 visitor. A `{ connection: { visitor } }` stub cannot stand in:
+    //    RFC 0007 deleted the connection-less quoters, so a visitor built with
+    //    no connection dies on `quoteTableName` (to-sql.ts:1665-1667).
     //
-    //    Imported as `@blazetrails/activerecord`/`@blazetrails/arel` (not via
-    //    dist paths) because scripts/parity is itself a workspace package —
-    //    see scripts/parity/package.json. That ensures Node ESM dedupes these
-    //    imports with the fixture's `@blazetrails/arel` import to a single
-    //    module instance, so the engine wiring is visible to the fixture's
-    //    nodes.
-    //
-    //    The sqlite3 adapter resolves the database path through
-    //    ActiveSupport's filesystem adapter *synchronously* (`getFs()` in
-    //    `prepareDatabasePath`), but the Node adapter's auto-registration is
-    //    async-only under pure ESM. Warm the registry first so the sync
-    //    lookup hits the cache instead of throwing "No filesystem adapter
-    //    configured".
-    const { getFsAsync, getPathAsync } = await import("@blazetrails/activesupport");
+    //    The sqlite3 adapter resolves the database path through the *sync*
+    //    `getFs()`, whose node auto-registration is async-only under pure ESM —
+    //    warm the registry first or it throws "No filesystem adapter configured".
     await getFsAsync();
     await getPathAsync();
-
-    const { Base } = await import("@blazetrails/activerecord");
     await Base.establishConnection({ adapter: "sqlite3", database: dbPath });
-    // Checking out the connection triggers the adapter's Arel-visitor wiring
-    // (e.g. `IS DISTINCT FROM` emits as `IS NOT` via Visitors.SQLite).
-    void Base.adapter;
+    void Base.adapter; // checkout wires the dialect visitor (IS DISTINCT FROM → IS NOT)
 
     // 4. Import query.ts. Fixtures end with `export default <expr>` — see
     //    scripts/parity/translate/arel.ts (generateTs).
@@ -235,7 +225,6 @@ async function main(): Promise<void> {
     // Close the adapter's SQLite handle before removing the temp dir — an open
     // handle makes rmSync of the .db file fail on Windows.
     try {
-      const { Base } = await import("@blazetrails/activerecord");
       const a = Base.adapter as { close?: () => void };
       if (typeof a.close === "function") a.close();
       Base.removeConnection();
