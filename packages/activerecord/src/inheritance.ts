@@ -514,7 +514,13 @@ export function abstractClass(this: typeof Base, value?: boolean): boolean {
 }
 
 /**
- * Get the STI base class for a model.
+ * Get the STI base class for a model — the TOPMOST `_inheritanceColumn`
+ * ancestor. Topmost-wins is deliberate and matches Rails' `base_class`, which
+ * walks up until the superclass is `Base` or abstract (inheritance.rb
+ * `set_base_class`); a nested hierarchy with no abstract class in between still
+ * resolves to the outermost root there. Callers that need the class owning the
+ * *table* (rather than the type column) want `stiSchemaHost` in model-schema.ts,
+ * which stops at the last ancestor still sharing the receiver's table.
  */
 export function getStiBase(modelClass: object): typeof Base {
   let current = modelClass as typeof Base;

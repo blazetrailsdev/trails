@@ -84,4 +84,42 @@ describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () 
     expect(own<number>(Ticket, "_schemaRevision")).toBe((ticketRevisionBefore ?? 0) + 1);
     expect(own<number>(Shape, "_schemaRevision")).toBe(shapeRevisionBefore);
   });
+
+  it("routes a shared-table STI child of an own-table descendant to the overlay clear, not a full reload", async () => {
+    class Shape extends Base {
+      static override tableName = "shapes";
+      static {
+        this.inheritanceColumn = "type";
+      }
+    }
+    class Ticket extends Shape {
+      static override tableName = "tickets";
+      static {
+        this.inheritanceColumn = "type";
+      }
+    }
+    registerSubclass(Ticket);
+    class Urgent extends Ticket {}
+    registerSubclass(Urgent);
+
+    const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
+    for (const klass of [Shape, Ticket, Urgent]) {
+      (klass as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+    }
+
+    await Urgent.loadSchema();
+    const urgentRevisionBefore = own<number>(Urgent, "_schemaRevision");
+    const ticketRevisionBefore = own<number>(Ticket, "_schemaRevision");
+    const shapeRevisionBefore = own<number>(Shape, "_schemaRevision");
+
+    reloadSchemaFromCache.call(Urgent as never);
+
+    // Overlay clear: Urgent's own memos are dropped without bumping its
+    // revision, and the full reload lands on Ticket (its schema host), not
+    // Shape (the topmost STI ancestor).
+    expect(own<number>(Urgent, "_schemaRevision")).toBe(urgentRevisionBefore);
+    expect(own<boolean>(Urgent, "_schemaLoaded")).toBeUndefined();
+    expect(own<number>(Ticket, "_schemaRevision")).toBe((ticketRevisionBefore ?? 0) + 1);
+    expect(own<number>(Shape, "_schemaRevision")).toBe(shapeRevisionBefore);
+  });
 });
