@@ -47,6 +47,7 @@ import { DeleteRestrictionError } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 
 import { fixtures } from "../test-helpers/fixtures.js";
+import "../test-helpers/canonical-model-index.js";
 // Imported under HM-prefixed local aliases so the top-level bindings don't
 // collide with the bespoke `class Author` / `class Post` declarations in the
 // still-unconverted describes below. Without the alias, esbuild renames those
@@ -1016,21 +1017,21 @@ describe("HasManyAssociationsTest", () => {
   it.skip("depends and nullify with composite foreign key nulls every FK column", async () => {
     // Regression guard: the pre-ForeignAssociation.nullifiedOwnerAttributes
     // path only nulled the first FK column when `foreignKey` was an array.
-    class CpkAuthor extends Base {
+    class NullifyCompositeAuthor extends Base {
       declare name: string | null;
-      declare cpk_posts: AssociationProxy<CpkPost>;
+      declare cpk_posts: AssociationProxy<NullifyCompositePost>;
 
       static {
         this.attribute("name", "string");
         this.hasMany("cpk_posts", {
-          className: "CpkPost",
+          className: "NullifyCompositePost",
           foreignKey: ["tenant_id", "author_id"],
           primaryKey: ["id", "id"],
           dependent: "nullify",
         });
       }
     }
-    class CpkPost extends Base {
+    class NullifyCompositePost extends Base {
       declare tenant_id: number | null;
       declare author_id: number | null;
       declare title: string | null;
@@ -1041,17 +1042,17 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
-    registerModel(CpkAuthor);
-    registerModel(CpkPost);
-    const author = await CpkAuthor.create({ name: "Alice" });
-    const post = await CpkPost.create({
+    registerModel(NullifyCompositeAuthor);
+    registerModel(NullifyCompositePost);
+    const author = await NullifyCompositeAuthor.create({ name: "Alice" });
+    const post = await NullifyCompositePost.create({
       tenant_id: author.id,
       author_id: author.id,
       title: "A",
       body: "body",
     });
     await author.destroy();
-    const reloaded = await CpkPost.find(post.id!);
+    const reloaded = await NullifyCompositePost.find(post.id!);
     expect((reloaded as any).tenant_id).toBeNull();
     expect((reloaded as any).author_id).toBeNull();
   });
@@ -2798,17 +2799,16 @@ describe("HasManyAssociationsTest", () => {
     expect((post as any).author_id).toBeNull();
   });
   it("create with bang on habtm when parent is new raises", async () => {
-    class Author extends Base {
-      declare name: string | null;
-
-      static {
-        this.attribute("name", "string");
-      }
+    const developer = Developer.new({ name: "Aredridel" });
+    let error: any;
+    try {
+      await association(developer, "projects").createBang({});
+    } catch (e) {
+      error = e;
     }
-    registerModel(Author);
-    const author = Author.new({ name: "Unsaved" });
-    expect(author.isNewRecord()).toBe(true);
-    expect(author.id).toBeNull();
+    expect(error).toBeInstanceOf(RecordNotSaved);
+    expect(error.message).toBe("You cannot call create unless the parent is saved");
+    expect(error.record).toBe(developer);
   });
   it("adding a mismatch class", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
