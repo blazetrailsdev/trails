@@ -472,8 +472,9 @@ async function singleAggregate(
 }
 
 /**
- * Both calculation arms run `select_all` on the relation's own arel, and
- * `build_arel` emits `arel.having(having_clause.ast) unless having_clause.empty?`
+ * Every calculation arm — including each of `performCount`'s managers — runs
+ * `select_all` on the relation's own arel, and `build_arel` emits
+ * `arel.having(having_clause.ast) unless having_clause.empty?`
  * unconditionally — with or without a GROUP BY (query_methods.rb:1756). Our arms
  * project explicitly instead of reusing `build_arel`, so the having clause has to
  * be re-applied by hand.
@@ -868,6 +869,7 @@ export async function performCount(
             Array.isArray(distinctSelect) ? distinctSelect : [distinctSelect]
           ).map((s) => new Nodes.SqlLiteral(s));
           applyFromToManager(this, idSubquery);
+          applyHavingToManager(this, idSubquery);
           if (this._limitValue !== null) idSubquery.take(this._limitValue);
           if (this._offsetValue !== null) idSubquery.skip(this._offsetValue);
           const [idSql, idBinds] = compileManagerWithBinds(this, idSubquery);
@@ -893,6 +895,7 @@ export async function performCount(
           // constraining the count, not just the id set.
           this._applyWheresToManager(countManager, table);
           applyFromToManager(this, countManager);
+          applyHavingToManager(this, countManager);
           countManager.where(table.get(pk).in(limitedIds));
           const [countSql, countBinds] = compileManagerWithBinds(this, countManager);
           const [withCtes, ctedBinds] = prependCtes(this, countSql, [...countBinds]);
@@ -913,6 +916,7 @@ export async function performCount(
         this._applyJoinsToManager(manager, makeEagerJd());
         this._applyWheresToManager(manager, table);
         applyFromToManager(this, manager);
+        applyHavingToManager(this, manager);
         const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
         const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
         const result = await this._conn().selectAll(
@@ -968,6 +972,7 @@ export async function performCount(
               Array.isArray(distinctSelect) ? distinctSelect : [distinctSelect]
             ).map((s) => new Nodes.SqlLiteral(s));
             applyFromToManager(this, idSubquery);
+            applyHavingToManager(this, idSubquery);
             if (this._limitValue !== null) idSubquery.take(this._limitValue);
             if (this._offsetValue !== null) idSubquery.skip(this._offsetValue);
             const [idSql, idBinds] = compileManagerWithBinds(this, idSubquery);
@@ -987,6 +992,7 @@ export async function performCount(
             this._applyJoinsToManager(countManager, makeEagerJd());
             this._applyWheresToManager(countManager, table);
             applyFromToManager(this, countManager);
+            applyHavingToManager(this, countManager);
             // Rails `distinct_relation_for_primary_key` restricts via
             // `where!(pk.zip(limited_ids.transpose).to_h)` — a per-column `IN`
             // (`author_id IN (...) AND id IN (...)`), not a tuple `IN`.
@@ -1008,6 +1014,7 @@ export async function performCount(
           this._applyJoinsToManager(manager, makeEagerJd());
           this._applyWheresToManager(manager, table);
           applyFromToManager(this, manager);
+          applyHavingToManager(this, manager);
           const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
           const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
           const result = await this._conn().selectAll(
@@ -1022,6 +1029,7 @@ export async function performCount(
         this._applyJoinsToManager(innerManager, makeEagerJd());
         this._applyWheresToManager(innerManager, table);
         applyFromToManager(this, innerManager);
+        applyHavingToManager(this, innerManager);
         if (this._limitValue !== null) innerManager.take(this._limitValue);
         if (this._offsetValue !== null) innerManager.skip(this._offsetValue);
         const [innerSql, allInnerBinds] = compileManagerWithBinds(this, innerManager);
@@ -1122,6 +1130,7 @@ export async function performCount(
     this._applyJoinsToManager(innerManager);
     this._applyWheresToManager(innerManager, innerTable);
     applyFromToManager(this, innerManager);
+    applyHavingToManager(this, innerManager);
     if (this._limitValue !== null) innerManager.take(this._limitValue);
     if (this._offsetValue !== null) innerManager.skip(this._offsetValue);
     // Wrap inner query as Arel AST: Grouping (parens) + TableAlias.
@@ -1172,6 +1181,7 @@ export async function performCount(
     this._applyJoinsToManager(manager);
     this._applyWheresToManager(manager, table);
     applyFromToManager(this, manager);
+    applyHavingToManager(this, manager);
     const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
     const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
     const result = await this._conn().selectAll(
@@ -1193,6 +1203,7 @@ export async function performCount(
       this._applyJoinsToManager(innerManager);
       this._applyWheresToManager(innerManager, table);
       applyFromToManager(this, innerManager);
+      applyHavingToManager(this, innerManager);
       const [innerSqlWithFrom, allInnerBinds] = compileManagerWithBinds(this, innerManager);
       const countAll = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
       const outerManager = project(countAll.as("count"));
@@ -1212,6 +1223,7 @@ export async function performCount(
     this._applyJoinsToManager(manager);
     this._applyWheresToManager(manager, table);
     applyFromToManager(this, manager);
+    applyHavingToManager(this, manager);
     const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
     const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
     const result = await this._conn().selectAll(
@@ -1228,6 +1240,7 @@ export async function performCount(
   this._applyJoinsToManager(manager);
   this._applyWheresToManager(manager, table);
   applyFromToManager(this, manager);
+  applyHavingToManager(this, manager);
   const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
   const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
   const result = await this._conn().selectAll(

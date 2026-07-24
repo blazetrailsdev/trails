@@ -289,4 +289,21 @@ describe("ungrouped calculation HAVING", () => {
     expect(await Account.having("sum(credit_limit) > 100").sum("credit_limit")).toBe(total);
     expect(await Account.having("sum(credit_limit) > 100000").sum("credit_limit")).toBe(0);
   });
+
+  it("emits HAVING with no GROUP BY on the count paths", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    const total = (await Account.count()) as number;
+    const credited = (await Account.where("credit_limit IS NOT NULL").count()) as number;
+    expect(total).toBeGreaterThan(1);
+    expect(credited).toBeGreaterThan(1);
+
+    expect(await Account.having("count(*) > 1").count()).toBe(total);
+    expect(await Account.having("count(*) > 100000").count()).toBe(0);
+
+    expect(await Account.having("count(*) > 1").count("credit_limit")).toBe(credited);
+    expect(await Account.having("count(*) > 100000").count("credit_limit")).toBe(0);
+
+    expect(await Account.distinct().having("count(*) > 1").count()).toBe(total);
+    expect(await Account.distinct().having("count(*) > 100000").count()).toBe(0);
+  });
 });
