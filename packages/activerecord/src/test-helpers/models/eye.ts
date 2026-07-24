@@ -14,10 +14,18 @@ export class Eye extends Base {
   overrideIrisWithReadOnlyForeignKeyColor: boolean = false;
 
   /**
-   * Rails reads `iris` directly in these callbacks. The trails has_one reader
-   * is async, so a callback running while the association is unloaded would see
-   * a thenable rather than a record; read the loaded target instead (an
-   * unloaded has_one on a just-created owner has no persisted row anyway).
+   * Rails reads `iris` directly in these callbacks (eye.rb). The trails has_one
+   * reader is async, so a sync callback firing while the association is
+   * unloaded receives a thenable rather than a record; read the loaded target
+   * instead.
+   *
+   * KNOWN DIVERGENCE: Rails' reader would `load_target` on a cold cache — a
+   * *persisted* Eye saved without anyone first touching `iris` still queries and
+   * pushes the result onto the callback stacks, where this getter pushes
+   * nothing. Every current caller pre-loads the target (association assignment
+   * or nested attributes), so no test observes the gap. Closing it needs a
+   * sync-readable has_one target, tracked by the story
+   * `eye-callbacks-cold-cache-has-one-read-diverges-from-rails`.
    */
   private get irisTarget(): Iris | null {
     const assoc = this.association("iris");
