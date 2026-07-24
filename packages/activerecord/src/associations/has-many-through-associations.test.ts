@@ -2534,10 +2534,7 @@ describe("HasManyThroughAssociationsTest", () => {
     await expect((order as any).chapters.toArray()).resolves.toBeInstanceOf(Array);
   });
 
-  // TS-only: insertRecord with validate false still raises on an invalid join record.
-  // Rails' save_through_record (has_many_through_association.rb:81-85) takes
-  // neither `validate` nor `raise`; those reach only the target save via
-  // insert_record's `super`, so the join row is always a bang save.
+  // TS-only: insertRecord with validate false still raises on invalid join record
   it("insertRecord with validate false still raises on invalid join record", async () => {
     class IrpvTagging extends Base {
       declare taggable_id: number | null;
