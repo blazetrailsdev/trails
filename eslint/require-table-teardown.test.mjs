@@ -80,6 +80,15 @@ tester.run("require-table-teardown", rule, {
     'await ctx.dropTable(name);\nawait ctx.dropTable("b");',
   ],
   invalid: [
+    // Symmetrically, a DROP name flush against an interpolation is a prefix,
+    // not a table: the phantom `tmp_` must not be credited as the teardown of
+    // the real `tmp_a`.
+    {
+      code:
+        'await c.exec("CREATE TABLE tmp_a (id int)");\n' +
+        "await c.exec(`DROP TABLE tmp_${suffix}`);",
+      errors: [{ messageId: "missingTeardown", data: { table: "tmp_a" } }],
+    },
     // Created, never dropped.
     {
       code: 'beforeAll(async () => { await ctx.createTable("widgets", () => {}); });',

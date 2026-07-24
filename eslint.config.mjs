@@ -22,6 +22,7 @@ import expectedFixtures from "./eslint/expected-fixtures.mjs";
 import manifestComplete from "./eslint/manifest-complete.mjs";
 import testFixtureParity from "./eslint/test-fixture-parity.mjs";
 import requireTableTeardown from "./eslint/require-table-teardown.mjs";
+import requireCanonicalRebuild from "./eslint/require-canonical-rebuild.mjs";
 import noRawSql from "./eslint/no-raw-sql.mjs";
 import noStandaloneAssociations from "./eslint/no-standalone-associations.mjs";
 import noInternalCanonicalLoaders from "./eslint/no-internal-canonical-loaders.mjs";
@@ -47,6 +48,42 @@ const requireTableTeardownRawSqlExclude = JSON.parse(
     "utf8",
   ),
 );
+// AR test files exempt from require-canonical-rebuild, in two groups.
+// `memoryScoped` files own a private `:memory:` adapter — they never touch the
+// shared per-worker database, so a canonical table they drop cannot drift it,
+// and the exemption is permanent. `backlog` files do drop a canonical table on
+// the shared database and leave it dropped; ratchet that array to zero (story
+// burn-down-canonical-rebuild-exclude). See eslint/require-canonical-rebuild.mjs.
+/** @type {{ memoryScoped: string[], backlog: string[] }} */
+const requireCanonicalRebuildExclude = JSON.parse(
+  readFileSync(new URL("./eslint/require-canonical-rebuild-exclude.json", import.meta.url), "utf8"),
+);
+
+/**
+ * The canonical table names — the top-level keys of `TEST_SCHEMA` in
+ * test-helpers/test-schema.ts, which the lint rule needs but cannot import
+ * (it is TypeScript). Read from the source so the list can never drift: the
+ * object's table keys are the only ones at two-space indent, column keys
+ * nesting one level deeper. A parse that comes back near-empty would silently
+ * disable the rule, so it fails loudly instead.
+ */
+function canonicalTableNames() {
+  const source = readFileSync(
+    new URL("./packages/activerecord/src/test-helpers/test-schema.ts", import.meta.url),
+    "utf8",
+  );
+  const declaration = source.slice(source.indexOf("export const TEST_SCHEMA"));
+  const body = declaration.slice(0, declaration.indexOf("\n};"));
+  const names = [...body.matchAll(/^ {2}"?([\w.]+)"?: [{[]/gm)].map((m) => m[1]);
+  if (names.length < 100) {
+    throw new Error(
+      `canonicalTableNames(): parsed only ${names.length} tables from test-schema.ts — the TEST_SCHEMA layout changed and require-canonical-rebuild would silently stop guarding.`,
+    );
+  }
+  return names;
+}
+/** @type {string[]} */
+const canonicalTables = canonicalTableNames();
 
 export default defineConfig(
   {
@@ -159,6 +196,7 @@ export default defineConfig(
           "expected-fixtures": expectedFixtures,
           "test-fixture-parity": testFixtureParity,
           "require-table-teardown": requireTableTeardown,
+          "require-canonical-rebuild": requireCanonicalRebuild,
           "no-raw-sql": noRawSql,
           "no-standalone-associations": noStandaloneAssociations,
           "no-internal-canonical-loaders": noInternalCanonicalLoaders,
@@ -407,6 +445,24 @@ export default defineConfig(
         },
       ]
     : []),
+
+  // ── require-canonical-rebuild: a test file that drops a canonical table
+  //    (a TEST_SCHEMA key) must restore it in the same file, via
+  //    rebuildCanonicalTables()/loadCanonicalSchema(). A canonical table left
+  //    dropped drifts the shared per-worker database for the next file.
+  //    test-helpers/** is exempt — the canonical loaders are its subject under
+  //    test. See eslint/require-canonical-rebuild.mjs. ──
+  {
+    files: ["packages/activerecord/src/**/*.test.ts"],
+    ignores: [
+      "packages/activerecord/src/test-helpers/**",
+      ...requireCanonicalRebuildExclude.memoryScoped,
+      ...requireCanonicalRebuildExclude.backlog,
+    ],
+    rules: {
+      "blazetrails/require-canonical-rebuild": ["error", { canonicalTables }],
+    },
+  },
 
   // ── no-raw-sql: ban raw SQL strings passed to execution sinks (and the
   //    RFC-0022 `sql.replace`/`sql.concat` string-surgery pattern) outside the
