@@ -449,10 +449,17 @@ export class PredicateBuilder {
     });
     // Single-column degenerate case: a single `IN (...)` predicate is
     // more compact than `c=v1 OR c=v2 OR ...` and typically optimizes
-    // identically (or better) on indexed columns.
+    // identically (or better) on indexed columns. Routing the values
+    // through the resolved column's `build` (→ ArrayHandler,
+    // array_handler.rb:13) is what makes them binds cast by that column's
+    // type; a bare `attribute.in(values)` wraps them in `Nodes::Casted`
+    // and inlines them untyped.
     if (cols.length === 1) {
-      const values = validTuples.map((t) => t[0]);
-      return resolved[0].attribute.in(values);
+      const { attribute, builder } = resolved[0];
+      return builder.build(
+        attribute,
+        validTuples.map((t) => t[0]),
+      );
     }
     // Build equalities through `buildBindAttribute` so each value
     // becomes a `QueryAttribute` (= bind param) rather than an

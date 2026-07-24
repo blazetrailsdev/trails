@@ -160,6 +160,19 @@ describe("Relation#where — composite-key form", () => {
     expect(node.left.name).toBe("post_id");
   });
 
+  it("single-column composite values flow through the column type as binds, not inlined literals", () => {
+    // Regression: the single-column branch used `attribute.in(rawValues)`,
+    // which inlines untyped `Casted` literals — so a string "2" for an
+    // integer column stayed a string and never became a bind (breaking
+    // compileWithBinds / prepared-statement caching).
+    const rel = (Post as any).all();
+    const node: any = rel.predicateBuilder.buildComposite(["comments.post_id"], [["1"], ["2"]]);
+    expect(node.constructor.name).toBe("HomogeneousIn");
+    expect(node.castedValues).toEqual([1, 2]);
+    const sql = (Post as any).all().where(node).toSql();
+    expect(sql).toMatch(/IN \(1,\s*2\)/);
+  });
+
   it("qualified composite cols match rows through a join", async () => {
     const post: any = await (Post as any).create({ title: "joined", body: "b", author_id: 1 });
     const other: any = await (Post as any).create({ title: "unjoined", body: "b", author_id: 1 });
@@ -176,8 +189,10 @@ describe("Relation#where — composite-key form", () => {
   it("single-column composite uses IN(...) (not OR-chain) for compactness", () => {
     const rel = (CpkBook as any).all();
     const node = rel.predicateBuilder.buildComposite(["author_id"], [[1], [2], [3]]);
-    // The Arel In node renders as `author_id IN (1, 2, 3)`; OR-chain
-    // would render as `author_id = 1 OR author_id = 2 OR author_id = 3`.
+    // The HomogeneousIn node renders as `author_id IN (?, ?, ?)`, which
+    // `toSql` substitutes to `IN (1, 2, 3)`; an OR-chain would render as
+    // `author_id = 1 OR author_id = 2 OR author_id = 3`.
+    expect(node.constructor.name).toBe("HomogeneousIn");
     const sql = (CpkBook as any).all().where(node).toSql();
     expect(sql).toMatch(/IN \(1,\s*2,\s*3\)/);
     expect(sql).not.toMatch(/OR/);
