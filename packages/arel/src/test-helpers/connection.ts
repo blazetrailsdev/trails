@@ -95,9 +95,9 @@ export const fakeRecordConnection: ArelConnection = {
   // connection-less quoter RFC 0007 is deleting and (b) silently emit adapter
   // renderings (`TRUE`) from a double whose entire purpose is to emit `'t'`.
   // Verified unreachable, not merely unused: the ToSql visitor calls none of them
-  // (they appear nowhere in visitors/to-sql.ts), and `unquotedTrue`/`unquotedFalse`
-  // are reached only via quoteArrayLiteral (quote-array.ts:86), which only the PG
-  // quoter's own `quote` override calls — an override this double replaces.
+  // (they appear nowhere in visitors/to-sql.ts), and nothing on the Arel side calls
+  // `unquotedTrue`/`unquotedFalse` at all — Rails reaches them from the adapter's
+  // `type_cast`, which is where trails' only caller lives too.
   quoteString: unreachableOnFakeRecord("quoteString"),
   quotedBinary: unreachableOnFakeRecord("quotedBinary"),
   quotedTrue: unreachableOnFakeRecord("quotedTrue"),

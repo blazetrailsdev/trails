@@ -12,14 +12,6 @@ export { TreeManager };
 export type { ArelEngine } from "./nodes/node.js";
 export { ArelError, EmptyJoinError, BindError } from "./errors.js";
 export { relationName } from "./attributes/attribute.js";
-// Deliberate: no Arel counterpart in Rails — ruby-pg owns this encoder, and
-// activerecord's OID::Array shares it from here so the two renderings of a PG
-// array literal cannot drift. api:compare extracts per-file declarations, not
-// index re-exports, so this line adds no symbol to its view (verified
-// cold-cache both ways). The alternative, a subpath import, would have to spell
-// the build layout — @blazetrails/arel has no `exports` map, so under
-// moduleResolution Node16 it resolves as `@blazetrails/arel/dist/...`.
-export { encodeArrayElement } from "./quote-array.js";
 
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { registerNodeDeps } from "./nodes/node.js";
