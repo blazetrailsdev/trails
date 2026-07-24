@@ -7,10 +7,12 @@
 // retry pulls, re-applies the edit, and pushes again; if it fails a
 // second time the caller is told to pick another story.
 //
-// Read paths consume $TASKS_DIR/index.json, a gitignored cache rebuilt on
-// demand: if the file is missing or any story `.md` is newer than
-// index.json, this script invokes the tasks-side build-index.mjs to
-// regenerate it.
+// Read paths serve an index built from the **origin/main tree** (fetch +
+// `git archive` into a temp dir + build-index there, cached by commit sha under
+// the git common dir). They never touch the working tree and take no lock. The
+// working-tree index — $TASKS_DIR/index.json, a gitignored cache rebuilt on
+// demand when missing or older than any story `.md` — still backs mutations and
+// the offline read fallback.
 //
 // Implementation note: RFC 0001 originally specified SQLite for the
 // index. JSON was sufficient for the current scale and avoids a binary
@@ -23,8 +25,10 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
   statSync,
+  symlinkSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -147,6 +151,144 @@ export function loadIndex(): Index {
     });
   }
   return JSON.parse(readFileSync(indexPath, "utf8")) as Index;
+}
+
+// ──────────────────── read path (origin/main tree) ────────────────────
+
+// Reads used to hard-reset the shared canonical checkout to origin/main under
+// the tasks-CLI lock, so every `ready`/`list` contended with live mutations
+// (20s wait, then a stale index and a "lock is busy" warning) and every read
+// mutated a working tree other agents were writing in. Nothing about serving a
+// fresh index requires the working tree: the index is derived purely from the
+// tree of the origin/main commit. Export that tree to a temp dir, build the
+// index there, and cache the result by commit sha under the git *common dir*
+// (never the working tree, so it can't dirty `git status` and no lock is
+// needed). The shared cache means the export runs once per new origin/main
+// commit across all agents; every other read is a fetch + a JSON parse.
+const READ_INDEX_CACHE_DIRNAME = "trails-tasks-read-index";
+
+// Sha the currently-served read index came from, or null when it came from the
+// working tree. `show` renders a story body, which must be read from the same
+// source as the index that pointed at it.
+let readIndexOriginSha: string | null = null;
+
+// Keep only the entry we just wrote: older shas are superseded the moment
+// origin/main moves, and this dir lives inside the shared .git.
+function pruneReadIndexCache(cacheDir: string, keep: string): void {
+  let names: string[];
+  try {
+    names = readdirSync(cacheDir);
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    if (name === keep) continue;
+    try {
+      unlinkSync(join(cacheDir, name));
+    } catch {
+      /* concurrent prune by another agent — nothing to do */
+    }
+  }
+}
+
+// Build (or serve from cache) the index for origin/main without touching the
+// working tree. Returns null when anything in the pipeline is unavailable —
+// offline, no origin/main, no `tar` — so the caller can fall back.
+export function buildIndexFromOriginMain(cwd?: string): { index: Index; sha: string } | null {
+  let sha: string;
+  let gitDir: string;
+  try {
+    git(["fetch", "--quiet", "origin", "main"], { silent: true, cwd });
+    sha = git(["rev-parse", "origin/main"], { silent: true, cwd });
+    // The COMMON dir, not `--absolute-git-dir`: per-worktree tasks checkouts
+    // each have their own git dir but share the common one, so the sha-keyed
+    // cache is built once for all of them.
+    gitDir = git(["rev-parse", "--path-format=absolute", "--git-common-dir"], {
+      silent: true,
+      cwd,
+    });
+  } catch {
+    return null;
+  }
+  if (!/^[0-9a-f]{40}$/.test(sha) || !gitDir) return null;
+  const cacheDir = join(gitDir, READ_INDEX_CACHE_DIRNAME);
+  const cached = join(cacheDir, `${sha}.json`);
+  if (existsSync(cached)) {
+    try {
+      return { index: JSON.parse(readFileSync(cached, "utf8")) as Index, sha };
+    } catch {
+      /* truncated by a crashed writer — rebuild below */
+    }
+  }
+  const scratch = mkdtempSync(join(tmpdir(), "trails-tasks-tree-"));
+  try {
+    const tarPath = join(scratch, "tree.tar");
+    const treeDir = join(scratch, "tree");
+    mkdirSync(treeDir, { recursive: true });
+    git(["archive", "--format=tar", "-o", tarPath, sha], { silent: true, cwd });
+    execFileSync("tar", ["-xf", tarPath, "-C", treeDir], { stdio: "ignore" });
+    // build-index.mjs imports js-yaml. The exported tree has no node_modules
+    // (they're not tracked), and ESM resolution walks up from the *script's*
+    // directory, so borrow the checkout's installed deps.
+    try {
+      symlinkSync(join(cwd ?? TASKS_DIR, "node_modules"), join(treeDir, "node_modules"));
+    } catch {
+      /* no install to borrow — build-index below fails and we fall back */
+    }
+    // Same `process.execPath` reasoning as loadIndex(). stdio "ignore": this is
+    // a read command, and build-index's progress chatter isn't its output.
+    execFileSync(process.execPath, ["scripts/build-index.mjs"], {
+      cwd: treeDir,
+      stdio: "ignore",
+    });
+    const built = readFileSync(join(treeDir, "index.json"), "utf8");
+    const index = JSON.parse(built) as Index;
+    try {
+      mkdirSync(cacheDir, { recursive: true });
+      // Write-then-rename: concurrent agents must never observe a half-written
+      // cache entry for a sha they'd then parse.
+      const staging = join(cacheDir, `${sha}.${Date.now()}.staging`);
+      writeFileSync(staging, built);
+      renameSync(staging, cached);
+      pruneReadIndexCache(cacheDir, `${sha}.json`);
+    } catch {
+      /* cache is an optimization — serving the built index still works */
+    }
+    return { index, sha };
+  } catch {
+    return null;
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
+// The read commands' index source. Prefers the origin/main tree (no lock, no
+// `reset --hard`); falls back to the old locked working-tree sync only when the
+// tree export is unavailable, so an offline agent still gets its index.
+export function loadIndexForRead(): Index {
+  readIndexOriginSha = null;
+  if (!TASKS_DIR_IS_SYMLINK) return loadIndex();
+  const fromOrigin = buildIndexFromOriginMain();
+  if (fromOrigin) {
+    readIndexOriginSha = fromOrigin.sha;
+    return fromOrigin.index;
+  }
+  syncFromOrigin();
+  return loadIndex();
+}
+
+// Read a story/RFC body from whichever source served the current read index.
+// Returns null when the path doesn't exist there.
+function readIndexedFile(filePath: string): string | null {
+  if (readIndexOriginSha) {
+    try {
+      return git(["show", `${readIndexOriginSha}:${filePath}`], { silent: true });
+    } catch {
+      return null;
+    }
+  }
+  const file = join(TASKS_DIR, filePath);
+  return existsSync(file) ? readFileSync(file, "utf8") : null;
 }
 
 export function isIndexStale(indexPath: string, tasksDir: string = TASKS_DIR): boolean {
@@ -455,11 +597,12 @@ function assertCleanWorktree(cwd: string | undefined): void {
   process.exit(1);
 }
 
-// Fetch + hard-reset the per-worktree tasks checkout to origin/main before
-// read commands. Keeps `ready`/`next-bundle`/`list`/`status` from serving
-// a stale index when the checkout hasn't been updated since spawn. Only
-// runs when using the per-worktree symlink (TASKS_DIR_IS_SYMLINK); the
-// canonical fallback and explicit $TASKS_DIR overrides are left alone.
+// Fetch + hard-reset the per-worktree tasks checkout to origin/main. This is
+// now only the FALLBACK freshness path for reads: loadIndexForRead() builds the
+// index straight from the origin/main tree and only lands here when that is
+// unavailable (offline, no `tar`). Only runs when using the per-worktree
+// symlink (TASKS_DIR_IS_SYMLINK); the canonical fallback and explicit
+// $TASKS_DIR overrides are left alone.
 function syncFromOrigin(): void {
   if (!TASKS_DIR_IS_SYMLINK) return;
   syncWorktreeToOrigin();
@@ -949,8 +1092,12 @@ export function commitAndPush(opts: {
     // we're about to make. Both callers of this path expect HEAD to be even
     // with origin/main *before* the mutation commit:
     //   - story flips on the shared canonical checkout (resolved via a
-    //     per-worktree `<cwd>/tasks` symlink): syncFromOrigin hard-resets it to
-    //     origin/main, so it sits exactly at origin/main.
+    //     per-worktree `<cwd>/tasks` symlink): the mutation loop's leading
+    //     `git pull --rebase` brings it up to origin/main before the mutation
+    //     commit, so HEAD sits at origin/main. (Reads no longer reset it there
+    //     — they build their index from the origin/main tree instead — but a
+    //     checkout that is merely BEHIND is 0 commits ahead, so this guard is
+    //     unaffected.)
     //   - `refine` in an agent's tasks worktree: the agent leaves *working-tree*
     //     edits (re-applied by the mutator), never commits, so its branch HEAD
     //     is still at origin/main.
@@ -2757,14 +2904,14 @@ function showStory(index: Index, id: string): void {
     console.error(`error: story "${id}" not found in index`);
     process.exit(1);
   }
-  const file = join(TASKS_DIR, entry.file_path);
-  if (!existsSync(file)) {
-    // Index is ahead of disk (e.g. a deleted story still in a stale index).
-    // Surface it cleanly rather than letting readFileSync throw a raw ENOENT.
+  const body = readIndexedFile(entry.file_path);
+  if (body === null) {
+    // Index is ahead of its source (e.g. a deleted story still in a stale
+    // index). Surface it cleanly rather than throwing a raw ENOENT.
     console.error(`error: story "${id}" is indexed at ${entry.file_path} but the file is missing`);
     process.exit(1);
   }
-  console.log(renderStoryView(entry.file_path, readFileSync(file, "utf8")));
+  console.log(renderStoryView(entry.file_path, body));
 }
 
 function statusCounts(index: Index, thresholdHours: number): void {
@@ -2875,17 +3022,15 @@ function main(): void {
 
   switch (cmd) {
     case "ready": {
-      syncFromOrigin();
-      const rows = ready(loadIndex(), { rfc: stringFlag(flags, "rfc") });
+      const rows = ready(loadIndexForRead(), { rfc: stringFlag(flags, "rfc") });
       flags.json ? console.log(JSON.stringify(rows, null, 2)) : fmt(rows);
       break;
     }
     case "next-bundle": {
-      syncFromOrigin();
       const maxLocRaw = stringFlag(flags, "max-loc") ?? "250";
       if (!/^\d+$/.test(maxLocRaw) || Number(maxLocRaw) <= 0) usage();
       const maxLoc = Number(maxLocRaw);
-      const rows = nextBundle(loadIndex(), {
+      const rows = nextBundle(loadIndexForRead(), {
         maxLoc,
         cluster: stringFlag(flags, "cluster"),
         rfc: stringFlag(flags, "rfc"),
@@ -2904,8 +3049,7 @@ function main(): void {
       break;
     }
     case "list": {
-      syncFromOrigin();
-      const idx = loadIndex();
+      const idx = loadIndexForRead();
       const rows = listFiltered(idx, {
         rfc: stringFlag(flags, "rfc"),
         status: stringFlag(flags, "status"),
@@ -2922,13 +3066,11 @@ function main(): void {
     case "show": {
       const id = pos[0];
       if (!id) usage();
-      syncFromOrigin();
-      showStory(loadIndex(), id);
+      showStory(loadIndexForRead(), id);
       break;
     }
     case "status":
-      syncFromOrigin();
-      statusCounts(loadIndex(), numberFlag(flags, "stale-hours") ?? DEFAULT_STALE_HOURS);
+      statusCounts(loadIndexForRead(), numberFlag(flags, "stale-hours") ?? DEFAULT_STALE_HOURS);
       break;
     case "claim": {
       const id = pos[0];

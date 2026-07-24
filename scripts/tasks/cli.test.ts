@@ -86,6 +86,7 @@ import {
   TASKS_DIR,
   dirtyWorktreeLines,
   syncWorktreeToOrigin,
+  buildIndexFromOriginMain,
   claimAgeHours,
   isStaleClaim,
   staleClaims,
@@ -3338,6 +3339,72 @@ describe("dirtyWorktreeLines", () => {
 
   it("treats an empty porcelain as clean", () => {
     expect(dirtyWorktreeLines("")).toEqual([]);
+  });
+});
+
+describe("buildIndexFromOriginMain (read path serves the origin/main tree)", () => {
+  const SHA = "a".repeat(40);
+  const emptyIndex = { generated_at: "2026-01-01", rfcs: [], stories: [] };
+
+  function setup(opts: { onFetch?: () => void } = {}) {
+    const gitDir = mkdtempSync(join(tmpdir(), "trails-read-index-"));
+    const seen: string[] = [];
+    execFileSyncMock.mockImplementation(((file: string, args: string[], o: { cwd?: string }) => {
+      if (file === "git") {
+        const label = args[2];
+        seen.push(label);
+        if (label === "fetch") opts.onFetch?.();
+        if (label === "rev-parse") return (args[3] === "origin/main" ? SHA : gitDir) as never;
+        return "" as never;
+      }
+      seen.push(file === "tar" ? "tar" : "build-index");
+      // Stand in for build-index.mjs: it writes index.json into the exported tree.
+      if (file !== "tar" && o?.cwd)
+        writeFileSync(join(o.cwd, "index.json"), JSON.stringify(emptyIndex));
+      return "" as never;
+    }) as never);
+    return { gitDir, seen };
+  }
+
+  it("never resets the working tree", () => {
+    const { seen } = setup();
+    buildIndexFromOriginMain();
+    expect(seen).not.toContain("reset");
+    expect(seen).not.toContain("status");
+  });
+
+  it("serves a cached index for the current origin/main sha without re-exporting", () => {
+    const { gitDir, seen } = setup();
+    const cacheDir = join(gitDir, "trails-tasks-read-index");
+    mkdirSync(cacheDir, { recursive: true });
+    const cached = { ...emptyIndex, generated_at: "cached" };
+    writeFileSync(join(cacheDir, `${SHA}.json`), JSON.stringify(cached));
+    const got = buildIndexFromOriginMain();
+    expect(got?.sha).toBe(SHA);
+    expect(got?.index.generated_at).toBe("cached");
+    expect(seen).toEqual(["fetch", "rev-parse", "rev-parse"]);
+  });
+
+  it("exports the tree, builds the index there, and caches it by sha", () => {
+    const { gitDir, seen } = setup();
+    const stale = join(gitDir, "trails-tasks-read-index", `${"b".repeat(40)}.json`);
+    mkdirSync(join(gitDir, "trails-tasks-read-index"), { recursive: true });
+    writeFileSync(stale, "{}");
+    const got = buildIndexFromOriginMain();
+    expect(got?.index.generated_at).toBe("2026-01-01");
+    expect(seen).toEqual(["fetch", "rev-parse", "rev-parse", "archive", "tar", "build-index"]);
+    // Cached for the next reader, and the superseded sha is pruned.
+    expect(existsSync(join(gitDir, "trails-tasks-read-index", `${SHA}.json`))).toBe(true);
+    expect(existsSync(stale)).toBe(false);
+  });
+
+  it("returns null when the fetch fails so the caller can fall back", () => {
+    setup({
+      onFetch: () => {
+        throw new Error("offline");
+      },
+    });
+    expect(buildIndexFromOriginMain()).toBeNull();
   });
 });
 
