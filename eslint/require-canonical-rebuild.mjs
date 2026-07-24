@@ -45,10 +45,11 @@
  * two permanently-exempt groups: `privateAdapter` files own their own adapter
  * (a `:memory:` database, or a throwaway file under a per-test tmpdir), so a
  * canonical table they drop cannot drift the shared per-worker database;
- * `nonExecuting` files name a canonical table in a drop that never reaches a
- * database — SQL captured for assertion, or a hand-rolled fake adapter.
- * Neither is backlog: a file that really leaves a canonical table dropped is
- * fixed, not listed.
+ * `nonExecuting` files have no database at all — a hand-rolled fake adapter
+ * records the DDL instead of running it. Neither is backlog: a file that
+ * really leaves a canonical table dropped is fixed, not listed, and a file
+ * that only sometimes skips execution (captureSql's stub mode) takes a
+ * line-scoped disable at the drop rather than a whole-file exemption.
  */
 
 import { calledName, staticString, rawDropNames, SQL_SINKS } from "./require-table-teardown.mjs";

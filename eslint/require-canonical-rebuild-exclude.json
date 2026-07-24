@@ -17,7 +17,6 @@
     "packages/activerecord/src/transactions.trails.test.ts"
   ],
   "nonExecuting": [
-    "packages/activerecord/src/adapters/abstract-mysql-adapter/active-schema.test.ts",
     "packages/activerecord/src/connection-adapters/postgresql/schema-statements-class.test.ts"
   ]
 }
