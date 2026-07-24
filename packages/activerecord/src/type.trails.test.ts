@@ -117,11 +117,6 @@ describe("Type.lookup under a non-sqlite configuration", () => {
   });
 });
 
-// The wiring the #5181 review asked for: `attribute()` on an AR model must go
-// through ActiveRecord's resolve_type_name (attributes.rb:296-298), so the
-// declaring model's adapter selects the registration. Before Base.resolveTypeName
-// was wired this resolved against ActiveModel's adapter-blind typeRegistry and
-// every model got the generic string type.
 describe("attribute() resolves through the declaring model's adapter", () => {
   const originalConnectionDbConfig = (Base as unknown as { connectionDbConfig: unknown })
     .connectionDbConfig;

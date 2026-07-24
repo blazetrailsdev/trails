@@ -42,17 +42,10 @@ import { TimestampWithTimeZone } from "./oid/timestamp-with-time-zone.js";
 import { Uuid } from "./oid/uuid.js";
 import { Xml } from "./oid/xml.js";
 
-// Mirrors: postgresql_adapter.rb:1168-1185, which registers these under
-// `adapter: :postgresql`. These live in ActiveRecord's registry (not
-// ActiveModel's) now that AR models resolve `attribute` names through
-// ActiveRecord::Type.
-//
-// Deviation: registered for all adapters rather than `adapter: "postgres"`.
-// Several PG-only tests declare `attribute(..., "interval" | "uuid")` on models
-// carrying a per-model adapter, where `connectionDbConfig()` raises
-// ConnectionNotEstablished and `Type.adapterNameFrom` degrades to "sqlite" — an
-// adapter-scoped registration would turn those into "Unknown type". Narrowing
-// these to :postgresql is tracked separately.
+// Mirrors: postgresql_adapter.rb:1168-1185. Deviation: registered for all
+// adapters, not `adapter: :postgresql` — PG-only tests declare these on models
+// whose connectionDbConfig() raises, so adapterNameFrom degrades to "sqlite"
+// and a scoped registration would read as Unknown type. Tracked separately.
 ArType.register("bit", Bit, { override: false });
 ArType.register("bit_varying", BitVarying, { override: false });
 ArType.register("cidr", Cidr, { override: false });

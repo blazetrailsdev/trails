@@ -101,44 +101,13 @@ export interface AttributeOptions {
   limit?: number | null;
 }
 
-/**
- * Rails: `type = resolve_type_name(type, **options)` — `default:` is peeled off
- * by the keyword signature, so only the remaining options reach the registry.
- * `virtual` / `userProvidedDefault` are trails-side declaration flags with no
- * Rails counterpart, so they are peeled off here too rather than leaking into a
- * type constructor.
- */
-function resolveType(
-  host: { resolveTypeName?(name: string, options?: Record<string, unknown>): Type },
-  name: string,
-  options?: AttributeOptions,
-): Type {
-  if (!host.resolveTypeName) return typeRegistry.lookup(name);
-  const {
-    default: _default,
-    virtual: _virtual,
-    userProvidedDefault: _userProvidedDefault,
-    ...typeOptions
-  } = options ?? {};
-  return host.resolveTypeName(
-    name,
-    Object.keys(typeOptions).length > 0 ? (typeOptions as Record<string, unknown>) : undefined,
-  );
-}
-
 /** @internal */
 export function attribute(
   this: {
     _attributeDefinitions: Map<string, AttributeDefinition>;
     prototype: object;
     _cachedDefaultAttributes?: AttributeSet | null;
-    // Mirrors Rails' `resolve_type_name(type, **options)` call in
-    // AttributeRegistration::ClassMethods#attribute. ActiveRecord overrides it
-    // to resolve through the adapter-specific registry, so the declaring class
-    // — not this module — decides which registry a symbolic name resolves in.
-    // Optional so bare attribute hosts that don't mix in AttributeRegistration
-    // still work; they fall back to the ActiveModel registry.
-    resolveTypeName?(name: string, options?: Record<string, unknown>): Type;
+    resolveTypeName(name: string, options?: Record<string, unknown>): Type;
   },
   name: string,
   // Mirrors Rails' `attribute(name, type = nil, **options)`: the type is
@@ -167,7 +136,7 @@ export function attribute(
   const type = typeProvided
     ? typeName instanceof Type
       ? typeName
-      : resolveType(this, typeName as string, options)
+      : this.resolveTypeName(typeName as string, typeOptions(options))
     : (existing?.type ?? typeRegistry.lookup("value"));
   // Preserve the existing defaultValue when no default is explicitly provided,
   // matching Rails' PendingType behavior: with_type only changes the type and
@@ -242,6 +211,28 @@ export function attribute(
 }
 
 /**
+ * Mirrors: ActiveModel::Attributes::ClassMethods#define_method_attribute=
+ *
+ * In Rails this generates a `canonical_name=` writer via code evaluation.
+ * Trails installs writers via Object.defineProperty in `attribute()`, so no
+ * code generation is required here. The method exists for API-compare parity
+ * and to expose the AttrNames accessor-method computation that Rails uses
+ * to derive the writer method name.
+ *
+ * @internal Rails-private helper.
+ */
+export function defineMethodAttribute(
+  canonicalName: string,
+  _options?: { owner?: unknown; as?: string },
+): void {
+  // Writers are already installed by attribute() via Object.defineProperty.
+  // Compute and expose the method name the same way Rails would, for callers
+  // that inspect the name (e.g. alias generation paths).
+  const { methodName } = AttrNames.defineAttributeAccessorMethod(canonicalName, true);
+  void methodName;
+}
+
+/**
  * Concrete mixin host for `ActiveModel::Attributes`. Rails ships
  * `Attributes` as a module included into a model; in TS this class is
  * the canonical instance-side surface. `Model` composes the same
@@ -294,26 +285,14 @@ export class Attributes {
   }
 }
 
-/**
- * Mirrors: ActiveModel::Attributes::ClassMethods#define_method_attribute=
- *
- * In Rails this generates a `canonical_name=` writer via code evaluation.
- * Trails installs writers via Object.defineProperty in `attribute()`, so no
- * code generation is required here. The method exists for API-compare parity
- * and to expose the AttrNames accessor-method computation that Rails uses
- * to derive the writer method name.
- *
- * @internal Rails-private helper.
- */
-export function defineMethodAttribute(
-  canonicalName: string,
-  _options?: { owner?: unknown; as?: string },
-): void {
-  // Writers are already installed by attribute() via Object.defineProperty.
-  // Compute and expose the method name the same way Rails would, for callers
-  // that inspect the name (e.g. alias generation paths).
-  const { methodName } = AttrNames.defineAttributeAccessorMethod(canonicalName, true);
-  void methodName;
+function typeOptions(options?: AttributeOptions): Record<string, unknown> | undefined {
+  const {
+    default: _default,
+    virtual: _virtual,
+    userProvidedDefault: _userProvidedDefault,
+    ...rest
+  } = options ?? {};
+  return Object.keys(rest).length > 0 ? (rest as Record<string, unknown>) : undefined;
 }
 
 // ---------------------------------------------------------------------------

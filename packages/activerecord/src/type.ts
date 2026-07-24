@@ -77,10 +77,6 @@ _registry.register("json", Json, { override: false });
 _registry.register("string", StringType, { override: false });
 _registry.register("text", Text, { override: false });
 _registry.register("time", Time, { override: false });
-// Not in Rails' list: ActiveModel::Type::Registry registers :value and
-// ActiveRecord::Type inherits nothing from it, so without this every
-// `attribute :x, :value` declaration would raise "Unknown type :value" once AR
-// models resolve through this registry.
 _registry.register("value", ValueType, { override: false });
 
 /** Mirrors Rails' `ActiveRecord::Type.registry` (attr_accessor getter). */

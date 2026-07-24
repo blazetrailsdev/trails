@@ -1592,6 +1592,7 @@ export class Base extends Model {
   declare static initializeGeneratedModules: typeof _initializeGeneratedModules;
   declare static _generatedAttributeMethods?: GeneratedAttributeMethods;
   declare static _defaultAttributes: typeof _arDefaultAttributes;
+  /** @internal */
   declare static resolveTypeName: typeof _resolveTypeName;
 
   // Mirrors: ActiveRecord::ModelSchema::ClassMethods
@@ -4834,8 +4835,6 @@ extend(Base, {
   initializeGeneratedModules: _initializeGeneratedModules,
   generateAliasAttributes: _generateAliasAttributes,
   _defaultAttributes: _arDefaultAttributes,
-  // Overrides ActiveModel's registry-blind resolve_type_name so `attribute`
-  // declarations resolve against the declaring model's adapter.
   resolveTypeName: _resolveTypeName,
 });
 // AttributeMethods class method — gates association/attribute names that would
