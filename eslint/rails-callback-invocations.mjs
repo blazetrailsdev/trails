@@ -136,8 +136,7 @@ const rule = {
 
     const check = (fnNode, name, reportNode) => {
       if (!name) return;
-      // File-qualified entry first; bare-name is a back-compat fallback.
-      const required = manifest[`${rel}#${name}`] ?? manifest[name];
+      const required = manifest[`${rel}#${name}`];
       if (!required || required.length === 0) return;
       if (exclude.has(`${rel}#${name}`)) return;
       const fired = eventsFired(fnNode, sourceCode);
