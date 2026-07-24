@@ -16,6 +16,7 @@ import * as ts from "typescript";
 import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
 import { OUTPUT_DIR, packageSrcDir } from "./config.js";
 import { rubyFileToTs, rubyMethodToTs } from "./conventions.js";
+import { JS_ENUMERABLE_ALIASES } from "./enumerable-idioms.js";
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -236,32 +237,24 @@ const SKIP_CALLS = new Set([
   "yield",
   "require",
   "require_relative",
-  // Collection / Enumerable
+  // Collection / Enumerable. The differently-named-JS-analogue idioms
+  // (any?/select/include?/…) come from the shared JS_ENUMERABLE_ALIASES table
+  // (RFC 0025) so this noise list and compare.ts's wide call ratchet can't
+  // drift; the same-named or analogue-less idioms below stay as literals.
+  ...JS_ENUMERABLE_ALIASES.keys(),
   "map",
-  "each",
-  "select",
-  "reject",
   "flat_map",
   "compact",
   "flatten",
   "reduce",
-  "inject",
-  "detect",
   "find",
-  "collect",
   "filter_map",
-  "any?",
-  "all?",
-  "none?",
   "empty?",
   "size",
   "length",
   "count",
   "first",
   "last",
-  "include?",
-  "key?",
-  "has_key?",
   "keys",
   "fetch",
   "merge",

@@ -89,6 +89,7 @@ import {
   displayLiteral,
 } from "./literals.js";
 import { isSourceUnported } from "./unported-files.js";
+import { JS_ENUMERABLE_ALIASES, jsEnumerableAliases } from "./enumerable-idioms.js";
 
 // Fidelity-critical Ruby calls for the advisory calls-parity check. Omitting
 // one of these from a ported body is almost always a real bug (callback /
@@ -150,48 +151,11 @@ const WIDE_SIGNIFICANT_CALLS: { has(value: string): boolean } = {
   has: (value) => value !== "super",
 };
 
-// Ruby Enumerable/Comparable calls whose faithful port is a native JS method
-// with a DIFFERENT name. `rubyMethodToTs` is a pure naming-convention mapper, so
-// it turns `any?` into ["isAny", "any"] and never into `some` — the wide gate
-// (which admits every call name) then flags
-// `_connections.some((c) => c.isConnected())` as failing to call `any?`, even
-// though it is the exact analogue. These aliases are consulted ONLY when
-// deciding whether the TS body already makes the call; they never widen which
-// Ruby calls are considered ported (see significantMissingCalls gate 2), so
-// adding one can never introduce a new mismatch.
-// Entries list ONLY the differently-named JS spelling: the convention name is
-// already a candidate, so `select → filter` needs just ["filter"]. Every alias
-// must be the whole call's analogue, not merely a plausible building block —
-// `min_by → reduce` would let any reduce anywhere silence a dropped min_by, so
-// such loose pairs are deliberately absent.
-export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
-  ["any?", ["some"]],
-  ["all?", ["every"]],
-  ["none?", ["some", "every"]],
-  ["one?", ["filter"]],
-  ["include?", ["includes", "has"]],
-  ["member?", ["includes", "has"]],
-  ["key?", ["has"]],
-  ["has_key?", ["has"]],
-  ["select", ["filter"]],
-  ["reject", ["filter"]],
-  ["detect", ["find"]],
-  ["collect", ["map"]],
-  ["collect_concat", ["flatMap"]],
-  ["each", ["forEach"]],
-  ["inject", ["reduce"]],
-  ["index", ["indexOf", "findIndex"]],
-  ["find_index", ["indexOf"]],
-  ["sort_by", ["sort"]],
-  // Ruby Array#concat mutates the receiver; the JS port is `push(...xs)`
-  // (Array#concat returns a new array, so it is NOT the analogue).
-  ["concat", ["push"]],
-]);
-
-/** JS-native call names that count as making Ruby call `rubyCall`. */
-export function jsEnumerableAliases(rubyCall: string): string[] {
-  return JS_ENUMERABLE_ALIASES.get(rubyCall) ?? [];
-}
+// The Ruby-Enumerable-idiom knowledge (differently-named JS analogues) lives in
+// one shared module so lint-calls.ts's noise list and this wide call ratchet
+// can't drift apart (RFC 0025). Re-exported so existing importers of these
+// names from compare.ts (compare.test.ts, the redundancy guard) keep working.
+export { JS_ENUMERABLE_ALIASES, jsEnumerableAliases };
 
 /**
  * Core of the advisory calls-parity check (pure, exported for tests). For a
