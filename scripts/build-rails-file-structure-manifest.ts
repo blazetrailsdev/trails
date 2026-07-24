@@ -106,16 +106,10 @@ const ORDER_ONLY_CANDIDATES: Record<string, string[]> = {
   "nil?": ["isNil", "nil"],
   hash: ["hash"],
   "eql?": ["isEql", "eql"],
-  // Ruby OPERATORS (`[]`, `==`, `<=>`, …) are NOT resolved here. Unlike the three
-  // universal predicates above — each with one canonical trails spelling — operator
-  // ports are class-specific and ambiguous, so a name-only global map is unsafe:
-  // `[]` ports to `get` in `Arel::Table` / `ActiveModel::Errors` /
-  // `LazyAttributeHash` but to `getAttribute` in `ActiveModel::AttributeSet`,
-  // where `get` is instead a non-Rails Map-compat helper (attribute_set.rb:16
-  // `[]` → `getAttribute` at attribute-set.ts:289; the `get` at :296 has no Rails
-  // counterpart). They are instead resolved PER-CLASS by `operatorSpelling`
-  // (operator-order-spelling.ts), keyed (fqn, operator)→spelling; an operator a
-  // class doesn't list there stays unmapped and sorts after the mapped block.
+  // Ruby OPERATORS (`[]`, `==`, `<=>`, …) are NOT resolved here: their TS
+  // spelling is class-specific (`[]`→`get` in `Arel::Table` but `getAttribute`
+  // in `ActiveModel::AttributeSet`), so they resolve PER-CLASS via
+  // `operatorSpelling` (operator-order-spelling.ts) instead of a name-only map.
 };
 
 // Append TS candidate names for a Ruby method onto `list`, deduping against
@@ -224,8 +218,7 @@ for (const [pkg, rubyPkg] of Object.entries<any>(railsApi.packages)) {
         const file = m.file ?? host.file;
         noteClass(file, className, host.fqn);
         const b = bucketFor(file, className);
-        // Instance operators (`[]`, `==`, …) resolve to a class-specific TS
-        // spelling keyed by the Ruby fqn; static methods have no operator ports.
+        // Operators are instance-only ports; resolve the class-specific spelling.
         const opCandidates = m.isStatic ? undefined : operatorSpelling(host.fqn, m.name);
         pushMethod(b.names, b.seen, m.name, m.isStatic, opCandidates);
       }
