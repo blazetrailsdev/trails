@@ -449,10 +449,21 @@ export class PredicateBuilder {
     });
     // Single-column degenerate case: a single `IN (...)` predicate is
     // more compact than `c=v1 OR c=v2 OR ...` and typically optimizes
-    // identically (or better) on indexed columns.
+    // identically (or better) on indexed columns. Route the value list
+    // through `build` (→ ArrayHandler, array_handler.rb:13) rather than
+    // `attribute.in(values)`: ArrayHandler builds `HomogeneousIn` (real
+    // binds, cast through the column's type) for multiple values and a
+    // bind Equality for one, whereas a bare `in` wraps the raw values in
+    // `Nodes::Casted` and inlines them untyped — the same problem the
+    // multi-column branch below avoids. Resolve through the *column's*
+    // builder so a qualified col (`comments.post_id`) casts against the
+    // joined table's type, not the base table's.
     if (cols.length === 1) {
-      const values = validTuples.map((t) => t[0]);
-      return resolved[0].attribute.in(values);
+      const { attribute, builder } = resolved[0];
+      return builder.build(
+        attribute,
+        validTuples.map((t) => t[0]),
+      );
     }
     // Build equalities through `buildBindAttribute` so each value
     // becomes a `QueryAttribute` (= bind param) rather than an
