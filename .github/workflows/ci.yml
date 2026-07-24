@@ -766,7 +766,19 @@ jobs:
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
       - run: pnpm vitest run packages/activerecord/
+        env:
+          # THROWAWAY (RFC drop-repair-worker-schema Phase 1): attribute every
+          # repairWorkerSchema firing to its triggering test file.
+          AR_REPAIR_COUNT_DIR: ${{ github.workspace }}/repair-counts
       - run: pnpm vitest run packages/activerecord-cli
+      - name: Upload repair counts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-counts-sqlite
+          path: repair-counts/
+          if-no-files-found: ignore
+          retention-days: 7
 
   # Reporting-only AR coverage (story ar-sqlite-lane-coverage-reporting, RFC
   # 0028). Runs the sqlite AR suite (the cheapest backend) with v8 coverage and
@@ -1017,6 +1029,8 @@ jobs:
           PGDATABASE: rails_js_test
           # AR_DB_FORKS deliberately unset: vitest.config.ts derives both the
           # worker count and the slot-DB pool from the runner's vCPU count.
+          # THROWAWAY (RFC drop-repair-worker-schema Phase 1).
+          AR_REPAIR_COUNT_DIR: ${{ github.workspace }}/repair-counts
       # CLI E2E is not sharded — run it once, on shard 1 only, to avoid a
       # redundant double-run across the two legs.
       # PG_TEST_URL is the activerecord-cli E2E's own input (it drives the CLI's
@@ -1026,6 +1040,14 @@ jobs:
         run: pnpm vitest run packages/activerecord-cli
         env:
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
+      - name: Upload repair counts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-counts-postgres-shard${{ matrix.shard }}
+          path: repair-counts/
+          if-no-files-found: ignore
+          retention-days: 7
 
   mysql-tests:
     name: Active Record MySQL Tests
@@ -1153,11 +1175,21 @@ jobs:
           MYSQL_DATABASE: rails_js_test
           # AR_DB_FORKS deliberately unset: vitest.config.ts derives both the
           # worker count and the slot-DB pool from the runner's vCPU count.
+          # THROWAWAY (RFC drop-repair-worker-schema Phase 1).
+          AR_REPAIR_COUNT_DIR: ${{ github.workspace }}/repair-counts
       # No MySQL connection env: no mysql-happy-path E2E exists yet. This run
       # covers the SQLite E2E until a mysql suite lands and can be wired up.
       # CLI E2E is not sharded — run it once, on shard 1 only.
       - if: ${{ matrix.shard == 1 }}
         run: pnpm vitest run packages/activerecord-cli
+      - name: Upload repair counts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-counts-maria-shard${{ matrix.shard }}
+          path: repair-counts/
+          if-no-files-found: ignore
+          retention-days: 7
 
   website:
     name: Website

@@ -29,6 +29,7 @@ import { generateSchemaFile } from "./test-helpers/schema-file-generator.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { Base } from "./base.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 // Registers _RelationCtor so Model.first()/.all()/.where() etc. work in
 // test files that import base.js directly rather than index.js (which
 // re-exports relation.js as a side effect).
@@ -74,6 +75,37 @@ if (process.env.AR_DISABLE_SCHEMA_REPAIR === undefined) {
   // Silence with AR_QUIET_SCHEMA_REPAIR once a table is known/tracked.
   if (repaired.length > 0 && process.env.AR_QUIET_SCHEMA_REPAIR === undefined) {
     console.warn(`[schema-repair] restored drifted canonical tables: ${repaired.join(", ")}`);
+  }
+  // THROWAWAY instrumentation (RFC drop-repair-worker-schema, Phase 1). When
+  // AR_REPAIR_COUNT_DIR is set, append one JSONL record per firing attributing
+  // the drift to the TRIGGERING test file (the file whose setup ran the repair),
+  // adapter, and repaired tables. A CI step uploads the dir; a local aggregator
+  // tallies by file/table/backend. DELETE this block with the capstone story.
+  if (repaired.length > 0 && process.env.AR_REPAIR_COUNT_DIR !== undefined) {
+    try {
+      const { getFs } = await import("@blazetrails/activesupport");
+      const fs = getFs();
+      const dir = process.env.AR_REPAIR_COUNT_DIR;
+      fs.mkdirSync(dir, { recursive: true });
+      // Attribute to the current test file: at setup-module eval vitest has
+      // already set the worker state's `filepath` to the file being started.
+      const w = (globalThis as { __vitest_worker__?: { filepath?: string } }).__vitest_worker__;
+      const rawFile = w?.filepath ?? null;
+      const file = rawFile ? rawFile.replace(/^.*\/packages\//, "packages/") : "(unknown)";
+      const workerId = process.env.VITEST_POOL_ID ?? process.env.VITEST_WORKER_ID ?? "1";
+      const record =
+        JSON.stringify({
+          file,
+          adapter,
+          tables: repaired,
+          worker: workerId,
+          pid: process.pid,
+          at: Temporal.Now.instant().toString(),
+        }) + "\n";
+      fs.appendFileSync(`${dir}/repair-${adapter}-w${workerId}-${process.pid}.jsonl`, record);
+    } catch {
+      // best-effort; never break a test run on instrumentation failure
+    }
   }
 }
 
