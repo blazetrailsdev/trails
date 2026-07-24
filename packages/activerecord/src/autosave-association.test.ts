@@ -32,7 +32,6 @@ import { Parrot as CanonicalParrot } from "./test-helpers/models/parrot.js";
 import { Bird as CanonicalBird } from "./test-helpers/models/bird.js";
 import { Eye, Iris, IrisWithReadOnlyForeignKey } from "./test-helpers/models/eye.js";
 import { Invoice } from "./test-helpers/models/invoice.js";
-import { Eye, Iris, IrisWithReadOnlyForeignKey } from "./test-helpers/models/eye.js";
 import { LineItem } from "./test-helpers/models/line-item.js";
 import {
   markForDestruction,
@@ -998,12 +997,6 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     record.association(name).setTarget(value as any);
   }
   fixtures([]);
-  beforeAll(() => {
-    registerModel(Eye);
-    registerModel(Iris);
-    registerModel(IrisWithReadOnlyForeignKey);
-  });
-
   beforeAll(() => {
     registerModel(CanonicalFirm);
     registerModel(Account);
