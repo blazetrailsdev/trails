@@ -82,6 +82,25 @@ export interface TestCaseInfo {
    * test:compare's literal expected-value comparison (assertion-values.ts).
    */
   assertionValues?: (string | null)[];
+  /**
+   * Number of no-op callbacks (`() => {}`) the body passes to some call. A
+   * non-zero count on a test whose NAME promises the block does something
+   * (`yields the payload for further modification`) is the hollow-body signal
+   * test:compare's name matching is blind to. TS extractor only.
+   */
+  emptyCallbacks?: number;
+  /**
+   * Total function callbacks the body passes to some call, excluding
+   * test-double sinks. `emptyCallbacks === callbackCount` means EVERY block the
+   * test hands out is a no-op. TS extractor only.
+   */
+  callbackCount?: number;
+  /**
+   * Assignments / deletes / increments anywhere in the body. Zero on a test
+   * whose name promises something is MUTATED means the body never performs the
+   * mutation the name claims to test. TS extractor only.
+   */
+  bodyMutations?: number;
   /** Whether the test is pending/skipped */
   pending?: boolean;
   /**

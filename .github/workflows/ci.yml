@@ -499,6 +499,14 @@ jobs:
           fi
           echo "No new or modified docs/activerecord trackers."
 
+      # test:compare matches our tests to Rails BY NAME, so a test whose name
+      # promises a behaviour its body never exercises reports coverage it does
+      # not provide (PR #4892). The tree is clean, so this is a zero-tolerance
+      # gate rather than a ratchet.
+      - name: Hollow Test Bodies
+        if: ${{ !cancelled() }}
+        run: pnpm test:hollow
+
       # PR attribution check. Scoped to deanmarano-authored PRs: the project
       # forbids Claude attribution in *his* PR descriptions and commits (see
       # CLAUDE.md "Do NOT add ... Generated with Claude Code"). Other

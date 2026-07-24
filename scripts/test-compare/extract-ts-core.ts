@@ -148,6 +148,85 @@ function countAssertions(
 }
 
 /**
+ * Test-double callees whose callback argument is MEANT to be a no-op — a
+ * silenced logger, a stubbed method. Counting those as hollow-body evidence
+ * flags healthy tests.
+ */
+const NOOP_CALLBACK_SINKS = /^(mockImplementation(Once)?|fn|spyOn)$/;
+
+/**
+ * Function callbacks passed as arguments to calls inside a test's subtree,
+ * split into empty (`() => {}`, statement-less body) and total. This is the
+ * hollow-body signal: where Rails' original yields a block that mutates, a
+ * no-op block makes the test unable to fail (see
+ * scripts/test-compare/hollow-bodies.ts). The test's OWN callback is excluded —
+ * the walk starts from the test call's arguments' subtrees.
+ */
+function countCallbacks(node: ts.CallExpression): {
+  empty: number;
+  total: number;
+  mutations: number;
+} {
+  let empty = 0;
+  let total = 0;
+  let mutations = 0;
+  const walk = (n: ts.Node) => {
+    if (ts.isCallExpression(n)) {
+      const callee = ts.isPropertyAccessExpression(n.expression)
+        ? n.expression.name.text
+        : ts.isIdentifier(n.expression)
+          ? n.expression.text
+          : "";
+      if (!NOOP_CALLBACK_SINKS.test(callee)) {
+        for (const arg of n.arguments) {
+          if (!ts.isArrowFunction(arg) && !ts.isFunctionExpression(arg)) continue;
+          total++;
+          if (ts.isBlock(arg.body) && arg.body.statements.length === 0) empty++;
+        }
+      }
+    }
+    ts.forEachChild(n, walk);
+  };
+  for (const arg of node.arguments) {
+    walk(arg);
+    mutations += countMutations(arg);
+  }
+  return { empty, total, mutations };
+}
+
+/**
+ * Assignments / deletes / increments anywhere in a test's body — the shape any
+ * test that MUTATES something has, and the shape the hollow
+ * `Notifications.instrument` tests (#4892) lacked entirely: they pushed the
+ * event into an array and asserted it came back unchanged, never writing to the
+ * yielded payload. Deliberately body-wide rather than callback-only: plenty of
+ * faithful `modifies`-named tests mutate at the top level of the body, and
+ * flagging those buries the real signal.
+ */
+function countMutations(node: ts.Node): number {
+  let count = 0;
+  const walk = (n: ts.Node) => {
+    if (ts.isBinaryExpression(n) && isAssignmentOperator(n.operatorToken.kind)) count++;
+    else if (ts.isDeleteExpression(n)) count++;
+    else if (ts.isPostfixUnaryExpression(n) || ts.isPrefixUnaryExpression(n)) {
+      if (
+        n.operator === ts.SyntaxKind.PlusPlusToken ||
+        n.operator === ts.SyntaxKind.MinusMinusToken
+      ) {
+        count++;
+      }
+    }
+    ts.forEachChild(n, walk);
+  };
+  walk(node);
+  return count;
+}
+
+function isAssignmentOperator(kind: ts.SyntaxKind): boolean {
+  return kind >= ts.SyntaxKind.FirstAssignment && kind <= ts.SyntaxKind.LastAssignment;
+}
+
+/**
  * The terminal matcher of an `expect(...).matcher(...)` chain, or `null` when
  * the call isn't such a chain. `expect(x).not.toBeNull()` yields `not:toBeNull`
  * — the negation is folded into the token so downstream normalization can line
@@ -340,6 +419,14 @@ export function extractTestsFromSource(content: string, relativePath: string): T
       assertionCount: countAssertions(node, helpers),
       assertionKinds,
       assertionValues,
+      ...(() => {
+        const cb = countCallbacks(node);
+        return {
+          emptyCallbacks: cb.empty,
+          callbackCount: cb.total,
+          bodyMutations: cb.mutations,
+        };
+      })(),
       pending,
       ...(finalGate ? { gate: finalGate } : {}),
     });
