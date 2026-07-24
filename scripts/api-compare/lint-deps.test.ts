@@ -569,9 +569,37 @@ describe("collectTaintedSymbols — transitive dep usage", () => {
       { checker, taintedSymbols: tainted, taintedRefs },
       refs,
     );
-    // The consumer reaches ActiveModel::Attribute only through the wrapper, so
-    // it inherits `Attribute` (not the wrapper identifier).
     expect(refs.has("Attribute")).toBe(true);
     expect(refs.has("isActiveModelAttribute")).toBe(false);
+  });
+
+  it("propagates alias-resolved refs through a wrapper chain to a fixed point", () => {
+    const pkg = "@blazetrails/activemodel";
+    const dir = writePkg({
+      "a.ts": `
+        import { Attribute as ModelAttribute } from "${pkg}";
+        export function isAttr(v: unknown) { return v instanceof ModelAttribute; }
+      `,
+      "b.ts": `
+        import { isAttr } from "./a.js";
+        export function checkAttr(v: unknown) { return isAttr(v); }
+      `,
+      "c.ts": `
+        import { checkAttr } from "./b.js";
+        export function visit(v: unknown) { return checkAttr(v); }
+      `,
+    });
+    const program = programFor(dir);
+    const { tainted, taintedRefs } = collectTaintedSymbols(program, dir, pkg, [], "activemodel");
+    const checker = program.getTypeChecker();
+    for (const f of ["a.ts", "b.ts", "c.ts"]) {
+      const sf = program.getSourceFiles().find((s) => s.fileName.endsWith(f))!;
+      const fn = sf.statements.find((s): s is ts.FunctionDeclaration =>
+        ts.isFunctionDeclaration(s),
+      )!;
+      const sym = checker.getSymbolAtLocation(fn.name!)!;
+      expect(tainted.has(sym)).toBe(true);
+      expect(taintedRefs.get(sym)?.has("Attribute")).toBe(true);
+    }
   });
 });

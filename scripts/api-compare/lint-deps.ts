@@ -161,14 +161,6 @@ export function collectDirectImports(sf: ts.SourceFile, tsImport: string): Set<s
   return names;
 }
 
-/**
- * Map each locally-bound name to the original exported name it aliases, for
- * named imports from tsImport. `import { Attribute as ModelAttribute }` yields
- * `ModelAttribute -> Attribute`. Only aliased bindings (local !== original) are
- * recorded; default/namespace imports have no distinct original type name to
- * resolve. Used so ref matching compares against the exported name Rails
- * references, not the local disambiguation alias.
- */
 export function collectImportAliases(sf: ts.SourceFile, tsImport: string): Map<string, string> {
   const aliases = new Map<string, string>();
   for (const stmt of sf.statements) {
@@ -264,32 +256,34 @@ export function collectTaintedSymbols(
     changed = false;
     for (const { sf, name, body, anchor } of candidates) {
       const sym = checker.getSymbolAtLocation(name);
-      if (!sym || tainted.has(sym)) continue;
+      if (!sym) continue;
       const refs = new Set<string>();
-      if (
-        methodUsesDepImport(
-          body,
-          getDirect(sf),
-          knownIds,
-          dep,
-          sf,
-          anchor,
-          {
-            checker,
-            taintedSymbols: tainted,
-            taintedRefs,
-            // A lint-deps-ignore opt-out should not taint the wrapper —
-            // otherwise an "uses raw SQL; no Arel needed" helper would
-            // grant credit to every caller and hide real violations.
-            skipIgnoreAnnotation: true,
-          },
-          refs,
-          getAlias(sf),
-        )
-      ) {
+      const uses = methodUsesDepImport(
+        body,
+        getDirect(sf),
+        knownIds,
+        dep,
+        sf,
+        anchor,
+        {
+          checker,
+          taintedSymbols: tainted,
+          taintedRefs,
+          // A lint-deps-ignore opt-out should not taint the wrapper —
+          // otherwise an "uses raw SQL; no Arel needed" helper would
+          // grant credit to every caller and hide real violations.
+          skipIgnoreAnnotation: true,
+        },
+        refs,
+        getAlias(sf),
+      );
+      if (!uses) continue;
+      if (!tainted.has(sym)) {
         tainted.add(sym);
-        // Record the dep type-names this wrapper resolves to, so callers
-        // that reach the dep only through it inherit the right refs.
+        changed = true;
+      }
+      const prev = taintedRefs.get(sym);
+      if (!prev || refs.size > prev.size) {
         taintedRefs.set(sym, refs);
         changed = true;
       }
@@ -455,11 +449,6 @@ export function hasLintDepsIgnore(node: ts.Node, dep: string, sourceFile: ts.Sou
 export interface TransitiveContext {
   checker: ts.TypeChecker;
   taintedSymbols: Set<ts.Symbol>;
-  // Dep type-names each tainted wrapper references directly. When a method
-  // reaches the dep only through a wrapper (e.g. `isActiveModelAttribute`,
-  // which does `v instanceof ModelAttribute`), the method inherits the
-  // wrapper's refs (`Attribute`) rather than the wrapper's own name — so ref
-  // matching sees the type Rails references, not the helper identifier.
   taintedRefs?: Map<ts.Symbol, Set<string>>;
   // Suppresses lint-deps-ignore detection. Used during taint
   // computation so an opt-out helper doesn't spuriously taint callers.
@@ -478,8 +467,6 @@ export function methodUsesDepImport(
   aliasMap?: Map<string, string>,
 ): boolean {
   if (!transitive?.skipIgnoreAnnotation && hasLintDepsIgnore(anchor, dep, sourceFile)) return true;
-  // Resolve a locally-bound alias back to the exported name Rails references,
-  // so `Attribute as ModelAttribute` is recorded as a ref to `Attribute`.
   const recordRef = (name: string) => collectRefs?.add(aliasMap?.get(name) ?? name);
   let found = false;
   // Walk top-down so we can distinguish:
@@ -496,12 +483,7 @@ export function methodUsesDepImport(
     if (ts.isPropertyAccessExpression(n) && ts.isIdentifier(n.expression)) {
       if (importedNames.has(n.expression.text)) {
         found = true;
-        // Leaf: for a namespace-style import (`Nodes.OuterJoin`) the member
-        // names the type.
         recordRef(n.name.text);
-        // Base: a class imported under a disambiguating alias and used as a
-        // static access (`AMAttribute.withCastValue`) names its type via the
-        // base identifier, so record its resolved export name too.
         if (aliasMap?.has(n.expression.text)) recordRef(n.expression.text);
         if (!collectRefs) return;
       }
