@@ -12,6 +12,7 @@
 require "ripper"
 require "json"
 require "pathname"
+require "set"
 require "time"
 
 SCRIPT_DIR = File.dirname(__FILE__)
@@ -143,11 +144,9 @@ class TestExtractor
     @helper_defs = {}
     collect_helper_defs(sexp, [])
 
-    # module name → scope path of the FIRST class that `include`s it. A module's
-    # tests are emitted once and attributed to the first includer (see
-    # process_include / flush_collected_modules), so that class is the one whose
-    # method overrides Ruby's lookup would actually run for those tests.
-    # Pre-collected because a module body is walked before the later `include`.
+    @module_defs = Set.new
+    collect_module_defs(sexp, [])
+
     @module_includers = {}
     collect_module_includers(sexp, [])
 
@@ -986,9 +985,18 @@ class TestExtractor
     node.each { |child| collect_helper_defs(child, scope) if child.is_a?(Array) }
   end
 
-  # Record the first class to `include` each module, keyed module name → the
-  # including class's scope path. Mirrors process_include's first-include-wins
-  # rule, which flush_collected_modules already uses for gates.
+  def collect_module_defs(node, scope)
+    return unless node.is_a?(Array)
+    if node[0] == :class || node[0] == :module
+      name = const_name(node[1])
+      inner = name ? scope + [name] : scope
+      @module_defs << inner if node[0] == :module && name
+      node.each { |child| collect_module_defs(child, inner) if child.is_a?(Array) }
+      return
+    end
+    node.each { |child| collect_module_defs(child, scope) if child.is_a?(Array) }
+  end
+
   def collect_module_includers(node, scope)
     return unless node.is_a?(Array)
     if node[0] == :class || node[0] == :module
@@ -997,10 +1005,58 @@ class TestExtractor
       node.each { |child| collect_module_includers(child, inner) if child.is_a?(Array) }
       return
     elsif node[0] == :command && ident_name(node[1]) == "include"
-      mod = const_name_from_args(node[2])
-      @module_includers[mod] ||= scope if mod && !scope.empty?
+      target = resolve_include_target(node[2], scope)
+      @module_includers[target] ||= scope if target && !scope.empty?
     end
     node.each { |child| collect_module_includers(child, scope) if child.is_a?(Array) }
+  end
+
+  def resolve_include_target(args, scope)
+    path = const_path_from_args(args)
+    return nil unless path
+    segments = path[:segments]
+    return nil if segments.empty?
+    return @module_defs.include?(segments) ? segments : nil if path[:rooted]
+
+    prefix = scope.dup
+    loop do
+      candidate = prefix + segments
+      return candidate if @module_defs.include?(candidate)
+      break if prefix.empty?
+      prefix = prefix[0...-1]
+    end
+    nil
+  end
+
+  def const_path(node)
+    return nil unless node.is_a?(Array)
+    case node[0]
+    when :@const
+      { segments: [node[1]], rooted: false }
+    when :const_ref, :var_ref
+      const_path(node[1])
+    when :top_const_ref
+      inner = const_path(node[1])
+      inner && { segments: inner[:segments], rooted: true }
+    when :const_path_ref
+      left = const_path(node[1])
+      right = const_path(node[2])
+      return nil unless left && right
+      { segments: left[:segments] + right[:segments], rooted: left[:rooted] }
+    end
+  end
+
+  def const_path_from_args(args)
+    return nil unless args.is_a?(Array)
+    if %i[var_ref const_ref const_path_ref top_const_ref].include?(args[0])
+      return const_path(args)
+    end
+    args.each do |child|
+      next unless child.is_a?(Array)
+      result = const_path_from_args(child)
+      return result if result
+    end
+    nil
   end
 
   # Scope paths to search, in Ruby method-resolution order, for a call made from
@@ -1013,12 +1069,7 @@ class TestExtractor
   def lookup_scopes(scope)
     return [scope] if scope.empty?
 
-    # A nested module is `include`d by its QUALIFIED constant
-    # (`include RoutingAssertionsSharedTests::WithRoutingSharedTests` —
-    # actionpack routing_assertions_test.rb), which is how the includer is
-    # keyed; an include from within the enclosing scope names it bare. Try the
-    # qualified path first, then the bare name.
-    includer = @module_includers[scope.join("::")] || @module_includers[scope.last]
+    includer = @module_includers[scope]
     includer && includer != scope ? [includer, scope] : [scope]
   end
 

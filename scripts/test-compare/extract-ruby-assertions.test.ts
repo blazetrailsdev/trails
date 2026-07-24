@@ -353,11 +353,129 @@ describe("Ruby extractor assertion-count collection", () => {
         end
       `,
     });
-    // actionpack routing_assertions_test.rb includes a nested shared module by
-    // its QUALIFIED constant, so the includer is keyed
-    // "SharedTests::WithRoutingSharedTests" while the module's scope path is
-    // segmented — the includer must still be found and its override (1) win.
     expect(counts["reachable"]).toBe(1);
+  });
+
+  it("finds the includer of a module included by ::-rooted constant", () => {
+    const counts = rubyAssertionCounts({
+      "cases/rooted_mixin_test.rb": `
+        module SharedTests
+          def test_reachable
+            check_route
+          end
+
+          def check_route
+            assert_equal 1, a
+            assert_equal 2, b
+          end
+        end
+
+        class RootedTest < ActionDispatch::IntegrationTest
+          include ::SharedTests
+
+          def check_route
+            assert_equal 1, a
+          end
+        end
+      `,
+    });
+    expect(counts["reachable"]).toBe(1);
+  });
+
+  it("finds the includer of a nested module included from the enclosing scope", () => {
+    const counts = rubyAssertionCounts({
+      "cases/enclosing_mixin_test.rb": `
+        module Outer
+          module SharedTests
+            def test_reachable
+              check_route
+            end
+
+            def check_route
+              assert_equal 1, a
+              assert_equal 2, b
+            end
+          end
+
+          class EnclosingTest < ActionDispatch::IntegrationTest
+            include SharedTests
+
+            def check_route
+              assert_equal 1, a
+            end
+          end
+        end
+      `,
+    });
+    expect(counts["reachable"]).toBe(1);
+  });
+
+  it("finds the includer of a nested module included by partially-qualified constant", () => {
+    const counts = rubyAssertionCounts({
+      "cases/partial_mixin_test.rb": `
+        module Outer
+          module SharedTests
+            module Inner
+              def test_reachable
+                check_route
+              end
+
+              def check_route
+                assert_equal 1, a
+                assert_equal 2, b
+              end
+            end
+          end
+
+          class PartialTest < ActionDispatch::IntegrationTest
+            include SharedTests::Inner
+
+            def check_route
+              assert_equal 1, a
+            end
+          end
+        end
+      `,
+    });
+    expect(counts["reachable"]).toBe(1);
+  });
+
+  it("does not attribute a module to an unrelated same-basename includer", () => {
+    const counts = rubyAssertionCounts({
+      "cases/collision_mixin_test.rb": `
+        module Alpha
+          module Shared
+            def test_reachable
+              check_route
+            end
+
+            def check_route
+              assert_equal 1, a
+              assert_equal 2, b
+            end
+          end
+        end
+
+        module Beta
+          module Shared
+            def check_route
+              assert_equal 1, a
+            end
+          end
+
+          class BetaTest < ActionDispatch::IntegrationTest
+            include Shared
+
+            def check_route
+              assert_equal 1, a
+              assert_equal 2, b
+              assert_equal 3, c
+            end
+          end
+        end
+      `,
+    });
+    expect(counts["reachable"]).toBe(2);
   });
 });
 
