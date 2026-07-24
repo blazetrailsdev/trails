@@ -461,11 +461,25 @@ export class PredicateBuilder {
     // Thread the join-dependency fallback through the per-tuple `buildFromHash`
     // so a qualified col (`"contracts.metadata"`) naming a table that only
     // exists as a join (`.joins(...)`, an alias) — not a direct reflection —
-    // resolves against the joined model, matching Rails' block to
-    // `build_where_clause` (`predicate_builder.rb:71-73`,
-    // `lookup_table_klass_from_join_dependencies`). Without it the dotted key
-    // falls to a bare `Table` + generic `TypeCasterConnection`, so the bind is
-    // typed by the raw column type instead of the joined model's.
+    // resolves against the joined model (`lookup_table_klass_from_join_dependencies`,
+    // predicate_builder.rb:71-73). Without it the dotted key falls to a bare
+    // `Table` + generic `TypeCasterConnection`, so the bind is typed by the raw
+    // column type instead of the joined model's.
+    //
+    // Threading it UNIFORMLY across the single- and multi-column branches is a
+    // deliberate extension, not Rails-mirroring: qualified composite columns
+    // have no faithful Rails behavior to match (see this method's docstring —
+    // Rails' Array-key branch at predicate_builder.rb:93-96 recurses via
+    // `expand_from_hash(key.zip(ids_set).to_h)`, which neither re-applies
+    // `convert_dot_notation_to_hash` NOR forwards `&block`, so Rails emits a
+    // broken bare `"contracts.metadata"` attribute on the base table for either
+    // arity). The trails extension (#5186) already resolves REFLECTIONS in the
+    // multi-column branch by routing each tuple through `buildFromHash` (the
+    // "qualified composite cols bind through the joined table's type" test), so
+    // threading `fallback` there too keeps join-only tables consistent with both
+    // reflections and the single-column path — matching Rails' block-loss on
+    // recursion would instead resolve reflections but silently drop join-only
+    // tables to the generic caster, an arbitrary split.
     if (cols.length === 1) {
       return this.buildFromHash({ [cols[0]]: validTuples.map((t) => t[0]) }, fallback);
     }
