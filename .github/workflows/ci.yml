@@ -171,7 +171,13 @@ jobs:
           # packages (ci.yml:604) — and both are carved out of the infra sweep
           # (INFRA_CARVEOUT_RE), so this clause is what keeps their self-tests
           # running on a subtree-only change.
-          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport)/|scripts/(tasks|guides-typecheck)/)'
+          # scripts/parity/ rides on it too: the query-runner integration tests
+          # spawn dump.ts/ar_dump.ts against the fixtures, so a change to either
+          # the runners or the fixtures has to re-run them. (Their other input,
+          # packages/activerecord/, is deliberately NOT on this gate — pulling
+          # every AR PR into the leaf-package suites costs more than it catches;
+          # the label-gated query-parity-trails job covers that direction.)
+          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport)/|scripts/(tasks|guides-typecheck|parity)/)'
           # guides_affected gates the Guides Code Type Check job, which
           # compiles fenced TS blocks in packages/website/docs/guides/**.
           # Today guides only import @blazetrails/activerecord,
@@ -643,6 +649,11 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - uses: ./.github/actions/cache-build
+      # scripts/parity/query/node spawns the dump runners as real subprocesses;
+      # they resolve @blazetrails/* through package `main` entries, so the
+      # dist/ trees have to exist before vitest starts.
+      - run: pnpm build
       - run: >
           pnpm vitest run
           packages/arel
@@ -650,6 +661,7 @@ jobs:
           packages/activesupport
           scripts/guides-typecheck
           scripts/tasks
+          scripts/parity/query/node
 
   # Consolidated leaf-test job. The cheapest sub-minute leaf suites — rack
   # (~27 s), actionview (~26 s), tse-compiler (~22 s), and the DX type tests

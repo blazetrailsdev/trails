@@ -12,9 +12,10 @@
  * pins the timestamp to a specific ISO 8601 UTC value (trailing Z required,
  * e.g. 2026-01-01T00:00:00.000Z); omitting it uses 2000-01-01T00:00:00.000Z.
  *
- * @blazetrails/arel must be built (packages/arel/dist/index.js) before running —
- * resolution goes through the published package `main` entry. In CI mirror the
- * schema-parity-trails job: `pnpm --filter @blazetrails/arel build` first.
+ * @blazetrails/{activesupport,activemodel,arel,activerecord} must all be built
+ * before running — resolution goes through the published package `main`
+ * entries, and the runner compiles through a real sqlite3 adapter connection.
+ * In CI mirror the query-parity-trails job and build them in dep order.
  */
 
 import Database from "better-sqlite3";
@@ -84,16 +85,20 @@ function describe(v: unknown): string {
 }
 
 function assertArelBuilt(): void {
-  // @blazetrails/arel resolves via package "main" → packages/arel/dist/index.js.
-  // tsx's own loader doesn't help here: the fixture is a module on disk that
-  // Node resolves through the normal package graph, not via the TS source.
+  // These resolve via package "main" → packages/<pkg>/dist/index.js. tsx's own
+  // loader doesn't help here: the fixture is a module on disk that Node
+  // resolves through the normal package graph, not via the TS source. The
+  // runner compiles through a real sqlite3 adapter connection, so the whole
+  // activerecord chain has to be built, not just arel.
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const arelDist = resolve(scriptDir, "../../../../packages/arel/dist/index.js");
-  if (!existsSync(arelDist)) {
-    process.stderr.write(
-      `parity dump (trails): @blazetrails/arel is not built (missing ${arelDist}).\n`,
-    );
-    process.stderr.write("Run: pnpm --filter @blazetrails/arel build\n");
+  const missing: string[] = [];
+  for (const pkg of ["activesupport", "activemodel", "arel", "activerecord"]) {
+    const dist = resolve(scriptDir, `../../../../packages/${pkg}/dist/index.js`);
+    if (!existsSync(dist)) missing.push(`@blazetrails/${pkg}`);
+  }
+  if (missing.length > 0) {
+    process.stderr.write(`parity dump (trails): missing dist/ for ${missing.join(", ")}\n`);
+    process.stderr.write("Run: pnpm build\n");
     process.exit(1);
   }
 }
@@ -146,22 +151,40 @@ async function main(): Promise<void> {
       db.close();
     }
 
-    // 2. Point `Arel::Table.engine` at an engine whose connection carries the
-    //    SQLite visitor, so both `Node#toSql()` and `TreeManager#toSql()`
-    //    compile through it (both resolve `engine.connection.visitor`).
-    //    Mirrors the Rails side's
-    //    `establish_connection adapter: "sqlite3"` — for example,
-    //    `IS DISTINCT FROM` now emits as `IS NOT` because
-    //    Visitors.SQLite#visitIsDistinctFrom overrides it.
+    // 2. Establish a real SQLite connection through trails AR. Mirrors the
+    //    Rails side's `establish_connection adapter: "sqlite3"`: importing
+    //    `@blazetrails/activerecord` sets `Arel::Table.engine` to a
+    //    Base-backed engine (base.ts, mirroring
+    //    `on_load(:active_record) { Arel::Table.engine = self }`), so both
+    //    `Node#toSql()` and `TreeManager#toSql()` resolve
+    //    `engine.connection.visitor` to the sqlite3 adapter's visitor — one
+    //    that carries real `quoteTableName`/`quoteColumnName`/`quote`.
+    //    A hand-rolled `{ connection: { visitor } }` stub cannot: RFC 0007
+    //    deleted the connection-less quoters, so a visitor built with no
+    //    connection dies on the first `quoteTableName` (to-sql.ts:1665-1667).
     //
-    //    Imported as `@blazetrails/arel` (not via dist path) because
-    //    scripts/parity is itself a workspace package — see
-    //    scripts/parity/package.json. That ensures Node ESM dedupes
-    //    this import with the fixture's `@blazetrails/arel` import to a
-    //    single module instance, so the engine assignment is visible
-    //    to the fixture's nodes.
-    const arel = await import("@blazetrails/arel");
-    arel.Table.engine = { connection: { visitor: new arel.Visitors.SQLite() } };
+    //    Imported as `@blazetrails/activerecord`/`@blazetrails/arel` (not via
+    //    dist paths) because scripts/parity is itself a workspace package —
+    //    see scripts/parity/package.json. That ensures Node ESM dedupes these
+    //    imports with the fixture's `@blazetrails/arel` import to a single
+    //    module instance, so the engine wiring is visible to the fixture's
+    //    nodes.
+    //
+    //    The sqlite3 adapter resolves the database path through
+    //    ActiveSupport's filesystem adapter *synchronously* (`getFs()` in
+    //    `prepareDatabasePath`), but the Node adapter's auto-registration is
+    //    async-only under pure ESM. Warm the registry first so the sync
+    //    lookup hits the cache instead of throwing "No filesystem adapter
+    //    configured".
+    const { getFsAsync, getPathAsync } = await import("@blazetrails/activesupport");
+    await getFsAsync();
+    await getPathAsync();
+
+    const { Base } = await import("@blazetrails/activerecord");
+    await Base.establishConnection({ adapter: "sqlite3", database: dbPath });
+    // Checking out the connection triggers the adapter's Arel-visitor wiring
+    // (e.g. `IS DISTINCT FROM` emits as `IS NOT` via Visitors.SQLite).
+    void Base.adapter;
 
     // 4. Import query.ts. Fixtures end with `export default <expr>` — see
     //    scripts/parity/translate/arel.ts (generateTs).
@@ -209,6 +232,16 @@ async function main(): Promise<void> {
     process.stdout.write(`  → ${outPathAbs}\n`);
   } finally {
     clock.uninstall();
+    // Close the adapter's SQLite handle before removing the temp dir — an open
+    // handle makes rmSync of the .db file fail on Windows.
+    try {
+      const { Base } = await import("@blazetrails/activerecord");
+      const a = Base.adapter as { close?: () => void };
+      if (typeof a.close === "function") a.close();
+      Base.removeConnection();
+    } catch {
+      /* connection never established, or already closed */
+    }
     try {
       rmSync(tmpDir, { recursive: true, force: true });
     } catch (err) {

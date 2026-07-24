@@ -29,6 +29,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import type { CanonicalQuery } from "../../canonical/query-types.js";
 import { Base, modelRegistry } from "@blazetrails/activerecord";
 import { Visitors } from "@blazetrails/arel";
+import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
 
 function usage(): never {
   process.stderr.write(
@@ -150,7 +151,22 @@ async function main(): Promise<void> {
     //    process-global registry. Without this eager access Relation#toSql()
     //    would use the default generic visitor since it never touches
     //    Base.adapter itself, producing incorrect boolean/date literals.
-    await Base.establishConnection(dbPath);
+    //
+    //    The sqlite3 adapter resolves the database path through
+    //    ActiveSupport's filesystem adapter *synchronously* (`getFs()` in
+    //    `prepareDatabasePath`), but the Node adapter's auto-registration is
+    //    async-only under pure ESM. Warm the registry first so the sync
+    //    lookup hits the cache instead of throwing "No filesystem adapter
+    //    configured".
+    await getFsAsync();
+    await getPathAsync();
+    //
+    //    The config must be an explicit adapter/database hash, mirroring the
+    //    Rails side's `establish_connection adapter: "sqlite3", database: ...`.
+    //    A bare path string is resolved as an *environment name* (Rails'
+    //    `resolve_config_for_connection`), which fails with "the `<path>`
+    //    database is not configured for the `development` environment".
+    await Base.establishConnection({ adapter: "sqlite3", database: dbPath });
     void Base.adapter; // trigger _wireArelVisitor so the correct Arel visitor is active
     // Regression coverage: fixtures ar-09/ar-11/ar-19/ar-29 each produce a
     // distinct wrong literal under the generic visitor (TRUE/FALSE, FOR UPDATE)
@@ -207,12 +223,15 @@ async function main(): Promise<void> {
         // paramSql/binds are informational-only; wrap the entire extraction so any
         // unexpected visitor or bind-processing error falls back to sql / empty binds.
         try {
-          // Use the adapter-wired dialect visitor (e.g. Visitors.SQLite for SQLite)
-          // so boolean literals, DISTINCT, etc. match the actual execution dialect.
-          const adapterVisitor = (Base.adapter as { arelVisitor?: unknown }).arelVisitor;
-          const visitorCtor =
-            adapterVisitor != null ? (adapterVisitor as object).constructor : Visitors.ToSql;
-          const visitor = new (visitorCtor as new () => InstanceType<typeof Visitors.ToSql>)();
+          // Use the connection's own visitor (e.g. Visitors.SQLite for SQLite)
+          // so boolean literals, DISTINCT, etc. match the actual execution
+          // dialect — and so quoting resolves through the real connection, the
+          // way `Node#to_sql` does. `arelVisitor()` is the *factory* method
+          // (abstract-adapter.ts:1715, mirroring Rails' `arel_visitor`);
+          // `visitor` is the instance it built at connect time.
+          const visitor = (Base.adapter as { visitor?: InstanceType<typeof Visitors.ToSql> })
+            .visitor;
+          if (visitor == null) throw new Error("connection has no Arel visitor");
           const [ps, bs] = (
             visitor as unknown as { compileWithBinds(node: unknown): [string, unknown[]] }
           ).compileWithBinds((manager as { ast: unknown }).ast);
@@ -235,11 +254,28 @@ async function main(): Promise<void> {
             return String(v);
           };
 
-          // Build a consistent paramSql where ONLY Date values become `?`; all
-          // other bind values are re-inlined using the visitor's quoting rules.
-          // This keeps `? count = binds.length` and matches adapter-specific rendering.
+          // Build a consistent paramSql where ONLY datetime values become `?`;
+          // all other bind values are re-inlined using the visitor's quoting
+          // rules. This keeps `? count = binds.length` and matches
+          // adapter-specific rendering.
+          //
+          // trails' Time analogue is Temporal, not JS Date (the adapter's
+          // `quote` rejects a Date outright), so the datetime probe is
+          // `epochMilliseconds` — carried by Temporal.Instant and
+          // Temporal.ZonedDateTime alike — with `instanceof Date` kept for any
+          // bind that never reaches a Temporal-typed attribute.
+          const epochMsOf = (v: unknown): number | null => {
+            if (v instanceof Date) return v.getTime();
+            if (v != null && typeof v === "object" && "epochMilliseconds" in v) {
+              const ms = (v as { epochMilliseconds: unknown }).epochMilliseconds;
+              if (typeof ms === "number") return ms;
+              if (typeof ms === "bigint") return Number(ms);
+            }
+            return null;
+          };
+
           let placeholderIdx = 0;
-          const dateBind: Date[] = [];
+          const dateBind: number[] = [];
           let mismatch = false;
           const processedParamSql = ps.replace(/\?/g, () => {
             if (placeholderIdx >= resolvedBinds.length) {
@@ -247,8 +283,9 @@ async function main(): Promise<void> {
               return "?";
             }
             const v = resolvedBinds[placeholderIdx++];
-            if (v instanceof Date) {
-              dateBind.push(v);
+            const epochMs = epochMsOf(v);
+            if (epochMs !== null) {
+              dateBind.push(epochMs);
               return "?";
             }
             return quoteBindValue(v);
@@ -262,7 +299,7 @@ async function main(): Promise<void> {
             binds = [];
           } else {
             paramSql = processedParamSql.trim();
-            binds = dateBind.map((b) => b.toISOString());
+            binds = dateBind.map((ms) => new Date(ms).toISOString());
           }
         } catch {
           paramSql = sqlStr;
