@@ -52,7 +52,7 @@ export class PredicateBuilder {
     this.rangeHandler = new RangeHandler((attribute, v) => {
       // Resolve the type once so sign detection and the cast below agree —
       // single source, like Rails' `build_bind_attribute` (predicate_builder.rb:67-69).
-      const type = this.typeOf(attribute.name);
+      const type: BoundType = this.table.type(attribute.name);
       const sentinel = this.unboundableSentinel(attribute.name, v, type);
       if (sentinel) return sentinel;
       return type.cast(v);
@@ -71,8 +71,8 @@ export class PredicateBuilder {
    * equality single-value path, and handles non-numeric out-of-range
    * bounds (e.g. custom types) type-agnostically.
    *
-   * Callers pass the type from {@link typeOf} so sign detection uses the same
-   * type as the accompanying cast.
+   * Callers pass the type from `table.type(...)` so sign detection uses the
+   * same type as the accompanying cast.
    */
   private unboundableSentinel(
     columnName: string,
@@ -81,18 +81,6 @@ export class PredicateBuilder {
   ): UnboundableBound | null {
     const sign = new QueryAttribute(columnName, value, type).isUnboundable();
     return sign === false ? null : new UnboundableBound(sign);
-  }
-
-  /**
-   * The single type source every bind-building path shares: Rails'
-   * `table.type(column_name)` (`TableMetadata#type` →
-   * `arel_table.type_for_attribute`, table_metadata.rb:17-19). One hop, no
-   * fallback — it throws on a caster-less table, and the caster itself resolves
-   * an unknown column to the default `ValueType` (type_caster/connection.rb:26),
-   * exactly like Rails.
-   */
-  private typeOf(columnName: string): BoundType {
-    return this.table.type(columnName) as BoundType;
   }
 
   buildFromHash(
@@ -331,8 +319,9 @@ export class PredicateBuilder {
     // `OID::Array#force_equality?` is `value.is_a?(::Array)` — a Ruby Set is not
     // an Array, so a Set on an array column force-equalizes in neither Rails nor
     // here. Normalizing Set→Array first would spuriously trip force-equality.
-    const forceEqNode = this._buildForceEqualityOrNull(attribute, value);
-    if (forceEqNode !== null) return forceEqNode;
+    if (this.table.type(attribute.name).isForceEquality?.(value) === true) {
+      return attribute.eq(this.buildBindAttribute(attribute.name, value));
+    }
     // Normalize Set → Array before dispatch so every code path (custom handlers,
     // explicit Array branch, handlerFor fallback) receives an array. Rails registers
     // Set with ArrayHandler by default (predicate_builder.rb:20).
@@ -385,12 +374,14 @@ export class PredicateBuilder {
     const klass = this.table.klass as { _normalizations?: Map<string, unknown> } | null;
     const normalizations = klass?._normalizations;
     if (!normalizations || !normalizations.has(columnName)) return value;
-    return this.typeOf(columnName).cast(value);
+    return this.table.type(columnName).cast(value);
   }
 
   buildRangePredicate(attribute: Nodes.Attribute, range: Range): Nodes.Node {
-    const rangeNode = this._buildForceEqualityOrNull(attribute, range);
-    if (rangeNode !== null) return rangeNode;
+    // Same force-equality precedence `build` applies (predicate_builder.rb:57-69).
+    if (this.table.type(attribute.name).isForceEquality?.(range) === true) {
+      return attribute.eq(this.buildBindAttribute(attribute.name, range));
+    }
     return this.rangeHandler.call(attribute, range);
   }
 
@@ -551,25 +542,6 @@ export class PredicateBuilder {
     const builder = new PredicateBuilder(table);
     builder.handlers = this.handlers;
     return builder;
-  }
-
-  /**
-   * Mirrors Rails `PredicateBuilder#build` force-equality dispatch
-   * (`operator ||= table.type(attribute.name).force_equality?(value) && :eq`,
-   * predicate_builder.rb:57-69): single-source lookup; when the type reports
-   * `force_equality?(value)`, returns `attribute.eq(bind)` — otherwise `null`
-   * so the caller falls through to handler dispatch. Type-agnostic: applies to
-   * `OID::Range`, `OID::Array`, and `Type::Serialized` alike.
-   *
-   * @internal
-   */
-  private _buildForceEqualityOrNull(attribute: Nodes.Attribute, value: unknown): Nodes.Node | null {
-    if (this.typeOf(attribute.name).isForceEquality?.(value) !== true) return null;
-    // Rails (`predicate_builder.rb#build`) emits a bind for force-equality
-    // types: `attribute.eq(build_bind_attribute(attribute.name, value))`. The
-    // bind value (e.g. a `Range`) serializes to its pg literal string via the
-    // adapter's `typeCast` in the bind path (`type_casted_binds`).
-    return attribute.eq(this.buildBindAttribute(attribute.name, value));
   }
 
   static references(conditions: string[] | Record<string, unknown>): Nodes.SqlLiteral[] {
