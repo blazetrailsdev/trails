@@ -66,6 +66,13 @@ export class InsertManager extends TreeManager {
    *   (Rails: `@ast.relation ||= fields.first.first.relation`)
    * - values pass through raw — no `Quoted` wrap (Rails preserves them
    *   for the dialect-specific value visitor to quote)
+   *
+   * @missingRailsCall each — Baseline (RFC 0047): wide call-set flag seeded when
+   *   the wide ratchet landed; bucket (b) equivalent or (c) noise pending
+   *   per-cluster burndown review.
+   * @missingRailsCall first — Baseline (RFC 0047): wide call-set flag seeded
+   *   when the wide ratchet landed; bucket (b) equivalent or (c) noise pending
+   *   per-cluster burndown review.
    */
   insert(fields: string | [Attribute | Node, unknown][] | null | undefined): this {
     if (fields == null) return this;
