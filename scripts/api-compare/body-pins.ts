@@ -151,8 +151,25 @@ export function findDuplicateKeys(pins: BodyPin[]): string[] {
   return [...dups];
 }
 
+/**
+ * Total order on the committed manifest, by UTF-16 code unit over `keyOf`
+ * (`package rubyFile rubyName`). Deliberately NOT `localeCompare`: ICU
+ * collation is locale- and ICU-version-dependent and treats punctuation as
+ * secondary, so keys differing only in `!`/`_`/`?` sort differently depending
+ * on who runs `--pin-all`, emitting symmetric +/- manifest churn with no
+ * content change. (Same fix as `compareKeys` in lint-call-mismatches.ts, which
+ * cannot be reused directly: body-pins keys on `rubyFile`, not `tsFile`/call.)
+ * `keyOf` is unique per pin (findDuplicateKeys enforces it), so no tie-break
+ * is needed.
+ */
+export function comparePinKeys(a: PinKey, b: PinKey): number {
+  const ka = keyOf(a);
+  const kb = keyOf(b);
+  return ka < kb ? -1 : ka > kb ? 1 : 0;
+}
+
 function sortPins(pins: BodyPin[]): BodyPin[] {
-  return [...pins].sort((a, b) => keyOf(a).localeCompare(keyOf(b)));
+  return [...pins].sort(comparePinKeys);
 }
 
 // Pin (or re-pin) matched pairs at their CURRENT digest. `select` limits which

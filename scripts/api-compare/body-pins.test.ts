@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   type BodyHashRecord,
   type BodyPin,
+  comparePinKeys,
   currentDigests,
   diffPins,
   findDuplicateKeys,
@@ -35,6 +36,26 @@ function pin(over: Partial<BodyPin> = {}): BodyPin {
 describe("keyOf", () => {
   it("keys on package + rubyFile + rubyName", () => {
     expect(keyOf(record())).toBe("activerecord persistence.rb save");
+  });
+});
+
+describe("comparePinKeys", () => {
+  it("orders by code unit, not ICU collation", () => {
+    const bang = pin({ rubyName: "permit!" });
+    const under = pin({ rubyName: "permit_any_in_array" });
+    // "!" (0x21) < "_" (0x5f) by code unit; ICU demotes punctuation to a
+    // secondary difference and can order these either way.
+    expect(comparePinKeys(bang, under)).toBeLessThan(0);
+    expect(comparePinKeys(under, bang)).toBeGreaterThan(0);
+    expect(comparePinKeys(bang, bang)).toBe(0);
+  });
+
+  it("puts uppercase before lowercase, unlike ICU's case-insensitive primary strength", () => {
+    const sorted = ["permit!", "permit_all", "permitted?", "Permit"]
+      .map((rubyName) => pin({ rubyName }))
+      .sort(comparePinKeys)
+      .map((p) => p.rubyName);
+    expect(sorted).toEqual(["Permit", "permit!", "permit_all", "permitted?"]);
   });
 });
 
@@ -104,6 +125,19 @@ describe("pinPairs", () => {
     expect(next.find((p) => p.rubyName === "save")!.digest).toBe("new1");
     // querying.rb was not selected → its pin stays at the old digest.
     expect(next.find((p) => p.rubyName === "find")!.digest).toBe("old2");
+  });
+
+  it("emits the same manifest order for any input order (no reseed churn)", () => {
+    // The manifest is regenerated from whatever order the artifact lists
+    // records in; a permuted artifact must not reorder committed pins.
+    const names = ["permit!", "permit_all", "permitted?", "Permit", "save"];
+    const records = names.map((rubyName, i) => record({ rubyName, digest: `${i}00000000000000` }));
+    const forward = pinPairs(records, [], { all: true }).map(keyOf);
+    const reversed = pinPairs([...records].reverse(), [], { all: true }).map(keyOf);
+    expect(reversed).toEqual(forward);
+    // Array#sort with no comparator is code-unit order — the emitted order
+    // must match it exactly.
+    expect(forward).toEqual([...forward].sort());
   });
 });
 
