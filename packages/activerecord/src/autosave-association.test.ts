@@ -31,6 +31,11 @@ import { ShipPart } from "./test-helpers/models/ship-part.js";
 import { Parrot as CanonicalParrot } from "./test-helpers/models/parrot.js";
 import { Bird as CanonicalBird } from "./test-helpers/models/bird.js";
 import { Eye, Iris, IrisWithReadOnlyForeignKey } from "./test-helpers/models/eye.js";
+import { Comment as CanonicalComment } from "./test-helpers/models/comment.js";
+import { Category as CanonicalCategory } from "./test-helpers/models/category.js";
+import { Post as CanonicalPost, PostWithAfterCreateCallback } from "./test-helpers/models/post.js";
+import { Customer as CanonicalCustomer } from "./test-helpers/models/customer.js";
+import { Order as CanonicalOrder } from "./test-helpers/models/order.js";
 import { Invoice } from "./test-helpers/models/invoice.js";
 import { LineItem } from "./test-helpers/models/line-item.js";
 import {
@@ -492,17 +497,21 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   fixtures([]);
 
   function makeModels() {
-    class Company extends Base {
+    class HmaFirm extends Base {
       declare name: string | null;
-      declare clients: AssociationProxy<Client>;
+      declare clients: AssociationProxy<HmaClient>;
 
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
-        this.hasMany("clients", { autosave: true, foreignKey: "client_of" });
+        this.hasMany("clients", {
+          autosave: true,
+          className: "HmaClient",
+          foreignKey: "client_of",
+        });
       }
     }
-    class Client extends Base {
+    class HmaClient extends Base {
       declare name: string | null;
       declare client_of: number | null;
 
@@ -513,9 +522,9 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
         this.validates("name", { presence: true });
       }
     }
-    registerModel("Company", Company);
-    registerModel("Client", Client);
-    return { Company, Client };
+    registerModel("HmaFirm", HmaFirm);
+    registerModel("HmaClient", HmaClient);
+    return { Company: HmaFirm, Client: HmaClient };
   }
 
   it("invalid adding", async () => {
@@ -1786,43 +1795,9 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
   }
 
   function makeOrderModels() {
-    class Customer extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "customers";
-        this.attribute("name", "string");
-      }
-    }
-    class Order extends Base {
-      declare name: string | null;
-      declare tree_id: number | null;
-      declare parent_id: number | null;
-      declare billing: Customer | null;
-      declare shipping: Customer | null;
-      declare loadBelongsTo: ((name: "billing") => Promise<Customer | null>) &
-        ((name: "shipping") => Promise<Customer | null>);
-
-      static {
-        this._tableName = "nodes";
-        this.attribute("name", "string");
-        this.attribute("tree_id", "integer");
-        this.attribute("parent_id", "integer");
-        this.belongsTo("billing", {
-          autosave: true,
-          className: "Customer",
-          foreignKey: "tree_id",
-        });
-        this.belongsTo("shipping", {
-          autosave: true,
-          className: "Customer",
-          foreignKey: "parent_id",
-        });
-      }
-    }
-    registerModel("Customer", Customer);
-    registerModel("Order", Order);
-    return { Customer, Order };
+    registerModel(CanonicalCustomer);
+    registerModel(CanonicalOrder);
+    return { Customer: CanonicalCustomer, Order: CanonicalOrder };
   }
 
   function setBilling(order: Base, customer: Base) {
@@ -2398,13 +2373,15 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
       activerecord: {
         errors: {
           models: {
-            "person/references": { format: "%{message}" },
+            // Rails keys this on `person/references`; the owner here is a
+            // bespoke stand-in, so the i18n key follows its underscored name.
+            "index_errors_person/references": { format: "%{message}" },
           },
         },
       },
     });
     try {
-      class Reference extends Base {
+      class IndexErrorsReference extends Base {
         declare favorite: boolean | null;
         declare job_id: number | null;
         declare person_id: number | null;
@@ -2419,24 +2396,26 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
           this.validates("job_id", { presence: true });
         }
       }
-      class Person extends Base {
+      class IndexErrorsPerson extends Base {
         declare name: string | null;
 
         static {
+          this._tableName = "people";
           this.attribute("name", "string");
         }
       }
-      registerModel("Person", Person);
-      registerModel("Reference", Reference);
+      const Person = IndexErrorsPerson;
+      registerModel("IndexErrorsPerson", IndexErrorsPerson);
+      registerModel("IndexErrorsReference", IndexErrorsReference);
       Associations.hasMany.call(Person, "references", {
         autosave: true,
         indexErrors: true,
-        className: "Reference",
+        className: "IndexErrorsReference",
         foreignKey: "person_id",
       });
 
-      const refValid = new Reference({ favorite: true, job_id: 1 });
-      const refInvalid = new Reference({ favorite: false });
+      const refValid = new IndexErrorsReference({ favorite: true, job_id: 1 });
+      const refInvalid = new IndexErrorsReference({ favorite: false });
       const p = new Person({});
       cacheAssoc(p, "references", [refValid, refInvalid]);
 
@@ -2453,13 +2432,15 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     I18n.storeTranslations("en", {
       activerecord: {
         attributes: {
-          person: { reference: "Super reference" },
+          // Rails keys this on `person`; the owner here is a bespoke stand-in,
+          // so the i18n key follows its underscored name.
+          base_errors_person: { reference: "Super reference" },
           reference: { base: "" },
         },
       },
     });
     try {
-      class Reference extends Base {
+      class BaseErrorsReference extends Base {
         declare favorite: boolean | null;
         declare job_id: number | null;
         declare person_id: number | null;
@@ -2474,19 +2455,21 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
           this.validates("job_id", { presence: true });
         }
       }
-      class Person extends Base {
+      class BaseErrorsPerson extends Base {
         declare name: string | null;
 
         static {
+          this._tableName = "people";
           this.attribute("name", "string");
           this.validates("reference", { presence: true });
         }
       }
-      registerModel("Person", Person);
-      registerModel("Reference", Reference);
+      const Person = BaseErrorsPerson;
+      registerModel("BaseErrorsPerson", BaseErrorsPerson);
+      registerModel("BaseErrorsReference", BaseErrorsReference);
       Associations.hasOne.call(Person, "reference", {
         autosave: true,
-        className: "Reference",
+        className: "BaseErrorsReference",
         foreignKey: "person_id",
       });
 
@@ -2494,7 +2477,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
       expect(await p.isValid()).toBe(false);
       expect(p.errors.fullMessages).toEqual(["Super reference can't be blank"]);
 
-      const refInvalid = new Reference({ favorite: false });
+      const refInvalid = new BaseErrorsReference({ favorite: false });
       cacheAssoc(p, "reference", refInvalid);
       expect(await refInvalid.isValid()).toBe(false);
       expect(await p.isValid()).toBe(false);
@@ -2554,7 +2537,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     // Rails: test "autosave does not pass through non custom validation contexts"
     // When autosave validates an associated record, it should NOT pass the owner's
     // standard (:create/:update) validation context — only custom contexts propagate.
-    class Person extends Base {
+    class ContextPerson extends Base {
       declare first_name: string | null;
 
       static {
@@ -2571,21 +2554,24 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         );
       }
     }
-    class Reference extends Base {
+    class ContextReference extends Base {
       declare person_id: number | null;
+      declare person: ContextPerson | null;
+      declare loadBelongsTo: (name: "person") => Promise<ContextPerson | null>;
 
       static {
         this._tableName = "references";
         this.attribute("person_id", "integer");
+        this.belongsTo("person", {
+          autosave: true,
+          className: "ContextPerson",
+          foreignKey: "person_id",
+        });
       }
     }
-    registerModel("Person", Person);
-    registerModel("Reference", Reference);
-    Associations.belongsTo.call(Reference, "person", {
-      autosave: true,
-      className: "Person",
-      foreignKey: "person_id",
-    });
+    const Person = ContextPerson;
+    registerModel("ContextPerson", ContextPerson);
+    registerModel("ContextReference", ContextReference);
 
     const person = await Person.create({ first_name: "cool" });
     // Change to "nah" — still valid because on:create validator doesn't run in :update context
@@ -2595,7 +2581,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     // autosave through reference should also be valid —
     // autosave uses the owner's _validationContext (nil → not custom) so person is validated
     // in its default :update context, where the :create-only validator is skipped.
-    const ref = new Reference({ person });
+    const ref = new ContextReference({ person });
     cacheAssoc(ref, "person", person);
     const valid = await ref.isValid();
     expect(valid).toBe(true);
@@ -2616,7 +2602,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         this.validates("name", { presence: true, on: "publish" } as any);
       }
     }
-    class Owner extends Base {
+    class WidgetOwner extends Base {
       declare name: string | null;
       declare widgets: AssociationProxy<Widget>;
 
@@ -2626,8 +2612,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         this.hasMany("widgets", { autosave: true, foreignKey: "author_id" });
       }
     }
+    const Owner = WidgetOwner;
     registerModel("Widget", Widget);
-    registerModel("Owner", Owner);
+    registerModel("WidgetOwner", WidgetOwner);
 
     const owner = await Owner.create({ name: "Alice" });
     // Create a persisted, unchanged widget with a blank status
@@ -2700,7 +2687,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         });
       }
     }
-    class User extends Base {
+    class ProfileUser extends Base {
       declare name: string | null;
 
       static {
@@ -2708,8 +2695,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         this.attribute("name", "string");
       }
     }
+    const User = ProfileUser;
     registerModel("Profile", Profile);
-    registerModel("User", User);
+    registerModel("ProfileUser", ProfileUser);
     Associations.hasOne.call(User, "profile", {
       autosave: true,
       foreignKey: "author_id",
@@ -2958,7 +2946,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         });
       }
     }
-    class User extends Base {
+    class ProfileUser extends Base {
       declare name: string | null;
 
       static {
@@ -2966,8 +2954,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         this.attribute("name", "string");
       }
     }
+    const User = ProfileUser;
     registerModel("Profile", Profile);
-    registerModel("User", User);
+    registerModel("ProfileUser", ProfileUser);
     Associations.hasOne.call(User, "profile", {
       autosave: true,
       foreignKey: "author_id",
@@ -3647,7 +3636,7 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
         this.attribute("author_id", "integer");
       }
     }
-    class User extends Base {
+    class ProfileUser extends Base {
       declare name: string | null;
 
       static {
@@ -3655,8 +3644,9 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
         this.attribute("name", "string");
       }
     }
+    const User = ProfileUser;
     registerModel("Profile", Profile);
-    registerModel("User", User);
+    registerModel("ProfileUser", ProfileUser);
     Associations.hasOne.call(User, "profile", {
       autosave: false,
       foreignKey: "author_id",
@@ -3736,59 +3726,11 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
   });
 
   it("autosave new record with after create callback and habtm association", async () => {
-    class Comment extends Base {
-      declare post_id: number | null;
-      declare body: string | null;
-
-      static {
-        this._tableName = "comments";
-        this.attribute("post_id", "integer");
-        this.attribute("body", "string");
-      }
-    }
-    class Category extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "categories";
-        this.attribute("name", "string");
-      }
-    }
-    class PostWithAfterCreateCallback extends Base {
-      declare title: string | null;
-      declare body: string | null;
-      declare author_id: number | null;
-      declare comments: AssociationProxy<Comment>;
-      declare categories: AssociationProxy<Category>;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-        this.attribute("author_id", "integer");
-        this.hasMany("comments", {
-          className: "HabtmAutosaveComment",
-          foreignKey: "post_id",
-        });
-        this.hasAndBelongsToMany("categories", {
-          className: "HabtmAutosaveCategory",
-          joinTable: "categories_posts",
-          foreignKey: "post_id",
-          associationForeignKey: "category_id",
-          autosave: true,
-        });
-      }
-    }
-    registerModel("HabtmAutosaveComment", Comment);
-    registerModel("HabtmAutosaveCategory", Category);
-    registerModel("PostWithAfterCreateCallback", PostWithAfterCreateCallback);
-    // Registered after the association so the habtm autosave after_create
-    // callback fires first — matching Rails, where `has_and_belongs_to_many`
-    // is declared before the model's own `after_create` block.
-    PostWithAfterCreateCallback.afterCreate(async (post: any) => {
-      const firstComment = post.association("comments").target[0];
-      await post.updateAttribute("author_id", firstComment.id);
-    });
+    registerModel(PostWithAfterCreateCallback);
+    // Comment belongsTo post (counter cache) resolves "Post" at save time.
+    registerModel(CanonicalPost);
+    registerModel(CanonicalComment);
+    registerModel(CanonicalCategory);
 
     const post = new PostWithAfterCreateCallback({
       title: "Captain Murphy",
