@@ -7,15 +7,18 @@ import os from "os";
 // headroom over the worker count — see test-helpers/ar-db-slots.ts (slots =
 // workers + headroom, or an explicit AR_DB_SLOTS override). TRAILS_TEST_FORKS
 // caps the vitest worker count so that concurrent local worktrees don't
-// saturate the machine. Precedence: TRAILS_TEST_FORKS > AR_DB_FORKS > 6.
-// Raise with TRAILS_TEST_FORKS=N for a solo full run; the live AR DB jobs
-// (postgres-tests, mysql-tests, maria-tests) all set AR_DB_FORKS=8.
+// saturate the machine. Precedence: TRAILS_TEST_FORKS > AR_DB_FORKS > 6,
+// all capped by the host ceiling below. Raise with TRAILS_TEST_FORKS=N for a
+// solo full run; the live AR DB jobs (postgres-tests, mysql-tests,
+// maria-tests) set AR_DB_FORKS=3, which is that ceiling on the 4-vCPU runner.
 //
-// On the 2-vCPU hosted runner, 8 forks is empirically not over-subscribed for
-// this suite: a measured sweep (story tune-ar-db-forks-to-runner-cores, RFC
-// 0028) found forks=8 and forks=4 wall-clock-indistinguishable (~571s vs ~574s
-// median over 5 runs) because the DDL-heavy suite is IO-bound on the tmpfs DB,
-// so extra forks overlap IO waits rather than contend for the 2 cores.
+// Historical note: those jobs used to set AR_DB_FORKS=8, but the per-project
+// `maxForks` was a vitest-3 no-op, so every CI run actually ran at vitest's
+// own `numCpus - 1` fallback. The 8 only inflated the advisory-slot pool
+// (ar-db-slots.ts sizes it from AR_DB_FORKS + 2) with slot DBs no worker could
+// ever claim. The tune-ar-db-forks-to-runner-cores sweep (RFC 0028) that found
+// forks=8 and forks=4 wall-clock-indistinguishable was comparing the clamped
+// fallback against itself, so it says nothing about 8 forks either way.
 //
 // forks=2 used to fail deterministically in that sweep (acquireAdvisorySlotPg
 // threw "all 2 advisory lock slots are held" after its bounded 5s retry) — not
@@ -84,8 +87,9 @@ const _parsedForks = parseInt(process.env.TRAILS_TEST_FORKS ?? process.env.AR_DB
 // Clamp to vitest's own host-derived ceiling (numCpus - 1): while the root
 // maxForks cap was a per-project no-op, that ceiling is what every run
 // actually used, and the suite's timeouts are tuned to it — on the 4-vCPU CI
-// runner, honoring AR_DB_FORKS=8 outright oversubscribes PG enough to push
-// the full-DB schema-dump tests past their 5s timeout. The env vars can only
+// runner, honoring a fork count above it (AR_DB_FORKS=8, as CI used to set)
+// oversubscribes PG enough to push the full-DB schema-dump tests past their
+// 5s timeout. The env vars can only
 // lower the cap, never raise it past the host. The advisory-slot pool still
 // sizes from AR_DB_FORKS (ar-db-slots.ts), so it can only over-provision.
 const _hostForkCap = Math.max(os.availableParallelism() - 1, 1);
