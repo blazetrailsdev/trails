@@ -489,6 +489,27 @@ export const ALREADY_PREDICATE_PREFIXES = [
 const ALREADY_PREDICATE_RE = new RegExp(`^(${ALREADY_PREDICATE_PREFIXES.join("|")})`);
 
 /**
+ * Bare Ruby predicates whose faithful TS port is a native JS *containment*
+ * spelling rather than either camel form. `include?` ports to `.includes()`,
+ * so without this the only candidates are `isInclude` / `include` — neither of
+ * which exists on a JS string or array, and every such port had to be
+ * hand-excluded from the wide call ratchet.
+ *
+ * The extra name is appended as a LAST candidate, so ports that already spell
+ * `isInclude()` (CollectionAssociation, Clusivity) keep matching exactly as
+ * before; this only widens what counts, it can never take a match away.
+ */
+const CONTAINMENT_PREDICATE_ALIASES = new Map<string, string>([
+  // `member?` is a Ruby alias of `include?` in Rails (finder_methods.rb,
+  // strong_parameters.rb), so it gets the same containment spelling.
+  ["include?", "includes"],
+  ["member?", "includes"],
+  // ActiveSupport's `exclude?` (Enumerable/String core-ext) is the negation;
+  // a port spells it `excludes`.
+  ["exclude?", "excludes"],
+]);
+
+/**
  * Convert Ruby method name → candidate TS names to try matching.
  *
  * Returns null if the method should be skipped entirely. Otherwise
@@ -508,6 +529,9 @@ const ALREADY_PREDICATE_RE = new RegExp(`^(${ALREADY_PREDICATE_PREFIXES.join("|"
  *     `Model.hasOne` association declaration.
  *   - Bare predicates (`valid?`, `blank?`) return both forms with the
  *     isPrefixed form first (`valid?` → ["isValid", "valid"]).
+ *   - Containment predicates (`include?`, `member?`, `exclude?`) append
+ *     the native JS spelling as a final candidate
+ *     (`include?` → ["isInclude", "include", "includes"]).
  */
 export function rubyMethodToTs(name: string): string[] | null {
   if (OPERATORS.has(name)) return null;
@@ -547,6 +571,10 @@ export function rubyMethodToTs(name: string): string[] | null {
     // association declaration).
     if (ALREADY_PREDICATE_RE.test(camel)) {
       return [camel, isPrefixed];
+    }
+    const containment = CONTAINMENT_PREDICATE_ALIASES.get(name);
+    if (containment !== undefined) {
+      return [isPrefixed, camel, containment];
     }
     return [isPrefixed, camel];
   }
@@ -599,6 +627,10 @@ export function explainConventions(): string {
   // subset) so the row can't name a different set than the matcher uses.
   const predicatePrefixes = ALREADY_PREDICATE_PREFIXES.map((p) => `\`${p}_*?\``).join(" / ");
 
+  const containmentPredicates = [...CONTAINMENT_PREDICATE_ALIASES.keys()]
+    .map((n) => `\`${n}\``)
+    .join(" / ");
+
   const skipSections = SKIP_GROUPS.map((g) => {
     const names = g.names.map((n) => `\`${n}\``).join(", ");
     return `- ${g.reason}\n  - ${names}`;
@@ -637,6 +669,7 @@ matches the first candidate present in the target file), not a call expression.
 | \`predicate?\` (bare) | \`is*\` prefix, camel fallback | \`valid?\` → ${example("valid?")} |
 | \`is_*?\` | camel form only (no doubled \`isIs*\`) | \`is_number?\` → ${example("is_number?")} |
 | ${predicatePrefixes} | camel form + \`is*\` fallback | \`has_attribute?\` → ${example("has_attribute?")} |
+| ${containmentPredicates} | \`is*\` / camel / native JS spelling | \`include?\` → ${example("include?")} |
 | \`name!\` (bang) | \`*Bang\` suffix | \`save!\` → ${example("save!")} |
 | \`name=\` (setter) | bare camel name | \`table_name=\` → ${example("table_name=")} |
 | \`initialize\` / \`new\` | \`constructor\` | \`initialize\` → ${example("initialize")} |

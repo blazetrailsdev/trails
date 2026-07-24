@@ -139,6 +139,20 @@ describe("rubyMethodToTs predicates", () => {
     expect(rubyMethodToTs("can_load?")).toEqual(["canLoad", "isCanLoad"]);
     expect(rubyMethodToTs("should_retry?")).toEqual(["shouldRetry", "isShouldRetry"]);
   });
+
+  it("offers the native JS containment spelling for include?/member?/exclude?", () => {
+    // A faithful `.includes()` port has neither camel candidate, so without
+    // the third candidate every such port needs a bespoke ratchet exclude.
+    expect(rubyMethodToTs("include?")).toEqual(["isInclude", "include", "includes"]);
+    expect(rubyMethodToTs("member?")).toEqual(["isMember", "member", "includes"]);
+    expect(rubyMethodToTs("exclude?")).toEqual(["isExclude", "exclude", "excludes"]);
+  });
+
+  it("keeps the containment spelling last so existing isInclude ports still match first", () => {
+    // CollectionAssociation#isInclude and Clusivity#isInclude are live ports;
+    // widening the candidate list must never displace them.
+    expect(rubyMethodToTs("include?")?.[0]).toBe("isInclude");
+  });
 });
 
 describe("rubyFileToTs", () => {

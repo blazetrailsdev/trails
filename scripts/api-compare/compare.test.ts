@@ -286,8 +286,14 @@ describe("jsEnumerableAliases", () => {
   it("maps the core Ruby Enumerable names to their JS analogues", () => {
     expect(jsEnumerableAliases("any?")).toContain("some");
     expect(jsEnumerableAliases("all?")).toContain("every");
-    expect(jsEnumerableAliases("include?")).toContain("includes");
+    expect(jsEnumerableAliases("include?")).toContain("has");
     expect(jsEnumerableAliases("select")).toContain("filter");
+  });
+
+  it("treats a negated containment call as exclude?'s analogue", () => {
+    // ActiveSupport's `exclude?` is `!include?`; ports spell it
+    // `!xs.includes(y)` (query-methods.ts) or `!set.has(y)`.
+    expect(jsEnumerableAliases("exclude?")).toEqual(["includes", "has"]);
   });
 
   it("returns an empty list for a name with no JS analogue", () => {

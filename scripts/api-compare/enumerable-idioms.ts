@@ -20,8 +20,17 @@ export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
   ["all?", ["every"]],
   ["none?", ["some", "every"]],
   ["one?", ["filter"]],
-  ["include?", ["includes", "has"]],
-  ["member?", ["includes", "has"]],
+  // `includes` is omitted here on purpose: it is now a naming-convention
+  // candidate for these two (CONTAINMENT_PREDICATE_ALIASES in conventions.ts),
+  // and conventions.test.ts fails on an alias the conventions already produce.
+  ["include?", ["has"]],
+  ["member?", ["has"]],
+  // ActiveSupport's `exclude?` is `!include?`, so the containment call is the
+  // whole call — ports spell it `!xs.includes(y)` / `!set.has(y)`. As with
+  // `none? → some/every` above, the ratchet only checks that the file makes a
+  // call by that NAME; the leading `!` is not verified. (The convention
+  // candidate for a method NAMED `exclude?` is `excludes`, so no overlap.)
+  ["exclude?", ["includes", "has"]],
   ["key?", ["has"]],
   ["has_key?", ["has"]],
   ["select", ["filter"]],
