@@ -136,8 +136,6 @@ describe("buildAdapterArg", () => {
     });
 
     it("forwards socket untouched for mysql and omits host", () => {
-      // Mysql2Adapter#constructor owns the socket -> socketPath mapping; this
-      // layer must not shadow it (see adapter-socket-key.trails.test.ts).
       const [config] = buildAdapterArg("mysql2", {
         adapter: "mysql2",
         database: "db",
