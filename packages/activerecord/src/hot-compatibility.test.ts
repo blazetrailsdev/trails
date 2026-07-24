@@ -120,104 +120,75 @@ describe("HotCompatibilityTest", () => {
     }
   });
 
+  // Both PG tests share Rails' body verbatim (create the record, warm the reload
+  // plan in a transaction, `add_column` on the second connection, then assert the
+  // stale re-run raises PreparedStatementCacheExpired and drains the cache); they
+  // differ only in the transaction nesting around the failing reload, which the
+  // caller supplies as `staleReload`.
+  async function assertPreparedStatementCleanup(
+    ddlConnection: DatabaseAdapter,
+    staleReload: (model: typeof Base, record: { reload(): Promise<unknown> }) => Promise<unknown>,
+  ): Promise<void> {
+    const adapter = Base.connection;
+    await new MigrationContext(adapter).createTable("hot_compatibilities", { force: true }, (t) => {
+      t.string("foo");
+      t.string("bar");
+    });
+    try {
+      class HotCompatibility extends Base {}
+      HotCompatibility.tableName = "hot_compatibilities";
+      (HotCompatibility as unknown as { adapter: DatabaseAdapter }).adapter = adapter;
+
+      const record = await HotCompatibility.create({ bar: "bar" });
+
+      // prepare the reload statement in a transaction
+      await HotCompatibility.transaction(async () => {
+        await record.reload();
+      });
+
+      expect(preparedStatementCacheSize(adapter)).toBeGreaterThan(0);
+
+      // add a new column on the second connection
+      await new MigrationContext(ddlConnection).addColumn("hot_compatibilities", "baz", "string");
+
+      await expect(staleReload(HotCompatibility, record)).rejects.toBeInstanceOf(
+        PreparedStatementCacheExpired,
+      );
+
+      expect(preparedStatementCacheSize(adapter)).toBe(0);
+    } finally {
+      await new MigrationContext(adapter).dropTable("hot_compatibilities", { ifExists: true });
+    }
+  }
+
   // Rails gates these on current_adapter?(:PostgreSQL) + prepared_statements.
   it.skipIf(adapterType !== "postgres")(
     "cleans up after prepared statement failure in a transaction",
     async () => {
-      await withTwoConnections(async (ddlConnection) => {
-        const adapter = Base.connection;
-        await new MigrationContext(adapter).createTable(
-          "hot_compatibilities",
-          { force: true },
-          (t) => {
-            t.string("foo");
-            t.string("bar");
-          },
-        );
-        try {
-          class HotCompatibility extends Base {}
-          HotCompatibility.tableName = "hot_compatibilities";
-          (HotCompatibility as unknown as { adapter: DatabaseAdapter }).adapter = adapter;
-
-          const record = await HotCompatibility.create({ bar: "bar" });
-
-          // prepare the reload statement in a transaction
-          await HotCompatibility.transaction(async () => {
+      await withTwoConnections((ddlConnection) =>
+        assertPreparedStatementCleanup(ddlConnection, (model, record) =>
+          model.transaction(async () => {
             await record.reload();
-          });
-
-          expect(preparedStatementCacheSize(adapter)).toBeGreaterThan(0);
-
-          // add a new column on the second connection
-          await new MigrationContext(ddlConnection).addColumn(
-            "hot_compatibilities",
-            "baz",
-            "string",
-          );
-
-          await expect(
-            HotCompatibility.transaction(async () => {
-              await record.reload();
-            }),
-          ).rejects.toBeInstanceOf(PreparedStatementCacheExpired);
-
-          expect(preparedStatementCacheSize(adapter)).toBe(0);
-        } finally {
-          await new MigrationContext(adapter).dropTable("hot_compatibilities", { ifExists: true });
-        }
-      });
+          }),
+        ),
+      );
     },
   );
 
   it.skipIf(adapterType !== "postgres")(
     "cleans up after prepared statement failure in nested transactions",
     async () => {
-      await withTwoConnections(async (ddlConnection) => {
-        const adapter = Base.connection;
-        await new MigrationContext(adapter).createTable(
-          "hot_compatibilities",
-          { force: true },
-          (t) => {
-            t.string("foo");
-            t.string("bar");
-          },
-        );
-        try {
-          class HotCompatibility extends Base {}
-          HotCompatibility.tableName = "hot_compatibilities";
-          (HotCompatibility as unknown as { adapter: DatabaseAdapter }).adapter = adapter;
-
-          const record = await HotCompatibility.create({ bar: "bar" });
-
-          // prepare the reload statement in a transaction
-          await HotCompatibility.transaction(async () => {
-            await record.reload();
-          });
-
-          expect(preparedStatementCacheSize(adapter)).toBeGreaterThan(0);
-
-          // add a new column on the second connection
-          await new MigrationContext(ddlConnection).addColumn(
-            "hot_compatibilities",
-            "baz",
-            "string",
-          );
-
-          await expect(
-            HotCompatibility.transaction(async () => {
-              await HotCompatibility.transaction(async () => {
-                await HotCompatibility.transaction(async () => {
-                  await record.reload();
-                });
+      await withTwoConnections((ddlConnection) =>
+        assertPreparedStatementCleanup(ddlConnection, (model, record) =>
+          model.transaction(async () => {
+            await model.transaction(async () => {
+              await model.transaction(async () => {
+                await record.reload();
               });
-            }),
-          ).rejects.toBeInstanceOf(PreparedStatementCacheExpired);
-
-          expect(preparedStatementCacheSize(adapter)).toBe(0);
-        } finally {
-          await new MigrationContext(adapter).dropTable("hot_compatibilities", { ifExists: true });
-        }
-      });
+            });
+          }),
+        ),
+      );
     },
   );
 });
