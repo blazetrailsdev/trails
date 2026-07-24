@@ -11,7 +11,7 @@
 
 import { getEnv, getOsAsync } from "@blazetrails/activesupport";
 import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
-import type { Schema, ColumnSpec, TableSchema, IndexSpec } from "./schema-types.js";
+import type { Schema, ColumnSpec, TableSchema, IndexSpec, ForeignKeySpec } from "./schema-types.js";
 
 const SCHEMA_TO_AR: Record<string, string> = { big_integer: "bigint" };
 
@@ -23,6 +23,7 @@ function isWrapped(t: TableSchema): t is {
   columns: Record<string, ColumnSpec>;
   primaryKey?: string[] | false;
   indexes?: IndexSpec[];
+  foreignKeys?: ForeignKeySpec[];
 } {
   if (!t || typeof t !== "object") return false;
   if (!("columns" in t)) return false;
@@ -31,6 +32,7 @@ function isWrapped(t: TableSchema): t is {
     if (pk !== false && !Array.isArray(pk)) return false;
     return true;
   }
+  if (Array.isArray((t as { foreignKeys?: unknown }).foreignKeys)) return true;
   return Array.isArray((t as { indexes?: unknown }).indexes);
 }
 
@@ -44,6 +46,10 @@ function primaryKeyOf(t: TableSchema): string[] | false | undefined {
 
 function indexesOf(t: TableSchema): IndexSpec[] {
   return isWrapped(t) ? ((t as { indexes?: IndexSpec[] }).indexes ?? []) : [];
+}
+
+function foreignKeysOf(t: TableSchema): ForeignKeySpec[] {
+  return isWrapped(t) ? ((t as { foreignKeys?: ForeignKeySpec[] }).foreignKeys ?? []) : [];
 }
 
 // `integer` and `big_integer` both map to an auto-increment serial/identity PK
@@ -125,6 +131,17 @@ function generateCode(
   // drop+recreate instead — safe for concurrent workers on a shared DB.
   const needsForce = adapterName === "postgres" || adapterName === "mysql";
 
+  // A referencing table must go before the table it points at: PG/MySQL below
+  // drop+recreate each table in declaration order, and a live child FK blocks
+  // (MySQL) or cascades away (PG) the parent's drop. Dropping every FK-carrying
+  // table up front keeps the per-table `force: "cascade"` recreate safe.
+  if (needsForce) {
+    for (const [tableName, tableSpec] of Object.entries(schema)) {
+      if (foreignKeysOf(tableSpec).length === 0) continue;
+      lines.push(`  await ctx.dropTable(${JSON.stringify(tableName)}, { ifExists: true });`);
+    }
+  }
+
   for (const [tableName, tableSpec] of Object.entries(schema)) {
     const cols = columnsOf(tableSpec);
     const pk = primaryKeyOf(tableSpec);
@@ -151,8 +168,20 @@ function generateCode(
     if (needsForce) tOptsEntries.push(`force: "cascade"`);
     const tOpts = tOptsEntries.length === 0 ? `{}` : `{ ${tOptsEntries.join(", ")} }`;
 
+    // Foreign keys ride inside the create-table block (Rails `t.foreign_key`),
+    // so a table declaring one always emits a block even with no columns.
+    const fks = foreignKeysOf(tableSpec);
+    const fkLines = fks.map(
+      (fk) =>
+        `    t.foreignKey(${JSON.stringify(fk.toTable)}, ${JSON.stringify({
+          column: fk.column,
+          ...(fk.primaryKey === undefined ? {} : { primaryKey: fk.primaryKey }),
+          ...(fk.name === undefined ? {} : { name: fk.name }),
+        })});`,
+    );
+
     const colEntries = Object.entries(cols);
-    if (colEntries.length === 0) {
+    if (colEntries.length === 0 && fkLines.length === 0) {
       lines.push(`  await ctx.createTable(${JSON.stringify(tableName)}, ${tOpts});`);
     } else {
       lines.push(`  await ctx.createTable(${JSON.stringify(tableName)}, ${tOpts}, (t) => {`);
@@ -172,6 +201,7 @@ function generateCode(
           `    t.column(${JSON.stringify(colName)}, ${JSON.stringify(toArType(primitive))}, ${colOpts(colSpec, colName, cpkCols, primitive, adapterName)});`,
         );
       }
+      lines.push(...fkLines);
       lines.push(`  });`);
     }
 

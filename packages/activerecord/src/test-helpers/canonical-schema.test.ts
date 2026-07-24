@@ -70,6 +70,23 @@ describe("rebuildCanonicalTables", () => {
     }
   });
 
+  test("rebuilds a referencing table when only its target was named", async () => {
+    const adapter = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
+    try {
+      await loadCanonicalSchema(adapter);
+      const canonical = await dumpSchema(adapter);
+
+      // Naming only the FK target must still restore the child: MySQL refuses to
+      // drop a table a live foreign key points at.
+      await rebuildCanonicalTables(adapter, ["fk_test_has_pk"]);
+      const dump = await dumpSchema(adapter);
+      expect(dump).toBe(canonical);
+      expect(dump).toContain('CONSTRAINT "fk_name" FOREIGN KEY ("fk_id")');
+    } finally {
+      await (adapter as unknown as BetterSQLite3Adapter).close();
+    }
+  });
+
   test("throws on an unknown canonical table name", async () => {
     const adapter = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
     try {

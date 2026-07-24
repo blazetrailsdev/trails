@@ -11,7 +11,6 @@
 // express (deliberately dropped during the port — fixture-row tests
 // don't depend on them):
 //   - secondary indexes / expression indexes
-//   - foreign-key constraints (add_foreign_key)
 //   - identifier-length stress columns (t.string "a" * max_identifier_length)
 //   - polymorphic helper (modeled directly as `<name>_id` + `<name>_type`)
 
@@ -1652,9 +1651,7 @@ export const TEST_SCHEMA: Schema = {
   records: {},
 
   // Rails declares `primary_key: "pk_id"` — DB-level PK on a non-`id`
-  // column; no synthetic `id`. The foreign_key constraint Rails declares
-  // on fk_test_has_fk is dropped (defineSchema can't express FKs; see
-  // header note).
+  // column; no synthetic `id`.
   fk_test_has_pk: {
     columns: {
       pk_id: { type: "integer", null: false },
@@ -1662,7 +1659,12 @@ export const TEST_SCHEMA: Schema = {
     primaryKey: ["pk_id"],
   },
   fk_test_has_fk: {
-    fk_id: { type: "integer", null: false },
+    columns: {
+      fk_id: { type: "integer", null: false },
+    },
+    foreignKeys: [
+      { toTable: "fk_test_has_pk", column: "fk_id", primaryKey: "pk_id", name: "fk_name" },
+    ],
   },
 
   fk_object_to_point_tos: {},
