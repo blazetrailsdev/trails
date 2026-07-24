@@ -1323,93 +1323,13 @@ describe("ReflectionTest", () => {
   });
 
   it("nested?", () => {
-    class NPost extends Base {
-      declare author_id: number | null;
-      declare comments: AssociationProxy<NComment>;
-      declare taggings: AssociationProxy<NTagging>;
-      declare tags: AssociationProxy<Base>;
-
-      static {
-        this.attribute("author_id", "integer");
-        this.hasMany("comments", { className: "NComment" });
-        this.hasMany("taggings", { className: "NTagging" });
-        this.hasMany("tags", { through: "taggings", className: "NTag" });
-      }
-    }
-    class NComment extends Base {
-      declare post_id: number | null;
-      declare post: NPost | null;
-      declare loadBelongsTo: (name: "post") => Promise<NPost | null>;
-
-      static {
-        this.attribute("post_id", "integer");
-        this.belongsTo("post", { className: "NPost" });
-      }
-    }
-    class NTagging extends Base {
-      declare post_id: number | null;
-      declare tag_id: number | null;
-      declare post: NPost | null;
-      declare tag: NTag | null;
-      declare loadBelongsTo: ((name: "post") => Promise<NPost | null>) &
-        ((name: "tag") => Promise<NTag | null>);
-
-      static {
-        this.attribute("post_id", "integer");
-        this.attribute("tag_id", "integer");
-        this.belongsTo("post", { className: "NPost" });
-        this.belongsTo("tag", { className: "NTag" });
-      }
-    }
-    class NTag extends Base {
-      declare name: string | null;
-
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class NAuthor extends Base {
-      declare name: string | null;
-      declare posts: AssociationProxy<NPost>;
-      declare comments: AssociationProxy<Base>;
-      declare tags: AssociationProxy<Base>;
-
-      static {
-        this.attribute("name", "string");
-        this.hasMany("posts", { className: "NPost" });
-        this.hasMany("comments", { through: "posts", source: "comments" });
-        this.hasMany("tags", { through: "posts", source: "tags" });
-      }
-    }
-    class NCategory extends Base {
-      declare name: string | null;
-      declare posts: AssociationProxy<NPost>;
-      declare postComments: AssociationProxy<Base>;
-
-      static {
-        this.attribute("name", "string");
-        this.hasAndBelongsToMany("posts", { className: "NPost" });
-        this.hasMany("postComments", {
-          through: "posts",
-          source: "comments",
-          className: "NComment",
-        });
-      }
-    }
-    registerModel("NPost", NPost);
-    registerModel("NComment", NComment);
-    registerModel("NTagging", NTagging);
-    registerModel("NTag", NTag);
-    registerModel("NAuthor", NAuthor);
-    registerModel("NCategory", NCategory);
-
-    const commentsRef = reflectOnAssociation(NAuthor, "comments") as ThroughReflection;
+    const commentsRef = reflectOnAssociation(Author, "comments") as ThroughReflection;
     expect(commentsRef.isNested()).toBe(false);
 
-    const tagsRef = reflectOnAssociation(NAuthor, "tags") as ThroughReflection;
+    const tagsRef = reflectOnAssociation(Author, "tags") as ThroughReflection;
     expect(tagsRef.isNested()).toBe(true);
 
-    const postCommentsRef = reflectOnAssociation(NCategory, "postComments") as ThroughReflection;
+    const postCommentsRef = reflectOnAssociation(Category, "postComments") as ThroughReflection;
     expect(postCommentsRef.isNested()).toBe(true);
   });
 
