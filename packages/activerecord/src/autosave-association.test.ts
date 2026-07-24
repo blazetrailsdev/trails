@@ -4093,8 +4093,6 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
           className: "HabtmAutosaveCategory",
           joinTable: "categories_posts",
           foreignKey: "post_id",
-          // The join-table column is derived from `className`, which no longer
-          // matches the canonical "Category" name the table was built for.
           associationForeignKey: "category_id",
           autosave: true,
         });
