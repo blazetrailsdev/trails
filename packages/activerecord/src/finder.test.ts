@@ -16,6 +16,7 @@ import { sql as arelSql } from "@blazetrails/arel";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { postFixtureData } from "./test-helpers/fixtures/posts.js";
 import { Account } from "./test-helpers/models/account.js";
+import { Client } from "./test-helpers/models/company.js";
 import "./test-helpers/canonical-model-index.js";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 import { adapterType } from "./test-adapter.js";
@@ -1503,11 +1504,17 @@ describe("FinderTest", () => {
 // FinderTest2 — additional coverage for finder_test.rb
 // ==========================================================================
 describe("FinderTest", () => {
-  const { posts, topics, accounts } = fixtures(["posts", "topics", "accounts", "companies"]);
+  const { posts, topics, accounts, companies } = fixtures([
+    "posts",
+    "topics",
+    "accounts",
+    "companies",
+  ]);
   registerModel(CanonicalPost);
   registerModel("Topic", CanonicalTopic);
   registerModel(Account);
   registerModel(CanonicalCompany);
+  registerModel(Client);
   const Post = CanonicalPost;
   const rid = (r: unknown) => (r as { id: number }).id;
 
@@ -1540,8 +1547,12 @@ describe("FinderTest", () => {
   });
 
   it("first have determined order by default", async () => {
-    const first = await Post.first();
-    expect(rid(first)).toBe(rid(posts("welcome")));
+    const expected = [companies("second_client"), companies("another_client")];
+    const clients = Client.where({ name: expected.map((c) => (c as { name: string }).name) });
+
+    expect((await clients.first(2)).map(rid)).toEqual(expected.map(rid));
+    expect((await clients.limit(5).first(2)).map(rid)).toEqual(expected.map(rid));
+    expect((await clients.order(null).first(2)).map(rid)).toEqual(expected.map(rid));
   });
 
   it("find without primary key", async () => {
