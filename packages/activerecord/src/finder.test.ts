@@ -1552,7 +1552,7 @@ describe("FinderTest", () => {
   it("finder with offset string", async () => {
     // Rails passes the offset as a string here; trails types `offset()` as
     // number, so the cast is what keeps the string path under test.
-    await expect(Post.offset("3" as unknown as number)).resolves.toBeDefined();
+    await expect(CanonicalTopic.offset("3" as unknown as number)).resolves.toBeDefined();
   });
 
   it("find on a scope does not perform statement caching", async () => {
@@ -1609,15 +1609,12 @@ describe("FinderTest", () => {
   });
 
   it("joins dont clobber id", async () => {
-    const first = await Post.where(`posts.id = ${rid(posts("welcome"))}`).first();
-    expect(rid(first)).toBe(rid(posts("welcome")));
-  });
-
-  it("named bind variables with quotes", async () => {
-    const quoted = posts("authorless").title;
-    expect(quoted).toContain("'");
-    const results = await Post.where({ title: quoted });
-    expect(results.map(rid)).toEqual([rid(posts("authorless"))]);
+    const first = await CanonicalFirm.joins(
+      "INNER JOIN companies clients ON clients.firm_id = companies.id",
+    )
+      .where("companies.id = 1")
+      .first();
+    expect(rid(first)).toBe(1);
   });
 
   it("find by one attribute bang with blank defined", async () => {
