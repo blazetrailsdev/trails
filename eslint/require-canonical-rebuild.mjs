@@ -40,10 +40,11 @@
  *     the set can't be read statically, so the file is treated as restoring
  *     everything rather than guessed at (no false positives).
  *
- * Files that operate on a private `:memory:` adapter never touch the shared
- * per-worker database and so cannot drift it; they are excluded in
- * eslint.config.mjs via `eslint/require-canonical-rebuild-exclude.json`, the
- * same pattern `require-table-teardown-raw-sql-exclude.json` uses.
+ * Exemptions live in `eslint/require-canonical-rebuild-exclude.json`, on the
+ * same pattern `require-table-teardown-raw-sql-exclude.json` uses, split into
+ * two groups: `memoryScoped` files own a private `:memory:` adapter, never
+ * touch the shared per-worker database, and are permanently exempt; `backlog`
+ * files really do leave a canonical table dropped and are ratcheted to zero.
  */
 
 import { calledName, staticString, rawDropNames, SQL_SINKS } from "./require-table-teardown.mjs";
@@ -92,7 +93,7 @@ const rule = {
     ],
     messages: {
       missingRebuild:
-        'Canonical table `{{table}}` is dropped but never restored in this file. Add `await rebuildCanonicalTables(adapter, ["{{table}}"])` after the drop. A canonical table left dropped drifts the shared per-worker database for every file that runs next. If this file owns a private `:memory:` adapter, add it to eslint/require-canonical-rebuild-exclude.json.',
+        'Canonical table `{{table}}` is dropped but never restored in this file. Add `await rebuildCanonicalTables(adapter, ["{{table}}"])` after the drop. A canonical table left dropped drifts the shared per-worker database for every file that runs next. If this file owns a private `:memory:` adapter it cannot drift the shared database — add it to the `memoryScoped` group in eslint/require-canonical-rebuild-exclude.json.',
     },
   },
 
@@ -116,10 +117,14 @@ const rule = {
             for (const table of rawDropNames(arg.value)) recordDrop(table, arg);
           }
         } else if (arg.type === "TemplateLiteral") {
-          for (const quasi of arg.quasis) {
-            if (!quasi.value.cooked) continue;
-            for (const table of rawDropNames(quasi.value.cooked)) recordDrop(table, arg);
-          }
+          // A quasi followed by an interpolation has a dynamic end: a name that
+          // runs to it is a prefix of a dynamic name, not a table (see
+          // rawDropNames).
+          const last = arg.quasis.length - 1;
+          arg.quasis.forEach((quasi, i) => {
+            if (!quasi.value.cooked) return;
+            for (const table of rawDropNames(quasi.value.cooked, i < last)) recordDrop(table, arg);
+          });
         }
       }
     }

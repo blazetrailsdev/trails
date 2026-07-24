@@ -61,6 +61,12 @@ tester.run("require-canonical-rebuild", rule, {
         'await rebuildCanonicalTables(adapter, ["people", "subscribers"]);',
       options,
     },
+    // A canonical name that only *prefixes* an interpolated one is not a drop
+    // of that table (`DROP TABLE posts_${suffix}` is a bespoke scratch table).
+    {
+      code: "await adapter.execute(`DROP TABLE posts${suffix}`);",
+      options,
+    },
     // A bespoke (non-canonical) table may be dropped freely — that balance is
     // require-table-teardown's job, not this rule's.
     {

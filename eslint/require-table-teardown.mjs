@@ -196,9 +196,12 @@ function rawCreateNames(text, endIsDynamic) {
  * Statically-knowable `DROP TABLE` names in `text`. A single statement may drop
  * several tables (`DROP TABLE a, b`); each comma-separated name counts, stopping
  * at a trailing `CASCADE`/`RESTRICT`, statement terminator, or a non-static
- * (interpolated) name.
+ * (interpolated) name. `endIsDynamic` works exactly as it does for
+ * `rawCreateNames`: a name that runs to the very end of a quasi followed by an
+ * interpolation (`DROP TABLE posts_${suffix}`) is a static *prefix* of a
+ * dynamic name, not a table, and is dropped rather than recorded.
  */
-export function rawDropNames(text) {
+export function rawDropNames(text, endIsDynamic = false) {
   const names = [];
   DROP_TABLE_RE.lastIndex = 0;
   let m;
@@ -207,8 +210,9 @@ export function rawDropNames(text) {
     let nm;
     while ((nm = NAME_RE.exec(rest)) !== null) {
       if (/^(?:cascade|restrict)$/i.test(nm[2])) break;
-      names.push(nm[2]);
-      rest = rest.slice(nm[0].length).replace(/^\s+/, "");
+      rest = rest.slice(nm[0].length);
+      if (!(endIsDynamic && rest.length === 0)) names.push(nm[2]);
+      rest = rest.replace(/^\s+/, "");
       if (rest[0] !== ",") break;
       rest = rest.slice(1);
     }
@@ -351,7 +355,7 @@ const rule = {
       for (const table of rawCreateNames(text, endIsDynamic)) {
         if (!created.has(table)) created.set(table, node);
       }
-      for (const table of rawDropNames(text)) dropped.add(table);
+      for (const table of rawDropNames(text, endIsDynamic)) dropped.add(table);
     }
 
     function recordSinkSql(call) {
