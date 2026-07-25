@@ -7037,7 +7037,7 @@ export class Relation<T extends Base> {
   }
 
   private isGlobalScope(registry: any): boolean {
-    return !!registry?.globalCurrentScope?.(this._modelClass, true);
+    return !!registry?.globalCurrentScope?.(this.model, true);
   }
 
   private currentScopeRestoringBlock(block?: (record: T) => void): (record: T) => void {
