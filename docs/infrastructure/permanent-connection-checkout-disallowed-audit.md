@@ -13,7 +13,7 @@ the flag (`ar-config.ts:126`) and a faithful, test-pinned enforcement branch
 
 The 114-file / 440-site blast radius quoted in the story does not survive
 measurement. The flag only fires when the pool's lease is _permanent_
-(`pool.isPermanentLease()`, `connection-pool.ts:640`), which the fixture pin
+(`pool.isPermanentLease()`, `connection-adapters/abstract/connection-pool.ts:640`), which the fixture pin
 clears exactly as in Rails — so most textual `Base.connection` occurrences never
 reach the gate. Instrumenting the `disallowed` branch and running **all 114
 files** (see Method) gives the exact population:
@@ -52,11 +52,11 @@ that trails' enforcement is already pinned by a Rails-named test.
 
 ## Finding 1 — enforcement is faithful and test-pinned, with one bypass
 
-`connection-handling.ts:453-476` mirrors `connection_handling.rb:265-295`
+`connection-handling.ts:453-476` mirrors `connection_handling.rb:274-295`
 arm-for-arm: `deprecated` warns then leases, `disallowed` raises
 `ActiveRecordError` with Rails' message, `true` falls through, and the
 non-permanent branch returns `activeConnection`. `isPermanentLease()`
-(`connection-pool.ts:640`) mirrors `permanent_lease?`. The raise is pinned by
+(`connection-adapters/abstract/connection-pool.ts:640`) mirrors `permanent_lease?`. The raise is pinned by
 `connection-handling.test.ts:145`.
 
 The divergence is line 455, _above_ the flag check:
