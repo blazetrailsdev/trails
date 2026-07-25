@@ -87,6 +87,7 @@ import {
   dirtyWorktreeLines,
   syncWorktreeToOrigin,
   buildIndexFromOriginMain,
+  readIndexedFile,
   claimAgeHours,
   isStaleClaim,
   staleClaims,
@@ -3342,9 +3343,11 @@ describe("dirtyWorktreeLines", () => {
   });
 });
 
+const emptyIdx: Index = { generated_at: "2026-01-01", rfcs: [], stories: [] };
+
 describe("buildIndexFromOriginMain (read path serves the origin/main tree)", () => {
   const SHA = "a".repeat(40);
-  const emptyIndex = { generated_at: "2026-01-01", rfcs: [], stories: [] };
+  const emptyIndex = emptyIdx;
 
   function setup(opts: { onFetch?: () => void } = {}) {
     const gitDir = mkdtempSync(join(tmpdir(), "trails-read-index-"));
@@ -3387,15 +3390,21 @@ describe("buildIndexFromOriginMain (read path serves the origin/main tree)", () 
 
   it("exports the tree, builds the index there, and caches it by sha", () => {
     const { gitDir, seen } = setup();
-    const stale = join(gitDir, "trails-tasks-read-index", `${"b".repeat(40)}.json`);
-    mkdirSync(join(gitDir, "trails-tasks-read-index"), { recursive: true });
+    const cacheDir = join(gitDir, "trails-tasks-read-index");
+    mkdirSync(cacheDir, { recursive: true });
+    const stale = join(cacheDir, `${"b".repeat(40)}.json`);
+    const otherAgentInFlight = join(cacheDir, `${"c".repeat(40)}.999.staging`);
     writeFileSync(stale, "{}");
+    writeFileSync(otherAgentInFlight, "{}");
     const got = buildIndexFromOriginMain();
     expect(got?.index.generated_at).toBe("2026-01-01");
     expect(seen).toEqual(["fetch", "rev-parse", "rev-parse", "archive", "tar", "build-index"]);
     // Cached for the next reader, and the superseded sha is pruned.
     expect(existsSync(join(gitDir, "trails-tasks-read-index", `${SHA}.json`))).toBe(true);
     expect(existsSync(stale)).toBe(false);
+    // Another agent's half-written entry is not a superseded index — pruning it
+    // would break its rename.
+    expect(existsSync(otherAgentInFlight)).toBe(true);
   });
 
   it("returns null when the fetch fails so the caller can fall back", () => {
@@ -3405,6 +3414,34 @@ describe("buildIndexFromOriginMain (read path serves the origin/main tree)", () 
       },
     });
     expect(buildIndexFromOriginMain()).toBeNull();
+  });
+});
+
+describe("readIndexedFile (body comes from the index's own source)", () => {
+  it("reads the body out of the origin/main commit the index was built from", () => {
+    const sha = "c".repeat(40);
+    const seen: string[][] = [];
+    execFileSyncMock.mockImplementation(((_file: string, args: string[]) => {
+      seen.push(args);
+      return "---\ntitle: x\n---\n" as never;
+    }) as never);
+    expect(readIndexedFile({ index: emptyIdx, sha }, "rfcs/0025-x/stories/y.md")).toContain(
+      "title: x",
+    );
+    expect(seen[0].slice(2)).toEqual(["show", `${sha}:rfcs/0025-x/stories/y.md`]);
+  });
+
+  it("returns null when the path is absent from that commit", () => {
+    execFileSyncMock.mockImplementation((() => {
+      throw new Error("path does not exist");
+    }) as never);
+    expect(readIndexedFile({ index: emptyIdx, sha: "d".repeat(40) }, "gone.md")).toBeNull();
+  });
+
+  it("falls back to the working tree when the index came from there", () => {
+    const dir = mkdtempSync(join(tmpdir(), "trails-read-body-"));
+    expect(readIndexedFile({ index: emptyIdx, sha: null }, join(dir, "missing.md"))).toBeNull();
+    expect(execFileSyncMock).not.toHaveBeenCalled();
   });
 });
 
