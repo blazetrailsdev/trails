@@ -148,8 +148,8 @@ the naming question is worth re-asking.
 Recorded here because the mapping surfaced them; they are _fidelity_ gaps, not
 layout gaps, so they are out of RFC 0064's scope (whose non-goal is "no behavior
 change to the test harness"). They are filed under **RFC 0071
-ar-test-helper-suite-wide-config-fidelity** — four stories, currently draft
-pending RFC acceptance:
+ar-test-helper-suite-wide-config-fidelity** (`status: active`) as four ready
+stories:
 
 - `helper.rb:27` `permanent_connection_checkout = :disallowed` — the flag
   exists (`ar-config.ts:126`) but the suite does not set it, so trails does not
