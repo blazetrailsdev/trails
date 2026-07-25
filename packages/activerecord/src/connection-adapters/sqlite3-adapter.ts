@@ -2397,6 +2397,15 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       (col) => Number(col.hidden ?? 0) !== 1,
     );
 
+    // Rails' alter_table -> copy_table -> primary_key(from) reaches
+    // table_structure, which raises StatementInvalid naming the table when it
+    // doesn't exist (sqlite3_adapter.rb:598, foreign_key_test.rb:322). Our
+    // rebuild reads PRAGMA directly, so raise the same error here rather than
+    // emitting a column-less CREATE TABLE that fails with a syntax error.
+    if (!tableInfo.length) {
+      throw new StatementInvalid(`Could not find table '${tableName}'`, { sql: "", binds: [] });
+    }
+
     const hasGenerated = tableInfo.some((col) => Number(col.hidden ?? 0) >= 2);
     const reflected = hasGenerated ? await this.columns(tableName) : [];
     const columns: Record<string, Record<string, unknown>> = {};
@@ -3183,7 +3192,17 @@ const REFERENTIAL_ACTION_MAP: Record<string, string> = {
 };
 
 function normalizeReferentialAction(action: string): string {
-  return REFERENTIAL_ACTION_MAP[action.toLowerCase()] ?? action.toUpperCase();
+  const sql = REFERENTIAL_ACTION_MAP[action.toLowerCase()];
+  // Rails reaches action_sql (schema_creation.rb:175) even on SQLite's
+  // table-rebuild path, so an unsupported :on_delete/:on_update raises
+  // ArgumentError rather than emitting invalid SQL (foreign_key_test.rb:302).
+  if (sql === undefined) {
+    throw new ArgumentError(
+      `'${action}' is not supported for on_update or on_delete. ` +
+        `Supported values are: cascade, nullify, restrict, no_action, set_default`,
+    );
+  }
+  return sql;
 }
 
 /** @internal */
