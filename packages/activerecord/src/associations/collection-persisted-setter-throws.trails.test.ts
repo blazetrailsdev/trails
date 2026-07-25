@@ -19,6 +19,7 @@ import { CollectionPersistedAssignmentError } from "./errors.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
+import { Category } from "../test-helpers/models/category.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 
 interface CollectionOwner {
@@ -38,6 +39,15 @@ const postsOf = (owner: Author): PostsProxy => (owner as unknown as { posts: Pos
 const targetOf = (owner: Author): Post[] =>
   (owner as unknown as { association(n: string): { target: Post[] } }).association("posts").target;
 
+// The `#{singular}Ids=` setter can't await, so the id→record resolution it
+// starts is still in flight when the constructor returns (the shape
+// `queueIdsWrite` documents). Settle it before asserting on the target.
+const settleTarget = async (target: () => unknown[]): Promise<void> => {
+  for (let i = 0; i < 50 && target().length === 0; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+};
+
 const writerOf =
   (owner: Author) =>
   (records: Post[]): Promise<void> =>
@@ -52,6 +62,7 @@ describe("CollectionPersistedSetterThrows", () => {
     registerModel(Author);
     registerModel(Post);
     registerModel(Comment);
+    registerModel(Category);
   });
 
   it("native = setter throws on a persisted owner", async () => {
@@ -116,31 +127,36 @@ describe("CollectionPersistedSetterThrows", () => {
   });
 
   it("constructor-form ids= reaches the association writer", async () => {
-    // `new Author({postIds: [...]})` used to die with an opaque
-    // `TypeError: Cannot read properties of undefined (reading 'get')`: the
-    // ids key matched no association NAME, so it stayed in the bag super()
-    // assigns, and the generated writer reached `this.association("posts")`
-    // before the association cache field existed. Rails has no such split
-    // (`Author.new(post_ids: [...])` runs `ids_writer` normally,
-    // collection_association.rb:61-83).
     const post = await Post.create({ title: "t", body: "b" });
     let author: Author | undefined;
     expect(() => {
       author = new Author({ name: "Bill", postIds: [post.id] });
     }).not.toThrow();
-    // The generated setter can't await, so the id→record resolution it kicks
-    // off is still in flight when the constructor returns (the pre-existing
-    // shape documented on `queueIdsWrite`). Settle it before asserting.
-    for (let i = 0; i < 50 && targetOf(author!).length === 0; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
+    await settleTarget(() => targetOf(author!));
     expect(targetOf(author!).map((p) => p.id)).toEqual([post.id]);
   });
 
-  it("constructor-form ids= does not swallow an unknown Ids key", async () => {
-    // Only a key that is a real generated collection writer is deferred — a
-    // model without the matching association still reports the key as unknown
-    // rather than having it silently rerouted.
+  it("create with an ids= key reaches the association writer", async () => {
+    const post = await Post.create({ title: "t", body: "b" });
+    const author = await Author.create({ name: "Bill", postIds: [post.id] });
+    expect(author.isPersisted()).toBe(true);
+  });
+
+  it("constructor-form habtm ids= reaches the association writer", async () => {
+    const post = await Post.create({ title: "t", body: "b" });
+    let category: Category | undefined;
+    expect(() => {
+      category = new Category({ name: "General", postIds: [post.id] });
+    }).not.toThrow();
+    const habtmTarget = (): unknown[] =>
+      (category as unknown as { association(n: string): { target: unknown[] } }).association(
+        "posts",
+      ).target;
+    await settleTarget(habtmTarget);
+    expect(habtmTarget().length).toBe(1);
+  });
+
+  it("constructor-form ids= does not swallow an unknown Ids key", () => {
     expect(() => new Post({ title: "t", body: "b", widgetIds: [1] } as never)).toThrow(/widgetIds/);
   });
 
