@@ -28,11 +28,6 @@ describe("ConnectionSwappingNestedTest", () => {
   let prevDefaultEnv: string;
   let prevCurrent: unknown;
 
-  // Rails points every database in this file at an on-disk sqlite file under
-  // `test/db/`, and encodes the primary/replica relationship by having a
-  // replica share its primary's *file*. trails has no `test/db` fixtures dir,
-  // so the files live in a per-test temp dir — what has to match Rails is the
-  // topology (file-backed, replicas sharing a file), not the literal path.
   const DB_NAMES = [
     "primary",
     "primary_shard_one",
@@ -44,26 +39,36 @@ describe("ConnectionSwappingNestedTest", () => {
     "arunit",
   ] as const;
 
-  let dbDir: string;
-  const dbPaths: Record<string, string> = {};
+  type DbName = (typeof DB_NAMES)[number];
 
-  /** Config for a sqlite database backed by the named file in the temp dir. */
-  const sqliteDb = (name: (typeof DB_NAMES)[number], extra: object = {}) => ({
+  async function asyncFs() {
+    const fs = await getFsAsync();
+    const { mkdtemp, writeFile, readdir, unlink, rmdir } = fs;
+    if (!mkdtemp || !writeFile || !readdir || !unlink || !rmdir) {
+      throw new Error("fs adapter is missing the async APIs this test requires");
+    }
+    return { mkdtemp, writeFile, readdir, unlink, rmdir };
+  }
+
+  let dbDir: string;
+  let dbPaths: Record<DbName, string>;
+
+  const sqliteDb = (name: DbName, extra: { replica?: boolean } = {}) => ({
     adapter: "sqlite3",
     database: dbPaths[name],
     ...extra,
   });
 
   beforeEach(async () => {
-    const fs = await getFsAsync();
+    const fs = await asyncFs();
     const path = await getPathAsync();
     const os = await getOsAsync();
-    dbDir = await fs.mkdtemp!(path.join(os.tmpdir(), "trails-conn-swap-"));
+
+    dbDir = await fs.mkdtemp(path.join(os.tmpdir(), "trails-conn-swap-"));
+    dbPaths = {} as Record<DbName, string>;
     for (const name of DB_NAMES) {
-      const file = path.join(dbDir, `${name}.sqlite3`);
-      dbPaths[name] = file;
-      // An empty file is a valid (empty) sqlite database.
-      await fs.writeFile!(file, "");
+      dbPaths[name] = path.join(dbDir, `${name}.sqlite3`);
+      await fs.writeFile(dbPaths[name], "");
     }
 
     prevConfigs = (Base as any).configurations;
@@ -83,13 +88,12 @@ describe("ConnectionSwappingNestedTest", () => {
     (TertiaryBase as any).connectionClass = false;
     vi.unstubAllEnvs();
 
-    // Sweep the whole dir so WAL sidecars (`-wal`/`-shm`) go with the DB files.
-    const fs = await getFsAsync();
+    const fs = await asyncFs();
     const path = await getPathAsync();
-    for (const entry of await fs.readdir!(dbDir)) {
-      await fs.unlink!(path.join(dbDir, entry));
+    for (const entry of await fs.readdir(dbDir)) {
+      await fs.unlink(path.join(dbDir, entry));
     }
-    await fs.rmdir!(dbDir);
+    await fs.rmdir(dbDir);
   });
 
   it("roles can be swapped granularly", () => {
