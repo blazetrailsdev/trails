@@ -105,6 +105,10 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     // no-op — see JSDoc
   }
 
+  protected override setNewRecord(record: Base): void {
+    this.replace(record, false);
+  }
+
   /**
    * No-op for the same reason as `detachDisplacedTarget` above: the
    * nested-attributes displacement path must not nullify/destroy a displaced
