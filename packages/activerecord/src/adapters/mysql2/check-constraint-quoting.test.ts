@@ -3,24 +3,23 @@
  */
 import { it, expect, beforeEach, afterEach } from "vitest";
 import {
-  describeIfMysql,
+  describeIfMysqlAdapter,
   isMariaDb,
+  leaseMysqlAdapter,
   Mysql2Adapter,
-  MYSQL_TEST_URL,
 } from "../abstract-mysql-adapter/test-helper.js";
 import { describeIfSupports } from "../../test-helpers/supports.js";
 
-describeIfMysql("Mysql2Adapter", () => {
+describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
+    adapter = await leaseMysqlAdapter();
     await adapter.createTable("trades", { force: true }, (t: any) => {
       t.string("name");
     });
   });
   afterEach(async () => {
     await adapter.dropTable("trades", { ifExists: true });
-    await adapter.close();
   });
 
   describeIfSupports("check_constraints", "MySQL2CheckConstraintQuotingTest", () => {

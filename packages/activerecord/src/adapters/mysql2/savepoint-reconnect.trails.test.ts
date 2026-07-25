@@ -32,6 +32,10 @@ describeIfMysql("Mysql2Adapter savepoint statements dirty the parent (trails)", 
   let adapter: Mysql2Adapter;
 
   beforeEach(() => {
+    // Stays self-built: the tests fault `rawConnectionForBlock` so
+    // `withRawConnection` genuinely tears down and re-establishes this adapter's
+    // socket mid-transaction. Driving that against the shared leased connection
+    // would leave the pool reconnecting under later tests in the same worker.
     adapter = new Mysql2Adapter(MYSQL_TEST_URL);
   });
   afterEach(async () => {

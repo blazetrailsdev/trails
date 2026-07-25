@@ -472,6 +472,8 @@ describeIfMysql("DefaultsTestWithoutTransactionalFixtures", () => {
     strict: boolean,
     fn: (klass: typeof Base) => Promise<void>,
   ): Promise<void> {
+    // Stays self-built: `strict` is the config under test, and a non-strict
+    // sql_mode must not leak onto the shared leased connection.
     const adapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, strict });
     try {
       await adapter.createTable("test_mysql_not_null_defaults", { force: true }, (t: any) => {

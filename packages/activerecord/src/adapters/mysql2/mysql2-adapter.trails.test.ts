@@ -11,7 +11,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
-  describeIfMysql,
+  describeIfMysqlAdapter,
+  leaseMysqlAdapter,
   Mysql2Adapter,
   MYSQL_TEST_URL,
   withDbWarningsAction,
@@ -54,6 +55,8 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
     // touching a real DB, preserving the `active ⟹ isConnected` invariant.
     expect(adapter.active).toBe(false);
     expect(adapter.isConnected()).toBe(false);
+    // Stays self-built: a *never-connected* adapter is exactly what this
+    // asserts on — the leased connection is live by construction.
     const fresh = new Mysql2Adapter(MYSQL_TEST_URL);
     expect(fresh.active).toBe(false);
     expect(fresh.isConnected()).toBe(false);
@@ -140,14 +143,13 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
   });
 });
 
-describeIfMysql("Mysql2Adapter (trails extensions)", () => {
+describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
+    adapter = await leaseMysqlAdapter();
   });
-  afterEach(async () => {
+  afterEach(() => {
     vi.restoreAllMocks();
-    await adapter.close();
   });
 
   // trails-only: the sync `active` getter converges to Rails' Mysql2Adapter#active?
@@ -157,6 +159,8 @@ describeIfMysql("Mysql2Adapter (trails extensions)", () => {
   // it has no never-connected window to cover; this guards trails' lazy-connect.
   describe("#active sync getter reflects connection state", () => {
     it("is false before any connection and true after the first query", async () => {
+      // Stays self-built: the never-connected → connected → disconnected walk
+      // is the assertion, and disconnectBang() must not hit the leased pool.
       const fresh = new Mysql2Adapter(MYSQL_TEST_URL);
       try {
         expect(fresh.active).toBe(false);
@@ -247,10 +251,9 @@ describeIfMysql("Mysql2Adapter (trails extensions)", () => {
   it("#exec_query queries with an empty result set still return the columns", async () => {
     // Mirrors adapter_test.rb: a zero-row SELECT must still report its
     // columns from the field descriptors, not collapse to an empty Result.
-    // Rails runs this against the canonical `subscribers` fixture table; the
-    // describeIfMysql suite does not bootstrap the canonical schema, so lay the
-    // canonical table through the canonical loader rather than hand-rolling its
-    // DDL. It is left in place afterwards on purpose: this suite shares the
+    // Rails runs this against the canonical `subscribers` fixture table; this
+    // suite does not bootstrap the canonical schema, so lay the canonical table
+    // through the canonical loader rather than hand-rolling its DDL. It is left in place afterwards on purpose: this suite shares the
     // per-worker database with every other file.
     await rebuildCanonicalTables(adapter, ["subscribers"]);
     const result = await adapter.execQuery("SELECT * FROM subscribers WHERE 1=0");

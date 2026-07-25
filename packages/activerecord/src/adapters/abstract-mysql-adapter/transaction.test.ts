@@ -2,16 +2,19 @@
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/transaction_test.rb
  */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
-import { describeIfMysql, isMariaDb, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import {
+  describeIfMysqlAdapter,
+  isMariaDb,
+  leaseMysqlAdapter,
+  Mysql2Adapter,
+  MYSQL_TEST_URL,
+} from "./test-helper.js";
 import { StatementTimeout, QueryAborted, ConnectionFailed } from "../../errors.js";
 
-describeIfMysql("Mysql2Adapter", () => {
+describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
-  });
-  afterEach(async () => {
-    await adapter.close();
+    adapter = await leaseMysqlAdapter();
   });
 
   describe("TransactionTest", () => {
@@ -32,6 +35,9 @@ describeIfMysql("Mysql2Adapter", () => {
       const rows = await adapter.execute("SELECT id FROM `samples` LIMIT 1");
       const id = Number(rows[0]["id"]);
 
+      // Stays self-built: the lock contention IS the test. Rails runs the
+      // competing FOR UPDATE on a second thread's pool connection; a second
+      // in-test adapter is the closest faithful shape.
       const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
       let error: unknown;
       try {
@@ -79,6 +85,8 @@ describeIfMysql("Mysql2Adapter", () => {
         return Number(rows[0]["n"]);
       };
 
+      // Stays self-built: the point is an INSERT from a *different* connection
+      // being (in)visible inside this connection's transaction.
       const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
       try {
         // 1. Default (REPEATABLE READ): INSERT by another connection is not visible

@@ -2,16 +2,32 @@
  * Mirrors Rails activerecord/test/cases/adapters/mysql2/statement_pool_test.rb
  */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
-import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import {
+  describeIfMysqlAdapter,
+  leaseMysqlAdapter,
+  Mysql2Adapter,
+  MYSQL_TEST_URL,
+} from "./test-helper.js";
 
-describeIfMysql("Mysql2Adapter", () => {
+describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
+  let originalPreparedStatements: boolean;
+  let originalStatementLimit: number;
   beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
+    adapter = await leaseMysqlAdapter();
+    originalPreparedStatements = adapter.preparedStatements;
+    originalStatementLimit = adapter.statementLimit;
     adapter.preparedStatements = true;
   });
-  afterEach(async () => {
-    await adapter.close();
+  afterEach(() => {
+    // preparedStatements/statementLimit are adapter-wide settings and the
+    // statement pool itself is per-connection state, both of which now outlive
+    // a single test on the shared leased connection. Restore the settings and
+    // drop the pool (disconnectBang is reconnectable — the next query
+    // re-establishes) so each test starts from the clean slate it asserts on.
+    adapter.preparedStatements = originalPreparedStatements;
+    adapter.statementLimit = originalStatementLimit;
+    adapter.disconnectBang();
   });
 
   describe("StatementPoolTest", () => {
@@ -97,21 +113,29 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("dealloc does not raise on inactive connection", async () => {
-      await adapter.beginDbTransaction();
-      await adapter.execute("SELECT ? AS n", [1]);
-      const pool = adapter._statementPoolForTest()!;
-      await adapter.rollback();
-      await adapter.close();
+      // Stays self-built: close() permanently kills the adapter, which would
+      // poison the leased connection for every later test in this worker.
+      const closable = new Mysql2Adapter(MYSQL_TEST_URL);
+      closable.preparedStatements = true;
+      await closable.beginDbTransaction();
+      await closable.execute("SELECT ? AS n", [1]);
+      const pool = closable._statementPoolForTest()!;
+      await closable.rollback();
+      await closable.close();
       expect(() => pool.clear()).not.toThrow();
     });
 
     it("reads statementLimit from the config hash (database.yml shape)", async () => {
+      // Stays self-built: reading a differently configured statementLimit off
+      // the config hash is the assertion.
       const configured = new Mysql2Adapter({ uri: MYSQL_TEST_URL, statementLimit: 7 });
       expect(configured.statementLimit).toBe(7);
       await configured.close();
     });
 
     it("reads preparedStatements from the config hash", async () => {
+      // Stays self-built: a differently configured preparedStatements is the
+      // assertion.
       const configured = new Mysql2Adapter({
         uri: MYSQL_TEST_URL,
         preparedStatements: false,
@@ -120,6 +144,7 @@ describeIfMysql("Mysql2Adapter", () => {
       await configured.close();
     });
 
+    // Self-built by construction: these assert what the constructor rejects.
     it("rejects invalid statementLimit at construction time", () => {
       expect(() => new Mysql2Adapter({ uri: MYSQL_TEST_URL, statementLimit: -1 })).toThrow(
         RangeError,
@@ -148,6 +173,8 @@ describeIfMysql("Mysql2Adapter", () => {
           }),
       ).toThrow(TypeError);
 
+      // Stays self-built: the assignment guard is asserted on a throwaway
+      // adapter so a rejected value can never reach the leased connection.
       const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
       try {
         expect(() => {

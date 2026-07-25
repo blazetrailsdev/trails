@@ -20,8 +20,9 @@
  */
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
-  describeIfMysql,
+  describeIfMysqlAdapter,
   isMariaDb,
+  leaseMysqlAdapter,
   Mysql2Adapter,
   MYSQL_TEST_URL,
   withDbWarningsAction,
@@ -40,17 +41,16 @@ import { rebuildCanonicalTables } from "../../test-helpers/canonical-schema.js";
 import { Result } from "../../result.js";
 import * as Arel from "@blazetrails/arel";
 
-describeIfMysql("Mysql2AdapterTest", () => {
+describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
+    adapter = await leaseMysqlAdapter();
   });
-  afterEach(async () => {
+  afterEach(() => {
     // Restore any console / logger spies installed by the warning-handler
     // tests so a throw before the inner mockRestore() can't leak the stub
     // into subsequent suites.
     vi.restoreAllMocks();
-    await adapter.close();
   });
 
   it("connection error", async () => {
@@ -60,6 +60,7 @@ describeIfMysql("Mysql2AdapterTest", () => {
     // `@raw_connection`), so the dead-socket failure surfaces here via the same
     // rescued `connect` → `set_pool(@pool)` path, carrying the standalone
     // adapter's NullPool.
+    // Stays self-built: Rails builds this dead-socket adapter in-test too.
     const badAdapter = new Mysql2Adapter({ socketPath: "/dev/null", preparedStatements: false });
     try {
       const error = await badAdapter
@@ -79,6 +80,7 @@ describeIfMysql("Mysql2AdapterTest", () => {
     // equals the adapter's own pool (a NullPool). trails' `reconnectBang()`
     // (Rails' `reconnect!`) now re-establishes the connection eagerly and
     // re-raises the translated ConnectionNotEstablished, so assert it directly.
+    // Stays self-built: Rails builds this dead-socket adapter in-test too.
     const badAdapter = new Mysql2Adapter({ socketPath: "/dev/null", preparedStatements: false });
     try {
       const error = await badAdapter
