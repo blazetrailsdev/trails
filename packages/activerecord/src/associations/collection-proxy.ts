@@ -1985,12 +1985,21 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Add one or more records to the collection by setting the FK and saving.
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#push / #<< — which
-   * return `self` (the collection proxy) for chaining. Returned via
-   * `stripThenable` so the (thenable) proxy isn't unwrapped by promise
-   * adoption — otherwise `return this` would call the proxy's `then` and
-   * load the target, breaking Rails' "push does not load target" invariant.
+   * return `proxy_association.concat(records) && self`, so the call is falsy
+   * as soon as one child fails to insert: `concat_records` raises
+   * `ActiveRecord::Rollback` on a false `insert_record`, and the enclosing
+   * `transaction { }` swallows it and yields nil out of `concat`. That is the
+   * `concatResult` check below — the failure is reported by return value, not
+   * by raising, because `concat` passes `raise = false`. Through associations
+   * are the exception: `HasManyThroughAssociation#concat_records` calls
+   * `super(records, true)`, so they raise instead and always return the proxy.
+   *
+   * `self` is returned via `stripThenable` so the (thenable) proxy isn't
+   * unwrapped by promise adoption — otherwise `return this` would call the
+   * proxy's `then` and load the target, breaking Rails' "push does not load
+   * target" invariant.
    */
-  async push(...records: T[]): Promise<Omit<this, "then">> {
+  async push(...records: T[]): Promise<Omit<this, "then"> | false> {
     this._ensureThroughWritable();
     this._raiseOnTypeMismatch(records);
     // Through association (including HABTM): create join records
@@ -2068,8 +2077,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // `CollectionAssociation#concatRecords` parity surface stay in lock-step.
     // A record whose `save` merely *returns false* (a validation/callback abort
     // that doesn't raise) still rolls back the records already inserted.
-    const concatRecords = (): Promise<void> =>
-      concatRecordsLoop(records, async (record, resultStillTrue) => {
+    const concatRecords = async (): Promise<T[]> => {
+      await concatRecordsLoop(records, async (record, resultStillTrue) => {
         // Route through replace_on_target (via _addToTarget) so set_inverse_instance
         // and @replaced_or_added_targets dedup tracking run on push/<<, mirroring
         // Rails' concat_records → add_to_target(record) { insert_record }. A record
@@ -2097,17 +2106,18 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         });
         return saved;
       });
+      return records;
+    };
     // Rails' `CollectionAssociation#concat` wraps the inserts in a transaction
     // for a persisted owner (`transaction { concat_records(records) }`,
     // collection_association.rb:133) so a mid-batch save failure rolls back the
     // records already inserted. A new-record owner skips the transaction — the
     // inserts are deferred to autosave, so no DB write happens here (and a
     // BEGIN would violate the "push does not query" invariant).
-    if (this._record.isNewRecord()) {
-      await concatRecords();
-    } else {
-      await this.transaction(concatRecords);
-    }
+    const concatResult = this._record.isNewRecord()
+      ? await concatRecords()
+      : await this.transaction(concatRecords);
+    if (!concatResult) return false;
     return stripThenable(this._proxySelf ?? this);
   }
 
@@ -2539,7 +2549,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /**
    * Alias for push.
    */
-  async concat(...records: T[]): Promise<Omit<this, "then">> {
+  async concat(...records: T[]): Promise<Omit<this, "then"> | false> {
     return this.push(...records);
   }
 
@@ -4157,7 +4167,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#append
    */
-  async append(...records: T[]): Promise<Omit<this, "then">> {
+  async append(...records: T[]): Promise<Omit<this, "then"> | false> {
     return this.push(...records);
   }
 

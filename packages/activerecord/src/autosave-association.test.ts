@@ -516,7 +516,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   it("invalid adding", async () => {
     const firm = await Firm.find(companies("first_firm").id);
     const c = new Client();
-    await firm.clientsOfFirm.concat(c);
+    expect(await firm.clientsOfFirm.push(c)).toBeFalsy();
     expect(c.isPersisted()).toBe(false);
     expect(await firm.isValid()).toBe(false);
     expect(await firm.save()).toBe(false);
