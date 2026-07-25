@@ -363,6 +363,11 @@ interface ArityMismatch {
 interface ArityResult {
   /** Pairs whose arity was actually compared (skips excluded). */
   compared: number;
+  /** Pairs dropped because the RUBY entry is a forwarding-macro placeholder
+   *  (`delegate`/unresolved `alias`, see arity.ts `isForwardingRubyEntry`).
+   *  Reported so the shrunken `compared` denominator is auditable rather than
+   *  silently absorbing the skip. */
+  forwardingSkipped: number;
   mismatched: number;
   mismatches: ArityMismatch[];
 }
@@ -1315,6 +1320,7 @@ export function main() {
     let filesExist = 0;
     let totalMisplaced = 0;
     let arityCompared = 0;
+    let arityForwardingSkipped = 0;
     const arityMismatches: ArityMismatch[] = [];
     let optionKeysCompared = 0;
     const optionKeyMismatches: OptionKeyMismatch[] = [];
@@ -1486,12 +1492,16 @@ export function main() {
         if (!rubyParams) return;
         // Every signature recorded for this TS name; a pair matches when it
         // overlaps ANY (see tsParamsByName above for why this is global).
-        // A `delegate`/unresolved-`alias` entry carries a placeholder `[0-0]`, not a
-        // signature — comparing it against the real TS arity is noise, so it is
-        // skipped before `arityCompared` counts it.
-        if (isForwardingRubyEntry(rubyParams, rubyNotesByName.get(rubyName))) return;
         const candidates = tsParamsByName.get(tsName) ?? [];
         if (candidates.length === 0) return;
+        // A `delegate`/unresolved-`alias` entry carries a placeholder `[0-0]`, not a
+        // signature — comparing it against the real TS arity is noise, so it is
+        // skipped before `arityCompared` counts it. Placed AFTER the no-candidate
+        // guard so the tally means "pairs that would otherwise have been compared".
+        if (isForwardingRubyEntry(rubyParams, rubyNotesByName.get(rubyName))) {
+          arityForwardingSkipped++;
+          return;
+        }
         if (candidates.every((c) => shouldSkipArity(rubyParams, c))) return;
         arityCompared++;
         const verdict = matchArityAgainst(rubyParams, candidates);
@@ -1820,6 +1830,7 @@ export function main() {
       inheritance,
       arity: {
         compared: arityCompared,
+        forwardingSkipped: arityForwardingSkipped,
         mismatched: arityMismatches.length,
         mismatches: arityMismatches,
       },
@@ -1875,6 +1886,7 @@ export function main() {
       {
         generatedAt: new Date().toISOString(),
         compared: results.reduce((n, r) => n + r.arity.compared, 0),
+        forwardingSkipped: results.reduce((n, r) => n + r.arity.forwardingSkipped, 0),
         mismatched: arityFlat.length,
         mismatches: arityFlat,
       },

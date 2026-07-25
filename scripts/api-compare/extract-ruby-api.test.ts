@@ -503,6 +503,27 @@ describe("Ruby extractor alias arity resolution", () => {
     });
     expect(r["Lonely#gone"]).toMatchObject({ params: [], notes: "alias" });
   });
+
+  // The `notes` tag is the CONTRACT the arity check keys off (arity.ts
+  // `isForwardingRubyEntry` drops these pairs). Renaming the tag here without
+  // updating that predicate would silently re-arm ~22 false mismatches, so the
+  // exact string is pinned on both forwarding kinds.
+  it("tags a `delegate`-generated method with empty placeholder params", () => {
+    const r = aliasParams({
+      "d.rb": `
+        module Pkg
+          module Querying
+            delegate :create_or_find_by, :in_groups_of, to: :all
+          end
+        end
+      `,
+    });
+    expect(r["Pkg::Querying#create_or_find_by"]).toMatchObject({
+      params: [],
+      notes: "delegate",
+    });
+    expect(r["Pkg::Querying#in_groups_of"]).toMatchObject({ params: [], notes: "delegate" });
+  });
 });
 
 describe("Ruby extractor umbrella module-config scanning", () => {
