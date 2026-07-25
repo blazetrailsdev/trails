@@ -1729,7 +1729,8 @@ jobs:
                 rails-comparison)
                   # Legitimate skip when no comparison-relevant path changed
                   # (no packages/**, scripts/{api,test,fixtures,schema}-compare/**,
-                  # vendor/**, or cross-cutting infra).
+                  # comparison-consumed manifest builders, vendor/**, or
+                  # cross-cutting infra — see COMPARISON_RE).
                   [ "$COMPARISON_AFFECTED" = "false" ] && continue
                   ;;
                 website)
