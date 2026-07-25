@@ -327,13 +327,46 @@ export class CollectionAssociation extends Association {
    * persisted-owner transaction (collection_association.rb:127-135) — the
    * nil that makes `CollectionProxy#<<` falsy.
    */
+  /**
+   * Run `block` in the reflection klass's transaction.
+   *
+   * Mirrors: ActiveRecord::Associations::CollectionAssociation#transaction —
+   * overridden by `ThroughAssociation#transaction` (the through model's), which
+   * `HasManyThroughAssociation` picks up.
+   * @internal
+   */
+  protected transaction<R>(block: () => Promise<R>): Promise<R | undefined> {
+    // Rails: reflection.klass.transaction(&block) — uses the reflection's klass, not assoc.klass
+    const klass = (this.reflection as any).klass ?? this.klass;
+    if (klass && typeof klass.transaction === "function") {
+      return klass.transaction(block);
+    }
+    return block();
+  }
+
+  /**
+   * Diff hooks Rails leaves to the concrete subclass: `HasManyAssociation`
+   * supplies `a - b` / `a & b`, `HasManyThroughAssociation` the multiset
+   * variants. Declared here (rather than implemented, as Rails' base has no
+   * definition at all) only so the shared `replace` machinery can call them.
+   * @internal
+   */
+  protected difference(_a: Base[], _b: Base[]): Base[] {
+    throw new Error("difference is implemented by CollectionAssociation subclasses");
+  }
+
+  /** @internal */
+  protected intersection(_a: Base[], _b: Base[]): Base[] {
+    throw new Error("intersection is implemented by CollectionAssociation subclasses");
+  }
+
   async concat(...records: Base[]): Promise<Base[] | undefined> {
     const flattened = records.flat();
     if (this.owner.isNewRecord()) {
       await this.loadTarget();
       return this.concatRecords(flattened);
     }
-    return transaction(this, () => this.concatRecords(flattened));
+    return this.transaction(() => this.concatRecords(flattened));
   }
 
   /** @internal */
@@ -531,7 +564,7 @@ export class CollectionAssociation extends Association {
       // inverse, then after_remove. delete_records (the DB delete) is skipped —
       // a new owner has no persisted join rows yet, so existing_records is
       // empty (the owner's save is what creates them).
-      const toRemove = this.target.filter((r) => !includesRecord(otherArray, r));
+      const toRemove = this.difference(this.target, otherArray);
       let removable = true;
       for (const r of toRemove) {
         if (!callback(this, "beforeRemove", r)) {
@@ -552,13 +585,8 @@ export class CollectionAssociation extends Association {
       // input array (before_add aborts affect @target membership but not the
       // returned set), and HMT#concat_records builds a through-row for each, so
       // we build for the whole difference rather than filtering on addToTarget.
-      const added: Base[] = [];
-      for (const r of otherArray) {
-        if (!includesRecord(this.target, r)) {
-          this.addToTarget(r);
-          added.push(r);
-        }
-      }
+      const added = this.difference(otherArray, this.target);
+      for (const r of added) this.addToTarget(r);
       this.loadedBang();
       this.buildThroughRecordsInMemory(added);
     } else {
@@ -568,17 +596,13 @@ export class CollectionAssociation extends Association {
       // here, not above the branch.
       replaceCommonRecordsInMemory(this, otherArray, originalTarget);
       if (!wasLoaded || !arraysEqual(otherArray, originalTarget)) {
-        for (const r of originalTarget) {
-          if (!includesRecord(otherArray, r)) {
-            const idx = this.target.indexOf(r);
-            if (idx !== -1) this.target.splice(idx, 1);
-          }
+        for (const r of this.difference(originalTarget, otherArray)) {
+          const idx = this.target.indexOf(r);
+          if (idx !== -1) this.target.splice(idx, 1);
         }
-        for (const r of otherArray) {
-          if (!includesRecord(this.target, r)) {
-            this.setOwnerAttributes(r);
-            this.addToTarget(r);
-          }
+        for (const r of this.difference(otherArray, this.target)) {
+          this.setOwnerAttributes(r);
+          this.addToTarget(r);
         }
         this.loadedBang();
         return { newTarget: [...otherArray], originalTarget, wasLoaded };
@@ -608,7 +632,7 @@ export class CollectionAssociation extends Association {
       pending.originalTarget = [...dbRecords];
     }
     const currentTarget = this.target;
-    await transaction(this, async () => {
+    await this.transaction(async () => {
       // replaceRecords diffs against assoc.target; restore originalTarget so
       // it sees the real DB state rather than the already-updated in-memory target
       this.target = [...pending.originalTarget];
@@ -931,7 +955,7 @@ export class CollectionAssociation extends Association {
     if (existingRecords.length === 0) {
       removed = await this.removeRecords(existingRecords, resolved, method ?? "");
     } else {
-      await transaction(this, async () => {
+      await this.transaction(async () => {
         removed = await this.removeRecords(existingRecords, resolved, method ?? "");
       });
     }
@@ -1216,21 +1240,23 @@ export async function concatRecordsLoop(
   if (!result) throw new Rollback();
 }
 
-/** @internal */
-function transaction<R>(
-  assoc: CollectionAssociation,
-  block: () => Promise<R>,
-): Promise<R | undefined> {
-  // Rails: reflection.klass.transaction(&block) — uses the reflection's klass, not assoc.klass
-  const klass = (assoc.reflection as any).klass ?? assoc.klass;
-  if (klass && typeof klass.transaction === "function") {
-    return klass.transaction(block);
-  }
-  return block();
+/**
+ * Reach the protected `difference`/`intersection` overrides from the
+ * module-level replace helpers.
+ * @internal
+ */
+function diffHooks(assoc: CollectionAssociation): {
+  difference(a: Base[], b: Base[]): Base[];
+  intersection(a: Base[], b: Base[]): Base[];
+} {
+  return assoc as unknown as {
+    difference(a: Base[], b: Base[]): Base[];
+    intersection(a: Base[], b: Base[]): Base[];
+  };
 }
 
 /** @internal */
-function includesRecord(records: Base[], record: Base): boolean {
+export function includesRecord(records: Base[], record: Base): boolean {
   return records.some((r) => (r as unknown as { isEqual(o: unknown): boolean }).isEqual(record));
 }
 
@@ -1241,9 +1267,10 @@ async function replaceRecords(
   originalTarget: Base[],
 ): Promise<Base[]> {
   // Rails: delete(difference(target, new_target)); concat(difference(new_target, target))
-  const toDelete = assoc.target.filter((r) => !includesRecord(newTarget, r));
+  const diff = diffHooks(assoc);
+  const toDelete = diff.difference(assoc.target, newTarget);
   if (toDelete.length > 0) await assoc.delete(...toDelete);
-  const toAdd = newTarget.filter((r) => !includesRecord(assoc.target, r));
+  const toAdd = diff.difference(newTarget, assoc.target);
   if (toAdd.length > 0) {
     try {
       await assoc.concat(...toAdd);
@@ -1268,7 +1295,7 @@ function replaceCommonRecordsInMemory(
   newTarget: Base[],
   originalTarget: Base[],
 ): void {
-  const common = newTarget.filter((r) => includesRecord(originalTarget, r));
+  const common = diffHooks(assoc).intersection(newTarget, originalTarget);
   for (const record of common) {
     replaceOnTarget(assoc, record, true, true);
   }

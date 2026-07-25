@@ -33,6 +33,36 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   }
 
   /**
+   * The through model owns the transaction — the join-row writes are what has
+   * to be atomic, not the target model's.
+   *
+   * Mirrors: ActiveRecord::Associations::ThroughAssociation#transaction
+   */
+  protected override transaction<R>(block: () => Promise<R>): Promise<R | undefined> {
+    return transaction(this, block);
+  }
+
+  /**
+   * Multiset difference: each occurrence of a record in `b` cancels at most one
+   * occurrence in `a`, so `[person, person] - [person]` keeps one `person` and
+   * the replace path creates the second join row.
+   *
+   * Mirrors: ActiveRecord::Associations::HasManyThroughAssociation#difference
+   */
+  protected override difference(a: Base[], b: Base[]): Base[] {
+    return multisetDifference(a, b);
+  }
+
+  /**
+   * Multiset intersection — the `select` counterpart of {@link difference}.
+   *
+   * Mirrors: ActiveRecord::Associations::HasManyThroughAssociation#intersection
+   */
+  protected override intersection(a: Base[], b: Base[]): Base[] {
+    return multisetIntersection(a, b);
+  }
+
+  /**
    * Mirrors Rails' `delegate :source_reflection, to: :reflection`
    * (ThroughAssociation, mixed into HasManyThroughAssociation).
    */
@@ -303,7 +333,12 @@ export class HasManyThroughAssociation extends HasManyAssociation {
       ?.sourceReflection;
     if (method !== "destroy" && sourceRefl?.options?.counterCache) {
       const counter = sourceRefl.counterCacheColumn?.();
-      const klass = safeKlass(sourceRefl) as {
+      // Rails decrements on `klass` — the *association's* klass (the target
+      // model, e.g. `Post`), not the source reflection's. They coincide for a
+      // plain source, but a polymorphic source belongs_to (taggings' `taggable`)
+      // has no klass at all, which is exactly the counter_cache this branch
+      // exists to maintain.
+      const klass = safeKlass({ klass: this.klass }) as {
         decrementCounter?: (col: string, ids: unknown) => Promise<unknown>;
       } | null;
       const ids = records.map((r) => (r as any).id).filter((id: unknown) => id != null);
@@ -662,37 +697,6 @@ async function updateThroughCounterCache(
 }
 
 /** @internal */
-function difference(_assoc: HasManyThroughAssociation, a: Base[], b: Base[]): Base[] {
-  return a.filter((r) => !b.includes(r));
-}
-
-/** @internal */
-function intersection(_assoc: HasManyThroughAssociation, a: Base[], b: Base[]): Base[] {
-  return a.filter((r) => b.includes(r));
-}
-
-/** @internal */
-function markOccurrence(
-  _assoc: HasManyThroughAssociation,
-  distribution: Map<Base, number>,
-  record: Base,
-): boolean {
-  const count = distribution.get(record) ?? 0;
-  if (count > 0) {
-    distribution.set(record, count - 1);
-    return true;
-  }
-  return false;
-}
-
-/** @internal */
-function distribution(_assoc: HasManyThroughAssociation, array: Base[]): Map<Base, number> {
-  const result = new Map<Base, number>();
-  for (const r of array) result.set(r, (result.get(r) ?? 0) + 1);
-  return result;
-}
-
-/** @internal */
 function throughRecordsFor(assoc: HasManyThroughAssociation, record: Base): Base[] {
   const throughName = assoc.reflection.options.through;
   if (!throughName) return [];
@@ -756,6 +760,47 @@ function deleteThroughRecords(assoc: HasManyThroughAssociation, records: Base[])
     cache.delete(record);
   }
   return Promise.resolve();
+}
+
+/**
+ * `distribution` + `mark_occurrence` (has_many_through_association.rb:187-195)
+ * as one occurrence counter. Ruby keys the hash by the record, hashing on
+ * AR::Core `hash`/`eql?` (class + id), so the buckets are matched with the same
+ * record equality rather than JS identity.
+ * @internal
+ */
+function distribution(records: Base[]): Array<{ record: Base; count: number }> {
+  const buckets: Array<{ record: Base; count: number }> = [];
+  for (const record of records) {
+    const bucket = buckets.find((b) => b.record.isEqual(record));
+    if (bucket) bucket.count += 1;
+    else buckets.push({ record, count: 1 });
+  }
+  return buckets;
+}
+
+/** @internal */
+function markOccurrence(buckets: Array<{ record: Base; count: number }>, record: Base): boolean {
+  const bucket = buckets.find((b) => b.record.isEqual(record));
+  if (!bucket || bucket.count <= 0) return false;
+  bucket.count -= 1;
+  return true;
+}
+
+/**
+ * Bodies of `HasManyThroughAssociation#difference` / `#intersection`, exposed
+ * for the `CollectionProxy` replace path (see `setDifference`).
+ * @internal
+ */
+export function multisetDifference(a: Base[], b: Base[]): Base[] {
+  const dist = distribution(b);
+  return a.filter((record) => !markOccurrence(dist, record));
+}
+
+/** @internal */
+export function multisetIntersection(a: Base[], b: Base[]): Base[] {
+  const dist = distribution(b);
+  return a.filter((record) => markOccurrence(dist, record));
 }
 
 /**

@@ -3,7 +3,7 @@ import type { AssociationDefinition } from "../associations.js";
 import { loadHasMany } from "../associations.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { RecordInvalid } from "../validations.js";
-import { CollectionAssociation } from "./collection-association.js";
+import { CollectionAssociation, includesRecord } from "./collection-association.js";
 import { ForeignAssociation } from "./foreign-association.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
 import { underscore } from "@blazetrails/activesupport";
@@ -20,6 +20,25 @@ import { underscore } from "@blazetrails/activesupport";
 export class HasManyAssociation extends CollectionAssociation {
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
+  }
+
+  /**
+   * Set difference (Ruby's `a - b`) over AR record equality — a record present
+   * anywhere in `b` is excluded from the result however many times it occurs.
+   *
+   * Mirrors: ActiveRecord::Associations::HasManyAssociation#difference
+   */
+  protected override difference(a: Base[], b: Base[]): Base[] {
+    return setDifference(a, b);
+  }
+
+  /**
+   * Set intersection (Ruby's `a & b`) over AR record equality.
+   *
+   * Mirrors: ActiveRecord::Associations::HasManyAssociation#intersection
+   */
+  protected override intersection(a: Base[], b: Base[]): Base[] {
+    return setIntersection(a, b);
   }
 
   /**
@@ -422,4 +441,20 @@ function nullifiedOwnerAttributes(assoc: HasManyAssociation): Record<string, nul
 function deriveAsTypeCol(assoc: { reflection: { options: { as?: string } } }): string | null {
   const asName = assoc.reflection.options.as;
   return asName ? `${underscore(asName)}_type` : null;
+}
+
+/**
+ * Bodies of `HasManyAssociation#difference` / `#intersection`, exposed so the
+ * `CollectionProxy` replace path — which is one class covering both the plain
+ * and the `:through` reflection, and so cannot pick a diff by inheritance —
+ * can reach the same set semantics the OO association uses.
+ * @internal
+ */
+export function setDifference(a: Base[], b: Base[]): Base[] {
+  return a.filter((record) => !includesRecord(b, record));
+}
+
+/** @internal */
+export function setIntersection(a: Base[], b: Base[]): Base[] {
+  return a.filter((record) => includesRecord(b, record));
 }
