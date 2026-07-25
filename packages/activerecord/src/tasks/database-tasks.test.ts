@@ -155,8 +155,6 @@ describe("DatabaseTasksRegisterTask", () => {
 });
 
 describe("DatabaseTasksDumpSchemaCacheTest", () => {
-  // Rails' `ActiveRecord::Base.lease_connection`: the ambient arunit
-  // connection, not a per-test one.
   fixtures([]);
 
   let originalSchema: string | undefined;
