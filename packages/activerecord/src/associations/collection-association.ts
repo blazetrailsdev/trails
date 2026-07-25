@@ -321,21 +321,19 @@ export class CollectionAssociation extends Association {
   /**
    * Add records to this association. Flattens arguments and inserts
    * each record, persisting if the owner is persisted.
+   *
+   * Yields the added records, or `undefined` when a failed `insert_record`
+   * made `concat_records` raise `ActiveRecord::Rollback` inside the
+   * persisted-owner transaction (collection_association.rb:127-135) — the
+   * nil that makes `CollectionProxy#<<` falsy.
    */
-  async concat(...records: Base[]): Promise<Base[]> {
+  async concat(...records: Base[]): Promise<Base[] | undefined> {
     const flattened = records.flat();
     if (this.owner.isNewRecord()) {
       await this.loadTarget();
-      await this.concatRecords(flattened);
-    } else {
-      // Rails wraps the persisted-owner concat in a transaction so a mid-batch
-      // save failure rolls back the records already inserted
-      // (collection_association.rb:133 — `transaction { concat_records(records) }`).
-      await transaction(this, async () => {
-        await this.concatRecords(flattened);
-      });
+      return this.concatRecords(flattened);
     }
-    return flattened;
+    return transaction(this, () => this.concatRecords(flattened));
   }
 
   /** @internal */
@@ -1219,7 +1217,10 @@ export async function concatRecordsLoop(
 }
 
 /** @internal */
-function transaction(assoc: CollectionAssociation, block: () => Promise<void>): Promise<void> {
+function transaction<R>(
+  assoc: CollectionAssociation,
+  block: () => Promise<R>,
+): Promise<R | undefined> {
   // Rails: reflection.klass.transaction(&block) — uses the reflection's klass, not assoc.klass
   const klass = (assoc.reflection as any).klass ?? assoc.klass;
   if (klass && typeof klass.transaction === "function") {
