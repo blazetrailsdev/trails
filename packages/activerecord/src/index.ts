@@ -301,6 +301,7 @@ export {
   DeleteRestrictionError,
   HasOnePersistedAssignmentError,
   CollectionPersistedAssignmentError,
+  CollectionIdsAssignmentError,
 } from "./associations/errors.js";
 export {
   AbstractReflection,

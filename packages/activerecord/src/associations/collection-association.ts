@@ -7,7 +7,7 @@ import { foreignKeyPresentFor } from "./foreign-association.js";
 import { throughForeignKeyPresent } from "./through-association.js";
 import type { AssociationReflection } from "../reflection.js";
 import { RecordNotSaved, Rollback } from "../errors.js";
-import { CollectionPersistedAssignmentError } from "./errors.js";
+import { CollectionIdsAssignmentError, CollectionPersistedAssignmentError } from "./errors.js";
 import { raiseNotFoundAll } from "../relation/finder-methods.js";
 import { normalizeAssociationKey } from "./key-normalization.js";
 import { polymorphicName } from "../inheritance.js";
@@ -109,23 +109,23 @@ export class CollectionAssociation extends Association {
   }
 
   /**
-   * The `#{singular}Ids=` analogue of {@link queueWrite}. Resolving ids to
-   * records is itself a query, so even the unpersisted-owner arm is async.
+   * The `#{singular}Ids=` analogue of {@link queueWrite} — and, unlike it,
+   * a throw on BOTH owner arms.
    *
-   * The unpersisted arm returns a promise the property setter must discard —
-   * an id that doesn't resolve (`raiseNotFoundAll`) surfaces as an unhandled
-   * rejection, not a catchable throw, and an immediate `save()` can race the
-   * in-flight resolution. This is the pre-existing shape (the setter always
-   * called `idsWriter` un-awaited) and the story's acceptance criteria keep
-   * unpersisted-owner assignment working, so it is retained rather than made
-   * a second persisted-style throw; callers who need the result awaitable use
-   * `await owner.association(name).idsWriter(ids)`.
+   * `queueWrite`'s unpersisted arm is faithful because Rails does no I/O for a
+   * new-record owner either. `ids_writer` has no such arm: it resolves the ids
+   * to records with a query before replacing
+   * (collection_association.rb:61-83), so the new-record path is DB I/O too.
+   * The sync setter used to return that promise for it to discard, which made
+   * a bad id (`raiseNotFoundAll`) an unhandled rejection instead of a
+   * catchable throw and let an immediate `save()` read the target before the
+   * in-flight replace landed. Awaitable surfaces exist for both arms —
+   * `await owner.update({ itemIds: [...] })` (persistence.ts routes collection
+   * keys through `idsWriter`) and `await owner.association(name).idsWriter()`
+   * — so this throws loudly and names them. RFC 0068.
    */
-  queueIdsWrite(ids: unknown[]): Promise<void> {
-    if ((this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
-      throw new CollectionPersistedAssignmentError(this.reflection.name);
-    }
-    return this.idsWriter(ids);
+  queueIdsWrite(_ids: unknown[]): never {
+    throw new CollectionIdsAssignmentError(this.reflection.name);
   }
 
   /**

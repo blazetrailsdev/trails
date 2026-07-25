@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::Associations error classes defined in
  * activerecord/lib/active_record/associations/errors.rb
  */
+import { singularize } from "@blazetrails/activesupport";
 import { ActiveRecordError, ConfigurationError } from "../errors.js";
 
 /**
@@ -419,6 +420,41 @@ export class CollectionPersistedAssignmentError extends ActiveRecordError {
         `(or \`.concat(...)\` / \`.destroy(...)\`).`,
     );
     this.name = "CollectionPersistedAssignmentError";
+    this.association = association;
+  }
+}
+
+/**
+ * Thrown when a collection association's ids are assigned with the native
+ * `#{singular}Ids=` setter — `owner.itemIds = [...]` or the matching
+ * mass-assignment key — on *either* owner arm.
+ *
+ * The ids writer is stricter than {@link CollectionPersistedAssignmentError}'s
+ * record writer, which only throws for a persisted owner: Rails' `ids_writer`
+ * (collection_association.rb:61-83) *resolves the ids to records with a query*
+ * before it replaces, so even the new-record arm — where the replace itself is
+ * pure in-memory work — needs I/O the sync setter cannot await. Returning that
+ * promise from the setter made a bad id (`raise_record_not_found_exception!`)
+ * surface as an unhandled rejection rather than a catchable throw, and let an
+ * immediate `save()` race the in-flight resolution. See RFC
+ * 0068-awaitable-has-one-setter ("Why 'loud' beats 'deferred'").
+ */
+export class CollectionIdsAssignmentError extends ActiveRecordError {
+  readonly association: string;
+
+  constructor(association: string) {
+    // The setter that raised, derived here rather than passed in so the
+    // message can never name a key that differs from the installed writer
+    // (builder/collection-association.ts singularizes the same way).
+    const idsName = `${singularize(association)}Ids`;
+    super(
+      `Cannot assign collection association \`${association}\` ids with \`=\`: ` +
+        `Rails resolves the ids with a query and replaces the collection at ` +
+        `assignment time, which requires \`await\` in JS. Use ` +
+        `\`await owner.update({ ${idsName}: [...] })\` (or ` +
+        `\`await owner.association("${association}").idsWriter([...])\`).`,
+    );
+    this.name = "CollectionIdsAssignmentError";
     this.association = association;
   }
 }

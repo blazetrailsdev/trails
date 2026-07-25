@@ -169,7 +169,6 @@ export function assignAssociationIfMatch(
         replace?: (v: unknown[]) => void;
         writer?: (v: unknown) => void;
         queueWrite?: (v: unknown) => void;
-        queueIdsWrite?: (v: unknown) => unknown;
       }
     | null
     | undefined;
