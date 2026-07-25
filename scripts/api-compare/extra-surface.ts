@@ -940,6 +940,19 @@ export function buildReport(
   };
 }
 
+export async function resolveAllowlist(
+  file: string = ALLOWLIST_PATH,
+): Promise<{ allow: AllowEntry[]; problems: string[] }> {
+  let allow: AllowEntry[];
+  try {
+    allow = await loadAllowlist(file);
+  } catch (e) {
+    return { allow: [], problems: [e instanceof Error ? e.message : String(e)] };
+  }
+  const problems = findInvalidAllowEntries(allow);
+  return problems.length > 0 ? { allow: [], problems } : { allow, problems };
+}
+
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   const args = parseArgs(argv);
 
@@ -954,17 +967,10 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const ruby: ApiManifest = JSON.parse(fs.readFileSync(rubyPath, "utf-8"));
   const ts: ApiManifest = JSON.parse(fs.readFileSync(tsPath, "utf-8"));
 
-  const allow = await loadAllowlist();
-  const invalid = findInvalidAllowEntries(allow);
-  if (invalid.length > 0) {
-    console.error(
-      `\nextra-surface allowlist: ${invalid.length} malformed entr(ies) in ` +
-        `${path.basename(ALLOWLIST_PATH)}:\n` +
-        invalid.map((m) => `  ${m}`).join("\n") +
-        "\nEvery entry needs a unique package+tsFile+name and a non-empty reason.\n",
-    );
-    process.exit(1);
-  }
+  // An unreadable or malformed allowlist must NOT stop the report: these
+  // outputs feed the stats pipeline. Degrade to no suppressions, print
+  // everything, and only then set the exit code.
+  const { allow, problems } = await resolveAllowlist();
 
   const report = buildReport(ruby, ts, {
     filterPkg: args.filterPkg,
@@ -980,6 +986,18 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     printHumanReport(report, args.topN, args.maxDetail);
   }
 
+  if (problems.length > 0) {
+    console.error(
+      `\nextra-surface allowlist: ${problems.length} problem(s) with ` +
+        `${path.basename(ALLOWLIST_PATH)} — the report above was produced with NO ` +
+        "suppressions:\n" +
+        problems.map((m) => `  ${m}`).join("\n") +
+        "\nEvery entry needs a unique package+tsFile+name and a non-empty reason.\n",
+    );
+    process.exit(1);
+  }
+
+  // Stale entries can't be judged when --exclude-glob hides whole TS files.
   if (args.excludeGlobs.length > 0) return;
   const { stale } = report.allowlist;
   if (stale.length === 0) return;

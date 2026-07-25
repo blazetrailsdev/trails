@@ -8,6 +8,7 @@ import {
   buildReport,
   findInvalidAllowEntries,
   loadAllowlist,
+  resolveAllowlist,
   parseArgs,
 } from "./extra-surface.js";
 import type { AllowEntry } from "./extra-surface.js";
@@ -1278,5 +1279,40 @@ describe("loadAllowlist", () => {
 
   it("parses the committed allowlist, which is well-formed", async () => {
     expect(findInvalidAllowEntries(await loadAllowlist())).toEqual([]);
+  });
+});
+
+describe("resolveAllowlist", () => {
+  async function writeAllow(contents: string): Promise<string> {
+    const file = path.join(await fs.mkdtemp(path.join(tmpdir(), "extra-surface-")), "allow.json");
+    await fs.writeFile(file, contents);
+    return file;
+  }
+
+  it("degrades an unreadable file to no suppressions, reporting the problem", async () => {
+    const r = await resolveAllowlist("scripts/api-compare/does-not-exist.json");
+    expect(r.allow).toEqual([]);
+    expect(r.problems).toHaveLength(1);
+    expect(r.problems[0]).toMatch(/Missing does-not-exist\.json/);
+  });
+
+  it("degrades a malformed entry to no suppressions, so the report never gates", async () => {
+    const file = await writeAllow(
+      JSON.stringify([{ package: "activemodel", tsFile: "foo.ts", name: "helper", reason: "" }]),
+    );
+    const r = await resolveAllowlist(file);
+    expect(r.allow).toEqual([]);
+    expect(r.problems).toEqual(["empty reason: activemodel foo.ts helper"]);
+  });
+
+  it("returns the entries when the file is well-formed", async () => {
+    const entry = {
+      package: "activemodel",
+      tsFile: "foo.ts",
+      name: "helper",
+      reason: "TS-idiom accessor.",
+    };
+    const r = await resolveAllowlist(await writeAllow(JSON.stringify([entry])));
+    expect(r).toEqual({ allow: [entry], problems: [] });
   });
 });
