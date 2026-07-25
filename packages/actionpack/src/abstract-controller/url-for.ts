@@ -10,7 +10,7 @@
  *    routes yet (`_routes` is a property in trails, not a method)
  *  - `NO_ROUTES_MESSAGE` — the Rails-shaped hint to surface at the
  *    eventual `urlFor()` call site
- *  - `filterActionMethodsForRoutes`, used by hosts to strip named-route
+ *  - `actionMethods`, used by hosts to strip named-route
  *    helper names out of their `actionMethods` list (mirrors Rails'
  *    `ClassMethods#action_methods` override)
  *
@@ -90,25 +90,6 @@ export const UrlForDefaults = {
 } as const;
 
 /**
- * Filter `actionMethods` by removing any names that collide with
- * named-route helper names. Mirrors Rails' `ClassMethods#action_methods`
- * override: when `_routes` is wired up, the method list shrinks by
- * the helper names so routing helpers don't show up as actions.
- *
- * @param baseActionMethods The unfiltered action list (typically from
- *   `AbstractController.actionMethods()`).
- * @param routes The route set returned by `_routes`, or `null`.
- */
-export function filterActionMethodsForRoutes(
-  baseActionMethods: readonly string[],
-  routes: RouteSetLike | null,
-): string[] {
-  if (!routes) return [...baseActionMethods];
-  const helpers = new Set(routes.namedRoutes.helperNames);
-  return baseActionMethods.filter((name) => !helpers.has(name));
-}
-
-/**
  * Rails-shaped class-level `_routes` reader. Returns the route set or
  * `null`. Hosts override by assigning their route set onto the class
  * (trails treats `_routes` as a property, not a method — see
@@ -126,8 +107,13 @@ export function _routes(host?: { _routes?: RouteSetLike | null }): RouteSetLike 
 
 /**
  * Rails-shaped class-level `action_methods` override. Mirrors
- * `module ClassMethods; def action_methods; super - _routes.named_routes.helper_names; end; end`.
- * Delegates to `filterActionMethodsForRoutes`.
+ * `module ClassMethods; def action_methods; super - _routes.named_routes.helper_names; end; end`
+ * — when `_routes` is wired up the list shrinks by the named-route helper
+ * names so routing helpers don't show up as actions.
+ *
+ * @param baseActionMethods The unfiltered action list (typically from
+ *   `AbstractController.actionMethods()`).
+ * @param routes The route set returned by `_routes`, or `null`.
  *
  * @internal
  */
@@ -135,5 +121,7 @@ export function actionMethods(
   baseActionMethods: readonly string[],
   routes: RouteSetLike | null = _routesClassDefault,
 ): string[] {
-  return filterActionMethodsForRoutes(baseActionMethods, routes);
+  if (!routes) return [...baseActionMethods];
+  const helpers = new Set(routes.namedRoutes.helperNames);
+  return baseActionMethods.filter((name) => !helpers.has(name));
 }

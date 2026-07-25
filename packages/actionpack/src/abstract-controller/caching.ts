@@ -31,7 +31,9 @@ export const CACHING_SLOTS: readonly CachingSlot[] = SLOTS;
 /**
  * Rails-shaped class-level defaults. Hosts read these once at include
  * time; we don't install them eagerly to avoid the
- * subclass-shadowing trap (see `applyAssetPaths` docstring).
+ * subclass-shadowing trap: an eager write of `undefined` creates an own
+ * property on the subclass that permanently shadows a later assignment
+ * on a parent class.
  */
 export const CACHING_DEFAULTS = {
   defaultStaticExtension: ".html",
@@ -52,16 +54,6 @@ export interface CachingClassMethods {
 
 export interface CachingHost {
   constructor: CachingClassMethods;
-}
-
-/**
- * Marks a host class as conforming to the `CachingClassMethods` slot
- * contract. No-op at runtime — see `applyAssetPaths` for the rationale.
- */
-export function applyCaching<T extends new (...args: never[]) => unknown>(
-  _cls: T & Partial<CachingClassMethods>,
-): void {
-  // Intentionally empty.
 }
 
 /**

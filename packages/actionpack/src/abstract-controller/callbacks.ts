@@ -135,16 +135,6 @@ export class ActionFilter implements CallbackPredicateLike {
   around(controller: AbstractController): boolean {
     return this.isMatch(controller);
   }
-
-  /** @internal */
-  get filters(): ReadonlyArray<ActionCallback | AroundCallback> {
-    return this._filters;
-  }
-
-  /** @internal */
-  get conditionalKey(): "only" | "except" {
-    return this._conditionalKey;
-  }
 }
 
 /**
@@ -361,6 +351,82 @@ export function _skipActionCallback(
     }
     chain.delete(cb);
   }
+}
+
+/**
+ * Host contract for the `*_action` macros: any controller class whose
+ * prototype backs the `processAction` callback chain.
+ */
+export interface ActionCallbackHost {
+  readonly prototype: object;
+}
+
+/**
+ * Register a before_action callback.
+ *
+ * Rails defines `before_action` / `after_action` / `around_action` (and the
+ * `prepend_`/`skip_`/`append_` variants) metaprogrammatically inside
+ * `Callbacks::ClassMethods` — see the `[:before, :after, :around].each` +
+ * `define_method "#{callback}_action"` loop in
+ * `vendor/rails/actionpack/lib/abstract_controller/callbacks.rb`. TypeScript
+ * has no `define_method`, so each name is spelled out here.
+ */
+export function beforeAction(
+  this: ActionCallbackHost,
+  callback: ActionCallback,
+  options: CallbackOptions = {},
+): void {
+  _registerActionCallback(this.prototype, "before", callback, options);
+}
+
+/** Register an after_action callback. See {@link beforeAction}. */
+export function afterAction(
+  this: ActionCallbackHost,
+  callback: ActionCallback,
+  options: CallbackOptions = {},
+): void {
+  _registerActionCallback(this.prototype, "after", callback, options);
+}
+
+/** Register an around_action callback. See {@link beforeAction}. */
+export function aroundAction(
+  this: ActionCallbackHost,
+  callback: AroundCallback,
+  options: CallbackOptions = {},
+): void {
+  _registerActionCallback(this.prototype, "around", callback, options);
+}
+
+/**
+ * Skip a registered before_action. Accepts the callback reference or
+ * (for callbacks registered with `name`) the name string. Conditional
+ * options (`if`/`unless`/`only`/`except`) merge via Rails skip semantics.
+ * See {@link beforeAction} for why the name is spelled out.
+ */
+export function skipBeforeAction(
+  this: ActionCallbackHost,
+  cb: ActionCallback | string,
+  options: CallbackOptions = {},
+): void {
+  _skipActionCallback(this.prototype, "before", cb, options);
+}
+
+/** Skip a registered after_action. See {@link skipBeforeAction}. */
+export function skipAfterAction(
+  this: ActionCallbackHost,
+  cb: ActionCallback | string,
+  options: CallbackOptions = {},
+): void {
+  _skipActionCallback(this.prototype, "after", cb, options);
+}
+
+/** Skip a registered around_action. See {@link skipBeforeAction}. */
+export function skipAroundAction(
+  this: ActionCallbackHost,
+  cb: AroundCallback | string,
+  options: CallbackOptions = {},
+): void {
+  _skipActionCallback(this.prototype, "around", cb, options);
 }
 
 /** Rails `AC::Callbacks#process_action` — runs the chain around `dispatch`. @internal */

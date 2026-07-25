@@ -62,7 +62,7 @@ export interface RenderingHost {
  * `AbstractController::Rendering#render`.
  */
 export function render<T extends RenderingHost>(this: T, ...args: unknown[]): void {
-  const options = normalizeRender(...args);
+  const options = _normalizeRender(...args);
   const renderedBody = this.renderToBody(options);
   if (options.html != null) {
     this._setHtmlContentType?.();
@@ -79,7 +79,7 @@ export function render<T extends RenderingHost>(this: T, ...args: unknown[]): vo
  * `AbstractController::Rendering#render_to_string`.
  */
 export function renderToString<T extends RenderingHost>(this: T, ...args: unknown[]): unknown {
-  const options = normalizeRender(...args);
+  const options = _normalizeRender(...args);
   return this.renderToBody(options);
 }
 
@@ -140,8 +140,13 @@ export function _processOptions(options: RenderOptions): RenderOptions {
   return options;
 }
 
-/** Combined normalization: args → options → variant → final hash. */
-export function normalizeRender(...args: unknown[]): RenderOptions {
+/**
+ * Rails-private `_normalize_render(*args)` — combined normalization:
+ * args → options → variant → final hash.
+ *
+ * @internal
+ */
+export function _normalizeRender(...args: unknown[]): RenderOptions {
   const options = _normalizeArgs(...(args as [unknown?, RenderOptions?]));
   _processVariant(options);
   return _normalizeOptions(options);
@@ -161,18 +166,6 @@ export function _processVariant(_options: RenderOptions): void {
  */
 export function _processFormat(_format: unknown): void {
   // Empty in the abstract layer.
-}
-
-/**
- * Rails-shaped private `_normalize_render(*args)` entry point. Same
- * signature/behavior as `normalizeRender` (the trails-named public
- * helper); kept here so the Rails-private name is exported for
- * `api:compare` and for subclasses that override the private hook.
- *
- * @internal
- */
-export function _normalizeRender(...args: unknown[]): RenderOptions {
-  return normalizeRender(...args);
 }
 
 /**

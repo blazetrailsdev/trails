@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { MemoryStore } from "@blazetrails/activesupport";
 
 import {
-  applyCaching,
   cache,
   cacheConfigured,
   cacheStore,
@@ -46,10 +45,6 @@ describe("AbstractController::Caching", () => {
         performCaching: true,
         enableFragmentCacheLogging: false,
       });
-    });
-
-    it("applyCaching is a slot-contract no-op", () => {
-      expect(() => applyCaching(HostClass)).not.toThrow();
     });
   });
 

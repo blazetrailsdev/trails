@@ -31,16 +31,17 @@ function allPublicMethodNames(proto: object | null | undefined): string[] {
 }
 
 import {
+  afterAction,
+  aroundAction,
+  beforeAction,
+  skipAfterAction,
+  skipAroundAction,
+  skipBeforeAction,
   _defineActionCallbacks,
   _insertCallbacks,
   _normalizeCallbackOption,
   _normalizeCallbackOptions,
-  _registerActionCallback,
-  _skipActionCallback,
   processAction as _runProcessActionCallbacks,
-  type ActionCallback,
-  type AroundCallback,
-  type CallbackOptions,
 } from "./callbacks.js";
 export type {
   ActionCallback,
@@ -258,17 +259,6 @@ export class AbstractController {
     return [...this._actionMethodCache];
   }
 
-  /** Check if an action exists. */
-  static hasAction(action: string): boolean {
-    if (
-      !Object.prototype.hasOwnProperty.call(this, "_actionMethodCache") ||
-      !this._actionMethodCache
-    ) {
-      this.actionMethods();
-    }
-    return this._actionMethodCache!.has(action);
-  }
-
   /** @internal Rails-private callback option normalizer. */
   static _normalizeCallbackOptions = _normalizeCallbackOptions;
   /** @internal Rails-private single-key callback option normalizer. */
@@ -276,37 +266,17 @@ export class AbstractController {
   /** @internal Rails-private callback insertion helper. */
   static _insertCallbacks = _insertCallbacks;
 
-  /** Register a before_action callback. */
-  static beforeAction(callback: ActionCallback, options: CallbackOptions = {}): void {
-    _registerActionCallback(this.prototype, "before", callback, options);
-  }
-
-  /** Register an after_action callback. */
-  static afterAction(callback: ActionCallback, options: CallbackOptions = {}): void {
-    _registerActionCallback(this.prototype, "after", callback, options);
-  }
-
-  /** Register an around_action callback. */
-  static aroundAction(callback: AroundCallback, options: CallbackOptions = {}): void {
-    _registerActionCallback(this.prototype, "around", callback, options);
-  }
-
-  /** Skip a registered before_action. Accepts the callback reference or
-   * (for callbacks registered with `name`) the name string. Conditional
-   * options (`if`/`unless`/`only`/`except`) merge via Rails skip semantics. */
-  static skipBeforeAction(cb: ActionCallback | string, options: CallbackOptions = {}): void {
-    _skipActionCallback(this.prototype, "before", cb, options);
-  }
-
-  /** Skip a registered after_action. */
-  static skipAfterAction(cb: ActionCallback | string, options: CallbackOptions = {}): void {
-    _skipActionCallback(this.prototype, "after", cb, options);
-  }
-
-  /** Skip a registered around_action. */
-  static skipAroundAction(cb: AroundCallback | string, options: CallbackOptions = {}): void {
-    _skipActionCallback(this.prototype, "around", cb, options);
-  }
+  /**
+   * Rails' `*_action` callback macros. Defined in `callbacks.ts` (the file
+   * that matches `abstract_controller/callbacks.rb`) and installed here,
+   * mirroring Rails' `include AbstractController::Callbacks`.
+   */
+  static beforeAction = beforeAction;
+  static afterAction = afterAction;
+  static aroundAction = aroundAction;
+  static skipBeforeAction = skipBeforeAction;
+  static skipAfterAction = skipAfterAction;
+  static skipAroundAction = skipAroundAction;
 
   /**
    * Process an action by name. Delegates to the callbacks-wrapping
@@ -323,8 +293,7 @@ export class AbstractController {
   /** Rails `Base#send_action` — raw method dispatch with actionMissing
    * fallback and ActionNotFound on no match. @internal */
   async _dispatchAction(action: string, ...args: unknown[]): Promise<void> {
-    const Constructor = this.constructor as typeof AbstractController;
-    if (Constructor.hasAction(action)) {
+    if (this.isActionMethod(action)) {
       const method = (this as any)[action];
       if (typeof method === "function") {
         await method.apply(this, args);
@@ -367,9 +336,10 @@ export class AbstractController {
     return this._findActionName(action) !== undefined;
   }
 
-  /** @internal */
+  /** Rails `action_method?` — is `name` one of this controller's actions?
+   * @internal */
   isActionMethod(name: string): boolean {
-    return (this.constructor as typeof AbstractController).hasAction(name);
+    return (this.constructor as typeof AbstractController).actionMethods().includes(name);
   }
 
   /** @internal */

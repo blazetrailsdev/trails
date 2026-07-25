@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryStore, Notifications } from "@blazetrails/activesupport";
 
 import {
-  applyFragments,
   combinedFragmentCacheKey,
   expireFragment,
   fragmentCacheKey,
@@ -46,18 +45,6 @@ afterEach(() => {
 });
 
 describe("class config", () => {
-  it("applyFragments is a no-op so subclasses inherit the parent key list", () => {
-    class Parent {
-      static fragmentCacheKeys = [() => "v1"];
-    }
-    class Child extends Parent {}
-    applyFragments(Child as unknown as new (...a: never[]) => unknown);
-    // Child must NOT have its own fragmentCacheKeys property — the
-    // parent's list inherits via the prototype chain.
-    expect(Object.prototype.hasOwnProperty.call(Child, "fragmentCacheKeys")).toBe(false);
-    expect(Child.fragmentCacheKeys).toHaveLength(1);
-  });
-
   it("fragmentCacheKey appends constants-as-thunks and blocks in order", () => {
     const cls: FragmentsClassMethods = { fragmentCacheKeys: [() => "a"] };
     fragmentCacheKey(cls, "b");
