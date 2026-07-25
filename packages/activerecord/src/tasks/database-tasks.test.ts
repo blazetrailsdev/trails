@@ -171,7 +171,8 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
   it("dump schema cache", async () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-dump-sc-"));
     const cachePath = path.join(tmp, "schema_cache.json");
-    await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
+    const dbFile = path.join(tmp, "arunit.sqlite3");
+    await Base.establishConnection({ adapter: "sqlite3", database: dbFile, pool: 1 });
     try {
       expect(fs.existsSync(cachePath)).toBe(false);
       const adapter = await Base.connectionPool().leaseConnection();
@@ -228,14 +229,16 @@ describe("DatabaseTasksDumpSchemaTest", () => {
     // Mirrors Rails: schemaDump is a bare filename; schemaDumpPath prepends dbDir.
     // The dir is removed before dumpSchema runs; dumpSchema must recreate it.
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-ensure-dbdir-"));
+    const dbTmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-ensure-dbdir-db-"));
+    const dbFile = path.join(dbTmp, "arunit.sqlite3");
     const prevDbDir = DatabaseTasks.dbDir;
-    await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
+    await Base.establishConnection({ adapter: "sqlite3", database: dbFile, pool: 1 });
     try {
       DatabaseTasks.dbDir = tmp;
       const schemaPath = path.join(tmp, "fake_db_config_schema.ts");
       const config = new HashConfig("arunit", "primary", {
         adapter: "sqlite3",
-        database: ":memory:",
+        database: dbFile,
         schemaDump: "fake_db_config_schema.ts",
       });
       fs.rmSync(tmp, { recursive: true, force: true });
@@ -250,20 +253,23 @@ describe("DatabaseTasksDumpSchemaTest", () => {
         /* ignore */
       }
       fs.rmSync(tmp, { recursive: true, force: true });
+      fs.rmSync(dbTmp, { recursive: true, force: true });
     }
   });
   it("db dir ignored if included in schema dump", async () => {
     // Mirrors Rails: schemaDump is an absolute path whose dirname == dbDir.
     // schemaDumpPath returns it verbatim (no double-prefix).
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-dbdir-ignored-"));
+    const dbTmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-dbdir-ignored-db-"));
+    const dbFile = path.join(dbTmp, "arunit.sqlite3");
     const prevDbDir = DatabaseTasks.dbDir;
-    await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
+    await Base.establishConnection({ adapter: "sqlite3", database: dbFile, pool: 1 });
     try {
       DatabaseTasks.dbDir = tmp;
       const schemaPath = path.join(tmp, "fake_db_config_schema.ts");
       const config = new HashConfig("arunit", "primary", {
         adapter: "sqlite3",
-        database: ":memory:",
+        database: dbFile,
         schemaDump: schemaPath, // absolute path — dirname == dbDir
       });
       fs.rmSync(tmp, { recursive: true, force: true });
@@ -278,6 +284,7 @@ describe("DatabaseTasksDumpSchemaTest", () => {
         /* ignore */
       }
       fs.rmSync(tmp, { recursive: true, force: true });
+      fs.rmSync(dbTmp, { recursive: true, force: true });
     }
   });
 });
@@ -918,10 +925,12 @@ describe("DatabaseTasksMigrateErrorTest", () => {
     const { SchemaCache } = await import("../connection-adapters/schema-cache.js");
     const originalVersion = process.env.VERSION;
     delete process.env.VERSION;
-    await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-migrate-cache-"));
+    const dbFile = path.join(tmp, "arunit.sqlite3");
+    await Base.establishConnection({ adapter: "sqlite3", database: dbFile, pool: 1 });
     DatabaseTasks.registerTask("sqlite", { create: async () => {} });
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      [DatabaseTasks.env]: { adapter: "sqlite3", database: ":memory:" },
+      [DatabaseTasks.env]: { adapter: "sqlite3", database: dbFile },
     });
     DatabaseTasks.registerMigrations([]);
     const clearSpy = vi.spyOn(SchemaCache.prototype, "clear");
@@ -940,6 +949,7 @@ describe("DatabaseTasksMigrateErrorTest", () => {
       DatabaseTasks.databaseConfiguration = null;
       DatabaseTasks.registerMigrations([]);
       DatabaseTasks.clearRegisteredTasks();
+      fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
 });
