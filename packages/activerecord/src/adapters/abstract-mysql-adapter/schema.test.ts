@@ -2,29 +2,30 @@
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/schema_test.rb
  */
 import { describe, it, beforeEach, afterEach, afterAll, expect } from "vitest";
-import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import {
+  describeIfMysqlAdapter,
+  leaseMysqlAdapter,
+  Mysql2Adapter,
+  MYSQL_TEST_URL,
+} from "./test-helper.js";
 import { Base } from "../../base.js";
 import { rebuildCanonicalTables } from "../../test-helpers/canonical-schema.js";
 
-async function restoreCanonicalOnPlainAdapter(names: readonly string[]): Promise<void> {
-  const restorer = new Mysql2Adapter(MYSQL_TEST_URL);
-  try {
-    await rebuildCanonicalTables(restorer, names);
-  } finally {
-    await restorer.close();
-  }
+// Both suites below drop/recreate canonical tables (`posts`; `students` /
+// `lessons_students` / `topics`) in the shape their assertions need, so each
+// puts them back on the leased connection before handing the worker on.
+async function restoreCanonicalTables(names: readonly string[]): Promise<void> {
+  const adapter = await leaseMysqlAdapter();
+  await rebuildCanonicalTables(adapter, names);
 }
 
-describeIfMysql("Mysql2Adapter", () => {
+describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
-  });
-  afterEach(async () => {
-    await adapter.close();
+    adapter = await leaseMysqlAdapter();
   });
   afterAll(async () => {
-    await restoreCanonicalOnPlainAdapter(["posts"]);
+    await restoreCanonicalTables(["posts"]);
   });
 
   describe("SchemaTest", () => {
@@ -184,13 +185,16 @@ describeIfMysql("Mysql2Adapter", () => {
 });
 
 // Top-level suite mirrors Rails: MysqlAnsiQuotesTest is a separate test class
-// (not nested inside SchemaTest's module). Keeping it outside the "Mysql2Adapter"
-// describe also avoids spinning up the SchemaTest adapter pool for ANSI tests.
-describeIfMysql("MySQLAnsiQuotesTest", () => {
-  // Build a fresh adapter with sql_mode='ANSI_QUOTES' applied in the pool init SQL
-  // so it persists across every checked-out connection — Rails uses
-  // `execute("SET SESSION sql_mode='ANSI_QUOTES'")` on its single leased connection;
-  // we apply the variable per-connection via the pool init hook (newClient).
+// (not nested inside SchemaTest's module).
+describeIfMysqlAdapter("MySQLAnsiQuotesTest", () => {
+  // The one adapter in this file that stays self-built rather than riding
+  // leaseMysqlAdapter(): sql_mode='ANSI_QUOTES' must not leak onto the shared
+  // leased connection the other suites (and every later test in this worker)
+  // run on. Rails likewise reconfigures a connection in-test from the primary
+  // config. Applying the variable in the pool init SQL (the newClient hook)
+  // makes it stick across every checked-out connection, where Rails gets away
+  // with a single `execute("SET SESSION sql_mode='ANSI_QUOTES'")` because it
+  // has exactly one leased connection to set it on.
   let ansi: Mysql2Adapter | undefined;
   beforeEach(() => {
     ansi = new Mysql2Adapter({ uri: MYSQL_TEST_URL, variables: { sql_mode: "ANSI_QUOTES" } });
@@ -205,7 +209,7 @@ describeIfMysql("MySQLAnsiQuotesTest", () => {
     ansi = undefined;
   });
   afterAll(async () => {
-    await restoreCanonicalOnPlainAdapter(["students", "lessons_students", "topics"]);
+    await restoreCanonicalTables(["students", "lessons_students", "topics"]);
   });
 
   it("primary key method with ansi quotes", async () => {

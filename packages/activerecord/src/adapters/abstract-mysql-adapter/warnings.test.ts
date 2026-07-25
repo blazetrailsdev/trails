@@ -3,20 +3,19 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
-  describeIfMysql,
+  describeIfMysqlAdapter,
+  leaseMysqlAdapter,
   Mysql2Adapter,
-  MYSQL_TEST_URL,
   withDbWarningsAction,
 } from "./test-helper.js";
 import { SQLWarning } from "../../errors.js";
 
-describeIfMysql("Mysql2Adapter", () => {
+describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
+    adapter = await leaseMysqlAdapter();
   });
-  afterEach(async () => {
-    await adapter.close();
+  afterEach(() => {
     vi.restoreAllMocks();
   });
 

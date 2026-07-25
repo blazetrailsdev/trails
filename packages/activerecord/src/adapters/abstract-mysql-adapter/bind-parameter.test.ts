@@ -16,15 +16,12 @@
  * it degrades to a string-equality bind.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 
-describeIfMysql("AbstractMySQLAdapter", () => {
+describeIfMysqlAdapter("AbstractMySQLAdapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
-  });
-  afterEach(async () => {
-    await adapter.close();
+    adapter = await leaseMysqlAdapter();
   });
 
   describe("BindParameterTest", () => {

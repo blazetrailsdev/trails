@@ -39,9 +39,9 @@ import { loadSchemaFromAdapter } from "./model-schema.js";
 import { itIfSupports, describeIfSupports } from "./test-helpers/supports.js";
 import { describeIfPg } from "./adapters/postgresql/test-helper.js";
 import {
-  describeIfMysql,
+  describeIfMysqlAdapter,
+  leaseMysqlAdapter,
   Mysql2Adapter,
-  MYSQL_TEST_URL,
 } from "./adapters/abstract-mysql-adapter/test-helper.js";
 
 async function freshContext(): Promise<{ adapter: DatabaseAdapter; ctx: MigrationContext }> {
@@ -2313,16 +2313,15 @@ describe("BulkAlterTableMigrationsTest", () => {
   });
 });
 
-describeIfMysql("BulkAlterTableMigrationsTest", () => {
+describeIfMysqlAdapter("BulkAlterTableMigrationsTest", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
+    adapter = await leaseMysqlAdapter();
     await adapter.exec("DROP TABLE IF EXISTS delete_me");
     await adapter.exec("CREATE TABLE delete_me (id INT NOT NULL AUTO_INCREMENT, PRIMARY KEY (id))");
   });
   afterEach(async () => {
     await adapter.exec("DROP TABLE IF EXISTS delete_me");
-    await adapter.close();
   });
 
   itIfSupports("bulk_alter", "updating auto increment", async () => {

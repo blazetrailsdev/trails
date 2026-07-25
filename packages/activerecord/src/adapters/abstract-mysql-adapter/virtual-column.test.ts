@@ -2,18 +2,18 @@
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/virtual_column_test.rb
  */
 import { it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { describeIfSupports } from "../../test-helpers/supports.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 
-describeIfMysql("Mysql2Adapter", () => {
+describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
 
   // The table is built per test (in beforeEach, after the global drop-all reset)
   // because the adapter dir runs under the AR setup, which wipes all tables before
   // every test. Mirrors Rails' `setup`/`teardown` create_table/drop_table dance.
   beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
+    adapter = await leaseMysqlAdapter();
     await adapter.dropTable("virtual_columns", { ifExists: true }).catch(() => {});
     await adapter.createTable("virtual_columns", { force: "cascade" }, (t: any) => {
       t.string("name");
@@ -34,7 +34,6 @@ describeIfMysql("Mysql2Adapter", () => {
 
   afterEach(async () => {
     await adapter.dropTable("virtual_columns", { ifExists: true }).catch(() => {});
-    await adapter.close();
   });
 
   describeIfSupports("virtual_columns", "VirtualColumnTest", () => {

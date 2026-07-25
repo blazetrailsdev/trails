@@ -1,19 +1,16 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/active_schema_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { captureSql } from "../../testing/sql-capture.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
 
-describeIfMysql("Mysql2Adapter", () => {
+describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
-  });
-  afterEach(async () => {
-    await adapter.close();
+    adapter = await leaseMysqlAdapter();
   });
 
   describe("ActiveSchemaTest", () => {
@@ -22,9 +19,9 @@ describeIfMysql("Mysql2Adapter", () => {
     // via the fixtures framework so its lifecycle (and teardown) is owned by the
     // canonical-schema machinery rather than a destructive create/drop here.
     // "add index" opts out of transactional fixtures: its real addIndex/
-    // removeIndex DDL runs through this file's separate adapter connection, which
-    // must not happen while Base.connection holds a fixture transaction on
-    // `people` (MySQL DDL implicitly commits and would strand that state).
+    // removeIndex DDL must not run while the leased connection holds a fixture
+    // transaction on `people` (MySQL DDL implicitly commits and would strand
+    // that state).
     fixtures(["people"], {
       usesTransaction: ["add index"],
     });

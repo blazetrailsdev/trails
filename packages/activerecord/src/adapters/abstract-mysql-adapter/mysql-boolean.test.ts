@@ -2,14 +2,14 @@
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/mysql_boolean_test.rb
  */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
-import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../index.js";
 
 class BooleanType extends Base {
   static tableName = "mysql_booleans";
 }
 
-describeIfMysql("Mysql2Adapter", () => {
+describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   let savedEmulateBooleans: boolean;
 
@@ -28,7 +28,7 @@ describeIfMysql("Mysql2Adapter", () => {
   }
 
   beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
+    adapter = await leaseMysqlAdapter();
     await adapter.createTable("mysql_booleans", { force: true }, (t: any) => {
       t.boolean("archived");
       t.string("published", { limit: 1 });
@@ -41,7 +41,6 @@ describeIfMysql("Mysql2Adapter", () => {
   afterEach(async () => {
     await emulateBooleans(savedEmulateBooleans);
     await adapter.dropTable("mysql_booleans", { ifExists: true });
-    await adapter.close();
   });
 
   describe("MysqlBooleanTest", () => {
