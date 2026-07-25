@@ -48,9 +48,7 @@ import { Uuid } from "./oid/uuid.js";
 import { Vector } from "./oid/vector.js";
 import { Xml } from "./oid/xml.js";
 
-// Mirrors: postgresql_adapter.rb:1168-1185. The two `add_modifier` lines that
-// open that block (array/range) are unported: trails has no registry
-// modifiers, and `attribute(..., array: true)` does not route through them.
+// Mirrors: postgresql_adapter.rb:1168-1185.
 ArType.register("bit", Bit, { adapter: "postgres" });
 ArType.register("bit_varying", BitVarying, { adapter: "postgres" });
 ArType.register("binary", Bytea, { adapter: "postgres" });
