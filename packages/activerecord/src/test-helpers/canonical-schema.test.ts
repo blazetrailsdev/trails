@@ -4,6 +4,7 @@ import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adap
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { FkSafeDropPlanHost } from "./canonical-schema.js";
 import {
+  bulkInboundFkHost,
   ensureCanonicalTables,
   fkSafeDropPlan,
   loadCanonicalSchema,
@@ -215,6 +216,104 @@ describe("fkSafeDropPlan", () => {
       scanInbound: true,
     });
     expect(plan.blockers).toEqual([{ fromTable: "outside", toTable: "a", name: "fk_outside_a" }]);
+  });
+
+  test("uses the bulk reverse lookup for the inbound scan when the host offers one", async () => {
+    const calls: string[] = [];
+    const bulk: string[][] = [];
+    const base = host(["a", "b", "outside"], { outside: ["a"] });
+    const plan = await fkSafeDropPlan(
+      {
+        tables: base.tables,
+        foreignKeys: async (name) => {
+          calls.push(name);
+          return base.foreignKeys(name);
+        },
+        foreignKeysReferencing: async (toTables) => {
+          bulk.push([...toTables]);
+          return [{ fromTable: "outside", toTable: "a", name: "fk_outside_a" }];
+        },
+      },
+      ["a", "b"],
+      { scanInbound: true },
+    );
+    // Only the dropped set is introspected per-table; `outside` is never
+    // touched individually — that is the whole point of the bulk lookup.
+    expect(calls).toEqual(["a", "b"]);
+    expect(bulk).toEqual([["a", "b"]]);
+    expect(plan.blockers).toEqual([{ fromTable: "outside", toTable: "a", name: "fk_outside_a" }]);
+  });
+
+  test("ignores bulk-reported keys from tables inside the dropped set or already gone", async () => {
+    const base = host(["a", "b", "outside"], { outside: ["a"] });
+    const plan = await fkSafeDropPlan(
+      {
+        tables: base.tables,
+        foreignKeys: base.foreignKeys,
+        foreignKeysReferencing: async () => [
+          { fromTable: "b", toTable: "a", name: "fk_b_a" },
+          { fromTable: "dropped_already", toTable: "a", name: "fk_gone_a" },
+          { fromTable: "outside", toTable: "a", name: "fk_outside_a" },
+        ],
+      },
+      ["a", "b"],
+      { scanInbound: true },
+    );
+    expect(plan.blockers).toEqual([{ fromTable: "outside", toTable: "a", name: "fk_outside_a" }]);
+  });
+});
+
+describe("bulkInboundFkHost", () => {
+  // Stands in for a live adapter: records the SQL it is handed and replays
+  // `rows` as the catalog result.
+  function fakeAdapter(adapterName: string, rows: Record<string, unknown>[] = []) {
+    const queries: string[] = [];
+    const adapter = {
+      adapterName,
+      quote: (value: unknown) => `'${String(value)}'`,
+      schemaQuery: async (sql: string) => {
+        queries.push(sql);
+        return rows;
+      },
+    } as unknown as AbstractAdapter;
+    return { adapter, queries };
+  }
+
+  const base: FkSafeDropPlanHost = { tables: async () => [], foreignKeys: async () => [] };
+
+  test("leaves the per-table host untouched on sqlite", () => {
+    const { adapter } = fakeAdapter("sqlite");
+    expect(bulkInboundFkHost(adapter, base)).toBe(base);
+  });
+
+  test("asks the catalog once for every referenced table", async () => {
+    const { adapter, queries } = fakeAdapter("postgres");
+    await bulkInboundFkHost(adapter, base).foreignKeysReferencing!(["authors", "topics"]);
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toContain("pg_constraint");
+    // Matched by resolved OID, not by name: `relname IN (...)` would also match
+    // a same-named table in another search-path schema.
+    expect(queries[0]).toContain("c.confrelid IN (to_regclass('authors'), to_regclass('topics'))");
+  });
+
+  test("collapses a composite foreign key to one blocker", async () => {
+    const row = {
+      from_table: "lessons_students",
+      to_table: "authors",
+      name: "fk_rails_13f362e4f5",
+    };
+    // MySQL's key_column_usage reports one row per constrained column.
+    const { adapter } = fakeAdapter("mysql", [row, { ...row }]);
+    const blockers = await bulkInboundFkHost(adapter, base).foreignKeysReferencing!(["authors"]);
+    expect(blockers).toEqual([
+      { fromTable: "lessons_students", toTable: "authors", name: "fk_rails_13f362e4f5" },
+    ]);
+  });
+
+  test("skips the catalog query when nothing is being dropped", async () => {
+    const { adapter, queries } = fakeAdapter("mysql");
+    expect(await bulkInboundFkHost(adapter, base).foreignKeysReferencing!([])).toEqual([]);
+    expect(queries).toEqual([]);
   });
 });
 
