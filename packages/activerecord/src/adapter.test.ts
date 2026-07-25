@@ -36,10 +36,7 @@ import { Subscriber } from "./test-helpers/models/subscriber.js";
 import { Event } from "./test-helpers/models/event.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
 import {
-  describeIfMysql,
   Mysql2Adapter,
-  MYSQL_TEST_URL,
-  databaseName,
   ARUNIT_DATABASE,
   ARUNIT2_DATABASE,
 } from "./adapters/abstract-mysql-adapter/test-helper.js";
@@ -368,7 +365,7 @@ describe("AdapterTest", () => {
   });
 
   // current database (gated by respond_to?(:current_database)) lives in the
-  // describeIfMysql AdapterTest block below (MySQL) and adapters/postgresql/
+  // MySQL-gated AdapterTest block below (MySQL) and adapters/postgresql/
   // adapter.test.ts (PG).
 
   it("#exec_query queries with no result set return an empty ActiveRecord::Result", async () => {
@@ -386,7 +383,7 @@ describe("AdapterTest", () => {
   });
 
   // charset / collation / show-variable / cross-database-selects (MySQL-only)
-  // live in the describeIfMysql AdapterTest block below.
+  // live in the MySQL-gated AdapterTest block below.
 
   // Rails gates this `unless in_memory_db?` (adapter_test.rb:176): a
   // re-established `:memory:` connection is a fresh, empty database.
@@ -1247,19 +1244,26 @@ describe("InvalidateTransactionTest", () => {
 // `current_database` case plus the cases wrapped in
 // `if current_adapter?(:Mysql2Adapter)` (charset/collation/show-variable/
 // cross-database-selects). SQLite/PG skip these via the current_adapter? gate;
-// here the whole block is gated behind `describeIfMysql`, which is
-// `describe.skip` when MYSQL_TEST_URL is absent.
-describeIfMysql("AdapterTest", () => {
+// here the block is gated on the *ambient* adapter (`adapterType === "mysql"`,
+// i.e. ARCONN=mysql2), which is what Rails' `current_adapter?(:Mysql2Adapter)`
+// means: these cases run against `ActiveRecord::Base.lease_connection`
+// (adapter_test.rb:13) on the MySQL lane and are skipped everywhere else. The
+// earlier shape — `describeIfMysql` plus a self-built `new Mysql2Adapter(...)`
+// under every ARCONN — probed the server directly and so never exercised the
+// leased pool connection or its config plumbing (configure_connection, pool
+// settings, prepared_statements).
+describe.runIf(adapterType === "mysql")("AdapterTest", () => {
   let adapter: Mysql2Adapter;
-  beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
+  beforeAll(async () => {
+    await establishFromTestConfig();
   });
-  afterEach(async () => {
-    await adapter.close();
+  beforeEach(async () => {
+    adapter = (await Base.leaseConnection()) as unknown as Mysql2Adapter;
+    await adapter.materializeTransactions();
   });
 
   it("current database", async () => {
-    expect(await adapter.currentDatabase()).toBe(databaseName(MYSQL_TEST_URL));
+    expect(await adapter.currentDatabase()).toBe(Base.connectionDbConfig()?.database);
   });
 
   it("charset", async () => {
@@ -1297,21 +1301,28 @@ describeIfMysql("AdapterTest", () => {
       `CREATE TABLE ${ARUNIT2_DATABASE}.courses (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL, college_id INT)`,
     );
 
-    // Mirrors Rails establishing a connection with the `:database` key removed:
-    // a cross-database select must succeed without a default database set.
-    const noDbUrl = new URL(MYSQL_TEST_URL);
-    noDbUrl.pathname = "/";
-    const noDbAdapter = new Mysql2Adapter(noDbUrl.toString());
     try {
-      // assert_nothing_raised: the select resolves without throwing.
-      await noDbAdapter.execute(
-        `SELECT ${ARUNIT_DATABASE}.pirates.*, ${ARUNIT2_DATABASE}.courses.* ` +
-          `FROM ${ARUNIT_DATABASE}.pirates, ${ARUNIT2_DATABASE}.courses`,
-      );
+      // Rails: `establish_connection(db_config.configuration_hash.except(:database))`
+      // then `Base.lease_connection.execute(...)`, with an `ensure` that
+      // re-establishes `:arunit`. `runWithoutConnection` is that ensure — it
+      // hands us the ambient configuration hash and restores the worker's pool
+      // afterward — so the no-database config is the ambient hash minus
+      // `database`, not a URL with its path cleared.
+      await runWithoutConnection(async (origConfig) => {
+        const { database: _database, ...exceptDatabase } = origConfig;
+        await Base.establishConnection(exceptDatabase);
+        // assert_nothing_raised: the select resolves without throwing.
+        await (
+          await Base.leaseConnection()
+        ).execute(
+          `SELECT ${ARUNIT_DATABASE}.pirates.*, ${ARUNIT2_DATABASE}.courses.* ` +
+            `FROM ${ARUNIT_DATABASE}.pirates, ${ARUNIT2_DATABASE}.courses`,
+        );
+      });
     } finally {
-      await noDbAdapter.close();
-      await adapter.execute(`DROP DATABASE IF EXISTS ${ARUNIT_DATABASE}`);
-      await adapter.execute(`DROP DATABASE IF EXISTS ${ARUNIT2_DATABASE}`);
+      const conn = (await Base.leaseConnection()) as unknown as Mysql2Adapter;
+      await conn.execute(`DROP DATABASE IF EXISTS ${ARUNIT_DATABASE}`);
+      await conn.execute(`DROP DATABASE IF EXISTS ${ARUNIT2_DATABASE}`);
     }
   });
 });
