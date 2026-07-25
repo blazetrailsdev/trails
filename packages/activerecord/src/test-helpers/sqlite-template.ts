@@ -57,6 +57,28 @@ export function unlinkDbFiles(fs: FsAdapter, base: string): void {
   }
 }
 
+// Registration is per *process*, not per module evaluation: vitest's
+// `isolate: true` reloads the module graph for every test file, so a
+// module-level Set would re-register a listener per file and leak them.
+const cleanupG = globalThis as typeof globalThis & { __arDbCleanupPaths?: Set<string> };
+
+/**
+ * Register a best-effort `process.on("exit")` unlink of a sqlite file DB and
+ * its WAL sidecars, at most once per path per process.
+ *
+ * Callers that must stay `process`-free (e.g. `test-database-config.ts`, whose
+ * fallback DB otherwise lingers in tmpdir after every setup-free run) route
+ * their cleanup through here — this module already carries the `process` and
+ * fs-adapter exception documented at the top of the file.
+ */
+export async function registerDbFileCleanupOnExit(base: string): Promise<void> {
+  const registered = (cleanupG.__arDbCleanupPaths ??= new Set<string>());
+  if (registered.has(base)) return;
+  registered.add(base);
+  const fs = await getFsAsync();
+  process.on("exit", () => unlinkDbFiles(fs, base));
+}
+
 /** Env var: absolute path of the canonical template DB built by globalSetup. */
 export const TEMPLATE_PATH_ENV = "AR_TEST_TEMPLATE_PATH";
 /** Env var: per-run token (stamped by globalSetup) so concurrent worktrees don't collide. */

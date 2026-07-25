@@ -6,7 +6,32 @@
  */
 import { describe, it, expect } from "vitest";
 import { getFsAsync } from "@blazetrails/activesupport/fs-adapter";
-import { TEMPLATE_PATH_ENV, RUN_TOKEN_ENV, WORKER_DB_ENV, isSqliteRun } from "./sqlite-template.js";
+import {
+  TEMPLATE_PATH_ENV,
+  RUN_TOKEN_ENV,
+  WORKER_DB_ENV,
+  isSqliteRun,
+  registerDbFileCleanupOnExit,
+  unlinkDbFiles,
+} from "./sqlite-template.js";
+
+describe("registerDbFileCleanupOnExit", () => {
+  it("registers one exit listener per path", async () => {
+    const base = `/tmp/ar-test-cleanup-probe-${Math.random().toString(36).slice(2)}.sqlite`;
+    const before = process.listenerCount("exit");
+    await registerDbFileCleanupOnExit(base);
+    await registerDbFileCleanupOnExit(base);
+    expect(process.listenerCount("exit")).toBe(before + 1);
+  });
+
+  it("unlinks the DB file and its WAL sidecars", async () => {
+    const fs = await getFsAsync();
+    const base = `/tmp/ar-test-cleanup-unlink-${Math.random().toString(36).slice(2)}.sqlite`;
+    for (const suffix of ["", "-wal", "-shm"]) fs.writeFileSync(base + suffix, "");
+    unlinkDbFiles(fs, base);
+    for (const suffix of ["", "-wal", "-shm"]) expect(await fs.exists(base + suffix)).toBe(false);
+  });
+});
 
 describe.skipIf(!isSqliteRun())("sqlite template-clone (Phase 0 probe)", () => {
   it("globalSetup built a template file for this run", async () => {
