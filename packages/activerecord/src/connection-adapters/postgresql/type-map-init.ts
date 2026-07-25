@@ -48,7 +48,9 @@ import { Uuid } from "./oid/uuid.js";
 import { Vector } from "./oid/vector.js";
 import { Xml } from "./oid/xml.js";
 
-// Mirrors: postgresql_adapter.rb:1168-1185.
+ArType.addModifier({ array: true }, OidArray, { adapter: "postgres" });
+ArType.addModifier({ range: true }, RangeType, { adapter: "postgres" });
+
 ArType.register("bit", Bit, { adapter: "postgres" });
 ArType.register("bit_varying", BitVarying, { adapter: "postgres" });
 ArType.register("binary", Bytea, { adapter: "postgres" });
@@ -67,11 +69,6 @@ ArType.register("legacy_point", LegacyPoint, { adapter: "postgres" });
 ArType.register("uuid", Uuid, { adapter: "postgres" });
 ArType.register("vector", Vector, { adapter: "postgres" });
 ArType.register("xml", Xml, { adapter: "postgres" });
-
-// Mirrors: postgresql_adapter.rb:1166-1167. Rails scopes these to
-// `adapter: :postgresql`; "postgres" is trails' normalized name for that family.
-ArType.addModifier({ array: true }, OidArray, { adapter: "postgres" });
-ArType.addModifier({ range: true }, RangeType, { adapter: "postgres" });
 
 /**
  * Mirrors: PostgreSQLAdapter.extract_limit — `$1.to_i if sql_type =~ /\((.*)\)/`.
