@@ -39,7 +39,17 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * Mirrors: ActiveRecord::Associations::ThroughAssociation#transaction
    */
   protected override transaction<R>(block: () => Promise<R>): Promise<R | undefined> {
-    return transaction(this, block);
+    const tr = throughReflection(this) as { klass?: unknown } | null;
+    let klass: { transaction?: (...args: unknown[]) => unknown } | null = null;
+    try {
+      klass = (tr?.klass ?? null) as { transaction?: (...args: unknown[]) => unknown } | null;
+    } catch {
+      klass = null;
+    }
+    if (klass && typeof klass.transaction === "function") {
+      return klass.transaction(block) as Promise<R | undefined>;
+    }
+    return block() as Promise<R | undefined>;
   }
 
   /**
@@ -50,7 +60,8 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * Mirrors: ActiveRecord::Associations::HasManyThroughAssociation#difference
    */
   protected override difference(a: Base[], b: Base[]): Base[] {
-    return multisetDifference(a, b);
+    const dist = distribution(b);
+    return a.filter((record) => !markOccurrence(dist, record));
   }
 
   /**
@@ -59,7 +70,8 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * Mirrors: ActiveRecord::Associations::HasManyThroughAssociation#intersection
    */
   protected override intersection(a: Base[], b: Base[]): Base[] {
-    return multisetIntersection(a, b);
+    const dist = distribution(b);
+    return a.filter((record) => markOccurrence(dist, record));
   }
 
   /**
@@ -785,7 +797,8 @@ function markOccurrence(buckets: Array<{ record: Base; count: number }>, record:
 }
 
 /**
- * Bodies of `HasManyThroughAssociation#difference` / `#intersection`, exposed
+ * The multiset diff of `HasManyThroughAssociation#difference` / `#intersection`
+ * over the same `distribution`/`markOccurrence` pair those methods use, exposed
  * for the `CollectionProxy` replace path (see `setDifference`).
  * @internal
  */
@@ -798,26 +811,6 @@ export function multisetDifference(a: Base[], b: Base[]): Base[] {
 export function multisetIntersection(a: Base[], b: Base[]): Base[] {
   const dist = distribution(b);
   return a.filter((record) => markOccurrence(dist, record));
-}
-
-/**
- * Wrap `block` in a transaction on the through-reflection's class. Falls
- * back to invoking the block directly when no through klass is available.
- *
- * Mirrors: ActiveRecord::Associations::ThroughAssociation#transaction
- *
- * @internal
- */
-function transaction<R>(
-  assoc: HasManyThroughAssociation,
-  block: (tx?: any) => Promise<R>,
-): Promise<R | undefined> {
-  const tr = throughReflection(assoc) as { klass?: unknown } | null;
-  const klass = safeKlass(tr) as { transaction?: (...args: any[]) => any } | null;
-  if (klass && typeof klass.transaction === "function") {
-    return klass.transaction(block) as Promise<R | undefined>;
-  }
-  return block() as Promise<R | undefined>;
 }
 
 /**
