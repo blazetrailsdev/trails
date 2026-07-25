@@ -188,9 +188,24 @@ describe("matchArityAgainst", () => {
     expect(matchArityAgainst([req("a")], [])).toEqual({ matched: true });
   });
 
-  it("reports a mismatch (first candidate's ranges) when none overlap", () => {
+  it("reports a mismatch (closest candidate's ranges) when none overlap", () => {
     const v = matchArityAgainst([req("a"), req("b")], [[req("a")]]);
     expect(v).toMatchObject({ matched: false, rubyRange: { min: 2 }, tsRange: { min: 1 } });
+  });
+
+  it("reports the closest candidate, not a 0-arg alias binding recorded first", () => {
+    // `isReadonlyAttribute: readonlyAttributeQ` style alias: the empty record
+    // comes first, but the 3-arg real signature is what the report must show.
+    const real: ParamInfo[] = [req("a"), req("b"), req("c")];
+    const v = matchArityAgainst([req("a"), req("b"), req("c"), req("d"), req("e")], [[], real]);
+    expect(v).toMatchObject({ matched: false, tsParams: real, tsRange: { min: 3, max: 3 } });
+  });
+
+  it("breaks a distance tie toward the longer parameter list", () => {
+    // Ruby takes 2; both candidates sit 2 slots away, so length decides.
+    const long: ParamInfo[] = [req("a"), req("b"), req("c"), req("d")];
+    const v = matchArityAgainst([req("a"), req("b")], [[], long]);
+    expect(v).toMatchObject({ matched: false, tsParams: long });
   });
 });
 

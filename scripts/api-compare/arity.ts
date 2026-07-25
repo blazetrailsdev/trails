@@ -278,22 +278,39 @@ export type ArityVerdict =
  * Verdict for a Ruby method against EVERY TS signature recorded for its name
  * (see compare.ts `tsParamsByName`). Matches if ANY candidate overlaps — that's
  * what lets the real implementation win over a 0-arg re-export binding exposed
- * under the same name; otherwise reports the first candidate's ranges.
+ * under the same name; otherwise reports the CLOSEST candidate — the one whose
+ * range sits nearest Ruby's, tie-broken by the longest parameter list — so a
+ * flagged mismatch shows the real signature rather than a 0-arg alias binding
+ * that happened to be recorded first.
  */
 export function matchArityAgainst(ruby: ParamInfo[], candidates: ParamInfo[][]): ArityVerdict {
-  let first: { m: ArityMatch; params: ParamInfo[] } | null = null;
+  let best: { m: ArityMatch; params: ParamInfo[]; distance: number } | null = null;
   for (const c of candidates) {
     const m = arityMatches(ruby, c);
     if (m.ok) return { matched: true };
-    first ??= { m, params: c };
+    const distance = rangeDistance(m.rubyRange, m.tsRange);
+    if (
+      best === null ||
+      distance < best.distance ||
+      (distance === best.distance && c.length > best.params.length)
+    ) {
+      best = { m, params: c, distance };
+    }
   }
-  if (!first) return { matched: true }; // no candidates — nothing to flag
+  if (!best) return { matched: true }; // no candidates — nothing to flag
   return {
     matched: false,
-    tsParams: first.params,
-    rubyRange: first.m.rubyRange,
-    tsRange: first.m.tsRange,
+    tsParams: best.params,
+    rubyRange: best.m.rubyRange,
+    tsRange: best.m.tsRange,
   };
+}
+
+/** Gap between two non-overlapping arity ranges (0 when they touch/overlap). */
+function rangeDistance(r: ArityRange, t: ArityRange): number {
+  if (t.min > r.max) return t.min - r.max;
+  if (r.min > t.max) return r.min - t.max;
+  return 0;
 }
 
 /** Render a parameter list as a readable signature, e.g. `(a, b = …, *rest, **opts)`. */

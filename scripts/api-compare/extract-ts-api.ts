@@ -1189,6 +1189,25 @@ function extractDefinePropertyForOf(
  * Used both for `export const Mod = { ... }` module discovery and for
  * resolving inline / property-access mod args to `include(Host, Mod)`.
  */
+/**
+ * Params of the function an identifier / property-access reference points at,
+ * or null when the expression isn't callable. Mirrors the alias resolution the
+ * named-export path does for `export { foo }` so that a binding like
+ * `isReadonlyAttribute: readonlyAttributeQ` reports the target's real arity
+ * instead of an empty list.
+ */
+export function paramsOfCallableRef(
+  expr: ts.Expression,
+  checker: ts.TypeChecker,
+): ParamInfo[] | null {
+  const type = checker.getTypeAtLocation(expr);
+  const signatures = type.getCallSignatures();
+  if (signatures.length === 0) return null;
+  const decl = signatures[0].declaration;
+  if (decl && ts.isFunctionLike(decl)) return extractParameters(decl.parameters);
+  return [];
+}
+
 export function harvestObjectLiteralMethods(
   obj: ts.ObjectLiteralExpression,
   checker: ts.TypeChecker,
@@ -1197,9 +1216,10 @@ export function harvestObjectLiteralMethods(
   const out: MethodInfo[] = [];
   for (const prop of obj.properties) {
     let mname: string | null = null;
-    // Params are recoverable for inline method/function forms; left empty for
-    // identifier references (`qux,` / `foo: NS.bar`) whose signature lives
-    // elsewhere — the arity check tolerates that via its global candidate pool.
+    // Params are recoverable for inline method/function forms; identifier
+    // references (`qux,` / `foo: NS.bar`) are resolved through the checker to
+    // the target function's signature, so an alias-only binding still carries
+    // the real arity into the candidate pool.
     let params: ParamInfo[] = [];
     let optionKeys: string[] | null | undefined;
     let calls: string[] | undefined;
@@ -1210,6 +1230,7 @@ export function harvestObjectLiteralMethods(
       calls = extractCalls(prop.body);
     } else if (ts.isShorthandPropertyAssignment(prop)) {
       mname = prop.name.text;
+      params = paramsOfCallableRef(prop.name, checker) ?? [];
     } else if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
       const init = prop.initializer;
       if (ts.isFunctionExpression(init) || ts.isArrowFunction(init)) {
@@ -1221,8 +1242,11 @@ export function harvestObjectLiteralMethods(
         // `foo: bar` / `foo: NS.bar` — count if the RHS resolves to a
         // callable. Catches `readAttributeForValidation:
         // _Validations.readAttributeForValidation` etc.
-        const t = checker.getTypeAtLocation(init);
-        if (t.getCallSignatures().length > 0) mname = prop.name.text;
+        const resolved = paramsOfCallableRef(init, checker);
+        if (resolved) {
+          mname = prop.name.text;
+          params = resolved;
+        }
       }
     }
     if (!mname) continue;

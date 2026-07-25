@@ -88,8 +88,27 @@ describe("harvestObjectLiteralMethods", () => {
       { name: "a", kind: "required", type: "number" },
       { name: "b", kind: "optional", default: "...", literal: { kind: "int", value: "1" } },
     ]);
-    // Shorthand reference: name captured, params unknown (signature lives elsewhere).
+    // Shorthand reference to an undeclared name: params stay unknown.
     expect(byName["noop"]).toEqual([]);
+  });
+
+  it("resolves alias bindings to the target function's params", () => {
+    const methods = objectLiteralMethods(
+      `function readonlyAttributeQ(this: unknown, attribute: string): boolean { return true; }
+      export const ClassMethods = {
+        readonlyAttributeQ,
+        isReadonlyAttribute: readonlyAttributeQ,
+      };`,
+    );
+    const byName = Object.fromEntries(methods.map((m) => [m.name, m.params]));
+    const expected = [
+      { name: "this", kind: "required", type: "unknown" },
+      { name: "attribute", kind: "required", type: "string" },
+    ];
+    // Both the shorthand and the renamed alias must carry the real 1-1 arity
+    // (post `this`-strip) into the candidate pool, not an empty list.
+    expect(byName["readonlyAttributeQ"]).toEqual(expected);
+    expect(byName["isReadonlyAttribute"]).toEqual(expected);
   });
 });
 
