@@ -1,0 +1,77 @@
+/**
+ * Trails-only: `null_scope?` has one body in Rails
+ * (collection_association.rb:304-306, `owner.new_record? &&
+ * !foreign_key_present?`); `CollectionProxy#null_scope?`
+ * (collection_proxy.rb:1150-1152) is a one-line delegation to it, used to route
+ * `calculate` and `pluck` through the `none!`d scope (collection_proxy.rb:
+ * 724-730). Rails has no test naming the predicate, so these tests pin the
+ * predicate from both hosts and drive the two routings it gates.
+ */
+import { describe, it, expect, beforeAll } from "vitest";
+import { registerModel } from "../index.js";
+import { Author } from "../test-helpers/models/author.js";
+import { Post } from "../test-helpers/models/post.js";
+import { fixtures } from "../test-helpers/fixtures.js";
+
+interface AssociationLike {
+  isNullScope(): boolean;
+}
+
+interface ProxyLike {
+  isNullScope(): boolean;
+  build(attributes: Record<string, unknown>): Post;
+  pluck(...columns: string[]): Promise<unknown[]>;
+  calculate(operation: "count", column?: string): Promise<unknown>;
+  count(): Promise<number>;
+}
+
+const associationOf = (owner: Author): AssociationLike =>
+  (owner as unknown as { association(n: string): AssociationLike }).association("posts");
+
+const proxyOf = (owner: Author): ProxyLike => (owner as unknown as { posts: ProxyLike }).posts;
+
+const newAuthor = () => new Author({ name: "Bill" });
+
+describe("NullScope", () => {
+  fixtures(["authors", "posts"]);
+
+  beforeAll(() => {
+    registerModel(Author);
+    registerModel(Post);
+  });
+
+  it("is true for a new owner with no foreign key present", () => {
+    const author = newAuthor();
+
+    expect(associationOf(author).isNullScope()).toBe(true);
+    expect(proxyOf(author).isNullScope()).toBe(true);
+  });
+
+  it("is false once the owner is persisted", async () => {
+    const author = (await Author.first())!;
+
+    expect(associationOf(author).isNullScope()).toBe(false);
+    expect(proxyOf(author).isNullScope()).toBe(false);
+  });
+
+  it("is false for a new owner whose primary key is already assigned", () => {
+    const author = new Author({ id: 42, name: "Bill" });
+
+    expect(associationOf(author).isNullScope()).toBe(false);
+    expect(proxyOf(author).isNullScope()).toBe(false);
+  });
+
+  it("routes pluck through the none scope, skipping built records", async () => {
+    const proxy = proxyOf(newAuthor());
+    proxy.build({ title: "unsaved", body: "b" });
+
+    expect(await proxy.pluck("title")).toEqual([]);
+  });
+
+  it("routes calculate through the none scope, skipping built records", async () => {
+    const proxy = proxyOf(newAuthor());
+    proxy.build({ title: "unsaved", body: "b" });
+
+    expect(await proxy.calculate("count")).toEqual(0);
+  });
+});

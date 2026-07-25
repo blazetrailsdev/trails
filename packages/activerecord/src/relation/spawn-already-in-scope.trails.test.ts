@@ -20,7 +20,7 @@ registerModel([Post]);
 
 /** The relation internals these tests reach into. */
 interface ScopeInternals {
-  _isAlreadyInScope(registry: ScopeRegistryLike): boolean;
+  isAlreadyInScope(registry: ScopeRegistryLike): boolean;
   _clone(): ScopeInternals;
   spawn(): ScopeInternals;
   where(conditions: Record<string, unknown>): ScopeInternals;
@@ -94,7 +94,7 @@ describe("SpawnAlreadyInScopeTest", () => {
     const outside = model.where({ type: "Post" });
     // Flag unset (not in a scope body) — a current scope alone is not enough.
     withCurrentScope(outside, (registry) => {
-      expect(outside._isAlreadyInScope(registry)).toBe(false);
+      expect(outside.isAlreadyInScope(registry)).toBe(false);
     });
 
     let flagWithoutScope: boolean | undefined;
@@ -106,15 +106,15 @@ describe("SpawnAlreadyInScopeTest", () => {
       bodyRelation = rel;
       const registry = model.scopeRegistry();
       // `_exec_scope` nils the current scope, so the flag alone is not enough.
-      flagWithoutScope = rel._isAlreadyInScope(registry);
+      flagWithoutScope = rel.isAlreadyInScope(registry);
       withCurrentScope(rel, (reg) => {
-        flagWithScope = rel._isAlreadyInScope(reg);
+        flagWithScope = rel.isAlreadyInScope(reg);
       });
       return rel;
     });
 
     withCurrentScope(bodyRelation, (registry) => {
-      flagAfterBody = bodyRelation!._isAlreadyInScope(registry);
+      flagAfterBody = bodyRelation!.isAlreadyInScope(registry);
     });
 
     expect(flagWithoutScope).toBe(false);
@@ -129,7 +129,7 @@ describe("SpawnAlreadyInScopeTest", () => {
     defineAndCallScope("clonedInBody", (rel) => {
       const cloned = rel._clone();
       withCurrentScope(cloned, (registry) => {
-        clonedFlag = cloned._isAlreadyInScope(registry);
+        clonedFlag = cloned.isAlreadyInScope(registry);
       });
       return rel;
     });

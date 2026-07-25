@@ -2959,7 +2959,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // owner WITH the owner PK present (e.g. a client-assigned UUID) still
       // queries — only the genuinely keyless new owner short-circuits. Reset
       // the in-memory target without touching the DB in that case.
-      if (this._record.isNewRecord() && !this._foreignKeyPresent()) {
+      if (this.isNullScope()) {
         this._target = [];
         this._targetLoaded = true;
         this._invalidateAssociationIds();
@@ -3637,6 +3637,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   async pluck(
     ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
   ): Promise<unknown[]> {
+    // Rails: `null_scope? ? scope.pluck(*column_names) : super`
+    // (collection_proxy.rb:728-730). A null scope has been `none!`d, so it must
+    // not read the in-memory target below — the built-but-unsaved children of a
+    // keyless new owner are not rows Rails would return.
+    if (this.isNullScope()) return this.scope().pluck(...columns);
     // Loaded-target fast path only handles bare string column names —
     // readAttribute can't resolve Arel nodes. For any non-string arg,
     // fall through to scope().pluck(...) so Relation's SQL path runs.
@@ -3999,6 +4004,26 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
+   * Whether the association scope is the null scope — the owner is a new record
+   * with no foreign key to query by, so `CollectionAssociation#scope` has
+   * `none!`d it (collection_association.rb:298-306). Mirrors
+   * `CollectionProxy#null_scope?` (collection_proxy.rb:1150-1152), a one-line
+   * delegation to `@association.null_scope?`.
+   *
+   * The body is re-expressed rather than borrowed from
+   * `CollectionAssociation.prototype.isNullScope` because the proxy's
+   * `_foreignKeyPresent` is the through-aware one (a `has_many :through` routes
+   * the check through the `belongs_to`), and — as with `isFindFromTarget` — the
+   * proxy must not resolve through `owner.association(name)`, whose state is a
+   * secondary copy.
+   *
+   * @internal
+   */
+  isNullScope(): boolean {
+    return this._record.isNewRecord() && !this._foreignKeyPresent();
+  }
+
+  /**
    * Render the collection, loading the target (from memory when
    * `find_from_target?`, otherwise via a bounded query) without forcing a
    * premature reload. Mirrors
@@ -4216,6 +4241,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       throw new Error(`Column name is required for calculation operation: ${op}`);
     }
     const s = this.scope();
+    // Rails: `null_scope? ? scope.calculate(operation, column_name) : super`
+    // (collection_proxy.rb:724-726). A `none!`d scope must reach `scope`'s
+    // calculation and never the in-memory fallback at the bottom of this
+    // method, which would count built records that have no rows behind them.
+    if (this.isNullScope()) return s.calculate(op, columnName);
     if (op === "count" && columnName == null && typeof s.count === "function") {
       return s.count();
     }

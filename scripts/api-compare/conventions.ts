@@ -275,6 +275,22 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
+      "ActiveModel::Dirty#as_json (dirty.rb:264-268) exists only to add " +
+      "`mutations_from_database` / `mutations_before_last_save` to the " +
+      "serializer's `except:` list. Those names leak into Ruby's output because " +
+      "`Serialization#serializable_hash` reads `attributes`, which for a plain " +
+      "ActiveModel is commonly `instance_values` — and the mutation trackers are " +
+      "ivars on the model itself. In trails the trackers are not attributes: " +
+      "they live on a separate `DirtyTracker` object reachable only via " +
+      "`_dirty`, and `asJson` serializes through `serializableHash` over the " +
+      "declared attribute set, so the exclusion is inherent and a ported " +
+      "override would be a no-op. Scoped to dirty.rb so it cannot silence a " +
+      "genuine `as_json` gap elsewhere.",
+    names: ["as_json"],
+    rubyFiles: ["dirty.rb"],
+  },
+  {
+    reason:
       "Calculations#build_count_subquery is realized inline inside trails' " +
       "performCount (calculations.ts) — the limit/offset count path builds the " +
       "subquery there rather than as a separate named method.",
