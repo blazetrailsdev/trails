@@ -344,19 +344,52 @@ export class HasOneAssociation extends SingularAssociation {
     // it here. Capture the loaded target BEFORE `super._createRecord`, which
     // builds the new record first — an invalid build (e.g. an inexistent foreign
     // key) must raise before any removal runs, exactly as Rails' `build_record`
-    // raises before `set_new_record`. An UNLOADED target is not removed at all,
-    // and nothing defers it either — RFC 0068 retired the queue that used to
-    // pick it up at the owner's next `save`. Rails would surface it here via
-    // `replace`'s leading `load_target`, which this path does not issue; until
-    // that load is ported, `create#{name}` over an unloaded persisted child
-    // leaves the old row attached.
-    const displaced = this.loaded ? this.target : null;
+    // raises before `set_new_record`. An UNLOADED target is surfaced by
+    // `replace`'s leading `load_target`, ported through
+    // `loadDisplacedTargetForCreate`.
+    const [displaced, loadError] = await this.loadDisplacedTargetForCreate();
     const record = await super._createRecord(attributes, shouldRaise, block);
+    // The build succeeded, so Rails would have reached `load_target` — and every
+    // exception but `RecordNotFound` propagates out of it (association.rb:189-195).
+    // Re-raise here, at the point Rails raises: after `build_record` and
+    // `record.save`, before `remove_target!` detaches anything.
+    if (loadError) throw loadError;
     // `super._createRecord` ran `setNewRecord` → `replace`, so `this.target` is
     // now the freshly created record; detach the displaced (previously attached)
     // one, matching `remove_target!` inside Rails' `replace`.
     await this.detachDisplacedTarget(displaced, record);
     return record;
+  }
+
+  /**
+   * The record `create#{name}` displaces: Rails' `replace` opens with
+   * `load_target` (has_one_association.rb:59), so `remove_target!` detaches a row
+   * that only ever existed in the DB. Routed through `loadTargetForBuild` — gated
+   * by `needsTargetLoadForBuild` (Rails' `find_target?`) so the SELECT runs only
+   * when Rails' would, and overridden by has_one_through to load the *through*
+   * proxy, since Rails' through `replace` issues no target load.
+   *
+   * Returns the displaced record and, separately, any error the load raised —
+   * the caller re-raises it only once `super._createRecord` has succeeded. The
+   * load must run FIRST (it is what surfaces the row to detach, and it has to
+   * precede the new record's FK write), but Rails reaches `load_target` only
+   * from `set_new_record`, i.e. *after* `build_record`. So a malformed
+   * association (an inexistent foreign key) surfaces the build error, while a
+   * genuine load failure unrelated to the build — a dropped connection, an
+   * unrelated SQL error — still propagates out of `create#{name}` exactly as it
+   * does in Rails, rather than being swallowed into `displaced = null`.
+   * `load_target` itself rescues only `RecordNotFound` (association.rb:189-195),
+   * which `loadTargetForBuild` already handles by returning null.
+   *
+   * @internal
+   */
+  private async loadDisplacedTargetForCreate(): Promise<[Base | null, unknown]> {
+    if (!this.needsTargetLoadForBuild()) return [this.loaded ? this.target : null, null];
+    try {
+      return [(await this.loadTargetForBuild()) as Base | null, null];
+    } catch (error) {
+      return [null, error];
+    }
   }
 
   /**
