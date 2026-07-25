@@ -15,13 +15,12 @@ import type {
 import { Result } from "./result.js";
 import { Base } from "./base.js";
 
-/**
- * Mirrors connection_pool_test.rb:20-29 — the duplicate pool's HashConfig is
- * built from the ambient `Base.connection_pool.db_config`'s configuration hash
- * with per-test options merged on (`:265-269`, `:293-296`), never a literal
- * database name. `reapingFrequency: null` keeps the idle reaper quiet unless a
- * test opts in.
- */
+interface AmbientPoolOptions {
+  role?: string;
+  shard?: string;
+  adapterFactory?: () => DatabaseAdapter;
+}
+
 function makeAmbientDbConfig(overrides: Record<string, unknown> = {}): HashConfig {
   return new HashConfig("test", "primary", {
     ...ambientPoolConfiguration(),
@@ -31,15 +30,26 @@ function makeAmbientDbConfig(overrides: Record<string, unknown> = {}): HashConfi
   });
 }
 
-function makePool(size: number = 5): ConnectionPool {
+function makeAmbientPool(
+  overrides: Record<string, unknown> = {},
+  {
+    role = "writing",
+    shard = "default",
+    adapterFactory = newRawTestAdapter,
+  }: AmbientPoolOptions = {},
+): ConnectionPool {
   const pc = new PoolConfig(
     new ConnectionDescriptor("primary"),
-    makeAmbientDbConfig({ pool: size }),
-    "writing",
-    "default",
-    { adapterFactory: newRawTestAdapter },
+    makeAmbientDbConfig(overrides),
+    role,
+    shard,
+    { adapterFactory },
   );
   return new ConnectionPool(pc);
+}
+
+function makePool(size: number = 5): ConnectionPool {
+  return makeAmbientPool({ pool: size });
 }
 
 class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAdapter {
@@ -115,14 +125,10 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
 }
 
 function makeTransactionAwarePool(size: number = 5): ConnectionPool {
-  const pc = new PoolConfig(
-    new ConnectionDescriptor("primary"),
-    makeAmbientDbConfig({ pool: size }),
-    "writing",
-    "default",
+  return makeAmbientPool(
+    { pool: size },
     { adapterFactory: () => new TransactionAwareTestAdapter() },
   );
-  return new ConnectionPool(pc);
 }
 
 it("checkout after close", async () => {
@@ -217,14 +223,7 @@ it("reap and active", async () => {
 
 it("idle timeout configuration", async () => {
   // High idleTimeout: flush() with no args keeps connections
-  const keepPc = new PoolConfig(
-    new ConnectionDescriptor("primary"),
-    makeAmbientDbConfig({ idleTimeout: 9999 }),
-    "writing",
-    "default",
-    { adapterFactory: newRawTestAdapter },
-  );
-  const keepPool = new ConnectionPool(keepPc);
+  const keepPool = makeAmbientPool({ idleTimeout: 9999 });
   const keepConn = await keepPool.checkout();
   keepPool.checkin(keepConn);
   expect(keepPool.stat().connections).toBe(1);
@@ -232,14 +231,7 @@ it("idle timeout configuration", async () => {
   expect(keepPool.stat().connections).toBe(1);
 
   // Small idleTimeout: flush() with no args removes expired idle connections
-  const flushPc = new PoolConfig(
-    new ConnectionDescriptor("primary"),
-    makeAmbientDbConfig({ idleTimeout: 1 }),
-    "writing",
-    "default",
-    { adapterFactory: newRawTestAdapter },
-  );
-  const flushPool = new ConnectionPool(flushPc);
+  const flushPool = makeAmbientPool({ idleTimeout: 1 });
   vi.useFakeTimers();
   try {
     const flushConn = await flushPool.checkout();
@@ -258,14 +250,7 @@ it("idle timeout configuration", async () => {
 });
 
 it("disable flush", async () => {
-  const pc = new PoolConfig(
-    new ConnectionDescriptor("primary"),
-    makeAmbientDbConfig({ idleTimeout: null }),
-    "writing",
-    "default",
-    { adapterFactory: newRawTestAdapter },
-  );
-  const pool = new ConnectionPool(pc);
+  const pool = makeAmbientPool({ idleTimeout: null });
   const conn = await pool.checkout();
   pool.checkin(conn);
   // flush is a no-op when idleTimeout is null
@@ -451,14 +436,7 @@ it("connection pool stat", async () => {
 });
 
 it("role and shard is returned", async () => {
-  const pc = new PoolConfig(
-    new ConnectionDescriptor("primary"),
-    makeAmbientDbConfig(),
-    "reading",
-    "shard_one",
-    { adapterFactory: newRawTestAdapter },
-  );
-  const pool = new ConnectionPool(pc);
+  const pool = makeAmbientPool({}, { role: "reading", shard: "shard_one" });
   expect(pool.role).toBe("reading");
   expect(pool.shard).toBe("shard_one");
 });
@@ -587,17 +565,10 @@ it("inspect does not show secrets", async () => {
   expect(str).toMatch(/env_name="test"/);
   expect(str).toMatch(/role="writing"/);
   expect(str).not.toMatch(/password/);
-  expect(str).not.toMatch(/sqlite3/);
+  expect(str).not.toContain(String(ambientPoolConfiguration().adapter));
 
   // With non-default shard
-  const pc = new PoolConfig(
-    new ConnectionDescriptor("primary"),
-    makeAmbientDbConfig(),
-    "reading",
-    "shard_one",
-    { adapterFactory: newRawTestAdapter },
-  );
-  const pool2 = new ConnectionPool(pc);
+  const pool2 = makeAmbientPool({}, { role: "reading", shard: "shard_one" });
   expect(pool2.inspect()).toMatch(/shard="shard_one"/);
   expect(pool2.inspect()).toMatch(/role="reading"/);
 });
