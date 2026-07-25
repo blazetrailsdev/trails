@@ -215,7 +215,6 @@ export class InternalMetadata {
   }
 
   private currentTime(connection: DatabaseAdapter): string {
-    // Rails: connection.default_timezone == :utc ? Time.now.utc : Time.now.
     // Format: "YYYY-MM-DD HH:mm:ss.SSS" — drop the trailing 'Z' and swap 'T' for ' '.
     // Truncate sub-ms (Rails uses ms-precise updated_at strings; default Temporal
     // rounding is halfExpand which would otherwise round up).
