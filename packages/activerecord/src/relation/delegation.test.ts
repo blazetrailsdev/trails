@@ -419,6 +419,7 @@ describe("DelegationTest", () => {
     const RECORD_DELEGATES: ReadonlyArray<readonly [string, string]> = [
       ["each", "each"],
       ["join", "join"],
+      ["intersect?", "isIntersect"],
       ["reverse", "reverse"],
       ["compact", "compact"],
       ["shuffle", "shuffle"],
@@ -452,6 +453,25 @@ describe("DelegationTest", () => {
       expect(await relation.rindex((c: any) => c.id === mid.id)).toBe(
         records.map((c) => c.id).lastIndexOf(mid.id),
       );
+    });
+
+    it("intersect? reports whether any record is shared, by record equality", async () => {
+      const records = await Comment.all();
+      // Ruby's Array#intersect? matches by hash/eql?, and ActiveRecord::Core
+      // aliases eql? to == (id equality) — so a freshly loaded, non-identical
+      // instance of the same row still counts as shared.
+      const reloaded = await Comment.find(records[0].id);
+      expect(await Comment.all().isIntersect([reloaded])).toBe(true);
+      expect(await Comment.all().isIntersect([])).toBe(false);
+      expect(await Comment.all().isIntersect([Comment.new()])).toBe(false);
+    });
+
+    it("intersect? is delegated on a CollectionProxy too", async () => {
+      const post = await Post.first();
+      const proxy = (post as any).comments;
+      const comments = await proxy.toArray();
+      expect(await proxy.isIntersect(comments.slice(0, 1))).toBe(true);
+      expect(await proxy.isIntersect([Comment.new()])).toBe(false);
     });
 
     it("to_fs(:db) joins the record ids", async () => {

@@ -334,6 +334,8 @@ const _generatedRelationMethodsByModel = new WeakMap<typeof Base, GeneratedRelat
  * The memoized per-model `GeneratedRelationMethods` module for `modelClass`.
  *
  * Mirrors: ActiveRecord::Delegation::DelegateCache#generated_relation_methods
+ *
+ * @internal
  */
 export function generatedRelationMethods(modelClass: typeof Base): GeneratedRelationMethods {
   let methods = _generatedRelationMethodsByModel.get(modelClass);
@@ -348,6 +350,8 @@ export function generatedRelationMethods(modelClass: typeof Base): GeneratedRela
  * Rails' `DelegateCache#include_relation_methods` (delegation.rb:57-60):
  * `delegate.include generated_relation_methods` installs the per-model module's
  * generated methods as real methods on a delegate prototype carrier.
+ *
+ * @internal
  */
 export function includeRelationMethods(
   carrier: object,
@@ -462,6 +466,7 @@ function stiCarrierChain(modelClass: typeof Base): (typeof Base)[] {
  */
 const _relationClassByModel = new WeakMap<typeof Base, FamilyCtor>();
 
+/** @internal */
 export function relationClassFor(modelClass: typeof Base): RelationCtor {
   return perModelCarrier(
     _relationClassByModel,
@@ -859,6 +864,11 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
     return records;
   },
   join: (records, separator?: string) => records.join(separator),
+  // Ruby's `Array#intersect?` matches by `hash`/`eql?`, and `ActiveRecord::Core`
+  // aliases `eql?` to `==` (id equality) — so this must use record equality, not
+  // JS identity via `Array#includes`.
+  isIntersect: (records, other: Base[]) =>
+    records.some((record) => other.some((o) => record.isEqual(o))),
   reverse: (records) => [...records].reverse(),
   compact: (records) => records.filter((record) => record != null),
   index: (records, valueOrFn: Base | ((record: Base) => unknown)) => {
@@ -962,6 +972,11 @@ export class DelegationMethods {
   /** `Array#join`. */
   async join(this: DelegationHost, separator?: string): Promise<string> {
     return RECORD_DELEGATES.join(await this.toArray(), separator) as string;
+  }
+
+  /** `Array#intersect?` — whether any record is also in `other`. */
+  async isIntersect(this: DelegationHost, other: Base[]): Promise<boolean> {
+    return RECORD_DELEGATES.isIntersect(await this.toArray(), other) as boolean;
   }
 
   /** `Array#reverse` (non-mutating). */

@@ -6590,7 +6590,7 @@ export class Relation<T extends Base> {
 
     // Rails: `elsif already_in_scope?(registry) then yield` — the receiver is
     // already installed as the current scope, so re-installing it is a no-op.
-    if (this._isAlreadyInScope(registry)) {
+    if (this.isAlreadyInScope(registry)) {
       return await callback();
     }
 
@@ -7032,12 +7032,12 @@ export class Relation<T extends Base> {
   // narrows this to "receiver is the current scope inside a scope body";
   // without it every relation under any `scoping {}` block would qualify.
   /** @internal */
-  _isAlreadyInScope(registry: any): boolean {
-    return this._delegateToModel && !!registry?.currentScope?.(this._modelClass, true);
+  isAlreadyInScope(registry: any): boolean {
+    return this._delegateToModel && !!registry?.currentScope?.(this.model, true);
   }
 
   private isGlobalScope(registry: any): boolean {
-    return !!registry?.globalCurrentScope?.(this._modelClass, true);
+    return !!registry?.globalCurrentScope?.(this.model, true);
   }
 
   private currentScopeRestoringBlock(block?: (record: T) => void): (record: T) => void {
@@ -7707,6 +7707,7 @@ export interface Relation<T extends Base>
 export interface Relation<T extends Base> {
   each(fn: (record: T, index: number) => void): Promise<T[]>;
   join(separator?: string): Promise<string>;
+  isIntersect(other: T[]): Promise<boolean>;
   reverse(): Promise<T[]>;
   compact(): Promise<T[]>;
   index(valueOrFn: T | ((record: T) => unknown)): Promise<number | null>;
