@@ -395,16 +395,20 @@ export class HasOneAssociation extends SingularAssociation {
    * be visible as `assoc.target` briefly reverting to the displaced record.
    * Name the record instead and leave the cached target alone.
    *
+   * The parked target is the ONLY intended difference: the guards below
+   * deliberately match `detachDisplacedTarget`'s, and neither pre-screens
+   * `isPersisted`. Rails' `remove_target!` gates on persistence only inside its
+   * `:destroy` and nullify arms; the `:delete` arm calls `target.delete`
+   * unconditionally, and `Persistence#delete` still marks the record destroyed
+   * and freezes it when the row does not exist (persistence.rb:439-444). Let
+   * `removeTargetBang`'s arms make that call.
+   *
    * @internal
    */
   async removeDisplacedRecord(displaced: Base | null): Promise<void> {
     if (!displaced) return;
     if ((displaced as { isDestroyed?: () => boolean }).isDestroyed?.()) return;
     if (sameRecord(displaced, this.target)) return;
-    // Only a persisted record has a row to remove. `remove_target!`'s nullify
-    // and destroy arms gate on this themselves, but its `:delete` arm does not,
-    // so check once here rather than relying on the arm that happens to run.
-    if (displaced.isPersisted() !== true) return;
     await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "", displaced);
   }
 

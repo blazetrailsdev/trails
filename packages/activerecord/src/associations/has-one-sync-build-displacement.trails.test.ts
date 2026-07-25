@@ -6,11 +6,12 @@
  * `remove_target!` inline (has_one_association.rb:68-69, 91-92), including the
  * persisted nullify `target.save` at :108. A synchronous JS builder cannot
  * await that write, so `setNewRecord` performs only the in-memory half; every
- * caller that can displace a persisted record issues the DB half itself via
- * `detachDisplacedTarget` — the `build#{Name}` / `create#{Name}` accessors, and
- * (for `assoc.build()`, which nested attributes calls directly) the
- * nested-attributes writer, which starts the removal inline at assignment and
- * awaits it in its `save` wrapper before the replacement is inserted.
+ * caller that can displace a persisted record issues the DB half itself. The
+ * `build#{Name}` / `create#{Name}` accessors use `detachDisplacedTarget`. For
+ * `assoc.build()`, which nested attributes calls directly, the nested-attributes
+ * writer uses `removeDisplacedRecord` — starting the removal inline at
+ * assignment and awaiting it in its `save` wrapper before the replacement is
+ * inserted.
  *
  * Rails' own `test_should_replace_an_existing_record_if_there_is_no_id`
  * (nested_attributes_test.rb:288) asserts only in-memory state and never saves
