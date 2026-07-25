@@ -106,34 +106,27 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   }
 
   /**
-   * Mirrors the two DB halves of Rails'
-   * `HasOneThroughAssociation#create_through_record`
-   * (has_one_through_association.rb:15-40), which our synchronous `replace`
-   * cannot run: `through_proxy.load_target` (:17), and — when that load turns
-   * up a *persisted* join row — `through_record.update(attributes)` (:33),
-   * which repoints the row at the just-created target inline, before `create`
-   * returns. The build-when-absent arm stays deferred to the owner's next
-   * save, which is Rails' own `owner.new_record? || !save` shape (:36-37).
+   * Runs the DB half of Rails' `create_through_record`
+   * (has_one_through_association.rb:15-40) that our synchronous `replace`
+   * cannot: `through_proxy.load_target` (:17) and the arm it selects. Rails
+   * reaches it from `set_new_record` → `replace(record, false)` *after*
+   * `build_record` + `record.save` (singular_association.rb:67-71), so the
+   * load runs here, after `super`, never before — an invalid build must raise
+   * before any join-model query, as it does in Rails.
+   *
+   * `save` is `false` on this path (`set_new_record`), so `createThroughRecord`
+   * picks Rails' own branches: `update` an existing *persisted* join row inline
+   * (:33), or merely `build` when absent (:36-37), leaving that row for the
+   * owner's next save.
    */
   protected override async _createRecord(
     attributes?: Record<string, unknown>,
     shouldRaise = false,
     block?: (record: Base) => void,
   ): Promise<Base | null> {
-    // An unpersisted owner has no join row to load and `super` raises
-    // RecordNotSaved for it, so the load must not run first.
-    const ownerPersisted = (this.owner as { isPersisted?: () => boolean }).isPersisted?.() ?? false;
-    let hasPersistedJoinRow = false;
-    if (ownerPersisted) {
-      await this.loadTargetForBuild();
-      const existing =
-        (throughAssociation(this) as { target?: Base | null } | null)?.target ?? null;
-      hasPersistedJoinRow =
-        existing != null && (existing as { isNewRecord?: () => boolean }).isNewRecord?.() !== true;
-    }
     const record = await super._createRecord(attributes, shouldRaise, block);
-    if (record && hasPersistedJoinRow && this._pendingReplace) {
-      await this.persistReplace();
+    if (record && this._pendingReplace) {
+      await this.persistReplace(false);
     }
     return record;
   }
@@ -422,7 +415,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    * `persistThroughRecord` calls it from `autosaveHasOne` during the owner's
    * save for the sync `build`/`create` path that could not `await`.
    */
-  async persistReplace(): Promise<void> {
+  async persistReplace(save = true): Promise<void> {
     const pending = this._pendingReplace;
     // Clear before the first `await` — mirrors HasOneAssociation#persistReplace.
     // The new awaitable `writer` (inherited from HasOneAssociation) makes this
@@ -461,7 +454,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     }
     if (!pending) return;
     await transaction(this, async () => {
-      await createThroughRecord(this, pending.record, true);
+      await createThroughRecord(this, pending.record, save);
     });
   }
 }
