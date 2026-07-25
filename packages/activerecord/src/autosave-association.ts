@@ -379,13 +379,15 @@ async function autosaveHasMany(record: Base, assoc: AssociationDefinition): Prom
       ((child as any).changedForAutosave?.() ?? false)
     ) {
       const saved = await _insertCollectionRecord(record, inst, assoc, child);
-      if (!saved) {
-        // Rails save_collection_association (autosave_association.rb:447-453):
-        // `errors.add(reflection.name)` lives only in the non-autosave,
-        // non-nested branch, gated on `reflection.validate?`. Autosave
-        // collections insert with validate:false and add no owner error on
-        // failure; nested records never reach a failed insert here
-        // (_insertCollectionRecord short-circuits them to `true`).
+      const failureIsIgnored = !assoc.options.autosave && assoc.options.validate === false;
+      // Rails save_collection_association (autosave_association.rb:447-453):
+      // in the non-autosave branch both `errors.add(reflection.name)` and the
+      // `saved` assignment sit under `if reflection.validate?`, so a
+      // `validate: false` collection keeps the loop's `saved = true` default.
+      // Autosave collections insert with validate:false and add no owner error
+      // on failure; nested records never reach a failed insert here
+      // (_insertCollectionRecord short-circuits them to `true`).
+      if (!saved && !failureIsIgnored) {
         if (!assoc.options.autosave && assoc.options.validate !== false) {
           propagateErrors(record, assoc.name);
         }
@@ -1318,9 +1320,13 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
       : reflection.hasOne === true || reflection.macro === "hasOne" || reflection.type === "hasOne";
 
   if (isCollection) {
-    // around_save runs only once per model regardless of how many collection
-    // autosave associations are declared — mirrors Rails' dedup via symbol.
-    if (!Object.prototype.hasOwnProperty.call(model, _AUTOSAVE_AROUND_SAVE_KEY)) {
+    // around_save runs once per save regardless of how many collection
+    // associations are declared — mirrors Rails' dedup via the
+    // `:around_save_collection_association` symbol, which also dedups across
+    // the inheritance chain, hence the prototype-chain lookup: a second hook
+    // registered by a subclass nests, and the nested invocation's
+    // `!prev && new_record?` would clobber the outer `_newRecordBeforeSave`.
+    if (!(_AUTOSAVE_AROUND_SAVE_KEY in model)) {
       Object.defineProperty(model, _AUTOSAVE_AROUND_SAVE_KEY, {
         value: true,
         configurable: true,
