@@ -228,6 +228,8 @@
   "packages/activerecord/src/autosave-association.test.ts::Ship::hasMany::parts",
   "packages/activerecord/src/autosave-association.test.ts::Ship::hasOne::part",
   "packages/activerecord/src/autosave-association.test.ts::User::hasOne::profile",
+  "packages/activerecord/src/autosave-association.trails.test.ts::Child::belongsTo::parent",
+  "packages/activerecord/src/autosave-association.trails.test.ts::Post::belongsTo::author",
   "packages/activerecord/src/autosave.test.ts::Author::hasMany::books",
   "packages/activerecord/src/autosave.test.ts::Company::hasMany::employees",
   "packages/activerecord/src/autosave.test.ts::Company::hasOne::account",

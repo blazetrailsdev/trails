@@ -101,6 +101,7 @@
   "packages/activerecord/src/attribute-methods/write.test.ts",
   "packages/activerecord/src/attributes.test.ts",
   "packages/activerecord/src/autosave-association.test.ts",
+  "packages/activerecord/src/autosave-association.trails.test.ts",
   "packages/activerecord/src/autosave.test.ts",
   "packages/activerecord/src/base.test.ts",
   "packages/activerecord/src/batches.test.ts",
