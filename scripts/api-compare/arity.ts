@@ -19,6 +19,11 @@
 // Every such strip is tried only as an *additional* candidate form alongside the
 // as-declared signature, and a match needs only ONE form to overlap — so a strip
 // can only ever gain a match, never manufacture a mismatch.
+//
+// Two classes of pair are dropped from the check entirely — and, so the summary
+// stays honest, from the `compared` denominator too: both-sides-zero-arg pairs
+// (shouldSkipArity) and Ruby entries whose recorded arity is a forwarding-macro
+// placeholder (isForwardingRubyEntry).
 
 import type { ParamInfo } from "./types.js";
 
@@ -264,6 +269,22 @@ function rangesOverlap(r: Arity, t: Arity): boolean {
   const slack = (r.hasKeywords ? 1 : 0) + (r.hasBlock ? 1 : 0);
   const rubyMax = r.max === Infinity ? Infinity : r.max + slack;
   return t.min <= rubyMax && r.min <= t.max;
+}
+
+/** Ruby entries the extractor synthesized from a forwarding macro, whose recorded
+ *  arity is a placeholder rather than a real signature.
+ *
+ *  `delegate :a, to: :b` generates `def a(...) = b.a(...)`: the true arity is the
+ *  TARGET's, which the static walker can't see, so `process_delegate` records
+ *  `params: []`. Same for an `alias`/`alias_method` whose target lives outside the
+ *  package — `resolve_aliases!` copies the target's params when it can find it and
+ *  leaves the entry empty when it can't. Comparing that placeholder `[0-0]` against
+ *  a faithfully-spelled TS signature is pure noise, so these pairs are dropped from
+ *  the check AND from the `compared` denominator (see compare.ts `checkArity`).
+ *
+ *  An alias whose target WAS resolved carries real params and is checked normally. */
+export function isForwardingRubyEntry(params: ParamInfo[], notes: string | undefined): boolean {
+  return params.length === 0 && (notes === "delegate" || notes === "alias");
 }
 
 /** Nothing to compare: both sides take zero positional args (reader/predicate ↔ getter). */

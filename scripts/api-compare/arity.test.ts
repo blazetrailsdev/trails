@@ -4,6 +4,7 @@ import {
   arityMatches,
   matchArityAgainst,
   shouldSkipArity,
+  isForwardingRubyEntry,
   renderSig,
 } from "./arity.js";
 import type { ParamInfo } from "./types.js";
@@ -280,6 +281,26 @@ describe("shouldSkipArity", () => {
   it("does not skip when either side takes args", () => {
     expect(shouldSkipArity([req("a")], [])).toBe(false);
     expect(shouldSkipArity([], [req("a")])).toBe(false);
+  });
+});
+
+describe("isForwardingRubyEntry", () => {
+  it("skips a delegate entry recorded with placeholder zero arity", () => {
+    expect(isForwardingRubyEntry([], "delegate")).toBe(true);
+  });
+
+  it("skips an alias whose target could not be resolved", () => {
+    expect(isForwardingRubyEntry([], "alias")).toBe(true);
+  });
+
+  it("checks an alias whose target params were resolved", () => {
+    expect(isForwardingRubyEntry([req("a")], "alias")).toBe(false);
+  });
+
+  it("checks a plain zero-arg method and other extractor notes", () => {
+    expect(isForwardingRubyEntry([], undefined)).toBe(false);
+    expect(isForwardingRubyEntry([], "scope")).toBe(false);
+    expect(isForwardingRubyEntry([], "class_attribute")).toBe(false);
   });
 });
 
