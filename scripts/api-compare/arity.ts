@@ -126,7 +126,7 @@ function leafTypeName(type: string | undefined): string | null {
 }
 
 /** Drop a leading `this:`-typed mixin receiver param (literally named `this`). */
-function stripThis(params: ParamInfo[]): ParamInfo[] {
+export function stripThis(params: ParamInfo[]): ParamInfo[] {
   return params.length > 0 && params[0].name === "this" ? params.slice(1) : params;
 }
 
