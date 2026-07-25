@@ -167,8 +167,13 @@ export class CollectionAssociation extends Association {
     if (existing && !existing.configurable) return;
     Object.defineProperty(mixin, idsName, {
       get: existing?.get,
+      // The ids setter throws on BOTH owner arms (`CollectionIdsAssignmentError`):
+      // Rails' `ids_writer` resolves the ids with a query even for a new record,
+      // so there is no arm a sync setter can serve. Returning the promise here
+      // instead made a bad id an unhandled rejection and raced an immediate
+      // `save()`. RFC 0068.
       set(this: AssociationInstanceHost, ids: unknown) {
-        return (this.association(name) as any).queueIdsWrite(ids);
+        (this.association(name) as any).queueIdsWrite(ids);
       },
       configurable: true,
     });

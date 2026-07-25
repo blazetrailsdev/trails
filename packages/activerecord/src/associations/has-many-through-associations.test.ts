@@ -2290,18 +2290,15 @@ describe("HasManyThroughAssociationsTest", () => {
     const author = await Author.create({ name: "Bill" });
     const general = await Category.find(categories("general").id);
 
-    // Rails assigns these ids through `update`, which persists the replacement
-    // inline. Mass-assignment cannot `await`, so the collection arm throws and
-    // callers use the awaitable `idsWriter` instead (RFC 0068).
-    const idsWriterFor = (name: string) =>
-      author.association(name) as unknown as { idsWriter(ids: unknown[]): Promise<void> };
-    await idsWriterFor("specialCategoriesWithConditions").idsWriter([general.id]);
-    await idsWriterFor("nonspecialCategoriesWithConditions").idsWriter([general.id]);
+    await author.update({
+      specialCategoriesWithConditionIds: [general.id],
+      nonspecialCategoriesWithConditionIds: [general.id],
+    });
 
     expect(await (author as any).specialCategoriesWithConditionIds).toEqual([general.id]);
     expect(await (author as any).nonspecialCategoriesWithConditionIds).toEqual([general.id]);
 
-    await idsWriterFor("nonspecialCategoriesWithConditions").idsWriter([]);
+    await author.update({ nonspecialCategoriesWithConditionIds: [] });
     await author.reload();
 
     expect(await (author as any).specialCategoriesWithConditionIds).toEqual([general.id]);

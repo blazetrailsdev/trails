@@ -12,10 +12,17 @@
  * (`await owner.items.replace([...])`). On an *unpersisted* owner Rails does
  * no I/O either, so the in-memory replace is faithful and kept. There is no
  * Rails test for this deviation.
+ *
+ * The `#{singular}Ids=` setter goes further and throws on BOTH owner arms
+ * (`CollectionIdsAssignmentError`): `ids_writer` resolves the ids to records
+ * with a query before replacing (collection_association.rb:61-83), so even the
+ * new-record arm is DB I/O. The awaitable surfaces are
+ * `await owner.update({ itemIds: [...] })` and
+ * `await owner.association(name).idsWriter([...])`.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel, AssociationTypeMismatch } from "../index.js";
-import { CollectionPersistedAssignmentError } from "./errors.js";
+import { registerModel, AssociationTypeMismatch, RecordNotFound } from "../index.js";
+import { CollectionIdsAssignmentError, CollectionPersistedAssignmentError } from "./errors.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
@@ -81,7 +88,44 @@ describe("CollectionPersistedSetterThrows", () => {
     const post = await Post.create({ title: "t", body: "b" });
     expect(() => {
       author.postIds = [post.id];
-    }).toThrow(CollectionPersistedAssignmentError);
+    }).toThrow(CollectionIdsAssignmentError);
+    // The message names the awaitable replacements.
+    expect(() => {
+      author.postIds = [post.id];
+    }).toThrow(/await owner\.update\(\{ postIds: \[\.\.\.\] \}\)/);
+  });
+
+  it("ids= setter throws on an unpersisted owner too", () => {
+    // Unlike the record writer, whose unpersisted arm is pure in-memory work,
+    // `ids_writer` queries to resolve the ids even for a new record. Returning
+    // that promise from the sync setter made a bad id an unhandled rejection
+    // and let an immediate `save()` race the in-flight replace, so this arm
+    // throws rather than floating a promise.
+    const author = new Author({ name: "Bill" });
+    expect(() => {
+      (author as unknown as CollectionOwner).postIds = [1];
+    }).toThrow(CollectionIdsAssignmentError);
+  });
+
+  it("a bad id is a catchable rejection on the awaitable ids surface", async () => {
+    // The hazard this replaces: through the setter, an id that doesn't resolve
+    // surfaced as an unhandled rejection. Through `update` it is catchable.
+    const author = await Author.create({ name: "Bill" });
+    await expect(author.update({ postIds: [0] })).rejects.toThrow(RecordNotFound);
+  });
+
+  it("update assigns collection ids on a persisted owner", async () => {
+    const author = await Author.create({ name: "Bill" });
+    const first = await Post.create({ title: "a", body: "a" });
+    const second = await Post.create({ title: "b", body: "b" });
+
+    expect(await author.update({ postIds: [first.id, second.id] })).toBeTruthy();
+    await author.reload();
+    expect(await postsOf(author).count()).toBe(2);
+
+    expect(await author.update({ postIds: [second.id] })).toBeTruthy();
+    await author.reload();
+    expect((await postsOf(author).toArray()).map((p) => p.title)).toEqual(["b"]);
   });
 
   it("mass-assignment throws on a persisted owner", async () => {
