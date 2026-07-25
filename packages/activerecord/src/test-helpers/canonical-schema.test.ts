@@ -282,7 +282,7 @@ describe("bulkInboundFkHost", () => {
   const base: FkSafeDropPlanHost = { tables: async () => [], foreignKeys: async () => [] };
 
   test("leaves the per-table host untouched on sqlite", () => {
-    const { adapter } = fakeAdapter("sqlite3");
+    const { adapter } = fakeAdapter("sqlite");
     expect(bulkInboundFkHost(adapter, base)).toBe(base);
   });
 
@@ -290,8 +290,10 @@ describe("bulkInboundFkHost", () => {
     const { adapter, queries } = fakeAdapter("postgres");
     await bulkInboundFkHost(adapter, base).foreignKeysReferencing!(["authors", "topics"]);
     expect(queries).toHaveLength(1);
-    expect(queries[0]).toContain("'authors', 'topics'");
     expect(queries[0]).toContain("pg_constraint");
+    // Matched by resolved OID, not by name: `relname IN (...)` would also match
+    // a same-named table in another search-path schema.
+    expect(queries[0]).toContain("c.confrelid IN (to_regclass('authors'), to_regclass('topics'))");
   });
 
   test("collapses a composite foreign key to one blocker", async () => {

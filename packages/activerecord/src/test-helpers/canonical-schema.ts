@@ -2266,20 +2266,35 @@ export function bulkInboundFkHost(
     const list = toTables.map((t) => adapter.quote(t)).join(", ");
     const sql =
       name === "postgres"
-        ? `SELECT t1.relname AS from_table, t2.relname AS to_table, c.conname AS name
+        ? // The referenced table is matched by OID via `to_regclass`, not by
+          // name: `relname IN (...)` scoped to the search path would match a
+          // same-named table in *any* schema on it and report a false-positive
+          // blocker (a real `decoy.authors` did, when this filtered on
+          // `nspname = ANY (current_schemas(false))`). `to_regclass` applies
+          // exactly PostgreSQL's own name resolution — first match on the search
+          // path, NULL when nothing resolves, which simply matches no row — so a
+          // drop-set name resolves to the one relation the DDL will drop, the
+          // same relation the per-table `foreignKeys` would have introspected.
+          `SELECT t1.relname AS from_table, t2.relname AS to_table, c.conname AS name
              FROM pg_constraint c
              JOIN pg_class t1 ON c.conrelid = t1.oid
              JOIN pg_class t2 ON c.confrelid = t2.oid
-             JOIN pg_namespace n ON c.connamespace = n.oid
              WHERE c.contype = 'f'
-               AND n.nspname = ANY (current_schemas(false))
-               AND t2.relname IN (${list})
+               AND c.confrelid IN (${toTables.map((t) => `to_regclass(${adapter.quote(t)})`).join(", ")})
              ORDER BY c.conname`
-        : `SELECT kcu.table_name AS from_table,
+        : // `referenced_column_name IS NOT NULL` and the schema scoping mirror
+          // the per-table `foreignKeys` (mysql/schema-statements.ts): the null
+          // check keeps non-FK key usage out, and scoping *both* ends to
+          // DATABASE() keeps a same-named table in another database from
+          // reporting a false-positive blocker (MySQL has no search path, so
+          // there is no resolution step beyond this).
+          `SELECT kcu.table_name AS from_table,
                   kcu.referenced_table_name AS to_table,
                   kcu.constraint_name AS name
              FROM information_schema.key_column_usage kcu
-             WHERE kcu.table_schema = DATABASE()
+             WHERE kcu.referenced_column_name IS NOT NULL
+               AND kcu.table_schema = DATABASE()
+               AND kcu.referenced_table_schema = DATABASE()
                AND kcu.referenced_table_name IN (${list})
              ORDER BY kcu.constraint_name`;
     const rows = await adapter.schemaQuery(sql);
