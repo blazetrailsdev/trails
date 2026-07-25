@@ -1048,7 +1048,9 @@ class ApiExtractor
   # be in a different file of a reopened class) and iterates to follow alias
   # chains (`alias a b; alias b c`). Cross-class/inherited targets that aren't in
   # the package stay empty (best-effort — the static walker can't see another
-  # gem's source). Drops the transient `alias_target` key afterward so it never
+  # gem's source) and are left WITHOUT the `aliasResolved` flag, which is what
+  # distinguishes them from an alias whose target legitimately takes zero
+  # arguments. Drops the transient `alias_target` key afterward so it never
   # reaches the manifest.
   # Public: invoked by `run` per package and by the extractor unit test.
   public def resolve_aliases!
@@ -1072,9 +1074,10 @@ class ApiExtractor
     # Fixpoint over ALL buckets at once, not per class: an alias may resolve to
     # an alias in an ancestor that is itself still unresolved, so a single
     # hash-ordered sweep would read an empty target and give up. Each
-    # non-breaking pass fills at least one previously-empty alias (filled
-    # aliases are skipped afterwards), so the unresolved count strictly
-    # decreases and the loop always terminates — no arbitrary iteration cap.
+    # non-breaking pass resolves at least one previously-unresolved alias (and
+    # resolved ones are skipped afterwards via `aliasResolved`), so the
+    # unresolved count strictly decreases and the loop always terminates — no
+    # arbitrary iteration cap.
     loop do
       changed = false
       all.each do |fqn, info|
@@ -1082,10 +1085,27 @@ class ApiExtractor
           by_name = tables[[fqn, bucket]]
           info[bucket].each do |m|
             next unless m[:notes] == "alias" && m[:alias_target]
-            next unless m[:params].nil? || m[:params].empty?
+            next if m[:aliasResolved]
             tgt = by_name[m[:alias_target]]
-            next unless tgt && tgt[:params] && !tgt[:params].empty?
+            next unless tgt && tgt[:params]
+            # A target that is ITSELF an as-yet-unresolved alias carries a
+            # placeholder, not its real arity — wait for a later pass to fill it.
+            next if tgt[:notes] == "alias" && !tgt[:aliasResolved]
+            # A `delegate`-generated target NEVER gains a real arity (it forwards
+            # to something the static walker can't see), so its empty params are a
+            # placeholder too. Resolving against it would stamp `aliasResolved` on
+            # a `[0-0]` that means "unknown", re-arming the very false mismatches
+            # this skip exists to remove — one hop removed, through the alias.
+            # Leaving the alias unresolved makes it forward-like in its own right,
+            # which is exactly what it is.
+            next if tgt[:notes] == "delegate"
             m[:params] = tgt[:params].map(&:dup)
+            # Records that the target WAS found, even when it legitimately takes
+            # no arguments. Without this flag an alias to a zero-arg method is
+            # shape-identical to one whose target was never found, and consumers
+            # (arity.ts `isForwardingRubyEntry`) would drop a genuinely checkable
+            # pair as if its arity were unknown.
+            m[:aliasResolved] = true
             changed = true
           end
         end

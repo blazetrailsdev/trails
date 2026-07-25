@@ -88,7 +88,10 @@ describe("Ruby extractor alias arity resolution", () => {
   // resolve_aliases!, plus the method's `notes`/`alias_target` keys.
   function aliasParams(
     fixtures: Record<string, string>,
-  ): Record<string, { params: string[]; notes?: string; hasAliasTarget: boolean }> {
+  ): Record<
+    string,
+    { params: string[]; notes?: string; aliasResolved?: boolean; hasAliasTarget: boolean }
+  > {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "alias-rb-"));
     try {
       for (const [rel, src] of Object.entries(fixtures)) {
@@ -111,6 +114,7 @@ describe("Ruby extractor alias arity resolution", () => {
             out["#{fqn}##{m[:name]}"] = {
               params: m[:params].map { |p| p[:name] },
               notes: m[:notes],
+              aliasResolved: m[:aliasResolved],
               hasAliasTarget: m.key?(:alias_target),
             }
           end
@@ -493,6 +497,43 @@ describe("Ruby extractor alias arity resolution", () => {
     expect(r["Reopened#alt"].params).toEqual(["p"]);
   });
 
+  it("flags an alias resolved to a zero-arg target as resolved", () => {
+    // `params: []` here is the TARGET's real (empty) arity, not a placeholder —
+    // `aliasResolved` is what tells arity.ts the pair is still checkable.
+    const r = aliasParams({
+      "z.rb": `
+        class Zero
+          def original; end
+          alias_method :renamed, :original
+        end
+      `,
+    });
+    expect(r["Zero#renamed"]).toMatchObject({
+      params: [],
+      notes: "alias",
+      aliasResolved: true,
+    });
+  });
+
+  it("leaves an alias to a `delegate`-generated target unresolved", () => {
+    // The delegate's `params: []` means "arity unknown", so an alias to it is
+    // just as unknown — marking it resolved would re-arm the false mismatches
+    // the arity skip removes, one hop away through the alias.
+    const r = aliasParams({
+      "c.rb": `
+        module Pkg
+          class Relation
+            delegate :in_groups_of, to: :records
+            alias_method :grouped, :in_groups_of
+          end
+        end
+      `,
+    });
+    expect(r["Pkg::Relation#in_groups_of"]).toMatchObject({ params: [], notes: "delegate" });
+    expect(r["Pkg::Relation#grouped"]).toMatchObject({ params: [], notes: "alias" });
+    expect(r["Pkg::Relation#grouped"].aliasResolved).toBeFalsy();
+  });
+
   it("leaves an alias to an out-of-package target empty (best effort)", () => {
     const r = aliasParams({
       "u.rb": `
@@ -502,6 +543,29 @@ describe("Ruby extractor alias arity resolution", () => {
       `,
     });
     expect(r["Lonely#gone"]).toMatchObject({ params: [], notes: "alias" });
+    // Never resolved — the flag stays unset (the test driver renders nil as null).
+    expect(r["Lonely#gone"].aliasResolved).toBeFalsy();
+  });
+
+  // The `notes` tag is the CONTRACT the arity check keys off (arity.ts
+  // `isForwardingRubyEntry` drops these pairs). Renaming the tag here without
+  // updating that predicate would silently re-arm ~22 false mismatches, so the
+  // exact string is pinned on both forwarding kinds.
+  it("tags a `delegate`-generated method with empty placeholder params", () => {
+    const r = aliasParams({
+      "d.rb": `
+        module Pkg
+          module Querying
+            delegate :create_or_find_by, :in_groups_of, to: :all
+          end
+        end
+      `,
+    });
+    expect(r["Pkg::Querying#create_or_find_by"]).toMatchObject({
+      params: [],
+      notes: "delegate",
+    });
+    expect(r["Pkg::Querying#in_groups_of"]).toMatchObject({ params: [], notes: "delegate" });
   });
 });
 

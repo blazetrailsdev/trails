@@ -19,8 +19,13 @@
 // Every such strip is tried only as an *additional* candidate form alongside the
 // as-declared signature, and a match needs only ONE form to overlap — so a strip
 // can only ever gain a match, never manufacture a mismatch.
+//
+// Two classes of pair are dropped from the check entirely — and, so the summary
+// stays honest, from the `compared` denominator too: both-sides-zero-arg pairs
+// (shouldSkipArity) and Ruby entries whose recorded arity is a forwarding-macro
+// placeholder (isForwardingRubyEntry).
 
-import type { ParamInfo } from "./types.js";
+import type { MethodInfo, ParamInfo } from "./types.js";
 
 /** TS host/receiver types — a leading param of one of these is the explicit host
  *  instance and is stripped. Leaf match also covers `Base<T>` / `ns.Relation`.
@@ -264,6 +269,27 @@ function rangesOverlap(r: Arity, t: Arity): boolean {
   const slack = (r.hasKeywords ? 1 : 0) + (r.hasBlock ? 1 : 0);
   const rubyMax = r.max === Infinity ? Infinity : r.max + slack;
   return t.min <= rubyMax && r.min <= t.max;
+}
+
+/** Ruby entries the extractor synthesized from a forwarding macro, whose recorded
+ *  arity is a placeholder rather than a real signature.
+ *
+ *  `delegate :a, to: :b` generates `def a(...) = b.a(...)`: the true arity is the
+ *  TARGET's, which the static walker can't see, so `process_delegate` records
+ *  `params: []`. An `alias`/`alias_method` is the same shape until
+ *  `resolve_aliases!` copies the target's params — which it can only do for a
+ *  target inside the package. Comparing that placeholder `[0-0]` against a
+ *  faithfully-spelled TS signature is pure noise, so these pairs are dropped from
+ *  the check AND from the `compared` denominator (see compare.ts `checkArity`).
+ *
+ *  A RESOLVED alias is checked normally, and resolution is read from the
+ *  `aliasResolved` flag rather than from a non-empty param list: an alias to a
+ *  genuinely zero-arg method resolves to `params: []`, which is shape-identical
+ *  to a target that was never found. Keying on emptiness would drop that real,
+ *  checkable pair and mask a TS side that later grew a spurious extra parameter. */
+export function isForwardingRubyEntry(ruby: Pick<MethodInfo, "notes" | "aliasResolved">): boolean {
+  if (ruby.notes === "delegate") return true;
+  return ruby.notes === "alias" && !ruby.aliasResolved;
 }
 
 /** Nothing to compare: both sides take zero positional args (reader/predicate ↔ getter). */

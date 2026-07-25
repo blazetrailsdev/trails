@@ -51,6 +51,22 @@ export interface MethodInfo {
    * out of normal coverage and only include them behind an opt-in flag.
    */
   internal?: boolean;
+  /**
+   * Ruby-side only: how the extractor synthesized this entry when it was NOT a
+   * literal `def` — `"delegate"`, `"alias"`, `"scope"`, `"class_attribute"`,
+   * `"define_column_methods"`, `"class_eval"`. See extract-ruby-api.rb. The
+   * forwarding kinds carry a placeholder empty param list rather than a real
+   * signature (see arity.ts `isForwardingRubyEntry`).
+   */
+  notes?: string;
+  /**
+   * Ruby-side only, `notes: "alias"` entries: the alias target was found and its
+   * params copied onto this entry. Distinguishes an alias to a genuinely
+   * zero-arg method (resolved, `params: []`) from one whose target lives outside
+   * the package (unresolved, also `params: []`). See extract-ruby-api.rb
+   * `resolve_aliases!` and arity.ts `isForwardingRubyEntry`.
+   */
+  aliasResolved?: boolean;
   /** Ruby-side option symbols consumed from an `options`/`opts`/`**kwargs`
    *  param (raw snake_case); advisory under-approximation. See options-keys.ts. */
   option_keys?: string[];

@@ -4,6 +4,7 @@ import {
   arityMatches,
   matchArityAgainst,
   shouldSkipArity,
+  isForwardingRubyEntry,
   renderSig,
 } from "./arity.js";
 import type { ParamInfo } from "./types.js";
@@ -280,6 +281,33 @@ describe("shouldSkipArity", () => {
   it("does not skip when either side takes args", () => {
     expect(shouldSkipArity([req("a")], [])).toBe(false);
     expect(shouldSkipArity([], [req("a")])).toBe(false);
+  });
+});
+
+describe("isForwardingRubyEntry", () => {
+  it("skips a delegate entry (arity is the unseen target's)", () => {
+    expect(isForwardingRubyEntry({ notes: "delegate" })).toBe(true);
+  });
+
+  it("skips an alias whose target could not be resolved", () => {
+    expect(isForwardingRubyEntry({ notes: "alias" })).toBe(true);
+  });
+
+  it("checks an alias whose target params were resolved", () => {
+    expect(isForwardingRubyEntry({ notes: "alias", aliasResolved: true })).toBe(false);
+  });
+
+  it("checks an alias resolved to a target that takes no arguments", () => {
+    // Resolution is read from the flag, not from a non-empty param list: this
+    // entry is shape-identical to the unresolved case above, but its arity IS
+    // known, so a TS side that grew a spurious param must still be flagged.
+    expect(isForwardingRubyEntry({ params: [], notes: "alias", aliasResolved: true })).toBe(false);
+  });
+
+  it("checks a plain method and other extractor notes", () => {
+    expect(isForwardingRubyEntry({})).toBe(false);
+    expect(isForwardingRubyEntry({ notes: "scope" })).toBe(false);
+    expect(isForwardingRubyEntry({ notes: "class_attribute" })).toBe(false);
   });
 });
 

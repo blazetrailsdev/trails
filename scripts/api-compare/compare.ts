@@ -81,6 +81,7 @@ import {
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
 import { isArityOverridden, isScopedSkip, rubyFileToTs, rubyMethodToTs } from "./conventions.js";
 import {
+  isForwardingRubyEntry,
   matchArityAgainst,
   renderSig,
   shouldSkipArity,
@@ -362,6 +363,11 @@ interface ArityMismatch {
 interface ArityResult {
   /** Pairs whose arity was actually compared (skips excluded). */
   compared: number;
+  /** Pairs dropped because the RUBY entry is a forwarding-macro placeholder
+   *  (`delegate`/unresolved `alias`, see arity.ts `isForwardingRubyEntry`).
+   *  Reported so the shrunken `compared` denominator is auditable rather than
+   *  silently absorbing the skip. */
+  forwardingSkipped: number;
   mismatched: number;
   mismatches: ArityMismatch[];
 }
@@ -1314,6 +1320,7 @@ export function main() {
     let filesExist = 0;
     let totalMisplaced = 0;
     let arityCompared = 0;
+    let arityForwardingSkipped = 0;
     const arityMismatches: ArityMismatch[] = [];
     let optionKeysCompared = 0;
     const optionKeyMismatches: OptionKeyMismatch[] = [];
@@ -1360,6 +1367,10 @@ export function main() {
       >();
       // First-sighting Ruby params per name (mirrors `seen`'s dedup) for arity.
       const rubyParamsByName = new Map<string, ParamInfo[]>();
+      // Names whose first-sighting Ruby entry is a forwarding-macro placeholder
+      // (see arity.ts). Recorded in lockstep with rubyParamsByName so the verdict
+      // always describes the very params the arity check would compare.
+      const rubyForwardingNames = new Set<string>();
       // First-sighting Ruby option keys per name (mirrors rubyParamsByName).
       const rubyOptionKeysByName = new Map<string, string[]>();
       // First-sighting Ruby body call-set per name (advisory calls-parity check).
@@ -1372,7 +1383,10 @@ export function main() {
         for (const rm of rubyMethods) {
           if (!methodMatchesMode(rm)) continue;
           dedupeRubyMethodInto(seen, rm, item.fqn, rubyFile);
-          if (!rubyParamsByName.has(rm.name)) rubyParamsByName.set(rm.name, rm.params);
+          if (!rubyParamsByName.has(rm.name)) {
+            rubyParamsByName.set(rm.name, rm.params);
+            if (isForwardingRubyEntry(rm)) rubyForwardingNames.add(rm.name);
+          }
           if (rm.option_keys && !rubyOptionKeysByName.has(rm.name)) {
             rubyOptionKeysByName.set(rm.name, rm.option_keys);
           }
@@ -1481,6 +1495,14 @@ export function main() {
         // overlaps ANY (see tsParamsByName above for why this is global).
         const candidates = tsParamsByName.get(tsName) ?? [];
         if (candidates.length === 0) return;
+        // A `delegate`/unresolved-`alias` entry carries a placeholder `[0-0]`, not a
+        // signature — comparing it against the real TS arity is noise, so it is
+        // skipped before `arityCompared` counts it. Placed AFTER the no-candidate
+        // guard so the tally means "pairs that would otherwise have been compared".
+        if (rubyForwardingNames.has(rubyName)) {
+          arityForwardingSkipped++;
+          return;
+        }
         if (candidates.every((c) => shouldSkipArity(rubyParams, c))) return;
         arityCompared++;
         const verdict = matchArityAgainst(rubyParams, candidates);
@@ -1809,6 +1831,7 @@ export function main() {
       inheritance,
       arity: {
         compared: arityCompared,
+        forwardingSkipped: arityForwardingSkipped,
         mismatched: arityMismatches.length,
         mismatches: arityMismatches,
       },
@@ -1864,6 +1887,7 @@ export function main() {
       {
         generatedAt: new Date().toISOString(),
         compared: results.reduce((n, r) => n + r.arity.compared, 0),
+        forwardingSkipped: results.reduce((n, r) => n + r.arity.forwardingSkipped, 0),
         mismatched: arityFlat.length,
         mismatches: arityFlat,
       },
