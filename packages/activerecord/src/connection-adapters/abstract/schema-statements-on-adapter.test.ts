@@ -12,32 +12,10 @@ import { AbstractSQLite3Adapter } from "../sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../better-sqlite3-adapter.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { ForeignKeyDefinition } from "./schema-definitions.js";
-import { Base } from "../../index.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
+import { ambientConnection, withRocketTables } from "../../test-helpers/rocket-tables.js";
 
 let adapter: AbstractSQLite3Adapter | undefined;
-
-// Rails' `@connection = ActiveRecord::Base.lease_connection`.
-async function ambientConnection(): Promise<AbstractAdapter> {
-  return (await Base.leaseConnection()) as unknown as AbstractAdapter;
-}
-
-// ForeignKeyTest's setup/teardown, foreign_key_test.rb:178-194.
-async function withRocketTables(conn: AbstractAdapter, body: () => Promise<void>): Promise<void> {
-  await conn.createTable("rockets", { force: true }, (t) => {
-    t.string("name");
-  });
-  await conn.createTable("astronauts", { force: true }, (t) => {
-    t.string("name");
-    t.references("rocket", { type: "bigint" });
-    t.references("favorite_rocket");
-  });
-  try {
-    await body();
-  } finally {
-    await conn.dropTable("astronauts", "rockets", { ifExists: true });
-  }
-}
 
 afterEach(async () => {
   await adapter?.close();

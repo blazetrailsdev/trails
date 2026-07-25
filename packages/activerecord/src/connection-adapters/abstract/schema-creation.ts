@@ -622,7 +622,9 @@ export class SchemaCreation {
       case "set_default":
         return `ON ${action} SET DEFAULT`;
       default:
-        throw new Error(
+        // Rails raises ArgumentError here (schema_creation.rb:181), which
+        // foreign_key_test.rb:302 asserts on.
+        throw new ArgumentError(
           `'${String(dependency)}' is not supported for on_update or on_delete. ` +
             `Supported values are: cascade, nullify, restrict, no_action, set_default`,
         );
