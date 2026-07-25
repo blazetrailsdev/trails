@@ -113,18 +113,30 @@ jobs:
           #                       inside the lint job
           #   rails-find/, sync-stats/, phase-g-hunt/, fixtures-inventory/,
           #   __fixtures__/, strip-asany*
-          #                     - local-dev tooling; no CI job runs them, and
-          #                       their vitest files are in no job's include
-          #                       list (unit-tests names its paths explicitly,
-          #                       ci.yml:604).
-          # The last three groups need no regex addition because preflight and
-          # lint have no path gate at all — they run on every non-docs-only
-          # change, so carving cannot skip them. `pnpm lint` is `eslint .`, so
-          # it also still lints every carved subtree.
+          #                     - local-dev tooling; no CI job runs the tools
+          #                       themselves.
+          #   ci-suite-coverage.test.ts
+          #                     - guards this file's own wiring; its only
+          #                       consumer is unit-tests, which names it in
+          #                       UNIT_TESTS_PKGS_RE.
+          # IMPORTANT: carving a subtree out of the infra sweep does NOT mean
+          # its own tests can go unnamed. unit-tests runs the compare/parity
+          # tooling's vitest suites — api-compare, test-compare,
+          # fixtures-compare, test-deps, rails-find, parity and the top-level
+          # scripts/*.test.ts files — so every one of those is also listed in
+          # UNIT_TESTS_PKGS_RE, while schema-compare's suite is a step of
+          # rails-comparison (COMPARISON_RE).
+          # scripts/ci-suite-coverage.test.ts enforces that pairing: it fails
+          # if a tooling test file is neither named in a ci.yml vitest
+          # invocation nor on its KNOWN_UNRUN list.
+          # The preflight/lint groups above need no regex addition because
+          # those jobs have no path gate at all — they run on every
+          # non-docs-only change, so carving cannot skip them. `pnpm lint` is
+          # `eslint .`, so it also still lints every carved subtree.
           # Deliberately NOT carved (genuinely cross-cutting): typecheck.mjs
           # (root `pnpm typecheck`), start-worktree.sh, and the remaining
           # top-level scripts/*.ts one-offs.
-          INFRA_CARVEOUT_RE='^scripts/((tasks|ci|guides-typecheck|rails-find|sync-stats|phase-g-hunt|fixtures-inventory|test-deps|__fixtures__|api-compare|test-compare|fixtures-compare|schema-compare|parity)/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|strip-asany)(\.test)?\.ts$)'
+          INFRA_CARVEOUT_RE='^scripts/((tasks|ci|guides-typecheck|rails-find|sync-stats|phase-g-hunt|fixtures-inventory|test-deps|__fixtures__|api-compare|test-compare|fixtures-compare|schema-compare|parity)/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|strip-asany|ci-suite-coverage)(\.test)?\.ts$)'
           # AR workspace deps: arel/activemodel/activesupport/globalid/
           # did-you-mean (per packages/activerecord/package.json). Also
           # consumes @blazetrails/trails-tsc at runtime via the tsc-wrapper
@@ -177,7 +189,12 @@ jobs:
           # packages/activerecord/, is deliberately NOT on this gate — pulling
           # every AR PR into the leaf-package suites costs more than it catches;
           # the label-gated query-parity-trails job covers that direction.)
-          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport)/|scripts/(tasks|guides-typecheck|parity)/)'
+          # The compare tooling's suites run in that same invocation and are
+          # ALL in INFRA_CARVEOUT_RE, so without naming them here a change
+          # confined to one of them would run none of its own tests.
+          # schema-compare/ is deliberately absent — its suite parses the real
+          # vendored schema.rb, so it runs in rails-comparison (COMPARISON_RE).
+          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport)/|scripts/(tasks|guides-typecheck|parity|api-compare|test-compare|fixtures-compare|test-deps|rails-find)/|scripts/(strip-asany|rails-file-structure-mixins|ci-suite-coverage)(\.test)?\.ts$)'
           # guides_affected gates the Guides Code Type Check job, which
           # compiles fenced TS blocks in packages/website/docs/guides/**.
           # Today guides only import @blazetrails/activerecord,
@@ -654,6 +671,13 @@ jobs:
       # they resolve @blazetrails/* through package `main` entries, so the
       # dist/ trees have to exist before vitest starts.
       - run: pnpm build
+      # The scripts/* suites added here are the compare tooling's own unit
+      # tests; none needs Ruby or the `pnpm build` above (that step exists for
+      # parity/query/node, which #5264 already wired in — the whole
+      # scripts/parity tree now passes, so one filter covers it).
+      # scripts/schema-compare is the one suite that belongs elsewhere: it
+      # parses the REAL vendored test/schema/schema.rb, so it runs as a step of
+      # rails-comparison, the job that fetches vendor/.
       - run: >
           pnpm vitest run
           packages/arel
@@ -661,7 +685,15 @@ jobs:
           packages/activesupport
           scripts/guides-typecheck
           scripts/tasks
-          scripts/parity/query/node
+          scripts/api-compare
+          scripts/test-compare
+          scripts/fixtures-compare
+          scripts/test-deps
+          scripts/rails-find
+          scripts/parity
+          scripts/strip-asany.test.ts
+          scripts/rails-file-structure-mixins.test.ts
+          scripts/ci-suite-coverage.test.ts
 
   # Consolidated leaf-test job. The cheapest sub-minute leaf suites — rack
   # (~27 s), actionview (~26 s), tse-compiler (~22 s), and the DX type tests
@@ -1325,6 +1357,12 @@ jobs:
         # debt only, and the baseline must never grow. Shape divergences on
         # shared tables are report-only for now (`--verbose` lists them).
         run: pnpm exec tsx scripts/schema-compare/compare.ts
+      - name: Schema comparison unit tests
+        # scripts/schema-compare/compare.test.ts parses the REAL vendored
+        # test/schema/schema.rb (not just synthetic snippets), so it only has
+        # signal after the vendor:fetch step above — hence here rather than in
+        # the unit-tests job, where the rest of the compare tooling's tests run.
+        run: pnpm vitest run scripts/schema-compare
       - name: Dependency lint
         run: pnpm exec tsx scripts/api-compare/lint-deps.ts
       - name: Rails-private JSDoc lint
@@ -1690,7 +1728,7 @@ jobs:
                   ;;
                 rails-comparison)
                   # Legitimate skip when no comparison-relevant path changed
-                  # (no packages/**, scripts/{api,test,fixtures}-compare/**,
+                  # (no packages/**, scripts/{api,test,fixtures,schema}-compare/**,
                   # vendor/**, or cross-cutting infra).
                   [ "$COMPARISON_AFFECTED" = "false" ] && continue
                   ;;
