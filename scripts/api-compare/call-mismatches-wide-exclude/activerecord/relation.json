@@ -4,7 +4,7 @@
     "tsFile": "relation.ts",
     "rubyName": "_exec_scope",
     "call": "model",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-entry verified (RFC 0072 model-accessor sweep): Rails relation.rb:552-558 resolves the registry via `model.scope_registry`; trails relation.ts `_execScope` reads the process-wide `ScopeRegistry.instance()` and never touches the model. Converge by porting the per-model registry accessor."
   },
   {
     "package": "activerecord",
@@ -186,7 +186,7 @@
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "model",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-entry verified (RFC 0072 model-accessor sweep): the `model` read lives in `construct_join_dependency` (query_methods.rb:1598-1602), which `apply_join_dependency` merely calls; trails' `applyJoinDependency` likewise holds no direct model read. Tracked under converge-relation-subfile-model-accessor-reads."
   },
   {
     "package": "activerecord",
@@ -634,7 +634,7 @@
     "tsFile": "relation.ts",
     "rubyName": "bind_attribute",
     "call": "model",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-entry verified (RFC 0072 model-accessor sweep): not a model-read routing gap. Rails relation.rb:102-110 calls `model._reflect_on_association(name)` to swap an association name for its foreign key; trails relation.ts has no such branch at all, so this is a missing behavior, not a `_modelClass`-vs-`model` read. Converge by porting the reflection branch."
   },
   {
     "package": "activerecord",
@@ -991,7 +991,7 @@
     "tsFile": "relation.ts",
     "rubyName": "destroy",
     "call": "model",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-entry verified (RFC 0072 model-accessor sweep): Rails relation.rb:1083-1092 branches on `model.composite_primary_key?` to decide whether the argument is a list of ids; trails relation.ts `destroy` has no multiple-id branch. Missing behavior, not a read-routing gap."
   },
   {
     "package": "activerecord",
@@ -2377,7 +2377,7 @@
     "tsFile": "relation.ts",
     "rubyName": "to_sql",
     "call": "model",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-entry verified (RFC 0072 model-accessor sweep): Rails relation.rb:1217-1218 wraps the render in `model.with_connection { |c| c.unprepared_statement { ... } }`; trails routes through `_toSqlViaConnection`/`_conn`, a trails-invented connection helper. The divergence is the connection-acquisition shape, not the model read."
   },
   {
     "package": "activerecord",
@@ -2503,14 +2503,14 @@
     "tsFile": "relation.ts",
     "rubyName": "update",
     "call": "model",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-entry verified (RFC 0072 model-accessor sweep): Rails relation.rb:620-627 dispatches the by-id form to `model.update(id, attributes)`; trails relation.ts `update` does `find(id)` then `record.update(...)`. A different code path, not a read-routing gap."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "update!",
     "call": "model",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-entry verified (RFC 0072 model-accessor sweep): Rails relation.rb:629-636 dispatches the by-id form to `model.update!(id, attributes)`; trails relation.ts `updateBang` does `find(id)` then `record.updateBang(...)`. A different code path, not a read-routing gap."
   },
   {
     "package": "activerecord",

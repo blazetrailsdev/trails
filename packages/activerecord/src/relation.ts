@@ -4216,7 +4216,7 @@ export class Relation<T extends Base> {
    * (e.g. `HasManyThroughAssociation#through_scope_attributes` passing the
    * through model's table).
    */
-  whereValuesHash(relationTableName: string = this._modelClass.tableName): Record<string, unknown> {
+  whereValuesHash(relationTableName: string = this.model.tableName): Record<string, unknown> {
     return this._whereClause.toH(relationTableName);
   }
 
@@ -4562,7 +4562,7 @@ export class Relation<T extends Base> {
 
   /** @internal */
   protected _scopeAttributes(): Record<string, unknown> {
-    return this._whereClause.toH(this._modelClass.tableName, { equalityOnly: true });
+    return this._whereClause.toH(this.model.tableName, { equalityOnly: true });
   }
 
   // -- Batches --
