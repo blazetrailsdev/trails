@@ -88,7 +88,10 @@ describe("Ruby extractor alias arity resolution", () => {
   // resolve_aliases!, plus the method's `notes`/`alias_target` keys.
   function aliasParams(
     fixtures: Record<string, string>,
-  ): Record<string, { params: string[]; notes?: string; hasAliasTarget: boolean }> {
+  ): Record<
+    string,
+    { params: string[]; notes?: string; aliasResolved?: boolean; hasAliasTarget: boolean }
+  > {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "alias-rb-"));
     try {
       for (const [rel, src] of Object.entries(fixtures)) {
@@ -111,6 +114,7 @@ describe("Ruby extractor alias arity resolution", () => {
             out["#{fqn}##{m[:name]}"] = {
               params: m[:params].map { |p| p[:name] },
               notes: m[:notes],
+              aliasResolved: m[:aliasResolved],
               hasAliasTarget: m.key?(:alias_target),
             }
           end
@@ -493,6 +497,24 @@ describe("Ruby extractor alias arity resolution", () => {
     expect(r["Reopened#alt"].params).toEqual(["p"]);
   });
 
+  it("flags an alias resolved to a zero-arg target as resolved", () => {
+    // `params: []` here is the TARGET's real (empty) arity, not a placeholder —
+    // `aliasResolved` is what tells arity.ts the pair is still checkable.
+    const r = aliasParams({
+      "z.rb": `
+        class Zero
+          def original; end
+          alias_method :renamed, :original
+        end
+      `,
+    });
+    expect(r["Zero#renamed"]).toMatchObject({
+      params: [],
+      notes: "alias",
+      aliasResolved: true,
+    });
+  });
+
   it("leaves an alias to an out-of-package target empty (best effort)", () => {
     const r = aliasParams({
       "u.rb": `
@@ -502,6 +524,8 @@ describe("Ruby extractor alias arity resolution", () => {
       `,
     });
     expect(r["Lonely#gone"]).toMatchObject({ params: [], notes: "alias" });
+    // Never resolved — the flag stays unset (the test driver renders nil as null).
+    expect(r["Lonely#gone"].aliasResolved).toBeFalsy();
   });
 
   // The `notes` tag is the CONTRACT the arity check keys off (arity.ts

@@ -1367,9 +1367,10 @@ export function main() {
       >();
       // First-sighting Ruby params per name (mirrors `seen`'s dedup) for arity.
       const rubyParamsByName = new Map<string, ParamInfo[]>();
-      // First-sighting Ruby extractor `notes` per name — recorded in lockstep with
-      // rubyParamsByName so the notes always describe the params being compared.
-      const rubyNotesByName = new Map<string, string>();
+      // Names whose first-sighting Ruby entry is a forwarding-macro placeholder
+      // (see arity.ts). Recorded in lockstep with rubyParamsByName so the verdict
+      // always describes the very params the arity check would compare.
+      const rubyForwardingNames = new Set<string>();
       // First-sighting Ruby option keys per name (mirrors rubyParamsByName).
       const rubyOptionKeysByName = new Map<string, string[]>();
       // First-sighting Ruby body call-set per name (advisory calls-parity check).
@@ -1384,7 +1385,7 @@ export function main() {
           dedupeRubyMethodInto(seen, rm, item.fqn, rubyFile);
           if (!rubyParamsByName.has(rm.name)) {
             rubyParamsByName.set(rm.name, rm.params);
-            if (rm.notes) rubyNotesByName.set(rm.name, rm.notes);
+            if (isForwardingRubyEntry(rm)) rubyForwardingNames.add(rm.name);
           }
           if (rm.option_keys && !rubyOptionKeysByName.has(rm.name)) {
             rubyOptionKeysByName.set(rm.name, rm.option_keys);
@@ -1498,7 +1499,7 @@ export function main() {
         // signature — comparing it against the real TS arity is noise, so it is
         // skipped before `arityCompared` counts it. Placed AFTER the no-candidate
         // guard so the tally means "pairs that would otherwise have been compared".
-        if (isForwardingRubyEntry(rubyParams, rubyNotesByName.get(rubyName))) {
+        if (rubyForwardingNames.has(rubyName)) {
           arityForwardingSkipped++;
           return;
         }
