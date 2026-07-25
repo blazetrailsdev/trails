@@ -177,6 +177,11 @@ export function acceptsNestedAttributesFor(
       this: Base,
       options?: { validate?: boolean; touch?: boolean },
     ): Promise<boolean> {
+      // Finish the displaced-record removals a nested-attributes assignment
+      // started (Rails runs them inline inside `replace`), before the parent
+      // save's has_one autosave inserts the replacement — so the nullify lands
+      // first, as it does in Rails.
+      await awaitPendingDisplacedRemovals(this);
       const result = await originalSave.call(this, options);
       if (!result) return false;
 
@@ -654,6 +659,58 @@ interface OneToOneAssociation {
   target: Base | null;
   build(attrs: Record<string, unknown>): Base | null;
   initializeAttributes(record: Base): void;
+  isLoaded?(): boolean;
+  removeDisplacedRecord?(displaced: Base | null): Promise<void>;
+}
+
+/**
+ * Start Rails' `remove_target!` for the record a nested-attributes `build`
+ * displaced, at the moment of assignment.
+ *
+ * Rails runs the removal inline inside `HasOneAssociation#replace`
+ * (has_one_association.rb:69) — the nested-attributes writer is a synchronous
+ * property setter (`pirate.shipAttributes = {...}`), so it cannot `await` the
+ * nullify save. It CAN issue it: `removeDisplacedRecord` is kicked off here,
+ * inline at assignment exactly as in Rails, and only its *completion* is
+ * deferred — to the nested-attributes `save` wrapper, which drains this list
+ * before the parent (and its autosaved new target) is persisted. That keeps
+ * Rails' write ordering (displaced row nullified before the replacement is
+ * inserted) and, like Rails, removes the displaced record even if the owner is
+ * never saved.
+ *
+ * The rejection is captured rather than left floating: a never-drained removal
+ * must not surface as an unhandled rejection, and a drained one must rethrow.
+ * @internal
+ */
+function removeDisplacedAtAssignment(
+  record: Base,
+  assoc: OneToOneAssociation,
+  displaced: Base | null,
+): void {
+  if (!displaced) return;
+  if (typeof assoc.removeDisplacedRecord !== "function") return;
+  const settled = assoc.removeDisplacedRecord(displaced).then(
+    () => null,
+    (error: unknown) => error ?? new Error("displaced record removal failed"),
+  );
+  const host = record as unknown as { _pendingDisplacedRemovals?: Promise<unknown>[] };
+  (host._pendingDisplacedRemovals ??= []).push(settled);
+}
+
+/**
+ * Await the removals started by `removeDisplacedAtAssignment`, rethrowing the
+ * first failure — the deferred half of Rails' inline `remove_target!`.
+ * @internal
+ */
+async function awaitPendingDisplacedRemovals(record: Base): Promise<void> {
+  const host = record as unknown as { _pendingDisplacedRemovals?: Promise<unknown>[] };
+  const pending = host._pendingDisplacedRemovals;
+  if (!pending?.length) return;
+  host._pendingDisplacedRemovals = [];
+  for (const settled of pending) {
+    const error = await settled;
+    if (error) throw error;
+  }
 }
 
 /** @internal */
@@ -772,7 +829,15 @@ export function assignNestedAttributesForOneToOneAssociation(
           );
         }
       } else {
+        // Rails' `build_#{name}` → `set_new_record` → `replace(record, false)`
+        // removes the displaced target inline (has_one_association.rb:69).
+        // Capture it before the build overwrites `assoc.target`, then start that
+        // removal here — see `removeDisplacedAtAssignment`. Rails only removes
+        // what `load_target` surfaced, so an unloaded association displaces
+        // nothing; `removeDisplacedRecord` owns the remaining guards.
+        const displaced = assoc.isLoaded?.() === false ? null : existing;
         assoc.build(assignable);
+        removeDisplacedAtAssignment(record, assoc, displaced);
       }
     }
   }
