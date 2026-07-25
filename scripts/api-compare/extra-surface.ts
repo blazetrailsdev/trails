@@ -51,15 +51,6 @@
  *   --novel-only          Drop moved-not-novel extras (filters barrel noise).
  *   --max-detail <N>      Cap names per file in detail listing (default 40).
  *   --help                Print this message.
- *
- * A committed reasoned allowlist (`extra-surface-allow.json`, keyed by
- * `package + tsFile + name` with a mandatory `reason`) records extras we
- * intend to keep — mixin installers, TS-idiom accessors. Allowed extras are
- * subtracted from the novel/moved counts and surfaced as a separate
- * "allowlisted" total (in `--json` too). Mirroring
- * `lint-call-mismatches.ts`, the file only shrinks: an entry that no longer
- * flags is STALE and fails the run. The report always prints first — these
- * outputs feed the parity stats pipeline and are never gated away.
  */
 
 import * as fs from "fs";
@@ -214,12 +205,6 @@ function pushTo<K, V>(map: Map<K, V[]>, key: K, value: V): void {
  */
 export type ExtraKind = "novel" | "moved";
 
-/**
- * One justified extra: a TS name we intend to keep even though the matched
- * Rails file has no counterpart (mixin installers, TS-idiom accessors, …).
- * Keyed by `package + tsFile + name` — the same grain the report emits — with a
- * mandatory one-line `reason`, mirroring `call-mismatches-exclude.json`.
- */
 export interface AllowEntry {
   package: string;
   tsFile: string;
@@ -236,12 +221,6 @@ export function allowKeyOf(e: { package: string; tsFile: string; name: string })
   return `${e.package} ${e.tsFile} ${e.name}`;
 }
 
-/**
- * Structural problems that make an allowlist file untrustworthy: a blank
- * `reason` (the whole point of the file is the justification) or a duplicate
- * key (the stale check would then tolerate one of the rows going stale).
- * Returned as human-readable lines; a non-empty result fails the run.
- */
 export function findInvalidAllowEntries(entries: AllowEntry[]): string[] {
   const problems: string[] = [];
   const seen = new Set<string>();
@@ -261,8 +240,19 @@ export function findInvalidAllowEntries(entries: AllowEntry[]): string[] {
 }
 
 export async function loadAllowlist(file: string = ALLOWLIST_PATH): Promise<AllowEntry[]> {
-  const raw = await fsp.readFile(file, "utf-8");
-  return JSON.parse(raw) as AllowEntry[];
+  let raw: string;
+  try {
+    raw = await fsp.readFile(file, "utf-8");
+  } catch {
+    throw new Error(
+      `Missing ${path.basename(file)} — the allowlist file must exist (\`[]\` when empty).`,
+    );
+  }
+  const parsed: unknown = JSON.parse(raw);
+  if (!Array.isArray(parsed)) {
+    throw new Error(`${path.basename(file)} must be a JSON array of allowlist entries.`);
+  }
+  return parsed as AllowEntry[];
 }
 
 export interface ExtraName {
@@ -277,7 +267,6 @@ interface ExtraFile {
   extraCount: number;
   novelCount: number;
   movedCount: number;
-  /** Extras suppressed by the reasoned allowlist — excluded from the counts above. */
   allowlistedCount: number;
   extras: ExtraName[];
 }
@@ -295,7 +284,6 @@ interface PackageTotals {
 interface AllowlistSummary {
   total: number;
   matched: number;
-  /** Entries in a scanned package that no longer correspond to an extra. */
   stale: AllowEntry[];
 }
 
@@ -725,9 +713,6 @@ function buildPackageReport(
     let allowlistedCount = 0;
     for (const name of tsNames) {
       if (allowed.has(name)) continue;
-      // Allowlist first, before --novel-only filtering: an entry justifying a
-      // moved extra must still count as matched under `--novel-only`, or the
-      // narrowed run would report it stale.
       const allowKey = allowKeyOf({ package: pkg, tsFile: expectedTs, name });
       if (allowKeys.has(allowKey)) {
         matchedAllowKeys.add(allowKey);
@@ -740,8 +725,6 @@ function buildPackageReport(
       if (kind === "novel") novelCount++;
       else movedCount++;
     }
-    // Counted before the early-out: a file whose every extra is allowlisted has
-    // no drift row, but its suppressions still belong in the package total.
     result.totalAllowlisted += allowlistedCount;
     if (extras.length === 0) continue;
 
@@ -945,8 +928,6 @@ export function buildReport(
       a.tsFile.localeCompare(b.tsFile),
   );
 
-  // Only entries in a package this run actually scanned can be judged stale —
-  // a `--package`-filtered run leaves every other package's entries unvisited.
   const stale = allow.filter(
     (e) => scannedPkgs.has(e.package) && !matchedAllowKeys.has(allowKeyOf(e)),
   );
@@ -999,10 +980,6 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     printHumanReport(report, args.topN, args.maxDetail);
   }
 
-  // The report itself always prints (it feeds the stats pipeline); the stale
-  // check only sets the exit code, after the output. `--exclude-glob` skips
-  // whole TS files, so entries for a skipped file would look stale — don't
-  // enforce on such a narrowed run.
   if (args.excludeGlobs.length > 0) return;
   const { stale } = report.allowlist;
   if (stale.length === 0) return;

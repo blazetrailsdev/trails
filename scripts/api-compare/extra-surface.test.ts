@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import * as fs from "fs/promises";
+import * as path from "path";
+import { tmpdir } from "os";
 import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
 import {
   buildGlobalRubyCandidates,
@@ -1106,8 +1109,6 @@ describe("buildReport — novel vs moved classification", () => {
 });
 
 describe("buildReport — reasoned allowlist", () => {
-  // Rails foo.rb defines `bar`; TS foo.ts adds `tsOnlyHelper` (novel) and
-  // `quux` (moved — Rails defines it in baz.rb).
   function makeManifests(): { ruby: ApiManifest; ts: ApiManifest } {
     const ruby: ApiManifest = {
       source: "ruby",
@@ -1213,7 +1214,6 @@ describe("buildReport — reasoned allowlist", () => {
       excludeGlobs: [],
       novelOnly: false,
       topN: 50,
-      // `bar` is matched by Rails foo.rb, so it is not extra surface at all.
       allow: [allowEntry("bar")],
     });
     expect(report.allowlist.stale.map((e) => e.name)).toEqual(["bar"]);
@@ -1263,8 +1263,20 @@ describe("findInvalidAllowEntries", () => {
   });
 });
 
-describe("the committed allowlist", () => {
-  it("parses and is well-formed", async () => {
+describe("loadAllowlist", () => {
+  it("rejects a missing file with an actionable message", async () => {
+    await expect(loadAllowlist("scripts/api-compare/does-not-exist.json")).rejects.toThrow(
+      /Missing does-not-exist\.json/,
+    );
+  });
+
+  it("rejects a file that is not a JSON array", async () => {
+    const file = path.join(await fs.mkdtemp(path.join(tmpdir(), "extra-surface-")), "allow.json");
+    await fs.writeFile(file, JSON.stringify({ package: "activemodel" }));
+    await expect(loadAllowlist(file)).rejects.toThrow(/must be a JSON array/);
+  });
+
+  it("parses the committed allowlist, which is well-formed", async () => {
     expect(findInvalidAllowEntries(await loadAllowlist())).toEqual([]);
   });
 });
