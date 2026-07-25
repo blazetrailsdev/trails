@@ -31,6 +31,7 @@ import { DatabaseConfigurations } from "../database-configurations.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { UrlConfig } from "../database-configurations/url-config.js";
+import { registerDbFileCleanupOnExit } from "./sqlite-template.js";
 import {
   connectionName,
   driverConfig,
@@ -168,8 +169,10 @@ async function fallbackDatabasePath(): Promise<string> {
     `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   const slot = getEnv("VITEST_POOL_ID") || getEnv("VITEST_WORKER_ID") || "1";
   const token = `${runToken}-${slot}`;
-  g.__arFallbackDbPath = path.join(os.tmpdir(), `ar-test-fallback-${token}.sqlite`);
-  return g.__arFallbackDbPath;
+  const dbPath = path.join(os.tmpdir(), `ar-test-fallback-${token}.sqlite`);
+  await registerDbFileCleanupOnExit(dbPath);
+  g.__arFallbackDbPath = dbPath;
+  return dbPath;
 }
 
 async function sqliteHash(): Promise<{ adapter: string; database: string }> {

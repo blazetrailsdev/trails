@@ -1,12 +1,69 @@
 /**
  * Phase 0 probe: confirms the sqlite template-clone mechanism is active
  * and that canonical DDL was issued exactly once for this vitest invocation.
- *
  * Skipped automatically on PG/MySQL runs (env vars not set).
+ *
+ * The `registerDbFileCleanupOnExit` suite is adapter-agnostic and always runs;
+ * it takes its own listeners back off so they don't accumulate across files.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { getFsAsync } from "@blazetrails/activesupport/fs-adapter";
-import { TEMPLATE_PATH_ENV, RUN_TOKEN_ENV, WORKER_DB_ENV, isSqliteRun } from "./sqlite-template.js";
+import { getOsAsync } from "@blazetrails/activesupport";
+import {
+  TEMPLATE_PATH_ENV,
+  RUN_TOKEN_ENV,
+  WORKER_DB_ENV,
+  isSqliteRun,
+  registerDbFileCleanupOnExit,
+  unlinkDbFiles,
+} from "./sqlite-template.js";
+
+const SIDECARS = ["", "-wal", "-shm"];
+
+async function tmpPath(): Promise<string> {
+  const os = await getOsAsync();
+  return `${os.tmpdir()}/ar-test-cleanup-${Math.random().toString(36).slice(2)}.sqlite`;
+}
+
+describe("registerDbFileCleanupOnExit", () => {
+  const added: Array<() => void> = [];
+
+  async function register(base: string): Promise<Array<() => void>> {
+    const before = new Set(process.listeners("exit"));
+    await registerDbFileCleanupOnExit(base);
+    const fresh = process.listeners("exit").filter((fn) => !before.has(fn)) as Array<() => void>;
+    added.push(...fresh);
+    return fresh;
+  }
+
+  afterEach(() => {
+    for (const fn of added.splice(0)) process.off("exit", fn);
+  });
+
+  it("runs its exit listener to unlink the DB file and its WAL sidecars", async () => {
+    const fs = await getFsAsync();
+    const base = await tmpPath();
+    for (const suffix of SIDECARS) fs.writeFileSync(base + suffix, "");
+
+    const [listener] = await register(base);
+    expect(listener, "registration must add exactly one exit listener").toBeDefined();
+    listener();
+
+    for (const suffix of SIDECARS) expect(await fs.exists(base + suffix)).toBe(false);
+  });
+
+  it("registers a path only once per process", async () => {
+    const base = await tmpPath();
+    expect(await register(base)).toHaveLength(1);
+    expect(await register(base)).toHaveLength(0);
+  });
+
+  it("tolerates a DB file that was never created", async () => {
+    const fs = await getFsAsync();
+    const base = await tmpPath();
+    expect(() => unlinkDbFiles(fs, base)).not.toThrow();
+  });
+});
 
 describe.skipIf(!isSqliteRun())("sqlite template-clone (Phase 0 probe)", () => {
   it("globalSetup built a template file for this run", async () => {

@@ -32,7 +32,9 @@
  * Hard rule: no `node:*` fs APIs — all filesystem access goes through the
  * activesupport fs-adapter. `process` is used only for runtime plumbing, not
  * fs: `process.env` reads carry the globalSetup → forked-worker handoff, and
- * `process.on("exit")` registers best-effort cleanup of the worker clone.
+ * `process.on("exit")` registers best-effort cleanup of the worker clone and,
+ * via `registerDbFileCleanupOnExit`, of file DBs owned by `process`-free
+ * modules.
  */
 import type { FsAdapter } from "@blazetrails/activesupport/fs-adapter";
 import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
@@ -54,6 +56,38 @@ export function unlinkDbFiles(fs: FsAdapter, base: string): void {
     } catch {
       // already gone / never created — nothing to do.
     }
+  }
+}
+
+const cleanupG = globalThis as typeof globalThis & { __arDbCleanupPaths?: Set<string> };
+
+/**
+ * Register a best-effort `process.on("exit")` unlink of a sqlite file DB and
+ * its WAL sidecars, at most once per path per process.
+ *
+ * Callers that must stay `process`-free (`test-database-config.ts`, whose
+ * fallback DB otherwise lingers in tmpdir after every setup-free run) route
+ * their cleanup through here — this module already carries the `process`
+ * exception documented at the top of the file.
+ *
+ * The de-dupe set hangs off `globalThis`, not module scope: vitest's
+ * `isolate: true` reloads the module graph per test file, so a module-level
+ * set would re-register — and leak — one exit listener per file.
+ */
+export async function registerDbFileCleanupOnExit(base: string): Promise<void> {
+  const registered = (cleanupG.__arDbCleanupPaths ??= new Set<string>());
+  if (registered.has(base)) return;
+  // Claimed before the await so concurrent callers can't both get past the
+  // check, but released again if attaching fails — otherwise a rejected
+  // `getFsAsync()` would mark the path registered with no listener behind it,
+  // silently forfeiting cleanup for the rest of the process.
+  registered.add(base);
+  try {
+    const fs = await getFsAsync();
+    process.on("exit", () => unlinkDbFiles(fs, base));
+  } catch (error) {
+    registered.delete(base);
+    throw error;
   }
 }
 
@@ -113,10 +147,7 @@ export async function ensureWorkerClone(): Promise<string | null> {
       fs.copyFileSync(template, dest);
     }
   }
-  // Best-effort cleanup on process exit. Registered once per worker.
-  // WAL mode (the sqlite adapter's default for file DBs) leaves `-wal`/`-shm`
-  // sidecars next to the main file; unlink those too so nothing lingers.
-  process.on("exit", () => unlinkDbFiles(fs, dest));
+  await registerDbFileCleanupOnExit(dest);
 
   g.__arWorkerDbPath = dest;
   return dest;
