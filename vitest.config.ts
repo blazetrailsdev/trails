@@ -344,7 +344,9 @@ export default defineConfig({
       {
         // All activerecord tests. Each fork gets its own database (rails_js_test_N
         // for PG/MySQL, provisioned via AR_DB_FORKS) so files can run in parallel.
-        // SQLite uses :memory: which is isolated per fork by default.
+        // SQLite is file-backed too: globalSetup builds one on-disk template and
+        // each fork restores it into its own private `.sqlite` clone stamped into
+        // AR_TEST_WORKER_DB (see test-helpers/sqlite-template.ts).
         resolve: { alias },
         test: {
           name: "activerecord",

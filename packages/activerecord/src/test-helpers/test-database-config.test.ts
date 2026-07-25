@@ -38,6 +38,17 @@ describe("buildTestDatabaseConfig", () => {
     expect(envConfig.pool).toBe(5);
   });
 
+  it("falls back to a file-backed sqlite DB when AR_TEST_WORKER_DB is unset", async () => {
+    vi.stubEnv("ARCONN", "sqlite3");
+    vi.stubEnv("AR_TEST_WORKER_DB", "");
+    const { envConfig } = await buildTestDatabaseConfig();
+    // Rails' `sqlite3` connection is file-backed (config.example.yml);
+    // `:memory:` is the opt-in `sqlite3_mem` connection only.
+    expect(envConfig.database).not.toBe(":memory:");
+    expect(envConfig.database).toMatch(/\.sqlite$/);
+    expect(envConfig.pool).toBe(5);
+  });
+
   it("pins pool 1 on the sqlite3_mem :memory: connection", async () => {
     vi.stubEnv("ARCONN", "sqlite3_mem");
     vi.stubEnv("AR_TEST_WORKER_DB", "");

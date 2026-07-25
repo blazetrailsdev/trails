@@ -23,7 +23,8 @@
  * Phase 4 of RFC 0002 — sole env-sniff source after bootstrap-test-handler deleted.
  */
 
-import { getEnv } from "@blazetrails/activesupport";
+import { getEnv, getOsAsync } from "@blazetrails/activesupport";
+import { getPathAsync } from "@blazetrails/activesupport/fs-adapter";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../base.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
@@ -66,7 +67,7 @@ interface NamedConnection {
   adapter: string;
   /** The public {@link TestAdapterName} lane this connection drives. */
   lane: TestAdapterName;
-  build(): HashConfig;
+  build(): Promise<HashConfig>;
 }
 
 /**
@@ -93,23 +94,24 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
   sqlite3: {
     adapter: "sqlite3",
     lane: "sqlite",
-    build: () => new HashConfig("test", "primary", sqliteHash()),
+    build: async () => new HashConfig("test", "primary", await sqliteHash()),
   },
   sqlite3_mem: {
     adapter: "sqlite3",
     lane: "sqlite",
-    build: () =>
+    build: async () =>
       new HashConfig("test", "primary", { adapter: "sqlite3", database: ":memory:", pool: 1 }),
   },
   postgresql: {
     adapter: "postgresql",
     lane: "postgres",
-    build: () => new HashConfig("test", "primary", serverHash("postgresql", postgresSettings())),
+    build: async () =>
+      new HashConfig("test", "primary", serverHash("postgresql", postgresSettings())),
   },
   mysql2: {
     adapter: "mysql2",
     lane: "mysql",
-    build: () => new HashConfig("test", "primary", serverHash("mysql2", mysqlSettings())),
+    build: async () => new HashConfig("test", "primary", serverHash("mysql2", mysqlSettings())),
   },
 };
 
@@ -119,7 +121,7 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
  * Mirrors `ARTest.connection_name` / `test_configuration_hashes` / the
  * adapter-name guard in `connection.rb`.
  */
-function resolve(): { adapter: TestAdapterName; envConfig: HashConfig | UrlConfig } {
+async function resolve(): Promise<{ adapter: TestAdapterName; envConfig: HashConfig | UrlConfig }> {
   const name = connectionName();
   // `name` is arbitrary user input from ARCONN, so the lookup is a partial one;
   // the miss below is Rails' "Connection not found" exit (connection.rb:14-19).
@@ -136,7 +138,7 @@ function resolve(): { adapter: TestAdapterName; envConfig: HashConfig | UrlConfi
     );
   }
 
-  const envConfig = connection.build();
+  const envConfig = await connection.build();
   // Rails: `unless connection_name.include?(arunit_adapter) raise ArgumentError`
   // (connection.rb:35-37). Previously this fired on a missing `*_TEST_URL` — an
   // env-presence proxy, since absent connection details silently resolved to
@@ -157,19 +159,40 @@ function resolve(): { adapter: TestAdapterName; envConfig: HashConfig | UrlConfi
 }
 
 /**
- * Build the sqlite primary config hash. Mirrors Rails' primary test config,
- * which leaves `pool` unset so `HashConfig#pool` defaults to 5
- * (`hash_config.rb:72`). We only pin `pool: 1` on a bare `:memory:` primary
- * (no `AR_TEST_WORKER_DB`): better-sqlite3 gives separate connections separate
- * empty `:memory:` DBs (Rails' `in_memory_db?`). The file-backed per-worker
- * clone lane shares the file across connections, so it inherits Rails' 5.
+ * Path of this process' fallback sqlite DB, used when globalSetup did not
+ * stamp `AR_TEST_WORKER_DB`. Memoized on `globalThis` so every connection
+ * opened in this process — and every re-evaluation of the module graph within
+ * one worker, which vitest's `isolate: true` does per file — lands on the same
+ * file. The token keeps concurrent processes on distinct files, so the
+ * per-worker isolation of the primary lane is preserved here too.
  */
-function sqliteHash(): { adapter: string; database: string; pool?: number } {
+async function fallbackDatabasePath(): Promise<string> {
+  const g = globalThis as typeof globalThis & { __arFallbackDbPath?: string };
+  if (g.__arFallbackDbPath) return g.__arFallbackDbPath;
+  const path = await getPathAsync();
+  const os = await getOsAsync();
+  const token = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  g.__arFallbackDbPath = path.join(os.tmpdir(), `ar-test-fallback-${token}.sqlite`);
+  return g.__arFallbackDbPath;
+}
+
+/**
+ * Build the sqlite primary config hash. Mirrors Rails' primary test config,
+ * which is file-backed (`config.example.yml`'s `sqlite3` entry points at
+ * `FIXTURES_ROOT/fixture_database.sqlite3`; `:memory:` is the opt-in
+ * `sqlite3_mem` connection only) and leaves `pool` unset so `HashConfig#pool`
+ * defaults to 5 (`hash_config.rb:72`).
+ *
+ * `AR_TEST_WORKER_DB` — the per-worker clone stamped by globalSetup — wins when
+ * present; without it we still hand back a file, just a per-process temp one,
+ * rather than silently dropping to an in-memory DB (which additionally gives
+ * separate connections separate empty DBs under better-sqlite3, Rails'
+ * `in_memory_db?`). Either way the file is shared across this process'
+ * connections, so both inherit Rails' pool of 5.
+ */
+async function sqliteHash(): Promise<{ adapter: string; database: string }> {
   const workerDb = getEnv("AR_TEST_WORKER_DB");
-  if (workerDb) {
-    return { adapter: "sqlite3", database: workerDb };
-  }
-  return { adapter: "sqlite3", database: ":memory:", pool: 1 };
+  return { adapter: "sqlite3", database: workerDb || (await fallbackDatabasePath()) };
 }
 
 /**
@@ -180,7 +203,7 @@ function sqliteHash(): { adapter: string; database: string; pool?: number } {
  * `_registeredTasks` (e.g. `database-tasks.test.ts`) can re-register.
  */
 export async function buildTestDatabaseConfig(): Promise<TestDatabaseConfig> {
-  const { adapter, envConfig } = resolve();
+  const { adapter, envConfig } = await resolve();
   const configs = new DatabaseConfigurations([envConfig]);
   DatabaseTasks.databaseConfiguration = configs;
 
@@ -218,7 +241,7 @@ export async function buildTestDatabaseConfig(): Promise<TestDatabaseConfig> {
  */
 export async function establishFromTestConfig(): Promise<void> {
   if (Base.isConnectedQ()) return;
-  const { envConfig } = resolve();
+  const { envConfig } = await resolve();
   if (envConfig instanceof UrlConfig) {
     await Base.establishConnection(envConfig.url);
     return;
