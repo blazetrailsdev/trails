@@ -275,10 +275,6 @@ export class DatabaseTasks {
 
     const config = configs.find((c) => c.name === "primary") ?? configs[0];
 
-    if (!skipInitialize) {
-      await initializeDatabase(config);
-    }
-
     const { Migrator, Migration } = await import("../migration.js");
     const scope = getEnv("SCOPE");
     const verbose = isVerbose();
@@ -333,9 +329,15 @@ export class DatabaseTasks {
       pool &&
       (!pool.dbConfig.database || !config.database || config.database === pool.dbConfig.database)
     ) {
+      // Rails: `initialize_database(migration_connection_pool.db_config)`
+      // (tasks/database_tasks.rb:268) — the pool's OWN config object, so the
+      // temporary pool it opens resolves to the established pool rather than a
+      // second one.
+      if (!skipInitialize) await initializeDatabase(pool.dbConfig);
       await runMigration(await pool.leaseConnection());
     } else {
       // Multi-db or no pool: withTemporaryConnection scopes the adapter lifecycle.
+      if (!skipInitialize) await initializeDatabase(config);
       await this.withTemporaryConnection(config, runMigration);
     }
   }
@@ -1096,14 +1098,28 @@ export class DatabaseTasks {
     }
     const rawConfiguration = config.configuration as Record<string, unknown>;
     const configuration = _normalizeSQLitePath(rawConfiguration, this.root);
+    // Rails passes the `DatabaseConfig` object itself
+    // (tasks/database_tasks.rb:652), which is what lets
+    // `ConnectionHandler#establish_connection` recognise an already-established
+    // pool for the same config and reuse it instead of opening a second one
+    // (connection_adapters/abstract/connection_handler.rb:139). Handing over a
+    // plain hash would mint a fresh `HashConfig` that can never match, and a
+    // second pool on a `:memory:` database discards the first one's data.
+    // The normalized hash is only used when path resolution actually rewrote
+    // something, since that rewrite has no config-object form.
+    const target = configuration === rawConfiguration ? config : configuration;
     // Mirrors Rails' `ensure` which restores even if establish_connection raises.
     try {
-      await Base.establishConnection(configuration);
+      await Base.establishConnection(target);
       const pool = Base.connectionPool();
       return await fn(pool);
     } finally {
       if (priorConfig !== null) {
-        await Base.establishConnection(priorConfig.configuration as Record<string, unknown>);
+        // Same reason as above: restoring through the config OBJECT lets the
+        // handler recognise the pool it already has. Restoring from a plain
+        // hash would replace (and disconnect) it, which on a `:memory:`
+        // database throws the data away.
+        await Base.establishConnection(priorConfig);
       } else {
         try {
           Base.removeConnection();
