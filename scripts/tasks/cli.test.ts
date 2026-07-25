@@ -3492,7 +3492,7 @@ describe("buildIndexFromOriginMain (read path serves the origin/main tree)", () 
     expect(seen).not.toContain("reset");
   });
 
-  it("skips the reset fallback for a non-symlink TASKS_DIR when the export is unavailable", () => {
+  it("is a no-op fallback for a non-symlink TASKS_DIR", () => {
     setup();
     syncFromOrigin(false);
     expect(execFileSyncMock).not.toHaveBeenCalled();
