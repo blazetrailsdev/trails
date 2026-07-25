@@ -76,9 +76,7 @@ export class Merger {
     const otherSelect = this.other._selectColumns;
     if (otherSelect == null || otherSelect.length === 0) return;
     const columns =
-      this.other._modelClass === rel._modelClass
-        ? otherSelect
-        : arelColumns.call(this.other, otherSelect);
+      this.other.model === rel.model ? otherSelect : arelColumns.call(this.other, otherSelect);
     rel._selectBang(...columns);
   }
 
@@ -195,7 +193,7 @@ export class Merger {
       (!relationFrom || relationFrom.isEmpty()) &&
       !!otherFrom &&
       !otherFrom.isEmpty() &&
-      this.relation._modelClass?.baseClass === this.other._modelClass?.baseClass
+      this.relation.model?.baseClass === this.other.model?.baseClass
     );
   }
 }

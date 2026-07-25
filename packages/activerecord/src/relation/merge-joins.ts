@@ -14,7 +14,7 @@ import { constructJoinDependency, structuralUnionEq } from "./query-methods.js";
 // Relation. Kept local (rather than `any`) so the shared module stays off the
 // no-explicit-any burndown allowlist (RFC 0037).
 interface JoinFoldRelation {
-  _modelClass: unknown;
+  model: unknown;
   _joinClauses: unknown[];
   _joinValues: unknown[];
   _joinsValues: unknown[];
@@ -66,7 +66,7 @@ export function foldMergeJoins(target: JoinFoldRelation, source: JoinFoldRelatio
   const clauses = source._joinClauses ?? [];
   if (clauses.length > 0) target._joinClauses.push(...clauses);
 
-  const sameKlass = source._modelClass === target._modelClass;
+  const sameKlass = source.model === target.model;
   const crossKlassNamed: unknown[] = [];
   for (const v of source.joinsValues ?? []) {
     if (!source._isNamedJoinValue(v)) {
@@ -102,7 +102,7 @@ export function foldMergeOuterJoins(target: JoinFoldRelation, source: JoinFoldRe
   // Read via the public leftOuterJoinsValues accessor (PR #4675 convergence),
   // symmetric with foldMergeJoins reading source.joinsValues.
   const otherLeft = source.leftOuterJoinsValues ?? [];
-  const sameKlass = source._modelClass === target._modelClass;
+  const sameKlass = source.model === target.model;
   if (sameKlass) {
     for (const v of otherLeft) {
       if (!target._leftOuterJoinsValues.some((seen) => structuralUnionEq(seen, v)))

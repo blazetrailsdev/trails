@@ -334,6 +334,9 @@ function makeFindSomeRel(
   opts: { limit?: number; offset?: number; ordered?: boolean } = {},
 ): any {
   return {
+    get model(): any {
+      return this._modelClass;
+    },
     _modelClass: {
       primaryKey: "id",
       name: "Post",
@@ -392,6 +395,9 @@ describe("findSome — narrows to pk column when select_values non-empty (ordere
   it("calls .select(pk) when the relation has select values", async () => {
     let selectedCol: string | undefined;
     const rel: any = {
+      get model(): any {
+        return this._modelClass;
+      },
       _modelClass: {
         primaryKey: "id",
         name: "Post",
@@ -442,6 +448,9 @@ function makeFindSomeOrderedRel(
   opts: { limit?: number; offset?: number } = {},
 ): any {
   return {
+    get model(): any {
+      return this._modelClass;
+    },
     _modelClass: {
       primaryKey: "id",
       name: "Post",
@@ -582,7 +591,7 @@ function makeRelForOrder(mc: {
   implicitOrderColumn?: string | null;
   _queryConstraintsList?: string[] | null;
 }): any {
-  return { _modelClass: mc };
+  return { _modelClass: mc, model: mc };
 }
 
 describe("_orderColumns — Rails _order_columns precedence", () => {
@@ -625,6 +634,9 @@ describe("_orderColumns — Rails _order_columns precedence", () => {
 describe("finder not-found message fidelity", () => {
   it("test_find_one_message_on_primary_key", async () => {
     const rel: any = {
+      get model(): any {
+        return this._modelClass;
+      },
       _modelClass: { name: "Car", primaryKey: "id" },
       raiseRecordNotFoundExceptionBang,
       _whereClause: { isEmpty: () => true },
@@ -645,6 +657,9 @@ describe("finder not-found message fidelity", () => {
 
   it("test_find_some_message_with_custom_primary_key", async () => {
     const rel: any = {
+      get model(): any {
+        return this._modelClass;
+      },
       _modelClass: {
         name: "MercedesCar",
         primaryKey: "name",

@@ -67,6 +67,8 @@ interface CalculationConnection {
 }
 
 interface CalculationRelation {
+  /** Relation#model (relation.rb:85) — the accessor Rails reads everywhere. */
+  model: CalculationRelation["_modelClass"];
   _modelClass: {
     arelTable: any;
     primaryKey: string | string[];
@@ -462,7 +464,7 @@ async function singleAggregate(
   const sql =
     isBigintColumn(rel, fn, column) && needsBigintCast(rel) ? wrapBigintAgg(withCtes) : withCtes;
   const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
-  const result = await rel._conn().selectAll(sql, `${rel._modelClass.name} ${opName}`, ctedBinds);
+  const result = await rel._conn().selectAll(sql, `${rel.model.name} ${opName}`, ctedBinds);
   const rows = result.toArray();
   const val = rows[0]?.val;
   if (val === undefined || val === null) {
@@ -570,9 +572,7 @@ async function groupedAggregate(
       ? wrapBigintAgg(withCtes, aliases, aggAlias)
       : withCtes;
   const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
-  const queryResult = await rel
-    ._conn()
-    .selectAll(sql, `${rel._modelClass.name} ${opName}`, ctedBinds);
+  const queryResult = await rel._conn().selectAll(sql, `${rel.model.name} ${opName}`, ctedBinds);
   const rows = queryResult.toArray();
 
   const aggOf = (val: unknown): unknown =>
@@ -651,7 +651,7 @@ function qualifiedGroupFieldForModel(rel: CalculationRelation, field: unknown): 
  */
 function resolveGroupAssociation(rel: CalculationRelation, groupCol: unknown): any {
   if (typeof groupCol !== "string") return null;
-  const reflection = (rel._modelClass as any)._reflectOnAssociation?.(groupCol);
+  const reflection = (rel.model as any)._reflectOnAssociation?.(groupCol);
   if (!reflection || !reflection.belongsTo?.()) return null;
   // Rails (calculations.rb:521) does `group_fields = Array(association.foreign_key)`
   // and builds a multi-column GROUP BY for a composite-key belongs_to, keyed by
@@ -717,9 +717,7 @@ async function groupedCompositeAssoc(
       ? wrapBigintAgg(withCtes, aliases, aggAlias)
       : withCtes;
   const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
-  const queryResult = await rel
-    ._conn()
-    .selectAll(sql, `${rel._modelClass.name} ${opName}`, ctedBinds);
+  const queryResult = await rel._conn().selectAll(sql, `${rel.model.name} ${opName}`, ctedBinds);
   const rows = queryResult.toArray();
 
   const aggOf = (val: unknown): unknown =>
@@ -876,7 +874,7 @@ export async function performCount(
           const [idWithCtes, idCtedBinds] = prependCtes(this, idSql, [...idBinds]);
           const idResult = await this._conn().selectAll(
             idWithCtes,
-            `${this._modelClass.name} Ids`,
+            `${this.model.name} Ids`,
             idCtedBinds,
           );
           const limitedIds = idResult.toArray().map((row) => row[pk]);
@@ -901,7 +899,7 @@ export async function performCount(
           const [withCtes, ctedBinds] = prependCtes(this, countSql, [...countBinds]);
           const limitedResult = await this._conn().selectAll(
             withCtes,
-            `${this._modelClass.name} Count`,
+            `${this.model.name} Count`,
             ctedBinds,
           );
           const limitedRows = limitedResult.toArray();
@@ -921,7 +919,7 @@ export async function performCount(
         const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
         const result = await this._conn().selectAll(
           withCtes,
-          `${this._modelClass.name} Count`,
+          `${this.model.name} Count`,
           ctedBinds,
         );
         const rows = result.toArray();
@@ -979,7 +977,7 @@ export async function performCount(
             const [idWithCtes, idCtedBinds] = prependCtes(this, idSql, [...idBinds]);
             const idResult = await this._conn().selectAll(
               idWithCtes,
-              `${this._modelClass.name} Ids`,
+              `${this.model.name} Ids`,
               idCtedBinds,
             );
             const tuples = idResult.toArray().map((row) => pk.map((c) => row[c]));
@@ -1003,7 +1001,7 @@ export async function performCount(
             const [withCtes, ctedBinds] = prependCtes(this, countSql, [...countBinds]);
             const result = await this._conn().selectAll(
               withCtes,
-              `${this._modelClass.name} Count`,
+              `${this.model.name} Count`,
               ctedBinds,
             );
             return Number(result.toArray()[0]?.count ?? 0);
@@ -1019,7 +1017,7 @@ export async function performCount(
           const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
           const result = await this._conn().selectAll(
             withCtes,
-            `${this._modelClass.name} Count`,
+            `${this.model.name} Count`,
             ctedBinds,
           );
           return Number(result.toArray()[0]?.count ?? 0);
@@ -1043,7 +1041,7 @@ export async function performCount(
         ]);
         const result = await this._conn().selectAll(
           withCtes,
-          `${this._modelClass.name} Count`,
+          `${this.model.name} Count`,
           ctedBinds,
         );
         return Number(result.toArray()[0]?.count ?? 0);
@@ -1149,11 +1147,7 @@ export async function performCount(
     if (this._optimizerHints.length > 0) outerManager.optimizerHints(...this._optimizerHints);
     const [outerSql, outerBinds] = compileManagerWithBinds(this, outerManager);
     const [withCtes, ctedBinds] = prependCtes(this, outerSql, [...allInnerBinds, ...outerBinds]);
-    const result = await this._conn().selectAll(
-      withCtes,
-      `${this._modelClass.name} Count`,
-      ctedBinds,
-    );
+    const result = await this._conn().selectAll(withCtes, `${this.model.name} Count`, ctedBinds);
     const rows = result.toArray();
     return Number(rows[0]?.count ?? 0);
   }
@@ -1184,11 +1178,7 @@ export async function performCount(
     applyHavingToManager(this, manager);
     const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
     const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
-    const result = await this._conn().selectAll(
-      withCtes,
-      `${this._modelClass.name} Count`,
-      ctedBinds,
-    );
+    const result = await this._conn().selectAll(withCtes, `${this.model.name} Count`, ctedBinds);
     const rows = result.toArray();
     return Number(rows[0]?.count ?? 0);
   }
@@ -1210,11 +1200,7 @@ export async function performCount(
       outerManager.from(new Nodes.SqlLiteral(`(${innerSqlWithFrom}) AS subquery`));
       const [outerSql, outerBinds] = compileManagerWithBinds(this, outerManager);
       const [withCtes, ctedBinds] = prependCtes(this, outerSql, [...allInnerBinds, ...outerBinds]);
-      const result = await this._conn().selectAll(
-        withCtes,
-        `${this._modelClass.name} Count`,
-        ctedBinds,
-      );
+      const result = await this._conn().selectAll(withCtes, `${this.model.name} Count`, ctedBinds);
       const rows = result.toArray();
       return Number(rows[0]?.count ?? 0);
     }
@@ -1226,11 +1212,7 @@ export async function performCount(
     applyHavingToManager(this, manager);
     const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
     const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
-    const result = await this._conn().selectAll(
-      withCtes,
-      `${this._modelClass.name} Count`,
-      ctedBinds,
-    );
+    const result = await this._conn().selectAll(withCtes, `${this.model.name} Count`, ctedBinds);
     const rows = result.toArray();
     return Number(rows[0]?.count ?? 0);
   }
@@ -1243,11 +1225,7 @@ export async function performCount(
   applyHavingToManager(this, manager);
   const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
   const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
-  const result = await this._conn().selectAll(
-    withCtes,
-    `${this._modelClass.name} Count`,
-    ctedBinds,
-  );
+  const result = await this._conn().selectAll(withCtes, `${this.model.name} Count`, ctedBinds);
   const rows = result.toArray();
   return Number(rows[0]?.count ?? 0);
 }
@@ -1429,7 +1407,7 @@ export function aggregateColumn(
 
 /** @internal */
 export function isAllAttributes(rel: CalculationRelation, columnNames: string[]): boolean {
-  const model = rel._modelClass as any;
+  const model = rel.model as any;
   const known = new Set<string>([
     ...(typeof model.attributeNames === "function" ? (model.attributeNames() as string[]) : []),
     ...Object.keys(model._attributeAliases ?? {}),
@@ -1591,7 +1569,7 @@ function pluckCastType(
  * Returns null when the model has no such attribute.
  */
 function pluckCastTypeForKnownColumn(rel: CalculationRelation, name: string): ColumnType | null {
-  const model = rel._modelClass;
+  const model = rel.model;
   if (!model._attributeDefinitions?.has(name)) return null;
   const coder = model._serializedAttributes?.get(name);
   if (coder) return { deserialize: (value) => coder.load(value) };

@@ -263,6 +263,8 @@ export function raiseNotFoundSingle(
 }
 
 interface FinderRelation {
+  /** Relation#model (relation.rb:85) — the accessor Rails reads everywhere. */
+  model: FinderRelation["_modelClass"];
   _modelClass: {
     name: string;
     primaryKey: string | string[];
@@ -720,10 +722,10 @@ export function raiseRecordNotFoundExceptionBang(
   // wheres, which Ruby interpolates as "" — hence the `?? ""`.
   const conditions = this._whereClause.isEmpty()
     ? ""
-    : ` [${this.arel().whereSql(this._modelClass)?.value ?? ""}]`;
+    : ` [${this.arel().whereSql(this.model)?.value ?? ""}]`;
 
-  const name = this._modelClass.name;
-  const k = key ?? String(this._modelClass.primaryKey);
+  const name = this.model.name;
+  const k = key ?? String(this.model.primaryKey);
 
   if (ids === undefined || ids === null) {
     // Rails: `error << " with#{conditions}" if conditions`.
@@ -852,11 +854,7 @@ export function constructRelationForExists(rel: FinderRelation, conditions: unkn
 
 /** @internal */
 export async function findWithIds(rel: FinderRelation, ids: unknown[]): Promise<any> {
-  const normalized = normalizeFindArgs(
-    (rel as any)._modelClass.name,
-    (rel as any)._modelClass.primaryKey,
-    ids,
-  );
+  const normalized = normalizeFindArgs(rel.model.name, rel.model.primaryKey, ids);
   if (normalized.emptyArray) return [];
   if (normalized.wantArray) {
     return findSome(rel, normalized.ids);
@@ -866,8 +864,8 @@ export async function findWithIds(rel: FinderRelation, ids: unknown[]): Promise<
 
 /** @internal */
 export async function findOne(rel: FinderRelation, id: unknown): Promise<any> {
-  const pk = (rel as any)._modelClass.primaryKey;
-  const conditions = Array.isArray(pk) ? buildPkWhere(pk, id as unknown[]) : { [pk as string]: id };
+  const pk = rel.model.primaryKey;
+  const conditions = Array.isArray(pk) ? buildPkWhere(pk, id as unknown[]) : { [pk]: id };
   const record = await (rel as any).findBy(conditions);
   if (!record) {
     // Rails find_one: raise_record_not_found_exception!(id, 0, 1)
@@ -906,7 +904,7 @@ export async function findSome(rel: FinderRelation, ids: unknown[]): Promise<any
 
 /** @internal */
 export async function findSomeOrdered(rel: FinderRelation, ids: unknown[]): Promise<any[]> {
-  const pk = (rel as any)._modelClass.primaryKey as string;
+  const pk = rel.model.primaryKey as string;
   const offsetValue: number = (rel as any)._offsetValue ?? 0;
   const limitValue: number | null = (rel as any)._limitValue ?? null;
   ids = ids.slice(offsetValue, offsetValue + (limitValue ?? ids.length));
@@ -915,11 +913,11 @@ export async function findSomeOrdered(rel: FinderRelation, ids: unknown[]): Prom
   relation._limitValue = null;
   relation._offsetValue = null;
   if ((rel as any).selectValues.length > 0) {
-    relation = relation.select((rel as any)._modelClass.arelTable.get(pk));
+    relation = relation.select((rel.model as any).arelTable.get(pk));
   }
   const records: any[] = await relation.toArray();
 
-  const pkType = (rel as any)._modelClass.typeForAttribute(pk);
+  const pkType = (rel.model as any).typeForAttribute(pk);
   const castKey = (v: unknown) => String(pkType.cast(v));
 
   if (records.length !== ids.length) {
@@ -959,7 +957,7 @@ export async function findLast(rel: FinderRelation, limit?: number): Promise<any
 
 /** @internal */
 export function orderedRelation(rel: FinderRelation): any {
-  const mc = (rel as any)._modelClass;
+  const mc = rel.model as any;
   const pk = mc?.primaryKey;
   const implicitOrder: string | null | undefined = mc?.implicitOrderColumn;
   const constraintsList: string[] | null = mc ? _queryConstraintsListFn.call(mc) : null;
@@ -979,7 +977,7 @@ export function orderedRelation(rel: FinderRelation): any {
 
 /** @internal */
 export function _orderColumns(rel: FinderRelation): string[] {
-  const mc = (rel as any)._modelClass;
+  const mc = rel.model as any;
   const pk = mc?.primaryKey;
   const implicitOrder: string | null | undefined = mc?.implicitOrderColumn;
   const constraintsList: string[] | null = mc ? _queryConstraintsListFn.call(mc) : null;
