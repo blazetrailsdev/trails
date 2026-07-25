@@ -77,9 +77,18 @@ const cleanupG = globalThis as typeof globalThis & { __arDbCleanupPaths?: Set<st
 export async function registerDbFileCleanupOnExit(base: string): Promise<void> {
   const registered = (cleanupG.__arDbCleanupPaths ??= new Set<string>());
   if (registered.has(base)) return;
+  // Claimed before the await so concurrent callers can't both get past the
+  // check, but released again if attaching fails — otherwise a rejected
+  // `getFsAsync()` would mark the path registered with no listener behind it,
+  // silently forfeiting cleanup for the rest of the process.
   registered.add(base);
-  const fs = await getFsAsync();
-  process.on("exit", () => unlinkDbFiles(fs, base));
+  try {
+    const fs = await getFsAsync();
+    process.on("exit", () => unlinkDbFiles(fs, base));
+  } catch (error) {
+    registered.delete(base);
+    throw error;
+  }
 }
 
 /** Env var: absolute path of the canonical template DB built by globalSetup. */
@@ -138,10 +147,7 @@ export async function ensureWorkerClone(): Promise<string | null> {
       fs.copyFileSync(template, dest);
     }
   }
-  // Best-effort cleanup on process exit. Registered once per worker.
-  // WAL mode (the sqlite adapter's default for file DBs) leaves `-wal`/`-shm`
-  // sidecars next to the main file; unlink those too so nothing lingers.
-  process.on("exit", () => unlinkDbFiles(fs, dest));
+  await registerDbFileCleanupOnExit(dest);
 
   g.__arWorkerDbPath = dest;
   return dest;
