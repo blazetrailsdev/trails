@@ -87,6 +87,8 @@ import {
   TASKS_DIR,
   dirtyWorktreeLines,
   syncWorktreeToOrigin,
+  buildIndexFromOriginMain,
+  readIndexedFile,
   claimAgeHours,
   isStaleClaim,
   staleClaims,
@@ -3420,6 +3422,111 @@ describe("dirtyWorktreeLines", () => {
 
   it("treats an empty porcelain as clean", () => {
     expect(dirtyWorktreeLines("")).toEqual([]);
+  });
+});
+
+const emptyIdx: Index = { generated_at: "2026-01-01", rfcs: [], stories: [] };
+
+describe("buildIndexFromOriginMain (read path serves the origin/main tree)", () => {
+  const SHA = "a".repeat(40);
+  const emptyIndex = emptyIdx;
+
+  // The cache lives in the shared git common dir — the same seam the lock uses.
+  afterEach(() => __setLockDirForTest(null));
+  function setup(opts: { onFetch?: () => void } = {}) {
+    const gitDir = mkdtempSync(join(tmpdir(), "trails-read-index-"));
+    __setLockDirForTest(gitDir);
+    const seen: string[] = [];
+    execFileSyncMock.mockImplementation(((file: string, args: string[], o: { cwd?: string }) => {
+      if (file === "git") {
+        const label = args[2];
+        seen.push(label);
+        if (label === "fetch") opts.onFetch?.();
+        if (label === "rev-parse") return SHA as never;
+        return "" as never;
+      }
+      seen.push(file === "tar" ? "tar" : "build-index");
+      // Stand in for build-index.mjs: it writes index.json into the exported tree.
+      if (file !== "tar" && o?.cwd)
+        writeFileSync(join(o.cwd, "index.json"), JSON.stringify(emptyIndex));
+      return "" as never;
+    }) as never);
+    return { gitDir, seen };
+  }
+
+  it("never resets the working tree", () => {
+    const { seen } = setup();
+    buildIndexFromOriginMain();
+    expect(seen).not.toContain("reset");
+    expect(seen).not.toContain("status");
+  });
+
+  it("serves a cached index for the current origin/main sha without re-exporting", () => {
+    const { gitDir, seen } = setup();
+    const cacheDir = join(gitDir, "trails-tasks-read-index");
+    mkdirSync(cacheDir, { recursive: true });
+    const cached = { ...emptyIndex, generated_at: "cached" };
+    writeFileSync(join(cacheDir, `${SHA}.json`), JSON.stringify(cached));
+    const got = buildIndexFromOriginMain();
+    expect(got?.sha).toBe(SHA);
+    expect(got?.index.generated_at).toBe("cached");
+    expect(seen).toEqual(["fetch", "rev-parse"]);
+  });
+
+  it("exports the tree, builds the index there, and caches it by sha", () => {
+    const { gitDir, seen } = setup();
+    const cacheDir = join(gitDir, "trails-tasks-read-index");
+    mkdirSync(cacheDir, { recursive: true });
+    const stale = join(cacheDir, `${"b".repeat(40)}.json`);
+    const otherAgentInFlight = join(cacheDir, `${"c".repeat(40)}.999.staging`);
+    writeFileSync(stale, "{}");
+    writeFileSync(otherAgentInFlight, "{}");
+    const got = buildIndexFromOriginMain();
+    expect(got?.index.generated_at).toBe("2026-01-01");
+    expect(seen).toEqual(["fetch", "rev-parse", "archive", "tar", "build-index"]);
+    // Cached for the next reader, and the superseded sha is pruned.
+    expect(existsSync(join(gitDir, "trails-tasks-read-index", `${SHA}.json`))).toBe(true);
+    expect(existsSync(stale)).toBe(false);
+    // Another agent's half-written entry is not a superseded index — pruning it
+    // would break its rename.
+    expect(existsSync(otherAgentInFlight)).toBe(true);
+  });
+
+  it("returns null when the fetch fails so the caller can fall back", () => {
+    setup({
+      onFetch: () => {
+        throw new Error("offline");
+      },
+    });
+    expect(buildIndexFromOriginMain()).toBeNull();
+  });
+});
+
+describe("readIndexedFile (body comes from the index's own source)", () => {
+  it("reads the body out of the origin/main commit the index was built from", () => {
+    const sha = "c".repeat(40);
+    const seen: string[][] = [];
+    execFileSyncMock.mockImplementation(((_file: string, args: string[]) => {
+      seen.push(args);
+      return "---\ntitle: x\n---\n" as never;
+    }) as never);
+    expect(readIndexedFile({ index: emptyIdx, sha }, "rfcs/0025-x/stories/y.md")).toContain(
+      "title: x",
+    );
+    expect(seen[0].slice(2)).toEqual(["show", `${sha}:rfcs/0025-x/stories/y.md`]);
+  });
+
+  it("returns null when the path is absent from that commit", () => {
+    execFileSyncMock.mockImplementation((() => {
+      throw new Error("path does not exist");
+    }) as never);
+    expect(readIndexedFile({ index: emptyIdx, sha: "d".repeat(40) }, "gone.md")).toBeNull();
+  });
+
+  it("falls back to the working tree when the index came from there", () => {
+    const dir = mkdtempSync(join(tmpdir(), "trails-read-body-"));
+    expect(readIndexedFile({ index: emptyIdx, sha: null }, join(dir, "missing.md"))).toBeNull();
+    expect(execFileSyncMock).not.toHaveBeenCalled();
   });
 });
 
