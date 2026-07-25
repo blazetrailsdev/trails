@@ -149,6 +149,7 @@ import {
   benchmark as benchmarkable,
   runLoadHooks,
   isBlank as _isBlankValue,
+  singularize as _singularize,
   type Included,
   type ParameterFilter,
   type BenchmarkLogger,
@@ -680,31 +681,83 @@ function _applyScopeAttributes(
   }
 }
 
+/** @internal An association definition as `_extractAssociationAttrs` reads it. */
+interface _AssociationDefLike {
+  name: string;
+  type: string;
+}
+
+/**
+ * A constructor-form assignment held back until after `super()`. `viaSetter`
+ * entries name a generated writer (`postIds`) rather than an association, so
+ * they must be dispatched through that setter — `assignAssociationIfMatch`
+ * matches on association name and would drop the value.
+ * @internal
+ */
+interface _PendingAssociationAttr {
+  name: string;
+  value: unknown;
+  viaSetter?: boolean;
+}
+
+/**
+ * @internal
+ * Is `key` the generated `#{singular}Ids` writer of one of `defs`' collection
+ * associations? Requires a live setter on the prototype as well as the name
+ * match, so that a `*Ids` key which would NOT dispatch an association writer
+ * inside `super()` (a genuine column, say) is left on the attribute path.
+ */
+function _isCollectionIdsWriter(
+  ctor: typeof Base | undefined,
+  defs: _AssociationDefLike[],
+  key: string,
+): boolean {
+  if (!key.endsWith("Ids")) return false;
+  const named = defs.some(
+    (a) =>
+      (a.type === "hasMany" || a.type === "hasAndBelongsToMany") &&
+      `${_singularize(a.name)}Ids` === key,
+  );
+  if (!named) return false;
+  let proto: object | null = (ctor as unknown as { prototype?: object })?.prototype ?? null;
+  while (proto) {
+    const descriptor = Object.getOwnPropertyDescriptor(proto, key);
+    if (descriptor) return typeof descriptor.set === "function";
+    proto = Object.getPrototypeOf(proto) as object | null;
+  }
+  return false;
+}
+
 /**
  * @internal
  * Pull constructor-form association assignments (e.g. `new Owner({items:
  * [...], profile: p})`) out of the regular attribute bag. Returns null
  * when no key matches a declared association so the hot path allocates
  * nothing.
+ *
+ * A generated `#{singular}Ids` key (`new Author({postIds: [...]})`) is deferred
+ * too: its setter reaches `this.association(name)`, whose cache field is not
+ * initialized until after `super()` returns.
  */
 function _extractAssociationAttrs(
   ctor: typeof Base | undefined,
   attrs: Record<string, unknown>,
 ): {
   rest: Record<string, unknown>;
-  assocs: Array<{ name: string; value: unknown }>;
+  assocs: _PendingAssociationAttr[];
 } | null {
-  const defs = (ctor as { _associations?: Array<{ name: string; type: string }> } | undefined)
-    ?._associations;
+  const defs = (ctor as { _associations?: _AssociationDefLike[] } | undefined)?._associations;
   if (!defs || defs.length === 0) return null;
   // Common case: models that declare associations but receive only regular
   // attrs at construction (`new Post({title})`). First pass detects whether
   // any key matches an association; only then do we allocate `rest` and
   // copy entries. Avoids per-construction overhead for the hot path.
-  let assocs: Array<{ name: string; value: unknown }> | null = null;
+  let assocs: _PendingAssociationAttr[] | null = null;
   for (const k of Object.keys(attrs)) {
     if (defs.find((a) => a.name === k)) {
       (assocs ??= []).push({ name: k, value: attrs[k] });
+    } else if (_isCollectionIdsWriter(ctor, defs, k)) {
+      (assocs ??= []).push({ name: k, value: attrs[k], viaSetter: true });
     }
   }
   if (!assocs) return null;
@@ -817,11 +870,12 @@ function _reinstateConstructorDirtiness(
 }
 
 /** @internal */
-function _dispatchAssociationAttrs(
-  record: Base,
-  assocs: Array<{ name: string; value: unknown }>,
-): void {
-  for (const { name, value } of assocs) {
+function _dispatchAssociationAttrs(record: Base, assocs: _PendingAssociationAttr[]): void {
+  for (const { name, value, viaSetter } of assocs) {
+    if (viaSetter) {
+      (record as unknown as Record<string, unknown>)[name] = value;
+      continue;
+    }
     _AttributeAssignment.assignAssociationIfMatch(
       record as unknown as { constructor?: unknown; association?: (name: string) => unknown },
       name,

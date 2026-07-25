@@ -26,6 +26,7 @@ import { CollectionIdsAssignmentError, CollectionPersistedAssignmentError } from
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
+import { Category } from "../test-helpers/models/category.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 
 interface CollectionOwner {
@@ -45,6 +46,15 @@ const postsOf = (owner: Author): PostsProxy => (owner as unknown as { posts: Pos
 const targetOf = (owner: Author): Post[] =>
   (owner as unknown as { association(n: string): { target: Post[] } }).association("posts").target;
 
+// The `#{singular}Ids=` setter can't await, so the id→record resolution it
+// starts is still in flight when the constructor returns (the shape
+// `queueIdsWrite` documents). Settle it before asserting on the target.
+const settleTarget = async (target: () => unknown[]): Promise<void> => {
+  for (let i = 0; i < 50 && target().length === 0; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+};
+
 const writerOf =
   (owner: Author) =>
   (records: Post[]): Promise<void> =>
@@ -59,6 +69,7 @@ describe("CollectionPersistedSetterThrows", () => {
     registerModel(Author);
     registerModel(Post);
     registerModel(Comment);
+    registerModel(Category);
   });
 
   it("native = setter throws on a persisted owner", async () => {
@@ -177,6 +188,40 @@ describe("CollectionPersistedSetterThrows", () => {
     await author.save();
     await author.reload();
     expect(await postsOf(author).count()).toBe(1);
+  });
+
+  it("constructor-form ids= reaches the association writer", async () => {
+    const post = await Post.create({ title: "t", body: "b" });
+    let author: Author | undefined;
+    expect(() => {
+      author = new Author({ name: "Bill", postIds: [post.id] });
+    }).not.toThrow();
+    await settleTarget(() => targetOf(author!));
+    expect(targetOf(author!).map((p) => p.id)).toEqual([post.id]);
+  });
+
+  it("create with an ids= key reaches the association writer", async () => {
+    const post = await Post.create({ title: "t", body: "b" });
+    const author = await Author.create({ name: "Bill", postIds: [post.id] });
+    expect(author.isPersisted()).toBe(true);
+  });
+
+  it("constructor-form habtm ids= reaches the association writer", async () => {
+    const post = await Post.create({ title: "t", body: "b" });
+    let category: Category | undefined;
+    expect(() => {
+      category = new Category({ name: "General", postIds: [post.id] });
+    }).not.toThrow();
+    const habtmTarget = (): unknown[] =>
+      (category as unknown as { association(n: string): { target: unknown[] } }).association(
+        "posts",
+      ).target;
+    await settleTarget(habtmTarget);
+    expect(habtmTarget().length).toBe(1);
+  });
+
+  it("constructor-form ids= does not swallow an unknown Ids key", () => {
+    expect(() => new Post({ title: "t", body: "b", widgetIds: [1] } as never)).toThrow(/widgetIds/);
   });
 
   it("the awaitable writer replaces on a persisted owner", async () => {
