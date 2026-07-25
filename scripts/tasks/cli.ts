@@ -245,26 +245,14 @@ export function buildIndexFromOriginMain(cwd?: string): { index: Index; sha: str
   }
 }
 
-// Seams so the two branches can be exercised without a real tasks checkout.
-export interface ReadIndexDeps {
-  fromOriginMain?: () => { index: Index; sha: string } | null;
-  sync?: () => void;
-  load?: () => Index;
-}
-
-// The origin/main-tree index is served however TASKS_DIR resolved: the export
-// mutates nothing, so there is no checkout to protect. Only the fallback —
-// syncFromOrigin's `reset --hard` — stays gated on TASKS_DIR_IS_SYMLINK.
-export function readIndexSource(deps: ReadIndexDeps = {}): ReadIndex {
-  const {
-    fromOriginMain = buildIndexFromOriginMain,
-    sync = syncFromOrigin,
-    load = loadIndex,
-  } = deps;
-  const fromOrigin = fromOriginMain();
+// The origin/main-tree export mutates no checkout, so it is served however
+// TASKS_DIR resolved. Only the fallback — syncFromOrigin's `reset --hard` —
+// stays gated on TASKS_DIR_IS_SYMLINK.
+export function readIndexSource(isSymlink: boolean = TASKS_DIR_IS_SYMLINK): ReadIndex {
+  const fromOrigin = buildIndexFromOriginMain();
   if (fromOrigin) return fromOrigin;
-  sync();
-  return { index: load(), sha: null };
+  syncFromOrigin(isSymlink);
+  return { index: loadIndex(), sha: null };
 }
 
 export function readIndexedFile(src: ReadIndex, filePath: string): string | null {
@@ -597,7 +585,7 @@ function assertCleanWorktree(cwd: string | undefined): void {
 // index straight from the origin/main tree and only lands here when that is
 // unavailable (offline, no `tar`). Only runs when using the per-worktree
 // symlink (TASKS_DIR_IS_SYMLINK); the canonical fallback and explicit
-// $TASKS_DIR overrides are left alone — a read must never reset a checkout the
+// $TASKS_DIR overrides are left alone: a read must never reset a checkout the
 // user chose.
 export function syncFromOrigin(isSymlink: boolean = TASKS_DIR_IS_SYMLINK): void {
   if (!isSymlink) return;

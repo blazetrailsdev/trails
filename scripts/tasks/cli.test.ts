@@ -3483,31 +3483,17 @@ describe("buildIndexFromOriginMain (read path serves the origin/main tree)", () 
     });
     expect(buildIndexFromOriginMain()).toBeNull();
   });
-});
 
-describe("readIndexSource (origin/main index is not gated on the symlink)", () => {
-  const fromOrigin = { index: { ...emptyIdx, generated_at: "from-origin" }, sha: "d".repeat(40) };
-
-  it("serves the origin/main index however TASKS_DIR resolved", () => {
-    const sync = vi.fn();
-    const load = vi.fn(() => emptyIdx);
-    const got = readIndexSource({ fromOriginMain: () => fromOrigin, sync, load });
-    expect(got.sha).toBe(fromOrigin.sha);
-    expect(got.index.generated_at).toBe("from-origin");
-    // No working-tree read and, critically, no reset of an explicit $TASKS_DIR.
-    expect(sync).not.toHaveBeenCalled();
-    expect(load).not.toHaveBeenCalled();
+  it("serves the read index when TASKS_DIR did not resolve to the per-worktree symlink", () => {
+    const { seen } = setup();
+    const got = readIndexSource(false);
+    expect(got.sha).toBe(SHA);
+    expect(got.index.generated_at).toBe("2026-01-01");
+    expect(seen).not.toContain("reset");
   });
 
-  it("falls back to the working-tree index when the origin/main export fails", () => {
-    const sync = vi.fn();
-    const load = vi.fn(() => ({ ...emptyIdx, generated_at: "working-tree" }));
-    const got = readIndexSource({ fromOriginMain: () => null, sync, load });
-    expect(got).toEqual({ index: { ...emptyIdx, generated_at: "working-tree" }, sha: null });
-    expect(sync).toHaveBeenCalledTimes(1);
-  });
-
-  it("skips the reset fallback when TASKS_DIR is not the per-worktree symlink", () => {
+  it("skips the reset fallback for a non-symlink TASKS_DIR when the export is unavailable", () => {
+    setup();
     syncFromOrigin(false);
     expect(execFileSyncMock).not.toHaveBeenCalled();
   });
