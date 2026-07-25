@@ -934,6 +934,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       await (Article as any).create({ title: "zOMG, welcome to my blorgh!" });
       const welcome = await (Article as any).last();
       expect(welcome.title).toBe("zOMG, welcome to my blorgh!");
+      // Not the canonical `articles`: the search path set at the top of this
+      // test puts both the createTable above and this drop in "my.schema", so
+      // public.articles is never touched and needs no canonical rebuild.
+      // eslint-disable-next-line blazetrails/require-canonical-rebuild
       await adapter.dropTable("articles", { ifExists: true });
     });
   });

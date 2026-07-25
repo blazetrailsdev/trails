@@ -7,6 +7,7 @@ import { adapterType } from "./test-adapter.js";
 import type { TestDatabaseAdapter } from "./test-adapter.js";
 import { itIfSupports, adapterSupports } from "./test-helpers/supports.js";
 import { fixtures } from "./test-helpers/fixtures.js";
+import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
 import {
   dumpAllTableSchema,
   dumpTableSchema,
@@ -1039,7 +1040,8 @@ describe("SchemaDumperDefaultsTest", () => {
 // *rides* (accounts/authors/binaries/movies/…) are shielded by `fixtures({})`
 // and are NOT dropped here. `companies`/`booleans`/`numeric_data`/`posts`/
 // `products` appear only because deferred cases still `force`-recreate them on
-// some adapters; the per-file schema repair restores the canonical shape after.
+// some adapters; the rebuildCanonicalTables call below restores their canonical
+// shape.
 afterAll(async () => {
   const ctx = new MigrationContext(Base.connection);
   const o = { ifExists: true } as const;
@@ -1069,4 +1071,16 @@ afterAll(async () => {
   await ctx.dropTable("test_uc_no_idx", o);
   await ctx.dropTable("timestamps", o);
   await ctx.dropTable("users", o);
+  // The drops above include canonical tables the deferred cases `force`-recreate
+  // in a bespoke shape; restore the canonical ones here instead of leaving the
+  // shared worker DB drifted for the next file.
+  await rebuildCanonicalTables(Base.connection, [
+    "booleans",
+    "companies",
+    "numeric_data",
+    "posts",
+    "products",
+    "string_key_objects",
+    "users",
+  ]);
 });
