@@ -344,13 +344,27 @@ export class HasOneAssociation extends SingularAssociation {
     // it here. Capture the loaded target BEFORE `super._createRecord`, which
     // builds the new record first — an invalid build (e.g. an inexistent foreign
     // key) must raise before any removal runs, exactly as Rails' `build_record`
-    // raises before `set_new_record`. An UNLOADED target is not removed at all,
-    // and nothing defers it either — RFC 0068 retired the queue that used to
-    // pick it up at the owner's next `save`. Rails would surface it here via
-    // `replace`'s leading `load_target`, which this path does not issue; until
-    // that load is ported, `create#{name}` over an unloaded persisted child
-    // leaves the old row attached.
-    const displaced = this.loaded ? this.target : null;
+    // raises before `set_new_record`. An UNLOADED target is surfaced by
+    // `replace`'s leading `load_target`, ported here through
+    // `loadTargetForBuild` (the same seam the `build#{name}` accessor uses):
+    // gated by `needsTargetLoadForBuild` so the SELECT runs only when Rails'
+    // `find_target?` would, and overridden by has_one_through to load the
+    // *through* proxy — Rails' through `replace` issues no target load.
+    let displaced = this.loaded ? this.target : null;
+    if (this.needsTargetLoadForBuild()) {
+      try {
+        displaced = (await this.loadTargetForBuild()) as Base | null;
+      } catch {
+        // Rails builds the record BEFORE `set_new_record` → `replace` →
+        // `load_target`, so a malformed association (e.g. an inexistent foreign
+        // key) raises out of `build_record`, never out of the load. We must load
+        // first — the load is what surfaces the row to remove, and it has to
+        // happen before the new record's FK is written — so swallow a failing
+        // load and let `super._createRecord`'s build raise the error Rails
+        // raises. Nothing was surfaced, so nothing is displaced.
+        displaced = null;
+      }
+    }
     const record = await super._createRecord(attributes, shouldRaise, block);
     // `super._createRecord` ran `setNewRecord` → `replace`, so `this.target` is
     // now the freshly created record; detach the displaced (previously attached)

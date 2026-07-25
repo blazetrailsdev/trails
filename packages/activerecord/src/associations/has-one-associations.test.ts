@@ -566,6 +566,29 @@ describe("HasOneAssociationsTest", () => {
     expect((await readHasOne(firm, "account")).id).toBe(created.id);
   });
 
+  // Trails deviation guard (no Rails counterpart, RFC 0068 story
+  // has-one-create-record-unloaded-target-not-removed): Rails' `replace` opens
+  // with `load_target` (has_one_association.rb:59), so `remove_target!` detaches
+  // a row that was only ever in the DB. `_createRecord` ports that leading load,
+  // so the never-loaded prior account is nullified / destroyed too.
+  it("create over an unloaded target nullifies the prior account", async () => {
+    const company = (await Company.create({ name: "UnloadedCo" })) as any;
+    const original = await Account.create({ firm_id: Number(company.id), credit_limit: 50 });
+    const found = (await Company.find(company.id)) as any;
+    const created = await found.createAccount({ credit_limit: 70 });
+    expect((await Account.find(original.id)).firm_id).toBeNull();
+    expect(await Account.where({ firm_id: Number(company.id) }).count()).toBe(1);
+    expect((await readHasOne(found, "account")).id).toBe(created.id);
+  });
+
+  it("create over an unloaded target destroys the prior dependent account", async () => {
+    const firm = (await Firm.find(Number((companies("first_firm") as any).id))) as any;
+    const originalId = Number((await Account.where({ firm_id: Number(firm.id) }).first())!.id);
+    const created = await firm.createAccount({ credit_limit: 70 });
+    await expect(Account.find(originalId)).rejects.toThrow(RecordNotFound);
+    expect((await readHasOne(firm, "account")).id).toBe(created.id);
+  });
+
   // Same root cause on the build path: `set_new_record` → `replace(record, false)`
   // still runs `remove_target!` on the loaded target (has_one_association.rb:69),
   // whose else-branch nullifies+saves the old row even though the new record is
