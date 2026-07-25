@@ -2080,12 +2080,18 @@ describe("BelongsToAssociationsTest", () => {
     const ship = await ShipRequired.create({ name: "Medusa", developer_id: david.id });
     expect(Number((ship as any).developer_id)).toBe(Number(david.id));
 
-    await ship.update({ developer_id: jamis.id });
+    // UPDATE and SELECT to check developer presence
+    await assertQueriesCount(4, false, async () => {
+      await ship.update({ developer_id: jamis.id });
+    });
 
     await ship.updateColumns({ developer_id: null });
     await ship.reload();
 
-    await ship.update({ developer_id: david.id });
+    // UPDATE and SELECT to check developer presence
+    await assertQueriesCount(4, false, async () => {
+      await ship.update({ developer_id: david.id });
+    });
     expect(Number((ship as any).developer_id)).toBe(Number(david.id));
   });
 
@@ -2104,7 +2110,10 @@ describe("BelongsToAssociationsTest", () => {
     const ship = await ShipRequired.create({ name: "Medusa", developer_id: david.id });
     await ship.reload();
 
-    await ship.update({ name: "Leviathan" });
+    // UPDATE only, no SELECT to check developer presence
+    await assertQueriesCount(3, false, async () => {
+      await ship.update({ name: "Leviathan" });
+    });
     expect(ship.name).toBe("Leviathan");
   });
 
@@ -2127,7 +2136,10 @@ describe("BelongsToAssociationsTest", () => {
       const ship = await TempShip.create({ name: "Medusa", developer_id: david.id });
       await ship.reload();
 
-      await ship.update({ name: "Leviathan" });
+      // UPDATE and SELECT to check developer presence
+      await assertQueriesCount(4, false, async () => {
+        await ship.update({ name: "Leviathan" });
+      });
       expect(ship.name).toBe("Leviathan");
     } finally {
       setBelongsToRequiredValidatesForeignKey(original);

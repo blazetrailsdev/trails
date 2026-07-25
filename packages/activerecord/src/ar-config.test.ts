@@ -15,7 +15,8 @@ describe("ar-config module-level flags", () => {
     // `belongsToRequiredValidatesForeignKey` is deliberately absent: the AR test
     // harness flips it to false suite-wide (helper.rb:43), so the live binding
     // never reads back the framework default here. `trailtie.test.ts` covers the
-    // `true` default via the untouched config hash.
+    // `true` default via the untouched versioned-defaults hash; the setter
+    // round-trip below covers the live binding.
     expect(arConfig.applicationRecordClass).toBeNull();
     expect(arConfig.errorOnIgnoredOrder).toBe(false);
     expect(arConfig.timestampedMigrations).toBe(true);
@@ -33,6 +34,9 @@ describe("ar-config module-level flags", () => {
       arConfig.setTimestampedMigrations(true);
       arConfig.setGenerateSecureTokenOn("create");
       arConfig.setRaiseIntWiderThan64bit(true);
+      // Back to the value the AR harness installs (helper.rb:43), not the
+      // framework default.
+      arConfig.setBelongsToRequiredValidatesForeignKey(false);
     });
 
     it("round-trip a written value", () => {
@@ -47,6 +51,9 @@ describe("ar-config module-level flags", () => {
 
       arConfig.setRaiseIntWiderThan64bit(false);
       expect(arConfig.raiseIntWiderThan64bit).toBe(false);
+
+      arConfig.setBelongsToRequiredValidatesForeignKey(true);
+      expect(arConfig.belongsToRequiredValidatesForeignKey).toBe(true);
     });
   });
 });
