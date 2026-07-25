@@ -108,8 +108,10 @@ export class InternalMetadata {
   async createTableAndSetFlags(environment: string, schemaSha1?: string): Promise<void> {
     if (!this._enabled) return;
     await this.createTable();
-    await this.set("environment", environment);
-    if (schemaSha1 !== undefined) await this.set("schema_sha1", schemaSha1);
+    await this.updateOrCreateEntry(this._connection, "environment", environment);
+    if (schemaSha1 !== undefined) {
+      await this.updateOrCreateEntry(this._connection, "schema_sha1", schemaSha1);
+    }
   }
 
   async dropTable(): Promise<void> {
@@ -127,7 +129,7 @@ export class InternalMetadata {
     // probing ar_internal_metadata — callers shouldn't observe stale
     // rows from a previous run that had the flag enabled.
     if (!this._enabled) return null;
-    const entry = await this.selectEntry(key);
+    const entry = await this.selectEntry(this._connection, key);
     if (!entry) return null;
     const value = entry[this.valueKey];
     if (value == null) return null;
@@ -143,18 +145,22 @@ export class InternalMetadata {
       // migration.ts (the cycle is ESM-safe because EnvironmentStorageError is only used in method bodies).
       throw new EnvironmentStorageError();
     }
-    await this.updateOrCreateEntry(key, value);
+    await this.updateOrCreateEntry(this._connection, key, value);
   }
 
   /** @internal */
-  private async updateOrCreateEntry(key: string, value: string): Promise<void> {
-    const entry = await this.selectEntry(key);
+  private async updateOrCreateEntry(
+    connection: DatabaseAdapter,
+    key: string,
+    value: string,
+  ): Promise<void> {
+    const entry = await this.selectEntry(connection, key);
     if (entry) {
       if (entry[this.valueKey] !== value) {
-        await this.updateEntry(key, value);
+        await this.updateEntry(connection, key, value);
       }
     } else {
-      await this.createEntry(key, value);
+      await this.createEntry(connection, key, value);
     }
   }
 
@@ -208,28 +214,37 @@ export class InternalMetadata {
     return this.deleteAllEntries();
   }
 
-  private currentTime(): string {
+  private currentTime(connection: DatabaseAdapter): string {
+    // Rails: connection.default_timezone == :utc ? Time.now.utc : Time.now.
     // Format: "YYYY-MM-DD HH:mm:ss.SSS" — drop the trailing 'Z' and swap 'T' for ' '.
     // Truncate sub-ms (Rails uses ms-precise updated_at strings; default Temporal
     // rounding is halfExpand which would otherwise round up).
-    return Temporal.Now.instant()
-      .toString({ smallestUnit: "millisecond", roundingMode: "trunc" })
-      .replace("T", " ")
-      .replace("Z", "");
+    const opts = { smallestUnit: "millisecond", roundingMode: "trunc" } as const;
+    if (connection.defaultTimezone === "utc") {
+      return Temporal.Now.instant().toString(opts).replace("T", " ").replace("Z", "");
+    }
+    return Temporal.Now.plainDateTimeISO().toString(opts).replace("T", " ");
   }
 
-  private async selectEntry(key: string): Promise<Record<string, unknown> | null> {
+  private async selectEntry(
+    connection: DatabaseAdapter,
+    key: string,
+  ): Promise<Record<string, unknown> | null> {
     const sm = new SelectManager(this.arelTable);
     sm.project(star);
     sm.where(this.arelTable.get(this.primaryKey).eq(key));
     sm.order(this.arelTable.get(this.primaryKey).asc());
     sm.take(1);
-    const rows = await this._connection.execute(this._connection.toSql(sm));
+    const rows = await connection.execute(connection.toSql(sm));
     return rows[0] ?? null;
   }
 
-  private async createEntry(key: string, value: string): Promise<void> {
-    const now = this.currentTime();
+  private async createEntry(
+    connection: DatabaseAdapter,
+    key: string,
+    value: string,
+  ): Promise<void> {
+    const now = this.currentTime(connection);
     const im = new InsertManager(this.arelTable);
     im.insert([
       [this.arelTable.get(this.primaryKey), key],
@@ -237,11 +252,15 @@ export class InternalMetadata {
       [this.arelTable.get("created_at"), now],
       [this.arelTable.get("updated_at"), now],
     ]);
-    await this._connection.execute(this._connection.toSql(im));
+    await connection.execute(connection.toSql(im));
   }
 
-  private async updateEntry(key: string, newValue: string): Promise<void> {
-    const now = this.currentTime();
+  private async updateEntry(
+    connection: DatabaseAdapter,
+    key: string,
+    newValue: string,
+  ): Promise<void> {
+    const now = this.currentTime(connection);
     const um = new UpdateManager();
     um.table(this.arelTable);
     um.set([
@@ -249,6 +268,6 @@ export class InternalMetadata {
       [this.arelTable.get("updated_at"), now],
     ]);
     um.where(this.arelTable.get(this.primaryKey).eq(key));
-    await this._connection.execute(this._connection.toSql(um));
+    await connection.execute(connection.toSql(um));
   }
 }
