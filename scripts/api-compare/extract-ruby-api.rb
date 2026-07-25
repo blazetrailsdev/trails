@@ -1091,6 +1091,14 @@ class ApiExtractor
             # A target that is ITSELF an as-yet-unresolved alias carries a
             # placeholder, not its real arity — wait for a later pass to fill it.
             next if tgt[:notes] == "alias" && !tgt[:aliasResolved]
+            # A `delegate`-generated target NEVER gains a real arity (it forwards
+            # to something the static walker can't see), so its empty params are a
+            # placeholder too. Resolving against it would stamp `aliasResolved` on
+            # a `[0-0]` that means "unknown", re-arming the very false mismatches
+            # this skip exists to remove — one hop removed, through the alias.
+            # Leaving the alias unresolved makes it forward-like in its own right,
+            # which is exactly what it is.
+            next if tgt[:notes] == "delegate"
             m[:params] = tgt[:params].map(&:dup)
             # Records that the target WAS found, even when it legitimately takes
             # no arguments. Without this flag an alias to a zero-arg method is

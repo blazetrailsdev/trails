@@ -515,6 +515,25 @@ describe("Ruby extractor alias arity resolution", () => {
     });
   });
 
+  it("leaves an alias to a `delegate`-generated target unresolved", () => {
+    // The delegate's `params: []` means "arity unknown", so an alias to it is
+    // just as unknown — marking it resolved would re-arm the false mismatches
+    // the arity skip removes, one hop away through the alias.
+    const r = aliasParams({
+      "c.rb": `
+        module Pkg
+          class Relation
+            delegate :in_groups_of, to: :records
+            alias_method :grouped, :in_groups_of
+          end
+        end
+      `,
+    });
+    expect(r["Pkg::Relation#in_groups_of"]).toMatchObject({ params: [], notes: "delegate" });
+    expect(r["Pkg::Relation#grouped"]).toMatchObject({ params: [], notes: "alias" });
+    expect(r["Pkg::Relation#grouped"].aliasResolved).toBeFalsy();
+  });
+
   it("leaves an alias to an out-of-package target empty (best effort)", () => {
     const r = aliasParams({
       "u.rb": `
