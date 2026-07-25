@@ -30,8 +30,8 @@ async function withRocketTables(conn: AbstractAdapter, body: () => Promise<void>
   });
   await conn.createTable("astronauts", (t) => {
     t.string("name");
-    t.bigint("rocket_id");
-    t.bigint("favorite_rocket_id");
+    t.references("rocket", { type: "bigint" });
+    t.references("favorite_rocket");
   });
   try {
     await body();
