@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
+import { registerDbFileCleanupOnExit } from "./sqlite-template.js";
 import { buildTestDatabaseConfig } from "./test-database-config.js";
 
 describe("buildTestDatabaseConfig", () => {
@@ -53,6 +54,16 @@ describe("buildTestDatabaseConfig", () => {
     const first = (await buildTestDatabaseConfig()).envConfig.database;
     const second = (await buildTestDatabaseConfig()).envConfig.database;
     expect(second).toBe(first);
+  });
+
+  it("registers the fallback database for cleanup on exit", async () => {
+    vi.stubEnv("ARCONN", "sqlite3");
+    vi.stubEnv("AR_TEST_WORKER_DB", "");
+    const database = String((await buildTestDatabaseConfig()).envConfig.database);
+
+    const before = new Set(process.listeners("exit"));
+    await registerDbFileCleanupOnExit(database);
+    expect(process.listeners("exit").filter((fn) => !before.has(fn))).toHaveLength(0);
   });
 
   it("prefers AR_TEST_WORKER_DB over the fallback database", async () => {

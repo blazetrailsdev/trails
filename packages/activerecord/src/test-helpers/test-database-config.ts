@@ -30,8 +30,8 @@ import { Base } from "../base.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
-import { registerDbFileCleanupOnExit } from "./sqlite-template.js";
 import { UrlConfig } from "../database-configurations/url-config.js";
+import { registerDbFileCleanupOnExit } from "./sqlite-template.js";
 import {
   connectionName,
   driverConfig,
@@ -170,9 +170,6 @@ async function fallbackDatabasePath(): Promise<string> {
   const slot = getEnv("VITEST_POOL_ID") || getEnv("VITEST_WORKER_ID") || "1";
   const token = `${runToken}-${slot}`;
   const dbPath = path.join(os.tmpdir(), `ar-test-fallback-${token}.sqlite`);
-  // Keyed on run token + slot, the file is bounded per run but survives it;
-  // unlink it (and its WAL sidecars) on exit. The hook lives in
-  // `sqlite-template.ts` because this module must stay `process`-free.
   await registerDbFileCleanupOnExit(dbPath);
   g.__arFallbackDbPath = dbPath;
   return dbPath;

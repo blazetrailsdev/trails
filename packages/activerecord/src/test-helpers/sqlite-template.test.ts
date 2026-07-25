@@ -1,11 +1,14 @@
 /**
  * Phase 0 probe: confirms the sqlite template-clone mechanism is active
  * and that canonical DDL was issued exactly once for this vitest invocation.
- *
  * Skipped automatically on PG/MySQL runs (env vars not set).
+ *
+ * The `registerDbFileCleanupOnExit` suite is adapter-agnostic and always runs;
+ * it takes its own listeners back off so they don't accumulate across files.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { getFsAsync } from "@blazetrails/activesupport/fs-adapter";
+import { getOsAsync } from "@blazetrails/activesupport";
 import {
   TEMPLATE_PATH_ENV,
   RUN_TOKEN_ENV,
@@ -15,21 +18,50 @@ import {
   unlinkDbFiles,
 } from "./sqlite-template.js";
 
+const SIDECARS = ["", "-wal", "-shm"];
+
+async function tmpPath(): Promise<string> {
+  const os = await getOsAsync();
+  return `${os.tmpdir()}/ar-test-cleanup-${Math.random().toString(36).slice(2)}.sqlite`;
+}
+
 describe("registerDbFileCleanupOnExit", () => {
-  it("registers one exit listener per path", async () => {
-    const base = `/tmp/ar-test-cleanup-probe-${Math.random().toString(36).slice(2)}.sqlite`;
-    const before = process.listenerCount("exit");
+  const added: Array<() => void> = [];
+
+  async function register(base: string): Promise<Array<() => void>> {
+    const before = new Set(process.listeners("exit"));
     await registerDbFileCleanupOnExit(base);
-    await registerDbFileCleanupOnExit(base);
-    expect(process.listenerCount("exit")).toBe(before + 1);
+    const fresh = process.listeners("exit").filter((fn) => !before.has(fn)) as Array<() => void>;
+    added.push(...fresh);
+    return fresh;
+  }
+
+  afterEach(() => {
+    for (const fn of added.splice(0)) process.off("exit", fn);
   });
 
-  it("unlinks the DB file and its WAL sidecars", async () => {
+  it("runs its exit listener to unlink the DB file and its WAL sidecars", async () => {
     const fs = await getFsAsync();
-    const base = `/tmp/ar-test-cleanup-unlink-${Math.random().toString(36).slice(2)}.sqlite`;
-    for (const suffix of ["", "-wal", "-shm"]) fs.writeFileSync(base + suffix, "");
-    unlinkDbFiles(fs, base);
-    for (const suffix of ["", "-wal", "-shm"]) expect(await fs.exists(base + suffix)).toBe(false);
+    const base = await tmpPath();
+    for (const suffix of SIDECARS) fs.writeFileSync(base + suffix, "");
+
+    const [listener] = await register(base);
+    expect(listener, "registration must add exactly one exit listener").toBeDefined();
+    listener();
+
+    for (const suffix of SIDECARS) expect(await fs.exists(base + suffix)).toBe(false);
+  });
+
+  it("registers a path only once per process", async () => {
+    const base = await tmpPath();
+    expect(await register(base)).toHaveLength(1);
+    expect(await register(base)).toHaveLength(0);
+  });
+
+  it("tolerates a DB file that was never created", async () => {
+    const fs = await getFsAsync();
+    const base = await tmpPath();
+    expect(() => unlinkDbFiles(fs, base)).not.toThrow();
   });
 });
 
