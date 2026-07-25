@@ -1,7 +1,6 @@
 // trails-only InternalMetadata cases — vendor/rails/activerecord/test/cases has
 // no internal_metadata_test.rb, so these have no Rails counterpart to mirror.
-import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { InternalMetadata } from "./internal-metadata.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
@@ -19,7 +18,25 @@ function currentTime(defaultTimezone: string): string {
   return metadataBuiltOverLocalAdapter.currentTime(fakeAdapter(defaultTimezone));
 }
 
+// 2026-07-25T23:25:21.123Z is 19:25:21.123 in New York — a fixed instant and a
+// fixed non-UTC zone, so the utc and local branches differ by a whole 4 hours
+// no matter what zone the host (or CI) runs in.
+const FIXED_INSTANT = "2026-07-25T23:25:21.123Z";
+const FIXED_UTC = "2026-07-25 23:25:21.123";
+const FIXED_LOCAL = "2026-07-25 19:25:21.123";
+
 describe("InternalMetadata#currentTime", () => {
+  beforeAll(() => {
+    vi.stubEnv("TZ", "America/New_York");
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(FIXED_INSTANT));
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
+
   it("formats as YYYY-MM-DD HH:mm:ss.SSS with no zone designator", () => {
     for (const tz of ["utc", "local"]) {
       expect(currentTime(tz)).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/);
@@ -27,16 +44,7 @@ describe("InternalMetadata#currentTime", () => {
   });
 
   it("reads the clock the connection's default timezone selects", () => {
-    const utcNow = Temporal.Now.instant().toString({
-      smallestUnit: "minute",
-      roundingMode: "trunc",
-    });
-    expect(currentTime("utc").slice(0, 16)).toBe(utcNow.slice(0, 16).replace("T", " "));
-
-    const localNow = Temporal.Now.plainDateTimeISO().toString({
-      smallestUnit: "minute",
-      roundingMode: "trunc",
-    });
-    expect(currentTime("local").slice(0, 16)).toBe(localNow.slice(0, 16).replace("T", " "));
+    expect(currentTime("utc")).toBe(FIXED_UTC);
+    expect(currentTime("local")).toBe(FIXED_LOCAL);
   });
 });
