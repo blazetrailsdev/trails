@@ -146,15 +146,25 @@ the naming question is worth re-asking.
 ## Observations out of scope for this spike
 
 Recorded here because the mapping surfaced them; they are _fidelity_ gaps, not
-layout gaps, and none is proposed as a follow-up by this spike:
+layout gaps, so they are out of RFC 0064's scope (whose non-goal is "no behavior
+change to the test harness"). They are filed under **RFC 0071
+ar-test-helper-suite-wide-config-fidelity** — four stories, currently draft
+pending RFC acceptance:
 
 - `helper.rb:27` `permanent_connection_checkout = :disallowed` — the flag
   exists (`ar-config.ts:126`) but the suite does not set it, so trails does not
-  ban `Base.connection` in tests the way Rails does. Flipping it is a
-  large behavioral change across the AR suite.
+  ban `Base.connection` in tests the way Rails does. 114 test files reference
+  `Base.connection`, so this is scoped as an audit first, not a flip →
+  `audit-permanent-connection-checkout-disallowed`.
 - `helper.rb:104-107` `extend_queries = true` + the two `install_support`
   calls — `encryption/config.ts:22` defaults `extendQueries` to `false` and
   install is per-test, so deterministic-encryption query extension is not
-  suite-wide as in Rails.
-- `helper.rb:43` `belongs_to_required_validates_foreign_key = false` and
-  `:14-16` PG `create_unlogged_tables = true` — flags exist, not set suite-wide.
+  suite-wide as in Rails. `trailtie.ts` has no `extendQueries` handling at all,
+  so the production-side `railtie.rb:351` arm is unported too →
+  `encryption-extend-queries-suite-wide`.
+- `helper.rb:43` `belongs_to_required_validates_foreign_key = false` —
+  `ar-config.ts:213` / `trailtie.ts:139` default `true` →
+  `belongs-to-required-validates-fk-false`.
+- `helper.rb:14-16` PG `create_unlogged_tables = true` —
+  `postgresql-adapter.ts:321` defaults `false`, so the PG lane pays full WAL
+  cost on every table build → `pg-create-unlogged-tables-in-suite`.
