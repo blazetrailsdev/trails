@@ -67,7 +67,6 @@ interface CalculationConnection {
 }
 
 interface CalculationRelation {
-  /** Relation#model (relation.rb:85) — the accessor Rails reads everywhere. */
   model: CalculationRelation["_modelClass"];
   _modelClass: {
     arelTable: any;

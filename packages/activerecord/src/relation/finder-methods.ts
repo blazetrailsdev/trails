@@ -263,7 +263,6 @@ export function raiseNotFoundSingle(
 }
 
 interface FinderRelation {
-  /** Relation#model (relation.rb:85) — the accessor Rails reads everywhere. */
   model: FinderRelation["_modelClass"];
   _modelClass: {
     name: string;
