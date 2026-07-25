@@ -171,13 +171,6 @@
     "package": "activerecord",
     "tsFile": "attribute-methods.ts",
     "rubyName": "attributes_for_update",
-    "call": "counter_cache_column?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "attributes_for_update",
     "call": "delete_if",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
