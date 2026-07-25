@@ -216,6 +216,50 @@ describe("fkSafeDropPlan", () => {
     });
     expect(plan.blockers).toEqual([{ fromTable: "outside", toTable: "a", name: "fk_outside_a" }]);
   });
+
+  test("uses the bulk reverse lookup for the inbound scan when the host offers one", async () => {
+    const calls: string[] = [];
+    const bulk: string[][] = [];
+    const base = host(["a", "b", "outside"], { outside: ["a"] });
+    const plan = await fkSafeDropPlan(
+      {
+        tables: base.tables,
+        foreignKeys: async (name) => {
+          calls.push(name);
+          return base.foreignKeys(name);
+        },
+        foreignKeysReferencing: async (toTables) => {
+          bulk.push([...toTables]);
+          return [{ fromTable: "outside", toTable: "a", name: "fk_outside_a" }];
+        },
+      },
+      ["a", "b"],
+      { scanInbound: true },
+    );
+    // Only the dropped set is introspected per-table; `outside` is never
+    // touched individually — that is the whole point of the bulk lookup.
+    expect(calls).toEqual(["a", "b"]);
+    expect(bulk).toEqual([["a", "b"]]);
+    expect(plan.blockers).toEqual([{ fromTable: "outside", toTable: "a", name: "fk_outside_a" }]);
+  });
+
+  test("ignores bulk-reported keys from tables inside the dropped set or already gone", async () => {
+    const base = host(["a", "b", "outside"], { outside: ["a"] });
+    const plan = await fkSafeDropPlan(
+      {
+        tables: base.tables,
+        foreignKeys: base.foreignKeys,
+        foreignKeysReferencing: async () => [
+          { fromTable: "b", toTable: "a", name: "fk_b_a" },
+          { fromTable: "dropped_already", toTable: "a", name: "fk_gone_a" },
+          { fromTable: "outside", toTable: "a", name: "fk_outside_a" },
+        ],
+      },
+      ["a", "b"],
+      { scanInbound: true },
+    );
+    expect(plan.blockers).toEqual([{ fromTable: "outside", toTable: "a", name: "fk_outside_a" }]);
+  });
 });
 
 // Read the live table-name set from sqlite_master.

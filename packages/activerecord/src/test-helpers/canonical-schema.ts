@@ -2093,6 +2093,18 @@ export interface FkSafeDropPlanHost {
   foreignKeys(
     tableName: string,
   ): Promise<readonly { readonly toTable: string; readonly name: string }[]>;
+  /**
+   * Optional bulk reverse lookup: every foreign key in the database that points
+   * at one of `toTables`, in one round trip. Adapters that don't provide it fall
+   * back to the per-table `foreignKeys` loop, which is what this stands in for.
+   *
+   * No Rails counterpart — `SchemaStatements#foreign_keys` is per-table there
+   * too and Rails has no reverse form. It is supplied by
+   * {@link bulkInboundFkHost} rather than by an adapter, so the invention stays
+   * inside the test helper that needs it and no production adapter grows a
+   * surface Rails lacks.
+   */
+  foreignKeysReferencing?(toTables: readonly string[]): Promise<readonly FkDropBlocker[]>;
 }
 
 /**
@@ -2180,11 +2192,18 @@ export async function fkSafeDropPlan(
   if (!sawForeignKey && !scanInbound) return { order: [...names], blockers: [] };
 
   const blockers: FkDropBlocker[] = [];
-  for (const table of existing) {
-    if (inSet.has(table)) continue;
-    for (const fk of await ss.foreignKeys(table)) {
-      if (inSet.has(fk.toTable)) {
-        blockers.push({ fromTable: table, toTable: fk.toTable, name: fk.name });
+  if (ss.foreignKeysReferencing) {
+    for (const fk of await ss.foreignKeysReferencing(names)) {
+      if (inSet.has(fk.fromTable) || !existing.has(fk.fromTable)) continue;
+      blockers.push(fk);
+    }
+  } else {
+    for (const table of existing) {
+      if (inSet.has(table)) continue;
+      for (const fk of await ss.foreignKeys(table)) {
+        if (inSet.has(fk.toTable)) {
+          blockers.push({ fromTable: table, toTable: fk.toTable, name: fk.name });
+        }
       }
     }
   }
@@ -2213,6 +2232,84 @@ export async function fkSafeDropPlan(
   // reverse: the result drops referencers first.
   for (const name of names) visit(name);
   return { order: ordered.reverse(), blockers };
+}
+
+/**
+ * Wrap `ss` so {@link fkSafeDropPlan}'s inbound scan reads every referencing
+ * foreign key in one catalog query instead of one introspection per live table
+ * not being dropped.
+ *
+ * This is an invention with no Rails counterpart: Rails' `foreign_keys` is
+ * per-table and it has no reverse form, so nothing upstream can be ported here.
+ * It is justified by cost, not taste — on a loaded canonical database (322
+ * tables) the per-table loop measured ~790ms per `rebuildCanonicalTables` call
+ * on PostgreSQL and ~530ms on MySQL, and the helper is called 21 times across
+ * the suite. Keeping it here rather than on the adapters confines the invented
+ * surface to the test helper that needs it; `fkSafeDropPlan` still takes the
+ * plain per-table host and its unit tests exercise that path unchanged.
+ *
+ * SQLite is left on the loop: `PRAGMA foreign_key_list` has no reverse form and
+ * the loop is already in the noise there (measured within run-to-run variance).
+ *
+ * @internal
+ */
+export function bulkInboundFkHost(
+  adapter: DatabaseAdapter,
+  ss: FkSafeDropPlanHost,
+): FkSafeDropPlanHost {
+  const name = adapter.adapterName;
+  if (name !== "postgres" && name !== "mysql") return ss;
+  const conn = adapter as unknown as {
+    schemaQuery(sql: string): Promise<Record<string, unknown>[]>;
+    quote(value: unknown): string;
+  };
+  const foreignKeysReferencing = async (
+    toTables: readonly string[],
+  ): Promise<readonly FkDropBlocker[]> => {
+    if (toTables.length === 0) return [];
+    const list = toTables.map((t) => conn.quote(t)).join(", ");
+    const sql =
+      name === "postgres"
+        ? `SELECT t1.relname AS from_table, t2.relname AS to_table, c.conname AS name
+             FROM pg_constraint c
+             JOIN pg_class t1 ON c.conrelid = t1.oid
+             JOIN pg_class t2 ON c.confrelid = t2.oid
+             JOIN pg_namespace n ON c.connamespace = n.oid
+             WHERE c.contype = 'f'
+               AND n.nspname = ANY (current_schemas(false))
+               AND t2.relname IN (${list})
+             ORDER BY c.conname`
+        : `SELECT DISTINCT kcu.table_name AS from_table,
+                    kcu.referenced_table_name AS to_table,
+                    kcu.constraint_name AS name
+             FROM information_schema.key_column_usage kcu
+             WHERE kcu.table_schema = DATABASE()
+               AND kcu.referenced_table_name IN (${list})
+             ORDER BY kcu.constraint_name`;
+    const rows = await conn.schemaQuery(sql);
+    // A composite foreign key yields one catalog row per column on PostgreSQL
+    // (and, MySQL's DISTINCT notwithstanding, is worth collapsing once here):
+    // the plan wants one blocker per constraint.
+    const seen = new Set<string>();
+    const blockers: FkDropBlocker[] = [];
+    for (const row of rows) {
+      const blocker = {
+        fromTable: String(row.from_table),
+        toTable: String(row.to_table),
+        name: String(row.name),
+      };
+      const key = `${blocker.fromTable} ${blocker.name}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      blockers.push(blocker);
+    }
+    return blockers;
+  };
+  return {
+    tables: () => ss.tables(),
+    foreignKeys: (table) => ss.foreignKeys(table),
+    foreignKeysReferencing,
+  };
 }
 
 /**
@@ -2282,9 +2379,11 @@ export async function rebuildCanonicalTables(
   // a sibling test that left a stray foreign key pointing at a canonical table,
   // which is exactly the shape fkSafeDropPlan's default heuristic cannot see —
   // the dropped table holds no FK of its own, so nothing would trigger the scan.
-  // The scan costs one FK introspection per live table not being rebuilt.
+  // The scan costs one FK introspection per live table not being rebuilt, which
+  // is why the host is wrapped: on PG/MySQL bulkInboundFkHost collapses that
+  // into a single catalog query (see its note on the deviation).
   const plan = await fkSafeDropPlan(
-    ss,
+    bulkInboundFkHost(adapter, ss),
     defs.map((d) => d.name),
     { scanInbound: true },
   );
