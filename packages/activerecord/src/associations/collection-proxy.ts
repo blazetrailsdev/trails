@@ -1286,8 +1286,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         built.inverseName,
       );
       if (inv) {
-        if (typeof inv.queueWrite === "function") {
-          inv.queueWrite(built.throughRecord);
+        if (typeof inv.syncWrite === "function") {
+          inv.syncWrite(built.throughRecord);
         } else {
           inv.target = built.throughRecord;
           inv.loadedBang?.();

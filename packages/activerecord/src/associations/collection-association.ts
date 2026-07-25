@@ -71,7 +71,7 @@ export class CollectionAssociation extends Association {
    * (collection_association.rb:46-48, :242), which for a *persisted* owner
    * runs the diffed deletes + inserts inline in a transaction. That is DB I/O,
    * so this returns a Promise — the sync property setter cannot reach it and
-   * uses {@link queueWrite} instead (RFC 0068).
+   * uses {@link syncWrite} instead (RFC 0068).
    */
   async writer(records: Base[]): Promise<void> {
     const plan = this.replace(records);
@@ -92,7 +92,7 @@ export class CollectionAssociation extends Association {
    *   delete can race an interim insert) we throw and name the awaitable
    *   Rails-named replacement (`await owner.items.replace([...])`).
    */
-  queueWrite(records: Base[]): void {
+  syncWrite(records: Base[]): void {
     // Rails' `replace` raises a class mismatch for every element as its very
     // first statement (collection_association.rb:242), before any load or
     // persist — and so before the persisted-owner deviation below. That guard
@@ -109,10 +109,10 @@ export class CollectionAssociation extends Association {
   }
 
   /**
-   * The `#{singular}Ids=` analogue of {@link queueWrite} — and, unlike it,
+   * The `#{singular}Ids=` analogue of {@link syncWrite} — and, unlike it,
    * a throw on BOTH owner arms.
    *
-   * `queueWrite`'s unpersisted arm is faithful because Rails does no I/O for a
+   * `syncWrite`'s unpersisted arm is faithful because Rails does no I/O for a
    * new-record owner either. `ids_writer` has no such arm: it resolves the ids
    * to records with a query before replacing
    * (collection_association.rb:61-83), so the new-record path is DB I/O too.
@@ -124,7 +124,7 @@ export class CollectionAssociation extends Association {
    * keys through `idsWriter`) and `await owner.association(name).idsWriter()`
    * — so this throws loudly and names them. RFC 0068.
    */
-  queueIdsWrite(_ids: unknown[]): never {
+  syncIdsWrite(_ids: unknown[]): never {
     throw new CollectionIdsAssignmentError(this.reflection.name);
   }
 

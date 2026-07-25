@@ -168,14 +168,14 @@ export function assignAssociationIfMatch(
     | {
         replace?: (v: unknown[]) => void;
         writer?: (v: unknown) => void;
-        queueWrite?: (v: unknown) => void;
+        syncWrite?: (v: unknown) => void;
       }
     | null
     | undefined;
   if (!proxy) return false;
   if (assoc.type === "hasMany" || assoc.type === "hasAndBelongsToMany") {
     // Mass-assignment can't await, so it shares the native `=` setter's
-    // `queueWrite` dispatch: in-memory replace on an unpersisted owner, and a
+    // `syncWrite` dispatch: in-memory replace on an unpersisted owner, and a
     // throw (`CollectionPersistedAssignmentError`) on a persisted one — Rails
     // replaces the collection inline at assignment, which needs `await` in JS.
     // Callers use `await owner.#{name}.replace([...])` instead (RFC 0068).
@@ -184,18 +184,18 @@ export function assignAssociationIfMatch(
     // not Array.wrap — Rails' replace calls `.each` on the argument and raises
     // on nil / scalars. Coercing here would silently accept inputs the regular
     // writer rejects.
-    if (typeof proxy.queueWrite !== "function") return false;
-    proxy.queueWrite(value as unknown[]);
+    if (typeof proxy.syncWrite !== "function") return false;
+    proxy.syncWrite(value as unknown[]);
     return true;
   }
   if (assoc.type === "hasOne") {
     // Mass-assignment can't await, so it shares the native `=` setter's
-    // `queueWrite` dispatch: in-memory replace on an unpersisted owner, and a
+    // `syncWrite` dispatch: in-memory replace on an unpersisted owner, and a
     // throw (`HasOnePersistedAssignmentError`) on a persisted one — Rails
     // persists a has_one displacement inline at assignment, which needs `await`
     // in JS. Callers use `await owner.set#{Name}(x)` instead (RFC 0068).
-    if (typeof proxy.queueWrite !== "function") return false;
-    proxy.queueWrite(value);
+    if (typeof proxy.syncWrite !== "function") return false;
+    proxy.syncWrite(value);
     return true;
   }
   if (assoc.type === "belongsTo") {

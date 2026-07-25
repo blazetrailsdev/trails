@@ -116,7 +116,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    *
    * @internal
    */
-  override async removeDisplacedRecord(): Promise<void> {
+  override async detachDisplacedRecord(): Promise<void> {
     // no-op — see JSDoc
   }
 
@@ -182,7 +182,12 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    * Mirrors: ActiveRecord::Associations::HasOneThroughAssociation#replace
    *
    * Dispatches through createThroughRecord instead of setting a direct FK.
-   * DB work is deferred via _pendingReplace and flushed by persistReplace.
+   * This body is the in-memory half only; it records the join-row work as
+   * `_pendingReplace` for `persistReplace` to carry out. On a *persisted*
+   * owner that is not a deferral — `writer` drains the marker before it
+   * returns, matching Rails' assignment-time `create_through_record`. Only the
+   * new-owner / `save: false` build arms leave it for the owner's next save,
+   * which is Rails' own shape (has_one_through_association.rb:33-37).
    */
   protected override replace(record: Base | null, save = true): void {
     if (record) (this as any).raiseOnTypeMismatchBang(record);

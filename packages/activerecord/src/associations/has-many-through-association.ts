@@ -224,8 +224,8 @@ export class HasManyThroughAssociation extends HasManyAssociation {
           if (built.isCollection) {
             inverseAssoc.addToTarget?.(built.throughRecord);
           } else if (built.isHasOne) {
-            if (typeof inverseAssoc.queueWrite === "function") {
-              inverseAssoc.queueWrite(built.throughRecord);
+            if (typeof inverseAssoc.syncWrite === "function") {
+              inverseAssoc.syncWrite(built.throughRecord);
             } else {
               inverseAssoc.target = built.throughRecord;
               inverseAssoc.loadedBang?.();

@@ -148,7 +148,7 @@ export class CollectionAssociation extends Association {
     // Skip `super.defineWriters` for the main name: the base installs a setter
     // calling the association's `writer`, which for collections is now
     // awaitable (it persists inline on a persisted owner). A JS property
-    // setter cannot `await`, so route to `queueWrite` — in-memory replace on
+    // setter cannot `await`, so route to `syncWrite` — in-memory replace on
     // an unpersisted owner, `CollectionPersistedAssignmentError` on a
     // persisted one, whose message names the awaitable replacement
     // (`await owner.#{name}.replace([...])`). RFC 0068.
@@ -157,7 +157,7 @@ export class CollectionAssociation extends Association {
       Object.defineProperty(mixin, name, {
         get: nameDescriptor?.get,
         set(this: AssociationInstanceHost, records: unknown) {
-          (this.association(name) as any).queueWrite(records);
+          (this.association(name) as any).syncWrite(records);
         },
         configurable: true,
       });
@@ -173,7 +173,7 @@ export class CollectionAssociation extends Association {
       // instead made a bad id an unhandled rejection and raced an immediate
       // `save()`. RFC 0068.
       set(this: AssociationInstanceHost, ids: unknown) {
-        (this.association(name) as any).queueIdsWrite(ids);
+        (this.association(name) as any).syncIdsWrite(ids);
       },
       configurable: true,
     });

@@ -660,7 +660,7 @@ interface OneToOneAssociation {
   build(attrs: Record<string, unknown>): Base | null;
   initializeAttributes(record: Base): void;
   isLoaded?(): boolean;
-  removeDisplacedRecord?(displaced: Base | null): Promise<void>;
+  detachDisplacedRecord?(displaced: Base | null): Promise<void>;
 }
 
 /**
@@ -670,7 +670,7 @@ interface OneToOneAssociation {
  * Rails runs the removal inline inside `HasOneAssociation#replace`
  * (has_one_association.rb:69) — the nested-attributes writer is a synchronous
  * property setter (`pirate.shipAttributes = {...}`), so it cannot `await` the
- * nullify save. It CAN issue it: `removeDisplacedRecord` is kicked off here,
+ * nullify save. It CAN issue it: `detachDisplacedRecord` is kicked off here,
  * inline at assignment exactly as in Rails, and only its *completion* is
  * deferred — to the nested-attributes `save` wrapper, which drains this list
  * before the parent (and its autosaved new target) is persisted. That keeps
@@ -682,14 +682,14 @@ interface OneToOneAssociation {
  * must not surface as an unhandled rejection, and a drained one must rethrow.
  * @internal
  */
-function removeDisplacedAtAssignment(
+function detachDisplacedAtAssignment(
   record: Base,
   assoc: OneToOneAssociation,
   displaced: Base | null,
 ): void {
   if (!displaced) return;
-  if (typeof assoc.removeDisplacedRecord !== "function") return;
-  const settled = assoc.removeDisplacedRecord(displaced).then(
+  if (typeof assoc.detachDisplacedRecord !== "function") return;
+  const settled = assoc.detachDisplacedRecord(displaced).then(
     () => null,
     (error: unknown) => error ?? new Error("displaced record removal failed"),
   );
@@ -698,7 +698,7 @@ function removeDisplacedAtAssignment(
 }
 
 /**
- * Await the removals started by `removeDisplacedAtAssignment`, rethrowing the
+ * Await the removals started by `detachDisplacedAtAssignment`, rethrowing the
  * first failure — the deferred half of Rails' inline `remove_target!`.
  * @internal
  */
@@ -832,12 +832,12 @@ export function assignNestedAttributesForOneToOneAssociation(
         // Rails' `build_#{name}` → `set_new_record` → `replace(record, false)`
         // removes the displaced target inline (has_one_association.rb:69).
         // Capture it before the build overwrites `assoc.target`, then start that
-        // removal here — see `removeDisplacedAtAssignment`. Rails only removes
+        // removal here — see `detachDisplacedAtAssignment`. Rails only removes
         // what `load_target` surfaced, so an unloaded association displaces
-        // nothing; `removeDisplacedRecord` owns the remaining guards.
+        // nothing; `detachDisplacedRecord` owns the remaining guards.
         const displaced = assoc.isLoaded?.() === false ? null : existing;
         assoc.build(assignable);
-        removeDisplacedAtAssignment(record, assoc, displaced);
+        detachDisplacedAtAssignment(record, assoc, displaced);
       }
     }
   }
