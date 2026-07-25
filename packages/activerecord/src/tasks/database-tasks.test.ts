@@ -749,6 +749,21 @@ async function backupIntoConnection(sourceFile: string): Promise<void> {
           `SELECT ${columnList.join(", ")} FROM backupSource.${table}`,
       );
     }
+    // `sqlite_master` hides internal tables behind the `sqlite_%` filter above,
+    // but Rails' page-level backup carries `sqlite_sequence` across, and the
+    // canonical schema's primary keys are `INTEGER PRIMARY KEY AUTOINCREMENT`
+    // (schema-creation.ts:502) — so dropping it would reset every AUTOINCREMENT
+    // counter relative to Rails. It materializes in the destination as soon as
+    // the first AUTOINCREMENT table is created above.
+    const [[sequences]] = await adapter.selectRows(
+      "SELECT count(*) FROM backupSource.sqlite_master WHERE name = 'sqlite_sequence'",
+    );
+    if (Number(sequences) > 0) {
+      await adapter.executeMutation("DELETE FROM main.sqlite_sequence");
+      await adapter.executeMutation(
+        "INSERT INTO main.sqlite_sequence (name, seq) SELECT name, seq FROM backupSource.sqlite_sequence",
+      );
+    }
   } finally {
     await adapter.execute("DETACH DATABASE backupSource");
   }
