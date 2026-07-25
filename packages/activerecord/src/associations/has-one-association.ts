@@ -401,6 +401,10 @@ export class HasOneAssociation extends SingularAssociation {
     if (!displaced) return;
     if ((displaced as { isDestroyed?: () => boolean }).isDestroyed?.()) return;
     if (sameRecord(displaced, this.target)) return;
+    // Only a persisted record has a row to remove. `remove_target!`'s nullify
+    // and destroy arms gate on this themselves, but its `:delete` arm does not,
+    // so check once here rather than relying on the arm that happens to run.
+    if (displaced.isPersisted() !== true) return;
     await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "", displaced);
   }
 

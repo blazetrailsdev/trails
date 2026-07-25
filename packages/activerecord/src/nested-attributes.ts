@@ -713,21 +713,6 @@ async function awaitPendingDisplacedRemovals(record: Base): Promise<void> {
   }
 }
 
-/**
- * The displaced record a nested-attributes `build` is about to replace, or null
- * when nothing needs removing. Mirrors the conditions under which Rails'
- * `remove_target!` does DB work: a *loaded*, persisted, not-already-destroyed
- * target that is not the record being assigned.
- * @internal
- */
-function displacedByNestedBuild(assoc: OneToOneAssociation, existing: Base | null): Base | null {
-  if (!existing) return null;
-  if (typeof assoc.isLoaded === "function" && !assoc.isLoaded()) return null;
-  if (!existing.isPersisted()) return null;
-  if ((existing as { isDestroyed?: () => boolean }).isDestroyed?.()) return null;
-  return existing;
-}
-
 /** @internal */
 function hasNestedId(attributes: Record<string, unknown>): boolean {
   const id = (attributes as any).id;
@@ -847,8 +832,10 @@ export function assignNestedAttributesForOneToOneAssociation(
         // Rails' `build_#{name}` → `set_new_record` → `replace(record, false)`
         // removes the displaced target inline (has_one_association.rb:69).
         // Capture it before the build overwrites `assoc.target`, then start that
-        // removal here — see `removeDisplacedAtAssignment`.
-        const displaced = displacedByNestedBuild(assoc, existing);
+        // removal here — see `removeDisplacedAtAssignment`. Rails only removes
+        // what `load_target` surfaced, so an unloaded association displaces
+        // nothing; `removeDisplacedRecord` owns the remaining guards.
+        const displaced = assoc.isLoaded?.() === false ? null : existing;
         assoc.build(assignable);
         removeDisplacedAtAssignment(record, assoc, displaced);
       }
