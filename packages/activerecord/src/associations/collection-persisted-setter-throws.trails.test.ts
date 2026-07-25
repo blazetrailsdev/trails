@@ -115,6 +115,35 @@ describe("CollectionPersistedSetterThrows", () => {
     expect(await postsOf(author).count()).toBe(1);
   });
 
+  it("constructor-form ids= reaches the association writer", async () => {
+    // `new Author({postIds: [...]})` used to die with an opaque
+    // `TypeError: Cannot read properties of undefined (reading 'get')`: the
+    // ids key matched no association NAME, so it stayed in the bag super()
+    // assigns, and the generated writer reached `this.association("posts")`
+    // before the association cache field existed. Rails has no such split
+    // (`Author.new(post_ids: [...])` runs `ids_writer` normally,
+    // collection_association.rb:61-83).
+    const post = await Post.create({ title: "t", body: "b" });
+    let author: Author | undefined;
+    expect(() => {
+      author = new Author({ name: "Bill", postIds: [post.id] });
+    }).not.toThrow();
+    // The generated setter can't await, so the id→record resolution it kicks
+    // off is still in flight when the constructor returns (the pre-existing
+    // shape documented on `queueIdsWrite`). Settle it before asserting.
+    for (let i = 0; i < 50 && targetOf(author!).length === 0; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    expect(targetOf(author!).map((p) => p.id)).toEqual([post.id]);
+  });
+
+  it("constructor-form ids= does not swallow an unknown Ids key", async () => {
+    // Only a key that is a real generated collection writer is deferred — a
+    // model without the matching association still reports the key as unknown
+    // rather than having it silently rerouted.
+    expect(() => new Post({ title: "t", body: "b", widgetIds: [1] } as never)).toThrow(/widgetIds/);
+  });
+
   it("the awaitable writer replaces on a persisted owner", async () => {
     const author = await Author.create({ name: "Bill" });
     const first = await Post.create({ title: "a", body: "a" });
