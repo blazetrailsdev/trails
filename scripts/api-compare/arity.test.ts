@@ -102,6 +102,39 @@ describe("arityMatches", () => {
     expect(arityMatches([req("a"), kw("rk"), kwopt("ok")], [req("a"), req("opts")]).ok).toBe(true);
   });
 
+  it("collapses multiple required kwargs into one TS options object", () => {
+    // ruby perform_query(raw_connection, sql, binds, type_casted_binds, prepare:,
+    //   notification_payload:, batch:) → [7,7]; collapsed → [5,5]
+    // ts performQuery(rawConnection, sql, binds, typeCastedBinds, options = …) → [4,5]
+    const rubyPerformQuery = [
+      req("raw_connection"),
+      req("sql"),
+      req("binds"),
+      req("type_casted_binds"),
+      kw("prepare"),
+      kw("notification_payload"),
+      kw("batch"),
+    ];
+    const tsPerformQuery = [
+      req("rawConnection"),
+      req("sql"),
+      req("binds"),
+      req("typeCastedBinds"),
+      opt("options"),
+    ];
+    expect(arityMatches(rubyPerformQuery, tsPerformQuery).ok).toBe(true);
+    // all-kwargs signature (batch_on_unloaded_relation) vs a single `opts`
+    expect(arityMatches([kw("a"), kw("b"), kw("c"), kw("d")], [req("opts")]).ok).toBe(true);
+  });
+
+  it("still flags a positional-count mismatch alongside collapsible kwargs", () => {
+    // ruby m(a, b, k1:, k2:) collapses to [3,3] — a 1-arg TS port stays flagged.
+    const m = arityMatches([req("a"), req("b"), kw("k1"), kw("k2")], [req("a")]);
+    expect(m.ok).toBe(false);
+    expect(m.rubyRange).toEqual({ min: 4, max: 4 });
+    expect(m.tsRange).toEqual({ min: 1, max: 1 });
+  });
+
   it("flags a genuinely missing positional arg", () => {
     // def foo(a, b)  vs  foo(a)  → ranges [2,2] vs [1,1] do not overlap
     const m = arityMatches([req("a"), req("b")], [req("a")]);

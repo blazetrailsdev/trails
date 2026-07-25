@@ -13,6 +13,9 @@
 //     conventional receiver name (see RECEIVER_PARAM_NAMES);
 //   - trailing callback: a `&block` ported as an explicit `fn`/`callback` param
 //     that the Ruby extractor didn't record (bare `yield`).
+// On the Ruby side, a method with ≥2 *required* keywords is also tried with the
+// whole kwarg group collapsed into one slot, since the port bundles them into a
+// single options object.
 // Every such strip is tried only as an *additional* candidate form alongside the
 // as-declared signature, and a match needs only ONE form to overlap — so a strip
 // can only ever gain a match, never manufacture a mismatch.
@@ -231,6 +234,29 @@ export function positionalArity(params: ParamInfo[], side: "ruby" | "ts"): Arity
   };
 }
 
+/** Collapse a Ruby method's *required* keywords (`key:`, no default) into ONE
+ *  required slot — the port's convention bundles every kwarg into a single
+ *  trailing options object, so `(sql, prepare:, batch:)` ports as
+ *  `(sql, options)`. Only meaningful with ≥2 required kwargs (one already maps
+ *  1:1); returns the list unchanged otherwise. Used solely as an extra Ruby-side
+ *  candidate form, so it can only ever *gain* a match. */
+function collapseRequiredKeywords(params: ParamInfo[]): ParamInfo[] {
+  const requiredKeywords = params.filter((p) => p.kind === "keyword" && p.default === undefined);
+  if (requiredKeywords.length < 2) return params;
+  let emitted = false;
+  const out: ParamInfo[] = [];
+  for (const p of params) {
+    if (p.kind === "keyword" && p.default === undefined) {
+      if (emitted) continue;
+      emitted = true;
+      out.push({ name: "options", kind: "required" });
+      continue;
+    }
+    out.push(p);
+  }
+  return out;
+}
+
 /** Do the ranges overlap, granting Ruby one extra max slot per optional-kwargs/block convention? */
 function rangesOverlap(r: Arity, t: Arity): boolean {
   const slack = (r.hasKeywords ? 1 : 0) + (r.hasBlock ? 1 : 0);
@@ -254,6 +280,7 @@ export function arityMatches(ruby: ParamInfo[], ts: ParamInfo[]): ArityMatch {
   const r = positionalArity(ruby, "ruby");
   const tAsDeclared = positionalArity(ts, "ts");
 
+  const rubyForms = [r, positionalArity(collapseRequiredKeywords(ruby), "ruby")];
   const base = stripThis(ts);
   const forms = [
     base,
@@ -261,7 +288,10 @@ export function arityMatches(ruby: ParamInfo[], ts: ParamInfo[]): ArityMatch {
     stripTrailingCallback(base),
     stripTrailingCallback(stripHostParam(base)),
   ];
-  const ok = forms.some((f) => rangesOverlap(r, positionalArity(f, "ts")));
+  const ok = forms.some((f) => {
+    const t = positionalArity(f, "ts");
+    return rubyForms.some((rf) => rangesOverlap(rf, t));
+  });
 
   return {
     ok,
