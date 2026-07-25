@@ -1985,12 +1985,15 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Add one or more records to the collection by setting the FK and saving.
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#push / #<< — which
-   * return `self` (the collection proxy) for chaining. Returned via
-   * `stripThenable` so the (thenable) proxy isn't unwrapped by promise
-   * adoption — otherwise `return this` would call the proxy's `then` and
-   * load the target, breaking Rails' "push does not load target" invariant.
+   * return `proxy_association.concat(records) && self`: the collection proxy
+   * for chaining, or a falsy value when a record failed to insert on a
+   * persisted owner (`concat_records` rolls the transaction back, so
+   * `concat` returns nil). `self` is returned via `stripThenable` so the
+   * (thenable) proxy isn't unwrapped by promise adoption — otherwise
+   * `return this` would call the proxy's `then` and load the target,
+   * breaking Rails' "push does not load target" invariant.
    */
-  async push(...records: T[]): Promise<Omit<this, "then">> {
+  async push(...records: T[]): Promise<Omit<this, "then"> | false> {
     this._ensureThroughWritable();
     this._raiseOnTypeMismatch(records);
     // Through association (including HABTM): create join records
@@ -2068,6 +2071,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // `CollectionAssociation#concatRecords` parity surface stay in lock-step.
     // A record whose `save` merely *returns false* (a validation/callback abort
     // that doesn't raise) still rolls back the records already inserted.
+    // `concat_records`' accumulated `result`: false once any insert fails.
+    // Rails reports it by returning nil out of the rolled-back transaction;
+    // here the loop's Rollback is swallowed by `transaction`, so the flag is
+    // what survives to the return statement.
+    let result = true;
     const concatRecords = (): Promise<void> =>
       concatRecordsLoop(records, async (record, resultStillTrue) => {
         // Route through replace_on_target (via _addToTarget) so set_inverse_instance
@@ -2093,6 +2101,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           // but still buffers this record into the target above.
           if (this._record.isNewRecord() || !resultStillTrue) return true;
           saved = (await insertRecord(record as T)) ?? false;
+          if (!saved) result = false;
           return saved;
         });
         return saved;
@@ -2108,6 +2117,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     } else {
       await this.transaction(concatRecords);
     }
+    if (!result) return false;
     return stripThenable(this._proxySelf ?? this);
   }
 
@@ -2539,7 +2549,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /**
    * Alias for push.
    */
-  async concat(...records: T[]): Promise<Omit<this, "then">> {
+  async concat(...records: T[]): Promise<Omit<this, "then"> | false> {
     return this.push(...records);
   }
 
@@ -4157,7 +4167,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#append
    */
-  async append(...records: T[]): Promise<Omit<this, "then">> {
+  async append(...records: T[]): Promise<Omit<this, "then"> | false> {
     return this.push(...records);
   }
 
