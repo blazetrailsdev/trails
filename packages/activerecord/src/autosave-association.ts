@@ -497,16 +497,6 @@ async function _insertCollectionRecordFallback(
 async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promise<boolean> {
   const inst = _loadedAssociation(record, assoc.name);
 
-  // A deferred (non-awaitable) assignment to a persisted owner
-  // (`owner.account = b` via the property setter / mass-assignment) records the
-  // displaced record so this single autosave path — not a parallel
-  // `persistReplace` — nullifies/destroys it, mirroring the `remove_target!`
-  // Rails runs synchronously inside `HasOneAssociation#replace`. Runs before the
-  // `!child` bail so assigning nil (`owner.account = null`) still removes it.
-  if (typeof inst?.removeDisplaced === "function" && (inst?._displacedRecords?.length ?? 0) > 0) {
-    await inst.removeDisplaced();
-  }
-
   // Rails `save_has_one_association`'s `through_reflection` arm persists the
   // join side of a has_one *through* (build/update/destroy via
   // `createThroughRecord`) — the analog of Rails' assignment-time
@@ -532,8 +522,8 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   // must NOT be inserted here — the through's own `persistReplace` reconciles
   // the existing DB row via `load_target` + `update`, and persisting it here
   // would duplicate that row. A plain `HasOneAssociation` never sets
-  // `_pendingReplace` itself (it converged onto `_displacedRecords` +
-  // `autosaveHasOne`), and the through association itself clears its marker
+  // `_pendingReplace` itself (its displacement removal runs inline, via
+  // `detachDisplacedTarget`), and the through association itself clears its marker
   // inside `persistThroughRecord` above, so a truthy marker on an instance with
   // no `persistThroughRecord` is unambiguously that suppression sentinel. Skip
   // the end-record persistence; the through owns the join row.

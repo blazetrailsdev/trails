@@ -106,6 +106,17 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   }
 
   /**
+   * No-op for the same reason as `detachDisplacedTarget` above: the
+   * nested-attributes displacement path must not nullify/destroy a displaced
+   * *end* record of a through association.
+   *
+   * @internal
+   */
+  override async removeDisplacedRecord(): Promise<void> {
+    // no-op — see JSDoc
+  }
+
+  /**
    * Mirrors Rails `HasOneThroughAssociation#replace` immediate persist to a
    * saved owner. The base `writer` saves the target's foreign key directly,
    * which is wrong for a through (persistence routes through the join model), so
@@ -388,9 +399,10 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     // Rails' `load_target` returning the same object on an already-loaded proxy.
     //
     // We also clear the suppression sentinel we set on the through proxy's
-    // duck-typed `_pendingReplace`: the base `HasOneAssociation#reset` clears
-    // only `_displacedRecords` (it never declares `_pendingReplace`, having
-    // converged onto `_displacedRecords` + `autosaveHasOne`), so without this the
+    // duck-typed `_pendingReplace`: the base `HasOneAssociation` never declares
+    // `_pendingReplace` (its displacement removal runs inline, via
+    // `detachDisplacedTarget`), so its `reset` does not clear it and without
+    // this the
     // sentinel would linger and permanently make `autosaveHasOne` skip the
     // proxy — silently dropping any *later* independent write to
     // `owner.currentMembership` on this same instance. Runs before the `!pending`

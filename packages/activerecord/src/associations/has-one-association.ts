@@ -18,39 +18,8 @@ import { polymorphicName } from "../inheritance.js";
  * Mirrors: ActiveRecord::Associations::HasOneAssociation
  */
 export class HasOneAssociation extends SingularAssociation {
-  /**
-   * The record(s) displaced by the sync `build#{name}` / `create#{name}` path
-   * (`setNewRecord`) on a *persisted* owner — recorded there and removed
-   * (FK-nullified/destroyed per `:dependent`) by the owner's `save`-time has_one
-   * autosave callback (`autosaveHasOne` → `removeDisplaced`). Rails does this
-   * removal synchronously inside `replace`; the sync builder cannot `await`, so
-   * we carry the displaced record forward to the single autosave persistence
-   * path rather than running a parallel `persistReplace`.
-   *
-   * The property setter no longer feeds this queue: on a persisted owner it
-   * throws (RFC 0068). The remaining producer is the *synchronous* build path —
-   * `setNewRecord`, reached via `assoc.build()` from nested attributes
-   * (nested-attributes.ts) as well as the `build#{name}` / `create#{name}`
-   * accessors. Rails runs `remove_target!`'s persisted nullify save inline
-   * (has_one_association.rb:108); a sync JS builder cannot await it, so the
-   * queue carries it to the owner's save. This is why the queue could NOT be
-   * retired wholesale with the deferred setter (RFC 0068).
-   *
-   * This is an *ordered collection*, not a single slot: repeated builds can
-   * displace more than one persisted record before `save()` drains the queue.
-   * Rails removes each inline inside `replace`, so every displacement is
-   * accounted for; we accumulate them and remove all at save time, in
-   * displacement order.
-   */
-  _displacedRecords: Base[] = [];
-
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
-  }
-
-  override reset(): void {
-    super.reset();
-    this._displacedRecords = [];
   }
 
   /**
@@ -184,38 +153,6 @@ export class HasOneAssociation extends SingularAssociation {
     // repeat of the in-transaction work) and, for `record === null`, clears the
     // inverse on the now-removed displaced record.
     this.replace(record);
-  }
-
-  /**
-   * Remove the record displaced by a deferred assignment to a persisted owner.
-   * Called by the has_one autosave callback (`autosaveHasOne`) before persisting
-   * the new target — the deferred analog of the `remove_target!` Rails runs
-   * inside `HasOneAssociation#replace`.
-   */
-  async removeDisplaced(): Promise<void> {
-    // Drain the whole collection, removing each displaced record in
-    // displacement order (Rails removes each inline inside `replace`).
-    const queued = this._displacedRecords;
-    this._displacedRecords = [];
-    for (const record of queued) {
-      await this.removeOne(record);
-    }
-  }
-
-  /**
-   * Run `remove_target!` for a single displaced record, honoring the
-   * reflection's `:dependent` (delete/destroy/else-nullify). Temporarily sets
-   * `target` to the displaced record so `removeTargetBang` acts on it, then
-   * restores the current target.
-   */
-  private async removeOne(displaced: Base): Promise<void> {
-    const currentTarget = this.target;
-    this.target = displaced;
-    try {
-      await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "");
-    } finally {
-      this.target = currentTarget;
-    }
   }
 
   /**
@@ -446,6 +383,27 @@ export class HasOneAssociation extends SingularAssociation {
     this.target = replacement;
   }
 
+  /**
+   * `remove_target!` for a record displaced by the *synchronous* `assoc.build()`
+   * path (nested attributes), run without disturbing `this.target`.
+   *
+   * `detachDisplacedTarget` parks the target on `displaced` for the duration of
+   * the removal to reproduce Rails' target-on-failure semantics — safe for the
+   * `build#{name}` accessors, whose callers `await` before observing anything.
+   * The nested-attributes writer is a synchronous property setter: it returns to
+   * the caller while this removal is still in flight, so a parked target would
+   * be visible as `assoc.target` briefly reverting to the displaced record.
+   * Name the record instead and leave the cached target alone.
+   *
+   * @internal
+   */
+  async removeDisplacedRecord(displaced: Base | null): Promise<void> {
+    if (!displaced) return;
+    if ((displaced as { isDestroyed?: () => boolean }).isDestroyed?.()) return;
+    if (sameRecord(displaced, this.target)) return;
+    await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "", displaced);
+  }
+
   protected override async doAsyncFindTarget(): Promise<Base | null> {
     // `loadHasOne`'s tail writeback lands in this holder mid-await, so a target
     // replaced while the query is in flight would be silently clobbered. Arm
@@ -529,11 +487,15 @@ export class HasOneAssociation extends SingularAssociation {
    * `save = false` gates only `transaction_if(save)` (:68) and `if save &&
    * !record.save` (:75) — `remove_target!` (:69) runs regardless, so building
    * over an existing target still nullifies the displaced record's foreign key
-   * and clears its inverse. We run that in-memory half here and hand the
-   * displaced record to `removeDisplaced` (the owner's `autosaveHasOne`) for the
-   * DB half — `build` is synchronous and cannot await a save. Only a *persisted*
-   * displaced record has a row to remove, so a transient in-memory target is not
-   * queued (matching `queueWrite`).
+   * and clears its inverse. We run that in-memory half here; the DB half needs
+   * an `await` this synchronous method cannot issue, so every caller that can
+   * displace a persisted record issues it itself — `detachDisplacedTarget` from
+   * the `build#{name}` / `create#{name}` accessors (builder/has-one.ts,
+   * `_createRecord`), `removeDisplacedRecord` from the nested-attributes writer
+   * (nested-attributes.ts, `removeDisplacedAtAssignment`). Nothing is queued
+   * here: a queue drained at the owner's `save` would defer a write Rails makes
+   * at assignment, and would double-remove records the awaiting callers have
+   * already detached.
    */
   protected override setNewRecord(record: Base): void {
     const displaced = this.target;
@@ -549,7 +511,6 @@ export class HasOneAssociation extends SingularAssociation {
       this.nullifyOwnerAttributes(displaced);
       this.removeInverseInstance(displaced);
     }
-    this._displacedRecords.push(displaced);
   }
 
   private nullifyOwnerAttributes(record: Base): void {
@@ -608,8 +569,10 @@ export function sameRecord(a: Base | null, b: Base | null): boolean {
  *
  * @internal
  */
-async function preloadDestroyInverseBelongsTo(assoc: HasOneAssociation): Promise<void> {
-  const target = assoc.target;
+async function preloadDestroyInverseBelongsTo(
+  assoc: HasOneAssociation,
+  target: Base | null = assoc.target,
+): Promise<void> {
   if (!target) return;
   const owner = assoc.owner;
   const targetCtor = (target as any).constructor as typeof Base;
@@ -640,8 +603,15 @@ async function preloadDestroyInverseBelongsTo(assoc: HasOneAssociation): Promise
 }
 
 /** @internal */
-async function removeTargetBang(assoc: HasOneAssociation, method: string): Promise<void> {
-  const target = assoc.target;
+async function removeTargetBang(
+  assoc: HasOneAssociation,
+  method: string,
+  // Rails' `remove_target!` always acts on `self.target`. The nested-attributes
+  // displacement path removes a record while `assoc.target` is already the
+  // replacement (it must not flip the cached target back mid-await, which is
+  // observable to synchronous readers), so it names the record explicitly.
+  target: Base | null = assoc.target,
+): Promise<void> {
   if (!target) return;
   if (method === "delete") {
     await ((target as any).delete?.() ?? Promise.resolve());
@@ -653,7 +623,7 @@ async function removeTargetBang(assoc: HasOneAssociation, method: string): Promi
     // `destroyed_by_association`) before destroying, and only destroy when the
     // record is actually persisted.
     (target as any).destroyedByAssociation = assoc.reflection;
-    await preloadDestroyInverseBelongsTo(assoc);
+    await preloadDestroyInverseBelongsTo(assoc, target);
     if (target.isPersisted()) await ((target as any).destroy?.() ?? Promise.resolve());
     return;
   }
