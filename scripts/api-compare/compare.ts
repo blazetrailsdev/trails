@@ -93,7 +93,7 @@ import {
 import {
   ARITY_EXCLUDE_PATH,
   arityExcludeKeyOf,
-  indexArityExcludes,
+  arityExcludeKeys,
   parseArityExcludes,
 } from "./arity-exclude.js";
 import { matchOptionKeysAgainst } from "./options-keys.js";
@@ -983,7 +983,7 @@ export function main() {
 
   // Reasoned arity suppressions (RFC 0072). Read sync to match this module's
   // other manifest reads; arity-exclude.ts's async loader serves the gate.
-  const arityExcludes = indexArityExcludes(
+  const arityExcludes = arityExcludeKeys(
     parseArityExcludes(fs.readFileSync(ARITY_EXCLUDE_PATH, "utf-8")),
   );
   const appliedArityExcludes = new Set<string>();

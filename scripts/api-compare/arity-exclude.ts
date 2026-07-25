@@ -95,8 +95,8 @@ export function findStaleArityExcludes(
   return entries.filter((e) => !applied.has(arityExcludeKeyOf(e)));
 }
 
-export function indexArityExcludes(
-  entries: readonly ArityExcludeEntry[],
-): Map<string, ArityExcludeEntry> {
-  return new Map(entries.map((e) => [arityExcludeKeyOf(e), e]));
+/** Compare-time lookup set. Only the key matters there — the `reason` is for
+ *  the human reading the file, not for the run. */
+export function arityExcludeKeys(entries: readonly ArityExcludeEntry[]): Set<string> {
+  return new Set(entries.map(arityExcludeKeyOf));
 }

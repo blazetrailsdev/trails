@@ -4,7 +4,7 @@ import {
   ARITY_EXCLUDE_PATH,
   arityExcludeKeyOf,
   findStaleArityExcludes,
-  indexArityExcludes,
+  arityExcludeKeys,
   loadArityExcludes,
   parseArityExcludes,
   type ArityExcludeEntry,
@@ -60,9 +60,9 @@ describe("the committed exclude file", () => {
   });
 });
 
-describe("indexArityExcludes", () => {
+describe("arityExcludeKeys", () => {
   it("keys on package + rubyFile + rubyName", () => {
-    const index = indexArityExcludes([entry]);
+    const index = arityExcludeKeys([entry]);
     expect(index.has(arityExcludeKeyOf(entry))).toBe(true);
     expect(index.has(arityExcludeKeyOf({ ...entry, package: "activemodel" }))).toBe(false);
     expect(index.has(arityExcludeKeyOf({ ...entry, rubyFile: "relation.rb" }))).toBe(false);
