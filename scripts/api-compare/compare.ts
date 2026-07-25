@@ -23,7 +23,10 @@
  * The advisory arity check compares the positional-arg ranges of name-matched
  * methods (it never affects the parity %). A one-line summary always prints and
  * output/arity-mismatches.json is always written; `--arity` adds the
- * per-method breakdown.
+ * per-method breakdown. A justified deviation can be suppressed with a
+ * reasoned arity-exclude.json entry (arity-exclude.ts), which drops the pair
+ * from both the mismatches and the compared denominator and surfaces as
+ * `N excluded` in the summary; lint-arity-excludes.ts fails a stale entry.
  *
  * Three further advisory checks run on the same name-matched pairs, each
  * one-line-summarized and always written to its own artifact, none affecting
@@ -88,6 +91,12 @@ import {
   stripThis,
   type ArityRange,
 } from "./arity.js";
+import {
+  ARITY_EXCLUDE_PATH,
+  arityExcludeKeyOf,
+  indexArityExcludes,
+  parseArityExcludes,
+} from "./arity-exclude.js";
 import { matchOptionKeysAgainst } from "./options-keys.js";
 import {
   compareDefaults,
@@ -369,6 +378,8 @@ interface ArityResult {
    *  silently absorbing the skip. */
   forwardingSkipped: number;
   mismatched: number;
+  /** Mismatching pairs suppressed by a reasoned arity-exclude.json entry. */
+  excluded: number;
   mismatches: ArityMismatch[];
 }
 
@@ -971,6 +982,15 @@ export function main() {
   const ruby: ApiManifest = JSON.parse(fs.readFileSync(rubyPath, "utf-8"));
   const ts: ApiManifest = JSON.parse(fs.readFileSync(tsPath, "utf-8"));
 
+  // Reasoned arity suppressions (RFC 0072). Read sync here to match this
+  // module's existing manifest reads; the async loader in arity-exclude.ts
+  // serves the gate script. Keys that actually suppressed a mismatch are
+  // recorded so lint-arity-excludes.ts can fail the unused (stale) ones.
+  const arityExcludes = indexArityExcludes(
+    parseArityExcludes(fs.readFileSync(ARITY_EXCLUDE_PATH, "utf-8")),
+  );
+  const appliedArityExcludes = new Set<string>();
+
   const results: PackageResult[] = [];
 
   for (const [pkg, rubyPkg] of Object.entries(ruby.packages)) {
@@ -1321,6 +1341,7 @@ export function main() {
     let totalMisplaced = 0;
     let arityCompared = 0;
     let arityForwardingSkipped = 0;
+    let arityExcluded = 0;
     const arityMismatches: ArityMismatch[] = [];
     let optionKeysCompared = 0;
     const optionKeyMismatches: OptionKeyMismatch[] = [];
@@ -1504,8 +1525,21 @@ export function main() {
           return;
         }
         if (candidates.every((c) => shouldSkipArity(rubyParams, c))) return;
-        arityCompared++;
         const verdict = matchArityAgainst(rubyParams, candidates);
+        // A reasoned exclude suppresses the mismatch AND drops the pair from
+        // the compared denominator, so a justified deviation neither inflates
+        // nor deflates the arity %. Applied only to a pair that really
+        // mismatches — an exclude on a now-matching pair stays unapplied and
+        // the gate reports it stale.
+        if (!verdict.matched) {
+          const excludeKey = arityExcludeKeyOf({ package: pkg, rubyFile, rubyName });
+          if (arityExcludes.has(excludeKey)) {
+            appliedArityExcludes.add(excludeKey);
+            arityExcluded++;
+            return;
+          }
+        }
+        arityCompared++;
         if (verdict.matched) return;
         arityMismatches.push({
           rubyFile,
@@ -1833,6 +1867,7 @@ export function main() {
         compared: arityCompared,
         forwardingSkipped: arityForwardingSkipped,
         mismatched: arityMismatches.length,
+        excluded: arityExcluded,
         mismatches: arityMismatches,
       },
       optionKeys: {
@@ -1886,9 +1921,14 @@ export function main() {
     JSON.stringify(
       {
         generatedAt: new Date().toISOString(),
+        packages: results.map((r) => r.package).sort(),
         compared: results.reduce((n, r) => n + r.arity.compared, 0),
         forwardingSkipped: results.reduce((n, r) => n + r.arity.forwardingSkipped, 0),
         mismatched: arityFlat.length,
+        excluded: results.reduce((n, r) => n + r.arity.excluded, 0),
+        // Keys that suppressed a real mismatch in THIS run — the gate treats
+        // every committed entry absent from this list as stale.
+        appliedExcludes: [...appliedArityExcludes].sort(),
         mismatches: arityFlat,
       },
       null,
@@ -2062,6 +2102,7 @@ function printReport(
   let grandInhMatched = 0;
   let grandArityCompared = 0;
   let grandArityMismatched = 0;
+  let grandArityExcluded = 0;
   let grandOptKeysCompared = 0;
   let grandOptKeysMismatched = 0;
   let grandOptKeysMissing = 0;
@@ -2084,6 +2125,7 @@ function printReport(
     grandInhMatched += pkg.inheritance.matched;
     grandArityCompared += pkg.arity.compared;
     grandArityMismatched += pkg.arity.mismatched;
+    grandArityExcluded += pkg.arity.excluded;
     grandOptKeysCompared += pkg.optionKeys.compared;
     grandOptKeysMismatched += pkg.optionKeys.mismatched;
     grandOptKeysMissing += pkg.optionKeys.mismatches.filter((m) => m.missingInTs.length > 0).length;
@@ -2103,7 +2145,9 @@ function printReport(
     const ar = pkg.arity;
     const arOk = ar.compared - ar.mismatched;
     const arPct = ar.compared > 0 ? Math.round((arOk / ar.compared) * 1000) / 10 : 0;
-    const arityNote = ar.compared > 0 ? `  |  arity: ${arOk}/${ar.compared} (${arPct}%)` : "";
+    const arExcludedNote = ar.excluded > 0 ? `, ${ar.excluded} excluded` : "";
+    const arityNote =
+      ar.compared > 0 ? `  |  arity: ${arOk}/${ar.compared} (${arPct}%${arExcludedNote})` : "";
     const bodyTotal = pkg.bodyHashes.length;
     const bodyPinned = pkg.bodyHashes.filter((b) =>
       pinnedKeys.has(`${pkg.package} ${b.rubyFile} ${b.rubyName}`),
@@ -2205,8 +2249,11 @@ function printReport(
   const grandArOk = grandArityCompared - grandArityMismatched;
   const arPct =
     grandArityCompared > 0 ? Math.round((grandArOk / grandArityCompared) * 1000) / 10 : 0;
+  const grandArityExcludedNote = grandArityExcluded > 0 ? `, ${grandArityExcluded} excluded` : "";
   const aritySummary =
-    grandArityCompared > 0 ? `  |  arity: ${grandArOk}/${grandArityCompared} (${arPct}%)` : "";
+    grandArityCompared > 0
+      ? `  |  arity: ${grandArOk}/${grandArityCompared} (${arPct}%${grandArityExcludedNote})`
+      : "";
   console.log(
     `  Overall: ${grandMatched}/${grandTotal} methods (${grandPct}%)  |  files: ${grandFilesExist}/${grandFiles}${inhSummary}${aritySummary}`,
   );
