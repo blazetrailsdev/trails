@@ -13,6 +13,9 @@
 //     conventional receiver name (see RECEIVER_PARAM_NAMES);
 //   - trailing callback: a `&block` ported as an explicit `fn`/`callback` param
 //     that the Ruby extractor didn't record (bare `yield`).
+// On the Ruby side, a method with ≥2 *required* keywords is also tried with the
+// whole kwarg group collapsed into one slot, since the port bundles them into a
+// single options object.
 // Every such strip is tried only as an *additional* candidate form alongside the
 // as-declared signature, and a match needs only ONE form to overlap — so a strip
 // can only ever gain a match, never manufacture a mismatch.
@@ -231,6 +234,31 @@ export function positionalArity(params: ParamInfo[], side: "ruby" | "ts"): Arity
   };
 }
 
+function isRequiredKeyword(p: ParamInfo): boolean {
+  return p.kind === "keyword" && p.default === undefined;
+}
+
+function isKeywordParam(p: ParamInfo): boolean {
+  return p.kind === "keyword" || p.kind === "keyword_rest";
+}
+
+/** Collapse a Ruby method's whole keyword group into ONE required slot — the
+ *  port's convention bundles every kwarg into a single trailing options object,
+ *  so `(sql, prepare:, notification_payload:, batch:)` ports as
+ *  `(sql, options)`. Optional kwargs / `**opts` ride in that same object, so
+ *  they collapse into the slot too rather than also claiming the `hasKeywords`
+ *  max-slack (which would over-count the options object as two slots).
+ *
+ *  Only applied with ≥2 required kwargs: with 0 the existing `hasKeywords`
+ *  slack already covers the convention, and with 1 the kwarg already maps 1:1
+ *  onto the options slot — so the list is returned unchanged. Used solely as an
+ *  extra Ruby-side candidate form, so it can only ever *gain* a match. */
+function collapseKeywordsIntoOptionsObject(params: ParamInfo[]): ParamInfo[] | null {
+  if (params.filter(isRequiredKeyword).length < 2) return null;
+  const positional = params.filter((p) => !isKeywordParam(p));
+  return [...positional, { name: "options", kind: "required" }];
+}
+
 /** Do the ranges overlap, granting Ruby one extra max slot per optional-kwargs/block convention? */
 function rangesOverlap(r: Arity, t: Arity): boolean {
   const slack = (r.hasKeywords ? 1 : 0) + (r.hasBlock ? 1 : 0);
@@ -254,6 +282,8 @@ export function arityMatches(ruby: ParamInfo[], ts: ParamInfo[]): ArityMatch {
   const r = positionalArity(ruby, "ruby");
   const tAsDeclared = positionalArity(ts, "ts");
 
+  const collapsed = collapseKeywordsIntoOptionsObject(ruby);
+  const rubyForms = collapsed ? [r, positionalArity(collapsed, "ruby")] : [r];
   const base = stripThis(ts);
   const forms = [
     base,
@@ -261,7 +291,10 @@ export function arityMatches(ruby: ParamInfo[], ts: ParamInfo[]): ArityMatch {
     stripTrailingCallback(base),
     stripTrailingCallback(stripHostParam(base)),
   ];
-  const ok = forms.some((f) => rangesOverlap(r, positionalArity(f, "ts")));
+  const ok = forms.some((f) => {
+    const t = positionalArity(f, "ts");
+    return rubyForms.some((rf) => rangesOverlap(rf, t));
+  });
 
   return {
     ok,
