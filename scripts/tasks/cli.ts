@@ -162,12 +162,6 @@ export interface ReadIndex {
   sha: string | null;
 }
 
-// Shared by every per-worktree tasks checkout, so one sha-keyed cache entry
-// serves them all (`--absolute-git-dir` would give each its own).
-function sharedGitDir(cwd?: string): string {
-  return git(["rev-parse", "--path-format=absolute", "--git-common-dir"], { silent: true, cwd });
-}
-
 // build-index.mjs imports js-yaml, and ESM resolution walks up from the
 // script's own directory; the exported tree has no node_modules of its own.
 function linkNodeModules(treeDir: string, from: string): void {
@@ -213,7 +207,10 @@ export function buildIndexFromOriginMain(cwd?: string): { index: Index; sha: str
   try {
     git(["fetch", "--quiet", "origin", "main"], { silent: true, cwd });
     sha = git(["rev-parse", "origin/main"], { silent: true, cwd });
-    gitDir = sharedGitDir(cwd);
+    // The same shared common dir the lock resolves to (one cache entry serves
+    // every per-worktree tasks checkout), via the same helper so the two can't
+    // drift onto different dirs.
+    gitDir = lockDirForTest ?? gitCommonDir(cwd ?? TASKS_DIR);
   } catch {
     return null;
   }

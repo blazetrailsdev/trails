@@ -3349,15 +3349,18 @@ describe("buildIndexFromOriginMain (read path serves the origin/main tree)", () 
   const SHA = "a".repeat(40);
   const emptyIndex = emptyIdx;
 
+  // The cache lives in the shared git common dir — the same seam the lock uses.
+  afterEach(() => __setLockDirForTest(null));
   function setup(opts: { onFetch?: () => void } = {}) {
     const gitDir = mkdtempSync(join(tmpdir(), "trails-read-index-"));
+    __setLockDirForTest(gitDir);
     const seen: string[] = [];
     execFileSyncMock.mockImplementation(((file: string, args: string[], o: { cwd?: string }) => {
       if (file === "git") {
         const label = args[2];
         seen.push(label);
         if (label === "fetch") opts.onFetch?.();
-        if (label === "rev-parse") return (args[3] === "origin/main" ? SHA : gitDir) as never;
+        if (label === "rev-parse") return SHA as never;
         return "" as never;
       }
       seen.push(file === "tar" ? "tar" : "build-index");
@@ -3385,7 +3388,7 @@ describe("buildIndexFromOriginMain (read path serves the origin/main tree)", () 
     const got = buildIndexFromOriginMain();
     expect(got?.sha).toBe(SHA);
     expect(got?.index.generated_at).toBe("cached");
-    expect(seen).toEqual(["fetch", "rev-parse", "rev-parse"]);
+    expect(seen).toEqual(["fetch", "rev-parse"]);
   });
 
   it("exports the tree, builds the index there, and caches it by sha", () => {
@@ -3398,7 +3401,7 @@ describe("buildIndexFromOriginMain (read path serves the origin/main tree)", () 
     writeFileSync(otherAgentInFlight, "{}");
     const got = buildIndexFromOriginMain();
     expect(got?.index.generated_at).toBe("2026-01-01");
-    expect(seen).toEqual(["fetch", "rev-parse", "rev-parse", "archive", "tar", "build-index"]);
+    expect(seen).toEqual(["fetch", "rev-parse", "archive", "tar", "build-index"]);
     // Cached for the next reader, and the superseded sha is pruned.
     expect(existsSync(join(gitDir, "trails-tasks-read-index", `${SHA}.json`))).toBe(true);
     expect(existsSync(stale)).toBe(false);
