@@ -35,18 +35,19 @@ describe.skipIf(lane === "sqlite")("bulkInboundFkHost (live catalog)", () => {
     // of its own, so nothing about the rebuilt set hints the constraint exists:
     // only the bulk reverse lookup can find it, and PG/MySQL refuse the DROP
     // while it is live.
-    await adapter.addForeignKey("lessons_students", "authors", { column: "lesson_id" });
+    // Canonical `lessons_students` declares no foreign key, so anything live on
+    // it is debris from an attempt that died before its own cleanup — clear it
+    // up front too, or `addForeignKey` throws on the duplicate constraint name
+    // and wedges this worker's DB for good.
+    await clearLessonsStudentsForeignKeys();
     try {
+      await adapter.addForeignKey("lessons_students", "authors", { column: "lesson_id" });
       expect(await adapter.foreignKeys("lessons_students")).toHaveLength(1);
 
       await rebuildCanonicalTables(adapter, ["authors"]);
       expect(await adapter.foreignKeys("lessons_students")).toEqual([]);
     } finally {
-      // A failure part-way through would otherwise leave the stray constraint on
-      // the per-worker DB every later file in this worker shares.
-      for (const fk of await adapter.foreignKeys("lessons_students")) {
-        await adapter.removeForeignKey("lessons_students", { name: fk.name });
-      }
+      await clearLessonsStudentsForeignKeys();
     }
   });
 
@@ -94,6 +95,12 @@ describe.skipIf(lane === "sqlite")("bulkInboundFkHost (live catalog)", () => {
     }
   });
 });
+
+async function clearLessonsStudentsForeignKeys(): Promise<void> {
+  for (const fk of await adapter.foreignKeys("lessons_students")) {
+    await adapter.removeForeignKey("lessons_students", { name: fk.name });
+  }
+}
 
 async function currentDatabase(): Promise<string> {
   const rows = (await adapter.execute("SELECT DATABASE() AS db")) as Array<{ db: string }>;
