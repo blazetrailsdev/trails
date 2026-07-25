@@ -23,17 +23,13 @@ import * as nodeFs from "node:fs";
 import * as nodeOs from "node:os";
 import * as nodePath from "node:path";
 
-// Rails' `ConnectionHandlingTest` declares no configuration of its own — it
-// drives `ActiveRecord::Base` against the ambient, file-backed test connection
-// established by the suite helper. Capture that db_config once and re-establish
-// from it between cases (the block removes/clears the pool as it goes).
-let ambientDbConfig: DatabaseConfig;
-
-async function setupConnection() {
-  await Base.establishConnection(ambientDbConfig);
-}
-
 describe("ConnectionHandlingTest", () => {
+  let ambientDbConfig: DatabaseConfig;
+
+  async function setupConnection() {
+    await Base.establishConnection(ambientDbConfig);
+  }
+
   beforeAll(async () => {
     await establishFromTestConfig();
     ambientDbConfig = Base.connectionDbConfig();
@@ -264,8 +260,7 @@ describe("ConnectionHandlingTest", () => {
   });
 
   it("connection_db_config", async () => {
-    const config = Base.connectionDbConfig();
-    expect(config.adapter).toBe(ambientDbConfig.adapter);
+    expect(Base.connectionDbConfig()).toBe(ambientDbConfig);
   });
 
   // Rails' build_db_config_from_hash deletes :url before constructing the
@@ -282,7 +277,9 @@ describe("ConnectionHandlingTest", () => {
 
   it("is_connected?", async () => {
     const pool = Base.connectionPool();
-    await pool.leaseConnection();
+    // trails' checkout is lazy where Rails' `checkout_and_verify` runs
+    // `verify!`, so the raw connection is opened here as Rails' checkout would.
+    await (await pool.leaseConnection()).verifyBang();
     expect(Base.isConnectedQ()).toBe(true);
     pool.releaseConnection();
   });
@@ -335,8 +332,7 @@ describe("ConnectionHandlingTest", () => {
     expect(Base.connectionPool()).toBeTruthy();
     // Mirrors Rails `remove_connection`: returns the removed pool's db_config.
     const removed = Base.removeConnection();
-    expect(removed?.adapter).toBe(ambientDbConfig.adapter);
-    expect(removed?.configurationHash.database).toBe(ambientDbConfig.configurationHash.database);
+    expect(removed).toBe(ambientDbConfig);
     expect(() => Base.connectionPool()).toThrow(/No database connection/);
     // Re-establish for other tests
     await setupConnection();
@@ -467,15 +463,10 @@ describe("ConnectionHandlingTest", () => {
     expect(Post.isPrimaryClass()).toBe(false);
   });
 
-  // Now that the block binds to the ambient test connection, the resolved
-  // adapter class follows the lane — this case pins the SQLite one.
   it.skipIf(adapterType !== "sqlite")(
     "#adapterClass resolves to the SQLite3Adapter constructor",
     async () => {
-      const Klass = await Base.adapterClass();
-      const { BetterSQLite3Adapter } =
-        await import("./connection-adapters/better-sqlite3-adapter.js");
-      expect(Klass).toBe(BetterSQLite3Adapter);
+      expect(await Base.adapterClass()).toBe(BetterSQLite3Adapter);
     },
   );
 
@@ -495,17 +486,18 @@ describe("ConnectionHandlingTest", () => {
     // Snapshot it so test ordering can't pin the wrong registry.
     const priorCurrent = (DatabaseConfigurations as any).current;
     try {
-      // The registry is in-memory (a hand-built `DatabaseConfigurations`), but
-      // the config it carries is the ambient, file-backed test config — Rails'
-      // `TestDatabases.create_and_load_schema` mutates exactly that entry.
       const inMemory = new DatabaseConfigurations([
-        new HashConfig(env, "primary", { ...ambientDbConfig.configurationHash }),
+        new HashConfig(env, "primary", {
+          ...ambientDbConfig.configurationHash,
+          database: "db/common.sqlite3",
+        }),
       ]);
 
       class InMemoryModel extends Base {}
       (InMemoryModel as any).configurations = inMemory;
 
       await InMemoryModel.establishConnection();
+      expect(InMemoryModel.connectionPool().dbConfig.database).toBe("db/common.sqlite3");
       expect(await InMemoryModel.adapterClass()).toBe(await Base.adapterClass());
     } finally {
       (DatabaseConfigurations as any).current = priorCurrent;
