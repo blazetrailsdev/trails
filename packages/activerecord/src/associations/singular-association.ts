@@ -22,7 +22,10 @@ export class SingularAssociation extends Association {
   }
 
   // has_one overrides this with an awaitable immediate-persist path that may
-  // return a Promise; belongs_to keeps the synchronous queue-only behavior.
+  // return a Promise; belongs_to keeps this synchronous body, which is already
+  // faithful — Rails' `BelongsToAssociation#replace` (belongs_to_association.rb
+  // :95-107) only sets the inverse and `replace_keys` the owner's foreign key,
+  // both in memory, and issues no DB work of its own.
   writer(record: Base | null): void | Promise<void> {
     this.replace(record);
   }

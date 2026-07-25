@@ -38,7 +38,7 @@ export class HasOneAssociation extends SingularAssociation {
    *   0068-awaitable-has-one-setter ("Why 'loud' beats 'deferred'") for the
    *   ergonomic-tradeoff decision to deviate loudly from Rails' legal syntax.
    */
-  queueWrite(record: Base | null): void {
+  syncWrite(record: Base | null): void {
     // Rails' `replace` raises a class mismatch as its very first statement
     // (has_one_association.rb:59-60), before any load/removal/persist — and so
     // before the persisted-owner deviation below. That guard is synchronous, so
@@ -63,7 +63,7 @@ export class HasOneAssociation extends SingularAssociation {
    * a *saved* owner: the displaced record is nullified/deleted/destroyed and
    * the new record saved immediately. Returns a Promise so callers can `await`
    * the writes — the only floating-promise-free way to reach the immediate path
-   * from JS (the sync property setter cannot await, so it uses `queueWrite`
+   * from JS (the sync property setter cannot await, so it uses `syncWrite`
    * instead). For a *new* owner the foreign key isn't known yet, so persistence
    * defers to the owner's next save (`autosaveHasOne`).
    */
@@ -344,9 +344,12 @@ export class HasOneAssociation extends SingularAssociation {
     // it here. Capture the loaded target BEFORE `super._createRecord`, which
     // builds the new record first — an invalid build (e.g. an inexistent foreign
     // key) must raise before any removal runs, exactly as Rails' `build_record`
-    // raises before `set_new_record`. An unloaded target is left to the property-
-    // setter displacement path (`queueWrite` flags), matching Rails' behaviour of
-    // only removing what `load_target` surfaces.
+    // raises before `set_new_record`. An UNLOADED target is not removed at all,
+    // and nothing defers it either — RFC 0068 retired the queue that used to
+    // pick it up at the owner's next `save`. Rails would surface it here via
+    // `replace`'s leading `load_target`, which this path does not issue; until
+    // that load is ported, `create#{name}` over an unloaded persisted child
+    // leaves the old row attached.
     const displaced = this.loaded ? this.target : null;
     const record = await super._createRecord(attributes, shouldRaise, block);
     // `super._createRecord` ran `setNewRecord` → `replace`, so `this.target` is
@@ -405,7 +408,7 @@ export class HasOneAssociation extends SingularAssociation {
    *
    * @internal
    */
-  async removeDisplacedRecord(displaced: Base | null): Promise<void> {
+  async detachDisplacedRecord(displaced: Base | null): Promise<void> {
     if (!displaced) return;
     if ((displaced as { isDestroyed?: () => boolean }).isDestroyed?.()) return;
     if (sameRecord(displaced, this.target)) return;
@@ -499,8 +502,8 @@ export class HasOneAssociation extends SingularAssociation {
    * an `await` this synchronous method cannot issue, so every caller that can
    * displace a persisted record issues it itself — `detachDisplacedTarget` from
    * the `build#{name}` / `create#{name}` accessors (builder/has-one.ts,
-   * `_createRecord`), `removeDisplacedRecord` from the nested-attributes writer
-   * (nested-attributes.ts, `removeDisplacedAtAssignment`). Nothing is queued
+   * `_createRecord`), `detachDisplacedRecord` from the nested-attributes writer
+   * (nested-attributes.ts, `detachDisplacedAtAssignment`). Nothing is queued
    * here: a queue drained at the owner's `save` would defer a write Rails makes
    * at assignment, and would double-remove records the awaiting callers have
    * already detached.

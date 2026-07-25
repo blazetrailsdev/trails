@@ -129,14 +129,14 @@ export class HasOne extends SingularAssociation {
     Object.defineProperty(mixin, name, {
       get: existing?.get,
       // A JS property setter cannot `await`. On an *unpersisted* owner Rails'
-      // assignment is in-memory too, so `queueWrite` sets the FK/inverse and
+      // assignment is in-memory too, so `syncWrite` sets the FK/inverse and
       // lets autosave persist at the owner's first `save()`. On a *persisted*
-      // owner `queueWrite` throws (`HasOnePersistedAssignmentError`): Rails
+      // owner `syncWrite` throws (`HasOnePersistedAssignmentError`): Rails
       // persists the displacement inline at assignment, which needs `await`.
       // Callers use `await owner.set#{Name}(value)` (the `set${cap}` sugar
       // above) or `await record.association(name).writer(value)` (RFC 0068).
-      set(this: { association(n: string): { queueWrite(v: unknown): void } }, value: unknown) {
-        this.association(name).queueWrite(value);
+      set(this: { association(n: string): { syncWrite(v: unknown): void } }, value: unknown) {
+        this.association(name).syncWrite(value);
       },
       configurable: true,
     });

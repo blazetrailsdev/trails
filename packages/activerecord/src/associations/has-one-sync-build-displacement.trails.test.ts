@@ -9,7 +9,7 @@
  * caller that can displace a persisted record issues the DB half itself. The
  * `build#{Name}` / `create#{Name}` accessors use `detachDisplacedTarget`. For
  * `assoc.build()`, which nested attributes calls directly, the nested-attributes
- * writer uses `removeDisplacedRecord` — starting the removal inline at
+ * writer uses `detachDisplacedRecord` — starting the removal inline at
  * assignment and awaiting it in its `save` wrapper before the replacement is
  * inserted.
  *
