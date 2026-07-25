@@ -48,8 +48,21 @@ because Rails' test runner is a single process with a single database:
 - opt-in DDL profiler — `test-setup-ddl-profile.ts`
 
 So `helper.rb`'s content is a **strict subset** of what the trails setup files
-do, spread across five files, three of which exist only because of vitest's
-fork model. `test-setup-ar.ts` covers 4 of ~16 `helper.rb` responsibilities.
+do, spread across five files (plus `globalSetup`), three of which exist only
+because of vitest's fork model. Of the 17 rows above, 4 have no analogue by
+language (`Thread.abort_on_exception`, the deprecator, `remove_method`, I18n)
+and 13 have a trails home; `test-setup-ar.ts` owns 4 of those 13.
+
+The boot order these files run in, which is what actually constrains the layout:
+
+| when                                       | file                                    | wired at               |
+| ------------------------------------------ | --------------------------------------- | ---------------------- |
+| once, main process, pre-fork               | `test-helpers/template-global-setup.ts` | `globalSetup`          |
+| per worker, 1st setupFile                  | `test-setup-worker-db.ts`               | `vitest.config.ts:363` |
+| per worker, 2nd                            | `test-setup-ar.ts`                      | `vitest.config.ts:364` |
+| per worker, MySQL lane only                | `test-setup-mysql.ts`                   | `vitest.config.ts:366` |
+| per worker, after the driver is registered | `test-setup-dy.ts`                      | `vitest.config.ts:368` |
+| per worker, `DDL_PROFILE=1` only           | `test-setup-ddl-profile.ts`             | `vitest.config.ts:371` |
 
 ## Trade-offs
 
@@ -71,11 +84,11 @@ points in the boot order, and two are conditionally wired
 `DDL_PROFILE=1`). A `cases/helper.ts` would therefore be a rename of one of
 five files, not a consolidation.
 
-**Partial-mirror over-claim.** Per the table, `test-setup-ar.ts` is 4/16.
-Naming it `cases/helper.ts` invites a future agent to assume the other twelve
-lines are handled there and to stop checking — the exact failure mode the
-per-line `// Mirror Rails activerecord/test/cases/helper.rb:NN` comments
-prevent. Those comments already deliver the discoverability the rename is
+**Partial-mirror over-claim.** Per the table, `test-setup-ar.ts` owns 4 of the
+13 `helper.rb` responsibilities that have a trails home. Naming it
+`cases/helper.ts` invites a future agent to assume the other nine are there and
+to stop checking — the exact failure mode the per-line
+`// Mirror Rails activerecord/test/cases/helper.rb:NN` comments prevent. Those comments already deliver the discoverability the rename is
 after, at the granularity where it matters (per setting, not per file), and
 `pnpm rails:find` covers the reverse lookup.
 
@@ -87,14 +100,25 @@ key off `test-helpers/test-schema.ts`, `test-helpers/fixtures/`, and
 `test-helpers/models/` — all unaffected by a setup-file rename. No parity
 metric moves.
 
-**Rename cost.** 47 `test-setup` references across the repo: 6 in
-`vitest.config.ts` (5 paths + prose), a glob in `eslint.config.mjs:484`
-(`packages/activerecord/src/test-setup-*.ts`, the `no-raw-sql` test-infra
-exemption), the `**/test-*.ts` allow-list pattern planned for the
-`no-direct-process-env` rule (`docs/infrastructure/browser-compat-plan.md:158`),
-and ~35 doc/comment cross-references. The `test-setup-*` glob is what makes
-those lint exemptions expressible as one pattern; a `cases/` tree would need
-either a second glob or a directory-wide exemption that is wider than intended.
+**Rename cost.** 93 `test-setup` references outside `vendor/` — 52 in
+code/config, 41 in docs. The load-bearing ones:
+
+- `vitest.config.ts` — 9 (5 setupFile paths + the arel one + prose).
+- `eslint/no-raw-sql.mjs:42` — a hardcoded filename regex,
+  `/(^|\/)test-setup-[^/]*\.ts$/`, exempting setup files from the raw-SQL ban.
+- `eslint.config.mjs:484` — the `packages/activerecord/src/test-setup-*.ts` glob
+  for the same exemption at config level.
+- `eslint/no-explicit-any-src-exclude.json:194` and
+  `eslint/rails-error-parity-exclude.json:115-116` — per-file ratchet entries
+  keyed by path.
+- `docs/infrastructure/browser-compat-plan.md:158` — the `**/test-*.ts`
+  allow-list pattern planned for the `no-direct-process-env` rule.
+
+The `test-setup-` **prefix** is what lets four separate lint mechanisms name
+this set with one pattern each. A `cases/` tree replaces each with either a
+second pattern or a directory-wide exemption wider than intended — and the
+ratchet JSONs would need path rewrites that conflict with any sibling PR
+touching them.
 
 **Sibling consistency.** `packages/arel/src/test-setup-engine.ts`
 (`vitest.config.ts:420`) follows the same convention for the non-AR `other`
@@ -112,8 +136,12 @@ Rails considers the single-file grab-bag a wart, not a layout to copy. Our
 Keep the `test-setup-*` convention. Fidelity to Rails here lives in the
 _settings applied and their values_, which the per-line mirror comments already
 pin to `helper.rb:NN`, not in the filename. Do not re-open this without a new
-argument that survives the four points above (no consolidation available,
-over-claim risk, zero compare-tooling gain, lint-glob cost).
+argument that survives the five points above (nothing to consolidate,
+over-claim risk, zero compare-tooling gain, four lint mechanisms keyed on the
+`test-setup-` prefix, cross-package convention). What _would_ change the answer:
+if vitest gained a single ordered-setup entry point so the five files could
+genuinely merge into one, the one-file `helper.rb` shape becomes available and
+the naming question is worth re-asking.
 
 ## Observations out of scope for this spike
 
