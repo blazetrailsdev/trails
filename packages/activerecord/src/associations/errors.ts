@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::Associations error classes defined in
  * activerecord/lib/active_record/associations/errors.rb
  */
+import { singularize } from "@blazetrails/activesupport";
 import { ActiveRecordError, ConfigurationError } from "../errors.js";
 
 /**
@@ -441,7 +442,11 @@ export class CollectionPersistedAssignmentError extends ActiveRecordError {
 export class CollectionIdsAssignmentError extends ActiveRecordError {
   readonly association: string;
 
-  constructor(association: string, idsName: string) {
+  constructor(association: string) {
+    // The setter that raised, derived here rather than passed in so the
+    // message can never name a key that differs from the installed writer
+    // (builder/collection-association.ts singularizes the same way).
+    const idsName = `${singularize(association)}Ids`;
     super(
       `Cannot assign collection association \`${association}\` ids with \`=\`: ` +
         `Rails resolves the ids with a query and replaces the collection at ` +

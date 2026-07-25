@@ -1,7 +1,7 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { association as associationProxy } from "../associations.js";
-import { underscore, isAbortSignal, singularize } from "@blazetrails/activesupport";
+import { underscore, isAbortSignal } from "@blazetrails/activesupport";
 import { Association } from "./association.js";
 import { foreignKeyPresentFor } from "./foreign-association.js";
 import { throughForeignKeyPresent } from "./through-association.js";
@@ -125,10 +125,7 @@ export class CollectionAssociation extends Association {
    * — so this throws loudly and names them. RFC 0068.
    */
   queueIdsWrite(_ids: unknown[]): never {
-    throw new CollectionIdsAssignmentError(
-      this.reflection.name,
-      `${singularize(this.reflection.name)}Ids`,
-    );
+    throw new CollectionIdsAssignmentError(this.reflection.name);
   }
 
   /**

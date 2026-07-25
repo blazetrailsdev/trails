@@ -107,6 +107,26 @@ describe("CollectionPersistedSetterThrows", () => {
     }).toThrow(CollectionIdsAssignmentError);
   });
 
+  it("ids= mass-assignment throws on both owner arms", async () => {
+    // Mass-assignment shares the setter, so it raises through
+    // `_assign_attributes`' rescue — the deviation is the `cause`, as in the
+    // record-writer case below.
+    const post = await Post.create({ title: "t", body: "b" });
+    const causeOf = (owner: Author): unknown => {
+      try {
+        (owner as unknown as CollectionOwner).assignAttributes({ postIds: [post.id] });
+      } catch (e) {
+        return (e as { cause?: unknown }).cause;
+      }
+      return undefined;
+    };
+
+    expect(causeOf(new Author({ name: "Bill" }))).toBeInstanceOf(CollectionIdsAssignmentError);
+    expect(causeOf(await Author.create({ name: "Bill" }))).toBeInstanceOf(
+      CollectionIdsAssignmentError,
+    );
+  });
+
   it("a bad id is a catchable rejection on the awaitable ids surface", async () => {
     // The hazard this replaces: through the setter, an id that doesn't resolve
     // surfaced as an unhandled rejection. Through `update` it is catchable.
