@@ -30,6 +30,7 @@ import { Table, Nodes } from "@blazetrails/arel";
 import { Map as TypeCasterMap } from "./type-caster/map.js";
 import { buildPkWhereNode, columnsHash } from "./model-schema.js";
 import { StatementCache } from "./statement-cache.js";
+import { withPooledOrDirectConnection } from "./connection-handling.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 
 /**
@@ -1144,7 +1145,7 @@ function respondsTo(value: unknown, name: string): boolean {
  * @internal
  */
 async function cachedFindBy(this: CoreHost, keys: string[], values: unknown[]): Promise<any> {
-  return (this as any).withConnection(async (connection: any) => {
+  return withPooledOrDirectConnection(this as any, async (connection: any) => {
     // Rails keys the cache on the array itself (structural equality); we
     // serialize it so ["a","b"] and ["a,b"] don't collide on a "," join.
     const cacheKey = JSON.stringify(keys);

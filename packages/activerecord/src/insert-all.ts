@@ -10,6 +10,7 @@ import { stiName, isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
 import { Result } from "./result.js";
+import { withPooledOrDirectConnection } from "./connection-handling.js";
 
 type ModelClass = typeof Base;
 type AdapterDialect = AdapterName;
@@ -73,7 +74,7 @@ export class InsertAll {
     options: InsertAllOptions = {},
   ): Promise<Result> {
     const model = (relation as any)._modelClass as ModelClass;
-    return (model as any).withConnection((c: ModelClass["connection"]) =>
+    return withPooledOrDirectConnection(model as any, (c) =>
       new InsertAll(relation, c, inserts, options).execute(),
     );
   }

@@ -414,6 +414,27 @@ export function withQueryConnection<T>(modelClass: typeof Base, run: () => Promi
   ) as Promise<T>;
 }
 
+/**
+ * `withConnection` for internal call sites that must also serve models backed
+ * by a directly-assigned adapter (`Model.adapter = x`), which have no
+ * handler-registered pool to lease from. Those run the block inline on the
+ * assigned adapter, mirroring the `connection` getter's `_adapter` fast path;
+ * everything else goes through the Rails-named `withConnection`.
+ *
+ * @internal
+ */
+export function withPooledOrDirectConnection<T>(
+  modelClass: typeof Base,
+  fn: (conn: DatabaseAdapter) => T | Promise<T>,
+): Promise<T> {
+  const direct = (modelClass as any)._adapter as DatabaseAdapter | undefined;
+  if (direct) return Promise.resolve(fn(direct));
+  return withConnection.call<typeof Base, [(conn: DatabaseAdapter) => T | Promise<T>], Promise<T>>(
+    modelClass,
+    fn,
+  );
+}
+
 export function connectionDbConfig(this: typeof Base) {
   return connectionPool.call(this).dbConfig;
 }
