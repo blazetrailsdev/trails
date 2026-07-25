@@ -2259,15 +2259,11 @@ export function bulkInboundFkHost(
 ): FkSafeDropPlanHost {
   const name = adapter.adapterName;
   if (name !== "postgres" && name !== "mysql") return ss;
-  const conn = adapter as unknown as {
-    schemaQuery(sql: string): Promise<Record<string, unknown>[]>;
-    quote(value: unknown): string;
-  };
   const foreignKeysReferencing = async (
     toTables: readonly string[],
   ): Promise<readonly FkDropBlocker[]> => {
     if (toTables.length === 0) return [];
-    const list = toTables.map((t) => conn.quote(t)).join(", ");
+    const list = toTables.map((t) => adapter.quote(t)).join(", ");
     const sql =
       name === "postgres"
         ? `SELECT t1.relname AS from_table, t2.relname AS to_table, c.conname AS name
@@ -2279,17 +2275,17 @@ export function bulkInboundFkHost(
                AND n.nspname = ANY (current_schemas(false))
                AND t2.relname IN (${list})
              ORDER BY c.conname`
-        : `SELECT DISTINCT kcu.table_name AS from_table,
-                    kcu.referenced_table_name AS to_table,
-                    kcu.constraint_name AS name
+        : `SELECT kcu.table_name AS from_table,
+                  kcu.referenced_table_name AS to_table,
+                  kcu.constraint_name AS name
              FROM information_schema.key_column_usage kcu
              WHERE kcu.table_schema = DATABASE()
                AND kcu.referenced_table_name IN (${list})
              ORDER BY kcu.constraint_name`;
-    const rows = await conn.schemaQuery(sql);
-    // A composite foreign key yields one catalog row per column on PostgreSQL
-    // (and, MySQL's DISTINCT notwithstanding, is worth collapsing once here):
-    // the plan wants one blocker per constraint.
+    const rows = await adapter.schemaQuery(sql);
+    // `key_column_usage` reports a composite foreign key as one row per column
+    // (the PG query joins no attribute rows, so it is already per-constraint);
+    // the plan wants one blocker per constraint either way.
     const seen = new Set<string>();
     const blockers: FkDropBlocker[] = [];
     for (const row of rows) {
