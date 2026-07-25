@@ -975,9 +975,9 @@ export class Relation<T extends Base> {
       .flat(1)
       .filter((r) => r != null);
 
-    const model = this._modelClass;
+    const model = this.model;
     const recordsOk = recs.every((r) => r instanceof model);
-    const relationsOk = relations.every((rel) => rel._modelClass === model);
+    const relationsOk = relations.every((rel) => rel.model === model);
     if (!recordsOk || !relationsOk) {
       throw new ArgumentError(
         `You must only pass a single or collection of ${model.name} objects to #${callee}.`,
@@ -1178,7 +1178,7 @@ export class Relation<T extends Base> {
     // column (e.g. enum integer mappings, date/time serialization) instead of the
     // JS-native string/number form. column.to_s drives the type lookup; an Arel node
     // (SqlLiteral) finds no attribute type and falls through to ValueType (no-op cast).
-    const typeCaster = new TypeCasterMap(this._modelClass);
+    const typeCaster = new TypeCasterMap(this.model);
     const columnName = typeof column === "string" ? column : String(column);
     // Normalize undefined → null so eq(null) emits IS NULL (not the invalid = NULL).
     const normalized = values.map((v) => {
@@ -2529,7 +2529,7 @@ export class Relation<T extends Base> {
       const allowRetry = this._lastSelectRetryable;
       const result = await this._conn().selectAll(
         sql,
-        `${this._modelClass.name} Load`,
+        `${this.model.name} Load`,
         this._lastSelectBinds,
         { allowRetry, preparable: this._lastSelectPreparable },
       );
@@ -3500,7 +3500,7 @@ export class Relation<T extends Base> {
     // `cache` block are served from the query cache. Routing through the raw
     // `execute()` here would bypass the cached `selectAll` override.
     const rows = await this._withQueryConnection(() =>
-      this._conn().selectRows(existsSql, `${this._modelClass.name} Exists?`, existsBinds),
+      this._conn().selectRows(existsSql, `${this.model.name} Exists?`, existsBinds),
     );
     // Rails: `select_rows(...).size == 1` — with LIMIT 1 the probe returns at
     // most one row, so a non-empty result means a match.
@@ -3800,11 +3800,7 @@ export class Relation<T extends Base> {
     this._applyCtesAndAnnotationsToManager(manager);
 
     const [pluckSql, pluckBinds] = this._compileAstWithBinds(manager.ast);
-    const result = await this._conn().selectAll(
-      pluckSql,
-      `${this._modelClass.name} Pluck`,
-      pluckBinds,
-    );
+    const result = await this._conn().selectAll(pluckSql, `${this.model.name} Pluck`, pluckBinds);
 
     // Type-cast results positionally through each result column's type
     // (model attribute type → join dependency → driver OID → identity),
@@ -3818,7 +3814,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#ids
    */
   async ids(): Promise<unknown[]> {
-    return this.pluck(this._modelClass.primaryKey as string);
+    return this.pluck(this.model.primaryKey as string);
   }
 
   /**
@@ -3865,8 +3861,8 @@ export class Relation<T extends Base> {
     );
     // Mirrors Rails relation.rb#update_all: bump locking_column when omitted.
     // Uses _incrementAttribute (COALESCE(col, 0) + 1) for NULL-safe increment.
-    if (this._modelClass.lockingEnabled) {
-      const lockingCol = this._modelClass.lockingColumn;
+    if (this.model.lockingEnabled) {
+      const lockingCol = this.model.lockingColumn;
       if (!Object.prototype.hasOwnProperty.call(updates, lockingCol)) {
         updateValues.push([table.get(lockingCol), this._incrementAttribute(lockingCol)]);
       }
@@ -3901,7 +3897,7 @@ export class Relation<T extends Base> {
     const [updateSql, updateBinds] = this._compileAstWithBinds(stmtAst);
     const count = await this._conn().execUpdate(
       updateSql,
-      `${this._modelClass.name} Update All`,
+      `${this.model.name} Update All`,
       updateBinds,
     );
     this.reset();
@@ -3945,7 +3941,7 @@ export class Relation<T extends Base> {
     }
 
     const table = this._modelClass.arelTable;
-    const primaryKey = this._modelClass.primaryKey;
+    const primaryKey = this.model.primaryKey;
     let stmtAst;
     if (typeof primaryKey === "string" || Array.isArray(primaryKey)) {
       // Mirrors Rails `delete_all`: always run `build_arel` + `compile_delete`
@@ -3992,7 +3988,7 @@ export class Relation<T extends Base> {
     const [deleteSql, deleteBinds] = this._compileAstWithBinds(stmtAst);
     const count = await this._conn().execDelete(
       deleteSql,
-      `${this._modelClass.name} Delete All`,
+      `${this.model.name} Delete All`,
       deleteBinds,
     );
     this.reset();
@@ -4016,7 +4012,7 @@ export class Relation<T extends Base> {
     // (e.g. Developer.updated_at → legacy_updated_at). Route through updateAll
     // so optimistic locking (lock_version increment) is applied — mirrors Rails
     // touch_all which calls update_all internally (relation.rb).
-    const touchUpdates = touchAttributesWithTime.call(this._modelClass, ...names, time);
+    const touchUpdates = touchAttributesWithTime.call(this.model, ...names, time);
     const updates: Record<string, unknown> = {};
     for (const [col, touchedAt] of Object.entries(touchUpdates)) {
       updates[col] = new Nodes.Quoted(touchedAt);
@@ -6127,7 +6123,7 @@ export class Relation<T extends Base> {
       // hash form; `touch: []` → no names), then touch the update-timestamp
       // columns via touchAttributesWithTime — same call Rails makes.
       const { names, time } = parseCounterCacheTouch(touchOption);
-      const touchUpdates = touchAttributesWithTime.call(this._modelClass, ...names, time);
+      const touchUpdates = touchAttributesWithTime.call(this.model, ...names, time);
       for (const [col, t] of Object.entries(touchUpdates)) {
         updates[col] = new Nodes.Quoted(t);
       }
@@ -6147,7 +6143,7 @@ export class Relation<T extends Base> {
     if (id == null) return 0;
     if (Array.isArray(id) && id.length === 0) return 0;
 
-    const primaryKey = this._modelClass.primaryKey;
+    const primaryKey = this.model.primaryKey;
     if (Array.isArray(primaryKey)) {
       const idArr = Array.isArray(id) ? id : [id];
       if (idArr.length !== primaryKey.length) return 0;
@@ -6347,7 +6343,7 @@ export class Relation<T extends Base> {
    * materializing every row.
    */
   async include(record: T): Promise<boolean> {
-    if (!(record instanceof this._modelClass)) return false;
+    if (!(record instanceof this.model)) return false;
     if (
       this.isLoaded ||
       this._offsetValue !== null ||
@@ -6393,12 +6389,10 @@ export class Relation<T extends Base> {
       return this._predicateBuilder;
     }
     let pb: PredicateBuilder;
-    const modelPbAccessor = (this._modelClass as any).predicateBuilder;
+    const modelPbAccessor = (this.model as any).predicateBuilder;
     const modelPb =
-      typeof modelPbAccessor === "function"
-        ? modelPbAccessor.call(this._modelClass)
-        : modelPbAccessor;
-    const metadata = new TableMetadata(this._modelClass, this.table);
+      typeof modelPbAccessor === "function" ? modelPbAccessor.call(this.model) : modelPbAccessor;
+    const metadata = new TableMetadata(this.model, this.table);
     if (modelPb && typeof modelPb.with === "function") {
       pb = modelPb.with(metadata);
     } else {
@@ -6578,7 +6572,7 @@ export class Relation<T extends Base> {
     const allQueries =
       typeof optionsOrCallback === "function" ? null : (optionsOrCallback.allQueries ?? null);
 
-    const modelClass = this._modelClass as any;
+    const modelClass = this.model as any;
     const registry = ScopeRegistry.instance();
 
     // Rails: global_scope? && all_queries == false → raise.
@@ -6689,8 +6683,8 @@ export class Relation<T extends Base> {
 
   /** @internal */
   async computeCacheKey(timestampColumn = "updated_at"): Promise<string> {
-    const key = `${this._modelClass.tableName}/query-${hexdigest(this.toSql())}`;
-    if (this._modelClass.collectionCacheVersioning) {
+    const key = `${this.model.tableName}/query-${hexdigest(this.toSql())}`;
+    if (this.model.collectionCacheVersioning) {
       return key;
     }
     const version = await this.computeCacheVersion(timestampColumn);
@@ -6703,7 +6697,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#cache_version
    */
   async cacheVersion(timestampColumn = "updated_at"): Promise<string | null> {
-    if (!this._modelClass.collectionCacheVersioning) return null;
+    if (!this.model.collectionCacheVersioning) return null;
     this._cacheVersions ??= new Map();
     if (!this._cacheVersions.has(timestampColumn)) {
       this._cacheVersions.set(
@@ -6903,7 +6897,7 @@ export class Relation<T extends Base> {
         }
       }
       if (ts != null) {
-        const fmt = this._modelClass.cacheTimestampFormat;
+        const fmt = this.model.cacheTimestampFormat;
         const formatted = formatCacheTimestamp(ts, fmt);
         return `${size}-${formatted}`;
       }
@@ -7041,7 +7035,7 @@ export class Relation<T extends Base> {
   }
 
   private currentScopeRestoringBlock(block?: (record: T) => void): (record: T) => void {
-    const modelClass = this._modelClass;
+    const modelClass = this.model;
     const currentScope = ScopeRegistry.currentScope(modelClass as any);
     return (record: T) => {
       ScopeRegistry.setCurrentScope(modelClass as any, currentScope ?? null);
@@ -7050,24 +7044,24 @@ export class Relation<T extends Base> {
   }
 
   private _new(attributes: Record<string, unknown>): T {
-    return new (this._modelClass as any)(attributes) as T;
+    return new (this.model as any)(attributes) as T;
   }
 
   private _create(attributes: Record<string, unknown>): Promise<T> {
-    return (this._modelClass as any).create(attributes);
+    return (this.model as any).create(attributes);
   }
 
   private _createBang(attributes: Record<string, unknown>): Promise<T> {
-    return (this._modelClass as any).createBang(attributes);
+    return (this.model as any).createBang(attributes);
   }
 
   private _scoping<R>(scope: any, registry: any, fn: () => R): R {
-    const previous = registry?.currentScope?.(this._modelClass, true);
-    registry?.setCurrentScope?.(this._modelClass, scope);
+    const previous = registry?.currentScope?.(this.model, true);
+    registry?.setCurrentScope?.(this.model, scope);
     try {
       return fn();
     } finally {
-      registry?.setCurrentScope?.(this._modelClass, previous);
+      registry?.setCurrentScope?.(this.model, previous);
     }
   }
 
@@ -7092,7 +7086,7 @@ export class Relation<T extends Base> {
       // RAW values and rely on that — so routing a cast value through
       // `buildBindAttribute` would cast twice. `withCastValue` is the preserving
       // constructor that matches Rails' semantics.
-      const type = this._modelClass.typeForAttribute(attr.name);
+      const type = this.model.typeForAttribute(attr.name);
       return [attr, QueryAttribute.withCastValue(attr.name, type.cast(value), type)];
     });
   }
@@ -7120,7 +7114,7 @@ export class Relation<T extends Base> {
 
   private instantiateRecords(rows: Record<string, unknown>[]): T[] {
     if (rows.length === 0) return [];
-    return rows.map((row) => this._modelClass._instantiate(row) as T);
+    return rows.map((row) => this.model._instantiate(row) as T);
   }
 
   private skipQueryCacheIfNecessary<R>(block: () => R): R {
