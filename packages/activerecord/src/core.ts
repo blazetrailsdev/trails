@@ -30,6 +30,7 @@ import { Table, Nodes } from "@blazetrails/arel";
 import { Map as TypeCasterMap } from "./type-caster/map.js";
 import { buildPkWhereNode, columnsHash } from "./model-schema.js";
 import { StatementCache } from "./statement-cache.js";
+import { withPooledOrDirectConnection } from "./connection-handling.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 
 /**
@@ -1144,31 +1145,32 @@ function respondsTo(value: unknown, name: string): boolean {
  * @internal
  */
 async function cachedFindBy(this: CoreHost, keys: string[], values: unknown[]): Promise<any> {
-  const connection = (this as any).connection;
-  // Rails keys the cache on the array itself (structural equality); we
-  // serialize it so ["a","b"] and ["a,b"] don't collide on a "," join.
-  const cacheKey = JSON.stringify(keys);
-  const statement = cachedFindByStatement.call(this, connection, cacheKey, () =>
-    StatementCache.create(connection, (params) => {
-      const wheres: Record<string, unknown> = {};
-      for (const k of keys) wheres[k] = params.bind();
-      return (this as any).where(wheres).limit(1);
-    }),
-  );
-  try {
-    const records = await statement.execute(values, connection, { allowRetry: true });
-    return records[0] ?? null;
-  } catch (e) {
-    // An out-of-range value for the column type returns null, matching the
-    // relation path's findBy (finder-methods.ts). Rails catches ::RangeError
-    // at the bind layer; our typed ActiveModelRangeError is the port of that.
-    if (e instanceof ActiveModelRangeError) return null;
-    // Rails: rescue TypeError; raise ActiveRecord::StatementInvalid — a bind
-    // value that slips past unsupportedValue but fails type coercion surfaces
-    // as the AR error callers rescue, not a raw TypeError.
-    if (e instanceof TypeError) throw new StatementInvalid(e.message);
-    throw e;
-  }
+  return withPooledOrDirectConnection(this as any, async (connection: any) => {
+    // Rails keys the cache on the array itself (structural equality); we
+    // serialize it so ["a","b"] and ["a,b"] don't collide on a "," join.
+    const cacheKey = JSON.stringify(keys);
+    const statement = cachedFindByStatement.call(this, connection, cacheKey, () =>
+      StatementCache.create(connection, (params) => {
+        const wheres: Record<string, unknown> = {};
+        for (const k of keys) wheres[k] = params.bind();
+        return (this as any).where(wheres).limit(1);
+      }),
+    );
+    try {
+      const records = await statement.execute(values, connection, { allowRetry: true });
+      return records[0] ?? null;
+    } catch (e) {
+      // An out-of-range value for the column type returns null, matching the
+      // relation path's findBy (finder-methods.ts). Rails catches ::RangeError
+      // at the bind layer; our typed ActiveModelRangeError is the port of that.
+      if (e instanceof ActiveModelRangeError) return null;
+      // Rails: rescue TypeError; raise ActiveRecord::StatementInvalid — a bind
+      // value that slips past unsupportedValue but fails type coercion surfaces
+      // as the AR error callers rescue, not a raw TypeError.
+      if (e instanceof TypeError) throw new StatementInvalid(e.message);
+      throw e;
+    }
+  });
 }
 
 export function findByBang(this: CoreHost, conditions: unknown, ...rest: unknown[]): Promise<any> {

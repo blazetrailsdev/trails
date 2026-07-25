@@ -48,8 +48,8 @@ export async function setupSecondPool(): Promise<void> {
   registerModel(Course);
   registerModel(Entrant);
   registerModel(Professor);
-  const arunit2 = ARUnit2Model.connection;
-  const primary = Base.connection;
+  const arunit2 = await ARUnit2Model.leaseConnection();
+  const primary = await Base.leaseConnection();
 
   // The primary database owns only `entrants`; remove the canonical schema's
   // `arunit2`-only tables so the two pools stay disjoint.
@@ -76,7 +76,7 @@ export async function setupSecondPool(): Promise<void> {
  * @internal
  */
 export async function teardownSecondPool(): Promise<void> {
-  await rebuildCanonicalTables(Base.connection, [
+  await rebuildCanonicalTables(await Base.leaseConnection(), [
     "colleges",
     "courses",
     "professors",
