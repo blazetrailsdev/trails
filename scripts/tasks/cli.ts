@@ -217,7 +217,7 @@ export function buildIndexFromOriginMain(cwd?: string): { index: Index; sha: str
   } catch {
     return null;
   }
-  if (!/^[0-9a-f]{40}$/.test(sha) || !gitDir) return null;
+  if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(sha) || !gitDir) return null;
   const cacheDir = join(gitDir, READ_INDEX_CACHE_DIRNAME);
   const entryName = `${sha}.json`;
   const cached = join(cacheDir, entryName);
