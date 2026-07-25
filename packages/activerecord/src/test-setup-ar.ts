@@ -19,6 +19,7 @@ import { setRaiseOnAssignToAttrReadonly } from "./ar-config.js";
 import { resetTestAdapterState } from "./test-adapter.js";
 import { shouldSkipGlobalReset } from "./test-helpers/skip-global-reset.js";
 import { Configurable as EncryptionConfigurable } from "./encryption/configurable.js";
+import { installExtendedQueriesIfConfigured } from "./encryption/install.js";
 import {
   TEST_PRIMARY_KEY,
   TEST_DETERMINISTIC_KEY,
@@ -57,6 +58,12 @@ EncryptionConfigurable.configure({
   deterministicKey: TEST_DETERMINISTIC_KEY,
   keyDerivationSalt: TEST_KEY_DERIVATION_SALT,
 });
+
+// Mirror Rails activerecord/test/cases/helper.rb:104-107 — the suite runs with
+// deterministic-encryption query support installed, standing in for what the
+// railtie does in a real app (railtie.rb:349-355).
+EncryptionConfigurable.config.extendQueries = true;
+installExtendedQueriesIfConfigured();
 
 // Wipe shared test-adapter state before every test so each test starts
 // from a clean slate.

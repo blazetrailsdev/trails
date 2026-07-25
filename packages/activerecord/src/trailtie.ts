@@ -27,6 +27,7 @@
 import { onLoad, Railtie as BaseRailtie, registerRailtie } from "@blazetrails/activesupport";
 import { Base } from "./base.js";
 import { Configurable as EncryptionConfigurable } from "./encryption/configurable.js";
+import { installExtendedQueriesIfConfigured } from "./encryption/install.js";
 import { SchemaReflection } from "./connection-adapters/schema-cache.js";
 import type { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
@@ -160,6 +161,10 @@ const onPostgresqlAdapterLoadedPushTimestamptz = (): void => {
   onLoad("active_record", { once: true }, pushTimestamptzToTimeZoneAwareTypes);
 };
 
+const installEncryptionExtendedQueries = (): void => {
+  installExtendedQueriesIfConfigured();
+};
+
 const setSqlite3StrictStringsByDefault = (adapter: typeof AbstractSQLite3Adapter): void => {
   adapter.strictStringsByDefault = true;
 };
@@ -251,6 +256,18 @@ export class Trailtie extends BaseRailtie {
       if (enc && Object.keys(enc).length > 0) {
         EncryptionConfigurable.configure(enc);
       }
+
+      // Rails (railtie.rb:349-355):
+      //   ActiveSupport.on_load(:active_record) do
+      //     # Support extended queries for deterministic attributes and validations
+      //     if ActiveRecord::Encryption.config.extend_queries
+      //       ActiveRecord::Encryption::ExtendedDeterministicQueries.install_support
+      //       ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidator.install_support
+      //     end
+      //   end
+      // The `extend_queries` gate is read when the hook fires, not now; our
+      // installer re-checks the flag itself, so it stays faithful.
+      onLoad("active_record", { once: true }, installEncryptionExtendedQueries);
     });
   }
 }
