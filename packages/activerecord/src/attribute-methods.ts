@@ -573,7 +573,7 @@ export function attributesForUpdate(this: InstanceMethodHost, attributeNames: st
   return attributeNames.filter((name) => {
     if (!colNames.has(name)) return false;
     if (mc.readonlyAttributeQ?.(name)) return false;
-    if (mc._counterCacheColumns?.has?.(name)) return false;
+    if (mc.isCounterCacheColumn?.(name)) return false;
     // Rails: column_for_attribute(name).virtual?
     const col = mc.columnForAttribute?.(name);
     if (col?.virtual || col?.isVirtual?.()) return false;
