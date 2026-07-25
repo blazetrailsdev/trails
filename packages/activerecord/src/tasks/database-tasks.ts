@@ -1494,10 +1494,8 @@ export async function initializeDatabase(dbConfig: DatabaseConfig): Promise<bool
  * pool serves the same database: opening a second pool on a `:memory:` database
  * destroys the first one's data, so the probe must not own its own connection
  * when a matching one exists.
- *
- * @internal
  */
-export async function initializeDatabaseOn(
+async function initializeDatabaseOn(
   adapter: import("../connection-adapters/abstract-adapter.js").AbstractAdapter,
   dbConfig: DatabaseConfig,
 ): Promise<boolean> {

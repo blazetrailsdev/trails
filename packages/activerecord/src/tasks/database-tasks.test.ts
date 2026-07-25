@@ -712,8 +712,8 @@ const skipMigrationTestCase = adapterType !== "sqlite" || inMemoryDb();
 interface MigrationTestCase {
   /** Rails: `capture_migration_output` (database_tasks_test.rb:1056-1060). */
   captureMigrationOutput(): Promise<string>;
-  /** Everything the case has written to stdout since the last capture. */
-  output(): string;
+  /** Rails: `capture(:stdout) { ... }` (activesupport test helper). */
+  captureStdout(fn: () => Promise<void>): Promise<string>;
 }
 
 /**
@@ -736,9 +736,17 @@ async function backupIntoConnection(sourceFile: string): Promise<void> {
     }
     for (const [type, name] of objects) {
       if (type !== "table") continue;
+      const table = adapter.quoteTableName(String(name));
+      // Column list rather than `SELECT *`: `pragma_table_info` omits generated
+      // columns, which cannot be inserted into.
+      const columns = await adapter.selectRows(
+        `SELECT name FROM pragma_table_info(${adapter.quote(String(name))}, 'backupSource')`,
+      );
+      const columnList = columns.map(([column]) => adapter.quoteColumnName(String(column)));
+      if (columnList.length === 0) continue;
       await adapter.executeMutation(
-        `INSERT INTO main.${adapter.quoteTableName(String(name))} ` +
-          `SELECT * FROM backupSource.${adapter.quoteTableName(String(name))}`,
+        `INSERT INTO main.${table} (${columnList.join(", ")}) ` +
+          `SELECT ${columnList.join(", ")} FROM backupSource.${table}`,
       );
     }
   } finally {
@@ -787,15 +795,15 @@ function databaseTasksMigrationTestCase(): MigrationTestCase {
     if (!skipMigrationTestCase) await establishFromTestConfig();
   });
 
+  const captureStdout = async (fn: () => Promise<void>): Promise<string> => {
+    stdoutChunks = [];
+    await fn();
+    return stdoutChunks.join("");
+  };
+
   return {
-    async captureMigrationOutput() {
-      stdoutChunks = [];
-      await DatabaseTasks.migrate();
-      return stdoutChunks.join("");
-    },
-    output() {
-      return stdoutChunks.join("");
-    },
+    captureStdout,
+    captureMigrationOutput: () => captureStdout(() => DatabaseTasks.migrate()),
   };
 }
 
@@ -944,8 +952,7 @@ describe("DatabaseTasksMigrateStatusTest", () => {
   });
 
   it.skipIf(skipMigrationTestCase)("migrate status table", async () => {
-    await DatabaseTasks.migrateStatus();
-    const output = testCase.output();
+    const output = await testCase.captureStdout(() => DatabaseTasks.migrateStatus());
     expect(output).toMatch(/database: :memory:/);
     expect(output).toMatch(/down\s+001\s+Valid people have last names/);
     expect(output).toMatch(/down\s+002\s+We need reminders/);
