@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { EncryptedUniquenessValidator } from "./extended-deterministic-uniqueness-validator.js";
+import { ExtendedDeterministicQueries } from "./extended-deterministic-queries.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Scheme } from "./scheme.js";
 import { isEncryptionDisabled } from "./context.js";
@@ -36,6 +37,13 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidatorTest
     };
     const record = { constructor: klass };
 
+    // The suite boots with ExtendedDeterministicQueries installed (helper.rb:104-107),
+    // which suppresses the extra previous-scheme query. Pin it off so this test
+    // exercises the un-extended branch it is about.
+    const installedSpy = vi
+      .spyOn(ExtendedDeterministicQueries, "installed", "get")
+      .mockReturnValue(false);
+
     const calls: Array<{ attribute: string; value: unknown; encryptionDisabled: boolean }> = [];
     const originalValidateEach = (_record: any, attribute: string, value: unknown) => {
       calls.push({ attribute, value, encryptionDisabled: isEncryptionDisabled() });
@@ -56,6 +64,8 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidatorTest
     expect(calls[1]).toBeDefined();
     expect(calls[1].value).toEqual([type.previousTypes[0].serialize("user@example.com")]);
     expect(calls[1].encryptionDisabled).toBe(true);
+
+    installedSpy.mockRestore();
   });
 
   it("validateEach skips non-deterministic attributes", async () => {

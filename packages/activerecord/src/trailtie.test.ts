@@ -6,6 +6,9 @@ import { SchemaReflection } from "./connection-adapters/schema-cache.js";
 import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
 import { Configurable as EncryptionConfigurable } from "./encryption/configurable.js";
+import { ExtendedDeterministicUniquenessValidator } from "./encryption/extended-deterministic-uniqueness-validator.js";
+import { installExtendedQueriesIfConfigured } from "./encryption/install.js";
+import { UniquenessValidator } from "./validations.js";
 import { deprecator } from "./deprecator.js";
 import { raiseOnAssignToAttrReadonly, setRaiseOnAssignToAttrReadonly } from "./ar-config.js";
 
@@ -23,6 +26,7 @@ describe("RailtieTest", () => {
   let savedEncryptionSupportUnencryptedData: boolean;
   let savedPartialInserts: boolean;
   let savedRaiseOnAssignToAttrReadonly: boolean;
+  let savedExtendQueries: boolean;
 
   beforeEach(() => {
     savedSubclasses = [...BaseRailtie.subclasses];
@@ -36,6 +40,7 @@ describe("RailtieTest", () => {
     savedEncryptionSupportUnencryptedData = EncryptionConfigurable.config.supportUnencryptedData;
     savedPartialInserts = Base.partialInserts;
     savedRaiseOnAssignToAttrReadonly = raiseOnAssignToAttrReadonly;
+    savedExtendQueries = EncryptionConfigurable.config.extendQueries;
 
     // Simulate a fresh app boot for each test: clear the load-hook registry
     // and re-emit the load events that base.ts / the adapter files would
@@ -59,6 +64,11 @@ describe("RailtieTest", () => {
     EncryptionConfigurable.config.supportUnencryptedData = savedEncryptionSupportUnencryptedData;
     Base.partialInserts = savedPartialInserts;
     setRaiseOnAssignToAttrReadonly(savedRaiseOnAssignToAttrReadonly);
+    // The suite boots with extended query support installed
+    // (test-setup-ar.ts, mirroring helper.rb:104-107); tests here uninstall it
+    // to observe the initializer doing the install, so put it back.
+    EncryptionConfigurable.config.extendQueries = savedExtendQueries;
+    installExtendedQueriesIfConfigured();
     for (const key of Object.keys(deprecators)) {
       delete deprecators[key];
     }
@@ -143,6 +153,26 @@ describe("RailtieTest", () => {
     cfg.encryption = { supportUnencryptedData: true };
     Trailtie.runInitializers();
     expect(EncryptionConfigurable.config.supportUnencryptedData).toBe(true);
+  });
+
+  it("runInitializers installs extended deterministic query support when extend_queries is set", () => {
+    ExtendedDeterministicUniquenessValidator.resetSupport(UniquenessValidator);
+    EncryptionConfigurable.config.extendQueries = true;
+
+    Trailtie.runInitializers();
+    runLoadHooks("active_record", Base);
+
+    expect(ExtendedDeterministicUniquenessValidator.installed).toBe(true);
+  });
+
+  it("runInitializers does not install extended deterministic query support when extend_queries is unset", () => {
+    ExtendedDeterministicUniquenessValidator.resetSupport(UniquenessValidator);
+    EncryptionConfigurable.config.extendQueries = false;
+
+    Trailtie.runInitializers();
+    runLoadHooks("active_record", Base);
+
+    expect(ExtendedDeterministicUniquenessValidator.installed).toBe(false);
   });
 
   it("load_defaults: partial_inserts is true without any version load", () => {
