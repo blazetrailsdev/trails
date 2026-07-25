@@ -1,13 +1,15 @@
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
-import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import {
+  describeIfMysqlAdapter,
+  leaseMysqlAdapter,
+  Mysql2Adapter,
+  MYSQL_TEST_URL,
+} from "./test-helper.js";
 
-describeIfMysql("Mysql2Adapter", () => {
+describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
-  });
-  afterEach(async () => {
-    await adapter.close();
+    adapter = await leaseMysqlAdapter();
   });
 
   describe("CountDeletedRowsWithLockTest", () => {
@@ -31,6 +33,8 @@ describeIfMysql("Mysql2Adapter", () => {
         "INSERT INTO `test_bulbs` (name, color) VALUES ('Jimmy', 'blue')",
       );
 
+      // Stays self-built: "in different threads" is the test — the concurrent
+      // INSERT has to run on a connection other than the one issuing the DELETE.
       const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
       try {
         const [deleteResult, _createResult] = await Promise.allSettled([

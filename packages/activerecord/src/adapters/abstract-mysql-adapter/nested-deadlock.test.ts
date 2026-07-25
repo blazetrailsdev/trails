@@ -1,5 +1,10 @@
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
-import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import {
+  describeIfMysqlAdapter,
+  leaseMysqlAdapter,
+  Mysql2Adapter,
+  MYSQL_TEST_URL,
+} from "./test-helper.js";
 import { Deadlocked, Rollback } from "../../errors.js";
 import { SavepointTransaction } from "../../connection-adapters/abstract/transaction.js";
 
@@ -26,13 +31,10 @@ function assertSavepoint(a: Mysql2Adapter): void {
   expect(a.currentTransaction()).toBeInstanceOf(SavepointTransaction);
 }
 
-describeIfMysql("Mysql2Adapter", () => {
+describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
-  });
-  afterEach(async () => {
-    await adapter.close();
+    adapter = await leaseMysqlAdapter();
   });
 
   describe("NestedDeadlockTest", () => {
@@ -114,6 +116,8 @@ describeIfMysql("Mysql2Adapter", () => {
     }
 
     it("deadlock correctly raises Deadlocked inside nested SavepointTransaction", async () => {
+      // Stays self-built: the deadlock needs two connections racing for the
+      // same rows — Rails' counterpart runs the second side on its own thread.
       const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
       try {
         const { results } = await raceNestedTransactions(adapter2);
@@ -130,6 +134,8 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("rollback exception is swallowed after a rollback", async () => {
+      // Stays self-built: the deadlock needs two connections racing for the
+      // same rows — Rails' counterpart runs the second side on its own thread.
       const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
       try {
         const { results, deadlocks } = await raceNestedTransactions(adapter2, "rollback");
@@ -144,6 +150,8 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("deadlock inside nested SavepointTransaction is recoverable", async () => {
+      // Stays self-built: the deadlock needs two connections racing for the
+      // same rows — Rails' counterpart runs the second side on its own thread.
       const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
       try {
         const { results, deadlocks } = await raceNestedTransactions(adapter2, "swallow");

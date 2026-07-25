@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { BigIntegerType } from "@blazetrails/activemodel";
 import {
-  describeIfMysql,
+  describeIfMysqlAdapter,
+  leaseMysqlAdapter,
   Mysql2Adapter,
-  MYSQL_TEST_URL,
 } from "../abstract-mysql-adapter/test-helper.js";
 
-describeIfMysql("Mysql2Adapter", () => {
+describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   const type = new BigIntegerType({ limit: 8 });
   // 2^62 — 19 digits, well above the 15-digit threshold where mysql2
@@ -14,7 +14,7 @@ describeIfMysql("Mysql2Adapter", () => {
   const BIG = 2n ** 62n;
 
   beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
+    adapter = await leaseMysqlAdapter();
     await adapter.executeMutation(`DROP TABLE IF EXISTS \`bigint_rt\``);
     await adapter.executeMutation(`
       CREATE TABLE \`bigint_rt\` (
@@ -27,7 +27,6 @@ describeIfMysql("Mysql2Adapter", () => {
 
   afterEach(async () => {
     await adapter.executeMutation(`DROP TABLE IF EXISTS \`bigint_rt\``);
-    await adapter.close();
   });
 
   describe("MySQL bigint round-trip", () => {
