@@ -24,7 +24,6 @@ import {
   introspectIndexes,
   introspectPrimaryKey,
 } from "../../../../packages/activerecord/src/schema-introspection.js";
-import { getFsAsync } from "@blazetrails/activesupport";
 import { canonicalize } from "./canonicalize.js";
 import type { NativeDump, NativeColumn, NativeIndex } from "./canonicalize.js";
 
@@ -58,10 +57,6 @@ async function main(): Promise<void> {
 
   const fixtureDirAbs = resolve(fixtureDir);
   const outPathAbs = resolve(outPath);
-
-  // The sync node fs auto-register relies on `require`, which is absent under
-  // pure ESM; awaiting the async path registers the adapter up front.
-  await getFsAsync();
 
   const tmpDir = mkdtempSync(join(tmpdir(), "parity-node-"));
   const dbPath = join(tmpDir, "schema.db");

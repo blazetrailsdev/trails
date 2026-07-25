@@ -133,6 +133,22 @@ export function registerFsAdapter(name: string, fs: FsAdapter, path: PathAdapter
 let nodeAttempted = false;
 let nodeAsyncPromise: Promise<boolean> | null = null;
 
+function syncBuiltinLoader(): ((id: string) => unknown) | null {
+  const proc = globalThis.process as
+    | (typeof globalThis.process & { getBuiltinModule?: (id: string) => unknown })
+    | undefined;
+  const getBuiltinModule = proc?.getBuiltinModule;
+  if (typeof getBuiltinModule === "function") return (id) => getBuiltinModule.call(proc, id);
+  if (typeof require === "undefined") return null;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const nodeModule = require("node:module") as {
+    createRequire(p: string): (id: string) => unknown;
+  };
+  return nodeModule.createRequire(
+    typeof __filename !== "undefined" ? __filename : "file:///activesupport",
+  );
+}
+
 function tryAutoRegisterNode(): boolean {
   if (registry.has("node")) return true;
   if (nodeAttempted) return false;
@@ -141,15 +157,8 @@ function tryAutoRegisterNode(): boolean {
     if (typeof globalThis.process === "undefined" || !globalThis.process.versions?.node) {
       return false;
     }
-    const nodeModule =
-      typeof require !== "undefined"
-        ? // eslint-disable-next-line @typescript-eslint/no-require-imports
-          require("node:module")
-        : null;
-    if (!nodeModule) return false;
-    const req = nodeModule.createRequire(
-      typeof __filename !== "undefined" ? __filename : "file:///activesupport",
-    );
+    const req = syncBuiltinLoader();
+    if (!req) return false;
     const nodeFs = req("node:fs") as Omit<FsAdapter, "cwd" | "exists" | "stat" | "lstat">;
     const fsPromises = req("node:fs/promises") as {
       access(p: string): Promise<void>;
