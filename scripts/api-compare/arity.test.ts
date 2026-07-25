@@ -201,6 +201,18 @@ describe("matchArityAgainst", () => {
     expect(v).toMatchObject({ matched: false, tsParams: real, tsRange: { min: 3, max: 3 } });
   });
 
+  it("breaks a distance tie on positional length, ignoring a `this:` receiver", () => {
+    // Equidistant candidates: the 3-positional one must beat the 2-positional
+    // one even though the latter is 3 params long counting `this`.
+    const withThis: ParamInfo[] = [req("this"), req("a"), req("b")];
+    const positional: ParamInfo[] = [req("a"), req("b"), req("c")];
+    const v = matchArityAgainst(
+      [req("a"), req("b"), req("c"), req("d"), req("e")],
+      [withThis, positional],
+    );
+    expect(v).toMatchObject({ matched: false, tsParams: positional });
+  });
+
   it("breaks a distance tie toward the longer parameter list", () => {
     // Ruby takes 2; both candidates sit 2 slots away, so length decides.
     const long: ParamInfo[] = [req("a"), req("b"), req("c"), req("d")];

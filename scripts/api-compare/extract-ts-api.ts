@@ -1215,7 +1215,11 @@ export function paramsOfCallableRef(
 ): ParamInfo[] | null {
   const signatures = checker.getTypeAtLocation(expr).getCallSignatures();
   if (signatures.length === 0) return null;
-  const decl = signatures[0].declaration;
+  // An overloaded target exposes one signature per overload; take the widest so
+  // the recorded arity spans every call the alias admits rather than silently
+  // truncating to whichever overload was declared first.
+  const widest = signatures.reduce((a, b) => (b.parameters.length > a.parameters.length ? b : a));
+  const decl = widest.declaration;
   return decl && ts.isFunctionLike(decl) ? extractParameters(decl.parameters) : [];
 }
 

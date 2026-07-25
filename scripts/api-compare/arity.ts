@@ -292,7 +292,10 @@ export function matchArityAgainst(ruby: ParamInfo[], candidates: ParamInfo[][]):
     if (
       best === null ||
       distance < best.distance ||
-      (distance === best.distance && c.length > best.params.length)
+      // Tie-break on POSITIONAL length: `distance` already comes from a
+      // `this`-stripped range, so comparing raw lengths would let a candidate
+      // win a tie on the strength of a receiver param nobody counts.
+      (distance === best.distance && stripThis(c).length > stripThis(best.params).length)
     ) {
       best = { m, params: c, distance };
     }

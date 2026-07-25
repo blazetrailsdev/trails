@@ -92,6 +92,19 @@ describe("harvestObjectLiteralMethods", () => {
     expect(byName["noop"]).toEqual([]);
   });
 
+  it("resolves an overloaded alias target to its widest signature", () => {
+    const methods = objectLiteralMethods(
+      `function find(id: number): void;
+      function find(id: number, options: object): void;
+      function find(id: number, options?: object): void {}
+      export const ClassMethods = { find };`,
+    );
+    expect(methods.find((m) => m.name === "find")!.params).toEqual([
+      { name: "id", kind: "required", type: "number" },
+      { name: "options", kind: "required", type: "object" },
+    ]);
+  });
+
   it("resolves alias bindings to the target function's params", () => {
     const methods = objectLiteralMethods(
       `function readonlyAttributeQ(this: unknown, attribute: string): boolean { return true; }
