@@ -3638,9 +3638,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
   ): Promise<unknown[]> {
     // Rails: `null_scope? ? scope.pluck(*column_names) : super`
-    // (collection_proxy.rb:728-730). A null scope has been `none!`d, so it must
-    // not read the in-memory target below — the built-but-unsaved children of a
-    // keyless new owner are not rows Rails would return.
+    // (collection_proxy.rb:728-730). A fidelity pin, not a bug fix: the paths
+    // below already return nothing for a null scope, but only incidentally —
+    // the loaded-target arm happens to filter new records, and the `super` arm
+    // happens to sit on the `1=0` seed `_finderScope` describes. Routing
+    // explicitly through the `none!`d scope makes the guarantee structural, so
+    // neither of those incidental properties can be refactored away silently.
     if (this.isNullScope()) return this.scope().pluck(...columns);
     // Loaded-target fast path only handles bare string column names —
     // readAttribute can't resolve Arel nodes. For any non-string arg,
@@ -3980,6 +3983,26 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
+   * Whether the association scope is the null scope — the owner is a new record
+   * with no foreign key to query by, so `CollectionAssociation#scope` has
+   * `none!`d it (collection_association.rb:298-306). Mirrors
+   * `CollectionProxy#null_scope?` (collection_proxy.rb:1150-1152), a one-line
+   * delegation to `@association.null_scope?`.
+   *
+   * The body is re-expressed rather than borrowed from
+   * `CollectionAssociation.prototype.isNullScope` because the proxy's
+   * `_foreignKeyPresent` is the through-aware one (a `has_many :through` routes
+   * the check through the `belongs_to`), and — as with `isFindFromTarget` — the
+   * proxy must not resolve through `owner.association(name)`, whose state is a
+   * secondary copy.
+   *
+   * @internal
+   */
+  isNullScope(): boolean {
+    return this._record.isNewRecord() && !this._foreignKeyPresent();
+  }
+
+  /**
    * Whether find should read the in-memory target rather than querying the
    * database. Mirrors `CollectionProxy#find_from_target?`
    * (collection_proxy.rb:1154), a one-line delegation to
@@ -4001,26 +4024,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       this as unknown as CollectionAssociation,
       this._targetLoaded,
     );
-  }
-
-  /**
-   * Whether the association scope is the null scope — the owner is a new record
-   * with no foreign key to query by, so `CollectionAssociation#scope` has
-   * `none!`d it (collection_association.rb:298-306). Mirrors
-   * `CollectionProxy#null_scope?` (collection_proxy.rb:1150-1152), a one-line
-   * delegation to `@association.null_scope?`.
-   *
-   * The body is re-expressed rather than borrowed from
-   * `CollectionAssociation.prototype.isNullScope` because the proxy's
-   * `_foreignKeyPresent` is the through-aware one (a `has_many :through` routes
-   * the check through the `belongs_to`), and — as with `isFindFromTarget` — the
-   * proxy must not resolve through `owner.association(name)`, whose state is a
-   * secondary copy.
-   *
-   * @internal
-   */
-  isNullScope(): boolean {
-    return this._record.isNewRecord() && !this._foreignKeyPresent();
   }
 
   /**
@@ -4242,9 +4245,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
     const s = this.scope();
     // Rails: `null_scope? ? scope.calculate(operation, column_name) : super`
-    // (collection_proxy.rb:724-726). A `none!`d scope must reach `scope`'s
-    // calculation and never the in-memory fallback at the bottom of this
-    // method, which would count built records that have no rows behind them.
+    // (collection_proxy.rb:724-726). As in `pluck`, a fidelity pin rather than
+    // a bug fix — the arms below also reach `scope`. It matters for the
+    // in-memory fallback at the bottom of this method, which counts loaded
+    // records with no rows behind them and must stay unreachable for a null
+    // scope no matter what `scope()` grows the ability to answer.
     if (this.isNullScope()) return s.calculate(op, columnName);
     if (op === "count" && columnName == null && typeof s.count === "function") {
       return s.count();
