@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
+import { getOsAsync } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { currentRole, currentPreventingWrites } from "../core.js";
@@ -26,7 +28,44 @@ describe("ConnectionSwappingNestedTest", () => {
   let prevDefaultEnv: string;
   let prevCurrent: unknown;
 
-  beforeEach(() => {
+  // Rails points every database in this file at an on-disk sqlite file under
+  // `test/db/`, and encodes the primary/replica relationship by having a
+  // replica share its primary's *file*. trails has no `test/db` fixtures dir,
+  // so the files live in a per-test temp dir — what has to match Rails is the
+  // topology (file-backed, replicas sharing a file), not the literal path.
+  const DB_NAMES = [
+    "primary",
+    "primary_shard_one",
+    "secondary",
+    "secondary_replica",
+    "secondary_shard_one",
+    "secondary_shard_two",
+    "tertiary",
+    "arunit",
+  ] as const;
+
+  let dbDir: string;
+  const dbPaths: Record<string, string> = {};
+
+  /** Config for a sqlite database backed by the named file in the temp dir. */
+  const sqliteDb = (name: (typeof DB_NAMES)[number], extra: object = {}) => ({
+    adapter: "sqlite3",
+    database: dbPaths[name],
+    ...extra,
+  });
+
+  beforeEach(async () => {
+    const fs = await getFsAsync();
+    const path = await getPathAsync();
+    const os = await getOsAsync();
+    dbDir = await fs.mkdtemp!(path.join(os.tmpdir(), "trails-conn-swap-"));
+    for (const name of DB_NAMES) {
+      const file = path.join(dbDir, `${name}.sqlite3`);
+      dbPaths[name] = file;
+      // An empty file is a valid (empty) sqlite database.
+      await fs.writeFile!(file, "");
+    }
+
     prevConfigs = (Base as any).configurations;
     prevDefaultEnv = DatabaseConfigurations.defaultEnv;
     prevCurrent = (DatabaseConfigurations as any).current;
@@ -43,15 +82,23 @@ describe("ConnectionSwappingNestedTest", () => {
     (SecondaryBase as any).connectionClass = false;
     (TertiaryBase as any).connectionClass = false;
     vi.unstubAllEnvs();
+
+    // Sweep the whole dir so WAL sidecars (`-wal`/`-shm`) go with the DB files.
+    const fs = await getFsAsync();
+    const path = await getPathAsync();
+    for (const entry of await fs.readdir!(dbDir)) {
+      await fs.unlink!(path.join(dbDir, entry));
+    }
+    await fs.rmdir!(dbDir);
   });
 
   it("roles can be swapped granularly", () => {
     (Base as any).configurations = {
       default_env: {
-        primary: { adapter: "sqlite3", database: ":memory:" },
-        primary_replica: { adapter: "sqlite3", database: ":memory:", replica: true },
-        secondary: { adapter: "sqlite3", database: ":memory:" },
-        secondary_replica: { adapter: "sqlite3", database: ":memory:", replica: true },
+        primary: sqliteDb("primary"),
+        primary_replica: sqliteDb("primary", { replica: true }),
+        secondary: sqliteDb("secondary"),
+        secondary_replica: sqliteDb("secondary_replica", { replica: true }),
       },
     };
 
@@ -107,16 +154,16 @@ describe("ConnectionSwappingNestedTest", () => {
   it("shards can be swapped granularly", () => {
     (Base as any).configurations = {
       default_env: {
-        primary: { adapter: "sqlite3", database: ":memory:" },
-        primary_replica: { adapter: "sqlite3", database: ":memory:", replica: true },
-        primary_shard_one: { adapter: "sqlite3", database: ":memory:" },
-        primary_shard_one_replica: { adapter: "sqlite3", database: ":memory:", replica: true },
-        secondary: { adapter: "sqlite3", database: ":memory:" },
-        secondary_replica: { adapter: "sqlite3", database: ":memory:", replica: true },
-        secondary_shard_one: { adapter: "sqlite3", database: ":memory:" },
-        secondary_shard_one_replica: { adapter: "sqlite3", database: ":memory:", replica: true },
-        secondary_shard_two: { adapter: "sqlite3", database: ":memory:" },
-        secondary_shard_two_replica: { adapter: "sqlite3", database: ":memory:", replica: true },
+        primary: sqliteDb("primary"),
+        primary_replica: sqliteDb("primary", { replica: true }),
+        primary_shard_one: sqliteDb("primary_shard_one"),
+        primary_shard_one_replica: sqliteDb("primary_shard_one", { replica: true }),
+        secondary: sqliteDb("secondary"),
+        secondary_replica: sqliteDb("secondary", { replica: true }),
+        secondary_shard_one: sqliteDb("secondary_shard_one"),
+        secondary_shard_one_replica: sqliteDb("secondary_shard_one", { replica: true }),
+        secondary_shard_two: sqliteDb("secondary_shard_two"),
+        secondary_shard_two_replica: sqliteDb("secondary_shard_two", { replica: true }),
       },
     };
 
@@ -180,16 +227,16 @@ describe("ConnectionSwappingNestedTest", () => {
   it("roles and shards can be swapped granularly", () => {
     (Base as any).configurations = {
       default_env: {
-        primary: { adapter: "sqlite3", database: ":memory:" },
-        primary_replica: { adapter: "sqlite3", database: ":memory:", replica: true },
-        primary_shard_one: { adapter: "sqlite3", database: ":memory:" },
-        primary_shard_one_replica: { adapter: "sqlite3", database: ":memory:", replica: true },
-        secondary: { adapter: "sqlite3", database: ":memory:" },
-        secondary_replica: { adapter: "sqlite3", database: ":memory:", replica: true },
-        secondary_shard_one: { adapter: "sqlite3", database: ":memory:" },
-        secondary_shard_one_replica: { adapter: "sqlite3", database: ":memory:", replica: true },
-        secondary_shard_two: { adapter: "sqlite3", database: ":memory:" },
-        secondary_shard_two_replica: { adapter: "sqlite3", database: ":memory:", replica: true },
+        primary: sqliteDb("primary"),
+        primary_replica: sqliteDb("primary", { replica: true }),
+        primary_shard_one: sqliteDb("primary_shard_one"),
+        primary_shard_one_replica: sqliteDb("primary_shard_one", { replica: true }),
+        secondary: sqliteDb("secondary"),
+        secondary_replica: sqliteDb("secondary", { replica: true }),
+        secondary_shard_one: sqliteDb("secondary_shard_one"),
+        secondary_shard_one_replica: sqliteDb("secondary_shard_one", { replica: true }),
+        secondary_shard_two: sqliteDb("secondary_shard_two"),
+        secondary_shard_two_replica: sqliteDb("secondary_shard_two", { replica: true }),
       },
     };
 
@@ -251,12 +298,12 @@ describe("ConnectionSwappingNestedTest", () => {
   it("connected to many", () => {
     (Base as any).configurations = {
       default_env: {
-        primary: { adapter: "sqlite3", database: ":memory:" },
-        primary_replica: { adapter: "sqlite3", database: ":memory:", replica: true },
-        secondary: { adapter: "sqlite3", database: ":memory:" },
-        secondary_replica: { adapter: "sqlite3", database: ":memory:", replica: true },
-        tertiary: { adapter: "sqlite3", database: ":memory:" },
-        tertiary_replica: { adapter: "sqlite3", database: ":memory:", replica: true },
+        primary: sqliteDb("primary"),
+        primary_replica: sqliteDb("primary", { replica: true }),
+        secondary: sqliteDb("secondary"),
+        secondary_replica: sqliteDb("secondary", { replica: true }),
+        tertiary: sqliteDb("tertiary"),
+        tertiary_replica: sqliteDb("tertiary", { replica: true }),
       },
     };
 
@@ -290,10 +337,10 @@ describe("ConnectionSwappingNestedTest", () => {
   it("prevent writes can be changed granularly", () => {
     (Base as any).configurations = {
       default_env: {
-        primary: { adapter: "sqlite3", database: ":memory:" },
-        primary_replica: { adapter: "sqlite3", database: ":memory:" },
-        secondary: { adapter: "sqlite3", database: ":memory:" },
-        secondary_replica: { adapter: "sqlite3", database: ":memory:" },
+        primary: sqliteDb("primary"),
+        primary_replica: sqliteDb("primary"),
+        secondary: sqliteDb("secondary"),
+        secondary_replica: sqliteDb("secondary_replica"),
       },
     };
 
@@ -346,7 +393,7 @@ describe("ConnectionSwappingNestedTest", () => {
 
     (Base as any).configurations = {
       default_env: {
-        arunit: { adapter: "sqlite3", database: ":memory:" },
+        arunit: sqliteDb("arunit"),
       },
     };
 
@@ -373,7 +420,7 @@ describe("ConnectionSwappingNestedTest", () => {
   it("prevent writes handles class reloading", async () => {
     (Base as any).configurations = {
       default_env: {
-        arunit: { adapter: "sqlite3", database: ":memory:" },
+        arunit: sqliteDb("arunit"),
       },
     };
 
