@@ -76,7 +76,12 @@ export interface TagEntry {
 }
 
 const TAG_LINE = /^\s*\*?\s*@missingRailsCall\s+(\S+)(?:\s+—\s?(.*))?$/;
-const ANY_TAG_LINE = /^\s*\*?\s*@\S/;
+// A line opening a NEW JSDoc tag: at most one space after the `*`. Curated
+// reasons can contain Ruby ivar names (`@primary_key`), and the wrapper's
+// hang indent (`*   `) can place one at line start — deeper-indented `@`
+// lines are continuations, not tag boundaries (found by the activerecord-wide
+// run: core.ts initInternals).
+const ANY_TAG_LINE = /^\s*\*?\s?@\S/;
 
 /** Parse a JSDoc comment's text (including delimiters) into its non-tag lines
  *  and its `@missingRailsCall` entries. Continuation lines (not starting a new
@@ -136,7 +141,9 @@ function renderEntry(e: TagEntry, indent: string): string[] {
   const lines: string[] = [];
   let cur = `${indent} * `;
   for (const w of words) {
-    if (cur.trim() !== "*" && (cur + w).length > 80) {
+    // Never break so a continuation line would START with an `@`-word (a Ruby
+    // ivar in the reason prose) — it would re-parse as a tag boundary.
+    if (cur.trim() !== "*" && (cur + w).length > 80 && !w.startsWith("@")) {
       lines.push(cur.trimEnd());
       cur = `${indent} *   `;
     }
@@ -195,10 +202,18 @@ export function reconcileFileText(
   text: string,
   expectations: Map<string, MethodExpectation>,
   reasonFor: (rubyName: string, call: string) => string,
-): { text: string | null; harvested: { tsName: string; entry: TagEntry }[] } {
+): {
+  text: string | null;
+  harvested: { tsName: string; entry: TagEntry }[];
+  /** Expectation names never seen on a body-bearing declaration (mixin
+   *  host-class duplicates, prototype-patched methods, …) — reported, never
+   *  silently dropped. */
+  unmatched: string[];
+} {
   const sf = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true);
   const edits: Edit[] = [];
   const harvested: { tsName: string; entry: TagEntry }[] = [];
+  const seen = new Set<string>();
 
   const visit = (node: ts.Node): void => {
     let name: string | null = null;
@@ -208,17 +223,26 @@ export function reconcileFileText(
     // pairs) are reconciled against the SAME expected-call set. Unlike the
     // lints this tool writes to source, so a shared name can stamp tags onto
     // a sibling they don't belong to — qualify by class if this ever bites.
+    // Only body-bearing declarations: overload SIGNATURES (and interface /
+    // ambient members) must not be stamped — tagging each overload duplicates
+    // the block once per signature (found by the activerecord-wide run).
     if (
       (ts.isFunctionDeclaration(node) ||
         ts.isMethodDeclaration(node) ||
         ts.isGetAccessor(node) ||
         ts.isSetAccessor(node)) &&
+      node.body &&
       node.name &&
       ts.isIdentifier(node.name)
     ) {
       name = node.name.text;
+    } else if (ts.isConstructorDeclaration(node) && node.body) {
+      // Ruby `initialize` matches the TS constructor (artifact tsName
+      // "constructor"), which carries no identifier.
+      name = "constructor";
     }
     if (name !== null) {
+      seen.add(name);
       const exp = expectations.get(name);
       const ranges = ts.getLeadingCommentRanges(text, node.getFullStart()) ?? [];
       const jsdocRange = ranges.filter((r) => text.slice(r.pos, r.pos + 3) === "/**").at(-1);
@@ -255,12 +279,13 @@ export function reconcileFileText(
   };
   visit(sf);
 
-  if (edits.length === 0) return { text: null, harvested };
+  const unmatched = [...expectations.keys()].filter((n) => !seen.has(n)).sort();
+  if (edits.length === 0) return { text: null, harvested, unmatched };
   let out = text;
   for (const e of edits.sort((a, b) => b.start - a.start)) {
     out = out.slice(0, e.start) + e.text + out.slice(e.end);
   }
-  return { text: out, harvested };
+  return { text: out, harvested, unmatched };
 }
 
 async function main(argv: string[]): Promise<number> {
@@ -314,7 +339,11 @@ async function main(argv: string[]): Promise<number> {
     } catch {
       continue; // expected TS file not ported yet — stub phase, not this slice
     }
-    const { text: next, harvested } = reconcileFileText(
+    const {
+      text: next,
+      harvested,
+      unmatched,
+    } = reconcileFileText(
       tsFile,
       text,
       expectations,
@@ -323,6 +352,9 @@ async function main(argv: string[]): Promise<number> {
     );
     for (const h of harvested) {
       console.log(`harvested (${tsFile} ${h.tsName} ${h.entry.call}): ${h.entry.reason}`);
+    }
+    if (unmatched.length > 0) {
+      console.log(`unmatched (${tsFile}): ${unmatched.join(", ")} — no body-bearing declaration`);
     }
     if (next !== null) {
       changed++;

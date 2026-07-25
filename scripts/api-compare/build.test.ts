@@ -101,6 +101,44 @@ describe("reconcileFileText", () => {
     expect(text!).toContain("@missingRailsCall write_attribute — why");
   });
 
+  it("round-trips a reason containing a Ruby ivar (@primary_key) across wraps", () => {
+    const src = ["export class Foo {", "  bar(): void {}", "}"].join("\n");
+    // Long enough that the wrapper would break right before the ivar word.
+    const reason =
+      "Per-entry verified (RFC 0032): Rails core.rb caches `klass.primary_key` into " +
+      "@primary_key and calls `klass.define_attribute_methods`; neither call appears here.";
+    const expectations = new Map([["bar", { rubyName: "bar", calls: new Set(["primary_key"]) }]]);
+    const first = reconcileFileText("foo.ts", src, expectations, () => reason).text!;
+    const second = reconcileFileText("foo.ts", first, expectations, () => reason);
+    expect(second.text).toBeNull();
+    const { entries } = parseJsdoc(first);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.reason).toContain("@primary_key and calls");
+  });
+
+  it("tags constructors (Ruby initialize) and reports unmatched expectations", () => {
+    const src = ["export class Foo {", "  constructor() {}", "}"].join("\n");
+    const expectations = new Map([
+      ["constructor", { rubyName: "initialize", calls: new Set(["super"]) }],
+      ["prototypePatched", { rubyName: "patched", calls: new Set(["save"]) }],
+    ]);
+    const { text, unmatched } = reconcileFileText("foo.ts", src, expectations, () => "why");
+    expect(text!).toContain("@missingRailsCall super — why");
+    expect(unmatched).toEqual(["prototypePatched"]);
+  });
+
+  it("stamps only the overload implementation, never the signatures", () => {
+    const src = [
+      "export function f(a: string): void;",
+      "export function f(a: number): void;",
+      "export function f(a: unknown): void {}",
+    ].join("\n");
+    const expectations = new Map([["f", { rubyName: "f", calls: new Set(["save"]) }]]);
+    const { text } = reconcileFileText("foo.ts", src, expectations, () => "why");
+    expect(text!.match(/@missingRailsCall save/g)).toHaveLength(1);
+    expect(text!.indexOf("@missingRailsCall")).toBeGreaterThan(text!.indexOf("f(a: number)"));
+  });
+
   it("removes a tags-only JSDoc entirely once all calls converge", () => {
     const src = [
       "export class Foo {",
