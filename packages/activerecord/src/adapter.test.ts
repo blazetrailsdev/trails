@@ -4,7 +4,6 @@ import { Notifications } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
-import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { SchemaCreation } from "./connection-adapters/abstract/schema-creation.js";
 import { AdapterError, ConnectionFailed } from "./errors.js";
 import {
@@ -242,6 +241,8 @@ describe("AdapterTest", () => {
       "indexes",
       "remove index when name and wrong column name specified",
       "remove index when name and wrong column name specified positional argument",
+      // Re-establishes `Base`, swapping the pool out from under the fixture pin.
+      "disable prepared statements",
     ],
   });
 
@@ -387,21 +388,19 @@ describe("AdapterTest", () => {
   // charset / collation / show-variable / cross-database-selects (MySQL-only)
   // live in the describeIfMysql AdapterTest block below.
 
-  it("disable prepared statements", async () => {
-    // Rails asserts `prepared_statements?` flips false once the global
-    // `ActiveRecord.disable_prepared_statements` toggle is set. Rails gates this
-    // `unless in_memory_db?`; our default DB is sqlite `:memory:`, so we hit the
-    // same setter chokepoint by constructing adapters on each side of the toggle.
+  // Rails gates this `unless in_memory_db?` (adapter_test.rb:176): a
+  // re-established `:memory:` connection is a fresh, empty database.
+  it.skipIf(inMemoryDb())("disable prepared statements", async () => {
     const original = disablePreparedStatements;
     try {
-      const enabled = new BetterSQLite3Adapter(":memory:", { preparedStatements: true });
-      expect(enabled.preparedStatements).toBe(true);
-      await enabled.close();
+      await runWithoutConnection(async (origConnection) => {
+        await Base.establishConnection({ ...origConnection, preparedStatements: true });
+        expect((await Base.leaseConnection()).preparedStatements).toBe(true);
 
-      setDisablePreparedStatements(true);
-      const disabled = new BetterSQLite3Adapter(":memory:", { preparedStatements: true });
-      expect(disabled.preparedStatements).toBe(false);
-      await disabled.close();
+        setDisablePreparedStatements(true);
+        await Base.establishConnection({ ...origConnection, preparedStatements: true });
+        expect((await Base.leaseConnection()).preparedStatements).toBe(false);
+      });
     } finally {
       setDisablePreparedStatements(original);
     }
