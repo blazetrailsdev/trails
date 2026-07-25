@@ -42,11 +42,24 @@ describe("buildTestDatabaseConfig", () => {
     vi.stubEnv("ARCONN", "sqlite3");
     vi.stubEnv("AR_TEST_WORKER_DB", "");
     const { envConfig } = await buildTestDatabaseConfig();
-    // Rails' `sqlite3` connection is file-backed (config.example.yml);
-    // `:memory:` is the opt-in `sqlite3_mem` connection only.
     expect(envConfig.database).not.toBe(":memory:");
     expect(envConfig.database).toMatch(/\.sqlite$/);
     expect(envConfig.pool).toBe(5);
+  });
+
+  it("reuses one fallback database path across calls", async () => {
+    vi.stubEnv("ARCONN", "sqlite3");
+    vi.stubEnv("AR_TEST_WORKER_DB", "");
+    const first = (await buildTestDatabaseConfig()).envConfig.database;
+    const second = (await buildTestDatabaseConfig()).envConfig.database;
+    expect(second).toBe(first);
+  });
+
+  it("prefers AR_TEST_WORKER_DB over the fallback database", async () => {
+    vi.stubEnv("ARCONN", "sqlite3");
+    vi.stubEnv("AR_TEST_WORKER_DB", "/tmp/ar-test-worker.sqlite3");
+    const { envConfig } = await buildTestDatabaseConfig();
+    expect(envConfig.database).toBe("/tmp/ar-test-worker.sqlite3");
   });
 
   it("pins pool 1 on the sqlite3_mem :memory: connection", async () => {

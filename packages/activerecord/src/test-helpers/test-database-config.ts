@@ -158,38 +158,20 @@ async function resolve(): Promise<{ adapter: TestAdapterName; envConfig: HashCon
   return { adapter: connection.lane, envConfig };
 }
 
-/**
- * Path of this process' fallback sqlite DB, used when globalSetup did not
- * stamp `AR_TEST_WORKER_DB`. Memoized on `globalThis` so every connection
- * opened in this process — and every re-evaluation of the module graph within
- * one worker, which vitest's `isolate: true` does per file — lands on the same
- * file. The token keeps concurrent processes on distinct files, so the
- * per-worker isolation of the primary lane is preserved here too.
- */
 async function fallbackDatabasePath(): Promise<string> {
   const g = globalThis as typeof globalThis & { __arFallbackDbPath?: string };
   if (g.__arFallbackDbPath) return g.__arFallbackDbPath;
   const path = await getPathAsync();
   const os = await getOsAsync();
-  const token = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  const runToken =
+    getEnv("AR_TEST_RUN_TOKEN") ||
+    `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+  const slot = getEnv("VITEST_POOL_ID") || getEnv("VITEST_WORKER_ID") || "1";
+  const token = `${runToken}-${slot}`;
   g.__arFallbackDbPath = path.join(os.tmpdir(), `ar-test-fallback-${token}.sqlite`);
   return g.__arFallbackDbPath;
 }
 
-/**
- * Build the sqlite primary config hash. Mirrors Rails' primary test config,
- * which is file-backed (`config.example.yml`'s `sqlite3` entry points at
- * `FIXTURES_ROOT/fixture_database.sqlite3`; `:memory:` is the opt-in
- * `sqlite3_mem` connection only) and leaves `pool` unset so `HashConfig#pool`
- * defaults to 5 (`hash_config.rb:72`).
- *
- * `AR_TEST_WORKER_DB` — the per-worker clone stamped by globalSetup — wins when
- * present; without it we still hand back a file, just a per-process temp one,
- * rather than silently dropping to an in-memory DB (which additionally gives
- * separate connections separate empty DBs under better-sqlite3, Rails'
- * `in_memory_db?`). Either way the file is shared across this process'
- * connections, so both inherit Rails' pool of 5.
- */
 async function sqliteHash(): Promise<{ adapter: string; database: string }> {
   const workerDb = getEnv("AR_TEST_WORKER_DB");
   return { adapter: "sqlite3", database: workerDb || (await fallbackDatabasePath()) };
