@@ -333,11 +333,6 @@ export class HasManyThroughAssociation extends HasManyAssociation {
       ?.sourceReflection;
     if (method !== "destroy" && sourceRefl?.options?.counterCache) {
       const counter = sourceRefl.counterCacheColumn?.();
-      // Rails decrements on `klass` — the *association's* klass (the target
-      // model, e.g. `Post`), not the source reflection's. They coincide for a
-      // plain source, but a polymorphic source belongs_to (taggings' `taggable`)
-      // has no klass at all, which is exactly the counter_cache this branch
-      // exists to maintain.
       const klass = safeKlass({ klass: this.klass }) as {
         decrementCounter?: (col: string, ids: unknown) => Promise<unknown>;
       } | null;

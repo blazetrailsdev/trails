@@ -32,8 +32,6 @@ describe("collection replace diffs instead of clearing", () => {
     author.postLog = [];
     await author.postsWithCallbacks.replace(kept);
 
-    // Only the dropped record generates callbacks — the kept ones are neither
-    // removed nor re-added.
     expect(author.postLog).toEqual([`before_removing${dropped.id}`, `after_removing${dropped.id}`]);
   });
 
@@ -56,7 +54,6 @@ describe("collection replace diffs instead of clearing", () => {
     const afterOne = await Reader.where({ post_id: post.id }).count();
     await post.people.replace([david, david]);
 
-    // Multiset difference: [david, david] - [david] leaves one david to insert.
     expect(await Reader.where({ post_id: post.id }).count()).toBe(Number(afterOne) + 1);
   });
 });

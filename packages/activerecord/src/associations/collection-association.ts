@@ -327,6 +327,15 @@ export class CollectionAssociation extends Association {
    * persisted-owner transaction (collection_association.rb:127-135) — the
    * nil that makes `CollectionProxy#<<` falsy.
    */
+  async concat(...records: Base[]): Promise<Base[] | undefined> {
+    const flattened = records.flat();
+    if (this.owner.isNewRecord()) {
+      await this.loadTarget();
+      return this.concatRecords(flattened);
+    }
+    return this.transaction(() => this.concatRecords(flattened));
+  }
+
   /**
    * Run `block` in the reflection klass's transaction.
    *
@@ -358,15 +367,6 @@ export class CollectionAssociation extends Association {
   /** @internal */
   protected intersection(_a: Base[], _b: Base[]): Base[] {
     throw new Error("intersection is implemented by CollectionAssociation subclasses");
-  }
-
-  async concat(...records: Base[]): Promise<Base[] | undefined> {
-    const flattened = records.flat();
-    if (this.owner.isNewRecord()) {
-      await this.loadTarget();
-      return this.concatRecords(flattened);
-    }
-    return this.transaction(() => this.concatRecords(flattened));
   }
 
   /** @internal */

@@ -3358,20 +3358,23 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * timestamp touches).
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#replace →
-   * `CollectionAssociation#replace` (collection_association.rb:242).
+   * `CollectionAssociation#replace` (collection_association.rb:242), returning
+   * the resulting target (`other_array` when nothing changed).
    */
-  async replace(records: T[]): Promise<void> {
+  async replace(records: T[]): Promise<T[]> {
     this._ensureThroughWritable();
     this._raiseOnTypeMismatch(records);
-    const originalTarget = [...(await this.toArray())];
+    const originalTarget = [...(await this._withoutStrictLoading(() => this.toArray()))];
     if (this._record.isNewRecord()) {
-      await this._replaceRecords(records, originalTarget);
-      return;
+      return this._replaceRecords(records, originalTarget);
     }
     this._replaceCommonRecordsInMemory(records, originalTarget);
-    if (!sameRecordList(records, originalTarget)) {
-      await this._replaceTransaction(() => this._replaceRecords(records, originalTarget));
-    }
+    if (sameRecordList(records, originalTarget)) return records;
+    let replaced: T[] = this._target;
+    await this._replaceTransaction(async () => {
+      replaced = await this._replaceRecords(records, originalTarget);
+    });
+    return replaced;
   }
 
   /**
@@ -3380,11 +3383,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * the original target and raising when the concat fails.
    * @internal
    */
-  private async _replaceRecords(newTarget: T[], originalTarget: T[]): Promise<void> {
-    // Rails diffs against `target`, which `load_target` has just filled and
-    // `delete` then prunes. The proxy's `_target` is only populated when the
-    // association is actually loaded, so track the same list explicitly from
-    // the loaded snapshot rather than reading a possibly-empty `_target`.
+  private async _replaceRecords(newTarget: T[], originalTarget: T[]): Promise<T[]> {
     let target = [...originalTarget];
     const toDelete = this._difference(target, newTarget);
     if (toDelete.length > 0) {
@@ -3399,6 +3398,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         this._record,
       );
     }
+    return this._target;
   }
 
   /**
