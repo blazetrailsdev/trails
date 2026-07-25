@@ -1,6 +1,17 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import * as fs from "fs/promises";
+import * as path from "path";
+import { tmpdir } from "os";
 import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
-import { buildGlobalRubyCandidates, buildReport, parseArgs } from "./extra-surface.js";
+import {
+  buildGlobalRubyCandidates,
+  buildReport,
+  findInvalidAllowEntries,
+  loadAllowlist,
+  resolveAllowlist,
+  parseArgs,
+} from "./extra-surface.js";
+import type { AllowEntry } from "./extra-surface.js";
 
 function method(name: string, internal = false): MethodInfo {
   return { name, visibility: internal ? "private" : "public", params: [], internal };
@@ -1095,5 +1106,213 @@ describe("buildReport — novel vs moved classification", () => {
     expect(report.topN[0].novelCount).toBe(2);
     expect(report.topN[1].novelCount).toBe(0);
     expect(report.topN[1].movedCount).toBe(5);
+  });
+});
+
+describe("buildReport — reasoned allowlist", () => {
+  function makeManifests(): { ruby: ApiManifest; ts: ApiManifest } {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            "ActiveModel::Foo": rubyClass({
+              name: "Foo",
+              file: "foo.rb",
+              instance: [method("bar")],
+            }),
+            "ActiveModel::Baz": rubyClass({
+              name: "Baz",
+              file: "baz.rb",
+              instance: [method("quux")],
+            }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            Foo: {
+              name: "Foo",
+              file: "foo.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("bar"), method("quux"), method("tsOnlyHelper")],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    return { ruby, ts };
+  }
+
+  const allowEntry = (name: string): AllowEntry => ({
+    package: "activemodel",
+    tsFile: "foo.ts",
+    name,
+    reason: "TS-idiom accessor with no Rails counterpart.",
+  });
+
+  it("subtracts an allowlisted extra from the novel count and reports it separately", () => {
+    const { ruby, ts } = makeManifests();
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+      allow: [allowEntry("tsOnlyHelper")],
+    });
+    const pkg = report.packages[0];
+    expect(pkg.totalNovel).toBe(0);
+    expect(pkg.totalMoved).toBe(1);
+    expect(pkg.totalAllowlisted).toBe(1);
+    expect(pkg.extraFiles[0].allowlistedCount).toBe(1);
+    expect(pkg.extraFiles[0].extras.map((e) => e.name)).toEqual(["quux"]);
+    expect(report.allowlist).toEqual({ total: 1, matched: 1, stale: [] });
+  });
+
+  it("keeps the package total when every extra of a file is allowlisted", () => {
+    const { ruby, ts } = makeManifests();
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+      allow: [allowEntry("tsOnlyHelper"), allowEntry("quux")],
+    });
+    const pkg = report.packages[0];
+    expect(pkg.extraFiles).toEqual([]);
+    expect(pkg.filesWithDrift).toBe(0);
+    expect(pkg.totalAllowlisted).toBe(2);
+    expect(report.allowlist.matched).toBe(2);
+  });
+
+  it("matches a moved extra even under --novel-only, so the entry isn't stale", () => {
+    const { ruby, ts } = makeManifests();
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: true,
+      topN: 50,
+      allow: [allowEntry("quux")],
+    });
+    expect(report.allowlist.stale).toEqual([]);
+    expect(report.packages[0].totalAllowlisted).toBe(1);
+  });
+
+  it("reports an entry that no longer flags as stale", () => {
+    const { ruby, ts } = makeManifests();
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+      allow: [allowEntry("bar")],
+    });
+    expect(report.allowlist.stale.map((e) => e.name)).toEqual(["bar"]);
+  });
+
+  it("does not judge entries of packages this run never scanned", () => {
+    const { ruby, ts } = makeManifests();
+    const report = buildReport(ruby, ts, {
+      filterPkg: "activerecord",
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+      allow: [allowEntry("bar")],
+    });
+    expect(report.packages).toEqual([]);
+    expect(report.allowlist.stale).toEqual([]);
+  });
+});
+
+describe("findInvalidAllowEntries", () => {
+  it("flags an empty reason", () => {
+    expect(
+      findInvalidAllowEntries([
+        { package: "activemodel", tsFile: "foo.ts", name: "helper", reason: "  " },
+      ]),
+    ).toEqual(["empty reason: activemodel foo.ts helper"]);
+  });
+
+  it("flags a duplicate key", () => {
+    const e: AllowEntry = {
+      package: "activemodel",
+      tsFile: "foo.ts",
+      name: "helper",
+      reason: "kept",
+    };
+    expect(findInvalidAllowEntries([e, { ...e }])).toEqual([
+      "duplicate key: activemodel foo.ts helper",
+    ]);
+  });
+
+  it("accepts a well-formed entry", () => {
+    expect(
+      findInvalidAllowEntries([
+        { package: "activemodel", tsFile: "foo.ts", name: "helper", reason: "kept" },
+      ]),
+    ).toEqual([]);
+  });
+});
+
+describe("loadAllowlist", () => {
+  it("rejects a missing file with an actionable message", async () => {
+    await expect(loadAllowlist("scripts/api-compare/does-not-exist.json")).rejects.toThrow(
+      /Missing does-not-exist\.json/,
+    );
+  });
+
+  it("rejects a file that is not a JSON array", async () => {
+    const file = path.join(await fs.mkdtemp(path.join(tmpdir(), "extra-surface-")), "allow.json");
+    await fs.writeFile(file, JSON.stringify({ package: "activemodel" }));
+    await expect(loadAllowlist(file)).rejects.toThrow(/must be a JSON array/);
+  });
+
+  it("parses the committed allowlist, which is well-formed", async () => {
+    expect(findInvalidAllowEntries(await loadAllowlist())).toEqual([]);
+  });
+});
+
+describe("resolveAllowlist", () => {
+  async function writeAllow(contents: string): Promise<string> {
+    const file = path.join(await fs.mkdtemp(path.join(tmpdir(), "extra-surface-")), "allow.json");
+    await fs.writeFile(file, contents);
+    return file;
+  }
+
+  it("degrades an unreadable file to no suppressions, reporting the problem", async () => {
+    const r = await resolveAllowlist("scripts/api-compare/does-not-exist.json");
+    expect(r.allow).toEqual([]);
+    expect(r.problems).toHaveLength(1);
+    expect(r.problems[0]).toMatch(/Missing does-not-exist\.json/);
+  });
+
+  it("degrades a malformed entry to no suppressions, so the report never gates", async () => {
+    const file = await writeAllow(
+      JSON.stringify([{ package: "activemodel", tsFile: "foo.ts", name: "helper", reason: "" }]),
+    );
+    const r = await resolveAllowlist(file);
+    expect(r.allow).toEqual([]);
+    expect(r.problems).toEqual(["empty reason: activemodel foo.ts helper"]);
+  });
+
+  it("returns the entries when the file is well-formed", async () => {
+    const entry = {
+      package: "activemodel",
+      tsFile: "foo.ts",
+      name: "helper",
+      reason: "TS-idiom accessor.",
+    };
+    const r = await resolveAllowlist(await writeAllow(JSON.stringify([entry])));
+    expect(r).toEqual({ allow: [entry], problems: [] });
   });
 });

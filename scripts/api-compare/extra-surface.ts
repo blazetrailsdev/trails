@@ -54,7 +54,9 @@
  */
 
 import * as fs from "fs";
+import * as fsp from "fs/promises";
 import * as path from "path";
+import { fileURLToPath } from "url";
 import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
 import { OUTPUT_DIR } from "./config.js";
 import { rubyFileToTs, rubyMethodToTs } from "./conventions.js";
@@ -203,6 +205,56 @@ function pushTo<K, V>(map: Map<K, V[]>, key: K, value: V): void {
  */
 export type ExtraKind = "novel" | "moved";
 
+export interface AllowEntry {
+  package: string;
+  tsFile: string;
+  name: string;
+  reason: string;
+}
+
+export const ALLOWLIST_PATH = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "extra-surface-allow.json",
+);
+
+export function allowKeyOf(e: { package: string; tsFile: string; name: string }): string {
+  return `${e.package} ${e.tsFile} ${e.name}`;
+}
+
+export function findInvalidAllowEntries(entries: AllowEntry[]): string[] {
+  const problems: string[] = [];
+  const seen = new Set<string>();
+  for (const e of entries) {
+    const key = allowKeyOf(e);
+    if (!e.package || !e.tsFile || !e.name) {
+      problems.push(`incomplete key: ${JSON.stringify(e)}`);
+      continue;
+    }
+    if (typeof e.reason !== "string" || e.reason.trim() === "") {
+      problems.push(`empty reason: ${key}`);
+    }
+    if (seen.has(key)) problems.push(`duplicate key: ${key}`);
+    seen.add(key);
+  }
+  return problems;
+}
+
+export async function loadAllowlist(file: string = ALLOWLIST_PATH): Promise<AllowEntry[]> {
+  let raw: string;
+  try {
+    raw = await fsp.readFile(file, "utf-8");
+  } catch {
+    throw new Error(
+      `Missing ${path.basename(file)} — the allowlist file must exist (\`[]\` when empty).`,
+    );
+  }
+  const parsed: unknown = JSON.parse(raw);
+  if (!Array.isArray(parsed)) {
+    throw new Error(`${path.basename(file)} must be a JSON array of allowlist entries.`);
+  }
+  return parsed as AllowEntry[];
+}
+
 export interface ExtraName {
   name: string;
   kind: ExtraKind;
@@ -215,6 +267,7 @@ interface ExtraFile {
   extraCount: number;
   novelCount: number;
   movedCount: number;
+  allowlistedCount: number;
   extras: ExtraName[];
 }
 
@@ -224,13 +277,21 @@ interface PackageTotals {
   totalExtras: number;
   totalNovel: number;
   totalMoved: number;
+  totalAllowlisted: number;
   extraFiles: ExtraFile[];
+}
+
+interface AllowlistSummary {
+  total: number;
+  matched: number;
+  stale: AllowEntry[];
 }
 
 interface Report {
   generatedAt: string;
   packages: PackageTotals[];
   topN: ExtraFile[];
+  allowlist: AllowlistSummary;
 }
 
 const HELP = `extra-surface — TS files with public API exceeding their Rails counterpart
@@ -249,6 +310,11 @@ Options:
   --max-detail <N>     Per-file detail listing cap (default 40 names;
                        0 = unlimited)
   --help               This message
+
+Reasoned allowlist: extra-surface-allow.json lists justified extras keyed by
+package + tsFile + name (each with a non-empty reason). Allowed extras are
+subtracted from the novel/moved counts and reported as an "Allowed" total;
+an entry that no longer flags is STALE and fails the run.
 
 Requires: pnpm api:compare must have run first to produce
   scripts/api-compare/output/{rails-api.json,ts-api.json}.
@@ -551,6 +617,8 @@ function buildPackageReport(
   crossPackageModules: Record<string, ClassInfo>,
   crossPackagePkgByFqn: Record<string, string>,
   novelOnly: boolean,
+  allowKeys: Set<string>,
+  matchedAllowKeys: Set<string>,
 ): PackageTotals {
   const rubyPkg = ruby.packages[pkg];
   const tsPkg = ts.packages[pkg];
@@ -560,6 +628,7 @@ function buildPackageReport(
     totalExtras: 0,
     totalNovel: 0,
     totalMoved: 0,
+    totalAllowlisted: 0,
     extraFiles: [],
   };
   if (!rubyPkg || !tsPkg) return result;
@@ -641,14 +710,22 @@ function buildPackageReport(
     const extras: ExtraName[] = [];
     let novelCount = 0;
     let movedCount = 0;
+    let allowlistedCount = 0;
     for (const name of tsNames) {
       if (allowed.has(name)) continue;
+      const allowKey = allowKeyOf({ package: pkg, tsFile: expectedTs, name });
+      if (allowKeys.has(allowKey)) {
+        matchedAllowKeys.add(allowKey);
+        allowlistedCount++;
+        continue;
+      }
       const kind: ExtraKind = globalRubyCandidates.has(name) ? "moved" : "novel";
       if (novelOnly && kind !== "novel") continue;
       extras.push({ name, kind });
       if (kind === "novel") novelCount++;
       else movedCount++;
     }
+    result.totalAllowlisted += allowlistedCount;
     if (extras.length === 0) continue;
 
     // Sort novel before moved, then alphabetical — novel is the higher-signal
@@ -663,6 +740,7 @@ function buildPackageReport(
       extraCount: extras.length,
       novelCount,
       movedCount,
+      allowlistedCount,
       extras,
     });
     result.filesWithDrift++;
@@ -744,17 +822,21 @@ function printHumanReport(report: Report, topN: number, maxDetail: number): void
 
   console.log(`${p.bold}Per-package totals${p.reset}`);
   console.log(
-    `  ${"Package".padEnd(20)} ${"Files".padStart(7)} ${"Novel".padStart(7)} ${"Moved".padStart(7)} ${"Total".padStart(7)}`,
+    `  ${"Package".padEnd(20)} ${"Files".padStart(7)} ${"Novel".padStart(7)} ${"Moved".padStart(7)} ${"Total".padStart(7)} ${"Allowed".padStart(7)}`,
   );
   console.log(
-    `  ${"-".repeat(20)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)}`,
+    `  ${"-".repeat(20)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)}`,
   );
   for (const pkg of report.packages) {
     const novel = padNumCell(pkg.totalNovel, colorCount(pkg.totalNovel, p), 7);
     console.log(
-      `  ${pkg.package.padEnd(20)} ${String(pkg.filesWithDrift).padStart(7)} ${novel} ${String(pkg.totalMoved).padStart(7)} ${String(pkg.totalExtras).padStart(7)}`,
+      `  ${pkg.package.padEnd(20)} ${String(pkg.filesWithDrift).padStart(7)} ${novel} ${String(pkg.totalMoved).padStart(7)} ${String(pkg.totalExtras).padStart(7)} ${String(pkg.totalAllowlisted).padStart(7)}`,
     );
   }
+  console.log(
+    `\n${p.dim}Allowlist (extra-surface-allow.json): ${report.allowlist.total} entr(ies), ` +
+      `${report.allowlist.matched} matched — allowed extras are subtracted from the counts above.${p.reset}`,
+  );
 
   console.log(
     `\n${p.bold}Top ${Math.min(topN, report.topN.length)} most-divergent files${p.reset}  ${p.dim}(ranked by novel count, then total)${p.reset}`,
@@ -805,16 +887,22 @@ export function buildReport(
     excludeGlobs: string[];
     novelOnly: boolean;
     topN: number;
+    allow?: AllowEntry[];
   },
 ): Report {
+  const allow = opts.allow ?? [];
+  const allowKeys = new Set(allow.map(allowKeyOf));
+  const matchedAllowKeys = new Set<string>();
   const globalRubyCandidates = buildGlobalRubyCandidates(ruby);
   const { modules: crossPackageModules, pkgByFqn: crossPackagePkgByFqn } =
     buildCrossPackageModules(ruby);
 
   const packages: PackageTotals[] = [];
+  const scannedPkgs = new Set<string>();
   for (const pkg of Object.keys(ruby.packages)) {
     if (opts.filterPkg && pkg !== opts.filterPkg) continue;
     if (!ts.packages[pkg]) continue;
+    scannedPkgs.add(pkg);
     packages.push(
       buildPackageReport(
         pkg,
@@ -825,6 +913,8 @@ export function buildReport(
         crossPackageModules,
         crossPackagePkgByFqn,
         opts.novelOnly,
+        allowKeys,
+        matchedAllowKeys,
       ),
     );
   }
@@ -838,14 +928,32 @@ export function buildReport(
       a.tsFile.localeCompare(b.tsFile),
   );
 
+  const stale = allow.filter(
+    (e) => scannedPkgs.has(e.package) && !matchedAllowKeys.has(allowKeyOf(e)),
+  );
+
   return {
     generatedAt: new Date().toISOString(),
     packages,
     topN: allExtras.slice(0, opts.topN),
+    allowlist: { total: allow.length, matched: matchedAllowKeys.size, stale },
   };
 }
 
-export function main(argv = process.argv.slice(2)): void {
+export async function resolveAllowlist(
+  file: string = ALLOWLIST_PATH,
+): Promise<{ allow: AllowEntry[]; problems: string[] }> {
+  let allow: AllowEntry[];
+  try {
+    allow = await loadAllowlist(file);
+  } catch (e) {
+    return { allow: [], problems: [e instanceof Error ? e.message : String(e)] };
+  }
+  const problems = findInvalidAllowEntries(allow);
+  return problems.length > 0 ? { allow: [], problems } : { allow, problems };
+}
+
+export async function main(argv = process.argv.slice(2)): Promise<void> {
   const args = parseArgs(argv);
 
   const rubyPath = path.join(OUTPUT_DIR, "rails-api.json");
@@ -859,18 +967,48 @@ export function main(argv = process.argv.slice(2)): void {
   const ruby: ApiManifest = JSON.parse(fs.readFileSync(rubyPath, "utf-8"));
   const ts: ApiManifest = JSON.parse(fs.readFileSync(tsPath, "utf-8"));
 
+  // An unreadable or malformed allowlist must NOT stop the report: these
+  // outputs feed the stats pipeline. Degrade to no suppressions, print
+  // everything, and only then set the exit code.
+  const { allow, problems } = await resolveAllowlist();
+
   const report = buildReport(ruby, ts, {
     filterPkg: args.filterPkg,
     excludeGlobs: args.excludeGlobs,
     novelOnly: args.novelOnly,
     topN: args.topN,
+    allow,
   });
 
   if (args.json) {
     console.log(JSON.stringify(report, null, 2));
-    return;
+  } else {
+    printHumanReport(report, args.topN, args.maxDetail);
   }
-  printHumanReport(report, args.topN, args.maxDetail);
+
+  if (problems.length > 0) {
+    console.error(
+      `\nextra-surface allowlist: ${problems.length} problem(s) with ` +
+        `${path.basename(ALLOWLIST_PATH)} — the report above was produced with NO ` +
+        "suppressions:\n" +
+        problems.map((m) => `  ${m}`).join("\n") +
+        "\nEvery entry needs a unique package+tsFile+name and a non-empty reason.\n",
+    );
+    process.exit(1);
+  }
+
+  // Stale entries can't be judged when --exclude-glob hides whole TS files.
+  if (args.excludeGlobs.length > 0) return;
+  const { stale } = report.allowlist;
+  if (stale.length === 0) return;
+  console.error(
+    `\nextra-surface allowlist: ${stale.length} STALE entr(ies) that no longer ` +
+      "flag as extra surface. The allowlist only shrinks — remove them from " +
+      `${path.basename(ALLOWLIST_PATH)}:\n` +
+      stale.map((e) => `  - ${e.package}  ${e.tsFile}  ${e.name}`).join("\n") +
+      "\n",
+  );
+  process.exit(1);
 }
 
 const invokedAsScript =
@@ -878,4 +1016,4 @@ const invokedAsScript =
   Array.isArray(process.argv) &&
   typeof process.argv[1] === "string" &&
   process.argv[1].endsWith("extra-surface.ts");
-if (invokedAsScript) main();
+if (invokedAsScript) void main();
