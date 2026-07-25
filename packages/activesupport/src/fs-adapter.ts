@@ -133,13 +133,6 @@ export function registerFsAdapter(name: string, fs: FsAdapter, path: PathAdapter
 let nodeAttempted = false;
 let nodeAsyncPromise: Promise<boolean> | null = null;
 
-/**
- * Synchronous access to a Node builtin without a static `node:*` import.
- * Under pure ESM there is no `require`, so `process.getBuiltinModule` (Node
- * >= 22.3) is the only synchronous door; CommonJS hosts and older runtimes
- * fall back to `createRequire`. Returns null on non-Node hosts, which keeps
- * browsers on the "not configured" error rather than a crash.
- */
 function syncBuiltinLoader(): ((id: string) => unknown) | null {
   const proc = globalThis.process as
     | (typeof globalThis.process & { getBuiltinModule?: (id: string) => unknown })
