@@ -251,10 +251,7 @@ export class Result {
   }
 
   #columnType(name: string, index: number, typeOverrides: ColumnTypes): ColumnType {
-    if (typeOverrides && name in typeOverrides) return typeOverrides[name];
-    if (index in this.columnTypes) return this.columnTypes[index as unknown as string];
-    if (name in this.columnTypes) return this.columnTypes[name];
-    return IDENTITY_TYPE;
+    return columnType(this, name, index, typeOverrides);
   }
 }
 
@@ -270,12 +267,13 @@ const EMPTY = Object.freeze(new Result(EMPTY_COLUMNS, EMPTY_ROWS, EMPTY_COLUMN_T
  * @internal
  */
 export function columnType(
+  result: Result,
   name: string,
   index: number,
   typeOverrides: ColumnTypes,
-  columnTypes: ColumnTypes,
 ): ColumnType {
-  if (name in typeOverrides) return typeOverrides[name];
+  const columnTypes = result.columnTypes;
+  if (typeOverrides && name in typeOverrides) return typeOverrides[name];
   if (index in columnTypes) return columnTypes[index as unknown as string];
   if (name in columnTypes) return columnTypes[name];
   return IDENTITY_TYPE;

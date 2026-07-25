@@ -4,6 +4,8 @@
  * Mirrors: ActiveRecord::Migration::JoinTable
  */
 
+import { deriveJoinTableName } from "../model-schema.js";
+
 /** @internal */
 export function findJoinTableName(
   table1: string,
@@ -15,7 +17,5 @@ export function findJoinTableName(
 
 /** @internal */
 export function joinTableName(table1: string, table2: string): string {
-  const joined = [String(table1), String(table2)].sort().join("\0");
-  const deduped = joined.replace(/^(.*[_.])(.+)\0\1(.+)/, "$1$2_$3");
-  return deduped.replaceAll("\0", "_");
+  return deriveJoinTableName(table1, table2);
 }

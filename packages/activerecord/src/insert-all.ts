@@ -130,7 +130,14 @@ export class InsertAll {
       this.keys.add(key);
     }
 
-    this.verifyAttributes();
+    // Rails calls verify_attributes(attributes) once per row from
+    // map_key_with_value (insert_all.rb:79), i.e. at SQL-build time. The port
+    // hoists the loop into the constructor so a mismatched batch raises before
+    // any async work starts; the per-row check itself is Rails' verbatim.
+    for (const row of this.inserts.slice(1)) {
+      this.verifyAttributes({ ...row, ...this._scopeAttributes });
+    }
+    this.verifyAttributeNamesAreKnown();
     this.configureOnDuplicateUpdateLogic(options.onDuplicate);
     this.ensureValidOptionsForConnectionBang();
   }
@@ -267,15 +274,15 @@ export class InsertAll {
   }
 
   /** @internal */
-  private verifyAttributes(): void {
-    if (this.inserts.length > 1) {
-      for (const row of this.inserts.slice(1)) {
-        const rowKeys = new Set([...Object.keys(row), ...Object.keys(this._scopeAttributes)]);
-        if (rowKeys.size !== this.keys.size || ![...this.keys].every((k) => rowKeys.has(k))) {
-          throw new Error("All objects being inserted must have the same keys");
-        }
-      }
+  private verifyAttributes(attributes: Record<string, unknown>): void {
+    const rowKeys = new Set(Object.keys(attributes));
+    if (rowKeys.size !== this.keys.size || ![...this.keys].every((k) => rowKeys.has(k))) {
+      throw new Error("All objects being inserted must have the same keys");
     }
+  }
+
+  /** @internal */
+  private verifyAttributeNamesAreKnown(): void {
     // Rails raises UnknownAttributeError in extract_types_from_columns_on against
     // schema_cache.columns_hash; we mirror the same intent against the model's
     // declared attribute set so the error surfaces before any SQL is built.

@@ -62,7 +62,7 @@ export class Aes256Gcm {
     this._validateKeyLength(this.secret);
     const keyBuf = Buffer.from(this.secret, "base64").subarray(0, KEY_LENGTH);
     const inputBuf = Buffer.isBuffer(clearText) ? clearText : Buffer.from(clearText, "utf-8");
-    const iv = this.generateIv(keyBuf, inputBuf, options?.deterministic ?? this.deterministic);
+    const iv = this.generateIv(inputBuf, options?.deterministic ?? this.deterministic);
     const cipher = getCrypto().createCipheriv(Aes256Gcm.CIPHER_TYPE, keyBuf, iv, {
       authTagLength: AUTH_TAG_LENGTH,
     });
@@ -135,16 +135,25 @@ export class Aes256Gcm {
     }
   }
 
-  /** @internal */
-  private generateIv(keyBuf: Buffer, inputBuf: Buffer, deterministic: boolean): Buffer {
+  /**
+   * Rails' first parameter is the live `OpenSSL::Cipher` (only so the random
+   * branch can call `cipher.random_iv`). WebCrypto has no such object before
+   * the IV exists, so the slot carries the deterministic flag instead — which
+   * Rails reads off `@deterministic`, and this port also lets `encrypt`
+   * override per call.
+   *
+   * @internal
+   */
+  private generateIv(clearText: Buffer, deterministic: boolean): Buffer {
     if (deterministic) {
-      return this.generateDeterministicIv(keyBuf, inputBuf);
+      return this.generateDeterministicIv(clearText);
     }
     return getCrypto().randomBytes(IV_LENGTH);
   }
 
   /** @internal */
-  private generateDeterministicIv(keyBuf: Buffer, clearText: Buffer): Buffer {
+  private generateDeterministicIv(clearText: Buffer): Buffer {
+    const keyBuf = Buffer.from(this.secret, "base64").subarray(0, KEY_LENGTH);
     return getCrypto()
       .createHmac("sha256", keyBuf)
       .update(clearText)

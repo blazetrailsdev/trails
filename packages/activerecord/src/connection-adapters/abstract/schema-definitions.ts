@@ -1020,6 +1020,17 @@ export class TableDefinition {
   }
 
   /** @internal */
+  /**
+   * Remove the column +name+ from the table.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::TableDefinition#remove_column
+   * (Rails deletes from `@columns_hash`; this port keeps an array.)
+   */
+  removeColumn(name: string): void {
+    const index = this.columns.findIndex((c) => c.name === String(name));
+    if (index !== -1) this.columns.splice(index, 1);
+  }
+
   protected validColumnDefinitionOptions(): string[] {
     return [
       "limit",

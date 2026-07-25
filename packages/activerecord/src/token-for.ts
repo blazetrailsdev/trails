@@ -144,13 +144,15 @@ export class TokenDefinition {
     });
   }
 
+  // `block` is Rails' bare `yield(payload[0])` — the finder the caller supplies
+  // as a block (`resolve_token(token) { |id| find_by(...) }`).
   async resolveToken(
     token: string,
-    finder: (id: unknown) => Promise<Base | null>,
+    block: (id: unknown) => Promise<Base | null>,
   ): Promise<Base | null> {
     const verified = this.messageVerifier().verified(token, { purpose: this.fullPurpose() });
     const payload = Array.isArray(verified) && verified.length > 0 ? verified : null;
-    const record = payload ? await finder(payload[0]) : null;
+    const record = payload ? await block(payload[0]) : null;
     return record && JSON.stringify(this.payloadFor(record)) === JSON.stringify(payload)
       ? record
       : null;

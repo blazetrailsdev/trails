@@ -2565,7 +2565,7 @@ export class Relation<T extends Base> {
       ...this._includesAssociations.filter((n) => !promotedIncludes.includes(n)),
     ];
     if (preloadAssocs.length > 0 && this._records.length > 0) {
-      await this._preloadAssociationsForRecords(this._records, preloadAssocs);
+      await this.preloadAssociations(this._records, preloadAssocs);
       if (token !== this._loadToken) return [];
     }
 
@@ -2788,7 +2788,7 @@ export class Relation<T extends Base> {
         result.toArray(),
         result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
       );
-      await this._preloadAssociationsForRecords(this._records, eagerAssociations);
+      await this.preloadAssociations(this._records, eagerAssociations);
       return;
     }
 
@@ -2806,7 +2806,7 @@ export class Relation<T extends Base> {
         result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
       );
       if (fallbackAssocs.length > 0) {
-        await this._preloadAssociationsForRecords(this._records, fallbackAssocs);
+        await this.preloadAssociations(this._records, fallbackAssocs);
       }
       return;
     }
@@ -2904,7 +2904,7 @@ export class Relation<T extends Base> {
     if (block) for (const record of this._records) block(record);
 
     if (fallbackAssocs.length > 0 && this._records.length > 0) {
-      await this._preloadAssociationsForRecords(this._records, fallbackAssocs);
+      await this.preloadAssociations(this._records, fallbackAssocs);
     }
   }
 
@@ -5833,9 +5833,21 @@ export class Relation<T extends Base> {
     return { tbl: key.slice(0, firstDot), col: key.slice(firstDot + 1) };
   }
 
-  private async _preloadAssociationsForRecords(
+  /**
+   * Mirrors: ActiveRecord::Relation#preload_associations (relation.rb:1321)
+   *
+   * Rails derives the spec list itself (`preload_values`, plus `includes_values`
+   * unless `eager_loading?`) — that is the `assocNames` default here. The
+   * internal `load` path passes the list explicitly because this port promotes
+   * `includes` to a JOIN per-association rather than all-or-nothing, so it has
+   * to subtract exactly the specs it promoted.
+   */
+  async preloadAssociations(
     records: T[],
-    assocNames: AssociationSpec[],
+    assocNames: AssociationSpec[] = [
+      ...this._preloadAssociations,
+      ...(this._eagerLoadingForSql() ? [] : this._includesAssociations),
+    ],
   ): Promise<void> {
     if (assocNames.length === 0) return;
     const { Preloader } = await import("./associations/preloader.js");
@@ -6536,10 +6548,6 @@ export class Relation<T extends Base> {
 
   aliasTracker(joins: Nodes.Node[] = [], aliases?: Map<string, number>): AliasTracker {
     return AliasTracker.create(this.model.connectionPool(), this.table.name, joins, aliases);
-  }
-
-  preloadAssociations(): AssociationSpec[] {
-    return [...this._preloadAssociations, ...this._includesAssociations];
   }
 
   bindAttribute(column: string, value: unknown): unknown {

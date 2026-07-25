@@ -65,9 +65,17 @@ export class ConnectionHandler {
    *
    * @internal
    */
-  determineOwnerName(owner: string | ConnectionOwner): ConnectionDescriptor | ConnectionOwner {
+  determineOwnerName(
+    owner: string | ConnectionOwner,
+    config?: DatabaseConfig | Record<string, unknown> | string,
+  ): ConnectionDescriptor | ConnectionOwner {
     if (typeof owner === "string") {
       return new ConnectionDescriptor(owner);
+    }
+    // Rails' `elsif config.is_a?(Symbol)` branch: a config named by symbol
+    // (here, by string) supplies the owner name when none was passed.
+    if (typeof config === "string") {
+      return new ConnectionDescriptor(config);
     }
     return owner;
   }
@@ -116,7 +124,7 @@ export class ConnectionHandler {
   ): ConnectionPool {
     const ownerName =
       options.owner != null
-        ? this.determineOwnerName(options.owner)
+        ? this.determineOwnerName(options.owner, config)
         : config instanceof DatabaseConfig
           ? new ConnectionDescriptor(config.name)
           : new ConnectionDescriptor(typeof options.owner === "string" ? options.owner : "primary");

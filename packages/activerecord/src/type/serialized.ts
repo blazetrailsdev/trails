@@ -328,7 +328,7 @@ export class Serialized extends ValueType {
 
   override isChangedInPlace(rawOldValue: unknown, value: unknown): boolean {
     if (value === null || value === undefined) return false;
-    const rawNewValue = encoded(this, value);
+    const rawNewValue = encoded.call(this, value);
     const oldNil = rawOldValue === null || rawOldValue === undefined;
     const newNil = rawNewValue === null || rawNewValue === undefined;
     return (
@@ -383,9 +383,10 @@ export class Serialized extends ValueType {
  *
  * @internal
  */
-export function encoded(serialized: Serialized, value: unknown): unknown {
+export function encoded(this: Serialized, value: unknown): unknown {
   // Use the constructor-cached default to avoid calling coder.load(null) again,
   // which would produce a fresh object on every call and break reference equality.
+  const serialized = this;
   const s = serialized as any;
   const defaultVal = s._defaultValue;
   if (value === defaultVal) return undefined;

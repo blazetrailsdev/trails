@@ -629,9 +629,18 @@ export function clearAttributeNamesMemo(host: SchemaHost): void {
   }
 }
 
-export function deriveJoinTableName(this: SchemaHost, otherTableName: string): string {
-  const tables = [underscore(this.name), otherTableName].sort();
-  return tables.join("_");
+/**
+ * Mirrors: ActiveRecord::ModelSchema.derive_join_table_name
+ *
+ * A module-level function in Rails (not a class method on the model): it takes
+ * both table names, sorts them, and collapses a shared `foo_`/`foo.` prefix so
+ * `foo_bars` + `foo_bazes` derive `foo_bars_bazes` rather than
+ * `foo_bars_foo_bazes`.
+ */
+export function deriveJoinTableName(firstTable: string, secondTable: string): string {
+  const joined = [String(firstTable), String(secondTable)].sort().join("\0");
+  const deduped = joined.replace(/^(.*[_.])(.+)\0\1(.+)/, "$1$2_$3");
+  return deduped.replaceAll("\0", "_");
 }
 
 export function quotedTableName(this: SchemaHost): string {
@@ -1553,7 +1562,6 @@ export const ClassMethods = {
   columnsHash,
   contentColumns,
   createTable,
-  deriveJoinTableName,
   quotedTableName,
   resetTableName,
   fullTableNamePrefix,
