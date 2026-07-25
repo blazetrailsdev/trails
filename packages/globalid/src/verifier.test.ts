@@ -27,7 +27,10 @@ describe("VerifierTest", () => {
     // URL-safe Verifier — the shared decode path normalizes both forms
     // before validating the signature.
     const verifier = new Verifier(SECRET);
-    const nonUrlSafe = new MessageVerifier(SECRET, { digest: "sha256", url_safe: false });
+    // Same digest as Verifier — which declares none, inheriting
+    // ActiveSupport::MessageVerifier's default exactly as Rails'
+    // GlobalID::Verifier does — so only the encoding differs.
+    const nonUrlSafe = new MessageVerifier(SECRET, { url_safe: false });
     const payload = { gid: "gid://bcx/Person/115186?expires_in", expires_at: null };
     const stdToken = nonUrlSafe.generate(payload);
     expect(verifier.verified(stdToken)).toEqual(payload);

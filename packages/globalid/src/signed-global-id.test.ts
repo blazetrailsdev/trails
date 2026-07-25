@@ -105,12 +105,10 @@ describe("SignedGlobalIDPurposeTest", () => {
 
   it("new accepts a :for", () => {
     // Rails: SignedGlobalID.new(Person.new(5).to_gid.uri, for: 'login') —
-    // the URI-first initializer form. In Trails this is the static
-    // `fromUri(uri, options)` factory since constructors are kwargs-style
-    // through static methods, not direct `new`.
+    // the URI-first initializer form.
     const verifier = makeVerifier();
     const loginSgid = SignedGlobalID.create(person(5), { verifier, for: "login" });
-    const expected = SignedGlobalID.fromUri(`gid://${TEST_APP}/Person/5`, {
+    const expected = new SignedGlobalID(`gid://${TEST_APP}/Person/5`, {
       verifier,
       for: "login",
     });

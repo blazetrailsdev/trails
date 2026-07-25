@@ -1,7 +1,7 @@
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { getApp } from "./config.js";
-import { buildGid, parseGid, type GidComponents } from "./uri/gid.js";
+import { GID, type GidComponents } from "./uri/gid.js";
 // LAZY-IMPORT CYCLE: signed-global-id ↔ global-id ↔ locator. The `GlobalID`
 // and `isOrExtends` runtime values are only referenced inside method bodies
 // below; don't promote those references to module level — native ESM throws
@@ -44,9 +44,9 @@ export interface SignedGlobalIDOptions {
 }
 
 /**
- * Options accepted by {@link SignedGlobalID.fromUri}. A narrower slice of
+ * Options accepted by the {@link SignedGlobalID} constructor. A narrower slice of
  * {@link SignedGlobalIDOptions} — only the knobs that affect verification
- * and the SGID instance fields, since fromUri operates on a pre-built URI
+ * and the SGID instance fields, since the constructor takes a pre-built URI
  * and can't embed `app` or arbitrary extra URI params.
  */
 export interface FromUriOptions {
@@ -81,32 +81,35 @@ export class SignedGlobalID {
 
   private readonly verifier: MessageVerifier;
   private _cached: string | undefined;
-  private _components: GidComponents | undefined;
+  private readonly _components: GidComponents;
   /** Stable per-instance hex id used by inspect(). Rails uses object_id. */
   private readonly _objectId: string;
 
-  private constructor(
-    uri: string,
-    purpose: string | null,
-    expiresAt: Temporal.Instant | undefined,
-    verifier: MessageVerifier,
-  ) {
+  /**
+   * Mirrors: SignedGlobalID#initialize(gid, options) — the URI-first entry
+   * point the Rails test `new accepts a :for` exercises. Use
+   * {@link SignedGlobalID.create} for the model-first form. Only
+   * verifier/purpose/expiration are read; `app` and extra URI params can't
+   * be threaded into an already-built URI string.
+   */
+  constructor(uri: string, options: FromUriOptions = {}) {
+    // Rails' SignedGlobalID#initialize delegates to URI::GID.parse, which
+    // raises on malformed URIs. Match that invariant here so callers get
+    // an early error rather than deferred failures from modelId/modelName
+    // getters reading garbage components.
+    this._components = GID.parse(uri).deconstructKeys();
     this.uri = uri;
-    this.purpose = purpose;
-    this.expiresAt = expiresAt;
-    this.verifier = verifier;
+    this.purpose = SignedGlobalID.pickPurpose(options);
+    this.expiresAt = pickExpiration(options);
+    this.verifier = SignedGlobalID.pickVerifier(options);
     this._objectId = (_nextObjectId++).toString(16).padStart(12, "0");
-  }
-
-  /** @internal — lazily parse and cache. */
-  private _parts(): GidComponents {
-    return (this._components ??= parseGid(this.uri));
   }
 
   /**
    * Create a SignedGlobalID for a model instance.
    *
-   * Mirrors: SignedGlobalID.new
+   * Mirrors: GlobalID.create — inherited by SignedGlobalID in Ruby, where
+   * `new` is polymorphic; declared here because the TS classes are peers.
    */
   static create(model: GlobalIDModel, options: SignedGlobalIDOptions = {}): SignedGlobalID {
     const app = options.app ?? getApp();
@@ -121,40 +124,14 @@ export class SignedGlobalID {
     for (const [k, v] of Object.entries(options)) {
       if (!KNOWN_SGID_KEYS.has(k) && v != null) filteredParams[k] = String(v);
     }
-    const uri = buildGid(
+    const gid = GID.build({
       app,
       modelName,
-      model.id,
-      Object.keys(filteredParams).length ? filteredParams : null,
-    );
+      modelId: model.id,
+      params: Object.keys(filteredParams).length ? filteredParams : null,
+    });
 
-    const verifier = SignedGlobalID.pickVerifier(options);
-    const purpose = SignedGlobalID.pickPurpose(options);
-    const expiresAt = pickExpiration(options);
-
-    return new SignedGlobalID(uri, purpose, expiresAt, verifier);
-  }
-
-  /**
-   * Build a SignedGlobalID from a raw GID URI plus options.
-   *
-   * Mirrors: SignedGlobalID.new(uri, options) — the Rails initializer that
-   * `SignedGlobalIDPurposeTest > 'new accepts a :for'` exercises. Use
-   * {@link create} for the model-first entry point; use this when you
-   * already have a URI string and want the SGID wrapper. Only
-   * verifier/purpose/expiration are read — `app` and extra URI params
-   * can't be threaded into an already-built URI string.
-   */
-  static fromUri(uri: string, options: FromUriOptions = {}): SignedGlobalID {
-    // Rails' SignedGlobalID#initialize delegates to URI::GID.parse, which
-    // raises on malformed URIs. Match that invariant here so callers get
-    // an early error rather than deferred failures from modelId/modelName
-    // getters reading garbage components.
-    parseGid(uri);
-    const verifier = SignedGlobalID.pickVerifier(options);
-    const purpose = SignedGlobalID.pickPurpose(options);
-    const expiresAt = pickExpiration(options);
-    return new SignedGlobalID(uri, purpose, expiresAt, verifier);
+    return new SignedGlobalID(gid.toString(), options);
   }
 
   /**
@@ -164,11 +141,11 @@ export class SignedGlobalID {
    * Mirrors: SignedGlobalID.parse
    */
   static parse(sgid: string, options: ParseOptions = {}): SignedGlobalID | null {
-    const verifier = SignedGlobalID.pickVerifier(options);
-    const purpose = SignedGlobalID.pickPurpose(options);
     const verified = SignedGlobalID.verify(sgid, options);
     if (verified === null) return null;
-    return new SignedGlobalID(verified.uri, purpose, verified.expiresAt, verifier);
+    // The token's own expiry wins over any class-level default: an explicit
+    // null tells pickExpiration "no expiration" (Rails: `expires_at: nil`).
+    return new SignedGlobalID(verified.uri, { ...options, expiresAt: verified.expiresAt ?? null });
   }
 
   // ─── Class-level config (Rails: attr_accessor :verifier, :expires_in) ─────
@@ -238,7 +215,7 @@ export class SignedGlobalID {
       const raw = verifier.verified(sgid, { purpose }) as SgidPayload | null;
       if (!raw || typeof raw !== "object" || typeof raw.gid !== "string") return null;
       if (raw.purpose !== purpose) return null;
-      parseGid(raw.gid);
+      GID.parse(raw.gid);
       let expiresAt: Temporal.Instant | undefined;
       if (raw.expires_at) {
         expiresAt = Temporal.Instant.from(raw.expires_at);
@@ -297,17 +274,17 @@ export class SignedGlobalID {
 
   /** Mirrors: GlobalID#model_id  — re-exposed on SignedGlobalID (peer class in TS, not a subclass). */
   get modelId(): string | string[] {
-    return this._parts().modelId;
+    return this._components.modelId;
   }
 
   /** Mirrors: GlobalID#model_name  — re-exposed on SignedGlobalID (peer class in TS, not a subclass). */
   get modelName(): string {
-    return this._parts().modelName;
+    return this._components.modelName;
   }
 
   /** Mirrors: GlobalID#params  — re-exposed on SignedGlobalID (peer class in TS, not a subclass). */
   get params(): Record<string, string> {
-    return this._parts().params;
+    return this._components.params;
   }
 
   /**

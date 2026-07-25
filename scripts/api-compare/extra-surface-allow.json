@@ -3,37 +3,37 @@
     "package": "abstractcontroller",
     "tsFile": "callbacks.ts",
     "name": "beforeAction",
-    "reason": "Rails defines `before_action` metaprogrammatically \u2014 `[:before, :after, :around].each { |cb| define_method \"#{cb}_action\" }` in abstract_controller/callbacks.rb (Callbacks::ClassMethods). The Ruby extractor only records literal `def`s, so no counterpart appears in rails-api.json even though this is the correct Rails-layout file for the macro."
+    "reason": "Rails defines `before_action` metaprogrammatically — `[:before, :after, :around].each { |cb| define_method \"#{cb}_action\" }` in abstract_controller/callbacks.rb (Callbacks::ClassMethods). The Ruby extractor only records literal `def`s, so no counterpart appears in rails-api.json even though this is the correct Rails-layout file for the macro."
   },
   {
     "package": "abstractcontroller",
     "tsFile": "callbacks.ts",
     "name": "afterAction",
-    "reason": "Rails defines `after_action` metaprogrammatically \u2014 `[:before, :after, :around].each { |cb| define_method \"#{cb}_action\" }` in abstract_controller/callbacks.rb (Callbacks::ClassMethods). The Ruby extractor only records literal `def`s, so no counterpart appears in rails-api.json even though this is the correct Rails-layout file for the macro."
+    "reason": "Rails defines `after_action` metaprogrammatically — `[:before, :after, :around].each { |cb| define_method \"#{cb}_action\" }` in abstract_controller/callbacks.rb (Callbacks::ClassMethods). The Ruby extractor only records literal `def`s, so no counterpart appears in rails-api.json even though this is the correct Rails-layout file for the macro."
   },
   {
     "package": "abstractcontroller",
     "tsFile": "callbacks.ts",
     "name": "aroundAction",
-    "reason": "Rails defines `around_action` metaprogrammatically \u2014 `[:before, :after, :around].each { |cb| define_method \"#{cb}_action\" }` in abstract_controller/callbacks.rb (Callbacks::ClassMethods). The Ruby extractor only records literal `def`s, so no counterpart appears in rails-api.json even though this is the correct Rails-layout file for the macro."
+    "reason": "Rails defines `around_action` metaprogrammatically — `[:before, :after, :around].each { |cb| define_method \"#{cb}_action\" }` in abstract_controller/callbacks.rb (Callbacks::ClassMethods). The Ruby extractor only records literal `def`s, so no counterpart appears in rails-api.json even though this is the correct Rails-layout file for the macro."
   },
   {
     "package": "abstractcontroller",
     "tsFile": "callbacks.ts",
     "name": "skipBeforeAction",
-    "reason": "Rails defines `skip_before_action` metaprogrammatically \u2014 `[:before, :after, :around].each { |cb| define_method \"#{cb}_action\" }` in abstract_controller/callbacks.rb (Callbacks::ClassMethods). The Ruby extractor only records literal `def`s, so no counterpart appears in rails-api.json even though this is the correct Rails-layout file for the macro."
+    "reason": "Rails defines `skip_before_action` metaprogrammatically — `[:before, :after, :around].each { |cb| define_method \"#{cb}_action\" }` in abstract_controller/callbacks.rb (Callbacks::ClassMethods). The Ruby extractor only records literal `def`s, so no counterpart appears in rails-api.json even though this is the correct Rails-layout file for the macro."
   },
   {
     "package": "abstractcontroller",
     "tsFile": "callbacks.ts",
     "name": "skipAfterAction",
-    "reason": "Rails defines `skip_after_action` metaprogrammatically \u2014 `[:before, :after, :around].each { |cb| define_method \"#{cb}_action\" }` in abstract_controller/callbacks.rb (Callbacks::ClassMethods). The Ruby extractor only records literal `def`s, so no counterpart appears in rails-api.json even though this is the correct Rails-layout file for the macro."
+    "reason": "Rails defines `skip_after_action` metaprogrammatically — `[:before, :after, :around].each { |cb| define_method \"#{cb}_action\" }` in abstract_controller/callbacks.rb (Callbacks::ClassMethods). The Ruby extractor only records literal `def`s, so no counterpart appears in rails-api.json even though this is the correct Rails-layout file for the macro."
   },
   {
     "package": "abstractcontroller",
     "tsFile": "callbacks.ts",
     "name": "skipAroundAction",
-    "reason": "Rails defines `skip_around_action` metaprogrammatically \u2014 `[:before, :after, :around].each { |cb| define_method \"#{cb}_action\" }` in abstract_controller/callbacks.rb (Callbacks::ClassMethods). The Ruby extractor only records literal `def`s, so no counterpart appears in rails-api.json even though this is the correct Rails-layout file for the macro."
+    "reason": "Rails defines `skip_around_action` metaprogrammatically — `[:before, :after, :around].each { |cb| define_method \"#{cb}_action\" }` in abstract_controller/callbacks.rb (Callbacks::ClassMethods). The Ruby extractor only records literal `def`s, so no counterpart appears in rails-api.json even though this is the correct Rails-layout file for the macro."
   },
   {
     "package": "abstractcontroller",
@@ -75,7 +75,7 @@
     "package": "abstractcontroller",
     "tsFile": "caching.ts",
     "name": "setCacheStore",
-    "reason": "Writer half of Rails' `ConfigMethods#cache_store` / `cache_store=` accessor pair. `cache_store=` camelizes to `cacheStore`, which the reader in the same file already declares \u2014 two exported functions cannot share a name, so the writer takes the `set` prefix."
+    "reason": "Writer half of Rails' `ConfigMethods#cache_store` / `cache_store=` accessor pair. `cache_store=` camelizes to `cacheStore`, which the reader in the same file already declares — two exported functions cannot share a name, so the writer takes the `set` prefix."
   },
   {
     "package": "abstractcontroller",
@@ -87,6 +87,78 @@
     "package": "abstractcontroller",
     "tsFile": "trailties/routes-helpers.ts",
     "name": "trailtieRoutesUrlHelpers",
-    "reason": "Trails spelling of Rails' `railtie_routes_url_helpers`, which `RoutesHelpers.with` calls on the namespace module (`namespace.railtie_routes_url_helpers(include_path_helpers)`). It is defined by Rails::Engine in railties, not by this file \u2014 here it is only the host-side hook slot the lookup probes for."
+    "reason": "Trails spelling of Rails' `railtie_routes_url_helpers`, which `RoutesHelpers.with` calls on the namespace module (`namespace.railtie_routes_url_helpers(include_path_helpers)`). It is defined by Rails::Engine in railties, not by this file — here it is only the host-side hook slot the lookup probes for."
+  },
+  {
+    "package": "globalid",
+    "tsFile": "uri/gid.ts",
+    "name": "constructor",
+    "reason": "URI::GID's public initializer comes from URI::Generic, so gid.rb declares none. TS has no URI base class to inherit it from, and the ported Rails test `new returns invalid gid when not checking` (uri_gid_test.rb) constructs one directly to bypass parse validation, so it is declared locally."
+  },
+  {
+    "package": "globalid",
+    "tsFile": "signed-global-id.ts",
+    "name": "[Symbol.toPrimitive]",
+    "reason": "TS analogue of Ruby's implicit string coercion: Rails relies on `to_s`/`to_param` being called whenever an SGID is interpolated into a string or a URL. `Symbol.toPrimitive` is the only hook that makes `String(sgid)` and template interpolation reach `toString()` for every hint."
+  },
+  {
+    "package": "globalid",
+    "tsFile": "signed-global-id.ts",
+    "name": "create",
+    "reason": "Rails' `SignedGlobalID < GlobalID` inherits `GlobalID.create` (polymorphic `new`). In TS the two are peer classes — SignedGlobalID's fields (verifier/purpose/expiresAt) come from options its base has no notion of — so `create` is re-declared here. Unifying them under real inheritance is tracked by the globalid-sgid-inherits-globalid story."
+  },
+  {
+    "package": "globalid",
+    "tsFile": "signed-global-id.ts",
+    "name": "modelClass",
+    "reason": "Inherited from GlobalID in Ruby; re-declared because the TS classes are peers, not a hierarchy. See the `create` entry for this file."
+  },
+  {
+    "package": "globalid",
+    "tsFile": "signed-global-id.ts",
+    "name": "modelId",
+    "reason": "Inherited from GlobalID in Ruby (`delegate :model_id, to: :uri`); re-declared because the TS classes are peers, not a hierarchy. See the `create` entry for this file."
+  },
+  {
+    "package": "globalid",
+    "tsFile": "signed-global-id.ts",
+    "name": "modelName",
+    "reason": "Inherited from GlobalID in Ruby (`delegate :model_name, to: :uri`); re-declared because the TS classes are peers, not a hierarchy. See the `create` entry for this file."
+  },
+  {
+    "package": "globalid",
+    "tsFile": "signed-global-id.ts",
+    "name": "params",
+    "reason": "Inherited from GlobalID in Ruby (`delegate :params, to: :uri`); re-declared because the TS classes are peers, not a hierarchy. See the `create` entry for this file."
+  },
+  {
+    "package": "globalid",
+    "tsFile": "signed-global-id.ts",
+    "name": "uri",
+    "reason": "Inherited from GlobalID in Ruby (`attr_reader :uri`); re-declared because the TS classes are peers, not a hierarchy. See the `create` entry for this file."
+  },
+  {
+    "package": "globalid",
+    "tsFile": "locator.ts",
+    "name": "setModelFinder",
+    "reason": "Stands in for Ruby's `model_name.constantize`, which GlobalID#model_class uses to turn a model name into a class. JS has no global constant table, so the host app registers a resolver instead. It lives next to the per-app locator registry it serves."
+  },
+  {
+    "package": "globalid",
+    "tsFile": "locator.ts",
+    "name": "lookupClass",
+    "reason": "The read side of the constantize stand-in registered through setModelFinder; the locators and GlobalID#modelClass call it wherever Rails writes `model_name.constantize`."
+  },
+  {
+    "package": "globalid",
+    "tsFile": "locator.ts",
+    "name": "find",
+    "reason": "Member of the duck-typed `LocatorModel` interface, not a locator method: it declares the Active Record finder Rails' BaseLocator calls as `model_class.find gid.model_id`. Ruby needs no such declaration."
+  },
+  {
+    "package": "globalid",
+    "tsFile": "locator.ts",
+    "name": "where",
+    "reason": "Member of the duck-typed `LocatorModel` interface, not a locator method: it declares the Active Record relation Rails' BaseLocator calls as `model_class.where(primary_key => ids)` on the ignore_missing path. Ruby needs no such declaration."
   }
 ]

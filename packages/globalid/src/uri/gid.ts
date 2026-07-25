@@ -16,9 +16,10 @@ const COMPOSITE_MODEL_ID_DELIMITER = "/";
 /**
  * Parse a `gid://app/ModelName/id` URI string.
  *
- * Mirrors: URI::GID.parse / URI::GID#set_model_components
+ * @internal Implementation behind {@link GID.parse}; module-private so the
+ * package's parse surface is spelled the Rails way (`URI::GID.parse`).
  */
-export function parseGid(uri: string): GidComponents {
+function parseGid(uri: string): GidComponents {
   if (!uri.startsWith("gid://")) {
     throw new BadURIError(`Not a gid:// URI scheme: ${uri}`);
   }
@@ -60,9 +61,10 @@ export function parseGid(uri: string): GidComponents {
 /**
  * Build a `gid://app/ModelName/id` URI string.
  *
- * Mirrors: URI::GID.build
+ * @internal Implementation behind {@link GID.build}; module-private so the
+ * package's build surface is spelled the Rails way (`URI::GID.build`).
  */
-export function buildGid(
+function buildGid(
   app: string,
   modelName: string,
   modelId: unknown,
@@ -140,7 +142,7 @@ function parseModelId(raw: string, modelName: string): string | string[] {
  * Shared by GlobalID.create and GID.build so their skip-parse paths
  * agree with the round-trip through parseGid(buildGid(...)).
  */
-export function normalizeModelId(raw: unknown, modelName: string): string | string[] {
+function normalizeModelId(raw: unknown, modelName: string): string | string[] {
   // Mirror parseModelId ordering: cap raw segments at
   // COMPOSITE_MODEL_ID_MAX_SIZE first, then filter empties. Reversing
   // the order would let a 21st non-empty segment slip past the cap
@@ -182,22 +184,27 @@ function cgiUnescape(s: string): string {
 // ─── URI::GID class wrapper (Rails parity) ─────────────────────────────────
 
 /**
- * Class form of the GID URI. Wraps {@link parseGid}/{@link buildGid} so the
- * Rails `URI::GID` method surface (parse / create / build / validate_app on
- * the class; modelName / modelId / params / toString / deconstructKeys on
- * the instance) is reachable for api:compare matching and for callers who
- * prefer an OO shape.
+ * The GID URI. Mirrors the Rails `URI::GID` surface — parse / create /
+ * build / validate_app on the class; app / modelName / modelId / params /
+ * toString / deconstructKeys on the instance — and is the only way into
+ * this module's parsing and building.
  *
  * Mirrors: URI::GID (vendor/globalid/lib/global_id/uri/gid.rb)
  */
 export class GID {
-  /** The raw GID URI string. */
-  readonly uri: string;
+  // Rails' URI::GID *is* the URI (it rebuilds `to_s` from its components);
+  // it has no `uri` member. We keep the raw string private and expose it
+  // through `toString()` only, so the public shape matches.
+  private readonly _uri: string;
   private readonly _components: GidComponents;
 
-  /** @internal — callers should use {@link GID.parse} / {@link GID.create} / {@link GID.build}. */
+  /**
+   * Rails' `URI::GID.new(*URI.split(str))` is public — it comes from
+   * `URI::Generic` and skips the `parse` argument checks. TS has no URI
+   * base class to inherit it from, so it's declared here.
+   */
   constructor(uri: string, components?: GidComponents) {
-    this.uri = uri;
+    this._uri = uri;
     this._components = components ?? parseGid(uri);
   }
 
@@ -220,7 +227,7 @@ export class GID {
 
   /** Mirrors: URI::GID#to_s */
   toString(): string {
-    return this.uri;
+    return this._uri;
   }
 
   /**

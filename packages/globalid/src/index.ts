@@ -8,14 +8,7 @@ export { Verifier } from "./verifier.js";
 /** @internal */
 export { _resetSignedGlobalIDClassConfig } from "./signed-global-id.js";
 export type { SignedGlobalIDOptions, ParseOptions, FromUriOptions } from "./signed-global-id.js";
-export {
-  parseGid,
-  buildGid,
-  validateApp,
-  GID,
-  MissingModelIdError,
-  InvalidModelIdError,
-} from "./uri/gid.js";
+export { validateApp, GID, MissingModelIdError, InvalidModelIdError } from "./uri/gid.js";
 export type { GidComponents } from "./uri/gid.js";
 export { Locator, BaseLocator, UnscopedLocator, BlockLocator, setModelFinder } from "./locator.js";
 /** @internal */
