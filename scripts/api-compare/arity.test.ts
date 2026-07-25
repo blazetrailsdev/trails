@@ -136,6 +136,14 @@ describe("arityMatches", () => {
     expect(arityMatches(ruby, [req("a"), req("b")]).ok).toBe(false);
   });
 
+  it("matches one required kwarg plus **opts without collapsing", () => {
+    // def m(a, k:, **o) — below the ≥2 collapse threshold, but the required
+    // kwarg already maps 1:1 onto the options slot and `**o` rides along via
+    // the existing hasKeywords slack: ruby [2,2+1] vs ts [2,2] overlaps.
+    expect(arityMatches([req("a"), kw("k"), kwrest("o")], [req("a"), req("opts")]).ok).toBe(true);
+    expect(arityMatches([kw("k"), kwrest("o")], [req("opts")]).ok).toBe(true);
+  });
+
   it("still flags a positional-count mismatch alongside collapsible kwargs", () => {
     // ruby m(a, b, k1:, k2:) collapses to [3,3] — a 1-arg TS port stays flagged.
     const m = arityMatches([req("a"), req("b"), kw("k1"), kw("k2")], [req("a")]);
