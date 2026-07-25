@@ -106,31 +106,31 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   }
 
   /**
-   * Mirrors Rails' `create#{name}` reaching
+   * Mirrors the two DB halves of Rails'
    * `HasOneThroughAssociation#create_through_record`
-   * (has_one_through_association.rb:15-40) via `set_new_record` → `replace`.
-   * Two halves of that method are DB work our sync `replace` cannot do:
-   *
-   *   - `through_proxy.load_target` (:17) — materialize the join row, which on a
-   *     re-fetched owner is UNLOADED. Without it `constructThroughRecordInMemory`
-   *     sees no through target and builds a fresh one.
-   *   - `through_record.update(attributes)` (:33) — when that load turns up a
-   *     *persisted* join row, Rails rewrites its source foreign key inline, so
-   *     the join row points at the just-created target as soon as `create`
-   *     returns, with no owner `save`.
-   *
-   * The build-when-absent arm stays deferred: Rails reaches it through
-   * `owner.new_record? || !save` (:36-37, `set_new_record` passes `save = false`)
-   * and only *builds* the join record, leaving it for the owner's next save.
+   * (has_one_through_association.rb:15-40), which our synchronous `replace`
+   * cannot run: `through_proxy.load_target` (:17), and — when that load turns
+   * up a *persisted* join row — `through_record.update(attributes)` (:33),
+   * which repoints the row at the just-created target inline, before `create`
+   * returns. The build-when-absent arm stays deferred to the owner's next
+   * save, which is Rails' own `owner.new_record? || !save` shape (:36-37).
    */
   protected override async _createRecord(
     attributes?: Record<string, unknown>,
     shouldRaise = false,
     block?: (record: Base) => void,
   ): Promise<Base | null> {
-    await this.loadTargetForBuild();
-    const existing = (throughAssociation(this) as { target?: Base | null } | null)?.target ?? null;
-    const hasPersistedJoinRow = existing != null && (existing as any).isNewRecord?.() !== true;
+    // An unpersisted owner has no join row to load and `super` raises
+    // RecordNotSaved for it, so the load must not run first.
+    const ownerPersisted = (this.owner as { isPersisted?: () => boolean }).isPersisted?.() ?? false;
+    let hasPersistedJoinRow = false;
+    if (ownerPersisted) {
+      await this.loadTargetForBuild();
+      const existing =
+        (throughAssociation(this) as { target?: Base | null } | null)?.target ?? null;
+      hasPersistedJoinRow =
+        existing != null && (existing as { isNewRecord?: () => boolean }).isNewRecord?.() !== true;
+    }
     const record = await super._createRecord(attributes, shouldRaise, block);
     if (record && hasPersistedJoinRow && this._pendingReplace) {
       await this.persistReplace();

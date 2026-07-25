@@ -318,9 +318,6 @@ describe("HasOneThroughAssociationsTest", () => {
     await newMember.save();
     const membershipId = (await readHasOne(newMember, "currentMembership")).id;
 
-    // Rails' create_through_record loads the through proxy and `update`s the
-    // existing (persisted) join row inline, so the join row points at the newly
-    // created club as soon as `create` returns — no owner `save` needed.
     const refetched = await Member.find(newMember.id);
     const countForMember = () => Membership.where({ member_id: refetched.id }).count();
     const before = await countForMember();
