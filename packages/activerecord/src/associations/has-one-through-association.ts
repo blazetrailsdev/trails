@@ -105,6 +105,39 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     // no-op — see JSDoc
   }
 
+  /**
+   * Mirrors Rails' `create#{name}` reaching
+   * `HasOneThroughAssociation#create_through_record`
+   * (has_one_through_association.rb:15-40) via `set_new_record` → `replace`.
+   * Two halves of that method are DB work our sync `replace` cannot do:
+   *
+   *   - `through_proxy.load_target` (:17) — materialize the join row, which on a
+   *     re-fetched owner is UNLOADED. Without it `constructThroughRecordInMemory`
+   *     sees no through target and builds a fresh one.
+   *   - `through_record.update(attributes)` (:33) — when that load turns up a
+   *     *persisted* join row, Rails rewrites its source foreign key inline, so
+   *     the join row points at the just-created target as soon as `create`
+   *     returns, with no owner `save`.
+   *
+   * The build-when-absent arm stays deferred: Rails reaches it through
+   * `owner.new_record? || !save` (:36-37, `set_new_record` passes `save = false`)
+   * and only *builds* the join record, leaving it for the owner's next save.
+   */
+  protected override async _createRecord(
+    attributes?: Record<string, unknown>,
+    shouldRaise = false,
+    block?: (record: Base) => void,
+  ): Promise<Base | null> {
+    await this.loadTargetForBuild();
+    const existing = (throughAssociation(this) as { target?: Base | null } | null)?.target ?? null;
+    const hasPersistedJoinRow = existing != null && (existing as any).isNewRecord?.() !== true;
+    const record = await super._createRecord(attributes, shouldRaise, block);
+    if (record && hasPersistedJoinRow && this._pendingReplace) {
+      await this.persistReplace();
+    }
+    return record;
+  }
+
   protected override setNewRecord(record: Base): void {
     this.replace(record, false);
   }

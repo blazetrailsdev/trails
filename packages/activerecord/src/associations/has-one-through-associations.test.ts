@@ -311,6 +311,27 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(Number(reloaded.club_id)).toBe(Number(newClub.id));
   });
 
+  it("creating with unloaded existing join row updates the join row without an owner save", async () => {
+    const newMember = await Member.create({ name: "Joe" });
+    const oldClub = await Club.create({ name: "Old Club" });
+    (newMember.association("club") as any).writer(oldClub);
+    await newMember.save();
+    const membershipId = (await readHasOne(newMember, "currentMembership")).id;
+
+    // Rails' create_through_record loads the through proxy and `update`s the
+    // existing (persisted) join row inline, so the join row points at the newly
+    // created club as soon as `create` returns — no owner `save` needed.
+    const refetched = await Member.find(newMember.id);
+    const countForMember = () => Membership.where({ member_id: refetched.id }).count();
+    const before = await countForMember();
+    const newClub = await (refetched.association("club") as any).create({ name: "New Club" });
+
+    expect(await countForMember()).toBe(before);
+    const reloaded = await Membership.find(membershipId);
+    expect(Number(reloaded.club_id)).toBe(Number(newClub.id));
+    expect(Number(reloaded.club_id)).not.toBe(Number(oldClub.id));
+  });
+
   it("building with unloaded existing join row reconciles regardless of through-proxy access order", async () => {
     const newMember = await Member.create({ name: "Joe" });
     (newMember.association("club") as any).writer(await Club.create({ name: "Old Club" }));
