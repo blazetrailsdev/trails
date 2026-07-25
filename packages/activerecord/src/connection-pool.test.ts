@@ -6,7 +6,7 @@ import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-
 import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { SchemaCache, SchemaReflection } from "./connection-adapters/schema-cache.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
-import { newRawTestAdapter, ambientPoolConfiguration } from "./test-adapter.js";
+import { newRawTestAdapter, ambientPoolConfiguration, inMemoryDb } from "./test-adapter.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import type {
   AdapterName,
@@ -14,6 +14,7 @@ import type {
 } from "./connection-adapters/abstract-adapter.js";
 import { Result } from "./result.js";
 import { Base } from "./base.js";
+import { assertNoQueries } from "./testing/query-assertions.js";
 
 interface AmbientPoolOptions {
   role?: string;
@@ -169,6 +170,18 @@ it("with connection", async () => {
     }),
   ).rejects.toThrow("boom");
   expect(pool.stat().busy).toBe(0);
+});
+
+it.skipIf(inMemoryDb())("new connection no query", async () => {
+  const pool = makePool();
+  expect(pool.stat().connections).toBe(0);
+  await pool.withConnection(() => {});
+  await pool.flush(0);
+  expect(pool.stat().connections).toBe(0);
+
+  await assertNoQueries(false, async () => {
+    await pool.withConnection(() => {});
+  });
 });
 
 it("active connection in use", async () => {

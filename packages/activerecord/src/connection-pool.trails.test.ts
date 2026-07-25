@@ -107,6 +107,22 @@ it("verifyBang on a checked-out adapter establishes the raw connection on every 
   }
 });
 
+it("leaseConnection routes its verify through checkout and establishes on verifyBang", async () => {
+  const pool = makePool();
+  const checkoutSpy = vi.spyOn(pool, "checkout");
+  try {
+    const conn = await pool.leaseConnection();
+    expect(checkoutSpy).toHaveBeenCalledTimes(1);
+    await conn.verifyBang();
+    expect(conn.isConnected()).toBe(true);
+    expect(pool.isConnected()).toBe(true);
+  } finally {
+    checkoutSpy.mockRestore();
+    pool.releaseConnection();
+    await closePoolConnections(pool);
+  }
+});
+
 it("with connection prevent permanent checkout releases connection", async () => {
   const pool = makePool();
   await pool.leaseConnection();
