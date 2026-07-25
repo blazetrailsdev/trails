@@ -7033,7 +7033,7 @@ export class Relation<T extends Base> {
   // without it every relation under any `scoping {}` block would qualify.
   /** @internal */
   isAlreadyInScope(registry: any): boolean {
-    return this._delegateToModel && !!registry?.currentScope?.(this._modelClass, true);
+    return this._delegateToModel && !!registry?.currentScope?.(this.model, true);
   }
 
   private isGlobalScope(registry: any): boolean {
