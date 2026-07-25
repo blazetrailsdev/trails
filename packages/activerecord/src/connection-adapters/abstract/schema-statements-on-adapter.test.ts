@@ -13,21 +13,12 @@ import { fixtures } from "../../test-helpers/fixtures.js";
 
 let adapter: AbstractSQLite3Adapter | undefined;
 
-/**
- * The ambient test connection, as Rails' `@connection =
- * ActiveRecord::Base.lease_connection` in
- * `cases/migration/foreign_key_test.rb`. DDL-behavior cases bind here rather
- * than to a private `:memory:` adapter, so they run on all three adapters.
- */
+// Rails' `@connection = ActiveRecord::Base.lease_connection`.
 async function ambientConnection(): Promise<AbstractAdapter> {
   return (await Base.leaseConnection()) as unknown as AbstractAdapter;
 }
 
-/**
- * The rockets/astronauts pair from `ForeignKeyTest`'s setup/teardown in
- * `cases/migration/foreign_key_test.rb:178-194`, created on and dropped from
- * the ambient connection around each DDL-behavior case.
- */
+// ForeignKeyTest's setup/teardown, foreign_key_test.rb:178-194.
 async function withRocketTables(conn: AbstractAdapter, body: () => Promise<void>): Promise<void> {
   await conn.dropTable("astronauts", "rockets", { ifExists: true });
   await conn.createTable("rockets", (t) => {
@@ -123,8 +114,8 @@ class SqliteCapturingAdapter extends AbstractAdapter {
 }
 
 describe("SchemaStatements mixed into AbstractAdapter", () => {
-  // DDL on the ambient connection must not run inside the fixture transaction:
-  // MySQL's implicit commit on DDL would commit it mid-test.
+  // Non-transactional: MySQL's implicit commit on DDL would otherwise commit
+  // the fixture transaction mid-test.
   fixtures([], { useTransactionalTests: false });
 
   it("tableAliasFor resolves tableAliasLength via the DatabaseLimits mixin", () => {
@@ -274,9 +265,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("createTable is callable directly on the adapter", async () => {
-    // Mixin-wiring smoke test: proves SchemaStatements is reachable directly on
-    // the adapter object (Rails' native `include` makes this untestable there),
-    // so it has no Rails counterpart and keeps a throwaway `:memory:` adapter.
+    // Mixin-wiring smoke test (no Rails counterpart): `:memory:` is deliberate.
     adapter = new BetterSQLite3Adapter(":memory:");
     await adapter.createTable("things", (t) => {
       t.string("name");
@@ -468,10 +457,8 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("addForeignKey with ifNotExists creates a second FK to the same table on a different column", async () => {
-    // Mirrors foreign_key_test.rb:237
-    // (test_add_foreign_key_with_if_not_exists_to_already_referenced_table):
-    // Rails slices :column into the existence check, so a same-target FK on a
-    // different column is NOT short-circuited.
+    // foreign_key_test.rb:237: Rails slices :column into the existence check,
+    // so a same-target FK on a different column is NOT short-circuited.
     const conn = await ambientConnection();
     await withRocketTables(conn, async () => {
       await conn.addForeignKey("astronauts", "rockets", { column: "rocket_id" });
