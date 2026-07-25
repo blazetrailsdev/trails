@@ -36,10 +36,7 @@ import { Subscriber } from "./test-helpers/models/subscriber.js";
 import { Event } from "./test-helpers/models/event.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
 import {
-  describeIfMysql,
   Mysql2Adapter,
-  MYSQL_TEST_URL,
-  databaseName,
   ARUNIT_DATABASE,
   ARUNIT2_DATABASE,
 } from "./adapters/abstract-mysql-adapter/test-helper.js";
@@ -368,7 +365,7 @@ describe("AdapterTest", () => {
   });
 
   // current database (gated by respond_to?(:current_database)) lives in the
-  // describeIfMysql AdapterTest block below (MySQL) and adapters/postgresql/
+  // MySQL-gated AdapterTest block below (MySQL) and adapters/postgresql/
   // adapter.test.ts (PG).
 
   it("#exec_query queries with no result set return an empty ActiveRecord::Result", async () => {
@@ -386,7 +383,7 @@ describe("AdapterTest", () => {
   });
 
   // charset / collation / show-variable / cross-database-selects (MySQL-only)
-  // live in the describeIfMysql AdapterTest block below.
+  // live in the MySQL-gated AdapterTest block below.
 
   // Rails gates this `unless in_memory_db?` (adapter_test.rb:176): a
   // re-established `:memory:` connection is a fresh, empty database.
@@ -1243,28 +1240,26 @@ describe("InvalidateTransactionTest", () => {
   );
 });
 
-// MySQL-gated AdapterTest probes from Rails adapter_test.rb: the
-// `current_database` case plus the cases wrapped in
-// `if current_adapter?(:Mysql2Adapter)` (charset/collation/show-variable/
-// cross-database-selects). SQLite/PG skip these via the current_adapter? gate;
-// here the whole block is gated behind `describeIfMysql`, which is
-// `describe.skip` when MYSQL_TEST_URL is absent.
-describeIfMysql("AdapterTest", () => {
+describe.runIf(adapterType === "mysql")("AdapterTest", () => {
+  const leaseMysql = async (): Promise<Mysql2Adapter> =>
+    (await Base.leaseConnection()) as unknown as Mysql2Adapter;
+
   let adapter: Mysql2Adapter;
-  beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
+
+  beforeAll(async () => {
+    await establishFromTestConfig();
   });
-  afterEach(async () => {
-    await adapter.close();
+
+  beforeEach(async () => {
+    adapter = await leaseMysql();
+    await adapter.materializeTransactions();
   });
 
   it("current database", async () => {
-    expect(await adapter.currentDatabase()).toBe(databaseName(MYSQL_TEST_URL));
+    expect(await adapter.currentDatabase()).toBe(Base.connectionDbConfig()?.database);
   });
 
   it("charset", async () => {
-    // Rails' assert_not_nil; charset() collapses null → "" (the ?? "" fallback),
-    // so the not-nil intent maps to non-empty here.
     expect(await adapter.charset()).not.toBe("");
     expect(await adapter.charset()).not.toBe("character_set_database");
     expect(await adapter.charset()).toBe(await adapter.showVariable("character_set_database"));
@@ -1281,15 +1276,10 @@ describeIfMysql("AdapterTest", () => {
   });
 
   it("not specifying database name for cross database selects", async () => {
-    // Rails reads `arunit`/`arunit2` from `ARTest.test_configuration_hashes`
-    // and selects `arunit.pirates` joined with `arunit2.courses`. We mirror
-    // that two-database layout with the config-derived `ARUNIT_DATABASE` /
-    // `ARUNIT2_DATABASE` names (see test-helper), seeding `pirates` in the
-    // first and `courses` in the second using their canonical columns.
-    await adapter.execute(`DROP DATABASE IF EXISTS ${ARUNIT_DATABASE}`);
-    await adapter.execute(`DROP DATABASE IF EXISTS ${ARUNIT2_DATABASE}`);
-    await adapter.execute(`CREATE DATABASE ${ARUNIT_DATABASE}`);
-    await adapter.execute(`CREATE DATABASE ${ARUNIT2_DATABASE}`);
+    for (const database of [ARUNIT_DATABASE, ARUNIT2_DATABASE]) {
+      await adapter.execute(`DROP DATABASE IF EXISTS ${database}`);
+      await adapter.execute(`CREATE DATABASE ${database}`);
+    }
     await adapter.execute(
       `CREATE TABLE ${ARUNIT_DATABASE}.pirates (id INT AUTO_INCREMENT PRIMARY KEY, catchphrase VARCHAR(255), parrot_id INT, non_validated_parrot_id INT, created_on DATETIME, updated_on DATETIME)`,
     );
@@ -1297,21 +1287,20 @@ describeIfMysql("AdapterTest", () => {
       `CREATE TABLE ${ARUNIT2_DATABASE}.courses (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL, college_id INT)`,
     );
 
-    // Mirrors Rails establishing a connection with the `:database` key removed:
-    // a cross-database select must succeed without a default database set.
-    const noDbUrl = new URL(MYSQL_TEST_URL);
-    noDbUrl.pathname = "/";
-    const noDbAdapter = new Mysql2Adapter(noDbUrl.toString());
     try {
-      // assert_nothing_raised: the select resolves without throwing.
-      await noDbAdapter.execute(
-        `SELECT ${ARUNIT_DATABASE}.pirates.*, ${ARUNIT2_DATABASE}.courses.* ` +
-          `FROM ${ARUNIT_DATABASE}.pirates, ${ARUNIT2_DATABASE}.courses`,
-      );
+      await runWithoutConnection(async ({ database: _database, ...exceptDatabase }) => {
+        await Base.establishConnection(exceptDatabase);
+        const connection = await leaseMysql();
+        await connection.execute(
+          `SELECT ${ARUNIT_DATABASE}.pirates.*, ${ARUNIT2_DATABASE}.courses.* ` +
+            `FROM ${ARUNIT_DATABASE}.pirates, ${ARUNIT2_DATABASE}.courses`,
+        );
+      });
     } finally {
-      await noDbAdapter.close();
-      await adapter.execute(`DROP DATABASE IF EXISTS ${ARUNIT_DATABASE}`);
-      await adapter.execute(`DROP DATABASE IF EXISTS ${ARUNIT2_DATABASE}`);
+      const connection = await leaseMysql();
+      for (const database of [ARUNIT_DATABASE, ARUNIT2_DATABASE]) {
+        await connection.execute(`DROP DATABASE IF EXISTS ${database}`);
+      }
     }
   });
 });
