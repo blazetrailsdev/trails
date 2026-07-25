@@ -14,9 +14,12 @@ import { establishFromTestConfig } from "../../test-helpers/test-database-config
 export { withDbWarningsAction } from "../../test-helpers/with-db-warnings-action.js";
 
 // A *serialization* of the MySQL sub-settings (MYSQL_HOST/MYSQL_PORT/
-// MYSQL_USER/...), not an env var of its own: these adapter suites probe the
-// server directly via describeIfMysql regardless of ARCONN, so they need a URL
-// to hand the driver, but they no longer source one from the environment.
+// MYSQL_USER/...), not an env var of its own: the suites still on
+// describeIfMysql probe the server directly regardless of ARCONN, so they need
+// a URL to hand the driver, but they no longer source one from the
+// environment. Being burned down in favour of describeIfMysqlAdapter +
+// leaseMysqlAdapter below; the remaining legitimate callers are the tests that
+// deliberately build a second, differently configured adapter.
 export const MYSQL_TEST_URL = mysqlUrl();
 
 export { databaseName } from "../../test-helpers/arunit2-config.js";
@@ -56,6 +59,12 @@ async function checkMysql(): Promise<{ available: boolean; isMariaDb: boolean; v
 
 ({ available: mysqlAvailable, isMariaDb: mariaDb, version: mysqlVersionStr } = await checkMysql());
 
+/**
+ * Server-reachability probe, NOT the port of `current_adapter?(:Mysql2Adapter)`
+ * — use {@link describeIfMysqlAdapter} for that. A suite gated on this one runs
+ * under every `ARCONN` against a self-built adapter, bypassing the leased pool
+ * connection.
+ */
 export const describeIfMysql = mysqlAvailable ? describe : (describe.skip as typeof describe);
 /** true when the connected server is MariaDB; false on MySQL or when MySQL is unavailable. */
 export const isMariaDb = mariaDb;

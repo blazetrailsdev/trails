@@ -21,6 +21,10 @@ describe("gates.ts pure helpers", () => {
       adapters: ["mysql"],
       source: ["wrapper"],
     });
+    expect(gateFromWrapper("describeIfMysqlAdapter")).toEqual({
+      adapters: ["mysql"],
+      source: ["wrapper"],
+    });
     expect(gateFromWrapper("describeIfSqlite")).toEqual({
       adapters: ["sqlite"],
       source: ["wrapper"],
