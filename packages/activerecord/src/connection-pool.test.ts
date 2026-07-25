@@ -6,7 +6,7 @@ import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-
 import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { SchemaCache, SchemaReflection } from "./connection-adapters/schema-cache.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
-import { newRawTestAdapter } from "./test-adapter.js";
+import { newRawTestAdapter, ambientPoolConfiguration } from "./test-adapter.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import type {
   AdapterName,
@@ -15,16 +15,30 @@ import type {
 import { Result } from "./result.js";
 import { Base } from "./base.js";
 
-function makePool(size: number = 5): ConnectionPool {
-  const dbConfig = new HashConfig("test", "primary", {
-    adapter: "sqlite3",
-    database: "test.db",
-    pool: size,
+/**
+ * Mirrors connection_pool_test.rb:20-29 — the duplicate pool's HashConfig is
+ * built from the ambient `Base.connection_pool.db_config`'s configuration hash
+ * with per-test options merged on (`:265-269`, `:293-296`), never a literal
+ * database name. `reapingFrequency: null` keeps the idle reaper quiet unless a
+ * test opts in.
+ */
+function makeAmbientDbConfig(overrides: Record<string, unknown> = {}): HashConfig {
+  return new HashConfig("test", "primary", {
+    ...ambientPoolConfiguration(),
+    checkoutTimeout: 0.2,
     reapingFrequency: null,
+    ...overrides,
   });
-  const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-    adapterFactory: newRawTestAdapter,
-  });
+}
+
+function makePool(size: number = 5): ConnectionPool {
+  const pc = new PoolConfig(
+    new ConnectionDescriptor("primary"),
+    makeAmbientDbConfig({ pool: size }),
+    "writing",
+    "default",
+    { adapterFactory: newRawTestAdapter },
+  );
   return new ConnectionPool(pc);
 }
 
@@ -101,15 +115,13 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
 }
 
 function makeTransactionAwarePool(size: number = 5): ConnectionPool {
-  const dbConfig = new HashConfig("test", "primary", {
-    adapter: "sqlite3",
-    database: "test.db",
-    pool: size,
-    reapingFrequency: null,
-  });
-  const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-    adapterFactory: () => new TransactionAwareTestAdapter(),
-  });
+  const pc = new PoolConfig(
+    new ConnectionDescriptor("primary"),
+    makeAmbientDbConfig({ pool: size }),
+    "writing",
+    "default",
+    { adapterFactory: () => new TransactionAwareTestAdapter() },
+  );
   return new ConnectionPool(pc);
 }
 
@@ -205,15 +217,9 @@ it("reap and active", async () => {
 
 it("idle timeout configuration", async () => {
   // High idleTimeout: flush() with no args keeps connections
-  const keepConfig = new HashConfig("test", "primary", {
-    adapter: "sqlite3",
-    database: "test.db",
-    idleTimeout: 9999,
-    reapingFrequency: null,
-  });
   const keepPc = new PoolConfig(
     new ConnectionDescriptor("primary"),
-    keepConfig,
+    makeAmbientDbConfig({ idleTimeout: 9999 }),
     "writing",
     "default",
     { adapterFactory: newRawTestAdapter },
@@ -226,15 +232,9 @@ it("idle timeout configuration", async () => {
   expect(keepPool.stat().connections).toBe(1);
 
   // Small idleTimeout: flush() with no args removes expired idle connections
-  const flushConfig = new HashConfig("test", "primary", {
-    adapter: "sqlite3",
-    database: "test.db",
-    idleTimeout: 1,
-    reapingFrequency: null,
-  });
   const flushPc = new PoolConfig(
     new ConnectionDescriptor("primary"),
-    flushConfig,
+    makeAmbientDbConfig({ idleTimeout: 1 }),
     "writing",
     "default",
     { adapterFactory: newRawTestAdapter },
@@ -258,15 +258,13 @@ it("idle timeout configuration", async () => {
 });
 
 it("disable flush", async () => {
-  const dbConfig = new HashConfig("test", "primary", {
-    adapter: "sqlite3",
-    database: "test.db",
-    idleTimeout: null,
-    reapingFrequency: null,
-  });
-  const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-    adapterFactory: newRawTestAdapter,
-  });
+  const pc = new PoolConfig(
+    new ConnectionDescriptor("primary"),
+    makeAmbientDbConfig({ idleTimeout: null }),
+    "writing",
+    "default",
+    { adapterFactory: newRawTestAdapter },
+  );
   const pool = new ConnectionPool(pc);
   const conn = await pool.checkout();
   pool.checkin(conn);
@@ -382,10 +380,7 @@ it("connection notification is called", async () => {
     payloads.push(event.payload as Record<string, unknown>);
   });
   try {
-    const dbConfig = new HashConfig("test", "primary", {
-      adapter: "sqlite3",
-      database: ":memory:",
-    });
+    const dbConfig = new HashConfig("test", "primary", ambientPoolConfiguration());
     Base.connectionHandler.establishConnection(dbConfig, { owner: ConnectionTestModel });
     expect(payloads).toHaveLength(1);
     expect(Object.keys(payloads[0]).sort()).toEqual(["config", "connection_name", "role", "shard"]);
@@ -405,7 +400,7 @@ it("connection notification is called for shard", async () => {
   });
   try {
     ConnectionTestModel.connectsTo({
-      shards: { default: { writing: { adapter: "sqlite3", database: ":memory:" } } },
+      shards: { default: { writing: ambientPoolConfiguration() } },
     });
     expect(payloads).toHaveLength(1);
     expect(Object.keys(payloads[0]).sort()).toEqual(["config", "connection_name", "role", "shard"]);
@@ -456,14 +451,13 @@ it("connection pool stat", async () => {
 });
 
 it("role and shard is returned", async () => {
-  const dbConfig = new HashConfig("test", "primary", {
-    adapter: "sqlite3",
-    database: "test.db",
-    reapingFrequency: null,
-  });
-  const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "reading", "shard_one", {
-    adapterFactory: newRawTestAdapter,
-  });
+  const pc = new PoolConfig(
+    new ConnectionDescriptor("primary"),
+    makeAmbientDbConfig(),
+    "reading",
+    "shard_one",
+    { adapterFactory: newRawTestAdapter },
+  );
   const pool = new ConnectionPool(pc);
   expect(pool.role).toBe("reading");
   expect(pool.shard).toBe("shard_one");
@@ -596,14 +590,13 @@ it("inspect does not show secrets", async () => {
   expect(str).not.toMatch(/sqlite3/);
 
   // With non-default shard
-  const dbConfig = new HashConfig("test", "primary", {
-    adapter: "sqlite3",
-    reapingFrequency: null,
-    database: "test.db",
-  });
-  const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "reading", "shard_one", {
-    adapterFactory: newRawTestAdapter,
-  });
+  const pc = new PoolConfig(
+    new ConnectionDescriptor("primary"),
+    makeAmbientDbConfig(),
+    "reading",
+    "shard_one",
+    { adapterFactory: newRawTestAdapter },
+  );
   const pool2 = new ConnectionPool(pc);
   expect(pool2.inspect()).toMatch(/shard="shard_one"/);
   expect(pool2.inspect()).toMatch(/role="reading"/);
