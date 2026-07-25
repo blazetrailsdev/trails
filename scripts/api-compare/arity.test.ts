@@ -127,6 +127,15 @@ describe("arityMatches", () => {
     expect(arityMatches([kw("a"), kw("b"), kw("c"), kw("d")], [req("opts")]).ok).toBe(true);
   });
 
+  it("counts the collapsed kwarg group as ONE slot, not one plus max-slack", () => {
+    // def m(k1:, k2:, k3:, opt: default) — the optional kwarg rides in the SAME
+    // options object, so the collapsed form is [1,1] with no extra slack: a
+    // two-positional TS port is still a mismatch.
+    const ruby = [kw("k1"), kw("k2"), kw("k3"), kwopt("opt")];
+    expect(arityMatches(ruby, [req("opts")]).ok).toBe(true);
+    expect(arityMatches(ruby, [req("a"), req("b")]).ok).toBe(false);
+  });
+
   it("still flags a positional-count mismatch alongside collapsible kwargs", () => {
     // ruby m(a, b, k1:, k2:) collapses to [3,3] — a 1-arg TS port stays flagged.
     const m = arityMatches([req("a"), req("b"), kw("k1"), kw("k2")], [req("a")]);

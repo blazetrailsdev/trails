@@ -234,27 +234,29 @@ export function positionalArity(params: ParamInfo[], side: "ruby" | "ts"): Arity
   };
 }
 
-/** Collapse a Ruby method's *required* keywords (`key:`, no default) into ONE
- *  required slot — the port's convention bundles every kwarg into a single
- *  trailing options object, so `(sql, prepare:, batch:)` ports as
- *  `(sql, options)`. Only meaningful with ≥2 required kwargs (one already maps
- *  1:1); returns the list unchanged otherwise. Used solely as an extra Ruby-side
- *  candidate form, so it can only ever *gain* a match. */
-function collapseRequiredKeywords(params: ParamInfo[]): ParamInfo[] {
-  const requiredKeywords = params.filter((p) => p.kind === "keyword" && p.default === undefined);
-  if (requiredKeywords.length < 2) return params;
-  let emitted = false;
-  const out: ParamInfo[] = [];
-  for (const p of params) {
-    if (p.kind === "keyword" && p.default === undefined) {
-      if (emitted) continue;
-      emitted = true;
-      out.push({ name: "options", kind: "required" });
-      continue;
-    }
-    out.push(p);
-  }
-  return out;
+function isRequiredKeyword(p: ParamInfo): boolean {
+  return p.kind === "keyword" && p.default === undefined;
+}
+
+function isKeywordParam(p: ParamInfo): boolean {
+  return p.kind === "keyword" || p.kind === "keyword_rest";
+}
+
+/** Collapse a Ruby method's whole keyword group into ONE required slot — the
+ *  port's convention bundles every kwarg into a single trailing options object,
+ *  so `(sql, prepare:, notification_payload:, batch:)` ports as
+ *  `(sql, options)`. Optional kwargs / `**opts` ride in that same object, so
+ *  they collapse into the slot too rather than also claiming the `hasKeywords`
+ *  max-slack (which would over-count the options object as two slots).
+ *
+ *  Only applied with ≥2 required kwargs: with 0 the existing `hasKeywords`
+ *  slack already covers the convention, and with 1 the kwarg already maps 1:1
+ *  onto the options slot — so the list is returned unchanged. Used solely as an
+ *  extra Ruby-side candidate form, so it can only ever *gain* a match. */
+function collapseKeywordsIntoOptionsObject(params: ParamInfo[]): ParamInfo[] | null {
+  if (params.filter(isRequiredKeyword).length < 2) return null;
+  const positional = params.filter((p) => !isKeywordParam(p));
+  return [...positional, { name: "options", kind: "required" }];
 }
 
 /** Do the ranges overlap, granting Ruby one extra max slot per optional-kwargs/block convention? */
@@ -280,7 +282,8 @@ export function arityMatches(ruby: ParamInfo[], ts: ParamInfo[]): ArityMatch {
   const r = positionalArity(ruby, "ruby");
   const tAsDeclared = positionalArity(ts, "ts");
 
-  const rubyForms = [r, positionalArity(collapseRequiredKeywords(ruby), "ruby")];
+  const collapsed = collapseKeywordsIntoOptionsObject(ruby);
+  const rubyForms = collapsed ? [r, positionalArity(collapsed, "ruby")] : [r];
   const base = stripThis(ts);
   const forms = [
     base,
