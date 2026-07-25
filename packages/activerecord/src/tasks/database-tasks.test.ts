@@ -9,6 +9,7 @@ import { NoEnvironmentInSchemaError, ProtectedEnvironmentError } from "../migrat
 import { SchemaMigration } from "../schema-migration.js";
 import { Base } from "../base.js";
 import { adapterType, inMemoryDb } from "../test-adapter.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 
 describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
   it("raises an error when called with protected environment", async () => {
@@ -154,6 +155,8 @@ describe("DatabaseTasksRegisterTask", () => {
 });
 
 describe("DatabaseTasksDumpSchemaCacheTest", () => {
+  fixtures([]);
+
   let originalSchema: string | undefined;
   let originalDbDir: string;
 
@@ -171,19 +174,13 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
   it("dump schema cache", async () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-dump-sc-"));
     const cachePath = path.join(tmp, "schema_cache.json");
-    const dbFile = path.join(tmp, "arunit.sqlite3");
-    await Base.establishConnection({ adapter: "sqlite3", database: dbFile, pool: 1 });
     try {
       expect(fs.existsSync(cachePath)).toBe(false);
-      const adapter = await Base.connectionPool().leaseConnection();
+      const adapter = await Base.leaseConnection();
       await DatabaseTasks.dumpSchemaCache(adapter, cachePath);
       expect(fs.existsSync(cachePath)).toBe(true);
     } finally {
-      try {
-        Base.removeConnection();
-      } catch {
-        /* ignore */
-      }
+      Base.clearCacheBang();
       fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
