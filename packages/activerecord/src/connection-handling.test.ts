@@ -277,8 +277,6 @@ describe("ConnectionHandlingTest", () => {
 
   it("is_connected?", async () => {
     const pool = Base.connectionPool();
-    // trails' checkout is lazy where Rails' `checkout_and_verify` runs
-    // `verify!`, so the raw connection is opened here as Rails' checkout would.
     await (await pool.leaseConnection()).verifyBang();
     expect(Base.isConnectedQ()).toBe(true);
     pool.releaseConnection();
