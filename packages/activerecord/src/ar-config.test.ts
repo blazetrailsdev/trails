@@ -12,7 +12,10 @@ describe("ar-config module-level flags", () => {
     expect(arConfig.asyncQueryExecutor).toBeNull();
     expect(arConfig.queues).toEqual({});
     expect(arConfig.maintainTestSchema).toBeNull();
-    expect(arConfig.belongsToRequiredValidatesForeignKey).toBe(true);
+    // `belongsToRequiredValidatesForeignKey` is deliberately absent: the AR test
+    // harness flips it to false suite-wide (helper.rb:43), so the live binding
+    // never reads back the framework default here. `trailtie.test.ts` covers the
+    // `true` default via the untouched config hash.
     expect(arConfig.applicationRecordClass).toBeNull();
     expect(arConfig.errorOnIgnoredOrder).toBe(false);
     expect(arConfig.timestampedMigrations).toBe(true);
