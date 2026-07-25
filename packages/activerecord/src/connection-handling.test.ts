@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./base.js";
 import { withQueryConnection, threadedConnectionFor } from "./connection-handling.js";
 import { setPermanentConnectionCheckout } from "./ar-config.js";
@@ -16,23 +16,27 @@ import {
   withIsolatedConnectionState,
 } from "./core.js";
 import { setTrailsRoot } from "@blazetrails/activesupport";
+import type { DatabaseConfig } from "./database-configurations/database-config.js";
+import { establishFromTestConfig } from "./test-helpers/test-database-config.js";
+import { adapterType } from "./test-adapter.js";
 import * as nodeFs from "node:fs";
 import * as nodeOs from "node:os";
 import * as nodePath from "node:path";
 
-function setupConnection() {
-  const config = new HashConfig("test", "primary", {
-    adapter: "sqlite3",
-    database: "test.db",
-    pool: 5,
-    reapingFrequency: null,
-  });
-  Base.connectionHandler.establishConnection(config, { owner: "Base" });
-}
-
 describe("ConnectionHandlingTest", () => {
+  let ambientDbConfig: DatabaseConfig;
+
+  async function setupConnection() {
+    await Base.establishConnection(ambientDbConfig);
+  }
+
+  beforeAll(async () => {
+    await establishFromTestConfig();
+    ambientDbConfig = Base.connectionDbConfig();
+  });
+
   beforeEach(async () => {
-    setupConnection();
+    await setupConnection();
   });
 
   afterEach(async () => {
@@ -256,8 +260,7 @@ describe("ConnectionHandlingTest", () => {
   });
 
   it("connection_db_config", async () => {
-    const config = Base.connectionDbConfig();
-    expect(config.adapter).toBe("sqlite3");
+    expect(Base.connectionDbConfig()).toBe(ambientDbConfig);
   });
 
   // Rails' build_db_config_from_hash deletes :url before constructing the
@@ -274,7 +277,9 @@ describe("ConnectionHandlingTest", () => {
 
   it("is_connected?", async () => {
     const pool = Base.connectionPool();
-    await pool.leaseConnection();
+    // trails' checkout is lazy where Rails' `checkout_and_verify` runs
+    // `verify!`, so the raw connection is opened here as Rails' checkout would.
+    await (await pool.leaseConnection()).verifyBang();
     expect(Base.isConnectedQ()).toBe(true);
     pool.releaseConnection();
   });
@@ -327,18 +332,17 @@ describe("ConnectionHandlingTest", () => {
     expect(Base.connectionPool()).toBeTruthy();
     // Mirrors Rails `remove_connection`: returns the removed pool's db_config.
     const removed = Base.removeConnection();
-    expect(removed?.adapter).toBe("sqlite3");
-    expect(removed?.configurationHash.database).toBe("test.db");
+    expect(removed).toBe(ambientDbConfig);
     expect(() => Base.connectionPool()).toThrow(/No database connection/);
     // Re-establish for other tests
-    setupConnection();
+    await setupConnection();
   });
 
   it("remove_connection returns undefined when no pool exists", async () => {
     Base.removeConnection();
     expect(Base.removeConnection()).toBeUndefined();
     // Re-establish for other tests
-    setupConnection();
+    await setupConnection();
   });
 
   it("connected_to stack is isolated per async context", async () => {
@@ -459,12 +463,12 @@ describe("ConnectionHandlingTest", () => {
     expect(Post.isPrimaryClass()).toBe(false);
   });
 
-  it("#adapterClass resolves to the SQLite3Adapter constructor", async () => {
-    const Klass = await Base.adapterClass();
-    const { BetterSQLite3Adapter } =
-      await import("./connection-adapters/better-sqlite3-adapter.js");
-    expect(Klass).toBe(BetterSQLite3Adapter);
-  });
+  it.skipIf(adapterType !== "sqlite")(
+    "#adapterClass resolves to the SQLite3Adapter constructor",
+    async () => {
+      expect(await Base.adapterClass()).toBe(BetterSQLite3Adapter);
+    },
+  );
 
   // Mirrors Rails: `ActiveRecord::Base.establish_connection` with no args
   // reads from `Base.configurations` (the in-memory registry), not from
@@ -483,17 +487,18 @@ describe("ConnectionHandlingTest", () => {
     const priorCurrent = (DatabaseConfigurations as any).current;
     try {
       const inMemory = new DatabaseConfigurations([
-        new HashConfig(env, "primary", { adapter: "sqlite3", database: ":memory:" }),
+        new HashConfig(env, "primary", {
+          ...ambientDbConfig.configurationHash,
+          database: "db/common.sqlite3",
+        }),
       ]);
 
       class InMemoryModel extends Base {}
       (InMemoryModel as any).configurations = inMemory;
 
       await InMemoryModel.establishConnection();
-      const Klass = await InMemoryModel.adapterClass();
-      const { BetterSQLite3Adapter } =
-        await import("./connection-adapters/better-sqlite3-adapter.js");
-      expect(Klass).toBe(BetterSQLite3Adapter);
+      expect(InMemoryModel.connectionPool().dbConfig.database).toBe("db/common.sqlite3");
+      expect(await InMemoryModel.adapterClass()).toBe(await Base.adapterClass());
     } finally {
       (DatabaseConfigurations as any).current = priorCurrent;
     }
@@ -600,6 +605,11 @@ describe("withRoleAndShard loads Relation return values within scope (Story K ga
   });
 });
 
+// The pools below inject their adapter via `adapterFactory`, so the pool never
+// opens the declared `database` — `new BetterSQLite3Adapter()` defaults to
+// `:memory:` (sqlite3-adapter.ts:357). The config therefore states what is
+// actually opened; naming a file here would claim a file-backed pool that does
+// not exist.
 describe("AbstractAdapter#isPreventingWrites stack matching", () => {
   afterEach(async () => {
     connectedToStack().length = 0;
@@ -759,7 +769,7 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
       primaryAbstractClass(AppRecord);
       const env = DatabaseConfigurations.currentEnv();
       (AppRecord as any).configurations = {
-        [env]: { primary: { adapter: "sqlite3", database: ":memory:" } },
+        [env]: { primary: { adapter: "sqlite3", database: "db/primary.sqlite3" } },
       };
       (SecondaryAbstract as any).configurations = (AppRecord as any).configurations;
 
@@ -871,7 +881,7 @@ describe("establish_connection accepts a DatabaseConfig", () => {
   it("re-establishes the connection from the captured DatabaseConfig object", async () => {
     const config = new HashConfig("test", "primary", {
       adapter: "sqlite3",
-      database: ":memory:",
+      database: "db/primary.sqlite3",
       pool: 5,
       reapingFrequency: null,
     });
@@ -885,7 +895,7 @@ describe("establish_connection accepts a DatabaseConfig", () => {
     const restored = Base.connectionDbConfig();
     expect(restored).toBe(captured);
     expect(restored.adapter).toBe("sqlite3");
-    expect(restored.configurationHash.database).toBe(":memory:");
+    expect(restored.configurationHash.database).toBe("db/primary.sqlite3");
   });
 });
 
@@ -906,7 +916,7 @@ describe("loadConfigFile resolves config/database.* against Trails.root", () => 
     nodeFs.mkdirSync(nodePath.join(tmpRoot, "config"));
     nodeFs.writeFileSync(
       nodePath.join(tmpRoot, "config", "database.json"),
-      JSON.stringify({ test: { adapter: "sqlite3", database: ":memory:" } }),
+      JSON.stringify({ test: { adapter: "sqlite3", database: "db/primary.sqlite3" } }),
     );
     setTrailsRoot(tmpRoot);
 
@@ -917,6 +927,6 @@ describe("loadConfigFile resolves config/database.* against Trails.root", () => 
 
     const dbConfig = RootConfigModel.connectionDbConfig();
     expect(dbConfig.adapter).toBe("sqlite3");
-    expect(dbConfig.configurationHash.database).toBe(":memory:");
+    expect(dbConfig.configurationHash.database).toBe("db/primary.sqlite3");
   });
 });
