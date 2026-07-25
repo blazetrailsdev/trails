@@ -1000,7 +1000,7 @@ describe("extractFromProgram — Object.defineProperty wiring", () => {
           enumerable: false,
         });
       `,
-      "callbacks.ts": `export function createRecord() {}`,
+      "callbacks.ts": `export function createRecord(attribute: string) {}`,
     });
     const methods = info.classes["base.ts:Base"].instanceMethods.map((m) => m.name);
     expect(methods).toContain("createOrUpdate");
@@ -1009,6 +1009,9 @@ describe("extractFromProgram — Object.defineProperty wiring", () => {
     )!;
     expect(m.visibility).toBe("private");
     expect(m.internal).toBe(true);
+    // The descriptor's `value` alias carries the target's arity — recording it
+    // as 0-arg put a bogus [0-0] candidate in the arity pool.
+    expect(m.params).toEqual([{ name: "attribute", kind: "required", type: "string" }]);
   });
 
   it("credits for-of loop over [name, fn][] array to host class (Pattern B)", () => {
@@ -1016,8 +1019,8 @@ describe("extractFromProgram — Object.defineProperty wiring", () => {
       "base.ts": `export class Base {}`,
       "callbacks.ts": `
         export function createOrUpdate() {}
-        export function _createRecord() {}
-        export function _updateRecord() {}
+        export function _createRecord(attributeNames: string[]) {}
+        export function _updateRecord(attributeNames: string[]) {}
       `,
       "wire.ts": `
         import { Base } from "./base.js";
@@ -1045,6 +1048,14 @@ describe("extractFromProgram — Object.defineProperty wiring", () => {
       expect(m.visibility).toBe("private");
       expect(m.internal).toBe(true);
     }
+    // Each tuple's own fn supplies the params — not one shared empty list.
+    const byName = Object.fromEntries(
+      info.classes["base.ts:Base"].instanceMethods.map((m) => [m.name, m.params]),
+    );
+    expect(byName["createOrUpdate"]).toEqual([]);
+    expect(byName["_createRecord"]).toEqual([
+      { name: "attributeNames", kind: "required", type: "string[]" },
+    ]);
   });
 
   it("skips for-of loop when descriptor has no `value` key (getter/setter descriptors)", () => {

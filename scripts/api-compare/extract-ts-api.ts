@@ -1036,16 +1036,39 @@ function classInfoForPrototype(
 }
 
 /** Push a method name onto classInfo if not already present. */
-function pushDefinePropertyMethod(classInfo: ClassInfo, name: string, line: number): void {
+function pushDefinePropertyMethod(
+  classInfo: ClassInfo,
+  name: string,
+  line: number,
+  params: ParamInfo[] = [],
+): void {
   if (classInfo.instanceMethods.some((m) => m.name === name)) return;
   classInfo.instanceMethods.push({
     name,
     visibility: "private",
     internal: true,
-    params: [],
+    params,
     line,
     file: classInfo.file,
   });
+}
+
+/** Params behind an `Object.defineProperty` `value:` — inline function or alias. */
+function paramsOfDescriptorValue(value: ts.Expression, checker: ts.TypeChecker): ParamInfo[] {
+  if (ts.isFunctionExpression(value) || ts.isArrowFunction(value)) {
+    return extractParameters(value.parameters);
+  }
+  return paramsOfCallableRef(value, checker) ?? [];
+}
+
+/** The `value:` initializer of an `Object.defineProperty` descriptor, if any. */
+function definePropertyValue(descriptor: ts.ObjectLiteralExpression): ts.Expression | null {
+  for (const p of descriptor.properties) {
+    if (ts.isPropertyAssignment(p) && ts.isIdentifier(p.name) && p.name.text === "value") {
+      return p.initializer;
+    }
+  }
+  return null;
 }
 
 /**
@@ -1068,14 +1091,17 @@ function extractDefinePropertyDirect(
   const [target, propNameExpr, descriptor] = expr.arguments;
   if (!ts.isStringLiteral(propNameExpr)) return;
   if (!ts.isObjectLiteralExpression(descriptor)) return;
-  const hasValue = descriptor.properties.some(
-    (p) => ts.isPropertyAssignment(p) && ts.isIdentifier(p.name) && p.name.text === "value",
-  );
-  if (!hasValue) return;
+  const value = definePropertyValue(descriptor);
+  if (!value) return;
   const classInfo = classInfoForPrototype(target, info, checker, srcDir);
   if (!classInfo) return;
   const line = expr.getSourceFile().getLineAndCharacterOfPosition(expr.getStart()).line + 1;
-  pushDefinePropertyMethod(classInfo, propNameExpr.text, line);
+  pushDefinePropertyMethod(
+    classInfo,
+    propNameExpr.text,
+    line,
+    paramsOfDescriptorValue(value, checker),
+  );
 }
 
 /**
@@ -1109,14 +1135,17 @@ function extractDefinePropertyForOf(
   if (!ts.isArrayLiteralExpression(iterable)) return;
 
   // Each element must be an array literal whose first element is a string literal.
-  const methodNames: string[] = [];
+  // The tuple's second element is the function bound to that name, so each
+  // entry carries its own arity rather than sharing an empty list.
+  const entries: { name: string; params: ParamInfo[] }[] = [];
   for (const el of iterable.elements) {
     if (!ts.isArrayLiteralExpression(el) || el.elements.length < 1) return;
     const first = el.elements[0];
     if (!ts.isStringLiteral(first)) return;
-    methodNames.push(first.text);
+    const fn = el.elements[1];
+    entries.push({ name: first.text, params: fn ? paramsOfDescriptorValue(fn, checker) : [] });
   }
-  if (methodNames.length === 0) return;
+  if (entries.length === 0) return;
 
   // Find `Object.defineProperty(Cls.prototype, nameVar, { value: ... })` in body.
   if (!ts.isBlock(node.statement)) return;
@@ -1133,18 +1162,15 @@ function extractDefinePropertyForOf(
     const [target, propNameExpr, descriptor] = expr.arguments;
     if (!ts.isIdentifier(propNameExpr) || propNameExpr.text !== nameVar) continue;
     if (!ts.isObjectLiteralExpression(descriptor)) continue;
-    const hasValue = descriptor.properties.some(
-      (p) => ts.isPropertyAssignment(p) && ts.isIdentifier(p.name) && p.name.text === "value",
-    );
-    if (!hasValue) continue;
+    if (!definePropertyValue(descriptor)) continue;
     classInfo = classInfoForPrototype(target, info, checker, srcDir);
     break;
   }
   if (!classInfo) return;
 
   const line = node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1;
-  for (const name of methodNames) {
-    pushDefinePropertyMethod(classInfo, name, line);
+  for (const entry of entries) {
+    pushDefinePropertyMethod(classInfo, entry.name, line, entry.params);
   }
 }
 
@@ -1175,6 +1201,25 @@ function extractDefinePropertyForOf(
  * Caller must already have ensured `node` is not exported.
  */
 /**
+ * Params of the function an identifier / property-access reference points at,
+ * or null when the expression isn't callable. Mirrors the alias resolution the
+ * named-export path does for `export { foo }` so that a binding like
+ * `isReadonlyAttribute: readonlyAttributeQ` reports the target's real arity
+ * instead of an empty list. Returns `[]` for a callable with no reachable
+ * declaration (a synthesized/ambient signature), which is what the pre-alias
+ * behavior recorded.
+ */
+export function paramsOfCallableRef(
+  expr: ts.Expression,
+  checker: ts.TypeChecker,
+): ParamInfo[] | null {
+  const signatures = checker.getTypeAtLocation(expr).getCallSignatures();
+  if (signatures.length === 0) return null;
+  const decl = signatures[0].declaration;
+  return decl && ts.isFunctionLike(decl) ? extractParameters(decl.parameters) : [];
+}
+
+/**
  * Extract method names from an object literal — covers the four shapes
  * Rails-style mixin modules use:
  *
@@ -1189,25 +1234,6 @@ function extractDefinePropertyForOf(
  * Used both for `export const Mod = { ... }` module discovery and for
  * resolving inline / property-access mod args to `include(Host, Mod)`.
  */
-/**
- * Params of the function an identifier / property-access reference points at,
- * or null when the expression isn't callable. Mirrors the alias resolution the
- * named-export path does for `export { foo }` so that a binding like
- * `isReadonlyAttribute: readonlyAttributeQ` reports the target's real arity
- * instead of an empty list.
- */
-export function paramsOfCallableRef(
-  expr: ts.Expression,
-  checker: ts.TypeChecker,
-): ParamInfo[] | null {
-  const type = checker.getTypeAtLocation(expr);
-  const signatures = type.getCallSignatures();
-  if (signatures.length === 0) return null;
-  const decl = signatures[0].declaration;
-  if (decl && ts.isFunctionLike(decl)) return extractParameters(decl.parameters);
-  return [];
-}
-
 export function harvestObjectLiteralMethods(
   obj: ts.ObjectLiteralExpression,
   checker: ts.TypeChecker,
