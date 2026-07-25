@@ -8,7 +8,7 @@
  * machinery. They were relocated verbatim out of transactions.test.ts (which
  * mirrors transactions_test.rb) so the convention file tracks Rails 1:1.
  */
-import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from "vitest";
+import { describe, it, expect, afterEach, afterAll, vi } from "vitest";
 import { throwAbort } from "@blazetrails/activesupport";
 import { Base, transaction } from "./index.js";
 import { NullTransaction } from "./connection-adapters/abstract/transaction.js";
@@ -75,35 +75,6 @@ afterEach(async () => {
 
 describe("TransactionTest", () => {
   fixtures({}, { useTransactionalTests: false });
-
-  beforeAll(async () => {
-    // Re-lay the canonical `topics` on the handler connection (drop-and-recreate,
-    // mirroring schema.rb's `create_table :topics`) so this file's signature
-    // cache is primed and a bespoke `topics` left behind by a sibling file can't
-    // shadow the CanonicalTopic model's shape. `topics` is boot-owned canonical,
-    // so it is not torn down (the boot schema owns/restores its shape).
-
-    await Base.connection.createTable("topics", { force: true }, (t) => {
-      t.string("title", { limit: 250 });
-      t.string("author_name");
-      t.string("author_email_address");
-      t.datetime("written_on");
-      t.time("bonus_time");
-      t.date("last_read");
-      t.text("content");
-      t.text("important");
-      t.binary("binary_content");
-      t.boolean("approved", { default: true });
-      t.integer("replies_count", { default: 0 });
-      t.integer("unique_replies_count", { default: 0 });
-      t.integer("parent_id");
-      t.string("parent_title");
-      t.string("type");
-      t.string("group");
-      t.timestamps({ null: true });
-      t.index(["author_name", "title"]);
-    });
-  });
 
   // trails-extra: a block-arg `tx.afterCommit(...)` registered on the explicit
   // `transaction(Model, (tx) => ...)` handle fires once the transaction commits.
