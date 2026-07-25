@@ -397,29 +397,43 @@ export function withConnection<T>(
  * @internal
  */
 export function withQueryConnection<T>(modelClass: typeof Base, run: () => Promise<T>): Promise<T> {
-  const klass = modelClass as unknown as {
-    _adapter?: unknown;
-    connectionPool?(): ConnectionPool | null | undefined;
-  };
-  if (klass._adapter || typeof klass.connectionPool !== "function") return run();
-  let pool: ConnectionPool | null | undefined;
-  try {
-    pool = klass.connectionPool();
-  } catch {
-    return run();
-  }
-  if (!pool || typeof pool.withConnection !== "function") return run();
+  const pool = leasablePool(modelClass);
+  if (!pool) return run();
   return Promise.resolve(
     pool.withConnection((conn) => IsolatedExecutionState.scope(QUERY_CONNECTION_KEY, conn, run)),
   ) as Promise<T>;
 }
 
 /**
- * `withConnection` for internal call sites that must also serve models backed
- * by a directly-assigned adapter (`Model.adapter = x`), which have no
- * handler-registered pool to lease from. Those run the block inline on the
- * assigned adapter, mirroring the `connection` getter's `_adapter` fast path;
- * everything else goes through the Rails-named `withConnection`.
+ * The pool an internal call site can lease from, or null when there is no
+ * lease to manage: a model backed by a directly-assigned adapter
+ * (`Model.adapter = x`), or one without a handler-registered pool (e.g. HABTM
+ * join models, whose `.connection` delegates to the owner and whose
+ * `connectionPool()` therefore throws for a direct-adapter owner).
+ *
+ * @internal
+ */
+function leasablePool(modelClass: typeof Base): ConnectionPool | null {
+  const klass = modelClass as unknown as {
+    _adapter?: unknown;
+    connectionPool?(): ConnectionPool | null | undefined;
+  };
+  if (klass._adapter || typeof klass.connectionPool !== "function") return null;
+  let pool: ConnectionPool | null | undefined;
+  try {
+    pool = klass.connectionPool();
+  } catch {
+    return null;
+  }
+  if (!pool || typeof pool.withConnection !== "function") return null;
+  return pool;
+}
+
+/**
+ * `withConnection` for internal call sites that must also serve the models
+ * {@link leasablePool} finds no pool for: those have no lease to manage, so the
+ * block runs inline on the connection the (deprecated) getter resolves —
+ * the directly-assigned adapter, or the owner's for an HABTM join model.
  *
  * @internal
  */
@@ -427,12 +441,9 @@ export function withPooledOrDirectConnection<T>(
   modelClass: typeof Base,
   fn: (conn: DatabaseAdapter) => T | Promise<T>,
 ): Promise<T> {
-  const direct = (modelClass as any)._adapter as DatabaseAdapter | undefined;
-  if (direct) return Promise.resolve(fn(direct));
-  return withConnection.call<typeof Base, [(conn: DatabaseAdapter) => T | Promise<T>], Promise<T>>(
-    modelClass,
-    fn,
-  );
+  const pool = leasablePool(modelClass);
+  if (!pool) return Promise.resolve(fn(connection.call(modelClass)));
+  return Promise.resolve(pool.withConnection(fn)) as Promise<T>;
 }
 
 export function connectionDbConfig(this: typeof Base) {

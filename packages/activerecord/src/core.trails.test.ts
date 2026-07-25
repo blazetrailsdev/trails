@@ -3,10 +3,12 @@
  * These guard documented trails implementation behavior that has no
  * Rails counterpart test, so they live in a `.trails.test.ts` sibling.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import { fixtures } from "./test-helpers/fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
+import { Base } from "./index.js";
+import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 
 describe("frozen / isFrozen", () => {
   fixtures(["topics"]);
@@ -71,5 +73,51 @@ describe("connection checkout in cached find paths", () => {
     } finally {
       restore();
     }
+  });
+});
+
+describe("connection checkout for directly-assigned adapters", () => {
+  let adapter: BetterSQLite3Adapter;
+  let DirectTopic: typeof Base;
+
+  beforeEach(async () => {
+    adapter = new BetterSQLite3Adapter(":memory:");
+    await adapter.exec(
+      "CREATE TABLE topics (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, approved INTEGER DEFAULT 0)",
+    );
+    const adp = adapter;
+    class TopicWithDirectAdapter extends Base {
+      static tableName = "topics";
+      static {
+        // No handler-registered pool for this name, so `connectionPool()`
+        // throws — the shape `adapters/postgresql/datatype.test.ts` hits under
+        // AR_NO_AUTO_SCHEMA, where only the assigned adapter can serve queries.
+        this.connectionSpecificationName = "TopicWithDirectAdapter";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("approved", "boolean");
+        this.adapter = adp;
+      }
+    }
+    DirectTopic = TopicWithDirectAdapter;
+  });
+
+  afterEach(async () => {
+    await adapter.exec("DROP TABLE IF EXISTS topics");
+    await adapter.close();
+  });
+
+  it("find resolves through the assigned adapter without a pool", async () => {
+    // Seeded through the assigned adapter only, so a lookup that leased from
+    // the ambient Base pool (whose canonical `topics` table lacks this row)
+    // would come back empty instead of quietly reading the wrong database.
+    await adapter.exec("INSERT INTO topics (id, title) VALUES (42, 'Alice')");
+    expect((await DirectTopic.find(42)).readAttribute("title")).toBe("Alice");
+    expect((await DirectTopic.findBy({ title: "Alice" }))!.id).toBe(42);
+  });
+
+  it("insertAll resolves through the assigned adapter without a pool", async () => {
+    await DirectTopic.insertAll([{ title: "Bob" }]);
+    expect(await DirectTopic.count()).toBe(1);
   });
 });
