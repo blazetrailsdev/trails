@@ -1169,43 +1169,14 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   });
 
   it("callbacks on child when parent autosaves child", async () => {
-    const log: string[] = [];
-    class CbParent extends Base {
-      declare name: string | null;
-      declare cbChild: CbChild | null;
-      declare loadHasOne: (name: "cbChild") => Promise<CbChild | null>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasOne("cbChild", {
-          autosave: true,
-          className: "CbChild",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class CbChild extends Base {
-      declare name: string | null;
-      declare author_id: number | null;
-
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-        this.afterSave(function () {
-          log.push("child_after_save");
-        });
-      }
-    }
-    registerModel("CbParent", CbParent);
-    registerModel("CbChild", CbChild);
-    const parent = await CbParent.create({ name: "P" });
-    const child = new CbChild({ name: "V" });
-    cacheAssoc(parent, "cbChild", child);
-    await parent.save();
-    expect(log).toContain("child_after_save");
-    expect(child.isNewRecord()).toBe(false);
+    const eye = await Eye.createBang({ iris: new Iris() });
+    const iris = eye.iris;
+    expect(iris?.beforeValidationCallbacksCounter).toBe(1);
+    expect(iris?.beforeCreateCallbacksCounter).toBe(1);
+    expect(iris?.beforeSaveCallbacksCounter).toBe(1);
+    expect(iris?.afterValidationCallbacksCounter).toBe(1);
+    expect(iris?.afterCreateCallbacksCounter).toBe(1);
+    expect(iris?.afterSaveCallbacksCounter).toBe(1);
   });
   it("callbacks on child when parent autosaves child twice", async () => {
     const eye = new Eye();
