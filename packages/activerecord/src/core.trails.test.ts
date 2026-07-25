@@ -41,9 +41,6 @@ describe("frozen / isFrozen", () => {
 describe("connection checkout in cached find paths", () => {
   fixtures(["topics"]);
 
-  // Rails core.rb:441-443 wraps cached_find_by in `with_connection`; reading the
-  // deprecated `connection` getter instead flips the lease permanent on a caller
-  // that never asked for one. Shadow the getter so any read raises.
   const banConnectionGetter = (klass: object) => {
     Object.defineProperty(klass, "connection", {
       configurable: true,
