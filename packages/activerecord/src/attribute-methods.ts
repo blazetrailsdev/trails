@@ -572,7 +572,7 @@ export function attributesForUpdate(this: InstanceMethodHost, attributeNames: st
   const colNames = new Set<string>(mc.columnNames?.() ?? []);
   return attributeNames.filter((name) => {
     if (!colNames.has(name)) return false;
-    if (mc._readonlyAttributes?.has?.(name)) return false;
+    if (mc.readonlyAttributeQ?.(name)) return false;
     if (mc._counterCacheColumns?.has?.(name)) return false;
     // Rails: column_for_attribute(name).virtual?
     const col = mc.columnForAttribute?.(name);
