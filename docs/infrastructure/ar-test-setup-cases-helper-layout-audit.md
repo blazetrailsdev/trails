@@ -12,8 +12,8 @@ exists so the question is not re-litigated.
 
 ## What `helper.rb` actually does
 
-`vendor/rails/activerecord/test/cases/helper.rb` is 107 lines and does a dozen
-unrelated things. Mapped to trails:
+`vendor/rails/activerecord/test/cases/helper.rb` is 107 lines and does seventeen
+loosely related things. Mapped to trails:
 
 | helper.rb responsibility                                         | trails location                                                                                                      |
 | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
@@ -88,8 +88,8 @@ five files, not a consolidation.
 13 `helper.rb` responsibilities that have a trails home. Naming it
 `cases/helper.ts` invites a future agent to assume the other nine are there and
 to stop checking — the exact failure mode the per-line
-`// Mirror Rails activerecord/test/cases/helper.rb:NN` comments prevent. Those comments already deliver the discoverability the rename is
-after, at the granularity where it matters (per setting, not per file), and
+`// Mirror Rails activerecord/test/cases/helper.rb:NN` comments prevent. Those
+comments already deliver the discoverability the rename is after, at the granularity where it matters (per setting, not per file), and
 `pnpm rails:find` covers the reverse lookup.
 
 **`test:compare` / `api:compare` gain nothing.** Both map _test cases_ and
