@@ -158,7 +158,7 @@ export async function freshAdapter(): Promise<TestDatabaseAdapter> {
   // is idempotent, so the first caller boots the primary pool and later callers
   // reuse it.
   await establishFromTestConfig();
-  const adapter = Base.connection;
+  const adapter = await Base.leaseConnection();
   await installEncryptionSchema(adapter);
   return adapter;
 }

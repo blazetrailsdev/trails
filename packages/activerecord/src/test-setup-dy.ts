@@ -47,7 +47,7 @@ const { supportsExpressionIndex } = await import("./test-helpers/schema-types.js
 const schemaFilePath = await generateSchemaFile(
   TEST_SCHEMA,
   adapter,
-  await supportsExpressionIndex(Base.connection),
+  await supportsExpressionIndex(await Base.leaseConnection()),
 );
 
 const pgExclusive = adapter === "postgres" && !!process.env.AR_PG_EXCLUSIVE_DB;
@@ -62,7 +62,9 @@ if ((adapter === "sqlite" && envConfig.database !== ":memory:") || pgExclusive |
 // DatabaseTasks loads the schema. Failure here means the load path is broken,
 // not just the signature cache. Cast because tableExists is on the concrete
 // adapter class, not the DatabaseAdapter interface.
-const _conn = Base.connection as unknown as { tableExists(n: string): Promise<boolean> };
+const _conn = (await Base.leaseConnection()) as unknown as {
+  tableExists(n: string): Promise<boolean>;
+};
 const missingTables: string[] = [];
 for (const t of ["accounts", "topics", "posts"]) {
   if (!(await _conn.tableExists(t))) missingTables.push(t);

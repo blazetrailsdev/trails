@@ -73,8 +73,9 @@ export class InsertAll {
     options: InsertAllOptions = {},
   ): Promise<Result> {
     const model = (relation as any)._modelClass as ModelClass;
-    const ia = new InsertAll(relation, model.connection, inserts, options);
-    return ia.execute();
+    return (model as any).withConnection((c: ModelClass["connection"]) =>
+      new InsertAll(relation, c, inserts, options).execute(),
+    );
   }
 
   constructor(

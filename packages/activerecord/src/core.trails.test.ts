@@ -37,3 +37,42 @@ describe("frozen / isFrozen", () => {
     expect(attrsOf(topic).isFrozen()).toBe(true);
   });
 });
+
+describe("connection checkout in cached find paths", () => {
+  fixtures(["topics"]);
+
+  // Rails core.rb:441-443 wraps cached_find_by in `with_connection`; reading the
+  // deprecated `connection` getter instead flips the lease permanent on a caller
+  // that never asked for one. Shadow the getter so any read raises.
+  const banConnectionGetter = (klass: object) => {
+    Object.defineProperty(klass, "connection", {
+      configurable: true,
+      get() {
+        throw new Error("Base.connection is banned: use withConnection");
+      },
+    });
+    return () => {
+      delete (klass as Record<string, unknown>)["connection"];
+    };
+  };
+
+  it("find(id) does not read the deprecated connection getter", async () => {
+    const topic = await Topic.first();
+    const restore = banConnectionGetter(Topic);
+    try {
+      expect((await Topic.find(topic!.id)).id).toBe(topic!.id);
+    } finally {
+      restore();
+    }
+  });
+
+  it("findBy does not read the deprecated connection getter", async () => {
+    const topic = await Topic.first();
+    const restore = banConnectionGetter(Topic);
+    try {
+      expect((await Topic.findBy({ id: topic!.id }))!.id).toBe(topic!.id);
+    } finally {
+      restore();
+    }
+  });
+});
