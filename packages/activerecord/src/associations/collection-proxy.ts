@@ -3381,6 +3381,18 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Rails' `replace_records` (collection_association.rb:418): delete the
    * records the new target dropped, then concat the ones it gained, restoring
    * the original target and raising when the concat fails.
+   *
+   * `target` tracks Rails' `@target` across the two diffs. It is a local copy
+   * because the proxy's `_target` is only populated when the association is
+   * genuinely loaded (a diverged or `find_target?`-false `toArray()` returns
+   * records without caching them), which would silently make the delete diff a
+   * no-op. The delete step applies Rails' `remove_records`
+   * (collection_association.rb:405) mutation verbatim: `@target -= records` is
+   * plain `Array#-`, which drops EVERY occurrence of a deleted record, not the
+   * `difference` hook's per-occurrence count. For a `:through` reflection that
+   * is what makes `[david, david].replace([david])` delete both join rows and
+   * re-concat a fresh one, exactly as Rails does — and it matches what
+   * `_removeFromTarget` does to the real `_target`.
    * @internal
    */
   private async _replaceRecords(newTarget: T[], originalTarget: T[]): Promise<T[]> {
@@ -3388,7 +3400,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const toDelete = this._difference(target, newTarget);
     if (toDelete.length > 0) {
       await this.delete(...toDelete);
-      target = this._difference(target, toDelete);
+      target = setDifference(target, toDelete) as T[];
     }
     const toAdd = this._difference(newTarget, target);
     if (toAdd.length > 0 && (await this.push(...toAdd)) === false) {

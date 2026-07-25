@@ -66,6 +66,21 @@ describe("collection replace diffs instead of clearing", () => {
     expect(await Reader.where({ post_id: post.id }).count()).toBe(Number(afterOne) + 1);
   });
 
+  it("re-creates the join row when a duplicate is replaced by a single occurrence", async () => {
+    const post = await Post.find(posts("thinking").id);
+    const david = await Person.find(people("david").id);
+
+    await post.people.replace([david, david]);
+    const duplicated = await Reader.where({ post_id: post.id });
+    expect(duplicated.length).toBe(2);
+
+    await post.people.replace([david]);
+    const remaining = await Reader.where({ post_id: post.id });
+
+    expect(remaining.length).toBe(1);
+    expect(duplicated.map((r) => Number(r.id))).not.toContain(Number(remaining[0].id));
+  });
+
   it("rolls the whole replace back when one of the new records cannot be saved", async () => {
     const firm = await Firm.find(companies("first_firm").id);
     const good = Client.new({ name: "Good" });
