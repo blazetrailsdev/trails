@@ -1012,10 +1012,9 @@ export async function isAssociationValid(
   association: any,
   record: any,
 ): Promise<boolean> {
-  // Mirrors Rails `association_valid?` (autosave_association.rb:371-398). Rails
-  // reads the reflection off the association (`association.reflection.name`,
-  // `association.options`) and the parent errors off `self`, so both stay
-  // implicit here rather than riding in as extra params.
+  // Mirrors Rails `association_valid?` (autosave_association.rb:371-398), which
+  // reads the reflection off the association and the errors off `self` — so
+  // neither rides in as an extra param.
   const owner = this as any;
   const reflection = association.reflection;
   if (typeof record.isDestroyed === "function" && record.isDestroyed()) return true;

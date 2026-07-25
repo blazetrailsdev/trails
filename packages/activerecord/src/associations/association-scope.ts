@@ -491,8 +491,8 @@ export class AssociationScope {
     tracker?: AliasTracker,
   ): Array<AbstractReflection | ReflectionProxy> {
     // Rails: `chain = [Reflection::RuntimeReflection.new(reflection, association)]`
-    // — the head resolves `klass` off the live association, which is what makes
-    // a polymorphic belongs_to head usable (its reflection can't compute one).
+    // (association_scope.rb:114) — the head resolves `klass` off the live
+    // association, which is what makes a polymorphic belongs_to head usable.
     const chain: Array<AbstractReflection | ReflectionProxy> = [
       new RuntimeReflection(reflection, association),
     ];

@@ -2206,58 +2206,62 @@ export class RuntimeReflection extends AbstractReflection {
     return callback();
   }
 
-  // Ruby's RuntimeReflection inherits AbstractReflection and reaches the rest of
-  // the reflection API through `method_missing`-free delegation on the members
-  // Rails' AssociationScope actually touches. TS has no such fallback, so the
-  // remaining members AssociationScope reads off the chain head are forwarded
-  // explicitly (same SimpleDelegator-style approach as ReflectionProxy).
+  // Ruby's RuntimeReflection is a SimpleDelegator-ish subclass: the members it
+  // doesn't define reach the wrapped reflection. TS has no such fallback, and
+  // AbstractReflection's defaults are hard-coded (`is_collection?` → false), so
+  // the members AssociationScope reads off the chain head are forwarded here —
+  // the same explicit forwarding ReflectionProxy uses.
 
   /** @internal */
   get options(): Record<string, unknown> {
-    return (this._reflection as any).options ?? {};
+    return asConcrete(this._reflection).options;
   }
 
   /** @internal */
   override isThroughReflection(): boolean {
-    return (this._reflection as any).isThroughReflection?.() ?? false;
+    return this._reflection.isThroughReflection();
   }
 
   /** @internal */
   override isCollection(): boolean {
-    return (this._reflection as any).isCollection?.() ?? false;
+    return this._reflection.isCollection();
   }
 
   /** @internal */
   override isPolymorphic(): boolean {
-    return (this._reflection as any).isPolymorphic?.() ?? false;
+    return this._reflection.isPolymorphic();
   }
 
   /** @internal */
   scopeFor(relation: unknown, owner?: unknown): unknown {
-    return (this._reflection as any).scopeFor?.(relation, owner) ?? relation;
+    return asConcrete(this._reflection).scopeFor?.(relation, owner) ?? relation;
   }
 
   /** @internal */
   joinPrimaryKeyFor(klass?: typeof Base): string | string[] {
-    const refl = this._reflection as any;
+    const refl = this._reflection as unknown as {
+      joinPrimaryKeyFor?: (klass?: typeof Base) => string | string[];
+      joinPrimaryKey: string | string[];
+    };
+    // The head's klass is the runtime one (`association.klass`), which is the
+    // whole point of RuntimeReflection: a polymorphic belongs_to can't compute
+    // its target class from the reflection alone.
     return typeof refl.joinPrimaryKeyFor === "function"
       ? refl.joinPrimaryKeyFor(klass ?? this.klass)
       : refl.joinPrimaryKey;
   }
 
   /** @internal */
-  override aliasCandidate(name: string): string {
-    return (this._reflection as any).aliasCandidate(name);
-  }
-
-  /** @internal */
   override get chain(): AbstractReflection[] {
-    return (this._reflection as any).chain;
+    return this._reflection.chain;
   }
 
   /** @internal */
   get sourceReflection(): AbstractReflection | null {
-    return (this._reflection as any).sourceReflection ?? null;
+    return (
+      (this._reflection as unknown as { sourceReflection?: AbstractReflection | null })
+        .sourceReflection ?? null
+    );
   }
 }
 
