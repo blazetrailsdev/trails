@@ -3,8 +3,8 @@
     "package": "activerecord",
     "tsFile": "readonly-attributes.ts",
     "rubyName": "_write_attribute",
-    "call": "new_record?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "call": "readonly_attribute?",
+    "reason": "Unmasked by alias-arity resolution (story arity-resolve-ts-alias-bindings-to-target-params): the TS body reads `_readonlyAttributes` directly instead of delegating to `readonlyAttributeQ`. Real gap, tracked as story converge-readonly-attribute-predicate-callers."
   },
   {
     "package": "activerecord",
@@ -24,7 +24,7 @@
     "package": "activerecord",
     "tsFile": "readonly-attributes.ts",
     "rubyName": "write_attribute",
-    "call": "new_record?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "call": "readonly_attribute?",
+    "reason": "Unmasked by alias-arity resolution (story arity-resolve-ts-alias-bindings-to-target-params): the TS body reads `_readonlyAttributes` directly instead of delegating to `readonlyAttributeQ`. Real gap, tracked as story converge-readonly-attribute-predicate-callers."
   }
 ]

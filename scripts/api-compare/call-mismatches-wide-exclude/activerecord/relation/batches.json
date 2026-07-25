@@ -23,13 +23,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation/batches.ts",
-    "rubyName": "batch_condition",
-    "call": "predicate_builder",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/batches.ts",
     "rubyName": "batch_on_loaded_relation",
     "call": "each_slice",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -60,13 +53,6 @@
     "tsFile": "relation/batches.ts",
     "rubyName": "batch_on_unloaded_relation",
     "call": "apply_finish_limit",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/batches.ts",
-    "rubyName": "batch_on_unloaded_relation",
-    "call": "empty?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -151,13 +137,6 @@
     "tsFile": "relation/batches.ts",
     "rubyName": "ensure_valid_options_for_batching!",
     "call": "columns",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/batches.ts",
-    "rubyName": "ensure_valid_options_for_batching!",
-    "call": "empty?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

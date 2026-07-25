@@ -24,13 +24,6 @@
     "package": "actiondispatch",
     "tsFile": "middleware/show-exceptions.ts",
     "rubyName": "fallback_to_html_format_if_invalid_mime_type",
-    "call": "content_mime_type",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/show-exceptions.ts",
-    "rubyName": "fallback_to_html_format_if_invalid_mime_type",
     "call": "formats",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

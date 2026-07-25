@@ -80,13 +80,6 @@
     "package": "activerecord",
     "tsFile": "counter-cache.ts",
     "rubyName": "update_counters",
-    "call": "composite_primary_key?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "counter-cache.ts",
-    "rubyName": "update_counters",
     "call": "primary_key",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

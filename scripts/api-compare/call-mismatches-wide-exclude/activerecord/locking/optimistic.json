@@ -9,13 +9,6 @@
   {
     "package": "activerecord",
     "tsFile": "locking/optimistic.ts",
-    "rubyName": "_update_row",
-    "call": "frozen?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "locking/optimistic.ts",
     "rubyName": "hook_attribute_type",
     "call": "locking_column",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -40,13 +33,6 @@
     "rubyName": "increment!",
     "call": "locking_enabled?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "locking/optimistic.ts",
-    "rubyName": "locking_column=",
-    "call": "reload_schema_from_cache",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails optimistic.rb:165-168 calls `reload_schema_from_cache` before assigning `value.to_s`; trails setLockingColumn (optimistic.ts:28-30) assigns the field only — the schema-cache reload (exists at attributes.ts:296) is skipped, and the TS signature already takes a string. Omission tracked in story locking-column-setter-skips-schema-reload."
   },
   {
     "package": "activerecord",

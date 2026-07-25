@@ -80,13 +80,6 @@
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
     "rubyName": "POST",
-    "call": "params_parsers",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails request.rb:408-434 runs the body through parse_formatted_parameters/params_parsers and ParamBuilder.from_pairs/from_hash with encoding templates; trails request.ts:949-951 returns `this.requestParameters` — body parsing happens in that accessor without the encoding-template/ParamBuilder machinery (unported by design)."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "POST",
     "call": "parse_formatted_parameters",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails request.rb:408-434 runs the body through parse_formatted_parameters/params_parsers and ParamBuilder.from_pairs/from_hash with encoding templates; trails request.ts:949-951 returns `this.requestParameters` — body parsing happens in that accessor without the encoding-template/ParamBuilder machinery (unported by design)."
   },
@@ -192,21 +185,7 @@
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
     "rubyName": "parse_formatted_parameters",
-    "call": "content_mime_type",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "parse_formatted_parameters",
     "call": "fetch",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "parse_formatted_parameters",
-    "call": "log_parse_error_once",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -228,13 +207,6 @@
     "tsFile": "http/request.ts",
     "rubyName": "request_parameters_list",
     "call": "get_header",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "reset_session",
-    "call": "session",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

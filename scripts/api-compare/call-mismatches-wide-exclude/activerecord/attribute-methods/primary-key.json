@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "attribute-methods/primary-key.ts",
-    "rubyName": "composite_primary_key?",
-    "call": "reset_primary_key",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods/primary-key.ts",
     "rubyName": "get_primary_key",
     "call": "foreign_key",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -79,13 +72,6 @@
   {
     "package": "activerecord",
     "tsFile": "attribute-methods/primary-key.ts",
-    "rubyName": "primary_key",
-    "call": "reset_primary_key",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods/primary-key.ts",
     "rubyName": "primary_key=",
     "call": "include",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -95,20 +81,6 @@
     "tsFile": "attribute-methods/primary-key.ts",
     "rubyName": "primary_key=",
     "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods/primary-key.ts",
-    "rubyName": "quoted_primary_key",
-    "call": "adapter_class",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods/primary-key.ts",
-    "rubyName": "reset_primary_key",
-    "call": "base_class",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

@@ -3,13 +3,6 @@
     "package": "actiondispatch",
     "tsFile": "system-testing/test-helpers/screenshot-helper.ts",
     "rubyName": "display_image",
-    "call": "absolute_image_path",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "system-testing/test-helpers/screenshot-helper.ts",
-    "rubyName": "display_image",
     "call": "read",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
