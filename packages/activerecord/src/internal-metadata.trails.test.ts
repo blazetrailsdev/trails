@@ -11,9 +11,12 @@ function fakeAdapter(defaultTimezone: string): DatabaseAdapter {
 
 type CurrentTimeHost = { currentTime(connection: DatabaseAdapter): string };
 
+const metadataBuiltOverLocalAdapter = new InternalMetadata(
+  fakeAdapter("local"),
+) as unknown as CurrentTimeHost;
+
 function currentTime(defaultTimezone: string): string {
-  const im = new InternalMetadata(fakeAdapter(defaultTimezone));
-  return (im as unknown as CurrentTimeHost).currentTime(fakeAdapter(defaultTimezone));
+  return metadataBuiltOverLocalAdapter.currentTime(fakeAdapter(defaultTimezone));
 }
 
 describe("InternalMetadata#currentTime", () => {
