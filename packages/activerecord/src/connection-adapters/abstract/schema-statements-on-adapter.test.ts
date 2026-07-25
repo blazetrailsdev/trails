@@ -2,6 +2,10 @@
  * Smoke test: SchemaStatements methods are accessible directly on the adapter.
  * Rails: `AbstractAdapter` includes `SchemaStatements`, so
  * `connection.create_table(...)` works without going through MigrationContext.
+ *
+ * DDL behaviors with a Rails counterpart run against the ambient connection;
+ * only the mixin-wiring smoke cases (untestable in Rails, where `include` is
+ * native) keep a throwaway `:memory:` adapter.
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { AbstractSQLite3Adapter } from "../sqlite3-adapter.js";
