@@ -1,17 +1,11 @@
 /**
- * Reasoned suppression file for the advisory arity check (RFC 0072).
+ * Reasoned suppression file for the advisory arity check (RFC 0072), shaped
+ * like the calls check's `call-mismatches-exclude.json`: a mandatory `reason`
+ * per entry, and a ratchet — an entry that no longer suppresses a live
+ * mismatch is STALE and fails the gate, so the file can only shrink.
  *
- * The arity dimension has no way to record a *justified* signature deviation:
- * every flagged pair sits in output/arity-mismatches.json forever, so genuine
- * fidelity gaps drown in state-threading deviations the port made on purpose.
- * This is the same shape as the calls check's `call-mismatches-exclude.json`
- * (lint-call-mismatches.ts) and conventions' `SKIP_GROUPS` reasons: an entry
- * carries a mandatory `reason` at the point the deviation is recorded, and the
- * file is a ratchet — an entry whose pair no longer mismatches (or no longer
- * exists) is STALE and fails the gate, so the file can only shrink.
- *
- * Keyed by `package + rubyFile + rubyName` — the Ruby side of the pair, which
- * is what a burndown story names; the TS side can move files without
+ * Keyed on the RUBY side of the pair (`package + rubyFile + rubyName`): that
+ * is what a burndown story names, and the TS side can move files without
  * invalidating a reason about the Ruby signature.
  *
  * Hard rules: no node:* imports, no process.* (the CLI entry guard in
@@ -21,6 +15,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import { PACKAGES } from "./config.js";
 
 export const ARITY_EXCLUDE_PATH = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -41,12 +36,9 @@ export function arityExcludeKeyOf(k: ArityExcludeKey): string {
   return `${k.package} ${k.rubyFile} ${k.rubyName}`;
 }
 
-/**
- * Parse + validate the committed exclude file. Every structural problem is a
- * hard error rather than a skipped row: a malformed entry that silently did
- * nothing would read as "suppressed" to whoever added it while the pair kept
- * flagging (or, worse, kept being suppressed under a key nothing enforces).
- */
+/** Every structural problem is a hard error rather than a skipped row: a
+ *  malformed entry that silently did nothing would read as "suppressed" to
+ *  whoever added it while the pair kept flagging. */
 export function parseArityExcludes(text: string): ArityExcludeEntry[] {
   const raw: unknown = JSON.parse(text);
   if (!Array.isArray(raw)) throw new Error("arity-exclude.json: expected a top-level array");
@@ -69,6 +61,13 @@ export function parseArityExcludes(text: string): ArityExcludeEntry[] {
           '"reason" must be a non-empty string — every deviation carries its justification',
       );
     }
+    // A package outside the compared set can never be applied, so it would sit
+    // in the file as a permanently-stale entry; name the typo instead.
+    if (!PACKAGES.includes(e.package!)) {
+      throw new Error(
+        `arity-exclude.json[${i}]: unknown package "${e.package}" — expected one of ${PACKAGES.join(", ")}`,
+      );
+    }
     const entry = e as ArityExcludeEntry;
     const key = arityExcludeKeyOf(entry);
     if (seen.has(key)) {
@@ -86,12 +85,8 @@ export async function loadArityExcludes(
   return parseArityExcludes(await fs.readFile(file, "utf-8"));
 }
 
-/**
- * Entries that did NOT suppress a live mismatch in the run that produced
- * `appliedKeys` — the pair converged, was renamed, or never mismatched at all.
- * Excludes are a ratchet, not a landfill: these fail the gate and must be
- * deleted.
- */
+/** Entries that suppressed nothing in the run that produced `appliedKeys` —
+ *  the pair converged, was renamed, or never mismatched at all. */
 export function findStaleArityExcludes(
   entries: readonly ArityExcludeEntry[],
   appliedKeys: Iterable<string>,
@@ -100,7 +95,6 @@ export function findStaleArityExcludes(
   return entries.filter((e) => !applied.has(arityExcludeKeyOf(e)));
 }
 
-/** Index for the compare-time lookup: key → entry. */
 export function indexArityExcludes(
   entries: readonly ArityExcludeEntry[],
 ): Map<string, ArityExcludeEntry> {

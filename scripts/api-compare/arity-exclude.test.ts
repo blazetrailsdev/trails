@@ -38,6 +38,12 @@ describe("parseArityExcludes", () => {
     );
   });
 
+  it("rejects an unknown package", () => {
+    expect(() =>
+      parseArityExcludes(JSON.stringify([{ ...entry, package: "activerecords" }])),
+    ).toThrow(/unknown package "activerecords"/);
+  });
+
   it("rejects a duplicate key", () => {
     expect(() =>
       parseArityExcludes(JSON.stringify([entry, { ...entry, reason: "other" }])),

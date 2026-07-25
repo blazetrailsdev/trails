@@ -1,23 +1,13 @@
 #!/usr/bin/env npx tsx
 /**
- * Gate for the reasoned arity-exclude file (RFC 0072).
+ * Gate for the reasoned arity-exclude file (RFC 0072):
  *
- * compare.ts suppresses a flagged arity pair when arity-exclude.json carries a
- * reasoned entry for it, and records the keys that actually suppressed
- * something in output/arity-mismatches.json (`appliedExcludes`). This script
- * fails on:
- *
- *   - a malformed entry (missing key field, empty `reason`, duplicate key) —
- *     parseArityExcludes raises;
- *   - a STALE entry: committed but unapplied in the run that wrote the
- *     artifact, i.e. the pair converged or no longer exists. Excludes are a
- *     ratchet, not a landfill, so the file can only shrink.
- *
- * The gate is NOT a ratchet on new mismatches — those stay advisory in the
- * artifact (the arity dimension never affects the parity %).
- *
- * Usage:
  *   pnpm tsx scripts/api-compare/lint-arity-excludes.ts   # gate (CI)
+ *
+ * Fails on a malformed entry (parseArityExcludes raises) or a STALE one —
+ * committed but absent from the artifact's `appliedExcludes`, i.e. it
+ * suppressed nothing in the run that wrote it. It is NOT a ratchet on new
+ * mismatches: those stay advisory (arity never affects the parity %).
  *
  * There is deliberately no `--write` reseed: an exclude must be written by
  * hand with its justification, which is the whole point of the `reason` field.
@@ -39,23 +29,19 @@ import {
 } from "./arity-exclude.js";
 import { OUTPUT_DIR, PACKAGES, ROOT_DIR } from "./config.js";
 
-// Gates the full-surface artifact only (compare.ts also writes per-mode
-// variants under --public-only/--privates-only); the excludes are written
-// against the default full-surface run.
+// Full-surface artifact only; compare.ts also writes --public-only /
+// --privates-only variants, but excludes are written against the default run.
 const ARTIFACT_PATH = path.join(OUTPUT_DIR, "arity-mismatches.json");
 
 export interface ArityArtifact {
-  /** Packages this run compared (compare.ts writes it sorted). */
   packages?: string[];
   /** Exclude keys that suppressed a real mismatch in this run. */
   appliedExcludes?: string[];
 }
 
-/**
- * Packages that should have been compared but are absent — a `--package`-
- * filtered or otherwise partial artifact would report every other package's
- * excludes as stale. Same determinism guard as lint-call-mismatches.ts.
- */
+/** Packages absent from the artifact: a `--package`-filtered (or otherwise
+ *  partial) run would report every other package's excludes as stale. Same
+ *  determinism guard as lint-call-mismatches.ts. */
 export function missingScope(
   artifact: ArityArtifact,
   expected: readonly string[] = PACKAGES,

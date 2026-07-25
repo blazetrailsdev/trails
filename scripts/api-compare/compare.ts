@@ -24,9 +24,8 @@
  * methods (it never affects the parity %). A one-line summary always prints and
  * output/arity-mismatches.json is always written; `--arity` adds the
  * per-method breakdown. A justified deviation can be suppressed with a
- * reasoned arity-exclude.json entry (arity-exclude.ts), which drops the pair
- * from both the mismatches and the compared denominator and surfaces as
- * `N excluded` in the summary; lint-arity-excludes.ts fails a stale entry.
+ * reasoned arity-exclude.json entry (arity-exclude.ts); lint-arity-excludes.ts
+ * then fails that entry once it goes stale.
  *
  * Three further advisory checks run on the same name-matched pairs, each
  * one-line-summarized and always written to its own artifact, none affecting
@@ -982,10 +981,8 @@ export function main() {
   const ruby: ApiManifest = JSON.parse(fs.readFileSync(rubyPath, "utf-8"));
   const ts: ApiManifest = JSON.parse(fs.readFileSync(tsPath, "utf-8"));
 
-  // Reasoned arity suppressions (RFC 0072). Read sync here to match this
-  // module's existing manifest reads; the async loader in arity-exclude.ts
-  // serves the gate script. Keys that actually suppressed a mismatch are
-  // recorded so lint-arity-excludes.ts can fail the unused (stale) ones.
+  // Reasoned arity suppressions (RFC 0072). Read sync to match this module's
+  // other manifest reads; arity-exclude.ts's async loader serves the gate.
   const arityExcludes = indexArityExcludes(
     parseArityExcludes(fs.readFileSync(ARITY_EXCLUDE_PATH, "utf-8")),
   );
@@ -1526,11 +1523,10 @@ export function main() {
         }
         if (candidates.every((c) => shouldSkipArity(rubyParams, c))) return;
         const verdict = matchArityAgainst(rubyParams, candidates);
-        // A reasoned exclude suppresses the mismatch AND drops the pair from
-        // the compared denominator, so a justified deviation neither inflates
-        // nor deflates the arity %. Applied only to a pair that really
-        // mismatches — an exclude on a now-matching pair stays unapplied and
-        // the gate reports it stale.
+        // Excluding also drops the pair from the compared denominator, so a
+        // justified deviation neither inflates nor deflates the arity %. Only a
+        // pair that really mismatches consumes its exclude — one on a
+        // now-matching pair stays unapplied and the gate reports it stale.
         if (!verdict.matched) {
           const excludeKey = arityExcludeKeyOf({ package: pkg, rubyFile, rubyName });
           if (arityExcludes.has(excludeKey)) {
@@ -1926,8 +1922,7 @@ export function main() {
         forwardingSkipped: results.reduce((n, r) => n + r.arity.forwardingSkipped, 0),
         mismatched: arityFlat.length,
         excluded: results.reduce((n, r) => n + r.arity.excluded, 0),
-        // Keys that suppressed a real mismatch in THIS run — the gate treats
-        // every committed entry absent from this list as stale.
+        // The gate treats every committed exclude absent from this list as stale.
         appliedExcludes: [...appliedArityExcludes].sort(),
         mismatches: arityFlat,
       },
