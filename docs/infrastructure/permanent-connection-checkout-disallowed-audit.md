@@ -3,6 +3,46 @@
 Story: `audit-permanent-connection-checkout-disallowed`
 (RFC 0071 — ar-test-helper-suite-wide-config-fidelity).
 
+## Status update (re-measured against `main`, 2026-07-25)
+
+The measurements below were taken before PRs #5323, #5327 and siblings landed.
+**Re-running the same instrumentation against current `main` changes the
+picture substantially** — most of the infrastructure findings are already fixed:
+
+| Finding                              | Then                   | Now on `main`                                         |
+| ------------------------------------ | ---------------------- | ----------------------------------------------------- |
+| 2 — `use-fixtures.ts:610`            | 1685 hits (86%)        | **1983 hits (95.5%) — still open**                    |
+| 2 — `use-transactional-tests.ts:67`  | 2 hits                 | 2 hits — still open                                   |
+| 3 — `test-setup-dy.ts:50,65`         | 170 hits, boot blocker | **fixed** — no `Base.connection`                      |
+| 4 — `core.ts:1147` (`cachedFindBy`)  | bug                    | **fixed** by #5323 (`withPooledOrDirectConnection`)   |
+| 4 — `insert-all.ts:76`               | bug                    | **fixed** by #5323                                    |
+| 4 — `setup-second-pool.ts:51,79`     | 2 hits                 | **fixed**                                             |
+| 4 — `encryption/test-helpers.ts:161` | same shape             | **fixed**                                             |
+| 4 — `model-schema.ts:41`             | 10 hits                | 11 hits — **the only remaining production site**      |
+| test-file sites                      | 33 / 23 files          | 34 / 24 files (adds `base-prevent-writes.test.ts:88`) |
+
+Current totals: **2077 hits**, of which 1983 (95.5%) are the single
+`use-fixtures.ts:610` line. The scan was also widened from `Base\.connection` to
+`\.connection` (114 → 129 files), which is what surfaced the extra site.
+
+Two corrections to the recommendation below, both learned from #5323:
+
+1. **Do not port internal call sites to `withConnection`.** It resolves through
+   `connectionPool()` and raises `ConnectionNotDefined` for models backed by
+   `Model.adapter = x` (and HABTM join models), where the deprecated getter took
+   its `_adapter` fast path. Use `withPooledOrDirectConnection(modelClass, fn)`
+   from `connection-handling.ts`. This is caught only by PG/MySQL adapter
+   suites — on SQLite the ambient `Base` pool answers and the test passes
+   against the _wrong_ database.
+2. **Flipping the flag does not prove internal fidelity.** Internal query paths
+   are wrapped in `withQueryConnection` (17 call sites), which leases via
+   `pool.withConnection` and therefore makes `isPermanentLease()` false — inner
+   `.connection` reads return `activeConnection` and never reach the gate. The
+   flip locks in current behavior and prevents regression; converging internals
+   onto Rails' threaded-yielded-connection shape is separate work.
+
+Follow-up work is tracked by RFC 0073 (`permanent-connection-checkout-disallowed`). The original audit follows unchanged.
+
 ## Summary
 
 Rails' `activerecord/test/cases/helper.rb:27` sets
