@@ -35,13 +35,18 @@ Two corrections to the recommendation below, both learned from #5323:
    suites — on SQLite the ambient `Base` pool answers and the test passes
    against the _wrong_ database.
 2. **Flipping the flag does not prove internal fidelity.** Internal query paths
-   are wrapped in `withQueryConnection` (17 call sites), which leases via
-   `pool.withConnection` and therefore makes `isPermanentLease()` false — inner
-   `.connection` reads return `activeConnection` and never reach the gate. The
+   are wrapped in `withQueryConnection` — **5 call sites across 3 files**
+   (`querying.ts:41,97`, `transactions.ts:102,577`,
+   `relation/calculations.ts:1339`) — which leases via `pool.withConnection` and
+   therefore makes `isPermanentLease()` false, so inner `.connection` reads
+   return `activeConnection` and never reach the gate. Note this covers the
+   query/transaction _entry points_, not every internal read: it is narrow. The
    flip locks in current behavior and prevents regression; converging internals
    onto Rails' threaded-yielded-connection shape is separate work.
 
-Follow-up work is tracked by RFC 0073 (`permanent-connection-checkout-disallowed`). The original audit follows unchanged.
+Follow-up work is tracked in the `tasks` repo as RFC 0073
+(`permanent-connection-checkout-disallowed`) — that repo, not this one, is the
+source of truth for AR work tracking. The original audit follows unchanged.
 
 ## Summary
 
