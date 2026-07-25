@@ -1,7 +1,9 @@
-import { afterEach, describe, it, expect, beforeAll, vi } from "vitest";
+import { afterAll, afterEach, describe, it, expect, beforeAll, vi } from "vitest";
 import { Base } from "../base.js";
 import { setupHandlerSuite } from "./setup-handler-suite.js";
 import { dropAllTables, resetTestTables } from "./drop-all-tables.js";
+import { rebuildCanonicalTables } from "./canonical-schema.js";
+import { TEST_SCHEMA } from "./test-schema.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
 let adapter: DatabaseAdapter;
@@ -36,6 +38,17 @@ setupHandlerSuite();
 
 beforeAll(() => {
   adapter = Base.adapter;
+});
+
+// The `dropAllTables` suite below asserts a zero-table database, so it wipes the
+// canonical schema out of the per-worker DB this file shares with every other
+// AR test file. Nothing lays it back down on its own — `test-setup-dy.ts` loads
+// the schema once per worker, not once per file — so restore it here or the next
+// file in this worker opens on an empty database. `schema_migrations` and
+// `ar_internal_metadata` are bookkeeping, not canonical, and are deliberately
+// left dropped (the Migrator tests want a clean `schema_migrations`).
+afterAll(async () => {
+  await rebuildCanonicalTables(adapter, Object.keys(TEST_SCHEMA));
 });
 
 describe("dropAllTables (PG connection-error retry, fake adapter)", () => {

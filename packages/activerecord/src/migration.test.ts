@@ -17,8 +17,6 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { Migration } from "./migration.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
-import { repairWorkerSchema } from "./test-helpers/schema-repair.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { SchemaCreation as PgSchemaCreation } from "./connection-adapters/postgresql/schema-creation.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./connection-adapters/mysql/schema-creation.js";
@@ -144,12 +142,9 @@ afterEach(async () => {
 // DB, so drop each BESPOKE table by name — mirroring Rails' teardown — to avoid
 // collisions with sibling files. Canonical tables (`people`, `books`,
 // `memberships`, `values`, …) are deliberately NOT in this list: dropping a
-// canonical table would corrupt siblings that ride it. The two ReservedWords
-// tests below force-create a bespoke `values(value)` over the canonical
-// `values` shape, so restore any drifted canonical table via
-// `repairWorkerSchema` after the bespoke drops.
+// canonical table would corrupt siblings that ride it.
 afterAll(async () => {
-  const { adapter, ctx } = await freshContext();
+  const { ctx } = await freshContext();
   const o = { ifExists: true } as const;
   await ctx.dropTable("big_numbers", o);
   await ctx.dropTable("binary_testings", o);
@@ -180,7 +175,6 @@ afterAll(async () => {
   await ctx.dropTable("things", o);
   await ctx.dropTable("widgets", o);
   await ctx.dropTable("wtx_test", o);
-  await repairWorkerSchema(adapter, TEST_SCHEMA);
 });
 
 function internalMetadataExistsSql(kind: typeof adapterType): string {
