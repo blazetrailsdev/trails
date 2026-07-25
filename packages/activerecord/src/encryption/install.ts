@@ -17,7 +17,7 @@ import {
  * Also installs `EncryptedUniquenessValidator` into `UniquenessValidator`
  * so uniqueness checks cover all previous encryption schemes.
  *
- * Mirrors: the Rails railtie that calls
+ * Mirrors: railtie.rb:349-355 — the `on_load(:active_record)` block that calls
  * `ActiveRecord::Encryption::ExtendedDeterministicQueries.install_support`
  * and `ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidator.install_support`
  * when `config.active_record.encryption.extend_queries` is set.
