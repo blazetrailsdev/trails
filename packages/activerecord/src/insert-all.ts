@@ -277,7 +277,7 @@ export class InsertAll {
   private verifyAttributes(attributes: Record<string, unknown>): void {
     const rowKeys = new Set(Object.keys(attributes));
     if (rowKeys.size !== this.keys.size || ![...this.keys].every((k) => rowKeys.has(k))) {
-      throw new Error("All objects being inserted must have the same keys");
+      throw new ArgumentError("All objects being inserted must have the same keys");
     }
   }
 
