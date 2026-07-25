@@ -80,7 +80,13 @@ import {
 } from "./config.js";
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
 import { isArityOverridden, isScopedSkip, rubyFileToTs, rubyMethodToTs } from "./conventions.js";
-import { matchArityAgainst, renderSig, shouldSkipArity, type ArityRange } from "./arity.js";
+import {
+  matchArityAgainst,
+  renderSig,
+  shouldSkipArity,
+  stripThis,
+  type ArityRange,
+} from "./arity.js";
 import { matchOptionKeysAgainst } from "./options-keys.js";
 import {
   compareDefaults,
@@ -1436,7 +1442,10 @@ export function main() {
           rubyName,
           rubyCalls,
           tsCalls,
-          (c) => (tsParamsByName.get(c) ?? []).some((sig) => sig.length > 0),
+          // A `this:` receiver is not an argument — counting it would
+          // promote zero-arg readers (`spawn`, `readonlyAttributeQ`) past the
+          // gate the moment alias bindings started carrying real params.
+          (c) => (tsParamsByName.get(c) ?? []).some((sig) => stripThis(sig).length > 0),
           rubyMethodToTs,
           callsSignificant,
         );

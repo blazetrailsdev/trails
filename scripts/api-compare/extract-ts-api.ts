@@ -1036,16 +1036,39 @@ function classInfoForPrototype(
 }
 
 /** Push a method name onto classInfo if not already present. */
-function pushDefinePropertyMethod(classInfo: ClassInfo, name: string, line: number): void {
+function pushDefinePropertyMethod(
+  classInfo: ClassInfo,
+  name: string,
+  line: number,
+  params: ParamInfo[] = [],
+): void {
   if (classInfo.instanceMethods.some((m) => m.name === name)) return;
   classInfo.instanceMethods.push({
     name,
     visibility: "private",
     internal: true,
-    params: [],
+    params,
     line,
     file: classInfo.file,
   });
+}
+
+/** Params behind an `Object.defineProperty` `value:` — inline function or alias. */
+function paramsOfDescriptorValue(value: ts.Expression, checker: ts.TypeChecker): ParamInfo[] {
+  if (ts.isFunctionExpression(value) || ts.isArrowFunction(value)) {
+    return extractParameters(value.parameters);
+  }
+  return paramsOfCallableRef(value, checker) ?? [];
+}
+
+/** The `value:` initializer of an `Object.defineProperty` descriptor, if any. */
+function definePropertyValue(descriptor: ts.ObjectLiteralExpression): ts.Expression | null {
+  for (const p of descriptor.properties) {
+    if (ts.isPropertyAssignment(p) && ts.isIdentifier(p.name) && p.name.text === "value") {
+      return p.initializer;
+    }
+  }
+  return null;
 }
 
 /**
@@ -1068,14 +1091,17 @@ function extractDefinePropertyDirect(
   const [target, propNameExpr, descriptor] = expr.arguments;
   if (!ts.isStringLiteral(propNameExpr)) return;
   if (!ts.isObjectLiteralExpression(descriptor)) return;
-  const hasValue = descriptor.properties.some(
-    (p) => ts.isPropertyAssignment(p) && ts.isIdentifier(p.name) && p.name.text === "value",
-  );
-  if (!hasValue) return;
+  const value = definePropertyValue(descriptor);
+  if (!value) return;
   const classInfo = classInfoForPrototype(target, info, checker, srcDir);
   if (!classInfo) return;
   const line = expr.getSourceFile().getLineAndCharacterOfPosition(expr.getStart()).line + 1;
-  pushDefinePropertyMethod(classInfo, propNameExpr.text, line);
+  pushDefinePropertyMethod(
+    classInfo,
+    propNameExpr.text,
+    line,
+    paramsOfDescriptorValue(value, checker),
+  );
 }
 
 /**
@@ -1109,14 +1135,17 @@ function extractDefinePropertyForOf(
   if (!ts.isArrayLiteralExpression(iterable)) return;
 
   // Each element must be an array literal whose first element is a string literal.
-  const methodNames: string[] = [];
+  // The tuple's second element is the function bound to that name, so each
+  // entry carries its own arity rather than sharing an empty list.
+  const entries: { name: string; params: ParamInfo[] }[] = [];
   for (const el of iterable.elements) {
     if (!ts.isArrayLiteralExpression(el) || el.elements.length < 1) return;
     const first = el.elements[0];
     if (!ts.isStringLiteral(first)) return;
-    methodNames.push(first.text);
+    const fn = el.elements[1];
+    entries.push({ name: first.text, params: fn ? paramsOfDescriptorValue(fn, checker) : [] });
   }
-  if (methodNames.length === 0) return;
+  if (entries.length === 0) return;
 
   // Find `Object.defineProperty(Cls.prototype, nameVar, { value: ... })` in body.
   if (!ts.isBlock(node.statement)) return;
@@ -1133,18 +1162,15 @@ function extractDefinePropertyForOf(
     const [target, propNameExpr, descriptor] = expr.arguments;
     if (!ts.isIdentifier(propNameExpr) || propNameExpr.text !== nameVar) continue;
     if (!ts.isObjectLiteralExpression(descriptor)) continue;
-    const hasValue = descriptor.properties.some(
-      (p) => ts.isPropertyAssignment(p) && ts.isIdentifier(p.name) && p.name.text === "value",
-    );
-    if (!hasValue) continue;
+    if (!definePropertyValue(descriptor)) continue;
     classInfo = classInfoForPrototype(target, info, checker, srcDir);
     break;
   }
   if (!classInfo) return;
 
   const line = node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1;
-  for (const name of methodNames) {
-    pushDefinePropertyMethod(classInfo, name, line);
+  for (const entry of entries) {
+    pushDefinePropertyMethod(classInfo, entry.name, line, entry.params);
   }
 }
 
@@ -1175,6 +1201,29 @@ function extractDefinePropertyForOf(
  * Caller must already have ensured `node` is not exported.
  */
 /**
+ * Params of the function an identifier / property-access reference points at,
+ * or null when the expression isn't callable. Mirrors the alias resolution the
+ * named-export path does for `export { foo }` so that a binding like
+ * `isReadonlyAttribute: readonlyAttributeQ` reports the target's real arity
+ * instead of an empty list. Returns `[]` for a callable with no reachable
+ * declaration (a synthesized/ambient signature), which is what the pre-alias
+ * behavior recorded.
+ */
+export function paramsOfCallableRef(
+  expr: ts.Expression,
+  checker: ts.TypeChecker,
+): ParamInfo[] | null {
+  const signatures = checker.getTypeAtLocation(expr).getCallSignatures();
+  if (signatures.length === 0) return null;
+  // An overloaded target exposes one signature per overload; take the widest so
+  // the recorded arity spans every call the alias admits rather than silently
+  // truncating to whichever overload was declared first.
+  const widest = signatures.reduce((a, b) => (b.parameters.length > a.parameters.length ? b : a));
+  const decl = widest.declaration;
+  return decl && ts.isFunctionLike(decl) ? extractParameters(decl.parameters) : [];
+}
+
+/**
  * Extract method names from an object literal — covers the four shapes
  * Rails-style mixin modules use:
  *
@@ -1197,9 +1246,10 @@ export function harvestObjectLiteralMethods(
   const out: MethodInfo[] = [];
   for (const prop of obj.properties) {
     let mname: string | null = null;
-    // Params are recoverable for inline method/function forms; left empty for
-    // identifier references (`qux,` / `foo: NS.bar`) whose signature lives
-    // elsewhere — the arity check tolerates that via its global candidate pool.
+    // Params are recoverable for inline method/function forms; identifier
+    // references (`qux,` / `foo: NS.bar`) are resolved through the checker to
+    // the target function's signature, so an alias-only binding still carries
+    // the real arity into the candidate pool.
     let params: ParamInfo[] = [];
     let optionKeys: string[] | null | undefined;
     let calls: string[] | undefined;
@@ -1210,6 +1260,7 @@ export function harvestObjectLiteralMethods(
       calls = extractCalls(prop.body);
     } else if (ts.isShorthandPropertyAssignment(prop)) {
       mname = prop.name.text;
+      params = paramsOfCallableRef(prop.name, checker) ?? [];
     } else if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
       const init = prop.initializer;
       if (ts.isFunctionExpression(init) || ts.isArrowFunction(init)) {
@@ -1221,8 +1272,11 @@ export function harvestObjectLiteralMethods(
         // `foo: bar` / `foo: NS.bar` — count if the RHS resolves to a
         // callable. Catches `readAttributeForValidation:
         // _Validations.readAttributeForValidation` etc.
-        const t = checker.getTypeAtLocation(init);
-        if (t.getCallSignatures().length > 0) mname = prop.name.text;
+        const resolved = paramsOfCallableRef(init, checker);
+        if (resolved) {
+          mname = prop.name.text;
+          params = resolved;
+        }
       }
     }
     if (!mname) continue;

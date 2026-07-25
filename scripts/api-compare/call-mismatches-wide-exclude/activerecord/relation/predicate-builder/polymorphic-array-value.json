@@ -5,12 +5,5 @@
     "rubyName": "klass",
     "call": "model",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails polymorphic_array_value.rb:36-42 reads `value.model` for Relation inputs; trails polymorphic-array-value.ts:77-81 reads the `_modelClass` field after duck-checking for a relation."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/predicate-builder/polymorphic-array-value.ts",
-    "rubyName": "queries",
-    "call": "empty?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

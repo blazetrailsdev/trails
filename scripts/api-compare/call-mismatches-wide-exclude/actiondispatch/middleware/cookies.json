@@ -10,13 +10,6 @@
     "package": "actiondispatch",
     "tsFile": "middleware/cookies.ts",
     "rubyName": "call",
-    "call": "have_cookie_jar?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/cookies.ts",
-    "rubyName": "call",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -61,19 +54,5 @@
     "rubyName": "parse",
     "call": "reserialize?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/cookies.ts",
-    "rubyName": "parse",
-    "call": "serializer",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/cookies.ts",
-    "rubyName": "serializer",
-    "call": "cookies_serializer",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails cookies.rb:574-586 switches on `request.cookies_serializer`; trails cookies.ts:746-765 reads the same env slot directly (`request.env[\"action_dispatch.cookies_serializer\"]`) so object serializers stay visible — the narrowing cookiesSerializer accessor is bypassed, hence no same-named call."
   }
 ]

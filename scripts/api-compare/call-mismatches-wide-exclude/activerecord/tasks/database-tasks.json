@@ -255,13 +255,6 @@
     "package": "activerecord",
     "tsFile": "tasks/database-tasks.ts",
     "rubyName": "migrate",
-    "call": "empty?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "migrate",
     "call": "write",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -299,13 +292,6 @@
     "rubyName": "migrate_status",
     "call": "table_exists?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "migration_connection",
-    "call": "lease_connection",
-    "reason": "migrationConnection (sync) routes through `leaseConnectionSync`; Rails-named `leaseConnection` is async in trails (converge-connection-pool-checkout-lease-async) and cannot be awaited from this sync accessor."
   },
   {
     "package": "activerecord",
@@ -452,13 +438,6 @@
     "tsFile": "tasks/database-tasks.ts",
     "rubyName": "structure_load",
     "call": "structure_load_flags_for",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "target_version",
-    "call": "empty?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

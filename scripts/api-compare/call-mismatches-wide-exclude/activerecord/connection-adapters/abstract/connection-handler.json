@@ -37,13 +37,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-handler.ts",
-    "rubyName": "establish_connection",
-    "call": "primary_class?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-handler.ts",
     "rubyName": "resolve_pool_config",
     "call": "configurations",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -67,13 +60,6 @@
     "tsFile": "connection-adapters/abstract/connection-handler.ts",
     "rubyName": "retrieve_connection_pool",
     "call": "compact",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-handler.ts",
-    "rubyName": "retrieve_connection_pool",
-    "call": "default_shard",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

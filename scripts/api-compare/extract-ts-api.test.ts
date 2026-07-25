@@ -88,8 +88,40 @@ describe("harvestObjectLiteralMethods", () => {
       { name: "a", kind: "required", type: "number" },
       { name: "b", kind: "optional", default: "...", literal: { kind: "int", value: "1" } },
     ]);
-    // Shorthand reference: name captured, params unknown (signature lives elsewhere).
+    // Shorthand reference to an undeclared name: params stay unknown.
     expect(byName["noop"]).toEqual([]);
+  });
+
+  it("resolves an overloaded alias target to its widest signature", () => {
+    const methods = objectLiteralMethods(
+      `function find(id: number): void;
+      function find(id: number, options: object): void;
+      function find(id: number, options?: object): void {}
+      export const ClassMethods = { find };`,
+    );
+    expect(methods.find((m) => m.name === "find")!.params).toEqual([
+      { name: "id", kind: "required", type: "number" },
+      { name: "options", kind: "required", type: "object" },
+    ]);
+  });
+
+  it("resolves alias bindings to the target function's params", () => {
+    const methods = objectLiteralMethods(
+      `function readonlyAttributeQ(this: unknown, attribute: string): boolean { return true; }
+      export const ClassMethods = {
+        readonlyAttributeQ,
+        isReadonlyAttribute: readonlyAttributeQ,
+      };`,
+    );
+    const byName = Object.fromEntries(methods.map((m) => [m.name, m.params]));
+    const expected = [
+      { name: "this", kind: "required", type: "unknown" },
+      { name: "attribute", kind: "required", type: "string" },
+    ];
+    // Both the shorthand and the renamed alias must carry the real 1-1 arity
+    // (post `this`-strip) into the candidate pool, not an empty list.
+    expect(byName["readonlyAttributeQ"]).toEqual(expected);
+    expect(byName["isReadonlyAttribute"]).toEqual(expected);
   });
 });
 
@@ -981,7 +1013,7 @@ describe("extractFromProgram — Object.defineProperty wiring", () => {
           enumerable: false,
         });
       `,
-      "callbacks.ts": `export function createRecord() {}`,
+      "callbacks.ts": `export function createRecord(attribute: string) {}`,
     });
     const methods = info.classes["base.ts:Base"].instanceMethods.map((m) => m.name);
     expect(methods).toContain("createOrUpdate");
@@ -990,6 +1022,9 @@ describe("extractFromProgram — Object.defineProperty wiring", () => {
     )!;
     expect(m.visibility).toBe("private");
     expect(m.internal).toBe(true);
+    // The descriptor's `value` alias carries the target's arity — recording it
+    // as 0-arg put a bogus [0-0] candidate in the arity pool.
+    expect(m.params).toEqual([{ name: "attribute", kind: "required", type: "string" }]);
   });
 
   it("credits for-of loop over [name, fn][] array to host class (Pattern B)", () => {
@@ -997,8 +1032,8 @@ describe("extractFromProgram — Object.defineProperty wiring", () => {
       "base.ts": `export class Base {}`,
       "callbacks.ts": `
         export function createOrUpdate() {}
-        export function _createRecord() {}
-        export function _updateRecord() {}
+        export function _createRecord(attributeNames: string[]) {}
+        export function _updateRecord(attributeNames: string[]) {}
       `,
       "wire.ts": `
         import { Base } from "./base.js";
@@ -1026,6 +1061,14 @@ describe("extractFromProgram — Object.defineProperty wiring", () => {
       expect(m.visibility).toBe("private");
       expect(m.internal).toBe(true);
     }
+    // Each tuple's own fn supplies the params — not one shared empty list.
+    const byName = Object.fromEntries(
+      info.classes["base.ts:Base"].instanceMethods.map((m) => [m.name, m.params]),
+    );
+    expect(byName["createOrUpdate"]).toEqual([]);
+    expect(byName["_createRecord"]).toEqual([
+      { name: "attributeNames", kind: "required", type: "string[]" },
+    ]);
   });
 
   it("skips for-of loop when descriptor has no `value` key (getter/setter descriptors)", () => {

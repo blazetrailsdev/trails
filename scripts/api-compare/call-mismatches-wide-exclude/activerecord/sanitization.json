@@ -80,13 +80,6 @@
     "package": "activerecord",
     "tsFile": "sanitization.ts",
     "rubyName": "sanitize_sql_for_order",
-    "call": "adapter_class",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "sanitization.ts",
-    "rubyName": "sanitize_sql_for_order",
     "call": "first",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

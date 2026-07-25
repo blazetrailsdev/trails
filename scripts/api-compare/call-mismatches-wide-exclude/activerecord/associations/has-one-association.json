@@ -59,13 +59,6 @@
     "package": "activerecord",
     "tsFile": "associations/has-one-association.ts",
     "rubyName": "delete",
-    "call": "query_constraints_list",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-association.ts",
-    "rubyName": "delete",
     "call": "update_columns",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -122,13 +115,6 @@
     "package": "activerecord",
     "tsFile": "associations/has-one-association.ts",
     "rubyName": "replace",
-    "call": "destroyed?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-association.ts",
-    "rubyName": "replace",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -145,13 +131,6 @@
     "rubyName": "replace",
     "call": "owner",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-association.ts",
-    "rubyName": "replace",
-    "call": "persisted?",
-    "reason": "Rails `replace` gates persistence with `save &&= owner.persisted?` (has_one_association.rb:62); trails converged has_one onto the autosave path so `replace` is purely in-memory and the `owner.persisted?` gate moved to `syncWrite`/`writer`/`persistImmediate`."
   },
   {
     "package": "activerecord",
