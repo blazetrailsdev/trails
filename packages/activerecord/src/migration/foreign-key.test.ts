@@ -11,14 +11,15 @@
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { StatementInvalid } from "../errors.js";
+import type { ReferentialAction } from "../connection-adapters/abstract/schema-definitions.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { ambientConnection, withRocketTables } from "../test-helpers/rocket-tables.js";
 import { adapterType } from "../test-adapter.js";
 
-// Rails' `unless current_adapter?(:SQLite3Adapter)` — SQLite's
-// PRAGMA foreign_key_list exposes no constraint name, so Rails skips the
-// `fk.name` assertions there.
-const namesForeignKeys = adapterType !== "sqlite";
+// Rails' `unless current_adapter?(:SQLite3Adapter)` guard on the `fk.name`
+// assertions: PRAGMA foreign_key_list exposes no constraint name, so SQLite
+// has no name to compare.
+const unlessSqlite3Adapter = adapterType !== "sqlite";
 
 describe("ActiveRecord::Migration::ForeignKeyTest", () => {
   // DDL can't run inside the transactional-fixtures wrapper (PG aborts the
@@ -39,7 +40,7 @@ describe("ActiveRecord::Migration::ForeignKeyTest", () => {
       expect(fk.toTable).toBe("rockets");
       expect(fk.column).toBe("rocket_id");
       expect(fk.primaryKey).toBe("id");
-      if (namesForeignKeys) expect(fk.name).toBe("fk_rails_78146ddd2e");
+      if (unlessSqlite3Adapter) expect(fk.name).toBe("fk_rails_78146ddd2e");
     });
   });
 
@@ -56,7 +57,7 @@ describe("ActiveRecord::Migration::ForeignKeyTest", () => {
       expect(fk.toTable).toBe("rockets");
       expect(fk.column).toBe("rocket_id");
       expect(fk.primaryKey).toBe("id");
-      if (namesForeignKeys) expect(fk.name).toBe("fk_rails_78146ddd2e");
+      if (unlessSqlite3Adapter) expect(fk.name).toBe("fk_rails_78146ddd2e");
     });
   });
 
@@ -165,14 +166,14 @@ describe("ActiveRecord::Migration::ForeignKeyTest", () => {
       await expect(
         conn.addForeignKey("astronauts", "rockets", {
           column: "rocket_id",
-          onDelete: "invalid" as never,
+          onDelete: "invalid" as unknown as ReferentialAction,
         }),
       ).rejects.toThrow(ArgumentError);
 
       await expect(
         conn.addForeignKey("astronauts", "rockets", {
           column: "rocket_id",
-          onUpdate: "invalid" as never,
+          onUpdate: "invalid" as unknown as ReferentialAction,
         }),
       ).rejects.toThrow(ArgumentError);
     });
@@ -195,20 +196,28 @@ describe("ActiveRecord::Migration::ForeignKeyTest", () => {
   it("add foreign key with non existent from table raises", async () => {
     const conn = await ambientConnection();
     await withRocketTables(conn, async () => {
-      await expect(conn.addForeignKey("missions", "rockets")).rejects.toThrow(
-        expect.objectContaining({ message: expect.stringMatching(/missions/) }),
+      // Rails asserts twice on ONE raise (`e = assert_raises ...`), so the
+      // error is captured rather than the call repeated.
+      const e = await conn.addForeignKey("missions", "rockets").then(
+        () => undefined,
+        (err: unknown) => err,
       );
-      await expect(conn.addForeignKey("missions", "rockets")).rejects.toThrow(StatementInvalid);
+      expect(e).toBeInstanceOf(StatementInvalid);
+      expect((e as Error).message).toMatch(/missions/);
     });
   });
 
   it("add foreign key with non existent to table raises", async () => {
     const conn = await ambientConnection();
     await withRocketTables(conn, async () => {
-      await expect(conn.addForeignKey("missions", "rockets")).rejects.toThrow(
-        expect.objectContaining({ message: expect.stringMatching(/missions/) }),
+      // Rails asserts twice on ONE raise (`e = assert_raises ...`), so the
+      // error is captured rather than the call repeated.
+      const e = await conn.addForeignKey("missions", "rockets").then(
+        () => undefined,
+        (err: unknown) => err,
       );
-      await expect(conn.addForeignKey("missions", "rockets")).rejects.toThrow(StatementInvalid);
+      expect(e).toBeInstanceOf(StatementInvalid);
+      expect((e as Error).message).toMatch(/missions/);
     });
   });
 });
