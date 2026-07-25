@@ -275,10 +275,6 @@ export class DatabaseTasks {
 
     const config = configs.find((c) => c.name === "primary") ?? configs[0];
 
-    if (!skipInitialize) {
-      await initializeDatabase(config);
-    }
-
     const { Migrator, Migration } = await import("../migration.js");
     const scope = getEnv("SCOPE");
     const verbose = isVerbose();
@@ -333,9 +329,15 @@ export class DatabaseTasks {
       pool &&
       (!pool.dbConfig.database || !config.database || config.database === pool.dbConfig.database)
     ) {
-      await runMigration(await pool.leaseConnection());
+      const adapter = await pool.leaseConnection();
+      // Probe through the established connection rather than a temporary one:
+      // a second pool on a `:memory:` database discards the data the first one
+      // holds, so the initialize step would wipe every previous migration.
+      if (!skipInitialize) await initializeDatabaseOn(adapter, config);
+      await runMigration(adapter);
     } else {
       // Multi-db or no pool: withTemporaryConnection scopes the adapter lifecycle.
+      if (!skipInitialize) await initializeDatabase(config);
       await this.withTemporaryConnection(config, runMigration);
     }
   }
@@ -1481,36 +1483,52 @@ export async function checkCurrentProtectedEnvironmentBang(
 
 /** @internal */
 export async function initializeDatabase(dbConfig: DatabaseConfig): Promise<boolean> {
-  return DatabaseTasks.withTemporaryConnection(dbConfig, async (adapter) => {
-    const { NoDatabaseError } = await import("../errors.js");
-    const { SchemaMigration } = await import("../schema-migration.js");
-    let alreadyInitialized = false;
-    try {
-      // Probe DB connectivity first — throws NoDatabaseError if the DB doesn't exist.
-      // tableExists() swallows all errors internally so can't detect a missing DB.
-      await adapter.execute("SELECT 1");
-      const sm = new SchemaMigration(adapter);
-      alreadyInitialized = await sm.tableExists();
-    } catch (error) {
-      if (error instanceof NoDatabaseError || _isMissingDatabaseError(error, adapter)) {
-        await DatabaseTasks.create(dbConfig);
-      } else {
-        throw error;
+  return DatabaseTasks.withTemporaryConnection(dbConfig, (adapter) =>
+    initializeDatabaseOn(adapter, dbConfig),
+  );
+}
+
+/**
+ * The body of {@link initializeDatabase}, run on a caller-supplied connection.
+ * `migrate` uses this to probe through the already-established pool when that
+ * pool serves the same database: opening a second pool on a `:memory:` database
+ * destroys the first one's data, so the probe must not own its own connection
+ * when a matching one exists.
+ *
+ * @internal
+ */
+export async function initializeDatabaseOn(
+  adapter: import("../connection-adapters/abstract-adapter.js").AbstractAdapter,
+  dbConfig: DatabaseConfig,
+): Promise<boolean> {
+  const { NoDatabaseError } = await import("../errors.js");
+  const { SchemaMigration } = await import("../schema-migration.js");
+  let alreadyInitialized = false;
+  try {
+    // Probe DB connectivity first — throws NoDatabaseError if the DB doesn't exist.
+    // tableExists() swallows all errors internally so can't detect a missing DB.
+    await adapter.execute("SELECT 1");
+    const sm = new SchemaMigration(adapter);
+    alreadyInitialized = await sm.tableExists();
+  } catch (error) {
+    if (error instanceof NoDatabaseError || _isMissingDatabaseError(error, adapter)) {
+      await DatabaseTasks.create(dbConfig);
+    } else {
+      throw error;
+    }
+  }
+  if (!alreadyInitialized) {
+    const rawPath = DatabaseTasks.schemaDumpPath(dbConfig);
+    if (rawPath) {
+      const p = getPath();
+      const resolved =
+        p.isAbsolute && !p.isAbsolute(rawPath) ? p.resolve(DatabaseTasks.root, rawPath) : rawPath;
+      if (getFs().existsSync(resolved)) {
+        await DatabaseTasks.loadSchema(dbConfig, DatabaseTasks.schemaFormat, resolved);
       }
     }
-    if (!alreadyInitialized) {
-      const rawPath = DatabaseTasks.schemaDumpPath(dbConfig);
-      if (rawPath) {
-        const p = getPath();
-        const resolved =
-          p.isAbsolute && !p.isAbsolute(rawPath) ? p.resolve(DatabaseTasks.root, rawPath) : rawPath;
-        if (getFs().existsSync(resolved)) {
-          await DatabaseTasks.loadSchema(dbConfig, DatabaseTasks.schemaFormat, resolved);
-        }
-      }
-    }
-    return !alreadyInitialized;
-  });
+  }
+  return !alreadyInitialized;
 }
 
 // Mirrors SQLite3Adapter._isMemoryFilename: `:memory:`, `file::memory:`, and
