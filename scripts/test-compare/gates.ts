@@ -77,6 +77,10 @@ export function gateFromWrapper(name: string, featureArg?: string | null): TestG
     case "describeIfPg":
       return { adapters: ["postgresql"], source: ["wrapper"] };
     case "describeIfMysql":
+    // The port of `current_adapter?(:Mysql2Adapter)` — same gate as
+    // describeIfMysql, but keyed on the active adapter rather than on a
+    // server-reachability probe.
+    case "describeIfMysqlAdapter":
       return { adapters: ["mysql"], source: ["wrapper"] };
     case "describeIfSqlite":
       return { adapters: ["sqlite"], source: ["wrapper"] };

@@ -2,17 +2,14 @@
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/auto_increment_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import type { SchemaSource } from "../../schema-dumper.js";
 
-describeIfMysql("Mysql2Adapter", () => {
+describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
-  });
-  afterEach(async () => {
-    await adapter.close();
+    adapter = await leaseMysqlAdapter();
   });
 
   describe("AutoIncrementTest", () => {

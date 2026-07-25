@@ -2,7 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/unsigned_type_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../base.js";
 import { RangeError as ActiveRecordRangeError } from "../../errors.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
@@ -10,10 +10,10 @@ import { SchemaDumper } from "../../schema-dumper.js";
 import type { SchemaSource } from "../../schema-dumper.js";
 import { deprecator } from "../../deprecator.js";
 
-describeIfMysql("Mysql2Adapter", () => {
+describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
+    adapter = await leaseMysqlAdapter();
     await adapter.createTable("unsigned_types", { force: true }, (t: any) => {
       t.integer("unsigned_integer", { unsigned: true });
       t.bigint("unsigned_bigint", { unsigned: true });
@@ -24,7 +24,6 @@ describeIfMysql("Mysql2Adapter", () => {
   });
   afterEach(async () => {
     await adapter.dropTable("unsigned_types", { ifExists: true });
-    await adapter.close();
   });
 
   async function unsignedTypeModel(): Promise<typeof Base> {

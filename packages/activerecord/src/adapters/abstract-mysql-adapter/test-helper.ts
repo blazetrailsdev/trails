@@ -4,6 +4,9 @@ import { Mysql2Adapter } from "../../connection-adapters/mysql2-adapter.js";
 import { Version } from "../../connection-adapters/abstract-adapter.js";
 import { arunitDatabaseNames } from "../../test-helpers/arunit2-config.js";
 import { mysqlSettings, mysqlUrl } from "../../test-helpers/test-connection-env.js";
+import { adapterType } from "../../test-adapter.js";
+import { Base } from "../../base.js";
+import { establishFromTestConfig } from "../../test-helpers/test-database-config.js";
 
 // `dbWarningsAction` is a single global setting on the base adapter, so the
 // shared helper toggles it for every adapter (including MySQL). Re-exported
@@ -11,9 +14,12 @@ import { mysqlSettings, mysqlUrl } from "../../test-helpers/test-connection-env.
 export { withDbWarningsAction } from "../../test-helpers/with-db-warnings-action.js";
 
 // A *serialization* of the MySQL sub-settings (MYSQL_HOST/MYSQL_PORT/
-// MYSQL_USER/...), not an env var of its own: these adapter suites probe the
-// server directly via describeIfMysql regardless of ARCONN, so they need a URL
-// to hand the driver, but they no longer source one from the environment.
+// MYSQL_USER/...), not an env var of its own: the suites still on
+// describeIfMysql probe the server directly regardless of ARCONN, so they need
+// a URL to hand the driver, but they no longer source one from the
+// environment. Being burned down in favour of describeIfMysqlAdapter +
+// leaseMysqlAdapter below; the remaining legitimate callers are the tests that
+// deliberately build a second, differently configured adapter.
 export const MYSQL_TEST_URL = mysqlUrl();
 
 export { databaseName } from "../../test-helpers/arunit2-config.js";
@@ -53,6 +59,12 @@ async function checkMysql(): Promise<{ available: boolean; isMariaDb: boolean; v
 
 ({ available: mysqlAvailable, isMariaDb: mariaDb, version: mysqlVersionStr } = await checkMysql());
 
+/**
+ * Server-reachability probe, NOT the port of `current_adapter?(:Mysql2Adapter)`
+ * — use {@link describeIfMysqlAdapter} for that. A suite gated on this one runs
+ * under every `ARCONN` against a self-built adapter, bypassing the leased pool
+ * connection.
+ */
 export const describeIfMysql = mysqlAvailable ? describe : (describe.skip as typeof describe);
 /** true when the connected server is MariaDB; false on MySQL or when MySQL is unavailable. */
 export const isMariaDb = mariaDb;
@@ -96,3 +108,28 @@ export const supportsExpressionIndex =
   mysqlAvailable && !mariaDb && _serverVersion?.gte("8.0.13") === true;
 
 export { Mysql2Adapter };
+
+/**
+ * The port of `current_adapter?(:Mysql2Adapter)` — the gate every
+ * `ActiveRecord::AbstractMysqlTestCase` suite runs under. `describeIfMysql`
+ * above is a *server-reachability* probe (it runs these suites against a
+ * self-built adapter under every `ARCONN`); this is the adapter gate, so the
+ * suite rides the ambient `Base.connection` on the mysql2 lane and skips
+ * everywhere else, exactly as Rails does.
+ */
+export const describeIfMysqlAdapter =
+  adapterType === "mysql" ? describe : (describe.skip as typeof describe);
+
+/**
+ * Port of these suites' `setup` line
+ * `@connection = ActiveRecord::Base.lease_connection`: leases the ambient pool
+ * connection (establishing it first when the file runs without `fixtures()`),
+ * so the leased connection's config plumbing — `configureConnection`, pool
+ * settings, `preparedStatements` — is what the test exercises.
+ */
+export async function leaseMysqlAdapter(): Promise<Mysql2Adapter> {
+  await establishFromTestConfig();
+  const adapter = (await Base.leaseConnection()) as unknown as Mysql2Adapter;
+  await adapter.materializeTransactions();
+  return adapter;
+}

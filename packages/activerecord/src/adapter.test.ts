@@ -36,6 +36,7 @@ import { Subscriber } from "./test-helpers/models/subscriber.js";
 import { Event } from "./test-helpers/models/event.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
 import {
+  leaseMysqlAdapter,
   Mysql2Adapter,
   ARUNIT_DATABASE,
   ARUNIT2_DATABASE,
@@ -1241,18 +1242,10 @@ describe("InvalidateTransactionTest", () => {
 });
 
 describe.runIf(adapterType === "mysql")("AdapterTest", () => {
-  const leaseMysql = async (): Promise<Mysql2Adapter> =>
-    (await Base.leaseConnection()) as unknown as Mysql2Adapter;
-
   let adapter: Mysql2Adapter;
 
-  beforeAll(async () => {
-    await establishFromTestConfig();
-  });
-
   beforeEach(async () => {
-    adapter = await leaseMysql();
-    await adapter.materializeTransactions();
+    adapter = await leaseMysqlAdapter();
   });
 
   it("current database", async () => {
@@ -1290,14 +1283,14 @@ describe.runIf(adapterType === "mysql")("AdapterTest", () => {
     try {
       await runWithoutConnection(async ({ database: _database, ...exceptDatabase }) => {
         await Base.establishConnection(exceptDatabase);
-        const connection = await leaseMysql();
+        const connection = await leaseMysqlAdapter();
         await connection.execute(
           `SELECT ${ARUNIT_DATABASE}.pirates.*, ${ARUNIT2_DATABASE}.courses.* ` +
             `FROM ${ARUNIT_DATABASE}.pirates, ${ARUNIT2_DATABASE}.courses`,
         );
       });
     } finally {
-      const connection = await leaseMysql();
+      const connection = await leaseMysqlAdapter();
       for (const database of [ARUNIT_DATABASE, ARUNIT2_DATABASE]) {
         await connection.execute(`DROP DATABASE IF EXISTS ${database}`);
       }

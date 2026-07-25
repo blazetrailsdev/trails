@@ -2,21 +2,20 @@
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/set_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import type { SchemaSource } from "../../schema-dumper.js";
 
-describeIfMysql("Mysql2Adapter", () => {
+describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
+    adapter = await leaseMysqlAdapter();
     await adapter.createTable("set_tests", { id: false, force: true }, (t: any) => {
       t.column("set_column", "set('text','blob','tiny','medium','long','unsigned','bigint')");
     });
   });
   afterEach(async () => {
     await adapter.dropTable("set_tests", { ifExists: true });
-    await adapter.close();
   });
 
   describe("SetTest", () => {

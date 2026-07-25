@@ -288,6 +288,7 @@ const ADAPTER_SUITE_WRAPPERS = new Set([
   "describe",
   "describeIfPg",
   "describeIfMysql",
+  "describeIfMysqlAdapter",
   "describeIfSqlite",
 ]);
 

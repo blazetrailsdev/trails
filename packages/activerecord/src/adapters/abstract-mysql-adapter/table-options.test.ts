@@ -6,11 +6,11 @@ import { Version } from "../../connection-adapters/abstract-adapter.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import type { SchemaSource } from "../../schema-dumper.js";
 import {
-  describeIfMysql,
+  describeIfMysqlAdapter,
   isMariaDb,
   mysqlVersion,
+  leaseMysqlAdapter,
   Mysql2Adapter,
-  MYSQL_TEST_URL,
 } from "./test-helper.js";
 
 // Rails: `skip "..." if @connection.database_version >= "5.7.22"`. We add
@@ -23,13 +23,10 @@ const skipNoTableOptions =
 const dumpTable = (adapter: Mysql2Adapter, tableName: string) =>
   SchemaDumper.dumpTableSchema(adapter as unknown as SchemaSource, tableName);
 
-describeIfMysql("Mysql2Adapter", () => {
+describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
-  });
-  afterEach(async () => {
-    await adapter.close();
+    adapter = await leaseMysqlAdapter();
   });
 
   describe("TableOptionsTest", () => {
