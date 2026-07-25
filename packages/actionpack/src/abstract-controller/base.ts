@@ -342,6 +342,12 @@ export class AbstractController {
    * lookup; our `actionMethods()` hands back a defensive array copy, so we
    * warm the memo and probe the underlying Set instead. This runs on every
    * dispatch.
+   *
+   * Reading the memo rather than the return value means a subclass that
+   * narrows `actionMethods` by overriding it (Rails does this in
+   * `UrlFor::ClassMethods`, subtracting named-route helper names) would not
+   * narrow this predicate with it. No trails subclass overrides it today; one
+   * that wants to must filter into the memo, not around it.
    * @internal
    */
   isActionMethod(name: string): boolean {
