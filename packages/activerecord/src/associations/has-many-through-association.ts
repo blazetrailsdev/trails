@@ -33,6 +33,48 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   }
 
   /**
+   * The through model owns the transaction — the join-row writes are what has
+   * to be atomic, not the target model's.
+   *
+   * Mirrors: ActiveRecord::Associations::ThroughAssociation#transaction
+   */
+  protected override transaction<R>(block: () => Promise<R>): Promise<R | undefined> {
+    const tr = throughReflection(this) as { klass?: unknown } | null;
+    let klass: { transaction?: (...args: unknown[]) => unknown } | null = null;
+    try {
+      klass = (tr?.klass ?? null) as { transaction?: (...args: unknown[]) => unknown } | null;
+    } catch {
+      klass = null;
+    }
+    if (klass && typeof klass.transaction === "function") {
+      return klass.transaction(block) as Promise<R | undefined>;
+    }
+    return block() as Promise<R | undefined>;
+  }
+
+  /**
+   * Multiset difference: each occurrence of a record in `b` cancels at most one
+   * occurrence in `a`, so `[person, person] - [person]` keeps one `person` and
+   * the replace path creates the second join row.
+   *
+   * Mirrors: ActiveRecord::Associations::HasManyThroughAssociation#difference
+   */
+  protected override difference(a: Base[], b: Base[]): Base[] {
+    const dist = distribution(b);
+    return a.filter((record) => !markOccurrence(dist, record));
+  }
+
+  /**
+   * Multiset intersection — the `select` counterpart of {@link difference}.
+   *
+   * Mirrors: ActiveRecord::Associations::HasManyThroughAssociation#intersection
+   */
+  protected override intersection(a: Base[], b: Base[]): Base[] {
+    const dist = distribution(b);
+    return a.filter((record) => markOccurrence(dist, record));
+  }
+
+  /**
    * Mirrors Rails' `delegate :source_reflection, to: :reflection`
    * (ThroughAssociation, mixed into HasManyThroughAssociation).
    */
@@ -297,13 +339,15 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     // Rails (159-162): when the SOURCE belongs_to (on the join model) declares
     // its own counter_cache, `klass.decrement_counter` on the target rows by id
     // for every method except `:destroy` (whose per-record callbacks handle it).
-    // Unreachable by the canonical models but ported for fidelity. `safeKlass` +
-    // id null-filter are defensive (a class-less polymorphic source, null PKs).
+    // `klass` is the ASSOCIATION's klass (the target model), not the source
+    // reflection's — a polymorphic source belongs_to has none, and taggings'
+    // `taggable` is exactly such a source. `safeKlass` + the id null-filter stay
+    // defensive (null PKs).
     const sourceRefl = (ownRefl as { sourceReflection?: SourceCounterReflection } | undefined)
       ?.sourceReflection;
     if (method !== "destroy" && sourceRefl?.options?.counterCache) {
       const counter = sourceRefl.counterCacheColumn?.();
-      const klass = safeKlass(sourceRefl) as {
+      const klass = safeKlass({ klass: this.klass }) as {
         decrementCounter?: (col: string, ids: unknown) => Promise<unknown>;
       } | null;
       const ids = records.map((r) => (r as any).id).filter((id: unknown) => id != null);
@@ -662,37 +706,6 @@ async function updateThroughCounterCache(
 }
 
 /** @internal */
-function difference(_assoc: HasManyThroughAssociation, a: Base[], b: Base[]): Base[] {
-  return a.filter((r) => !b.includes(r));
-}
-
-/** @internal */
-function intersection(_assoc: HasManyThroughAssociation, a: Base[], b: Base[]): Base[] {
-  return a.filter((r) => b.includes(r));
-}
-
-/** @internal */
-function markOccurrence(
-  _assoc: HasManyThroughAssociation,
-  distribution: Map<Base, number>,
-  record: Base,
-): boolean {
-  const count = distribution.get(record) ?? 0;
-  if (count > 0) {
-    distribution.set(record, count - 1);
-    return true;
-  }
-  return false;
-}
-
-/** @internal */
-function distribution(_assoc: HasManyThroughAssociation, array: Base[]): Map<Base, number> {
-  const result = new Map<Base, number>();
-  for (const r of array) result.set(r, (result.get(r) ?? 0) + 1);
-  return result;
-}
-
-/** @internal */
 function throughRecordsFor(assoc: HasManyThroughAssociation, record: Base): Base[] {
   const throughName = assoc.reflection.options.through;
   if (!throughName) return [];
@@ -759,23 +772,45 @@ function deleteThroughRecords(assoc: HasManyThroughAssociation, records: Base[])
 }
 
 /**
- * Wrap `block` in a transaction on the through-reflection's class. Falls
- * back to invoking the block directly when no through klass is available.
- *
- * Mirrors: ActiveRecord::Associations::ThroughAssociation#transaction
- *
+ * `distribution` + `mark_occurrence` (has_many_through_association.rb:187-195)
+ * as one occurrence counter. Ruby keys the hash by the record, hashing on
+ * AR::Core `hash`/`eql?` (class + id), so the buckets are matched with the same
+ * record equality rather than JS identity.
  * @internal
  */
-function transaction<R>(
-  assoc: HasManyThroughAssociation,
-  block: (tx?: any) => Promise<R>,
-): Promise<R | undefined> {
-  const tr = throughReflection(assoc) as { klass?: unknown } | null;
-  const klass = safeKlass(tr) as { transaction?: (...args: any[]) => any } | null;
-  if (klass && typeof klass.transaction === "function") {
-    return klass.transaction(block) as Promise<R | undefined>;
+function distribution(records: Base[]): Array<{ record: Base; count: number }> {
+  const buckets: Array<{ record: Base; count: number }> = [];
+  for (const record of records) {
+    const bucket = buckets.find((b) => b.record.isEqual(record));
+    if (bucket) bucket.count += 1;
+    else buckets.push({ record, count: 1 });
   }
-  return block() as Promise<R | undefined>;
+  return buckets;
+}
+
+/** @internal */
+function markOccurrence(buckets: Array<{ record: Base; count: number }>, record: Base): boolean {
+  const bucket = buckets.find((b) => b.record.isEqual(record));
+  if (!bucket || bucket.count <= 0) return false;
+  bucket.count -= 1;
+  return true;
+}
+
+/**
+ * The multiset diff of `HasManyThroughAssociation#difference` / `#intersection`
+ * over the same `distribution`/`markOccurrence` pair those methods use, exposed
+ * for the `CollectionProxy` replace path (see `setDifference`).
+ * @internal
+ */
+export function multisetDifference(a: Base[], b: Base[]): Base[] {
+  const dist = distribution(b);
+  return a.filter((record) => !markOccurrence(dist, record));
+}
+
+/** @internal */
+export function multisetIntersection(a: Base[], b: Base[]): Base[] {
+  const dist = distribution(b);
+  return a.filter((record) => markOccurrence(dist, record));
 }
 
 /**

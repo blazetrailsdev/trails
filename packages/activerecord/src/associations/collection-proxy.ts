@@ -71,8 +71,12 @@ import {
   _violatesStrictLoading,
 } from "../associations.js";
 import { _setCollectionProxyCtor } from "./collection-proxy-slot.js";
-import { buildThroughInverseFor } from "./has-many-through-association.js";
-import { countRecords } from "./has-many-association.js";
+import {
+  buildThroughInverseFor,
+  multisetDifference,
+  multisetIntersection,
+} from "./has-many-through-association.js";
+import { countRecords, setDifference, setIntersection } from "./has-many-association.js";
 import { throughForeignKeyPresent } from "./through-association.js";
 import { foreignKeyPresentFor } from "./foreign-association.js";
 import type { AssociationReflection } from "../reflection.js";
@@ -150,6 +154,14 @@ export type AssociationProxy<
     // `Array<T>[i]` semantics under TS's standard lib.
     readonly [index: number]: T | undefined;
   };
+
+/**
+ * Ruby's `Array#==` over AR records: same length, pairwise `==` (class + id),
+ * order-sensitive. Used by `replace` for `other_array != original_target`.
+ */
+function sameRecordList(a: Base[], b: Base[]): boolean {
+  return a.length === b.length && a.every((record, i) => record.isEqual(b[i]));
+}
 
 /**
  * Validate a numeric limit (safe non-negative integer) and raise the
@@ -3340,14 +3352,126 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Replace the collection with a new set of records.
+   * Replace the collection with a new set of records, performing a diff so
+   * only the records that actually changed are deleted/added — records common
+   * to the old and new sets are left in place (no remove/add callbacks, no
+   * timestamp touches).
    *
-   * Mirrors: ActiveRecord::Associations::CollectionProxy#replace
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#replace →
+   * `CollectionAssociation#replace` (collection_association.rb:242), returning
+   * the resulting target (`other_array` when nothing changed).
    */
-  async replace(records: T[]): Promise<void> {
+  async replace(records: T[]): Promise<T[]> {
     this._ensureThroughWritable();
-    await this.clear();
-    await this.push(...records);
+    this._raiseOnTypeMismatch(records);
+    const originalTarget = [...(await this._withoutStrictLoading(() => this.toArray()))];
+    if (this._record.isNewRecord()) {
+      return this._replaceRecords(records, originalTarget);
+    }
+    this._replaceCommonRecordsInMemory(records, originalTarget);
+    if (sameRecordList(records, originalTarget)) return records;
+    let replaced: T[] = this._target;
+    await this._replaceTransaction(async () => {
+      replaced = await this._replaceRecords(records, originalTarget);
+    });
+    return replaced;
+  }
+
+  /**
+   * Rails' `replace_records` (collection_association.rb:418): delete the
+   * records the new target dropped, then concat the ones it gained, restoring
+   * the original target and raising when the concat fails.
+   *
+   * `target` tracks Rails' `@target` across the two diffs. It is a local copy
+   * because the proxy's `_target` is only populated when the association is
+   * genuinely loaded (a diverged or `find_target?`-false `toArray()` returns
+   * records without caching them), which would silently make the delete diff a
+   * no-op. The delete step applies Rails' `remove_records`
+   * (collection_association.rb:405) mutation verbatim: `@target -= records` is
+   * plain `Array#-`, which drops EVERY occurrence of a deleted record, not the
+   * `difference` hook's per-occurrence count. For a `:through` reflection that
+   * is what makes `[david, david].replace([david])` delete both join rows and
+   * re-concat a fresh one, exactly as Rails does — and it matches what
+   * `_removeFromTarget` does to the real `_target`.
+   * @internal
+   */
+  private async _replaceRecords(newTarget: T[], originalTarget: T[]): Promise<T[]> {
+    let target = [...originalTarget];
+    const toDelete = this._difference(target, newTarget);
+    if (toDelete.length > 0) {
+      await this.delete(...toDelete);
+      target = setDifference(target, toDelete) as T[];
+    }
+    const toAdd = this._difference(newTarget, target);
+    if (toAdd.length > 0 && (await this.push(...toAdd)) === false) {
+      this._target = [...originalTarget];
+      throw new RecordNotSaved(
+        `Failed to replace ${this._assocName} because one or more of the new records could not be saved.`,
+        this._record,
+      );
+    }
+    return this._target;
+  }
+
+  /**
+   * Rails' `replace_common_records_in_memory` (collection_association.rb:430):
+   * swap each record the two sets share into the target in place, skipping the
+   * add callbacks.
+   * @internal
+   */
+  private _replaceCommonRecordsInMemory(newTarget: T[], originalTarget: T[]): void {
+    for (const record of this._intersection(newTarget, originalTarget)) {
+      this._replaceOnTarget(record, { skipCallbacks: true, replace: true });
+    }
+  }
+
+  /**
+   * `difference`/`intersection` are the hooks Rails splits across
+   * `HasManyAssociation` (set: `a - b`, `a & b`) and
+   * `HasManyThroughAssociation` (multiset, occurrence-counting — which is what
+   * makes `post.people = [person, person]` create two join rows). The proxy is
+   * a single class serving both reflection kinds, so it selects by
+   * `_isThrough` rather than by inheritance, reusing the very bodies those two
+   * classes install.
+   * @internal
+   */
+  private _difference(a: T[], b: T[]): T[] {
+    return (this._isThrough ? multisetDifference(a, b) : setDifference(a, b)) as T[];
+  }
+
+  /** @internal */
+  private _intersection(a: T[], b: T[]): T[] {
+    return (this._isThrough ? multisetIntersection(a, b) : setIntersection(a, b)) as T[];
+  }
+
+  /**
+   * Rails wraps `replace_records` in `transaction`, which
+   * `ThroughAssociation#transaction` overrides to use the through model's.
+   * @internal
+   */
+  private async _replaceTransaction(block: () => Promise<void>): Promise<void> {
+    const throughModel = this._isThrough ? this._resolveThroughModel() : null;
+    if (throughModel && typeof throughModel.transaction === "function") {
+      await throughModel.transaction(block);
+      return;
+    }
+    await this.transaction(block);
+  }
+
+  /**
+   * The join model class behind a `:through` reflection, or `null` when the
+   * through association can't be resolved (the misconfiguration cases are
+   * already reported by `_ensureThroughWritable`).
+   * @internal
+   */
+  private _resolveThroughModel(): typeof Base | null {
+    const ctor = this._record.constructor as typeof Base;
+    const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
+    const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
+    if (!throughAssoc) return null;
+    const throughClassName =
+      throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
+    return resolveAssocClass(this._record, throughAssoc.name, throughClassName);
   }
 
   /**
