@@ -72,8 +72,11 @@ export class ConnectionHandler {
     if (typeof owner === "string") {
       return new ConnectionDescriptor(owner);
     }
-    // Rails' `elsif config.is_a?(Symbol)` branch: a config named by symbol
-    // (here, by string) supplies the owner name when none was passed.
+    // Rails' `elsif config.is_a?(Symbol)` branch — a config given as a bare
+    // name supplies the owner. `establishConnection`'s declared config union
+    // has no string arm yet, so this only fires for untyped callers passing
+    // Rails' `establish_connection :primary` shorthand; it is spelled out here
+    // rather than left to the future so the ported branch set stays complete.
     if (typeof config === "string") {
       return new ConnectionDescriptor(config);
     }

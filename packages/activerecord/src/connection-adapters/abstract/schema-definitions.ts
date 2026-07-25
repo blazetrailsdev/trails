@@ -1019,7 +1019,6 @@ export class TableDefinition {
     return this;
   }
 
-  /** @internal */
   /**
    * Remove the column +name+ from the table.
    *
@@ -1031,6 +1030,7 @@ export class TableDefinition {
     if (index !== -1) this.columns.splice(index, 1);
   }
 
+  /** @internal */
   protected validColumnDefinitionOptions(): string[] {
     return [
       "limit",

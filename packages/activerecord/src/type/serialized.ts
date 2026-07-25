@@ -386,8 +386,7 @@ export class Serialized extends ValueType {
 export function encoded(this: Serialized, value: unknown): unknown {
   // Use the constructor-cached default to avoid calling coder.load(null) again,
   // which would produce a fresh object on every call and break reference equality.
-  const serialized = this;
-  const s = serialized as any;
+  const s = this as any;
   const defaultVal = s._defaultValue;
   if (value === defaultVal) return undefined;
   if (typeof value === "object" && value !== null && s._defaultValueJson !== undefined) {
@@ -397,12 +396,9 @@ export function encoded(this: Serialized, value: unknown): unknown {
       // non-serializable; treat as non-default
     }
   }
-  const payload = serialized.coder.dump(value);
+  const payload = this.coder.dump(value);
   // Rails: if payload && subtype.binary? → ActiveModel::Type::Binary::Data.new(payload)
-  if (
-    payload &&
-    ((serialized.subtype as any).binary?.() ?? (serialized.subtype as any).isBinary?.())
-  ) {
+  if (payload && ((this.subtype as any).binary?.() ?? (this.subtype as any).isBinary?.())) {
     return new BinaryData(payload);
   }
   return payload;
