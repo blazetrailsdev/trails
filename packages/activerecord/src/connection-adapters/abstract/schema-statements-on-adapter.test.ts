@@ -24,11 +24,10 @@ async function ambientConnection(): Promise<AbstractAdapter> {
 
 // ForeignKeyTest's setup/teardown, foreign_key_test.rb:178-194.
 async function withRocketTables(conn: AbstractAdapter, body: () => Promise<void>): Promise<void> {
-  await conn.dropTable("astronauts", "rockets", { ifExists: true });
-  await conn.createTable("rockets", (t) => {
+  await conn.createTable("rockets", { force: true }, (t) => {
     t.string("name");
   });
-  await conn.createTable("astronauts", (t) => {
+  await conn.createTable("astronauts", { force: true }, (t) => {
     t.string("name");
     t.references("rocket", { type: "bigint" });
     t.references("favorite_rocket");
@@ -465,7 +464,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     // so a same-target FK on a different column is NOT short-circuited.
     const conn = await ambientConnection();
     await withRocketTables(conn, async () => {
-      await conn.addForeignKey("astronauts", "rockets", { column: "rocket_id" });
+      await conn.addForeignKey("astronauts", "rockets");
       await conn.addForeignKey("astronauts", "rockets", {
         column: "favorite_rocket_id",
         ifNotExists: true,
@@ -483,12 +482,11 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     // parity), and the ifNotExists guard routes through foreignKeyExists ->
     // isDefinedFor for an element-wise compare.
     const conn = await ambientConnection();
-    await conn.dropTable("astronauts", "rockets", { ifExists: true });
-    await conn.createTable("rockets", { primaryKey: ["tenant_id", "id"] }, (t) => {
+    await conn.createTable("rockets", { force: true, primaryKey: ["tenant_id", "id"] }, (t) => {
       t.integer("tenant_id");
       t.integer("id");
     });
-    await conn.createTable("astronauts", (t) => {
+    await conn.createTable("astronauts", { force: true }, (t) => {
       t.integer("rocket_id");
       t.integer("rocket_tenant_id");
     });
