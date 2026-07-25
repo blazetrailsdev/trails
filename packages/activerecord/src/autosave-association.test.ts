@@ -1171,9 +1171,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   });
 
   it("callbacks on child when parent autosaves child", async () => {
-    const eye = new Eye();
-    cacheAssoc(eye, "iris", new Iris());
-    await eye.saveBang();
+    const eye = await Eye.createBang({ iris: new Iris() });
     const iris = eye.iris;
     expect(iris?.beforeValidationCallbacksCounter).toBe(1);
     expect(iris?.beforeCreateCallbacksCounter).toBe(1);
