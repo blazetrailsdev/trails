@@ -1,3 +1,11 @@
+/**
+ * TS-only autosave tests with no counterpart in
+ * `vendor/rails/activerecord/test/cases/autosave_association_test.rb`. They live
+ * here rather than in `autosave-association.test.ts` so they don't inflate the
+ * apparent test count of the Rails-named describes `test:compare` matches
+ * against Rails test classes. Describe names still mirror the Rails class the
+ * behavior belongs to, so a reader knows where each test's subject lives.
+ */
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, assignNestedAttributes } from "./index.js";
@@ -33,7 +41,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
 });
 
 describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
-  fixtures(["companies", "developers"]);
+  fixtures(["companies"]);
   beforeAll(() => {
     registerModel(CanonicalCompany);
     registerModel(Firm);
