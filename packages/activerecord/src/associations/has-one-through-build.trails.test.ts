@@ -86,4 +86,43 @@ describe("HasOneThroughBuildTrails", () => {
     await member.association("club").reload();
     expect((member.association("club").target as Club | null)?.id).toBe(newClub.id);
   });
+
+  it("buildClub over a loaded through target does not touch the displaced club", async () => {
+    const member = members("groucho");
+    const displaced = (await (member as unknown as { club: Promise<Club | null> }).club) as Club;
+    expect(displaced).toBeInstanceOf(Club);
+    expect(member.association("club").isLoaded()).toBe(true);
+
+    const built = await (
+      member as unknown as { buildClub(attrs: Record<string, unknown>): Promise<Club> }
+    ).buildClub({ name: "Displacing Club" });
+
+    expect(built.isNewRecord()).toBe(true);
+    expect(member.association("club").target).toBe(built);
+
+    // The displaced end record has no FK back to the member; the through's join
+    // row owns the link, so the club itself must be untouched — in memory and
+    // after the owner's save drains its queues.
+    expect(displaced.hasChangesToSave).toBe(false);
+    await member.save();
+    const reloadedDisplaced = await Club.find(displaced.id);
+    expect(reloadedDisplaced.name).toBe(displaced.name);
+  });
+
+  it("createClub over a loaded through target does not touch the displaced club", async () => {
+    const member = members("groucho");
+    const displaced = (await (member as unknown as { club: Promise<Club | null> }).club) as Club;
+    expect(displaced).toBeInstanceOf(Club);
+
+    const created = await (
+      member as unknown as { createClub(attrs: Record<string, unknown>): Promise<Club> }
+    ).createClub({ name: "Created Displacing Club" });
+
+    expect(created.isPersisted()).toBe(true);
+    expect(member.association("club").target).toBe(created);
+
+    await member.save();
+    const reloadedDisplaced = await Club.find(displaced.id);
+    expect(reloadedDisplaced.name).toBe(displaced.name);
+  });
 });

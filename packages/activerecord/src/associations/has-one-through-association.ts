@@ -106,6 +106,25 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   }
 
   /**
+   * Rails' `set_new_record` is `replace(record, false)` and nothing else
+   * (has_one_association.rb:87-93). The base `HasOneAssociation` override adds a
+   * direct-FK tail — `nullifyOwnerAttributes` / `removeInverseInstance` on the
+   * displaced target plus a `_displacedRecords` push — standing in for
+   * `remove_target!`, which Rails' `HasOneThroughAssociation#replace`
+   * (has_one_through_association.rb:9-13) does NOT run: a through's end record
+   * carries no foreign key back to the owner, so nullifying it either raises
+   * `MissingAttributeError` (no such column) or silently blanks an unrelated
+   * column that merely matches the derived FK name. Displacement belongs to
+   * `createThroughRecord` / `persistReplace`, which mutate the *join* row. Same
+   * reason `detachDisplacedTarget` is a no-op above.
+   *
+   * @internal
+   */
+  protected override setNewRecord(record: Base): void {
+    this.replace(record, false);
+  }
+
+  /**
    * Mirrors Rails `HasOneThroughAssociation#replace` immediate persist to a
    * saved owner. The base `writer` saves the target's foreign key directly,
    * which is wrong for a through (persistence routes through the join model), so
