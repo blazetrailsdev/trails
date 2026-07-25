@@ -182,11 +182,9 @@ describe("CollectionPersistedSetterThrows", () => {
   });
 
   it("constructor-form ids= reaches the association writer", async () => {
-    // A `#{singular}Ids` key is deferred past `super()` so it dispatches the
-    // generated setter instead of running while `_associationInstances` is
-    // still undefined. Reaching the writer is what's asserted here: the
-    // deviation throw above is the observable proof, where the un-deferred
-    // path died with an opaque `TypeError` from inside `super()`.
+    // The throw IS the assertion: without the deferral past `super()` these
+    // die with a `TypeError` on an undefined `_associationInstances`, never
+    // reaching the writer that raises the deviation.
     const post = await Post.create({ title: "t", body: "b" });
     expect(() => new Author({ name: "Bill", postIds: [post.id] })).toThrow(
       CollectionIdsAssignmentError,
