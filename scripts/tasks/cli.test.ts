@@ -1265,9 +1265,9 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(seen).not.toContain("reset");
   });
 
-  // The tasks repo's .husky/post-commit hook background-pushes main after
-  // every commit, racing commitAndPush's own explicit push (and capable of
-  // shipping an empty clobbered commit before the guard above can reset it).
+  // The tasks repo's .husky/post-commit hook pushes main after every commit,
+  // racing commitAndPush's own explicit push (and capable of shipping an empty
+  // clobbered commit before the guard above can reset it).
   // The CLI must commit with RFCS_NO_AUTOPUSH=1 so the hook stands down.
   it("commits with RFCS_NO_AUTOPUSH=1 so the post-commit hook does not race the push", () => {
     setup();
@@ -1566,9 +1566,7 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(mutatorCalls).toBe(2);
     // Pre-loop: HEAD:main guard (fetch, rev-list) then one checkout per
     // generated file restores them.
-    // First attempt: pull, add, commit, push(throws). The race branch then
-    // confirms the commit did NOT land (rev-parse HEAD, fetch, rev-parse
-    // origin/main all return "" here, so HEAD !== origin/main) and resets.
+    // First attempt: pull, add, commit, push(throws), reset.
     // Second attempt: pull, add, commit, push(ok).
     expect(seen).toEqual([
       "fetch",
@@ -1580,9 +1578,6 @@ describe("commitAndPush (git mutation flow)", () => {
       "commit",
       "diff-tree",
       "push",
-      "rev-parse",
-      "fetch",
-      "rev-parse",
       "reset",
       "pull",
       "add",
@@ -1617,49 +1612,35 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(seen.filter((l) => l === "reset").length).toBe(2);
   });
 
-  // Regression: the tasks repo's `.husky/post-commit` hook auto-pushes `main`
-  // in the background after every commit. That background push races this
-  // explicit push; when the hook's push lands first, origin/main advances to
-  // OUR commit and git then rejects THIS push with "[rejected] ... (fetch
-  // first)" — even though the mutation is already on origin/main. That is a
-  // success, not a lost race: commitAndPush must confirm origin/main == HEAD
-  // and return 0, NOT reset + retry (which the reflog evidence showed wrongly
-  // reporting failure on a landed `priority` flip).
-  it("treats a rejected push as success when our commit already landed on origin/main", () => {
-    const { seen, exit } = setup();
-    const HEAD_SHA = "061e7d5ad3452f6950fbe974e72326ff28b1baed";
+  // "fetch first" used to be ambiguous — the post-commit hook could land our
+  // own commit — so the catch confirmed with rev-parse/fetch/rev-parse before
+  // deciding. With the hook silenced for CLI commits every rejection is a lost
+  // race, so the confirm round-trip must stay gone.
+  it("resets and retries a fetch-first rejection without a confirm round-trip", () => {
+    const { seen } = setup();
+    let push = 0;
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "symbolic-ref") return "main" as never;
       seen.push(label);
       if (label === "diff-tree") return "story.md" as never;
-      if (label === "push") {
-        // The background post-commit push already won the race and put our
-        // commit on origin/main; git rejects this one with stale-info info.
+      if (label === "push" && push++ === 0) {
         throw pushError("! [rejected]        main -> main (fetch first)");
       }
-      // Both HEAD and origin/main resolve to the same commit — ours landed.
-      if (label === "rev-parse") return HEAD_SHA as never;
       return "" as never;
     });
     let mutatorCalls = 0;
-    // No throw: commitAndPush returns normally (the top-level handler exits 0).
     commitAndPush({
       message: "test",
       fileToStage: "/some/file.md",
       mutator: () => mutatorCalls++,
-      raceMessage: "should not be reached",
-      raceExitCode: 3,
+      raceMessage: "no",
+      raceExitCode: 99,
     });
-    expect(mutatorCalls).toBe(1);
-    // process.exit is never called: no raceExitCode, no exit 1.
-    expect(exit).not.toHaveBeenCalled();
-    // The mutation is confirmed landed via rev-parse HEAD + fetch + rev-parse
-    // origin/main; it must NOT reset the tree or retry the mutation.
-    expect(seen.filter((l) => l === "push").length).toBe(1);
-    expect(seen.filter((l) => l === "reset").length).toBe(0);
-    expect(seen.filter((l) => l === "commit").length).toBe(1);
-    expect(seen.filter((l) => l === "rev-parse").length).toBe(2);
+    expect(mutatorCalls).toBe(2);
+    // The rejected push is followed immediately by the reset — no rev-parse or
+    // fetch in between.
+    expect(seen.slice(seen.indexOf("push"), seen.indexOf("push") + 2)).toEqual(["push", "reset"]);
   });
 
   it("surfaces non-race push failures verbatim and exits 1 (no reset, no retry)", () => {
