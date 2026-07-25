@@ -116,8 +116,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     }
 
     it("deadlock correctly raises Deadlocked inside nested SavepointTransaction", async () => {
-      // Stays self-built: the deadlock needs two connections racing for the
-      // same rows — Rails' counterpart runs the second side on its own thread.
+      // Stays self-built: the second side of the deadlock needs its own
+      // connection (Rails runs it on its own thread).
       const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
       try {
         const { results } = await raceNestedTransactions(adapter2);
@@ -134,8 +134,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("rollback exception is swallowed after a rollback", async () => {
-      // Stays self-built: the deadlock needs two connections racing for the
-      // same rows — Rails' counterpart runs the second side on its own thread.
+      // Stays self-built: the second side of the deadlock needs its own
+      // connection (Rails runs it on its own thread).
       const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
       try {
         const { results, deadlocks } = await raceNestedTransactions(adapter2, "rollback");
@@ -150,8 +150,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("deadlock inside nested SavepointTransaction is recoverable", async () => {
-      // Stays self-built: the deadlock needs two connections racing for the
-      // same rows — Rails' counterpart runs the second side on its own thread.
+      // Stays self-built: the second side of the deadlock needs its own
+      // connection (Rails runs it on its own thread).
       const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
       try {
         const { results, deadlocks } = await raceNestedTransactions(adapter2, "swallow");

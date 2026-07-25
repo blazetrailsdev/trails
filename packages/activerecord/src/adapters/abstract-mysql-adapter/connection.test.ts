@@ -19,6 +19,14 @@ import {
 } from "../../errors.js";
 import mysql from "mysql2/promise";
 
+// The leased connection memoizes the server version on first read, so the
+// version tests below have to drop that memo both before stubbing (the real
+// version is already cached) and after (their stubbed one must not outlive the
+// test). Rails' @connection is likewise long-lived; its stubs re-run the query.
+function clearVersionCache(adapter: Mysql2Adapter): void {
+  (adapter as unknown as { _databaseVersion: unknown })._databaseVersion = null;
+}
+
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
@@ -29,9 +37,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     Notifications.unsubscribeAll();
     // Several tests here disconnect/discard the leased connection (as Rails'
     // connection_test.rb does to `Base.lease_connection`); verify it back so the
-    // next test in this worker gets a live one. The version tests memoize a
-    // stubbed version onto it, so drop that too — it re-derives on next read.
-    (adapter as any)._databaseVersion = null;
+    // next test in this worker gets a live one.
+    clearVersionCache(adapter);
     await adapter.verifyBang();
   });
 
@@ -371,26 +378,19 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       }
     });
 
-    // The leased connection has already resolved (and memoized) the real
-    // server version, so every stub below has to clear the cache first —
-    // Rails' @connection is likewise long-lived and its stubs re-run the query.
-    const clearVersionCache = (): void => {
-      (adapter as any)._databaseVersion = null;
-    };
-
     it("version string", async () => {
       const spy = vi.spyOn(adapter, "getFullVersion");
-      clearVersionCache();
+      clearVersionCache(adapter);
       spy.mockResolvedValueOnce("8.0.35-0ubuntu0.22.04.1");
       expect((await adapter.getDatabaseVersion()).toString()).toBe("8.0.35");
 
-      clearVersionCache();
+      clearVersionCache(adapter);
       spy.mockResolvedValueOnce("5.7.0");
       expect((await adapter.getDatabaseVersion()).toString()).toBe("5.7.0");
     });
 
     it("version string with mariadb", async () => {
-      clearVersionCache();
+      clearVersionCache(adapter);
       vi.spyOn(adapter, "getFullVersion").mockResolvedValueOnce(
         "5.5.5-10.6.5-MariaDB-1:10.6.5+maria~focal",
       );
@@ -400,7 +400,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("version string invalid", async () => {
       const spy = vi.spyOn(adapter, "getFullVersion");
       const assertVersionError = async (version: string | null, expectedMsg: string) => {
-        clearVersionCache();
+        clearVersionCache(adapter);
         spy.mockResolvedValueOnce(version as string);
         let caughtErr: unknown;
         try {
@@ -460,7 +460,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     afterEach(() => vi.restoreAllMocks());
 
     it("maps ER_BAD_DB_ERROR (1049) to NoDatabaseError", async () => {
-      // Stays self-built: a deliberately bad config is the assertion.
+      // Stays self-built: the config names a database that does not exist.
       const a = new Mysql2Adapter("mysql://root@localhost/no_such_db");
       stubCreateConnection(makeDriverError(1049));
       try {
@@ -471,7 +471,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("maps ER_ACCESS_DENIED_ERROR (1045) to DatabaseConnectionError", async () => {
-      // Stays self-built: a deliberately bad config is the assertion.
+      // Stays self-built: the config names a user that cannot authenticate.
       const a = new Mysql2Adapter({ host: "localhost", user: "baduser", database: "test" });
       stubCreateConnection(makeDriverError(1045));
       try {
@@ -484,7 +484,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("maps ER_ACCESS_DENIED_ERROR via URI to DatabaseConnectionError with parsed username", async () => {
-      // Stays self-built: a deliberately bad config is the assertion.
+      // Stays self-built: the URI carries the bad username the error must name.
       const a = new Mysql2Adapter("mysql://myuser:pw@localhost/test");
       stubCreateConnection(makeDriverError(1045));
       try {
@@ -497,7 +497,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("maps ER_CONN_HOST_ERROR (2003) to DatabaseConnectionError with hostname", async () => {
-      // Stays self-built: a deliberately bad config is the assertion.
+      // Stays self-built: the URI carries the unreachable host the error must name.
       const a = new Mysql2Adapter("mysql://root@myhost.example.com/test");
       stubCreateConnection(makeDriverError(2003));
       try {
