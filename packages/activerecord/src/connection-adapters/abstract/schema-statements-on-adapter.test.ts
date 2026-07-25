@@ -2,14 +2,42 @@
  * Smoke test: SchemaStatements methods are accessible directly on the adapter.
  * Rails: `AbstractAdapter` includes `SchemaStatements`, so
  * `connection.create_table(...)` works without going through MigrationContext.
+ *
+ * DDL behaviors with a Rails counterpart run against the ambient connection;
+ * only the mixin-wiring smoke cases (untestable in Rails, where `include` is
+ * native) keep a throwaway `:memory:` adapter.
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { AbstractSQLite3Adapter } from "../sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../better-sqlite3-adapter.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { ForeignKeyDefinition } from "./schema-definitions.js";
+import { Base } from "../../index.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 
 let adapter: AbstractSQLite3Adapter | undefined;
+
+// Rails' `@connection = ActiveRecord::Base.lease_connection`.
+async function ambientConnection(): Promise<AbstractAdapter> {
+  return (await Base.leaseConnection()) as unknown as AbstractAdapter;
+}
+
+// ForeignKeyTest's setup/teardown, foreign_key_test.rb:178-194.
+async function withRocketTables(conn: AbstractAdapter, body: () => Promise<void>): Promise<void> {
+  await conn.createTable("rockets", { force: true }, (t) => {
+    t.string("name");
+  });
+  await conn.createTable("astronauts", { force: true }, (t) => {
+    t.string("name");
+    t.references("rocket", { type: "bigint" });
+    t.references("favorite_rocket");
+  });
+  try {
+    await body();
+  } finally {
+    await conn.dropTable("astronauts", "rockets", { ifExists: true });
+  }
+}
 
 afterEach(async () => {
   await adapter?.close();
@@ -89,6 +117,10 @@ class SqliteCapturingAdapter extends AbstractAdapter {
 }
 
 describe("SchemaStatements mixed into AbstractAdapter", () => {
+  // Non-transactional: MySQL's implicit commit on DDL would otherwise commit
+  // the fixture transaction mid-test.
+  fixtures([], { useTransactionalTests: false });
+
   it("tableAliasFor resolves tableAliasLength via the DatabaseLimits mixin", () => {
     // SchemaStatements no longer defines tableAliasLength (Rails keeps it only
     // in DatabaseLimits); the mixed-in adapter still resolves it to 64.
@@ -230,16 +262,13 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("columnExists returns false for a value containing quotes instead of erroring", async () => {
-    adapter = new BetterSQLite3Adapter(":memory:");
-    await adapter.createTable("gadgets", { id: false }, (t) => {
-      t.string("state");
-    });
-    expect(await adapter.columnExists("gadgets", "state")).toBe(true);
-    expect(await adapter.columnExists("gadgets", "state = 'active'")).toBe(false);
-    await adapter.dropTable("gadgets");
+    const conn = await ambientConnection();
+    expect(await conn.columnExists("posts", "title")).toBe(true);
+    expect(await conn.columnExists("posts", "title = 'active'")).toBe(false);
   });
 
   it("createTable is callable directly on the adapter", async () => {
+    // Mixin-wiring smoke test (no Rails counterpart): `:memory:` is deliberate.
     adapter = new BetterSQLite3Adapter(":memory:");
     await adapter.createTable("things", (t) => {
       t.string("name");
@@ -254,6 +283,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("dropTable removes the table", async () => {
+    // Mixin-wiring smoke test (no Rails counterpart): `:memory:` is deliberate.
     adapter = new BetterSQLite3Adapter(":memory:");
     await adapter.createTable("temp_table", (t) => t.string("value"));
     expect(await adapter.tableExists("temp_table")).toBe(true);
@@ -262,6 +292,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("addColumn and columnExists work on adapter", async () => {
+    // Mixin-wiring smoke test (no Rails counterpart): `:memory:` is deliberate.
     adapter = new BetterSQLite3Adapter(":memory:");
     await adapter.createTable("widgets", { id: false }, (t) => {
       t.string("title");
@@ -405,48 +436,44 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("addForeignKey with ifNotExists is a no-op when the FK already exists", async () => {
-    adapter = new BetterSQLite3Adapter(":memory:");
-    await adapter.createTable("authors", (t) => t.string("name"));
-    await adapter.createTable("articles", (t) => t.bigint("author_id"));
-    await adapter.addForeignKey("articles", "authors", { column: "author_id" });
-    const before = (await adapter.foreignKeys("articles")).length;
-    await adapter.addForeignKey("articles", "authors", {
-      column: "author_id",
-      ifNotExists: true,
+    const conn = await ambientConnection();
+    await withRocketTables(conn, async () => {
+      await conn.addForeignKey("astronauts", "rockets", { column: "rocket_id" });
+      const before = (await conn.foreignKeys("astronauts")).length;
+      await conn.addForeignKey("astronauts", "rockets", {
+        column: "rocket_id",
+        ifNotExists: true,
+      });
+      expect((await conn.foreignKeys("astronauts")).length).toBe(before);
     });
-    expect((await adapter.foreignKeys("articles")).length).toBe(before);
-    await adapter.dropTable("articles", "authors");
   });
 
   it("addForeignKey with ifNotExists creates the FK when none exists", async () => {
-    adapter = new BetterSQLite3Adapter(":memory:");
-    await adapter.createTable("authors", (t) => t.string("name"));
-    await adapter.createTable("articles", (t) => t.bigint("author_id"));
-    await adapter.addForeignKey("articles", "authors", {
-      column: "author_id",
-      ifNotExists: true,
+    const conn = await ambientConnection();
+    await withRocketTables(conn, async () => {
+      await conn.addForeignKey("astronauts", "rockets", {
+        column: "rocket_id",
+        ifNotExists: true,
+      });
+      expect((await conn.foreignKeys("astronauts")).length).toBe(1);
     });
-    expect((await adapter.foreignKeys("articles")).length).toBe(1);
-    await adapter.dropTable("articles", "authors");
   });
 
   it("addForeignKey with ifNotExists creates a second FK to the same table on a different column", async () => {
-    // Rails slices :column into the existence check, so a same-target FK on a
-    // different column is NOT short-circuited.
-    adapter = new BetterSQLite3Adapter(":memory:");
-    await adapter.createTable("authors", (t) => t.string("name"));
-    await adapter.createTable("articles", (t) => {
-      t.bigint("author_id");
-      t.bigint("editor_id");
+    // foreign_key_test.rb:237: Rails slices :column into the existence check,
+    // so a same-target FK on a different column is NOT short-circuited.
+    const conn = await ambientConnection();
+    await withRocketTables(conn, async () => {
+      await conn.addForeignKey("astronauts", "rockets");
+      await conn.addForeignKey("astronauts", "rockets", {
+        column: "favorite_rocket_id",
+        ifNotExists: true,
+      });
+      const fks = await conn.foreignKeys("astronauts");
+      expect(fks.length).toBe(2);
+      expect(fks.every((fk) => fk.toTable === "rockets")).toBe(true);
+      expect(fks.map((fk) => fk.column).sort()).toEqual(["favorite_rocket_id", "rocket_id"]);
     });
-    await adapter.addForeignKey("articles", "authors", { column: "author_id" });
-    await adapter.addForeignKey("articles", "authors", {
-      column: "editor_id",
-      ifNotExists: true,
-    });
-    const cols = (await adapter.foreignKeys("articles")).map((fk) => fk.column).sort();
-    expect(cols).toEqual(["author_id", "editor_id"]);
-    await adapter.dropTable("articles", "authors");
   });
 
   it("addForeignKey with ifNotExists is a no-op when a composite FK already exists", async () => {
@@ -454,30 +481,33 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     // array identity. foreignKeys() reports composite columns as arrays (Rails
     // parity), and the ifNotExists guard routes through foreignKeyExists ->
     // isDefinedFor for an element-wise compare.
-    adapter = new BetterSQLite3Adapter(":memory:");
-    await adapter.createTable("rockets", { primaryKey: ["tenant_id", "id"] }, (t) => {
+    const conn = await ambientConnection();
+    await conn.createTable("rockets", { force: true, primaryKey: ["tenant_id", "id"] }, (t) => {
       t.integer("tenant_id");
       t.integer("id");
     });
-    await adapter.createTable("astronauts", (t) => {
+    await conn.createTable("astronauts", { force: true }, (t) => {
       t.integer("rocket_id");
       t.integer("rocket_tenant_id");
     });
-    await adapter.addForeignKey("astronauts", "rockets", {
-      column: ["rocket_tenant_id", "rocket_id"],
-      primaryKey: ["tenant_id", "id"],
-    });
-    expect((await adapter.foreignKeys("astronauts"))[0].column).toEqual([
-      "rocket_tenant_id",
-      "rocket_id",
-    ]);
-    const before = (await adapter.foreignKeys("astronauts")).length;
-    await adapter.addForeignKey("astronauts", "rockets", {
-      column: ["rocket_tenant_id", "rocket_id"],
-      primaryKey: ["tenant_id", "id"],
-      ifNotExists: true,
-    });
-    expect((await adapter.foreignKeys("astronauts")).length).toBe(before);
-    await adapter.dropTable("astronauts", "rockets");
+    try {
+      await conn.addForeignKey("astronauts", "rockets", {
+        column: ["rocket_tenant_id", "rocket_id"],
+        primaryKey: ["tenant_id", "id"],
+      });
+      expect((await conn.foreignKeys("astronauts"))[0].column).toEqual([
+        "rocket_tenant_id",
+        "rocket_id",
+      ]);
+      const before = (await conn.foreignKeys("astronauts")).length;
+      await conn.addForeignKey("astronauts", "rockets", {
+        column: ["rocket_tenant_id", "rocket_id"],
+        primaryKey: ["tenant_id", "id"],
+        ifNotExists: true,
+      });
+      expect((await conn.foreignKeys("astronauts")).length).toBe(before);
+    } finally {
+      await conn.dropTable("astronauts", "rockets", { ifExists: true });
+    }
   });
 });
