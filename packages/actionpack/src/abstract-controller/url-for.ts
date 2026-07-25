@@ -44,8 +44,8 @@ export interface RouteSetLike {
  * this on the class. **It's a property, not a method** — trails reads
  * `controller._routes` directly (see `action-controller/renderer.ts`'s
  * `envForRequest`), unlike Rails which uses a `def _routes` method.
- * `null` means "no routes wired up yet"; `filterActionMethodsForRoutes`
- * then returns the unfiltered action set.
+ * `null` means "no routes wired up yet"; `actionMethods` then returns the
+ * unfiltered action set.
  */
 export interface UrlForClassMethods {
   _routes: RouteSetLike | null;

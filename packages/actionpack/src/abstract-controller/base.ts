@@ -336,10 +336,18 @@ export class AbstractController {
     return this._findActionName(action) !== undefined;
   }
 
-  /** Rails `action_method?` — is `name` one of this controller's actions?
-   * @internal */
+  /**
+   * Rails `action_method?` — `self.class.action_methods.include?(name)`.
+   * Rails memoizes `action_methods` to a Set, so its `include?` is a hash
+   * lookup; our `actionMethods()` hands back a defensive array copy, so we
+   * warm the memo and probe the underlying Set instead. This runs on every
+   * dispatch.
+   * @internal
+   */
   isActionMethod(name: string): boolean {
-    return (this.constructor as typeof AbstractController).actionMethods().includes(name);
+    const cls = this.constructor as typeof AbstractController;
+    cls.actionMethods();
+    return cls._actionMethodCache!.has(name);
   }
 
   /** @internal */
