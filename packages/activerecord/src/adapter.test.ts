@@ -241,8 +241,7 @@ describe("AdapterTest", () => {
       "indexes",
       "remove index when name and wrong column name specified",
       "remove index when name and wrong column name specified positional argument",
-      // Re-establishes `Base` (swapping the pool out from under the fixture
-      // pin), so it cannot ride the shared transaction.
+      // Re-establishes `Base`, swapping the pool out from under the fixture pin.
       "disable prepared statements",
     ],
   });
@@ -389,15 +388,9 @@ describe("AdapterTest", () => {
   // charset / collation / show-variable / cross-database-selects (MySQL-only)
   // live in the describeIfMysql AdapterTest block below.
 
-  // Rails gates this `unless in_memory_db? || TrilogyAdapter` — a bare
-  // `:memory:` sqlite worker cannot re-establish `Base` without losing the
-  // schema, so it is skipped there exactly as in Rails.
+  // Rails gates this `unless in_memory_db?` (adapter_test.rb:176): a
+  // re-established `:memory:` connection is a fresh, empty database.
   it.skipIf(inMemoryDb())("disable prepared statements", async () => {
-    // Rails re-establishes `Base` from `arunit`'s configuration_hash merged with
-    // `prepared_statements: true` on both sides of the global
-    // `ActiveRecord.disable_prepared_statements` toggle, then restores `:arunit`
-    // in an `ensure`. `runWithoutConnection` is our ConnectionHelper port of
-    // that capture/restore, and hands back the ambient config to merge into.
     const original = disablePreparedStatements;
     try {
       await runWithoutConnection(async (origConnection) => {
