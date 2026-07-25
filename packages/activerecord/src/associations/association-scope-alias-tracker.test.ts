@@ -97,14 +97,19 @@ describe("AssociationScope — AliasTracker aliases repeated tables", () => {
     // correctness depends on orthogonal chain-expansion work —
     // task #21).
     class TestScope extends AssociationScope {
-      public runGetChain(reflection: any) {
+      public runGetChain(reflection: any, association: any) {
         const tracker = AliasTracker.create(null, reflection.klass.arelTable.name, []);
-        return this.getChain(reflection, tracker);
+        return this.getChain(reflection, association, tracker);
       }
     }
-    const builtChain = new TestScope(() => null).runGetChain(refl);
+    const builtChain = new TestScope(() => null).runGetChain(refl, {
+      owner: new AtComment(),
+      reflection: refl,
+      klass: refl.klass,
+    });
     expect(builtChain.length).toBe(chain.length);
-    // The head entry is the original reflection (no aliasedTable).
+    // The head entry is the RuntimeReflection wrapping the original
+    // reflection (no aliasedTable).
     // The tail's first proxy visits comments again and must be
     // aliased — not the bare "comments".
     const tailAliased = (builtChain[1] as any).aliasedTable;

@@ -365,8 +365,8 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     // falls to the own branch, so a distinct own counter (`tags_with_destroy_count`)
     // still decrements.
     if (count > 0) {
-      const throughRefl = throughName ? ctor._reflectOnAssociation?.(throughName) : undefined;
-      if (throughRefl?.isCollection?.() && updateThroughCounter(throughRefl, method)) {
+      const throughRefl = throughCounterReflection(this);
+      if (throughRefl?.isCollection?.() && updateThroughCounter.call(this, method)) {
         await updateThroughCounterCache(this.owner, throughRefl, -count);
       } else {
         await updateThroughCounterCache(this.owner, ownRefl, -count);
@@ -683,10 +683,29 @@ interface RichCounterReflection {
  * other method always.
  * @internal
  */
-function updateThroughCounter(throughReflection: RichCounterReflection, method: string): boolean {
-  if (method === "destroy") return !throughReflection.isInverseUpdatesCounterCache?.();
+function updateThroughCounter(this: HasManyThroughAssociation, method: string): boolean {
+  const through = throughCounterReflection(this);
+  if (method === "destroy") return !through?.isInverseUpdatesCounterCache?.();
   if (method === "nullify") return false;
   return true;
+}
+
+/**
+ * Ruby reads `through_reflection` (ThroughAssociation) straight off the
+ * association; our reflection objects reach the through step through the
+ * owner's registry, so resolve it once here for both the counter-cache branch
+ * and `update_through_counter?`.
+ * @internal
+ */
+function throughCounterReflection(
+  assoc: HasManyThroughAssociation,
+): RichCounterReflection | undefined {
+  const throughName = assoc.reflection.options.through;
+  if (!throughName) return undefined;
+  const ctor = assoc.owner.constructor as {
+    _reflectOnAssociation?: (n: string) => RichCounterReflection | undefined;
+  };
+  return ctor._reflectOnAssociation?.(throughName);
 }
 
 /**

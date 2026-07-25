@@ -71,13 +71,13 @@ export class NestedError extends ActiveModelNestedError {
 }
 
 /** @internal */
-function association(err: NestedError): NestedError["association"] {
-  return err.association;
+function association(this: NestedError): NestedError["association"] {
+  return this.association;
 }
 
 /** @internal */
-function indexErrorsSetting(err: NestedError): boolean | "nestedAttributesOrder" {
-  const opts = err.association.options ?? err.association.reflection.options;
+function indexErrorsSetting(this: NestedError): boolean | "nestedAttributesOrder" {
+  const opts = this.association.options ?? this.association.reflection.options;
   if (opts && "indexErrors" in opts) {
     return opts["indexErrors"] as boolean | "nestedAttributesOrder";
   }
@@ -85,17 +85,17 @@ function indexErrorsSetting(err: NestedError): boolean | "nestedAttributesOrder"
 }
 
 /** @internal */
-function index(err: NestedError, innerError: { base?: unknown }): number | undefined {
-  const records = orderedRecords(err);
+function index(this: NestedError, innerError: { base?: unknown }): number | undefined {
+  const records = orderedRecords.call(this);
   if (!records || !innerError.base) return undefined;
   const idx = records.findIndex((r) => r === innerError.base);
   return idx >= 0 ? idx : undefined;
 }
 
 /** @internal */
-function orderedRecords(err: NestedError): unknown[] | null {
-  const setting = indexErrorsSetting(err);
-  const assoc = err.association;
+function orderedRecords(this: NestedError): unknown[] | null {
+  const setting = indexErrorsSetting.call(this);
+  const assoc = this.association;
   if (setting === true) return Array.isArray(assoc.target) ? assoc.target : null;
   if (setting === "nestedAttributesOrder") return assoc.nestedAttributesTarget ?? null;
   return null;

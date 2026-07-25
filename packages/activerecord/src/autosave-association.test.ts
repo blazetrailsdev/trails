@@ -4743,7 +4743,7 @@ describe("computePrimaryKey", () => {
 
   it("returns explicit reflection primaryKey option as-is", () => {
     const record = makeRecord({ primaryKey: "id" });
-    const result = computePrimaryKey.call(record, { options: { primaryKey: "custom_id" } });
+    const result = computePrimaryKey({ options: { primaryKey: "custom_id" } }, record);
     expect(result).toBe("custom_id");
   });
 
@@ -4754,7 +4754,7 @@ describe("computePrimaryKey", () => {
       queryConstraintsList: ["tenant_id", "id"],
       hasQueryConstraints: true,
     });
-    const result = computePrimaryKey.call(record, { options: { queryConstraints: true } });
+    const result = computePrimaryKey({ options: { queryConstraints: true } }, record);
     expect(result).toEqual(["tenant_id", "id"]);
   });
 
@@ -4765,7 +4765,7 @@ describe("computePrimaryKey", () => {
       queryConstraintsList: ["shop_id", "id"],
       hasQueryConstraints: true,
     });
-    const result = computePrimaryKey.call(record, { options: {} });
+    const result = computePrimaryKey({ options: {} }, record);
     expect(result).toEqual(["shop_id", "id"]);
   });
 
@@ -4777,29 +4777,32 @@ describe("computePrimaryKey", () => {
       queryConstraintsList: ["shop_id", "id"],
       hasQueryConstraints: true,
     });
-    const result = computePrimaryKey.call(record, {
-      options: { foreignKey: "order_id" },
-    });
+    const result = computePrimaryKey(
+      {
+        options: { foreignKey: "order_id" },
+      },
+      record,
+    );
     expect(result).toBe("id");
   });
 
   it("collapses CPK to 'id' when composite PK includes id and no queryConstraints", () => {
     // Mirrors: composite_primary_key? branch — primary_key.include?("id") ? "id" : primary_key
     const record = makeRecord({ primaryKey: ["shop_id", "id"] });
-    const result = computePrimaryKey.call(record, { options: {} });
+    const result = computePrimaryKey({ options: {} }, record);
     expect(result).toBe("id");
   });
 
   it("returns full composite PK when CPK has no 'id' column", () => {
     // Mirrors: composite_primary_key? branch — primary_key.include?("id") ? "id" : primary_key
     const record = makeRecord({ primaryKey: ["shop_id", "status"] });
-    const result = computePrimaryKey.call(record, { options: {} });
+    const result = computePrimaryKey({ options: {} }, record);
     expect(result).toEqual(["shop_id", "status"]);
   });
 
   it("returns class primary key for non-composite, non-constrained record", () => {
     const record = makeRecord({ primaryKey: "id" });
-    const result = computePrimaryKey.call(record, { options: {} });
+    const result = computePrimaryKey({ options: {} }, record);
     expect(result).toBe("id");
   });
 });

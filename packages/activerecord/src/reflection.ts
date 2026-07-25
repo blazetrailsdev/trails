@@ -2205,6 +2205,60 @@ export class RuntimeReflection extends AbstractReflection {
   allIncludes(callback: () => any): any {
     return callback();
   }
+
+  // Ruby's RuntimeReflection inherits AbstractReflection and reaches the rest of
+  // the reflection API through `method_missing`-free delegation on the members
+  // Rails' AssociationScope actually touches. TS has no such fallback, so the
+  // remaining members AssociationScope reads off the chain head are forwarded
+  // explicitly (same SimpleDelegator-style approach as ReflectionProxy).
+
+  /** @internal */
+  get options(): Record<string, unknown> {
+    return (this._reflection as any).options ?? {};
+  }
+
+  /** @internal */
+  override isThroughReflection(): boolean {
+    return (this._reflection as any).isThroughReflection?.() ?? false;
+  }
+
+  /** @internal */
+  override isCollection(): boolean {
+    return (this._reflection as any).isCollection?.() ?? false;
+  }
+
+  /** @internal */
+  override isPolymorphic(): boolean {
+    return (this._reflection as any).isPolymorphic?.() ?? false;
+  }
+
+  /** @internal */
+  scopeFor(relation: unknown, owner?: unknown): unknown {
+    return (this._reflection as any).scopeFor?.(relation, owner) ?? relation;
+  }
+
+  /** @internal */
+  joinPrimaryKeyFor(klass?: typeof Base): string | string[] {
+    const refl = this._reflection as any;
+    return typeof refl.joinPrimaryKeyFor === "function"
+      ? refl.joinPrimaryKeyFor(klass ?? this.klass)
+      : refl.joinPrimaryKey;
+  }
+
+  /** @internal */
+  override aliasCandidate(name: string): string {
+    return (this._reflection as any).aliasCandidate(name);
+  }
+
+  /** @internal */
+  override get chain(): AbstractReflection[] {
+    return (this._reflection as any).chain;
+  }
+
+  /** @internal */
+  get sourceReflection(): AbstractReflection | null {
+    return (this._reflection as any).sourceReflection ?? null;
+  }
 }
 
 // ---------------------------------------------------------------------------

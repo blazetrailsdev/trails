@@ -588,9 +588,7 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   // then `primary_key_value = primary_key.map { _read_attribute(_1) }`.
   const ctor = record.constructor as typeof Base;
   const reflection = (ctor as any)._reflectOnAssociation?.(assoc.name);
-  const pkSpec = reflection
-    ? computePrimaryKey.call(record as unknown as AutosaveAssociationHost, reflection)
-    : (ctor.primaryKey ?? "id");
+  const pkSpec = reflection ? computePrimaryKey(reflection, record) : (ctor.primaryKey ?? "id");
   const pkArr: string[] = Array.isArray(pkSpec) ? pkSpec : [pkSpec];
   const pkForChangeCheck = pkArr.map((k) => record._readAttribute(k));
   const changedForSave =
@@ -623,10 +621,7 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
       if (explicitPk) {
         primaryKey = explicitPk;
       } else {
-        const candidatePk = computePrimaryKey.call(
-          record as unknown as AutosaveAssociationHost,
-          reflection ?? assoc,
-        );
+        const candidatePk = computePrimaryKey(reflection ?? assoc, record);
         // computePrimaryKey may collapse a CPK to "id" when queryConstraintsList is null
         // (our queryConstraintsList doesn't auto-return composite PK, unlike Rails).
         // When that produces a scalar against a composite FK, fall back to ctor.primaryKey
@@ -787,7 +782,7 @@ function _resolveBelongsToPrimaryKey(
       }
     }
   }
-  const rawPk = computePrimaryKey.call(assocRecord as any, { options: assoc.options });
+  const rawPk = computePrimaryKey({ options: assoc.options }, assocRecord);
   return Array.isArray(rawPk) ? rawPk : [rawPk];
 }
 
@@ -955,7 +950,7 @@ export async function validateHasOneAssociation(
     )
       return;
   }
-  await isAssociationValid(reflection, record, this, inst);
+  await isAssociationValid.call(this, inst, record);
 }
 
 /** @internal */
@@ -973,7 +968,7 @@ export async function validateBelongsToAssociation(
   if (!(record.changedForAutosave?.() ?? false) && !customCtx) return;
   _setValidatingBelongsToFor(this, reflection, true);
   try {
-    await isAssociationValid(reflection, record, this, inst);
+    await isAssociationValid.call(this, inst, record);
   } finally {
     _setValidatingBelongsToFor(this, reflection, false);
   }
@@ -1007,18 +1002,22 @@ export async function validateCollectionAssociation(
       );
   if (!records) return;
   for (const record of records) {
-    await isAssociationValid(reflection, record, this, association);
+    await isAssociationValid.call(this, association, record);
   }
 }
 
 /** @internal */
 export async function isAssociationValid(
-  reflection: any,
-  record: any,
-  owner: any,
+  this: AutosaveAssociationHost,
   association: any,
+  record: any,
 ): Promise<boolean> {
-  // Mirrors Rails `association_valid?` (autosave_association.rb:371-398).
+  // Mirrors Rails `association_valid?` (autosave_association.rb:371-398). Rails
+  // reads the reflection off the association (`association.reflection.name`,
+  // `association.options`) and the parent errors off `self`, so both stay
+  // implicit here rather than riding in as extra params.
+  const owner = this as any;
+  const reflection = association.reflection;
   if (typeof record.isDestroyed === "function" && record.isDestroyed()) return true;
   if (reflection.options?.autosave && isMarkedForDestruction(record)) return true;
   const context =
@@ -1202,12 +1201,9 @@ export async function saveBelongsToAssociation(
 }
 
 /** @internal */
-export function computePrimaryKey(
-  this: AutosaveAssociationHost,
-  reflection: any,
-): string | string[] {
+export function computePrimaryKey(reflection: any, record: any): string | string[] {
   if (reflection.options?.primaryKey) return reflection.options.primaryKey;
-  const ctor = this.constructor as typeof Base & {
+  const ctor = record.constructor as typeof Base & {
     primaryKey?: string | string[];
     _hasQueryConstraints?: boolean;
     _queryConstraintsList?: string[] | null;

@@ -126,7 +126,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
     // aliased tables during the chain walk.
     const unscoped = klass.unscoped() as { aliasTracker: () => AliasTracker };
     return DisableJoinsAssociationRelation.deferred(klass, async () => {
-      const reverseChain = this.getChain(sourceReflection, unscoped.aliasTracker())
+      const reverseChain = this.getChain(sourceReflection, association, unscoped.aliasTracker())
         .slice()
         .reverse();
       const [lastReflection, lastOrdered, lastJoinIds] = await this._lastScopeChain(

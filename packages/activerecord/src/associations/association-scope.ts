@@ -2,6 +2,7 @@ import { Table as ArelTable, Nodes } from "@blazetrails/arel";
 import { TableMetadata } from "../table-metadata.js";
 import type { Base } from "../base.js";
 import type { AssociationReflection, AbstractReflection } from "../reflection.js";
+import { RuntimeReflection } from "../reflection.js";
 import { AliasTracker, aliasedArelTableForReflection } from "./alias-tracker.js";
 import { polymorphicName } from "../inheritance.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
@@ -278,7 +279,7 @@ export class AssociationScope {
     // thread-connection-table-alias-length-into-tracker-construction) it falls
     // back to the 64 default — a documented `create`-side deviation, not a
     // call-site one.
-    const chain = this.getChain(reflection, scopeRelation.aliasTracker());
+    const chain = this.getChain(reflection, association, scopeRelation.aliasTracker());
     // Rails: `scope.extending! reflection.extensions` (association_scope.rb:28).
     // Mix any `extend:`-declared modules onto the relation so extension
     // methods are available on the loaded association's relation.
@@ -486,9 +487,15 @@ export class AssociationScope {
    */
   protected getChain(
     reflection: AssociationReflection,
+    association: AssociationScopeable,
     tracker?: AliasTracker,
   ): Array<AbstractReflection | ReflectionProxy> {
-    const chain: Array<AbstractReflection | ReflectionProxy> = [reflection];
+    // Rails: `chain = [Reflection::RuntimeReflection.new(reflection, association)]`
+    // — the head resolves `klass` off the live association, which is what makes
+    // a polymorphic belongs_to head usable (its reflection can't compute one).
+    const chain: Array<AbstractReflection | ReflectionProxy> = [
+      new RuntimeReflection(reflection, association),
+    ];
     const tail = reflection.chain.slice(1);
     const name = reflection.name;
     for (const refl of tail) {
