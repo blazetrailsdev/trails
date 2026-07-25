@@ -327,8 +327,10 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     // Rails (159-162): when the SOURCE belongs_to (on the join model) declares
     // its own counter_cache, `klass.decrement_counter` on the target rows by id
     // for every method except `:destroy` (whose per-record callbacks handle it).
-    // Unreachable by the canonical models but ported for fidelity. `safeKlass` +
-    // id null-filter are defensive (a class-less polymorphic source, null PKs).
+    // `klass` is the ASSOCIATION's klass (the target model), not the source
+    // reflection's — a polymorphic source belongs_to has none, and taggings'
+    // `taggable` is exactly such a source. `safeKlass` + the id null-filter stay
+    // defensive (null PKs).
     const sourceRefl = (ownRefl as { sourceReflection?: SourceCounterReflection } | undefined)
       ?.sourceReflection;
     if (method !== "destroy" && sourceRefl?.options?.counterCache) {

@@ -13,15 +13,24 @@ import { fixtures } from "../test-helpers/fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Person } from "../test-helpers/models/person.js";
+import { Firm, Client } from "../test-helpers/models/company.js";
 import { Reader } from "../test-helpers/models/reader.js";
 
 registerModel(Author);
 registerModel(Post);
 registerModel(Person);
+registerModel(Firm);
+registerModel(Client);
 registerModel(Reader);
 
 describe("collection replace diffs instead of clearing", () => {
-  const { authors, posts, people } = fixtures(["authors", "posts", "people", "readers"]);
+  const { authors, posts, people, companies } = fixtures([
+    "authors",
+    "posts",
+    "people",
+    "readers",
+    "companies",
+  ]);
 
   it("leaves records common to the old and new target untouched", async () => {
     const author = await Author.find(authors("david").id);
@@ -55,5 +64,18 @@ describe("collection replace diffs instead of clearing", () => {
     await post.people.replace([david, david]);
 
     expect(await Reader.where({ post_id: post.id }).count()).toBe(Number(afterOne) + 1);
+  });
+
+  it("rolls the whole replace back when one of the new records cannot be saved", async () => {
+    const firm = await Firm.find(companies("first_firm").id);
+    const good = Client.new({ name: "Good" });
+    const bad = Client.new({ name: "Bad" });
+    bad.raiseOnSave = true;
+
+    const before = await firm.clientsOfFirm;
+    await expect(firm.clientsOfFirm.replace([good, bad])).rejects.toThrow(Client.RaisedOnSave);
+
+    const after = await Firm.find(companies("first_firm").id);
+    expect((await after.clientsOfFirm).map((c) => c.id)).toEqual(before.map((c) => c.id));
   });
 });
