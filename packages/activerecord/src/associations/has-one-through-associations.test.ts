@@ -311,6 +311,38 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(Number(reloaded.club_id)).toBe(Number(newClub.id));
   });
 
+  it("creating with unloaded existing join row updates the join row without an owner save", async () => {
+    const newMember = await Member.create({ name: "Joe" });
+    const oldClub = await Club.create({ name: "Old Club" });
+    (newMember.association("club") as any).writer(oldClub);
+    await newMember.save();
+    const membershipId = (await readHasOne(newMember, "currentMembership")).id;
+
+    const refetched = await Member.find(newMember.id);
+    const countForMember = () => Membership.where({ member_id: refetched.id }).count();
+    const before = await countForMember();
+    const newClub = await (refetched.association("club") as any).create({ name: "New Club" });
+
+    expect(await countForMember()).toBe(before);
+    const reloaded = await Membership.find(membershipId);
+    expect(Number(reloaded.club_id)).toBe(Number(newClub.id));
+    expect(Number(reloaded.club_id)).not.toBe(Number(oldClub.id));
+  });
+
+  it("creating with no existing join row only builds the join record", async () => {
+    const newMember = await Member.create({ name: "Joe" });
+    const countForMember = () => Membership.where({ member_id: newMember.id }).count();
+
+    const newClub = await (newMember.association("club") as any).create({ name: "New Club" });
+    expect(await countForMember()).toBe(0);
+    expect(tgt(newMember, "currentMembership").isNewRecord()).toBe(true);
+
+    expect(await newMember.save()).toBe(true);
+    expect(await countForMember()).toBe(1);
+    const membership = await Membership.where({ member_id: newMember.id }).first();
+    expect(Number(membership?.club_id)).toBe(Number(newClub.id));
+  });
+
   it("building with unloaded existing join row reconciles regardless of through-proxy access order", async () => {
     const newMember = await Member.create({ name: "Joe" });
     (newMember.association("club") as any).writer(await Club.create({ name: "Old Club" }));
