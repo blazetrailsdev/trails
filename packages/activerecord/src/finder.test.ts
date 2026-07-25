@@ -14,6 +14,9 @@ import {
 import { sql as arelSql } from "@blazetrails/arel";
 
 import { fixtures } from "./test-helpers/fixtures.js";
+import { postFixtureData } from "./test-helpers/fixtures/posts.js";
+import { Account } from "./test-helpers/models/account.js";
+import { Client } from "./test-helpers/models/company.js";
 import "./test-helpers/canonical-model-index.js";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 import { adapterType } from "./test-adapter.js";
@@ -1501,38 +1504,55 @@ describe("FinderTest", () => {
 // FinderTest2 — additional coverage for finder_test.rb
 // ==========================================================================
 describe("FinderTest", () => {
-  fixtures([]);
-
-  class Post extends Base {
-    static {
-      this.tableName = "posts";
-      this.attribute("title", "string", { default: "" });
-      this.attribute("body", "string", { default: "" });
-    }
-  }
+  const { posts, topics, accounts, companies } = fixtures([
+    "posts",
+    "topics",
+    "accounts",
+    "companies",
+  ]);
+  registerModel(CanonicalPost);
+  registerModel("Topic", CanonicalTopic);
+  registerModel(Account);
+  registerModel(CanonicalCompany);
+  registerModel(Client);
+  const Post = CanonicalPost;
+  const rid = (r: unknown) => (r as { id: number }).id;
 
   it("find by empty in condition", async () => {
-    await Post.create({ title: "a" });
     const results = await Post.where({ title: [] });
     expect(results.length).toBe(0);
   });
 
   it("find with nil inside set passed for one attribute", async () => {
-    await Post.create({ title: "a" });
-    const results = await Post.where({ title: ["a", null] });
-    expect(Array.isArray(results)).toBe(true);
+    const clientOf = (
+      await CanonicalCompany.where({
+        client_of: [2, 1, null],
+        name: ["37signals", "Summit", "Microsoft"],
+      }).order("client_of DESC")
+    ).map((r) => (r as { client_of: bigint | number | null }).client_of);
+
+    expect(clientOf).toContain(null);
+    expect(
+      clientOf
+        .filter((c) => c != null)
+        .map(Number)
+        .sort(),
+    ).toEqual([1, 2]);
   });
 
   it("find_by with associations", async () => {
-    await Post.create({ title: "unique-title" });
-    const found = await Post.findBy({ title: "unique-title" });
+    const found = await Post.findBy({ title: posts("welcome").title });
     expect(found).not.toBeNull();
+    expect(rid(found)).toBe(rid(posts("welcome")));
   });
 
   it("first have determined order by default", async () => {
-    await Post.create({ title: "a" });
-    const first = await Post.first();
-    expect(first).not.toBeNull();
+    const expected = [companies("second_client"), companies("another_client")];
+    const clients = Client.where({ name: expected.map((c) => (c as { name: string }).name) });
+
+    expect((await clients.first(2)).map(rid)).toEqual(expected.map(rid));
+    expect((await clients.limit(5).first(2)).map(rid)).toEqual(expected.map(rid));
+    expect((await clients.order(null).first(2)).map(rid)).toEqual(expected.map(rid));
   });
 
   it("find without primary key", async () => {
@@ -1541,30 +1561,31 @@ describe("FinderTest", () => {
   });
 
   it("finder with offset string", async () => {
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    const sql = Post.all().offset(1).toSql();
-    expect(sql).toContain("OFFSET");
+    // Rails passes the offset as a string here; trails types `offset()` as
+    // number, so the cast is what keeps the string path under test.
+    await expect(CanonicalTopic.offset("3" as unknown as number)).resolves.toBeDefined();
   });
 
   it("find on a scope does not perform statement caching", async () => {
-    await Post.create({ title: "scope-test" });
-    const scope = Post.where({ title: "scope-test" });
+    const scope = Post.where({ title: posts("welcome").title });
     const r1 = await scope;
     const r2 = await scope;
     expect(r1.length).toBe(r2.length);
   });
 
   it("find_by on a scope does not perform statement caching", async () => {
-    await Post.create({ title: "findby-scope" });
-    const r1 = await Post.findBy({ title: "findby-scope" });
-    const r2 = await Post.findBy({ title: "findby-scope" });
+    const r1 = await Post.findBy({ title: posts("welcome").title });
+    const r2 = await Post.findBy({ title: posts("welcome").title });
     expect(r1?.id).toBe(r2?.id);
   });
 
   it("find by on relation with large number", async () => {
-    const result = await Post.findBy({ id: 999999999 });
-    expect(result).toBeNull();
+    const huge = 9999999999999999999999999999999n;
+    expect(await CanonicalTopic.where("1=1").findBy({ id: huge })).toBeNull();
+    const found = await CanonicalTopic.where({ id: [rid(topics("first")), huge] }).findBy({
+      id: rid(topics("first")),
+    });
+    expect(rid(found)).toBe(rid(topics("first")));
   });
 
   // Rails: test "find_by! raises RecordNotFound if the record is missing"
@@ -1582,20 +1603,29 @@ describe("FinderTest", () => {
   });
 
   it("implicit order set to primary key", async () => {
-    await Post.create({ title: "pk-order" });
-    const sql = Post.all().toSql();
-    expect(sql).toContain("SELECT");
+    const oldImplicitOrderColumn = CanonicalTopic.implicitOrderColumn;
+    CanonicalTopic.implicitOrderColumn = "id";
+    try {
+      await assertQueriesMatch(
+        new RegExp(`ORDER BY ${escapeRegExp(quoteTableName("topics.id"))} DESC LIMIT`, "i"),
+        undefined,
+        false,
+        async () => {
+          await CanonicalTopic.last();
+        },
+      );
+    } finally {
+      CanonicalTopic.implicitOrderColumn = oldImplicitOrderColumn;
+    }
   });
 
   it("joins dont clobber id", async () => {
-    const p = await Post.create({ title: "join-test" });
-    expect(p.id).toBeTruthy();
-  });
-
-  it("named bind variables with quotes", async () => {
-    await Post.create({ title: "it's quoted" });
-    const results = await Post.where({ title: "it's quoted" });
-    expect(results.length).toBe(1);
+    const first = await CanonicalFirm.joins(
+      "INNER JOIN companies clients ON clients.firm_id = companies.id",
+    )
+      .where("companies.id = 1")
+      .first();
+    expect(rid(first)).toBe(1);
   });
 
   it("find by one attribute bang with blank defined", async () => {
@@ -1603,40 +1633,33 @@ describe("FinderTest", () => {
   });
 
   it("select rows", async () => {
-    await Post.create({ title: "row1" });
     const results = await Post.all();
-    expect(results.length).toBe(1);
+    expect(results.length).toBe(Object.keys(postFixtureData).length);
   });
 
   it("find ignores previously inserted record", async () => {
-    const p = await Post.create({ title: "first" });
-    await Post.create({ title: "second" });
-    const found = await Post.find(p.id);
-    expect(found.id).toBe(p.id);
+    await Post.create({ title: "test", body: "it out", author_id: 0 });
+    expect(await Post.where({ id: null })).toEqual([]);
   });
 
   it("find by one attribute with several options", async () => {
-    await Post.create({ title: "opt1" });
-    const found = await Post.findBy({ title: "opt1" });
-    expect(found).not.toBeNull();
+    const found = await Account.order("id DESC")
+      .where("id != ?", rid(accounts("rails_core_account")))
+      .findBy({ credit_limit: 50 });
+    expect(rid(found)).toBe(rid(accounts("unknown")));
   });
 });
 
 describe("FinderTest", () => {
-  fixtures([]);
+  fixtures(["topics"]);
+  registerModel("Topic", CanonicalTopic);
 
   // Rails: test_find_with_array_of_ids
   // Rails: test_find_raises_record_not_found
   // Rails: test_find_by_with_conditions
   // Rails: test_find_by_returns_nil
   it("find_by returns nil if the record is missing", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "Alice" });
-    const found = await Topic.findBy({ title: "Nobody" });
+    const found = await CanonicalTopic.findBy({ title: "Nobody" });
     expect(found).toBeNull();
   });
 
