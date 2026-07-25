@@ -169,15 +169,10 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
   });
 
   it("dump schema cache", async () => {
-    // Rails dumps the cache off the ambient `arunit` connection — a file-backed
-    // sqlite3 database, not `:memory:`. A temp file DB stands in for it.
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-dump-sc-"));
     const cachePath = path.join(tmp, "schema_cache.json");
-    await Base.establishConnection({
-      adapter: "sqlite3",
-      database: path.join(tmp, "arunit.sqlite3"),
-      pool: 1,
-    });
+    const dbFile = path.join(tmp, "arunit.sqlite3");
+    await Base.establishConnection({ adapter: "sqlite3", database: dbFile, pool: 1 });
     try {
       expect(fs.existsSync(cachePath)).toBe(false);
       const adapter = await Base.connectionPool().leaseConnection();
@@ -234,8 +229,6 @@ describe("DatabaseTasksDumpSchemaTest", () => {
     // Mirrors Rails: schemaDump is a bare filename; schemaDumpPath prepends dbDir.
     // The dir is removed before dumpSchema runs; dumpSchema must recreate it.
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-ensure-dbdir-"));
-    // Rails' db_config here is `arunit`/`primary` — a file-backed sqlite3
-    // database. It lives outside `tmp` because `tmp` is removed mid-test.
     const dbTmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-ensure-dbdir-db-"));
     const dbFile = path.join(dbTmp, "arunit.sqlite3");
     const prevDbDir = DatabaseTasks.dbDir;
@@ -259,7 +252,6 @@ describe("DatabaseTasksDumpSchemaTest", () => {
       } catch {
         /* ignore */
       }
-      // Removes the DB file along with any -wal/-shm siblings.
       fs.rmSync(tmp, { recursive: true, force: true });
       fs.rmSync(dbTmp, { recursive: true, force: true });
     }
@@ -268,7 +260,6 @@ describe("DatabaseTasksDumpSchemaTest", () => {
     // Mirrors Rails: schemaDump is an absolute path whose dirname == dbDir.
     // schemaDumpPath returns it verbatim (no double-prefix).
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-dbdir-ignored-"));
-    // As above: `arunit`/`primary` is file-backed, and `tmp` is removed mid-test.
     const dbTmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-dbdir-ignored-db-"));
     const dbFile = path.join(dbTmp, "arunit.sqlite3");
     const prevDbDir = DatabaseTasks.dbDir;
@@ -292,7 +283,6 @@ describe("DatabaseTasksDumpSchemaTest", () => {
       } catch {
         /* ignore */
       }
-      // Removes the DB file along with any -wal/-shm siblings.
       fs.rmSync(tmp, { recursive: true, force: true });
       fs.rmSync(dbTmp, { recursive: true, force: true });
     }
@@ -709,9 +699,6 @@ describe("DatabaseTasksMigrateTest", () => {
   let originalVersion: string | undefined;
   beforeEach(async () => {
     originalVersion = process.env.VERSION;
-    // `:memory:` is Rails-faithful here: DatabaseTasksMigrateTest inherits
-    // DatabaseTasksMigrationTestCase, whose setup establishes a `:memory:`
-    // connection (database_tasks_test.rb:1038) to avoid rolling back at the end.
     await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
   });
   afterEach(() => {
@@ -875,9 +862,6 @@ describe("DatabaseTasksMigrateStatusTest", () => {
       stdoutChunks.push(typeof chunk === "string" ? chunk : chunk.toString());
       return true;
     });
-    // `:memory:` is Rails-faithful here too — DatabaseTasksMigrateStatusTest is
-    // another DatabaseTasksMigrationTestCase subclass, and the status output
-    // assertion below matches on `database: :memory:` (database_tasks_test.rb:1172).
     await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
     // Mirror Rails test setup: @schema_migration.create_table (database_tasks_test.rb:1169)
     const pool = Base.connectionPool();
@@ -941,9 +925,6 @@ describe("DatabaseTasksMigrateErrorTest", () => {
     const { SchemaCache } = await import("../connection-adapters/schema-cache.js");
     const originalVersion = process.env.VERSION;
     delete process.env.VERSION;
-    // Rails runs this on the ambient `arunit` connection (a file-backed sqlite3
-    // database) — DatabaseTasksMigrateErrorTest is not one of the `:memory:`
-    // DatabaseTasksMigrationTestCase subclasses.
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-migrate-cache-"));
     const dbFile = path.join(tmp, "arunit.sqlite3");
     await Base.establishConnection({ adapter: "sqlite3", database: dbFile, pool: 1 });
@@ -968,7 +949,6 @@ describe("DatabaseTasksMigrateErrorTest", () => {
       DatabaseTasks.databaseConfiguration = null;
       DatabaseTasks.registerMigrations([]);
       DatabaseTasks.clearRegisteredTasks();
-      // Removes the DB file along with any -wal/-shm siblings.
       fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
