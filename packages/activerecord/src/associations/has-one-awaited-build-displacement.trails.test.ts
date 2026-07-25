@@ -1,21 +1,3 @@
-/**
- * Trails-only surface: the awaitable `build#{Name}` / `create#{Name}` accessors
- * remove the displaced has_one target inline (`detachDisplacedTarget`), while
- * the synchronous `setNewRecord` underneath them ALSO queues that record on
- * `_displacedRecords` for the owner's autosave drain (`removeDisplaced`) — so
- * `remove_target!` ran twice for one displacement.
- *
- * Rails runs it exactly once: `set_new_record` -> `replace(record, false)`
- * (has_one_association.rb:68-69, 91-92). The end state was already correct on
- * both paths (the second removal's writes are absorbed: the `:destroy` branch
- * is gated on `target.persisted?`, and the nullify branch re-saves an unchanged
- * record, which emits no UPDATE), so these assert the removal COUNT — the
- * displaced record's `save` under the nullify branch, plus the drained queue.
- *
- * The queue itself stays: the synchronous `assoc.build()` path nested
- * attributes uses never reaches these accessors (see
- * has-one-sync-build-displacement.trails.test.ts).
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel, type Base } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
@@ -36,7 +18,6 @@ interface PirateWithShip {
   save(): Promise<boolean>;
 }
 
-/** Count `save` calls on the association's loaded target. */
 function spyOnTargetSave(assoc: ShipAssociation): () => number {
   const target = assoc.target as unknown as { save: (...args: unknown[]) => unknown };
   const original = target.save.bind(target);
@@ -85,5 +66,21 @@ describe("has_one displacement via the awaitable build/create accessors", () => 
     await pirate.save();
 
     expect(saveCalls()).toBe(1);
+  });
+
+  it("removes each displaced record exactly once across repeated awaited builds", async () => {
+    const pirate = await pirateWithLoadedShip();
+    const assoc = pirate.association("ship");
+    const firstSaveCalls = spyOnTargetSave(assoc);
+
+    await pirate.createShip({ name: "Second Ship" });
+    const secondSaveCalls = spyOnTargetSave(assoc);
+    await pirate.buildShip({ name: "Third Ship" });
+
+    expect(assoc._displacedRecords).toHaveLength(0);
+    await pirate.save();
+
+    expect(firstSaveCalls()).toBe(1);
+    expect(secondSaveCalls()).toBe(1);
   });
 });

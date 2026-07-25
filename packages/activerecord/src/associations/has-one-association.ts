@@ -435,12 +435,6 @@ export class HasOneAssociation extends SingularAssociation {
     if (!displaced) return;
     if ((displaced as { isDestroyed?: () => boolean }).isDestroyed?.()) return;
     if (sameRecord(displaced, replacement)) return;
-    // The `build`/`create` that produced `replacement` ran `setNewRecord`, which
-    // queued this same record on `_displacedRecords` for the owner's autosave
-    // drain. We are about to run `remove_target!` on it inline, so drop it from
-    // the queue: Rails runs `remove_target!` exactly once per displacement
-    // (has_one_association.rb:68-69, 91-92), and a queued duplicate would issue
-    // a second, redundant removal at save time.
     this.dequeueDisplaced(displaced);
     // Mirror Rails' `HasOneAssociation#replace`, where `self.target = record` runs
     // only after the transaction block: if `remove_target!` raises (e.g. a failed
@@ -453,12 +447,6 @@ export class HasOneAssociation extends SingularAssociation {
     this.target = replacement;
   }
 
-  /**
-   * Drop the first queued entry matching `record` from `_displacedRecords`, so
-   * a displacement removed inline is not removed a second time by the owner's
-   * autosave drain. Only the first match is dropped: the queue is an ordered
-   * collection and repeated builds can queue the same record more than once.
-   */
   private dequeueDisplaced(record: Base): void {
     const index = this._displacedRecords.findIndex((queued) => sameRecord(queued, record));
     if (index !== -1) this._displacedRecords.splice(index, 1);
