@@ -52,7 +52,7 @@ setRaiseOnAssignToAttrReadonly(true);
 // Mirror Rails activerecord/test/cases/helper.rb:43 — the AR test suite turns
 // off the required-`belongs_to` foreign-key presence check globally, so the
 // presence validation only runs when the FK (or polymorphic type) is nil or
-// changed. Production keeps the Rails default of `true` (active_record.rb:327);
+// changed. Production keeps the Rails default of `true` (active_record.rb:345-346);
 // only the test harness flips it.
 setBelongsToRequiredValidatesForeignKey(false);
 

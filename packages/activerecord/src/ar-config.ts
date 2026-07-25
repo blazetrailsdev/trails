@@ -208,7 +208,7 @@ export function setMaintainTestSchema(value: boolean | null): void {
  * When true (the default), a required `belongs_to` also validates that the
  * association's foreign key is present, not just the association object.
  * Mirrors `ActiveRecord.belongs_to_required_validates_foreign_key`
- * (active_record.rb:326-327, default true).
+ * (active_record.rb:345-346, default true).
  */
 export let belongsToRequiredValidatesForeignKey = true;
 
