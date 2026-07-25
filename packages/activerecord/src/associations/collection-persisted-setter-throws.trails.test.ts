@@ -46,15 +46,6 @@ const postsOf = (owner: Author): PostsProxy => (owner as unknown as { posts: Pos
 const targetOf = (owner: Author): Post[] =>
   (owner as unknown as { association(n: string): { target: Post[] } }).association("posts").target;
 
-// The `#{singular}Ids=` setter can't await, so the id→record resolution it
-// starts is still in flight when the constructor returns (the shape
-// `queueIdsWrite` documents). Settle it before asserting on the target.
-const settleTarget = async (target: () => unknown[]): Promise<void> => {
-  for (let i = 0; i < 50 && target().length === 0; i++) {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  }
-};
-
 const writerOf =
   (owner: Author) =>
   (records: Post[]): Promise<void> =>
@@ -191,33 +182,27 @@ describe("CollectionPersistedSetterThrows", () => {
   });
 
   it("constructor-form ids= reaches the association writer", async () => {
+    // The throw IS the assertion: without the deferral past `super()` these
+    // die with a `TypeError` on an undefined `_associationInstances`, never
+    // reaching the writer that raises the deviation.
     const post = await Post.create({ title: "t", body: "b" });
-    let author: Author | undefined;
-    expect(() => {
-      author = new Author({ name: "Bill", postIds: [post.id] });
-    }).not.toThrow();
-    await settleTarget(() => targetOf(author!));
-    expect(targetOf(author!).map((p) => p.id)).toEqual([post.id]);
+    expect(() => new Author({ name: "Bill", postIds: [post.id] })).toThrow(
+      CollectionIdsAssignmentError,
+    );
   });
 
   it("create with an ids= key reaches the association writer", async () => {
     const post = await Post.create({ title: "t", body: "b" });
-    const author = await Author.create({ name: "Bill", postIds: [post.id] });
-    expect(author.isPersisted()).toBe(true);
+    await expect(Author.create({ name: "Bill", postIds: [post.id] })).rejects.toThrow(
+      CollectionIdsAssignmentError,
+    );
   });
 
   it("constructor-form habtm ids= reaches the association writer", async () => {
     const post = await Post.create({ title: "t", body: "b" });
-    let category: Category | undefined;
-    expect(() => {
-      category = new Category({ name: "General", postIds: [post.id] });
-    }).not.toThrow();
-    const habtmTarget = (): unknown[] =>
-      (category as unknown as { association(n: string): { target: unknown[] } }).association(
-        "posts",
-      ).target;
-    await settleTarget(habtmTarget);
-    expect(habtmTarget().length).toBe(1);
+    expect(() => new Category({ name: "General", postIds: [post.id] })).toThrow(
+      CollectionIdsAssignmentError,
+    );
   });
 
   it("constructor-form ids= does not swallow an unknown Ids key", () => {
