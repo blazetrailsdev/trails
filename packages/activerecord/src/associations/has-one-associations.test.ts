@@ -569,8 +569,7 @@ describe("HasOneAssociationsTest", () => {
   // Trails deviation guard (no Rails counterpart, RFC 0068 story
   // has-one-create-record-unloaded-target-not-removed): Rails' `replace` opens
   // with `load_target` (has_one_association.rb:59), so `remove_target!` detaches
-  // a row that was only ever in the DB. `_createRecord` ports that leading load,
-  // so the never-loaded prior account is nullified / destroyed too.
+  // a row that was only ever in the DB — never loaded through the association.
   it("create over an unloaded target nullifies the prior account", async () => {
     const company = (await Company.create({ name: "UnloadedCo" })) as any;
     const original = await Account.create({ firm_id: Number(company.id), credit_limit: 50 });
