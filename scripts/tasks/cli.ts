@@ -245,12 +245,13 @@ export function buildIndexFromOriginMain(cwd?: string): { index: Index; sha: str
   }
 }
 
-export function readIndexSource(): ReadIndex {
-  if (TASKS_DIR_IS_SYMLINK) {
-    const fromOrigin = buildIndexFromOriginMain();
-    if (fromOrigin) return fromOrigin;
-    syncFromOrigin();
-  }
+// The origin/main-tree export mutates no checkout, so it is served however
+// TASKS_DIR resolved. Only the fallback — syncFromOrigin's `reset --hard` —
+// stays gated on TASKS_DIR_IS_SYMLINK.
+export function readIndexSource(isSymlink: boolean = TASKS_DIR_IS_SYMLINK): ReadIndex {
+  const fromOrigin = buildIndexFromOriginMain();
+  if (fromOrigin) return fromOrigin;
+  syncFromOrigin(isSymlink);
   return { index: loadIndex(), sha: null };
 }
 
@@ -584,9 +585,10 @@ function assertCleanWorktree(cwd: string | undefined): void {
 // index straight from the origin/main tree and only lands here when that is
 // unavailable (offline, no `tar`). Only runs when using the per-worktree
 // symlink (TASKS_DIR_IS_SYMLINK); the canonical fallback and explicit
-// $TASKS_DIR overrides are left alone.
-function syncFromOrigin(): void {
-  if (!TASKS_DIR_IS_SYMLINK) return;
+// $TASKS_DIR overrides are left alone: a read must never reset a checkout the
+// user chose.
+export function syncFromOrigin(isSymlink: boolean = TASKS_DIR_IS_SYMLINK): void {
+  if (!isSymlink) return;
   syncWorktreeToOrigin();
 }
 

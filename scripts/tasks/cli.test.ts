@@ -88,6 +88,8 @@ import {
   dirtyWorktreeLines,
   syncWorktreeToOrigin,
   buildIndexFromOriginMain,
+  readIndexSource,
+  syncFromOrigin,
   readIndexedFile,
   claimAgeHours,
   isStaleClaim,
@@ -3480,6 +3482,20 @@ describe("buildIndexFromOriginMain (read path serves the origin/main tree)", () 
       },
     });
     expect(buildIndexFromOriginMain()).toBeNull();
+  });
+
+  it("serves the read index when TASKS_DIR did not resolve to the per-worktree symlink", () => {
+    const { seen } = setup();
+    const got = readIndexSource(false);
+    expect(got.sha).toBe(SHA);
+    expect(got.index.generated_at).toBe("2026-01-01");
+    expect(seen).not.toContain("reset");
+  });
+
+  it("is a no-op fallback for a non-symlink TASKS_DIR", () => {
+    setup();
+    syncFromOrigin(false);
+    expect(execFileSyncMock).not.toHaveBeenCalled();
   });
 });
 
