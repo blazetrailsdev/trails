@@ -73,6 +73,16 @@ and the two ratchets gate different artifacts against different baselines; a
 combined `api:gates` wrapper was considered and declined as premature — the doc
 pointer above is the intended fix.
 
+The advisory **arity** check has its own reasoned suppression file,
+`scripts/api-compare/arity-exclude.json` (RFC 0072), keyed by
+`package + rubyFile + rubyName` with a mandatory `reason` per entry. `pnpm
+api:compare` applies it — an excluded pair drops out of both the mismatch list
+and the compared denominator, and the summary reports `N excluded`. `pnpm
+api:arity` (a CI step) fails on a malformed entry or a **stale** one: excludes
+are a ratchet, so an entry whose pair converged (or no longer exists) must be
+deleted by hand. There is deliberately no reseed — an exclude only ever earns
+its place by being written with its justification.
+
 "Misplaced" means tests exist but are in
 the wrong file per Rails layout — they need to be moved, not rewritten. The
 per-file "Extra" column counts TS tests in the convention file that matched no

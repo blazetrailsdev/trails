@@ -1327,6 +1327,12 @@ jobs:
         # baseline. Fails on a new mismatch or a stale baseline entry; reseed
         # with `pnpm tsx scripts/api-compare/lint-call-mismatches.ts --write`.
         run: pnpm exec tsx scripts/api-compare/lint-call-mismatches.ts
+      - name: Arity excludes gate
+        # Fails on a malformed or STALE entry in
+        # scripts/api-compare/arity-exclude.json (the reasoned suppression file
+        # for the advisory arity check, applied by the API comparison step
+        # above). Excludes only shrink — delete a converged entry by hand.
+        run: pnpm exec tsx scripts/api-compare/lint-arity-excludes.ts
       - name: Body-pins gate
         # Source-hash pinning (RFC 0025). Fails when a pinned pair's normalized
         # Rails body digest drifts from the current vendored source
