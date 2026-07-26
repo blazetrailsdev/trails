@@ -77,12 +77,6 @@ import {
   CompositePrimaryKeyMismatchError,
 } from "./associations/errors.js";
 import { AssociationScope, invokeScopeLambda } from "./associations/association-scope.js";
-// Cyclic with `has-many-association.ts`, which imports this module's
-// `@internal` loader helpers back. The cycle is function-level only — neither
-// side touches the other at module-evaluation time — so whichever module is
-// entered first, the hoisted function declarations are already bound by the
-// time either is called.
-import { findTarget as findHasManyTarget } from "./associations/has-many-association.js";
 import type { Association as AssociationInstance } from "./associations/association.js";
 import {
   validateThroughReflection,
@@ -109,7 +103,6 @@ import type { AssociationReflection } from "./reflection.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
 import { foreignKeyPresentFor } from "./associations/foreign-association.js";
 import { throughForeignKeyPresent } from "./associations/through-association.js";
-import { findTarget } from "./associations/singular-association.js";
 
 /**
  * One `before_add`/`after_add`/`before_remove`/`after_remove` entry. Mirrors
@@ -840,7 +833,7 @@ export function _canRouteThroughViaAssociationScope(
  * gate.
  *
  * A nested-through association on an UNSAVED owner is kept on the 2-step
- * `loadHasManyThrough` / IN-subquery loader: the SQL JOIN can only see through
+ * `HasManyThroughAssociation#findTarget` / IN-subquery loader: the SQL JOIN can only see through
  * rows already in the database, not an in-memory-assigned through target
  * (`post.author = mary` before save). Rails resolves those from the loaded
  * through target via `find_target?`; our 2-step loader mirrors that. Once the
@@ -886,7 +879,7 @@ export function _ownerChainReflection(reflection: any): any {
  * Disable-joins routing gate. Mirrors `_canRouteThroughViaAssociationScope`
  * but for `disable_joins: true` through associations — runs the chain
  * via the Rails-faithful `DisableJoinsAssociationScope` (per-step pluck
- * + IN list) rather than the legacy `loadHasManyThrough` 2-step.
+ * + IN list) rather than the legacy `HasManyThroughAssociation#findTarget` 2-step.
  *
  * Currently routes: single-column and composite-key through
  * associations (PR #645), polymorphic-source + `sourceType`
@@ -971,7 +964,7 @@ export function _scopeForAssociation(model: typeof Base): Relation<Base> {
  * the exact same function reference. AssociationScope already merges
  * `reflection.scope` (the macro-time lambda) via `scopeFor`; re-applying
  * would double-merge. Callers that synthesize a NEW lambda (e.g.
- * `loadHasManyThrough` wrapping with `sourceType` filtering) pass a
+ * `HasManyThroughAssociation#findTarget` wrapping with `sourceType` filtering) pass a
  * different reference and still run.
  *
  * @internal
@@ -1429,7 +1422,7 @@ export async function loadHasOne(
 
   // Handle has_one :through. Same routing rules as findTarget —
   // route through AssociationScope's JOIN-based path for the simple
-  // shape; everything else falls back to the 2-step loadHasOneThrough.
+  // shape; everything else falls back to the 2-step `HasOneThroughAssociation#findTarget`.
   if (options.through) {
     const ctorEarly = record.constructor as typeof Base;
     const reflEarly = ctorEarly._reflectOnAssociation?.(assocName);
@@ -1437,7 +1430,8 @@ export async function loadHasOne(
       return _loadSingularThroughViaDisableJoinsScope(record, reflEarly, options);
     }
     if (!_routeThroughViaAssociationScope(record, reflEarly, options)) {
-      return loadHasOneThrough(record, assocName, options);
+      const { findTarget } = await import("./associations/has-one-through-association.js");
+      return findTarget(record, assocName, options);
     }
     // Fall through into the AssociationScope path below.
   }
@@ -1982,7 +1976,7 @@ export async function countHasMany(
     // loading so the count works on strict-loading models.
     record._strictLoadingBypassCount++;
     try {
-      // Preserve loadHasManyThrough's loud failure for a misconfigured through:
+      // Preserve `HasManyThroughAssociation#findTarget`'s loud failure for a misconfigured through:
       // buildThroughJoinScope returns null for a missing reflection, which would
       // otherwise silently count as 0.
       const ctor = record.constructor as typeof Base;
@@ -2014,182 +2008,6 @@ export async function countHasMany(
     );
   }
   return result;
-}
-
-/**
- * Load a has_many :through association.
- */
-export async function loadHasManyThrough(
-  record: Base,
-  assocName: string,
-  options: AssociationOptions,
-): Promise<Base[]> {
-  const ctor = record.constructor as typeof Base;
-  const associations: AssociationDefinition[] = ctor._associations ?? [];
-  const throughAssoc = associations.find((a) => a.name === options.through);
-  if (!throughAssoc) {
-    throw _hmtNotFound(ctor, assocName, options.through!);
-  }
-
-  // Resolve the target model
-  const className = options.className ?? camelize(singularize(assocName));
-  const targetModel = resolveAssocClass(record, assocName, className);
-
-  // The source defaults to the singularized association name
-  const sourceName = options.source ?? singularize(assocName);
-
-  // Look up the source association on the through model early so we can
-  // push sourceType filtering into the through query
-  const throughClassName =
-    throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
-  const throughModel = resolveAssocClass(record, throughAssoc.name, throughClassName);
-  const throughModelAssocs: AssociationDefinition[] = throughModel._associations ?? [];
-  const sourceAssoc =
-    throughModelAssocs.find((a) => a.name === sourceName) ??
-    throughModelAssocs.find((a) => a.name === pluralize(sourceName));
-  const sourceAssocKind = sourceAssoc?.type ?? "belongsTo";
-
-  // Load through records
-  let throughRecords: Base[];
-  if (throughAssoc.type === "hasMany") {
-    // If sourceType is set, add the type filter to the through query
-    if (
-      options.sourceType &&
-      sourceAssoc?.options?.polymorphic &&
-      sourceAssocKind === "belongsTo"
-    ) {
-      const resolvedSourceName = sourceAssoc?.name ?? sourceName;
-      const sourceTypeCol = `${underscore(resolvedSourceName)}_type`;
-      const originalScope = throughAssoc.options.scope;
-      const augmentedOptions = {
-        ...throughAssoc.options,
-        scope: (rel: any) => {
-          let r = rel.where({ [sourceTypeCol]: options.sourceType });
-          if (originalScope) r = originalScope(r);
-          return r;
-        },
-      };
-      throughRecords = await findHasManyTarget(record, throughAssoc.name, augmentedOptions);
-    } else {
-      throughRecords = await findHasManyTarget(record, throughAssoc.name, throughAssoc.options);
-    }
-  } else if (throughAssoc.type === "hasOne") {
-    const one = await loadHasOne(record, throughAssoc.name, throughAssoc.options);
-    throughRecords = one ? [one] : [];
-  } else if (throughAssoc.type === "belongsTo") {
-    const one = await findTarget(record, throughAssoc.name, throughAssoc.options);
-    throughRecords = one ? [one] : [];
-  } else {
-    throughRecords = [];
-  }
-
-  if (throughRecords.length === 0) return [];
-
-  if (sourceAssocKind === "belongsTo") {
-    // Through record has FK pointing to target (e.g., tagging.tag_id -> tag.id)
-    const targetFk = sourceAssoc?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
-
-    const targetIds = throughRecords
-      .map((r) => r._readAttribute(targetFk as string))
-      .filter((v) => v !== null && v !== undefined);
-    if (targetIds.length === 0) return [];
-    let rel = targetModel.all().where({ [targetModel.primaryKey as string]: targetIds });
-    rel = applyAssociationScope(rel, options.scope, record);
-    return rel.toArray();
-  } else if (sourceAssoc?.options?.through) {
-    // Nested through: the source association is itself a :through association
-    // (e.g. Categorization.post_taggings -> author.taggings, where
-    // author.taggings is `through: :posts`). Resolve it recursively on each
-    // through record rather than assuming a direct FK to the through table.
-    const results: Base[] = [];
-    for (const tr of throughRecords) {
-      const sub = await findHasManyTarget(tr, sourceAssoc.name, sourceAssoc.options);
-      results.push(...sub);
-    }
-    if (!options.scope) return results;
-    // Re-apply the outer association's own scope (e.g. an `order`/`where` on
-    // the nested HMT) by reloading the resolved targets through it.
-    const ids = results
-      .map((r) => r._readAttribute(targetModel.primaryKey as string))
-      .filter((v) => v !== null && v !== undefined);
-    if (ids.length === 0) return [];
-    const rel3 = applyAssociationScope(
-      targetModel.all().where({ [targetModel.primaryKey as string]: ids }),
-      options.scope,
-      record,
-    );
-    return rel3.toArray();
-  } else {
-    // Source is has_many/has_one: target has FK pointing back to through record
-    const sourceAsName = sourceAssoc?.options?.as;
-    const throughClassName =
-      throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
-    const sourceFk = sourceAsName
-      ? (sourceAssoc?.options?.foreignKey ?? `${underscore(sourceAsName)}_id`)
-      : (sourceAssoc?.options?.foreignKey ?? `${underscore(throughClassName)}_id`);
-    const throughIds = throughRecords
-      .map((r) => r._readAttribute((r.constructor as typeof Base).primaryKey as string))
-      .filter((v) => v !== null && v !== undefined);
-    if (throughIds.length === 0) return [];
-    const whereConditions: Record<string, unknown> = { [sourceFk as string]: throughIds };
-    if (sourceAsName) whereConditions[`${underscore(sourceAsName)}_type`] = throughClassName;
-    let rel2 = targetModel.all().where(whereConditions);
-    rel2 = applyAssociationScope(rel2, options.scope, record);
-    return rel2.toArray();
-  }
-}
-
-/**
- * Load a has_one :through association.
- */
-export async function loadHasOneThrough(
-  record: Base,
-  assocName: string,
-  options: AssociationOptions,
-): Promise<Base | null> {
-  const ctor = record.constructor as typeof Base;
-  const associations: AssociationDefinition[] = ctor._associations ?? [];
-  const throughAssoc = associations.find((a) => a.name === options.through);
-  if (!throughAssoc) {
-    throw _hmtNotFound(ctor, assocName, options.through!);
-  }
-
-  // Load the through record (could be has_one or belongs_to)
-  let throughRecord: Base | null;
-  if (throughAssoc.type === "hasOne") {
-    throughRecord = await loadHasOne(record, throughAssoc.name, throughAssoc.options);
-  } else if (throughAssoc.type === "belongsTo") {
-    throughRecord = await findTarget(record, throughAssoc.name, throughAssoc.options);
-  } else if (throughAssoc.type === "hasMany") {
-    const throughRecords = await findHasManyTarget(record, throughAssoc.name, throughAssoc.options);
-    throughRecord = throughRecords[0] ?? null;
-  } else {
-    throughRecord = null;
-  }
-
-  if (!throughRecord) return null;
-
-  // Now load the source from the through record
-  const sourceName = options.source ?? assocName;
-  const throughCtor = throughRecord.constructor as typeof Base;
-  const throughAssociations: AssociationDefinition[] = throughCtor._associations ?? [];
-  const sourceAssoc = throughAssociations.find((a) => a.name === sourceName);
-
-  if (sourceAssoc) {
-    if (sourceAssoc.type === "belongsTo") {
-      return findTarget(throughRecord, sourceName, sourceAssoc.options);
-    } else if (sourceAssoc.type === "hasOne") {
-      return loadHasOne(throughRecord, sourceName, sourceAssoc.options);
-    }
-  }
-
-  // Fallback: try as belongs_to by convention
-  const className = options.className ?? camelize(sourceName);
-  const targetFk = `${underscore(sourceName)}_id`;
-  const fkValue = throughRecord._readAttribute(targetFk);
-  if (fkValue === null || fkValue === undefined) return null;
-  const targetModel = resolveAssocClass(throughRecord, sourceName, className);
-  return targetModel.findBy({ [targetModel.primaryKey as string]: fkValue });
 }
 
 /**
@@ -2280,7 +2098,7 @@ function createHabtmJoinModel(
     configurable: true,
   });
 
-  // Add belongsTo associations matching what loadHasManyThrough expects
+  // Add belongsTo associations matching what `HasManyThroughAssociation#findTarget` expects
   const joinAssocs: AssociationDefinition[] = [];
   joinAssocs.push({
     type: "belongsTo",

@@ -1,13 +1,20 @@
 import type { Base } from "../base.js";
-import type { AssociationDefinition } from "../associations.js";
-import { HasManyAssociation } from "./has-many-association.js";
+import type { AssociationDefinition, AssociationOptions } from "../associations.js";
+import { findTarget as findSingularTarget } from "./singular-association.js";
+import { HasManyAssociation, findTarget as findHasManyTarget } from "./has-many-association.js";
 import {
   HasManyThroughCantAssociateThroughHasOneOrManyReflection,
   HasManyThroughNestedAssociationsAreReadonly,
 } from "./errors.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
-import { underscore, singularize, camelize } from "@blazetrails/activesupport";
-import { resolveAssocClass, association as collectionProxyFor } from "../associations.js";
+import { underscore, singularize, pluralize, camelize, isBlank } from "@blazetrails/activesupport";
+import {
+  resolveAssocClass,
+  association as collectionProxyFor,
+  applyAssociationScope,
+  loadHasOne,
+  _hmtNotFound,
+} from "../associations.js";
 import {
   sourceReflection,
   staleStateImpl as throughStaleState,
@@ -1029,5 +1036,132 @@ function ensureNotNested(assoc: HasManyThroughAssociation): void {
       (assoc.owner.constructor as { name: string }).name,
       assoc.reflection.name,
     );
+  }
+}
+
+/**
+ * Mirrors: HasManyThroughAssociation#target_reflection_has_associated_record?
+ * (has_many_through_association.rb:121).
+ *
+ * @internal
+ */
+function targetReflectionHasAssociatedRecord(
+  record: Base,
+  throughAssoc: AssociationDefinition,
+): boolean {
+  if (throughAssoc.type !== "belongsTo") return true;
+  const fk = throughAssoc.options.foreignKey ?? `${underscore(throughAssoc.name)}_id`;
+  const columns = Array.isArray(fk) ? fk : [fk];
+  return !columns.every((column) => isBlank(record._readAttribute(String(column))));
+}
+
+/**
+ * Mirrors: HasManyThroughAssociation#find_target
+ * (has_many_through_association.rb:225).
+ *
+ * @internal
+ */
+export async function findTarget(
+  record: Base,
+  assocName: string,
+  options: AssociationOptions,
+): Promise<Base[]> {
+  const ctor = record.constructor as typeof Base;
+  const associations: AssociationDefinition[] = ctor._associations ?? [];
+  const throughAssoc = associations.find((a) => a.name === options.through);
+  if (!throughAssoc) {
+    throw _hmtNotFound(ctor, assocName, options.through!);
+  }
+  if (!targetReflectionHasAssociatedRecord(record, throughAssoc)) return [];
+
+  const className = options.className ?? camelize(singularize(assocName));
+  const targetModel = resolveAssocClass(record, assocName, className);
+
+  const sourceName = options.source ?? singularize(assocName);
+
+  const throughClassName =
+    throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
+  const throughModel = resolveAssocClass(record, throughAssoc.name, throughClassName);
+  const throughModelAssocs: AssociationDefinition[] = throughModel._associations ?? [];
+  const sourceAssoc =
+    throughModelAssocs.find((a) => a.name === sourceName) ??
+    throughModelAssocs.find((a) => a.name === pluralize(sourceName));
+  const sourceAssocKind = sourceAssoc?.type ?? "belongsTo";
+
+  let throughRecords: Base[];
+  if (throughAssoc.type === "hasMany") {
+    if (
+      options.sourceType &&
+      sourceAssoc?.options?.polymorphic &&
+      sourceAssocKind === "belongsTo"
+    ) {
+      const resolvedSourceName = sourceAssoc?.name ?? sourceName;
+      const sourceTypeCol = `${underscore(resolvedSourceName)}_type`;
+      const originalScope = throughAssoc.options.scope;
+      const augmentedOptions = {
+        ...throughAssoc.options,
+        scope: (rel: any) => {
+          let r = rel.where({ [sourceTypeCol]: options.sourceType });
+          if (originalScope) r = originalScope(r);
+          return r;
+        },
+      };
+      throughRecords = await findHasManyTarget(record, throughAssoc.name, augmentedOptions);
+    } else {
+      throughRecords = await findHasManyTarget(record, throughAssoc.name, throughAssoc.options);
+    }
+  } else if (throughAssoc.type === "hasOne") {
+    const one = await loadHasOne(record, throughAssoc.name, throughAssoc.options);
+    throughRecords = one ? [one] : [];
+  } else if (throughAssoc.type === "belongsTo") {
+    const one = await findSingularTarget(record, throughAssoc.name, throughAssoc.options);
+    throughRecords = one ? [one] : [];
+  } else {
+    throughRecords = [];
+  }
+
+  if (throughRecords.length === 0) return [];
+
+  if (sourceAssocKind === "belongsTo") {
+    const targetFk = sourceAssoc?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
+
+    const targetIds = throughRecords
+      .map((r) => r._readAttribute(targetFk as string))
+      .filter((v) => v !== null && v !== undefined);
+    if (targetIds.length === 0) return [];
+    let rel = targetModel.all().where({ [targetModel.primaryKey as string]: targetIds });
+    rel = applyAssociationScope(rel, options.scope, record);
+    return rel.toArray();
+  } else if (sourceAssoc?.options?.through) {
+    const results: Base[] = [];
+    for (const tr of throughRecords) {
+      const sub = await findHasManyTarget(tr, sourceAssoc.name, sourceAssoc.options);
+      results.push(...sub);
+    }
+    if (!options.scope) return results;
+    const ids = results
+      .map((r) => r._readAttribute(targetModel.primaryKey as string))
+      .filter((v) => v !== null && v !== undefined);
+    if (ids.length === 0) return [];
+    const rel = applyAssociationScope(
+      targetModel.all().where({ [targetModel.primaryKey as string]: ids }),
+      options.scope,
+      record,
+    );
+    return rel.toArray();
+  } else {
+    const sourceAsName = sourceAssoc?.options?.as;
+    const sourceFk = sourceAsName
+      ? (sourceAssoc?.options?.foreignKey ?? `${underscore(sourceAsName)}_id`)
+      : (sourceAssoc?.options?.foreignKey ?? `${underscore(throughClassName)}_id`);
+    const throughIds = throughRecords
+      .map((r) => r._readAttribute((r.constructor as typeof Base).primaryKey as string))
+      .filter((v) => v !== null && v !== undefined);
+    if (throughIds.length === 0) return [];
+    const whereConditions: Record<string, unknown> = { [sourceFk as string]: throughIds };
+    if (sourceAsName) whereConditions[`${underscore(sourceAsName)}_type`] = throughClassName;
+    let rel = targetModel.all().where(whereConditions);
+    rel = applyAssociationScope(rel, options.scope, record);
+    return rel.toArray();
   }
 }

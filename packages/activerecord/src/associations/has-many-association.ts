@@ -15,7 +15,6 @@ import {
   _violatesStrictLoading,
   _wireInverseAssociation,
   applyAssociationScope,
-  loadHasManyThrough,
   ownerReflectionForeignKey,
   resolveAssocClass,
   syncToAssociationInstance,
@@ -571,7 +570,8 @@ export async function findTarget(
     // which the SQL JOIN cannot see — `_routeThroughViaAssociationScope` keeps
     // those on the 2-step loader.
     if (!_routeThroughViaAssociationScope(record, reflEarly, options)) {
-      return loadHasManyThrough(record, assocName, options);
+      const { findTarget: findThroughTarget } = await import("./has-many-through-association.js");
+      return findThroughTarget(record, assocName, options);
     }
     // Fall through into the AssociationScope path below.
   }

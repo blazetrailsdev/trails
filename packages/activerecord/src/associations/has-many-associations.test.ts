@@ -37,8 +37,9 @@ import { Car } from "../test-helpers/models/car.js";
 import { Bulb } from "../test-helpers/models/bulb.js";
 import { Developer, AuditLog } from "../test-helpers/models/developer.js";
 import { Project } from "../test-helpers/models/project.js";
-import { Associations, loadHasManyThrough, isAssociationCached } from "../associations.js";
+import { Associations, isAssociationCached } from "../associations.js";
 import { findTarget as findHasManyTarget } from "./has-many-association.js";
+import { findTarget as findHasManyThroughTarget } from "./has-many-through-association.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 
@@ -3995,7 +3996,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await ThrIdAuthor.create({ name: "Alice" });
     const post = await ThrIdPost.create({ author_id: author.id, title: "P", body: "body" });
     const comment = await ThrIdComment.create({ post_id: post.id, body: "C" });
-    const comments = await loadHasManyThrough(author, "thr_id_comments", {
+    const comments = await findHasManyThroughTarget(author, "thr_id_comments", {
       through: "thr_id_posts",
       className: "ThrIdComment",
       source: "thr_id_comments",
