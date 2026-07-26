@@ -236,6 +236,7 @@ interface QueryMethodsHost {
   _skipPreloading: boolean;
   _skipQueryCache: boolean | undefined;
   _modelClass: typeof import("../base.js").Base;
+  model: QueryMethodsHost["_modelClass"];
   predicateBuilder: import("./predicate-builder.js").PredicateBuilder;
 }
 
@@ -1034,7 +1035,7 @@ export function buildWhereClause(
     } else if (opts.includes("?")) {
       parts = [buildBoundSqlLiteral.call(this, opts, rest)];
     } else {
-      parts = [new Nodes.SqlLiteral(this._modelClass.sanitizeSqlArray(opts, ...rest))];
+      parts = [new Nodes.SqlLiteral(this.model.sanitizeSqlArray(opts, ...rest))];
     }
     return new WhereClause(parts);
   }
@@ -1044,7 +1045,7 @@ export function buildWhereClause(
     // auto-adds references for its nested-hash / dotted-key tables, so an
     // includes(...) with a WHERE on the joined table promotes to eager JOIN.
     referencesBang.call(this, ...referencesFromConditions(opts));
-    const mc = (this as any)._modelClass;
+    const mc = this.model;
     const aliases: Record<string, string> = mc?._attributeAliases ?? {};
     // Rails never pre-casts hash values here — build_where_clause hands them
     // raw to PredicateBuilder, whose QueryAttribute bind casts/serializes at
@@ -1737,10 +1738,10 @@ export function constructJoinDependency(
   // The join type (InnerJoin for joins(), OuterJoin for eager_load/left_outer_joins)
   // is threaded into the JoinDependency so joinConstraints emits the requested join.
   const jd = new JoinDependency(
-    this._modelClass,
+    this.model,
     joinType as typeof Nodes.InnerJoin | typeof Nodes.OuterJoin | undefined,
   );
-  const modelName = (this._modelClass as any).name ?? "model";
+  const modelName = (this.model as any).name ?? "model";
   const specs = Array.isArray(associations) ? associations : [associations];
   const tree = makeAssocTree();
   for (const spec of specs) walkAssociationTree(spec, tree);
@@ -2087,7 +2088,7 @@ export function columnReferences(orderArgs: unknown[]): string[] {
 
 /** @internal */
 export function sanitizeOrderArguments(this: QueryMethodsHost, orderArgs: unknown[]): unknown[] {
-  return orderArgs.map((arg) => (this as any)._modelClass?.sanitizeSqlForOrder?.(arg) ?? arg);
+  return orderArgs.map((arg) => (this.model as any)?.sanitizeSqlForOrder?.(arg) ?? arg);
 }
 
 function flattenedOrderKeysForRawSqlCheck(orderArgs: unknown[]): (string | symbol)[] {
@@ -2317,7 +2318,7 @@ function safeQuoteColumnName(modelClass: any, name: string): string {
 export function isTableNameMatches(this: QueryMethodsHost, from: unknown): boolean {
   const table: any = (this as any)._modelClass?.arelTable;
   if (!table) return false;
-  const modelClass: any = (this as any)._modelClass;
+  const modelClass: any = this.model;
   const name = escapeRegex(table.name);
   const quotedTableName = safeQuoteTableName(modelClass, table.name);
   const quoted = escapeRegex(quotedTableName);
@@ -2332,7 +2333,7 @@ export function arelColumn(
   field: string | symbol | Nodes.Node,
   fallback?: (attr: string) => unknown,
 ): unknown {
-  const modelClass: any = (this as any)._modelClass;
+  const modelClass: any = this.model;
   const table: any = modelClass?.arelTable;
   // Rails: a raw Arel node has no columns_hash/table.column form; it falls to
   // the block, else passes through unchanged (query_methods.rb:1996-2003).
@@ -2377,7 +2378,7 @@ export function arelColumnWithTable(
   const existing = (this as any)._referencesValues ?? [];
   if (!existing.includes(tableName)) (this as any)._referencesValues = [...existing, tableName];
   const colStr = typeof columnName === "symbol" ? symbolToName(columnName) : columnName;
-  const modelClass: any = (this as any)._modelClass;
+  const modelClass: any = this.model;
   // Schema-qualified table names (e.g. "schema.table") must not be passed to
   // ArelTable — the visitor quotes the whole string as one identifier, producing
   // "schema.table"."col" instead of "schema"."table"."col".
@@ -2421,7 +2422,7 @@ export function arelColumnsFromHash(
 
 /** @internal */
 export function orderColumn(this: QueryMethodsHost, field: string): unknown {
-  const modelClass: any = (this as any)._modelClass;
+  const modelClass: any = this.model;
   const table: any = modelClass?.arelTable;
   return arelColumn.call(this, field, (attrName: string) => {
     if (attrName === "count" && ((this as any)._groupColumns ?? []).length > 0) {
@@ -2458,7 +2459,7 @@ export function arelColumnAliasesFromHash(
   return Reflect.ownKeys(fields).flatMap((key) => {
     const columnsAliases = fields[key as any];
     const tableName = typeof key === "symbol" ? symbolToName(key) : key;
-    const modelClass: any = (this as any)._modelClass;
+    const modelClass: any = this.model;
     const quoteAlias = (a: unknown): string =>
       safeQuoteColumnName(modelClass, typeof a === "symbol" ? symbolToName(a) : String(a));
     if (isPlainObject(columnsAliases)) {
@@ -3180,7 +3181,7 @@ export function buildWithJoinNode(
   name: string,
   kind: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin = Nodes.InnerJoin,
 ): unknown {
-  const mc = (this as any)._modelClass;
+  const mc = this.model;
   const table: any = mc?.arelTable;
   if (!table) throw new ActiveRecordError("Cannot build CTE join node: model has no arelTable");
   const withTable = new ArelTable(name);

@@ -329,17 +329,29 @@ describe("raiseNotFoundSingle", () => {
 // findSome — expected_size accounting (Gap 1)
 // ---------------------------------------------------------------------------
 
+const postModelStub = {
+  primaryKey: "id",
+  name: "Post",
+  typeForAttribute: (_col: string) => ({ cast: (v: unknown) => v }),
+  arelTable: { get: (col: string) => col },
+};
+
+const carModelStub = { name: "Car", primaryKey: "id" };
+
+const mercedesModelStub = {
+  name: "MercedesCar",
+  primaryKey: "name",
+  typeForAttribute: (_col: string) => ({ cast: (v: unknown) => v }),
+  arelTable: { get: (col: string) => col },
+};
+
 function makeFindSomeRel(
   records: any[],
   opts: { limit?: number; offset?: number; ordered?: boolean } = {},
 ): any {
   return {
-    _modelClass: {
-      primaryKey: "id",
-      name: "Post",
-      typeForAttribute: (_col: string) => ({ cast: (v: unknown) => v }),
-      arelTable: { get: (col: string) => col },
-    },
+    _modelClass: postModelStub,
+    model: postModelStub,
     _limitValue: opts.limit ?? null,
     _offsetValue: opts.offset ?? null,
     // ordered=true simulates a relation with ORDER BY (findSome stays in the accounting path)
@@ -392,12 +404,8 @@ describe("findSome — narrows to pk column when select_values non-empty (ordere
   it("calls .select(pk) when the relation has select values", async () => {
     let selectedCol: string | undefined;
     const rel: any = {
-      _modelClass: {
-        primaryKey: "id",
-        name: "Post",
-        typeForAttribute: (_col: string) => ({ cast: (v: unknown) => v }),
-        arelTable: { get: (col: string) => col },
-      },
+      _modelClass: postModelStub,
+      model: postModelStub,
       _limitValue: null,
       _offsetValue: null,
       _orderClauses: ["id ASC"],
@@ -442,12 +450,8 @@ function makeFindSomeOrderedRel(
   opts: { limit?: number; offset?: number } = {},
 ): any {
   return {
-    _modelClass: {
-      primaryKey: "id",
-      name: "Post",
-      typeForAttribute: (_col: string) => ({ cast: (v: unknown) => v }),
-      arelTable: { get: (col: string) => col },
-    },
+    _modelClass: postModelStub,
+    model: postModelStub,
     _limitValue: opts.limit ?? null,
     _offsetValue: opts.offset ?? null,
     _orderClauses: [],
@@ -582,7 +586,7 @@ function makeRelForOrder(mc: {
   implicitOrderColumn?: string | null;
   _queryConstraintsList?: string[] | null;
 }): any {
-  return { _modelClass: mc };
+  return { _modelClass: mc, model: mc };
 }
 
 describe("_orderColumns — Rails _order_columns precedence", () => {
@@ -625,7 +629,8 @@ describe("_orderColumns — Rails _order_columns precedence", () => {
 describe("finder not-found message fidelity", () => {
   it("test_find_one_message_on_primary_key", async () => {
     const rel: any = {
-      _modelClass: { name: "Car", primaryKey: "id" },
+      _modelClass: carModelStub,
+      model: carModelStub,
       raiseRecordNotFoundExceptionBang,
       _whereClause: { isEmpty: () => true },
       findBy: async () => null,
@@ -645,12 +650,8 @@ describe("finder not-found message fidelity", () => {
 
   it("test_find_some_message_with_custom_primary_key", async () => {
     const rel: any = {
-      _modelClass: {
-        name: "MercedesCar",
-        primaryKey: "name",
-        typeForAttribute: (_col: string) => ({ cast: (v: unknown) => v }),
-        arelTable: { get: (col: string) => col },
-      },
+      _modelClass: mercedesModelStub,
+      model: mercedesModelStub,
       _limitValue: null,
       _offsetValue: null,
       selectValues: [],

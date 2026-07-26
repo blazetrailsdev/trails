@@ -9,7 +9,7 @@ import { structuralUnionEq } from "./query-methods.js";
 // Kept local (rather than `any`) so the shared module stays off the
 // no-explicit-any burndown allowlist (RFC 0037).
 interface PreloadFoldRelation {
-  _modelClass: {
+  model: {
     name?: string;
     reflectOnAllAssociations(): Array<{ name: string; className: string }>;
   };
@@ -53,16 +53,14 @@ export function foldMergePreloads(target: PreloadFoldRelation, source: PreloadFo
   const otherIncludes = source._includesAssociations ?? [];
   if (otherPreloads.length === 0 && otherIncludes.length === 0) return;
 
-  if (source._modelClass === target._modelClass) {
+  if (source.model === target.model) {
     unionAppend(target._preloadAssociations, otherPreloads);
     unionAppend(target._includesAssociations, otherIncludes);
     return;
   }
 
-  const otherName = source._modelClass?.name;
-  const reflection = target._modelClass
-    .reflectOnAllAssociations()
-    .find((r) => r.className === otherName);
+  const otherName = source.model?.name;
+  const reflection = target.model.reflectOnAllAssociations().find((r) => r.className === otherName);
   if (!reflection) return;
 
   if (otherPreloads.length > 0) {
