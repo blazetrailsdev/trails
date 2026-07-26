@@ -10,7 +10,7 @@
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
 import { Base } from "../base.js";
-import { association, setHasOne, loadBelongsTo } from "../associations.js";
+import { association, loadBelongsTo } from "../associations.js";
 import { AssociationTypeMismatch, ConfigurationError } from "../errors.js";
 import {
   HasManyThroughAssociationNotFoundError,
@@ -303,7 +303,7 @@ describe("AssociationsJoinModelTest", () => {
     const misc = await Tag.find(tags("misc").id);
     const tagging = await (misc as any).taggings.create();
     const thinking = await Post.find(posts("thinking").id);
-    await setHasOne(thinking, "tagging", tagging, { as: "taggable", className: "Tagging" });
+    await (thinking as any).setTagging(tagging);
 
     expect(tagging.taggable_type).toBe("Post");
     expect(tagging.taggable_id).toBe(Number(thinking.id));

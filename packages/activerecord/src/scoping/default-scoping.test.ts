@@ -42,7 +42,7 @@ import {
   AuditLog,
 } from "../test-helpers/models/developer.js";
 import { Mentor } from "../test-helpers/models/mentor.js";
-import { buildHasOne, setHasOne } from "../associations.js";
+import { buildHasOne } from "../associations.js";
 import {
   Comment,
   SpecialComment,
@@ -893,7 +893,7 @@ describe("DefaultScopingTest", () => {
   });
 
   // Singular sibling of the STI write-path fix: the has_one read (loadHasOne),
-  // build (buildHasOne), and assign (setHasOne) paths on an STI subclass owner
+  // build (buildHasOne), and assign (set#{Name}) paths on an STI subclass owner
   // must derive the foreign key from the class that *declared* the association
   // (`Post` → `post_id`), not the owner instance's class (`SpecialPost` →
   // `special_post_id`). Mirrors Rails using `reflection.foreign_key`.
@@ -914,9 +914,9 @@ describe("DefaultScopingTest", () => {
       const loaded = await reader.loadHasOne("verySpecialComment");
       expect(loaded.id).toBe(comment.id);
 
-      // setHasOne writes the declaring-class FK onto a freshly assigned target.
+      // The has_one writer writes the declaring-class FK onto a freshly assigned target.
       const assigned = new VerySpecialComment({ body: "assigned sti has_one" });
-      await setHasOne(post, "verySpecialComment", assigned);
+      await post.setVerySpecialComment(assigned);
       expect(Number(assigned._readAttribute("post_id"))).toBe(Number(post.id));
 
       // buildHasOne sets the declaring-class FK on the built target.

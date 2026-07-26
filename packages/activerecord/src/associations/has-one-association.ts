@@ -470,6 +470,18 @@ export class HasOneAssociation extends SingularAssociation {
     if (this.reflection.options.as) {
       return [`${underscore(this.reflection.options.as)}_id`];
     }
+    // Rails' `reflection.foreign_key` derives from `reflection.active_record`
+    // — the class that *declared* the association — not the owner instance's
+    // class. For an STI subclass owner (a `SpecialPost` whose
+    // `has_one :very_special_comment` is declared on `Post`) that is `post_id`,
+    // not `special_post_id`. The rich reflection already applies that rule.
+    const declared = (
+      ctor as {
+        _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | undefined;
+      }
+    )._reflectOnAssociation?.(this.reflection.name)?.foreignKey;
+    if (typeof declared === "string") return [declared];
+    if (Array.isArray(declared)) return declared;
     const pk = this.reflection.options.primaryKey ?? ctor.primaryKey ?? "id";
     if (Array.isArray(pk)) {
       return pk.map((col: string) => `${underscore(ctor.name)}_${col}`);

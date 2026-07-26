@@ -25,8 +25,8 @@ class Boy extends Human {
 // expose no generated `face=` / `dashboard=` *property* accessor (unlike
 // has_many, which yields a real CollectionProxy — see test 4), so a plain
 // `record.face = f` would set an own data property the validator never reads.
-// The only real setters are the low-level `setHasOne` / `setBelongsTo`, but
-// those issue a findBy + save against the target table, side effects Rails'
+// The only real setters are the association writers (`association(name).writer`),
+// but those issue a findBy + save against the target table, side effects Rails'
 // in-memory setter skips for a brand-new (unsaved, null-PK) owner. Writing the
 // association cache directly — the same idiom autosave-association.test.ts uses
 // via its `cacheAssoc` helper — is the faithful in-memory mirror: presence
