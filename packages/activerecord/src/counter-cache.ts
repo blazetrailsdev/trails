@@ -147,74 +147,59 @@ export async function resetCounters(
     }
   }
 
-  const record = await this.find(id);
-  const assocDefs = (this as any)._associations as
-    | Array<{ type: string; name: string; options: any }>
-    | undefined;
-  const hasManyAssocs = assocDefs?.filter((a) => a.type === "hasMany") ?? [];
-  const { resolveCounterColumn, countHasMany } = await import("./associations.js");
+  const object = await this.find(id);
+  const { countHasMany } = await import("./associations.js");
+  const { reflectOnAllAssociations } = await import("./reflection.js");
 
   const updates: Record<string, unknown> = {};
-  for (const counterName of counterNames) {
-    let assoc = hasManyAssocs.find((a) => a.name === counterName);
-    let counterColumn: string;
-
-    if (assoc) {
-      counterColumn = resolveCounterColumn(this, assoc, counterName);
-    } else {
-      if (counterName.endsWith("_count")) {
-        assoc = hasManyAssocs.find((a) => a.name === counterName.slice(0, -6));
-      }
-      if (!assoc) {
-        for (const candidate of hasManyAssocs) {
-          const col = resolveCounterColumn(this, candidate, candidate.name);
-          if (col === counterName) {
-            assoc = candidate;
-            break;
-          }
-        }
-      }
-      if (!assoc) {
-        // Mirrors Rails' ArgumentError in CounterCache::ClassMethods#reset_counters.
-        throw new ArgumentError(`'${this.name}' has no association called '${counterName}'`);
-      }
-      counterColumn = resolveCounterColumn(this, assoc, assoc.name);
+  for (const counter of counterNames) {
+    let counterAssociation = counter;
+    let hasManyAssociation: any = (this as any)._reflectOnAssociation?.(counterAssociation) ?? null;
+    if (!hasManyAssociation) {
+      const hasMany = reflectOnAllAssociations(this, "hasMany");
+      hasManyAssociation =
+        hasMany.find(
+          (association: any) =>
+            association.counterCacheColumn() &&
+            association.counterCacheColumn() === counterAssociation,
+        ) ?? null;
+      if (hasManyAssociation) counterAssociation = hasManyAssociation.pluralName;
+    }
+    if (!hasManyAssociation) {
+      throw new ArgumentError(`'${this.name}' has no association called '${counterAssociation}'`);
     }
 
-    // Mirrors Rails: for a `has_many :through`, the counter column comes from the
-    // through (join) reflection, while the count still runs against the through.
-    if (assoc.options.through) {
-      const through = hasManyAssocs.find((a) => a.name === assoc.options.through);
-      if (through) counterColumn = resolveCounterColumn(this, through, through.name);
+    const countReflection = hasManyAssociation;
+    if (hasManyAssociation.isThroughReflection?.()) {
+      hasManyAssociation = hasManyAssociation.throughReflection;
     }
 
-    const count = await countHasMany(record, assoc.name, assoc.options);
-    // Mirrors Rails: `updates[counter_name] = count if count != count_was` — skip
-    // the UPDATE entirely when the stored counter already matches the recount.
-    // Ruby's `!=` is type-coercing across Integer/Bignum; in TS we have to match
-    // explicitly when the stored attribute is bigint (e.g. big_integer columns).
-    const countWas =
-      (record as any).readAttribute?.(counterColumn) ?? (record as any)[counterColumn];
+    const foreignKey = String(hasManyAssociation.foreignKey);
+    const childClass = hasManyAssociation.klass;
+    const reflection = reflectOnAllAssociations(childClass, "belongsTo").find(
+      (e: any) => String(e.foreignKey) === foreignKey && !!e.options?.counterCache,
+    ) as any;
+    const counterName = reflection.counterCacheColumn();
+
+    const count = await countHasMany(object, countReflection.name, countReflection.options);
+    // Ruby's `!=` is type-coercing across Integer/Bignum; in TS the stored
+    // attribute of a big_integer column is a bigint and needs an explicit widen.
+    const countWas = (object as any).readAttribute?.(counterName) ?? (object as any)[counterName];
     const sameCount =
       typeof countWas === "bigint" ? countWas === BigInt(count) : count === countWas;
     if (!sameCount) {
-      updates[counterColumn] = typeof countWas === "bigint" ? BigInt(count) : count;
+      updates[counterName] = typeof countWas === "bigint" ? BigInt(count) : count;
     }
   }
 
   if (options.touch) {
-    // Mirror Rails counter_cache.rb: parse touch into names + time (`{ time: }`
-    // hash form; `touch: []` → no names), then touch via touchAttributesWithTime.
     const { names, time } = parseCounterCacheTouch(options.touch);
     const touchUpdates = touchAttributesWithTime.call(this, ...names, time);
     Object.assign(updates, touchUpdates);
   }
 
   if (Object.keys(updates).length > 0) {
-    // Mirrors Rails: `unscoped.where(primary_key => [object.id]).update_all(updates)`.
-    // `record.id` returns the CPK tuple via the PrimaryKey#id accessor, and
-    // matches the cast already applied by `find` for scalar PKs.
-    await this.unscoped().where(buildPkPredicate(this, record.id)).updateAll(updates);
+    await this.unscoped().where(buildPkPredicate(this, object.id)).updateAll(updates);
   }
 }
 
