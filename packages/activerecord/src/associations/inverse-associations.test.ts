@@ -763,7 +763,10 @@ describe("InverseHasManyTests", () => {
   it("trying to use inverses that dont exist should raise an error", async () => {
     const human = (await Human.first())!;
     await expect(
-      findHasManyTarget(human, "secretInterests", { className: "Interest", inverseOf: "secretHuman" }),
+      findHasManyTarget(human, "secretInterests", {
+        className: "Interest",
+        inverseOf: "secretHuman",
+      }),
     ).rejects.toThrow(InverseOfAssociationNotFoundError);
   });
 
