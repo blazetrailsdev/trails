@@ -121,12 +121,53 @@ packages/activerecord/src/
     models/ fixtures/ test-schema.ts   (already mirror Rails; unchanged)
 ```
 
-Current `test-helpers/*.ts` with no `support/*.rb` counterpart (`ar-db-slots.ts`,
-`sqlite-template.ts`, `template-global-setup.ts`, `skip-global-reset.ts`, …) are
-vitest-fork-model infrastructure Rails has no analogue for. They keep invented
-names because there is nothing to be faithful to — but they should not sit in a
-directory that _looks_ like `support/`. Each story decides its file's home
-explicitly.
+### Every current `test-helpers/` entry has a destination
+
+`test-helpers/` is today a mashup of two different Rails trees: some of it
+mirrors `test/support/*.rb`, and some of it mirrors the **`test/` root**
+(`vendor/rails/activerecord/test/` contains `assets/`, `cases/`, `fixtures/`,
+`migrations/`, `models/`, `schema/`, `support/`). The directory is **not**
+deleted and **not** moved wholesale — it is partially drained. Disposition of
+all 36 files and 4 subdirectories:
+
+**A. Mirrors the Rails `test/` root — stays put, keeps its name** (already
+faithful; `schema:compare` / `fixtures:compare` key off these paths):
+`models/`, `fixtures/`, `migrations/`, `assets/`, `test-schema.ts`
+(← `test/schema/schema.rb`).
+
+**B. Moves to `support/` with a Rails name** (story 1 relocates; stories 3-5
+rename): `connection-helper.ts` and `schema-dumping-helper.ts` (names already
+correct), `test-connection-env.ts` + `test-database-config.ts` +
+`arunit2-config.ts` → `config.ts`, `supports.ts` → `adapter-helper.ts`,
+`canonical-schema.ts` + `schema-file-generator.ts` → `load-schema-helper.ts`,
+`second-connection.ts` + `setup-second-pool.ts` + `setup-handler-suite.ts`
+→ `connection.ts`.
+
+**C. Moves to `support/`, keeps its invented name** — vitest-fork-model or
+trails-harness infrastructure with no Rails counterpart, but still test support:
+`ar-db-slots.ts`, `ar-db-forks-default.ts`, `sqlite-template.ts`,
+`template-global-setup.ts`, `skip-global-reset.ts`, `ddl-profile.ts`,
+`canonical-model-index.ts`, `canonical-model-index-encryption-setup.ts`,
+`quote-regex.ts`, `with-db-warnings-action.ts`, `setup-adapter-suite.ts`,
+`drop-all-tables.ts`, `seed-association-cache.ts`, `schema-types.ts`.
+Each keeps its name because there is nothing to be faithful to — but it belongs
+in the support tree, not a differently-named one.
+
+**D. Destination unresolved — `disposition-remaining-test-helpers` decides**
+(story 7). These are suspected of being _library_ code misfiled into test
+infra, or of mapping somewhere other than `support/`, and each needs its Rails
+counterpart confirmed before it moves:
+`fixtures.ts`, `fixture-set.ts`, `define-fixtures.ts`, `fixtures-registry.ts`,
+`use-fixtures.ts`, `with-transactional-fixtures.ts`, `use-transactional-tests.ts`
+(Rails' equivalents are `lib/active_record/fixtures.rb`,
+`lib/active_record/fixture_set/`, `lib/active_record/test_fixtures.rb` — **lib**,
+not test support, and trails already has a top-level `src/test-fixtures.ts`);
+`in-time-zone.ts` (Rails' `InTimeZone` is a module _inside_ `cases/helper.rb:66-79`,
+so it may belong in `cases/helper.ts`); `protected-params.ts`;
+`repair-validations.ts`.
+
+Nothing in `test-helpers/` is left unaccounted for by A-D. Story 1 moves only
+B and C; A stays; D waits for story 7.
 
 ## What does NOT move
 
@@ -148,10 +189,12 @@ Filed under RFC 0064. Ordering matters, and per CLAUDE.md these ship one at a
 time from `main` — no stacking. The directory rename goes first so later stories
 edit files at their final paths.
 
-1. `move-test-helpers-to-support-dir` — mechanical `test-helpers/` → `support/`
-   rename (keeping `models/`, `fixtures/`, `test-schema.ts` in place), plus the
-   lint globs, ratchet JSON paths, and `vitest.config.ts` references. Single
-   mechanical rename — the one CLAUDE.md exception to the fan-out rule.
+1. `move-test-helpers-to-support-dir` — create `support/` and move **only
+   buckets B and C** into it. `test-helpers/` survives, holding bucket A
+   (`models/`, `fixtures/`, `migrations/`, `assets/`, `test-schema.ts`) and
+   bucket D until story 7. This is explicitly **not** a whole-directory
+   `git mv`. Includes the lint globs, ratchet JSON paths, and
+   `vitest.config.ts` references for the moved files.
 2. `rename-test-setup-ar-to-cases-helper` — `test-setup-ar.ts` → `cases/helper.ts`.
 3. `support-config-and-connection` — `test-connection-env.ts`,
    `test-database-config.ts`, `arunit2-config.ts` → `support/config.ts`;
@@ -165,6 +208,9 @@ edit files at their final paths.
    `async_helper.rb` (`assert_async_equal`), `fake_adapter.rb`
    (`FakeActiveRecordAdapter`, which `helper.rb:46` registers). These have no
    trails file at all today.
+7. `disposition-remaining-test-helpers` — resolve bucket D above: confirm each
+   file's Rails counterpart and move it (or establish that it is library code
+   that belongs outside the test tree entirely).
 
 ## Observations out of scope for this spike
 
