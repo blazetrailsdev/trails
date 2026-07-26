@@ -462,20 +462,6 @@ export class BelongsToAssociation extends SingularAssociation {
     if (!counterCol) return;
     if (!this.owner.isPersisted()) return;
     if (!this.foreignKeyPresent()) return;
-    // A scalar foreign key cannot address a composite-primary-key target row:
-    // Rails' `update_counters_via_scope` zips the FK value against
-    // `primary_key(klass)` (belongs_to_association.rb:119-122), and a length
-    // mismatch has no valid WHERE to build. Rails' own suite never pairs a
-    // composite-PK model with a counter cache reached through a scalar FK; the
-    // counter path this body absorbed skipped the pair with the same arity
-    // check, so it travels with the body.
-    const targetPrimaryKey =
-      (this.klass as any)?.primaryKey ?? (this.target as any)?.constructor?.primaryKey;
-    if (
-      Array.isArray(targetPrimaryKey) &&
-      targetPrimaryKey.length !== this.foreignKeyNames().length
-    )
-      return;
 
     const touch = (this.reflection.options as any).touch;
 

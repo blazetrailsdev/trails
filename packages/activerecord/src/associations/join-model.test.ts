@@ -1071,7 +1071,20 @@ describe("AssociationsJoinModelTest", () => {
 
     const order = await CpkOrderWithTaggings.createBang({ shop_id: 42, status: "paid" });
     const tag = await Tag.createBang({ name: "rails-faithful" });
-    await (order as any).orderTaggings.createBang({ tag_id: (tag as any).id });
+    // The join row is inserted directly rather than through
+    // `orderTaggings.createBang`: Rails' Tagging declares
+    // `belongs_to :taggable, polymorphic: true, counter_cache: :tags_count`
+    // (tagging.rb:14), and `cpk_orders` has no `tags_count` column in Rails'
+    // schema.rb, so the model create path would (in Rails too) fail on the
+    // counter update. `insert_all` skips callbacks, which is what this test
+    // needs — the assertion is about the through-read, not the write.
+    await Tagging.insertAll([
+      {
+        tag_id: (tag as any).id,
+        taggable_id: (order as any)._readAttribute("id"),
+        taggable_type: (CpkOrderWithTaggings as any).polymorphicName(),
+      },
+    ]);
 
     const loadedTags = (await (order as any).orderTagNames.toArray()) as Base[];
     expect(loadedTags.map((t) => (t as any).id)).toEqual([(tag as any).id]);
