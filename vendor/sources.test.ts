@@ -17,6 +17,7 @@ describe("vendor/sources.ts", () => {
   });
 
   it("declares the rails source with all 9 wave-1 packages", () => {
+    // (Wave 3.5 added a 10th, actionpackversion — see #1621.)
     const rails = SOURCES.find((s) => s.name === "rails");
     expect(rails).toBeDefined();
     expect(rails!.origin).toEqual({
@@ -29,6 +30,7 @@ describe("vendor/sources.ts", () => {
         "abstractcontroller",
         "actioncontroller",
         "actiondispatch",
+        "actionpackversion",
         "actionview",
         "activemodel",
         "activerecord",
@@ -57,6 +59,34 @@ describe("vendor/sources.ts", () => {
     expect(gid!.packages).toEqual([
       { name: "globalid", libPath: "lib/global_id", testPath: "test/cases" },
     ]);
+  });
+
+  it("declares the i18n source, vendored-only until packages/i18n exists", () => {
+    const i18n = SOURCES.find((s) => s.name === "i18n");
+    expect(i18n).toBeDefined();
+    expect(i18n!.origin).toEqual({
+      type: "git",
+      url: "https://github.com/ruby-i18n/i18n.git",
+      ref: "v1.14.8",
+    });
+    expect(i18n!.packages).toEqual([
+      {
+        name: "i18n",
+        libPath: "lib/i18n",
+        testPath: "test",
+        compareApi: false,
+        compareTests: false,
+      },
+    ]);
+    // Not enrolled in either compare derivation until the RFC's package-home
+    // story lands (there is no packages/i18n TS dir to map onto yet).
+    expect(apiComparePackages()).not.toContain("i18n");
+    expect(Object.keys(libPathsManifest())).not.toContain("i18n");
+    expect(Object.keys(testPathsManifest())).not.toContain("i18n");
+    // But the source itself is resolvable for tooling that reads the clone.
+    expect(resolvePath("i18n").endsWith("vendor/i18n/lib/i18n")).toBe(true);
+    expect(resolvePath("i18n", "test").endsWith("vendor/i18n/test")).toBe(true);
+    expect(vendoredRoot("i18n").endsWith("vendor/i18n")).toBe(true);
   });
 
   it("vendor/sources.lock.json has an entry for every source (commit invariant)", async () => {
@@ -130,7 +160,7 @@ describe("vendor/sources.ts", () => {
   });
 
   it("resolvePath throws when test requested for package without testPath", () => {
-    expect(() => resolvePath("abstractcontroller", "test")).toThrow(/no testPath/);
+    expect(() => resolvePath("actionpackversion", "test")).toThrow(/no testPath/);
   });
 
   it("vendoredRoot returns absolute source root", () => {
@@ -165,6 +195,8 @@ describe("vendor/sources.ts", () => {
         "activerecord",
         "activesupport",
         "arel",
+        "actionpackversion",
+        "did-you-mean",
         "globalid",
         "rack",
         "trailties",
@@ -187,9 +219,11 @@ describe("vendor/sources.ts", () => {
     const m = testPathsManifest();
     // Same set as extract-ruby-tests.rb's pre-wave-5 PACKAGE_TEST_DIRS:
     // 9 Rails+Rack packages + globalid (compareTests defaults to true).
-    // abstractcontroller has no testPath; rack tests live at the source root.
+    // actionpackversion has no testPath; rack tests live at the source root;
+    // abstractcontroller gained a testPath in wave 3.5 (#1621).
     expect(Object.keys(m).sort()).toEqual(
       [
+        "abstractcontroller",
         "actioncontroller",
         "actiondispatch",
         "actionview",
@@ -197,6 +231,7 @@ describe("vendor/sources.ts", () => {
         "activerecord",
         "activesupport",
         "arel",
+        "did-you-mean",
         "globalid",
         "rack",
         "trailties",
