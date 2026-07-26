@@ -27,3 +27,21 @@ describe("SignedGlobalID pick_purpose explicit-null semantics", () => {
     expect(SignedGlobalID.parse(sgid.toString(), { verifier, for: null })?.uri).toBe(sgid.uri);
   });
 });
+
+describe("SignedGlobalID.parse verifier resolution", () => {
+  const verifier = new MessageVerifier("test-secret", { digest: "sha256", url_safe: true });
+  const person = { id: 5, constructor: { name: "Person" } };
+
+  beforeEach(() => setApp("bcx"));
+  afterEach(() => _resetApp());
+
+  it("parse raises when no verifier is configured", () => {
+    // The verify helpers swallow every error to return null, so without an
+    // explicit check `parse` would report a missing verifier as an invalid
+    // token. Rails raises — pick_verifier's ArgumentError is not rescued.
+    const sgid = SignedGlobalID.create(person, { verifier });
+    expect(() => SignedGlobalID.parse(sgid.toString())).toThrow(
+      /Pass a `verifier:` option .* SignedGlobalID\.verifier/,
+    );
+  });
+});

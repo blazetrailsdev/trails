@@ -166,14 +166,18 @@ export class MessageVerifier {
     return getCrypto().createHmac(this.digest, this.secret).update(data).digest("hex");
   }
 
-  private encode(buf: Buffer): string {
+  // Rails declares encode/decode private, but GlobalID::Verifier overrides
+  // them (Ruby private methods are still overridable). TS forbids
+  // redeclaring a private base member in a subclass, so they're protected
+  // here to keep that override path open.
+  protected encode(buf: Buffer): string {
     if (this.urlSafe) {
       return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
     }
     return buf.toString("base64");
   }
 
-  private decode(str: string): Buffer {
+  protected decode(str: string): Buffer {
     // Support both url-safe and standard base64
     const normalized = str.replace(/-/g, "+").replace(/_/g, "/");
     // Add padding if needed

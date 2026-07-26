@@ -1,11 +1,5 @@
 import { getApp } from "./config.js";
-import {
-  buildGid,
-  normalizeModelId,
-  parseGid,
-  validateApp,
-  type GidComponents,
-} from "./uri/gid.js";
+import { GID, validateApp, type GidComponents } from "./uri/gid.js";
 import { Locator, lookupClass, type LocateOptions, type LocatorModel } from "./locator.js";
 // LAZY-IMPORT CYCLE: global-id ↔ signed-global-id ↔ locator. Safe because
 // every cross-module reference below happens inside a method body (runtime),
@@ -47,9 +41,14 @@ export class GlobalID {
   readonly uri: string;
   private readonly _components: GidComponents;
 
-  private constructor(uri: string, components: GidComponents) {
-    this.uri = uri;
-    this._components = components;
+  /**
+   * Rails' `GlobalID#initialize` stores the `URI::GID` and delegates
+   * app/model_name/model_id/params/to_s to it; we snapshot its components
+   * instead, so every entry point goes through a parsed GID.
+   */
+  private constructor(gid: GID) {
+    this.uri = gid.toString();
+    this._components = gid.deconstructKeys();
   }
 
   get app(): string {
@@ -80,26 +79,19 @@ export class GlobalID {
     }
     const modelName = model.constructor.name;
     const params = Object.keys(filteredParams).length ? filteredParams : null;
-    const uri = buildGid(app, modelName, model.id, params);
-    const components: GidComponents = {
-      app,
-      modelName,
-      modelId: normalizeModelId(model.id, modelName),
-      params: params ?? {},
-    };
-    return new GlobalID(uri, components);
+    return new GlobalID(GID.build({ app, modelName, modelId: model.id, params }));
   }
 
   /** Mirrors: GlobalID.parse — falls back to base64-decoded form. */
   static parse(gid: string | GlobalID, _options: GlobalIDOptions = {}): GlobalID | null {
     if (gid instanceof GlobalID) return gid;
     try {
-      return new GlobalID(gid, parseGid(gid));
+      return new GlobalID(GID.parse(gid));
     } catch {
       try {
         const b64 = gid.replace(/-/g, "+").replace(/_/g, "/");
         const decoded = atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4));
-        return new GlobalID(decoded, parseGid(decoded));
+        return new GlobalID(GID.parse(decoded));
       } catch {
         return null;
       }
