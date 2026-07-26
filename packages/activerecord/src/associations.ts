@@ -112,7 +112,7 @@ import type { AssociationReflection } from "./reflection.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
 import { foreignKeyPresentFor } from "./associations/foreign-association.js";
 import { throughForeignKeyPresent } from "./associations/through-association.js";
-import { findTarget as findBelongsToTarget } from "./associations/singular-association.js";
+import { findTarget } from "./associations/singular-association.js";
 
 /**
  * Association options.
@@ -2420,7 +2420,7 @@ export async function loadHasManyThrough(
     const one = await loadHasOne(record, throughAssoc.name, throughAssoc.options);
     throughRecords = one ? [one] : [];
   } else if (throughAssoc.type === "belongsTo") {
-    const one = await findBelongsToTarget(record, throughAssoc.name, throughAssoc.options);
+    const one = await findTarget(record, throughAssoc.name, throughAssoc.options);
     throughRecords = one ? [one] : [];
   } else {
     throughRecords = [];
@@ -2502,7 +2502,7 @@ export async function loadHasOneThrough(
   if (throughAssoc.type === "hasOne") {
     throughRecord = await loadHasOne(record, throughAssoc.name, throughAssoc.options);
   } else if (throughAssoc.type === "belongsTo") {
-    throughRecord = await findBelongsToTarget(record, throughAssoc.name, throughAssoc.options);
+    throughRecord = await findTarget(record, throughAssoc.name, throughAssoc.options);
   } else if (throughAssoc.type === "hasMany") {
     const throughRecords = await loadHasMany(record, throughAssoc.name, throughAssoc.options);
     throughRecord = throughRecords[0] ?? null;
@@ -2520,7 +2520,7 @@ export async function loadHasOneThrough(
 
   if (sourceAssoc) {
     if (sourceAssoc.type === "belongsTo") {
-      return findBelongsToTarget(throughRecord, sourceName, sourceAssoc.options);
+      return findTarget(throughRecord, sourceName, sourceAssoc.options);
     } else if (sourceAssoc.type === "hasOne") {
       return loadHasOne(throughRecord, sourceName, sourceAssoc.options);
     }
