@@ -17,9 +17,6 @@ function serializer(format: Format): Serializer {
   return SerializerWithFallback.get(format);
 }
 
-// The Rails test passes the bare `Marshal` / `ActiveSupport::JSON` /
-// `ActiveSupport::MessagePack` modules as the deserializer; those expose
-// `load`/`decode` rather than our Serializer surface, so wrap them here.
 const MARSHAL_SIGNATURE = "\x04\x08";
 const marshalModule = {
   load: (dumped: string) => coder.load(dumped.slice(MARSHAL_SIGNATURE.length)),

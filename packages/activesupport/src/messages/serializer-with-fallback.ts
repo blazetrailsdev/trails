@@ -11,7 +11,9 @@
  * trails has no Ruby Marshal runtime, so the `:marshal` format is backed by the
  * fidelity `coder` (`cache/coder.ts`) — the same trails Marshal-equivalent the
  * cache serializers use — behind Rails' `\x04\x08` Marshal signature so
- * cross-format detection still works.
+ * cross-format detection still works. `MessagePackWithFallback#available?` is
+ * likewise constant-true: message_pack is a bundled dep here, with no dynamic
+ * require to rescue.
  */
 
 import { Notifications } from "../notifications.js";
@@ -103,7 +105,6 @@ function fallback(format: Format): boolean {
   return format !== "marshal";
 }
 
-// Rails' `AllowMarshal` module: `super || format == :marshal`.
 function allowMarshalFallback(format: Format): boolean {
   return fallback(format) || format === "marshal";
 }
@@ -153,7 +154,6 @@ const jsonWithFallback: Serializer = {
     return JSON_START_WITH.test(dumped);
   },
 
-  // Assume JSON format if format could not be determined.
   detectFormat(dumped: string): Format | undefined {
     return detectFormat(dumped) ?? "json";
   },
@@ -185,8 +185,6 @@ const messagePackWithFallback: Serializer = {
   },
 };
 
-// Mirrors Rails MessagePackWithFallback#available?: message_pack is a bundled
-// dep in trails, so this always returns true (no dynamic require to rescue).
 /** @internal */
 function isAvailable(): boolean {
   return true;

@@ -109,8 +109,10 @@ function filterHashKeys(keys: unknown[], options: NormalizedOptions): Set<unknow
   return new Set(keys);
 }
 
-// String-aware comment removal: quoted spans (and their backslash escapes) are
-// copied verbatim so a `//` or `/*` inside a JSON string survives.
+/**
+ * String-aware comment removal: quoted spans (and their backslash escapes) are
+ * copied verbatim so a comment marker inside a JSON string survives.
+ */
 function stripJsonComments(value: string): string {
   let out = "";
   let index = 0;
@@ -145,14 +147,16 @@ export namespace ActiveSupportJSON {
     return JSON.stringify(resolved) ?? "null";
   }
 
+  /**
+   * Ruby's JSON parser — what `ActiveSupport::JSON.decode` delegates to — skips
+   * block and line comments anywhere whitespace is allowed, while `JSON.parse`
+   * rejects them. The retry runs only after a parse failure, so valid documents
+   * (where a comment marker can only be inside a string) are untouched.
+   */
   export function decode(value: string): unknown {
     try {
       return JSON.parse(value);
     } catch (error) {
-      // Ruby's JSON parser — what `ActiveSupport::JSON.decode` delegates to —
-      // skips `/* … */` and `// …` comments anywhere whitespace is allowed;
-      // `JSON.parse` rejects them. Only retry on a parse failure so valid
-      // documents (where a `//` may only appear inside a string) are untouched.
       if (!(error instanceof SyntaxError)) throw error;
       return JSON.parse(stripJsonComments(value));
     }
