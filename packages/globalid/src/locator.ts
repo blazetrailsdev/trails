@@ -13,8 +13,20 @@ import type { MessageVerifier } from "@blazetrails/activesupport/message-verifie
 export interface LocatorModel {
   name: string;
   primaryKey?: string | string[];
-  /** Single-id form returns a record; array form returns an ordered array. */
+  /**
+   * Single-id form returns a record; array form returns an ordered array.
+   *
+   * @noRailsEquivalent Member of the duck-typed `LocatorModel` interface, not a
+   * locator method: it declares the Active Record finder Rails' BaseLocator
+   * calls as `model_class.find gid.model_id`. Ruby needs no such declaration.
+   */
   find(id: unknown): Promise<unknown> | unknown;
+  /**
+   * @noRailsEquivalent Member of the duck-typed `LocatorModel` interface, not a
+   * locator method: it declares the Active Record relation Rails' BaseLocator
+   * calls as `model_class.where(primary_key => ids)` on the ignore_missing
+   * path. Ruby needs no such declaration.
+   */
   where?(conditions: Record<string, unknown>): {
     toArray?(): Promise<unknown[]> | unknown[];
   };
@@ -52,6 +64,12 @@ export type ModelFinder = (name: string) => LocatorModel | undefined;
 
 let _modelFinder: ModelFinder | undefined;
 
+/**
+ * @noRailsEquivalent Stands in for Ruby's `model_name.constantize`, which
+ * GlobalID#model_class uses to turn a model name into a class. JS has no global
+ * constant table, so the host app registers a resolver instead. It lives next
+ * to the per-app locator registry it serves.
+ */
 export function setModelFinder(finder: ModelFinder): void {
   _modelFinder = finder;
 }

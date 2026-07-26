@@ -202,6 +202,12 @@ export class GID {
    * Rails' `URI::GID.new(*URI.split(str))` is public — it comes from
    * `URI::Generic` and skips the `parse` argument checks. TS has no URI
    * base class to inherit it from, so it's declared here.
+   *
+   * @noRailsEquivalent URI::GID's public initializer comes from URI::Generic,
+   * so gid.rb declares none. TS has no URI base class to inherit it from, and
+   * the ported Rails test `new returns invalid gid when not checking`
+   * (uri_gid_test.rb) constructs one directly to bypass parse validation, so
+   * it is declared locally.
    */
   constructor(uri: string, components?: GidComponents) {
     this._uri = uri;

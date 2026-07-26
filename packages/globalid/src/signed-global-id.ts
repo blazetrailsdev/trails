@@ -74,7 +74,13 @@ interface SgidPayload {
 }
 
 export class SignedGlobalID {
-  /** The raw GID URI string, e.g. `gid://MyApp/User/1` */
+  /**
+   * The raw GID URI string, e.g. `gid://MyApp/User/1`
+   *
+   * @noRailsEquivalent Inherited from GlobalID in Ruby (`attr_reader :uri`);
+   * re-declared because the TS classes are peers, not a hierarchy. See the
+   * `create` entry for this file.
+   */
   readonly uri: string;
   readonly purpose: string | null;
   readonly expiresAt: Temporal.Instant | undefined;
@@ -110,6 +116,13 @@ export class SignedGlobalID {
    *
    * Mirrors: GlobalID.create — inherited by SignedGlobalID in Ruby, where
    * `new` is polymorphic; declared here because the TS classes are peers.
+   *
+   * @noRailsEquivalent Rails' `SignedGlobalID < GlobalID` inherits
+   * `GlobalID.create` (polymorphic `new`). In TS the two are peer classes —
+   * SignedGlobalID's fields (verifier/purpose/expiresAt) come from options its
+   * base has no notion of — so `create` is re-declared here. Unifying them
+   * under real inheritance is tracked by the globalid-sgid-inherits-globalid
+   * story.
    */
   static create(model: GlobalIDModel, options: SignedGlobalIDOptions = {}): SignedGlobalID {
     const app = options.app ?? getApp();
@@ -277,17 +290,35 @@ export class SignedGlobalID {
     return this.toString();
   }
 
-  /** Mirrors: GlobalID#model_id  — re-exposed on SignedGlobalID (peer class in TS, not a subclass). */
+  /**
+   * Mirrors: GlobalID#model_id  — re-exposed on SignedGlobalID (peer class in TS, not a subclass).
+   *
+   * @noRailsEquivalent Inherited from GlobalID in Ruby (`delegate :model_id, to: :uri`);
+   * re-declared because the TS classes are peers, not a hierarchy. See the
+   * `create` entry for this file.
+   */
   get modelId(): string | string[] {
     return this._components.modelId;
   }
 
-  /** Mirrors: GlobalID#model_name  — re-exposed on SignedGlobalID (peer class in TS, not a subclass). */
+  /**
+   * Mirrors: GlobalID#model_name  — re-exposed on SignedGlobalID (peer class in TS, not a subclass).
+   *
+   * @noRailsEquivalent Inherited from GlobalID in Ruby (`delegate :model_name, to: :uri`);
+   * re-declared because the TS classes are peers, not a hierarchy. See the
+   * `create` entry for this file.
+   */
   get modelName(): string {
     return this._components.modelName;
   }
 
-  /** Mirrors: GlobalID#params  — re-exposed on SignedGlobalID (peer class in TS, not a subclass). */
+  /**
+   * Mirrors: GlobalID#params  — re-exposed on SignedGlobalID (peer class in TS, not a subclass).
+   *
+   * @noRailsEquivalent Inherited from GlobalID in Ruby (`delegate :params, to: :uri`);
+   * re-declared because the TS classes are peers, not a hierarchy. See the
+   * `create` entry for this file.
+   */
   get params(): Record<string, string> {
     return this._components.params;
   }
@@ -299,6 +330,10 @@ export class SignedGlobalID {
    * In Ruby SGID inherits the `model <= GlobalID` guard from GID; in TS
    * the peer class repeats it so a misconfigured ModelFinder can't slip
    * either identity through.
+   *
+   * @noRailsEquivalent Inherited from GlobalID in Ruby; re-declared because the
+   * TS classes are peers, not a hierarchy. See the `create` entry for this
+   * file.
    */
   get modelClass(): LocatorModel {
     const klass = lookupClass(this.modelName);
@@ -331,7 +366,14 @@ export class SignedGlobalID {
     return `#<SignedGlobalID:0x${this._objectId}>`;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent TS analogue of Ruby's implicit string coercion: Rails
+   * relies on `to_s`/`to_param` being called whenever an SGID is interpolated
+   * into a string or a URL. `Symbol.toPrimitive` is the only hook that makes
+   * `String(sgid)` and template interpolation reach `toString()` for every
+   * hint.
+   */
   [Symbol.toPrimitive](_hint: string): string {
     return this.toString();
   }
