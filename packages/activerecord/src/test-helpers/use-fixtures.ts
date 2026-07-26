@@ -91,7 +91,8 @@ export interface FixturesConnectionOpts {
   /**
    * Caller-supplied connection/adapter thunk. When set, {@link fixtures}
    * seeds, cleans, and (when transactional) pins fixtures
-   * through this connection instead of the default `() => Base.connection`.
+   * through this connection instead of the default pool lease
+   * ({@link leaseFixtureConnection}).
    *
    * Mirrors Rails loading a fixture set through a model-specific `connection`
    * (multi-database suites) or through a suite's own adapter. Composes with
