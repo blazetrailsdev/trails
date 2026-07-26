@@ -29,8 +29,9 @@ export interface PackageEntry {
    * Default true. Set to false to vendor the source (so test-compare or other
    * tooling can read it) without including it in the api-compare PACKAGES
    * derivation. Reserved for cases where the extractor can't yet handle a
-   * gem's idioms. Today no source sets this flag; rack and globalid were
-   * wired into api-compare in wave 6 (#1589).
+   * gem's idioms, or where no TS-side package dir exists yet to map onto
+   * (i18n today). Rack and globalid were wired into api-compare in wave 6
+   * (#1589).
    */
   compareApi?: boolean;
   /**
@@ -166,6 +167,23 @@ export const SOURCES: readonly UpstreamSource[] = [
         libPath: "lib/global_id",
         // Globalid puts *_test.rb under test/cases/ (not test/ directly).
         testPath: "test/cases",
+      },
+    ],
+  },
+  {
+    name: "i18n",
+    origin: {
+      type: "git",
+      url: "https://github.com/ruby-i18n/i18n.git",
+      ref: "v1.14.8",
+    },
+    packages: [
+      {
+        name: "i18n",
+        libPath: "lib/i18n",
+        testPath: "test",
+        compareApi: false,
+        compareTests: false,
       },
     ],
   },

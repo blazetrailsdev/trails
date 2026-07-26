@@ -16,7 +16,7 @@ describe("vendor/sources.ts", () => {
     expect(SOURCES.length).toBeGreaterThan(0);
   });
 
-  it("declares the rails source with all 9 wave-1 packages", () => {
+  it("declares the rails source with all 10 packages (9 wave-1 + actionpackversion)", () => {
     const rails = SOURCES.find((s) => s.name === "rails");
     expect(rails).toBeDefined();
     expect(rails!.origin).toEqual({
@@ -29,6 +29,7 @@ describe("vendor/sources.ts", () => {
         "abstractcontroller",
         "actioncontroller",
         "actiondispatch",
+        "actionpackversion",
         "actionview",
         "activemodel",
         "activerecord",
@@ -57,6 +58,31 @@ describe("vendor/sources.ts", () => {
     expect(gid!.packages).toEqual([
       { name: "globalid", libPath: "lib/global_id", testPath: "test/cases" },
     ]);
+  });
+
+  it("declares the i18n source, vendored-only until packages/i18n exists", () => {
+    const i18n = SOURCES.find((s) => s.name === "i18n");
+    expect(i18n).toBeDefined();
+    expect(i18n!.origin).toEqual({
+      type: "git",
+      url: "https://github.com/ruby-i18n/i18n.git",
+      ref: "v1.14.8",
+    });
+    expect(i18n!.packages).toEqual([
+      {
+        name: "i18n",
+        libPath: "lib/i18n",
+        testPath: "test",
+        compareApi: false,
+        compareTests: false,
+      },
+    ]);
+    expect(apiComparePackages()).not.toContain("i18n");
+    expect(Object.keys(libPathsManifest())).not.toContain("i18n");
+    expect(Object.keys(testPathsManifest())).not.toContain("i18n");
+    expect(resolvePath("i18n").endsWith("vendor/i18n/lib/i18n")).toBe(true);
+    expect(resolvePath("i18n", "test").endsWith("vendor/i18n/test")).toBe(true);
+    expect(vendoredRoot("i18n").endsWith("vendor/i18n")).toBe(true);
   });
 
   it("vendor/sources.lock.json has an entry for every source (commit invariant)", async () => {
@@ -130,7 +156,7 @@ describe("vendor/sources.ts", () => {
   });
 
   it("resolvePath throws when test requested for package without testPath", () => {
-    expect(() => resolvePath("abstractcontroller", "test")).toThrow(/no testPath/);
+    expect(() => resolvePath("actionpackversion", "test")).toThrow(/no testPath/);
   });
 
   it("vendoredRoot returns absolute source root", () => {
@@ -149,7 +175,7 @@ describe("vendor/sources.ts", () => {
     expect(pkgs).toContain("abstractcontroller");
   });
 
-  it("apiComparePackages returns exactly the wave-6 11-entry api-compare set", () => {
+  it("apiComparePackages returns exactly the current api-compare set", () => {
     // Bulletproofs against a future PR that accidentally toggles compareApi
     // on a package, or adds/drops a source from SOURCES without updating
     // extract-ruby-api.rb. extract-ruby-api.rb's PACKAGE_DIRS is now derived
@@ -160,11 +186,13 @@ describe("vendor/sources.ts", () => {
         "abstractcontroller",
         "actioncontroller",
         "actiondispatch",
+        "actionpackversion",
         "actionview",
         "activemodel",
         "activerecord",
         "activesupport",
         "arel",
+        "did-you-mean",
         "globalid",
         "rack",
         "trailties",
@@ -183,13 +211,11 @@ describe("vendor/sources.ts", () => {
     expect(m["globalid"].endsWith("vendor/globalid/lib/global_id")).toBe(true);
   });
 
-  it("testPathsManifest returns absolute test dirs for the wave-5 set", () => {
+  it("testPathsManifest returns absolute test dirs for every test-compared package", () => {
     const m = testPathsManifest();
-    // Same set as extract-ruby-tests.rb's pre-wave-5 PACKAGE_TEST_DIRS:
-    // 9 Rails+Rack packages + globalid (compareTests defaults to true).
-    // abstractcontroller has no testPath; rack tests live at the source root.
     expect(Object.keys(m).sort()).toEqual(
       [
+        "abstractcontroller",
         "actioncontroller",
         "actiondispatch",
         "actionview",
@@ -197,6 +223,7 @@ describe("vendor/sources.ts", () => {
         "activerecord",
         "activesupport",
         "arel",
+        "did-you-mean",
         "globalid",
         "rack",
         "trailties",

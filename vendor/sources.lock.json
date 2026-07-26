@@ -8,6 +8,10 @@
       "ref": "v1.3.0",
       "sha": "a10102196ceaa9ffec3744eda857ebe421a57134"
     },
+    "i18n": {
+      "ref": "v1.14.8",
+      "sha": "f2fb6a5766dee835082eb74ee83f52e0a6479573"
+    },
     "rack": {
       "ref": "v3.1.14",
       "sha": "5440b2c8b006f1c2ef202c2bd60dd70924c9b1c1"
