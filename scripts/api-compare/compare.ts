@@ -769,8 +769,17 @@ function nearestNamespaceMatch(
  * If only one FQN matches an unqualified short name, that single candidate is
  * returned regardless of context. When multiple candidates exist,
  * namespace-prefix walking picks the nearest enclosing match; if none of the
- * candidates share a namespace prefix with the context the full candidate list
- * is returned (original behavior, safe fallback).
+ * candidates share a namespace prefix with the context the verbatim name is
+ * returned — the top-level reading, matching the qualified-name arm.
+ *
+ * This resolver always returns exactly one FQN, because Ruby's constant lookup
+ * binds exactly one. It once returned the whole candidate list on that last
+ * arm; measured against the real manifests that arm never fired (26 ambiguous
+ * unqualified include sites across all 13 packages, all of them resolved by
+ * the namespace walk), so narrowing it moved no method counts and removed a
+ * latent multi-bind — the same false-positive shape PR #5344 removed from the
+ * includer graph, where 21 methods were counting as implemented in files
+ * Ruby's lookup never reaches.
  *
  * Every consumer of `moduleFqnByShort` resolves through here —
  * `flattenIncludedMethodInfos` (expected surface) and `buildModuleIncluderFqns`
@@ -794,8 +803,12 @@ export function resolveModuleName(
   if (candidates.length === 1) return candidates;
 
   const nearest = nearestNamespaceMatch(incName, contextFqn, candidates);
-  // No prefix match — fall back to all candidates (original behavior).
-  return nearest ? [nearest] : candidates;
+  // No prefix match — take the top-level reading, the same fall-through the
+  // qualified-name arm above uses. Ruby binds exactly one constant here
+  // (lexical scope, then ancestry, then top-level, then NameError); returning
+  // every same-named candidate would hand each one's methods to the host's
+  // expected surface and each one's includers to the search set.
+  return nearest ? [nearest] : [incName];
 }
 
 /**

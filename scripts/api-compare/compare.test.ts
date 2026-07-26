@@ -973,9 +973,19 @@ describe("resolveModuleName", () => {
     expect(resolveModuleName("::Foo::Bar", "Baz::Qux", new Map())).toEqual(["Foo::Bar"]);
   });
 
-  it("returns all candidates when context has no prefix match", () => {
+  it("returns the top-level reading when context has no prefix match", () => {
+    // Ruby binds one constant, never every same-named candidate: handing back
+    // both would give `Z::Bar` X::Foo's *and* Y::Foo's methods as expected
+    // surface, and both modules' includer files as legal homes for them.
     const byShort = new Map([["Foo", ["X::Foo", "Y::Foo"]]]);
-    expect(resolveModuleName("Foo", "Z::Bar", byShort)).toEqual(["X::Foo", "Y::Foo"]);
+    expect(resolveModuleName("Foo", "Z::Bar", byShort)).toEqual(["Foo"]);
+  });
+
+  it("never returns more than one binding", () => {
+    const byShort = new Map([["Foo", ["X::Foo", "Y::Foo", "X::Y::Foo"]]]);
+    for (const ctx of ["Z::Bar", "X::Bar", "X::Y::Bar", "Foo", "A::B::C::D"]) {
+      expect(resolveModuleName("Foo", ctx, byShort)).toHaveLength(1);
+    }
   });
 
   it("prefers nearest namespace prefix — abstract base wins over sibling adapter", () => {
