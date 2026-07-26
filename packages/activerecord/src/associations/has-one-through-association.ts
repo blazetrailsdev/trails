@@ -6,6 +6,7 @@ import {
   HasOneThroughNestedAssociationsAreReadonly,
 } from "./errors.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
+import { RecordInvalid } from "../validations.js";
 import {
   sourceReflection,
   staleStateImpl as throughStaleState,
@@ -118,13 +119,26 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    * picks Rails' own branches: `update` an existing *persisted* join row inline
    * (:33), or merely `build` when absent (:36-37), leaving that row for the
    * owner's next save.
+   *
+   * Rails runs `set_new_record` BEFORE `raise RecordInvalid` (:69-70), so a
+   * `create#{name}!` whose child fails validation still reconciles the join
+   * row — `update` writes the unsaved record, blanking the join foreign key.
+   * `super` raises from inside itself, hence the reconcile in the `catch`.
    */
   protected override async _createRecord(
     attributes?: Record<string, unknown>,
     shouldRaise = false,
     block?: (record: Base) => void,
   ): Promise<Base | null> {
-    const record = await super._createRecord(attributes, shouldRaise, block);
+    let record: Base | null;
+    try {
+      record = await super._createRecord(attributes, shouldRaise, block);
+    } catch (error) {
+      if (error instanceof RecordInvalid && this._pendingReplace) {
+        await this.persistReplace(false);
+      }
+      throw error;
+    }
     if (record && this._pendingReplace) {
       await this.persistReplace(false);
     }
