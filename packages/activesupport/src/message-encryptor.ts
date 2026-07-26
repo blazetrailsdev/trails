@@ -1,5 +1,5 @@
 import { getCrypto } from "./crypto-adapter.js";
-import { Codec, type MessageSerializer } from "./messages/codec.js";
+import { Codec, Thrown, type MessageSerializer } from "./messages/codec.js";
 import type { Format } from "./messages/serializer-with-fallback.js";
 
 export class InvalidMessage extends Error {
@@ -64,22 +64,31 @@ export class MessageEncryptor extends Codec {
   }
 
   decryptAndVerify(message: string): unknown {
+    return this.catchAndRaise("invalid_message_format", { as: InvalidMessage }, () =>
+      this.catchAndRaise("invalid_message_serialization", { as: InvalidMessage }, () =>
+        this.catchAndIgnore("invalid_message_content", () => this.readMessage(message)),
+      ),
+    );
+  }
+
+  private readMessage(message: string): unknown {
     if (!message || typeof message !== "string") {
-      throw new InvalidMessage();
+      throw new Thrown("invalid_message_format", "invalid message string");
     }
 
     const lastDash = message.lastIndexOf("--");
-    if (lastDash === -1) throw new InvalidMessage();
+    if (lastDash === -1) {
+      throw new Thrown("invalid_message_format", "missing message digest");
+    }
 
     const encrypted = message.slice(0, lastDash);
     const signature = message.slice(lastDash + 2);
 
     if (!this.verifySignature(encrypted, signature)) {
-      throw new InvalidMessage("Signature mismatch");
+      throw new Thrown("invalid_message_format", "mismatched digest");
     }
 
-    const decrypted = this.decrypt(encrypted);
-    return this.deserialize(decrypted);
+    return this.deserialize(this.decrypt(encrypted));
   }
 
   private encrypt(plaintext: string): string {
@@ -89,28 +98,28 @@ export class MessageEncryptor extends Codec {
     const iv = getCrypto().randomBytes(ivLength);
 
     const cipher = getCrypto().createCipheriv(this.cipher, key, iv);
-    const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+    const encrypted = Buffer.concat([cipher.update(plaintext, "latin1"), cipher.final()]);
 
-    const encryptedB64 = encrypted.toString("base64");
-    const ivB64 = iv.toString("base64");
+    const encryptedB64 = this.encode(encrypted);
+    const ivB64 = this.encode(iv);
 
     return `${encryptedB64}--${ivB64}`;
   }
 
   private decrypt(encrypted: string): string {
     const parts = encrypted.split("--");
-    if (parts.length !== 2) throw new InvalidMessage();
+    if (parts.length !== 2) {
+      throw new Thrown("invalid_message_format", "invalid message format");
+    }
 
     const [encryptedB64, ivB64] = parts;
 
-    if (!encryptedB64 || !ivB64) throw new InvalidMessage();
-
-    if (!/^[A-Za-z0-9+/=]+$/.test(encryptedB64) || !/^[A-Za-z0-9+/=]+$/.test(ivB64)) {
-      throw new InvalidMessage("Invalid encoding");
+    if (!encryptedB64 || !ivB64) {
+      throw new Thrown("invalid_message_format", "invalid message format");
     }
 
-    const encryptedBuf = Buffer.from(encryptedB64, "base64");
-    const iv = Buffer.from(ivB64, "base64");
+    const encryptedBuf = this.decode(encryptedB64);
+    const iv = this.decode(ivB64);
 
     const keyLength = this.keyLength();
     const key = this.secret.slice(0, keyLength);
@@ -118,9 +127,9 @@ export class MessageEncryptor extends Codec {
     try {
       const decipher = getCrypto().createDecipheriv(this.cipher, key, iv);
       const decrypted = Buffer.concat([decipher.update(encryptedBuf), decipher.final()]);
-      return decrypted.toString("utf8");
+      return decrypted.toString("latin1");
     } catch {
-      throw new InvalidMessage("Decryption failed");
+      throw new Thrown("invalid_message_format", "decryption failed");
     }
   }
 

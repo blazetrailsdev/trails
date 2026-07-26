@@ -1,5 +1,5 @@
 import { getCrypto } from "./crypto-adapter.js";
-import { Codec, type MessageSerializer } from "./messages/codec.js";
+import { Codec, Thrown, type MessageSerializer } from "./messages/codec.js";
 import type { Format } from "./messages/serializer-with-fallback.js";
 import { Temporal } from "./temporal.js";
 import { currentTimeInstant } from "./time-travel.js";
@@ -56,77 +56,84 @@ export class MessageVerifier extends Codec {
     }
 
     const serialized = this.serialize(payload);
-    const encoded = this.encode(Buffer.from(serialized));
+    const encoded = this.encode(serialized);
     const signature = this.sign(encoded);
     return `${encoded}--${signature}`;
   }
 
   verify(message: string, options: VerifyOptions = {}): unknown {
-    const result = this.verified(message, options);
-    if (result === null && !this.validMessage(message)) {
-      throw new InvalidSignature();
-    }
-    return this._verifiedOrThrow(message, options);
-  }
-
-  private _verifiedOrThrow(message: string, options: VerifyOptions = {}): unknown {
-    if (!this.validMessage(message)) {
-      throw new InvalidSignature();
-    }
-
-    try {
-      const [encoded] = message.split("--");
-      const decoded = this.decode(encoded);
-      const parsed = this.deserialize(decoded.toString());
-
-      if (typeof parsed !== "object" || parsed === null || !("value" in parsed)) {
-        throw new InvalidSignature("Missing value key");
-      }
-
-      const payload = parsed as Record<string, unknown>;
-
-      if (payload._expiresAt) {
-        const expiresAt = Temporal.Instant.from(payload._expiresAt as string);
-        if (Temporal.Instant.compare(expiresAt, currentTimeInstant()) <= 0) {
-          throw new InvalidSignature("Expired message");
-        }
-      }
-
-      if (options.purpose && payload._purpose !== options.purpose) {
-        throw new InvalidSignature("Purpose mismatch");
-      }
-
-      return payload.value;
-    } catch (e) {
-      if (e instanceof InvalidSignature) throw e;
-      throw new InvalidSignature();
-    }
+    return this.catchAndRaise("invalid_message_format", { as: InvalidSignature }, () =>
+      this.catchAndRaise("invalid_message_serialization", {}, () =>
+        this.catchAndRaise("invalid_message_content", { as: InvalidSignature }, () =>
+          this.readMessage(message, options),
+        ),
+      ),
+    );
   }
 
   verified(message: string, options: VerifyOptions = {}): unknown | null {
-    try {
-      return this._verifiedOrThrow(message, options);
-    } catch {
-      return null;
-    }
+    return this.catchAndIgnore("invalid_message_format", () =>
+      this.catchAndRaise("invalid_message_serialization", {}, () =>
+        this.catchAndIgnore("invalid_message_content", () => this.readMessage(message, options)),
+      ),
+    );
   }
 
   validMessage(message: string): boolean {
-    if (!message || typeof message !== "string") return false;
+    return !!this.catchAndIgnore("invalid_message_format", () => this.extractEncoded(message));
+  }
 
-    const parts = message.split("--");
-    if (parts.length < 2) return false;
+  private readMessage(message: string, options: VerifyOptions): unknown {
+    const encoded = this.extractEncoded(message);
+    const parsed = this.deserialize(this.decode(encoded).toString("latin1"));
+    return this.verifyMetadata(parsed, options);
+  }
 
-    const signature = parts[parts.length - 1];
+  private verifyMetadata(parsed: unknown, options: VerifyOptions): unknown {
+    if (typeof parsed !== "object" || parsed === null || !("value" in parsed)) {
+      throw new Thrown("invalid_message_content", "missing value key");
+    }
+
+    const payload = parsed as Record<string, unknown>;
+
+    if (payload._expiresAt) {
+      const expiresAt = Temporal.Instant.from(payload._expiresAt as string);
+      if (Temporal.Instant.compare(expiresAt, currentTimeInstant()) <= 0) {
+        throw new Thrown("invalid_message_content", "expired message");
+      }
+    }
+
+    if (options.purpose && payload._purpose !== options.purpose) {
+      throw new Thrown("invalid_message_content", "mismatched purpose");
+    }
+
+    return payload.value;
+  }
+
+  private extractEncoded(signed: string): string {
+    if (!signed || typeof signed !== "string") {
+      throw new Thrown("invalid_message_format", "invalid message string");
+    }
+
+    const parts = signed.split("--");
+    const signature = parts.length < 2 ? undefined : parts[parts.length - 1];
     const encoded = parts.slice(0, -1).join("--");
 
-    if (!encoded || !signature) return false;
+    if (!encoded || !signature) {
+      throw new Thrown("invalid_message_format", "missing message digest");
+    }
 
+    if (!this.digestMatches(encoded, signature)) {
+      throw new Thrown("invalid_message_format", "mismatched digest");
+    }
+
+    return encoded;
+  }
+
+  private digestMatches(encoded: string, signature: string): boolean {
     try {
-      const expectedSig = this.sign(encoded);
       const sigBuf = Buffer.from(signature, "hex");
-      const expectedBuf = Buffer.from(expectedSig, "hex");
-
+      const expectedBuf = Buffer.from(this.sign(encoded), "hex");
       if (sigBuf.length !== expectedBuf.length) return false;
       return getCrypto().timingSafeEqual(sigBuf, expectedBuf);
     } catch {
@@ -138,17 +145,14 @@ export class MessageVerifier extends Codec {
     return getCrypto().createHmac(this.digest, this.secret).update(data).digest("hex");
   }
 
-  protected override encode(data: string | Buffer): string {
-    const buf = typeof data === "string" ? Buffer.from(data, "latin1") : data;
-    if (this.urlSafe) {
-      return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+  protected override decode(encoded: string, urlSafe: boolean = this.urlSafe): Buffer {
+    try {
+      return super.decode(encoded, urlSafe);
+    } catch (error) {
+      if (error instanceof Thrown && error.tag === "invalid_message_format") {
+        return super.decode(encoded, !urlSafe);
+      }
+      throw error;
     }
-    return buf.toString("base64");
-  }
-
-  protected override decode(str: string): Buffer {
-    const normalized = str.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
-    return Buffer.from(padded, "base64");
   }
 }

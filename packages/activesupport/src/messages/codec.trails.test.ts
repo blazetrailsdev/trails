@@ -1,11 +1,60 @@
 import { describe, expect, it } from "vitest";
 
-import { MessageEncryptor } from "../message-encryptor.js";
-import { MessageVerifier } from "../message-verifier.js";
+import { InvalidMessage, MessageEncryptor } from "../message-encryptor.js";
+import { InvalidSignature, MessageVerifier } from "../message-verifier.js";
+import type { Format } from "./serializer-with-fallback.js";
+
+const SECRET = "x".repeat(32);
+const FORMATS: Format[] = [
+  "marshal",
+  "json",
+  "json_allow_marshal",
+  "message_pack",
+  "message_pack_allow_marshal",
+];
 
 describe("Messages::Codec (trails)", () => {
   it("subclasses default to the json serializer", () => {
     expect(MessageEncryptor.defaultSerializer).toBe("json");
     expect(MessageVerifier.defaultSerializer).toBe("json");
+  });
+
+  it.each(FORMATS)("MessageVerifier round-trips a %s payload", (serializer) => {
+    const verifier = new MessageVerifier(SECRET, { serializer });
+    const value = { greeting: "héllo→😀", n: 42, list: [1, 2, 3] };
+    expect(verifier.verify(verifier.generate(value))).toEqual(value);
+  });
+
+  it.each(FORMATS)("MessageEncryptor round-trips a %s payload", (serializer) => {
+    const encryptor = new MessageEncryptor(SECRET, { serializer });
+    const value = { greeting: "héllo→😀", n: 42, list: [1, 2, 3] };
+    expect(encryptor.decryptAndVerify(encryptor.encryptAndSign(value))).toEqual(value);
+  });
+
+  it("decode retries with the opposite url-safe direction", () => {
+    const urlSafe = new MessageVerifier(SECRET, { url_safe: true });
+    const value = { a: "?".repeat(40) };
+    const message = urlSafe.generate(value);
+
+    expect(new MessageVerifier(SECRET).verify(message)).toEqual(value);
+    expect(new MessageVerifier(SECRET).verified(message)).toEqual(value);
+  });
+
+  it("verify raises InvalidSignature on a tampered message", () => {
+    const verifier = new MessageVerifier(SECRET);
+    const message = verifier.generate("hello");
+
+    expect(() => verifier.verify(message.slice(0, -1) + "0")).toThrow(InvalidSignature);
+    expect(verifier.verified(message.slice(0, -1) + "0")).toBeNull();
+    expect(verifier.validMessage(message.slice(0, -1) + "0")).toBe(false);
+    expect(verifier.validMessage(message)).toBe(true);
+  });
+
+  it("decryptAndVerify raises InvalidMessage on a tampered message", () => {
+    const encryptor = new MessageEncryptor(SECRET);
+    const message = encryptor.encryptAndSign("hello");
+
+    expect(() => encryptor.decryptAndVerify(message.slice(0, -1) + "0")).toThrow(InvalidMessage);
+    expect(() => encryptor.decryptAndVerify("not-a-message")).toThrow(InvalidMessage);
   });
 });
