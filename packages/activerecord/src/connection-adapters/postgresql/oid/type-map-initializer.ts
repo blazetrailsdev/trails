@@ -158,7 +158,7 @@ export class TypeMapInitializer {
   private registerWithSubtype(
     oid: number | string,
     targetOid: number,
-    build: (subtype: OidSubtype) => unknown,
+    block: (subtype: OidSubtype) => unknown,
   ): void {
     // Divergence: Rails assumes @store responds to lookup. If a TS TypeMap
     // store omits it, the lazy builder below would silently receive
@@ -168,7 +168,7 @@ export class TypeMapInitializer {
     }
     if (this.storeHas(targetOid)) {
       this.register(oid, (_oid: number | string, ...args: unknown[]) =>
-        build(this.storeLookup(targetOid, ...args) as OidSubtype),
+        block(this.storeLookup(targetOid, ...args) as OidSubtype),
       );
     }
   }

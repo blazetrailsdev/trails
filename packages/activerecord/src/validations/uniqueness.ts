@@ -176,7 +176,7 @@ export class UniquenessValidator extends EachValidator {
 
     if (
       record.isPersisted?.() &&
-      !(await isValidationNeeded(this, modelClass, record, attribute, this.options))
+      !(await isValidationNeeded(this, modelClass, record, attribute))
     ) {
       return;
     }
@@ -281,8 +281,8 @@ async function isValidationNeeded(
   klass: any,
   record: any,
   attribute: string,
-  options: Record<string, unknown>,
 ): Promise<boolean> {
+  const options = validator.options;
   if (options.conditions || Object.prototype.hasOwnProperty.call(options, "caseSensitive")) {
     return true;
   }

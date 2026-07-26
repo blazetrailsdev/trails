@@ -170,7 +170,7 @@ export class SchemaCache {
 
     this._version = (coder["version"] as string | number) ?? null;
 
-    this.deriveColumnsHash();
+    this.deriveColumnsHashAndDeduplicateValues();
   }
 
   isCached(tableName: string): boolean {
@@ -537,12 +537,11 @@ export class SchemaCache {
     );
     this._indexes = new Map(Object.entries((indexes as Record<string, unknown[]>) ?? {}));
 
-    this.deriveColumnsHash();
+    this.deriveColumnsHashAndDeduplicateValues();
   }
 
   /**
-   * Rebuild `_columnsHash` from `_columns` (Rails:
-   * derive_columns_hash_and_deduplicate_values). Both `_columns` and the
+   * Rebuild `_columnsHash` from `_columns`. Both `_columns` and the
    * authoritative `_primaryKeys` are already loaded, so reconcile the per-column
    * `primaryKey` flags against the key cache before exposing the hash — a schema
    * cache dumped before this convergence can carry MySQL's promoted-unique
@@ -550,7 +549,7 @@ export class SchemaCache {
    * step must not resurface the bogus flag. Mirrors Rails treating `@primary_keys`
    * as authoritative while deriving `columns_hash` (schema_cache.rb).
    */
-  private deriveColumnsHash(): void {
+  private deriveColumnsHashAndDeduplicateValues(): void {
     this._columnsHash.clear();
     for (const [table, cols] of this._columns) {
       this.reconcilePrimaryKeyFlags(table, cols);
@@ -960,24 +959,6 @@ export function emptyCache(): SchemaCache {
  */
 export function isIgnoredTable(tableName: string): boolean {
   return isSchemaCacheIgnoredTable(tableName);
-}
-
-/**
- * Rebuild columnsHash from columns after loading from disk. Rails also
- * deduplicates string values (-value) to share objects across rows; TS
- * uses regular strings so no deduplication step is needed.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::SchemaCache#derive_columns_hash_and_deduplicate_values (private)
- *
- * @internal
- */
-export function deriveColumnsHashAndDeduplicateValues(cache: SchemaCache): void {
-  (cache as any)._columnsHash.clear();
-  for (const [table, cols] of (cache as any)._columns as Map<string, Column[]>) {
-    const hash: Record<string, Column> = {};
-    for (const col of cols) hash[col.name] = col;
-    (cache as any)._columnsHash.set(table, hash);
-  }
 }
 
 /**
