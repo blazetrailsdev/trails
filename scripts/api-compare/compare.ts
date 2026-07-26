@@ -699,11 +699,10 @@ function nearestNamespaceMatch(
  * candidates share a namespace prefix with the context the full candidate list
  * is returned (original behavior, safe fallback).
  *
- * Every consumer of `moduleFqnByShort` resolves through here — both the
- * expected-surface flattener (`flattenIncludedMethodInfos`) and the
- * includer-graph builder in `main`. They must not disagree: a broader lookup
- * in one of them lets a method count as implemented in a file that Ruby's
- * constant lookup never binds.
+ * Every consumer of `moduleFqnByShort` resolves through here —
+ * `flattenIncludedMethodInfos` (expected surface) and `buildModuleIncluderFqns`
+ * (where that surface may be implemented). A broader lookup in either one lets
+ * a method count as implemented in a file Ruby's constant lookup never binds.
  */
 export function resolveModuleName(
   incName: string,
@@ -724,6 +723,35 @@ export function resolveModuleName(
   const nearest = nearestNamespaceMatch(incName, contextFqn, candidates);
   // No prefix match — fall back to all candidates (original behavior).
   return nearest ? [nearest] : candidates;
+}
+
+/**
+ * Build the direct `include`/`extend` graph: module FQN → FQNs that mix it in.
+ *
+ * Downstream this becomes "TS files a module's methods may legitimately live
+ * in", so a wrong edge here is a false match, not just noise. `include` names
+ * resolve through `resolveModuleName` — the same Ruby constant lookup
+ * `flattenIncludedMethodInfos` uses, and the reason both live in this file.
+ * The two must never diverge: this builder once resolved unqualified names
+ * against the raw short-name map, which made `Rack::Response::Helpers`'
+ * `response.ts` an implementation site for `Rack::Request`'s headers even
+ * though `class Rack::Request; include Helpers` binds its own nested module.
+ */
+export function buildModuleIncluderFqns(
+  entities: { fqn: string; info: ClassInfo }[],
+  moduleFqnByShort: Map<string, string[]>,
+): Map<string, Set<string>> {
+  const moduleIncluderFqns = new Map<string, Set<string>>();
+  for (const { fqn, info } of entities) {
+    for (const inc of [...(info.includes || []), ...(info.extends || [])]) {
+      for (const modFqn of resolveModuleName(inc, fqn, moduleFqnByShort)) {
+        const includers = moduleIncluderFqns.get(modFqn) || new Set<string>();
+        includers.add(fqn);
+        moduleIncluderFqns.set(modFqn, includers);
+      }
+    }
+  }
+  return moduleIncluderFqns;
 }
 
 /**
@@ -1262,7 +1290,6 @@ export function main() {
     // Named's methods should also be checked against base.ts.
 
     // Step 1: build direct include/extend graph (module FQN → includer FQNs)
-    const moduleIncluderFqns = new Map<string, Set<string>>();
     const allClassesAndModules = [
       ...Object.entries(rubyPkg.classes).map(([fqn, info]) => ({
         fqn,
@@ -1276,27 +1303,8 @@ export function main() {
     const fqnToFile = new Map<string, string>();
     for (const { fqn, info } of allClassesAndModules) {
       if (info.file) fqnToFile.set(fqn, info.file);
-      for (const inc of [...(info.includes || []), ...(info.extends || [])]) {
-        // Same Ruby constant lookup as `flattenIncludedMethodInfos` — the two
-        // consumers of `moduleFqnByShort` must agree on which module an
-        // `include` binds. This builder used to be deliberately broad
-        // (`moduleFqnByShort.get(inc)`, i.e. every module sharing the short
-        // name became an includer). That credited 21 methods to a file Ruby
-        // would never reach: `Rack::Request`'s `get_header`/`set_header`/
-        // `has_header?`/`body` were matched in `response.ts` via
-        // `Rack::Response::Helpers`, `ActionView::ViewPaths`' surface in
-        // `lookup-context.ts` via `LookupContext::ViewPaths`, and
-        // `MySQL::TableDefinition#charset`/`collation` in the abstract
-        // `TableDefinition`. All of them are real gaps, so the narrowing
-        // surfaces them instead of hiding them.
-        const resolved = resolveModuleName(inc, fqn, moduleFqnByShort);
-        for (const modFqn of resolved) {
-          const includers = moduleIncluderFqns.get(modFqn) || new Set();
-          includers.add(fqn);
-          moduleIncluderFqns.set(modFqn, includers);
-        }
-      }
     }
+    const moduleIncluderFqns = buildModuleIncluderFqns(allClassesAndModules, moduleFqnByShort);
 
     // Step 2: transitively resolve includer files (DFS with memoization)
     const moduleIncluderFiles = new Map<string, Set<string>>();
