@@ -139,8 +139,8 @@ function parseModelId(raw: string, modelName: string): string | string[] {
  * since buildGid joins sparse arrays into a `/`-only segment string
  * which is truthy and slips past its own guard.
  *
- * Shared by GlobalID.create and GID.build so their skip-parse paths
- * agree with the round-trip through parseGid(buildGid(...)).
+ * Used by GID.build so its skip-parse path agrees with the round-trip
+ * through parseGid(buildGid(...)).
  */
 function normalizeModelId(raw: unknown, modelName: string): string | string[] {
   // Mirror parseModelId ordering: cap raw segments at
@@ -181,7 +181,7 @@ function cgiUnescape(s: string): string {
   return decodeURIComponent(s.replace(/\+/g, "%20"));
 }
 
-// ─── URI::GID class wrapper (Rails parity) ─────────────────────────────────
+// ─── URI::GID ──────────────────────────────────────────────────────────────
 
 /**
  * The GID URI. Mirrors the Rails `URI::GID` surface — parse / create /

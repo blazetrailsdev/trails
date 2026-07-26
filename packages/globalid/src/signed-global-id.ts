@@ -44,12 +44,12 @@ export interface SignedGlobalIDOptions {
 }
 
 /**
- * Options accepted by the {@link SignedGlobalID} constructor. A narrower slice of
- * {@link SignedGlobalIDOptions} — only the knobs that affect verification
- * and the SGID instance fields, since the constructor takes a pre-built URI
- * and can't embed `app` or arbitrary extra URI params.
+ * Options accepted by the {@link SignedGlobalID} constructor — a narrower
+ * slice of {@link SignedGlobalIDOptions} holding only the knobs that affect
+ * verification and the SGID instance fields, since the constructor takes a
+ * pre-built URI and can't embed `app` or arbitrary extra URI params.
  */
-export interface FromUriOptions {
+export interface SignedGlobalIDInitOptions {
   for?: string | null;
   expiresIn?: number | null;
   expiresAt?: Temporal.Instant | null;
@@ -92,7 +92,7 @@ export class SignedGlobalID {
    * verifier/purpose/expiration are read; `app` and extra URI params can't
    * be threaded into an already-built URI string.
    */
-  constructor(uri: string, options: FromUriOptions = {}) {
+  constructor(uri: string, options: SignedGlobalIDInitOptions = {}) {
     // Rails' SignedGlobalID#initialize delegates to URI::GID.parse, which
     // raises on malformed URIs. Match that invariant here so callers get
     // an early error rather than deferred failures from modelId/modelName
@@ -141,6 +141,11 @@ export class SignedGlobalID {
    * Mirrors: SignedGlobalID.parse
    */
   static parse(sgid: string, options: ParseOptions = {}): SignedGlobalID | null {
+    // Rails' `verify` reaches `pick_verifier`, which raises when no verifier
+    // is available — only InvalidSignature is rescued. Our verify helpers
+    // swallow every error to return null, so assert the verifier here to keep
+    // "no verifier configured" a raise rather than a silent null.
+    SignedGlobalID.pickVerifier(options);
     const verified = SignedGlobalID.verify(sgid, options);
     if (verified === null) return null;
     // The token's own expiry wins over any class-level default: an explicit

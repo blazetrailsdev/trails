@@ -41,9 +41,14 @@ export class GlobalID {
   readonly uri: string;
   private readonly _components: GidComponents;
 
-  private constructor(uri: string, components: GidComponents) {
-    this.uri = uri;
-    this._components = components;
+  /**
+   * Rails' `GlobalID#initialize` stores the `URI::GID` and delegates
+   * app/model_name/model_id/params/to_s to it; we snapshot its components
+   * instead, so every entry point goes through a parsed GID.
+   */
+  private constructor(gid: GID) {
+    this.uri = gid.toString();
+    this._components = gid.deconstructKeys();
   }
 
   get app(): string {
@@ -57,15 +62,6 @@ export class GlobalID {
   }
   get params(): Record<string, string> {
     return this._components.params;
-  }
-
-  /**
-   * @internal Rails' `GlobalID#initialize` stores the `URI::GID` itself and
-   * delegates app/model_name/model_id/params/to_s to it. We snapshot the
-   * components instead, so every entry point funnels through here.
-   */
-  private static fromGid(gid: GID): GlobalID {
-    return new GlobalID(gid.toString(), gid.deconstructKeys());
   }
 
   /** Mirrors: GlobalID.create */
@@ -83,19 +79,19 @@ export class GlobalID {
     }
     const modelName = model.constructor.name;
     const params = Object.keys(filteredParams).length ? filteredParams : null;
-    return GlobalID.fromGid(GID.build({ app, modelName, modelId: model.id, params }));
+    return new GlobalID(GID.build({ app, modelName, modelId: model.id, params }));
   }
 
   /** Mirrors: GlobalID.parse — falls back to base64-decoded form. */
   static parse(gid: string | GlobalID, _options: GlobalIDOptions = {}): GlobalID | null {
     if (gid instanceof GlobalID) return gid;
     try {
-      return GlobalID.fromGid(GID.parse(gid));
+      return new GlobalID(GID.parse(gid));
     } catch {
       try {
         const b64 = gid.replace(/-/g, "+").replace(/_/g, "/");
         const decoded = atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4));
-        return GlobalID.fromGid(GID.parse(decoded));
+        return new GlobalID(GID.parse(decoded));
       } catch {
         return null;
       }
