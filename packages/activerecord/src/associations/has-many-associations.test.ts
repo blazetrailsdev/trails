@@ -3,6 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import type { AssociationProxy } from "./collection-proxy.js";
+import { findTarget } from "./singular-association.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Notifications, throwAbort } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -38,7 +39,6 @@ import { Developer, AuditLog } from "../test-helpers/models/developer.js";
 import { Project } from "../test-helpers/models/project.js";
 import {
   Associations,
-  loadBelongsTo,
   loadHasMany,
   loadHasManyThrough,
   isAssociationCached,
@@ -2851,7 +2851,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(InvValPost);
     const author = await InvValAuthor.create({ name: "Alice" });
     const post = await InvValPost.create({ author_id: author.id, title: "A", body: "body" });
-    const loaded = await loadBelongsTo(post, "author", {
+    const loaded = await findTarget(post, "author", {
       className: "InvValAuthor",
       foreignKey: "author_id",
       inverseOf: "inv_val_posts",

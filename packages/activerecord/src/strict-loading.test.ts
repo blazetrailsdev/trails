@@ -4,6 +4,7 @@
  * Targets: vendor/rails/activerecord/test/cases/strict_loading_test.rb
  */
 import { describe, it, expect, beforeAll } from "vitest";
+import { findTarget } from "./associations/singular-association.js";
 import { Notifications } from "@blazetrails/activesupport";
 import {
   Base,
@@ -12,7 +13,7 @@ import {
   actionOnStrictLoadingViolation,
   setActionOnStrictLoadingViolation,
 } from "./index.js";
-import { association, loadBelongsTo, loadHasOne } from "./associations.js";
+import { association, loadHasOne } from "./associations.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { Developer, AuditLog, AuditLogRequired } from "./test-helpers/models/developer.js";
 import { Ship } from "./test-helpers/models/ship.js";
@@ -568,7 +569,7 @@ describe("StrictLoadingTest", () => {
     await developer!.updateColumn("mentor_id", mentor.id);
 
     await expect(
-      loadBelongsTo(developer!, "strictLoadingMentor", {
+      findTarget(developer!, "strictLoadingMentor", {
         className: "Mentor",
         foreignKey: "mentor_id",
         strictLoading: true,
@@ -583,7 +584,7 @@ describe("StrictLoadingTest", () => {
       const developer = await Developer.first();
       await developer!.updateColumn("mentor_id", mentor.id);
 
-      await expect(loadBelongsTo(developer!, "mentor", { className: "Mentor" })).rejects.toThrow(
+      await expect(findTarget(developer!, "mentor", { className: "Mentor" })).rejects.toThrow(
         StrictLoadingViolationError,
       );
     });
@@ -596,7 +597,7 @@ describe("StrictLoadingTest", () => {
       const developer = await Developer.first();
       await developer!.updateColumn("mentor_id", mentor.id);
 
-      const loaded = await loadBelongsTo(developer!, "strictLoadingOffMentor", {
+      const loaded = await findTarget(developer!, "strictLoadingOffMentor", {
         className: "Mentor",
         foreignKey: "mentor_id",
         strictLoading: false,
@@ -613,7 +614,7 @@ describe("StrictLoadingTest", () => {
 
     const developer = (await Developer.all().includes("strictLoadingMentor").first())!;
 
-    const loaded = await loadBelongsTo(developer, "strictLoadingMentor", {
+    const loaded = await findTarget(developer, "strictLoadingMentor", {
       className: "Mentor",
       foreignKey: "mentor_id",
       strictLoading: true,
@@ -629,7 +630,7 @@ describe("StrictLoadingTest", () => {
       await first!.updateColumn("mentor_id", mentor.id);
 
       const developer = (await Developer.all().includes("mentor").first())!;
-      const loaded = await loadBelongsTo(developer, "mentor", { className: "Mentor" });
+      const loaded = await findTarget(developer, "mentor", { className: "Mentor" });
       expect(loaded?.id).toBe(mentor.id);
     });
   });
@@ -832,7 +833,7 @@ describe("StrictLoadingTest", () => {
     treasure.strictLoadingBang();
     expect(treasure.isStrictLoading()).toBe(true);
 
-    await expect(loadBelongsTo(treasure, "looter", { polymorphic: true })).rejects.toThrow(
+    await expect(findTarget(treasure, "looter", { polymorphic: true })).rejects.toThrow(
       "`Treasure` is marked for strict_loading. " +
         "The polymorphic association named `:looter` cannot be lazily loaded.",
     );
@@ -853,7 +854,7 @@ describe("StrictLoadingTest", () => {
       logged = event.payload.reflection.strictLoadingViolationMessage(event.payload.owner);
     });
     try {
-      await loadBelongsTo(treasure, "looter", { polymorphic: true });
+      await findTarget(treasure, "looter", { polymorphic: true });
       expect(logged).toBe(
         "`Treasure` is marked for strict_loading. " +
           "The polymorphic association named `:looter` cannot be lazily loaded.",

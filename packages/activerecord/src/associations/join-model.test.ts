@@ -8,9 +8,10 @@
  * self-referential groups) are tracked as sibling stories.
  */
 import { describe, it, expect } from "vitest";
+import { findTarget } from "./singular-association.js";
 import { registerModel } from "../index.js";
 import { Base } from "../base.js";
-import { association, loadBelongsTo } from "../associations.js";
+import { association } from "../associations.js";
 import { AssociationTypeMismatch, ConfigurationError } from "../errors.js";
 import {
   HasManyThroughAssociationNotFoundError,
@@ -307,7 +308,7 @@ describe("AssociationsJoinModelTest", () => {
 
     expect(tagging.taggable_type).toBe("Post");
     expect(tagging.taggable_id).toBe(Number(thinking.id));
-    const taggable = (await loadBelongsTo(tagging, "taggable", { polymorphic: true })) as Base;
+    const taggable = (await findTarget(tagging, "taggable", { polymorphic: true })) as Base;
     expect(taggable.id).toBe(thinking.id);
   });
 
@@ -320,7 +321,7 @@ describe("AssociationsJoinModelTest", () => {
 
     expect(tagging.taggable_type).toBe("Post");
     expect(tagging.taggable_id).toBe(Number(post.id));
-    const taggable = (await loadBelongsTo(tagging, "taggable", { polymorphic: true })) as Base;
+    const taggable = (await findTarget(tagging, "taggable", { polymorphic: true })) as Base;
     expect(taggable.id).toBe(post.id);
   });
 
@@ -1144,7 +1145,7 @@ describe("AssociationsJoinModelTest", () => {
 
   it("polymorphic has many going through join model with custom foreign key", async () => {
     const tagging = await Tagging.find(taggings("welcome_general").id);
-    const superTag = (await loadBelongsTo(tagging, "superTag", {
+    const superTag = (await findTarget(tagging, "superTag", {
       className: "Tag",
       foreignKey: "super_tag_id",
     })) as Base;

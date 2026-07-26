@@ -7,6 +7,7 @@
  */
 
 import type { Base } from "../base.js";
+import { findTarget as _findBelongsToTarget } from "./singular-association.js";
 import { Association as AssociationInstance } from "./association.js";
 import { BelongsToAssociation } from "./belongs-to-association.js";
 import { BelongsToPolymorphicAssociation } from "./belongs-to-polymorphic-association.js";
@@ -15,7 +16,6 @@ import { HasManyThroughAssociation } from "./has-many-through-association.js";
 import { HasOneAssociation } from "./has-one-association.js";
 import { HasOneThroughAssociation } from "./has-one-through-association.js";
 import {
-  loadBelongsTo as _loadBelongsToOnce,
   loadHasOne as _loadHasOneOnce,
   _associationNotFound,
   _preloadedHolderTarget,
@@ -155,7 +155,7 @@ export function association(this: Base, name: string): AssociationInstance {
 export async function loadBelongsTo(this: Base, name: string): Promise<Base | null> {
   const assocDef = assertSingularAssociation.call(this, name, "belongsTo");
   const result = await bypassStrictLoading.call(this, () =>
-    _loadBelongsToOnce(this, name, (assocDef.options ?? {}) as any),
+    _findBelongsToTarget(this, name, (assocDef.options ?? {}) as any),
   );
   // Loader writeback: this is the tail of this function's own query, not a
   // caller replacing the target. See Association#_setTargetFromLoader.

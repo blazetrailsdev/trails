@@ -1,5 +1,6 @@
 import type { Base } from "./base.js";
-import { loadBelongsTo, loadHasOne } from "./associations.js";
+import { loadHasOne } from "./associations.js";
+import { findTarget } from "./associations/singular-association.js";
 import type { AssociationDefinition } from "./associations.js";
 import { upcaseFirst } from "@blazetrails/activesupport";
 
@@ -38,7 +39,7 @@ export function delegate(
 
         let target: Base | null = null;
         if (assocDef.type === "belongsTo") {
-          target = await loadBelongsTo(this, assocName, assocDef.options);
+          target = await findTarget(this, assocName, assocDef.options);
         } else if (assocDef.type === "hasOne") {
           target = await loadHasOne(this, assocName, assocDef.options);
         }

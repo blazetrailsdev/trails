@@ -2,6 +2,7 @@
  * Mirrors Rails activerecord/test/cases/associations/inverse_associations_test.rb
  */
 import { describe, it, expect, beforeAll } from "vitest";
+import { findTarget } from "./singular-association.js";
 import {
   Base,
   association,
@@ -11,7 +12,7 @@ import {
   InverseOfAssociationNotFoundError,
   InverseOfAssociationRecursiveError,
 } from "../index.js";
-import { loadBelongsTo, loadHasOne, loadHasMany } from "../associations.js";
+import { loadHasOne, loadHasMany } from "../associations.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Branch, BrokenBranch } from "../test-helpers/models/branch.js";
 import { Human } from "../test-helpers/models/human.js";
@@ -259,7 +260,7 @@ describe("AutomaticInverseFindingTests", () => {
     const comment = (await Comment.first())!;
     const rating = await Rating.createBang({ comment_id: (comment as any).id });
 
-    const ratingComment = (await loadBelongsTo(rating, "comment", { inverseOf: "ratings" })) as any;
+    const ratingComment = (await findTarget(rating, "comment", { inverseOf: "ratings" })) as any;
     expect(ratingComment.id).toBe((comment as any).id);
 
     ratingComment.body = "Fennec foxes are the smallest of the foxes.";
@@ -269,7 +270,7 @@ describe("AutomaticInverseFindingTests", () => {
   it("has many and belongs to automatic inverse shares objects on comment", async () => {
     const rating = await Rating.createBang({});
     const comment = (await Comment.first())!;
-    await loadBelongsTo(rating, "comment", { inverseOf: "ratings" });
+    await findTarget(rating, "comment", { inverseOf: "ratings" });
     (rating as any).comment = comment;
 
     expect((rating as any).comment).toBe(comment);
@@ -833,9 +834,9 @@ describe("InverseHasManyTests", () => {
     const post1 = (await Post.first())!;
     const post2 = (await Post.all().order("id").offset(1).first())!;
     const comment = (await loadHasMany(post1, "comments", { inverseOf: "post" }))[0] as any;
-    expect(await loadBelongsTo(comment, "post", { inverseOf: "comments" })).toBe(post1);
+    expect(await findTarget(comment, "post", { inverseOf: "comments" })).toBe(post1);
     await comment.updateBang({ post_id: (post2 as any).id });
-    const reloaded = (await loadBelongsTo(comment, "post", { inverseOf: "comments" })) as any;
+    const reloaded = (await findTarget(comment, "post", { inverseOf: "comments" })) as any;
     expect(reloaded.id).toBe((post2 as any).id);
   });
 });
@@ -848,7 +849,7 @@ describe("InverseBelongsToTests", () => {
 
   it("child instance should be shared with parent on find", async () => {
     const face = faces("trusting");
-    const human = (await loadBelongsTo(face, "human", { inverseOf: "face" }))!;
+    const human = (await findTarget(face, "human", { inverseOf: "face" }))!;
     expect((human as any).face.description).toBe((face as any).description);
     (face as any).description = "gormless";
     expect((human as any).face.description).toBe((face as any).description);
@@ -900,7 +901,7 @@ describe("InverseBelongsToTests", () => {
 
   it("should not try to set inverse instances when the inverse is a has many", async () => {
     const interest = interests("trainspotting");
-    const human = (await loadBelongsTo(interest, "human", { inverseOf: "interests" }))!;
+    const human = (await findTarget(interest, "human", { inverseOf: "interests" }))!;
     // Rails: human.interests.detect { |_iz| _iz.id == interest.id } — block-find
     // over the CollectionProxy (Enumerable#detect loads the target), not the AR
     // PK finder.
@@ -916,7 +917,7 @@ describe("InverseBelongsToTests", () => {
   it("with has many inversing should try to set inverse instances when the inverse is a has many", async () => {
     await withHasManyInversing(Human, async () => {
       const interest = interests("trainspotting");
-      const human = (await loadBelongsTo(interest, "human", { inverseOf: "interests" })) as any;
+      const human = (await findTarget(interest, "human", { inverseOf: "interests" })) as any;
       const cached = human._associationCache("interests")?.target as any[];
       const iz = cached.find((i: any) => i.id === (interest as any).id);
       expect(iz).toBeDefined();
@@ -941,7 +942,7 @@ describe("InverseBelongsToTests", () => {
   it("with has many inversing does not trigger association callbacks on set when the inverse is a has many", async () => {
     await withHasManyInversing(Interest, async () => {
       const interest = interests("trainspotting");
-      const human = (await loadBelongsTo(interest, "humanWithCallbacks", {
+      const human = (await findTarget(interest, "humanWithCallbacks", {
         className: "Human",
         foreignKey: "human_id",
         inverseOf: "interestsWithCallbacks",
@@ -983,23 +984,23 @@ describe("InverseBelongsToTests", () => {
 
   it("unscope does not set inverse when incorrect", async () => {
     const interest = interests("trainspotting");
-    const human = (await loadBelongsTo(interest, "human", { inverseOf: "interests" }))!;
+    const human = (await findTarget(interest, "human", { inverseOf: "interests" }))!;
     const createdHuman = await Human.create({ name: "wrong human" });
     const foundInterest = await (createdHuman as any).interests
       .or((human as any).interests)
       .detect((thisInterest: any) => (interest as any).id === thisInterest.id);
-    const foundHuman = await loadBelongsTo(foundInterest, "human", { inverseOf: "interests" });
+    const foundHuman = await findTarget(foundInterest, "human", { inverseOf: "interests" });
     expect((foundHuman as any).id).toBe((human as any).id);
   });
 
   it("or does not set inverse when incorrect", async () => {
     const interest = interests("trainspotting");
-    const human = (await loadBelongsTo(interest, "human", { inverseOf: "interests" }))!;
+    const human = (await findTarget(interest, "human", { inverseOf: "interests" }))!;
     const createdHuman = await Human.create({ name: "wrong human" });
     const foundInterest = await (createdHuman as any).interests
       .unscope("where")
       .detect((thisInterest: any) => (interest as any).id === thisInterest.id);
-    const foundHuman = await loadBelongsTo(foundInterest, "human", { inverseOf: "interests" });
+    const foundHuman = await findTarget(foundInterest, "human", { inverseOf: "interests" });
     expect((foundHuman as any).id).toBe((human as any).id);
   });
 
@@ -1018,13 +1019,13 @@ describe("InverseBelongsToTests", () => {
   it("trying to use inverses that dont exist should raise an error", async () => {
     const face = (await Face.first())!;
     await expect(
-      loadBelongsTo(face, "confusedHuman", { className: "Human", inverseOf: "cnffusedFace" }),
+      findTarget(face, "confusedHuman", { className: "Human", inverseOf: "cnffusedFace" }),
     ).rejects.toThrow(InverseOfAssociationNotFoundError);
   });
 
   it("trying to use inverses that dont exist should have suggestions for fix", async () => {
     const face = (await Face.first())!;
-    const err = await loadBelongsTo(face, "confusedHuman", {
+    const err = await findTarget(face, "confusedHuman", {
       className: "Human",
       inverseOf: "cnffusedFace",
     }).catch((e) => e);
@@ -1052,7 +1053,7 @@ describe("InversePolymorphicBelongsToTests", () => {
 
   it("child instance should be shared with parent on find", async () => {
     const face = faces("confused");
-    const human = (await loadBelongsTo(face, "polymorphicHuman", {
+    const human = (await findTarget(face, "polymorphicHuman", {
       polymorphic: true,
       inverseOf: "polymorphicFace",
     })) as any;
@@ -1065,7 +1066,7 @@ describe("InversePolymorphicBelongsToTests", () => {
 
   it("eager loaded child instance should be shared with parent on find", async () => {
     let face = (await Face.where({ description: "confused" }).includes("human"))[0] as any;
-    let human = (await loadBelongsTo(face, "polymorphicHuman", {
+    let human = (await findTarget(face, "polymorphicHuman", {
       polymorphic: true,
       inverseOf: "polymorphicFace",
     })) as any;
@@ -1078,7 +1079,7 @@ describe("InversePolymorphicBelongsToTests", () => {
     face = (
       await Face.where({ description: "confused" }).includes("human").order("humans.id")
     )[0] as any;
-    human = (await loadBelongsTo(face, "polymorphicHuman", {
+    human = (await findTarget(face, "polymorphicHuman", {
       polymorphic: true,
       inverseOf: "polymorphicFace",
     })) as any;
@@ -1160,7 +1161,7 @@ describe("InversePolymorphicBelongsToTests", () => {
 
   it("should not try to set inverse instances when the inverse is a has many", async () => {
     const interest = interests("llama_wrangling");
-    const human = (await loadBelongsTo(interest, "polymorphicHuman", {
+    const human = (await findTarget(interest, "polymorphicHuman", {
       polymorphic: true,
       inverseOf: "polymorphicInterests",
     })) as any;
@@ -1177,7 +1178,7 @@ describe("InversePolymorphicBelongsToTests", () => {
   it("with has many inversing should try to set inverse instances when the inverse is a has many", async () => {
     await withHasManyInversing(Human, async () => {
       const interest = interests("llama_wrangling");
-      const human = (await loadBelongsTo(interest, "polymorphicHuman", {
+      const human = (await findTarget(interest, "polymorphicHuman", {
         polymorphic: true,
         inverseOf: "polymorphicInterests",
       })) as any;
@@ -1202,7 +1203,7 @@ describe("InversePolymorphicBelongsToTests", () => {
 
   it("trying to access inverses that dont exist shouldnt raise an error", async () => {
     const face = (await Face.first())!;
-    await loadBelongsTo(face, "puzzledPolymorphicHuman", {
+    await findTarget(face, "puzzledPolymorphicHuman", {
       polymorphic: true,
       inverseOf: "puzzledPolymorphicFace",
     });
@@ -1240,8 +1241,8 @@ describe("InverseMultipleHasManyInversesForSameModel", () => {
 
   it("that we can load associations that have the same reciprocal name from different models", async () => {
     const interest = (await Interest.first())!;
-    await loadBelongsTo(interest, "zine", { inverseOf: "interests" });
-    await loadBelongsTo(interest, "human", { inverseOf: "interests" });
+    await findTarget(interest, "zine", { inverseOf: "interests" });
+    await findTarget(interest, "human", { inverseOf: "interests" });
   });
 
   it("that we can create associations that have the same reciprocal name from different models", async () => {
@@ -1276,7 +1277,7 @@ describe("InverseBelongsToTests", () => {
       const main = await BrokenBranch.create({});
       const feature = await association(main, "branches").create({});
       const topic = association(feature, "branches").build({});
-      const err = await loadBelongsTo(topic, "branch", {
+      const err = await findTarget(topic, "branch", {
         className: "BrokenBranch",
         inverseOf: "branch",
       }).catch((e) => e);

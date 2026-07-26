@@ -49,7 +49,6 @@ export {
   Associations,
   registerModel,
   modelRegistry,
-  loadBelongsTo,
   loadHasOne,
   buildHasOne,
   buildBelongsTo,
