@@ -1251,6 +1251,27 @@ export function hasInternalJsDocTag(node: ts.Node): boolean {
 }
 
 /**
+ * True when the callable a mixin-object entry references (`qux,` /
+ * `foo: NS.bar`) is itself declared `@internal`. A Rails-style mixin object
+ * re-exports one declaration under many hosts — model-schema.ts's
+ * `ClassMethods` entry, base.ts's `Base` class surface, index.ts's re-export —
+ * so the internal-ness has to be read off the single declaration rather than
+ * re-tagged at every install site.
+ */
+function isInternalSymbol(symbol: ts.Symbol | undefined, checker: ts.TypeChecker): boolean {
+  // A shorthand's own name resolves to the *property* symbol, so callers must
+  // hand in the value symbol; an import binding resolves to an alias, whose
+  // JSDoc lives on the aliased declaration.
+  let target = symbol;
+  if (target && target.flags & ts.SymbolFlags.Alias) target = checker.getAliasedSymbol(target);
+  return (target?.declarations ?? []).some((d) => hasInternalJsDocTag(d));
+}
+
+function isInternalCallableRef(expr: ts.Expression, checker: ts.TypeChecker): boolean {
+  return isInternalSymbol(checker.getSymbolAtLocation(expr), checker);
+}
+
+/**
  * Extract method names from an object literal — covers the four shapes
  * Rails-style mixin modules use:
  *
@@ -1280,6 +1301,7 @@ export function harvestObjectLiteralMethods(
     let params: ParamInfo[] = [];
     let optionKeys: string[] | null | undefined;
     let calls: string[] | undefined;
+    let internal = hasInternalJsDocTag(prop);
     if (ts.isMethodDeclaration(prop) && prop.name && ts.isIdentifier(prop.name)) {
       mname = prop.name.text;
       params = extractParameters(prop.parameters);
@@ -1288,6 +1310,7 @@ export function harvestObjectLiteralMethods(
     } else if (ts.isShorthandPropertyAssignment(prop)) {
       mname = prop.name.text;
       params = paramsOfCallableRef(prop.name, checker) ?? [];
+      internal = isInternalSymbol(checker.getShorthandAssignmentValueSymbol(prop), checker);
     } else if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
       const init = prop.initializer;
       if (ts.isFunctionExpression(init) || ts.isArrowFunction(init)) {
@@ -1303,6 +1326,7 @@ export function harvestObjectLiteralMethods(
         if (resolved) {
           mname = prop.name.text;
           params = resolved;
+          internal = isInternalCallableRef(init, checker);
         }
       }
     }
@@ -1314,6 +1338,7 @@ export function harvestObjectLiteralMethods(
       params,
       line,
       file,
+      ...(internal ? { internal: true } : {}),
       ...(optionKeys !== undefined ? { optionKeys } : {}),
       ...(calls !== undefined ? { calls } : {}),
     });
