@@ -475,7 +475,11 @@ export class HasOneAssociation extends SingularAssociation {
     // class. For an STI subclass owner (a `SpecialPost` whose
     // `has_one :very_special_comment` is declared on `Post`) that is `post_id`,
     // not `special_post_id`. The rich reflection already applies that rule.
-    const declared = ctor._reflectOnAssociation?.(this.reflection.name)?.foreignKey;
+    const declared = (
+      ctor as {
+        _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | undefined;
+      }
+    )._reflectOnAssociation?.(this.reflection.name)?.foreignKey;
     if (typeof declared === "string") return [declared];
     if (Array.isArray(declared)) return declared;
     const pk = this.reflection.options.primaryKey ?? ctor.primaryKey ?? "id";
