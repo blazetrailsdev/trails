@@ -109,6 +109,35 @@ function filterHashKeys(keys: unknown[], options: NormalizedOptions): Set<unknow
   return new Set(keys);
 }
 
+/**
+ * String-aware comment removal: quoted spans (and their backslash escapes) are
+ * copied verbatim so a comment marker inside a JSON string survives.
+ */
+function stripJsonComments(value: string): string {
+  let out = "";
+  let index = 0;
+  while (index < value.length) {
+    const char = value[index];
+    if (char === '"') {
+      const start = index++;
+      while (index < value.length && value[index] !== '"') {
+        index += value[index] === "\\" ? 2 : 1;
+      }
+      out += value.slice(start, ++index);
+    } else if (char === "/" && value[index + 1] === "*") {
+      const end = value.indexOf("*/", index + 2);
+      index = end === -1 ? value.length : end + 2;
+    } else if (char === "/" && value[index + 1] === "/") {
+      const end = value.indexOf("\n", index + 2);
+      index = end === -1 ? value.length : end;
+    } else {
+      out += char;
+      index++;
+    }
+  }
+  return out;
+}
+
 export namespace ActiveSupportJSON {
   // Rails: `ActiveSupport::JSON.encode` runs the `as_json` traversal
   // unconditionally, options or not (encoding.rb:22-25) — the options-only
@@ -118,7 +147,18 @@ export namespace ActiveSupportJSON {
     return JSON.stringify(resolved) ?? "null";
   }
 
+  /**
+   * Ruby's JSON parser — what `ActiveSupport::JSON.decode` delegates to — skips
+   * block and line comments anywhere whitespace is allowed, while `JSON.parse`
+   * rejects them. The retry runs only after a parse failure, so valid documents
+   * (where a comment marker can only be inside a string) are untouched.
+   */
   export function decode(value: string): unknown {
-    return JSON.parse(value);
+    try {
+      return JSON.parse(value);
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
+      return JSON.parse(stripJsonComments(value));
+    }
   }
 }
