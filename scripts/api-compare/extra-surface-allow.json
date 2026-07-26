@@ -189,19 +189,19 @@
     "package": "activerecord",
     "tsFile": "inheritance.ts",
     "name": "enableSti",
-    "reason": "Setter for the `inheritance_column` class_attribute (`class_attribute :inheritance_column, instance_writer: false, default: \"type\"`, model_schema.rb). Rails generates the `inheritance_column=` writer metaprogrammatically, so the Ruby extractor — which records only literal `def`s — has no counterpart to match. trails additionally uses the slot's presence as the STI-enabled sentinel (`stiEnabled`), which is why the writer is named for the effect rather than the attribute."
+    "reason": "CONVERGENCE PENDING — story `converge-enablesti-onto-inheritance-column-setter`. Rails has no `enable_sti`: STI is implicit and the column is named by assignment (`self.inheritance_column = 'zoink'`, model_schema.rb:146-151; `class_attribute :inheritance_column, instance_accessor: false, default: \"type\"` at model_schema.rb:172). The faithful writer is already ported and wired — `ModelSchema.inheritanceColumn` behind the Rails-named `Base.inheritanceColumn` setter (base.ts:1653) — so `enableSti(X)` is spelled `X.inheritanceColumn = ...`. Allowlisted to hold the count while the 93 call sites migrate; not a permanent exemption."
   },
   {
     "package": "activerecord",
     "tsFile": "inheritance.ts",
     "name": "getInheritanceColumn",
-    "reason": "Reader for the `inheritance_column` class_attribute (model_schema.rb). Rails generates the reader metaprogrammatically via `class_attribute`, so the Ruby extractor records no literal `def inheritance_column` to match against."
+    "reason": "CONVERGENCE PENDING — story `converge-inheritance-column-reader-onto-ported-nullable`. The faithful reader is already ported: `ModelSchema.inheritanceColumn` (model-schema.ts) returns `null` for `self.inheritance_column = nil` and is exposed as `Base.inheritanceColumn` (base.ts:1649). `getInheritanceColumn` flattens that `null` to `\"type\"`, which is why trails also needs the Rails-less `inheritanceColumnDisabled` predicate to recover the discarded information. Allowlisted to hold the count while callers move to the nullable reader; not a permanent exemption."
   },
   {
     "package": "activerecord",
     "tsFile": "inheritance.ts",
     "name": "instantiateSti",
-    "reason": "Free-function form of Rails' STI construction path `instantiate` -> `discriminate_class_for_record` -> `find_sti_class` (inheritance.rb:299-321). Rails overrides `Persistence::ClassMethods#instantiate` in place; trails cannot override a static across the mixin boundary, so the STI-dispatching constructor is a separate named entry point and `instantiate` stays the plain one. The class decision itself lives in the ported `discriminateClassForRecord`."
+    "reason": "CONVERGENCE PENDING — story `converge-instantiatesti-into-ported-instantiate`. Rails has one entry point, not two: `Persistence::ClassMethods#instantiate` (persistence.rb:100-103) is `discriminate_class_for_record` + `instantiate_instance_of`, and trails' persistence.ts `instantiate` already reproduces that. `instantiateSti` is a second hydration path wrapping the private `directInstantiate`, kept only because the recursion guard in `base.ts:_instantiate` compares the stored type value against the JS class `name` — which diverges from `stiName` for a `storeFullStiClass` namespaced model. Allowlisted to hold the count while the guard is converged to an identity comparison; not a permanent exemption."
   },
   {
     "package": "activerecord",
