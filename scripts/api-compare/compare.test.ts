@@ -249,12 +249,19 @@ describe("significantMissingCalls", () => {
       expect(isDelegatingWrapper("indexes", new Set(["pgSchemaStatements"]))).toBe(false);
     });
 
+    it("stops reading a body as a wrapper past the call-count threshold", () => {
+      // The threshold is the whole safety mechanism: it is what keeps a real body
+      // that happens to call its own name from buying transparency. Pin both
+      // sides of the boundary so widening it is a deliberate edit.
+      const atLimit = new Set(["indexes", "pgSchemaStatements", "clearDataSourceCacheBang"]);
+      expect(isDelegatingWrapper("indexes", atLimit)).toBe(true);
+      expect(isDelegatingWrapper("indexes", new Set([...atLimit, "schemaQuery"]))).toBe(false);
+    });
+
     it("compares a wrapper against the delegate's call-set", () => {
       const merged = effectiveTsCalls("indexes", wrapper, () => delegate);
       // The wrapper's own calls survive; the delegate's are added.
-      expect([...merged].sort()).toEqual(
-        ["columnNamesFromColumnNumbers", "indexes", "join", "map", "pgSchemaStatements", "schemaQuery"], // prettier-ignore
-      );
+      expect(merged).toEqual(new Set([...wrapper, ...delegate]));
     });
 
     it("leaves a non-wrapper body's call-set untouched", () => {

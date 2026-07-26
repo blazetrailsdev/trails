@@ -173,10 +173,14 @@ const SIGNIFICANT_CALLS = new Set([
 // justified by the non-call construct it becomes.
 //
 // A name qualifies either because NO JS call form exists (`to_s`, `each`), or
-// because the only JS call form belongs to a receiver shape the ports don't use
-// (`key?` → `Map#has`, where Rails' hashes port to object literals). Names in the
-// second group keep their JS_ENUMERABLE_ALIASES entry: the alias is unreachable
-// from here, but lint-calls.ts still consumes the table's KEYS as its noise list.
+// because the only JS call form belongs to a receiver shape the ports don't use:
+// `key?`/`has_key?` alias to `Map#has`, but Rails' options/params hashes port to
+// object literals, whose membership tests are the `in` operator, `x.k !== undefined`,
+// or destructuring with a default. The gate cannot tell a faithful `"k" in opts`
+// from a dropped guard either way, so keeping them would baseline every
+// options-hash port forever with no way to ever discharge it. Names in this second
+// group keep their JS_ENUMERABLE_ALIASES entry: the alias is unreachable from here,
+// but lint-calls.ts still consumes the table's KEYS as its noise list.
 //
 // DELIBERATELY NOT suppressed — `size`, `empty?`, `first`, `last`: these read as
 // plain Array/property idioms (`xs.length`, `xs.length === 0`, `xs[0]`, `xs.at(-1)`)
@@ -196,14 +200,8 @@ export const WIDE_NO_JS_CALL_FORM = new Set([
   "present?", // truthiness (`x != null && x !== ""`)
   "blank?", // truthiness (`!x`)
   "to_str", // implicit String coercion — same family as `to_s`
-  // Ruby `key?`/`has_key?` on an options/params Hash. The idiom table's only JS
-  // form is `Map#has`, but Rails' hashes port to TS object literals, whose
-  // membership tests are the `in` operator, `x.k !== undefined`, or destructuring
-  // with a default — none of which record a callee. The gate cannot tell a
-  // faithful `"k" in opts` from a dropped guard, so keeping these would baseline
-  // every options-hash port forever with no way to ever discharge it.
-  "key?",
-  "has_key?",
+  "key?", // `"k" in opts` / `opts.k !== undefined` on a ported options object
+  "has_key?", // ditto
 ]);
 
 // Opt-in WIDE significant set (RFC 0047): admits EVERY ported Ruby call name as
