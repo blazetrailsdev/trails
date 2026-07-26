@@ -636,10 +636,6 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
                 ? decl.initializer.body
                 : undefined;
             const calls = extractCalls(body);
-            // `export const foo = makeFoo(...)` reaches fileFunctions only
-            // through this export-symbol path, so the `@internal` tag has to
-            // be read here too — for a VariableDeclaration the JSDoc hangs off
-            // the enclosing VariableStatement, which getJSDocTags walks up to.
             const internal = hasInternalJsDocTag(decl);
             fileFunctions.push({
               name: sym.name,
