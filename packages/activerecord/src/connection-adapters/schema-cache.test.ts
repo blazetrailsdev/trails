@@ -475,7 +475,7 @@ describe("SchemaCacheTest", () => {
     const cache = new SchemaCache();
     cache.setColumns("users", [makeColumn("id", "integer")]);
     // setColumns populates both _columns and _columnsHash
-    expect(cache.isColumnsHashCached(null, "users")).toBe(true);
+    expect(cache.isColumnsHash(null, "users")).toBe(true);
     // Also verify columnsHash() returns the expected data
     const hash = await cache.columnsHash(null, "users");
     expect(hash!["id"]).toBeInstanceOf(Column);
@@ -484,7 +484,7 @@ describe("SchemaCacheTest", () => {
   it("#columns_hash? is not populated by #data_source_exists?", () => {
     const cache = new SchemaCache();
     cache.setDataSourceExists("users", true);
-    expect(cache.isColumnsHashCached(null, "users")).toBe(false);
+    expect(cache.isColumnsHash(null, "users")).toBe(false);
   });
 
   it("keeps _columns and _columnsHash in sync across set and clear", () => {
@@ -492,14 +492,14 @@ describe("SchemaCacheTest", () => {
     // the same map they read. That only stays safe if the two column maps are
     // populated and cleared together: setColumns must warm both, and
     // clearDataSourceCacheBang must drop both, so isCached and
-    // isColumnsHashCached never disagree for a given table.
+    // isColumnsHash never disagree for a given table.
     const cache = new SchemaCache();
     cache.setColumns("users", [makeColumn("id", "integer")]);
-    expect(cache.isCached("users")).toBe(cache.isColumnsHashCached(null, "users"));
+    expect(cache.isCached("users")).toBe(cache.isColumnsHash(null, "users"));
     expect(cache.isCached("users")).toBe(true);
 
     cache.clearDataSourceCacheBang(null, "users");
-    expect(cache.isCached("users")).toBe(cache.isColumnsHashCached(null, "users"));
+    expect(cache.isCached("users")).toBe(cache.isColumnsHash(null, "users"));
     expect(cache.isCached("users")).toBe(false);
   });
 

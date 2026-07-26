@@ -278,10 +278,24 @@ export class SchemaCache {
     return undefined;
   }
 
-  isColumnsHashCached(_pool: unknown, tableName: string): boolean {
+  // Rails: columns_hash?(_pool, table_name) — "checks whether the columns hash
+  // is already cached for a table" (schema_cache.rb:359).
+  isColumnsHash(_pool: unknown, tableName: string): boolean {
     return this._columnsHash.has(tableName);
   }
 
+  /**
+   * Synchronous, query-free read of an already-warmed columns hash. Rails has
+   * no counterpart: `columns_hash(pool, table)` is its only accessor, and in
+   * Ruby it can block on a connection checkout when the entry is cold. The
+   * trails callers here are genuinely synchronous and cannot await —
+   * `Model.columnsHash()` / `columnNames()` / `columnForAttribute()`
+   * (`model-schema.ts:338`, `:391`) are Rails-sync accessors reached from
+   * attribute-method definition and from user code that never awaits. They
+   * pair this with {@link isColumnsHash} (the same `_columnsHash` map) so a
+   * cold table falls through to the async `columnsHash` path instead of
+   * silently reporting an empty schema.
+   */
   getCachedColumnsHash(tableName: string): Record<string, Column> | undefined {
     return this._columnsHash.get(tableName);
   }
@@ -423,6 +437,20 @@ export class SchemaCache {
     this._indexes.delete(name);
   }
 
+  /**
+   * Populate the columns / columns-hash / data-source entries for a table from
+   * columns the caller has *already* reflected. Rails has no sync writer — its
+   * only population path is `add(pool, table_name)`, which issues the
+   * introspection queries itself behind a blocking `with_connection`.
+   *
+   * trails needs the split because the reflecting caller is already inside an
+   * `await` and holds the result: `AbstractAdapter#columns`
+   * (`abstract-adapter.ts:2460`) awaits the adapter's own `columns()` query and
+   * then hands the rows here, so routing through `add()` would re-issue the
+   * same query on a second checkout. It also warms `_dataSourceExists` — a
+   * table whose columns just came back demonstrably exists — which is what lets
+   * the sync readers above answer without a query.
+   */
   setColumns(tableName: string, cols: Column[]): void {
     this.reconcilePrimaryKeyFlags(tableName, cols);
     this._columns.set(tableName, cols);
@@ -434,6 +462,20 @@ export class SchemaCache {
     this._dataSourceExists.set(tableName, true);
   }
 
+  /**
+   * Sync counterpart of {@link setColumns} for the authoritative primary key.
+   * No Rails counterpart for the same reason: `add()` runs the `primary_keys`
+   * query itself. Here the key has already been resolved by the awaiting
+   * caller — `loadSchemaFromAdapter` (`model-schema.ts`) awaits
+   * `adapter.primaryKey(table)` alongside `columns()` and warms both maps — so
+   * {@link getCachedPrimaryKeys} can answer the sync
+   * `Model.primaryKey` accessor (`attribute-methods/primary-key.ts:218`)
+   * without a query.
+   *
+   * Order-independent with {@link setColumns}: whichever lands second runs
+   * {@link reconcilePrimaryKeyFlags}, so the authoritative key always wins over
+   * a column-reflected flag.
+   */
   setPrimaryKeys(tableName: string, pk: string | string[] | null): void {
     this._primaryKeys.set(tableName, pk);
     const cols = this._columns.get(tableName);
@@ -475,6 +517,21 @@ export class SchemaCache {
     }
   }
 
+  /**
+   * Sync writer for the data-source-existence map, completing the
+   * {@link setColumns} / {@link setPrimaryKeys} trio. Rails populates this only
+   * as a side effect of `data_source_exists?(pool, name)`, which blocks on the
+   * query and so can warm the map from a test with no pool; the ported Rails
+   * test `#columns_hash? is not populated by #data_source_exists?`
+   * (`schema_cache_test.rb`) relies on exactly that. The trails port has no
+   * blocking call to lean on, so the pool-less callers — that Rails test and
+   * the `SchemaCache` fixture setup around it — seed the map through this
+   * writer instead of standing up a fake pool per assertion.
+   *
+   * @internal Test-harness seeding only; production warming goes through
+   * {@link setColumns} (which sets `true` for a table whose columns just came
+   * back) or the async `dataSourceExists` query.
+   */
   setDataSourceExists(tableName: string, exists: boolean): void {
     this._dataSourceExists.set(tableName, exists);
   }
@@ -706,9 +763,9 @@ export class SchemaReflection {
     return (await this.cache(pool)).columnsHash(pool, tableName);
   }
 
-  isColumnsHashCached(pool: unknown, tableName: string): boolean {
+  isColumnsHash(pool: unknown, tableName: string): boolean {
     this.ensureSyncCache();
-    return this._cache?.isColumnsHashCached(pool, tableName) ?? false;
+    return this._cache?.isColumnsHash(pool, tableName) ?? false;
   }
 
   async indexes(pool: unknown, tableName: string): Promise<unknown[]> {
@@ -765,7 +822,7 @@ export class SchemaReflection {
   /**
    * Attempt to populate _cache synchronously from disk when version
    * checking is disabled. Used by sync-only paths (isCached, size,
-   * isColumnsHashCached) that can't await.
+   * isColumnsHash) that can't await.
    */
   private ensureSyncCache(): void {
     if (this._cache) return;
@@ -894,8 +951,8 @@ export class BoundSchemaReflection {
     return this._schemaReflection.columnsHash(this._pool, tableName);
   }
 
-  isColumnsHashCached(tableName: string): boolean {
-    return this._schemaReflection.isColumnsHashCached(this._pool, tableName);
+  isColumnsHash(tableName: string): boolean {
+    return this._schemaReflection.isColumnsHash(this._pool, tableName);
   }
 
   async indexes(tableName: string): Promise<unknown[]> {

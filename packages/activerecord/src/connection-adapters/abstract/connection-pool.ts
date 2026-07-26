@@ -224,7 +224,22 @@ export class LeaseRegistry {
     return lease;
   }
 
-  peek(context: string): Lease | undefined {
+  /**
+   * Non-creating lookup — the read-only counterpart of {@link get} (Rails'
+   * `[]`, which memoizes a fresh `Lease` on miss). Rails' callers here
+   * (`remove_connection_from_thread_cache`, and the disconnect/reload sweep's
+   * per-connection clear) can use `[]` freely because `@map` is a
+   * `WeakThreadKeyMap` keyed by live Thread objects: an entry created for a
+   * thread that never leased is collected with the thread. Trails' `_map` is a
+   * plain `Map` keyed by the *string* `executionContextId()`, which nothing
+   * ever collects, so `get`-on-miss would grow the registry by one dead Lease
+   * per context the sweep touches. Those two clear-only paths therefore read
+   * through this instead.
+   *
+   * `_`-prefixed (repo Rails-private convention): file-internal, no callers
+   * outside connection-pool.ts.
+   */
+  _peek(context: string): Lease | undefined {
     return this._map.get(context);
   }
 
@@ -248,6 +263,16 @@ type ConnectionHandlerLike = {
 export class ExecutorHooks {
   private static _getConnectionHandler: (() => ConnectionHandlerLike | null) | null = null;
 
+  /**
+   * Install the lazy resolver backing {@link connectionHandler}. Rails needs no
+   * such hook: `complete` just references the `ActiveRecord::Base` constant,
+   * which Ruby resolves at call time. In TS an import of `Base` from this
+   * module would be a module-level cycle (Base → connection handling → pool),
+   * so `index.ts` — the one module that has both sides loaded — calls this once
+   * at wire-up time to hand the pool a getter instead.
+   *
+   * @internal Wiring only; called exactly once, from `index.ts`.
+   */
   static setConnectionHandlerResolver(resolver: () => ConnectionHandlerLike | null): void {
     ExecutorHooks._getConnectionHandler = resolver;
   }
@@ -516,6 +541,20 @@ export class ConnectionPool implements ReapablePool {
     return this._cacheConfig.dirtiesQueryCache;
   }
 
+  /**
+   * True when this pool's `query_cache:` config is literally `false`, i.e. the
+   * cache is disabled by configuration rather than merely not enabled right now.
+   *
+   * Rails has no such reader: `QueryCache::ExecutorHooks.run` asks inline with
+   * `next if pool.db_config&.query_cache == false` (query_cache.rb). Trails
+   * normalizes `query_cache` at pool construction into
+   * `ConnectionPoolConfiguration` (`normalizeQueryCacheConfig`), so the raw
+   * `false` is no longer readable off `dbConfig` at that point — this getter is
+   * the named form of Rails' inline predicate, delegating to the same
+   * normalized flag. Consumed by `QueryCache.run`'s skip guard
+   * (`query-cache.ts:107`), whose `QueryCacheRunTarget` interface is satisfied
+   * by both pools and the connection-level mixin.
+   */
   get queryCacheDisabled(): boolean {
     return this._cacheConfig.queryCacheDisabled;
   }
@@ -1086,7 +1125,7 @@ export class ConnectionPool implements ReapablePool {
         // withNewConnectionsBlocked's reseed.
         if (this._checkedOut.has(conn)) {
           this._checkedOut.delete(conn);
-          this._leases?.peek(ctx)?.clear(conn);
+          this._leases?._peek(ctx)?.clear(conn);
           // Mirror Rails' `checkin` (which calls `expire`): clear the in-use
           // flag so a survivor re-entering `_available` can be re-leased.
           (conn as unknown as { expire?: () => void }).expire?.();
@@ -1181,7 +1220,7 @@ export class ConnectionPool implements ReapablePool {
    *
    * @internal
    */
-  trackCloseDrain(drain: Promise<void> | undefined): void {
+  _trackCloseDrain(drain: Promise<void> | undefined): void {
     if (!drain) return;
     this._pendingCloseDrains.add(drain);
     const forget = (): void => {
@@ -1191,7 +1230,7 @@ export class ConnectionPool implements ReapablePool {
   }
 
   /**
-   * Await every async close stashed by {@link trackCloseDrain} (currently the
+   * Await every async close stashed by {@link _trackCloseDrain} (currently the
    * checkout-failure swap discard) so an async-only driver's handle is fully
    * closed before the caller re-opens the same DB. Resolves immediately when
    * nothing is in flight (the sync-driver case).
@@ -1775,7 +1814,7 @@ function removeConnectionFromThreadCache(
   ownerThread?: string | number,
 ): void {
   const owner = ownerThread ?? executionContextId();
-  pool._leases?.peek(String(owner))?.clear(conn);
+  pool._leases?._peek(String(owner))?.clear(conn);
 }
 
 /** @internal */
@@ -1892,7 +1931,7 @@ function checkoutAndVerify(pool: Pool, c: DatabaseAdapter): DatabaseAdapter {
     // can't await under its sync contract; stash it on the pool so a caller can
     // drain it (pool.drainPendingCloses) before re-opening the same DB. Sync
     // drivers contribute a resolved no-op.
-    pool.trackCloseDrain((c as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.());
+    pool._trackCloseDrain((c as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.());
     throw err;
   }
 }

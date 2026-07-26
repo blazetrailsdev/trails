@@ -632,7 +632,7 @@ describe("ConnectionPool schema cache", () => {
       // Adapter-visible raw cache is propagated so synchronous consumers
       // (Model.columnNames) see the introspected columns without a DB hit.
       expect(pool.poolConfig.schemaCache).not.toBeNull();
-      expect(pool.poolConfig.schemaCache!.isColumnsHashCached(null, "posts")).toBe(true);
+      expect(pool.poolConfig.schemaCache!.isColumnsHash(null, "posts")).toBe(true);
     } finally {
       SchemaReflection.eagerLoadSchemaCache = prevEager;
       await closePoolConnections(pool);

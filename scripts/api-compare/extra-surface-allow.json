@@ -292,5 +292,131 @@
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "name": "dropRange",
     "reason": "Rails has no range-type DDL helper anywhere — ranges are created with a raw `execute(\"CREATE TYPE … AS RANGE\")`. trails adds `createRange`/`dropRange` following Rails' own type-DDL helpers (create_enum/drop_enum/rename_enum, postgresql_adapter.rb:541-615), including their `reload_type_map` epilogue; the implementation and the full justification live at the emitting call site, connection-adapters/postgresql/schema-statements-class.ts. Deliberately PostgreSQL-only: the no-op stubs that shadowed these on AbstractAdapter were deleted rather than allowlisted, since Rails stubs only the enum quartet on the base."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/schema-cache.ts",
+    "name": "getCachedColumnsHash",
+    "reason": "Sync, query-free read of an already-warmed columns hash. Rails' only accessor is `columns_hash(pool, table)` (schema_cache.rb:352), which blocks on a connection checkout when cold. Trails' callers are genuinely synchronous and cannot await: `Model.columnsHash()` / `columnNames()` / `columnForAttribute()` (model-schema.ts:338, :391) are Rails-sync accessors reached from attribute-method definition and from user code. Paired with `columns_hash?` (`isColumnsHash`) so a cold table falls through to the async path rather than reporting an empty schema. Justification at the declaration."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/schema-cache.ts",
+    "name": "getCachedPrimaryKeys",
+    "reason": "Sync, query-free read of an already-cached primary key, backing the sync `Model.primaryKey` accessor (attribute-methods/primary-key.ts:218). Rails' `primary_keys(pool, table)` blocks on the query instead. Also derives the key from warm columns' `primaryKey` flags so `id: false` custom-PK tables resolve after a columns-only warm. Full rationale, including the deliberate `undefined`-not-`null` fall-through and the MySQL adapter-scoping, is at the declaration."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/schema-cache.ts",
+    "name": "getCachedDataSourceExists",
+    "reason": "Sync, query-free read of an already-resolved `data_source_exists?` answer, for the sync `Model` schema probe in model-schema.ts:1521. Rails' `data_source_exists?(pool, name)` blocks on the query. Returns `undefined` for a never-checked table so the caller can distinguish it from a checked-and-absent one. Justification at the declaration."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/schema-cache.ts",
+    "name": "setColumns",
+    "reason": "Sync writer. Rails populates the cache only via `add(pool, table_name)`, which issues the introspection queries itself behind a blocking `with_connection`. Trails' reflecting caller is already inside an `await` and holds the rows — `AbstractAdapter#columns` (abstract-adapter.ts:2460) awaits the adapter's own `columns()` and hands them here — so routing through `add()` would re-issue the same query on a second checkout. Justification at the declaration."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/schema-cache.ts",
+    "name": "setPrimaryKeys",
+    "reason": "Sync writer, counterpart of `setColumns` for the authoritative primary key. Same reason: `loadSchemaFromAdapter` (model-schema.ts) has already awaited `adapter.primaryKey(table)` and warms both maps, so `getCachedPrimaryKeys` can answer the sync `Model.primaryKey` accessor without a query. Order-independent with `setColumns` via `reconcilePrimaryKeyFlags`. Justification at the declaration."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/schema-cache.ts",
+    "name": "setDataSourceExists",
+    "reason": "Test-harness seeding only (marked `@internal` at the declaration). Rails warms this map as a side effect of the blocking `data_source_exists?(pool, name)`, which its ported test `#columns_hash? is not populated by #data_source_exists?` (schema_cache_test.rb) relies on. Trails has no blocking call to lean on, so the pool-less callers seed the map through this writer instead of standing up a fake pool per assertion. Production warming goes through `setColumns` or the async query."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/schema-cache.ts",
+    "name": "recordTouchedTables",
+    "reason": "Test-harness only (marked `@internal` at the declaration). Opens a recording window in which `clear_data_source_cache!` notes the table it cleared, so `withTransactionalFixtures` (test-helpers/with-transactional-fixtures.ts:281) can re-warm exactly the tables a test invalidated. Rails needs no ledger: its fixture teardown re-reflects from a live blocking connection."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/schema-cache.ts",
+    "name": "takeTouchedTables",
+    "reason": "Test-harness only (marked `@internal` at the declaration). Closes the `recordTouchedTables` window and returns the tables cleared inside it, consumed by test-helpers/with-transactional-fixtures.ts:78. No Rails analogue for the same reason as `recordTouchedTables`."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/schema-cache.ts",
+    "name": "loadAllBang",
+    "reason": "trails-only composite (marked `@internal` at the declaration): `cache(pool)` (Rails' `SchemaReflection#load!`) followed by `SchemaCache#add_all(pool)`. Rails has no `load_all!`; the two steps are separate calls there. Pairing them gives the eager-warm pool path a single entry point that also routes through the lone-connection `FakePool`. Do not grep Rails for it."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/schema-cache.ts",
+    "name": "eagerLoadSchemaCache",
+    "reason": "trails-only opt-in flag with no Rails counterpart (Rails has only `lazily_load_schema_cache`, which loads a committed dump). It exists because trails' sync `Model.columnNames()` / `columnsHash()` need a warm cache to take the DB-sourced branch, and there is no blocking reflection to fall back on. Off by default; boot-time only. Full rationale at the declaration."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/schema-cache.ts",
+    "name": "loadedCache",
+    "reason": "Sync, non-loading peek at the already-populated `SchemaCache` (marked `@internal` at the declaration). Rails' `SchemaReflection` has no such reader because every accessor can block on `cache(pool)`. `ConnectionPool` uses it to propagate a dump-loaded cache into `poolConfig.schemaCache` from a synchronous wire-up point (connection-pool.ts:1290, :1341) that cannot await the load it is reacting to."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "name": "NullConfig",
+    "reason": "Rails nests this class inside `NullPool` (`class NullPool; class NullConfig` — connection_pool.rb:14-22), and the Ruby extractor records only the outer `NullPool`. TS cannot declare a nested class, so it is a sibling export re-attached as `NullPool.NullConfig` (a static, matching Rails' constant lookup path). Same class, same file, same semantics — an extractor-shape artifact, not added surface."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "name": "poolAbsent",
+    "reason": "Named predicate for `pool == null || pool instanceof NullPool`. Rails has no equivalent because a standalone adapter's `@pool = NullPool.new` responds to the whole pool protocol with nils, so Ruby callers never need to ask. Trails' schema-cache and bare-adapter fallbacks historically keyed off `pool == null` and silently missed the NullPool case; this centralizes the check so both are treated as `no pool`. Justification at the declaration."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "name": "realPool",
+    "reason": "Returns `pool` when it is a real, connection-owning pool, else `null` — the NullPool-aware form of the `adapter.pool ?? fallback` idiom. Load-bearing: the schema cache must target `realPool(adapter.pool) ?? adapter`, because a NullPool-carrying adapter passed as a pool yields a cache that can never check out a connection. Rails needs no such helper for the reason given under `poolAbsent`. Justification at the declaration."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "name": "adapterReady",
+    "reason": "Promise that resolves once this pool's adapter class has been loaded by the async `ConnectionAdapters` resolver. Rails needs nothing here: `require` is synchronous, so `establish_connection` returns with the adapter class already resolvable. Trails resolves adapters through a dynamic `import()`, so sync entry points like `connectsTo` / `ConnectionHandler.establishConnection` (connection-handling.ts:167, connection-handler.ts:181) attach the in-flight promise for callers that must await preload before issuing real queries. Justification at the declaration."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "name": "leaseConnectionSync",
+    "reason": "Sync lease for the callers that mirror Rails' *synchronous* `lease_connection` but cannot await: `Migration#connection`'s bare-migration fallback (base.ts `_arConfig`, tasks/database-tasks.ts `migrationConnection`) and the deprecated sync `.connection` getter (connection-handling.ts). The Rails-named `leaseConnection` / `checkout` had to become async because per-checkout `verifyBang` is async, so this preserves the old sync path (still running `checkoutAndVerify` on a fresh non-pinned checkout). Marked `@internal`; not for production query paths. Justification at the declaration."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "name": "withQueryCache",
+    "reason": "Pool-level extraction of Rails' `ActiveRecord::QueryCache.cache(&block)` (query_cache.rb:206), whose `ensure` clears the cache when it was not previously enabled. In Ruby that logic sits in the module method because `enable_query_cache` yields synchronously; in TS `enableQueryCache` returns a promise, so the was-enabled/clear-on-exit bookkeeping has to live next to the state it guards. `QueryCache.cache` (query-cache.ts:66) delegates straight here, so the Rails-named entry point keeps its Rails behavior. Justification at the declaration."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "name": "queryCacheDisabled",
+    "reason": "Named form of Rails' inline `next if pool.db_config&.query_cache == false` in `QueryCache::ExecutorHooks.run` (query_cache.rb). Trails normalizes `query_cache` at pool construction into `ConnectionPoolConfiguration`, so the raw `false` is no longer readable off `dbConfig` at that point; the getter delegates to the same normalized flag and is consumed by `QueryCache.run`'s skip guard (query-cache.ts:107). Justification at the declaration."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "name": "drainPendingCloses",
+    "reason": "Awaits the async `driver.close()` calls stashed by synchronous discard paths, so an async-only driver's handle is fully closed before a caller re-opens the same DB (marked `@internal` at the declaration). Ruby needs no such bookkeeping: `driver.close` is synchronous there, so Rails' `discard!` / checkout-failure swap complete the close before returning. Justification at the declaration."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "name": "discardBangDraining",
+    "reason": "Drain-carrying variant of `discardBang` for `PoolConfig`'s async discard sweep: same synchronous discard, but returns the in-flight async-close drains so the caller can await them once every pool has been discarded rather than serializing pool-by-pool (marked `@internal` at the declaration). Rails' `discard!` is fully synchronous and has nothing to hand back. Justification at the declaration."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "name": "setConnectionHandlerResolver",
+    "reason": "Wiring hook (marked `@internal`, called exactly once from index.ts). Rails' `ExecutorHooks.complete` just references the `ActiveRecord::Base` constant, which Ruby resolves at call time. In TS importing `Base` here would be a module-level cycle (Base -> connection handling -> pool), so the one module with both sides loaded installs a lazy getter instead. Justification at the declaration."
   }
 ]
