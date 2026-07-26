@@ -164,10 +164,20 @@ counterpart confirmed before it moves:
 not test support, and trails already has a top-level `src/test-fixtures.ts`);
 `in-time-zone.ts` (Rails' `InTimeZone` is a module _inside_ `cases/helper.rb:66-79`,
 so it may belong in `cases/helper.ts`); `protected-params.ts`;
-`repair-validations.ts`.
+`repair-validations.ts`; `rocket-tables.ts` (its own docstring notes that
+`ActiveRecord::Migration::ForeignKeyTest` creates and drops `rockets` /
+`astronauts` **inline**, `foreign_key_test.rb:178-194` — so the faithful home is
+the test file that uses it, not a shared support helper; confirm before moving).
 
-Nothing in `test-helpers/` is left unaccounted for by A-D. Story 1 moves only
-B and C; A stays; D waits for story 7.
+**Staleness warning.** This table was taken against this branch's base commit,
+and `main` moves. `rocket-tables.ts` landed on `main` after the branch was cut
+and is absent from the branch checkout — it appears above only via a
+`git show origin/main` read. **Whichever story executes first must re-scan
+`test-helpers/` against current `main`** and bucket anything new rather than
+trusting this list verbatim; story 1's acceptance criteria carry that
+instruction.
+
+Story 1 moves only B and C; A stays; D waits for story 7.
 
 ## What does NOT move
 
