@@ -165,12 +165,12 @@
     "package": "activerecord",
     "tsFile": "associations.ts",
     "name": "registerModel",
-    "reason": "trails-only model registry with no Rails analogue. Ruby resolves an association's class through constant lookup (Reflection#compute_class -> Object.const_get / ActiveSupport autoloading), so Rails never registers models anywhere and `register_model` exists nowhere in the source. ESM has no constant namespace to walk and no autoload hook, so trails must be told which classes exist. It is deliberately public (re-exported from index.ts) because application code has to call it; @internal would be a lie. Kept in associations.ts because association class resolution is its only consumer path."
+    "reason": "trails-only model registry with no Rails analogue: `register_model` is defined nowhere in the Rails source (verified by grep over vendor/rails). Ruby resolves an association's class through constant lookup — Reflection#compute_class (reflection.rb:434 and :490) into Object.const_get, backed by ActiveSupport autoloading — so Rails never registers models anywhere. ESM has no constant namespace to walk and no autoload hook, so trails must be told which classes exist. Deliberately public (re-exported from index.ts) because application code has to call it, which is why @internal would be a lie rather than a fix. Kept in associations.ts because association class resolution is its only consumer path."
   },
   {
     "package": "activerecord",
     "tsFile": "associations.ts",
     "name": "initializeAssociations",
-    "reason": "trails-only ESM module-cycle escape hatch with no Rails analogue. The associations -> CollectionProxy -> Relation -> Base -> associations cycle forces CollectionProxy registration to be late-bound; the package entry does it eagerly, and this is the supported explicit hook for consumers who deep-import `@blazetrails/activerecord/associations` without touching the entry. Ruby's require/autoload resolves such cycles at load time so there is nothing to port. Public by intent (documented consumer hook), so @internal is not appropriate."
+    "reason": "trails-only ESM module-cycle escape hatch with no Rails analogue: `initialize_associations` is defined nowhere in the Rails source (verified by grep over vendor/rails). The associations -> CollectionProxy -> Relation -> Base -> associations cycle forces CollectionProxy registration to be late-bound; the package entry does it eagerly, and this is the supported explicit hook for consumers who deep-import `@blazetrails/activerecord/associations` without touching the entry. Ruby's require/autoload resolves such cycles at load time, so there is nothing to port. Public by intent (documented consumer hook), so @internal is not appropriate."
   }
 ]

@@ -398,9 +398,10 @@ export function lookupModelWithAutoload(name: string): typeof Base | undefined {
  * Resolve a model class by name.
  *
  * @internal Registry lookup, not a Rails method. Ruby resolves association
- * class names through constant lookup (`compute_class` / `Object.const_get`),
- * so there is no `resolve_model` anywhere in Rails; trails needs an explicit
- * registry because ESM has no constant namespace to walk. Sits between the
+ * class names through constant lookup — `Reflection#compute_class`
+ * (`reflection.rb:434` and `:490`) into `Object.const_get` — so `resolve_model`
+ * is defined nowhere in the Rails source; trails needs an explicit registry
+ * because ESM has no constant namespace to walk. Sits between the
  * already-`@internal` {@link lookupModelWithAutoload} and
  * {@link resolveAssocClass}, which are the same invention.
  */
@@ -1241,10 +1242,12 @@ async function _loadSingularViaStatementCache(
  * PK-null check covers the defensive edge where a saved record
  * somehow has a null composite-PK component.
  *
- * @internal No Rails counterpart: Rails spells this guard inline at each site
- * (`if owner.new_record?` / `null_scope?` in ThroughAssociation), so there is
- * no method to port. Extracted here only because trails has several entry
- * points into the DJAS chain walk that must not diverge on the guard.
+ * @internal No Rails counterpart (`owner_has_unresolved_through_key` is defined
+ * nowhere in the Rails source). Rails spells this guard inline at each site —
+ * `if owner.new_record?`, or `CollectionAssociation#null_scope?`
+ * (`associations/collection_association.rb:304`) — so there is no method to
+ * port. Extracted here only because trails has several entry points into the
+ * DJAS chain walk that must not diverge on the guard.
  */
 export function ownerHasUnresolvedThroughKey(
   record: Base,
@@ -2279,10 +2282,12 @@ export function _inlinePolymorphicKeys(
  * and CollectionProxy's constructor (which seeds its own where-clause
  * via the same condition).
  *
- * @internal No Rails counterpart. Rails never materializes the owner-scoping
- * hash on its own: `AssociationScope#add_constraints` writes the predicate
- * straight onto the relation being built. This is a trails-only factoring so
- * the two construction sites can't drift.
+ * @internal No Rails counterpart (`compute_has_many_where` is defined nowhere
+ * in the Rails source). Rails never materializes the owner-scoping hash on its
+ * own: `AssociationScope#add_constraints`
+ * (`associations/association_scope.rb:124`) writes the predicate straight onto
+ * the relation being built. This is a trails-only factoring so the two
+ * construction sites can't drift.
  */
 export function computeHasManyWhere(
   record: Base,
@@ -2434,11 +2439,13 @@ export function computeHasManyWhere(
  * so resetCounters works under strict loading.
  * Returns null if primary key values are missing.
  *
- * @internal No Rails counterpart. Rails gets an unexecuted, side-effect-free
- * relation for free via `association.scope` (`Association#scope` ->
- * `AssociationScope.scope`); trails' `loadHasMany` fuses relation building
- * with caching/strict-loading/inverse_of, so the bypass has to be spelled out
- * as its own function until that fusion is undone.
+ * @internal No Rails counterpart (`build_has_many_relation` is defined nowhere
+ * in the Rails source). Rails gets an unexecuted, side-effect-free relation for
+ * free via `association.scope` — `Association#scope`
+ * (`associations/association.rb:107`) into `AssociationScope#scope`
+ * (`associations/association_scope.rb:21`). trails' `loadHasMany` fuses
+ * relation building with caching/strict-loading/inverse_of, so the bypass has
+ * to be spelled out as its own function until that fusion is undone.
  */
 export function buildHasManyRelation(
   record: Base,
@@ -2473,11 +2480,13 @@ export function buildHasManyRelation(
  * Returns null when the owner FK is absent (unsaved owner / null PK), matching
  * the short-circuit in `loadHasMany`.
  *
- * @internal No Rails counterpart, for the same reason as
- * {@link buildHasManyRelation}: in Rails this relation IS
- * `association.scope`, and `CollectionAssociation#count_records` just calls
- * `scope.count(:all)` on it. Named separately here only because trails builds
- * the JOIN form inside `loadHasMany` rather than in an AssociationScope.
+ * @internal No Rails counterpart (`build_through_join_scope` is defined nowhere
+ * in the Rails source), for the same reason as {@link buildHasManyRelation}: in
+ * Rails this relation IS `association.scope`, and
+ * `HasManyAssociation#count_records` (`associations/has_many_association.rb:80`)
+ * just calls `scope.count(:all)` on it (`:84`). Named separately here only
+ * because trails builds the JOIN form inside `loadHasMany` rather than in an
+ * AssociationScope.
  */
 export function buildThroughJoinScope(
   record: Base,
