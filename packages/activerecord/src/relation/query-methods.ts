@@ -244,14 +244,14 @@ interface QueryMethodsHost {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function resolveOrderMatcher(host: QueryMethodsHost): RegExp {
+function resolveOrderMatcher(model: QueryMethodsHost["model"]): RegExp {
   try {
     // Mirrors Rails' `model.adapter_class.column_name_with_order_matcher` — a
     // class-level lookup that does NOT lease a connection. Reading the
     // deprecated `.connection` getter here would permanently check out a
     // connection under `permanent_connection_checkout = :deprecated|:disallowed`
     // whenever an ordered relation is built outside a `with_connection` scope.
-    const adapterClass: any = host._modelClass.adapterClassSync?.();
+    const adapterClass: any = (model as any).adapterClassSync?.();
     return adapterClass?.columnNameWithOrderMatcher?.() ?? abstractOrderMatcher();
   } catch {
     // No adapter configured — fall back to abstract pattern.
@@ -572,7 +572,7 @@ function orderHashEntry(
   if (key instanceof Nodes.Node) {
     return direction === "desc" ? (key as any).desc() : (key as any).asc();
   }
-  disallowRawSqlBang([String(key)], resolveOrderMatcher(host));
+  disallowRawSqlBang([String(key)], resolveOrderMatcher(host.model));
   return [String(key), direction];
 }
 
@@ -620,7 +620,7 @@ function orderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
         if (!(arg as unknown[]).every((e) => typeof e === "string")) {
           throw argumentError("Order arguments passed as an array must contain only strings");
         }
-        disallowRawSqlBang(arg as string[], resolveOrderMatcher(this));
+        disallowRawSqlBang(arg as string[], resolveOrderMatcher(this.model));
         for (const elem of arg as string[]) {
           if (elem.trim() !== "") this._orderClauses.push(elem);
         }
@@ -646,7 +646,7 @@ function orderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
       // ASC`), unlike a string, which stays bare. Store as a `[col, "asc"]`
       // tuple so `_applyOrderToManager` routes it through column resolution.
       const name = symbolToName(arg);
-      disallowRawSqlBang([name], resolveOrderMatcher(this));
+      disallowRawSqlBang([name], resolveOrderMatcher(this.model));
       this._orderClauses.push([name, "asc"]);
     } else if (typeof arg === "string") {
       // Rails maps each String order arg through unchanged (preprocess_order_args'
@@ -655,7 +655,7 @@ function orderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
       // SqlLiteral (see _applyOrderToManager). Validate immediately, mirroring
       // Rails raising on order("invalid") at call time.
       if (arg.trim() !== "") {
-        disallowRawSqlBang([arg], resolveOrderMatcher(this));
+        disallowRawSqlBang([arg], resolveOrderMatcher(this.model));
         this._orderClauses.push(arg);
       }
     } else if (arg !== null && typeof arg === "object") {
@@ -696,7 +696,7 @@ function reorderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
         if (!(arg as unknown[]).every((e) => typeof e === "string")) {
           throw argumentError("Order arguments passed as an array must contain only strings");
         }
-        disallowRawSqlBang(arg as string[], resolveOrderMatcher(this));
+        disallowRawSqlBang(arg as string[], resolveOrderMatcher(this.model));
         for (const elem of arg as string[]) {
           if (elem.trim() !== "") this._orderClauses.push(elem);
         }
@@ -719,14 +719,14 @@ function reorderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
       // ASC`), unlike a string, which stays bare. Store as a `[col, "asc"]`
       // tuple so `_applyOrderToManager` routes it through column resolution.
       const name = symbolToName(arg);
-      disallowRawSqlBang([name], resolveOrderMatcher(this));
+      disallowRawSqlBang([name], resolveOrderMatcher(this.model));
       this._orderClauses.push([name, "asc"]);
     } else if (typeof arg === "string") {
       // Each String order arg maps through unchanged and stays bare (see the
       // orderBang string branch); blanks are compact_blank'd away. No pairing
       // with a following "asc"/"desc" arg, no qualification.
       if (arg.trim() !== "") {
-        disallowRawSqlBang([arg], resolveOrderMatcher(this));
+        disallowRawSqlBang([arg], resolveOrderMatcher(this.model));
         this._orderClauses.push(arg);
       }
     } else if (arg !== null && typeof arg === "object") {
@@ -2117,7 +2117,7 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
   const keysForCheck = flattenedOrderKeysForRawSqlCheck(orderArgs).map((k) =>
     typeof k === "symbol" ? symbolToName(k) : k,
   );
-  disallowRawSqlBang(keysForCheck, resolveOrderMatcher(this));
+  disallowRawSqlBang(keysForCheck, resolveOrderMatcher(this.model));
   validateOrderArgs.call(this, orderArgs);
   const refs = columnReferences(orderArgs);
   if (refs.length > 0) {
@@ -2542,12 +2542,15 @@ export function buildFrom(this: QueryMethodsHost): unknown {
  *
  * @internal
  */
-function selectListColumns(host: QueryMethodsHost): unknown[] | null {
+function selectListColumns(
+  host: QueryMethodsHost,
+  model: QueryMethodsHost["model"],
+): unknown[] | null {
   const selectCols = (host as any)._selectColumns;
   if (selectCols && selectCols.length > 0) {
     return arelColumns.call(host, selectCols);
   }
-  const modelClass: any = (host as any)._modelClass;
+  const modelClass = model as any;
   if (
     (modelClass?.ignoredColumns?.length ?? 0) > 0 ||
     modelClass?.enumerateColumnsInSelectStatements
@@ -2574,7 +2577,7 @@ function selectListColumns(host: QueryMethodsHost): unknown[] | null {
  * @internal
  */
 export function buildProjections(this: QueryMethodsHost): unknown[] {
-  const cols = selectListColumns(this);
+  const cols = selectListColumns(this, this.model);
   if (cols) return cols;
   const table: any = (this as any).table ?? (this as any)._modelClass?.arelTable;
   return [table ? tableStar(table) : arelSql("*")];
@@ -2594,7 +2597,7 @@ function tableStar(table: any): unknown {
  * @internal
  */
 export function buildSelect(this: QueryMethodsHost, arel: any): void {
-  const cols = selectListColumns(this);
+  const cols = selectListColumns(this, this.model);
   if (cols) {
     arel.project(...cols);
     return;
