@@ -160,5 +160,17 @@
     "tsFile": "locator.ts",
     "name": "where",
     "reason": "Member of the duck-typed `LocatorModel` interface, not a locator method: it declares the Active Record relation Rails' BaseLocator calls as `model_class.where(primary_key => ids)` on the ignore_missing path. Ruby needs no such declaration."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations.ts",
+    "name": "registerModel",
+    "reason": "trails-only model registry with no Rails analogue. Ruby resolves an association's class through constant lookup (Reflection#compute_class -> Object.const_get / ActiveSupport autoloading), so Rails never registers models anywhere and `register_model` exists nowhere in the source. ESM has no constant namespace to walk and no autoload hook, so trails must be told which classes exist. It is deliberately public (re-exported from index.ts) because application code has to call it; @internal would be a lie. Kept in associations.ts because association class resolution is its only consumer path."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations.ts",
+    "name": "initializeAssociations",
+    "reason": "trails-only ESM module-cycle escape hatch with no Rails analogue. The associations -> CollectionProxy -> Relation -> Base -> associations cycle forces CollectionProxy registration to be late-bound; the package entry does it eagerly, and this is the supported explicit hook for consumers who deep-import `@blazetrails/activerecord/associations` without touching the entry. Ruby's require/autoload resolves such cycles at load time so there is nothing to port. Public by intent (documented consumer hook), so @internal is not appropriate."
   }
 ]

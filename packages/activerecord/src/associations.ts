@@ -396,6 +396,13 @@ export function lookupModelWithAutoload(name: string): typeof Base | undefined {
 
 /**
  * Resolve a model class by name.
+ *
+ * @internal Registry lookup, not a Rails method. Ruby resolves association
+ * class names through constant lookup (`compute_class` / `Object.const_get`),
+ * so there is no `resolve_model` anywhere in Rails; trails needs an explicit
+ * registry because ESM has no constant namespace to walk. Sits between the
+ * already-`@internal` {@link lookupModelWithAutoload} and
+ * {@link resolveAssocClass}, which are the same invention.
  */
 export function resolveModel(name: string): typeof Base {
   const model = lookupModelWithAutoload(name);
@@ -1233,6 +1240,11 @@ async function _loadSingularViaStatementCache(
  * target. `isNewRecord()` covers unsaved records; the explicit
  * PK-null check covers the defensive edge where a saved record
  * somehow has a null composite-PK component.
+ *
+ * @internal No Rails counterpart: Rails spells this guard inline at each site
+ * (`if owner.new_record?` / `null_scope?` in ThroughAssociation), so there is
+ * no method to port. Extracted here only because trails has several entry
+ * points into the DJAS chain walk that must not diverge on the guard.
  */
 export function ownerHasUnresolvedThroughKey(
   record: Base,
@@ -2266,6 +2278,11 @@ export function _inlinePolymorphicKeys(
  * Shared by `buildHasManyRelation` (which wraps it in `all().where(...)`)
  * and CollectionProxy's constructor (which seeds its own where-clause
  * via the same condition).
+ *
+ * @internal No Rails counterpart. Rails never materializes the owner-scoping
+ * hash on its own: `AssociationScope#add_constraints` writes the predicate
+ * straight onto the relation being built. This is a trails-only factoring so
+ * the two construction sites can't drift.
  */
 export function computeHasManyWhere(
   record: Base,
@@ -2416,6 +2433,12 @@ export function computeHasManyWhere(
  * Skips caching, strict loading, and inverse_of — used by countHasMany
  * so resetCounters works under strict loading.
  * Returns null if primary key values are missing.
+ *
+ * @internal No Rails counterpart. Rails gets an unexecuted, side-effect-free
+ * relation for free via `association.scope` (`Association#scope` ->
+ * `AssociationScope.scope`); trails' `loadHasMany` fuses relation building
+ * with caching/strict-loading/inverse_of, so the bypass has to be spelled out
+ * as its own function until that fusion is undone.
  */
 export function buildHasManyRelation(
   record: Base,
@@ -2449,6 +2472,12 @@ export function buildHasManyRelation(
  *
  * Returns null when the owner FK is absent (unsaved owner / null PK), matching
  * the short-circuit in `loadHasMany`.
+ *
+ * @internal No Rails counterpart, for the same reason as
+ * {@link buildHasManyRelation}: in Rails this relation IS
+ * `association.scope`, and `CollectionAssociation#count_records` just calls
+ * `scope.count(:all)` on it. Named separately here only because trails builds
+ * the JOIN form inside `loadHasMany` rather than in an AssociationScope.
  */
 export function buildThroughJoinScope(
   record: Base,
