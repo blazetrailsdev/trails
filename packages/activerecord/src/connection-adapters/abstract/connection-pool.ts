@@ -169,6 +169,14 @@ export class NullPool implements AbstractPool {
  * pool) carries a NullPool by default, matching Rails' `@pool = NullPool.new`;
  * the schema-cache / bare-adapter fallbacks that historically keyed off
  * `pool == null` use this so a NullPool is treated the same as "no pool".
+ *
+ * @noRailsEquivalent Named predicate for `pool == null || pool instanceof
+ * NullPool`. Rails has no equivalent because a standalone adapter's
+ * `@pool = NullPool.new` responds to the whole pool protocol with nils,
+ * so Ruby callers never need to ask. Trails' schema-cache and bare-
+ * adapter fallbacks historically keyed off `pool == null` and silently
+ * missed the NullPool case; this centralizes the check so both are
+ * treated as `no pool`. Justification at the declaration.
  */
 export function poolAbsent(pool: unknown): boolean {
   return pool == null || pool instanceof NullPool;
@@ -180,6 +188,14 @@ export function poolAbsent(pool: unknown): boolean {
  * `realPool(adapter.pool) ?? adapter` where code previously wrote
  * `adapter.pool ?? adapter` to yield a schema-cache target that can actually
  * check out a connection.
+ *
+ * @noRailsEquivalent Returns `pool` when it is a real, connection-owning
+ * pool, else `null` — the NullPool-aware form of the `adapter.pool ??
+ * fallback` idiom. Load-bearing: the schema cache must target
+ * `realPool(adapter.pool) ?? adapter`, because a NullPool-carrying
+ * adapter passed as a pool yields a cache that can never check out a
+ * connection. Rails needs no such helper for the reason given under
+ * `poolAbsent`. Justification at the declaration.
  */
 export function realPool(pool: unknown): unknown | null {
   return poolAbsent(pool) ? null : pool;
@@ -274,6 +290,15 @@ export class ExecutorHooks {
    * at wire-up time to hand the pool a getter instead.
    *
    * @internal Wiring only; called exactly once, from `index.ts`.
+   *
+   * @noRailsEquivalent Wiring hook (marked `@internal`, called exactly
+   * once from index.ts:13, `ExecutorHooks.setConnectionHandlerResolver(()
+   * => _Base.connectionHandler)`). Rails' `ExecutorHooks.complete` just
+   * references the `ActiveRecord::Base` constant, which Ruby resolves at
+   * call time. In TS importing `Base` here would be a module-level cycle
+   * (Base -> connection handling -> pool), so the one module with both
+   * sides loaded installs a lazy getter instead. Justification at the
+   * declaration.
    */
   static setConnectionHandlerResolver(resolver: () => ConnectionHandlerLike | null): void {
     ExecutorHooks._getConnectionHandler = resolver;
@@ -326,6 +351,16 @@ export class ConnectionPool implements ReapablePool {
    * `connectsTo` so callers can await preload before issuing real queries;
    * defaults to a resolved promise for pools whose adapterFactory is
    * supplied directly.
+   *
+   * @noRailsEquivalent Promise that resolves once this pool's adapter
+   * class has been loaded by the async `ConnectionAdapters` resolver.
+   * Rails needs nothing here: `require` is synchronous, so
+   * `establish_connection` returns with the adapter class already
+   * resolvable. Trails resolves adapters through a dynamic `import()`, so
+   * the sync entry points `connectsTo` (connection-handling.ts) and
+   * `ConnectionHandler.establishConnection` (connection-handler.ts)
+   * attach the in-flight promise for callers that must await preload
+   * before issuing real queries. Justification at the declaration.
    */
   adapterReady: Promise<unknown> = Promise.resolve();
 
@@ -561,6 +596,20 @@ export class ConnectionPool implements ReapablePool {
    * skipping a pool configured `queryCache: "disabled"`. The predicate has to be
    * asked of the *normalized* value, which is what this getter delegates to.
    * Consumed by `QueryCache.run`'s skip guard in query-cache.ts.
+   *
+   * @noRailsEquivalent Named form of Rails' inline `next if
+   * pool.db_config&.query_cache == false` in
+   * `ActiveRecord::QueryCache.run` (active_record/query_cache.rb:39 — the
+   * top-level file, not connection_adapters/abstract/query_cache.rb,
+   * whose `db_config&.query_cache` at :122 is a different case-statement
+   * computing the cache max size). Deliberately NOT converged to that
+   * literal comparison: `dbConfig.queryCache` is readable, but trails'
+   * public config type also accepts the "enabled"/"disabled" string
+   * aliases Rails never sees as raw values, and
+   * `normalizeQueryCacheConfig` maps "disabled" -> false, so
+   * `dbConfig.queryCache === false` would stop skipping a pool configured
+   * `queryCache: "disabled"`. The predicate must be asked of the
+   * normalized value. Justification at the declaration.
    */
   get queryCacheDisabled(): boolean {
     return this._cacheConfig.queryCacheDisabled;
@@ -644,6 +693,17 @@ export class ConnectionPool implements ReapablePool {
    * is tracked by `connection-pool-pinned-sync-checkout-per-checkout-verify`.
    *
    * @internal
+   *
+   * @noRailsEquivalent Sync lease for the callers that mirror Rails'
+   * synchronous `lease_connection` but cannot await:
+   * `Migration#connection`'s bare-migration fallback (base.ts
+   * `_arConfig`, tasks/database-tasks.ts `migrationConnection`) and the
+   * deprecated sync `.connection` getter (connection-handling.ts). The
+   * Rails-named `leaseConnection` / `checkout` had to become async
+   * because per-checkout `verifyBang` is async, so this preserves the old
+   * sync path (still running `checkoutAndVerify` on a fresh non-pinned
+   * checkout). Marked `@internal`; not for production query paths.
+   * Justification at the declaration.
    */
   leaseConnectionSync(): DatabaseAdapter {
     const lease = this.connectionLease();
@@ -1035,6 +1095,17 @@ export class ConnectionPool implements ReapablePool {
    * discarded. Not a Rails counterpart — Rails' `discard!` is fully synchronous.
    *
    * @internal
+   *
+   * @noRailsEquivalent Drain-carrying variant of `discardBang` for
+   * `PoolConfig._discardPoolBangSync`, which reproduces Rails'
+   * synchronous `discard_pool!` critical section (`@pool.discard!; @pool
+   * = nil`). It must stay synchronous so a failing discard throws
+   * *before* `_pool` is nulled — awaiting the async `discardBang` would
+   * lose that ordering — while still surfacing the in-flight async-close
+   * drains for the caller to await once every config in the sweep has
+   * been discarded. Rails' `discard!` is fully synchronous and has
+   * nothing to hand back. Marked `@internal`; justification at the
+   * declaration.
    */
   discardBangDraining(): Array<Promise<void>> {
     return this._discardBang();
@@ -1222,6 +1293,15 @@ export class ConnectionPool implements ReapablePool {
    * nothing is in flight (the sync-driver case).
    *
    * @internal
+   *
+   * @noRailsEquivalent Awaits the async `driver.close()` calls stashed by
+   * `_trackCloseDrain` from synchronous discard paths (the checkout-
+   * failure swap in `checkoutAndVerify`), so an async-only driver's
+   * handle is fully closed before a caller re-opens the same DB — sqlite-
+   * adapter.test.ts relies on this between reopen cycles. Ruby needs no
+   * such bookkeeping: `driver.close` is synchronous there, so Rails'
+   * equivalent paths complete the close before returning. Marked
+   * `@internal`; justification at the declaration.
    */
   async drainPendingCloses(): Promise<void> {
     await Promise.all(this._pendingCloseDrains);
