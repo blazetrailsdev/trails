@@ -53,7 +53,6 @@ export {
   loadHasManyThrough,
   association,
   isAssociationCached,
-  loadHabtm,
   updateCounterCaches,
   eagerLoadBang,
 } from "./associations.js";

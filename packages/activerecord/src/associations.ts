@@ -1,7 +1,5 @@
 import type { Base } from "./base.js";
 import type { Relation } from "./relation.js";
-import { Table as ArelTable } from "@blazetrails/arel";
-import { Connection as TypeCasterConnection } from "./type-caster/connection.js";
 import { SpellChecker } from "@blazetrails/did-you-mean";
 import type { CollectionProxy, AssociationProxy } from "./associations/collection-proxy.js";
 import { _CollectionProxyCtor } from "./associations/collection-proxy-slot.js";
@@ -2326,25 +2324,6 @@ function singleFk(fk: string | string[] | undefined, fallback: string): string {
 }
 
 /**
- * Resolve the owner primary key column for HABTM.
- *
- * Rails' `Builder::HasAndBelongsToMany` does not forward `:primary_key`
- * to the generated middle `has_many :through` or to the rhs `belongs_to`
- * (see `middle_options` / `belongs_to_options` —
- * activerecord/lib/active_record/associations/builder/has_and_belongs_to_many.rb).
- * The owner-side join always resolves to the model's primary key.
- *
- * @internal
- */
-function habtmOwnerPk(_options: AssociationOptions, ctor: typeof Base): string {
-  const pk = ctor.primaryKey;
-  if (Array.isArray(pk)) {
-    throw new ConfigurationError("HABTM associations do not support composite primary keys");
-  }
-  return pk;
-}
-
-/**
  * Compute the default HABTM join-table name.
  *
  * Mirrors ActiveRecord::Associations::Builder::HasAndBelongsToMany#table_name:
@@ -2386,83 +2365,6 @@ export function habtmTargetFk(
   if (options.associationForeignKey) return String(options.associationForeignKey);
   if (options.className) return deriveForeignKey(String(options.className));
   return `${underscore(singularize(assocName))}_id`;
-}
-
-/**
- * Load a has_and_belongs_to_many association.
- */
-export async function loadHabtm(
-  record: Base,
-  assocName: string,
-  options: AssociationOptions & { joinTable?: string },
-): Promise<Base[]> {
-  // Check preloaded cache first — an eager-loaded (preloaded) HABTM
-  // association is reachable without a strict-loading violation.
-  const preloaded = _preloadedHolderTarget(record, assocName);
-  if (preloaded) {
-    return (preloaded.value ?? []) as Base[];
-  }
-
-  // Lazily loading a HABTM on a strict-loading owner (or a reflection marked
-  // `strictLoading: true`) is a violation, just like the other macros. Gated by
-  // `find_target?`: a *new* strict owner without the FK present never reaches
-  // `find_target`, so it returns `[]` without raising.
-  if (
-    _violatesStrictLoading(record, options) &&
-    _findTargetReachable(record, assocName, options, "foreign")
-  ) {
-    strictLoadingViolationBang(record, assocName, {
-      className: options.className ?? camelize(singularize(assocName)),
-    });
-  }
-
-  const ctor = record.constructor as typeof Base;
-  const className = options.className ?? camelize(singularize(assocName));
-  const targetModel = resolveAssocClass(record, assocName, className);
-  const joinTable = options.joinTable ?? defaultJoinTableName(ctor, assocName, options);
-  // Prefer the rich reflection's foreignKey (derived from the class that
-  // *declared* the HABTM, not the STI subclass owner) before the owner-class
-  // fallback — mirrors Rails `reflection.foreign_key`.
-  const ownerFk = singleFk(
-    options.foreignKey ?? ctor._reflectOnAssociation?.(assocName)?.foreignKey,
-    `${underscore(ctor.name)}_id`,
-  );
-  const targetFk = habtmTargetFk(assocName, options as { className?: unknown });
-  const ownerPkCol = habtmOwnerPk(options, ctor);
-  const pkValue = record._readAttribute(ownerPkCol);
-  if (pkValue === null || pkValue === undefined) return [];
-
-  // Reject composite target PKs
-  const targetPkCol = targetModel.primaryKey;
-  if (Array.isArray(targetPkCol)) {
-    throw new Error("HABTM associations do not support composite primary keys on the target model");
-  }
-
-  // Use Arel subquery: SELECT target_fk FROM join_table WHERE owner_fk = ?
-  // The HABTM join table has no model, so its caster comes from the connection
-  // — the same shape as the no-klass branch of `associated_table`
-  // (table_metadata.rb:47-48). `.get(ownerFk).eq(pkValue)` builds a `Casted`,
-  // which reaches the table's caster.
-  const joinArelTable = new ArelTable(joinTable, {
-    typeCaster: new TypeCasterConnection(ctor as never, joinTable),
-  });
-  const subquery = joinArelTable
-    .project(joinArelTable.get(targetFk))
-    .where(joinArelTable.get(ownerFk).eq(pkValue));
-
-  const targetArelTable = targetModel.arelTable;
-  const inNode = targetArelTable.get(targetPkCol).in(subquery);
-
-  // Start from `klass.scope_for_association` so target-model default_scope
-  // / current_scope are honored — matches Rails' `Association#scope` which
-  // builds via `AssociationRelation.create(klass, self).merge!(klass.scope_for_association)`
-  // (collection_association.rb / association.rb). Then apply the join-IN
-  // filter and the caller-supplied scope lambda for query-method
-  // composition (where/order/select/group/having/unscope).
-  let rel: any = _scopeForAssociation(targetModel).where(inNode);
-  rel = applyAssociationScope(rel, options.scope, record);
-
-  return rel.toArray();
 }
 
 /**
