@@ -51,8 +51,6 @@ export {
   modelRegistry,
   loadBelongsTo,
   loadHasOne,
-  buildHasOne,
-  buildBelongsTo,
   loadHasMany,
   loadHasManyThrough,
   association,

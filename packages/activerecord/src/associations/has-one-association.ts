@@ -467,6 +467,19 @@ export class HasOneAssociation extends SingularAssociation {
     if (typeof fk === "string") return [fk];
     if (Array.isArray(fk)) return fk;
     const ctor = (this.owner as any).constructor;
+    // Prefer the *rich* reflection's foreign key, derived from the class that
+    // *declared* the association (`reflection.active_record`), not the owner
+    // instance's class — for an STI subclass owner (a `SpecialPost` whose
+    // `has_one :very_special_comment` is declared on `Post`) this yields
+    // `post_id`, not `special_post_id`. Mirrors Rails `reflection.foreign_key`,
+    // and matches `CollectionAssociation#foreignKeyColumns`.
+    const reflectionFk = (
+      ctor as {
+        _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | undefined;
+      }
+    )._reflectOnAssociation?.(this.reflection.name)?.foreignKey;
+    if (typeof reflectionFk === "string") return [reflectionFk];
+    if (Array.isArray(reflectionFk)) return reflectionFk;
     if (this.reflection.options.as) {
       return [`${underscore(this.reflection.options.as)}_id`];
     }
