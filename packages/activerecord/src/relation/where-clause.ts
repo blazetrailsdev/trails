@@ -154,13 +154,7 @@ export class WhereClause {
     return result;
   }
 
-  /**
-   * Rails' `WhereClause#except_predicates` — reads `predicates` off the
-   * receiver, so it is a method here rather than a free function taking the
-   * predicate array.
-   *
-   * @internal
-   */
+  /** @internal */
   private exceptPredicates(columns: (string | Nodes.Attribute | Nodes.Node)[]): Nodes.Node[] {
     // Rails: separate Attribute objects from string column names.
     // Attributes compared via eql() (table-qualified), strings by name only.
@@ -198,12 +192,8 @@ export class WhereClause {
     });
   }
 
-  /**
-   * Rails keeps this private; it stays public here because Relation's
-   * update/delete manager paths build their WHERE list from it directly.
-   *
-   * @internal
-   */
+  /** @internal Deviation: Rails keeps this private, but Relation's update/delete
+   *  manager paths build their WHERE list from it directly. */
   predicatesWithWrappedSqlLiterals(): Nodes.Node[] {
     return this.nonEmptyPredicates().map((node) => {
       if (node instanceof Nodes.SqlLiteral) return wrapSqlLiteral(node);
@@ -229,7 +219,7 @@ export class WhereClause {
   }
 
   /** @internal */
-  private referencedColumns(): Record<string, Nodes.Node> {
+  protected referencedColumns(): Record<string, Nodes.Node> {
     const hash: Record<string, Nodes.Node> = {};
     this.eachAttributes((attr, node) => {
       const key =

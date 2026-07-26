@@ -354,12 +354,8 @@ export function generatedRelationMethods(modelClass: typeof Base): GeneratedRela
  * @internal
  */
 export function includeRelationMethods(modelClass: typeof Base, delegate: object): void {
-  // Rails recurses (`superclass.include_relation_methods(delegate) unless
-  // base_class?`) and includes its OWN module last, so an own generated method
-  // wins over an inherited one. `stiCarrierChain` returns that same chain
-  // base_class-first; the index is the module's install priority (base_class =
-  // 0, own = highest), which is how the carrier reproduces Ruby's ancestor-chain
-  // MRO structurally rather than by include order.
+  // Deviation: Ruby's recursion + include-order MRO is reproduced structurally
+  // by an install priority (base_class = 0, own = highest) instead.
   stiCarrierChain(modelClass).forEach((ancestor, priority) => {
     generatedRelationMethods(ancestor).includeInto(delegate, priority);
   });
@@ -417,14 +413,6 @@ function perModelCarrier(
       configurable: true,
     });
     cache.set(modelClass, subclass);
-    // Include each STI ancestor's generated module (from `base_class` down) and
-    // finally the model's OWN. Safe because the generated delegator is now
-    // model-agnostic (`classMethodDelegator` reads the relation's live
-    // `_modelClass` at call time), so an ancestor's module installed onto an STI
-    // child carrier still dispatches to the child (child scope + child STI
-    // type-condition) — inherited generated methods resolve by ordinary
-    // prototype lookup instead of re-entering the `Proxy` miss path per
-    // subclass.
     includeRelationMethods(modelClass, subclass.prototype);
   }
   return subclass;

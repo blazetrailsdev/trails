@@ -239,12 +239,7 @@ export class Result {
     return this.#indexedRows;
   }
 
-  /**
-   * Mirrors: ActiveRecord::Result#hash_rows (private) — memoizes `@hash_rows`
-   * off the receiver's own `rows` / `column_indexes`.
-   *
-   * @internal
-   */
+  /** @internal */
   private hashRows(): Record<string, unknown>[] {
     if (this.#hashRows) return this.#hashRows;
     const entries = Object.entries(this.columnIndexes);

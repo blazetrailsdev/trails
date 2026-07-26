@@ -51,11 +51,6 @@ export class InsertAll {
   uniqueBy: string | string[] | IndexDefinition | undefined;
   returning: string | string[] | Nodes.SqlLiteral | false;
 
-  /**
-   * Rails' `@on_duplicate`: seeded with the caller's raw `:on_duplicate` (which
-   * may be an Arel node carrying custom update SQL) and narrowed in place by
-   * `configureOnDuplicateUpdateLogic`, which reads it off the receiver.
-   */
   onDuplicate: "skip" | "update" | Nodes.SqlLiteral | undefined;
   updateOnly: string | string[] | undefined;
   updateSql: Nodes.SqlLiteral | undefined;
