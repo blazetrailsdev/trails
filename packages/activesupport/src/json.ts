@@ -109,6 +109,33 @@ function filterHashKeys(keys: unknown[], options: NormalizedOptions): Set<unknow
   return new Set(keys);
 }
 
+// String-aware comment removal: quoted spans (and their backslash escapes) are
+// copied verbatim so a `//` or `/*` inside a JSON string survives.
+function stripJsonComments(value: string): string {
+  let out = "";
+  let index = 0;
+  while (index < value.length) {
+    const char = value[index];
+    if (char === '"') {
+      const start = index++;
+      while (index < value.length && value[index] !== '"') {
+        index += value[index] === "\\" ? 2 : 1;
+      }
+      out += value.slice(start, ++index);
+    } else if (char === "/" && value[index + 1] === "*") {
+      const end = value.indexOf("*/", index + 2);
+      index = end === -1 ? value.length : end + 2;
+    } else if (char === "/" && value[index + 1] === "/") {
+      const end = value.indexOf("\n", index + 2);
+      index = end === -1 ? value.length : end;
+    } else {
+      out += char;
+      index++;
+    }
+  }
+  return out;
+}
+
 export namespace ActiveSupportJSON {
   // Rails: `ActiveSupport::JSON.encode` runs the `as_json` traversal
   // unconditionally, options or not (encoding.rb:22-25) — the options-only
@@ -119,6 +146,15 @@ export namespace ActiveSupportJSON {
   }
 
   export function decode(value: string): unknown {
-    return JSON.parse(value);
+    try {
+      return JSON.parse(value);
+    } catch (error) {
+      // Ruby's JSON parser — what `ActiveSupport::JSON.decode` delegates to —
+      // skips `/* … */` and `// …` comments anywhere whitespace is allowed;
+      // `JSON.parse` rejects them. Only retry on a parse failure so valid
+      // documents (where a `//` may only appear inside a string) are untouched.
+      if (!(error instanceof SyntaxError)) throw error;
+      return JSON.parse(stripJsonComments(value));
+    }
   }
 }
