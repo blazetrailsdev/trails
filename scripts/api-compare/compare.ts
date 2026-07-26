@@ -189,6 +189,15 @@ export const WIDE_NO_JS_CALL_FORM = new Set([
   "each", // for...of loop — no .forEach callee
   "present?", // truthiness (`x != null && x !== ""`)
   "blank?", // truthiness (`!x`)
+  "to_str", // implicit String coercion — same family as `to_s`
+  // Ruby `key?`/`has_key?` on an options/params Hash. The idiom table's only JS
+  // form is `Map#has`, but Rails' hashes port to TS object literals, whose
+  // membership tests are the `in` operator, `x.k !== undefined`, or destructuring
+  // with a default — none of which record a callee. The gate cannot tell a
+  // faithful `"k" in opts` from a dropped guard, so keeping these would baseline
+  // every options-hash port forever with no way to ever discharge it.
+  "key?",
+  "has_key?",
 ]);
 
 // Opt-in WIDE significant set (RFC 0047): admits EVERY ported Ruby call name as
@@ -254,6 +263,40 @@ export function significantMissingCalls(
     missing.push(`${rc} → ${mapped.join("|")}`);
   }
   return missing;
+}
+
+/**
+ * Largest own-call-set a TS body may have and still read as a pure delegating
+ * wrapper: the self-named delegate call, the receiver accessor that produces the
+ * delegate, and at most one guard/bookkeeping call (`clearDataSourceCacheBang`,
+ * an `await`ed version probe). Above that the body is doing real work of its own,
+ * so its omissions are its own.
+ */
+const DELEGATION_MAX_CALLS = 3;
+
+/**
+ * Whether a matched TS body is a pure delegating wrapper — `return
+ * this.pgSchemaStatements().indexes(tableName)` — rather than the port itself.
+ *
+ * This exists because of how Ruby `include` attribution lands in the wide gate.
+ * A Rails module mixed into a class (`PostgreSQL::SchemaStatements` into
+ * `PostgreSQLAdapter`) has its methods attributed to the INCLUDING class's file
+ * (postgresql_adapter.rb), so the wide gate name-matches them against
+ * postgresql-adapter.ts. But trails ports those bodies into a sibling collaborator
+ * (postgresql/schema-statements-class.ts) whose filename has no Rails counterpart,
+ * so it is never itself paired; the adapter only keeps a one-line delegation. The
+ * gate was therefore charging the wrapper with the whole mixin's Rails call set —
+ * a pure attribution artifact, and the bulk of the +353 entries #5334's include
+ * resolution added to the baseline.
+ *
+ * The extractor records call NAMES only, no body structure, so the wrapper shape
+ * is inferred from the call-set: it contains the method's OWN name (the delegate
+ * call) and is no larger than DELEGATION_MAX_CALLS. A self-recursive body can
+ * also match, which is harmless — unioning its own calls into its own call-set
+ * is a no-op.
+ */
+export function isDelegatingWrapper(tsName: string, tsCalls: Set<string>): boolean {
+  return tsCalls.has(tsName) && tsCalls.size <= DELEGATION_MAX_CALLS;
 }
 
 /**
@@ -1036,6 +1079,11 @@ export function main() {
     const tsParamsByFileName = new Map<string, Map<string, ParamInfo[][]>>();
     // Body call-sets scoped per (file, name) for the advisory calls-parity check.
     const tsCallsByFileName = new Map<string, Map<string, string[][]>>();
+    // Same call-sets unioned across ALL files, keyed by name only. Consulted
+    // ONLY by the delegation-transparency gate (see `delegateCalls` below),
+    // never as the primary population — the per-file scoping above is what
+    // keeps same-named methods on unrelated classes from cross-satisfying.
+    const tsCallsByName = new Map<string, Set<string>>();
     const recordTsParams = (m: MethodInfo, file = m.file ?? "") => {
       const sigs = tsParamsByName.get(m.name) ?? [];
       sigs.push(m.params);
@@ -1052,6 +1100,9 @@ export function main() {
         const byName = tsCallsByFileName.get(file) ?? new Map<string, string[][]>();
         byName.set(m.name, [...(byName.get(m.name) ?? []), m.calls]);
         tsCallsByFileName.set(file, byName);
+        const union = tsCallsByName.get(m.name) ?? new Set<string>();
+        for (const c of m.calls) union.add(c);
+        tsCallsByName.set(m.name, union);
       }
     };
 
@@ -1489,6 +1540,17 @@ export function main() {
         const tsCandidateSets = tsCallsByFileName.get(tsFile)?.get(tsName);
         if (!tsCandidateSets || tsCandidateSets.length === 0) return;
         const tsCalls = new Set(tsCandidateSets.flat());
+        // Delegation transparency: when the matched body is a one-line wrapper
+        // forwarding to a same-named method elsewhere, compare against the
+        // DELEGATE's call-set — the wrapper is not the port (see
+        // isDelegatingWrapper). The union is by name across all files, so an
+        // unrelated same-named method can satisfy a call; that imprecision is
+        // acceptable here precisely because the matched body demonstrably
+        // contains no ported logic to hold to account, and the alternative is
+        // baselining the whole mixin's call set against a `return` statement.
+        if (isDelegatingWrapper(tsName, tsCalls)) {
+          for (const c of tsCallsByName.get(tsName) ?? []) tsCalls.add(c);
+        }
         callsCompared++;
         const missing = significantMissingCalls(
           rubyName,

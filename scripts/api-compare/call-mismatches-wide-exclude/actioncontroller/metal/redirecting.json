@@ -9,13 +9,6 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/redirecting.ts",
-    "rubyName": "_compute_redirect_to_location",
-    "call": "to_str",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/redirecting.ts",
     "rubyName": "_enforce_open_redirect_protection",
     "call": "truncate",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -32,13 +25,6 @@
     "tsFile": "metal/redirecting.ts",
     "rubyName": "_extract_redirect_to_status",
     "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/redirecting.ts",
-    "rubyName": "_extract_redirect_to_status",
-    "call": "key?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -67,13 +53,6 @@
     "tsFile": "metal/redirecting.ts",
     "rubyName": "url_options",
     "call": "merge!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/redirecting.ts",
-    "rubyName": "url_options",
-    "call": "request",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

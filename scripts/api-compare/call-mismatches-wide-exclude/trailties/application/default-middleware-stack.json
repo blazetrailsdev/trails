@@ -17,13 +17,6 @@
     "package": "trailties",
     "tsFile": "application/default-middleware-stack.ts",
     "rubyName": "build_stack",
-    "call": "key?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "trailties",
-    "tsFile": "application/default-middleware-stack.ts",
-    "rubyName": "build_stack",
     "call": "require",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }

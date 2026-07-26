@@ -16,6 +16,7 @@ import {
   JS_ENUMERABLE_ALIASES,
   WIDE_SIGNIFICANT_CALLS,
   WIDE_NO_JS_CALL_FORM,
+  isDelegatingWrapper,
   narrowCallsApplies,
 } from "./compare.js";
 import { rubyMethodToTs } from "./conventions.js";
@@ -209,6 +210,41 @@ describe("significantMissingCalls", () => {
     ]) {
       expect(WIDE_SIGNIFICANT_CALLS.has(call)).toBe(true);
     }
+  });
+
+  it("suppresses key?/has_key? — an options-hash port tests membership with `in`", () => {
+    // Rails `options.key?(:status)` ports to `"status" in options` / `options.status
+    // !== undefined`; the idiom table's only JS form is Map#has, which an object
+    // literal never calls, so no TS body could ever discharge the flag.
+    const missing = significantMissingCalls(
+      "_extract_redirect_to_status",
+      ["key?", "has_key?", "to_str"],
+      new Set(),
+      () => true,
+      map,
+      WIDE_SIGNIFICANT_CALLS,
+    );
+    expect(missing).toEqual([]);
+  });
+
+  describe("delegation transparency", () => {
+    it("reads a one-line forwarder as a delegating wrapper", () => {
+      // PostgreSQLAdapter#indexes is `return this.pgSchemaStatements().indexes(t)`;
+      // the mixin's real port lives in the collaborator, so the wrapper's own
+      // call-set is not the body to hold to account.
+      expect(isDelegatingWrapper("indexes", new Set(["indexes", "pgSchemaStatements"]))).toBe(true);
+    });
+
+    it("does not read a body doing its own work as a delegating wrapper", () => {
+      // A self-named call inside a real body (recursion, or a same-named call on
+      // a collected object) must not buy transparency for the rest of the body.
+      const own = new Set(["indexes", "schemaQuery", "map", "split", "join"]);
+      expect(isDelegatingWrapper("indexes", own)).toBe(false);
+    });
+
+    it("does not read a body without a self-named call as a delegating wrapper", () => {
+      expect(isDelegatingWrapper("indexes", new Set(["pgSchemaStatements"]))).toBe(false);
+    });
   });
 
   it("does not flag each — its faithful port is a for-of loop, not a callee", () => {

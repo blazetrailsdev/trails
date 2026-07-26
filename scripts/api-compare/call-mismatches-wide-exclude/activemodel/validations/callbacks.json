@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activemodel",
-    "tsFile": "validations/callbacks.ts",
-    "rubyName": "set_options_for_callback",
-    "call": "key?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  }
-]

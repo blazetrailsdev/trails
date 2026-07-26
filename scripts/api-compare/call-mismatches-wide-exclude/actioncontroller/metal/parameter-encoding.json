@@ -1,9 +1,0 @@
-[
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/parameter-encoding.ts",
-    "rubyName": "action_encoding_template",
-    "call": "has_key?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  }
-]

@@ -59,13 +59,6 @@
     "package": "activesupport",
     "tsFile": "cache.ts",
     "rubyName": "merged_options",
-    "call": "key?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache.ts",
-    "rubyName": "merged_options",
     "call": "merge",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -75,20 +68,6 @@
     "rubyName": "namespace_key",
     "call": "call",
     "reason": "Converged (RFC 0032): trails store.ts namespaceKey invokes callable namespaces via `ns = (ns as () => string)()` — a call expression on a local, which the extractor does not record as a named call."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache.ts",
-    "rubyName": "namespace_key",
-    "call": "key?",
-    "reason": "Converged (RFC 0032): trails store.ts namespaceKey checks the per-call override with the `\"namespace\" in callOptions` operator — the JS spelling of Ruby's `key?`; the extractor sees no call."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache.ts",
-    "rubyName": "normalize_options",
-    "call": "key?",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails cache.rb:901-910 loops OPTION_ALIASES with each/key?; trails cache/store.ts:451-463 inlines the single expires_in alias family with explicit null checks."
   },
   {
     "package": "activesupport",

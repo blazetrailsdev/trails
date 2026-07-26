@@ -58,13 +58,6 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/params-wrapper.ts",
-    "rubyName": "_wrapper_enabled?",
-    "call": "key?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/params-wrapper.ts",
     "rubyName": "wrap_parameters",
     "call": "from_hash",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
