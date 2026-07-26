@@ -155,6 +155,7 @@ class PullRequest extends Base {
 class PrFile extends Base {
   static {
     this.tableName = "pr_files";
+    this.attribute("id", "big_integer");
     this.attribute("pr_number", "integer");
     this.attribute("filename", "string");
     this.attribute("status", "string");
@@ -168,6 +169,7 @@ class PrFile extends Base {
 class PrCommit extends Base {
   static {
     this.tableName = "pr_commits";
+    this.attribute("id", "big_integer");
     this.attribute("pr_number", "integer");
     this.attribute("sha", "string");
     this.attribute("message", "string");
@@ -210,6 +212,7 @@ class PrReview extends Base {
 class PrRequestedReviewer extends Base {
   static {
     this.tableName = "pr_requested_reviewers";
+    this.attribute("id", "big_integer");
     this.attribute("pr_number", "integer");
     this.attribute("reviewer", "string");
     this.attribute("reviewer_type", "string");
@@ -219,6 +222,7 @@ class PrRequestedReviewer extends Base {
 class PrLinkedIssue extends Base {
   static {
     this.tableName = "pr_linked_issues";
+    this.attribute("id", "big_integer");
     this.attribute("pr_number", "integer");
     this.attribute("issue_number", "integer");
     this.attribute("issue_title", "string");
@@ -229,6 +233,7 @@ class PrLinkedIssue extends Base {
 class PrTimelineEvent extends Base {
   static {
     this.tableName = "pr_timeline_events";
+    this.attribute("id", "big_integer");
     this.attribute("pr_number", "integer");
     this.attribute("event_type", "string");
     this.attribute("actor", "string");
@@ -285,6 +290,7 @@ class WorkflowJob extends Base {
 class WorkflowStep extends Base {
   static {
     this.tableName = "workflow_steps";
+    this.attribute("id", "big_integer");
     this.attribute("job_id", "big_integer");
     this.attribute("name", "string");
     this.attribute("status", "string");
@@ -299,6 +305,7 @@ class WorkflowStep extends Base {
 class CheckAnnotation extends Base {
   static {
     this.tableName = "check_annotations";
+    this.attribute("id", "big_integer");
     this.attribute("run_id", "big_integer");
     this.attribute("job_id", "big_integer");
     this.attribute("path", "string");
@@ -313,6 +320,7 @@ class CheckAnnotation extends Base {
 class TestCompareStat extends Base {
   static {
     this.tableName = "test_compare_stats";
+    this.attribute("id", "big_integer");
     this.attribute("merge_commit_sha", "string");
     this.attribute("pr_number", "integer");
     this.attribute("package", "string");
@@ -329,6 +337,7 @@ class TestCompareStat extends Base {
 class ApiCompareStat extends Base {
   static {
     this.tableName = "api_compare_stats";
+    this.attribute("id", "big_integer");
     this.attribute("merge_commit_sha", "string");
     this.attribute("pr_number", "integer");
     this.attribute("package", "string");
@@ -343,6 +352,7 @@ class ApiCompareStat extends Base {
 class ApiComparePrivatesStat extends Base {
   static {
     this.tableName = "api_compare_privates_stats";
+    this.attribute("id", "big_integer");
     this.attribute("merge_commit_sha", "string");
     this.attribute("pr_number", "integer");
     this.attribute("package", "string");
@@ -356,6 +366,7 @@ class ApiComparePrivatesStat extends Base {
 class CompareLog extends Base {
   static {
     this.tableName = "compare_logs";
+    this.attribute("id", "big_integer");
     this.attribute("merge_commit_sha", "string");
     this.attribute("pr_number", "integer");
     this.attribute("step_name", "string");
@@ -379,6 +390,7 @@ class RawJobLog extends Base {
 class SyncLog extends Base {
   static {
     this.tableName = "sync_log";
+    this.attribute("id", "big_integer");
     this.attribute("synced_at", "string");
     this.attribute("prs_synced", "integer", { default: 0 });
     this.attribute("runs_synced", "integer", { default: 0 });
