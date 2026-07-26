@@ -197,14 +197,23 @@ function rubyMethodCandidates(rubyName: string): string[] | null {
  * Ruby constant with its TS counterpart; scoring the two passes off different
  * name rules would let a constant compare as a value yet still read as drift.
  *
- * The camelized form is emitted for SCREAMING_SNAKE names only. A CamelCase
- * constant (`Version = Gem::Version`, `Cipher = OpenSSL::Cipher`) camelizes to
- * a bare lowercase word that is indistinguishable from an ordinary method
- * name, so admitting it would silently absolve a genuinely novel TS `version`
- * / `cipher` — a far worse trade than the one drift-read it saves.
+ * The camelized form is emitted only for multi-token SCREAMING_SNAKE names —
+ * the ones where camelizing produces a case transition (`ER_DUP_ENTRY` →
+ * `erDupEntry`) that could only have come from a constant. A single-token name
+ * camelizes to a bare lowercase word indistinguishable from an ordinary method
+ * name, whether it started CamelCase (`Version = Gem::Version`) or SCREAMING
+ * (`VERSION = "10.0.0"`, arel.rb:29) — `snakeToCamel` is a no-op without a `_`
+ * to drive capitalization, so both collapse to `version`. Admitting that would
+ * silently absolve a genuinely novel TS `version` everywhere the allow-set is
+ * unioned in, a far worse trade than the one drift-read it saves.
+ *
+ * This is deliberately narrower than `constantNameMatches`, which may pair
+ * `VERSION` with a TS `version` for value comparison. Pairing a *known* TS
+ * constant to diff its value is safe; minting a lowercase allow-set entry that
+ * any method name can collide with is not.
  */
 function rubyConstantCandidates(name: string): string[] {
-  if (!/^[A-Z0-9_]+$/.test(name)) return [name];
+  if (!/^[A-Z0-9]+(_[A-Z0-9]+)+$/.test(name)) return [name];
   const camel = snakeToCamel(name.toLowerCase());
   return camel === name ? [name] : [name, camel];
 }

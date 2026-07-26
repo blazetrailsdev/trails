@@ -128,7 +128,7 @@ describe("buildGlobalRubyCandidates", () => {
     expect(set.has("erDupEntry")).toBe(true);
   });
 
-  it("does not camelize a CamelCase constant into a bare method-like name", () => {
+  it("does not camelize a single-token constant into a bare method-like name", () => {
     const ruby: ApiManifest = {
       source: "ruby",
       generatedAt: "",
@@ -138,12 +138,16 @@ describe("buildGlobalRubyCandidates", () => {
           modules: {},
           fileConstants: {
             "connection_adapters/abstract_adapter.rb": { Version: { kind: "expr" } },
+            // arel.rb:29 — SCREAMING, but single-token, so it camelizes to the
+            // same bare `version` a CamelCase constant would.
+            "arel.rb": { VERSION: { kind: "string", value: "10.0.0" } },
           },
         },
       },
     };
     const set = buildGlobalRubyCandidates(ruby);
     expect(set.has("Version")).toBe(true);
+    expect(set.has("VERSION")).toBe(true);
     // `version` would absolve any novel TS method of that name, everywhere.
     expect(set.has("version")).toBe(false);
   });
