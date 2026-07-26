@@ -280,7 +280,7 @@ export function registerModuleTableNameSuffix(moduleName: string, suffix: string
  * caller then falls back to `self.table_name_prefix`/`_suffix`). Mirrors the
  * `module_parents.detect { |p| p.respond_to?(:table_name_prefix) }` walk in
  * `ActiveRecord::ModelSchema::ClassMethods#full_table_name_{prefix,suffix}`
- * (model_schema.rb:301-307).
+ * (model_schema.rb:302-307).
  *
  * Two kinds of parent "respond to" the decorator and thus stop the walk:
  * a module that registered one (`registered`), or an *AR-model-class* parent —

@@ -165,19 +165,19 @@
     "package": "activerecord",
     "tsFile": "inheritance.ts",
     "name": "qualifiedName",
-    "reason": "Ruby resolves a model's namespace through the constant path (`Module#name`, `Module#module_parents`) and reads a module-level `table_name_prefix`/`table_name_suffix` off the enclosing module object — see `full_table_name_prefix` in model_schema.rb:301-307. JS classes carry no module path and there are no module objects to respond to those readers, so trails substitutes an explicit registry: namespaced models declare `static moduleName` and their wrapping module registers its decoration here. There is no Ruby `def` to match because Ruby gets this from the object model."
+    "reason": "Ruby resolves a model's namespace through the constant path (`Module#name`, `Module#module_parents`) and reads a module-level `table_name_prefix`/`table_name_suffix` off the enclosing module object — see `full_table_name_prefix` in model_schema.rb:302-307. JS classes carry no module path and there are no module objects to respond to those readers, so trails substitutes an explicit registry: namespaced models declare `static moduleName` and their wrapping module registers its decoration here. There is no Ruby `def` to match because Ruby gets this from the object model."
   },
   {
     "package": "activerecord",
     "tsFile": "inheritance.ts",
     "name": "registerModuleTableNamePrefix",
-    "reason": "Ruby resolves a model's namespace through the constant path (`Module#name`, `Module#module_parents`) and reads a module-level `table_name_prefix`/`table_name_suffix` off the enclosing module object — see `full_table_name_prefix` in model_schema.rb:301-307. JS classes carry no module path and there are no module objects to respond to those readers, so trails substitutes an explicit registry: namespaced models declare `static moduleName` and their wrapping module registers its decoration here. There is no Ruby `def` to match because Ruby gets this from the object model."
+    "reason": "Ruby resolves a model's namespace through the constant path (`Module#name`, `Module#module_parents`) and reads a module-level `table_name_prefix`/`table_name_suffix` off the enclosing module object — see `full_table_name_prefix` in model_schema.rb:302-307. JS classes carry no module path and there are no module objects to respond to those readers, so trails substitutes an explicit registry: namespaced models declare `static moduleName` and their wrapping module registers its decoration here. There is no Ruby `def` to match because Ruby gets this from the object model."
   },
   {
     "package": "activerecord",
     "tsFile": "inheritance.ts",
     "name": "registerModuleTableNameSuffix",
-    "reason": "Ruby resolves a model's namespace through the constant path (`Module#name`, `Module#module_parents`) and reads a module-level `table_name_prefix`/`table_name_suffix` off the enclosing module object — see `full_table_name_prefix` in model_schema.rb:301-307. JS classes carry no module path and there are no module objects to respond to those readers, so trails substitutes an explicit registry: namespaced models declare `static moduleName` and their wrapping module registers its decoration here. There is no Ruby `def` to match because Ruby gets this from the object model."
+    "reason": "Ruby resolves a model's namespace through the constant path (`Module#name`, `Module#module_parents`) and reads a module-level `table_name_prefix`/`table_name_suffix` off the enclosing module object — see `full_table_name_prefix` in model_schema.rb:302-307. JS classes carry no module path and there are no module objects to respond to those readers, so trails substitutes an explicit registry: namespaced models declare `static moduleName` and their wrapping module registers its decoration here. There is no Ruby `def` to match because Ruby gets this from the object model."
   },
   {
     "package": "activerecord",
