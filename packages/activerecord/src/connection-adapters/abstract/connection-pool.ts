@@ -544,22 +544,23 @@ export class ConnectionPool implements ReapablePool {
   }
 
   /**
-   * True when this pool's `query_cache:` config is literally `false`, i.e. the
-   * cache is disabled by configuration rather than merely not enabled right now.
+   * True when this pool's query cache is disabled *by configuration*, rather
+   * than merely not enabled right now.
    *
    * Rails has no such reader: `ActiveRecord::QueryCache.run` asks inline with
    * `next if pool.db_config&.query_cache == false`
    * (`active_record/query_cache.rb:39` — the top-level file, not
    * `connection_adapters/abstract/query_cache.rb`, whose `db_config&.query_cache`
    * at `:122` is a different case-statement computing the cache max size).
-   * Trails
-   * normalizes `query_cache` at pool construction into
-   * `ConnectionPoolConfiguration` (`normalizeQueryCacheConfig`), so the raw
-   * `false` is no longer readable off `dbConfig` at that point — this getter is
-   * the named form of Rails' inline predicate, delegating to the same
-   * normalized flag. Consumed by `QueryCache.run`'s skip guard
-   * (`query-cache.ts:107`), whose `QueryCacheRunTarget` interface is satisfied
-   * by both pools and the connection-level mixin.
+   *
+   * Deliberately *not* converged to that literal comparison. `dbConfig.queryCache`
+   * is still readable, but trails' public config type additionally accepts the
+   * `"enabled"` / `"disabled"` string aliases that Rails never sees as raw
+   * values, and `normalizeQueryCacheConfig` maps `"disabled"` → `false`. Asking
+   * Rails' `dbConfig.queryCache === false` directly would therefore stop
+   * skipping a pool configured `queryCache: "disabled"`. The predicate has to be
+   * asked of the *normalized* value, which is what this getter delegates to.
+   * Consumed by `QueryCache.run`'s skip guard in query-cache.ts.
    */
   get queryCacheDisabled(): boolean {
     return this._cacheConfig.queryCacheDisabled;

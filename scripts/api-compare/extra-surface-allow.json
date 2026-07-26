@@ -393,7 +393,7 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "name": "queryCacheDisabled",
-    "reason": "Named form of Rails' inline `next if pool.db_config&.query_cache == false` in `ActiveRecord::QueryCache.run` (active_record/query_cache.rb:39 — the top-level file, not connection_adapters/abstract/query_cache.rb, whose `db_config&.query_cache` at :122 is a different case-statement computing the cache max size). Trails normalizes `query_cache` at pool construction into `ConnectionPoolConfiguration`, so the raw `false` is no longer readable off `dbConfig` at that point; the getter delegates to the same normalized flag and is consumed by `QueryCache.run`'s skip guard (query-cache.ts). Justification at the declaration."
+    "reason": "Named form of Rails' inline `next if pool.db_config&.query_cache == false` in `ActiveRecord::QueryCache.run` (active_record/query_cache.rb:39 — the top-level file, not connection_adapters/abstract/query_cache.rb, whose `db_config&.query_cache` at :122 is a different case-statement computing the cache max size). Deliberately NOT converged to that literal comparison: `dbConfig.queryCache` is readable, but trails' public config type also accepts the \"enabled\"/\"disabled\" string aliases Rails never sees as raw values, and `normalizeQueryCacheConfig` maps \"disabled\" -> false, so `dbConfig.queryCache === false` would stop skipping a pool configured `queryCache: \"disabled\"`. The predicate must be asked of the normalized value. Justification at the declaration."
   },
   {
     "package": "activerecord",
