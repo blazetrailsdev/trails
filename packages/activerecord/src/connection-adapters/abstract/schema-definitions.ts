@@ -849,8 +849,6 @@ export class TableDefinition {
   readonly as?: string;
   readonly options?: string;
   readonly comment?: string;
-  readonly charset?: string;
-  readonly collation?: string;
   readonly compositePrimaryKey?: string[];
   private _id: boolean | PrimaryKeyType | IdHashOptions;
   private _adapterName: "sqlite" | "postgres" | "mysql";
@@ -898,8 +896,6 @@ export class TableDefinition {
     this.as = tdOptions.as;
     this.options = tdOptions.options;
     this.comment = tdOptions.comment;
-    this.charset = tdOptions.charset;
-    this.collation = tdOptions.collation;
     if (hasCompositePk) {
       this.compositePrimaryKey = tdOptions.primaryKey as string[];
     }

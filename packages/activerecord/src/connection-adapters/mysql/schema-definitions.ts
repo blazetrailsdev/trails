@@ -55,6 +55,9 @@ export interface ColumnMethods {
 }
 
 export class TableDefinition extends AbstractTableDefinition {
+  readonly charset?: string;
+  readonly collation?: string;
+
   constructor(
     tableName: string,
     options: {
@@ -79,6 +82,8 @@ export class TableDefinition extends AbstractTableDefinition {
       adapterName: "mysql",
       adapter: mysqlSchemaQuoter(adapter),
     });
+    this.charset = rest.charset ?? undefined;
+    this.collation = rest.collation ?? undefined;
   }
 
   blob(name: string, options: ColumnOptions & { limit?: number } = {}): this {
