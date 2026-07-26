@@ -4,8 +4,8 @@ import {
   CollectionAssociation,
   callback as assocCallback,
   concatRecordsLoop,
+  type CallbackHost,
 } from "./collection-association.js";
-import type { CallbackHost } from "./collection-association.js";
 import type { PrettyPrinter } from "../pretty-print.js";
 import type { AssociationRelation as AssociationRelationType } from "../association-relation.js";
 import {

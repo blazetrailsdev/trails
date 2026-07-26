@@ -1388,7 +1388,8 @@ export interface CallbackHost {
 
 /**
  * Unified association-callback dispatch. Mirrors Rails'
- * `CollectionAssociation#callback`: looks up the registered callbacks for
+ * `CollectionAssociation#callback` (collection_association.rb:492), whose
+ * lookup half is `callbacks_for` (:498): looks up the registered callbacks for
  * `kind` (`beforeAdd`/`afterAdd`/`beforeRemove`/`afterRemove`) and invokes
  * each. Returns `false` if any callback aborts (Rails `throw :abort`,
  * modelled here as a callback returning `false`), so callers can halt the
@@ -1403,9 +1404,7 @@ export interface CallbackHost {
  * sites share one proc array; passing `kind` here would break the proxy's
  * `cb(owner, record)` call site.
  *
- * Mirrors: ActiveRecord::Associations::CollectionAssociation#callback
- * (collection_association.rb:492).
- *
+ * `callback` is private in Rails, hence `@internal`.
  * @internal
  */
 export function callback(assoc: CallbackHost, kind: string, record: Base): boolean {
