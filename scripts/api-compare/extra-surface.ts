@@ -1132,8 +1132,9 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     console.error(
       `\nextra-surface: ${staleTagged.length} STALE @noRailsEquivalent tag(s) on ` +
         "methods that no longer flag as extra surface — Rails gained the method, " +
-        "the file mapping changed, or the tag covers a moved (misplaced) port. " +
-        "Delete the tag next to the code:\n" +
+        "the file mapping changed, the declaration is internal or `_`-prefixed " +
+        "(never counted), or the tag covers a moved (misplaced) port that belongs " +
+        "in its Rails-layout file. Delete the tag next to the code:\n" +
         staleTagged.map((e) => `  - ${e.package}  ${e.tsFile}  ${e.name}`).join("\n") +
         "\n",
     );
