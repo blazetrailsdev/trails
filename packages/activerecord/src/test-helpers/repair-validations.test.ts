@@ -3,11 +3,12 @@ import { Base } from "../index.js";
 import { setupHandlerSuite } from "./setup-handler-suite.js";
 import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
 import { repairValidations } from "./repair-validations.js";
+import { leaseFixtureConnection } from "./fixture-connection.js";
 
 // interests and zines are canonical schema.rb tables laid by the boot schema;
 // the inline models ride them rather than recreating a bespoke shape.
 setupHandlerSuite();
-withTransactionalFixtures(() => Base.connection);
+withTransactionalFixtures(leaseFixtureConnection);
 
 describe("repairValidations", () => {
   it("removes a validator added inside the block after it returns", async () => {
