@@ -98,6 +98,15 @@ export interface ClassInfo {
   name: string;
   superclass?: string;
   file?: string;
+  /**
+   * Set only on entries the extractor cloned because `file` merely
+   * re-exports the class (`export { X } from "./y.js"`); holds the
+   * `<declaringFile>:<Name>` key of the real declaration. compare.ts
+   * still needs the clone (Rails often expects the class at the barrel's
+   * path), but surface accounting must not charge the barrel with the
+   * declaring file's methods a second time — see extra-surface.ts.
+   */
+  reExportedFrom?: string;
   includes: string[];
   extends: string[];
   instanceMethods: MethodInfo[];

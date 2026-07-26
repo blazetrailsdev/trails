@@ -699,12 +699,22 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
     const sourceKey = `${targetRel}:${re.sourceName}`;
     const sourceClass = info.classes[sourceKey];
     if (sourceClass) {
-      info.classes[key] = { ...sourceClass, name: re.localName, file: re.fromFile };
+      info.classes[key] = {
+        ...sourceClass,
+        name: re.localName,
+        file: re.fromFile,
+        reExportedFrom: sourceKey,
+      };
       continue;
     }
     const sourceModule = info.modules[sourceKey];
     if (sourceModule) {
-      info.modules[key] = { ...sourceModule, name: re.localName, file: re.fromFile };
+      info.modules[key] = {
+        ...sourceModule,
+        name: re.localName,
+        file: re.fromFile,
+        reExportedFrom: sourceKey,
+      };
     }
   }
 
