@@ -676,67 +676,6 @@ export function _correctNames(dictionary: string[], input: string): string[] {
 }
 
 /**
- * Resolve the counter cache column for a hasMany association by inspecting
- * the child model's belongsTo reflection for a counterCache option.
- * Falls back to `${assocName}_count` if no reflection is found.
- */
-export function resolveCounterColumn(
-  parentModel: typeof Base,
-  assoc: { type: string; name: string; options: any },
-  counterName: string,
-): string {
-  // If counter name was passed as a column name directly, use it
-  if (counterName.endsWith("_count")) return counterName;
-
-  const childClassName = assoc.options.className ?? camelize(singularize(assoc.name));
-  if (!modelRegistry.has(childClassName)) {
-    return `${assoc.name}_count`;
-  }
-  const childModel = resolveModel(childClassName);
-  const childAssocs = childModel._associations as AssociationDefinition[] | undefined;
-  if (childAssocs) {
-    // Check against parent name and STI base class name
-    const parentNames = new Set([parentModel.name]);
-    // Registry keys let namespaced (modular) class_name: "Mod::Name" resolve.
-    for (const key of (parentModel as any)._registryKeys ?? []) parentNames.add(key);
-    let proto = Object.getPrototypeOf(parentModel);
-    while (proto && proto.name && proto !== Function.prototype) {
-      parentNames.add(proto.name);
-      proto = Object.getPrototypeOf(proto);
-    }
-    // Mirror Rails: pick the child `belongs_to` whose foreign key matches the
-    // has_many's (so two associations to the same class resolve correctly).
-    const hmForeignKey = assoc.options.foreignKey ?? `${underscore(parentModel.name)}_id`;
-    const fkEq = (a: AssociationDefinition): boolean => {
-      const fk = a.options.foreignKey ?? `${underscore(a.name)}_id`;
-      const left = Array.isArray(fk) ? fk : [fk];
-      const right = Array.isArray(hmForeignKey) ? hmForeignKey : [hmForeignKey];
-      return left.length === right.length && left.every((k, i) => String(k) === String(right[i]));
-    };
-    const candidates = childAssocs.filter(
-      (a) =>
-        a.type === "belongsTo" &&
-        a.options.counterCache &&
-        (parentNames.has(a.options.className ?? "") || parentNames.has(camelize(a.name))),
-    );
-    const belongsTo = candidates.find(fkEq) ?? candidates[0];
-    if (belongsTo) {
-      if (typeof belongsTo.options.counterCache === "string") {
-        return belongsTo.options.counterCache;
-      }
-      // Delegate to the belongs_to reflection's counterCacheColumn(), which
-      // handles flat class names (CpkBook → books_count) via inverse lookup.
-      const col = (childModel as any)
-        ._reflectOnAssociation?.(belongsTo.name)
-        ?.counterCacheColumn?.();
-      if (col) return col;
-      return `${pluralize(underscore(childModel.name))}_count`;
-    }
-  }
-  return `${assoc.name}_count`;
-}
-
-/**
  * Associations mixin — adds belongsTo, hasOne, hasMany to a model class.
  *
  * Mirrors: ActiveRecord::Associations::ClassMethods
@@ -2518,6 +2457,17 @@ export function buildThroughJoinScope(
  * Count associated records for a hasMany association using COUNT(*)
  * without loading records into memory. Bypasses strict loading checks
  * so resetCounters works on strict-loading models.
+ *
+ * @internal No Rails counterpart. Rails' `reset_counters` counts with
+ * `object.send(counter_association).count(:all)` — the proxy delegates to
+ * `association.scope`, which is side-effect-free. The Rails-named
+ * `HasManyAssociation#count_records` already exists as `countRecords`
+ * (`associations/has-many-association.ts`) and is a *different* method (it
+ * reads the counter cache and trims the target). This function exists only
+ * because trails fuses relation building with caching/strict-loading inside
+ * `loadHasMany`, the same deviation documented on its two callees
+ * {@link buildHasManyRelation} and {@link buildThroughJoinScope}; it
+ * disappears when that fusion is undone.
  */
 export async function countHasMany(
   record: Base,
@@ -3449,6 +3399,13 @@ export async function updateCounterCaches(
  * which uses `updateColumn` and would bypass that override, is intentionally not
  * wired for instance dispatch; if a future change routes instance dispatch
  * through it, the DB bump disappears and this sync must be revisited.)
+ *
+ * @internal No Rails counterpart. Rails never needs an in-memory
+ * `lock_version` sync here: `Locking::Optimistic#update_counters` merges the
+ * locking-column bump into the same UPDATE, and the in-memory record is
+ * reconciled by the `_update_record` lock-version write rather than by a
+ * separate reflect step. This function only exists to close the in-memory gap
+ * described above and has no Rails method to converge onto.
  */
 export function reflectLockVersionBump(record: Base): void {
   const ctor = record.constructor as typeof Base;

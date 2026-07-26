@@ -151,43 +151,50 @@ export async function resetCounters(
   const assocDefs = (this as any)._associations as
     | Array<{ type: string; name: string; options: any }>
     | undefined;
-  const hasManyAssocs = assocDefs?.filter((a) => a.type === "hasMany") ?? [];
-  const { resolveCounterColumn, countHasMany } = await import("./associations.js");
+  const { countHasMany } = await import("./associations.js");
+  const { reflectOnAllAssociations } = await import("./reflection.js");
 
   const updates: Record<string, unknown> = {};
   for (const counterName of counterNames) {
-    let assoc = hasManyAssocs.find((a) => a.name === counterName);
-    let counterColumn: string;
-
-    if (assoc) {
-      counterColumn = resolveCounterColumn(this, assoc, counterName);
-    } else {
-      if (counterName.endsWith("_count")) {
-        assoc = hasManyAssocs.find((a) => a.name === counterName.slice(0, -6));
-      }
-      if (!assoc) {
-        for (const candidate of hasManyAssocs) {
-          const col = resolveCounterColumn(this, candidate, candidate.name);
-          if (col === counterName) {
-            assoc = candidate;
-            break;
-          }
-        }
-      }
-      if (!assoc) {
-        // Mirrors Rails' ArgumentError in CounterCache::ClassMethods#reset_counters.
-        throw new ArgumentError(`'${this.name}' has no association called '${counterName}'`);
-      }
-      counterColumn = resolveCounterColumn(this, assoc, assoc.name);
+    // Mirrors Rails' `counter_association` local: it starts as the passed
+    // symbol and is rewritten to the reflection's plural name when the symbol
+    // turned out to be a counter *column* rather than an association name.
+    let counterAssociation = counterName;
+    let hasManyAssociation: any = (this as any)._reflectOnAssociation?.(counterAssociation) ?? null;
+    if (!hasManyAssociation) {
+      hasManyAssociation =
+        reflectOnAllAssociations(this, "hasMany").find((association: any) => {
+          const column = association.counterCacheColumn();
+          return !!column && column === counterAssociation;
+        }) ?? null;
+      if (hasManyAssociation) counterAssociation = hasManyAssociation.pluralName;
+    }
+    if (!hasManyAssociation) {
+      // Mirrors Rails' ArgumentError in CounterCache::ClassMethods#reset_counters.
+      throw new ArgumentError(`'${this.name}' has no association called '${counterAssociation}'`);
     }
 
     // Mirrors Rails: for a `has_many :through`, the counter column comes from the
     // through (join) reflection, while the count still runs against the through.
-    if (assoc.options.through) {
-      const through = hasManyAssocs.find((a) => a.name === assoc.options.through);
-      if (through) counterColumn = resolveCounterColumn(this, through, through.name);
+    if (hasManyAssociation.isThroughReflection?.()) {
+      hasManyAssociation = hasManyAssociation.throughReflection;
     }
 
+    const foreignKey = String(hasManyAssociation.foreignKey);
+    const childClass = hasManyAssociation.klass;
+    const reflection = reflectOnAllAssociations(childClass, "belongsTo").find(
+      (e: any) => String(e.foreignKey) === foreignKey && !!e.options?.counterCache,
+    );
+    const counterColumn = (reflection as any)?.counterCacheColumn();
+    if (!counterColumn) {
+      throw new ArgumentError(`'${this.name}' has no association called '${counterAssociation}'`);
+    }
+
+    // Rails: `object.send(counter_association).count(:all)`.
+    const assoc = assocDefs?.find((a) => a.name === counterAssociation);
+    if (!assoc) {
+      throw new ArgumentError(`'${this.name}' has no association called '${counterAssociation}'`);
+    }
     const count = await countHasMany(record, assoc.name, assoc.options);
     // Mirrors Rails: `updates[counter_name] = count if count != count_was` — skip
     // the UPDATE entirely when the stored counter already matches the recount.
