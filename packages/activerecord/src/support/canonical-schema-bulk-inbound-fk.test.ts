@@ -13,9 +13,9 @@
  */
 import { beforeAll, describe, expect, it } from "vitest";
 import { Base } from "../base.js";
-import { rebuildCanonicalTables } from "../support/canonical-schema.js";
-import { setupHandlerSuite } from "../support/setup-handler-suite.js";
-import { activeLane } from "../support/test-connection-env.js";
+import { rebuildCanonicalTables } from "./canonical-schema.js";
+import { setupHandlerSuite } from "./setup-handler-suite.js";
+import { activeLane } from "./test-connection-env.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
 const lane = activeLane();

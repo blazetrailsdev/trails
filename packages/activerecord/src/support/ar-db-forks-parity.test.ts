@@ -1,8 +1,8 @@
 import { osAdapterConfig, registerOsAdapter } from "@blazetrails/activesupport";
 import { getFsAsync } from "@blazetrails/activesupport/fs-adapter";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { DEFAULT_FORKS, resolveForkCount } from "../support/ar-db-forks-default.js";
-import { workerForkCount } from "../support/ar-db-slots.js";
+import { DEFAULT_FORKS, resolveForkCount } from "./ar-db-forks-default.js";
+import { workerForkCount } from "./ar-db-slots.js";
 
 const sourcePath = (relative: string): string =>
   decodeURIComponent(new URL(relative, import.meta.url).pathname);

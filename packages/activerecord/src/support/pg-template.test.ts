@@ -14,16 +14,11 @@
  */
 import { describe, it, expect } from "vitest";
 import pg from "pg";
-import { generateSchemaFile } from "../support/schema-file-generator.js";
+import { generateSchemaFile } from "./schema-file-generator.js";
 import { schemaSha1 } from "../tasks/database-tasks.js";
-import { TEST_SCHEMA } from "./test-schema.js";
-import { PG_TEMPLATE_ENV } from "../support/template-global-setup.js";
-import {
-  activeLane,
-  postgresSettings,
-  settingsUrl,
-  withDatabase,
-} from "../support/test-connection-env.js";
+import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
+import { PG_TEMPLATE_ENV } from "./template-global-setup.js";
+import { activeLane, postgresSettings, settingsUrl, withDatabase } from "./test-connection-env.js";
 
 const pgActive = activeLane() === "postgres";
 
