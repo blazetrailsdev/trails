@@ -187,24 +187,6 @@
   },
   {
     "package": "activerecord",
-    "tsFile": "inheritance.ts",
-    "name": "enableSti",
-    "reason": "CONVERGENCE PENDING — story `converge-enablesti-onto-inheritance-column-setter`. Rails has no `enable_sti`: STI is implicit and the column is named by assignment (`self.inheritance_column = 'zoink'`, model_schema.rb:146-151; `class_attribute :inheritance_column, instance_accessor: false, default: \"type\"` at model_schema.rb:172). The faithful writer is already ported and wired — `ModelSchema.inheritanceColumn` behind the Rails-named `Base.inheritanceColumn` setter (base.ts:1653) — so `enableSti(X)` is spelled `X.inheritanceColumn = ...`. Allowlisted to hold the count while the 93 call sites migrate; not a permanent exemption."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "inheritance.ts",
-    "name": "getInheritanceColumn",
-    "reason": "CONVERGENCE PENDING — story `converge-inheritance-column-reader-onto-ported-nullable`. The faithful reader is already ported: `ModelSchema.inheritanceColumn` (model-schema.ts) returns `null` for `self.inheritance_column = nil` and is exposed as `Base.inheritanceColumn` (base.ts:1649). `getInheritanceColumn` flattens that `null` to `\"type\"`, which is why trails also needs the Rails-less `inheritanceColumnDisabled` predicate to recover the discarded information. Allowlisted to hold the count while callers move to the nullable reader; not a permanent exemption."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "inheritance.ts",
-    "name": "instantiateSti",
-    "reason": "CONVERGENCE PENDING — story `converge-instantiatesti-into-ported-instantiate`. Rails has one entry point, not two: `Persistence::ClassMethods#instantiate` (persistence.rb:100-103) is `discriminate_class_for_record` + `instantiate_instance_of`, and trails' persistence.ts `instantiate` already reproduces that. `instantiateSti` is a second hydration path wrapping the private `directInstantiate`, kept only because the recursion guard in `base.ts:_instantiate` compares the stored type value against the JS class `name` — which diverges from `stiName` for a `storeFullStiClass` namespaced model. Allowlisted to hold the count while the guard is converged to an identity comparison; not a permanent exemption."
-  },
-  {
-    "package": "activerecord",
     "tsFile": "associations.ts",
     "name": "registerModel",
     "reason": "trails-only model registry with no Rails analogue: `register_model` is defined nowhere in the Rails source (verified by grep over vendor/rails). Ruby resolves an association's class through constant lookup — Reflection#compute_class (reflection.rb:434 and :490) into Object.const_get, backed by ActiveSupport autoloading — so Rails never registers models anywhere. ESM has no constant namespace to walk and no autoload hook, so trails must be told which classes exist. Deliberately public (re-exported from index.ts) because application code has to call it, which is why @internal would be a lie rather than a fix. Kept in associations.ts because association class resolution is its only consumer path."
