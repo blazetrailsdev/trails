@@ -332,22 +332,22 @@ function counterCachedAssociationNames(ctor: typeof Base): string[] {
 }
 
 /**
- * Resolve a reflection's foreign key. Rails reads `reflection.foreign_key`
- * directly; trails' association reflections may still be raw definitions
- * (`{ name, options }`) with no derived key, so fall back to the same
- * derivation Reflection uses — explicit `foreignKey`/`queryConstraints`, then
- * `<as>_id` for a polymorphic `has_many ... as:`, then `<name>_id`.
+ * Derive a foreign key for a reflection that has none. Rails always has
+ * `reflection.foreign_key`; trails' association reflections may still be raw
+ * definitions (`{ name, options }`), so callers read `.foreignKey` first and
+ * fall back here to the derivation Reflection itself uses — explicit
+ * `foreignKey`/`queryConstraints`, then `<as>_id` for a polymorphic
+ * `has_many ... as:`, then `<name>_id`.
  *
  * `nameFallback` is the last resort only: for the `destroyed_by_association`
  * side it is the destroyed record's class name, which matches Rails' derived
  * `<owner>_id` for the common `has_many` (a parent whose has_many names a
  * different foreign key always carries it explicitly in `options`).
  */
-function reflectionForeignKey(
-  reflection: { foreignKey?: unknown; options?: Record<string, unknown> } | null | undefined,
+function derivedForeignKey(
+  reflection: { options?: Record<string, unknown> } | null | undefined,
   nameFallback: string,
 ): unknown {
-  if (reflection?.foreignKey != null) return reflection.foreignKey;
   const options = reflection?.options ?? {};
   if (options.foreignKey != null) return options.foreignKey;
   if (options.queryConstraints != null) return options.queryConstraints;
@@ -386,13 +386,11 @@ export async function destroyRow(
         foreignKey?: unknown;
         options?: Record<string, unknown>;
       } | null;
-      if (
-        !dba ||
-        !_foreignKeysEqual(
-          reflectionForeignKey(dba, this.constructor.name),
-          reflectionForeignKey(assoc.reflection, name),
-        )
-      ) {
+      const destroyedByForeignKey =
+        dba?.foreignKey ?? derivedForeignKey(dba, this.constructor.name);
+      const reflectionForeignKey =
+        assoc.reflection?.foreignKey ?? derivedForeignKey(assoc.reflection, name);
+      if (!dba || !_foreignKeysEqual(destroyedByForeignKey, reflectionForeignKey)) {
         await assoc.decrementCounters();
       }
     }

@@ -15,6 +15,9 @@ import { Book } from "../test-helpers/models/book.js";
 import { Human } from "../test-helpers/models/human.js";
 import { Essay } from "../test-helpers/models/essay.js";
 import { CpkAuthor, CpkBook } from "../test-helpers/models/cpk.js";
+// Zeitwerk analog: Cpk::Book's counter-cached/association targets (Cpk::Order)
+// are resolved by name, as Rails resolves them from the autoloaded models tree.
+import "../test-helpers/canonical-model-index.js";
 
 registerModel(Post);
 registerModel(Comment);
