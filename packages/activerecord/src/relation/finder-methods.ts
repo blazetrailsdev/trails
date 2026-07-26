@@ -78,6 +78,9 @@ export interface NormalizedFindIds {
  * Does NOT do the actual lookup or the "couldn't find all" aggregate
  * error — that stays at the call site (SQL vs in-memory each have
  * their own count-comparison logic).
+ * @internal Package-private argument normalizer shared by `performFind` and
+ * `CollectionProxy#find`; Rails inlines this in `find` itself, so there is no
+ * Rails counterpart to match against.
  */
 export function normalizeFindArgs(
   modelName: string,
@@ -188,6 +191,11 @@ export function normalizeFindArgs(
  *
  * `notFoundIds` (Rails' `ids_writer` passes `ids - found_ids`) appends the
  * trailing "Couldn't find <Model> with <key> <ids>." sentence.
+ * @internal Message-composition half of Rails'
+ * `raise_record_not_found_exception!`; the Rails-named port is
+ * `raiseRecordNotFoundExceptionBang` below, which needs a bound relation.
+ * This form takes plain arguments so the in-memory collection paths can
+ * reuse the identical message without one.
  */
 export function raiseNotFoundAll(
   modelName: string,
@@ -244,6 +252,8 @@ function formatNotFoundAllMessage(
 /**
  * Raise the single-id not-found error for a simple PK.
  * Matches `Relation.performFind`'s `"with 'pk'=<id>"` message.
+ * @internal Sibling of `raiseNotFoundAll` for the single-id message; see
+ * `raiseRecordNotFoundExceptionBang` for the Rails-named entry point.
  */
 export function raiseNotFoundSingle(
   modelName: string,
@@ -308,6 +318,10 @@ function buildPkWhere(pk: string[], tuple: unknown[]): Record<string, unknown> {
   return conditions;
 }
 
+/**
+ * @internal Async-split implementation behind the public `find` finder;
+ * the Rails-matched name is the `finderMethods` key, not this one.
+ */
 export async function performFind(this: FinderRelation, ...args: unknown[]): Promise<any> {
   const pk = this._modelClass.primaryKey;
   const modelName = this._modelClass.name;
@@ -371,6 +385,10 @@ export async function performFind(this: FinderRelation, ...args: unknown[]): Pro
   return records;
 }
 
+/**
+ * @internal Async-split implementation behind the public `findBy` finder;
+ * the Rails-matched name is the `finderMethods` key, not this one.
+ */
 export async function performFindBy(
   this: FinderRelation,
   conditions: unknown,
@@ -393,6 +411,10 @@ export async function performFindBy(
   }
 }
 
+/**
+ * @internal Async-split implementation behind the public `findBy!` finder;
+ * the Rails-matched name is the `finderMethods` key, not this one.
+ */
 export async function performFindByBang(
   this: FinderRelation,
   conditions: unknown,
@@ -408,6 +430,10 @@ export async function performFindByBang(
   return record;
 }
 
+/**
+ * @internal Async-split implementation behind the public `findSoleBy` finder;
+ * the Rails-matched name is the `finderMethods` key, not this one.
+ */
 export async function performFindSoleBy(
   this: FinderRelation,
   ...conditions: unknown[]
@@ -426,6 +452,10 @@ function hasReversibleOrder(rel: FinderRelation): boolean {
   return rel._orderClauses.length > 0;
 }
 
+/**
+ * @internal Async-split implementation behind the public `first` finder;
+ * the Rails-matched name is the `finderMethods` key, not this one.
+ */
 export async function performFirst(this: FinderRelation, n?: number): Promise<any> {
   // `_isEmptyRelation()` is the shared none-short-circuit chokepoint: on an
   // AssociationRelation it first rebases a stale new-owner `1=0` seed onto the
@@ -441,6 +471,10 @@ export async function performFirst(this: FinderRelation, n?: number): Promise<an
   return (await this.findNthWithLimit(0, 1))[0] ?? null;
 }
 
+/**
+ * @internal Async-split implementation behind the public `first!` finder;
+ * the Rails-matched name is the `finderMethods` key, not this one.
+ */
 export async function performFirstBang(this: FinderRelation): Promise<any> {
   const record = await performFirst.call(this);
   if (!record) {
@@ -457,6 +491,10 @@ function orderByPk(rel: FinderRelation, direction: "asc" | "desc"): any {
   return rel.order({ [pk]: direction });
 }
 
+/**
+ * @internal Async-split implementation behind the public `last` finder;
+ * the Rails-matched name is the `finderMethods` key, not this one.
+ */
 export async function performLast(this: FinderRelation, n?: number): Promise<any> {
   // See performFirst: `_isEmptyRelation()` rebases a stale new-owner seed before
   // reporting the none short-circuit.
@@ -493,6 +531,10 @@ export async function performLast(this: FinderRelation, n?: number): Promise<any
   return records[0] ?? null;
 }
 
+/**
+ * @internal Async-split implementation behind the public `last!` finder;
+ * the Rails-matched name is the `finderMethods` key, not this one.
+ */
 export async function performLastBang(this: FinderRelation): Promise<any> {
   const record = await performLast.call(this);
   if (!record) {
@@ -501,6 +543,10 @@ export async function performLastBang(this: FinderRelation): Promise<any> {
   return record;
 }
 
+/**
+ * @internal Async-split implementation behind the public `sole` finder;
+ * the Rails-matched name is the `finderMethods` key, not this one.
+ */
 export async function performSole(this: FinderRelation): Promise<any> {
   const rel = this._clone();
   rel._limitValue = 2;
@@ -516,6 +562,10 @@ export async function performSole(this: FinderRelation): Promise<any> {
   return records[0];
 }
 
+/**
+ * @internal Async-split implementation behind the public `take` finder;
+ * the Rails-matched name is the `finderMethods` key, not this one.
+ */
 export async function performTake(this: FinderRelation, limit?: number): Promise<any> {
   const rel = this._clone();
   if (limit !== undefined) {
@@ -527,6 +577,10 @@ export async function performTake(this: FinderRelation, limit?: number): Promise
   return records[0] ?? null;
 }
 
+/**
+ * @internal Async-split implementation behind the public `take!` finder;
+ * the Rails-matched name is the `finderMethods` key, not this one.
+ */
 export async function performTakeBang(this: FinderRelation): Promise<any> {
   const record = await performTake.call(this);
   if (!record) {
@@ -572,34 +626,65 @@ export async function findNthFromLast(this: FinderRelation, index: number): Prom
   return relation.reverseOrder().offset(index).first();
 }
 
+/**
+ * @internal Async-split implementation behind the public `second` finder;
+ * the Rails-matched name is the `finderMethods` key, not this one.
+ */
 export async function performSecond(this: FinderRelation): Promise<any | null> {
   return (await this.findNthWithLimit(1, 1))[0] ?? null;
 }
 
+/**
+ * @internal Async-split implementation behind the public `third` finder;
+ * the Rails-matched name is the `finderMethods` key, not this one.
+ */
 export async function performThird(this: FinderRelation): Promise<any | null> {
   return (await this.findNthWithLimit(2, 1))[0] ?? null;
 }
 
+/**
+ * @internal Async-split implementation behind the public `fourth` finder;
+ * the Rails-matched name is the `finderMethods` key, not this one.
+ */
 export async function performFourth(this: FinderRelation): Promise<any | null> {
   return (await this.findNthWithLimit(3, 1))[0] ?? null;
 }
 
+/**
+ * @internal Async-split implementation behind the public `fifth` finder;
+ * the Rails-matched name is the `finderMethods` key, not this one.
+ */
 export async function performFifth(this: FinderRelation): Promise<any | null> {
   return (await this.findNthWithLimit(4, 1))[0] ?? null;
 }
 
+/**
+ * @internal Async-split implementation behind the public `fortyTwo` finder;
+ * the Rails-matched name is the `finderMethods` key, not this one.
+ */
 export async function performFortyTwo(this: FinderRelation): Promise<any | null> {
   return (await this.findNthWithLimit(41, 1))[0] ?? null;
 }
 
+/**
+ * @internal Async-split implementation behind the public `secondToLast` finder;
+ * the Rails-matched name is the `finderMethods` key, not this one.
+ */
 export async function performSecondToLast(this: FinderRelation): Promise<any | null> {
   return this.findNthFromLast(1);
 }
 
+/**
+ * @internal Async-split implementation behind the public `thirdToLast` finder;
+ * the Rails-matched name is the `finderMethods` key, not this one.
+ */
 export async function performThirdToLast(this: FinderRelation): Promise<any | null> {
   return this.findNthFromLast(2);
 }
 
+// The `perform*Bang` consts below are `@internal`: each is the async-split
+// implementation behind the like-named public finder (`second!`, `third!`, …).
+// The Rails-matched names are the `finderMethods` keys, not these.
 function bangFinder(finder: (this: FinderRelation) => Promise<any | null>) {
   return async function (this: FinderRelation): Promise<any> {
     const record = await finder.call(this);
@@ -610,14 +695,25 @@ function bangFinder(finder: (this: FinderRelation) => Promise<any | null>) {
   };
 }
 
+/** @internal */
 export const performSecondBang = bangFinder(performSecond);
+/** @internal */
 export const performThirdBang = bangFinder(performThird);
+/** @internal */
 export const performFourthBang = bangFinder(performFourth);
+/** @internal */
 export const performFifthBang = bangFinder(performFifth);
+/** @internal */
 export const performFortyTwoBang = bangFinder(performFortyTwo);
+/** @internal */
 export const performSecondToLastBang = bangFinder(performSecondToLast);
+/** @internal */
 export const performThirdToLastBang = bangFinder(performThirdToLast);
 
+/**
+ * @internal Async-split implementation behind the public `findOrCreateBy!` finder;
+ * the Rails-matched name is the `finderMethods` key, not this one.
+ */
 export async function performFindOrCreateByBang(
   this: FinderRelation,
   conditions: Record<string, unknown>,
@@ -631,6 +727,10 @@ export async function performFindOrCreateByBang(
   return performCreateOrFindByBang.call(this, conditions, extra);
 }
 
+/**
+ * @internal Async-split implementation behind the public `createOrFindBy!` finder;
+ * the Rails-matched name is the `finderMethods` key, not this one.
+ */
 export async function performCreateOrFindByBang(
   this: FinderRelation,
   conditions: Record<string, unknown>,

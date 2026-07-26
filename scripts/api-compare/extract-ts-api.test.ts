@@ -1240,4 +1240,21 @@ describe("extractFromProgram — @internal JSDoc on top-level functions", () => 
     expect(info.modules["key-normalization.ts:KeyNormalization"]).toBeUndefined();
     expect(info.fileFunctions["key-normalization.ts"].every((f) => f.internal)).toBe(true);
   });
+
+  it("tags an @internal-tagged exported function-valued const and leaves its sibling public", () => {
+    const info = extractFromFiles("/p", {
+      "finder-methods.ts": `
+        function bangFinder(f: () => number) { return () => f(); }
+        function base(): number { return 1; }
+
+        /** @internal */
+        export const performSecondBang = bangFinder(base);
+
+        export const secondBang = bangFinder(base);
+      `,
+    });
+    const fns = info.fileFunctions["finder-methods.ts"];
+    expect(fns.find((f) => f.name === "performSecondBang")!.internal).toBe(true);
+    expect(fns.find((f) => f.name === "secondBang")!.internal).toBeUndefined();
+  });
 });
