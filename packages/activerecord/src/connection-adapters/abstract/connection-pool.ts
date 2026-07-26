@@ -589,7 +589,7 @@ export class ConnectionPool implements ReapablePool {
   // --- Pool state ---
 
   get activeConnection(): DatabaseAdapter | null {
-    return this._connectionLease().connection;
+    return this.connectionLease().connection;
   }
 
   isConnected(): boolean {
@@ -618,7 +618,7 @@ export class ConnectionPool implements ReapablePool {
   // path routes through `checkout`, which awaits `verifyBang`. Intentional
   // NAME+semantics fidelity to Rails' `lease_connection`, not the sync return.
   async leaseConnection(): Promise<DatabaseAdapter> {
-    const lease = this._connectionLease();
+    const lease = this.connectionLease();
     lease.sticky = true;
     if (!lease.connection) {
       lease.connection = await this.checkout();
@@ -646,7 +646,7 @@ export class ConnectionPool implements ReapablePool {
    * @internal
    */
   leaseConnectionSync(): DatabaseAdapter {
-    const lease = this._connectionLease();
+    const lease = this.connectionLease();
     lease.sticky = true;
     if (!lease.connection) {
       const pinned = this._resolvePinnedConnection();
@@ -663,11 +663,11 @@ export class ConnectionPool implements ReapablePool {
   }
 
   isPermanentLease(): boolean {
-    return this._connectionLease().sticky === null;
+    return this.connectionLease().sticky === null;
   }
 
   releaseConnection(): boolean {
-    const conn = this._connectionLease().release();
+    const conn = this.connectionLease().release();
     if (conn) {
       this.checkin(conn);
       return true;
@@ -698,7 +698,7 @@ export class ConnectionPool implements ReapablePool {
     // established connection in fixture mode so pool size 1 doesn't trip
     // ConnectionTimeoutError on `_acquireConnection`.
     const fixtureSharedConnection = slot === "fixture" ? (this._connections?.[0] ?? null) : null;
-    const leasedConnection = fixtureSharedConnection ?? this._connectionLease().connection;
+    const leasedConnection = fixtureSharedConnection ?? this.connectionLease().connection;
     const connection = pin?.connection ?? leasedConnection ?? this._acquireConnection();
     const newlyCheckedOut = !pin && leasedConnection == null;
 
@@ -886,7 +886,7 @@ export class ConnectionPool implements ReapablePool {
 
   checkin(conn: DatabaseAdapter): void {
     if (this._isConnectionPinned(conn)) return;
-    this._connectionLease().clear(conn);
+    this.connectionLease().clear(conn);
     if (this._checkedOut.has(conn)) {
       this._checkedOut.delete(conn);
       // Mirrors `conn._run_checkin_callbacks { conn.expire }`: expire is the
@@ -914,7 +914,7 @@ export class ConnectionPool implements ReapablePool {
     options: { preventPermanentCheckout?: boolean; checkoutTimeout?: number } = {},
   ): Promise<T> {
     const preventPermanent = options.preventPermanentCheckout ?? false;
-    const lease = this._connectionLease();
+    const lease = this.connectionLease();
     const stickyWas = lease.sticky;
     if (preventPermanent) lease.sticky = false;
 
@@ -1405,7 +1405,7 @@ export class ConnectionPool implements ReapablePool {
   _eagerWarmPromise: Promise<void> | null = null;
 
   remove(conn: DatabaseAdapter): void {
-    this._connectionLease().clear(conn);
+    this.connectionLease().clear(conn);
     this._checkedOut.delete(conn);
     this._lastCheckinAt.delete(conn);
     this._available?.delete(conn);
@@ -1479,7 +1479,13 @@ export class ConnectionPool implements ReapablePool {
     return this._pinnedConnections.get(executionContextId())?.connection;
   }
 
-  private _connectionLease(): Lease {
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#connection_lease
+   * (`connection_pool.rb:711`, private) — the per-execution-context lease
+   * record. Carries the Rails name directly rather than sitting behind an
+   * `_`-prefixed alias, so the call sites read as Rails' do.
+   */
+  private connectionLease(): Lease {
     if (!this._leases) {
       this._leases = new LeaseRegistry();
     }
@@ -1526,24 +1532,11 @@ function isTransactionAware(conn: DatabaseAdapter): conn is TransactionAwareConn
 // ---------------------------------------------------------------------------
 
 // `Pool` is a structural alias used by the @internal helpers below to reach
-// private state (`_connections`, `_leases`, `_connectionLease`, etc.) on
+// private state (`_connections`, `_leases`, `_available`, etc.) on
 // the host without widening the public API. `any` is intentional — the
 // helpers mirror Rails' file-private surface and shouldn't constrain the
 // public class declaration.
 type Pool = any;
-
-/**
- * Returns the per-execution-context lease record (the lease tracker keyed
- * by the current isolated execution context). Wraps `_connectionLease`,
- * matching Rails' private `connection_lease`.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#connection_lease
- *
- * @internal
- */
-function connectionLease(pool: Pool): Lease {
-  return pool._connectionLease();
-}
 
 /**
  * Builds the async-query executor. JS runs single-threaded, so a real
