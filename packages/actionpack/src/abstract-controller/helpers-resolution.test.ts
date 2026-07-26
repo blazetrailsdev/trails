@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   allHelpersFromPath,
-  defaultHelperModule,
+  defaultHelperModuleBang,
   helper,
   helperModulesFromPaths,
   modulesForHelpers,
@@ -136,16 +136,16 @@ describe("helperModulesFromPaths", () => {
   });
 });
 
-describe("defaultHelperModule", () => {
+describe("defaultHelperModuleBang", () => {
   it("strips the Controller suffix and includes the matching helper", () => {
     const cls: HelpersClassMethods = { name: "FooController" };
-    defaultHelperModule(cls, { resolve });
+    defaultHelperModuleBang(cls, { resolve });
     expect(cls._helpers!.foo.call({})).toBe("FOO");
   });
 
   it("swallows the NameError when the helper does not exist", () => {
     const cls: HelpersClassMethods = { name: "MissingController" };
-    expect(() => defaultHelperModule(cls, { resolve })).not.toThrow();
+    expect(() => defaultHelperModuleBang(cls, { resolve })).not.toThrow();
     expect(cls._helpers).toBeUndefined();
   });
 
@@ -153,14 +153,14 @@ describe("defaultHelperModule", () => {
     const throwing = () => {
       throw new Error("connection lost");
     };
-    expect(() => defaultHelperModule({ name: "FooController" }, { resolve: throwing })).toThrow(
+    expect(() => defaultHelperModuleBang({ name: "FooController" }, { resolve: throwing })).toThrow(
       /connection lost/,
     );
   });
 
   it("is a no-op on an anonymous class (no name)", () => {
     const cls: HelpersClassMethods = {};
-    defaultHelperModule(cls, { resolve });
+    defaultHelperModuleBang(cls, { resolve });
     expect(cls._helpers).toBeUndefined();
   });
 
@@ -169,7 +169,7 @@ describe("defaultHelperModule", () => {
     // "Plain" unchanged, then `helper("Plain")` is called. PlainHelper
     // doesn't exist → NameError → swallowed.
     const cls: HelpersClassMethods = { name: "Plain" };
-    defaultHelperModule(cls, { resolve });
+    defaultHelperModuleBang(cls, { resolve });
     expect(cls._helpers).toBeUndefined();
   });
 
@@ -182,12 +182,12 @@ describe("defaultHelperModule", () => {
       }
       return undefined;
     };
-    expect(() => defaultHelperModule(cls, { resolve: surprising })).toThrow(/SomeOtherThing/);
+    expect(() => defaultHelperModuleBang(cls, { resolve: surprising })).toThrow(/SomeOtherThing/);
   });
 
   it("composes with helper(): subsequent helper(cls, X) layers on top", () => {
     const cls: HelpersClassMethods = { name: "FooController" };
-    defaultHelperModule(cls, { resolve });
+    defaultHelperModuleBang(cls, { resolve });
     helper(cls, BarHelper);
     expect(cls._helpers!.foo.call({})).toBe("FOO");
     expect(cls._helpers!.bar.call({})).toBe("BAR");

@@ -5,7 +5,6 @@ import { camelize } from "@blazetrails/activesupport";
  * controller methods (and external modules) to views. This PR ports
  * the runtime surface that operates on already-resolved modules:
  *
- *   - `applyHelpers(cls)` — no-op slot-contract marker (mirrors `applyAssetPaths` / `applyFragments`).
  *   - `helperMethod(cls, ...names)` — proxy `name(...args)` → `controller[name](...args)`.
  *   - `helper(cls, ...mods)` — include resolved modules into `_helpers`.
  *   - `clearHelpers(cls)` — reset, then re-add previous `_helperMethods`.
@@ -13,7 +12,7 @@ import { camelize } from "@blazetrails/activesupport";
  *   - `modulesForHelpers(args, opts)` — Rails `Resolution#modules_for_helpers`.
  *   - `allHelpersFromPath(paths)` — Rails `Resolution#all_helpers_from_path`.
  *   - `helperModulesFromPaths(paths, opts)` — Rails `Resolution#helper_modules_from_paths`.
- *   - `defaultHelperModule(cls, opts)` — Rails `default_helper_module!`.
+ *   - `defaultHelperModuleBang(cls, opts)` — Rails `default_helper_module!`.
  *
  * Ported from `vendor/rails/actionpack/lib/abstract_controller/helpers.rb`.
  *
@@ -57,20 +56,6 @@ const includedHelperModules = new WeakMap<HelperMethodsModule, WeakSet<object>>(
 
 export interface HelpersHost {
   constructor: HelpersClassMethods;
-}
-
-/**
- * Marks a host class as conforming to the helpers slot contract.
- * No-op at runtime — mirrors `applyAssetPaths` / `applyFragments`.
- * Seeding `_helpers = {}` on a subclass would shadow the parent's
- * module; instead reads fall back to an empty module, and
- * `_helpersForModification` does Rails' `class_attribute`-style
- * copy-on-write clone the first time a subclass mutates.
- */
-export function applyHelpers<T extends new (...args: never[]) => unknown>(
-  _cls: T & Partial<HelpersClassMethods>,
-): void {
-  // Intentionally empty.
 }
 
 /** Instance-side `_helpers`: returns `this.class._helpers`. */
@@ -399,7 +384,10 @@ export async function helperModulesFromPaths(
  * matching `uninitialized constant` error raised by
  * `modulesForHelpers`, so unrelated resolver failures still propagate.
  */
-export function defaultHelperModule(cls: HelpersClassMethods, options: ResolutionOptions): void {
+export function defaultHelperModuleBang(
+  cls: HelpersClassMethods,
+  options: ResolutionOptions,
+): void {
   const className = cls.name;
   if (!className) return; // anonymous — Rails' inherited hook also skips
   const helperPrefix = className.replace(/Controller$/, "");
@@ -415,19 +403,6 @@ export function defaultHelperModule(cls: HelpersClassMethods, options: Resolutio
     if (err instanceof Error && err.message === `uninitialized constant ${expectedName}`) return;
     throw err;
   }
-}
-
-/**
- * Bang-suffix alias for {@link defaultHelperModule} so the Rails name
- * (`default_helper_module!`) is reachable by api:compare. Same behavior —
- * Rails' bang here signals "swallows NameError for the specific helper name",
- * not a destructive mutation, so a thin alias is the right shape.
- */
-export function defaultHelperModuleBang(
-  cls: HelpersClassMethods,
-  options: ResolutionOptions,
-): void {
-  defaultHelperModule(cls, options);
 }
 
 function camelizeHelperPrefix(raw: string): string {

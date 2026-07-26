@@ -44,19 +44,6 @@ export interface FragmentsHost {
   instrumentPayload?(key: unknown): Record<string, unknown>;
 }
 
-/**
- * Marks a host class as conforming to the fragments slot contract.
- * No-op at runtime — mirrors `applyAssetPaths` / `applyCaching`. Seeding
- * an own `fragmentCacheKeys = []` here would shadow an inherited list
- * on subclasses; instead `fragmentCacheKey` and reads treat `undefined`
- * as an empty list, preserving Rails' `class_attribute` copy-on-write.
- */
-export function applyFragments<T extends new (...args: never[]) => unknown>(
-  _cls: T & Partial<FragmentsClassMethods>,
-): void {
-  // Intentionally empty.
-}
-
 export function fragmentCacheKey(
   cls: FragmentsClassMethods,
   valueOrBlock: unknown | FragmentCacheKeyBlock,

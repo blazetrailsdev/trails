@@ -3,7 +3,7 @@ import {
   _routesInstanceDefault,
   _routesClassDefault,
   UrlForDefaults,
-  filterActionMethodsForRoutes,
+  actionMethods,
   type RouteSetLike,
 } from "./url-for.js";
 
@@ -15,9 +15,9 @@ describe("AbstractController::UrlFor", () => {
     });
   });
 
-  describe("filterActionMethodsForRoutes()", () => {
+  describe("actionMethods()", () => {
     it("returns the unfiltered list when no route set is wired up", () => {
-      expect(filterActionMethodsForRoutes(["show", "index"], null)).toEqual(["show", "index"]);
+      expect(actionMethods(["show", "index"], null)).toEqual(["show", "index"]);
     });
 
     it("removes any action name that collides with a route helper name", () => {
@@ -28,27 +28,24 @@ describe("AbstractController::UrlFor", () => {
       const routes: RouteSetLike = {
         namedRoutes: { helperNames: ["posts_url", "post_path", "show"] },
       };
-      expect(filterActionMethodsForRoutes(["show", "index", "edit"], routes)).toEqual([
-        "index",
-        "edit",
-      ]);
+      expect(actionMethods(["show", "index", "edit"], routes)).toEqual(["index", "edit"]);
     });
 
     it("returns a defensive copy so callers can't mutate the source", () => {
       const original = ["a", "b"];
-      const filtered = filterActionMethodsForRoutes(original, null);
+      const filtered = actionMethods(original, null);
       filtered.push("evil");
       expect(original).toEqual(["a", "b"]);
     });
 
     it("ignores a defaultEnv on the route set when filtering", () => {
       // defaultEnv is part of RouteSetLike (consumed by the renderer),
-      // but filterActionMethodsForRoutes shouldn't care about it.
+      // but actionMethods shouldn't care about it.
       const routes: RouteSetLike = {
         namedRoutes: { helperNames: ["posts_path", "show"] },
         defaultEnv: { HTTP_HOST: "example.com" },
       };
-      expect(filterActionMethodsForRoutes(["show", "index"], routes)).toEqual(["index"]);
+      expect(actionMethods(["show", "index"], routes)).toEqual(["index"]);
     });
   });
 

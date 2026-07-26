@@ -16,13 +16,8 @@ export {
   type LocalizeOptions,
 } from "./translation.js";
 export { deprecator } from "./deprecator.js";
-export {
-  applyAssetPaths,
-  ASSET_PATH_SLOTS,
-  type AssetPathSlot,
-  type AssetPathsHost,
-} from "./asset-paths.js";
-export { applyLogger, benchmark, type LoggerHost, type LoggerLike } from "./logger.js";
+export { ASSET_PATH_SLOTS, type AssetPathSlot, type AssetPathsHost } from "./asset-paths.js";
+export { benchmark, type LoggerHost, type LoggerLike } from "./logger.js";
 export { Collector } from "./collector.js";
 export {
   DoubleRenderError,
@@ -34,7 +29,7 @@ export {
   _normalizeOptions,
   _processOptions,
   _processVariant,
-  normalizeRender,
+  _normalizeRender,
   type RenderOptions,
   type RenderingHost,
 } from "./rendering.js";
@@ -43,13 +38,11 @@ export {
   _routesClassDefault,
   NO_ROUTES_MESSAGE,
   UrlForDefaults,
-  filterActionMethodsForRoutes,
   type NamedRoutesLike,
   type RouteSetLike,
   type UrlForClassMethods,
 } from "./url-for.js";
 export {
-  applyCaching,
   cache,
   cacheConfigured,
   cacheStore,
@@ -64,7 +57,6 @@ export {
   type ViewCacheDependency,
 } from "./caching.js";
 export {
-  applyFragments,
   combinedFragmentCacheKey,
   expireFragment,
   fragmentCacheKey,
@@ -80,9 +72,8 @@ export {
   _helpersForModification,
   _helpersInstance,
   allHelpersFromPath,
-  applyHelpers,
   clearHelpers,
-  defaultHelperModule,
+  defaultHelperModuleBang,
   helper,
   helperMethod,
   helperModulesFromPaths,

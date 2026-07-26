@@ -17,19 +17,6 @@ export interface LoggerHost {
 }
 
 /**
- * Marks a host class as conforming to the `LoggerHost` slot contract.
- * No-op at runtime — see `applyAssetPaths` for the rationale. JS static
- * inheritance gives Rails-style propagation of `logger` for free.
- */
-export function applyLogger<T extends new (...args: never[]) => unknown>(
-  _cls: T & Partial<LoggerHost>,
-): void {
-  // Intentionally empty — see asset-paths.ts docstring. The
-  // `Partial<LoggerHost>` bound surfaces the slot contract at call
-  // sites without requiring the host to pre-declare the slot.
-}
-
-/**
  * Mirrors `ActiveSupport::Benchmarkable#benchmark`. Thin wrapper around
  * the shared `benchmark` helper in `@blazetrails/activesupport` —
  * preserved here so existing actionpack callers don't break.

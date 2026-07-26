@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { AbstractController, ActionNotFound } from "./base.js";
 import {
   ActionFilter,
+  afterAction,
+  beforeAction,
   _insertCallbacks,
   _normalizeCallbackOption,
   _normalizeCallbackOptions,
@@ -445,8 +447,9 @@ describe("AbstractController::Base — trails-only", () => {
     class HasActionController extends AbstractController {
       async index() {}
     }
-    expect(HasActionController.hasAction("index")).toBe(true);
-    expect(HasActionController.hasAction("missing")).toBe(false);
+    const c = new HasActionController();
+    expect(c.isActionMethod("index")).toBe(true);
+    expect(c.isActionMethod("missing")).toBe(false);
   });
 
   it("performed starts false", () => {
@@ -550,5 +553,34 @@ describe("AbstractController callback statics", () => {
     expect(AbstractController._normalizeCallbackOptions).toBe(_normalizeCallbackOptions);
     expect(AbstractController._normalizeCallbackOption).toBe(_normalizeCallbackOption);
     expect(AbstractController._insertCallbacks).toBe(_insertCallbacks);
+  });
+
+  it("installs the *_action macros from callbacks.ts", () => {
+    expect(AbstractController.beforeAction).toBe(beforeAction);
+    expect(AbstractController.afterAction).toBe(afterAction);
+  });
+
+  // The macros are mixed in as static fields, so `this` inside them is the
+  // receiving class. If that ever resolved to AbstractController instead,
+  // every controller in the process would share one callback chain.
+  it("registers on the receiving subclass, not on a sibling or the base", async () => {
+    class Left extends AbstractController {
+      seen: string[] = [];
+      async index() {}
+    }
+    class Right extends Left {
+      async index() {}
+    }
+    Right.beforeAction((c) => {
+      (c as Right).seen.push("right");
+    });
+
+    const right = new Right();
+    await right.process("index");
+    expect(right.seen).toEqual(["right"]);
+
+    const left = new Left();
+    await left.process("index");
+    expect(left.seen).toEqual([]);
   });
 });

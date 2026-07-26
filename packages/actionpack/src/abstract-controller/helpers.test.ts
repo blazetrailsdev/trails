@@ -4,7 +4,6 @@ import {
   _helpers,
   _helpersForModification,
   _helpersInstance,
-  applyHelpers,
   clearHelpers,
   defineHelpersModule,
   helper,
@@ -17,21 +16,6 @@ import {
 function makeBase(): HelpersClassMethods & { name: string } {
   return { name: "Base" } as HelpersClassMethods & { name: string };
 }
-
-describe("applyHelpers", () => {
-  it("is a no-op so subclasses inherit the parent's _helpers via prototype", () => {
-    class Parent {
-      static _helpers: HelperMethodsModule = { hi: () => "hi" };
-      static _helperMethods = ["hi"];
-    }
-    class Child extends Parent {}
-    applyHelpers(Child as unknown as new (...a: never[]) => unknown);
-    expect(Object.prototype.hasOwnProperty.call(Child, "_helpers")).toBe(false);
-    expect(Object.prototype.hasOwnProperty.call(Child, "_helperMethods")).toBe(false);
-    expect(Child._helpers.hi).toBe(Parent._helpers.hi);
-    expect(Child._helperMethods).toEqual(["hi"]);
-  });
-});
 
 describe("helperMethod", () => {
   it("registers a proxy that forwards to controller[name]", () => {

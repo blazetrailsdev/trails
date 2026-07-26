@@ -1,1 +1,92 @@
-[]
+[
+  {
+    "package": "abstractcontroller",
+    "tsFile": "callbacks.ts",
+    "name": "beforeAction",
+    "reason": "Rails defines `before_action` metaprogrammatically \u2014 `[:before, :after, :around].each { |cb| define_method \"#{cb}_action\" }` in abstract_controller/callbacks.rb (Callbacks::ClassMethods). The Ruby extractor only records literal `def`s, so no counterpart appears in rails-api.json even though this is the correct Rails-layout file for the macro."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "callbacks.ts",
+    "name": "afterAction",
+    "reason": "Rails defines `after_action` metaprogrammatically \u2014 `[:before, :after, :around].each { |cb| define_method \"#{cb}_action\" }` in abstract_controller/callbacks.rb (Callbacks::ClassMethods). The Ruby extractor only records literal `def`s, so no counterpart appears in rails-api.json even though this is the correct Rails-layout file for the macro."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "callbacks.ts",
+    "name": "aroundAction",
+    "reason": "Rails defines `around_action` metaprogrammatically \u2014 `[:before, :after, :around].each { |cb| define_method \"#{cb}_action\" }` in abstract_controller/callbacks.rb (Callbacks::ClassMethods). The Ruby extractor only records literal `def`s, so no counterpart appears in rails-api.json even though this is the correct Rails-layout file for the macro."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "callbacks.ts",
+    "name": "skipBeforeAction",
+    "reason": "Rails defines `skip_before_action` metaprogrammatically \u2014 `[:before, :after, :around].each { |cb| define_method \"#{cb}_action\" }` in abstract_controller/callbacks.rb (Callbacks::ClassMethods). The Ruby extractor only records literal `def`s, so no counterpart appears in rails-api.json even though this is the correct Rails-layout file for the macro."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "callbacks.ts",
+    "name": "skipAfterAction",
+    "reason": "Rails defines `skip_after_action` metaprogrammatically \u2014 `[:before, :after, :around].each { |cb| define_method \"#{cb}_action\" }` in abstract_controller/callbacks.rb (Callbacks::ClassMethods). The Ruby extractor only records literal `def`s, so no counterpart appears in rails-api.json even though this is the correct Rails-layout file for the macro."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "callbacks.ts",
+    "name": "skipAroundAction",
+    "reason": "Rails defines `skip_around_action` metaprogrammatically \u2014 `[:before, :after, :around].each { |cb| define_method \"#{cb}_action\" }` in abstract_controller/callbacks.rb (Callbacks::ClassMethods). The Ruby extractor only records literal `def`s, so no counterpart appears in rails-api.json even though this is the correct Rails-layout file for the macro."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "base.ts",
+    "name": "beforeAction",
+    "reason": "Install site, not a definition: `static beforeAction = beforeAction` mixes the callbacks.ts implementation onto AbstractController (CLAUDE.md module-mixin pattern), mirroring Rails' `include AbstractController::Callbacks`. The TS extractor counts the static field as surface on base.ts; the definition and its metaprogramming rationale live in callbacks.ts."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "base.ts",
+    "name": "afterAction",
+    "reason": "Install site, not a definition: `static afterAction = afterAction` mixes the callbacks.ts implementation onto AbstractController (CLAUDE.md module-mixin pattern), mirroring Rails' `include AbstractController::Callbacks`. The TS extractor counts the static field as surface on base.ts; the definition and its metaprogramming rationale live in callbacks.ts."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "base.ts",
+    "name": "aroundAction",
+    "reason": "Install site, not a definition: `static aroundAction = aroundAction` mixes the callbacks.ts implementation onto AbstractController (CLAUDE.md module-mixin pattern), mirroring Rails' `include AbstractController::Callbacks`. The TS extractor counts the static field as surface on base.ts; the definition and its metaprogramming rationale live in callbacks.ts."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "base.ts",
+    "name": "skipBeforeAction",
+    "reason": "Install site, not a definition: `static skipBeforeAction = skipBeforeAction` mixes the callbacks.ts implementation onto AbstractController (CLAUDE.md module-mixin pattern), mirroring Rails' `include AbstractController::Callbacks`. The TS extractor counts the static field as surface on base.ts; the definition and its metaprogramming rationale live in callbacks.ts."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "base.ts",
+    "name": "skipAfterAction",
+    "reason": "Install site, not a definition: `static skipAfterAction = skipAfterAction` mixes the callbacks.ts implementation onto AbstractController (CLAUDE.md module-mixin pattern), mirroring Rails' `include AbstractController::Callbacks`. The TS extractor counts the static field as surface on base.ts; the definition and its metaprogramming rationale live in callbacks.ts."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "base.ts",
+    "name": "skipAroundAction",
+    "reason": "Install site, not a definition: `static skipAroundAction = skipAroundAction` mixes the callbacks.ts implementation onto AbstractController (CLAUDE.md module-mixin pattern), mirroring Rails' `include AbstractController::Callbacks`. The TS extractor counts the static field as surface on base.ts; the definition and its metaprogramming rationale live in callbacks.ts."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "name": "setCacheStore",
+    "reason": "Writer half of Rails' `ConfigMethods#cache_store` / `cache_store=` accessor pair. `cache_store=` camelizes to `cacheStore`, which the reader in the same file already declares \u2014 two exported functions cannot share a name, so the writer takes the `set` prefix."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "trailties/routes-helpers.ts",
+    "name": "withRoutesHelpers",
+    "reason": "Rails `AbstractController::Railties::RoutesHelpers.with`. `with` is a reserved word in ES strict mode, so the declaration cannot be named `with`; it is declared as `withRoutesHelpers` and re-exported as `with` at the bottom of the file."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "trailties/routes-helpers.ts",
+    "name": "trailtieRoutesUrlHelpers",
+    "reason": "Trails spelling of Rails' `railtie_routes_url_helpers`, which `RoutesHelpers.with` calls on the namespace module (`namespace.railtie_routes_url_helpers(include_path_helpers)`). It is defined by Rails::Engine in railties, not by this file \u2014 here it is only the host-side hook slot the lookup probes for."
+  }
+]

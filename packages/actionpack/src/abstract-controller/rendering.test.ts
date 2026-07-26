@@ -7,7 +7,7 @@ import {
   viewAssigns,
   _normalizeArgs,
   _normalizeOptions,
-  normalizeRender,
+  _normalizeRender,
   type RenderOptions,
   type RenderingHost,
 } from "./rendering.js";
@@ -123,9 +123,9 @@ describe("_normalizeArgs", () => {
   });
 });
 
-describe("normalizeRender", () => {
+describe("_normalizeRender", () => {
   it("composes args normalization, variant processing, and options normalization", () => {
-    expect(normalizeRender({ template: "x" })).toEqual({ template: "x" });
+    expect(_normalizeRender({ template: "x" })).toEqual({ template: "x" });
   });
 
   it("_normalizeOptions is the identity in the abstract layer", () => {
