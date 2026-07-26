@@ -194,8 +194,6 @@ const QUOTE_STRING_MAP: Record<string, string> = {
 };
 
 export class AbstractMysqlAdapter extends AbstractAdapter {
-  static readonly Version = Version;
-
   /**
    * Return Column objects for a table. Mirrors Rails'
    * `AbstractMysqlAdapter#columns` (via `SchemaStatements#columns`):
@@ -1007,7 +1005,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /** @internal Mirrors: AbstractMysqlAdapter#text_type? */
   isTextType(type: string): boolean {
-    const t = this.nativeTypeMap.lookup(type.toLowerCase().trim());
+    const t = this._nativeTypeMap.lookup(type.toLowerCase().trim());
     return t instanceof StringType || t instanceof TextType;
   }
 
@@ -1335,7 +1333,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return args;
   }
 
-  static buildTypeMap(
+  /**
+   * Rails builds the adapter's type map with `initialize_type_map(m)` on a
+   * fresh `TypeMap` (abstract_mysql_adapter.rb:711). trails keeps that Rails
+   * name for the registration pass and puts the allocate-then-register wrapper
+   * behind the Rails-private `_` prefix, matching the already-converged
+   * spelling on `AbstractSQLite3Adapter._buildTypeMap`.
+   */
+  protected static _buildTypeMap(
     this: typeof AbstractMysqlAdapter,
     options: { emulateBooleans?: boolean } = {},
   ): TypeMap {
@@ -1366,9 +1371,15 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     this._typeMap = null;
   }
 
-  get nativeTypeMap(): TypeMap {
+  /**
+   * The memoized native type map. Rails reaches it through the adapter's own
+   * `type_map` (abstract_adapter.rb) and never exposes a separate public
+   * accessor, so this stays Rails-private (`_` prefix) — the same spelling
+   * `AbstractSQLite3Adapter` uses for its `_nativeTypeMap` slot.
+   */
+  get _nativeTypeMap(): TypeMap {
     if (!this._typeMap) {
-      this._typeMap = (this.constructor as typeof AbstractMysqlAdapter).buildTypeMap({
+      this._typeMap = (this.constructor as typeof AbstractMysqlAdapter)._buildTypeMap({
         emulateBooleans: this._emulateBooleans,
       });
     }
@@ -1376,7 +1387,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   lookupCastType(sqlType: string): import("@blazetrails/activemodel").Type {
-    return this.nativeTypeMap.lookup(sqlType.toLowerCase().trim());
+    return this._nativeTypeMap.lookup(sqlType.toLowerCase().trim());
   }
 
   lookupCastTypeFromColumn(column: {

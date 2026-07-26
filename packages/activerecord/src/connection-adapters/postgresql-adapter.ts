@@ -1919,6 +1919,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * For INSERT, if the statement includes a RETURNING clause the first column
    * of the first returned row is treated as the inserted ID. Otherwise, the
    * `rowCount` is returned.
+   *
+   * Rails has no `execute_mutation`; the `execute`/`executeMutation` split is a
+   * deliberate trails deviation justified once at the `AbstractAdapter`
+   * declaration (abstract-adapter.ts, `executeMutation` on the
+   * DatabaseStatements signature block) — read it there before changing this.
    */
   async executeMutation(sql: string, binds: unknown[] = [], name: string = "SQL"): Promise<number> {
     sql = this.preprocessQuery(sql);
