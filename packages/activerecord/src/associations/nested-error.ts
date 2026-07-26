@@ -29,6 +29,9 @@ interface InnerErrorLike {
  */
 export class NestedError extends ActiveModelNestedError {
   private readonly _association: AssociationLike;
+  // Narrows the base class' `innerError` to the AR shape — `index` reads
+  // `inner_error.base` (nested_error.rb:34).
+  declare readonly innerError: InnerErrorLike;
 
   constructor(association: AssociationLike, innerError: InnerErrorLike) {
     const attribute = NestedError.computeAttribute(association, innerError);
@@ -46,12 +49,13 @@ export class NestedError extends ActiveModelNestedError {
     innerError: InnerErrorLike,
   ): string {
     // Ruby runs `compute_attribute` as an instance method inside the
-    // constructor — after `@association` is set but *before* `super`
-    // (nested_error.rb:8-12). TS forbids touching `this` before `super`, so the
-    // readers below run against a receiver carrying the one ivar Ruby has at
-    // that point.
+    // constructor — after `@association` and `@inner_error` are set but *before*
+    // `super` (nested_error.rb:8-12). TS forbids touching `this` before
+    // `super`, so the readers below run against a receiver carrying exactly the
+    // two ivars Ruby has at that point.
     const self: NestedError = Object.assign(Object.create(NestedError.prototype) as NestedError, {
       _association: association,
+      innerError,
     });
     const name = association.reflection.name;
     // isCollection: check the Association method if available, otherwise infer
@@ -61,7 +65,7 @@ export class NestedError extends ActiveModelNestedError {
         ? association.isCollection()
         : Array.isArray(association.target);
     if (isCollection && indexErrorsSetting.call(self)) {
-      const idx = index.call(self, innerError);
+      const idx = index.call(self);
       if (idx != null) {
         return `${name}[${idx}].${innerError.attribute}`;
       }
@@ -90,15 +94,15 @@ function indexErrorsSetting(this: NestedError): boolean | "nestedAttributesOrder
 
 /**
  * Mirrors Rails' `index` (nested_error.rb:33-35) —
- * `ordered_records&.find_index(inner_error.base)`. Ruby reads `inner_error`
- * off the instance; here it rides in, because the sole caller
- * (`computeAttribute`) runs before `super` has stored it.
+ * `ordered_records&.find_index(inner_error.base)`, reading `inner_error` off
+ * the instance.
  * @internal
  */
-function index(this: NestedError, innerError: { base?: unknown }): number | undefined {
+function index(this: NestedError): number | undefined {
   const records = orderedRecords.call(this);
-  if (!records || !innerError.base) return undefined;
-  const idx = records.findIndex((r) => r === innerError.base);
+  const base = this.innerError.base;
+  if (!records || !base) return undefined;
+  const idx = records.findIndex((r) => r === base);
   return idx >= 0 ? idx : undefined;
 }
 
