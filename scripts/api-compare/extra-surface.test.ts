@@ -127,6 +127,26 @@ describe("buildGlobalRubyCandidates", () => {
     expect(set.has("ER_DUP_ENTRY")).toBe(true);
     expect(set.has("erDupEntry")).toBe(true);
   });
+
+  it("does not camelize a CamelCase constant into a bare method-like name", () => {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activerecord: {
+          classes: {},
+          modules: {},
+          fileConstants: {
+            "connection_adapters/abstract_adapter.rb": { Version: { kind: "expr" } },
+          },
+        },
+      },
+    };
+    const set = buildGlobalRubyCandidates(ruby);
+    expect(set.has("Version")).toBe(true);
+    // `version` would absolve any novel TS method of that name, everywhere.
+    expect(set.has("version")).toBe(false);
+  });
 });
 
 describe("buildReport — novel vs moved classification", () => {

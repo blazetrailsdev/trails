@@ -191,13 +191,20 @@ function rubyMethodCandidates(rubyName: string): string[] | null {
 /**
  * TS-candidate names for a Ruby file-level constant. Constants aren't
  * case-transformed on the way over — `ER_DUP_ENTRY` ports verbatim — so the
- * name itself is the primary candidate. The camelized-lowercase form is the
- * second candidate purely to stay in lockstep with `constantNameMatches`
+ * name itself is always a candidate. The camelized form is the second
+ * candidate, keeping scoring in lockstep with `constantNameMatches`
  * (literals.ts), which the literal-value comparison already uses to pair a
  * Ruby constant with its TS counterpart; scoring the two passes off different
  * name rules would let a constant compare as a value yet still read as drift.
+ *
+ * The camelized form is emitted for SCREAMING_SNAKE names only. A CamelCase
+ * constant (`Version = Gem::Version`, `Cipher = OpenSSL::Cipher`) camelizes to
+ * a bare lowercase word that is indistinguishable from an ordinary method
+ * name, so admitting it would silently absolve a genuinely novel TS `version`
+ * / `cipher` — a far worse trade than the one drift-read it saves.
  */
 function rubyConstantCandidates(name: string): string[] {
+  if (!/^[A-Z0-9_]+$/.test(name)) return [name];
   const camel = snakeToCamel(name.toLowerCase());
   return camel === name ? [name] : [name, camel];
 }
