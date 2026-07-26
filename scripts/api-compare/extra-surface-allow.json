@@ -392,12 +392,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "name": "withQueryCache",
-    "reason": "Pool-level extraction of Rails' `ActiveRecord::QueryCache.cache(&block)` (query_cache.rb:206), whose `ensure` clears the cache when it was not previously enabled. In Ruby that logic sits in the module method because `enable_query_cache` yields synchronously; in TS `enableQueryCache` returns a promise, so the was-enabled/clear-on-exit bookkeeping has to live next to the state it guards. `QueryCache.cache` (query-cache.ts) delegates straight here, so the Rails-named entry point keeps its Rails behavior. Justification at the declaration."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "name": "queryCacheDisabled",
     "reason": "Named form of Rails' inline `next if pool.db_config&.query_cache == false` in `ActiveRecord::QueryCache.run` (active_record/query_cache.rb:39 — the top-level file, not connection_adapters/abstract/query_cache.rb, whose `db_config&.query_cache` at :122 is a different case-statement computing the cache max size). Trails normalizes `query_cache` at pool construction into `ConnectionPoolConfiguration`, so the raw `false` is no longer readable off `dbConfig` at that point; the getter delegates to the same normalized flag and is consumed by `QueryCache.run`'s skip guard (query-cache.ts). Justification at the declaration."
   },

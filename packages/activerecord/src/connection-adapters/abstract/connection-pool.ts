@@ -585,27 +585,6 @@ export class ConnectionPool implements ReapablePool {
     this._cacheConfig.clearQueryCache();
   }
 
-  /**
-   * Enable the query cache for the duration of `fn`. If the cache wasn't
-   * previously enabled, clear it on exit. Mirrors Rails'
-   * `ActiveRecord::QueryCache.cache(&block)`:
-   *
-   *     was_enabled = pool.query_cache_enabled
-   *     begin
-   *       pool.enable_query_cache(&block)
-   *     ensure
-   *       pool.clear_query_cache unless was_enabled
-   *     end
-   */
-  async withQueryCache<T>(fn: () => T | Promise<T>): Promise<T> {
-    const wasEnabled = this.queryCacheEnabled;
-    try {
-      return await this.enableQueryCache(fn);
-    } finally {
-      if (!wasEnabled) this.clearQueryCache();
-    }
-  }
-
   // --- Pool state ---
 
   get activeConnection(): DatabaseAdapter | null {

@@ -45,11 +45,13 @@ export interface QueryCacheCompleteTarget {
 /**
  * A connection pool whose query cache `cache`/`uncached` block helpers can
  * drive. Mirrors the `connection_pool` that Rails'
- * `ActiveRecord::QueryCache::ClassMethods` operate on (`enable_query_cache`
- * via the clear-on-exit `withQueryCache`, and `disable_query_cache`).
+ * `ActiveRecord::QueryCache::ClassMethods` operate on — the same four members
+ * its `cache` / `uncached` touch.
  */
 export interface QueryCacheBlockPool {
-  withQueryCache<T>(fn: () => T | Promise<T>): Promise<T>;
+  readonly queryCacheEnabled: boolean;
+  enableQueryCache<T>(fn: () => T | Promise<T>): Promise<T>;
+  clearQueryCache(): void;
   disableQueryCache<T>(fn: () => T | Promise<T>, options?: { dirties?: boolean }): Promise<T>;
 }
 
@@ -59,11 +61,28 @@ export class QueryCache {
    * the prior state — clearing the cache on exit unless it was already enabled.
    *
    * Mirrors: ActiveRecord::QueryCache::ClassMethods#cache
-   * (`pool.enable_query_cache(&block)` with `pool.clear_query_cache unless
-   * was_enabled` in the ensure; the pool's `withQueryCache` owns that logic).
+   * (`active_record/query_cache.rb:9-21`):
+   *
+   *     was_enabled = pool.query_cache_enabled
+   *     begin
+   *       pool.enable_query_cache(&block)
+   *     ensure
+   *       pool.clear_query_cache unless was_enabled
+   *     end
+   *
+   * The `was_enabled` bookkeeping lives here, as in Rails, rather than behind a
+   * pool-side helper: `enableQueryCache` already restores the prior
+   * enabled/dirties state in its own `finally` (matching Rails'
+   * `enable_query_cache`), so the only thing left for this layer is the
+   * clear-on-exit, and every member it needs is public pool surface.
    */
-  static cache<T>(pool: QueryCacheBlockPool, block: () => T | Promise<T>): Promise<T> {
-    return pool.withQueryCache(block);
+  static async cache<T>(pool: QueryCacheBlockPool, block: () => T | Promise<T>): Promise<T> {
+    const wasEnabled = pool.queryCacheEnabled;
+    try {
+      return await pool.enableQueryCache(block);
+    } finally {
+      if (!wasEnabled) pool.clearQueryCache();
+    }
   }
 
   /**
