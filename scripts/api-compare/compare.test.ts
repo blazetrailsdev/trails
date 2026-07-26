@@ -910,6 +910,21 @@ describe("resolveModuleName", () => {
     );
     expect(result).toEqual(["AR::ConnectionAdapters::PostgreSQL::Quoting"]);
   });
+
+  it("binds a class's own nested module over an identically-named sibling's", () => {
+    // `class Rack::Request; include Helpers; end` where both Request and
+    // Response nest a `Helpers`: Ruby binds Request's. The includer-graph
+    // builder relies on this — the broad lookup it used to do made
+    // Response's TS file count as an implementation site for Request's
+    // methods.
+    const byShort = new Map([["Helpers", ["Rack::Request::Helpers", "Rack::Response::Helpers"]]]);
+    expect(resolveModuleName("Helpers", "Rack::Request", byShort)).toEqual([
+      "Rack::Request::Helpers",
+    ]);
+    expect(resolveModuleName("Helpers", "Rack::Response::Raw", byShort)).toEqual([
+      "Rack::Response::Helpers",
+    ]);
+  });
 });
 
 describe("dedupeRubyMethodInto", () => {

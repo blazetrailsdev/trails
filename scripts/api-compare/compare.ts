@@ -698,6 +698,12 @@ function nearestNamespaceMatch(
  * namespace-prefix walking picks the nearest enclosing match; if none of the
  * candidates share a namespace prefix with the context the full candidate list
  * is returned (original behavior, safe fallback).
+ *
+ * Every consumer of `moduleFqnByShort` resolves through here — both the
+ * expected-surface flattener (`flattenIncludedMethodInfos`) and the
+ * includer-graph builder in `main`. They must not disagree: a broader lookup
+ * in one of them lets a method count as implemented in a file that Ruby's
+ * constant lookup never binds.
  */
 export function resolveModuleName(
   incName: string,
@@ -1271,13 +1277,19 @@ export function main() {
     for (const { fqn, info } of allClassesAndModules) {
       if (info.file) fqnToFile.set(fqn, info.file);
       for (const inc of [...(info.includes || []), ...(info.extends || [])]) {
-        // Qualified names need the namespace walk (`PostgreSQL::Quoting` is not
-        // a key here); unqualified ones stay deliberately broad — narrowing them
-        // to the scoped match drops 21 methods that this graph legitimately
-        // credits to a sibling includer's file.
-        const resolved = inc.includes("::")
-          ? resolveModuleName(inc, fqn, moduleFqnByShort)
-          : moduleFqnByShort.get(inc) || [inc];
+        // Same Ruby constant lookup as `flattenIncludedMethodInfos` — the two
+        // consumers of `moduleFqnByShort` must agree on which module an
+        // `include` binds. This builder used to be deliberately broad
+        // (`moduleFqnByShort.get(inc)`, i.e. every module sharing the short
+        // name became an includer). That credited 21 methods to a file Ruby
+        // would never reach: `Rack::Request`'s `get_header`/`set_header`/
+        // `has_header?`/`body` were matched in `response.ts` via
+        // `Rack::Response::Helpers`, `ActionView::ViewPaths`' surface in
+        // `lookup-context.ts` via `LookupContext::ViewPaths`, and
+        // `MySQL::TableDefinition#charset`/`collation` in the abstract
+        // `TableDefinition`. All of them are real gaps, so the narrowing
+        // surfaces them instead of hiding them.
+        const resolved = resolveModuleName(inc, fqn, moduleFqnByShort);
         for (const modFqn of resolved) {
           const includers = moduleIncluderFqns.get(modFqn) || new Set();
           includers.add(fqn);
