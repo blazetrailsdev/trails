@@ -19,7 +19,8 @@
  *      class/module's *own* methods (skipping inherited surface so the
  *      diff measures this file's drift, not its ancestor's) plus top-level
  *      `fileFunctions`. Filter out `internal: true` (Ruby private/protected,
- *      TS private/protected, TS `#`-prefixed fields, `@internal` JSDoc) and
+ *      TS private/protected, TS `#`-prefixed fields, and `@internal` JSDoc
+ *      on a top-level exported function) and
  *      separately filter `_`-prefixed names — the extractor keeps those as
  *      public exports; the Rails-private convention in this repo means they
  *      should not count toward extra surface.
@@ -389,7 +390,9 @@ export function parseArgs(argv: string[]): CliArgs {
  *
  * The extractor keeps `_`-prefixed exports as public (only Ruby
  * `private`/`protected`, TS `private`/`protected`, `#`-prefixed fields,
- * and `@internal` JSDoc set `internal: true`). The Rails-private
+ * and `@internal` JSDoc on a top-level exported function set
+ * `internal: true`; class/module members take the flag from their TS
+ * visibility modifier only). The Rails-private
  * convention in this repo means we filter `_`-prefix here too.
  */
 export function collectTsFileNames(

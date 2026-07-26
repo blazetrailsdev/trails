@@ -1207,3 +1207,37 @@ describe("tsLiteralValue — negative numbers", () => {
     expect(tsLiteralValue(parseExpr("-x"))).toBeUndefined();
   });
 });
+
+describe("extractFromProgram — @internal JSDoc on top-level functions", () => {
+  it("tags an @internal-tagged export function and leaves its untagged sibling public", () => {
+    const info = extractFromFiles("/p", {
+      "quoting.ts": `
+        /**
+         * Wiring seam, not Rails surface.
+         *
+         * @internal
+         */
+        export function dispatchQuote(value: unknown): string { return ""; }
+
+        /** Rails-facing. */
+        export function quote(value: unknown): string { return ""; }
+      `,
+    });
+    const fns = info.fileFunctions["quoting.ts"];
+    expect(fns.find((f) => f.name === "dispatchQuote")!.internal).toBe(true);
+    expect(fns.find((f) => f.name === "quote")!.internal).toBeUndefined();
+  });
+
+  it("skips the fabricated module for a file whose exported functions are all @internal", () => {
+    const info = extractFromFiles("/p", {
+      "key-normalization.ts": `
+        /** @internal */
+        export function normalizeKey(k: string): string { return k; }
+        /** @internal */
+        export function denormalizeKey(k: string): string { return k; }
+      `,
+    });
+    expect(info.modules["key-normalization.ts:KeyNormalization"]).toBeUndefined();
+    expect(info.fileFunctions["key-normalization.ts"].every((f) => f.internal)).toBe(true);
+  });
+});

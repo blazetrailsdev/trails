@@ -471,6 +471,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
         const line = node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1;
         const fnOptionKeys = extractOptionKeys(node.parameters, checker);
         const fnCalls = extractCalls(node.body);
+        const internal = hasInternalJsDocTag(node);
         fileFunctions.push({
           name: node.name.text,
           visibility: "public",
@@ -478,6 +479,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
           isStatic: false,
           line,
           file: relPath,
+          ...(internal ? { internal: true } : {}),
           ...(fnOptionKeys !== undefined ? { optionKeys: fnOptionKeys } : {}),
           ...(fnCalls !== undefined ? { calls: fnCalls } : {}),
         });
@@ -1224,6 +1226,16 @@ export function paramsOfCallableRef(
   const widest = signatures.reduce((a, b) => (b.parameters.length > a.parameters.length ? b : a));
   const decl = widest.declaration;
   return decl && ts.isFunctionLike(decl) ? extractParameters(decl.parameters) : [];
+}
+
+/**
+ * True when a declaration's leading JSDoc carries an `@internal` tag. An
+ * exported top-level function has no `private`/`protected` modifier to carry
+ * the "wiring seam, not Rails-facing surface" signal (CONTRIBUTING.md), so
+ * the tag is its only marker; consumers filter on `internal: true`.
+ */
+export function hasInternalJsDocTag(node: ts.Node): boolean {
+  return ts.getJSDocTags(node).some((tag) => tag.tagName.text === "internal");
 }
 
 /**
