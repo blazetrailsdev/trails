@@ -480,6 +480,15 @@ export function columnNameWithOrderMatcher(): RegExp {
   return /^((?:(?:\w+\.)?\w+|\w+\((?:|(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?\w+)\)))\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)(?:\s*,\s*(?:(?:\w+\.)?\w+|\w+\((?:|(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?\w+)\)))\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)*$/i;
 }
 
+/**
+ * Rails writes this inline as `Arel::Nodes::SqlLiteral === value` at each
+ * branch (abstract/quoting.rb `quote`/`type_cast`); there is no
+ * `sql_literal?` predicate to mirror. Factored out here only because TS
+ * cannot spell `===`-style case matching, so it is module-internal — same
+ * treatment as the `dispatch*` helpers alongside it.
+ *
+ * @internal
+ */
 export function isSqlLiteral(value: unknown): value is { value: string } {
   return (
     value !== null &&

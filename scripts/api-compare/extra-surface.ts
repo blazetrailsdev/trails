@@ -105,6 +105,14 @@ const TS_ALWAYS_ALLOWED = new Set([
   "toHash",
   "valueOf",
   "klasses",
+  // `lookup_cast_type` is a real Rails method — abstract/quoting.rb:234 and
+  // postgresql/quoting.rb:195 — but it sits on `conventions.SKIP` because the
+  // *PostgreSQL* one issues an async `SELECT oid` our standalone-function
+  // quoting module can't run. SKIP is global, so that one unportable adapter
+  // variant was making every faithful `lookupCastType` (abstract/quoting.ts,
+  // abstract-mysql-adapter.ts, sqlite3-adapter.ts) read as novel drift. This
+  // is exactly the carrying-the-pattern-through case the list exists for.
+  "lookupCastType",
   // JS-only protocol surface on the thenable/iterable Relation — Promise
   // (`catch`/`finally`; `then` is above) and the iteration protocols. Pure
   // language-level conventions with no Rails counterpart.

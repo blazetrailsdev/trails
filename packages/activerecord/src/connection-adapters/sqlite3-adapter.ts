@@ -615,6 +615,13 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   /**
    * Execute an INSERT/UPDATE/DELETE and return affected rows or insert ID.
    * Wrapped in a `sql.active_record` notification — see `execute`.
+   *
+   * Rails has no `execute_mutation`; the `execute`/`executeMutation` split is a
+   * deliberate trails deviation justified once at the `AbstractAdapter`
+   * declaration (abstract-adapter.ts, `executeMutation` on the
+   * DatabaseStatements signature block) — read it there before changing this.
+   * In particular, this cannot be rerouted through `execute`: better-sqlite3
+   * `.all()` throws on a non-reader statement.
    */
   async executeMutation(sql: string, binds: unknown[] = [], name: string = "SQL"): Promise<number> {
     // preprocessQuery runs Rails' check_if_write_query, which raises
@@ -1220,10 +1227,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // factories at lookup time now, so — like Rails' SQLite3Adapter — no override
     // beyond `lookup_cast_type(column.sql_type)` is needed.
     return this.lookupCastType(column.sqlType ?? "");
-  }
-
-  get nativeTypeMap(): TypeMap {
-    return this._nativeTypeMap;
   }
 
   // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter::SQLite3Integer
