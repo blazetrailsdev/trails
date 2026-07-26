@@ -550,6 +550,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
         const visibility: "public" | "private" | "protected" =
           isPrivateField || hasPrivateMod ? "private" : hasProtectedMod ? "protected" : "public";
         const internal = visibility !== "public";
+        const noRailsEquivalent = noRailsEquivalentReason(decl);
         const line = decl.getSourceFile().getLineAndCharacterOfPosition(decl.getStart()).line + 1;
         const declFile = path.relative(srcDir, decl.getSourceFile().fileName).replace(/\\/g, "/");
         mixinMethods.push({
@@ -561,6 +562,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
           file: relPath,
           ...(declFile !== relPath ? { declaredIn: declFile } : {}),
           ...(internal ? { internal: true } : {}),
+          ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
         });
       }
 

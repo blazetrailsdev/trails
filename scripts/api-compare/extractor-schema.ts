@@ -73,6 +73,7 @@ export const EXTRACTOR_OUTPUT_FIELDS = [
   "option_keys",
   "optionKeys",
   "declaredIn",
+  "noRailsEquivalent",
 ] as const;
 
 /**

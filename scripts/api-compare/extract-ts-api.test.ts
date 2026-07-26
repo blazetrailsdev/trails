@@ -1393,6 +1393,24 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     );
   });
 
+  it("records the reason on a synthesized __mixin member", () => {
+    const info = extractFromFiles("/p", {
+      "attributes.ts": `
+        export function Attributes(Base: new () => object) {
+          class M extends Base {
+            /** @noRailsEquivalent async attribute hydration, JS-only */
+            loadAttributes(): void {}
+          }
+          return M;
+        }
+      `,
+    });
+    const mixin = info.modules["attributes.ts:Attributes__mixin"];
+    expect(mixin.instanceMethods.find((m) => m.name === "loadAttributes")!.noRailsEquivalent).toBe(
+      "async attribute hydration, JS-only",
+    );
+  });
+
   it("throws when the tag carries no reason", () => {
     expect(() =>
       extractFromSource(`
