@@ -193,7 +193,7 @@
     "tsFile": "relation/query-methods.ts",
     "rubyName": "build_join_buckets",
     "call": "model",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-entry verified (RFC 0072 cross-helper reads): Rails query_methods.rb:1847-1850 pops the stashed eager JoinDependency out of `joins_values` only `if joins.last.base_klass == model`. trails does not keep JoinDependencies in `joinsValues` at all — the eager stash lives in its own `_eagerLoadAssociations` store and cross-klass merged JDs in `_namedInnerJoinDeps`, so the `base_klass == model` discriminator is structural (the eager stash is always this relation's own model) and there is no `joins.last` to test. Porting the guard literally would require re-merging the three stores into one `joins_values`."
   },
   {
     "package": "activerecord",
@@ -305,13 +305,6 @@
     "tsFile": "relation/query-methods.ts",
     "rubyName": "build_select",
     "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/query-methods.ts",
-    "rubyName": "build_select",
-    "call": "model",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -557,13 +550,6 @@
     "tsFile": "relation/query-methods.ts",
     "rubyName": "preprocess_order_args",
     "call": "join",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/query-methods.ts",
-    "rubyName": "preprocess_order_args",
-    "call": "model",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

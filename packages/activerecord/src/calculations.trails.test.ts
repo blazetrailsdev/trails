@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 import type { JoinDependency } from "./associations/join-dependency.js";
-import { lookupCastTypeFromJoinDependencies } from "./relation/calculations.js";
+import { lookupCastTypeFromJoinDependencies, typeFor } from "./relation/calculations.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 // Opt into the canonical-model autoload index so the `topics` association target
 // (`Topic`) resolves by name on first reference — no manual `registerModel`.
@@ -305,5 +305,38 @@ describe("ungrouped calculation HAVING", () => {
 
     expect(await Account.distinct().having("count(*) > 1").count()).toBe(total);
     expect(await Account.distinct().having("count(*) > 100000").count()).toBe(0);
+  });
+});
+
+// ==========================================================================
+// type_for unit tests
+//
+// `typeFor` is the port of Rails' private `Calculations#type_for`
+// (calculations.rb:597-600), which has no dedicated Rails test: it resolves a
+// field to the model's own attribute type, taking the last dot-segment of a
+// qualified name and the `name` of an Arel node. These tests pin that shape so
+// it cannot drift back into the broader trails-invented `resolveColType`.
+// ==========================================================================
+
+describe("typeFor", () => {
+  it("resolves a bare, qualified and node-shaped field through the model's attribute type", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    const rel = Account.all() as unknown as Parameters<typeof typeFor>[0];
+    const expected = Account.typeForAttribute("credit_limit");
+
+    expect(typeFor(rel, "credit_limit")).toBe(expected);
+    expect(typeFor(rel, "accounts.credit_limit")).toBe(expected);
+    expect(typeFor(rel, Account.arelTable.get("credit_limit") as never)).toBe(expected);
+  });
+
+  it("returns the model's own type for an enum attribute without unwrapping the subtype", async () => {
+    const { Book } = await import("./test-helpers/models/book.js");
+    // `resolveColType` (the aggregate-cast helper) unwraps an EnumType to its
+    // subtype; Rails' `type_for` does not — it is a plain
+    // `model.type_for_attribute` lookup.
+    expect(Book.typeForAttribute("status")).toHaveProperty("subtypeType");
+    expect(typeFor(Book.all() as unknown as Parameters<typeof typeFor>[0], "status")).toBe(
+      Book.typeForAttribute("status"),
+    );
   });
 });

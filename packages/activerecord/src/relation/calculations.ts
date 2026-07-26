@@ -133,7 +133,7 @@ function resolveColType(rel: CalculationRelation, column: string | Nodes.Node): 
   const dot = colStr.lastIndexOf(".");
   const bare = dot >= 0 ? colStr.slice(dot + 1) : colStr;
   const resolved =
-    pluckCastTypeForKnownColumn(rel, bare) ??
+    pluckCastTypeForKnownColumn(rel.model, bare) ??
     (lookupCastTypeFromJoinDependencies(rel, bare) as ColumnType | null);
   // Rails unwraps an EnumType to its subtype before casting an aggregate value
   // (`type = type.subtype if Enum::EnumType === type`), so min/max/sum return
@@ -604,7 +604,7 @@ async function groupedAggregate(
   const keyTypes = groupNodes.map((node, i) => {
     const fieldName = qualifiedGroupFieldForModel(rel, groupFields[i]);
     return ((node instanceof Nodes.Attribute ? node.typeCaster : null) ??
-      (fieldName === null ? null : pluckCastTypeForKnownColumn(rel, fieldName)) ??
+      (fieldName === null ? null : pluckCastTypeForKnownColumn(rel.model, fieldName)) ??
       queryResult.columnTypes?.[aliases[i]] ??
       null) as { deserialize?(v: unknown): unknown } | null;
   });
@@ -1486,8 +1486,12 @@ export async function executeGroupedCalculation(
 }
 
 /** @internal */
-export function typeFor(rel: CalculationRelation, field: string): unknown {
-  return resolveColType(rel, field);
+export function typeFor(rel: CalculationRelation, field: string | Nodes.Node): unknown {
+  const fieldName =
+    field instanceof Nodes.Node
+      ? String((field as unknown as { name?: string }).name ?? "")
+      : (String(field).split(".").pop() ?? "");
+  return rel.model.typeForAttribute?.(fieldName);
 }
 
 /** @internal */
@@ -1539,7 +1543,7 @@ export function typeCastPluckValues(
     // cast by name through the model's attribute types where known.
     const overrides: Record<string, ColumnType> = {};
     for (const name of result.columns) {
-      const type = pluckCastTypeForKnownColumn(rel, name);
+      const type = pluckCastTypeForKnownColumn(rel.model, name);
       if (type) overrides[name] = type;
     }
     return result.castValues(overrides);
@@ -1554,7 +1558,7 @@ function pluckCastType(
   index: number,
   result: Result,
 ): ColumnType {
-  const known = pluckCastTypeForKnownColumn(rel, name);
+  const known = pluckCastTypeForKnownColumn(rel.model, name);
   if (known) return known;
   const joinType = lookupCastTypeFromJoinDependencies(rel, name) as ColumnType | null;
   if (joinType) return joinType;
@@ -1567,8 +1571,10 @@ function pluckCastType(
  * (Rails wraps these in a Serialized type) or the declared attribute type.
  * Returns null when the model has no such attribute.
  */
-function pluckCastTypeForKnownColumn(rel: CalculationRelation, name: string): ColumnType | null {
-  const model = rel.model;
+function pluckCastTypeForKnownColumn(
+  model: CalculationRelation["_modelClass"],
+  name: string,
+): ColumnType | null {
   if (!model._attributeDefinitions?.has(name)) return null;
   const coder = model._serializedAttributes?.get(name);
   if (coder) return { deserialize: (value) => coder.load(value) };

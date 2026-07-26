@@ -39,7 +39,7 @@
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_joins",
     "call": "model",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-entry verified (RFC 0072 cross-helper reads): Rails merger.rb:117-134 reads `other.model` / `relation.model` while folding joins; trails merger.ts#mergeJoins is a thin wrapper over `foldMergeJoins` (relation/merge-joins.ts), which performs the same-model comparison through `.model` (PR #5325). The folder is shared with mergeOuterJoins, so the split stays."
   },
   {
     "package": "activerecord",
@@ -116,7 +116,7 @@
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_outer_joins",
     "call": "model",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-entry verified (RFC 0072 cross-helper reads): Rails merger.rb:136-152 reads `other.model` / `relation.model` while folding left outer joins; trails merger.ts#mergeOuterJoins is a thin wrapper over `foldMergeOuterJoins` (relation/merge-joins.ts), which performs the same-model comparison through `.model` (PR #5325). The folder is shared with mergeJoins, so the split stays."
   },
   {
     "package": "activerecord",
