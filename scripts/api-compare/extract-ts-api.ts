@@ -1703,12 +1703,14 @@ function extractInterface(
     const line = member.getSourceFile().getLineAndCharacterOfPosition(member.getStart()).line + 1;
 
     if (ts.isMethodSignature(member)) {
+      const noRailsEquivalent = noRailsEquivalentReason(member);
       instanceMethods.push({
         name: memberName,
         visibility: "public",
         params: member.parameters ? extractParameters(member.parameters) : [],
         line,
         file,
+        ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
       });
     }
   }

@@ -1461,6 +1461,26 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     expect(reasonOf("locate")).toBeUndefined();
   });
 
+  it("records the reason on a tagged interface method signature", () => {
+    const info = extractFromFiles("/p", {
+      "quoting.ts": `
+        export interface Quoting {
+          /** @noRailsEquivalent async quoting seam, no Rails counterpart */
+          quoteAsync(value: unknown): Promise<string>;
+
+          quote(value: unknown): string;
+        }
+      `,
+    });
+    const iface = info.classes["quoting.ts:Quoting"] ?? info.modules["quoting.ts:Quoting"];
+    expect(iface.instanceMethods.find((m) => m.name === "quoteAsync")!.noRailsEquivalent).toBe(
+      "async quoting seam, no Rails counterpart",
+    );
+    expect(
+      iface.instanceMethods.find((m) => m.name === "quote")!.noRailsEquivalent,
+    ).toBeUndefined();
+  });
+
   it("throws when the tag carries no reason", () => {
     expect(() =>
       extractFromSource(`
