@@ -5,6 +5,7 @@ import { Trailtie } from "../trailtie.js";
 export class Trailties implements Iterable<Trailtie> {
   readonly all: Trailtie[] = Trailtie.subclasses().map((k) => k.instance());
 
+  /** @noRailsEquivalent JS iteration protocol — Ruby reaches iteration through Enumerable#each */
   [Symbol.iterator](): Iterator<Trailtie> {
     return this.all[Symbol.iterator]();
   }

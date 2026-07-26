@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   snakeToCamel,
   rubyMethodToTs,
+  rubyMethodToTsIgnoringSkip,
+  SKIP_TS_MIRROR_IS_DRIFT,
   rubyFileToTs,
   SKIP,
   SKIP_GROUPS,
@@ -73,6 +75,27 @@ describe("snakeToCamel", () => {
     expect(snakeToCamel("verbatim_copy")).toBe("verbatimCopy");
     expect(snakeToCamel("http_verb")).toBe("httpVerb");
     expect(snakeToCamel("superb_thing")).toBe("superbThing");
+  });
+});
+
+describe("rubyMethodToTsIgnoringSkip", () => {
+  it("maps SKIP names that rubyMethodToTs refuses", () => {
+    expect(rubyMethodToTs("freeze")).toBeNull();
+    expect(rubyMethodToTsIgnoringSkip("freeze")).toEqual(["freeze"]);
+    expect(rubyMethodToTsIgnoringSkip("lookup_cast_type")).toEqual(["lookupCastType"]);
+    expect(rubyMethodToTsIgnoringSkip("pretty_print")).toEqual(["prettyPrint"]);
+  });
+
+  it("still refuses operators", () => {
+    expect(rubyMethodToTsIgnoringSkip("==")).toBeNull();
+  });
+});
+
+describe("SKIP_TS_MIRROR_IS_DRIFT", () => {
+  it("covers the Ruby hook groups only", () => {
+    expect([...SKIP_TS_MIRROR_IS_DRIFT].sort()).toEqual(
+      ["extended", "inherited", "included", "singleton_method_added"].sort(),
+    );
   });
 });
 

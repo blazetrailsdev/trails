@@ -115,6 +115,20 @@ export interface SkipGroup {
   /** Why every name in this group is skipped. */
   reason: string;
   names: string[];
+  /**
+   * A TS declaration of these names is *drift*, not a faithful mirror, even
+   * when the matched Ruby file defines the method — so extra-surface must keep
+   * flagging it (`rubyMethodToTsIgnoringSkip` is not consulted for them).
+   *
+   * Set on the Ruby-hook groups: `included`/`extended`/`inherited` /
+   * `singleton_method_added` have no TS equivalent at all, so a same-named TS
+   * method isn't carrying the Rails pattern through — it's a trails invention
+   * that the group's `reason` exists to keep OUT of the port. Everything else
+   * on SKIP is a method that genuinely exists in Rails and whose skip is about
+   * *scoring* (one unportable variant, an ivar-reader shape), so a TS override
+   * in the file where Ruby defines it IS the port.
+   */
+  tsMirrorIsDrift?: true;
 }
 
 export const SKIP_GROUPS: SkipGroup[] = [
@@ -166,10 +180,12 @@ export const SKIP_GROUPS: SkipGroup[] = [
   {
     reason: "Ruby module lifecycle hooks — no TypeScript equivalent.",
     names: ["extended", "included", "inherited"],
+    tsMirrorIsDrift: true,
   },
   {
     reason: "Ruby object hooks — no TypeScript equivalent.",
     names: ["singleton_method_added"],
+    tsMirrorIsDrift: true,
   },
   {
     reason:
@@ -229,6 +245,11 @@ export const SKIP_GROUPS: SkipGroup[] = [
 ];
 
 export const SKIP = new Set<string>(SKIP_GROUPS.flatMap((g) => g.names));
+
+/** {@link SkipGroup.tsMirrorIsDrift} names, flattened. */
+export const SKIP_TS_MIRROR_IS_DRIFT = new Set<string>(
+  SKIP_GROUPS.filter((g) => g.tsMirrorIsDrift).flatMap((g) => g.names),
+);
 
 /**
  * Like {@link SkipGroup}, but the skip applies *only* within the listed Ruby
@@ -550,8 +571,22 @@ const CONTAINMENT_PREDICATE_ALIASES = new Map<string, string>([
  *     (`include?` → ["isInclude", "include", "includes"]).
  */
 export function rubyMethodToTs(name: string): string[] | null {
-  if (OPERATORS.has(name)) return null;
   if (SKIP.has(name)) return null;
+  return rubyMethodToTsIgnoringSkip(name);
+}
+
+/**
+ * {@link rubyMethodToTs} without the {@link SKIP} gate.
+ *
+ * A SKIP entry means "don't expect a TS counterpart" for *scoring coverage* —
+ * it does NOT mean the Ruby method is absent. extra-surface needs the opposite
+ * question answered: given that this Ruby file really does define `freeze` /
+ * `inspect` / `to_h`, what would a faithful TS override be called? Only this
+ * entry point answers it; the SKIP gate stays in place for compare.ts, so a
+ * skipped method still never counts as a missing port.
+ */
+export function rubyMethodToTsIgnoringSkip(name: string): string[] | null {
+  if (OPERATORS.has(name)) return null;
   if (name === "initialize" || name === "new") return ["constructor"];
   if (name === "to_s" || name === "to_str") return ["toString"];
   if (name === "to_json") return ["toJSON"];

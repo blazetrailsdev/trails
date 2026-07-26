@@ -298,6 +298,7 @@ export class AdditionalValue {
     return String(this.value);
   }
 
+  /** @noRailsEquivalent JS primitive-coercion protocol — Ruby coerces through to_s/to_i instead */
   valueOf(): unknown {
     return this.value;
   }

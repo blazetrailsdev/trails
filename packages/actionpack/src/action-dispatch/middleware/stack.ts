@@ -161,6 +161,7 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
     return [...this.entries];
   }
 
+  /** @noRailsEquivalent JS iteration protocol — Ruby reaches iteration through Enumerable#each */
   [Symbol.iterator](): Iterator<MiddlewareEntry> {
     return this.entries[Symbol.iterator]();
   }

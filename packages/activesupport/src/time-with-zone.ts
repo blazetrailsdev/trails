@@ -931,7 +931,12 @@ export class TimeWithZone {
     return this._epochMs;
   }
 
-  /** valueOf for comparison operators to work */
+  /**
+   * valueOf for comparison operators to work
+   *
+   * @noRailsEquivalent JS primitive-coercion protocol — Ruby coerces through
+   * to_s/to_i instead
+   */
   valueOf(): number {
     return this._epochMs;
   }

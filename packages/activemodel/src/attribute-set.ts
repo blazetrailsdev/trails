@@ -313,6 +313,8 @@ export class AttributeSet {
   /**
    * Make AttributeSet iterable — yields [name, value] pairs for compatibility
    * with code that iterates `for (const [k, v] of _attributes)`.
+   *
+   * @noRailsEquivalent JS iteration protocol — Ruby reaches iteration through Enumerable#each
    */
   *[Symbol.iterator](): IterableIterator<[string, unknown]> {
     for (const name of this.keys()) {

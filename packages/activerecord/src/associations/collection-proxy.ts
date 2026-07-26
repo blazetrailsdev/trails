@@ -115,9 +115,11 @@ export interface CollectionProxy<T extends Base = Base> {
     onfulfilled?: ((value: T[]) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
   ): Promise<TResult1 | TResult2>;
+  /** @noRailsEquivalent JS Promise protocol — Ruby has no thenable */
   catch<TResult = never>(
     onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | null,
   ): Promise<T[] | TResult>;
+  /** @noRailsEquivalent JS Promise protocol — Ruby has no thenable */
   finally(onfinally?: (() => void) | null): Promise<T[]>;
 }
 
@@ -345,6 +347,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return (await this.loadTarget()).length;
   }
 
+  /** @noRailsEquivalent JS iteration protocol — Ruby uses Enumerable#each */
   [Symbol.iterator](): IterableIterator<T> {
     return this._target[Symbol.iterator]();
   }
@@ -4424,7 +4427,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /**
    * Async iterator — allows `for await (const record of proxy)`.
    *
-   * Mirrors: Ruby's Enumerable#each on CollectionProxy
+   * @noRailsEquivalent JS async-iteration protocol — Ruby's Enumerable#each
+   * is synchronous and has no async counterpart
    */
   async *[Symbol.asyncIterator](): AsyncIterableIterator<T> {
     const records = await this.loadTarget();

@@ -24,6 +24,7 @@ export class BodyProxy {
     return this._closed;
   }
 
+  /** @noRailsEquivalent JS async-iteration protocol — Ruby's Enumerable#each is synchronous */
   async *[Symbol.asyncIterator](): AsyncIterator<any> {
     if (this.body && typeof this.body[Symbol.asyncIterator] === "function") {
       for await (const item of this.body) yield item;

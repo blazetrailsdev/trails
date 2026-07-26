@@ -363,6 +363,7 @@ export class ConnectionPool implements ReapablePool {
     return this.inspect();
   }
 
+  /** @noRailsEquivalent Node inspection hook — a JS runtime protocol, not a Rails method */
   [Symbol.for("nodejs.util.inspect.custom")](): string {
     return this.inspect();
   }
