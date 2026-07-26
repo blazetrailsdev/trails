@@ -128,7 +128,7 @@ export class WhereClause {
   extractAttributes(): (string | Nodes.Attribute | Nodes.Node)[] {
     const attrs: (string | Nodes.Attribute | Nodes.Node)[] = [];
     for (const node of this.predicates) {
-      const attr = fetchAttributeNode(node);
+      const attr = fetchAttribute(node);
       if (attr !== null) {
         attrs.push(attr);
         continue;
@@ -146,7 +146,7 @@ export class WhereClause {
   toH(tableName?: string, opts: { equalityOnly?: boolean } = {}): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const node of equalities(this.predicates, opts.equalityOnly ?? false)) {
-      const attr = fetchAttributeNode(node);
+      const attr = fetchAttribute(node);
       if (attr === null) continue;
       if (tableName !== undefined && relationName(attr.relation.name) !== tableName) continue;
       result[attr.name] = extractNodeValue((node as any).right);
@@ -175,7 +175,7 @@ export class WhereClause {
       }
     }
     return this.predicates.filter((node) => {
-      const attr = fetchAttributeNode(node);
+      const attr = fetchAttribute(node);
       if (attr === null) {
         // Mirrors Rails' `non_attrs.include?(node.left)` branch: drop a predicate
         // whose left expression matches one being merged in (last equality wins).
@@ -262,7 +262,7 @@ function predicationLeft(node: Nodes.Node): Nodes.Node | null {
   return null;
 }
 
-function fetchAttributeNode(node: Nodes.Node): Nodes.Attribute | null {
+function fetchAttribute(node: Nodes.Node): Nodes.Attribute | null {
   let found: Nodes.Attribute | null = null;
   node.fetchAttribute?.((attr: Nodes.Node) => {
     if (attr instanceof Nodes.Attribute) {
@@ -277,7 +277,7 @@ function fetchAttributeNode(node: Nodes.Node): Nodes.Attribute | null {
   });
   if (found) return found;
   if (node instanceof Nodes.Not) {
-    return fetchAttributeNode((node as any).expr);
+    return fetchAttribute((node as any).expr);
   }
   return null;
 }
