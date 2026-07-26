@@ -1395,14 +1395,12 @@ export interface CallbackHost {
  * modelled here as a callback returning `false`), so callers can halt the
  * add/remove like Rails' `catch(:abort) ... || return`.
  *
- * Arity note: Rails procs take `(method, owner, record)` and `callback`
- * passes the kind through (so the symbol case can `callback.send(method, ...)`).
- * Here the builder binds the method/symbol at registration time, so the
- * stored procs take `(owner, record)` — the same 2-arg shape consumed by
- * this dispatcher on the CollectionProxy add/remove paths, which read the
- * identical callback array. Keeping the 2-arg convention lets both dispatch
- * sites share one proc array; passing `kind` here would break the proxy's
- * `cb(owner, record)` call site.
+ * Arity note: like Rails, the stored procs take `(method, owner, record)` and
+ * this dispatcher passes `kind` through as `method`. The symbol and proc arms
+ * ignore it, but the object arm needs it — Rails' `callback.send(method, owner,
+ * record)` (builder/collection_association.rb:51) dispatches the callback kind
+ * as a method ON the callback object, so binding it at registration time would
+ * silently drop object callbacks.
  *
  * `callback` is private in Rails, hence `@internal`.
  * @internal
@@ -1419,14 +1417,14 @@ export function callback(assoc: CallbackHost, kind: string, record: Base): boole
     // (faithful `throw :abort`); a `false` return no longer halts (Rails 5+).
     if (catchAbort) {
       try {
-        (cb as any)(assoc.owner, record);
+        (cb as any)(kind, assoc.owner, record);
       } catch (e) {
         if (!isAbortSignal(e)) throw e;
         return false;
       }
     } else {
       // after callbacks run outside the catch; their return value is ignored.
-      (cb as any)(assoc.owner, record);
+      (cb as any)(kind, assoc.owner, record);
     }
   }
   return true;

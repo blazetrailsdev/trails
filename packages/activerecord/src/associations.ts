@@ -113,6 +113,17 @@ import { foreignKeyPresentFor } from "./associations/foreign-association.js";
 import { throughForeignKeyPresent } from "./associations/through-association.js";
 
 /**
+ * One `before_add`/`after_add`/`before_remove`/`after_remove` entry. Mirrors
+ * the three arms Rails' `Builder::CollectionAssociation.define_callback`
+ * accepts (builder/collection_association.rb:44-52): a method name on the
+ * owner, a callable, or an object that responds to the callback kind itself.
+ */
+export type CollectionCallback<K extends string> =
+  | string
+  | ((owner: Base, record: Base) => void | false)
+  | { [P in K]: (owner: Base, record: Base) => void | false };
+
+/**
  * Association options.
  */
 export interface AssociationOptions {
@@ -143,14 +154,10 @@ export interface AssociationOptions {
    * resolved in an async pre-validation phase on save; a synchronous block also
    * fires during a standalone `valid?`. */
   default?: (owner: Base) => Base | null | Promise<Base | null>;
-  beforeAdd?:
-    | ((owner: Base, record: Base) => void | false)
-    | ((owner: Base, record: Base) => void | false)[];
-  afterAdd?: ((owner: Base, record: Base) => void) | ((owner: Base, record: Base) => void)[];
-  beforeRemove?:
-    | ((owner: Base, record: Base) => void | false)
-    | ((owner: Base, record: Base) => void | false)[];
-  afterRemove?: ((owner: Base, record: Base) => void) | ((owner: Base, record: Base) => void)[];
+  beforeAdd?: CollectionCallback<"beforeAdd"> | CollectionCallback<"beforeAdd">[];
+  afterAdd?: CollectionCallback<"afterAdd"> | CollectionCallback<"afterAdd">[];
+  beforeRemove?: CollectionCallback<"beforeRemove"> | CollectionCallback<"beforeRemove">[];
+  afterRemove?: CollectionCallback<"afterRemove"> | CollectionCallback<"afterRemove">[];
   /** Mixes methods into the association's CollectionProxy and every
    * relation spawned from it, mirroring Rails' `has_many :things,
    * extend: ModA` / `extend: [ModA, ModB]`. A module is an object whose

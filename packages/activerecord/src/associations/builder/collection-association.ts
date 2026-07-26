@@ -77,13 +77,22 @@ export class CollectionAssociation extends Association {
       return;
     }
 
+    // Mirrors Rails' three arms (builder/collection_association.rb:44-52). All
+    // three take `(method, owner, record)` — the `method` (callback kind) is
+    // unused by the symbol/proc arms but IS what the object arm dispatches on,
+    // so it has to be threaded through rather than bound here.
     const normalized = callbackValues.map((callback: any) => {
       if (typeof callback === "string" || typeof callback === "symbol") {
-        return (owner: any, record: any) => owner[callback](record);
+        // Rails: `->(method, owner, record) { owner.send(callback, record) }`
+        return (_method: string, owner: any, record: any) => owner[callback](record);
       } else if (typeof callback === "function") {
-        return (owner: any, record: any) => callback(owner, record);
+        // Rails: `->(method, owner, record) { callback.call(owner, record) }`
+        return (_method: string, owner: any, record: any) => callback(owner, record);
       } else {
-        return (owner: any, record: any) => callback.call(owner, record);
+        // Rails: `->(method, owner, record) { callback.send(method, owner, record) }`
+        // — an object callback responds to the callback kind itself, e.g.
+        // `before_add: SomeAuditor` invokes `SomeAuditor.before_add(owner, record)`.
+        return (method: string, owner: any, record: any) => callback[method](owner, record);
       }
     });
 
@@ -94,7 +103,8 @@ export class CollectionAssociation extends Association {
     model[fullCallbackName] = [...prior, ...normalized];
 
     // Also store normalized callbacks in the association options so
-    // fireAssocCallbacks (which reads options.beforeAdd etc.) finds them
+    // `CollectionAssociation#callback`'s `callbacksFor` fallback (which reads
+    // options.beforeAdd etc.) finds them
     const assocs: any[] = model._associations ?? [];
     const assocDef = assocs.find((a: any) => a.name === name);
     if (assocDef) {
