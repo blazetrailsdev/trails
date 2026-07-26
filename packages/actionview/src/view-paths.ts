@@ -11,6 +11,8 @@ export type ViewPathsInput =
 
 type DetailValue = ReadonlyArray<string | symbol>;
 
+const EMPTY_VIEW_PATHS = new PathSet();
+
 export interface ViewPathsClass {
   new (...args: unknown[]): unknown;
   readonly name: string;
@@ -31,7 +33,7 @@ export class ClassMethods {
   static _viewPaths(this: ViewPathsClass, paths: PathSet): void;
   static _viewPaths(this: ViewPathsClass, paths?: PathSet): PathSet | void {
     if (paths === undefined) {
-      return PathRegistry.getViewPaths(this) ?? new PathSet();
+      return PathRegistry.getViewPaths(this) ?? EMPTY_VIEW_PATHS;
     }
     PathRegistry.setViewPaths(this, paths);
   }
