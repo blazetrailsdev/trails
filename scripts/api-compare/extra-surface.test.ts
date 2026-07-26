@@ -2,7 +2,8 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { tmpdir } from "os";
-import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
+import * as ts from "typescript";
+import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo } from "./types.js";
 import {
   buildGlobalRubyCandidates,
   buildReport,
@@ -10,7 +11,9 @@ import {
   loadAllowlist,
   resolveAllowlist,
   parseArgs,
+  collectTsFileNames,
 } from "./extra-surface.js";
+import { extractFromProgram } from "./extract-ts-api.js";
 import type { AllowEntry } from "./extra-surface.js";
 
 function method(name: string, internal = false): MethodInfo {
@@ -1314,5 +1317,86 @@ describe("resolveAllowlist", () => {
     };
     const r = await resolveAllowlist(await writeAllow(JSON.stringify([entry])));
     expect(r).toEqual({ allow: [entry], problems: [] });
+  });
+});
+
+describe("collectTsFileNames — `__mixin` pseudo-modules", () => {
+  /** Compile a virtual multi-file package and run the real TS extractor. */
+  function extract(files: Record<string, string>): PackageInfo {
+    const srcDir = "/p";
+    const all: Record<string, string> = {};
+    for (const [rel, src] of Object.entries(files)) all[`${srcDir}/${rel}`] = src;
+    const names = Object.keys(all);
+    const host: ts.CompilerHost = {
+      getSourceFile: (name) =>
+        all[name] === undefined
+          ? undefined
+          : ts.createSourceFile(name, all[name], ts.ScriptTarget.Latest, true),
+      getDefaultLibFileName: () => "lib.d.ts",
+      writeFile: () => undefined,
+      getCurrentDirectory: () => "/",
+      getCanonicalFileName: (n) => n,
+      useCaseSensitiveFileNames: () => true,
+      getNewLine: () => "\n",
+      fileExists: (name) => name in all,
+      readFile: (name) => all[name],
+      resolveModuleNames: (moduleNames, containingFile) =>
+        moduleNames.map((m) => {
+          if (!m.startsWith("./") && !m.startsWith("../")) return undefined;
+          const dir = path.posix.dirname(containingFile);
+          const candidate = path.posix.normalize(`${dir}/${m.replace(/\.js$/, "")}.ts`);
+          return candidate in all
+            ? { resolvedFileName: candidate, extension: ts.Extension.Ts }
+            : undefined;
+        }),
+    };
+    const program = ts.createProgram(
+      names,
+      { noLib: true, target: ts.ScriptTarget.Latest, module: ts.ModuleKind.ESNext },
+      host,
+    );
+    return extractFromProgram(program, srcDir);
+  }
+
+  const FILES = {
+    "base.ts": `
+      export class Base {
+        toSlug(): string { return ""; }
+      }
+    `,
+    "inheritance.ts": `
+      import { Base } from "./base.js";
+      export function stiClassFor(this: typeof Base, typeName: string): typeof Base {
+        return Base;
+      }
+    `,
+  };
+
+  it("drops host-interface members that inheritance.ts does not declare", () => {
+    const info = extract(FILES);
+    const mixin = info.modules["inheritance.ts:stiClassFor__mixin"];
+    expect(mixin?.synthesizedMixin).toBe(true);
+    // The extractor still carries the host surface (the Rails-layout check
+    // relies on the pseudo-module); it is tagged with its real declaring file.
+    expect(mixin.instanceMethods.find((m) => m.name === "toSlug")?.declaredIn).toBe("base.ts");
+
+    const names = collectTsFileNames(
+      "inheritance.ts",
+      [],
+      Object.values(info.modules),
+      info.fileFunctions?.["inheritance.ts"],
+    );
+    expect(names.has("toSlug")).toBe(false);
+  });
+
+  it("still counts the mixin function's own name as inheritance.ts surface", () => {
+    const info = extract(FILES);
+    const names = collectTsFileNames(
+      "inheritance.ts",
+      [],
+      Object.values(info.modules),
+      info.fileFunctions?.["inheritance.ts"],
+    );
+    expect(names.has("stiClassFor")).toBe(true);
   });
 });

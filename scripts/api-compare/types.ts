@@ -83,6 +83,15 @@ export interface MethodInfo {
    * false-missing pinned to base.ts. See extract-ruby-api.rb#scan_umbrella_file.
    */
   umbrellaConfig?: boolean;
+  /**
+   * TS-side only, on `synthesizedMixin` pseudo-modules: the file that actually
+   * declares this member, when it is NOT the file the pseudo-module is keyed
+   * under. A mixin function returning `typeof Base` drags Base's entire
+   * instance surface into the pseudo-module; those members are declared
+   * elsewhere and are not the pseudo-module file's own surface.
+   * See extract-ts-api.ts and extra-surface.ts `collectTsFileNames`.
+   */
+  declaredIn?: string;
 }
 
 export interface ClassInfo {
@@ -93,6 +102,15 @@ export interface ClassInfo {
   extends: string[];
   instanceMethods: MethodInfo[];
   classMethods: MethodInfo[];
+  /**
+   * TS-side only: this entry is not a real declared class/module but a
+   * pseudo-module synthesized from an exported function whose return type has
+   * construct signatures (`<file>:<fn>__mixin`). Its members come from the
+   * returned constructor's instance type, which usually includes surface
+   * declared in other files. Consumers that attribute surface to a file must
+   * consult `MethodInfo.declaredIn`. See extract-ts-api.ts.
+   */
+  synthesizedMixin?: boolean;
 }
 
 export interface PackageInfo {

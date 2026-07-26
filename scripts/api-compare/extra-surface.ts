@@ -392,7 +392,7 @@ export function parseArgs(argv: string[]): CliArgs {
  * and `@internal` JSDoc set `internal: true`). The Rails-private
  * convention in this repo means we filter `_`-prefix here too.
  */
-function collectTsFileNames(
+export function collectTsFileNames(
   file: string,
   classes: ClassInfo[],
   modules: ClassInfo[],
@@ -412,8 +412,19 @@ function collectTsFileNames(
   }
   for (const m of modules) {
     if (m.file !== file) continue;
-    for (const im of m.instanceMethods) push(im);
-    for (const cm of m.classMethods) push(cm);
+    // `<file>:<fn>__mixin` pseudo-modules carry the instance surface of the
+    // class the mixin function returns, most of which is declared in other
+    // files. A member declared elsewhere is by definition not this file's
+    // surface. The mixin function's own name still arrives via fileFunctions.
+    const skipForeign = m.synthesizedMixin === true;
+    for (const im of m.instanceMethods) {
+      if (skipForeign && im.declaredIn !== undefined) continue;
+      push(im);
+    }
+    for (const cm of m.classMethods) {
+      if (skipForeign && cm.declaredIn !== undefined) continue;
+      push(cm);
+    }
   }
   for (const fn of fileFunctions ?? []) push(fn);
   return out;

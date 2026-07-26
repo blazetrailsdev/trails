@@ -547,6 +547,11 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
           isPrivateField || hasPrivateMod ? "private" : hasProtectedMod ? "protected" : "public";
         const internal = visibility !== "public";
         const line = decl.getSourceFile().getLineAndCharacterOfPosition(decl.getStart()).line + 1;
+        // Functions returning `typeof Base` (STI helpers, association loaders)
+        // drag the whole returned class's instance surface in here. Record
+        // where each member is really declared so surface-attribution
+        // consumers can drop the ones this file does not own.
+        const declFile = path.relative(srcDir, decl.getSourceFile().fileName).replace(/\\/g, "/");
         mixinMethods.push({
           name: prop.name,
           visibility,
@@ -554,6 +559,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
           isStatic: false,
           line,
           file: relPath,
+          ...(declFile !== relPath ? { declaredIn: declFile } : {}),
           ...(internal ? { internal: true } : {}),
         });
       }
@@ -578,6 +584,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
           extends: [],
           instanceMethods: mixinMethods,
           classMethods: [],
+          synthesizedMixin: true,
         };
         fileHasClassOrModule = true;
       }
