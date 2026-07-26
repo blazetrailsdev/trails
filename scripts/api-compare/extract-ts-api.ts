@@ -1735,15 +1735,19 @@ function extractNamespace(
     for (const stmt of node.body.statements) {
       if (ts.isFunctionDeclaration(stmt) && stmt.name && isExported(stmt)) {
         const line = stmt.getSourceFile().getLineAndCharacterOfPosition(stmt.getStart()).line + 1;
+        const noRailsEquivalent = noRailsEquivalentReason(stmt);
         instanceMethods.push({
           name: stmt.name.text,
           visibility: "public",
           params: extractParameters(stmt.parameters),
           line,
           file,
+          ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
         });
       } else if (ts.isVariableStatement(stmt) && isExported(stmt)) {
         const line = stmt.getSourceFile().getLineAndCharacterOfPosition(stmt.getStart()).line + 1;
+        // JSDoc attaches to the statement, not the individual declarator.
+        const stmtReason = noRailsEquivalentReason(stmt);
         for (const decl of stmt.declarationList.declarations) {
           if (!ts.isIdentifier(decl.name)) continue;
           const init = decl.initializer;
@@ -1764,12 +1768,14 @@ function extractNamespace(
             }
           }
           if (isFunctionLike) {
+            const noRailsEquivalent = noRailsEquivalentReason(decl) ?? stmtReason;
             instanceMethods.push({
               name: decl.name.text,
               visibility: "public",
               params,
               line,
               file,
+              ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
             });
           }
         }

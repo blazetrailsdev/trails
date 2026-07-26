@@ -1439,6 +1439,28 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     ).toBe("JS-only lifecycle hook");
   });
 
+  it("records the reason on tagged namespace members", () => {
+    const info = extractFromFiles("/p", {
+      "locator.ts": `
+        export namespace Locator {
+          /** @noRailsEquivalent trails-side model-facing finder */
+          export function findGlobalId(): void {}
+
+          /** @noRailsEquivalent JS-only signed-id ergonomic */
+          export const findSignedGlobalId = (): void => {};
+
+          export function locate(): void {}
+        }
+      `,
+    });
+    const ns = info.modules["locator.ts:Locator"];
+    const reasonOf = (name: string) =>
+      ns.instanceMethods.find((m) => m.name === name)!.noRailsEquivalent;
+    expect(reasonOf("findGlobalId")).toBe("trails-side model-facing finder");
+    expect(reasonOf("findSignedGlobalId")).toBe("JS-only signed-id ergonomic");
+    expect(reasonOf("locate")).toBeUndefined();
+  });
+
   it("throws when the tag carries no reason", () => {
     expect(() =>
       extractFromSource(`
