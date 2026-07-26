@@ -102,6 +102,25 @@ describe("DecimalTest", () => {
   });
 
   it("changed?", () => {
+    const type = new Types.DecimalType();
+
+    expect(type.isChanged(0.0, 0, "wibble")).toBe(true);
+    expect(type.isChanged(5.0, 0, "wibble")).toBe(true);
+    expect(type.isChanged(5.0, 5.0, "5.0wibble")).toBe(false);
+    expect(type.isChanged(5.0, 5.0, "5.0")).toBe(false);
+    expect(type.isChanged(-5.0, -5.0, "-5.0")).toBe(false);
+    expect(type.isChanged(5.0, 5.0, "0.5e+1")).toBe(false);
+    // Rails passes `BigDecimal("0.0") / 0` here. Trails' BigDecimal carries no
+    // non-finite state, so a NaN decimal cast round-trips as the sentinel
+    // string "NaN" (see `_castWithoutScale`) — that sentinel stands in for
+    // Ruby's BigDecimal NaN on both sides of the comparison.
+    expect(type.isChanged("NaN", "NaN", "NaN")).toBe(false);
+    // ...and a Float NaN written over a BigDecimal NaN is still a change,
+    // because Rails' `equal_nan?` requires `old_value.instance_of?(new_value.class)`.
+    expect(type.isChanged("NaN", NaN, NaN)).toBe(true);
+  });
+
+  it("dirty tracking treats a reverted decimal as unchanged", () => {
     class MyModel extends Model {
       static {
         this.attribute("price", "decimal");

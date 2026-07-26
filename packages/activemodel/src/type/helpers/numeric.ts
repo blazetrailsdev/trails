@@ -3,27 +3,36 @@
  *
  * Mirrors: ActiveModel::Type::Helpers::Numeric (numeric.rb:7-34)
  */
+import { BigDecimal } from "@blazetrails/activesupport";
 import { ValueType } from "../value.js";
-
-/** Mirrors: ActiveModel::Type::Helpers::Numeric::NUMERIC_REGEX */
-const NUMERIC_REGEX = /^\s*[+-]?\d/;
 
 /**
  * Mirrors: ActiveModel::Type::Helpers::Numeric#equal_nan?
  *
- * Trails has no BigDecimal class, so the constructor-equality check
- * collapses to "both are JS numbers and both are NaN".
+ *   (old_value.is_a?(::Float) || old_value.is_a?(BigDecimal)) &&
+ *     old_value.nan? && old_value.instance_of?(new_value.class) && new_value.nan?
+ *
+ * Trails passes the CAST new value here rather than Rails'
+ * `new_value_before_type_cast` — a pre-existing deviation locked in by
+ * `float.test.ts` ("equal_nan? uses cast value"), left alone here.
+ *
+ * Rails' `instance_of?(new_value.class)` guard means a Float NaN written over
+ * a BigDecimal NaN still counts as a change. Trails' `BigDecimal` carries no
+ * non-finite state, so `DecimalType#cast` represents a NaN decimal as the
+ * sentinel string `"NaN"` — that sentinel IS this port's BigDecimal NaN, and
+ * the class guard maps to requiring the same representation on both sides.
  *
  * @internal Rails-private helper.
  */
 export function isEqualNan(oldValue: unknown, newValue: unknown): boolean {
-  return (
-    typeof oldValue === "number" &&
-    Number.isNaN(oldValue) &&
-    typeof newValue === "number" &&
-    Number.isNaN(newValue)
-  );
+  if (typeof oldValue === "number") {
+    return Number.isNaN(oldValue) && typeof newValue === "number" && Number.isNaN(newValue);
+  }
+  return oldValue === "NaN" && newValue === "NaN";
 }
+
+/** Mirrors: ActiveModel::Type::Helpers::Numeric::NUMERIC_REGEX */
+const NUMERIC_REGEX = /^\s*[+-]?\d/;
 
 /**
  * Mirrors: ActiveModel::Type::Helpers::Numeric#number_to_non_number?
@@ -45,6 +54,14 @@ export function isNumberToNonNumber(oldValue: unknown, newValueBeforeTypeCast: u
  */
 export function isNonNumericString(value: unknown): boolean {
   return !NUMERIC_REGEX.test(String(value));
+}
+
+/**
+ * Cast decimals are {@link BigDecimal} instances; compare them by their fixed
+ * ("F") form so JS identity does not stand in for Ruby's value equality.
+ */
+function normalizeBigDecimal(value: unknown): unknown {
+  return value instanceof BigDecimal ? value.toString("F") : value;
 }
 
 // Constructor rest args must be `any[]` — idiomatic in TypeScript mixin
@@ -108,10 +125,16 @@ export function applyNumericMixin<TBase extends AbstractValueTypeCtor>(
       newValue: unknown,
       newValueBeforeTypeCast?: unknown,
     ): boolean {
+      // Rails' `super` here is `Value#changed?` (`old_value != new_value`) —
+      // Ruby `!=` on BigDecimal is value equality, so a cast decimal reverted
+      // to its previous value is unchanged. JS `!==` is object identity, so
+      // normalize BigDecimal operands to their fixed form first.
+      const old = normalizeBigDecimal(oldValue);
+      const fresh = normalizeBigDecimal(newValue);
       return (
-        (super.isChanged(oldValue, newValue, newValueBeforeTypeCast) ||
-          isNumberToNonNumber(oldValue, newValueBeforeTypeCast)) &&
-        !isEqualNan(oldValue, newValue)
+        (super.isChanged(old, fresh, newValueBeforeTypeCast) ||
+          isNumberToNonNumber(old, newValueBeforeTypeCast)) &&
+        !isEqualNan(old, fresh)
       );
     }
   }

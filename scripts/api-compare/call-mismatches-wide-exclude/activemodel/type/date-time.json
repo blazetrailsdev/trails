@@ -2,9 +2,9 @@
   {
     "package": "activemodel",
     "tsFile": "type/date-time.ts",
-    "rubyName": "cast_value",
-    "call": "apply_seconds_precision",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "rubyName": "apply_seconds_precision",
+    "call": "change",
+    "reason": "Converged: `applySecondsPrecision` truncates the sub-second components directly via `Temporal.PlainTime#with` / `Temporal.Instant.fromEpochNanoseconds`, which is this port's analogue of Ruby's `Time#change(nsec:)` — Temporal has no `change` method."
   },
   {
     "package": "activemodel",
@@ -45,15 +45,8 @@
     "package": "activemodel",
     "tsFile": "type/date-time.ts",
     "rubyName": "serialize_cast_value",
-    "call": "apply_seconds_precision",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "type/date-time.ts",
-    "rubyName": "serialize_cast_value",
     "call": "getlocal",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Not applicable: Rails' `serialize_cast_value` calls `getutc`/`getlocal` to re-attach a zone to a Ruby Time. The cast value here is a zoneless Temporal.PlainTime / absolute Temporal.Instant, so both branches are identity; trails resolves `default_timezone` at parse time (`configuredTimezone`) and again at quote time in the adapter's `quotedDate`."
   },
   {
     "package": "activemodel",
