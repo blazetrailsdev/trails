@@ -79,6 +79,11 @@ import {
   CompositePrimaryKeyMismatchError,
 } from "./associations/errors.js";
 import { AssociationScope, invokeScopeLambda } from "./associations/association-scope.js";
+// Cyclic with `has-many-association.ts`, which imports this module's
+// `@internal` loader helpers back. The cycle is function-level only — neither
+// side touches the other at module-evaluation time — so whichever module is
+// entered first, the hoisted function declarations are already bound by the
+// time either is called.
 import { findTarget as findHasManyTarget } from "./associations/has-many-association.js";
 import type { Association as AssociationInstance } from "./associations/association.js";
 import {
