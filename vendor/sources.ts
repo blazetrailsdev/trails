@@ -29,15 +29,14 @@ export interface PackageEntry {
    * Default true. Set to false to vendor the source (so test-compare or other
    * tooling can read it) without including it in the api-compare PACKAGES
    * derivation. Reserved for cases where the extractor can't yet handle a
-   * gem's idioms, or where the TS-side home for the package doesn't exist
-   * yet (i18n today; rack and globalid were vendored-only until wave 6
-   * wired them in, #1589).
+   * gem's idioms. Today no source sets this flag; rack and globalid were
+   * wired into api-compare in wave 6 (#1589).
    */
   compareApi?: boolean;
   /**
-   * Default true. Mirror of `compareApi` for test-compare. globalid set this
-   * to false in wave 5 (flipped on in wave 6); i18n sets both flags false
-   * until its TS package home exists.
+   * Default true. Mirror of `compareApi` for test-compare. globalid sets this
+   * to false in wave 5 (its tests aren't wired into test-compare yet); wave 6
+   * flips it on alongside its api-compare wiring.
    */
   compareTests?: boolean;
 }
@@ -155,23 +154,13 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/ruby-i18n/i18n.git",
-      // Latest 1.x release; Rails 8.0.2's activesupport pins i18n (>= 1.6, < 2).
       ref: "v1.14.8",
     },
     packages: [
       {
         name: "i18n",
-        // Module root `lib/i18n/`, matching the activerecord/rack pattern.
-        // The entrypoint lib/i18n.rb (the I18n module facade — translate/
-        // localize/locale accessors) sits outside this dir; the parity RFC
-        // decides how the facade surface is charged when compare is enrolled.
         libPath: "lib/i18n",
         testPath: "test",
-        // Vendored-only for now (RFC 0074): there is no packages/i18n TS home
-        // yet — today's i18n surface is scattered shims in activesupport/
-        // activemodel/activerecord, so the package-name → packages/<name>/src
-        // derivation can't resolve. The RFC's first story creates packages/i18n
-        // and flips these flags on.
         compareApi: false,
         compareTests: false,
       },
