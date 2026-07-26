@@ -116,10 +116,8 @@ describe("HasOneThroughAssociationsTest", () => {
   registerModel(Owner);
   registerModel(Post);
   registerModel(FirstPost);
-  enableSti(Comment);
   registerModel(Comment);
   registerModel(SpecialComment);
-  registerSubclass(SpecialComment);
   registerModel(Categorization);
   registerModel(Customer);
   registerModel(Carrier);
@@ -333,20 +331,17 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it("raising create with an invalid record still reconciles an unloaded join row", async () => {
-    // Rails' `SingularAssociation#_create_record` (singular_association.rb:63-71)
-    // runs the whole of `set_new_record` — i.e. `create_through_record`, join-row
-    // `update` included — BEFORE `raise RecordInvalid`. `Author` validates
-    // `name`, so `create_author!` with no name fails and the join row (the post)
-    // is still updated toward the unsaved author, blanking its `author_id`.
     const author = await Author.create({ name: "David" });
     const post = await Post.create({ title: "t", body: "b", author_id: author.id });
     const comment = await SpecialComment.create({ post_id: post.id, body: "sc" });
 
     const refetched = await SpecialComment.find(comment.id);
+    const authorsBefore = await Author.count();
     await expect((refetched.association("author") as any).createBang({})).rejects.toThrow(
       RecordInvalid,
     );
 
+    expect(await Author.count()).toBe(authorsBefore);
     expect((await Post.find(post.id)).author_id).toBeNull();
   });
 
