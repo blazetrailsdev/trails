@@ -10,7 +10,7 @@
 import { describe, it, expect } from "vitest";
 import { findTarget } from "./associations/singular-association.js";
 import { StrictLoadingViolationError, registerModel } from "./index.js";
-import { loadHasOne, loadHabtm } from "./associations.js";
+import { loadHasOne } from "./associations.js";
 import { findTarget as findHasManyTarget } from "./associations/has-many-association.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { Developer, AuditLog } from "./test-helpers/models/developer.js";
@@ -70,7 +70,10 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
   it("does not raise on lazy loading a habtm on a new strict-loading owner without the foreign key", async () => {
     const developer = new Developer({ name: "New Dev" });
     developer.strictLoadingBang();
-    await expect(loadHabtm(developer, "projects", optionsFor("projects"))).resolves.toEqual([]);
+    // HABTM has no association class of its own: `Builder::HasAndBelongsToMany`
+    // rewrites it into a `has_many :through`, so the load runs through the
+    // through association's `find_target` rather than a bespoke habtm loader.
+    await expect(developer.projects.toArray()).resolves.toEqual([]);
   });
 
   it("does not raise on lazy loading a belongs_to on a persisted strict-loading owner without the foreign key", async () => {
