@@ -185,7 +185,7 @@ export class SchemaCache {
       return this._primaryKeys.get(tableName);
     }
 
-    if (isSchemaCacheIgnoredTable(tableName)) return null;
+    if (this.isIgnoredTable(tableName)) return null;
 
     return withConnection(pool, async (connection) => {
       if (await this.dataSourceExists(connection, tableName)) {
@@ -201,7 +201,7 @@ export class SchemaCache {
   }
 
   async dataSourceExists(pool: unknown, name: string): Promise<boolean | undefined> {
-    if (isSchemaCacheIgnoredTable(name)) return undefined;
+    if (this.isIgnoredTable(name)) return undefined;
     // Rails: eager-load all data sources on first cache miss
     if (this._dataSourceExists.size === 0) {
       const tables = await this.tablesToCache(pool);
@@ -236,7 +236,7 @@ export class SchemaCache {
   }
 
   async columns(pool: unknown, tableName: string): Promise<Column[] | undefined> {
-    if (isSchemaCacheIgnoredTable(tableName)) {
+    if (this.isIgnoredTable(tableName)) {
       throw new StatementInvalid(`Table '${tableName}' doesn't exist`);
     }
 
@@ -366,7 +366,7 @@ export class SchemaCache {
       return this._indexes.get(tableName)!;
     }
 
-    if (isSchemaCacheIgnoredTable(tableName)) return [];
+    if (this.isIgnoredTable(tableName)) return [];
 
     return withConnection(pool, async (connection) => {
       if (typeof connection.indexes === "function") {
@@ -638,11 +638,21 @@ export class SchemaCache {
 
   // Rails: tables_to_cache(pool) — gets data_sources from connection,
   // filtering out anything matched by ActiveRecord.schema_cache_ignored_tables.
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaCache#ignored_table?
+   * (`schema_cache.rb:436`, private) — `ActiveRecord.schema_cache_ignored_table?`
+   * behind a private method on the cache, which is what every ignore check in
+   * this class calls.
+   */
+  private isIgnoredTable(tableName: string): boolean {
+    return isSchemaCacheIgnoredTable(tableName);
+  }
+
   private async tablesToCache(pool: unknown): Promise<string[]> {
     return withConnection(pool, async (connection) => {
       if (typeof connection.dataSources === "function") {
         const tables = (await connection.dataSources()) as string[];
-        return tables.filter((t) => !isSchemaCacheIgnoredTable(t));
+        return tables.filter((t) => !this.isIgnoredTable(t));
       }
       return [];
     });
@@ -1014,17 +1024,6 @@ export class FakePool {
  */
 export function emptyCache(): SchemaCache {
   return new SchemaCache();
-}
-
-/**
- * Returns true when the table name matches the schema_cache_ignored_tables list.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::SchemaCache#ignored_table? (private)
- *
- * @internal
- */
-export function isIgnoredTable(tableName: string): boolean {
-  return isSchemaCacheIgnoredTable(tableName);
 }
 
 /**
