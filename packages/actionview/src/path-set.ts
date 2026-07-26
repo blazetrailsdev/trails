@@ -137,9 +137,9 @@ export class PathSet implements Iterable<PathSetResolver> {
 
   /**
    * @internal
-   * Validates incoming paths. Rails additionally wraps `String`/`Pathname`
-   * entries in a `FileSystemResolver`; that wrapping lands with the resolver
-   * port in Phase 1c. Until then non-Resolver entries throw.
+   * Validates incoming paths. `String`/`Pathname` wrapping happens up front in
+   * `PathRegistry.castFileSystemResolvers` (`ViewPaths#_build_view_paths`), so
+   * only resolvers reach this point.
    */
   private typecast(paths: ReadonlyArray<PathSetResolver | unknown>): PathSetResolver[] {
     return paths.map((path) => {
@@ -151,7 +151,7 @@ export class PathSet implements Iterable<PathSetResolver> {
         return path as PathSetResolver;
       }
       throw new TypeError(
-        `${String(path)} is not a valid path: must be a Resolver (string/Pathname wrapping lands in Phase 1c)`,
+        `${String(path)} is not a valid path: must be a Resolver (strings are wrapped by PathRegistry.castFileSystemResolvers)`,
       );
     });
   }

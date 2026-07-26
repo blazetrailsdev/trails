@@ -7,7 +7,6 @@
  */
 
 import type { LookupContext } from "./lookup-context.js";
-import type { TemplateResolver } from "./resolver/resolver.js";
 
 export interface RenderOptions {
   template?: string;
@@ -49,19 +48,4 @@ export interface LayoutsClass {
     name: string | symbol | false | null | ((...args: unknown[]) => unknown),
     conditions?: { only?: string | string[]; except?: string | string[] },
   ): void;
-}
-
-/** @internal stub - real impl in Phase 4 */
-export interface ViewPaths {
-  viewPaths: TemplateResolver[];
-  prependViewPath(path: string | TemplateResolver | string[]): void;
-  appendViewPath(path: string | TemplateResolver | string[]): void;
-  detailsFor(name: string): Record<string, unknown>;
-}
-
-/** @internal stub - real impl in Phase 4 */
-export interface ViewPathsClass {
-  viewPaths: TemplateResolver[];
-  prependViewPath(path: string | TemplateResolver | string[]): void;
-  appendViewPath(path: string | TemplateResolver | string[]): void;
 }

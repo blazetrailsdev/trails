@@ -3,6 +3,7 @@ import { getPathAsync } from "@blazetrails/activesupport";
 import { FileSystemResolver } from "./resolver/file-system-resolver.js";
 import { InMemoryResolver } from "./resolver/in-memory-resolver.js";
 import { PathRegistry } from "./path-registry.js";
+import { PathSet } from "./path-set.js";
 
 beforeAll(async () => {
   await getPathAsync();
@@ -44,7 +45,7 @@ describe("PathRegistry", () => {
 
   test("setViewPaths + getViewPaths round-trips per class", () => {
     class MyController {}
-    const paths = [new InMemoryResolver()];
+    const paths = new PathSet([new InMemoryResolver()]);
     PathRegistry.setViewPaths(MyController, paths);
     expect(PathRegistry.getViewPaths(MyController)).toBe(paths);
   });
@@ -52,7 +53,7 @@ describe("PathRegistry", () => {
   test("getViewPaths walks the prototype chain", () => {
     class Base {}
     class Child extends Base {}
-    const paths = [new InMemoryResolver()];
+    const paths = new PathSet([new InMemoryResolver()]);
     PathRegistry.setViewPaths(Base, paths);
     expect(PathRegistry.getViewPaths(Child)).toBe(paths);
   });

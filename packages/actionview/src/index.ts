@@ -36,10 +36,11 @@ export type {
   Rendering,
   Layouts,
   LayoutsClass,
-  ViewPaths,
-  ViewPathsClass,
   RenderOptions as RenderingOptions,
 } from "./rendering.js";
+
+export { ClassMethods as ViewPathsClassMethods } from "./view-paths.js";
+export type { ViewPaths, ViewPathsClass, ViewPathsInput } from "./view-paths.js";
 
 export { Renderer, RenderedTemplate } from "./renderer.js";
 export type { ViewContext, RenderOptions as RendererOptions } from "./renderer.js";
