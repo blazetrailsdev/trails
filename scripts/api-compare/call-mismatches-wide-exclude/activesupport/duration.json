@@ -39,7 +39,7 @@
     "tsFile": "duration.ts",
     "rubyName": "initialize",
     "call": "include?",
-    "reason": "Converged (RFC 0032): Rails iterates parts and asks `VARIABLE_PARTS.include?(part)`; trails inverts the loop (`VARIABLE_PARTS.some(...)` over the fixed parts record), so membership is the iteration itself — no include? call exists to match."
+    "reason": "Converged (RFC 0032): Rails iterates parts and asks `VARIABLE_PARTS.include?(part)`; trails inverts the loop (`VARIABLE_PARTS.some(...)` over the fixed parts record), so membership is the iteration itself \u2014 no include? call exists to match."
   },
   {
     "package": "activesupport",
@@ -47,6 +47,13 @@
     "rubyName": "iso8601",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "duration.ts",
+    "rubyName": "iso8601",
+    "call": "serialize",
+    "reason": "Rails builds the string via ISO8601Serializer#serialize; trails inlines it in iso8601 (the `new` half of the same call is already baselined above)."
   },
   {
     "package": "activesupport",

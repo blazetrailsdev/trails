@@ -84,7 +84,7 @@ export class MessageEncryptor extends Codec {
     const encrypted = message.slice(0, lastDash);
     const signature = message.slice(lastDash + 2);
 
-    if (!this.verifySignature(encrypted, signature)) {
+    if (!this.verify(encrypted, signature)) {
       throw new Thrown("invalid_message_format", "mismatched digest");
     }
 
@@ -137,7 +137,7 @@ export class MessageEncryptor extends Codec {
     return getCrypto().createHmac(this.digest, this.signSecret).update(data).digest("hex");
   }
 
-  private verifySignature(data: string, signature: string): boolean {
+  private verify(data: string, signature: string): boolean {
     try {
       const expected = this.sign(data);
       const expectedBuf = Buffer.from(expected, "hex");
