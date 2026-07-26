@@ -7,8 +7,13 @@ distinct `helper.rb` lines, should the AR test-setup files be reorganized under
 a Rails-style `cases/` tree (e.g. `cases/helper.ts`), or does the
 `test-setup-*` convention stay?
 
-**Recommendation: keep as-is (option b).** Rationale below; this document
-exists so the question is not re-litigated.
+**Recommendation: rename to a Rails `cases/` + `support/` layout (option a).**
+Plan and follow-up stories at the bottom.
+
+> **Revision, 2026-07-26.** The first version of this audit recommended keeping
+> `test-setup-*`. That was wrong on a fact and wrong on a weighting, and is
+> corrected here — see [Why the first recommendation was
+> wrong](#why-the-first-recommendation-was-wrong).
 
 ## What `helper.rb` actually does
 
@@ -64,107 +69,125 @@ The boot order these files run in, which is what actually constrains the layout:
 | per worker, after the driver is registered | `test-setup-dy.ts`                      | `vitest.config.ts:368` |
 | per worker, `DDL_PROFILE=1` only           | `test-setup-ddl-profile.ts`             | `vitest.config.ts:371` |
 
-## Trade-offs
+## Why the first recommendation was wrong
 
-**Vitest `setupFiles` vs Rails `require`.** The `test-setup-*` files are not
-libraries — they are _ordered side-effect entry points_ declared in
-`vitest.config.ts:363-371`, and the order is load-bearing
-(`test-setup-worker-db` claims the slot → `test-setup-ar` registers the driver
-and flips config → `test-setup-dy` opens the connection and lays the schema).
-Rails' `helper.rb` is `require`d by each test file, so it is a library and one
-file is the natural shape. A `cases/helper.ts` name would suggest importable
-setup that our files explicitly are not; `test-setup-*` names the mechanism
-that actually runs them.
+**The factual error.** v1 claimed the trails setup files have "no counterpart"
+in Rails and that a `cases/` tree would be "a rename of 1 of 5 files, not a
+consolidation." That is false. `vendor/rails/activerecord/test/support/`
+contains ten files — `config.rb`, `connection.rb`, `connection_helper.rb`,
+`load_schema_helper.rb`, `adapter_helper.rb`, `async_helper.rb`, `ddl_helper.rb`,
+`schema_dumping_helper.rb`, `fake_adapter.rb`, `tools.rb` — plus
+`test/config.rb`. Most of what our test-infra files do has a _named_ Rails home.
+v1 only compared against `cases/helper.rb` and concluded from that narrow view
+that nothing else mapped.
 
-**Consolidation is not available.** The one-file-per-`helper.rb` shape only
-works if the five files can merge, and they cannot: `globalSetup` runs in the
-main process before forks, the other four run per-worker at three different
-points in the boot order, and two are conditionally wired
-(`test-setup-mysql.ts` on the MySQL lane, `test-setup-ddl-profile.ts` on
-`DDL_PROFILE=1`). A `cases/helper.ts` would therefore be a rename of one of
-five files, not a consolidation.
+**The weighting error.** Three of v1's five arguments were convenience, not
+fidelity: rename cost (93 references, lint globs, ratchet JSONs), consistency
+with the sibling `test-setup-*` convention (a trails invention, not a Rails
+one), and "the compare tooling doesn't map these files anyway." Fidelity is this
+project's primary goal; those are costs to pay and mechanisms to update, not
+reasons to keep a non-Rails name.
 
-**Partial-mirror over-claim.** Per the table, `test-setup-ar.ts` owns 4 of the
-13 `helper.rb` responsibilities that have a trails home. Naming it
-`cases/helper.ts` invites a future agent to assume the other nine are there and
-to stop checking — the exact failure mode the per-line
-`// Mirror Rails activerecord/test/cases/helper.rb:NN` comments prevent. Those
-comments already deliver the discoverability the rename is after, at the granularity where it matters (per setting, not per file), and
-`pnpm rails:find` covers the reverse lookup.
+What survives from v1: the boot-order constraint is real, so the five setup
+files cannot collapse into one. But Rails' test infra is not one file either —
+it is `cases/helper.rb` plus ten `support/*.rb`. Multiple files is the faithful
+shape; only our _names and directories_ are invented.
 
-**`test:compare` / `api:compare` gain nothing.** Both map _test cases_ and
-_source_, not setup infra: `scripts/test-compare/` and `scripts/api-compare/`
-have zero references to `test-setup*` or `helper.rb` outside one fixture
-string in `extra-surface.test.ts:743`. `schema-compare` and `fixtures-compare`
-key off `test-helpers/test-schema.ts`, `test-helpers/fixtures/`, and
-`test-helpers/models/` — all unaffected by a setup-file rename. No parity
-metric moves.
+**The precedent already exists.** `test-helpers/` already contains
+`connection-helper.ts` and `schema-dumping-helper.ts` — exact kebab-case
+renderings of `support/connection_helper.rb` and `support/schema_dumping_helper.rb`.
+Someone already started mirroring `support/` file-for-file; they just did it
+inside a directory named `test-helpers/`. This plan finishes that work rather
+than starting something new.
 
-**Rename cost.** 93 `test-setup` references outside `vendor/` — 52 in
-code/config, 41 in docs. The load-bearing ones:
+## Target layout
 
-- `vitest.config.ts` — 9 (5 setupFile paths + the arel one + prose).
-- `eslint/no-raw-sql.mjs:42` — a hardcoded filename regex,
-  `/(^|\/)test-setup-[^/]*\.ts$/`, exempting setup files from the raw-SQL ban.
-- `eslint.config.mjs:484` — the `packages/activerecord/src/test-setup-*.ts` glob
-  for the same exemption at config level.
-- `eslint/no-explicit-any-src-exclude.json:194` and
-  `eslint/rails-error-parity-exclude.json:115-116` — per-file ratchet entries
-  keyed by path.
-- `docs/infrastructure/browser-compat-plan.md:158` — the `**/test-*.ts`
-  allow-list pattern planned for the `no-direct-process-env` rule.
+```
+packages/activerecord/src/
+  cases/
+    helper.ts               <- test/cases/helper.rb
+  support/
+    config.ts               <- test/support/config.rb  (+ test/config.rb)
+    connection.ts           <- test/support/connection.rb
+    connection-helper.ts    <- test/support/connection_helper.rb    [name already matches]
+    schema-dumping-helper.ts<- test/support/schema_dumping_helper.rb [name already matches]
+    load-schema-helper.ts   <- test/support/load_schema_helper.rb
+    adapter-helper.ts       <- test/support/adapter_helper.rb
+    async-helper.ts         <- test/support/async_helper.rb
+    ddl-helper.ts           <- test/support/ddl_helper.rb
+    fake-adapter.ts         <- test/support/fake_adapter.rb
+  test-setup-worker-db.ts   (no Rails counterpart — Rails is single-process)
+  test-helpers/
+    models/ fixtures/ test-schema.ts   (already mirror Rails; unchanged)
+```
 
-The `test-setup-` **prefix** is what lets four separate lint mechanisms name
-this set with one pattern each. A `cases/` tree replaces each with either a
-second pattern or a directory-wide exemption wider than intended — and the
-ratchet JSONs would need path rewrites that conflict with any sibling PR
-touching them.
+Current `test-helpers/*.ts` with no `support/*.rb` counterpart (`ar-db-slots.ts`,
+`sqlite-template.ts`, `template-global-setup.ts`, `skip-global-reset.ts`, …) are
+vitest-fork-model infrastructure Rails has no analogue for. They keep invented
+names because there is nothing to be faithful to — but they should not sit in a
+directory that _looks_ like `support/`. Each story decides its file's home
+explicitly.
 
-**Sibling consistency.** `packages/arel/src/test-setup-engine.ts`
-(`vitest.config.ts:420`) follows the same convention for the non-AR `other`
-project. Moving only AR's files under `cases/` splits a repo-wide convention
-for one package. (Aside: `test-setup-ar.ts:3-4`'s header refers to "the sibling
-`test-setup.ts`", which no longer exists — a stale comment, not a file.)
+## What does NOT move
 
-**Rails' own view.** `helper.rb:18` reads
-`# TODO: Move all these random hacks into the ARTest namespace and into the support/ dir` —
-Rails considers the single-file grab-bag a wart, not a layout to copy. Our
-`test-helpers/` tree is already the `test/support/` analogue that TODO asks for.
+- **`test-setup-worker-db.ts` and the template `globalSetup`.** Per-worker DB
+  isolation via advisory locks exists because vitest forks; Rails' suite is one
+  process against one database. No Rails name to adopt.
+- **`test-helpers/models/`, `fixtures/`, `test-schema.ts`.** Already faithful to
+  `test/models/`, `test/fixtures/`, `test/schema/schema.rb`, and already the
+  keys `schema:compare` / `fixtures:compare` read. Moving them buys nothing and
+  risks the compare manifests.
+- **Test files themselves.** Rails puts tests in `test/cases/*_test.rb`; trails
+  puts `*.test.ts` next to source by repo convention (CLAUDE.md). That is a
+  settled, separate divergence — this plan does not reopen it, which is why
+  `cases/` here holds only `helper.ts`.
 
-## Decision
+## Follow-up stories
 
-Keep the `test-setup-*` convention. Fidelity to Rails here lives in the
-_settings applied and their values_, which the per-line mirror comments already
-pin to `helper.rb:NN`, not in the filename. Do not re-open this without a new
-argument that survives the five points above (nothing to consolidate,
-over-claim risk, zero compare-tooling gain, four lint mechanisms keyed on the
-`test-setup-` prefix, cross-package convention). What _would_ change the answer:
-if vitest gained a single ordered-setup entry point so the five files could
-genuinely merge into one, the one-file `helper.rb` shape becomes available and
-the naming question is worth re-asking.
+Filed under RFC 0064. Ordering matters, and per CLAUDE.md these ship one at a
+time from `main` — no stacking. The directory rename goes first so later stories
+edit files at their final paths.
+
+1. `move-test-helpers-to-support-dir` — mechanical `test-helpers/` → `support/`
+   rename (keeping `models/`, `fixtures/`, `test-schema.ts` in place), plus the
+   lint globs, ratchet JSON paths, and `vitest.config.ts` references. Single
+   mechanical rename — the one CLAUDE.md exception to the fan-out rule.
+2. `rename-test-setup-ar-to-cases-helper` — `test-setup-ar.ts` → `cases/helper.ts`.
+3. `support-config-and-connection` — `test-connection-env.ts`,
+   `test-database-config.ts`, `arunit2-config.ts` → `support/config.ts`;
+   the connection bootstrap in `test-setup-dy.ts` → `support/connection.ts`.
+4. `support-adapter-helper` — `currentAdapter` / `inMemoryDb` and the
+   `supports.ts` predicates → `support/adapter-helper.ts`, matching
+   `adapter_helper.rb`'s method set.
+5. `support-load-schema-helper` — `canonical-schema.ts` /
+   `schema-file-generator.ts` → `support/load-schema-helper.ts`.
+6. `port-missing-support-helpers` — `ddl_helper.rb` (`with_example_table`),
+   `async_helper.rb` (`assert_async_equal`), `fake_adapter.rb`
+   (`FakeActiveRecordAdapter`, which `helper.rb:46` registers). These have no
+   trails file at all today.
 
 ## Observations out of scope for this spike
 
-Recorded here because the mapping surfaced them; they are _fidelity_ gaps, not
-layout gaps, so they are out of RFC 0064's scope (whose non-goal is "no behavior
-change to the test harness"). They are filed under **RFC 0071
-ar-test-helper-suite-wide-config-fidelity** (`status: active`) as four ready
-stories:
+The mapping also surfaced four `helper.rb` settings that trails has a flag for
+but never applies suite-wide. Those are _fidelity_ gaps, not layout gaps, so
+they were filed separately under **RFC 0071
+ar-test-helper-suite-wide-config-fidelity**. As of 2026-07-26 they are already
+resolved or superseded:
 
-- `helper.rb:27` `permanent_connection_checkout = :disallowed` — the flag
-  exists (`ar-config.ts:126`) but the suite does not set it, so trails does not
-  ban `Base.connection` in tests the way Rails does. 114 test files reference
-  `Base.connection`, so this is scoped as an audit first, not a flip →
-  `audit-permanent-connection-checkout-disallowed`.
-- `helper.rb:104-107` `extend_queries = true` + the two `install_support`
-  calls — `encryption/config.ts:22` defaults `extendQueries` to `false` and
-  install is per-test, so deterministic-encryption query extension is not
-  suite-wide as in Rails. `trailtie.ts` has no `extendQueries` handling at all,
-  so the production-side `railtie.rb:351` arm is unported too →
-  `encryption-extend-queries-suite-wide`.
-- `helper.rb:43` `belongs_to_required_validates_foreign_key = false` —
-  `ar-config.ts:213` / `trailtie.ts:139` default `true` →
+- `helper.rb:104-107` `extend_queries = true` + the two `install_support` calls
+  (`encryption/config.ts:22` defaulted `false`; `trailtie.ts` had no
+  `extendQueries` handling, so the production `railtie.rb:351` arm was unported
+  too) — **done**, `encryption-extend-queries-suite-wide`.
+- `helper.rb:43` `belongs_to_required_validates_foreign_key = false`
+  (`ar-config.ts:213` / `trailtie.ts:139` defaulted `true`) — **done**,
   `belongs-to-required-validates-fk-false`.
-- `helper.rb:14-16` PG `create_unlogged_tables = true` —
-  `postgresql-adapter.ts:321` defaults `false`, so the PG lane pays full WAL
-  cost on every table build → `pg-create-unlogged-tables-in-suite`.
+- `helper.rb:14-16` PG `create_unlogged_tables = true`
+  (`postgresql-adapter.ts:321` defaults `false`) — closed,
+  `pg-create-unlogged-tables-in-suite`.
+- `helper.rb:27` `permanent_connection_checkout = :disallowed` — owned by
+  **RFC 0073 permanent-connection-checkout-disallowed**, which has 11 stories
+  and a completed measurement. Note that RFC's finding before touching this:
+  the `Base.connection` textual grep this audit originally cited (114 files) is
+  the wrong instrument — instrumenting the gate found 2077 hits, 1983 of them
+  (95.5%) from a single line, `use-fixtures.ts:610`, that the grep does not
+  match. The duplicate RFC 0071 story was closed as superseded.
