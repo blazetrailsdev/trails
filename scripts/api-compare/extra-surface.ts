@@ -252,6 +252,42 @@ export function allowKeyOf(e: { package: string; tsFile: string; name: string })
   return `${e.package} ${e.tsFile} ${e.name}`;
 }
 
+/**
+ * Every `@noRailsEquivalent`-tagged declaration in the TS manifest, as
+ * allowlist entries (RFC 0080). The tag is the inline successor of
+ * extra-surface-allow.json: both sources are honored during the migration
+ * window and both feed the same `Allowed` totals. Keyed by the CONTAINER's
+ * file, matching how `collectTsFileNames` gathers the names it compares.
+ * Keys are deduped: one declaration reaches many hosts (the mixin object, the
+ * install site, the auto-synthesized file module), so the same key arrives
+ * repeatedly and would otherwise inflate the tag total.
+ */
+export function collectTaggedEntries(ts: ApiManifest): AllowEntry[] {
+  const out: AllowEntry[] = [];
+  const seen = new Set<string>();
+  const push = (pkg: string, tsFile: string, m: MethodInfo): void => {
+    if (m.noRailsEquivalent === undefined) return;
+    const entry = { package: pkg, tsFile, name: m.name, reason: m.noRailsEquivalent };
+    const key = allowKeyOf(entry);
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(entry);
+  };
+  for (const [pkg, tsPkg] of Object.entries(ts.packages)) {
+    for (const container of [tsPkg.classes, tsPkg.modules]) {
+      for (const c of Object.values(container) as ClassInfo[]) {
+        if (!c.file || c.reExportedFrom) continue;
+        for (const m of c.instanceMethods) push(pkg, c.file, m);
+        for (const m of c.classMethods) push(pkg, c.file, m);
+      }
+    }
+    for (const [file, fns] of Object.entries(tsPkg.fileFunctions ?? {})) {
+      for (const fn of fns) push(pkg, file, fn);
+    }
+  }
+  return out;
+}
+
 export function findInvalidAllowEntries(entries: AllowEntry[]): string[] {
   const problems: string[] = [];
   const seen = new Set<string>();
@@ -323,6 +359,12 @@ interface Report {
   packages: PackageTotals[];
   topN: ExtraFile[];
   allowlist: AllowlistSummary;
+  /**
+   * `@noRailsEquivalent` tags found in the TS manifest. Additive to the
+   * existing shape — the `allowlist` summary and every count above keep
+   * their meaning for the stats-DB consumer.
+   */
+  tagged: AllowlistSummary;
 }
 
 const HELP = `extra-surface — TS files with public API exceeding their Rails counterpart
@@ -682,6 +724,8 @@ function buildPackageReport(
   novelOnly: boolean,
   allowKeys: Set<string>,
   matchedAllowKeys: Set<string>,
+  tagKeys: Set<string>,
+  matchedTagKeys: Set<string>,
 ): PackageTotals {
   const rubyPkg = ruby.packages[pkg];
   const tsPkg = ts.packages[pkg];
@@ -778,8 +822,14 @@ function buildPackageReport(
     for (const name of tsNames) {
       if (allowed.has(name)) continue;
       const allowKey = allowKeyOf({ package: pkg, tsFile: expectedTs, name });
-      if (allowKeys.has(allowKey)) {
-        matchedAllowKeys.add(allowKey);
+      // Both sources are consulted during the migration window: record the
+      // match on each that has it, so a doubly-justified name leaves neither
+      // the JSON entry nor the tag looking stale.
+      const jsonAllowed = allowKeys.has(allowKey);
+      const tagAllowed = tagKeys.has(allowKey);
+      if (jsonAllowed) matchedAllowKeys.add(allowKey);
+      if (tagAllowed) matchedTagKeys.add(allowKey);
+      if (jsonAllowed || tagAllowed) {
         allowlistedCount++;
         continue;
       }
@@ -901,6 +951,10 @@ function printHumanReport(report: Report, topN: number, maxDetail: number): void
     `\n${p.dim}Allowlist (extra-surface-allow.json): ${report.allowlist.total} entr(ies), ` +
       `${report.allowlist.matched} matched — allowed extras are subtracted from the counts above.${p.reset}`,
   );
+  console.log(
+    `${p.dim}@noRailsEquivalent tags: ${report.tagged.total} tag(s), ` +
+      `${report.tagged.matched} matched — counted in Allowed alongside the allowlist.${p.reset}`,
+  );
 
   console.log(
     `\n${p.bold}Top ${Math.min(topN, report.topN.length)} most-divergent files${p.reset}  ${p.dim}(ranked by novel count, then total)${p.reset}`,
@@ -957,6 +1011,9 @@ export function buildReport(
   const allow = opts.allow ?? [];
   const allowKeys = new Set(allow.map(allowKeyOf));
   const matchedAllowKeys = new Set<string>();
+  const tagged = collectTaggedEntries(ts);
+  const tagKeys = new Set(tagged.map(allowKeyOf));
+  const matchedTagKeys = new Set<string>();
   const globalRubyCandidates = buildGlobalRubyCandidates(ruby);
   const { modules: crossPackageModules, pkgByFqn: crossPackagePkgByFqn } =
     buildCrossPackageModules(ruby);
@@ -979,6 +1036,8 @@ export function buildReport(
         opts.novelOnly,
         allowKeys,
         matchedAllowKeys,
+        tagKeys,
+        matchedTagKeys,
       ),
     );
   }
@@ -995,12 +1054,16 @@ export function buildReport(
   const stale = allow.filter(
     (e) => scannedPkgs.has(e.package) && !matchedAllowKeys.has(allowKeyOf(e)),
   );
+  const staleTagged = tagged.filter(
+    (e) => scannedPkgs.has(e.package) && !matchedTagKeys.has(allowKeyOf(e)),
+  );
 
   return {
     generatedAt: new Date().toISOString(),
     packages,
     topN: allExtras.slice(0, opts.topN),
     allowlist: { total: allow.length, matched: matchedAllowKeys.size, stale },
+    tagged: { total: tagged.length, matched: matchedTagKeys.size, stale: staleTagged },
   };
 }
 
@@ -1064,7 +1127,22 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   // Stale entries can't be judged when --exclude-glob hides whole TS files.
   if (args.excludeGlobs.length > 0) return;
   const { stale } = report.allowlist;
-  if (stale.length === 0) return;
+  const staleTagged = report.tagged.stale;
+  if (staleTagged.length > 0) {
+    console.error(
+      `\nextra-surface: ${staleTagged.length} STALE @noRailsEquivalent tag(s) on ` +
+        "methods that no longer flag as extra surface — Rails gained the method, " +
+        "the file mapping changed, the declaration is internal or `_`-prefixed " +
+        "(never counted), or the tag covers a moved (misplaced) port that belongs " +
+        "in its Rails-layout file. Delete the tag next to the code:\n" +
+        staleTagged.map((e) => `  - ${e.package}  ${e.tsFile}  ${e.name}`).join("\n") +
+        "\n",
+    );
+  }
+  if (stale.length === 0) {
+    if (staleTagged.length > 0) process.exit(1);
+    return;
+  }
   console.error(
     `\nextra-surface allowlist: ${stale.length} STALE entr(ies) that no longer ` +
       "flag as extra surface. The allowlist only shrinks — remove them from " +

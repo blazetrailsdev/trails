@@ -1308,3 +1308,209 @@ describe("extractFromProgram — re-export attribution", () => {
     expect(info.classes["adapters.ts:LocalHelper"].reExportedFrom).toBeUndefined();
   });
 });
+
+describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
+  it("records the reason on a tagged class member and leaves its sibling bare", () => {
+    const info = extractFromSource(`
+      class Foo {
+        /**
+         * Registry hook — public by design; @internal would be a lie.
+         *
+         * @noRailsEquivalent trails-only model registry seam
+         */
+        registerModel(): void {}
+
+        save(): void {}
+      }
+    `);
+    const registerModel = info.instanceMethods.find((m) => m.name === "registerModel")!;
+    expect(registerModel.noRailsEquivalent).toBe("trails-only model registry seam");
+    expect(registerModel.internal).toBeUndefined();
+    expect(info.instanceMethods.find((m) => m.name === "save")!.noRailsEquivalent).toBeUndefined();
+  });
+
+  it("records the reason on a tagged getter and a tagged static method", () => {
+    const info = extractFromSource(`
+      class Foo {
+        /** @noRailsEquivalent JS thenable protocol */
+        get pending(): boolean { return true; }
+
+        /** @noRailsEquivalent TS-only ergonomic finder */
+        static findGlobalId(): void {}
+      }
+    `);
+    expect(info.instanceMethods.find((m) => m.name === "pending")!.noRailsEquivalent).toBe(
+      "JS thenable protocol",
+    );
+    expect(info.classMethods.find((m) => m.name === "findGlobalId")!.noRailsEquivalent).toBe(
+      "TS-only ergonomic finder",
+    );
+  });
+
+  it("records the reason on a tagged top-level exported function", () => {
+    const info = extractFromFiles("/p", {
+      "associations.ts": `
+        /** @noRailsEquivalent public registration surface, no Rails counterpart */
+        export function registerModel(): void {}
+
+        export function hasMany(): void {}
+      `,
+    });
+    const fns = info.fileFunctions["associations.ts"];
+    expect(fns.find((f) => f.name === "registerModel")!.noRailsEquivalent).toBe(
+      "public registration surface, no Rails counterpart",
+    );
+    expect(fns.find((f) => f.name === "hasMany")!.noRailsEquivalent).toBeUndefined();
+  });
+
+  it("records the reason on a tagged object-literal module member", () => {
+    const methods = objectLiteralMethods(`
+      export const QueryMethods = {
+        /** @noRailsEquivalent async iteration protocol, JS-only */
+        eachAsync() {},
+        where() {},
+      };
+    `);
+    expect(methods.find((m) => m.name === "eachAsync")!.noRailsEquivalent).toBe(
+      "async iteration protocol, JS-only",
+    );
+    expect(methods.find((m) => m.name === "where")!.noRailsEquivalent).toBeUndefined();
+  });
+
+  it("joins continuation lines into one reason", () => {
+    const info = extractFromSource(`
+      class Foo {
+        /**
+         * @noRailsEquivalent Rails reaches this through the connection
+         *   adapter; trails exposes it directly because the pool is async.
+         */
+        withConnection(): void {}
+      }
+    `);
+    expect(info.instanceMethods.find((m) => m.name === "withConnection")!.noRailsEquivalent).toBe(
+      "Rails reaches this through the connection adapter; trails exposes it " +
+        "directly because the pool is async.",
+    );
+  });
+
+  it("records the reason on a synthesized __mixin member", () => {
+    const info = extractFromFiles("/p", {
+      "attributes.ts": `
+        export function Attributes(Base: new () => object) {
+          class M extends Base {
+            /** @noRailsEquivalent async attribute hydration, JS-only */
+            loadAttributes(): void {}
+          }
+          return M;
+        }
+      `,
+    });
+    const mixin = info.modules["attributes.ts:Attributes__mixin"];
+    expect(mixin.instanceMethods.find((m) => m.name === "loadAttributes")!.noRailsEquivalent).toBe(
+      "async attribute hydration, JS-only",
+    );
+  });
+
+  it("leaves an inherited __mixin member's tag on its declaring file only", () => {
+    const info = extractFromFiles("/p", {
+      "base.ts": `
+        export class Base {
+          /** @noRailsEquivalent JS-only lifecycle hook */
+          dispose(): void {}
+        }
+      `,
+      "attributes.ts": `
+        import { Base } from "./base.js";
+        export function Attributes(B: typeof Base) {
+          class M extends B {
+            loadAttributes(): void {}
+          }
+          return M;
+        }
+      `,
+    });
+    const mixin = info.modules["attributes.ts:Attributes__mixin"];
+    const dispose = mixin.instanceMethods.find((m) => m.name === "dispose")!;
+    expect(dispose.declaredIn).toBe("base.ts");
+    expect(dispose.noRailsEquivalent).toBeUndefined();
+    expect(
+      info.classes["base.ts:Base"].instanceMethods.find((m) => m.name === "dispose")!
+        .noRailsEquivalent,
+    ).toBe("JS-only lifecycle hook");
+  });
+
+  it("records the reason on tagged namespace members", () => {
+    const info = extractFromFiles("/p", {
+      "locator.ts": `
+        export namespace Locator {
+          /** @noRailsEquivalent trails-side model-facing finder */
+          export function findGlobalId(): void {}
+
+          /** @noRailsEquivalent JS-only signed-id ergonomic */
+          export const findSignedGlobalId = (): void => {};
+
+          export function locate(): void {}
+        }
+      `,
+    });
+    const ns = info.modules["locator.ts:Locator"];
+    const reasonOf = (name: string) =>
+      ns.instanceMethods.find((m) => m.name === name)!.noRailsEquivalent;
+    expect(reasonOf("findGlobalId")).toBe("trails-side model-facing finder");
+    expect(reasonOf("findSignedGlobalId")).toBe("JS-only signed-id ergonomic");
+    expect(reasonOf("locate")).toBeUndefined();
+  });
+
+  it("records the reason on a tagged interface method signature", () => {
+    const info = extractFromFiles("/p", {
+      "quoting.ts": `
+        export interface Quoting {
+          /** @noRailsEquivalent async quoting seam, no Rails counterpart */
+          quoteAsync(value: unknown): Promise<string>;
+
+          quote(value: unknown): string;
+        }
+      `,
+    });
+    const iface = info.classes["quoting.ts:Quoting"] ?? info.modules["quoting.ts:Quoting"];
+    expect(iface.instanceMethods.find((m) => m.name === "quoteAsync")!.noRailsEquivalent).toBe(
+      "async quoting seam, no Rails counterpart",
+    );
+    expect(
+      iface.instanceMethods.find((m) => m.name === "quote")!.noRailsEquivalent,
+    ).toBeUndefined();
+  });
+
+  it("carries a tag through an interface's resolved extends members", () => {
+    const info = extractFromFiles("/p", {
+      "relation-base.ts": `
+        export interface RelationBase {
+          /** @noRailsEquivalent JS thenable protocol on Relation */
+          then(onFulfilled: () => void): void;
+
+          where(): void;
+        }
+      `,
+      "relation.ts": `
+        import type { RelationBase } from "./relation-base.js";
+        export interface Relation extends RelationBase {}
+      `,
+    });
+    const rel = info.classes["relation.ts:Relation"] ?? info.modules["relation.ts:Relation"];
+    expect(rel.instanceMethods.find((m) => m.name === "then")!.noRailsEquivalent).toBe(
+      "JS thenable protocol on Relation",
+    );
+    expect(rel.instanceMethods.find((m) => m.name === "where")!.noRailsEquivalent).toBeUndefined();
+  });
+
+  it("throws when the tag carries no reason", () => {
+    expect(() =>
+      extractFromSource(`
+        class Foo {
+          /** @noRailsEquivalent */
+          registerModel(): void {}
+        }
+      `),
+    ).toThrow(/@noRailsEquivalent needs a reason/);
+  });
+});

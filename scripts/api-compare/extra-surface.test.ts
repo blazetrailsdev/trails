@@ -12,6 +12,7 @@ import {
   resolveAllowlist,
   parseArgs,
   collectTsFileNames,
+  collectTaggedEntries,
 } from "./extra-surface.js";
 import { extractFromProgram } from "./extract-ts-api.js";
 import type { AllowEntry } from "./extra-surface.js";
@@ -1531,5 +1532,224 @@ describe("buildReport — re-export clones", () => {
     const byFile = new Map(report.packages[0].extraFiles.map((f) => [f.tsFile, f]));
     expect(byFile.get("foo.ts")!.extras.map((e) => e.name)).toEqual(["declaredOnFoo"]);
     expect(byFile.get("barrel.ts")!.extras.map((e) => e.name)).toEqual(["declaredOnBarrel"]);
+  });
+});
+
+describe("buildReport — @noRailsEquivalent tags", () => {
+  function makeManifests(reason?: string): { ruby: ApiManifest; ts: ApiManifest } {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            "ActiveModel::Foo": rubyClass({
+              name: "Foo",
+              file: "foo.rb",
+              instance: [method("bar")],
+            }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const tagged: MethodInfo = { ...method("tsOnlyHelper") };
+    if (reason !== undefined) tagged.noRailsEquivalent = reason;
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            Foo: {
+              name: "Foo",
+              file: "foo.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("bar"), tagged],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    return { ruby, ts };
+  }
+
+  const run = (m: { ruby: ApiManifest; ts: ApiManifest }, allow: AllowEntry[] = []) =>
+    buildReport(m.ruby, m.ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+      allow,
+    });
+
+  it("counts a tagged extra as allowlisted instead of novel", () => {
+    const report = run(makeManifests("public registry seam, no Rails counterpart"));
+    const pkg = report.packages[0];
+    expect(pkg.totalNovel).toBe(0);
+    expect(pkg.totalAllowlisted).toBe(1);
+    expect(pkg.extraFiles).toEqual([]);
+    expect(report.tagged).toEqual({ total: 1, matched: 1, stale: [] });
+    expect(report.allowlist).toEqual({ total: 0, matched: 0, stale: [] });
+  });
+
+  it("reports the tagged extra as novel when the tag is absent", () => {
+    const pkg = run(makeManifests()).packages[0];
+    expect(pkg.totalNovel).toBe(1);
+    expect(pkg.totalAllowlisted).toBe(0);
+  });
+
+  it("reports a tag on a name that does not flag as extra surface as stale", () => {
+    const m = makeManifests("no counterpart");
+    m.ts.packages.activemodel.classes.Foo.instanceMethods[0].noRailsEquivalent = "no counterpart";
+    const report = run(m);
+    expect(report.tagged.stale.map((e) => e.name)).toEqual(["bar"]);
+    expect(report.tagged.matched).toBe(1);
+  });
+
+  it("counts a name justified by both the JSON allowlist and a tag once", () => {
+    const allow: AllowEntry[] = [
+      {
+        package: "activemodel",
+        tsFile: "foo.ts",
+        name: "tsOnlyHelper",
+        reason: "migrating to the inline tag.",
+      },
+    ];
+    const report = run(makeManifests("public registry seam"), allow);
+    expect(report.packages[0].totalAllowlisted).toBe(1);
+    expect(report.allowlist.stale).toEqual([]);
+    expect(report.tagged.stale).toEqual([]);
+  });
+
+  it("does not judge tags of packages this run never scanned", () => {
+    const report = buildReport(
+      makeManifests("no counterpart").ruby,
+      makeManifests("no counterpart").ts,
+      {
+        filterPkg: "activerecord",
+        excludeGlobs: [],
+        novelOnly: false,
+        topN: 50,
+        allow: [],
+      },
+    );
+    expect(report.tagged.stale).toEqual([]);
+  });
+});
+
+describe("collectTaggedEntries", () => {
+  it("collects tags from class members and file functions, deduping repeated keys", () => {
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activerecord: {
+          classes: {
+            Foo: {
+              name: "Foo",
+              file: "foo.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [{ ...method("helper"), noRailsEquivalent: "why" }],
+              classMethods: [{ ...method("helper"), noRailsEquivalent: "why" }],
+            },
+          },
+          modules: {},
+          fileFunctions: {
+            "associations.ts": [{ ...method("registerModel"), noRailsEquivalent: "public seam" }],
+          },
+        },
+      },
+    };
+    expect(collectTaggedEntries(ts)).toEqual([
+      { package: "activerecord", tsFile: "foo.ts", name: "helper", reason: "why" },
+      {
+        package: "activerecord",
+        tsFile: "associations.ts",
+        name: "registerModel",
+        reason: "public seam",
+      },
+    ]);
+  });
+});
+
+describe("@noRailsEquivalent — extractor to report", () => {
+  function extract(files: Record<string, string>): PackageInfo {
+    const srcDir = "/p";
+    const all: Record<string, string> = {};
+    for (const [rel, src] of Object.entries(files)) all[`${srcDir}/${rel}`] = src;
+    const host: ts.CompilerHost = {
+      getSourceFile: (name) =>
+        all[name] === undefined
+          ? undefined
+          : ts.createSourceFile(name, all[name], ts.ScriptTarget.Latest, true),
+      getDefaultLibFileName: () => "lib.d.ts",
+      writeFile: () => undefined,
+      getCurrentDirectory: () => "/",
+      getCanonicalFileName: (n) => n,
+      useCaseSensitiveFileNames: () => true,
+      getNewLine: () => "\n",
+      fileExists: (name) => name in all,
+      readFile: (name) => all[name],
+    };
+    const program = ts.createProgram(
+      Object.keys(all),
+      { noLib: true, noResolve: true, target: ts.ScriptTarget.Latest },
+      host,
+    );
+    return extractFromProgram(program, srcDir);
+  }
+
+  it("carries a tag written in TS source through to the Allowed totals", () => {
+    const tsPkg = extract({
+      "associations.ts": `
+        export class Associations {
+          hasMany(): void {}
+
+          /** @noRailsEquivalent public model registry, no Rails counterpart */
+          registerModel(): void {}
+        }
+      `,
+    });
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activerecord: {
+          classes: {
+            "ActiveRecord::Associations": rubyClass({
+              name: "Associations",
+              file: "associations.rb",
+              instance: [method("has_many")],
+            }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const ts_: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: { activerecord: tsPkg },
+    };
+    const report = buildReport(ruby, ts_, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+      allow: [],
+    });
+    expect(report.tagged).toEqual({
+      total: 1,
+      matched: 1,
+      stale: [],
+    });
+    expect(report.packages[0].totalAllowlisted).toBe(1);
+    expect(report.packages[0].totalNovel).toBe(0);
+    expect(report.packages[0].extraFiles).toEqual([]);
   });
 });

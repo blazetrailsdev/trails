@@ -52,6 +52,13 @@ export interface MethodInfo {
    */
   internal?: boolean;
   /**
+   * TS-side only: reason prose from a `@noRailsEquivalent` JSDoc tag —
+   * deliberate trails-only surface with no Rails counterpart (RFC 0080).
+   * Unlike `internal`, the method stays part of the compared surface;
+   * extra-surface.ts counts it as allowlisted instead of novel/moved.
+   */
+  noRailsEquivalent?: string;
+  /**
    * Ruby-side only: how the extractor synthesized this entry when it was NOT a
    * literal `def` — `"delegate"`, `"alias"`, `"scope"`, `"class_attribute"`,
    * `"define_column_methods"`, `"class_eval"`. See extract-ruby-api.rb. The

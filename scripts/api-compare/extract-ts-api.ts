@@ -472,6 +472,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
         const fnOptionKeys = extractOptionKeys(node.parameters, checker);
         const fnCalls = extractCalls(node.body);
         const internal = hasInternalJsDocTag(node);
+        const noRailsEquivalent = noRailsEquivalentReason(node);
         fileFunctions.push({
           name: node.name.text,
           visibility: "public",
@@ -480,6 +481,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
           line,
           file: relPath,
           ...(internal ? { internal: true } : {}),
+          ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
           ...(fnOptionKeys !== undefined ? { optionKeys: fnOptionKeys } : {}),
           ...(fnCalls !== undefined ? { calls: fnCalls } : {}),
         });
@@ -550,6 +552,11 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
         const internal = visibility !== "public";
         const line = decl.getSourceFile().getLineAndCharacterOfPosition(decl.getStart()).line + 1;
         const declFile = path.relative(srcDir, decl.getSourceFile().fileName).replace(/\\/g, "/");
+        // Only a member DECLARED in this file carries its tag into the mixin
+        // entry: `collectTsFileNames` skips foreign synthesized members, so a
+        // tag copied off an inherited base-class method would never match here
+        // and would read as stale on top of its correct match on the base file.
+        const noRailsEquivalent = declFile === relPath ? noRailsEquivalentReason(decl) : undefined;
         mixinMethods.push({
           name: prop.name,
           visibility,
@@ -559,6 +566,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
           file: relPath,
           ...(declFile !== relPath ? { declaredIn: declFile } : {}),
           ...(internal ? { internal: true } : {}),
+          ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
         });
       }
 
@@ -637,6 +645,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
                 : undefined;
             const calls = extractCalls(body);
             const internal = hasInternalJsDocTag(decl);
+            const noRailsEquivalent = noRailsEquivalentReason(decl);
             fileFunctions.push({
               name: sym.name,
               visibility: "public",
@@ -645,6 +654,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
               line,
               file: relPath,
               ...(internal ? { internal: true } : {}),
+              ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
               ...(calls !== undefined ? { calls } : {}),
             });
           }
@@ -1251,6 +1261,51 @@ export function hasInternalJsDocTag(node: ts.Node): boolean {
 }
 
 /**
+ * Reason prose of a declaration's `@noRailsEquivalent` tag, or undefined when
+ * the tag is absent. Unlike `@internal` (which removes the method from the
+ * compared surface), this tag keeps the method counted and justifies it as
+ * deliberate trails-only surface — extra-surface.ts reports it as allowlisted.
+ * Continuation lines belong to the tag and are joined into one line; the prose
+ * is otherwise preserved verbatim. An empty reason is a hard error: an
+ * unjustified tag is exactly what the allowlist's empty-reason rejection
+ * refuses (RFC 0080).
+ */
+export function noRailsEquivalentReason(node: ts.Node): string | undefined {
+  for (const tag of ts.getJSDocTags(node)) {
+    if (tag.tagName.text !== "noRailsEquivalent") continue;
+    const reason = (ts.getTextOfJSDocComment(tag.comment) ?? "").replace(/\s+/g, " ").trim();
+    if (reason === "") {
+      const sf = node.getSourceFile();
+      const line = sf.getLineAndCharacterOfPosition(node.getStart()).line + 1;
+      throw new Error(
+        `@noRailsEquivalent needs a reason: ${sf.fileName}:${line} — ` +
+          "state why this surface has no Rails counterpart.",
+      );
+    }
+    return reason;
+  }
+  return undefined;
+}
+
+/**
+ * `@noRailsEquivalent` reason reached through a symbol, for object-literal
+ * bindings (`{ foo }` / `{ foo: NS.bar }`) whose tag lives on the referenced
+ * declaration rather than the property. Mirrors `isInternalSymbol`.
+ */
+function noRailsEquivalentOfSymbol(
+  symbol: ts.Symbol | undefined,
+  checker: ts.TypeChecker,
+): string | undefined {
+  let target = symbol;
+  if (target && target.flags & ts.SymbolFlags.Alias) target = checker.getAliasedSymbol(target);
+  for (const d of target?.declarations ?? []) {
+    const reason = noRailsEquivalentReason(d);
+    if (reason !== undefined) return reason;
+  }
+  return undefined;
+}
+
+/**
  * True when `symbol` resolves to a declaration tagged `@internal`. A mixin
  * object re-exports one declaration under many hosts (ClassMethods, the Base
  * class surface, the index re-export), so the tag is read once at the
@@ -1304,6 +1359,7 @@ export function harvestObjectLiteralMethods(
     let optionKeys: string[] | null | undefined;
     let calls: string[] | undefined;
     let internal = hasInternalJsDocTag(prop);
+    let noRailsEquivalent = noRailsEquivalentReason(prop);
     if (ts.isMethodDeclaration(prop) && prop.name && ts.isIdentifier(prop.name)) {
       mname = prop.name.text;
       params = extractParameters(prop.parameters);
@@ -1312,7 +1368,9 @@ export function harvestObjectLiteralMethods(
     } else if (ts.isShorthandPropertyAssignment(prop)) {
       mname = prop.name.text;
       params = paramsOfCallableRef(prop.name, checker) ?? [];
-      internal = isInternalSymbol(checker.getShorthandAssignmentValueSymbol(prop), checker);
+      const valueSymbol = checker.getShorthandAssignmentValueSymbol(prop);
+      internal = isInternalSymbol(valueSymbol, checker);
+      noRailsEquivalent ??= noRailsEquivalentOfSymbol(valueSymbol, checker);
     } else if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
       const init = prop.initializer;
       if (ts.isFunctionExpression(init) || ts.isArrowFunction(init)) {
@@ -1329,6 +1387,10 @@ export function harvestObjectLiteralMethods(
           mname = prop.name.text;
           params = resolved;
           internal = isInternalCallableRef(init, checker);
+          noRailsEquivalent ??= noRailsEquivalentOfSymbol(
+            checker.getSymbolAtLocation(init),
+            checker,
+          );
         }
       }
     }
@@ -1341,6 +1403,7 @@ export function harvestObjectLiteralMethods(
       line,
       file,
       ...(internal ? { internal: true } : {}),
+      ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
       ...(optionKeys !== undefined ? { optionKeys } : {}),
       ...(calls !== undefined ? { calls } : {}),
     });
@@ -1453,6 +1516,8 @@ export function extractClass(
     const memberName = getMemberName(member);
     const visibility = memberVisibility(member);
     const internal = visibility !== "public";
+    const noRailsEquivalent = noRailsEquivalentReason(member);
+    const tagged = noRailsEquivalent !== undefined ? { noRailsEquivalent } : {};
     const isStatic = hasModifier(member, ts.SyntaxKind.StaticKeyword);
     const line = member.getSourceFile().getLineAndCharacterOfPosition(member.getStart()).line + 1;
 
@@ -1481,6 +1546,7 @@ export function extractClass(
         file,
         isStatic,
         ...(internal ? { internal: true } : {}),
+        ...tagged,
         ...(optionKeys !== undefined ? { optionKeys } : {}),
         ...(calls !== undefined ? { calls } : {}),
       };
@@ -1508,6 +1574,7 @@ export function extractClass(
         line,
         file,
         ...(internal ? { internal: true } : {}),
+        ...tagged,
         ...(calls !== undefined ? { calls } : {}),
       });
     } else if (ts.isGetAccessorDeclaration(member) && memberName) {
@@ -1519,6 +1586,7 @@ export function extractClass(
         file,
         isStatic,
         ...(internal ? { internal: true } : {}),
+        ...tagged,
       };
       if (isStatic) {
         classMethods.push(method);
@@ -1535,6 +1603,7 @@ export function extractClass(
         file,
         isStatic,
         ...(internal ? { internal: true } : {}),
+        ...tagged,
       };
       if (isStatic) {
         classMethods.push(method);
@@ -1552,6 +1621,7 @@ export function extractClass(
         file,
         isStatic,
         ...(internal ? { internal: true } : {}),
+        ...tagged,
       };
       if (isStatic) {
         classMethods.push(method);
@@ -1609,12 +1679,18 @@ function extractInterface(
               const propType = checker.getTypeOfSymbolAtLocation(prop, type);
               const signatures = propType.getCallSignatures();
               if (signatures.length > 0) {
+                // Unlike the `__mixin` and inherited-interface-property cases
+                // elsewhere, these entries carry no `declaredIn`, so
+                // `collectTsFileNames` counts them as THIS file's surface —
+                // they need the resolved declaration's tag to be justifiable.
+                const noRailsEquivalent = noRailsEquivalentOfSymbol(prop, checker);
                 instanceMethods.push({
                   name: propName,
                   visibility: "public",
                   params: [],
                   line: 0,
                   file,
+                  ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
                 });
               }
             }
@@ -1633,12 +1709,14 @@ function extractInterface(
     const line = member.getSourceFile().getLineAndCharacterOfPosition(member.getStart()).line + 1;
 
     if (ts.isMethodSignature(member)) {
+      const noRailsEquivalent = noRailsEquivalentReason(member);
       instanceMethods.push({
         name: memberName,
         visibility: "public",
         params: member.parameters ? extractParameters(member.parameters) : [],
         line,
         file,
+        ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
       });
     }
   }
@@ -1665,15 +1743,19 @@ function extractNamespace(
     for (const stmt of node.body.statements) {
       if (ts.isFunctionDeclaration(stmt) && stmt.name && isExported(stmt)) {
         const line = stmt.getSourceFile().getLineAndCharacterOfPosition(stmt.getStart()).line + 1;
+        const noRailsEquivalent = noRailsEquivalentReason(stmt);
         instanceMethods.push({
           name: stmt.name.text,
           visibility: "public",
           params: extractParameters(stmt.parameters),
           line,
           file,
+          ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
         });
       } else if (ts.isVariableStatement(stmt) && isExported(stmt)) {
         const line = stmt.getSourceFile().getLineAndCharacterOfPosition(stmt.getStart()).line + 1;
+        // JSDoc attaches to the statement, not the individual declarator.
+        const stmtReason = noRailsEquivalentReason(stmt);
         for (const decl of stmt.declarationList.declarations) {
           if (!ts.isIdentifier(decl.name)) continue;
           const init = decl.initializer;
@@ -1694,12 +1776,14 @@ function extractNamespace(
             }
           }
           if (isFunctionLike) {
+            const noRailsEquivalent = noRailsEquivalentReason(decl) ?? stmtReason;
             instanceMethods.push({
               name: decl.name.text,
               visibility: "public",
               params,
               line,
               file,
+              ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
             });
           }
         }
