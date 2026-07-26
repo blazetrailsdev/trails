@@ -5,7 +5,7 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { registerModel } from "./index.js"; // also eager-loads CollectionProxy for association()
 import { fixtures } from "./test-helpers/fixtures.js";
-import { itIfSupports } from "./test-helpers/supports.js";
+import { itIfSupports } from "./support/supports.js";
 import { Base } from "./base.js";
 import { Task } from "./test-helpers/models/task.js";
 import { Topic } from "./test-helpers/models/topic.js";

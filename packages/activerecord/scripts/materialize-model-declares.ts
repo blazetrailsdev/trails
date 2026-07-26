@@ -29,7 +29,7 @@ import {
   type ModelAssociationLookup,
 } from "../src/type-virtualization/resolve-target.js";
 import type { SchemaColumnValue } from "../src/type-virtualization/synthesize.js";
-import type { TableSchema, WrappedTableSchema } from "../src/test-helpers/schema-types.js";
+import type { TableSchema, WrappedTableSchema } from "../src/support/schema-types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MODELS_DIR = path.resolve(__dirname, "../src/test-helpers/models");
@@ -744,7 +744,7 @@ async function main(): Promise<void> {
   let schemaColumnsByTable: SchemaColumnsByTable = {};
   if (targets.some((f) => f.startsWith(modelsDirPrefix))) {
     const { TEST_SCHEMA } = await import("../src/test-helpers/test-schema.js");
-    const { isWrappedSchema } = await import("../src/test-helpers/schema-types.js");
+    const { isWrappedSchema } = await import("../src/support/schema-types.js");
     schemaColumnsByTable = normalizeSchema(TEST_SCHEMA, isWrappedSchema);
   }
   const associationLookup = buildModelAssociationLookup(registry);

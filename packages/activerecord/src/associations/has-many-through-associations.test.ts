@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Base, registerModel, RecordInvalid } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { association } from "../associations.js";
-import { quoteTableName } from "../test-helpers/quote-regex.js";
+import { quoteTableName } from "../support/quote-regex.js";
 
 import {
   Author,

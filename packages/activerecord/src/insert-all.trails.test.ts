@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { fixtures } from "./test-helpers/fixtures.js";
-import "./test-helpers/canonical-model-index.js";
+import "./support/canonical-model-index.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import type { Base } from "./base.js";
 

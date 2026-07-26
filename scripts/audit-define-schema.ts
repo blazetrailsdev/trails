@@ -37,7 +37,7 @@ const files = allTs.filter((f) => {
   // The schema helper and the drop helper legitimately reference these
   // identifiers in their own implementations — skip them.
   if (f.endsWith("/test-helpers/define-schema.ts")) return false;
-  if (f.endsWith("/test-helpers/drop-all-tables.ts")) return false;
+  if (f.endsWith("/support/drop-all-tables.ts")) return false;
   // Static fixture files used as compiler inputs by the type-virtualization
   // / tsc-wrapper test rigs aren't consumed as live models by Vitest —
   // they exist to be parsed/emitted, not executed against an adapter.

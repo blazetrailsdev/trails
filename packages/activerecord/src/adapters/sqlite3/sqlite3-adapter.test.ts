@@ -3,7 +3,7 @@
  */
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfSqlite } from "./test-helper.js";
-import { itIfSupports } from "../../test-helpers/supports.js";
+import { itIfSupports } from "../../support/supports.js";
 import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { Notifications } from "@blazetrails/activesupport";

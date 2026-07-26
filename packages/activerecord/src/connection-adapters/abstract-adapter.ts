@@ -674,7 +674,7 @@ export class AbstractAdapter implements Quoting {
     // The module-level `include(...)` / callback / query-cache wiring is applied
     // lazily on first construction rather than at module-evaluation time. This
     // avoids a TDZ crash when the adapter graph is imported from a non-runtime
-    // entry point (e.g. `test-helpers/schema-types` → SchemaStatements) that
+    // entry point (e.g. `support/schema-types` → SchemaStatements) that
     // re-enters this module mid-cycle before the mixin classes have initialized.
     ensureAbstractAdapterMixinsApplied();
     // Mirrors Rails abstract_adapter.rb:155 — @visitor = arel_visitor

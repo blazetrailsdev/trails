@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { canonicalModelIndex } from "./canonical-model-index.js";
 import { resolveModel } from "../associations.js";
-import { Comment } from "./models/comment.js";
-import { Owner } from "./models/owner.js";
-import { Pet } from "./models/pet.js";
-import { MyAppBusinessCompany } from "./models/company-in-module.js";
+import { Comment } from "../test-helpers/models/comment.js";
+import { Owner } from "../test-helpers/models/owner.js";
+import { Pet } from "../test-helpers/models/pet.js";
+import { MyAppBusinessCompany } from "../test-helpers/models/company-in-module.js";
 
 describe("canonical model autoload index (Zeitwerk analog)", () => {
   it("indexes canonical models by their class name", () => {

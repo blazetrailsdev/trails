@@ -7,7 +7,7 @@ import { isValidUuid, normalizeUuid } from "../../connection-adapters/postgresql
 import { SchemaDumper } from "../../schema-dumper.js";
 import { SchemaStatements } from "../../connection-adapters/abstract/schema-statements.js";
 import { RecordNotFound } from "../../errors.js";
-import { itIfSupports } from "../../test-helpers/supports.js";
+import { itIfSupports } from "../../support/supports.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
 import { Base, registerModel } from "../../index.js";
 

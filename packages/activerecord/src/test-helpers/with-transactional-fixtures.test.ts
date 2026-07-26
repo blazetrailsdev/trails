@@ -6,7 +6,7 @@ import {
   type TestDatabaseAdapter,
 } from "../test-adapter.js";
 import { Base } from "../base.js";
-import { establishFromTestConfig } from "./test-database-config.js";
+import { establishFromTestConfig } from "../support/test-database-config.js";
 import { AbstractSQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import { NullTransaction } from "../connection-adapters/abstract/transaction.js";

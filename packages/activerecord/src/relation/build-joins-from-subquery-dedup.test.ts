@@ -19,7 +19,7 @@ import { fixtures } from "../test-helpers/fixtures.js";
 // Opt into the canonical-model autoload index so the belongsTo("author") target
 // (`Author`) resolves by name during JoinDependency construction — no manual
 // `registerModel`.
-import "../test-helpers/canonical-model-index.js";
+import "../support/canonical-model-index.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 

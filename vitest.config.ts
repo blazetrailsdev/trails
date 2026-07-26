@@ -1,13 +1,13 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
 import os from "os";
-import { resolveForkCount } from "./packages/activerecord/src/test-helpers/ar-db-forks-default.js";
+import { resolveForkCount } from "./packages/activerecord/src/support/ar-db-forks-default.js";
 
 // AR_DB_FORKS (read in test-setup-worker-db.ts) requests a vitest worker
 // count; TEST_FORKS below is the effective one — the request clamped to the
 // host ceiling, the same clamp ar-db-slots.ts applies via the OS adapter. The
 // advisory-lock slot pool is sized SEPARATELY, with headroom over that
-// effective count — see test-helpers/ar-db-slots.ts (slots = workers +
+// effective count — see support/ar-db-slots.ts (slots = workers +
 // headroom, or an explicit AR_DB_SLOTS override). TRAILS_TEST_FORKS
 // caps the vitest worker count so that concurrent local worktrees don't
 // saturate the machine. Precedence: TRAILS_TEST_FORKS > AR_DB_FORKS >
@@ -277,6 +277,7 @@ const COVERAGE_EXCLUDE = [
   "**/dist/**",
   "**/__snapshots__/**",
   "**/test-helpers/**",
+  "packages/activerecord/src/support/**",
   "**/test-support/**",
   "**/*.config.ts",
   "packages/website/**",
@@ -346,7 +347,7 @@ export default defineConfig({
         // for PG/MySQL, provisioned via AR_DB_FORKS) so files can run in parallel.
         // SQLite is file-backed too: globalSetup builds one on-disk template and
         // each fork restores it into its own private `.sqlite` clone stamped into
-        // AR_TEST_WORKER_DB (see test-helpers/sqlite-template.ts).
+        // AR_TEST_WORKER_DB (see support/sqlite-template.ts).
         resolve: { alias },
         test: {
           name: "activerecord",
@@ -358,7 +359,7 @@ export default defineConfig({
           // Phase 0 sqlite template-clone (perf): build the canonical schema
           // into a template file once for the whole run; workers clone it
           // instead of re-issuing the DDL per file. No-op on PG/MySQL runs.
-          globalSetup: ["./packages/activerecord/src/test-helpers/template-global-setup.ts"],
+          globalSetup: ["./packages/activerecord/src/support/template-global-setup.ts"],
           setupFiles: [
             "./packages/activerecord/src/test-setup-worker-db.ts",
             "./packages/activerecord/src/test-setup-ar.ts",

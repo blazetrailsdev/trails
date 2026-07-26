@@ -2,16 +2,16 @@ import { describe } from "vitest";
 import mysql from "mysql2/promise";
 import { Mysql2Adapter } from "../../connection-adapters/mysql2-adapter.js";
 import { Version } from "../../connection-adapters/abstract-adapter.js";
-import { arunitDatabaseNames } from "../../test-helpers/arunit2-config.js";
-import { mysqlSettings, mysqlUrl } from "../../test-helpers/test-connection-env.js";
+import { arunitDatabaseNames } from "../../support/arunit2-config.js";
+import { mysqlSettings, mysqlUrl } from "../../support/test-connection-env.js";
 import { adapterType } from "../../test-adapter.js";
 import { Base } from "../../base.js";
-import { establishFromTestConfig } from "../../test-helpers/test-database-config.js";
+import { establishFromTestConfig } from "../../support/test-database-config.js";
 
 // `dbWarningsAction` is a single global setting on the base adapter, so the
 // shared helper toggles it for every adapter (including MySQL). Re-exported
 // here so MySQL adapter tests can keep importing it from this module.
-export { withDbWarningsAction } from "../../test-helpers/with-db-warnings-action.js";
+export { withDbWarningsAction } from "../../support/with-db-warnings-action.js";
 
 // A *serialization* of the MySQL sub-settings (MYSQL_HOST/MYSQL_PORT/
 // MYSQL_USER/...), not an env var of its own: the suites still on
@@ -22,7 +22,7 @@ export { withDbWarningsAction } from "../../test-helpers/with-db-warnings-action
 // deliberately build a second, differently configured adapter.
 export const MYSQL_TEST_URL = mysqlUrl();
 
-export { databaseName } from "../../test-helpers/arunit2-config.js";
+export { databaseName } from "../../support/arunit2-config.js";
 
 /**
  * ARTest models the AR suite as two databases — `arunit` (primary) and
@@ -100,7 +100,7 @@ export const supportsDefaultExpression =
 /**
  * Mirrors AbstractMysqlAdapter#supports_expression_index?
  * (abstract_mysql_adapter.rb:104): MySQL ≥ 8.0.13 only; never MariaDB. Feeds
- * the `expression_index` entry in test-helpers/supports.ts, which cannot bake
+ * the `expression_index` entry in support/supports.ts, which cannot bake
  * the answer into a static adapterType table — the mysql lane may be MySQL 8
  * (true) or the MariaDB CI stand-in (false).
  */

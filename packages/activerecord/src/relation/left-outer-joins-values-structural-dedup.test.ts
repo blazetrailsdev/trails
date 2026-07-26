@@ -18,7 +18,7 @@ import { fixtures } from "../test-helpers/fixtures.js";
 // Opt into the canonical-model autoload index so the `posts`/`comments`
 // association targets (`Post`, `Comment`) resolve by name during build_joins —
 // no manual `registerModel`.
-import "../test-helpers/canonical-model-index.js";
+import "../support/canonical-model-index.js";
 import { Author } from "../test-helpers/models/author.js";
 
 interface JoinValueHost {

@@ -9,7 +9,7 @@ import {
   MYSQL_TEST_URL,
 } from "./test-helper.js";
 import { Base } from "../../base.js";
-import { rebuildCanonicalTables } from "../../test-helpers/canonical-schema.js";
+import { rebuildCanonicalTables } from "../../support/canonical-schema.js";
 
 // Both suites below drop/recreate canonical tables (`posts`; `students` /
 // `lessons_students` / `topics`) in the shape their assertions need, so each

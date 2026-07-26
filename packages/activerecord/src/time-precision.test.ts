@@ -7,7 +7,7 @@ import { adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./schema-dumper.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { itIfSupports } from "./test-helpers/supports.js";
+import { itIfSupports } from "./support/supports.js";
 
 function nsecTime(v: Temporal.PlainTime): number {
   return v.millisecond * 1_000_000 + v.microsecond * 1_000 + v.nanosecond;

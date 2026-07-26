@@ -5,15 +5,15 @@ import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import type { SchemaSource } from "./schema-dumper.js";
 import { adapterType } from "./test-adapter.js";
 import type { TestDatabaseAdapter } from "./test-adapter.js";
-import { itIfSupports, adapterSupports } from "./test-helpers/supports.js";
+import { itIfSupports, adapterSupports } from "./support/supports.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
+import { rebuildCanonicalTables } from "./support/canonical-schema.js";
 import {
   dumpAllTableSchema,
   dumpTableSchema,
   FULL_DUMP_TIMEOUT_MS,
-} from "./test-helpers/schema-dumping-helper.js";
-import { establishFromTestConfig } from "./test-helpers/test-database-config.js";
+} from "./support/schema-dumping-helper.js";
+import { establishFromTestConfig } from "./support/test-database-config.js";
 
 // The first describe uses `fixtures({})` (canonical schema + reset shield);
 // the later bespoke-table describes deliberately keep the global per-test reset,

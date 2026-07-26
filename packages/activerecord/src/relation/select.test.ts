@@ -12,7 +12,7 @@ import { fixtures } from "../test-helpers/fixtures.js";
 import { Post, PostWithDefaultSelect } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { registerModel } from "../associations.js";
-import { quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
+import { quoteTableName, escapeRegExp } from "../support/quote-regex.js";
 
 registerModel(Post);
 registerModel(Comment);

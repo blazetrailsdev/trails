@@ -22,7 +22,7 @@ import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adap
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { loadCanonicalSchema } from "./canonical-schema.js";
 import { generateSchemaFile } from "./schema-file-generator.js";
-import { TEST_SCHEMA } from "./test-schema.js";
+import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { InternalMetadata } from "../internal-metadata.js";
 import { schemaSha1 } from "../tasks/database-tasks.js";
 import {

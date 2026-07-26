@@ -15,7 +15,7 @@ import { Base } from "../index.js";
 import { registerModel } from "../associations.js";
 import { registerSubclass } from "../inheritance.js";
 import { adapterType } from "../test-adapter.js";
-import { itIfSupports } from "../test-helpers/supports.js";
+import { itIfSupports } from "../support/supports.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";

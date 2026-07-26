@@ -16,7 +16,7 @@ import {
 } from "./compare.js";
 import { TEST_SCHEMA } from "../../packages/activerecord/src/test-helpers/test-schema.js";
 import type { Finding } from "./compare.js";
-import type { Schema } from "../../packages/activerecord/src/test-helpers/schema-types.js";
+import type { Schema } from "../../packages/activerecord/src/support/schema-types.js";
 
 const parse = (rb: string) => parseSchemaRb(`ActiveRecord::Schema.define do\n${rb}\nend\n`);
 const columnsOfTable = (rb: string, table: string) => [...parse(rb).get(table)!.columns.keys()];

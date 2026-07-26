@@ -16,7 +16,7 @@ import { quoteDefaultExpression } from "./connection-adapters/abstract/quoting.j
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Migration } from "./migration.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
+import { rebuildCanonicalTables } from "./support/canonical-schema.js";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { SchemaCreation as PgSchemaCreation } from "./connection-adapters/postgresql/schema-creation.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./connection-adapters/mysql/schema-creation.js";
@@ -36,7 +36,7 @@ function emitTableSql(td: TableDefinition): Promise<string> {
 }
 import { Person } from "./test-helpers/models/person.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
-import { itIfSupports, describeIfSupports } from "./test-helpers/supports.js";
+import { itIfSupports, describeIfSupports } from "./support/supports.js";
 import { describeIfPg } from "./adapters/postgresql/test-helper.js";
 import {
   describeIfMysqlAdapter,

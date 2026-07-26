@@ -21,7 +21,7 @@ import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Person } from "../test-helpers/models/person.js";
 import { Friendship } from "../test-helpers/models/friendship.js";
-import { quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
+import { quoteTableName, escapeRegExp } from "../support/quote-regex.js";
 
 // Person self-registers on import; Friendship does not, but `followers`
 // (through friendships, source follower) needs it in the registry.

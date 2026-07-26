@@ -12,7 +12,7 @@ import {
   isFixtureRef,
 } from "./define-fixtures.js";
 import { fixtures } from "./fixtures.js";
-import { setupHandlerSuite } from "./setup-handler-suite.js";
+import { setupHandlerSuite } from "../support/setup-handler-suite.js";
 import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
 import { Author } from "./models/author.js";
 import { Post } from "./models/post.js";

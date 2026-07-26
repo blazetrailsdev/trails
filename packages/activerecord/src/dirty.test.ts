@@ -27,10 +27,10 @@ import { TimeWithZone, getZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
 import { MigrationContext } from "./migration.js";
-import { describeIfSupports } from "./test-helpers/supports.js";
+import { describeIfSupports } from "./support/supports.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
+import { rebuildCanonicalTables } from "./support/canonical-schema.js";
 
 import { Pirate } from "./test-helpers/models/pirate.js";
 import { Parrot, LiveParrot } from "./test-helpers/models/parrot.js";

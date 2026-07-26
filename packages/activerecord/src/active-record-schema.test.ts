@@ -9,7 +9,7 @@ import { SchemaMigration } from "./schema-migration.js";
 
 import { adapterType } from "./test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { itIfSupports } from "./test-helpers/supports.js";
+import { itIfSupports } from "./support/supports.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 
 beforeAll(() => {

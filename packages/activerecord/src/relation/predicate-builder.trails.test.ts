@@ -13,7 +13,7 @@ import {
 } from "../test-helpers/models/cpk.js";
 import { registerModel } from "../associations.js";
 import type { Base } from "../index.js";
-import { escapeRegExp, quoteTableName, quoteColumnName } from "../test-helpers/quote-regex.js";
+import { escapeRegExp, quoteTableName, quoteColumnName } from "../support/quote-regex.js";
 import { PredicateBuilder } from "./predicate-builder.js";
 import { TableMetadata } from "../table-metadata.js";
 

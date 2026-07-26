@@ -3,7 +3,7 @@
 import { describe, it, expect } from "vitest";
 import { defineJoinTableFixtures } from "./define-fixtures.js";
 import { fixtures } from "./fixtures.js";
-import { setupHandlerSuite } from "./setup-handler-suite.js";
+import { setupHandlerSuite } from "../support/setup-handler-suite.js";
 import { Tree } from "./models/tree.js";
 import { Base } from "../base.js";
 import "../relation.js";

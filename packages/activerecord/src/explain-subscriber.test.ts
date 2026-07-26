@@ -2,7 +2,7 @@ import { describe, expect, beforeEach, afterEach } from "vitest";
 
 import { ExplainSubscriber } from "./explain-subscriber.js";
 import { ExplainRegistry } from "./explain-registry.js";
-import { itIfSupports } from "./test-helpers/supports.js";
+import { itIfSupports } from "./support/supports.js";
 
 const SUBSCRIBER = new ExplainSubscriber();
 

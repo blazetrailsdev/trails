@@ -12,7 +12,7 @@ import { fixtures } from "./test-helpers/fixtures.js";
 // Opt into the canonical-model autoload index so association targets
 // (`Molecule`/`Electron` via `Liquid`) resolve by name — no manual
 // `registerModel`.
-import "./test-helpers/canonical-model-index.js";
+import "./support/canonical-model-index.js";
 
 fixtures([]);
 

@@ -37,8 +37,8 @@ import { Computer } from "../test-helpers/models/computer.js";
 import { PublisherArticle, PublisherMagazine } from "../test-helpers/models/publisher.js";
 import { Professor } from "../test-helpers/models/professor.js";
 import { Course } from "../test-helpers/models/course.js";
-import { setupSecondPool, teardownSecondPool } from "../test-helpers/setup-second-pool.js";
-import { isSqliteRun } from "../test-helpers/sqlite-template.js";
+import { setupSecondPool, teardownSecondPool } from "../support/setup-second-pool.js";
+import { isSqliteRun } from "../support/sqlite-template.js";
 
 // Test-file-local models mirroring the Rails fixture file's inline class
 // definitions (has_and_belongs_to_many_associations_test.rb:63-90).

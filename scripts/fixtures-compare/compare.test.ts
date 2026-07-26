@@ -2,7 +2,7 @@ import { describe, it, expect, afterAll } from "vitest";
 // prettier-ignore
 import { stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow, ERB_SKIP_SENTINEL, tsModelPath, compareModelClass, buildIdIndexForTest, loadRailsYamlForTest } from "./compare.js";
 import type { RubyClass } from "./compare.js";
-import type { Schema } from "../../packages/activerecord/src/test-helpers/schema-types.js";
+import type { Schema } from "../../packages/activerecord/src/support/schema-types.js";
 
 // prettier-ignore
 const idIndex = new Map<string, Map<number, string[]>>([["authors", new Map([[1, ["david"]], [2, ["mary"]], [3, ["dup_a", "dup_b"]]])]]);

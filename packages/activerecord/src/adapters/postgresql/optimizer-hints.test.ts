@@ -3,7 +3,7 @@
  */
 import { it, expect, beforeAll } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { describeIfSupports } from "../../test-helpers/supports.js";
+import { describeIfSupports } from "../../support/supports.js";
 import { assertQueriesMatch } from "../../testing/query-assertions.js";
 import { captureSql } from "../../testing/sql-capture.js";
 import { Base } from "../../index.js";

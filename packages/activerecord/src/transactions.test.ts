@@ -23,7 +23,7 @@ import {
 } from "./index.js";
 
 import { adapterType } from "./test-adapter.js";
-import { itIfSupports } from "./test-helpers/supports.js";
+import { itIfSupports } from "./support/supports.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { Reply, SillyReply, UniqueReply, SillyUniqueReply } from "./test-helpers/models/reply.js";

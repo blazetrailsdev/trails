@@ -10,7 +10,7 @@ import { travel, travelBack } from "@blazetrails/activesupport";
 import { fixtures } from "./test-helpers/fixtures.js";
 // Opt into the canonical-model autoload index so association targets resolve by
 // name on first reference — no manual `registerModel`.
-import "./test-helpers/canonical-model-index.js";
+import "./support/canonical-model-index.js";
 import { setBeforeCommittedOnAllRecords } from "./ar-config.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { Invoice } from "./test-helpers/models/invoice.js";

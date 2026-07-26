@@ -11,7 +11,7 @@ import { Base } from "./base.js";
 import { registerModel } from "./associations.js";
 
 import { fixtures } from "./test-helpers/fixtures.js";
-import { quoteTableName as canonicalQuoteTableName } from "./test-helpers/quote-regex.js";
+import { quoteTableName as canonicalQuoteTableName } from "./support/quote-regex.js";
 // Aliased so the canonical models read clearly alongside the merge-block usage
 // below and so the `test:compare` `RelationTest` matcher stays unambiguous.
 import { Post as CanonPost } from "./test-helpers/models/post.js";

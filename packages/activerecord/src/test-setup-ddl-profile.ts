@@ -1,10 +1,10 @@
 /**
  * Opt-in DDL profiler vitest setup hook (dormant unless DDL_PROFILE=1).
  * Only wired into the suite when DDL_PROFILE=1 (see vitest.config.ts). Installs
- * the adapter-prototype patches in {@link ./test-helpers/ddl-profile.ts}.
+ * the adapter-prototype patches in {@link ./support/ddl-profile.ts}.
  */
 import { afterAll, beforeEach, expect } from "vitest";
-import { install, flush, setCurrentFile, setTestPathResolver } from "./test-helpers/ddl-profile.js";
+import { install, flush, setCurrentFile, setTestPathResolver } from "./support/ddl-profile.js";
 
 await install();
 

@@ -4,13 +4,13 @@
  *
  * Opens a bootstrap connection to the base DB and tries an advisory lock for
  * slot N=1..slotPoolSize(). The pool is sized with headroom over the worker
- * count (see test-helpers/ar-db-slots.ts), so a worker recycling in between
+ * count (see support/ar-db-slots.ts), so a worker recycling in between
  * files always finds a free slot. Claims the first free slot, publishes it as
  * `AR_DB_SLOT`, and holds the bootstrap connection for the life of the process
  * (lock released automatically on disconnect).
  *
  * The slot is published as a *number*, not as a rewritten connection URL:
- * `test-helpers/test-connection-env.ts` applies the `_N` database suffix, so
+ * `support/test-connection-env.ts` applies the `_N` database suffix, so
  * every consumer derives the same worker database from one signal instead of
  * reading a mutated string.
  *
@@ -24,7 +24,7 @@
  * TRAILS_TEST_FORKS / AR_DB_FORKS: the requested vitest worker count, clamped
  * to the host's numCpus - 1 by workerForkCount() itself (via the OS adapter).
  * The advisory-slot pool is sized separately, with headroom over that count —
- * see test-helpers/ar-db-slots.ts (override with AR_DB_SLOTS).
+ * see support/ar-db-slots.ts (override with AR_DB_SLOTS).
  */
 
 import pg from "pg";
@@ -34,14 +34,14 @@ import mysql from "mysql2/promise";
 // restoreFromPath backup primitive to clone the template into the per-worker
 // file.
 import "./sqlite/better-sqlite3.js";
-import { WORKER_DB_ENV, ensureWorkerClone } from "./test-helpers/sqlite-template.js";
-import { slotPoolSize, workerForkCount } from "./test-helpers/ar-db-slots.js";
+import { WORKER_DB_ENV, ensureWorkerClone } from "./support/sqlite-template.js";
+import { slotPoolSize, workerForkCount } from "./support/ar-db-slots.js";
 import {
   SLOT_ENV,
   activeLane,
   mysqlSettings,
   postgresSettings,
-} from "./test-helpers/test-connection-env.js";
+} from "./support/test-connection-env.js";
 
 // Shared by all evaluations of this module within the same worker process.
 const g = globalThis as typeof globalThis & {
@@ -68,7 +68,7 @@ function slotExhaustionMessage(fn: string, lockKind: string, slots: number): str
     `${fn}: all ${slots} ${lockKind} slots are held after ` +
     `${SLOT_RETRY_ATTEMPTS} attempts (${(SLOT_RETRY_ATTEMPTS * SLOT_RETRY_DELAY_MS) / 1000}s) ` +
     `with ${workerForkCount()} effective forks (slot pool = forks + headroom, see ` +
-    `test-helpers/ar-db-slots.ts). More than ${workerForkCount()} workers are competing: ` +
+    `support/ar-db-slots.ts). More than ${workerForkCount()} workers are competing: ` +
     `check that the vitest worker cap is honored (root-level poolOptions in ` +
     `vitest.config.ts), increase AR_DB_SLOTS, or check for stuck workers.`
   );

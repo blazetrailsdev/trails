@@ -24,7 +24,7 @@ import {
   SerializationFailure,
   ValueTooLong,
 } from "../../errors.js";
-import { withSecondAdapter } from "../../test-helpers/second-connection.js";
+import { withSecondAdapter } from "../../support/second-connection.js";
 import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 
 // Run `fn` with `ext` guaranteed disabled; restore the pre-state (enabled

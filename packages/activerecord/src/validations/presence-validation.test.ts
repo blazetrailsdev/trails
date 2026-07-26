@@ -13,7 +13,7 @@ import { Face } from "../test-helpers/models/face.js";
 import { Interest } from "../test-helpers/models/interest.js";
 import { Speedometer } from "../test-helpers/models/speedometer.js";
 import { Dashboard } from "../test-helpers/models/dashboard.js";
-import { seedAssociationCache } from "../test-helpers/seed-association-cache.js";
+import { seedAssociationCache } from "../support/seed-association-cache.js";
 
 // Rails `class Boy < Human; end` — a plain subclass sharing the humans table.
 class Boy extends Human {

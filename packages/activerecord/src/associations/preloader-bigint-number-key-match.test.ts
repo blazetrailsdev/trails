@@ -13,7 +13,7 @@ import { Preloader } from "./preloader.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 // Opt into the canonical-model autoload index so the `posts` association target
 // (`Post`) resolves by name during preload — no manual `registerModel`.
-import "../test-helpers/canonical-model-index.js";
+import "../support/canonical-model-index.js";
 import { Author } from "../test-helpers/models/author.js";
 
 type RecordInternals = {

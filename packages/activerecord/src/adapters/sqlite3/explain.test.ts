@@ -8,7 +8,7 @@ import { fixtures } from "../../test-helpers/fixtures.js";
 import { Author } from "../../test-helpers/models/author.js";
 // Opt into the canonical-model autoload index so `Author.has_many :posts`
 // resolves `Post` by name on first reference.
-import "../../test-helpers/canonical-model-index.js";
+import "../../support/canonical-model-index.js";
 
 // -- Rails test class: explain_test.rb (ActiveRecord::SQLite3TestCase) --
 // Pinned to the SQLite backend: the `EXPLAIN for: … "authors" …` header quoting

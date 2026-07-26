@@ -21,7 +21,7 @@ import { fixtures } from "../test-helpers/fixtures.js";
 // Opt into the canonical-model autoload index so the `author` association target
 // (`Author`) resolves by name during eager build_joins — no manual
 // `registerModel`.
-import "../test-helpers/canonical-model-index.js";
+import "../support/canonical-model-index.js";
 import { Post } from "../test-helpers/models/post.js";
 
 describe("eager build_joins shared AliasTracker", () => {

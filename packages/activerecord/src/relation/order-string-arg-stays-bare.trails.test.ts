@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Customer } from "../test-helpers/models/customer.js";
-import { quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
+import { quoteTableName, escapeRegExp } from "../support/quote-regex.js";
 
 // Adapter-aware `"customers"."name"` — backticks on MySQL/MariaDB.
 const qualifiedName = escapeRegExp(quoteTableName("customers.name"));

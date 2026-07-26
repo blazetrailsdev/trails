@@ -3,8 +3,8 @@ import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import "./index.js";
 import { Base } from "./base.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { setupSecondPool, teardownSecondPool } from "./test-helpers/setup-second-pool.js";
-import { isSqliteRun } from "./test-helpers/sqlite-template.js";
+import { setupSecondPool, teardownSecondPool } from "./support/setup-second-pool.js";
+import { isSqliteRun } from "./support/sqlite-template.js";
 import { Course } from "./test-helpers/models/course.js";
 import { Entrant } from "./test-helpers/models/entrant.js";
 

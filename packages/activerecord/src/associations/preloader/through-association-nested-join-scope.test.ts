@@ -28,7 +28,7 @@ import { Club } from "../../test-helpers/models/club.js";
 import { Membership, CurrentMembership } from "../../test-helpers/models/membership.js";
 import { Category } from "../../test-helpers/models/category.js";
 import { Categorization } from "../../test-helpers/models/categorization.js";
-import { quoteTableName, escapeRegExp } from "../../test-helpers/quote-regex.js";
+import { quoteTableName, escapeRegExp } from "../../support/quote-regex.js";
 
 registerModel(Member);
 registerModel(Club);

@@ -4,7 +4,7 @@ import { loadCanonicalSchema } from "./canonical-schema.js";
 import {
   withTransactionalFixtures,
   type TransactionalFixturesAdapter,
-} from "./with-transactional-fixtures.js";
+} from "../test-helpers/with-transactional-fixtures.js";
 
 export interface AdapterSuiteOptions<A extends TransactionalFixturesAdapter> {
   /** Builds the adapter once per file in `beforeAll`. */

@@ -10,7 +10,7 @@
  */
 import { describe, it, beforeAll, expect } from "vitest";
 import { Base } from "../base.js";
-import { setupHandlerSuite } from "./setup-handler-suite.js";
+import { setupHandlerSuite } from "../support/setup-handler-suite.js";
 
 class HandlerResolvedPost extends Base {
   static {

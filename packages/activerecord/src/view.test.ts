@@ -10,10 +10,10 @@ import { describe, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "./index.js";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
+import { rebuildCanonicalTables } from "./support/canonical-schema.js";
 import { adapterType } from "./test-adapter.js";
-import { describeIfSupports, itIfSupports } from "./test-helpers/supports.js";
-import { dumpTableSchema } from "./test-helpers/schema-dumping-helper.js";
+import { describeIfSupports, itIfSupports } from "./support/supports.js";
+import { dumpTableSchema } from "./support/schema-dumping-helper.js";
 
 // In Rails, AbstractAdapter includes SchemaStatements, so introspection
 // methods (views, viewExists, tableExists, isDataSourceExists) live directly

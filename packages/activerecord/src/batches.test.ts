@@ -8,7 +8,7 @@ import { Relation } from "./index.js";
 import { errorOnIgnoredOrder, setErrorOnIgnoredOrder } from "./ar-config.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { assertQueriesCount, assertQueriesMatch } from "./testing/query-assertions.js";
-import { quoteTableName, escapeRegExp } from "./test-helpers/quote-regex.js";
+import { quoteTableName, escapeRegExp } from "./support/quote-regex.js";
 import {
   Post,
   PostWithDefaultScope,

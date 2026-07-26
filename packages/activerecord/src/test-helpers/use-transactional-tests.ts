@@ -1,4 +1,4 @@
-import { establishFromTestConfig } from "./test-database-config.js";
+import { establishFromTestConfig } from "../support/test-database-config.js";
 import { leaseFixtureConnection } from "./fixture-connection.js";
 import {
   withTransactionalFixtures,

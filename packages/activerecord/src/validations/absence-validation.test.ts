@@ -7,7 +7,7 @@ import { Base } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Human } from "../test-helpers/models/human.js";
 import { Face } from "../test-helpers/models/face.js";
-import { seedAssociationCache } from "../test-helpers/seed-association-cache.js";
+import { seedAssociationCache } from "../support/seed-association-cache.js";
 
 fixtures({});
 

@@ -1,11 +1,11 @@
 import { Base } from "../base.js";
 import { registerModel } from "../associations.js";
 import { rebuildCanonicalTables } from "./canonical-schema.js";
-import { ARUnit2Model } from "./models/arunit2-model.js";
-import { Course } from "./models/course.js";
-import { College } from "./models/college.js";
-import { Entrant } from "./models/entrant.js";
-import { Professor } from "./models/professor.js";
+import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
+import { Course } from "../test-helpers/models/course.js";
+import { College } from "../test-helpers/models/college.js";
+import { Entrant } from "../test-helpers/models/entrant.js";
+import { Professor } from "../test-helpers/models/professor.js";
 import { resolveSecondDatabaseConfig } from "./arunit2-config.js";
 
 /**

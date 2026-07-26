@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
-import { setupHandlerSuite } from "./setup-handler-suite.js";
+import { setupHandlerSuite } from "../support/setup-handler-suite.js";
 import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
 import { repairValidations } from "./repair-validations.js";
 import { leaseFixtureConnection } from "./fixture-connection.js";

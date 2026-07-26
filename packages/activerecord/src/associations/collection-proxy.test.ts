@@ -21,7 +21,7 @@ import { fixtures } from "../test-helpers/fixtures.js";
 // fixture set of their own — resolve by name on first reference instead of
 // needing a manual `registerModel`. Installed per-file rather than globally so
 // only converted (fully-canonical) files pick up the fallback.
-import "../test-helpers/canonical-model-index.js";
+import "../support/canonical-model-index.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Tagging } from "../test-helpers/models/tagging.js";

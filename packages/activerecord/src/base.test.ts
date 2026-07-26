@@ -13,7 +13,7 @@ import {
 import { TableNotSpecified, ActiveRecordError } from "./errors.js";
 
 import { adapterType } from "./test-adapter.js";
-import { quoteColumnName } from "./test-helpers/quote-regex.js";
+import { quoteColumnName } from "./support/quote-regex.js";
 import { association } from "./associations.js";
 import { connectedToStack } from "./core.js";
 import { Range as ArRange } from "./connection-adapters/postgresql/oid/range.js";
@@ -35,7 +35,7 @@ import {
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { Car } from "./test-helpers/models/car.js";
 import { Bulb } from "./test-helpers/models/bulb.js";
-import "./test-helpers/canonical-model-index.js";
+import "./support/canonical-model-index.js";
 import { MultiparameterAssignmentErrors, type AttributeAssignmentError } from "./errors.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");

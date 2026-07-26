@@ -47,7 +47,7 @@ import { DeleteRestrictionError } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 
 import { fixtures } from "../test-helpers/fixtures.js";
-import "../test-helpers/canonical-model-index.js";
+import "../support/canonical-model-index.js";
 // Imported under HM-prefixed local aliases so the top-level bindings don't
 // collide with the bespoke `class Author` / `class Post` declarations in the
 // still-unconverted describes below. Without the alias, esbuild renames those
