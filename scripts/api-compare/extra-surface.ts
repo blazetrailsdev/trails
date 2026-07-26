@@ -14,7 +14,10 @@
  *      that Ruby file — any visibility, since a TS method mirroring a
  *      Rails-private method exists in Rails (a visibility divergence, not
  *      extra surface). Map each to its TS-candidate name set via
- *      `rubyMethodToTs`. Union = the "allowed" TS name set.
+ *      `rubyMethodCandidates`, which also resolves `conventions.SKIP`
+ *      mirrors (`freeze`, `to_a`, `lookup_cast_type`) so a TS override is
+ *      allowed in the file where Ruby defines the method. Union = the
+ *      "allowed" TS name set.
  *   3. Collect public TS names declared in the matching TS file — each
  *      class/module's *own* methods (skipping inherited surface so the
  *      diff measures this file's drift, not its ancestor's) plus top-level
@@ -140,43 +143,50 @@ const PORTED_UNPORTED_MIXIN_METHODS: Record<string, string[]> = {
 };
 
 /**
- * TS candidates a Ruby method on `conventions.SKIP` maps to.
+ * Extra TS candidates for Ruby names the normal case-transform can't spell.
  *
- * SKIP means api:compare never expects a TS counterpart — `rubyMethodToTs`
- * returns null — but the Ruby method still EXISTS in the file, so a TS
- * override of it (`freeze`, `inspect`, `lookupCastType`) is Rails-faithful,
- * not drift. Resolving these through the normal name mapping keeps the
- * allowance *file-scoped*: `freeze` is allowed in core.ts because core.rb
- * defines `freeze`, and stays flagged anywhere Ruby doesn't.
- *
- * Only the case-transform is missing for most names; the map covers the few
- * whose TS spelling isn't derivable (`to_a` → the JS `toArray`, Ruby `==` →
- * `equals`, since TS has no operator overloading).
+ * `to_a`/`to_ary` camelize to `toA`/`toAry`; the JS spelling of that protocol
+ * is `toArray`. `==` is an operator — TS has no operator overloading, so the
+ * port is a named `equals`. Ruby copy semantics come from `Object#clone`/`#dup`
+ * (never `def`ed in Rails) plus the `initialize_copy` hook the class DOES
+ * define; JS has no `Object#clone`, so the faithful port of that pair is a
+ * `clone`/`dup` method on the class.
  */
-const SKIP_MIRROR_CANDIDATES: Record<string, string[]> = {
+const MIRROR_CANDIDATE_OVERRIDES: Record<string, string[]> = {
   to_a: ["toArray"],
   to_ary: ["toArray"],
   "==": ["equals"],
-  // Ruby copy semantics come from `Object#clone`/`#dup` (never `def`ed in
-  // Rails) plus the `initialize_copy` hook the class DOES define. JS has no
-  // Object#clone, so the faithful port of that pair is a `clone`/`dup` method
-  // on the class — allowed exactly where Ruby defines the hook.
   initialize_copy: ["clone", "dup"],
   initialize_dup: ["dup"],
   initialize_clone: ["clone"],
 };
 
+/**
+ * TS candidates for a Ruby method `rubyMethodToTs` refuses to map.
+ *
+ * `conventions.SKIP` means api:compare never expects a TS counterpart, but the
+ * Ruby method still EXISTS in the file — so a TS override of it (`freeze`,
+ * `inspect`, `lookupCastType`) is Rails-faithful, not drift. Mapping those
+ * names here keeps the allowance *file-scoped*: `freeze` is allowed in core.ts
+ * because core.rb defines `freeze`, and stays flagged anywhere Ruby doesn't.
+ * That's strictly tighter than the blanket in-file allow-set this replaced.
+ *
+ * Two exclusions: `SKIP_TS_MIRROR_IS_DRIFT` names (Ruby hooks — a same-named
+ * TS method is a trails invention, not a port), and anything neither on SKIP
+ * nor in the override map, so ordinary unmapped names (operators other than
+ * `==`) stay unmapped.
+ */
 function skipMirrorCandidates(rubyName: string): string[] | null {
   if (SKIP_TS_MIRROR_IS_DRIFT.has(rubyName)) return null;
-  const extra = SKIP_MIRROR_CANDIDATES[rubyName];
-  if (!SKIP.has(rubyName) && !extra) return null;
-  const mapped = rubyMethodToTsIgnoringSkip(rubyName) ?? [];
-  const all = [...mapped, ...(extra ?? [])];
-  return all.length > 0 ? all : null;
+  const overrides = MIRROR_CANDIDATE_OVERRIDES[rubyName];
+  if (!SKIP.has(rubyName) && !overrides) return null;
+  const candidates = [...(rubyMethodToTsIgnoringSkip(rubyName) ?? []), ...(overrides ?? [])];
+  return candidates.length > 0 ? candidates : null;
 }
 
 /**
- * `rubyMethodToTs` for any method, plus the trails `Q`-suffix predicate form.
+ * `rubyMethodToTs` for any method, falling back to `skipMirrorCandidates` for
+ * the names it refuses, plus the trails `Q`-suffix predicate form.
  * trails encodes a Ruby `?` predicate with a trailing `Q` in TS
  * (`connected_to?` → `connectedToQ`), sometimes stacked on the is-prefix form
  * (`connected?` → `isConnectedQ`). The base mapper only emits the is-prefix

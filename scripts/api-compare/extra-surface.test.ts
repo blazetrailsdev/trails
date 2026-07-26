@@ -357,6 +357,8 @@ describe("buildReport — novel vs moved classification", () => {
                 method("limit_value"), // Relation::VALUE_METHODS accessor
                 method("freeze"), // conventions.SKIP, but Rails defines it here
                 method("to_a"), // conventions.SKIP, spelled `toArray` in TS
+                method("=="), // operator — spelled `equals` in TS
+                method("initialize_copy"), // copy hook — spelled `clone`/`dup` in TS
               ],
             }),
           },
@@ -382,6 +384,8 @@ describe("buildReport — novel vs moved classification", () => {
                 method("limitValue"), // Relation::VALUE_METHODS accessor (matched in-file)
                 method("freeze"), // SKIP mirror — foo.rb defines `freeze`
                 method("toArray"), // SKIP mirror — foo.rb defines `to_a`
+                method("equals"), // SKIP mirror — foo.rb defines `==`
+                method("clone"), // SKIP mirror — foo.rb defines `initialize_copy`
                 method("catch"), // JS Promise protocol, no Ruby counterpart
                 method("genuinelyNovel"),
               ],
