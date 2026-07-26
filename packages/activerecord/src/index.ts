@@ -50,7 +50,6 @@ export {
   registerModel,
   modelRegistry,
   loadHasOne,
-  loadHasMany,
   loadHasManyThrough,
   association,
   isAssociationCached,

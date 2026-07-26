@@ -53,7 +53,7 @@ export class Association {
    *  collection proxy that it can hydrate from this instance's target. */
   _loadedViaAsync = false;
   /**
-   * Nonzero while THIS holder is itself driving a loader (`loadHasMany` &c.)
+   * Nonzero while THIS holder is itself driving a loader (`findTarget` &c.)
    * through `doAsyncFindTarget`, so the loader's own `setTarget` writeback
    * into this holder must be skipped — the driving caller assigns the result
    * itself the moment its `await` resumes.
@@ -68,12 +68,12 @@ export class Association {
    * **Scoping — this flag is holder-scoped, not loader-scoped.** While it is
    * set, `syncToAssociationInstance` suppresses *every* writeback into this
    * holder, not just the driving loader's own. A concurrent
-   * `loadHasMany(owner, sameName, differentOptions)` carrying differently
+   * `findTarget(owner, sameName, differentOptions)` carrying differently
    * scoped rows is therefore dropped from the holder too (it still returns its
    * rows to its own caller; only the holder cache goes unwritten, and the
    * driving load assigns the holder immediately after). Making it
    * loader-scoped would require threading a per-load token through
-   * `loadHasMany`; the holder-scoped version is what the guard needs, since a
+   * `findTarget`; the holder-scoped version is what the guard needs, since a
    * collection that legitimately mutates its own target mid-load (dirty
    * targets, in-memory built/pushed records, target merging) is unaffected
    * either way.

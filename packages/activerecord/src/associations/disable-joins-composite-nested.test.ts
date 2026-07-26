@@ -31,7 +31,8 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, MigrationContext, registerModel } from "../index.js";
-import { Associations, loadHasMany } from "../associations.js";
+import { Associations } from "../associations.js";
+import { findTarget } from "./has-many-association.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 
 function migrationCtx() {
@@ -175,7 +176,7 @@ describe("DJAS composite-key + nested-through", () => {
     });
     try {
       const reflection = (CknShop as any)._reflectOnAssociation("cknLineItemTags");
-      const tags = await loadHasMany(shop, "cknLineItemTags", reflection.options);
+      const tags = await findTarget(shop, "cknLineItemTags", reflection.options);
       expect(tags.map((t: any) => t.value).sort()).toEqual(["red", "sale"]);
     } finally {
       Notifications.unsubscribe(sub);
@@ -199,7 +200,7 @@ describe("DJAS composite-key + nested-through", () => {
 
     const unsaved = CknShop.new({ name: "unsaved" });
     const reflection = (CknShop as any)._reflectOnAssociation("cknLineItemTags");
-    const tags = await loadHasMany(unsaved, "cknLineItemTags", reflection.options);
+    const tags = await findTarget(unsaved, "cknLineItemTags", reflection.options);
     expect(tags).toEqual([]);
     expect(tags.map((t: any) => t.value)).not.toContain("orphan-tag");
   });

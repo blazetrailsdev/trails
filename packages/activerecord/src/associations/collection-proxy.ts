@@ -68,7 +68,6 @@ import {
   resolveAssocClass,
   buildHasManyRelation,
   buildThroughJoinScope,
-  loadHasMany,
   _routeThroughViaAssociationScope,
   ownerHasUnresolvedThroughKey,
   _setCollectionInverseInstance,
@@ -80,7 +79,12 @@ import {
   multisetDifference,
   multisetIntersection,
 } from "./has-many-through-association.js";
-import { countRecords, setDifference, setIntersection } from "./has-many-association.js";
+import {
+  countRecords,
+  findTarget,
+  setDifference,
+  setIntersection,
+} from "./has-many-association.js";
 import { throughForeignKeyPresent } from "./through-association.js";
 import { foreignKeyPresentFor } from "./foreign-association.js";
 import type { AssociationReflection } from "../reflection.js";
@@ -809,8 +813,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /**
    * Shared execution core for `toArray()` and `load()`. Routes both the
    * unmutated and mutated (whereBang / orderBang / ...) proxy through a
-   * single `loadHasMany` call. When the proxy state has diverged from the
-   * seed, a `queryExecutor` callback is passed so `loadHasMany` skips cache
+   * single `findTarget` call. When the proxy state has diverged from the
+   * seed, a `queryExecutor` callback is passed so `findTarget` skips cache
    * and scope rebuild and runs the mutated Relation directly — mirrors Rails'
    * `CollectionProxy → AssociationRelation#exec_queries → loadTarget` path
    * which always routes through the OO association regardless of scope state.
@@ -834,7 +838,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
             _AssociationRelationCtor!.prototype as unknown as { toArray(): Promise<Base[]> }
           ).toArray.call(this)
       : undefined;
-    const results = (await loadHasMany(
+    const results = (await findTarget(
       this._record,
       this._assocName,
       this._assocDef.options,
@@ -1069,7 +1073,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /**
    * Propagate the owner's strict-loading mode onto each loaded child —
    * mirrors `Association#set_strict_loading`, which Rails applies in
-   * `find_target` / `exec_queries`. The functional `loadHasMany` path
+   * `find_target` / `exec_queries`. The functional `findTarget` path
    * (the common `await blog.posts` reader) bypasses the OO
    * `CollectionAssociation.loadTarget` where this cascade lives, so we
    * route through the OO association here to reuse the exact same logic.
@@ -1743,7 +1747,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         !this._assocDef.options.disableJoins &&
         !_routeThroughViaAssociationScope(this._record, refl, this._assocDef.options)
       ) {
-        const results = await loadHasMany(this._record, this._assocName, this._assocDef.options);
+        const results = await findTarget(this._record, this._assocName, this._assocDef.options);
         return results.length;
       }
       // Routed shapes fall through to `countFn.call(this.scope())` below;
@@ -1964,7 +1968,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     if (this._target.length > 0) return false;
     // Through associations: #exists always loads the full target, so prefer
     // count() which routes through AssociationScope as a SQL COUNT for the
-    // common shapes (loadHasMany fallback still loads for the rest).
+    // common shapes (findTarget fallback still loads for the rest).
     if (this._isThrough) return (await this.count()) === 0;
     // Mirrors Rails collection_association.rb#empty?:
     //   if loaded? || @association_ids || reflection.has_active_cached_counter?
@@ -4457,7 +4461,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 // `await proxy; proxy[0]` / `proxy.target.length` work after a single await.
 // `toArray()` stays available for callers who want a fresh array
 // without hydrating this proxy's `_target` / `_loaded` (it still goes
-// through `loadHasMany`, which syncs into the record's association
+// through `findTarget`, which syncs into the record's association
 // instance cache — only this proxy's local cache is left untouched).
 applyThenable(CollectionProxy.prototype, "load");
 

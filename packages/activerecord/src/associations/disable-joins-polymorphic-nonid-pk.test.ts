@@ -2,7 +2,7 @@
  * DJAS: polymorphic belongsTo-through with non-id target PK (task #20).
  *
  * The non-DJAS path has a regression test at
- * `association-scope.test.ts` ("loadHasMany through with sourceType +
+ * `association-scope.test.ts` ("findTarget through with sourceType +
  * non-id target PK uses correct join column"). The DJAS walk routes
  * through the same reflection infrastructure (`joinPrimaryKeyFor`
  * resolves the source target's actual PK column for a polymorphic
@@ -28,7 +28,8 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel, TableDefinition } from "../index.js";
-import { Associations, loadHasMany } from "../associations.js";
+import { Associations } from "../associations.js";
+import { findTarget } from "./has-many-association.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 
 describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
@@ -167,7 +168,7 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
     });
     try {
       const reflection = (DpAuthor as any)._reflectOnAssociation("noJoinsDpPhotos");
-      const photos = await loadHasMany(author, "noJoinsDpPhotos", reflection.options);
+      const photos = await findTarget(author, "noJoinsDpPhotos", reflection.options);
       expect(photos.map((p: any) => p.uuid)).toEqual([photo.uuid]);
       expect(photos.map((p: any) => p.title)).toEqual(["p1"]);
     } finally {

@@ -1,7 +1,8 @@
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
-import { Associations, loadHasMany, loadHasOne } from "../associations.js";
+import { Associations, loadHasOne } from "../associations.js";
+import { findTarget } from "./has-many-association.js";
 import { AssociationScope, ReflectionProxy } from "./association-scope.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -276,7 +277,7 @@ describe("AssociationScope", () => {
 
   it("loadHasMany applies caller-supplied options.scope when it differs from reflection.scope", async () => {
     // Regression for the loadHasManyThrough path that wraps options.scope
-    // with sourceType filtering before calling loadHasMany. The migrated
+    // with sourceType filtering before calling findTarget. The migrated
     // path skips re-applying when options.scope === reflection.scope
     // (avoid double-application), but augmented scopes must still run.
     // Canonical Author has_many :posts carries no macro scope, so the
@@ -287,7 +288,7 @@ describe("AssociationScope", () => {
 
     // Augmented options.scope — NOT equal to the reflection's macro
     // scope (which is null here). Loader must still apply it.
-    const results = await loadHasMany(author, "posts", {
+    const results = await findTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
       scope: (rel: any) => rel.where({ title: "published" }),
@@ -488,7 +489,8 @@ describe("AssociationScope", () => {
     // scalar <as>_id value — reject with CompositePrimaryKeyMismatchError.
     // (When the CPK includes "id", it collapses to "id" matching Rails'
     // join_id_for; only the no-id case is unrepresentable.)
-    const { loadHasMany, CompositePrimaryKeyMismatchError } = await import("../index.js");
+    const { CompositePrimaryKeyMismatchError } = await import("../index.js");
+    const { findTarget } = await import("./has-many-association.js");
     class CpkAsOwner extends Base {
       declare a: number | null;
       declare b: number | null;
@@ -512,7 +514,7 @@ describe("AssociationScope", () => {
     registerModel(CpkAsTarget);
     const owner = new CpkAsOwner({ a: 1, b: 2 });
     await expect(
-      loadHasMany(owner, "comments", {
+      findTarget(owner, "comments", {
         className: "CpkAsTarget",
         as: "commentable",
       }),
@@ -700,7 +702,7 @@ describe("AssociationScope", () => {
       taggable_type: "Comment",
     });
 
-    const posts = (await loadHasMany(tag, "taggedPosts", {
+    const posts = (await findTarget(tag, "taggedPosts", {
       className: "Post",
       through: "taggings",
       source: "taggable",
@@ -752,7 +754,7 @@ describe("AssociationScope", () => {
     const op = await Post.create({ author_id: other.id, title: "op", body: "b" });
     await Comment.create({ post_id: op.id, body: "other" });
 
-    const comments = (await loadHasMany(author, "comments", {
+    const comments = (await findTarget(author, "comments", {
       className: "Comment",
       through: "posts",
       source: "comments",
@@ -780,12 +782,12 @@ describe("AssociationScope", () => {
   });
 
   it("loadHasMany through chain (belongsTo source, no sourceType) routes via AssociationScope", async () => {
-    // PR 3b migration: loadHasMany for has_many :through where source
+    // PR 3b migration: findTarget for has_many :through where source
     // is non-polymorphic belongsTo (no sourceType) now routes through
     // AssociationScope's JOIN-based path instead of the 2-step IN-list
     // loader. Canonical Author has_many :categories through
     // :categorizations, where Categorization belongs_to :category.
-    // End-to-end: insert records, call loadHasMany, assert the right rows
+    // End-to-end: insert records, call findTarget, assert the right rows
     // return — exercises the migrated path through real DB.
     const alice = await Author.create({ name: "Alice" });
     const bob = await Author.create({ name: "Bob" });
@@ -796,7 +798,7 @@ describe("AssociationScope", () => {
     await Categorization.create({ author_id: alice.id, category_id: ts.id });
     await Categorization.create({ author_id: bob.id, category_id: go.id });
 
-    const categories = (await loadHasMany(alice, "categories", {
+    const categories = (await findTarget(alice, "categories", {
       className: "Category",
       through: "categorizations",
       source: "category",

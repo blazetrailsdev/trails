@@ -902,7 +902,7 @@ export class CollectionAssociation extends Association {
     if (this.reflection.options.as) {
       return [`${underscore(this.reflection.options.as)}_id`];
     }
-    // Derive composite FKs for CPK owners (mirrors loadHasMany)
+    // Derive composite FKs for CPK owners (mirrors findTarget)
     const pk = this.reflection.options.primaryKey ?? ctor.primaryKey ?? "id";
     if (Array.isArray(pk)) {
       return pk.map((col: string) => `${underscore(ctor.name)}_${col}`);

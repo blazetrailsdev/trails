@@ -8,7 +8,7 @@
  *
  * The TS helper consolidates the equivalent post-merge step shared by
  * `loadBelongsTo`, `loadHasOne` (×2 — reflection path + inline fallback),
- * `loadHasMany` (×2), `loadHasManyThrough` (×2), `loadHabtm`,
+ * `findTarget` (×2), `loadHasManyThrough` (×2), `loadHabtm`,
  * `buildHasManyRelation`, and the DJAS-routed `_loadThroughViaDisableJoinsScope`.
  */
 import { describe, it, expect } from "vitest";

@@ -1,12 +1,38 @@
 import type { Base } from "../base.js";
-import type { AssociationDefinition } from "../associations.js";
-import { loadHasMany } from "../associations.js";
-import { DeleteRestrictionError } from "./errors.js";
+import type { AssociationDefinition, AssociationOptions } from "../associations.js";
+import {
+  _builtAssociationScope,
+  _canRouteThroughViaDisableJoinsAssociationScope,
+  _findTargetReachable,
+  _inlineOwnerKey,
+  _inlinePolymorphicKeys,
+  _loadThroughViaDisableJoinsScope,
+  _ownerChainReflection,
+  _preloadedHolderTarget,
+  _resolveInverseName,
+  _routeThroughViaAssociationScope,
+  _scopeForAssociation,
+  _violatesStrictLoading,
+  _wireInverseAssociation,
+  applyAssociationScope,
+  loadHasManyThrough,
+  ownerReflectionForeignKey,
+  resolveAssocClass,
+  syncToAssociationInstance,
+  validateInverseOf,
+} from "../associations.js";
+import { strictLoadingViolationBang } from "../core.js";
+import {
+  validateThroughReflection,
+  routeThroughCheckValidity,
+} from "./validate-through-reflection.js";
+import { CompositePrimaryKeyMismatchError, DeleteRestrictionError } from "./errors.js";
+import { polymorphicName } from "../inheritance.js";
 import { RecordInvalid } from "../validations.js";
 import { CollectionAssociation, includesRecord } from "./collection-association.js";
 import { ForeignAssociation } from "./foreign-association.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
-import { underscore } from "@blazetrails/activesupport";
+import { camelize, singularize, underscore } from "@blazetrails/activesupport";
 
 /**
  * Proxy that handles a has_many association.
@@ -128,13 +154,13 @@ export class HasManyAssociation extends CollectionAssociation {
 
   protected override async doAsyncFindTarget(): Promise<Base[]> {
     // Every caller of doAsyncFindTarget assigns the returned records into
-    // this holder itself, so loadHasMany's tail writeback into the same
+    // this holder itself, so findTarget's tail writeback into the same
     // holder is redundant — and, because it lands mid-await, clobbers any
     // reassignment made while the query was in flight. See
     // `_loaderWritebackSuppressed`.
     this._loaderWritebackSuppressed++;
     try {
-      return await loadHasMany(this.owner, this.reflection.name, this.reflection.options);
+      return await findTarget(this.owner, this.reflection.name, this.reflection.options);
     } finally {
       this._loaderWritebackSuppressed--;
     }
@@ -457,4 +483,239 @@ export function setDifference(a: Base[], b: Base[]): Base[] {
 /** @internal */
 export function setIntersection(a: Base[], b: Base[]): Base[] {
   return a.filter((record) => includesRecord(b, record));
+}
+
+/**
+ * Find the has_many association's target records.
+ *
+ * Mirrors: ActiveRecord::Associations::Association#find_target
+ * (association.rb:248) as reached through `CollectionAssociation` /
+ * `HasManyAssociation`. Takes the owner/name/options triple rather than an
+ * association instance because the CollectionProxy load path and the
+ * through-association loaders reach it without one.
+ */
+export async function findTarget(
+  record: Base,
+  assocName: string,
+  options: AssociationOptions,
+  queryExecutor?: () => Promise<Base[]>,
+): Promise<Base[]> {
+  if (options.through) {
+    validateThroughReflection(record.constructor as typeof Base, assocName);
+  }
+  // Check cached (inverse_of) first, then preloaded — skip when a scope
+  // override is provided (the scope has been mutated; the cache would return
+  // stale/incorrect data for the diverged query).
+  if (!queryExecutor) {
+    // Honor an instance-cache hit (a directly-seeded or inverse-seeded
+    // collection target), but ignore the association's *own* collection proxy:
+    // its in-memory built/pushed records are not a complete collection and must
+    // still be merged with a DB query (this loader runs inside that proxy's
+    // load path, where `proxy.loaded` is false by construction).
+    const cache = record._associationCache(assocName);
+    if (
+      cache &&
+      cache !== record._collectionProxies.get(assocName) &&
+      Array.isArray(cache.target) &&
+      !(typeof (cache as any).isStaleTarget === "function" && (cache as any).isStaleTarget())
+    ) {
+      return cache.target;
+    }
+    const preloaded = _preloadedHolderTarget(record, assocName);
+    if (preloaded) {
+      return (preloaded.value ?? []) as Base[];
+    }
+  }
+
+  // Strict loading check. Gated by `find_target?`: a new-record owner without
+  // the FK present never reaches `find_target` and so never raises.
+  if (
+    _violatesStrictLoading(record, options) &&
+    _findTargetReachable(record, assocName, options, "foreign")
+  ) {
+    strictLoadingViolationBang(record, assocName, {
+      className: options.className ?? camelize(singularize(assocName)),
+    });
+  }
+
+  // Scope-override path: CollectionProxy passes this when its Relation state
+  // has been mutated (whereBang / orderBang / ...). The executor runs the
+  // mutated scope directly; cache lookup and scope rebuild are bypassed.
+  if (queryExecutor) return queryExecutor();
+
+  // Handle through associations. Routes through AssociationScope's
+  // JOIN-based path for the simple shape (see
+  // _canRouteThroughViaAssociationScope); everything else stays on the
+  // 2-step loadHasManyThrough.
+  if (options.through) {
+    const ctorEarly = record.constructor as typeof Base;
+    const reflEarly = ctorEarly._reflectOnAssociation?.(assocName);
+    if (_canRouteThroughViaDisableJoinsAssociationScope(reflEarly, options)) {
+      return _loadThroughViaDisableJoinsScope(record, reflEarly, options);
+    }
+    // Nested-through shapes flatten their whole `reflection.chain` into the
+    // JOIN-based AssociationScope path below, sharing its inverse-wiring and
+    // null-FK short-circuit. An unsaved owner resolves its through step from
+    // the in-memory association target (e.g. `post.author = mary` before save),
+    // which the SQL JOIN cannot see — `_routeThroughViaAssociationScope` keeps
+    // those on the 2-step loader.
+    if (!_routeThroughViaAssociationScope(record, reflEarly, options)) {
+      return loadHasManyThrough(record, assocName, options);
+    }
+    // Fall through into the AssociationScope path below.
+  }
+
+  const ctor = record.constructor as typeof Base;
+  const className = options.className ?? camelize(singularize(assocName));
+  const primaryKey = options.primaryKey ?? ctor.primaryKey;
+
+  const targetModel = resolveAssocClass(record, assocName, className);
+
+  if (options.inverseOf) {
+    validateInverseOf(targetModel, assocName, options.inverseOf);
+  }
+
+  // Resolve FK columns (may be array for CPK; `:as` swaps to the
+  // polymorphic FK column). Prefer the rich reflection's foreign key so an STI
+  // subclass owner uses the declaring class's column (see
+  // `ownerReflectionForeignKey`).
+  const foreignKey = options.as
+    ? (options.foreignKey ?? `${underscore(options.as)}_id`)
+    : (options.foreignKey ??
+      ownerReflectionForeignKey(ctor, assocName) ??
+      (options.queryConstraints
+        ? options.queryConstraints
+        : Array.isArray(primaryKey)
+          ? primaryKey.map((col: string) => `${underscore(ctor.name)}_${col}`)
+          : `${underscore(ctor.name)}_id`));
+
+  // Polymorphic `:as` requires a scalar FK. A composite FK is always
+  // rejected. A composite owner PK collapses to "id" when present
+  // (matching Rails' join_id_for); otherwise reject.
+  if (options.as) {
+    if (Array.isArray(foreignKey)) {
+      // Route through the reflection's canonical checkValidityBang (Rails'
+      // single raise site) so the error carries the Rails-faithful message;
+      // a no-op for polymorphic `:as` (Rails permits no composite key there).
+      routeThroughCheckValidity(ctor, assocName);
+      // No reflection resolvable — minimal trails-only fallback guard.
+      throw new CompositePrimaryKeyMismatchError({
+        activeRecord: ctor.name,
+        name: assocName,
+        primaryKey,
+        foreignKey,
+      });
+    }
+    if (Array.isArray(primaryKey) && !primaryKey.includes("id")) {
+      // Route through the reflection's canonical checkValidityBang (Rails'
+      // single raise site) so the error carries the Rails-faithful message;
+      // a no-op for polymorphic `:as` (Rails permits no composite key there).
+      routeThroughCheckValidity(ctor, assocName);
+      // No reflection resolvable — minimal trails-only fallback guard.
+      throw new CompositePrimaryKeyMismatchError({
+        activeRecord: ctor.name,
+        name: assocName,
+        primaryKey,
+        foreignKey,
+      });
+    }
+  }
+  // Route through AssociationScope when we have a reflection registered.
+  // AssociationScope handles scalar, composite, polymorphic `:as`, and
+  // STI in a single path matching Rails' `AssociationScope.scope`.
+  // Inline fallback only when the reflection hasn't been registered
+  // (happens in tests that define associations via the lower-level API
+  // without going through Reflection.create).
+  const reflection = ctor._reflectOnAssociation?.(assocName);
+  // Null-FK short-circuit: read the SAME columns the eventual query
+  // reads. For non-through, reflection.joinForeignKey is the owner-
+  // side activeRecordPrimaryKey for hasMany. For through reflections the
+  // owner-side column is on `_ownerChainReflection` (chain.last).
+  const reflForOwnerFk = _ownerChainReflection(reflection);
+  const fkCheckPks = reflForOwnerFk
+    ? Array.isArray(reflForOwnerFk.joinForeignKey)
+      ? reflForOwnerFk.joinForeignKey
+      : [reflForOwnerFk.joinForeignKey]
+    : Array.isArray(primaryKey)
+      ? primaryKey
+      : [primaryKey];
+  for (const pk of fkCheckPks) {
+    const v = record._readAttribute(pk);
+    if (v === null || v === undefined) return [];
+  }
+
+  let rel: any;
+  if (reflection) {
+    // Rails' `Association#scope` is
+    //   AssociationRelation.create(klass, self).merge!(klass.scope_for_association)
+    // (association.rb:313), so the unscoped+constraints relation MUST
+    // be merged with `klass.scope_for_association` — otherwise default_scope
+    // / scope extensions silently disappear. AssociationScope.scope
+    // already merges `reflection.scope` (macro-time lambda) via scopeFor;
+    // skip re-applying `options.scope` ONLY when it's that exact same
+    // function. Callers like `loadHasManyThrough` synthesize a NEW
+    // `options.scope` (wrapping with `sourceType` filtering) — those
+    // must still run.
+    const built = _builtAssociationScope(record, assocName, reflection, targetModel);
+    const baseRelation = _scopeForAssociation(targetModel);
+    rel = baseRelation.merge(built);
+    rel = applyAssociationScope(rel, options.scope, record, reflection.scope);
+  } else {
+    // Inline fallback: no reflection (lower-level test helpers).
+    if (Array.isArray(foreignKey)) {
+      const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
+      const pkCols = Array.isArray(ownerKey) ? ownerKey : [ownerKey];
+      if (pkCols.length !== foreignKey.length) {
+        // Route through the reflection's canonical checkValidityBang (Rails'
+        // single raise site) so the error carries the Rails-faithful message.
+        routeThroughCheckValidity(ctor, assocName);
+        // No reflection registered (lower-level test helper) — minimal guard.
+        throw new CompositePrimaryKeyMismatchError({
+          activeRecord: ctor.name,
+          name: assocName,
+          primaryKey: pkCols,
+          foreignKey,
+        });
+      }
+      const conditions: Record<string, unknown> = {};
+      for (let i = 0; i < foreignKey.length; i++) {
+        conditions[foreignKey[i]] = record._readAttribute(pkCols[i]);
+      }
+      rel = _scopeForAssociation(targetModel).where(conditions);
+    } else if (options.as) {
+      const typeCol = `${underscore(options.as)}_type`;
+      const { fkCols, ownerKeyCols } = _inlinePolymorphicKeys(
+        ctor,
+        options,
+        primaryKey,
+        foreignKey,
+      );
+      const conditions: Record<string, unknown> = { [typeCol]: polymorphicName(ctor) };
+      for (let i = 0; i < fkCols.length; i++) {
+        conditions[fkCols[i]] = record._readAttribute(ownerKeyCols[i]);
+      }
+      rel = _scopeForAssociation(targetModel).where(conditions);
+    } else {
+      const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
+      rel = _scopeForAssociation(targetModel).where({
+        [foreignKey]: record._readAttribute(ownerKey as string),
+      });
+    }
+    rel = applyAssociationScope(rel, options.scope, record);
+  }
+  // Set inverse_of on each loaded child. Resolve via the reflection so
+  // automatic_inverse_of also wires each child's parent reference.
+  // Mirrors HasManyAssociation#set_inverse_instance. Wiring runs inside the
+  // instantiation block (Rails' `find_target` yields `set_inverse_instance`
+  // per record) so it lands BEFORE the child's find/initialize callbacks.
+  const inverseName = _resolveInverseName(ctor, assocName, options);
+  if (inverseName) {
+    rel._instantiateBlock = (child: Base) => {
+      _wireInverseAssociation(record, child, inverseName);
+    };
+  }
+  const results: Base[] = await rel.toArray();
+
+  syncToAssociationInstance(record, assocName, results);
+  return results;
 }

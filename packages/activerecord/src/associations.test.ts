@@ -33,7 +33,8 @@ import { Member } from "./test-helpers/models/member.js";
 import { Membership } from "./test-helpers/models/membership.js";
 import { Human } from "./test-helpers/models/human.js";
 import { Interest } from "./test-helpers/models/interest.js";
-import { buildHasManyRelation, loadHasMany, loadHasOne } from "./associations.js";
+import { buildHasManyRelation, loadHasOne } from "./associations.js";
+import { findTarget as findHasManyTarget } from "./associations/has-many-association.js";
 import "./test-helpers/models/ship.js";
 import "./test-helpers/models/bird.js";
 import "./test-helpers/models/treasure.js";
@@ -803,8 +804,8 @@ describe("PreloaderTest", () => {
     // line_item_discount_applications). The second preload must skip that branch
     // and issue only the three shipping/discount queries.
     const reloaded = (await Invoice.where({ id: invoice.id }))[0];
-    const lineItems = await loadHasMany(reloaded, "lineItems", {});
-    for (const li of lineItems) await loadHasMany(li, "discountApplications", {});
+    const lineItems = await findHasManyTarget(reloaded, "lineItems", {});
+    for (const li of lineItems) await findHasManyTarget(li, "discountApplications", {});
     const secondSqls = await captureSql(async () => {
       await new Preloader({ records: [reloaded], associations: nested }).call();
     });
@@ -2547,7 +2548,7 @@ describe("AssociationsTest", () => {
     await ShardedComment.create({ blog_id: 1, blog_post_id: (post as any).id, body: "A" });
     await ShardedComment.create({ blog_id: 1, blog_post_id: (post as any).id, body: "B" });
     await ShardedComment.create({ blog_id: 2, blog_post_id: (post as any).id, body: "Other" });
-    const comments = await loadHasMany(post, "freshComments", {
+    const comments = await findHasManyTarget(post, "freshComments", {
       className: "ShardedComment",
       foreignKey: ["blog_id", "blog_post_id"],
     });
@@ -2577,7 +2578,7 @@ describe("AssociationsTest", () => {
     const [, orderId] = order.id as [number, number];
     await CpkOrderAgreement.create({ order_id: orderId, signature: "abc" });
     await CpkOrderAgreement.create({ order_id: orderId, signature: "def" });
-    const agreements = await loadHasMany(order, "freshAgreements", {
+    const agreements = await findHasManyTarget(order, "freshAgreements", {
       className: "CpkOrderAgreement",
       foreignKey: "order_id",
     });
@@ -2609,7 +2610,7 @@ describe("AssociationsTest", () => {
     await CpkOrderAgreement.create({ order_id: orderId, signature: "abc" });
     await CpkOrderAgreement.create({ order_id: orderId, signature: "def" });
     await (CpkOrderAgreement as any).where("1=0").scoping(async () => {
-      const agreements = await loadHasMany(order, "freshAgreements", {
+      const agreements = await findHasManyTarget(order, "freshAgreements", {
         className: "CpkOrderAgreement",
         foreignKey: "order_id",
       });
@@ -2641,7 +2642,7 @@ describe("AssociationsTest", () => {
       parent_type: "ShardedBlogPost",
       title: "wrongShard",
     });
-    const children = await loadHasMany(post, "freshChildren", {
+    const children = await findHasManyTarget(post, "freshChildren", {
       className: "ShardedBlogPost",
       as: "parent",
     });
@@ -2712,7 +2713,7 @@ describe("AssociationsTest", () => {
       title: "Parent",
     });
     await expect(
-      loadHasMany(post, "freshChildren", {
+      findHasManyTarget(post, "freshChildren", {
         className: "ShardedBlogPostWithRevision",
         as: "parent",
       }),
@@ -2770,7 +2771,7 @@ describe("AssociationsTest", () => {
       title: "Book",
     });
     await CpkBook.where({ author_id: 3, id: 4 }).updateAll({ title: "A different title" });
-    const books = await loadHasMany(order, "books", {
+    const books = await findHasManyTarget(order, "books", {
       foreignKey: ["shop_id", "order_id"],
       className: "CpkBook",
     });
