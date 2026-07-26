@@ -78,6 +78,7 @@ export interface NormalizedFindIds {
  * Does NOT do the actual lookup or the "couldn't find all" aggregate
  * error — that stays at the call site (SQL vs in-memory each have
  * their own count-comparison logic).
+ * @internal Rails inlines this in `find`; no counterpart to match against.
  */
 export function normalizeFindArgs(
   modelName: string,
@@ -188,6 +189,7 @@ export function normalizeFindArgs(
  *
  * `notFoundIds` (Rails' `ids_writer` passes `ids - found_ids`) appends the
  * trailing "Couldn't find <Model> with <key> <ids>." sentence.
+ * @internal Relation-free form of `raiseRecordNotFoundExceptionBang` below.
  */
 export function raiseNotFoundAll(
   modelName: string,
@@ -244,6 +246,7 @@ function formatNotFoundAllMessage(
 /**
  * Raise the single-id not-found error for a simple PK.
  * Matches `Relation.performFind`'s `"with 'pk'=<id>"` message.
+ * @internal Relation-free form of `raiseRecordNotFoundExceptionBang` below.
  */
 export function raiseNotFoundSingle(
   modelName: string,
@@ -308,6 +311,7 @@ function buildPkWhere(pk: string[], tuple: unknown[]): Record<string, unknown> {
   return conditions;
 }
 
+/** @internal */
 export async function performFind(this: FinderRelation, ...args: unknown[]): Promise<any> {
   const pk = this._modelClass.primaryKey;
   const modelName = this._modelClass.name;
@@ -371,6 +375,7 @@ export async function performFind(this: FinderRelation, ...args: unknown[]): Pro
   return records;
 }
 
+/** @internal */
 export async function performFindBy(
   this: FinderRelation,
   conditions: unknown,
@@ -393,6 +398,7 @@ export async function performFindBy(
   }
 }
 
+/** @internal */
 export async function performFindByBang(
   this: FinderRelation,
   conditions: unknown,
@@ -408,6 +414,7 @@ export async function performFindByBang(
   return record;
 }
 
+/** @internal */
 export async function performFindSoleBy(
   this: FinderRelation,
   ...conditions: unknown[]
@@ -426,6 +433,7 @@ function hasReversibleOrder(rel: FinderRelation): boolean {
   return rel._orderClauses.length > 0;
 }
 
+/** @internal */
 export async function performFirst(this: FinderRelation, n?: number): Promise<any> {
   // `_isEmptyRelation()` is the shared none-short-circuit chokepoint: on an
   // AssociationRelation it first rebases a stale new-owner `1=0` seed onto the
@@ -441,6 +449,7 @@ export async function performFirst(this: FinderRelation, n?: number): Promise<an
   return (await this.findNthWithLimit(0, 1))[0] ?? null;
 }
 
+/** @internal */
 export async function performFirstBang(this: FinderRelation): Promise<any> {
   const record = await performFirst.call(this);
   if (!record) {
@@ -457,6 +466,7 @@ function orderByPk(rel: FinderRelation, direction: "asc" | "desc"): any {
   return rel.order({ [pk]: direction });
 }
 
+/** @internal */
 export async function performLast(this: FinderRelation, n?: number): Promise<any> {
   // See performFirst: `_isEmptyRelation()` rebases a stale new-owner seed before
   // reporting the none short-circuit.
@@ -493,6 +503,7 @@ export async function performLast(this: FinderRelation, n?: number): Promise<any
   return records[0] ?? null;
 }
 
+/** @internal */
 export async function performLastBang(this: FinderRelation): Promise<any> {
   const record = await performLast.call(this);
   if (!record) {
@@ -501,6 +512,7 @@ export async function performLastBang(this: FinderRelation): Promise<any> {
   return record;
 }
 
+/** @internal */
 export async function performSole(this: FinderRelation): Promise<any> {
   const rel = this._clone();
   rel._limitValue = 2;
@@ -516,6 +528,7 @@ export async function performSole(this: FinderRelation): Promise<any> {
   return records[0];
 }
 
+/** @internal */
 export async function performTake(this: FinderRelation, limit?: number): Promise<any> {
   const rel = this._clone();
   if (limit !== undefined) {
@@ -527,6 +540,7 @@ export async function performTake(this: FinderRelation, limit?: number): Promise
   return records[0] ?? null;
 }
 
+/** @internal */
 export async function performTakeBang(this: FinderRelation): Promise<any> {
   const record = await performTake.call(this);
   if (!record) {
@@ -572,30 +586,37 @@ export async function findNthFromLast(this: FinderRelation, index: number): Prom
   return relation.reverseOrder().offset(index).first();
 }
 
+/** @internal */
 export async function performSecond(this: FinderRelation): Promise<any | null> {
   return (await this.findNthWithLimit(1, 1))[0] ?? null;
 }
 
+/** @internal */
 export async function performThird(this: FinderRelation): Promise<any | null> {
   return (await this.findNthWithLimit(2, 1))[0] ?? null;
 }
 
+/** @internal */
 export async function performFourth(this: FinderRelation): Promise<any | null> {
   return (await this.findNthWithLimit(3, 1))[0] ?? null;
 }
 
+/** @internal */
 export async function performFifth(this: FinderRelation): Promise<any | null> {
   return (await this.findNthWithLimit(4, 1))[0] ?? null;
 }
 
+/** @internal */
 export async function performFortyTwo(this: FinderRelation): Promise<any | null> {
   return (await this.findNthWithLimit(41, 1))[0] ?? null;
 }
 
+/** @internal */
 export async function performSecondToLast(this: FinderRelation): Promise<any | null> {
   return this.findNthFromLast(1);
 }
 
+/** @internal */
 export async function performThirdToLast(this: FinderRelation): Promise<any | null> {
   return this.findNthFromLast(2);
 }
@@ -610,14 +631,22 @@ function bangFinder(finder: (this: FinderRelation) => Promise<any | null>) {
   };
 }
 
+/** @internal */
 export const performSecondBang = bangFinder(performSecond);
+/** @internal */
 export const performThirdBang = bangFinder(performThird);
+/** @internal */
 export const performFourthBang = bangFinder(performFourth);
+/** @internal */
 export const performFifthBang = bangFinder(performFifth);
+/** @internal */
 export const performFortyTwoBang = bangFinder(performFortyTwo);
+/** @internal */
 export const performSecondToLastBang = bangFinder(performSecondToLast);
+/** @internal */
 export const performThirdToLastBang = bangFinder(performThirdToLast);
 
+/** @internal */
 export async function performFindOrCreateByBang(
   this: FinderRelation,
   conditions: Record<string, unknown>,
@@ -631,6 +660,7 @@ export async function performFindOrCreateByBang(
   return performCreateOrFindByBang.call(this, conditions, extra);
 }
 
+/** @internal */
 export async function performCreateOrFindByBang(
   this: FinderRelation,
   conditions: Record<string, unknown>,

@@ -636,6 +636,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
                 ? decl.initializer.body
                 : undefined;
             const calls = extractCalls(body);
+            const internal = hasInternalJsDocTag(decl);
             fileFunctions.push({
               name: sym.name,
               visibility: "public",
@@ -643,6 +644,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
               isStatic: false,
               line,
               file: relPath,
+              ...(internal ? { internal: true } : {}),
               ...(calls !== undefined ? { calls } : {}),
             });
           }
