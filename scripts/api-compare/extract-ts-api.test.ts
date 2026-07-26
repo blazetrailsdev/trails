@@ -1411,6 +1411,34 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     );
   });
 
+  it("leaves an inherited __mixin member's tag on its declaring file only", () => {
+    const info = extractFromFiles("/p", {
+      "base.ts": `
+        export class Base {
+          /** @noRailsEquivalent JS-only lifecycle hook */
+          dispose(): void {}
+        }
+      `,
+      "attributes.ts": `
+        import { Base } from "./base.js";
+        export function Attributes(B: typeof Base) {
+          class M extends B {
+            loadAttributes(): void {}
+          }
+          return M;
+        }
+      `,
+    });
+    const mixin = info.modules["attributes.ts:Attributes__mixin"];
+    const dispose = mixin.instanceMethods.find((m) => m.name === "dispose")!;
+    expect(dispose.declaredIn).toBe("base.ts");
+    expect(dispose.noRailsEquivalent).toBeUndefined();
+    expect(
+      info.classes["base.ts:Base"].instanceMethods.find((m) => m.name === "dispose")!
+        .noRailsEquivalent,
+    ).toBe("JS-only lifecycle hook");
+  });
+
   it("throws when the tag carries no reason", () => {
     expect(() =>
       extractFromSource(`

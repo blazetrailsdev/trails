@@ -550,9 +550,13 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
         const visibility: "public" | "private" | "protected" =
           isPrivateField || hasPrivateMod ? "private" : hasProtectedMod ? "protected" : "public";
         const internal = visibility !== "public";
-        const noRailsEquivalent = noRailsEquivalentReason(decl);
         const line = decl.getSourceFile().getLineAndCharacterOfPosition(decl.getStart()).line + 1;
         const declFile = path.relative(srcDir, decl.getSourceFile().fileName).replace(/\\/g, "/");
+        // Only a member DECLARED in this file carries its tag into the mixin
+        // entry: `collectTsFileNames` skips foreign synthesized members, so a
+        // tag copied off an inherited base-class method would never match here
+        // and would read as stale on top of its correct match on the base file.
+        const noRailsEquivalent = declFile === relPath ? noRailsEquivalentReason(decl) : undefined;
         mixinMethods.push({
           name: prop.name,
           visibility,
