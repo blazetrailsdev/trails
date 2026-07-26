@@ -19,6 +19,7 @@ import {
   readWorkspaceGraph,
   transitiveDeps,
   widenKeyWithDeps,
+  dependencyInputFiles,
   CACHE_VERSION,
 } from "./shared-cache.js";
 
@@ -268,5 +269,34 @@ describe("cross-package cache inputs", () => {
         ["arel", "a"],
       ]),
     );
+  });
+});
+
+describe("dependencyInputFiles", () => {
+  it("collects src sources and built declarations, skipping tests", async () => {
+    const root = mkTmp();
+    fs.mkdirSync(path.join(root, "src", "core-ext"), { recursive: true });
+    fs.mkdirSync(path.join(root, "dist", "core-ext"), { recursive: true });
+    fs.writeFileSync(path.join(root, "src", "core-ext", "string.ts"), "export const a = 1;");
+    fs.writeFileSync(path.join(root, "src", "core-ext", "string.test.ts"), "");
+    fs.writeFileSync(
+      path.join(root, "dist", "core-ext", "string.d.ts"),
+      "export declare const a: number;",
+    );
+    fs.writeFileSync(path.join(root, "dist", "core-ext", "string.js"), "");
+    fs.writeFileSync(path.join(root, "tsconfig.json"), "{}");
+    const files = (await dependencyInputFiles(root)).map((f) => path.relative(root, f)).sort();
+    expect(files).toEqual([
+      path.join("dist", "core-ext", "string.d.ts"),
+      path.join("src", "core-ext", "string.ts"),
+      "tsconfig.json",
+    ]);
+  });
+
+  it("tolerates an unbuilt package with no dist and no tsconfig", async () => {
+    const root = mkTmp();
+    fs.mkdirSync(path.join(root, "src"));
+    fs.writeFileSync(path.join(root, "src", "index.ts"), "");
+    expect(await dependencyInputFiles(root)).toEqual([path.join(root, "src", "index.ts")]);
   });
 });

@@ -165,6 +165,53 @@ export function transitiveDeps(graph: WorkspaceGraph, dirName: string): string[]
   return [...seen].sort();
 }
 
+async function filesUnder(dir: string, keep: (name: string) => boolean): Promise<string[]> {
+  let entries;
+  try {
+    entries = await fs.readdir(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const nested = await Promise.all(
+    entries.map(async (entry) => {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) return filesUnder(full, keep);
+      return keep(entry.name) ? [full] : [];
+    }),
+  );
+  return nested.flat();
+}
+
+/**
+ * Every file of `packageRoot` that can feed a DEPENDENT package's extraction.
+ *
+ * With no `paths` mapping in the root tsconfig, `@blazetrails/<dep>` resolves
+ * through the dep's `exports` to its BUILT `dist/*.d.ts` — those declarations,
+ * not the dep's `src`, are what the compiler actually reads. Both are included:
+ * `dist` because it's the real input (a rebuild with unchanged `src` still
+ * changes the dependent's extraction), `src` because an edit that hasn't been
+ * built yet still changes what a later run will see. A missing `src` or `dist`
+ * simply contributes nothing.
+ */
+export async function dependencyInputFiles(packageRoot: string): Promise<string[]> {
+  const [src, dist] = await Promise.all([
+    filesUnder(
+      path.join(packageRoot, "src"),
+      (name) => name.endsWith(".ts") && !name.endsWith(".test.ts") && !name.endsWith(".d.ts"),
+    ),
+    filesUnder(path.join(packageRoot, "dist"), (name) => name.endsWith(".d.ts")),
+  ]);
+  const files = [...src, ...dist];
+  const tsConfig = path.join(packageRoot, "tsconfig.json");
+  try {
+    await fs.stat(tsConfig);
+    files.push(tsConfig);
+  } catch {
+    // no tsconfig — nothing to fold in
+  }
+  return files;
+}
+
 /**
  * Widen a package's own cache key with its dependencies' fingerprints, as
  * `[dirName, fingerprint]` pairs. Empty deps return `own` unchanged so

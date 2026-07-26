@@ -25,6 +25,7 @@ import {
   sharedCacheDir,
   contentFingerprint,
   widenKeyWithDeps,
+  dependencyInputFiles,
   readShared,
   writeShared,
   readWorkspaceGraph,
@@ -184,21 +185,33 @@ export async function main() {
   // `API_COMPARE_FORCE=1` one on an unchanged tree.
   const PACKAGES_DIR = path.join(ROOT_DIR, "packages");
   const graph = await readWorkspaceGraph(PACKAGES_DIR);
-  const dirFingerprints = new Map<string, Promise<{ mtime: string; content: string }>>();
-  function dirFingerprint(dir: string): Promise<{ mtime: string; content: string }> {
-    let pending = dirFingerprints.get(dir);
+  const dirInputs = new Map<string, Promise<{ root: string; files: string[] }>>();
+  function dependencyInputs(dir: string): Promise<{ root: string; files: string[] }> {
+    let pending = dirInputs.get(dir);
     if (!pending) {
-      pending = (async () => {
-        const root = path.join(PACKAGES_DIR, dir);
-        const inputs = getAllTsFiles(path.join(root, "src"));
-        const tsConfig = path.join(root, "tsconfig.json");
-        if (fs.existsSync(tsConfig)) inputs.push(tsConfig);
-        return {
-          mtime: packageFingerprint(inputs, root),
-          content: await contentFingerprint(inputs, root),
-        };
-      })();
-      dirFingerprints.set(dir, pending);
+      const root = path.join(PACKAGES_DIR, dir);
+      pending = dependencyInputFiles(root).then((files) => ({ root, files }));
+      dirInputs.set(dir, pending);
+    }
+    return pending;
+  }
+  const dirMtimeFingerprints = new Map<string, Promise<string>>();
+  function dirMtimeFingerprint(dir: string): Promise<string> {
+    let pending = dirMtimeFingerprints.get(dir);
+    if (!pending) {
+      pending = dependencyInputs(dir).then(({ root, files }) => packageFingerprint(files, root));
+      dirMtimeFingerprints.set(dir, pending);
+    }
+    return pending;
+  }
+  // Content hashing reads every byte of the dependency, so it stays lazy: only
+  // a LOCAL cache miss (which then consults the shared cache) ever needs it.
+  const dirContentFingerprints = new Map<string, Promise<string>>();
+  function dirContentFingerprint(dir: string): Promise<string> {
+    let pending = dirContentFingerprints.get(dir);
+    if (!pending) {
+      pending = dependencyInputs(dir).then(({ root, files }) => contentFingerprint(files, root));
+      dirContentFingerprints.set(dir, pending);
     }
     return pending;
   }
@@ -210,7 +223,13 @@ export async function main() {
   ): Promise<string> {
     const deps = transitiveDeps(graph, dirName);
     const pairs = await Promise.all(
-      deps.map(async (dep) => [dep, (await dirFingerprint(dep))[kind]] as [string, string]),
+      deps.map(
+        async (dep) =>
+          [
+            dep,
+            kind === "mtime" ? await dirMtimeFingerprint(dep) : await dirContentFingerprint(dep),
+          ] as [string, string],
+      ),
     );
     return widenKeyWithDeps(own, pairs);
   }
