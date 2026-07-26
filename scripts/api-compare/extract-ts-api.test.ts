@@ -1258,3 +1258,28 @@ describe("extractFromProgram — @internal JSDoc on top-level functions", () => 
     expect(fns.find((f) => f.name === "secondBang")!.internal).toBeUndefined();
   });
 });
+
+describe("extractFromProgram — re-export attribution", () => {
+  it("marks barrel clones with reExportedFrom and leaves local declarations bare", () => {
+    const info = extractFromFiles("/p", {
+      "adapters/abstract-adapter.ts": `export class AbstractAdapter { quoteTableName(): void {} }`,
+      "adapters/pool.ts": `export const ConnectionPool = { checkout() {} };`,
+      "adapters.ts": `
+        export { AbstractAdapter } from "./adapters/abstract-adapter.js";
+        export { ConnectionPool } from "./adapters/pool.js";
+        export class LocalHelper { helpMe(): void {} }
+      `,
+    });
+
+    expect(
+      info.classes["adapters/abstract-adapter.ts:AbstractAdapter"].reExportedFrom,
+    ).toBeUndefined();
+    expect(info.classes["adapters.ts:AbstractAdapter"].reExportedFrom).toBe(
+      "adapters/abstract-adapter.ts:AbstractAdapter",
+    );
+    expect(info.modules["adapters.ts:ConnectionPool"].reExportedFrom).toBe(
+      "adapters/pool.ts:ConnectionPool",
+    );
+    expect(info.classes["adapters.ts:LocalHelper"].reExportedFrom).toBeUndefined();
+  });
+});

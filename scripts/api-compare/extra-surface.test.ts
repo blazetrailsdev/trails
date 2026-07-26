@@ -1397,3 +1397,67 @@ describe("collectTsFileNames — `__mixin` pseudo-modules", () => {
     expect(names.has("stiClassFor")).toBe(true);
   });
 });
+
+describe("buildReport — re-export clones", () => {
+  it("charges a barrel only with the classes it declares itself", () => {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            "ActiveModel::Foo": rubyClass({ name: "Foo", file: "foo.rb" }),
+            "ActiveModel::Barrel": rubyClass({ name: "Barrel", file: "barrel.rb" }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            "foo.ts:Foo": {
+              name: "Foo",
+              file: "foo.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("declaredOnFoo")],
+              classMethods: [],
+            },
+            "barrel.ts:Foo": {
+              name: "Foo",
+              file: "barrel.ts",
+              reExportedFrom: "foo.ts:Foo",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("declaredOnFoo")],
+              classMethods: [],
+            },
+            "barrel.ts:Barrel": {
+              name: "Barrel",
+              file: "barrel.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("declaredOnBarrel")],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const byFile = new Map(report.packages[0].extraFiles.map((f) => [f.tsFile, f]));
+    expect(byFile.get("foo.ts")!.extras.map((e) => e.name)).toEqual(["declaredOnFoo"]);
+    expect(byFile.get("barrel.ts")!.extras.map((e) => e.name)).toEqual(["declaredOnBarrel"]);
+  });
+});

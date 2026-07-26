@@ -98,6 +98,7 @@ export interface ClassInfo {
   name: string;
   superclass?: string;
   file?: string;
+  reExportedFrom?: string;
   includes: string[];
   extends: string[];
   instanceMethods: MethodInfo[];

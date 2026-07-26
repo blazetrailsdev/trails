@@ -687,11 +687,11 @@ function buildPackageReport(
   const tsClassesByFile = new Map<string, ClassInfo[]>();
   const tsModulesByFile = new Map<string, ClassInfo[]>();
   for (const c of Object.values(tsPkg.classes) as ClassInfo[]) {
-    if (!c.file) continue;
+    if (!c.file || c.reExportedFrom) continue;
     pushTo(tsClassesByFile, c.file, c);
   }
   for (const m of Object.values(tsPkg.modules) as ClassInfo[]) {
-    if (!m.file) continue;
+    if (!m.file || m.reExportedFrom) continue;
     pushTo(tsModulesByFile, m.file, m);
   }
   const tsFileFunctions = tsPkg.fileFunctions ?? {};
