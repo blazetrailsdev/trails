@@ -185,7 +185,7 @@ export class SchemaCache {
       return this._primaryKeys.get(tableName);
     }
 
-    if (isSchemaCacheIgnoredTable(tableName)) return null;
+    if (this.isIgnoredTable(tableName)) return null;
 
     return withConnection(pool, async (connection) => {
       if (await this.dataSourceExists(connection, tableName)) {
@@ -201,7 +201,7 @@ export class SchemaCache {
   }
 
   async dataSourceExists(pool: unknown, name: string): Promise<boolean | undefined> {
-    if (isSchemaCacheIgnoredTable(name)) return undefined;
+    if (this.isIgnoredTable(name)) return undefined;
     // Rails: eager-load all data sources on first cache miss
     if (this._dataSourceExists.size === 0) {
       const tables = await this.tablesToCache(pool);
@@ -236,7 +236,7 @@ export class SchemaCache {
   }
 
   async columns(pool: unknown, tableName: string): Promise<Column[] | undefined> {
-    if (isSchemaCacheIgnoredTable(tableName)) {
+    if (this.isIgnoredTable(tableName)) {
       throw new StatementInvalid(`Table '${tableName}' doesn't exist`);
     }
 
@@ -278,10 +278,29 @@ export class SchemaCache {
     return undefined;
   }
 
-  isColumnsHashCached(_pool: unknown, tableName: string): boolean {
+  // Rails: columns_hash?(_pool, table_name) — "checks whether the columns hash
+  // is already cached for a table" (schema_cache.rb:359).
+  isColumnsHash(_pool: unknown, tableName: string): boolean {
     return this._columnsHash.has(tableName);
   }
 
+  /**
+   * Synchronous, query-free read of an already-warmed columns hash. Rails has
+   * no counterpart: `columns_hash(pool, table)` is its only accessor, and in
+   * Ruby it can block on a connection checkout when the entry is cold.
+   *
+   * Both trails callers are Rails-sync accessors that cannot await: the sync
+   * `Model.columnsHash()` (`model-schema.ts` `columnsHash`, which user code and
+   * `columnNames()` call without awaiting) and `cachedColumnsHash`, which
+   * `attributes.ts` `_defaultAttributes` reads while *constructing* a record.
+   * Both gate on `_columnsHash` — the same map this reads, not `isCached`'s
+   * `_columns` — so a cold table falls through to the async `columnsHash` path
+   * rather than silently reporting an empty schema.
+   *
+   * @noRailsEquivalent Rails' only accessor, `columns_hash(pool, table)`,
+   * may block on a checkout; these callers are Rails-sync and cannot await.
+   * See above.
+   */
   getCachedColumnsHash(tableName: string): Record<string, Column> | undefined {
     return this._columnsHash.get(tableName);
   }
@@ -291,6 +310,9 @@ export class SchemaCache {
    * check. `undefined` when this table has never been checked (a warm cache
    * only seeds `true` for tables it saw — an unchecked absent table is not
    * `false` here until `dataSourceExists` misses on it).
+   *
+   * @noRailsEquivalent Rails' `data_source_exists?(pool, name)` blocks on
+   * the query; `cachedTableExists` is sync and cannot await. See above.
    */
   getCachedDataSourceExists(name: string): boolean | undefined {
     return this._dataSourceExists.get(name);
@@ -332,6 +354,9 @@ export class SchemaCache {
    * keyless table's `primary_key` from the "id" convention to `null` — a
    * behavior change beyond surfacing custom keys. Falling through keeps this a
    * strictly additive read: a table that resolved "id" before still does.
+   *
+   * @noRailsEquivalent Rails' `primary_keys(pool, table)` blocks on the
+   * query; `Model.primaryKey` is sync and cannot await. See above.
    */
   getCachedPrimaryKeys(tableName: string): string | string[] | null | undefined {
     if (this._primaryKeys.has(tableName)) return this._primaryKeys.get(tableName);
@@ -351,7 +376,7 @@ export class SchemaCache {
       return this._indexes.get(tableName)!;
     }
 
-    if (isSchemaCacheIgnoredTable(tableName)) return [];
+    if (this.isIgnoredTable(tableName)) return [];
 
     return withConnection(pool, async (connection) => {
       if (typeof connection.indexes === "function") {
@@ -396,6 +421,10 @@ export class SchemaCache {
    * {@link takeTouchedTables} is called. Test-harness only.
    *
    * @internal
+   *
+   * @noRailsEquivalent Test-harness ledger. Rails re-reflects from a live
+   * blocking connection at fixture teardown and needs no record of what was
+   * cleared.
    */
   recordTouchedTables(): void {
     this._touchedTables = new Set();
@@ -406,6 +435,9 @@ export class SchemaCache {
    * close the recording window. Test-harness only.
    *
    * @internal
+   *
+   * @noRailsEquivalent Test-harness ledger, closing the window opened by
+   * `recordTouchedTables`. No Rails analogue, for the same reason.
    */
   takeTouchedTables(): Set<string> {
     const touched = this._touchedTables ?? new Set<string>();
@@ -423,6 +455,28 @@ export class SchemaCache {
     this._indexes.delete(name);
   }
 
+  /**
+   * Populate the columns / columns-hash / data-source entries for a table from
+   * columns the caller has *already* reflected. Rails has no sync writer — its
+   * only population path is `add(pool, table_name)`, which issues the
+   * introspection queries itself behind `pool.with_connection`.
+   *
+   * That is exactly why the one production caller cannot use `add()`: it has no
+   * pool. `AbstractAdapter#columnForAttribute`'s bare-adapter branch
+   * (`abstract-adapter.ts`, the `poolAbsent(this.pool)` fallback) runs on a
+   * standalone adapter, where `add()` and the `columnsHash` DB fallback both
+   * bail on the null-pool guard. It calls the adapter's own `columns()`
+   * directly and seeds the result here, then reads it straight back via
+   * {@link getCachedColumnsHash}.
+   *
+   * Also warms `_dataSourceExists` — a table whose columns just came back
+   * demonstrably exists — which is what lets the sync readers above answer
+   * without a query.
+   *
+   * @noRailsEquivalent Rails populates only via `add(pool, table_name)`,
+   * which needs a pool; the one caller is the bare-adapter path that has
+   * none. See above.
+   */
   setColumns(tableName: string, cols: Column[]): void {
     this.reconcilePrimaryKeyFlags(tableName, cols);
     this._columns.set(tableName, cols);
@@ -434,6 +488,28 @@ export class SchemaCache {
     this._dataSourceExists.set(tableName, true);
   }
 
+  /**
+   * Sync counterpart of {@link setColumns} for the authoritative primary key.
+   * Rails has no sync writer here either — `add(pool, table_name)` runs the
+   * `primary_keys` query itself behind `pool.with_connection`.
+   *
+   * @internal Test-harness seeding only — it has no production caller. It
+   * exists because the ported `SchemaCache` tests (`test_clearing`,
+   * `test_marshal_dump_and_load`, `test_clear_data_source_cache`, and the
+   * primary-key-reconciliation cases) drive a pool-less `SchemaCache`, where
+   * Rails' tests drive a live `@cache` bound to a real connection and let
+   * `add` / `primary_keys` warm the map for them. Production warms
+   * `_primaryKeys` through the async `primaryKeys` query instead, which is
+   * what {@link getCachedPrimaryKeys} then reads back synchronously.
+   *
+   * Order-independent with {@link setColumns}: whichever lands second runs
+   * {@link reconcilePrimaryKeyFlags}, so the authoritative key always wins over
+   * a column-reflected flag.
+   *
+   * @noRailsEquivalent Test-harness seeding, no production caller: Rails'
+   * tests let the blocking `add` / `primary_keys` warm the map, the trails
+   * ports run pool-less. See above.
+   */
   setPrimaryKeys(tableName: string, pk: string | string[] | null): void {
     this._primaryKeys.set(tableName, pk);
     const cols = this._columns.get(tableName);
@@ -475,6 +551,25 @@ export class SchemaCache {
     }
   }
 
+  /**
+   * Sync writer for the data-source-existence map, completing the
+   * {@link setColumns} / {@link setPrimaryKeys} trio. Rails populates this only
+   * as a side effect of `data_source_exists?(pool, name)`, which blocks on the
+   * query.
+   *
+   * @internal Test-harness seeding only — like {@link setPrimaryKeys} it has no
+   * production caller. Rails' `SchemaCache` tests (`test_data_source_exist`,
+   * `#columns_hash? is not populated by #data_source_exists?`,
+   * `schema_cache_test.rb:324`, `:347`) drive a live `@cache` bound to a real
+   * connection, so the blocking `data_source_exists?` warms the map for them;
+   * the trails ports run pool-less and seed it through this writer instead.
+   * Production warming goes through {@link setColumns} (which sets `true` for a
+   * table whose columns just came back) or the async `dataSourceExists` query.
+   *
+   * @noRailsEquivalent Test-harness seeding, no production caller: Rails'
+   * tests let the blocking `data_source_exists?` warm the map, the trails
+   * ports run pool-less. See above.
+   */
   setDataSourceExists(tableName: string, exists: boolean): void {
     this._dataSourceExists.set(tableName, exists);
   }
@@ -572,11 +667,21 @@ export class SchemaCache {
 
   // Rails: tables_to_cache(pool) — gets data_sources from connection,
   // filtering out anything matched by ActiveRecord.schema_cache_ignored_tables.
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaCache#ignored_table?
+   * (`schema_cache.rb:436`, private) — `ActiveRecord.schema_cache_ignored_table?`
+   * behind a private method on the cache, which is what every ignore check in
+   * this class calls.
+   */
+  private isIgnoredTable(tableName: string): boolean {
+    return isSchemaCacheIgnoredTable(tableName);
+  }
+
   private async tablesToCache(pool: unknown): Promise<string[]> {
     return withConnection(pool, async (connection) => {
       if (typeof connection.dataSources === "function") {
         const tables = (await connection.dataSources()) as string[];
-        return tables.filter((t) => !isSchemaCacheIgnoredTable(t));
+        return tables.filter((t) => !this.isIgnoredTable(t));
       }
       return [];
     });
@@ -626,6 +731,11 @@ export class SchemaReflection {
    * Boot-time only: `resetColumnInformation` always clears the table's entry
    * (Rails' `clear_data_source_cache!`) regardless of this flag — the next
    * load re-reflects it.
+   *
+   * @noRailsEquivalent Opt-in eager DB warming. Rails has only
+   * `lazily_load_schema_cache` (a committed dump) because its sync
+   * accessors can fall back on blocking reflection; trails' cannot. See
+   * above.
    */
   static eagerLoadSchemaCache = false;
 
@@ -638,8 +748,19 @@ export class SchemaReflection {
     this._cachePath = cachePath ?? null;
   }
 
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaReflection#empty_cache
+   * (`schema_cache.rb:100`, private). Rails uses `allocate` + `send(:initialize)`
+   * to bypass a custom `new`; TS has no such distinction, so a plain
+   * construction is the faithful equivalent. Every empty-cache fallback in this
+   * class routes through it, as Rails' do.
+   */
+  private emptyCache(): SchemaCache {
+    return new SchemaCache();
+  }
+
   clearBang(): void {
-    this._cache = new SchemaCache();
+    this._cache = this.emptyCache();
     this._cachePromise = null;
   }
 
@@ -660,6 +781,10 @@ export class SchemaReflection {
    * this pairs the two so the eager-warm pool path has a single entry point
    * that also routes through the lone-connection `FakePool`. Don't grep Rails
    * for it.
+   *
+   * @noRailsEquivalent trails-only composite of Rails'
+   * `SchemaReflection#load!` and `SchemaCache#add_all`; Rails has no
+   * `load_all!`. See above.
    */
   async loadAllBang(pool: unknown): Promise<this> {
     const cache = await this.cache(pool);
@@ -674,6 +799,10 @@ export class SchemaReflection {
    * so adapter-side consumers (AbstractAdapter.schemaCache) see the
    * preloaded data from a schema_cache.json without hitting the DB.
    * External callers should not mutate the returned cache.
+   *
+   * @noRailsEquivalent Sync, non-loading peek. Rails' `SchemaReflection`
+   * needs none because every accessor can block on `cache(pool)`. See
+   * above.
    */
   get loadedCache(): SchemaCache | null {
     return this._cache;
@@ -706,9 +835,9 @@ export class SchemaReflection {
     return (await this.cache(pool)).columnsHash(pool, tableName);
   }
 
-  isColumnsHashCached(pool: unknown, tableName: string): boolean {
+  isColumnsHash(pool: unknown, tableName: string): boolean {
     this.ensureSyncCache();
-    return this._cache?.isColumnsHashCached(pool, tableName) ?? false;
+    return this._cache?.isColumnsHash(pool, tableName) ?? false;
   }
 
   async indexes(pool: unknown, tableName: string): Promise<unknown[]> {
@@ -737,7 +866,7 @@ export class SchemaReflection {
   }
 
   async dumpTo(pool: unknown, filename: string): Promise<void> {
-    const freshCache = new SchemaCache();
+    const freshCache = this.emptyCache();
     await freshCache.addAll(pool);
     freshCache.dumpTo(filename);
     this._cache = freshCache;
@@ -752,10 +881,10 @@ export class SchemaReflection {
       const promise = this.loadCache(pool).then((loaded) => {
         // Guard against clearBang() racing with an in-flight load
         if (this._cachePromise === promise) {
-          this._cache = loaded ?? new SchemaCache();
+          this._cache = loaded ?? this.emptyCache();
           this._cachePromise = null;
         }
-        return this._cache ?? new SchemaCache();
+        return this._cache ?? this.emptyCache();
       });
       this._cachePromise = promise;
     }
@@ -765,7 +894,7 @@ export class SchemaReflection {
   /**
    * Attempt to populate _cache synchronously from disk when version
    * checking is disabled. Used by sync-only paths (isCached, size,
-   * isColumnsHashCached) that can't await.
+   * isColumnsHash) that can't await.
    */
   private ensureSyncCache(): void {
     if (this._cache) return;
@@ -894,8 +1023,8 @@ export class BoundSchemaReflection {
     return this._schemaReflection.columnsHash(this._pool, tableName);
   }
 
-  isColumnsHashCached(tableName: string): boolean {
-    return this._schemaReflection.isColumnsHashCached(this._pool, tableName);
+  isColumnsHash(tableName: string): boolean {
+    return this._schemaReflection.isColumnsHash(this._pool, tableName);
   }
 
   async indexes(tableName: string): Promise<unknown[]> {
@@ -936,29 +1065,6 @@ export class FakePool {
   withConnection<T>(callback: (conn: unknown) => T): T {
     return callback(this._connection);
   }
-}
-
-/**
- * Allocate and initialize a new empty SchemaCache — used by SchemaReflection
- * to create a fresh cache without loading from disk.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::SchemaReflection#empty_cache (private)
- *
- * @internal
- */
-export function emptyCache(): SchemaCache {
-  return new SchemaCache();
-}
-
-/**
- * Returns true when the table name matches the schema_cache_ignored_tables list.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::SchemaCache#ignored_table? (private)
- *
- * @internal
- */
-export function isIgnoredTable(tableName: string): boolean {
-  return isSchemaCacheIgnoredTable(tableName);
 }
 
 /**

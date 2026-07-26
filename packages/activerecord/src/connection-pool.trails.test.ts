@@ -19,6 +19,7 @@ import {
   withExecutionContext,
 } from "./connection-adapters/abstract/connection-pool.js";
 import { Store } from "./connection-adapters/abstract/query-cache.js";
+import { QueryCache } from "./query-cache.js";
 import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-descriptor.js";
 import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { SchemaReflection, BoundSchemaReflection } from "./connection-adapters/schema-cache.js";
@@ -632,7 +633,7 @@ describe("ConnectionPool schema cache", () => {
       // Adapter-visible raw cache is propagated so synchronous consumers
       // (Model.columnNames) see the introspected columns without a DB hit.
       expect(pool.poolConfig.schemaCache).not.toBeNull();
-      expect(pool.poolConfig.schemaCache!.isColumnsHashCached(null, "posts")).toBe(true);
+      expect(pool.poolConfig.schemaCache!.isColumnsHash(null, "posts")).toBe(true);
     } finally {
       SchemaReflection.eagerLoadSchemaCache = prevEager;
       await closePoolConnections(pool);
@@ -993,10 +994,10 @@ describe("ConnectionPoolConfiguration query cache", () => {
       pool.checkin(conn);
     });
 
-    it("withQueryCache enables for the duration of fn and clears on exit", async () => {
+    it("QueryCache.cache enables for the duration of fn and clears on exit", async () => {
       const pool = makePool(1);
       let observed: Store | null = null;
-      await pool.withQueryCache(async () => {
+      await QueryCache.cache(pool, async () => {
         const conn = await pool.checkout();
         observed = (conn as unknown as { _queryCache: Store | null })._queryCache;
         expect(observed!.enabled).toBe(true);

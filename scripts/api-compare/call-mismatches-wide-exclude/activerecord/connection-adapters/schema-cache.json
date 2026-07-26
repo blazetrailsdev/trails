@@ -23,6 +23,13 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/schema-cache.ts",
+    "rubyName": "columns_hash?",
+    "call": "cache",
+    "reason": "Satisfied by a different path: Rails' `columns_hash?(pool, t)` is `cache(pool).columns_hash?(...)` (schema_cache.rb:57), but trails' `cache(pool)` is async while `columns_hash?` is a sync predicate, so `SchemaReflection#isColumnsHash` calls the sync `ensureSyncCache()` analogue instead. `size`/`cache` in this file is the structurally identical omission (Rails `cache(pool).size`; trails `ensureSyncCache()` then `_cache?.size`), though that entry carries only the generic RFC 0047 seed reason rather than this explanation."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/schema-cache.ts",
     "rubyName": "deep_deduplicate",
     "call": "transform_keys",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -102,13 +109,6 @@
     "tsFile": "connection-adapters/schema-cache.ts",
     "rubyName": "size",
     "call": "cache",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/schema-cache.ts",
-    "rubyName": "tables_to_cache",
-    "call": "ignored_table?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

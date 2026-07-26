@@ -292,5 +292,11 @@
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "name": "dropRange",
     "reason": "Rails has no range-type DDL helper anywhere — ranges are created with a raw `execute(\"CREATE TYPE … AS RANGE\")`. trails adds `createRange`/`dropRange` following Rails' own type-DDL helpers (create_enum/drop_enum/rename_enum, postgresql_adapter.rb:541-615), including their `reload_type_map` epilogue; the implementation and the full justification live at the emitting call site, connection-adapters/postgresql/schema-statements-class.ts. Deliberately PostgreSQL-only: the no-op stubs that shadowed these on AbstractAdapter were deleted rather than allowlisted, since Rails stubs only the enum quartet on the base."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "name": "NullConfig",
+    "reason": "Rails nests this class inside `NullPool` (`class NullPool; class NullConfig` — connection_pool.rb:14-22), and the Ruby extractor records only the outer `NullPool`. TS cannot declare a nested class, so it is a sibling export re-attached as `NullPool.NullConfig` (a static, matching Rails' constant lookup path). Same class, same file, same semantics — an extractor-shape artifact, not added surface."
   }
 ]

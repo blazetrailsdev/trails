@@ -169,6 +169,9 @@ export class NullPool implements AbstractPool {
  * pool) carries a NullPool by default, matching Rails' `@pool = NullPool.new`;
  * the schema-cache / bare-adapter fallbacks that historically keyed off
  * `pool == null` use this so a NullPool is treated the same as "no pool".
+ *
+ * @noRailsEquivalent Rails' `NullPool` answers the whole pool protocol, so
+ * Ruby callers never ask whether a pool is real. See above.
  */
 export function poolAbsent(pool: unknown): boolean {
   return pool == null || pool instanceof NullPool;
@@ -180,6 +183,9 @@ export function poolAbsent(pool: unknown): boolean {
  * `realPool(adapter.pool) ?? adapter` where code previously wrote
  * `adapter.pool ?? adapter` to yield a schema-cache target that can actually
  * check out a connection.
+ *
+ * @noRailsEquivalent NullPool-aware form of `adapter.pool ?? fallback`;
+ * unnecessary in Rails for the same reason as `poolAbsent`. See above.
  */
 export function realPool(pool: unknown): unknown | null {
   return poolAbsent(pool) ? null : pool;
@@ -224,7 +230,24 @@ export class LeaseRegistry {
     return lease;
   }
 
-  peek(context: string): Lease | undefined {
+  /**
+   * Non-creating lookup — the clear-only counterpart of {@link get} (Rails'
+   * `[]`, which memoizes a fresh `Lease` on miss). Both callers only want to
+   * drop a connection from a lease *if one exists*:
+   * `removeConnectionFromThreadCache` and `_clearReloadableConnections`.
+   *
+   * Rails writes `@leases[owner_thread].clear(conn)` (connection_pool.rb:889)
+   * and can afford `[]` because `@map` is a `WeakThreadKeyMap` keyed by live
+   * Thread objects — an entry created for a thread that never leased dies with
+   * the thread. Trails' `_map` is a plain `Map` keyed by the *string*
+   * `executionContextId()`, which nothing ever collects, so `get`-on-miss would
+   * permanently insert a dead `Lease` every time one of these paths runs on a
+   * context that never leased.
+   *
+   * `_`-prefixed (repo Rails-private convention): file-internal, no callers
+   * outside connection-pool.ts.
+   */
+  _peek(context: string): Lease | undefined {
     return this._map.get(context);
   }
 
@@ -248,6 +271,20 @@ type ConnectionHandlerLike = {
 export class ExecutorHooks {
   private static _getConnectionHandler: (() => ConnectionHandlerLike | null) | null = null;
 
+  /**
+   * Install the lazy resolver backing {@link connectionHandler}. Rails needs no
+   * such hook: `complete` just references the `ActiveRecord::Base` constant,
+   * which Ruby resolves at call time. In TS an import of `Base` from this
+   * module would be a module-level cycle (Base → connection handling → pool),
+   * so `index.ts` — the one module that has both sides loaded — calls this once
+   * at wire-up time to hand the pool a getter instead.
+   *
+   * @internal Wiring only; called exactly once, from `index.ts`.
+   *
+   * @noRailsEquivalent Wiring hook. Ruby resolves the `ActiveRecord::Base`
+   * constant at call time; a TS import here would be a module cycle. See
+   * above.
+   */
   static setConnectionHandlerResolver(resolver: () => ConnectionHandlerLike | null): void {
     ExecutorHooks._getConnectionHandler = resolver;
   }
@@ -299,6 +336,10 @@ export class ConnectionPool implements ReapablePool {
    * `connectsTo` so callers can await preload before issuing real queries;
    * defaults to a resolved promise for pools whose adapterFactory is
    * supplied directly.
+   *
+   * @noRailsEquivalent Rails' `require` is synchronous, so
+   * `establish_connection` returns with the adapter class resolvable;
+   * trails resolves adapters via dynamic `import()`. See above.
    */
   adapterReady: Promise<unknown> = Promise.resolve();
 
@@ -517,6 +558,29 @@ export class ConnectionPool implements ReapablePool {
     return this._cacheConfig.dirtiesQueryCache;
   }
 
+  /**
+   * True when this pool's query cache is disabled *by configuration*, rather
+   * than merely not enabled right now.
+   *
+   * Rails has no such reader: `ActiveRecord::QueryCache.run` asks inline with
+   * `next if pool.db_config&.query_cache == false`
+   * (`active_record/query_cache.rb:39` — the top-level file, not
+   * `connection_adapters/abstract/query_cache.rb`, whose `db_config&.query_cache`
+   * at `:122` is a different case-statement computing the cache max size).
+   *
+   * Deliberately *not* converged to that literal comparison. `dbConfig.queryCache`
+   * is still readable, but trails' public config type additionally accepts the
+   * `"enabled"` / `"disabled"` string aliases that Rails never sees as raw
+   * values, and `normalizeQueryCacheConfig` maps `"disabled"` → `false`. Asking
+   * Rails' `dbConfig.queryCache === false` directly would therefore stop
+   * skipping a pool configured `queryCache: "disabled"`. The predicate has to be
+   * asked of the *normalized* value, which is what this getter delegates to.
+   * Consumed by `QueryCache.run`'s skip guard in query-cache.ts.
+   *
+   * @noRailsEquivalent Rails asks `pool.db_config&.query_cache == false`
+   * inline; trails' config also accepts a "disabled" alias, so the
+   * predicate must read the normalized value. See above.
+   */
   get queryCacheDisabled(): boolean {
     return this._cacheConfig.queryCacheDisabled;
   }
@@ -541,31 +605,10 @@ export class ConnectionPool implements ReapablePool {
     this._cacheConfig.clearQueryCache();
   }
 
-  /**
-   * Enable the query cache for the duration of `fn`. If the cache wasn't
-   * previously enabled, clear it on exit. Mirrors Rails'
-   * `ActiveRecord::QueryCache.cache(&block)`:
-   *
-   *     was_enabled = pool.query_cache_enabled
-   *     begin
-   *       pool.enable_query_cache(&block)
-   *     ensure
-   *       pool.clear_query_cache unless was_enabled
-   *     end
-   */
-  async withQueryCache<T>(fn: () => T | Promise<T>): Promise<T> {
-    const wasEnabled = this.queryCacheEnabled;
-    try {
-      return await this.enableQueryCache(fn);
-    } finally {
-      if (!wasEnabled) this.clearQueryCache();
-    }
-  }
-
   // --- Pool state ---
 
   get activeConnection(): DatabaseAdapter | null {
-    return this._connectionLease().connection;
+    return this.connectionLease().connection;
   }
 
   isConnected(): boolean {
@@ -594,7 +637,7 @@ export class ConnectionPool implements ReapablePool {
   // path routes through `checkout`, which awaits `verifyBang`. Intentional
   // NAME+semantics fidelity to Rails' `lease_connection`, not the sync return.
   async leaseConnection(): Promise<DatabaseAdapter> {
-    const lease = this._connectionLease();
+    const lease = this.connectionLease();
     lease.sticky = true;
     if (!lease.connection) {
       lease.connection = await this.checkout();
@@ -620,9 +663,13 @@ export class ConnectionPool implements ReapablePool {
    * is tracked by `connection-pool-pinned-sync-checkout-per-checkout-verify`.
    *
    * @internal
+   *
+   * @noRailsEquivalent Sync lease for callers mirroring Rails' synchronous
+   * `lease_connection` that cannot await, since trails' `leaseConnection`
+   * had to become async. See above.
    */
   leaseConnectionSync(): DatabaseAdapter {
-    const lease = this._connectionLease();
+    const lease = this.connectionLease();
     lease.sticky = true;
     if (!lease.connection) {
       const pinned = this._resolvePinnedConnection();
@@ -639,11 +686,11 @@ export class ConnectionPool implements ReapablePool {
   }
 
   isPermanentLease(): boolean {
-    return this._connectionLease().sticky === null;
+    return this.connectionLease().sticky === null;
   }
 
   releaseConnection(): boolean {
-    const conn = this._connectionLease().release();
+    const conn = this.connectionLease().release();
     if (conn) {
       this.checkin(conn);
       return true;
@@ -674,7 +721,7 @@ export class ConnectionPool implements ReapablePool {
     // established connection in fixture mode so pool size 1 doesn't trip
     // ConnectionTimeoutError on `_acquireConnection`.
     const fixtureSharedConnection = slot === "fixture" ? (this._connections?.[0] ?? null) : null;
-    const leasedConnection = fixtureSharedConnection ?? this._connectionLease().connection;
+    const leasedConnection = fixtureSharedConnection ?? this.connectionLease().connection;
     const connection = pin?.connection ?? leasedConnection ?? this._acquireConnection();
     const newlyCheckedOut = !pin && leasedConnection == null;
 
@@ -862,7 +909,7 @@ export class ConnectionPool implements ReapablePool {
 
   checkin(conn: DatabaseAdapter): void {
     if (this._isConnectionPinned(conn)) return;
-    this._connectionLease().clear(conn);
+    this.connectionLease().clear(conn);
     if (this._checkedOut.has(conn)) {
       this._checkedOut.delete(conn);
       // Mirrors `conn._run_checkin_callbacks { conn.expire }`: expire is the
@@ -890,7 +937,7 @@ export class ConnectionPool implements ReapablePool {
     options: { preventPermanentCheckout?: boolean; checkoutTimeout?: number } = {},
   ): Promise<T> {
     const preventPermanent = options.preventPermanentCheckout ?? false;
-    const lease = this._connectionLease();
+    const lease = this.connectionLease();
     const stickyWas = lease.sticky;
     if (preventPermanent) lease.sticky = false;
 
@@ -1011,6 +1058,9 @@ export class ConnectionPool implements ReapablePool {
    * discarded. Not a Rails counterpart — Rails' `discard!` is fully synchronous.
    *
    * @internal
+   *
+   * @noRailsEquivalent Rails' `discard!` is fully synchronous and has no
+   * async closes to hand back. See above.
    */
   discardBangDraining(): Array<Promise<void>> {
     return this._discardBang();
@@ -1087,7 +1137,7 @@ export class ConnectionPool implements ReapablePool {
         // withNewConnectionsBlocked's reseed.
         if (this._checkedOut.has(conn)) {
           this._checkedOut.delete(conn);
-          this._leases?.peek(ctx)?.clear(conn);
+          this._leases?._peek(ctx)?.clear(conn);
           // Mirror Rails' `checkin` (which calls `expire`): clear the in-use
           // flag so a survivor re-entering `_available` can be re-leased.
           (conn as unknown as { expire?: () => void }).expire?.();
@@ -1182,7 +1232,7 @@ export class ConnectionPool implements ReapablePool {
    *
    * @internal
    */
-  trackCloseDrain(drain: Promise<void> | undefined): void {
+  _trackCloseDrain(drain: Promise<void> | undefined): void {
     if (!drain) return;
     this._pendingCloseDrains.add(drain);
     const forget = (): void => {
@@ -1192,12 +1242,16 @@ export class ConnectionPool implements ReapablePool {
   }
 
   /**
-   * Await every async close stashed by {@link trackCloseDrain} (currently the
+   * Await every async close stashed by {@link _trackCloseDrain} (currently the
    * checkout-failure swap discard) so an async-only driver's handle is fully
    * closed before the caller re-opens the same DB. Resolves immediately when
    * nothing is in flight (the sync-driver case).
    *
    * @internal
+   *
+   * @noRailsEquivalent Ruby's `driver.close` is synchronous, so Rails'
+   * discard paths complete the close before returning and need no drain
+   * bookkeeping. See above.
    */
   async drainPendingCloses(): Promise<void> {
     await Promise.all(this._pendingCloseDrains);
@@ -1381,7 +1435,7 @@ export class ConnectionPool implements ReapablePool {
   _eagerWarmPromise: Promise<void> | null = null;
 
   remove(conn: DatabaseAdapter): void {
-    this._connectionLease().clear(conn);
+    this.connectionLease().clear(conn);
     this._checkedOut.delete(conn);
     this._lastCheckinAt.delete(conn);
     this._available?.delete(conn);
@@ -1455,7 +1509,13 @@ export class ConnectionPool implements ReapablePool {
     return this._pinnedConnections.get(executionContextId())?.connection;
   }
 
-  private _connectionLease(): Lease {
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#connection_lease
+   * (`connection_pool.rb:711`, private) — the per-execution-context lease
+   * record. Carries the Rails name directly rather than sitting behind an
+   * `_`-prefixed alias, so the call sites read as Rails' do.
+   */
+  private connectionLease(): Lease {
     if (!this._leases) {
       this._leases = new LeaseRegistry();
     }
@@ -1502,24 +1562,11 @@ function isTransactionAware(conn: DatabaseAdapter): conn is TransactionAwareConn
 // ---------------------------------------------------------------------------
 
 // `Pool` is a structural alias used by the @internal helpers below to reach
-// private state (`_connections`, `_leases`, `_connectionLease`, etc.) on
+// private state (`_connections`, `_leases`, `_available`, etc.) on
 // the host without widening the public API. `any` is intentional — the
 // helpers mirror Rails' file-private surface and shouldn't constrain the
 // public class declaration.
 type Pool = any;
-
-/**
- * Returns the per-execution-context lease record (the lease tracker keyed
- * by the current isolated execution context). Wraps `_connectionLease`,
- * matching Rails' private `connection_lease`.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#connection_lease
- *
- * @internal
- */
-function connectionLease(pool: Pool): Lease {
-  return pool._connectionLease();
-}
 
 /**
  * Builds the async-query executor. JS runs single-threaded, so a real
@@ -1776,7 +1823,7 @@ function removeConnectionFromThreadCache(
   ownerThread?: string | number,
 ): void {
   const owner = ownerThread ?? executionContextId();
-  pool._leases?.peek(String(owner))?.clear(conn);
+  pool._leases?._peek(String(owner))?.clear(conn);
 }
 
 /** @internal */
@@ -1893,7 +1940,7 @@ function checkoutAndVerify(pool: Pool, c: DatabaseAdapter): DatabaseAdapter {
     // can't await under its sync contract; stash it on the pool so a caller can
     // drain it (pool.drainPendingCloses) before re-opening the same DB. Sync
     // drivers contribute a resolved no-op.
-    pool.trackCloseDrain((c as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.());
+    pool._trackCloseDrain((c as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.());
     throw err;
   }
 }
