@@ -15,7 +15,7 @@ import {
   indexNestedAttributeErrors,
   setIndexNestedAttributeErrors,
 } from "./index.js";
-import { Associations, setBelongsTo, association } from "./associations.js";
+import { Associations, association } from "./associations.js";
 
 import {
   Agency,
@@ -1427,11 +1427,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     const { Pirate, Ship } = makeModels();
     const pirate = new Pirate({ catchphrase: "Savvy?" });
     const ship = new Ship({ name: "Black Pearl" });
-    setBelongsTo(ship, "pirate", pirate, {
-      className: "Pirate",
-      foreignKey: "pirate_id",
-      inverseOf: "ship",
-    });
+    (ship as any).pirate = pirate;
     await pirate.save();
     const reloaded = await Pirate.find(pirate.id!);
     const reloadedShip = (await reloaded.association("ship").loadTarget()) as Base;
@@ -1926,7 +1922,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     registerModel(PolySponsor);
     const member = await PolyMember.create({ name: "Alice" });
     const sponsor = new PolySponsor({});
-    setBelongsTo(sponsor, "sponsorable", member, { polymorphic: true });
+    (sponsor as any).sponsorable = member;
     await sponsor.save();
     const reloaded = await PolySponsor.find(sponsor.id!);
     expect(reloaded.sponsorable_id).toBe(member.id);

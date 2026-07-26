@@ -11,7 +11,7 @@ import {
   InverseOfAssociationNotFoundError,
   InverseOfAssociationRecursiveError,
 } from "../index.js";
-import { loadBelongsTo, loadHasOne, loadHasMany, setBelongsTo } from "../associations.js";
+import { loadBelongsTo, loadHasOne, loadHasMany } from "../associations.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Branch, BrokenBranch } from "../test-helpers/models/branch.js";
 import { Human } from "../test-helpers/models/human.js";
@@ -965,7 +965,7 @@ describe("InverseBelongsToTests", () => {
       const human = await Human.create({});
       await association(human, "interests").load();
       const interest = new Interest();
-      setBelongsTo(interest, "human", human, { inverseOf: "interests" });
+      (interest as any).human = human;
       await association(human, "interests").push(interest);
       expect(await association(human, "interests").size()).toBe(1);
     });
