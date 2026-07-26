@@ -4,6 +4,8 @@
  */
 
 import { getCrypto } from "./crypto-adapter.js";
+import { Codec, type MessageSerializer } from "./messages/codec.js";
+import type { Format } from "./messages/serializer-with-fallback.js";
 import { Temporal } from "./temporal.js";
 // Use the travel-aware clock so expiry honors ActiveSupport::Testing::TimeHelpers
 // (`travel`/`travelTo`). With no travel active this is identical to
@@ -17,23 +19,10 @@ export class InvalidSignature extends Error {
   }
 }
 
-interface Serializer {
-  dump(value: unknown): string;
-  load(value: string): unknown;
-}
-
-const JSONSerializer: Serializer = {
-  dump(v) {
-    return JSON.stringify(v);
-  },
-  load(s) {
-    return JSON.parse(s);
-  },
-};
-
 interface MessageVerifierOptions {
   digest?: string;
-  serializer?: Serializer;
+  /** A `SerializerWithFallback` format name (`"json"`, `"marshal"`, …) or a serializer object. */
+  serializer?: Format | MessageSerializer;
   url_safe?: boolean;
 }
 
@@ -47,17 +36,21 @@ interface VerifyOptions {
   purpose?: string | null;
 }
 
-export class MessageVerifier {
+export class MessageVerifier extends Codec {
+  // Rails' Codec defaults to `:marshal`; trails keeps `:json` here because the
+  // signed payloads this class produces are consumed as JSON envelopes by
+  // GlobalID, ActiveRecord signed ids, and credentials — switching the default
+  // would invalidate every message already in the wild. Callers wanting Rails'
+  // default pass `serializer: "marshal"` explicitly.
+  static override defaultSerializer: Format | MessageSerializer = "json";
+
   private secret: string | Buffer;
   private digest: string;
-  private serializer: Serializer;
-  private urlSafe: boolean;
 
   constructor(secret: string | Buffer, options: MessageVerifierOptions = {}) {
+    super({ serializer: options.serializer, urlSafe: options.url_safe });
     this.secret = secret;
     this.digest = options.digest ?? "sha1";
-    this.serializer = options.serializer ?? JSONSerializer;
-    this.urlSafe = options.url_safe ?? false;
   }
 
   generate(value: unknown, options: GenerateOptions = {}): string {
@@ -81,7 +74,7 @@ export class MessageVerifier {
       payload._purpose = options.purpose;
     }
 
-    const serialized = this.serializer.dump(payload);
+    const serialized = this.serialize(payload);
     const encoded = this.encode(Buffer.from(serialized));
     const signature = this.sign(encoded);
     return `${encoded}--${signature}`;
@@ -105,7 +98,7 @@ export class MessageVerifier {
     try {
       const [encoded] = message.split("--");
       const decoded = this.decode(encoded);
-      const parsed = this.serializer.load(decoded.toString());
+      const parsed = this.deserialize(decoded.toString());
 
       if (typeof parsed !== "object" || parsed === null || !("value" in parsed)) {
         throw new InvalidSignature("Missing value key");
@@ -170,14 +163,15 @@ export class MessageVerifier {
   // them (Ruby private methods are still overridable). TS forbids
   // redeclaring a private base member in a subclass, so they're protected
   // here to keep that override path open.
-  protected encode(buf: Buffer): string {
+  protected override encode(data: string | Buffer): string {
+    const buf = typeof data === "string" ? Buffer.from(data, "latin1") : data;
     if (this.urlSafe) {
       return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
     }
     return buf.toString("base64");
   }
 
-  protected decode(str: string): Buffer {
+  protected override decode(str: string): Buffer {
     // Support both url-safe and standard base64
     const normalized = str.replace(/-/g, "+").replace(/_/g, "/");
     // Add padding if needed

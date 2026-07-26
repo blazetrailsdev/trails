@@ -4,6 +4,8 @@
  */
 
 import { getCrypto } from "./crypto-adapter.js";
+import { Codec, type MessageSerializer } from "./messages/codec.js";
+import type { Format } from "./messages/serializer-with-fallback.js";
 
 export class InvalidMessage extends Error {
   constructor(message = "Invalid message") {
@@ -12,32 +14,24 @@ export class InvalidMessage extends Error {
   }
 }
 
-interface Serializer {
-  dump(value: unknown): string;
-  load(value: string): unknown;
-}
-
-const JSONSerializer: Serializer = {
-  dump(v) {
-    return JSON.stringify(v);
-  },
-  load(s) {
-    return JSON.parse(s);
-  },
-};
-
 interface MessageEncryptorOptions {
   cipher?: string;
   digest?: string;
-  serializer?: Serializer;
+  /** A `SerializerWithFallback` format name (`"json"`, `"marshal"`, …) or a serializer object. */
+  serializer?: Format | MessageSerializer;
 }
 
-export class MessageEncryptor {
+export class MessageEncryptor extends Codec {
+  // Rails' Codec defaults to `:marshal`; trails keeps `:json` here because
+  // encrypted credentials and every message this class has already written are
+  // JSON payloads — flipping the default would make them undecryptable.
+  // Callers wanting Rails' default pass `serializer: "marshal"` explicitly.
+  static override defaultSerializer: Format | MessageSerializer = "json";
+
   private secret: Buffer;
   private signSecret: Buffer;
   private cipher: string;
   private digest: string;
-  private serializer: Serializer;
 
   constructor(
     secret: string | Buffer,
@@ -58,9 +52,10 @@ export class MessageEncryptor {
       opts = options ?? {};
     }
 
+    super({ serializer: opts.serializer });
+
     this.cipher = opts.cipher ?? "aes-256-cbc";
     this.digest = opts.digest ?? "sha1";
-    this.serializer = opts.serializer ?? JSONSerializer;
 
     this.secret = typeof secret === "string" ? Buffer.from(secret) : secret;
 
@@ -72,7 +67,7 @@ export class MessageEncryptor {
   }
 
   encryptAndSign(value: unknown): string {
-    const serialized = this.serializer.dump(value);
+    const serialized = this.serialize(value);
     const encrypted = this.encrypt(serialized);
     const signature = this.sign(encrypted);
     return `${encrypted}--${signature}`;
@@ -94,7 +89,7 @@ export class MessageEncryptor {
     }
 
     const decrypted = this.decrypt(encrypted);
-    return this.serializer.load(decrypted);
+    return this.deserialize(decrypted);
   }
 
   private encrypt(plaintext: string): string {
