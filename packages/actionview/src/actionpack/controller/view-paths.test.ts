@@ -1,8 +1,8 @@
 import { afterEach, beforeAll, describe, expect, test } from "vitest";
 import { getPathAsync } from "@blazetrails/activesupport";
-import { PathRegistry } from "./path-registry.js";
-import { PathSet } from "./path-set.js";
-import { FileSystemResolver } from "./resolver/file-system-resolver.js";
+import { PathRegistry } from "../../path-registry.js";
+import { PathSet } from "../../path-set.js";
+import { FileSystemResolver } from "../../resolver/file-system-resolver.js";
 import {
   ClassMethods,
   appendViewPath,
@@ -11,7 +11,7 @@ import {
   viewPaths,
   type ViewPaths,
   type ViewPathsClass,
-} from "./view-paths.js";
+} from "../../view-paths.js";
 
 const FIXTURE_LOAD_PATH = "/fixtures";
 
@@ -22,10 +22,6 @@ beforeAll(async () => {
   expand = (paths) => paths.map((p) => path.resolve(p));
 });
 
-/**
- * Stands in for `ActionController::Base` — the ViewPaths surface assigned onto
- * a class that supplies `abstract?` and `controller_path`.
- */
 class TestController implements ViewPaths {
   declare readonly ["constructor"]: ViewPathsClass;
 
@@ -61,12 +57,12 @@ afterEach(() => {
 });
 
 describe("ViewLoadPathsTest", () => {
-  test("test_template_load_path_was_set_correctly", () => {
+  test("template load path was set correctly", () => {
     TestController.viewPaths([FIXTURE_LOAD_PATH]);
     assertPaths(new TestController().viewPaths(), FIXTURE_LOAD_PATH);
   });
 
-  test("test_controller_appends_view_path_correctly", () => {
+  test("controller appends view path correctly", () => {
     TestController.viewPaths([FIXTURE_LOAD_PATH]);
     const controller = new TestController();
 
@@ -80,7 +76,7 @@ describe("ViewLoadPathsTest", () => {
     assertPaths(controller.viewPaths(), FIXTURE_LOAD_PATH, "foo", "bar", "baz", FIXTURE_LOAD_PATH);
   });
 
-  test("test_controller_prepends_view_path_correctly", () => {
+  test("controller prepends view path correctly", () => {
     TestController.viewPaths([FIXTURE_LOAD_PATH]);
     const controller = new TestController();
 
@@ -94,7 +90,7 @@ describe("ViewLoadPathsTest", () => {
     assertPaths(controller.viewPaths(), FIXTURE_LOAD_PATH, "foo", "bar", "baz", FIXTURE_LOAD_PATH);
   });
 
-  test("test_inheritance", () => {
+  test("inheritance", () => {
     const originalLoadPaths = [FIXTURE_LOAD_PATH];
     TestController.viewPaths(originalLoadPaths);
 
@@ -113,7 +109,7 @@ describe("ViewLoadPathsTest", () => {
     assertPaths(C.viewPaths(), "c/path");
   });
 
-  test("test_lookup_context_accessor", () => {
+  test("lookup context accessor", () => {
     TestController.viewPaths([FIXTURE_LOAD_PATH]);
     expect(new TestController().lookupContext().prefixes).toEqual(["test"]);
   });

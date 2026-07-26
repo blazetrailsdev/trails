@@ -1,8 +1,3 @@
-/**
- * TS-only coverage for the parts of `ActionView::ViewPaths` whose Rails tests
- * live in controller integration suites (rendering through a real
- * `ActionController::Base`) that ActionView cannot host on its own.
- */
 import { afterEach, describe, expect, test } from "vitest";
 import { PathRegistry } from "./path-registry.js";
 import {

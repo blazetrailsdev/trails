@@ -15,11 +15,6 @@ import type { TemplateResolver } from "./resolver/resolver.js";
 
 type ClassLike = new (...args: unknown[]) => unknown;
 
-/**
- * What a class's registered view paths can be: Rails always stores a
- * `PathSet` (see `ViewPaths` and `path_registry.rb`'s `map(&:to_a)`); the
- * bare resolver array is the shape ActionView's own callers still pass.
- */
 export type RegisteredViewPaths = PathSet | TemplateResolver[];
 
 export class PathRegistry {
@@ -85,8 +80,6 @@ export class PathRegistry {
     };
     for (const r of this._fileSystemResolvers.values()) add(r);
     for (const paths of this._viewPathsByClass.values()) {
-      // PathSet holds the `findAll` protocol, `TemplateResolver` the `find`
-      // one; Rails has a single Resolver protocol, so both are resolvers here.
       const list =
         paths instanceof PathSet ? (paths.toArray() as unknown as TemplateResolver[]) : paths;
       for (const r of list) add(r);
