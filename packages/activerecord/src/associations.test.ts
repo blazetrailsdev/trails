@@ -6,6 +6,7 @@
  * GeneratedMethodsTest, and WithAnnotationsTest.
  */
 import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from "vitest";
+import { findTarget } from "./associations/singular-association.js";
 import { Base, association, reflectOnAssociation, registerModel, NameError, pp } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { captureSql } from "./testing/sql-capture.js";
@@ -32,7 +33,7 @@ import { Member } from "./test-helpers/models/member.js";
 import { Membership } from "./test-helpers/models/membership.js";
 import { Human } from "./test-helpers/models/human.js";
 import { Interest } from "./test-helpers/models/interest.js";
-import { buildHasManyRelation, loadBelongsTo, loadHasMany, loadHasOne } from "./associations.js";
+import { buildHasManyRelation, loadHasMany, loadHasOne } from "./associations.js";
 import "./test-helpers/models/ship.js";
 import "./test-helpers/models/bird.js";
 import "./test-helpers/models/treasure.js";
@@ -877,10 +878,10 @@ describe("PreloaderTest", () => {
     // that on `has_many_inversing` (BelongsToAssociation#invertible_for?), which
     // is unset here, so the loaded author carries no inverse collection.
     spy.mockClear();
-    const reloadedAuthor = (await loadBelongsTo(fav, "author", {
+    const reloadedAuthor = (await findTarget(fav, "author", {
       inverseOf: "authorFavorites",
     })) as any;
-    const reloadedFavorite = (await loadBelongsTo(fav, "favoriteAuthor", {})) as any;
+    const reloadedFavorite = (await findTarget(fav, "favoriteAuthor", {})) as any;
     expect(reloadedAuthor.name).toBe("Mary");
     expect(reloadedFavorite.name).toBe("Bob");
     expect(spy).not.toHaveBeenCalled();
@@ -1118,7 +1119,7 @@ describe("PreloaderTest", () => {
     const maryPost = (await Post.where({ id: maryPostId }))[0];
 
     // Force-load bob's author; mary's stays unloaded.
-    const loadedBob = await loadBelongsTo(bobPost, "author", {});
+    const loadedBob = await findTarget(bobPost, "author", {});
     expect(bobPost.association("author").isLoaded()).toBe(true);
     expect(maryPost.association("author").isLoaded()).toBe(false);
 
@@ -1365,7 +1366,7 @@ describe("PreloaderTest", () => {
     });
 
     // Load the blogPost on the comment instance first (warms the association cache).
-    await loadBelongsTo(comment, "blogPost", { className: "ShardedBlogPost" });
+    await findTarget(comment, "blogPost", { className: "ShardedBlogPost" });
 
     // Preloading on the already-loaded record must not fire any SQL queries
     // (mirrors Rails' assert_no_queries block).

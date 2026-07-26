@@ -1,10 +1,10 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
-import { loadBelongsTo, reflectLockVersionBump } from "../associations.js";
+import { reflectLockVersionBump } from "../associations.js";
 import { underscore } from "@blazetrails/activesupport";
 import { belongsToCounterCacheColumn } from "../reflection.js";
 import { hasQueryConstraints, queryConstraintsList } from "../persistence.js";
-import { SingularAssociation } from "./singular-association.js";
+import { SingularAssociation, findTarget } from "./singular-association.js";
 import { Rollback } from "../errors.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 
@@ -320,7 +320,7 @@ export class BelongsToAssociation extends SingularAssociation {
     // which the stale-key check cannot see. See `_loaderWritebackSuppressed`.
     this._loaderWritebackSuppressed++;
     try {
-      return await loadBelongsTo(this.owner, this.reflection.name, this.reflection.options);
+      return await findTarget(this.owner, this.reflection.name, this.reflection.options);
     } finally {
       this._loaderWritebackSuppressed--;
     }

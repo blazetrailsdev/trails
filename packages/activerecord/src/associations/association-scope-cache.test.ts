@@ -15,8 +15,9 @@
  * synthetic `cache_*` tables.
  */
 import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
+import { findTarget } from "./singular-association.js";
 import { registerModel, enableSti, registerSubclass } from "../index.js";
-import { loadHasMany, loadBelongsTo, loadHasOne } from "../associations.js";
+import { loadHasMany, loadHasOne } from "../associations.js";
 import { AssociationScope } from "./association-scope.js";
 import { StatementCache } from "../statement-cache.js";
 import { fixtures } from "../test-helpers/fixtures.js";
@@ -126,13 +127,13 @@ describe("Association scope cache", () => {
 
     const spy = vi.spyOn(StatementCache, "create");
 
-    const r1 = await loadBelongsTo(p1, "author", opts);
+    const r1 = await findTarget(p1, "author", opts);
     expect((r1 as any)?.id).toBe(authors("david").id);
     const afterFirst = spy.mock.calls.length;
     expect(afterFirst).toBe(1);
 
     // Second owner's load reuses the cached statement — no recompile.
-    const r2 = await loadBelongsTo(p2, "author", opts);
+    const r2 = await findTarget(p2, "author", opts);
     expect((r2 as any)?.id).toBe(authors("bob").id);
     expect(spy.mock.calls.length).toBe(afterFirst);
   });

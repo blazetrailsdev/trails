@@ -8,8 +8,9 @@
  * convention file tracks Rails 1:1.
  */
 import { describe, it, expect } from "vitest";
+import { findTarget } from "./associations/singular-association.js";
 import { StrictLoadingViolationError, registerModel } from "./index.js";
-import { loadBelongsTo, loadHasOne, loadHasMany, loadHabtm } from "./associations.js";
+import { loadHasOne, loadHasMany, loadHabtm } from "./associations.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { Developer, AuditLog } from "./test-helpers/models/developer.js";
 import { Ship } from "./test-helpers/models/ship.js";
@@ -60,7 +61,7 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
   it("does not raise on lazy loading a belongs_to on a new strict-loading owner without the foreign key", async () => {
     const developer = new Developer({ name: "New Dev" });
     developer.strictLoadingBang();
-    await expect(loadBelongsTo(developer, "firm", optionsFor("firm"))).resolves.toBeNull();
+    await expect(findTarget(developer, "firm", optionsFor("firm"))).resolves.toBeNull();
   });
 
   it("does not raise on lazy loading a habtm on a new strict-loading owner without the foreign key", async () => {
@@ -77,14 +78,14 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
     developer.firm_id = null as unknown as number;
     developer.strictLoadingBang();
     expect(developer.isNewRecord()).toBe(false);
-    await expect(loadBelongsTo(developer, "firm", optionsFor("firm"))).resolves.toBeNull();
+    await expect(findTarget(developer, "firm", optionsFor("firm"))).resolves.toBeNull();
   });
 
   it("raises on lazy loading a belongs_to on a new strict-loading owner with the foreign key present", async () => {
     const developer = new Developer({ name: "New Dev", firm_id: 1 });
     developer.strictLoadingBang();
     expect(developer.isNewRecord()).toBe(true);
-    await expect(loadBelongsTo(developer, "firm", optionsFor("firm"))).rejects.toThrow(
+    await expect(findTarget(developer, "firm", optionsFor("firm"))).rejects.toThrow(
       StrictLoadingViolationError,
     );
   });
