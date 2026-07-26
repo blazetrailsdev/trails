@@ -74,16 +74,14 @@ export class TableDefinition extends AbstractTableDefinition {
       adapterName?: "sqlite" | "postgres" | "mysql";
     } = {},
   ) {
-    const { adapter, adapterName: _ignoredAdapterName, ...rest } = options;
+    const { adapter, adapterName: _ignoredAdapterName, charset, collation, ...rest } = options;
     super(tableName, {
       ...rest,
-      charset: rest.charset ?? undefined,
-      collation: rest.collation ?? undefined,
       adapterName: "mysql",
       adapter: mysqlSchemaQuoter(adapter),
     });
-    this.charset = rest.charset ?? undefined;
-    this.collation = rest.collation ?? undefined;
+    this.charset = charset ?? undefined;
+    this.collation = collation ?? undefined;
   }
 
   blob(name: string, options: ColumnOptions & { limit?: number } = {}): this {
