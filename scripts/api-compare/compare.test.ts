@@ -915,11 +915,11 @@ describe("resolveModuleName", () => {
     const byShort = new Map([["Quoting", ["AR::ConnectionAdapters::Quoting"]]]);
     expect(
       resolveModuleName("Quoting", "AR::ConnectionAdapters::AbstractAdapter", byShort),
-    ).toEqual(["AR::ConnectionAdapters::Quoting"]);
+    ).toEqual("AR::ConnectionAdapters::Quoting");
   });
 
   it("falls back to the verbatim qualified name when nothing matches", () => {
-    expect(resolveModuleName("Foo::Bar", "Baz::Qux", new Map())).toEqual(["Foo::Bar"]);
+    expect(resolveModuleName("Foo::Bar", "Baz::Qux", new Map())).toEqual("Foo::Bar");
   });
 
   it("resolves a partially-qualified name through the enclosing namespace", () => {
@@ -930,7 +930,7 @@ describe("resolveModuleName", () => {
         "AR::ConnectionAdapters::PostgreSQLAdapter",
         byShort,
       ),
-    ).toEqual(["AR::ConnectionAdapters::PostgreSQL::Quoting"]);
+    ).toEqual("AR::ConnectionAdapters::PostgreSQL::Quoting");
   });
 
   it("returns a fully-qualified name that already matches a known module", () => {
@@ -939,7 +939,7 @@ describe("resolveModuleName", () => {
     ]);
     expect(
       resolveModuleName("Other::Quoting", "AR::ConnectionAdapters::PostgreSQLAdapter", byShort),
-    ).toEqual(["Other::Quoting"]);
+    ).toEqual("Other::Quoting");
   });
 
   it("prefers the nearest namespace prefix over a top-level qualified match", () => {
@@ -952,30 +952,44 @@ describe("resolveModuleName", () => {
         "AR::ConnectionAdapters::PostgreSQLAdapter",
         byShort,
       ),
-    ).toEqual(["AR::ConnectionAdapters::PostgreSQL::Quoting"]);
+    ).toEqual("AR::ConnectionAdapters::PostgreSQL::Quoting");
   });
 
   it("returns the verbatim qualified name when no namespace prefix matches", () => {
     const byShort = new Map([["Quoting", ["Somewhere::Else::Quoting"]]]);
-    expect(resolveModuleName("PostgreSQL::Quoting", "AR::Base", byShort)).toEqual([
+    expect(resolveModuleName("PostgreSQL::Quoting", "AR::Base", byShort)).toEqual(
       "PostgreSQL::Quoting",
-    ]);
+    );
   });
 
   it("strips a leading :: and resolves top-level, ignoring nearer candidates", () => {
     // `include ::Foo` is absolute: it must not bind to the lexically nearer
     // `Z::Foo` the unqualified form would pick.
     const byShort = new Map([["Foo", ["Z::Foo", "Foo"]]]);
-    expect(resolveModuleName("::Foo", "Z::Bar", byShort)).toEqual(["Foo"]);
+    expect(resolveModuleName("::Foo", "Z::Bar", byShort)).toEqual("Foo");
   });
 
   it("strips a leading :: from a qualified absolute name", () => {
-    expect(resolveModuleName("::Foo::Bar", "Baz::Qux", new Map())).toEqual(["Foo::Bar"]);
+    expect(resolveModuleName("::Foo::Bar", "Baz::Qux", new Map())).toEqual("Foo::Bar");
   });
 
-  it("returns all candidates when context has no prefix match", () => {
+  it("returns the top-level reading when context has no prefix match", () => {
+    // Ruby binds one constant, never every same-named candidate: handing back
+    // both would give `Z::Bar` X::Foo's *and* Y::Foo's methods as expected
+    // surface, and both modules' includer files as legal homes for them.
     const byShort = new Map([["Foo", ["X::Foo", "Y::Foo"]]]);
-    expect(resolveModuleName("Foo", "Z::Bar", byShort)).toEqual(["X::Foo", "Y::Foo"]);
+    expect(resolveModuleName("Foo", "Z::Bar", byShort)).toEqual("Foo");
+  });
+
+  it("binds the nearest enclosing candidate or top-level, never an unrelated sibling", () => {
+    // Whatever the context, the binding is the innermost enclosing namespace
+    // that defines `Foo`, else top-level `Foo` — never a candidate the context
+    // does not enclose. `Y::Foo` is unreachable from every context here.
+    const byShort = new Map([["Foo", ["X::Foo", "Y::Foo", "X::Y::Foo"]]]);
+    expect(resolveModuleName("Foo", "X::Y::Bar", byShort)).toEqual("X::Y::Foo");
+    expect(resolveModuleName("Foo", "X::Bar", byShort)).toEqual("X::Foo");
+    expect(resolveModuleName("Foo", "Z::Bar", byShort)).toEqual("Foo");
+    expect(resolveModuleName("Foo", "A::B::C::D", byShort)).toEqual("Foo");
   });
 
   it("prefers nearest namespace prefix — abstract base wins over sibling adapter", () => {
@@ -986,7 +1000,7 @@ describe("resolveModuleName", () => {
     ];
     const byShort = new Map([["Quoting", candidates]]);
     const result = resolveModuleName("Quoting", "AR::ConnectionAdapters::AbstractAdapter", byShort);
-    expect(result).toEqual(["AR::ConnectionAdapters::Quoting"]);
+    expect(result).toEqual("AR::ConnectionAdapters::Quoting");
   });
 
   it("prefers adapter-specific namespace when including class is in that namespace", () => {
@@ -1000,19 +1014,19 @@ describe("resolveModuleName", () => {
       "AR::ConnectionAdapters::PostgreSQL::PostgreSQLAdapter",
       byShort,
     );
-    expect(result).toEqual(["AR::ConnectionAdapters::PostgreSQL::Quoting"]);
+    expect(result).toEqual("AR::ConnectionAdapters::PostgreSQL::Quoting");
   });
 
   it("binds a class's own nested module over an identically-named sibling's", () => {
     // `class Rack::Request; include Helpers; end` where both Request and
     // Response nest a `Helpers`: Ruby binds Request's.
     const byShort = new Map([["Helpers", ["Rack::Request::Helpers", "Rack::Response::Helpers"]]]);
-    expect(resolveModuleName("Helpers", "Rack::Request", byShort)).toEqual([
+    expect(resolveModuleName("Helpers", "Rack::Request", byShort)).toEqual(
       "Rack::Request::Helpers",
-    ]);
-    expect(resolveModuleName("Helpers", "Rack::Response::Raw", byShort)).toEqual([
+    );
+    expect(resolveModuleName("Helpers", "Rack::Response::Raw", byShort)).toEqual(
       "Rack::Response::Helpers",
-    ]);
+    );
   });
 });
 

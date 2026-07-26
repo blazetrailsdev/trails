@@ -769,33 +769,46 @@ function nearestNamespaceMatch(
  * If only one FQN matches an unqualified short name, that single candidate is
  * returned regardless of context. When multiple candidates exist,
  * namespace-prefix walking picks the nearest enclosing match; if none of the
- * candidates share a namespace prefix with the context the full candidate list
- * is returned (original behavior, safe fallback).
+ * candidates share a namespace prefix with the context the verbatim name is
+ * returned — the top-level reading, matching the qualified-name arm.
+ *
+ * Returns exactly one FQN, because Ruby's constant lookup binds exactly one:
+ * lexical scope, then the ancestry chain, then top-level, then `NameError`.
+ * The return type is `string` rather than `string[]` to keep that structural.
  *
  * Every consumer of `moduleFqnByShort` resolves through here —
  * `flattenIncludedMethodInfos` (expected surface) and `buildModuleIncluderFqns`
  * (where that surface may be implemented). A broader lookup in either one lets
  * a method count as implemented in a file Ruby's constant lookup never binds.
+ * That is why the last arm no longer returns the *whole* candidate list
+ * ("original behavior, safe fallback"): safe against false negatives, but each
+ * extra candidate donates its methods to the expected surface and its
+ * includers' files to the search set, so a wrong one is a false match.
+ * Measured over the real manifests, that arm never fired — 26 ambiguous
+ * unqualified include sites across all 13 packages, every one resolved by the
+ * namespace walk — so dropping it moved no method counts. Same false-positive
+ * shape PR #5344 removed from the includer graph, where 21 methods were
+ * counting as implemented in files Ruby's lookup never reaches.
  */
 export function resolveModuleName(
   incName: string,
   contextFqn: string,
   moduleFqnByShort: Map<string, string[]>,
-): string[] {
+): string {
   // A leading `::` is Ruby's absolute-reference marker, not a namespace
   // qualifier: `include ::Foo` names top-level `Foo` regardless of context.
-  if (incName.startsWith("::")) return [incName.slice(2)];
+  if (incName.startsWith("::")) return incName.slice(2);
   if (incName.includes("::")) {
     const candidates = moduleFqnByShort.get(incName.split("::").pop()!) ?? [];
-    return [nearestNamespaceMatch(incName, contextFqn, candidates) ?? incName];
+    return nearestNamespaceMatch(incName, contextFqn, candidates) ?? incName;
   }
   const candidates = moduleFqnByShort.get(incName);
-  if (!candidates || candidates.length === 0) return [incName];
-  if (candidates.length === 1) return candidates;
+  if (!candidates || candidates.length === 0) return incName;
+  if (candidates.length === 1) return candidates[0];
 
-  const nearest = nearestNamespaceMatch(incName, contextFqn, candidates);
-  // No prefix match — fall back to all candidates (original behavior).
-  return nearest ? [nearest] : candidates;
+  // No prefix match — take the top-level reading, the same fall-through the
+  // qualified-name arm above uses.
+  return nearestNamespaceMatch(incName, contextFqn, candidates) ?? incName;
 }
 
 /**
@@ -817,11 +830,10 @@ export function buildModuleIncluderFqns(
   const moduleIncluderFqns = new Map<string, Set<string>>();
   for (const { fqn, info } of entities) {
     for (const inc of [...(info.includes || []), ...(info.extends || [])]) {
-      for (const modFqn of resolveModuleName(inc, fqn, moduleFqnByShort)) {
-        const includers = moduleIncluderFqns.get(modFqn) || new Set<string>();
-        includers.add(fqn);
-        moduleIncluderFqns.set(modFqn, includers);
-      }
+      const modFqn = resolveModuleName(inc, fqn, moduleFqnByShort);
+      const includers = moduleIncluderFqns.get(modFqn) || new Set<string>();
+      includers.add(fqn);
+      moduleIncluderFqns.set(modFqn, includers);
     }
   }
   return moduleIncluderFqns;
@@ -868,22 +880,20 @@ export function flattenIncludedMethodInfos(
   const visited = new Set<string>();
 
   const walk = (incName: string, asClassMethods: boolean, contextFqn: string): void => {
-    const fqns = resolveModuleName(incName, contextFqn, moduleFqnByShort);
-    for (const fqn of fqns) {
-      if (visited.has(fqn)) continue;
-      visited.add(fqn);
-      const mod = rubyPkg.modules[fqn] as unknown as ClassInfo | undefined;
-      if (!mod) continue;
-      // A module whose source file we've explicitly declined to port should
-      // not contribute its methods to includers either — otherwise an
-      // unported mixin (e.g. Railties::ControllerRuntime, included into
-      // ActionController via an `on_load` block, not into Railtie itself)
-      // leaks expected methods onto the host. See UNPORTED_FILES.
-      if (mod.file && isSourceUnported(mod.file, pkg)) continue;
-      const sink = asClassMethods ? klass : instance;
-      for (const m of mod.instanceMethods) sink.push(m);
-      for (const inc of mod.includes ?? []) walk(inc, asClassMethods, fqn);
-    }
+    const fqn = resolveModuleName(incName, contextFqn, moduleFqnByShort);
+    if (visited.has(fqn)) return;
+    visited.add(fqn);
+    const mod = rubyPkg.modules[fqn] as unknown as ClassInfo | undefined;
+    if (!mod) return;
+    // A module whose source file we've explicitly declined to port should
+    // not contribute its methods to includers either — otherwise an
+    // unported mixin (e.g. Railties::ControllerRuntime, included into
+    // ActionController via an `on_load` block, not into Railtie itself)
+    // leaks expected methods onto the host. See UNPORTED_FILES.
+    if (mod.file && isSourceUnported(mod.file, pkg)) return;
+    const sink = asClassMethods ? klass : instance;
+    for (const m of mod.instanceMethods) sink.push(m);
+    for (const inc of mod.includes ?? []) walk(inc, asClassMethods, fqn);
   };
 
   for (const inc of entity.includes ?? []) walk(inc, false, entityFqn);
