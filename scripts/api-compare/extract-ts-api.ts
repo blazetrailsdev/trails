@@ -547,6 +547,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
           isPrivateField || hasPrivateMod ? "private" : hasProtectedMod ? "protected" : "public";
         const internal = visibility !== "public";
         const line = decl.getSourceFile().getLineAndCharacterOfPosition(decl.getStart()).line + 1;
+        const declFile = path.relative(srcDir, decl.getSourceFile().fileName).replace(/\\/g, "/");
         mixinMethods.push({
           name: prop.name,
           visibility,
@@ -554,6 +555,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
           isStatic: false,
           line,
           file: relPath,
+          ...(declFile !== relPath ? { declaredIn: declFile } : {}),
           ...(internal ? { internal: true } : {}),
         });
       }
@@ -578,6 +580,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
           extends: [],
           instanceMethods: mixinMethods,
           classMethods: [],
+          synthesizedMixin: true,
         };
         fileHasClassOrModule = true;
       }

@@ -392,7 +392,7 @@ export function parseArgs(argv: string[]): CliArgs {
  * and `@internal` JSDoc set `internal: true`). The Rails-private
  * convention in this repo means we filter `_`-prefix here too.
  */
-function collectTsFileNames(
+export function collectTsFileNames(
   file: string,
   classes: ClassInfo[],
   modules: ClassInfo[],
@@ -412,8 +412,15 @@ function collectTsFileNames(
   }
   for (const m of modules) {
     if (m.file !== file) continue;
-    for (const im of m.instanceMethods) push(im);
-    for (const cm of m.classMethods) push(cm);
+    const skipForeign = m.synthesizedMixin === true;
+    for (const im of m.instanceMethods) {
+      if (skipForeign && im.declaredIn !== undefined) continue;
+      push(im);
+    }
+    for (const cm of m.classMethods) {
+      if (skipForeign && cm.declaredIn !== undefined) continue;
+      push(cm);
+    }
   }
   for (const fn of fileFunctions ?? []) push(fn);
   return out;
