@@ -16,6 +16,9 @@ import {
   readShared,
   writeShared,
   pruneSharedCache,
+  readWorkspaceGraph,
+  transitiveDeps,
+  widenKeyWithDeps,
   CACHE_VERSION,
 } from "./shared-cache.js";
 
@@ -190,5 +193,80 @@ describe("readShared / writeShared", () => {
     expect(await readShared(dir, "ts-arel", "key1")).toBe('{"v":1}');
     // readShared awaits its own touch, so the new mtime is observable immediately.
     expect((await fs.promises.stat(file)).mtimeMs).toBeGreaterThan(0);
+  });
+});
+
+describe("cross-package cache inputs", () => {
+  function writePackage(packagesDir: string, dir: string, deps: string[]): void {
+    fs.mkdirSync(path.join(packagesDir, dir), { recursive: true });
+    fs.writeFileSync(
+      path.join(packagesDir, dir, "package.json"),
+      JSON.stringify({
+        name: `@blazetrails/${dir}`,
+        dependencies: Object.fromEntries(
+          deps.map((d) => [`@blazetrails/${d}`, "workspace:*"] as const),
+        ),
+      }),
+    );
+  }
+
+  it("resolves workspace dependency names to directories", async () => {
+    const packagesDir = mkTmp();
+    writePackage(packagesDir, "actionview", ["activesupport"]);
+    writePackage(packagesDir, "activesupport", []);
+    const graph = await readWorkspaceGraph(packagesDir);
+    expect(graph.dirOfName["@blazetrails/activesupport"]).toBe("activesupport");
+    expect(graph.depsOfDir.actionview).toEqual(["activesupport"]);
+  });
+
+  it("ignores non-workspace dependencies", async () => {
+    const packagesDir = mkTmp();
+    writePackage(packagesDir, "activesupport", []);
+    fs.writeFileSync(
+      path.join(packagesDir, "activesupport", "package.json"),
+      JSON.stringify({ name: "@blazetrails/activesupport", dependencies: { yaml: "^2" } }),
+    );
+    const graph = await readWorkspaceGraph(packagesDir);
+    expect(graph.depsOfDir.activesupport).toEqual([]);
+  });
+
+  it("closes over transitive dependencies without looping on cycles", async () => {
+    const packagesDir = mkTmp();
+    writePackage(packagesDir, "trailties", ["activerecord"]);
+    writePackage(packagesDir, "activerecord", ["arel", "trailties"]);
+    writePackage(packagesDir, "arel", ["activesupport"]);
+    writePackage(packagesDir, "activesupport", []);
+    const graph = await readWorkspaceGraph(packagesDir);
+    expect(transitiveDeps(graph, "trailties")).toEqual(
+      ["activerecord", "arel", "activesupport"].sort(),
+    );
+  });
+
+  it("widens a package key when a dependency's fingerprint changes", () => {
+    // The divergence this pins: actionview re-exports activesupport symbols, so
+    // its extracted surface moves when activesupport does. A key built from
+    // actionview's own files alone kept serving the pre-change extraction from
+    // cache while API_COMPARE_FORCE=1 produced the post-change one.
+    const own = "actionview-own-fingerprint";
+    const before = widenKeyWithDeps(own, [["activesupport", "aaa"]]);
+    const after = widenKeyWithDeps(own, [["activesupport", "bbb"]]);
+    expect(before).not.toBe(own);
+    expect(after).not.toBe(before);
+  });
+
+  it("is order-independent and a no-op without dependencies", () => {
+    const own = "own";
+    expect(widenKeyWithDeps(own, [])).toBe(own);
+    expect(
+      widenKeyWithDeps(own, [
+        ["arel", "a"],
+        ["activesupport", "b"],
+      ]),
+    ).toBe(
+      widenKeyWithDeps(own, [
+        ["activesupport", "b"],
+        ["arel", "a"],
+      ]),
+    );
   });
 });
