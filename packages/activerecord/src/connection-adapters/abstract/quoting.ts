@@ -484,8 +484,9 @@ export function columnNameWithOrderMatcher(): RegExp {
  * Rails writes this inline as `Arel::Nodes::SqlLiteral === value` at each
  * branch (abstract/quoting.rb `quote`/`type_cast`); there is no
  * `sql_literal?` predicate to mirror. Factored out here only because TS
- * cannot spell `===`-style case matching, so it is module-internal — same
- * treatment as the `dispatch*` helpers alongside it.
+ * cannot spell `===`-style case matching. Adapter-internal rather than public
+ * API — sqlite3-adapter.ts imports it for the same branch — so it carries the
+ * same `@internal` marking as the `dispatch*` helpers alongside it.
  *
  * @internal
  */

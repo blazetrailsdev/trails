@@ -194,8 +194,6 @@ const QUOTE_STRING_MAP: Record<string, string> = {
 };
 
 export class AbstractMysqlAdapter extends AbstractAdapter {
-  static readonly Version = Version;
-
   /**
    * Return Column objects for a table. Mirrors Rails'
    * `AbstractMysqlAdapter#columns` (via `SchemaStatements#columns`):

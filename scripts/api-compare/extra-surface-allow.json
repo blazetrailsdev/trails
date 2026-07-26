@@ -207,13 +207,7 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
     "name": "Version",
-    "reason": "`AbstractAdapter::Version` is a real Rails nested class (abstract_adapter.rb:243); `static readonly Version = Version` is the TS spelling of that nested Ruby constant, and AbstractMysqlAdapter re-pins it exactly as Rails resolves `AbstractAdapter::Version` through inheritance. It reads as extra surface only because extra-surface skips nested Ruby classes when building a file's allow-set (the `primaryClassPerFile` filter) while still counting the TS nested class. Nothing to converge."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "name": "Version",
-    "reason": "`AbstractAdapter::Version` is a real Rails nested class (abstract_adapter.rb:243); `static readonly Version = Version` is the TS spelling of that nested Ruby constant, and AbstractMysqlAdapter re-pins it exactly as Rails resolves `AbstractAdapter::Version` through inheritance. It reads as extra surface only because extra-surface skips nested Ruby classes when building a file's allow-set (the `primaryClassPerFile` filter) while still counting the TS nested class. Nothing to converge."
+    "reason": "`AbstractAdapter::Version` is a real Rails nested class (abstract_adapter.rb:243); `static readonly Version = Version` is the TS spelling of that nested Ruby constant, so this is public Rails API parity, not drift. It reads as extra surface only because extra-surface skips nested Ruby classes when building a file's allow-set (the `primaryClassPerFile` filter) while still counting the TS nested class. Nothing to converge. AbstractMysqlAdapter's redundant re-pin of the same constant was deleted rather than allowlisted — JS statics are inherited, so it shadowed nothing and had no readers."
   },
   {
     "package": "activerecord",
