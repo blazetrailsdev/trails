@@ -31,8 +31,7 @@ export class ClassMethods {
   static _viewPaths(this: ViewPathsClass, paths: PathSet): void;
   static _viewPaths(this: ViewPathsClass, paths?: PathSet): PathSet | void {
     if (paths === undefined) {
-      const registered = PathRegistry.getViewPaths(this);
-      return registered instanceof PathSet ? registered : new PathSet(registered ?? []);
+      return PathRegistry.getViewPaths(this) ?? new PathSet();
     }
     PathRegistry.setViewPaths(this, paths);
   }

@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, test } from "vitest";
 import { PathRegistry } from "./path-registry.js";
+import { InMemoryResolver } from "./resolver/in-memory-resolver.js";
+import { TemplateHandlers } from "./template/handlers.js";
 import {
   ClassMethods,
   _prefixes,
+  appendViewPath,
   detailsForLookup,
   formats,
   isAnyTemplates,
@@ -33,6 +36,7 @@ class BaseController implements ViewPaths {
   formats = formats;
   locale = locale;
   isTemplateExists = isTemplateExists;
+  appendViewPath = appendViewPath;
   isAnyTemplates = isAnyTemplates;
 }
 
@@ -51,6 +55,7 @@ class DraftsController extends PostsController {
 
 afterEach(() => {
   PathRegistry.reset();
+  TemplateHandlers.clear();
 });
 
 describe("ViewPaths::ClassMethods", () => {
@@ -88,5 +93,21 @@ describe("ViewPaths", () => {
 
     expect(controller.isTemplateExists("index", ["posts"])).toBe(false);
     expect(controller.isAnyTemplates("index", ["posts"])).toBe(false);
+  });
+
+  test("an appended resolver is searched by template_exists?", () => {
+    TemplateHandlers.registerTemplateHandler("tse", {
+      extensions: ["tse"],
+      render: () => "",
+    });
+    const resolver = new InMemoryResolver();
+    resolver.add("posts/index", "html", "tse", "hello");
+    PostsController.viewPaths([]);
+    const controller = new PostsController();
+
+    controller.appendViewPath(resolver);
+
+    expect(controller.isTemplateExists("index", ["posts"])).toBe(true);
+    expect(controller.isTemplateExists("missing", ["posts"])).toBe(false);
   });
 });

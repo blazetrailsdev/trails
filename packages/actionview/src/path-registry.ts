@@ -15,17 +15,15 @@ import type { TemplateResolver } from "./resolver/resolver.js";
 
 type ClassLike = new (...args: unknown[]) => unknown;
 
-export type RegisteredViewPaths = PathSet | TemplateResolver[];
-
 export class PathRegistry {
   /** @internal Hooks fired whenever a new FileSystemResolver is built via castFileSystemResolvers. */
   static readonly fileSystemResolverHooks: Array<() => void> = [];
 
   private static _fileSystemResolvers = new Map<string, FileSystemResolver>();
-  private static _viewPathsByClass = new Map<ClassLike, RegisteredViewPaths>();
+  private static _viewPathsByClass = new Map<ClassLike, PathSet>();
 
   /** @internal */
-  static getViewPaths(klass: ClassLike): RegisteredViewPaths | undefined {
+  static getViewPaths(klass: ClassLike): PathSet | undefined {
     if (this._viewPathsByClass.has(klass)) return this._viewPathsByClass.get(klass);
     const proto = Object.getPrototypeOf(klass) as ClassLike | null;
     return proto && typeof proto === "function" && proto !== Function.prototype
@@ -34,7 +32,7 @@ export class PathRegistry {
   }
 
   /** @internal */
-  static setViewPaths(klass: ClassLike, paths: RegisteredViewPaths): void {
+  static setViewPaths(klass: ClassLike, paths: PathSet): void {
     this._viewPathsByClass.set(klass, paths);
   }
 
@@ -80,9 +78,7 @@ export class PathRegistry {
     };
     for (const r of this._fileSystemResolvers.values()) add(r);
     for (const paths of this._viewPathsByClass.values()) {
-      const list =
-        paths instanceof PathSet ? (paths.toArray() as unknown as TemplateResolver[]) : paths;
-      for (const r of list) add(r);
+      for (const r of paths.toArray() as unknown as TemplateResolver[]) add(r);
     }
     return out;
   }

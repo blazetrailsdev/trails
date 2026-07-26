@@ -139,15 +139,14 @@ export class PathSet implements Iterable<PathSetResolver> {
    * @internal
    * Validates incoming paths. `String`/`Pathname` wrapping happens up front in
    * `PathRegistry.castFileSystemResolvers` (`ViewPaths#_build_view_paths`), so
-   * only resolvers reach this point — either protocol, `findAll` or `find`.
+   * only resolvers reach this point.
    */
   private typecast(paths: ReadonlyArray<PathSetResolver | unknown>): PathSetResolver[] {
     return paths.map((path) => {
       if (
         path !== null &&
         typeof path === "object" &&
-        (typeof (path as PathSetResolver).findAll === "function" ||
-          typeof (path as { find?: unknown }).find === "function")
+        typeof (path as PathSetResolver).findAll === "function"
       ) {
         return path as PathSetResolver;
       }
