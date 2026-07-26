@@ -179,7 +179,7 @@
     "tsFile": "relation/calculations.ts",
     "rubyName": "execute_grouped_calculation",
     "call": "model",
-    "reason": "Per-entry verified (RFC 0072 cross-helper reads): Rails calculations.rb:519-539 reads `model._reflect_on_association`, `model.with_connection` and `model.adapter_class` inside execute_grouped_calculation; trails relation/calculations.ts delegates to the shared `groupedAggregate` helper, which performs those reads (`rel.model._reflectOnAssociation`, `rel.model.name` on select_all). The helper is shared with the grouped `count`/`sum` arms, so the split stays."
+    "reason": "Per-entry verified (RFC 0072 cross-helper reads): Rails calculations.rb:519-539 reads `model._reflect_on_association`, `model.with_connection` and `model.adapter_class` inside execute_grouped_calculation; trails relation/calculations.ts delegates to the shared `groupedAggregate` helper, which performs those reads (`rel.model.name` on select_all, and `rel.model._reflectOnAssociation` via its `resolveGroupAssociation` helper). `groupedAggregate` is shared with the grouped `count`/`sum` arms, so the split stays."
   },
   {
     "package": "activerecord",

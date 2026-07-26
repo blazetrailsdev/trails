@@ -39,7 +39,7 @@
     "tsFile": "duration.ts",
     "rubyName": "initialize",
     "call": "include?",
-    "reason": "Converged (RFC 0032): Rails iterates parts and asks `VARIABLE_PARTS.include?(part)`; trails inverts the loop (`VARIABLE_PARTS.some(...)` over the fixed parts record), so membership is the iteration itself — no include? call exists to match."
+    "reason": "Converged (RFC 0032): Rails iterates parts and asks `VARIABLE_PARTS.include?(part)`; trails inverts the loop (`VARIABLE_PARTS.some(...)` over the fixed parts record), so membership is the iteration itself \u2014 no include? call exists to match."
   },
   {
     "package": "activesupport",

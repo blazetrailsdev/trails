@@ -11,7 +11,7 @@
     "tsFile": "associations/collection-association.ts",
     "rubyName": "callback",
     "call": "call",
-    "reason": "Syntax-only: Ruby needs `proc.call(...)` to invoke a Proc (collection_association.rb:494); JS invokes bare. The substantive part of that line — threading `method` so the object-callback arm can dispatch it — IS implemented (see callbacks.trails.test.ts)."
+    "reason": "Syntax-only: Ruby needs `proc.call(...)` to invoke a Proc (collection_association.rb:494); JS invokes bare. The substantive part of that line \u2014 threading `method` so the object-callback arm can dispatch it \u2014 IS implemented (see callbacks.trails.test.ts)."
   },
   {
     "package": "activerecord",

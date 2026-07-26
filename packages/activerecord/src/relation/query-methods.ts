@@ -251,7 +251,7 @@ function resolveOrderMatcher(model: QueryMethodsHost["model"]): RegExp {
     // deprecated `.connection` getter here would permanently check out a
     // connection under `permanent_connection_checkout = :deprecated|:disallowed`
     // whenever an ordered relation is built outside a `with_connection` scope.
-    const adapterClass: any = (model as any).adapterClassSync?.();
+    const adapterClass: any = model.adapterClassSync?.();
     return adapterClass?.columnNameWithOrderMatcher?.() ?? abstractOrderMatcher();
   } catch {
     // No adapter configured — fall back to abstract pattern.
@@ -2550,7 +2550,7 @@ function selectListColumns(
   if (selectCols && selectCols.length > 0) {
     return arelColumns.call(host, selectCols);
   }
-  const modelClass = model as any;
+  const modelClass: any = model;
   if (
     (modelClass?.ignoredColumns?.length ?? 0) > 0 ||
     modelClass?.enumerateColumnsInSelectStatements
@@ -2579,7 +2579,7 @@ function selectListColumns(
 export function buildProjections(this: QueryMethodsHost): unknown[] {
   const cols = selectListColumns(this, this.model);
   if (cols) return cols;
-  const table: any = (this as any).table ?? (this as any)._modelClass?.arelTable;
+  const table: any = (this as any).table ?? (this.model as any)?.arelTable;
   return [table ? tableStar(table) : arelSql("*")];
 }
 
@@ -2602,7 +2602,7 @@ export function buildSelect(this: QueryMethodsHost, arel: any): void {
     arel.project(...cols);
     return;
   }
-  const table: any = (this as any).table ?? (this as any)._modelClass?.arelTable;
+  const table: any = (this as any).table ?? (this.model as any)?.arelTable;
   arel.project(table ? tableStar(table) : arelSql("*"));
 }
 

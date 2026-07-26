@@ -1490,7 +1490,7 @@ export function typeFor(rel: CalculationRelation, field: string | Nodes.Node): u
   const fieldName =
     field instanceof Nodes.Node
       ? String((field as unknown as { name?: string }).name ?? "")
-      : String(field).split(".").pop()!;
+      : (String(field).split(".").pop() ?? "");
   return rel.model.typeForAttribute?.(fieldName);
 }
 
