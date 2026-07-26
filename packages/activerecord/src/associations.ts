@@ -2368,41 +2368,6 @@ export function habtmTargetFk(
 }
 
 /**
- * Fire one or more association callbacks (before_add, after_add, etc.).
- */
-export function fireAssocCallbacks(
-  cbs:
-    | ((owner: Base, record: Base) => void | false)
-    | ((owner: Base, record: Base) => void | false)[]
-    | undefined,
-  owner: Base,
-  record: Base,
-  catchAbort = false,
-): boolean {
-  if (!cbs) return true;
-  const arr = Array.isArray(cbs) ? cbs : [cbs];
-  for (const cb of arr) {
-    // Rails wraps only `before_add`/`before_remove` in `catch(:abort)`
-    // (collection_association.rb:400-402, 462-464). Those callers pass
-    // `catchAbort=true`; an after callback runs outside the catch, so a
-    // `throw :abort` from after_add/after_remove propagates (Rails parity).
-    if (catchAbort) {
-      try {
-        cb(owner, record);
-      } catch (e) {
-        if (!isAbortSignal(e)) throw e;
-        return false;
-      }
-    } else {
-      // after_add/after_remove run outside the catch; their return value is
-      // ignored (Rails 5+ only halts on `throw :abort`, never on `false`).
-      cb(owner, record);
-    }
-  }
-  return true;
-}
-
-/**
  * Factory to get a CollectionProxy for a has_many association.
  * Returns a cached proxy if one exists on the record.
  */
