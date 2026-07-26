@@ -693,19 +693,18 @@ function updateThroughCounter(this: HasManyThroughAssociation, method: string): 
 /**
  * Ruby reads `through_reflection` (ThroughAssociation) straight off the
  * association; our reflection objects reach the through step through the
- * owner's registry, so resolve it once here for both the counter-cache branch
- * and `update_through_counter?`.
+ * owner's registry, so resolve it here for both the counter-cache branch and
+ * `update_through_counter?`. Routes through the file's `throughReflection`
+ * walker, which mirrors `ThroughAssociation#through_reflection`
+ * (through_association.rb:14-24) by recursing to the innermost non-through
+ * reflection — a single `_reflectOnAssociation(options.through)` lookup would
+ * stop at the intermediate reflection for a nested `through:` chain.
  * @internal
  */
 function throughCounterReflection(
   assoc: HasManyThroughAssociation,
 ): RichCounterReflection | undefined {
-  const throughName = assoc.reflection.options.through;
-  if (!throughName) return undefined;
-  const ctor = assoc.owner.constructor as {
-    _reflectOnAssociation?: (n: string) => RichCounterReflection | undefined;
-  };
-  return ctor._reflectOnAssociation?.(throughName);
+  return (throughReflection(assoc) as RichCounterReflection | null) ?? undefined;
 }
 
 /**
