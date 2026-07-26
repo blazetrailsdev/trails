@@ -1227,4 +1227,17 @@ describe("extractFromProgram — @internal JSDoc on top-level functions", () => 
     expect(fns.find((f) => f.name === "dispatchQuote")!.internal).toBe(true);
     expect(fns.find((f) => f.name === "quote")!.internal).toBeUndefined();
   });
+
+  it("skips the fabricated module for a file whose exported functions are all @internal", () => {
+    const info = extractFromFiles("/p", {
+      "key-normalization.ts": `
+        /** @internal */
+        export function normalizeKey(k: string): string { return k; }
+        /** @internal */
+        export function denormalizeKey(k: string): string { return k; }
+      `,
+    });
+    expect(info.modules["key-normalization.ts:KeyNormalization"]).toBeUndefined();
+    expect(info.fileFunctions["key-normalization.ts"].every((f) => f.internal)).toBe(true);
+  });
 });

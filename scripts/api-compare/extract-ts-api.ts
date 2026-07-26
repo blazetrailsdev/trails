@@ -1203,17 +1203,6 @@ function extractDefinePropertyForOf(
  * Caller must already have ensured `node` is not exported.
  */
 /**
- * True when a declaration's leading JSDoc carries an `@internal` tag — the
- * repo-wide convention (CONTRIBUTING.md) for "exported for wiring, not part
- * of the Rails-facing surface". Exported top-level functions have no
- * `private`/`protected` modifier to carry that signal, so the tag is the
- * only marker; consumers filter on `internal: true` (see extra-surface.ts).
- */
-export function hasInternalJsDocTag(node: ts.Node): boolean {
-  return ts.getJSDocTags(node).some((tag) => tag.tagName.text === "internal");
-}
-
-/**
  * Params of the function an identifier / property-access reference points at,
  * or null when the expression isn't callable. Mirrors the alias resolution the
  * named-export path does for `export { foo }` so that a binding like
@@ -1234,6 +1223,16 @@ export function paramsOfCallableRef(
   const widest = signatures.reduce((a, b) => (b.parameters.length > a.parameters.length ? b : a));
   const decl = widest.declaration;
   return decl && ts.isFunctionLike(decl) ? extractParameters(decl.parameters) : [];
+}
+
+/**
+ * True when a declaration's leading JSDoc carries an `@internal` tag. An
+ * exported top-level function has no `private`/`protected` modifier to carry
+ * the "wiring seam, not Rails-facing surface" signal (CONTRIBUTING.md), so
+ * the tag is its only marker; consumers filter on `internal: true`.
+ */
+export function hasInternalJsDocTag(node: ts.Node): boolean {
+  return ts.getJSDocTags(node).some((tag) => tag.tagName.text === "internal");
 }
 
 /**
