@@ -714,8 +714,19 @@ export class SchemaReflection {
     this._cachePath = cachePath ?? null;
   }
 
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaReflection#empty_cache
+   * (`schema_cache.rb:100`, private). Rails uses `allocate` + `send(:initialize)`
+   * to bypass a custom `new`; TS has no such distinction, so a plain
+   * construction is the faithful equivalent. Every empty-cache fallback in this
+   * class routes through it, as Rails' do.
+   */
+  private emptyCache(): SchemaCache {
+    return new SchemaCache();
+  }
+
   clearBang(): void {
-    this._cache = new SchemaCache();
+    this._cache = this.emptyCache();
     this._cachePromise = null;
   }
 
@@ -813,7 +824,7 @@ export class SchemaReflection {
   }
 
   async dumpTo(pool: unknown, filename: string): Promise<void> {
-    const freshCache = new SchemaCache();
+    const freshCache = this.emptyCache();
     await freshCache.addAll(pool);
     freshCache.dumpTo(filename);
     this._cache = freshCache;
@@ -828,10 +839,10 @@ export class SchemaReflection {
       const promise = this.loadCache(pool).then((loaded) => {
         // Guard against clearBang() racing with an in-flight load
         if (this._cachePromise === promise) {
-          this._cache = loaded ?? new SchemaCache();
+          this._cache = loaded ?? this.emptyCache();
           this._cachePromise = null;
         }
-        return this._cache ?? new SchemaCache();
+        return this._cache ?? this.emptyCache();
       });
       this._cachePromise = promise;
     }
@@ -1012,18 +1023,6 @@ export class FakePool {
   withConnection<T>(callback: (conn: unknown) => T): T {
     return callback(this._connection);
   }
-}
-
-/**
- * Allocate and initialize a new empty SchemaCache — used by SchemaReflection
- * to create a fresh cache without loading from disk.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::SchemaReflection#empty_cache (private)
- *
- * @internal
- */
-export function emptyCache(): SchemaCache {
-  return new SchemaCache();
 }
 
 /**
