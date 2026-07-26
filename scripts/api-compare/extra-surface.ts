@@ -686,10 +686,6 @@ function buildPackageReport(
 
   const tsClassesByFile = new Map<string, ClassInfo[]>();
   const tsModulesByFile = new Map<string, ClassInfo[]>();
-  // A barrel that merely re-exports a class carries a cloned entry with the
-  // full method list of the declaring file's class. Charging both files
-  // double-counts every name (and every real drift) — the declaring file's
-  // entry already covers them — so re-export clones are skipped here.
   for (const c of Object.values(tsPkg.classes) as ClassInfo[]) {
     if (!c.file || c.reExportedFrom) continue;
     pushTo(tsClassesByFile, c.file, c);

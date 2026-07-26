@@ -1263,8 +1263,6 @@ describe("extractFromProgram — re-export attribution", () => {
     expect(info.modules["adapters.ts:ConnectionPool"].reExportedFrom).toBe(
       "adapters/pool.ts:ConnectionPool",
     );
-    // A file that declares its own class alongside re-exports keeps that
-    // class attributed to itself.
     expect(info.classes["adapters.ts:LocalHelper"].reExportedFrom).toBeUndefined();
   });
 });
