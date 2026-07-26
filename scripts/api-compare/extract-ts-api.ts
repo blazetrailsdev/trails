@@ -20,7 +20,14 @@ import type {
   ParamInfo,
   LiteralValue,
 } from "./types.js";
-import { ROOT_DIR, OUTPUT_DIR, PACKAGES, PACKAGE_DIR_OVERRIDES, packageSrcDir } from "./config.js";
+import {
+  ROOT_DIR,
+  OUTPUT_DIR,
+  PACKAGES,
+  PACKAGE_DIR_OVERRIDES,
+  PACKAGE_SRC_SUBDIR,
+  packageSrcDir,
+} from "./config.js";
 import {
   sharedCacheDir,
   contentFingerprint,
@@ -43,8 +50,8 @@ import { extractorSchemaToken } from "./extractor-schema.js";
 // the field are evicted automatically. Both keys are widened with the
 // TRANSITIVE workspace dependencies' fingerprints — a package's extraction
 // resolves imports into sibling packages, so its surface changes when they do.
-// Set `API_COMPARE_FORCE=1` to skip the
-// cache entirely. The token is computed async (it hashes the extractor
+// Set `API_COMPARE_FORCE=1` to skip the cache entirely. The token is computed
+// async (it hashes the extractor
 // sources), so it lives on `main()` rather than as a module const.
 const CACHE_DIR = path.join(OUTPUT_DIR, "ts-api-cache");
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -215,13 +222,8 @@ export async function main() {
     }
     return pending;
   }
-  /** `own` key widened with the transitive dependency dirs' fingerprints. */
-  async function withDeps(
-    own: string,
-    dirName: string,
-    kind: "mtime" | "content",
-  ): Promise<string> {
-    const deps = transitiveDeps(graph, dirName);
+  /** `own` key widened with the fingerprints of `deps` (package DIRECTORIES). */
+  async function withDeps(own: string, deps: string[], kind: "mtime" | "content"): Promise<string> {
     const pairs = await Promise.all(
       deps.map(
         async (dep) =>
@@ -256,9 +258,15 @@ export async function main() {
     // Anchor relative paths at the package root so tsconfig.json
     // doesn't show up as `../tsconfig.json` (which it would if we
     // anchored at the src dir).
+    // Packages that share a directory (actionpack hosts abstractcontroller,
+    // actioncontroller, actiondispatch) import across the sibling src subdirs
+    // that their own fingerprint — scoped to one subdir — doesn't cover, so the
+    // whole directory joins their dependency set.
+    const inputDirs = transitiveDeps(graph, dirName);
+    if (PACKAGE_SRC_SUBDIR[pkg]) inputDirs.push(dirName);
     const fingerprint = await withDeps(
       packageFingerprint(fingerprintInputs, pkgRoot),
-      dirName,
+      inputDirs,
       "mtime",
     );
     const cachePath = path.join(CACHE_DIR, `${pkg}.json`);
@@ -283,7 +291,7 @@ export async function main() {
     let sharedKey: string | null = null;
     if (sharedDir) {
       const ownContent = await contentFingerprint(fingerprintInputs, pkgRoot);
-      const contentKey = `${SCHEMA_VERSION}-${await withDeps(ownContent, dirName, "content")}`;
+      const contentKey = `${SCHEMA_VERSION}-${await withDeps(ownContent, inputDirs, "content")}`;
       const body = await readShared(sharedDir, `ts-${pkg}`, contentKey);
       if (body) {
         try {
