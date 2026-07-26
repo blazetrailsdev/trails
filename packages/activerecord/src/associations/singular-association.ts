@@ -241,6 +241,12 @@ function scopeForCreate(assoc: SingularAssociation): Record<string, unknown> {
  * `BelongsToAssociation#find_target?` (`belongs_to_association.rb:124`) —
  * the reachability gate is `_findTargetReachable(..., "belongsTo")` below.
  *
+ * It lives here rather than in `belongs-to-association.ts` because
+ * `belongs_to_association.rb` defines no `find_target` of its own: Rails
+ * inherits the singular one and specializes only the `find_target?` predicate.
+ * Putting the loader under the belongs_to file would name a method Rails does
+ * not declare there.
+ *
  * @internal
  */
 export async function findTarget(
