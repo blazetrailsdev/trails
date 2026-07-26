@@ -1271,7 +1271,13 @@ export function main() {
     for (const { fqn, info } of allClassesAndModules) {
       if (info.file) fqnToFile.set(fqn, info.file);
       for (const inc of [...(info.includes || []), ...(info.extends || [])]) {
-        const resolved = moduleFqnByShort.get(inc) || [inc];
+        // Qualified names need the namespace walk (`PostgreSQL::Quoting` is not
+        // a key here); unqualified ones stay deliberately broad — narrowing them
+        // to the scoped match drops 21 methods that this graph legitimately
+        // credits to a sibling includer's file.
+        const resolved = inc.includes("::")
+          ? resolveModuleName(inc, fqn, moduleFqnByShort)
+          : moduleFqnByShort.get(inc) || [inc];
         for (const modFqn of resolved) {
           const includers = moduleIncluderFqns.get(modFqn) || new Set();
           includers.add(fqn);
