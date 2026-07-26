@@ -60,7 +60,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
 import { OUTPUT_DIR } from "./config.js";
-import { rubyFileToTs, rubyMethodToTs } from "./conventions.js";
+import { rubyFileToTs, rubyMethodToTs, snakeToCamel } from "./conventions.js";
 import { resolveModuleName } from "./compare.js";
 import { isSourceUnported } from "./unported-files.js";
 
@@ -187,6 +187,36 @@ function rubyMethodCandidates(rubyName: string): string[] | null {
   if (!base) return null;
   if (!rubyName.endsWith("?")) return base;
   return [...base, ...base.map((c) => c + "Q")];
+}
+
+/**
+ * TS-candidate names for a Ruby file-level constant. Constants aren't
+ * case-transformed on the way over — `ER_DUP_ENTRY` ports verbatim — so the
+ * name itself is always a candidate. The camelized form is the second
+ * candidate, keeping scoring in lockstep with `constantNameMatches`
+ * (literals.ts), which the literal-value comparison already uses to pair a
+ * Ruby constant with its TS counterpart; scoring the two passes off different
+ * name rules would let a constant compare as a value yet still read as drift.
+ *
+ * The camelized form is emitted only for multi-token SCREAMING_SNAKE names —
+ * the ones where camelizing produces a case transition (`ER_DUP_ENTRY` →
+ * `erDupEntry`) that could only have come from a constant. A single-token name
+ * camelizes to a bare lowercase word indistinguishable from an ordinary method
+ * name, whether it started CamelCase (`Version = Gem::Version`) or SCREAMING
+ * (`VERSION = "10.0.0"`, arel.rb:29) — `snakeToCamel` is a no-op without a `_`
+ * to drive capitalization, so both collapse to `version`. Admitting that would
+ * silently absolve a genuinely novel TS `version` everywhere the allow-set is
+ * unioned in, a far worse trade than the one drift-read it saves.
+ *
+ * This is deliberately narrower than `constantNameMatches`, which may pair
+ * `VERSION` with a TS `version` for value comparison. Pairing a *known* TS
+ * constant to diff its value is safe; minting a lowercase allow-set entry that
+ * any method name can collide with is not.
+ */
+function rubyConstantCandidates(name: string): string[] {
+  if (!/^[A-Z0-9]+(_[A-Z0-9]+)+$/.test(name)) return [name];
+  const camel = snakeToCamel(name.toLowerCase());
+  return camel === name ? [name] : [name, camel];
 }
 
 /** Get-or-init helper: replaces the `(get() ?? set([]).get()!).push(v)` idiom. */
@@ -478,6 +508,11 @@ function foldClassMethodsModules(modules: Record<string, ClassInfo>): Set<string
  *     its methods never enter `allowed` — matching the `isSourceUnported`
  *     guard at compare.ts:507. The check uses the module's *owning* package.
  *
+ * The matched file's `fileConstants` names join `allowed` too (see
+ * `rubyConstantCandidates`): a faithfully-ported `ER_DUP_ENTRY` is not extra
+ * surface. Constants have no mixin routing — they belong to the file, not to
+ * an entity — so they're added once up front rather than per entity.
+ *
  * Since `allowed` is a flat name set (instance vs class collapsed on the TS
  * side anyway), we simply union both `instanceMethods` and `classMethods`
  * for the *host* entity, but ONLY `instanceMethods` for walked-into mixins.
@@ -494,8 +529,15 @@ function collectAllowedNames(
   moduleFqnByShort: Map<string, string[]>,
   crossPackageModules: Record<string, ClassInfo>,
   crossPackagePkgByFqn: Record<string, string>,
+  fileConstantNames: string[],
 ): Set<string> {
   const allowed = new Set<string>();
+  // File-level constants are declared per Ruby *file*, not per entity, so they
+  // enter the allow-set once for the whole file rather than through the
+  // entity/mixin walk below.
+  for (const name of fileConstantNames) {
+    for (const c of rubyConstantCandidates(name)) allowed.add(c);
+  }
   const visited = new Set<string>();
 
   const addMethods = (methods: MethodInfo[]): void => {
@@ -573,10 +615,23 @@ function collectAllowedNames(
  * Rails-private method that lives in a *different* `.rb` is "moved" (it exists
  * in Rails, just elsewhere), not "novel". Treating private mirrors as novel
  * would inflate the high-signal tier with methods Rails actually defines.
+ *
+ * File-level constants join the oracle on the same rule as methods: a Ruby
+ * constant declared in a *different* `.rb` than the matched one scores as
+ * `moved`, not `novel`. Rails does relocate constants (a shared error-code or
+ * message constant reachable from several adapters), so the alternative —
+ * leaving constants out of the oracle — would re-mint every constant that
+ * doesn't sit in its own file as novel-by-omission, which is exactly the
+ * miscount this pass exists to remove.
  */
 export function buildGlobalRubyCandidates(ruby: ApiManifest): Set<string> {
   const all = new Set<string>();
   for (const pkg of Object.values(ruby.packages)) {
+    for (const consts of Object.values(pkg.fileConstants ?? {})) {
+      for (const name of Object.keys(consts)) {
+        for (const c of rubyConstantCandidates(name)) all.add(c);
+      }
+    }
     const entities = [...Object.values(pkg.classes), ...Object.values(pkg.modules)] as ClassInfo[];
     for (const e of entities) {
       for (const m of [...e.instanceMethods, ...e.classMethods]) {
@@ -715,6 +770,7 @@ function buildPackageReport(
       moduleFqnByShort,
       crossPackageModules,
       crossPackagePkgByFqn,
+      Object.keys(rubyPkg.fileConstants?.[rubyFile] ?? {}),
     );
 
     const extras: ExtraName[] = [];
