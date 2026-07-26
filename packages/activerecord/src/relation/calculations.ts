@@ -1582,7 +1582,7 @@ function pluckCastType(
   const joinType = lookupCastTypeFromJoinDependencies(rel, name) as ColumnType | null;
   if (joinType) return joinType;
   // Driver OID type (e.g. PostgreSQL) or identity fallback.
-  return columnType(name, index, {}, result.columnTypes);
+  return columnType(result, name, index, {});
 }
 
 /**

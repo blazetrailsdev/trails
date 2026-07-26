@@ -567,7 +567,7 @@ export class SchemaDumper {
 
   /** @internal */
   private _finalizeDump(lines: string[]): string | Promise<string> {
-    const result = this.dumpTables(lines);
+    const result = this.tables(lines);
     if (result instanceof Promise) {
       return result.then(async () => {
         await this.virtualTables(lines);
@@ -646,7 +646,7 @@ export class SchemaDumper {
     lines.push("}");
   }
 
-  private dumpTables(lines: string[]): void | Promise<void> {
+  private tables(lines: string[]): void | Promise<void> {
     const tableNames = this._source.tables();
     if (tableNames instanceof Promise) {
       return tableNames.then(async (raw) => {

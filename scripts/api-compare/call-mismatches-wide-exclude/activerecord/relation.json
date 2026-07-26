@@ -2117,36 +2117,22 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "preload_associations",
-    "call": "call",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader — the value reads are direct field spreads."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "preload_associations",
     "call": "includes_values",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader — the value reads are direct field spreads."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "preload_associations",
-    "call": "new",
-    "reason": "Constructor idiom: Ruby `X.new` ports to TS `new X()`, which extractCalls records as a construction/type reference rather than a named call. The construction is present in the port. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader \u2014 the value reads are direct field spreads."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "preload_associations",
     "call": "preload_values",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader — the value reads are direct field spreads."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader \u2014 the value reads are direct field spreads."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "preload_associations",
     "call": "strict_loading_value",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader — the value reads are direct field spreads."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader \u2014 the value reads are direct field spreads."
   },
   {
     "package": "activerecord",
@@ -2651,5 +2637,12 @@
     "rubyName": "where",
     "call": "first",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "exec_queries",
+    "call": "preload_associations",
+    "reason": "Newly comparable (RFC 0072 arity sweep): relation.ts has no `execQueries` \u2014 Rails' exec_queries body is split across `load`/`_executeEagerLoad`, which DO call preloadAssociations. Converge by porting exec_queries as one method."
   }
 ]

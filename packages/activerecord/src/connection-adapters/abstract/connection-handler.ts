@@ -65,7 +65,17 @@ export class ConnectionHandler {
    *
    * @internal
    */
-  determineOwnerName(owner: string | ConnectionOwner): ConnectionDescriptor | ConnectionOwner {
+  determineOwnerName(
+    owner: string | ConnectionOwner,
+    // Rails' third branch is `elsif config.is_a?(Symbol)` — the bare-name
+    // shorthand `establish_connection :primary`. It is deliberately NOT ported:
+    // Ruby distinguishes that Symbol from a String config (a connection URL),
+    // which falls through to `owner_name` unchanged, and TS collapses both onto
+    // `string`. Porting it as `typeof config === "string"` would misread a URL
+    // as a connection name. The parameter stays so the signature matches Rails
+    // and the branch can land once a Symbol-shaped config exists to key on.
+    _config?: DatabaseConfig | Record<string, unknown>,
+  ): ConnectionDescriptor | ConnectionOwner {
     if (typeof owner === "string") {
       return new ConnectionDescriptor(owner);
     }
@@ -116,7 +126,7 @@ export class ConnectionHandler {
   ): ConnectionPool {
     const ownerName =
       options.owner != null
-        ? this.determineOwnerName(options.owner)
+        ? this.determineOwnerName(options.owner, config)
         : config instanceof DatabaseConfig
           ? new ConnectionDescriptor(config.name)
           : new ConnectionDescriptor(typeof options.owner === "string" ? options.owner : "primary");

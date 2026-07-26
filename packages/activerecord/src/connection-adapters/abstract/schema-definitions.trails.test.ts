@@ -1,5 +1,9 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { ForeignKeyDefinition, CheckConstraintDefinition } from "./schema-definitions.js";
+import {
+  ForeignKeyDefinition,
+  CheckConstraintDefinition,
+  TableDefinition,
+} from "./schema-definitions.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 
 const originalFkPattern = SchemaDumper.fkIgnorePattern;
@@ -42,5 +46,26 @@ describe("CheckConstraintDefinition#export_name_on_schema_dump?", () => {
     SchemaDumper.chkIgnorePattern = /^ignored_/;
     expect(chk("ignored_chk_trades_price").isExportNameOnSchemaDump).toBe(false);
     expect(chk("chk_rails_0123456789").isExportNameOnSchemaDump).toBe(true);
+  });
+});
+
+describe("TableDefinition#remove_column", () => {
+  const td = (): TableDefinition => {
+    const t = new TableDefinition("astronauts");
+    t.string("name");
+    t.integer("rocket_id");
+    return t;
+  };
+
+  it("drops the named column and leaves the rest in order", () => {
+    const t = td();
+    t.removeColumn("name");
+    expect(t.columns.map((c) => c.name)).toEqual(["id", "rocket_id"]);
+  });
+
+  it("is a no-op for a column that was never defined", () => {
+    const t = td();
+    t.removeColumn("nonexistent");
+    expect(t.columns.map((c) => c.name)).toEqual(["id", "name", "rocket_id"]);
   });
 });

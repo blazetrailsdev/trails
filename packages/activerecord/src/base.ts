@@ -1625,7 +1625,6 @@ export class Base extends Model {
   declare static hasAttributeDefinition: typeof ModelSchema.hasAttributeDefinition;
   declare static columnsHash: typeof ModelSchema.columnsHash;
   declare static contentColumns: typeof ModelSchema.contentColumns;
-  declare static deriveJoinTableName: typeof ModelSchema.deriveJoinTableName;
   declare static quotedTableName: typeof ModelSchema.quotedTableName;
   declare static resetTableName: typeof ModelSchema.resetTableName;
   declare static fullTableNamePrefix: typeof ModelSchema.fullTableNamePrefix;

@@ -285,5 +285,33 @@
     "rubyName": "table",
     "call": "valid_type?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "schema-dumper.ts",
+    "rubyName": "dump",
+    "call": "tables",
+    "reason": "Newly comparable (RFC 0072 arity sweep): `dump` reaches `tables` through `_finalizeDump`, the port's sync/async fork for schema sources whose `tables()` may return a Promise. Called, just one frame down."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "schema-dumper.ts",
+    "rubyName": "tables",
+    "call": "reject",
+    "reason": "Newly comparable (RFC 0072 arity sweep): Rails builds `not_ignored_tables` with `reject { ignored?(...) }`; the port applies the same `isIgnored` predicate as a `continue` inside the emit loop. Equivalent."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "schema-dumper.ts",
+    "rubyName": "tables",
+    "call": "count",
+    "reason": "Newly comparable (RFC 0072 arity sweep): Rails uses `count` only for the `index < count - 1` blank-line separator; the port pushes a trailing blank line per table instead. Equivalent output, no count needed."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "schema-dumper.ts",
+    "rubyName": "tables",
+    "call": "string",
+    "reason": "Newly comparable (RFC 0072 arity sweep): Rails buffers foreign keys in a `StringIO` and appends `.string`; the port accumulates into the same `lines` array it already threads, so there is no second buffer to stringify. Equivalent."
   }
 ]
