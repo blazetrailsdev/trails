@@ -775,21 +775,20 @@ function nearestNamespaceMatch(
  * Returns exactly one FQN, because Ruby's constant lookup binds exactly one:
  * lexical scope, then the ancestry chain, then top-level, then `NameError`.
  * The return type is `string` rather than `string[]` to keep that structural.
- * This once returned the *whole* candidate list on the last arm ("original
- * behavior, safe fallback") — safe against false negatives, never measured
- * against false positives, which is the costly direction: each extra
- * candidate donates its methods to the host's expected surface and its
- * includers' files to the search set, so a wrong one is a false match.
- * Measured over the real manifests that arm never fired — 26 ambiguous
- * unqualified include sites across all 13 packages, every one resolved by the
- * namespace walk — so removing it moved no method counts. Same false-positive
- * shape PR #5344 removed from the includer graph, where 21 methods were
- * counting as implemented in files Ruby's lookup never reaches.
  *
  * Every consumer of `moduleFqnByShort` resolves through here —
  * `flattenIncludedMethodInfos` (expected surface) and `buildModuleIncluderFqns`
  * (where that surface may be implemented). A broader lookup in either one lets
  * a method count as implemented in a file Ruby's constant lookup never binds.
+ * That is why the last arm no longer returns the *whole* candidate list
+ * ("original behavior, safe fallback"): safe against false negatives, but each
+ * extra candidate donates its methods to the expected surface and its
+ * includers' files to the search set, so a wrong one is a false match.
+ * Measured over the real manifests, that arm never fired — 26 ambiguous
+ * unqualified include sites across all 13 packages, every one resolved by the
+ * namespace walk — so dropping it moved no method counts. Same false-positive
+ * shape PR #5344 removed from the includer graph, where 21 methods were
+ * counting as implemented in files Ruby's lookup never reaches.
  */
 export function resolveModuleName(
   incName: string,
