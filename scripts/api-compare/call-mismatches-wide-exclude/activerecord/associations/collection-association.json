@@ -9,6 +9,13 @@
   {
     "package": "activerecord",
     "tsFile": "associations/collection-association.ts",
+    "rubyName": "callback",
+    "call": "call",
+    "reason": "Satisfied by a different path: Ruby's `callback.call(method, owner, record)` (collection_association.rb:494) is proc invocation, which in JS is the bare `cb(owner, record)` this body already does; the `method` argument is bound at registration by Builder::CollectionAssociation.define_callback, so the stored procs are 2-arg (see the arity note on `callback`)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/collection-association.ts",
     "rubyName": "concat",
     "call": "skip_strict_loading",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
