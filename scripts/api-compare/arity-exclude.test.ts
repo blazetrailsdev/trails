@@ -52,10 +52,11 @@ describe("parseArityExcludes", () => {
 });
 
 describe("the committed exclude file", () => {
-  it("is valid and ships empty", async () => {
+  it("is valid and every entry carries a reason", async () => {
     const entries = await loadArityExcludes();
-    // Populating it is the arity-state-threading-triage story's job, not this one.
-    expect(entries).toEqual([]);
+    for (const e of entries) {
+      expect(e.reason.trim().length).toBeGreaterThan(0);
+    }
     expect(await fs.readFile(ARITY_EXCLUDE_PATH, "utf-8")).toMatch(/\n$/);
   });
 });

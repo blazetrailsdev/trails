@@ -117,7 +117,7 @@ export class Result {
   }
 
   [Symbol.iterator](): IterableIterator<Record<string, unknown>> {
-    return this.#getHashRows()[Symbol.iterator]();
+    return this.hashRows()[Symbol.iterator]();
   }
 
   includesColumn(name: string): boolean {
@@ -137,7 +137,7 @@ export class Result {
   each(
     block?: (row: Record<string, unknown>) => void,
   ): (IterableIterator<Record<string, unknown>> & { size: number }) | void {
-    const rows = this.#getHashRows();
+    const rows = this.hashRows();
     if (block) {
       for (const row of rows) block(row);
       return;
@@ -150,7 +150,7 @@ export class Result {
   }
 
   toArray(): Record<string, unknown>[] {
-    return this.#getHashRows();
+    return this.hashRows();
   }
 
   /**
@@ -175,14 +175,14 @@ export class Result {
   }
 
   at(idx: number): Record<string, unknown> | undefined {
-    const rows = this.#getHashRows();
+    const rows = this.hashRows();
     return idx < 0 ? rows[rows.length + idx] : rows[idx];
   }
 
   first(): Record<string, unknown> | undefined;
   first(n: number): Record<string, unknown>[];
   first(n?: number): Record<string, unknown> | Record<string, unknown>[] | undefined {
-    const rows = this.#getHashRows();
+    const rows = this.hashRows();
     if (n === undefined) return rows[0];
     if (n < 0) throw new Error("negative array size");
     return rows.slice(0, n);
@@ -191,7 +191,7 @@ export class Result {
   last(): Record<string, unknown> | undefined;
   last(n: number): Record<string, unknown>[];
   last(n?: number): Record<string, unknown> | Record<string, unknown>[] | undefined {
-    const rows = this.#getHashRows();
+    const rows = this.hashRows();
     if (n === undefined) return rows[rows.length - 1];
     if (n < 0) throw new Error("negative array size");
     return n >= rows.length ? rows.slice() : rows.slice(rows.length - n);
@@ -239,7 +239,8 @@ export class Result {
     return this.#indexedRows;
   }
 
-  #getHashRows(): Record<string, unknown>[] {
+  /** @internal */
+  private hashRows(): Record<string, unknown>[] {
     if (this.#hashRows) return this.#hashRows;
     const entries = Object.entries(this.columnIndexes);
     this.#hashRows = this.rows.map((row) => {
@@ -277,23 +278,4 @@ export function columnType(
   if (index in columnTypes) return columnTypes[index as unknown as string];
   if (name in columnTypes) return columnTypes[name];
   return IDENTITY_TYPE;
-}
-
-/**
- * Build the memoized array of hash rows from raw rows and column indexes.
- *
- * Mirrors: ActiveRecord::Result#hash_rows (private)
- *
- * @internal
- */
-export function hashRows(
-  rows: unknown[][],
-  colIndexes: Record<string, number>,
-): Record<string, unknown>[] {
-  const entries = Object.entries(colIndexes);
-  return rows.map((row) => {
-    const obj: Record<string, unknown> = {};
-    for (const [key, i] of entries) obj[key] = row[i];
-    return obj;
-  });
 }

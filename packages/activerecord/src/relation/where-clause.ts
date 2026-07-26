@@ -46,7 +46,7 @@ export class WhereClause {
   merge(other: WhereClause): WhereClause {
     // Rails: remove predicates from self that conflict with other's attributes,
     // then union with other's predicates (other wins on conflict)
-    const filtered = exceptPredicates(this.predicates, other.extractAttributes());
+    const filtered = this.exceptPredicates(other.extractAttributes());
     return new WhereClause(unionNodes(filtered, other.predicates));
   }
 
@@ -66,7 +66,7 @@ export class WhereClause {
   }
 
   except(...columns: (string | Nodes.Attribute | Nodes.Node)[]): WhereClause {
-    return new WhereClause(exceptPredicates(this.predicates, columns));
+    return new WhereClause(this.exceptPredicates(columns));
   }
 
   clear(): void {
@@ -106,7 +106,7 @@ export class WhereClause {
   }
 
   get ast(): Nodes.Node {
-    const wrapped = predicatesWithWrappedSqlLiterals(this.predicates);
+    const wrapped = this.predicatesWithWrappedSqlLiterals();
     return wrapped.length === 1 ? wrapped[0] : new Nodes.And(wrapped);
   }
 
@@ -128,7 +128,7 @@ export class WhereClause {
   extractAttributes(): (string | Nodes.Attribute | Nodes.Node)[] {
     const attrs: (string | Nodes.Attribute | Nodes.Node)[] = [];
     for (const node of this.predicates) {
-      const attr = fetchAttributeNode(node);
+      const attr = fetchAttribute(node);
       if (attr !== null) {
         attrs.push(attr);
         continue;
@@ -146,12 +146,89 @@ export class WhereClause {
   toH(tableName?: string, opts: { equalityOnly?: boolean } = {}): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const node of equalities(this.predicates, opts.equalityOnly ?? false)) {
-      const attr = fetchAttributeNode(node);
+      const attr = fetchAttribute(node);
       if (attr === null) continue;
       if (tableName !== undefined && relationName(attr.relation.name) !== tableName) continue;
       result[attr.name] = extractNodeValue((node as any).right);
     }
     return result;
+  }
+
+  /** @internal */
+  private exceptPredicates(columns: (string | Nodes.Attribute | Nodes.Node)[]): Nodes.Node[] {
+    // Rails: separate Attribute objects from string column names.
+    // Attributes compared via eql() (table-qualified), strings by name only.
+    const attrNodes: Nodes.Attribute[] = [];
+    const exprNodes: Nodes.Node[] = [];
+    const colStrings = new Set<string>();
+    for (const c of columns) {
+      if (typeof c === "string") colStrings.add(c);
+      else if (c instanceof Nodes.Attribute) {
+        attrNodes.push(c);
+        // Also register as qualified "table.column" so cross-model merges work
+        // even when two Table instances for the same table have different klass/
+        // typeCaster (and thus different stableSerialize outputs, breaking eql).
+        colStrings.add(`${relationName(c.relation.name)}.${c.name}`);
+      } else if (c instanceof Nodes.Node) {
+        // Non-Attribute expression LHS (e.g. NamedFunction) — Rails' `non_attrs`.
+        exprNodes.push(c);
+      }
+    }
+    return this.predicates.filter((node) => {
+      const attr = fetchAttribute(node);
+      if (attr === null) {
+        // Mirrors Rails' `non_attrs.include?(node.left)` branch: drop a predicate
+        // whose left expression matches one being merged in (last equality wins).
+        const left = predicationLeft(node);
+        if (left !== null && exprNodes.some((e) => e.eql(left))) return false;
+        return true;
+      }
+      if (attrNodes.some((a) => a.eql(attr))) return false;
+      if (colStrings.has(attr.name)) return false;
+      // Match qualified "table.column" strings against the attribute's relation + name
+      const qualified = `${relationName(attr.relation.name)}.${attr.name}`;
+      if (colStrings.has(qualified)) return false;
+      return true;
+    });
+  }
+
+  /** @internal Deviation: Rails keeps this private, but Relation's update/delete
+   *  manager paths build their WHERE list from it directly. */
+  predicatesWithWrappedSqlLiterals(): Nodes.Node[] {
+    return this.nonEmptyPredicates().map((node) => {
+      if (node instanceof Nodes.SqlLiteral) return wrapSqlLiteral(node);
+      return node;
+    });
+  }
+
+  /** @internal */
+  private nonEmptyPredicates(): Nodes.Node[] {
+    return this.predicates.filter((n) => !(n instanceof Nodes.SqlLiteral && n.value === ""));
+  }
+
+  /** @internal */
+  private eachAttributes(fn: (attr: Nodes.Attribute | Nodes.Node, node: Nodes.Node) => void): void {
+    for (const node of this.predicates) {
+      let attr: Nodes.Attribute | Nodes.Node | null = extractAttribute(node);
+      if (!attr && isEqualityNode(node)) {
+        const left = (node as any).left;
+        if (left && typeof left.fetchAttribute === "function") attr = left;
+      }
+      if (attr) fn(attr, node);
+    }
+  }
+
+  /** @internal */
+  protected referencedColumns(): Record<string, Nodes.Node> {
+    const hash: Record<string, Nodes.Node> = {};
+    this.eachAttributes((attr, node) => {
+      const key =
+        attr instanceof Nodes.Attribute
+          ? `${relationName(attr.relation.name)}.${attr.name}`
+          : String(attr);
+      hash[key] = node;
+    });
+    return hash;
   }
 }
 
@@ -185,7 +262,7 @@ function predicationLeft(node: Nodes.Node): Nodes.Node | null {
   return null;
 }
 
-function fetchAttributeNode(node: Nodes.Node): Nodes.Attribute | null {
+function fetchAttribute(node: Nodes.Node): Nodes.Attribute | null {
   let found: Nodes.Attribute | null = null;
   node.fetchAttribute?.((attr: Nodes.Node) => {
     if (attr instanceof Nodes.Attribute) {
@@ -200,7 +277,7 @@ function fetchAttributeNode(node: Nodes.Node): Nodes.Attribute | null {
   });
   if (found) return found;
   if (node instanceof Nodes.Not) {
-    return fetchAttributeNode((node as any).expr);
+    return fetchAttribute((node as any).expr);
   }
   return null;
 }
@@ -243,47 +320,6 @@ function extractNodeValue(node: unknown): unknown {
   return node;
 }
 
-/** @internal */
-function exceptPredicates(
-  predicates: Nodes.Node[],
-  columns: (string | Nodes.Attribute | Nodes.Node)[],
-): Nodes.Node[] {
-  // Rails: separate Attribute objects from string column names.
-  // Attributes compared via eql() (table-qualified), strings by name only.
-  const attrNodes: Nodes.Attribute[] = [];
-  const exprNodes: Nodes.Node[] = [];
-  const colStrings = new Set<string>();
-  for (const c of columns) {
-    if (typeof c === "string") colStrings.add(c);
-    else if (c instanceof Nodes.Attribute) {
-      attrNodes.push(c);
-      // Also register as qualified "table.column" so cross-model merges work
-      // even when two Table instances for the same table have different klass/
-      // typeCaster (and thus different stableSerialize outputs, breaking eql).
-      colStrings.add(`${relationName(c.relation.name)}.${c.name}`);
-    } else if (c instanceof Nodes.Node) {
-      // Non-Attribute expression LHS (e.g. NamedFunction) — Rails' `non_attrs`.
-      exprNodes.push(c);
-    }
-  }
-  return predicates.filter((node) => {
-    const attr = fetchAttributeNode(node);
-    if (attr === null) {
-      // Mirrors Rails' `non_attrs.include?(node.left)` branch: drop a predicate
-      // whose left expression matches one being merged in (last equality wins).
-      const left = predicationLeft(node);
-      if (left !== null && exprNodes.some((e) => e.eql(left))) return false;
-      return true;
-    }
-    if (attrNodes.some((a) => a.eql(attr))) return false;
-    if (colStrings.has(attr.name)) return false;
-    // Match qualified "table.column" strings against the attribute's relation + name
-    const qualified = `${relationName(attr.relation.name)}.${attr.name}`;
-    if (colStrings.has(qualified)) return false;
-    return true;
-  });
-}
-
 function unionNodes(a: Nodes.Node[], b: Nodes.Node[]): Nodes.Node[] {
   const result = [...a];
   for (const node of b) {
@@ -295,23 +331,8 @@ function unionNodes(a: Nodes.Node[], b: Nodes.Node[]): Nodes.Node[] {
 }
 
 /** @internal */
-function predicatesWithWrappedSqlLiterals(predicates: Nodes.Node[]): Nodes.Node[] {
-  return nonEmptyPredicates(predicates).map((node) => {
-    if (node instanceof Nodes.SqlLiteral) return wrapSqlLiteral(node);
-    return node;
-  });
-}
-
-export { predicatesWithWrappedSqlLiterals as getWrappedSqlPredicates };
-
-/** @internal */
 function predicates(wc: WhereClause): Nodes.Node[] {
   return wc.predicates;
-}
-
-/** @internal */
-function nonEmptyPredicates(predicates: Nodes.Node[]): Nodes.Node[] {
-  return predicates.filter((n) => !(n instanceof Nodes.SqlLiteral && n.value === ""));
 }
 
 /** @internal */
@@ -333,34 +354,6 @@ function extractAttribute(node: Nodes.Node): Nodes.Attribute | null {
     return true; // found a match — keep traversing (Nary may have more children)
   });
   return attrNode;
-}
-
-/** @internal */
-function eachAttributes(
-  predicates: Nodes.Node[],
-  fn: (attr: Nodes.Attribute | Nodes.Node, node: Nodes.Node) => void,
-): void {
-  for (const node of predicates) {
-    let attr: Nodes.Attribute | Nodes.Node | null = extractAttribute(node);
-    if (!attr && isEqualityNode(node)) {
-      const left = (node as any).left;
-      if (left && typeof left.fetchAttribute === "function") attr = left;
-    }
-    if (attr) fn(attr, node);
-  }
-}
-
-/** @internal */
-function referencedColumns(predicates: Nodes.Node[]): Record<string, Nodes.Node> {
-  const hash: Record<string, Nodes.Node> = {};
-  eachAttributes(predicates, (attr, node) => {
-    const key =
-      attr instanceof Nodes.Attribute
-        ? `${relationName(attr.relation.name)}.${attr.name}`
-        : String(attr);
-    hash[key] = node;
-  });
-  return hash;
 }
 
 /** @internal */

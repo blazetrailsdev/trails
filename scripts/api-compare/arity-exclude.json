@@ -1,1 +1,32 @@
-[]
+[
+  {
+    "package": "activerecord",
+    "rubyFile": "connection_adapters/mysql/database_statements.rb",
+    "rubyName": "max_allowed_packet_reached?",
+    "reason": "Rails reads the packet ceiling from `max_allowed_packet`, which memoizes an async `SHOW VARIABLES` round-trip. `combineMultiStatements` is synchronous in trails and hands the limit down as `maxPacket` (currently the 16 MiB MySQL default), so the third param cannot be dropped until that caller chain becomes async."
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "connection_adapters/mysql/schema_statements.rb",
+    "rubyName": "row_format_dynamic_by_default?",
+    "reason": "Ruby reads `mariadb?` / `database_version` off the adapter; the TS port is a free function in the mixin module, called from AbstractMysqlAdapter with those two flags already resolved. Converging means giving the MySQL schema-statements module a host interface, which is the same work as the sibling `default_row_format` entry."
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "connection_adapters/mysql/schema_statements.rb",
+    "rubyName": "default_row_format",
+    "reason": "Rails memoizes `@default_row_format` from two `SHOW VARIABLES` queries (innodb_file_per_table / innodb_file_format). The TS port is a pure function fed both flags plus the version, so converging to zero-arg requires the async query + memo to move onto an adapter host first."
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "database_configurations/url_config.rb",
+    "rubyName": "build_url_hash",
+    "reason": "Ruby reads `@url`, but the TS port must run BEFORE `super(...)` in the UrlConfig constructor — its result is merged into the configuration hash passed up to HashConfig, and `this` is unavailable before `super`. The url therefore has to be threaded in as a parameter."
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration.rb",
+    "rubyName": "run_without_lock",
+    "reason": "Rails' Migrator holds `@direction` / `@target_version` as construction-time ivars; trails' MigrationContext keeps one long-lived instance and passes both per call. Converging means splitting a per-run Migrator out of MigrationContext, which is a structural port well beyond an arity fix."
+  }
+]

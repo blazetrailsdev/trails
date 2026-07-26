@@ -455,7 +455,7 @@ export class Transaction {
   async rollbackRecords(): Promise<void> {
     const recs = this.records;
     if (recs) {
-      const ite = this.uniqueRecords(recs);
+      const ite = this.uniqueRecords();
       const instanceMap = this.prepareInstancesToRunCallbacksOn(ite);
 
       try {
@@ -496,7 +496,7 @@ export class Transaction {
         // copy of each logical record runs (dedup by record equality), so a
         // deferred touch held on a second copy of a parent never flushes.
         const ite = beforeCommittedOnAllRecords
-          ? this.uniqueRecords(recs)
+          ? this.uniqueRecords()
           : this.uniqueRecordsByEquality(recs);
         for (const record of ite) {
           if (typeof (record as any).beforeCommittedBang === "function") {
@@ -515,7 +515,7 @@ export class Transaction {
   async commitRecords(): Promise<void> {
     const recs = this.records;
     if (recs) {
-      const ite = this.uniqueRecords(recs);
+      const ite = this.uniqueRecords();
 
       if (this._runCommitCallbacks) {
         const instanceMap = this.prepareInstancesToRunCallbacksOn(ite);
@@ -591,10 +591,10 @@ export class Transaction {
   }
 
   /** @internal */
-  private uniqueRecords(recs: unknown[]): unknown[] {
+  private uniqueRecords(): unknown[] {
     const seen = new Set<unknown>();
     const result: unknown[] = [];
-    for (const record of recs) {
+    for (const record of this.records ?? []) {
       if (!seen.has(record)) {
         seen.add(record);
         result.push(record);
@@ -639,7 +639,7 @@ export class Transaction {
   private async runActionOnRecords(
     records: unknown[],
     instancesToRunCallbacksOn: CandidateLookup,
-    action: (record: unknown, shouldRunCallbacks: boolean) => Promise<void> | void,
+    callback: (record: unknown, shouldRunCallbacks: boolean) => Promise<void> | void,
   ): Promise<void> {
     while (records.length > 0) {
       const record = records.shift()!;
@@ -647,7 +647,7 @@ export class Transaction {
       // instance chosen as the candidate runs its callbacks; sibling copies of
       // the same logical row are skipped.
       const shouldRunCallbacks = instancesToRunCallbacksOn.get(record) === record;
-      await action(record, shouldRunCallbacks);
+      await callback(record, shouldRunCallbacks);
     }
   }
 

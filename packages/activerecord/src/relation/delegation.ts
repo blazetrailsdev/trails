@@ -353,12 +353,12 @@ export function generatedRelationMethods(modelClass: typeof Base): GeneratedRela
  *
  * @internal
  */
-export function includeRelationMethods(
-  carrier: object,
-  methods: GeneratedRelationMethods,
-  priority: number,
-): void {
-  methods.includeInto(carrier, priority);
+export function includeRelationMethods(modelClass: typeof Base, delegate: object): void {
+  // Deviation: Ruby's recursion + include-order MRO is reproduced structurally
+  // by an install priority (base_class = 0, own = highest) instead.
+  stiCarrierChain(modelClass).forEach((ancestor, priority) => {
+    generatedRelationMethods(ancestor).includeInto(delegate, priority);
+  });
 }
 
 /**
@@ -413,26 +413,7 @@ function perModelCarrier(
       configurable: true,
     });
     cache.set(modelClass, subclass);
-    // Mirror Rails' `include_relation_methods` superclass recursion
-    // (`superclass.include_relation_methods(delegate) unless base_class?`,
-    // delegation.rb:57-60): include each STI ancestor model's generated module
-    // (from `base_class` down) and finally the model's OWN module. Rails walks
-    // super first, then includes own last, so an own generated method wins over
-    // an inherited one; `stiCarrierChain` returns the chain base_class-first to
-    // preserve that order. This is safe because the generated delegator is now
-    // model-agnostic (`classMethodDelegator` reads the relation's live
-    // `_modelClass` at call time), so an ancestor's module installed onto an STI
-    // child carrier still dispatches to the child (child scope + child STI
-    // type-condition) — inherited generated methods resolve by ordinary
-    // prototype lookup instead of re-entering the `Proxy` miss path per
-    // subclass. The chain index is the module's priority (base_class = 0, own =
-    // highest), so `includeRelationMethods` structurally lets an own method win
-    // over an inherited one of the same name regardless of `generate()` order,
-    // mirroring Ruby's ancestor-chain MRO.
-    const carrierProto = subclass.prototype;
-    stiCarrierChain(modelClass).forEach((ancestor, priority) => {
-      includeRelationMethods(carrierProto, generatedRelationMethods(ancestor), priority);
-    });
+    includeRelationMethods(modelClass, subclass.prototype);
   }
   return subclass;
 }

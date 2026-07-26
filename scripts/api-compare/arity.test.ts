@@ -202,6 +202,17 @@ describe("arityMatches", () => {
     expect(arityMatches([], [req("date", "Date")]).ok).toBe(true);
   });
 
+  it("strips a leading `validator` receiver", () => {
+    // ruby UniquenessValidator#covered_by_unique_index?(klass, record, attribute, scope)
+    // vs isCoveredByUniqueIndex(validator, klass, record, attribute, scope)
+    expect(
+      arityMatches(
+        [req("klass"), req("record"), req("attribute"), req("scope")],
+        [req("validator"), req("klass"), req("record"), req("attribute"), req("scope")],
+      ).ok,
+    ).toBe(true);
+  });
+
   it("strips a leading `_`-prefixed placeholder receiver", () => {
     // ruby present?()  vs  present(_value)
     expect(arityMatches([], [req("_value")]).ok).toBe(true);

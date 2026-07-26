@@ -124,10 +124,7 @@ import { SpawnMethods } from "./relation/spawn-methods.js";
 import { FromClause } from "./relation/from-clause.js";
 import { TableMetadata } from "./table-metadata.js";
 import { Map as TypeCasterMap } from "./type-caster/map.js";
-import {
-  WhereClause,
-  getWrappedSqlPredicates as predicatesWithWrappedSqlLiterals,
-} from "./relation/where-clause.js";
+import { WhereClause } from "./relation/where-clause.js";
 import { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
 import {
   touchAttributesWithTime,
@@ -207,7 +204,7 @@ function _whereClauseToSql(
   whereClause: WhereClause,
   connection: { toSql(arel: unknown): string },
 ): string {
-  const wrapped = predicatesWithWrappedSqlLiterals(whereClause.predicates);
+  const wrapped = whereClause.predicatesWithWrappedSqlLiterals();
   if (wrapped.length === 0) return "";
   const node = wrapped.length === 1 ? wrapped[0] : new Nodes.And(wrapped);
   return connection.toSql(node);
@@ -3889,7 +3886,7 @@ export class Relation<T extends Base> {
       stmtAst = arel.compileUpdate(updateValues, key, havingAst, groupColumns).ast;
     } else {
       const um = new UpdateManager().table(table).set(updateValues);
-      for (const node of predicatesWithWrappedSqlLiterals(this._whereClause.predicates)) {
+      for (const node of this._whereClause.predicatesWithWrappedSqlLiterals()) {
         um.where(node);
       }
       stmtAst = um.ast;
@@ -3979,7 +3976,7 @@ export class Relation<T extends Base> {
     } else {
       // No primary key — fall back to a plain DeleteManager.
       const dm = new DeleteManager().from(table);
-      for (const node of predicatesWithWrappedSqlLiterals(this._whereClause.predicates)) {
+      for (const node of this._whereClause.predicatesWithWrappedSqlLiterals()) {
         dm.where(node);
       }
       stmtAst = dm.ast;
@@ -5476,7 +5473,7 @@ export class Relation<T extends Base> {
   }
 
   private _collectAllWhereNodes(_table: Table, rel: Relation<T>): Nodes.Node[] {
-    return predicatesWithWrappedSqlLiterals(rel._whereClause.predicates);
+    return rel._whereClause.predicatesWithWrappedSqlLiterals();
   }
 
   private _applyWheresToManager(manager: SelectManager, table: Table): void {

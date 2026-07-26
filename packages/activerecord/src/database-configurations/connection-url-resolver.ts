@@ -160,7 +160,7 @@ export class ConnectionUrlResolver {
       username: parsed.username || undefined,
       password: parsed.password || undefined,
       port: parsed.port ? Number(parsed.port) : undefined,
-      database: this.databaseFromPath(parsed.pathname),
+      database: this.databaseFromPath(),
       // URL API wraps IPv6 addresses in brackets; strip them to match Rails behavior
       host: hostname ? hostname.replace(/^\[(.+)\]$/, "$1") : undefined,
       ...this.queryHash(),
@@ -168,7 +168,8 @@ export class ConnectionUrlResolver {
   }
 
   /** @internal */
-  private databaseFromPath(path: string): string | undefined {
+  private databaseFromPath(): string | undefined {
+    const path = this._parsed?.pathname;
     if (!path) return undefined;
     // SQLite uses the full path as database name; others strip the leading slash
     if (this._adapter === "sqlite3") {

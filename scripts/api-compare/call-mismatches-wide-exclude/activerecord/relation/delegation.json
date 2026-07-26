@@ -52,13 +52,6 @@
     "package": "activerecord",
     "tsFile": "relation/delegation.ts",
     "rubyName": "include_relation_methods",
-    "call": "generated_relation_methods",
-    "reason": "Mechanism divergence (story delegation-generated-methods-per-model-prototype-carrier): trails' per-model prototype-carrier port installs generated methods onto per-model Relation subclass prototypes (relationClassFor / GeneratedRelationMethods.includeInto) rather than replicating Rails' anonymous-module include, so the call-set differs by construction."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/delegation.ts",
-    "rubyName": "include_relation_methods",
     "call": "include",
     "reason": "Mechanism divergence (story delegation-generated-methods-per-model-prototype-carrier): trails' per-model prototype-carrier port installs generated methods onto per-model Relation subclass prototypes (relationClassFor / GeneratedRelationMethods.includeInto) rather than replicating Rails' anonymous-module include, so the call-set differs by construction."
   },

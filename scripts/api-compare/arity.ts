@@ -116,6 +116,9 @@ const RECEIVER_PARAM_NAMES = new Set([
   "tags",
   "controller",
   "collection",
+  // A `*Validator` instance passed positionally: in Rails these methods are
+  // instance methods ON the validator, so the leading param IS the receiver.
+  "validator",
 ]);
 
 /** Trailing-param NAMES that conventionally denote a ported Ruby block (`&block`).

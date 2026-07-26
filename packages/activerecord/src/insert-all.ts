@@ -51,7 +51,7 @@ export class InsertAll {
   uniqueBy: string | string[] | IndexDefinition | undefined;
   returning: string | string[] | Nodes.SqlLiteral | false;
 
-  onDuplicate: "skip" | "update" | undefined;
+  onDuplicate: "skip" | "update" | Nodes.SqlLiteral | undefined;
   updateOnly: string | string[] | undefined;
   updateSql: Nodes.SqlLiteral | undefined;
 
@@ -92,7 +92,7 @@ export class InsertAll {
     this.uniqueBy = options.uniqueBy;
     this._recordTimestamps = options.recordTimestamps ?? this.model.recordTimestamps;
     this.updateSql = undefined;
-    this.onDuplicate = undefined;
+    this.onDuplicate = options.onDuplicate;
 
     if (options.onDuplicate !== undefined) this.disallowRawSqlBang(options.onDuplicate);
     if (options.returning !== undefined && options.returning !== false)
@@ -131,7 +131,7 @@ export class InsertAll {
     }
 
     this.verifyAttributeNamesAreKnown();
-    this.configureOnDuplicateUpdateLogic(options.onDuplicate);
+    this.configureOnDuplicateUpdateLogic();
     this.ensureValidOptionsForConnectionBang();
   }
 
@@ -304,8 +304,9 @@ export class InsertAll {
   }
 
   /** @internal */
-  private configureOnDuplicateUpdateLogic(onDuplicate: InsertAllOptions["onDuplicate"]): void {
-    if (this.isCustomUpdateSqlProvided(onDuplicate) && this.updateOnly !== undefined) {
+  private configureOnDuplicateUpdateLogic(): void {
+    const onDuplicate = this.onDuplicate;
+    if (this.isCustomUpdateSqlProvided() && this.updateOnly !== undefined) {
       // Rails: raise ArgumentError (insert_all.rb).
       throw new ArgumentError(
         "You can't set :update_only and provide custom update SQL via :on_duplicate at the same time",
@@ -314,7 +315,7 @@ export class InsertAll {
     if (
       onDuplicate !== undefined &&
       onDuplicate !== "update" &&
-      !this.isCustomUpdateSqlProvided(onDuplicate) &&
+      !this.isCustomUpdateSqlProvided() &&
       this.updateOnly !== undefined
     ) {
       throw new Error("Cannot use both onDuplicate and updateOnly");
@@ -323,7 +324,7 @@ export class InsertAll {
     if (this.updateOnly !== undefined) {
       this._updatableColumns = Array.isArray(this.updateOnly) ? this.updateOnly : [this.updateOnly];
       this.onDuplicate = this._updatableColumns.length === 0 ? "skip" : "update";
-    } else if (this.isCustomUpdateSqlProvided(onDuplicate)) {
+    } else if (this.isCustomUpdateSqlProvided()) {
       this.updateSql = onDuplicate as Nodes.SqlLiteral;
       this.onDuplicate = "update";
     } else if (onDuplicate === "skip") {
@@ -335,8 +336,8 @@ export class InsertAll {
   }
 
   /** @internal */
-  private isCustomUpdateSqlProvided(onDuplicate: InsertAllOptions["onDuplicate"]): boolean {
-    return onDuplicate instanceof Nodes.SqlLiteral;
+  private isCustomUpdateSqlProvided(): boolean {
+    return this.onDuplicate instanceof Nodes.SqlLiteral;
   }
 
   /** @internal Mirrors: ActiveRecord::InsertAll#unique_by_columns */
