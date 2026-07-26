@@ -1207,3 +1207,24 @@ describe("tsLiteralValue — negative numbers", () => {
     expect(tsLiteralValue(parseExpr("-x"))).toBeUndefined();
   });
 });
+
+describe("extractFromProgram — @internal JSDoc on top-level functions", () => {
+  it("tags an @internal-tagged export function and leaves its untagged sibling public", () => {
+    const info = extractFromFiles("/p", {
+      "quoting.ts": `
+        /**
+         * Wiring seam, not Rails surface.
+         *
+         * @internal
+         */
+        export function dispatchQuote(value: unknown): string { return ""; }
+
+        /** Rails-facing. */
+        export function quote(value: unknown): string { return ""; }
+      `,
+    });
+    const fns = info.fileFunctions["quoting.ts"];
+    expect(fns.find((f) => f.name === "dispatchQuote")!.internal).toBe(true);
+    expect(fns.find((f) => f.name === "quote")!.internal).toBeUndefined();
+  });
+});

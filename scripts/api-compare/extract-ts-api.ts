@@ -471,6 +471,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
         const line = node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1;
         const fnOptionKeys = extractOptionKeys(node.parameters, checker);
         const fnCalls = extractCalls(node.body);
+        const internal = hasInternalJsDocTag(node);
         fileFunctions.push({
           name: node.name.text,
           visibility: "public",
@@ -478,6 +479,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
           isStatic: false,
           line,
           file: relPath,
+          ...(internal ? { internal: true } : {}),
           ...(fnOptionKeys !== undefined ? { optionKeys: fnOptionKeys } : {}),
           ...(fnCalls !== undefined ? { calls: fnCalls } : {}),
         });
@@ -1200,6 +1202,17 @@ function extractDefinePropertyForOf(
  *
  * Caller must already have ensured `node` is not exported.
  */
+/**
+ * True when a declaration's leading JSDoc carries an `@internal` tag — the
+ * repo-wide convention (CONTRIBUTING.md) for "exported for wiring, not part
+ * of the Rails-facing surface". Exported top-level functions have no
+ * `private`/`protected` modifier to carry that signal, so the tag is the
+ * only marker; consumers filter on `internal: true` (see extra-surface.ts).
+ */
+export function hasInternalJsDocTag(node: ts.Node): boolean {
+  return ts.getJSDocTags(node).some((tag) => tag.tagName.text === "internal");
+}
+
 /**
  * Params of the function an identifier / property-access reference points at,
  * or null when the expression isn't callable. Mirrors the alias resolution the
