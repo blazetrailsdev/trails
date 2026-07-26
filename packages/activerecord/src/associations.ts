@@ -94,13 +94,7 @@ import {
   foreignKey as deriveForeignKey,
   isAbortSignal,
 } from "@blazetrails/activesupport";
-import {
-  getInheritanceColumn,
-  findStiClass,
-  stiEnabled,
-  registerSubclass,
-  polymorphicName,
-} from "./inheritance.js";
+import { registerSubclass, polymorphicName } from "./inheritance.js";
 import { flushPendingCounterCacheColumns, _foreignKeysEqual } from "./counter-cache.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
