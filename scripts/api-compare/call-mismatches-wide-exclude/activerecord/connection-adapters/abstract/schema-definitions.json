@@ -151,14 +151,14 @@
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "integer_like_primary_key?",
     "call": "include?",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails schema_definitions.rb:605-607 uses `[:integer, :bigint].include?(type)` and `!options.key?(:default)`; trails schema-definitions.ts:1031-1037 inlines the type equality checks and tests `options.default === undefined`. The presence check is preserved under the nil\u2194null mapping: an explicit `default: null` is !== undefined, so it disables the rewrite exactly as Rails' key?-present nil does; the only unmatched shape is an explicit `default: undefined`, which has no Ruby analogue and conventionally means absent in JS."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails schema_definitions.rb:605-607 uses `[:integer, :bigint].include?(type)` and `!options.key?(:default)`; trails schema-definitions.ts:1031-1037 inlines the type equality checks and tests `options.default === undefined`. The presence check is preserved under the nil↔null mapping: an explicit `default: null` is !== undefined, so it disables the rewrite exactly as Rails' key?-present nil does; the only unmatched shape is an explicit `default: undefined`, which has no Ruby analogue and conventionally means absent in JS."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "integer_like_primary_key?",
     "call": "key?",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails schema_definitions.rb:605-607 uses `[:integer, :bigint].include?(type)` and `!options.key?(:default)`; trails schema-definitions.ts:1031-1037 inlines the type equality checks and tests `options.default === undefined`. The presence check is preserved under the nil\u2194null mapping: an explicit `default: null` is !== undefined, so it disables the rewrite exactly as Rails' key?-present nil does; the only unmatched shape is an explicit `default: undefined`, which has no Ruby analogue and conventionally means absent in JS."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails schema_definitions.rb:605-607 uses `[:integer, :bigint].include?(type)` and `!options.key?(:default)`; trails schema-definitions.ts:1031-1037 inlines the type equality checks and tests `options.default === undefined`. The presence check is preserved under the nil↔null mapping: an explicit `default: null` is !== undefined, so it disables the rewrite exactly as Rails' key?-present nil does; the only unmatched shape is an explicit `default: undefined`, which has no Ruby analogue and conventionally means absent in JS."
   },
   {
     "package": "activerecord",
@@ -226,6 +226,13 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
+    "rubyName": "remove_column",
+    "call": "delete",
+    "reason": "Newly comparable (RFC 0072 arity sweep): Rails deletes from the `@columns_hash` Hash; TableDefinition here stores `columns` as an ordered array, so the same removal is a findIndex/splice. Equivalent — no Hash to delete from."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "remove_references",
     "call": "remove_reference",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -278,12 +285,5 @@
     "rubyName": "timestamps",
     "call": "key?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-definitions.ts",
-    "rubyName": "remove_column",
-    "call": "delete",
-    "reason": "Newly comparable (RFC 0072 arity sweep): Rails deletes from the `@columns_hash` Hash; TableDefinition here stores `columns` as an ordered array, so the same removal is a findIndex/splice. Equivalent \u2014 no Hash to delete from."
   }
 ]

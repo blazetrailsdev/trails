@@ -826,9 +826,48 @@ describe("resolveModuleName", () => {
     ).toEqual(["AR::ConnectionAdapters::Quoting"]);
   });
 
-  it("passes through already-qualified names without consulting the map", () => {
-    // Early return fires on "::" — byShort is irrelevant for pre-qualified names.
+  it("falls back to the verbatim qualified name when nothing matches", () => {
     expect(resolveModuleName("Foo::Bar", "Baz::Qux", new Map())).toEqual(["Foo::Bar"]);
+  });
+
+  it("resolves a partially-qualified name through the enclosing namespace", () => {
+    const byShort = new Map([["Quoting", ["AR::ConnectionAdapters::PostgreSQL::Quoting"]]]);
+    expect(
+      resolveModuleName(
+        "PostgreSQL::Quoting",
+        "AR::ConnectionAdapters::PostgreSQLAdapter",
+        byShort,
+      ),
+    ).toEqual(["AR::ConnectionAdapters::PostgreSQL::Quoting"]);
+  });
+
+  it("returns a fully-qualified name that already matches a known module", () => {
+    const byShort = new Map([
+      ["Quoting", ["AR::ConnectionAdapters::PostgreSQL::Quoting", "Other::Quoting"]],
+    ]);
+    expect(
+      resolveModuleName("Other::Quoting", "AR::ConnectionAdapters::PostgreSQLAdapter", byShort),
+    ).toEqual(["Other::Quoting"]);
+  });
+
+  it("prefers the nearest namespace prefix over a top-level qualified match", () => {
+    const byShort = new Map([
+      ["Quoting", ["PostgreSQL::Quoting", "AR::ConnectionAdapters::PostgreSQL::Quoting"]],
+    ]);
+    expect(
+      resolveModuleName(
+        "PostgreSQL::Quoting",
+        "AR::ConnectionAdapters::PostgreSQLAdapter",
+        byShort,
+      ),
+    ).toEqual(["AR::ConnectionAdapters::PostgreSQL::Quoting"]);
+  });
+
+  it("returns the verbatim qualified name when no namespace prefix matches", () => {
+    const byShort = new Map([["Quoting", ["Somewhere::Else::Quoting"]]]);
+    expect(resolveModuleName("PostgreSQL::Quoting", "AR::Base", byShort)).toEqual([
+      "PostgreSQL::Quoting",
+    ]);
   });
 
   it("strips a leading :: and resolves top-level, ignoring nearer candidates", () => {

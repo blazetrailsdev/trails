@@ -451,6 +451,13 @@
     "package": "activerecord",
     "tsFile": "tasks/database-tasks.ts",
     "rubyName": "truncate_tables",
+    "call": "tables",
+    "reason": "Newly comparable (RFC 0072 arity sweep): Rails calls `conn.truncate_tables(*conn.tables)`; trails delegates the whole operation to a per-adapter task handler's `truncateAll`, which enumerates tables itself. Pre-existing structural deviation."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/database-tasks.ts",
+    "rubyName": "truncate_tables",
     "call": "with_temporary_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -474,12 +481,5 @@
     "rubyName": "with_temporary_pool_for_each",
     "call": "configurations",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "truncate_tables",
-    "call": "tables",
-    "reason": "Newly comparable (RFC 0072 arity sweep): Rails calls `conn.truncate_tables(*conn.tables)`; trails delegates the whole operation to a per-adapter task handler's `truncateAll`, which enumerates tables itself. Pre-existing structural deviation."
   }
 ]
