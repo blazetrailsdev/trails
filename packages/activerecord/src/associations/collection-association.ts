@@ -621,11 +621,11 @@ export class CollectionAssociation extends Association {
   protected async persistReplacePlan(pending: ReplacePlan): Promise<void> {
     if (this.owner.isNewRecord()) return;
     // If the association wasn't loaded at assignment time, fetch the persisted
-    // baseline directly via doAsyncFindTarget to avoid the loadedBang short-circuit
+    // baseline directly rather than via findTarget, to avoid the loadedBang short-circuit
     // and without mutating this.target (mirrors Rails' load_target in replace).
     if (!pending.wasLoaded) {
       // Query the DB directly via scope() to get the persisted baseline.
-      // doAsyncFindTarget() hits the association-instance cache (which may
+      // findTarget() hits the association-instance cache (which may
       // already reflect the in-memory replace) and returns the wrong diff.
       const rel = this.scope() as { toArray?: () => Promise<Base[]> } | null | undefined;
       const dbRecords = rel?.toArray ? await rel.toArray() : [];
@@ -669,7 +669,7 @@ export class CollectionAssociation extends Association {
       if (cached !== undefined && Array.isArray(cached)) {
         this.target = this.mergeTargetLists(cached, this.target);
       } else {
-        const found = await this.doAsyncFindTarget();
+        const found = await this.findTarget();
         if (found !== undefined && found !== null && Array.isArray(found)) {
           // Rails applies set_strict_loading per record in find_target's DB
           // execute block — only freshly loaded records, never cached ones.
