@@ -106,6 +106,27 @@ describe("buildGlobalRubyCandidates", () => {
     // visibility divergence (the method exists in Rails), not novel surface.
     expect(set.has("privateOne")).toBe(true);
   });
+
+  it("includes file-level constant names verbatim so a relocated constant is moved, not novel", () => {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activerecord: {
+          classes: {},
+          modules: {},
+          fileConstants: {
+            "connection_adapters/abstract_mysql_adapter.rb": {
+              ER_DUP_ENTRY: { kind: "int", value: "1062" },
+            },
+          },
+        },
+      },
+    };
+    const set = buildGlobalRubyCandidates(ruby);
+    expect(set.has("ER_DUP_ENTRY")).toBe(true);
+    expect(set.has("erDupEntry")).toBe(true);
+  });
 });
 
 describe("buildReport — novel vs moved classification", () => {
@@ -189,6 +210,33 @@ describe("buildReport — novel vs moved classification", () => {
     expect(pkg.totalNovel).toBe(1);
     expect(pkg.totalMoved).toBe(0);
     expect(pkg.extraFiles[0].extras.map((e) => e.name)).toEqual(["tsOnlyHelper"]);
+  });
+
+  it("allows a constant declared in the matched Ruby file, moves one from another file", () => {
+    const { ruby, ts } = makeManifests();
+    ruby.packages["activemodel"].fileConstants = {
+      "foo.rb": { ER_DUP_ENTRY: { kind: "int", value: "1062" } },
+      "baz.rb": { SHARED_MESSAGE: { kind: "string", value: "boom" } },
+    };
+    // A ported constant surfaces on the TS side as a static class member.
+    ts.packages["activemodel"].classes["Foo"].classMethods = [
+      method("ER_DUP_ENTRY"),
+      method("SHARED_MESSAGE"),
+      method("TS_ONLY_CONST"),
+    ];
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles[0];
+    expect(f.extras.map((e) => [e.name, e.kind])).toEqual([
+      ["TS_ONLY_CONST", "novel"],
+      ["tsOnlyHelper", "novel"],
+      ["quux", "moved"],
+      ["SHARED_MESSAGE", "moved"],
+    ]);
   });
 
   it("a TS public method mirroring a Rails-PRIVATE method is not extra surface", () => {

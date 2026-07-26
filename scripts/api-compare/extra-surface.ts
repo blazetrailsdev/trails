@@ -59,7 +59,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
 import { OUTPUT_DIR } from "./config.js";
-import { rubyFileToTs, rubyMethodToTs } from "./conventions.js";
+import { rubyFileToTs, rubyMethodToTs, snakeToCamel } from "./conventions.js";
 import { resolveModuleName } from "./compare.js";
 import { isSourceUnported } from "./unported-files.js";
 
@@ -186,6 +186,20 @@ function rubyMethodCandidates(rubyName: string): string[] | null {
   if (!base) return null;
   if (!rubyName.endsWith("?")) return base;
   return [...base, ...base.map((c) => c + "Q")];
+}
+
+/**
+ * TS-candidate names for a Ruby file-level constant. Constants aren't
+ * case-transformed on the way over — `ER_DUP_ENTRY` ports verbatim — so the
+ * name itself is the primary candidate. The camelized-lowercase form is the
+ * second candidate purely to stay in lockstep with `constantNameMatches`
+ * (literals.ts), which the literal-value comparison already uses to pair a
+ * Ruby constant with its TS counterpart; scoring the two passes off different
+ * name rules would let a constant compare as a value yet still read as drift.
+ */
+function rubyConstantCandidates(name: string): string[] {
+  const camel = snakeToCamel(name.toLowerCase());
+  return camel === name ? [name] : [name, camel];
 }
 
 /** Get-or-init helper: replaces the `(get() ?? set([]).get()!).push(v)` idiom. */
@@ -468,6 +482,11 @@ function foldClassMethodsModules(modules: Record<string, ClassInfo>): Set<string
  *     its methods never enter `allowed` — matching the `isSourceUnported`
  *     guard at compare.ts:507. The check uses the module's *owning* package.
  *
+ * The matched file's `fileConstants` names join `allowed` too (see
+ * `rubyConstantCandidates`): a faithfully-ported `ER_DUP_ENTRY` is not extra
+ * surface. Constants have no mixin routing — they belong to the file, not to
+ * an entity — so they're added once up front rather than per entity.
+ *
  * Since `allowed` is a flat name set (instance vs class collapsed on the TS
  * side anyway), we simply union both `instanceMethods` and `classMethods`
  * for the *host* entity, but ONLY `instanceMethods` for walked-into mixins.
@@ -484,8 +503,15 @@ function collectAllowedNames(
   moduleFqnByShort: Map<string, string[]>,
   crossPackageModules: Record<string, ClassInfo>,
   crossPackagePkgByFqn: Record<string, string>,
+  fileConstantNames: string[],
 ): Set<string> {
   const allowed = new Set<string>();
+  // File-level constants are declared per Ruby *file*, not per entity, so they
+  // enter the allow-set once for the whole file rather than through the
+  // entity/mixin walk below.
+  for (const name of fileConstantNames) {
+    for (const c of rubyConstantCandidates(name)) allowed.add(c);
+  }
   const visited = new Set<string>();
 
   const addMethods = (methods: MethodInfo[]): void => {
@@ -563,10 +589,23 @@ function collectAllowedNames(
  * Rails-private method that lives in a *different* `.rb` is "moved" (it exists
  * in Rails, just elsewhere), not "novel". Treating private mirrors as novel
  * would inflate the high-signal tier with methods Rails actually defines.
+ *
+ * File-level constants join the oracle on the same rule as methods: a Ruby
+ * constant declared in a *different* `.rb` than the matched one scores as
+ * `moved`, not `novel`. Rails does relocate constants (a shared error-code or
+ * message constant reachable from several adapters), so the alternative —
+ * leaving constants out of the oracle — would re-mint every constant that
+ * doesn't sit in its own file as novel-by-omission, which is exactly the
+ * miscount this pass exists to remove.
  */
 export function buildGlobalRubyCandidates(ruby: ApiManifest): Set<string> {
   const all = new Set<string>();
   for (const pkg of Object.values(ruby.packages)) {
+    for (const consts of Object.values(pkg.fileConstants ?? {})) {
+      for (const name of Object.keys(consts)) {
+        for (const c of rubyConstantCandidates(name)) all.add(c);
+      }
+    }
     const entities = [...Object.values(pkg.classes), ...Object.values(pkg.modules)] as ClassInfo[];
     for (const e of entities) {
       for (const m of [...e.instanceMethods, ...e.classMethods]) {
@@ -705,6 +744,7 @@ function buildPackageReport(
       moduleFqnByShort,
       crossPackageModules,
       crossPackagePkgByFqn,
+      Object.keys(rubyPkg.fileConstants?.[rubyFile] ?? {}),
     );
 
     const extras: ExtraName[] = [];

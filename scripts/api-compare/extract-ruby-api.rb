@@ -272,7 +272,10 @@ class ApiExtractor
   def initialize
     @classes = {}
     @modules = {}
-    # rel_path → { CONST_NAME => literal_value } for literal-valued constants.
+    # rel_path → { CONST_NAME => literal_value }. Non-literal RHSs (hashes with
+    # content, regexps, procs, `Struct.new`) are recorded as {kind: "expr"} so
+    # the map is a complete declared-constant *name* index for extra-surface
+    # scoring; the literal-value diff (compare.ts) skips "expr" on either side.
     @file_constants = {}
     @namespace_stack = []
     @visibility_stack = [:public]
@@ -1752,14 +1755,16 @@ class ApiExtractor
     elems.all? { |e| e.is_a?(Array) && [:symbol_literal, :dyna_symbol].include?(e[0]) }
   end
 
-  # Record a constant with a literal RHS, keyed file → NAME (unwrapping `.freeze`).
+  # Record a constant keyed file → NAME (unwrapping `.freeze`). A non-literal
+  # RHS still gets an entry, as {kind: "expr"} — the name is what extra-surface
+  # scoring needs, and "expr" is already the uncomparable marker for literals.
   def maybe_record_constant(lhs, rhs)
     return unless lhs.is_a?(Array) && lhs[0] == :var_field
     const = lhs[1]
     return unless const.is_a?(Array) && const[0] == :@const
     rhs = unwrap_freeze(rhs)
     lit = literal_value(rhs)
-    return if lit.nil? || lit[:kind] == "expr"
+    return if lit.nil?
     (@file_constants[@current_file] ||= {})[const[1]] = lit
   end
 

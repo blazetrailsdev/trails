@@ -933,3 +933,38 @@ describe("Ruby extractor option-key const expansion", () => {
     expect(r["Bar::Rel#build"]).toEqual(["top_a", "top_b"]);
   });
 });
+
+describe("Ruby extractor file constants", () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+  function rubyFileConstants(src: string): Record<string, { kind: string }> {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "consts-rb-"));
+    try {
+      fs.writeFileSync(path.join(dir, "adapter.rb"), src);
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        ex.process_file(File.join(${JSON.stringify(dir)}, "adapter.rb"), ${JSON.stringify(dir)})
+        puts JSON.generate(ex.file_constants["adapter.rb"] || {})
+      `;
+      return JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it("records non-literal constants as expr so the name index is complete", () => {
+    const c = rubyFileConstants(`
+      class Adapter
+        ER_DUP_ENTRY = 1062
+        NATIVE_DATABASE_TYPES = { primary_key: "bigserial primary key" }
+        VALID_OPTIONS = [:class_name, :foreign_key].freeze
+      end
+    `);
+    expect(c["ER_DUP_ENTRY"]).toEqual({ kind: "int", value: "1062" });
+    // Names extra-surface scoring needs; the literal diff skips "expr" values.
+    expect(c["NATIVE_DATABASE_TYPES"]).toEqual({ kind: "expr" });
+    expect(c["VALID_OPTIONS"]).toEqual({ kind: "expr" });
+  });
+});
