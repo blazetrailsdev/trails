@@ -92,7 +92,6 @@ import {
   pluralize,
   camelize,
   foreignKey as deriveForeignKey,
-  isAbortSignal,
 } from "@blazetrails/activesupport";
 import {
   getInheritanceColumn,
@@ -3012,41 +3011,6 @@ export async function loadHabtm(
 }
 
 /**
- * Fire one or more association callbacks (before_add, after_add, etc.).
- */
-export function fireAssocCallbacks(
-  cbs:
-    | ((owner: Base, record: Base) => void | false)
-    | ((owner: Base, record: Base) => void | false)[]
-    | undefined,
-  owner: Base,
-  record: Base,
-  catchAbort = false,
-): boolean {
-  if (!cbs) return true;
-  const arr = Array.isArray(cbs) ? cbs : [cbs];
-  for (const cb of arr) {
-    // Rails wraps only `before_add`/`before_remove` in `catch(:abort)`
-    // (collection_association.rb:400-402, 462-464). Those callers pass
-    // `catchAbort=true`; an after callback runs outside the catch, so a
-    // `throw :abort` from after_add/after_remove propagates (Rails parity).
-    if (catchAbort) {
-      try {
-        cb(owner, record);
-      } catch (e) {
-        if (!isAbortSignal(e)) throw e;
-        return false;
-      }
-    } else {
-      // after_add/after_remove run outside the catch; their return value is
-      // ignored (Rails 5+ only halts on `throw :abort`, never on `false`).
-      cb(owner, record);
-    }
-  }
-  return true;
-}
-
-/**
  * Factory to get a CollectionProxy for a has_many association.
  * Returns a cached proxy if one exists on the record.
  */
@@ -3456,47 +3420,6 @@ export function reflectLockVersionBump(record: Base): void {
   const lc = ctor.lockingColumn;
   const bumped = (Number((record as any).readAttribute?.(lc)) || 0) + 1;
   (record as any)._attributes?.writeFromDatabase(lc, bumped);
-}
-
-/**
- * Touch parent associations after a record is saved or destroyed.
- *
- * Mirrors: ActiveRecord::Associations::Builder::BelongsTo touch option
- */
-export async function touchBelongsToParents(record: Base): Promise<void> {
-  const ctor = record.constructor as typeof Base;
-  const associations: AssociationDefinition[] = ctor._associations ?? [];
-
-  for (const assoc of associations) {
-    if (assoc.type !== "belongsTo" || !assoc.options.touch) continue;
-
-    const foreignKey = assoc.options.foreignKey ?? `${underscore(assoc.name)}_id`;
-    const fkValue = record._readAttribute(foreignKey as string);
-    if (fkValue === null || fkValue === undefined) continue;
-
-    let targetModel: typeof Base;
-    if (assoc.options.polymorphic) {
-      const typeCol = assoc.options.foreignType ?? `${underscore(assoc.name)}_type`;
-      const typeName = record._readAttribute(typeCol) as string | null;
-      if (!typeName) continue;
-      targetModel = ctor.polymorphicClassFor(typeName);
-    } else {
-      const className = assoc.options.className ?? camelize(assoc.name);
-      targetModel = resolveAssocClass(record, assoc.name, className);
-    }
-
-    const parent = await targetModel.findBy({ [targetModel.primaryKey as string]: fkValue });
-    if (!parent) continue;
-
-    const touchOpt = assoc.options.touch;
-    if (touchOpt === true) {
-      await parent.touch();
-    } else if (typeof touchOpt === "string") {
-      await parent.touch(touchOpt);
-    } else if (Array.isArray(touchOpt) && touchOpt.length > 0) {
-      await parent.touch(...touchOpt);
-    }
-  }
 }
 
 /**

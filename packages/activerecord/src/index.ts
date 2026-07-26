@@ -59,7 +59,6 @@ export {
   isAssociationCached,
   loadHabtm,
   updateCounterCaches,
-  touchBelongsToParents,
   eagerLoadBang,
 } from "./associations.js";
 export { CollectionProxy } from "./associations/collection-proxy.js";
