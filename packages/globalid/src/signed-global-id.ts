@@ -99,9 +99,9 @@ export class SignedGlobalID {
     // getters reading garbage components.
     this._components = GID.parse(uri).deconstructKeys();
     this.uri = uri;
+    this.verifier = SignedGlobalID.pickVerifier(options);
     this.purpose = SignedGlobalID.pickPurpose(options);
     this.expiresAt = pickExpiration(options);
-    this.verifier = SignedGlobalID.pickVerifier(options);
     this._objectId = (_nextObjectId++).toString(16).padStart(12, "0");
   }
 
