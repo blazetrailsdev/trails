@@ -545,7 +545,15 @@ export interface AbstractAdapter {
    * "This statement does not return data. Use run() instead" on a non-reader
    * statement, so `execute` must first grow the `column_count.zero?` branch.
    *
-   * Convergence is tracked as RFC 0023 `unify-execute-mutation-into-perform-query`.
+   * Convergence lives in **RFC 0076 `execute-primitive-convergence`** — e.g.
+   * `inline-mysql-exec-mutation-indirection`, `sqlite-truncate-through-execute`,
+   * `converge-vestigial-postgresql-perform-query`. Do NOT cite RFC 0023
+   * `unify-execute-mutation-into-perform-query` here: that story and its
+   * per-adapter siblings are already `done` (the shared `performQuery`
+   * primitive exists on all three adapters and DDL in
+   * `abstract/schema-statements.ts` already routes through `execute`), so it
+   * will not delete anything further and sends readers chasing a closed story.
+   *
    * The concrete adapters' `executeMutation` overrides (postgresql-adapter.ts,
    * sqlite3-adapter.ts) carry the same rationale by pointing here — do not
    * restate it there, and do not add a third primitive.
@@ -2389,9 +2397,13 @@ export class AbstractAdapter implements Quoting {
    * reports back by mutating it — which is how Rails' `raw_execute` hands
    * `notification_payload` to `perform_query` for `row_count`/`statement_name`.
    *
-   * trails' `rawExecute` does not call `log` yet; wiring that up is part of
-   * `unify-execute-mutation-into-perform-query` (RFC 0023), which first needs
-   * `performQuery` on sqlite3/mysql2 (only PG assigns one today).
+   * trails' `rawExecute` does not call `log` yet; wiring that up is RFC 0076
+   * `wire-raw-execute-through-log`. (This used to cite RFC 0023
+   * `unify-execute-mutation-into-perform-query` "which first needs performQuery
+   * on sqlite3/mysql2 (only PG assigns one today)" — both halves are now stale:
+   * that story is `done`, and all three adapters have the primitive, PG on the
+   * prototype, sqlite3 as `_performQuery`, mysql2 by calling the imported
+   * `performQuery` directly.)
    */
   async log<T>(
     sql: string,
