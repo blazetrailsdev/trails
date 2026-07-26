@@ -258,6 +258,9 @@ export function allowKeyOf(e: { package: string; tsFile: string; name: string })
  * extra-surface-allow.json: both sources are honored during the migration
  * window and both feed the same `Allowed` totals. Keyed by the CONTAINER's
  * file, matching how `collectTsFileNames` gathers the names it compares.
+ * Keys are deduped: one declaration reaches many hosts (the mixin object, the
+ * install site, the auto-synthesized file module), so the same key arrives
+ * repeatedly and would otherwise inflate the tag total.
  */
 export function collectTaggedEntries(ts: ApiManifest): AllowEntry[] {
   const out: AllowEntry[] = [];
@@ -266,8 +269,6 @@ export function collectTaggedEntries(ts: ApiManifest): AllowEntry[] {
     if (m.noRailsEquivalent === undefined) return;
     const entry = { package: pkg, tsFile, name: m.name, reason: m.noRailsEquivalent };
     const key = allowKeyOf(entry);
-    // One declaration reaches many hosts (mixin object + install site + the
-    // auto-synthesized file module), so the same key arrives repeatedly.
     if (seen.has(key)) return;
     seen.add(key);
     out.push(entry);
@@ -821,8 +822,9 @@ function buildPackageReport(
     for (const name of tsNames) {
       if (allowed.has(name)) continue;
       const allowKey = allowKeyOf({ package: pkg, tsFile: expectedTs, name });
-      // A name may be justified by either source during the migration window;
-      // record the match on both so neither reads as stale when both exist.
+      // Both sources are consulted during the migration window: record the
+      // match on each that has it, so a doubly-justified name leaves neither
+      // the JSON entry nor the tag looking stale.
       const jsonAllowed = allowKeys.has(allowKey);
       const tagAllowed = tagKeys.has(allowKey);
       if (jsonAllowed) matchedAllowKeys.add(allowKey);
@@ -948,6 +950,10 @@ function printHumanReport(report: Report, topN: number, maxDetail: number): void
   console.log(
     `\n${p.dim}Allowlist (extra-surface-allow.json): ${report.allowlist.total} entr(ies), ` +
       `${report.allowlist.matched} matched — allowed extras are subtracted from the counts above.${p.reset}`,
+  );
+  console.log(
+    `${p.dim}@noRailsEquivalent tags: ${report.tagged.total} tag(s), ` +
+      `${report.tagged.matched} matched — counted in Allowed alongside the allowlist.${p.reset}`,
   );
 
   console.log(
@@ -1120,6 +1126,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 
   // Stale entries can't be judged when --exclude-glob hides whole TS files.
   if (args.excludeGlobs.length > 0) return;
+  const { stale } = report.allowlist;
   const staleTagged = report.tagged.stale;
   if (staleTagged.length > 0) {
     console.error(
@@ -1131,7 +1138,6 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
         "\n",
     );
   }
-  const { stale } = report.allowlist;
   if (stale.length === 0) {
     if (staleTagged.length > 0) process.exit(1);
     return;

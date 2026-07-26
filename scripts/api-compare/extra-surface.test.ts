@@ -1676,3 +1676,80 @@ describe("collectTaggedEntries", () => {
     ]);
   });
 });
+
+describe("@noRailsEquivalent — extractor to report", () => {
+  function extract(files: Record<string, string>): PackageInfo {
+    const srcDir = "/p";
+    const all: Record<string, string> = {};
+    for (const [rel, src] of Object.entries(files)) all[`${srcDir}/${rel}`] = src;
+    const host: ts.CompilerHost = {
+      getSourceFile: (name) =>
+        all[name] === undefined
+          ? undefined
+          : ts.createSourceFile(name, all[name], ts.ScriptTarget.Latest, true),
+      getDefaultLibFileName: () => "lib.d.ts",
+      writeFile: () => undefined,
+      getCurrentDirectory: () => "/",
+      getCanonicalFileName: (n) => n,
+      useCaseSensitiveFileNames: () => true,
+      getNewLine: () => "\n",
+      fileExists: (name) => name in all,
+      readFile: (name) => all[name],
+    };
+    const program = ts.createProgram(
+      Object.keys(all),
+      { noLib: true, noResolve: true, target: ts.ScriptTarget.Latest },
+      host,
+    );
+    return extractFromProgram(program, srcDir);
+  }
+
+  it("carries a tag written in TS source through to the Allowed totals", () => {
+    const tsPkg = extract({
+      "associations.ts": `
+        export class Associations {
+          hasMany(): void {}
+
+          /** @noRailsEquivalent public model registry, no Rails counterpart */
+          registerModel(): void {}
+        }
+      `,
+    });
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activerecord: {
+          classes: {
+            "ActiveRecord::Associations": rubyClass({
+              name: "Associations",
+              file: "associations.rb",
+              instance: [method("has_many")],
+            }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const ts_: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: { activerecord: tsPkg },
+    };
+    const report = buildReport(ruby, ts_, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+      allow: [],
+    });
+    expect(report.tagged).toEqual({
+      total: 1,
+      matched: 1,
+      stale: [],
+    });
+    expect(report.packages[0].totalAllowlisted).toBe(1);
+    expect(report.packages[0].totalNovel).toBe(0);
+    expect(report.packages[0].extraFiles).toEqual([]);
+  });
+});
