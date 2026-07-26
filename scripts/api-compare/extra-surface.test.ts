@@ -1321,7 +1321,6 @@ describe("resolveAllowlist", () => {
 });
 
 describe("collectTsFileNames — `__mixin` pseudo-modules", () => {
-  /** Compile a virtual multi-file package and run the real TS extractor. */
   function extract(files: Record<string, string>): PackageInfo {
     const srcDir = "/p";
     const all: Record<string, string> = {};
@@ -1376,8 +1375,6 @@ describe("collectTsFileNames — `__mixin` pseudo-modules", () => {
     const info = extract(FILES);
     const mixin = info.modules["inheritance.ts:stiClassFor__mixin"];
     expect(mixin?.synthesizedMixin).toBe(true);
-    // The extractor still carries the host surface (the Rails-layout check
-    // relies on the pseudo-module); it is tagged with its real declaring file.
     expect(mixin.instanceMethods.find((m) => m.name === "toSlug")?.declaredIn).toBe("base.ts");
 
     const names = collectTsFileNames(

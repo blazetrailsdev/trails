@@ -49,6 +49,10 @@ describe("extractorSchemaToken", () => {
     expect(EXTRACTOR_OUTPUT_FIELDS).toContain("calls");
   });
 
+  it("includes declaredIn in the declared output field set", () => {
+    expect(EXTRACTOR_OUTPUT_FIELDS).toContain("declaredIn");
+  });
+
   it("tolerates a missing extractor source (best-effort hash)", async () => {
     const dir = mkDir();
     fs.rmSync(path.join(dir, EXTRACTOR_SOURCES[0]));

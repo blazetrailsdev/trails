@@ -62,6 +62,7 @@ export const EXTRACTOR_OUTPUT_FIELDS = [
   "internal",
   "option_keys",
   "optionKeys",
+  "declaredIn",
 ] as const;
 
 /**

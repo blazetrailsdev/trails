@@ -412,10 +412,6 @@ export function collectTsFileNames(
   }
   for (const m of modules) {
     if (m.file !== file) continue;
-    // `<file>:<fn>__mixin` pseudo-modules carry the instance surface of the
-    // class the mixin function returns, most of which is declared in other
-    // files. A member declared elsewhere is by definition not this file's
-    // surface. The mixin function's own name still arrives via fileFunctions.
     const skipForeign = m.synthesizedMixin === true;
     for (const im of m.instanceMethods) {
       if (skipForeign && im.declaredIn !== undefined) continue;
