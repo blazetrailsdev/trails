@@ -165,12 +165,18 @@ const SIGNIFICANT_CALLS = new Set([
 //
 // Ruby calls whose FAITHFUL JS port emits no call at all — the receiver is
 // consumed by a native language construct (a template literal, a for-of loop, a
-// truthiness test). No alias in JS_ENUMERABLE_ALIASES can ever match one of these,
-// because there is no callee to record: the wide gate would baseline every
-// occurrence forever, diluting its signal exactly the way `super` did before it was
-// excluded (see WIDE_SIGNIFICANT_CALLS below). These are therefore suppressed from
-// the wide significant set (RFC 0025). Each name is justified by the non-call
-// construct it becomes.
+// truthiness test, the `in` operator). No entry in JS_ENUMERABLE_ALIASES can match
+// one of these in a faithful port, because there is no callee to record: the wide
+// gate would baseline every occurrence forever, diluting its signal exactly the way
+// `super` did before it was excluded (see WIDE_SIGNIFICANT_CALLS below). These are
+// therefore suppressed from the wide significant set (RFC 0025). Each name is
+// justified by the non-call construct it becomes.
+//
+// A name qualifies either because NO JS call form exists (`to_s`, `each`), or
+// because the only JS call form belongs to a receiver shape the ports don't use
+// (`key?` → `Map#has`, where Rails' hashes port to object literals). Names in the
+// second group keep their JS_ENUMERABLE_ALIASES entry: the alias is unreachable
+// from here, but lint-calls.ts still consumes the table's KEYS as its noise list.
 //
 // DELIBERATELY NOT suppressed — `size`, `empty?`, `first`, `last`: these read as
 // plain Array/property idioms (`xs.length`, `xs.length === 0`, `xs[0]`, `xs.at(-1)`)
@@ -297,6 +303,32 @@ const DELEGATION_MAX_CALLS = 3;
  */
 export function isDelegatingWrapper(tsName: string, tsCalls: Set<string>): boolean {
   return tsCalls.has(tsName) && tsCalls.size <= DELEGATION_MAX_CALLS;
+}
+
+/**
+ * The call-set `checkCalls` should actually hold a matched TS body to: its own,
+ * unless the body is a delegating wrapper (see isDelegatingWrapper), in which case
+ * the same-named DELEGATE's calls are unioned in so the port gets compared instead
+ * of the forwarder.
+ *
+ * `delegateCalls` resolves a method name to every call made by that name anywhere
+ * in the package (and its deps) — deliberately coarser than the per-(file, name)
+ * scoping the primary population uses, so an unrelated same-named method can
+ * satisfy a call. That imprecision is confined to bodies that
+ * `isDelegatingWrapper` has already established contain no ported logic to hold to
+ * account; the alternative is baselining a whole mixin's Rails call set against a
+ * one-line `return`. It is transparency, not suppression: when the delegate ALSO
+ * omits the Ruby call, the flag survives.
+ */
+export function effectiveTsCalls(
+  tsName: string,
+  tsCalls: Set<string>,
+  delegateCalls: (name: string) => Iterable<string> | undefined,
+): Set<string> {
+  if (!isDelegatingWrapper(tsName, tsCalls)) return tsCalls;
+  const merged = new Set(tsCalls);
+  for (const c of delegateCalls(tsName) ?? []) merged.add(c);
+  return merged;
 }
 
 /**
@@ -1079,10 +1111,11 @@ export function main() {
     const tsParamsByFileName = new Map<string, Map<string, ParamInfo[][]>>();
     // Body call-sets scoped per (file, name) for the advisory calls-parity check.
     const tsCallsByFileName = new Map<string, Map<string, string[][]>>();
-    // Same call-sets unioned across ALL files, keyed by name only. Consulted
-    // ONLY by the delegation-transparency gate (see `delegateCalls` below),
-    // never as the primary population — the per-file scoping above is what
-    // keeps same-named methods on unrelated classes from cross-satisfying.
+    // Same call-sets unioned by NAME across this package and its deps (the same
+    // scope tsParamsByName uses). Consulted ONLY by the delegation-transparency
+    // gate (see effectiveTsCalls), never as the primary population — the
+    // per-file scoping above is what keeps same-named methods on unrelated
+    // classes from cross-satisfying.
     const tsCallsByName = new Map<string, Set<string>>();
     const recordTsParams = (m: MethodInfo, file = m.file ?? "") => {
       const sigs = tsParamsByName.get(m.name) ?? [];
@@ -1539,18 +1572,11 @@ export function main() {
         if (!rubyCalls || rubyCalls.length === 0) return;
         const tsCandidateSets = tsCallsByFileName.get(tsFile)?.get(tsName);
         if (!tsCandidateSets || tsCandidateSets.length === 0) return;
-        const tsCalls = new Set(tsCandidateSets.flat());
-        // Delegation transparency: when the matched body is a one-line wrapper
-        // forwarding to a same-named method elsewhere, compare against the
-        // DELEGATE's call-set — the wrapper is not the port (see
-        // isDelegatingWrapper). The union is by name across all files, so an
-        // unrelated same-named method can satisfy a call; that imprecision is
-        // acceptable here precisely because the matched body demonstrably
-        // contains no ported logic to hold to account, and the alternative is
-        // baselining the whole mixin's call set against a `return` statement.
-        if (isDelegatingWrapper(tsName, tsCalls)) {
-          for (const c of tsCallsByName.get(tsName) ?? []) tsCalls.add(c);
-        }
+        // Delegation transparency: a one-line forwarder is compared against the
+        // call-set of the method it forwards to (see effectiveTsCalls).
+        const tsCalls = effectiveTsCalls(tsName, new Set(tsCandidateSets.flat()), (n) =>
+          tsCallsByName.get(n),
+        );
         callsCompared++;
         const missing = significantMissingCalls(
           rubyName,

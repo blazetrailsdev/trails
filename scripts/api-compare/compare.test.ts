@@ -17,6 +17,7 @@ import {
   WIDE_SIGNIFICANT_CALLS,
   WIDE_NO_JS_CALL_FORM,
   isDelegatingWrapper,
+  effectiveTsCalls,
   narrowCallsApplies,
 } from "./compare.js";
 import { rubyMethodToTs } from "./conventions.js";
@@ -228,11 +229,13 @@ describe("significantMissingCalls", () => {
   });
 
   describe("delegation transparency", () => {
+    // PostgreSQLAdapter#indexes is `return this.pgSchemaStatements().indexes(t)`.
+    const wrapper = new Set(["indexes", "pgSchemaStatements"]);
+    // The real port, in the collaborator the wrapper forwards to.
+    const delegate = ["schemaQuery", "map", "join", "columnNamesFromColumnNumbers"];
+
     it("reads a one-line forwarder as a delegating wrapper", () => {
-      // PostgreSQLAdapter#indexes is `return this.pgSchemaStatements().indexes(t)`;
-      // the mixin's real port lives in the collaborator, so the wrapper's own
-      // call-set is not the body to hold to account.
-      expect(isDelegatingWrapper("indexes", new Set(["indexes", "pgSchemaStatements"]))).toBe(true);
+      expect(isDelegatingWrapper("indexes", wrapper)).toBe(true);
     });
 
     it("does not read a body doing its own work as a delegating wrapper", () => {
@@ -244,6 +247,51 @@ describe("significantMissingCalls", () => {
 
     it("does not read a body without a self-named call as a delegating wrapper", () => {
       expect(isDelegatingWrapper("indexes", new Set(["pgSchemaStatements"]))).toBe(false);
+    });
+
+    it("compares a wrapper against the delegate's call-set", () => {
+      const merged = effectiveTsCalls("indexes", wrapper, () => delegate);
+      // The wrapper's own calls survive; the delegate's are added.
+      expect([...merged].sort()).toEqual(
+        ["columnNamesFromColumnNumbers", "indexes", "join", "map", "pgSchemaStatements", "schemaQuery"], // prettier-ignore
+      );
+    });
+
+    it("leaves a non-wrapper body's call-set untouched", () => {
+      const own = new Set(["indexes", "schemaQuery", "map", "split", "join"]);
+      expect(effectiveTsCalls("indexes", own, () => delegate)).toBe(own);
+    });
+
+    it("discharges a mixin flag the wrapper drops but the delegate makes", () => {
+      // Rails' PostgreSQL::SchemaStatements#indexes is attributed to the
+      // INCLUDING class's file, so the gate matches it against the adapter's
+      // forwarder. Charging that `return` with the mixin's call set was the bulk
+      // of the ratchet expansion #5334's include resolution produced.
+      const tsCalls = effectiveTsCalls("indexes", wrapper, () => delegate);
+      const missing = significantMissingCalls(
+        "indexes",
+        ["column_names_from_column_numbers"],
+        tsCalls,
+        () => true,
+        map,
+        WIDE_SIGNIFICANT_CALLS,
+      );
+      expect(missing).toEqual([]);
+    });
+
+    it("still flags a call the delegate omits too", () => {
+      // Transparency, not suppression: the delegate is the port, so its own
+      // omissions remain the gate's business.
+      const tsCalls = effectiveTsCalls("indexes", wrapper, () => delegate);
+      const missing = significantMissingCalls(
+        "indexes",
+        ["unquote_identifier"],
+        tsCalls,
+        () => true,
+        map,
+        WIDE_SIGNIFICANT_CALLS,
+      );
+      expect(missing).toEqual(["unquote_identifier → unquoteIdentifier"]);
     });
   });
 
