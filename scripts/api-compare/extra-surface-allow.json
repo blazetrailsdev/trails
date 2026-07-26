@@ -163,6 +163,30 @@
   },
   {
     "package": "activerecord",
+    "tsFile": "inheritance.ts",
+    "name": "qualifiedName",
+    "reason": "Ruby resolves a model's namespace through the constant path (`Module#name`, `Module#module_parents`) and reads a module-level `table_name_prefix`/`table_name_suffix` off the enclosing module object — see `full_table_name_prefix` in model_schema.rb:302-307. JS classes carry no module path and there are no module objects to respond to those readers, so trails substitutes an explicit registry: namespaced models declare `static moduleName` and their wrapping module registers its decoration here. There is no Ruby `def` to match because Ruby gets this from the object model."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "inheritance.ts",
+    "name": "registerModuleTableNamePrefix",
+    "reason": "Ruby resolves a model's namespace through the constant path (`Module#name`, `Module#module_parents`) and reads a module-level `table_name_prefix`/`table_name_suffix` off the enclosing module object — see `full_table_name_prefix` in model_schema.rb:302-307. JS classes carry no module path and there are no module objects to respond to those readers, so trails substitutes an explicit registry: namespaced models declare `static moduleName` and their wrapping module registers its decoration here. There is no Ruby `def` to match because Ruby gets this from the object model."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "inheritance.ts",
+    "name": "registerModuleTableNameSuffix",
+    "reason": "Ruby resolves a model's namespace through the constant path (`Module#name`, `Module#module_parents`) and reads a module-level `table_name_prefix`/`table_name_suffix` off the enclosing module object — see `full_table_name_prefix` in model_schema.rb:302-307. JS classes carry no module path and there are no module objects to respond to those readers, so trails substitutes an explicit registry: namespaced models declare `static moduleName` and their wrapping module registers its decoration here. There is no Ruby `def` to match because Ruby gets this from the object model."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "inheritance.ts",
+    "name": "registerSubclass",
+    "reason": "Stands in for Ruby's `inherited` hook (inheritance.rb:287), which Rails uses to register each subclass with the DescendantsTracker. TypeScript has no class-definition hook, so subclasses call `registerSubclass(Klass)` from a static initializer block instead. CLAUDE.md already routes Ruby lifecycle hooks to a no-TS-equivalent skip; SKIP_GROUPS is keyed by *Ruby* name and only suppresses the missing-method direction, so the extra TS surface it creates is recorded here."
+  },
+  {
+    "package": "activerecord",
     "tsFile": "associations.ts",
     "name": "registerModel",
     "reason": "trails-only model registry with no Rails analogue: `register_model` is defined nowhere in the Rails source (verified by grep over vendor/rails). Ruby resolves an association's class through constant lookup — Reflection#compute_class (reflection.rb:434 and :490) into Object.const_get, backed by ActiveSupport autoloading — so Rails never registers models anywhere. ESM has no constant namespace to walk and no autoload hook, so trails must be told which classes exist. Deliberately public (re-exported from index.ts) because application code has to call it, which is why @internal would be a lie rather than a fix. Kept in associations.ts because association class resolution is its only consumer path."

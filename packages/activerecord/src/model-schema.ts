@@ -118,6 +118,8 @@ function ownSchemaMemo<K extends keyof SchemaHost>(
  * inherit the base class's table name.
  *
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#table_name
+ *
+ * @internal
  */
 export function resolveTableName(this: typeof Base): string {
   if ((this as any)._tableName != null) return (this as any)._tableName;
@@ -175,7 +177,7 @@ function containedTableNamePrefix(this: typeof Base): string {
 /**
  * Build a WHERE clause string for the primary key of a given record.
  *
- * Mirrors: used throughout ActiveRecord persistence internals
+ * @internal
  */
 export function buildPkWhere(this: typeof Base, idValue: unknown): string {
   const pk = this.primaryKey;
@@ -197,7 +199,7 @@ export function buildPkWhere(this: typeof Base, idValue: unknown): string {
 /**
  * Build an Arel node for a primary key WHERE condition.
  *
- * Mirrors: used with Arel managers for type-safe SQL generation
+ * @internal
  */
 export function buildPkWhereNode(
   this: typeof Base,
@@ -239,6 +241,8 @@ export function buildPkWhereNode(
  *
  * Mirrors: how `ActiveRecord::Persistence#_update_record` / `#_delete_record`
  * turn `_query_constraints_hash` into the predicate WHERE.
+ *
+ * @internal
  */
 export function buildWhereNodeFromConstraints(
   this: typeof Base,
@@ -280,9 +284,10 @@ export function columnNames(this: typeof Base): string[] {
 }
 
 /**
- * Check if a model class has a given attribute defined.
+ * Check if a model class has a given attribute defined. Backs the Rails-named
+ * public accessor `Base.hasAttribute` (Rails' `has_attribute?`, attribute_methods.rb).
  *
- * Mirrors: ActiveRecord::ModelSchema::ClassMethods#has_attribute?
+ * @internal
  */
 export function hasAttributeDefinition(this: typeof Base, name: string): boolean {
   // Rails: `attr_name = attribute_aliases[attr_name] || attr_name`
@@ -382,6 +387,8 @@ type DatabaseAdapterLike = { schemaCache?: unknown };
  * whose default matters here has already pinned a connection via the
  * `!_schemaLoaded` reflection in `_defaultAttributes`, so `{}` is only reached for
  * columns that carry no client-side default anyway.
+ *
+ * @internal
  */
 export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike> {
   const cachedFrom = (conn: { schemaCache?: unknown } | null | undefined) => {
@@ -437,7 +444,7 @@ export function contentColumns(this: typeof Base): any[] {
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#native_database_types
  */
-export function sqlTypeFor(typeName: string, adapterName?: string): string {
+function sqlTypeFor(typeName: string, adapterName?: string): string {
   if (adapterName === "postgres") {
     switch (typeName) {
       case "integer":
@@ -772,6 +779,7 @@ export function columns(this: SchemaHost): any[] {
   return this._columns;
 }
 
+/** @internal */
 export function attributeSetCoder(this: SchemaHost): AttributeSetCoder {
   return new AttributeSetCoder(typeRegistry);
 }
@@ -1213,6 +1221,8 @@ function applyColumnsHash(
  * Populates the schema cache if needed (async). User-declared attributes
  * (`userProvided: true`) are NEVER overwritten — matching Rails where
  * `attribute :foo, :bar` always wins over schema-reflected types.
+ *
+ * @internal
  */
 export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   if (getAbstractClass.call(this as any)) return;

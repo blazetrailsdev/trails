@@ -231,6 +231,8 @@ export function qualifiedName(modelClass: typeof Base): string {
 
 /**
  * The namespace segments for `modelClass` — `moduleName.split("::")` or `[]`.
+ *
+ * @internal
  */
 export function namespaceSegments(modelClass: typeof Base): string[] {
   const moduleName = (modelClass as typeof Base & { moduleName?: string }).moduleName;
@@ -242,6 +244,8 @@ export function namespaceSegments(modelClass: typeof Base): string[] {
  * `"MyApplication::Business::Prefixed"` →
  * `["MyApplication::Business::Prefixed", "MyApplication::Business", "MyApplication"]`.
  * Mirrors Ruby's `Module#module_parents` (sans `Object`).
+ *
+ * @internal
  */
 export function moduleParentChain(moduleName: string | undefined): string[] {
   if (!moduleName) return [];
@@ -276,7 +280,7 @@ export function registerModuleTableNameSuffix(moduleName: string, suffix: string
  * caller then falls back to `self.table_name_prefix`/`_suffix`). Mirrors the
  * `module_parents.detect { |p| p.respond_to?(:table_name_prefix) }` walk in
  * `ActiveRecord::ModelSchema::ClassMethods#full_table_name_{prefix,suffix}`
- * (model_schema.rb:301-307).
+ * (model_schema.rb:302-307).
  *
  * Two kinds of parent "respond to" the decorator and thus stop the walk:
  * a module that registered one (`registered`), or an *AR-model-class* parent —
@@ -298,6 +302,7 @@ function lookupModuleDecoration(
   return undefined;
 }
 
+/** @internal */
 export function lookupModuleTableNamePrefix(moduleName: string | undefined): string | undefined {
   return lookupModuleDecoration(
     moduleName,
@@ -306,6 +311,7 @@ export function lookupModuleTableNamePrefix(moduleName: string | undefined): str
   );
 }
 
+/** @internal */
 export function lookupModuleTableNameSuffix(moduleName: string | undefined): string | undefined {
   return lookupModuleDecoration(
     moduleName,
@@ -463,6 +469,8 @@ export function stiEnabled(modelClass: object): boolean {
 
 /**
  * Check if a model class is an STI subclass (not the base STI class).
+ *
+ * @internal
  */
 export function isStiSubclass(modelClass: object): boolean {
   // Walk up the prototype chain to find if any parent has _inheritanceColumn
@@ -515,6 +523,8 @@ export function abstractClass(this: typeof Base, value?: boolean): boolean {
 
 /**
  * Get the STI base class for a model.
+ *
+ * @internal
  */
 export function getStiBase(modelClass: object): typeof Base {
   let current = modelClass as typeof Base;
@@ -631,6 +641,8 @@ const SELECT_ALIAS_READERS = Symbol.for("activerecord.selectAliasReaders");
  * `@attributes.key?`, so once `reload` swaps in a plain `SELECT *` attribute set
  * `record.post_count` raises `NoMethodError` — we mirror that by deleting the
  * stale getter (property access then yields `undefined`, the trails analog).
+ *
+ * @internal
  */
 export function defineDynamicSelectReaders(record: Base): void {
   const attrs = (record as any)._attributes as { keys(): Iterable<string> };

@@ -70,6 +70,31 @@ function objectLiteralMethods(source: string): MethodInfo[] {
 }
 
 describe("harvestObjectLiteralMethods", () => {
+  it("reads @internal off the declaration a mixin entry references", () => {
+    const methods = objectLiteralMethods(
+      `/** @internal */
+      function hidden(a: number): void {}
+      function shown(a: number): void {}
+      const NS = { aliased: hidden };
+      export const Reg = {
+        hidden,
+        shown,
+        viaProperty: hidden,
+        viaNamespace: NS.aliased,
+        /** @internal */
+        inline(a: number): void {},
+      };`,
+    );
+    const byName = Object.fromEntries(methods.map((m) => [m.name, m.internal === true]));
+    expect(byName).toEqual({
+      hidden: true,
+      shown: false,
+      viaProperty: true,
+      viaNamespace: true,
+      inline: true,
+    });
+  });
+
   it("captures params for inline method and function-property forms", () => {
     const methods = objectLiteralMethods(
       `export const Reg = {
