@@ -114,8 +114,7 @@ export class SignedGlobalID {
   /**
    * Create a SignedGlobalID for a model instance.
    *
-   * Mirrors: GlobalID.create — inherited by SignedGlobalID in Ruby, where
-   * `new` is polymorphic; declared here because the TS classes are peers.
+   * Mirrors: GlobalID.create
    *
    * @noRailsEquivalent Rails' `SignedGlobalID < GlobalID` inherits
    * `GlobalID.create` (polymorphic `new`). In TS the two are peer classes —
@@ -291,7 +290,7 @@ export class SignedGlobalID {
   }
 
   /**
-   * Mirrors: GlobalID#model_id  — re-exposed on SignedGlobalID (peer class in TS, not a subclass).
+   * Mirrors: GlobalID#model_id
    *
    * @noRailsEquivalent Inherited from GlobalID in Ruby (`delegate :model_id, to: :uri`);
    * re-declared because the TS classes are peers, not a hierarchy. See the
@@ -302,7 +301,7 @@ export class SignedGlobalID {
   }
 
   /**
-   * Mirrors: GlobalID#model_name  — re-exposed on SignedGlobalID (peer class in TS, not a subclass).
+   * Mirrors: GlobalID#model_name
    *
    * @noRailsEquivalent Inherited from GlobalID in Ruby (`delegate :model_name, to: :uri`);
    * re-declared because the TS classes are peers, not a hierarchy. See the
@@ -313,7 +312,7 @@ export class SignedGlobalID {
   }
 
   /**
-   * Mirrors: GlobalID#params  — re-exposed on SignedGlobalID (peer class in TS, not a subclass).
+   * Mirrors: GlobalID#params
    *
    * @noRailsEquivalent Inherited from GlobalID in Ruby (`delegate :params, to: :uri`);
    * re-declared because the TS classes are peers, not a hierarchy. See the
@@ -326,7 +325,8 @@ export class SignedGlobalID {
   /**
    * Resolve the model class via the registered ModelFinder.
    *
-   * Mirrors: GlobalID#model_class  — re-exposed on SignedGlobalID (peer class in TS, not a subclass).
+   * Mirrors: GlobalID#model_class
+   *
    * In Ruby SGID inherits the `model <= GlobalID` guard from GID; in TS
    * the peer class repeats it so a misconfigured ModelFinder can't slip
    * either identity through.
