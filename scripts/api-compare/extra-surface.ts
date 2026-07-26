@@ -559,34 +559,32 @@ function collectAllowedNames(
   };
 
   const walkMixin = (incName: string, contextFqn: string): void => {
-    const fqns = resolveModuleName(incName, contextFqn, moduleFqnByShort);
-    for (const fqn of fqns) {
-      if (visited.has(fqn)) continue;
-      visited.add(fqn);
-      // Fall back to the cross-package map: a railtie-injected mixin (see
-      // AMBIENT_RAILTIE_MIXINS) or a fully-qualified cross-gem include lives
-      // in another package's modules, not this package's.
-      const localMod = rubyModules[fqn];
-      const mod = localMod ?? crossPackageModules[fqn];
-      if (!mod) continue;
-      // A module whose source file we've explicitly declined to port should
-      // not contribute its methods to the host's allowed set — otherwise an
-      // unported mixin still flips its TS ports from extra surface to allowed.
-      // Mirrors compare.flattenIncludedMethodInfos (compare.ts:507). Resolve
-      // `isSourceUnported` against the module's *owning* package: a local
-      // module's owner is the host `pkg`, a cross-package module's owner is
-      // the package it was extracted from (package-scoped unported patterns
-      // key off the owner, not the host).
-      const ownerPkg = localMod ? pkg : (crossPackagePkgByFqn[fqn] ?? pkg);
-      if (mod.file && isSourceUnported(mod.file, ownerPkg)) continue;
-      // Only the module's instance methods cross into the host. Class
-      // methods on the module itself stay on the module (Ruby `include`
-      // semantics; matches compare.flattenIncludedMethodInfos).
-      addMethods(mod.instanceMethods);
-      // Chain `include`s only — a module's own `extend` doesn't propagate
-      // (Ruby singleton-class semantics).
-      for (const inc of mod.includes ?? []) walkMixin(inc, fqn);
-    }
+    const fqn = resolveModuleName(incName, contextFqn, moduleFqnByShort);
+    if (visited.has(fqn)) return;
+    visited.add(fqn);
+    // Fall back to the cross-package map: a railtie-injected mixin (see
+    // AMBIENT_RAILTIE_MIXINS) or a fully-qualified cross-gem include lives
+    // in another package's modules, not this package's.
+    const localMod = rubyModules[fqn];
+    const mod = localMod ?? crossPackageModules[fqn];
+    if (!mod) return;
+    // A module whose source file we've explicitly declined to port should
+    // not contribute its methods to the host's allowed set — otherwise an
+    // unported mixin still flips its TS ports from extra surface to allowed.
+    // Mirrors compare.flattenIncludedMethodInfos (compare.ts:507). Resolve
+    // `isSourceUnported` against the module's *owning* package: a local
+    // module's owner is the host `pkg`, a cross-package module's owner is
+    // the package it was extracted from (package-scoped unported patterns
+    // key off the owner, not the host).
+    const ownerPkg = localMod ? pkg : (crossPackagePkgByFqn[fqn] ?? pkg);
+    if (mod.file && isSourceUnported(mod.file, ownerPkg)) return;
+    // Only the module's instance methods cross into the host. Class
+    // methods on the module itself stay on the module (Ruby `include`
+    // semantics; matches compare.flattenIncludedMethodInfos).
+    addMethods(mod.instanceMethods);
+    // Chain `include`s only — a module's own `extend` doesn't propagate
+    // (Ruby singleton-class semantics).
+    for (const inc of mod.includes ?? []) walkMixin(inc, fqn);
   };
 
   for (const { fqn, info } of entities) {
