@@ -159,6 +159,15 @@ describe("DateTimeTest", () => {
     expect(zdt.hour).toBe(0);
     expect(zdt.minute).toBe(0);
   });
+  it("serialize_cast_value is equivalent to serialize after cast", () => {
+    const type = new Types.DateTimeType({ precision: 1 });
+    const value = type.cast("1999-12-31T12:34:56.789-10:00");
+
+    expect(type.serializeCastValue(value)).toEqual(type.serialize(value));
+    expect((type.serializeCastValue(value) as Temporal.Instant).toString()).toBe(
+      "1999-12-31T22:34:56.7Z",
+    );
+  });
 });
 
 describe("DateTimeType#isChanged", () => {
@@ -225,15 +234,5 @@ describe("DateTimeType#isChanged", () => {
     const t = new Types.DateTimeType();
     expect(t.isChanged(null, null)).toBe(false);
     expect(t.isChanged(null, "2024-01-01")).toBe(true);
-  });
-
-  it("serialize_cast_value is equivalent to serialize after cast", () => {
-    const type = new Types.DateTimeType({ precision: 1 });
-    const value = type.cast("1999-12-31T12:34:56.789-10:00");
-
-    expect(type.serializeCastValue(value)).toEqual(type.serialize(value));
-    expect((type.serializeCastValue(value) as Temporal.Instant).toString()).toBe(
-      "1999-12-31T22:34:56.7Z",
-    );
   });
 });

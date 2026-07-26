@@ -154,7 +154,6 @@ describe("TimeTest", () => {
     const value = type.cast("1999-12-31T12:34:56.789-10:00");
 
     expect(type.serializeCastValue(value)).toEqual(type.serialize(value));
-    // precision: 1 truncates everything past the first sub-second digit.
     expect(type.serializeCastValue(value)?.toString()).toBe("12:34:56.7");
   });
 });

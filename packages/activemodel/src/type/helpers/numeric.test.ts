@@ -69,7 +69,6 @@ describe("Helpers::Numeric private predicates", () => {
     it("returns false for non-number inputs", () => {
       expect(isEqualNan(null, null)).toBe(false);
       expect(isEqualNan("nan", "nan")).toBe(false);
-      // Mixed representations fail Rails' `old_value.instance_of?(new_value.class)` guard.
       expect(isEqualNan("NaN", NaN)).toBe(false);
       expect(isEqualNan(NaN, "NaN")).toBe(false);
     });
