@@ -547,8 +547,12 @@ export class ConnectionPool implements ReapablePool {
    * True when this pool's `query_cache:` config is literally `false`, i.e. the
    * cache is disabled by configuration rather than merely not enabled right now.
    *
-   * Rails has no such reader: `QueryCache::ExecutorHooks.run` asks inline with
-   * `next if pool.db_config&.query_cache == false` (query_cache.rb). Trails
+   * Rails has no such reader: `ActiveRecord::QueryCache.run` asks inline with
+   * `next if pool.db_config&.query_cache == false`
+   * (`active_record/query_cache.rb:39` — the top-level file, not
+   * `connection_adapters/abstract/query_cache.rb`, whose `db_config&.query_cache`
+   * at `:122` is a different case-statement computing the cache max size).
+   * Trails
    * normalizes `query_cache` at pool construction into
    * `ConnectionPoolConfiguration` (`normalizeQueryCacheConfig`), so the raw
    * `false` is no longer readable off `dbConfig` at that point — this getter is
