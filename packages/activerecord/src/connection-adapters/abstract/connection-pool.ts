@@ -225,16 +225,18 @@ export class LeaseRegistry {
   }
 
   /**
-   * Non-creating lookup — the read-only counterpart of {@link get} (Rails'
-   * `[]`, which memoizes a fresh `Lease` on miss). Rails' callers here
-   * (`remove_connection_from_thread_cache`, and the disconnect/reload sweep's
-   * per-connection clear) can use `[]` freely because `@map` is a
-   * `WeakThreadKeyMap` keyed by live Thread objects: an entry created for a
-   * thread that never leased is collected with the thread. Trails' `_map` is a
-   * plain `Map` keyed by the *string* `executionContextId()`, which nothing
-   * ever collects, so `get`-on-miss would grow the registry by one dead Lease
-   * per context the sweep touches. Those two clear-only paths therefore read
-   * through this instead.
+   * Non-creating lookup — the clear-only counterpart of {@link get} (Rails'
+   * `[]`, which memoizes a fresh `Lease` on miss). Both callers only want to
+   * drop a connection from a lease *if one exists*:
+   * `removeConnectionFromThreadCache` and `_clearReloadableConnections`.
+   *
+   * Rails writes `@leases[owner_thread].clear(conn)` (connection_pool.rb:889)
+   * and can afford `[]` because `@map` is a `WeakThreadKeyMap` keyed by live
+   * Thread objects — an entry created for a thread that never leased dies with
+   * the thread. Trails' `_map` is a plain `Map` keyed by the *string*
+   * `executionContextId()`, which nothing ever collects, so `get`-on-miss would
+   * permanently insert a dead `Lease` every time one of these paths runs on a
+   * context that never leased.
    *
    * `_`-prefixed (repo Rails-private convention): file-internal, no callers
    * outside connection-pool.ts.

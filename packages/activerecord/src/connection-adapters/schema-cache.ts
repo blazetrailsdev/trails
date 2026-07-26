@@ -287,14 +287,15 @@ export class SchemaCache {
   /**
    * Synchronous, query-free read of an already-warmed columns hash. Rails has
    * no counterpart: `columns_hash(pool, table)` is its only accessor, and in
-   * Ruby it can block on a connection checkout when the entry is cold. The
-   * trails callers here are genuinely synchronous and cannot await —
-   * `Model.columnsHash()` / `columnNames()` / `columnForAttribute()`
-   * (`model-schema.ts:338`, `:391`) are Rails-sync accessors reached from
-   * attribute-method definition and from user code that never awaits. They
-   * pair this with {@link isColumnsHash} (the same `_columnsHash` map) so a
-   * cold table falls through to the async `columnsHash` path instead of
-   * silently reporting an empty schema.
+   * Ruby it can block on a connection checkout when the entry is cold.
+   *
+   * Both trails callers are Rails-sync accessors that cannot await: the sync
+   * `Model.columnsHash()` (`model-schema.ts` `columnsHash`, which user code and
+   * `columnNames()` call without awaiting) and `cachedColumnsHash`, which
+   * `attributes.ts` `_defaultAttributes` reads while *constructing* a record.
+   * Both gate on `_columnsHash` — the same map this reads, not `isCached`'s
+   * `_columns` — so a cold table falls through to the async `columnsHash` path
+   * rather than silently reporting an empty schema.
    */
   getCachedColumnsHash(tableName: string): Record<string, Column> | undefined {
     return this._columnsHash.get(tableName);
@@ -441,15 +442,19 @@ export class SchemaCache {
    * Populate the columns / columns-hash / data-source entries for a table from
    * columns the caller has *already* reflected. Rails has no sync writer — its
    * only population path is `add(pool, table_name)`, which issues the
-   * introspection queries itself behind a blocking `with_connection`.
+   * introspection queries itself behind `pool.with_connection`.
    *
-   * trails needs the split because the reflecting caller is already inside an
-   * `await` and holds the result: `AbstractAdapter#columns`
-   * (`abstract-adapter.ts:2460`) awaits the adapter's own `columns()` query and
-   * then hands the rows here, so routing through `add()` would re-issue the
-   * same query on a second checkout. It also warms `_dataSourceExists` — a
-   * table whose columns just came back demonstrably exists — which is what lets
-   * the sync readers above answer without a query.
+   * That is exactly why the one production caller cannot use `add()`: it has no
+   * pool. `AbstractAdapter#columnForAttribute`'s bare-adapter branch
+   * (`abstract-adapter.ts`, the `poolAbsent(this.pool)` fallback) runs on a
+   * standalone adapter, where `add()` and the `columnsHash` DB fallback both
+   * bail on the null-pool guard. It calls the adapter's own `columns()`
+   * directly and seeds the result here, then reads it straight back via
+   * {@link getCachedColumnsHash}.
+   *
+   * Also warms `_dataSourceExists` — a table whose columns just came back
+   * demonstrably exists — which is what lets the sync readers above answer
+   * without a query.
    */
   setColumns(tableName: string, cols: Column[]): void {
     this.reconcilePrimaryKeyFlags(tableName, cols);
@@ -464,13 +469,17 @@ export class SchemaCache {
 
   /**
    * Sync counterpart of {@link setColumns} for the authoritative primary key.
-   * No Rails counterpart for the same reason: `add()` runs the `primary_keys`
-   * query itself. Here the key has already been resolved by the awaiting
-   * caller — `loadSchemaFromAdapter` (`model-schema.ts`) awaits
-   * `adapter.primaryKey(table)` alongside `columns()` and warms both maps — so
-   * {@link getCachedPrimaryKeys} can answer the sync
-   * `Model.primaryKey` accessor (`attribute-methods/primary-key.ts:218`)
-   * without a query.
+   * Rails has no sync writer here either — `add(pool, table_name)` runs the
+   * `primary_keys` query itself behind `pool.with_connection`.
+   *
+   * @internal Test-harness seeding only — it has no production caller. It
+   * exists because the ported `SchemaCache` tests (`test_clearing`,
+   * `test_marshal_dump_and_load`, `test_clear_data_source_cache`, and the
+   * primary-key-reconciliation cases) drive a pool-less `SchemaCache`, where
+   * Rails' tests drive a live `@cache` bound to a real connection and let
+   * `add` / `primary_keys` warm the map for them. Production warms
+   * `_primaryKeys` through the async `primaryKeys` query instead, which is
+   * what {@link getCachedPrimaryKeys} then reads back synchronously.
    *
    * Order-independent with {@link setColumns}: whichever lands second runs
    * {@link reconcilePrimaryKeyFlags}, so the authoritative key always wins over
@@ -521,16 +530,16 @@ export class SchemaCache {
    * Sync writer for the data-source-existence map, completing the
    * {@link setColumns} / {@link setPrimaryKeys} trio. Rails populates this only
    * as a side effect of `data_source_exists?(pool, name)`, which blocks on the
-   * query and so can warm the map from a test with no pool; the ported Rails
-   * test `#columns_hash? is not populated by #data_source_exists?`
-   * (`schema_cache_test.rb`) relies on exactly that. The trails port has no
-   * blocking call to lean on, so the pool-less callers — that Rails test and
-   * the `SchemaCache` fixture setup around it — seed the map through this
-   * writer instead of standing up a fake pool per assertion.
+   * query.
    *
-   * @internal Test-harness seeding only; production warming goes through
-   * {@link setColumns} (which sets `true` for a table whose columns just came
-   * back) or the async `dataSourceExists` query.
+   * @internal Test-harness seeding only — like {@link setPrimaryKeys} it has no
+   * production caller. Rails' `SchemaCache` tests (`test_data_source_exist`,
+   * `#columns_hash? is not populated by #data_source_exists?`,
+   * `schema_cache_test.rb:324`, `:347`) drive a live `@cache` bound to a real
+   * connection, so the blocking `data_source_exists?` warms the map for them;
+   * the trails ports run pool-less and seed it through this writer instead.
+   * Production warming goes through {@link setColumns} (which sets `true` for a
+   * table whose columns just came back) or the async `dataSourceExists` query.
    */
   setDataSourceExists(tableName: string, exists: boolean): void {
     this._dataSourceExists.set(tableName, exists);
