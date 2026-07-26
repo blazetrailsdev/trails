@@ -4150,8 +4150,8 @@ export class Base extends Model {
    * `GlobalID::Locator.locate` directly and globalid's railtie injects only
    * `GlobalID::Identification` (the instance-side `to_gid` family) onto
    * `ActiveRecord::Base`, so there is no `find_global_id` `def` anywhere in
-   * Rails or globalid. trails' globalid `wire` module registers this ergonomic
-   * class-method form onto Base; it delegates straight to the ported Locator.
+   * Rails or globalid. trails adds the ergonomic class-method form here and
+   * delegates straight to the ported Locator.
    */
   static findGlobalId(
     input: string | import("@blazetrails/globalid").GlobalID,

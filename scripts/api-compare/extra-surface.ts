@@ -99,11 +99,13 @@ interface RubyEntity {
  * contributes its instance methods to the host's allowed set.
  *
  * `methods` are raw Ruby method names the railtie surface implies but which
- * have no static `def` anywhere (so they can't be reached via a module). Only
- * use it when the missing counterpart is a Ruby-extractor blind spot: a
- * trails-only method with no Rails counterpart at all belongs on its own
- * declaration as `@noRailsEquivalent` instead (that is where the model-side
- * `findGlobalId` / `findSignedGlobalId[!]` finders are justified).
+ * have no static `def` anywhere (so they can't be reached via a module). It is
+ * only for that Ruby-extractor blind spot — a trails-only method with no Rails
+ * counterpart at all is justified by a `@noRailsEquivalent` tag on its own
+ * declaration instead, which is where the model-side `findGlobalId` /
+ * `findSignedGlobalId[!]` finders moved (RFC 0080). No entry needs `methods`
+ * today; it stays because the blind spot it covers is a property of the Ruby
+ * extractor, not of any one gem.
  */
 const AMBIENT_RAILTIE_MIXINS: Record<string, { includes?: string[]; methods?: string[] }> = {
   "ActiveRecord::Base": {

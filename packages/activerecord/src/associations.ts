@@ -60,7 +60,7 @@ export async function eagerLoadBang(): Promise<void> {
  * explicit hook for consumers who deep-import
  * `@blazetrails/activerecord/associations` without touching the entry. Ruby's
  * require/autoload resolves such cycles at load time, so there is nothing to
- * port. Public by intent (documented consumer hook), so an `\@internal` tag
+ * port. Public by intent (a documented consumer hook), so marking it internal
  * would be inaccurate.
  */
 export async function initializeAssociations(): Promise<void> {
@@ -320,9 +320,9 @@ function guardCanonicalNameShadow(name: string, model: typeof Base): void {
  * backed by ActiveSupport autoloading — so Rails never registers models
  * anywhere. ESM has no constant namespace to walk and no autoload hook, so
  * trails must be told which classes exist. Deliberately public (re-exported from
- * index.ts) because application code has to call it, which is why an
- * `\@internal` tag would be a lie rather than a fix. Kept in associations.ts
- * because association class resolution is its only consumer path.
+ * index.ts) because application code has to call it, so marking it internal
+ * would be a lie rather than a fix. Kept in associations.ts because association
+ * class resolution is its only consumer path.
  */
 export function registerModel(model: typeof Base): void;
 export function registerModel(name: string, model: typeof Base): void;
