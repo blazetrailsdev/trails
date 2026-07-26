@@ -124,7 +124,20 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     shouldRaise = false,
     block?: (record: Base) => void,
   ): Promise<Base | null> {
-    const record = await super._createRecord(attributes, shouldRaise, block);
+    // Rails runs `set_new_record` — hence all of `create_through_record` —
+    // BEFORE `raise RecordInvalid.new(record) if !saved && raise_error`
+    // (singular_association.rb:67-70), so a `create#{name}!` whose child fails
+    // validation STILL reconciles the join row: `through_record.update(club:
+    // record)` (:33) runs with the unsaved record, blanking the join row's
+    // foreign key. Our `super` raises that error from inside itself, so the
+    // reconcile has to be driven from the catch to keep Rails' ordering.
+    let record: Base | null;
+    try {
+      record = await super._createRecord(attributes, shouldRaise, block);
+    } catch (error) {
+      if (this._pendingReplace) await this.persistReplace(false);
+      throw error;
+    }
     if (record && this._pendingReplace) {
       await this.persistReplace(false);
     }

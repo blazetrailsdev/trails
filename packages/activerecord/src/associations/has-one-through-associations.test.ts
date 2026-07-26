@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
+import { Base, registerModel, enableSti, registerSubclass, RecordInvalid } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { assertQueriesMatch, assertQueriesCount } from "../testing/query-assertions.js";
 import {
@@ -36,7 +36,7 @@ import { Author, AuthorAddress } from "../test-helpers/models/author.js";
 import { Essay } from "../test-helpers/models/essay.js";
 import { Owner } from "../test-helpers/models/owner.js";
 import { Post, FirstPost } from "../test-helpers/models/post.js";
-import { Comment } from "../test-helpers/models/comment.js";
+import { Comment, SpecialComment } from "../test-helpers/models/comment.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
 import { Customer } from "../test-helpers/models/customer.js";
 import { Carrier } from "../test-helpers/models/carrier.js";
@@ -116,7 +116,10 @@ describe("HasOneThroughAssociationsTest", () => {
   registerModel(Owner);
   registerModel(Post);
   registerModel(FirstPost);
+  enableSti(Comment);
   registerModel(Comment);
+  registerModel(SpecialComment);
+  registerSubclass(SpecialComment);
   registerModel(Categorization);
   registerModel(Customer);
   registerModel(Carrier);
@@ -327,6 +330,24 @@ describe("HasOneThroughAssociationsTest", () => {
     const reloaded = await Membership.find(membershipId);
     expect(Number(reloaded.club_id)).toBe(Number(newClub.id));
     expect(Number(reloaded.club_id)).not.toBe(Number(oldClub.id));
+  });
+
+  it("raising create with an invalid record still reconciles an unloaded join row", async () => {
+    // Rails' `SingularAssociation#_create_record` (singular_association.rb:63-71)
+    // runs the whole of `set_new_record` — i.e. `create_through_record`, join-row
+    // `update` included — BEFORE `raise RecordInvalid`. `Author` validates
+    // `name`, so `create_author!` with no name fails and the join row (the post)
+    // is still updated toward the unsaved author, blanking its `author_id`.
+    const author = await Author.create({ name: "David" });
+    const post = await Post.create({ title: "t", body: "b", author_id: author.id });
+    const comment = await SpecialComment.create({ post_id: post.id, body: "sc" });
+
+    const refetched = await SpecialComment.find(comment.id);
+    await expect((refetched.association("author") as any).createBang({})).rejects.toThrow(
+      RecordInvalid,
+    );
+
+    expect((await Post.find(post.id)).author_id).toBeNull();
   });
 
   it("creating with no existing join row only builds the join record", async () => {
