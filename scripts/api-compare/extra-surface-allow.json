@@ -176,36 +176,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
-    "name": "executeMutation",
-    "reason": "Deliberate trails deviation, justified once at the AbstractAdapter declaration (connection-adapters/abstract-adapter.ts) and referenced from the concrete adapters. Rails has ONE query primitive per adapter, `perform_query`, which branches on `stmt.column_count.zero?` to decide whether it returns rows (sqlite3/database_statements.rb:78-112; abstract:561, postgresql:135, mysql2:41). trails splits it into row-returning `execute` and row-count `executeMutation`. The split cannot be undone by renaming: sqlite's `execute` runs `stmt.all()` and better-sqlite3 throws on a non-reader statement, so `execute` must first grow the `column_count.zero?` branch. Convergence is RFC 0023 `unify-execute-mutation-into-perform-query`."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "name": "executeMutation",
-    "reason": "Deliberate trails deviation, justified once at the AbstractAdapter declaration (connection-adapters/abstract-adapter.ts) and referenced from the concrete adapters. Rails has ONE query primitive per adapter, `perform_query`, which branches on `stmt.column_count.zero?` to decide whether it returns rows (sqlite3/database_statements.rb:78-112; abstract:561, postgresql:135, mysql2:41). trails splits it into row-returning `execute` and row-count `executeMutation`. The split cannot be undone by renaming: sqlite's `execute` runs `stmt.all()` and better-sqlite3 throws on a non-reader statement, so `execute` must first grow the `column_count.zero?` branch. Convergence is RFC 0023 `unify-execute-mutation-into-perform-query`."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "name": "executeMutation",
-    "reason": "Deliberate trails deviation, justified once at the AbstractAdapter declaration (connection-adapters/abstract-adapter.ts) and referenced from the concrete adapters. Rails has ONE query primitive per adapter, `perform_query`, which branches on `stmt.column_count.zero?` to decide whether it returns rows (sqlite3/database_statements.rb:78-112; abstract:561, postgresql:135, mysql2:41). trails splits it into row-returning `execute` and row-count `executeMutation`. The split cannot be undone by renaming: sqlite's `execute` runs `stmt.all()` and better-sqlite3 throws on a non-reader statement, so `execute` must first grow the `column_count.zero?` branch. Convergence is RFC 0023 `unify-execute-mutation-into-perform-query`."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "name": "exec",
-    "reason": "Bare-driver DDL hop, an artifact of the same execute/executeMutation split (see the deviation note at connection-adapters/abstract-adapter.ts). Rails has no `def exec`: its adapter-level `execute` calls the driver directly inside `perform_query`, so schema DDL and user SQL share one entry point. trails' `execute` is only the row-returning half of the split and rewrites binds, so schema statements need an unrewritten driver hop; `exec` is that hop, kept on the adapter so DDL callers do not each reach for `withRawConnection`. It disappears with RFC 0023 `unify-execute-mutation-into-perform-query`."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "name": "exec",
-    "reason": "Bare-driver DDL hop, an artifact of the same execute/executeMutation split (see the deviation note at connection-adapters/abstract-adapter.ts). Rails has no `def exec`: its adapter-level `execute` calls the driver directly inside `perform_query`, so schema DDL and user SQL share one entry point. trails' `execute` is only the row-returning half of the split and rewrites binds, so schema statements need an unrewritten driver hop; `exec` is that hop, kept on the adapter so DDL callers do not each reach for `withRawConnection`. It disappears with RFC 0023 `unify-execute-mutation-into-perform-query`."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
     "name": "Version",
     "reason": "`AbstractAdapter::Version` is a real Rails nested class (abstract_adapter.rb:243); `static readonly Version = Version` is the TS spelling of that nested Ruby constant, so this is public Rails API parity, not drift. It reads as extra surface only because extra-surface skips nested Ruby classes when building a file's allow-set (the `primaryClassPerFile` filter) while still counting the TS nested class. Nothing to converge. AbstractMysqlAdapter's redundant re-pin of the same constant was deleted rather than allowlisted — JS statics are inherited, so it shadowed nothing and had no readers."
   },
@@ -218,30 +188,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
-    "name": "quoteIdentifier",
-    "reason": "Rails' abstract quoting has no generic identifier quoter; `quote_table_name` simply delegates to `quote_column_name` (abstract/quoting.rb:66-67), which makes `quote_column_name` the de-facto one. trails names the shared primitive `quoteIdentifier` so `quoteColumnName`, `quoteTableName` and the schema-statement quoters (which quote neither a column nor a table) all delegate to one place. Resolved the same way on every adapter and on both quoting modules; renaming ~166 call sites to `quoteColumnName` would make them lie about what they quote."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "name": "quoteIdentifier",
-    "reason": "Rails' abstract quoting has no generic identifier quoter; `quote_table_name` simply delegates to `quote_column_name` (abstract/quoting.rb:66-67), which makes `quote_column_name` the de-facto one. trails names the shared primitive `quoteIdentifier` so `quoteColumnName`, `quoteTableName` and the schema-statement quoters (which quote neither a column nor a table) all delegate to one place. Resolved the same way on every adapter and on both quoting modules; renaming ~166 call sites to `quoteColumnName` would make them lie about what they quote."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/quoting.ts",
-    "name": "quoteIdentifier",
-    "reason": "Rails' abstract quoting has no generic identifier quoter; `quote_table_name` simply delegates to `quote_column_name` (abstract/quoting.rb:66-67), which makes `quote_column_name` the de-facto one. trails names the shared primitive `quoteIdentifier` so `quoteColumnName`, `quoteTableName` and the schema-statement quoters (which quote neither a column nor a table) all delegate to one place. Resolved the same way on every adapter and on both quoting modules; renaming ~166 call sites to `quoteColumnName` would make them lie about what they quote."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/mysql/quoting.ts",
-    "name": "quoteIdentifier",
-    "reason": "Rails' abstract quoting has no generic identifier quoter; `quote_table_name` simply delegates to `quote_column_name` (abstract/quoting.rb:66-67), which makes `quote_column_name` the de-facto one. trails names the shared primitive `quoteIdentifier` so `quoteColumnName`, `quoteTableName` and the schema-statement quoters (which quote neither a column nor a table) all delegate to one place. Resolved the same way on every adapter and on both quoting modules; renaming ~166 call sites to `quoteColumnName` would make them lie about what they quote."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
     "name": "isNoDatabaseError",
     "reason": "Rails recognizes the no-such-database condition inline at the connect site and raises `ActiveRecord::NoDatabaseError` there (postgresql_adapter.rb:63, sqlite3_adapter.rb:38,120) — there is no named predicate to mirror. trails needs the predicate separated from raising because `DatabaseTasks._isMissingDatabaseError` (tasks/database-tasks.ts) classifies an already-raised raw driver error, after the adapter failed to construct. Identical shape on all three: the base returns false, each concrete adapter overrides with its driver check."
   },
@@ -304,12 +250,6 @@
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "name": "schemaStatements",
     "reason": "Rails gains these bodies with `include SchemaStatements` on the adapter, so there is no accessor to mirror. The schema-statement surface is far too large for the repo's `this`-typed module-mixin pattern to stay readable, so trails keeps it in a companion class; `schemaStatements(host?)` is the accessor that returns it bound to a host adapter. It is the TS stand-in for the `include`, not new capability — mysql2-adapter.ts overrides it to return the MySQL companion the same way Rails includes `MySQL::SchemaStatements`."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "name": "schemaQuery",
-    "reason": "Rails' equivalent is a call convention, not a method: `internal_exec_query(sql, \"SCHEMA\")` (abstract/database_statements.rb), where the \"SCHEMA\" name is what keeps adapter-internal reflection out of the log and out of the query cache. trails reifies the convention as one helper so the reflection call sites cannot forget the name, and so it can reach the pre-wrap `execute` body — necessary because the execute/executeMutation split leaves `execute` wearing the dirty-query-cache wrapper. Justified at the declaration."
   },
   {
     "package": "activerecord",
