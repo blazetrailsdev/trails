@@ -27,6 +27,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { AssociationScope } from "./association-scope.js";
 import { AliasTracker } from "./alias-tracker.js";
+import { RuntimeReflection } from "../reflection.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 
 describe("AssociationScope — AliasTracker aliases repeated tables", () => {
@@ -97,14 +98,22 @@ describe("AssociationScope — AliasTracker aliases repeated tables", () => {
     // correctness depends on orthogonal chain-expansion work —
     // task #21).
     class TestScope extends AssociationScope {
-      public runGetChain(reflection: any) {
+      public runGetChain(reflection: any, association: any) {
         const tracker = AliasTracker.create(null, reflection.klass.arelTable.name, []);
-        return this.getChain(reflection, tracker);
+        return this.getChain(reflection, association, tracker);
       }
     }
-    const builtChain = new TestScope(() => null).runGetChain(refl);
+    const builtChain = new TestScope(() => null).runGetChain(refl, {
+      owner: new AtComment(),
+      reflection: refl,
+      klass: refl.klass,
+    });
     expect(builtChain.length).toBe(chain.length);
-    // The head entry is the original reflection (no aliasedTable).
+    // Rails' head entry is `RuntimeReflection.new(reflection, association)`
+    // (association_scope.rb:114) — it resolves `klass` off the live
+    // association, so a polymorphic belongs_to head is usable.
+    expect(builtChain[0]).toBeInstanceOf(RuntimeReflection);
+    expect((builtChain[0] as any).klass).toBe(refl.klass);
     // The tail's first proxy visits comments again and must be
     // aliased — not the bare "comments".
     const tailAliased = (builtChain[1] as any).aliasedTable;
