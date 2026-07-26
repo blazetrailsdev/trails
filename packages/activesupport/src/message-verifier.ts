@@ -1,15 +1,7 @@
-/**
- * MessageVerifier - signs and verifies messages using HMAC.
- * Mirrors ActiveSupport::MessageVerifier.
- */
-
 import { getCrypto } from "./crypto-adapter.js";
 import { Codec, type MessageSerializer } from "./messages/codec.js";
 import type { Format } from "./messages/serializer-with-fallback.js";
 import { Temporal } from "./temporal.js";
-// Use the travel-aware clock so expiry honors ActiveSupport::Testing::TimeHelpers
-// (`travel`/`travelTo`). With no travel active this is identical to
-// `Temporal.Now.instant()`, so production behavior is unchanged.
 import { currentTimeInstant } from "./time-travel.js";
 
 export class InvalidSignature extends Error {
@@ -21,7 +13,6 @@ export class InvalidSignature extends Error {
 
 interface MessageVerifierOptions {
   digest?: string;
-  /** A `SerializerWithFallback` format name (`"json"`, `"marshal"`, …) or a serializer object. */
   serializer?: Format | MessageSerializer;
   url_safe?: boolean;
 }
@@ -37,11 +28,6 @@ interface VerifyOptions {
 }
 
 export class MessageVerifier extends Codec {
-  // Rails' Codec defaults to `:marshal`; trails keeps `:json` here because the
-  // signed payloads this class produces are consumed as JSON envelopes by
-  // GlobalID, ActiveRecord signed ids, and credentials — switching the default
-  // would invalidate every message already in the wild. Callers wanting Rails'
-  // default pass `serializer: "marshal"` explicitly.
   static override defaultSerializer: Format | MessageSerializer = "json";
 
   private secret: string | Buffer;
@@ -59,11 +45,6 @@ export class MessageVerifier extends Codec {
     if (options.expiresAt) {
       payload._expiresAt = options.expiresAt.toString({ smallestUnit: "millisecond" });
     } else if (options.expiresIn !== undefined) {
-      // Temporal.Duration components must be integers, but Rails (and
-      // existing trails callers) pass fractional seconds — e.g. 0.001
-      // for a 1ms expiry. Round to the nearest millisecond so any
-      // sub-second precision is preserved without violating Temporal's
-      // integer-component invariant.
       const milliseconds = Math.round(options.expiresIn * 1000);
       payload._expiresAt = currentTimeInstant()
         .add({ milliseconds })
@@ -85,8 +66,6 @@ export class MessageVerifier extends Codec {
     if (result === null && !this.validMessage(message)) {
       throw new InvalidSignature();
     }
-    // verified returns null both for invalid messages AND for null values
-    // we need to distinguish between the two
     return this._verifiedOrThrow(message, options);
   }
 
@@ -159,10 +138,6 @@ export class MessageVerifier extends Codec {
     return getCrypto().createHmac(this.digest, this.secret).update(data).digest("hex");
   }
 
-  // Rails declares encode/decode private, but GlobalID::Verifier overrides
-  // them (Ruby private methods are still overridable). TS forbids
-  // redeclaring a private base member in a subclass, so they're protected
-  // here to keep that override path open.
   protected override encode(data: string | Buffer): string {
     const buf = typeof data === "string" ? Buffer.from(data, "latin1") : data;
     if (this.urlSafe) {
@@ -172,9 +147,7 @@ export class MessageVerifier extends Codec {
   }
 
   protected override decode(str: string): Buffer {
-    // Support both url-safe and standard base64
     const normalized = str.replace(/-/g, "+").replace(/_/g, "/");
-    // Add padding if needed
     const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
     return Buffer.from(padded, "base64");
   }

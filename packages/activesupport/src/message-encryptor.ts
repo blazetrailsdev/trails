@@ -1,8 +1,3 @@
-/**
- * MessageEncryptor - encrypts and signs messages.
- * Mirrors ActiveSupport::MessageEncryptor.
- */
-
 import { getCrypto } from "./crypto-adapter.js";
 import { Codec, type MessageSerializer } from "./messages/codec.js";
 import type { Format } from "./messages/serializer-with-fallback.js";
@@ -17,15 +12,10 @@ export class InvalidMessage extends Error {
 interface MessageEncryptorOptions {
   cipher?: string;
   digest?: string;
-  /** A `SerializerWithFallback` format name (`"json"`, `"marshal"`, …) or a serializer object. */
   serializer?: Format | MessageSerializer;
 }
 
 export class MessageEncryptor extends Codec {
-  // Rails' Codec defaults to `:marshal`; trails keeps `:json` here because
-  // encrypted credentials and every message this class has already written are
-  // JSON payloads — flipping the default would make them undecryptable.
-  // Callers wanting Rails' default pass `serializer: "marshal"` explicitly.
   static override defaultSerializer: Format | MessageSerializer = "json";
 
   private secret: Buffer;
@@ -115,7 +105,6 @@ export class MessageEncryptor extends Codec {
 
     if (!encryptedB64 || !ivB64) throw new InvalidMessage();
 
-    // Validate strict base64 (no newlines or special chars)
     if (!/^[A-Za-z0-9+/=]+$/.test(encryptedB64) || !/^[A-Za-z0-9+/=]+$/.test(ivB64)) {
       throw new InvalidMessage("Invalid encoding");
     }
@@ -152,7 +141,6 @@ export class MessageEncryptor extends Codec {
   }
 
   private keyLength(): number {
-    // Extract key length from cipher name (e.g. aes-256-cbc -> 32 bytes)
     const match = this.cipher.match(/(\d+)/);
     if (match) return parseInt(match[1], 10) / 8;
     return 32;
