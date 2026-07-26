@@ -6,9 +6,14 @@
 // column). The parent convergence PR could not exercise this — no canonical STI
 // has_one :through fixture — so that coverage lives here on the has_many path.
 //
-// The singular sibling below covers `HasOneAssociation#foreignKeyColumns`, which
-// derived the FK from the owner *instance's* class until it was pointed at the
-// same rich reflection.
+// The singular sibling below covers the same rule on the has_one *build* path,
+// `association(name).build(...)` → `setOwnerAttributes` →
+// `HasOneAssociation#foreignKeyColumns`. #5355 fixed `foreignKeyColumns` to
+// consult the rich reflection, but reached it from the writer path only — the
+// build assertion in `default-scoping.test.ts` still went through the dead
+// `buildHasOne` engine function, which carried its own copy of the rule. So the
+// live build path was never exercised. It passes as written; this is the
+// coverage that was missing, not a regression guard.
 
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../index.js";
