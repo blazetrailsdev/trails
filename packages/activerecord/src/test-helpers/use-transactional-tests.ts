@@ -1,12 +1,12 @@
-import { Base } from "../base.js";
 import { establishFromTestConfig } from "./test-database-config.js";
+import { leaseFixtureConnection } from "./fixture-connection.js";
 import {
   withTransactionalFixtures,
   type WithTransactionalFixturesOptions,
 } from "./with-transactional-fixtures.js";
 
 /**
- * Opt-in per-test transaction isolation for the primary `Base.connection` path.
+ * Opt-in per-test transaction isolation for the primary pool-leased path.
  * Mirrors Rails' `use_transactional_tests = true` (default in `TestFixtures`).
  *
  * Each test body is wrapped in a transaction that rolls back in `afterEach`,
@@ -23,7 +23,7 @@ import {
  * **When to use this vs `setupHandlerSuite + withTransactionalFixtures`:**
  * Use `useTransactionalTests()` for self-contained test files that want the
  * handler bootstrapped automatically. Use `setupHandlerSuite()` +
- * `withTransactionalFixtures(() => Base.connection)` when the file is part of a suite that
+ * `withTransactionalFixtures(leaseFixtureConnection)` when the file is part of a suite that
  * shares a long-lived handler across multiple describes — `setupHandlerSuite`
  * keeps the adapter alive across files whereas `useTransactionalTests` fires
  * `resetTestAdapterState` on exit (depth reaches zero), tearing down the pool.
@@ -64,7 +64,7 @@ export function useTransactionalTests(options?: WithTransactionalFixturesOptions
   // (matches the idiom in setupHandlerSuite). establishFromTestConfig is
   // idempotent (guarded by Base.isConnectedQ()), so calling it from both
   // setupHandlerSuite and useTransactionalTests in the same file is safe.
-  withTransactionalFixtures(() => Base.connection, {
+  withTransactionalFixtures(leaseFixtureConnection, {
     ...options,
     _beforeAll: establishFromTestConfig,
   });

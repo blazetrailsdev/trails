@@ -23,6 +23,7 @@ import {
   withTransactionalFixtures,
   type WithTransactionalFixturesOptions,
 } from "./with-transactional-fixtures.js";
+import { leaseFixtureConnection } from "./fixture-connection.js";
 
 /**
  * A tableless fixture entry: seeds rows directly into the named table with no
@@ -607,7 +608,7 @@ export function fixtures(
   // Caller-supplied connection/adapter thunk wins over the default handler
   // connection: multi-database suites seed through a model-specific
   // `*.connection`, and adapter-owning suites seed through their own adapter.
-  const getConnection = connection ?? (() => Base.connection);
+  const getConnection = connection ?? leaseFixtureConnection;
 
   setupHandlerSuite();
   // Rails' `use_transactional_tests = false` (default is true): skip the
