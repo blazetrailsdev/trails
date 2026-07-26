@@ -1,9 +1,9 @@
 /**
  * trails-specific strict-loading invariants with no Rails counterpart.
  *
- * These guard the functional loaders' `find_target?` gate (a new-record
- * strict-loading owner WITHOUT the foreign key present returns nil/[] silently
- * instead of raising). They were relocated verbatim out of
+ * These guard the `find_target?` gate (a new-record strict-loading owner
+ * WITHOUT the foreign key present returns nil/[] silently instead of
+ * raising). They were relocated verbatim out of
  * strict-loading.test.ts (which mirrors strict_loading_test.rb) so the
  * convention file tracks Rails 1:1.
  */
@@ -22,7 +22,7 @@ interface ReflectionHost {
   _reflectOnAssociation(name: string): { options: Record<string, unknown> };
 }
 
-// The functional loaders mirror Rails' `find_target?` gate (association.rb:320):
+// The loaders mirror Rails' `find_target?` gate (association.rb:320):
 // `violates_strict_loading?` is reached only from inside `find_target`, which
 // `find_target?` enters when `!owner.new_record? || foreign_key_present?`. So a
 // new-record strict-loading owner WITHOUT the foreign key present returns nil/[]
@@ -70,9 +70,6 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
   it("does not raise on lazy loading a habtm on a new strict-loading owner without the foreign key", async () => {
     const developer = new Developer({ name: "New Dev" });
     developer.strictLoadingBang();
-    // HABTM has no association class of its own: `Builder::HasAndBelongsToMany`
-    // rewrites it into a `has_many :through`, so the load runs through the
-    // through association's `find_target` rather than a bespoke habtm loader.
     await expect(developer.projects.toArray()).resolves.toEqual([]);
   });
 

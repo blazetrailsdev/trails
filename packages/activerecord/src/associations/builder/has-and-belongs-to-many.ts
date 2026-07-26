@@ -264,8 +264,8 @@ export class HasAndBelongsToMany {
     // We additionally retain `foreignKey` because our public HABTM
     // reflection plays the dual role Rails splits between
     // `habtm_reflection` (which keeps the full options) and the generated
-    // through-`has_many` — join-key resolution (`_resolveHabtmJoin`)
-    // reads this directly off the public reflection.
+    // through-`has_many` — join-key resolution (`_resolveHabtmJoin`) reads
+    // this directly off the public reflection.
     // `primaryKey` is intentionally NOT forwarded: Rails'
     // `Builder::HasAndBelongsToMany` does not pass `:primary_key` to the
     // middle has_many or rhs belongs_to, so the owner join always uses
@@ -296,10 +296,9 @@ export class HasAndBelongsToMany {
     // `undefined` when callers pass `joinTable: undefined` explicitly.
     // `associationForeignKey` is retained on the reflection options to
     // mirror Rails' `habtm_reflection` (which keeps the full options
-    // hash); note however that `_build` and `_resolveHabtmJoin`
-    // currently hard-code the target FK as
-    // `${singular(name)}_id` — full plumbing into the generated join
-    // model and join SQL is a follow-up.
+    // hash); note however that `_build` and `_resolveHabtmJoin` currently
+    // hard-code the target FK as `${singular(name)}_id` — full plumbing into
+    // the generated join model and join SQL is a follow-up.
     const habtmOptions: Record<string, unknown> = {
       joinTable: joinTableName,
       through: middleName,
@@ -330,9 +329,9 @@ export class HasAndBelongsToMany {
     // Pull `scope:` off the options bag and forward it as the dedicated
     // scope arg on the reflection. Mirrors Rails' Builder::Association,
     // which captures `scope` as a positional arg to `has_and_belongs_to_many`
-    // rather than treating it as a generic option. The through-routing
-    // loaders already check `options.scope` — keeping it
-    // there too means callers who don't go through reflection still see it.
+    // rather than treating it as a generic option. The through-routing loaders
+    // already check `options.scope` — keeping it there too means callers who
+    // don't go through reflection still see it.
     const habtmScope =
       typeof habtmOptions.scope === "function"
         ? (habtmOptions.scope as (...args: any[]) => any)
