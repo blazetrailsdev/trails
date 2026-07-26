@@ -3500,10 +3500,6 @@ export class Base extends Model {
     if (!saveOk) return false;
 
     if (saved) {
-      if (wasNewRecord) {
-        await CounterCache._createRecord.call(this as any, async () => undefined);
-      }
-
       await flushPendingReplaces(this);
     }
 

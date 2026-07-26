@@ -330,6 +330,11 @@ function counterCachedAssociationNames(ctor: typeof Base): string[] {
  * (`{ name, options }`) with no derived key, so fall back to the same
  * derivation Reflection uses — explicit `foreignKey`/`queryConstraints`, then
  * `<as>_id` for a polymorphic `has_many ... as:`, then `<name>_id`.
+ *
+ * `nameFallback` is the last resort only: for the `destroyed_by_association`
+ * side it is the destroyed record's class name, which matches Rails' derived
+ * `<owner>_id` for the common `has_many` (a parent whose has_many names a
+ * different foreign key always carries it explicitly in `options`).
  */
 function reflectionForeignKey(
   reflection: { foreignKey?: unknown; options?: Record<string, unknown> } | null | undefined,
