@@ -138,20 +138,25 @@ export class PathSet implements Iterable<PathSetResolver> {
   /**
    * @internal
    * Validates incoming paths. Rails additionally wraps `String`/`Pathname`
-   * entries in a `FileSystemResolver`; that wrapping lands with the resolver
-   * port in Phase 1c. Until then non-Resolver entries throw.
+   * entries in a `FileSystemResolver`; here that wrapping happens up front in
+   * `PathRegistry.castFileSystemResolvers` (see `ViewPaths#_build_view_paths`),
+   * so only resolvers reach this point. Both resolver protocols are accepted:
+   * `findAll` (PathSet's own lookup shape) and `find` (`Resolver`/
+   * `FileSystemResolver`) — Rails has a single Resolver protocol, and the two
+   * here are still to be unified.
    */
   private typecast(paths: ReadonlyArray<PathSetResolver | unknown>): PathSetResolver[] {
     return paths.map((path) => {
       if (
         path !== null &&
         typeof path === "object" &&
-        typeof (path as PathSetResolver).findAll === "function"
+        (typeof (path as PathSetResolver).findAll === "function" ||
+          typeof (path as { find?: unknown }).find === "function")
       ) {
         return path as PathSetResolver;
       }
       throw new TypeError(
-        `${String(path)} is not a valid path: must be a Resolver (string/Pathname wrapping lands in Phase 1c)`,
+        `${String(path)} is not a valid path: must be a Resolver (strings are wrapped by PathRegistry.castFileSystemResolvers)`,
       );
     });
   }

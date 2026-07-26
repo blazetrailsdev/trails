@@ -9,20 +9,28 @@
  */
 
 import { getPath } from "@blazetrails/activesupport";
+import { PathSet } from "./path-set.js";
 import { FileSystemResolver } from "./resolver/file-system-resolver.js";
 import type { TemplateResolver } from "./resolver/resolver.js";
 
 type ClassLike = new (...args: unknown[]) => unknown;
+
+/**
+ * What a class's registered view paths can be: Rails always stores a
+ * `PathSet` (see `ViewPaths` and `path_registry.rb`'s `map(&:to_a)`); the
+ * bare resolver array is the shape ActionView's own callers still pass.
+ */
+export type RegisteredViewPaths = PathSet | TemplateResolver[];
 
 export class PathRegistry {
   /** @internal Hooks fired whenever a new FileSystemResolver is built via castFileSystemResolvers. */
   static readonly fileSystemResolverHooks: Array<() => void> = [];
 
   private static _fileSystemResolvers = new Map<string, FileSystemResolver>();
-  private static _viewPathsByClass = new Map<ClassLike, TemplateResolver[]>();
+  private static _viewPathsByClass = new Map<ClassLike, RegisteredViewPaths>();
 
   /** @internal */
-  static getViewPaths(klass: ClassLike): TemplateResolver[] | undefined {
+  static getViewPaths(klass: ClassLike): RegisteredViewPaths | undefined {
     if (this._viewPathsByClass.has(klass)) return this._viewPathsByClass.get(klass);
     const proto = Object.getPrototypeOf(klass) as ClassLike | null;
     return proto && typeof proto === "function" && proto !== Function.prototype
@@ -31,7 +39,7 @@ export class PathRegistry {
   }
 
   /** @internal */
-  static setViewPaths(klass: ClassLike, paths: TemplateResolver[]): void {
+  static setViewPaths(klass: ClassLike, paths: RegisteredViewPaths): void {
     this._viewPathsByClass.set(klass, paths);
   }
 
@@ -77,7 +85,11 @@ export class PathRegistry {
     };
     for (const r of this._fileSystemResolvers.values()) add(r);
     for (const paths of this._viewPathsByClass.values()) {
-      for (const r of paths) add(r);
+      // PathSet holds the `findAll` protocol, `TemplateResolver` the `find`
+      // one; Rails has a single Resolver protocol, so both are resolvers here.
+      const list =
+        paths instanceof PathSet ? (paths.toArray() as unknown as TemplateResolver[]) : paths;
+      for (const r of list) add(r);
     }
     return out;
   }
