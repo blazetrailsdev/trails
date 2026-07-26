@@ -831,8 +831,6 @@ describe("resolveModuleName", () => {
   });
 
   it("resolves a partially-qualified name through the enclosing namespace", () => {
-    // Rails' postgresql_adapter.rb: `include PostgreSQL::Quoting` inside
-    // `module ActiveRecord::ConnectionAdapters`.
     const byShort = new Map([["Quoting", ["AR::ConnectionAdapters::PostgreSQL::Quoting"]]]);
     expect(
       resolveModuleName(
@@ -850,6 +848,19 @@ describe("resolveModuleName", () => {
     expect(
       resolveModuleName("Other::Quoting", "AR::ConnectionAdapters::PostgreSQLAdapter", byShort),
     ).toEqual(["Other::Quoting"]);
+  });
+
+  it("prefers the nearest namespace prefix over a top-level qualified match", () => {
+    const byShort = new Map([
+      ["Quoting", ["PostgreSQL::Quoting", "AR::ConnectionAdapters::PostgreSQL::Quoting"]],
+    ]);
+    expect(
+      resolveModuleName(
+        "PostgreSQL::Quoting",
+        "AR::ConnectionAdapters::PostgreSQLAdapter",
+        byShort,
+      ),
+    ).toEqual(["AR::ConnectionAdapters::PostgreSQL::Quoting"]);
   });
 
   it("returns the verbatim qualified name when no namespace prefix matches", () => {

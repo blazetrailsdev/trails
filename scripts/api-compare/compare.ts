@@ -664,6 +664,19 @@ export function tsShouldIncludeInIndex(m: MethodInfo, mode: CompareMode): boolea
   return mode === "public" ? !m.internal : true;
 }
 
+function nearestNamespaceMatch(
+  incName: string,
+  contextFqn: string,
+  candidates: readonly string[],
+): string | undefined {
+  const parts = contextFqn.split("::");
+  for (let i = parts.length; i > 0; i--) {
+    const candidate = `${parts.slice(0, i).join("::")}::${incName}`;
+    if (candidates.includes(candidate)) return candidate;
+  }
+  return undefined;
+}
+
 /**
  * Resolve a bare include name (e.g. `"Quoting"`) to the best-matching FQN(s)
  * from the perspective of `contextFqn` (the including class or module).
@@ -675,14 +688,16 @@ export function tsShouldIncludeInIndex(m: MethodInfo, mode: CompareMode): boolea
  * have the same short name. This scoped resolution avoids the false-positive
  * where PostgreSQL-specific methods inflate AbstractAdapter's missing count.
  *
- * A partially-qualified name (`PostgreSQL::Quoting`) gets the same prefix
- * walk, keyed on its last segment, falling back to the verbatim name when no
- * prefix matches. If only one FQN
- * matches the short name, that single candidate is returned regardless of
- * context. When multiple candidates exist, namespace-prefix walking picks the
- * nearest enclosing match; if none of the candidates share a namespace prefix
- * with the context the full candidate list is returned (original behavior,
- * safe fallback).
+ * A partially-qualified name gets the same walk, keyed on its last segment:
+ * `include PostgreSQL::Quoting` inside `module ActiveRecord::ConnectionAdapters`
+ * names `ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting`. With no prefix
+ * match it falls back to the verbatim name, which is the top-level reading.
+ *
+ * If only one FQN matches an unqualified short name, that single candidate is
+ * returned regardless of context. When multiple candidates exist,
+ * namespace-prefix walking picks the nearest enclosing match; if none of the
+ * candidates share a namespace prefix with the context the full candidate list
+ * is returned (original behavior, safe fallback).
  */
 export function resolveModuleName(
   incName: string,
@@ -693,36 +708,16 @@ export function resolveModuleName(
   // qualifier: `include ::Foo` names top-level `Foo` regardless of context.
   if (incName.startsWith("::")) return [incName.slice(2)];
   if (incName.includes("::")) {
-    // A partially-qualified name (`include PostgreSQL::Quoting` inside
-    // `module ActiveRecord::ConnectionAdapters`) still resolves through the
-    // enclosing namespaces — the manifest keys modules by FQN, so walk the
-    // context's prefixes to recover it. Candidates are keyed by short name,
-    // i.e. the include's LAST segment.
-    const shortName = incName.split("::").pop()!;
-    const qualifiedCandidates = moduleFqnByShort.get(shortName);
-    if (qualifiedCandidates && qualifiedCandidates.length > 0) {
-      if (qualifiedCandidates.includes(incName)) return [incName];
-      const contextParts = contextFqn.split("::");
-      for (let i = contextParts.length; i > 0; i--) {
-        const candidate = `${contextParts.slice(0, i).join("::")}::${incName}`;
-        if (qualifiedCandidates.includes(candidate)) return [candidate];
-      }
-    }
-    return [incName];
+    const candidates = moduleFqnByShort.get(incName.split("::").pop()!) ?? [];
+    return [nearestNamespaceMatch(incName, contextFqn, candidates) ?? incName];
   }
   const candidates = moduleFqnByShort.get(incName);
   if (!candidates || candidates.length === 0) return [incName];
   if (candidates.length === 1) return candidates;
 
-  // Walk namespace prefixes from longest to shortest, pick first match.
-  const parts = contextFqn.split("::");
-  for (let i = parts.length; i > 0; i--) {
-    const candidate = `${parts.slice(0, i).join("::")}::${incName}`;
-    if (candidates.includes(candidate)) return [candidate];
-  }
-
+  const nearest = nearestNamespaceMatch(incName, contextFqn, candidates);
   // No prefix match — fall back to all candidates (original behavior).
-  return candidates;
+  return nearest ? [nearest] : candidates;
 }
 
 /**
