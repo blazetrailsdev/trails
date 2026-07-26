@@ -784,8 +784,18 @@ export class Association {
     return k;
   }
 
-  private async findTarget(): Promise<Base | Base[] | null> {
-    return this.loadTarget();
+  /**
+   * Mirrors: ActiveRecord::Associations::Association#find_target
+   * (association.rb:248) — the seam `load_target` runs to fetch the target.
+   * Subclasses override it with the actual query; the trails hook they have
+   * historically overridden is `doAsyncFindTarget`, which this delegates to so
+   * both spellings resolve to one implementation per subclass.
+   *
+   * (Was previously a private stub that called `loadTarget()` — the inverse of
+   * Rails' direction, and unreachable.)
+   */
+  protected async findTarget(): Promise<Base | Base[] | null> {
+    return this.doAsyncFindTarget();
   }
 
   private skipStrictLoading<T>(block: () => T): T {

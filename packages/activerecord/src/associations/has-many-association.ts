@@ -152,18 +152,30 @@ export class HasManyAssociation extends CollectionAssociation {
     return updateCounterIfSuccess(this, saved, 1);
   }
 
-  protected override async doAsyncFindTarget(): Promise<Base[]> {
-    // Every caller of doAsyncFindTarget assigns the returned records into
-    // this holder itself, so findTarget's tail writeback into the same
-    // holder is redundant — and, because it lands mid-await, clobbers any
-    // reassignment made while the query was in flight. See
-    // `_loaderWritebackSuppressed`.
+  /**
+   * Fetch the collection's target records.
+   *
+   * Mirrors: ActiveRecord::Associations::Association#find_target
+   * (association.rb:248) as reached through `CollectionAssociation#load_target`
+   * (collection_association.rb:272). This is the association-instance entry
+   * point; it wraps the functional loader below, which the CollectionProxy and
+   * the through-association loaders reach without an association instance.
+   */
+  protected override async findTarget(): Promise<Base[]> {
+    // Every caller assigns the returned records into this holder itself, so the
+    // loader's tail writeback into the same holder is redundant — and, because
+    // it lands mid-await, clobbers any reassignment made while the query was in
+    // flight. See `_loaderWritebackSuppressed`.
     this._loaderWritebackSuppressed++;
     try {
       return await findTarget(this.owner, this.reflection.name, this.reflection.options);
     } finally {
       this._loaderWritebackSuppressed--;
     }
+  }
+
+  protected override async doAsyncFindTarget(): Promise<Base[]> {
+    return this.findTarget();
   }
 
   protected override setOwnerAttributes(record: Base): void {
@@ -488,11 +500,14 @@ export function setIntersection(a: Base[], b: Base[]): Base[] {
 /**
  * Find the has_many association's target records.
  *
- * Mirrors: ActiveRecord::Associations::Association#find_target
- * (association.rb:248) as reached through `CollectionAssociation` /
- * `HasManyAssociation`. Takes the owner/name/options triple rather than an
+ * The functional body behind `HasManyAssociation#findTarget`, which is the
+ * Rails-shaped entry point (`ActiveRecord::Associations::Association#find_target`,
+ * association.rb:248). It takes the owner/name/options triple rather than an
  * association instance because the CollectionProxy load path and the
- * through-association loaders reach it without one.
+ * through-association loaders reach the loader without one; that triple shape
+ * is a trails-only calling convention, not Rails surface.
+ *
+ * @internal
  */
 export async function findTarget(
   record: Base,
