@@ -130,13 +130,6 @@ export class InsertAll {
       this.keys.add(key);
     }
 
-    // Rails calls verify_attributes(attributes) once per row from
-    // map_key_with_value (insert_all.rb:79), i.e. at SQL-build time. The port
-    // hoists the loop into the constructor so a mismatched batch raises before
-    // any async work starts; the per-row check itself is Rails' verbatim.
-    for (const row of this.inserts.slice(1)) {
-      this.verifyAttributes({ ...row, ...this._scopeAttributes });
-    }
     this.verifyAttributeNamesAreKnown();
     this.configureOnDuplicateUpdateLogic(options.onDuplicate);
     this.ensureValidOptionsForConnectionBang();
@@ -251,6 +244,12 @@ export class InsertAll {
           if (!(col in merged)) merged[col] = val;
         }
       }
+      // Rails calls verify_attributes here (insert_all.rb:79), after the
+      // scope merge and the timestamps reverse_merge — and it must stay here,
+      // not in the constructor: `keysIncludingTimestamps` reads the model's
+      // timestamp attributes off the reflected schema, which is not loaded yet
+      // at construction time.
+      this.verifyAttributes(merged);
       return keysList.map((key) => fn(key, merged[key]));
     });
   }
@@ -275,8 +274,12 @@ export class InsertAll {
 
   /** @internal */
   private verifyAttributes(attributes: Record<string, unknown>): void {
+    // Rails compares against keys_including_timestamps, NOT @keys — the caller
+    // has already reverse_merged the create timestamps into `attributes`, so
+    // both sides carry them whenever record_timestamps? is on.
+    const expected = this.keysIncludingTimestamps();
     const rowKeys = new Set(Object.keys(attributes));
-    if (rowKeys.size !== this.keys.size || ![...this.keys].every((k) => rowKeys.has(k))) {
+    if (rowKeys.size !== expected.size || ![...expected].every((k) => rowKeys.has(k))) {
       throw new ArgumentError("All objects being inserted must have the same keys");
     }
   }
