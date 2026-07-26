@@ -48,6 +48,16 @@ export const SCHEMA_VERSION_BASE = 8;
  * types.ts). Adding a property to `MethodInfo` that the extractor populates?
  * Add its emitted key here too, so the schema token changes and stale cache
  * entries missing the field are evicted automatically.
+ *
+ * Scope is per-METHOD by construction: entity-level `ClassInfo` fields
+ * (`includes`, `extends`, `superclass`, `synthesizedMixin`, …) are NOT tracked
+ * here and never have been. An entity-level field only needs its own token
+ * input when it can change WITHOUT any per-method field changing; every one
+ * added so far has shipped alongside the per-method field its consumer reads
+ * (`synthesizedMixin` pairs with `declaredIn`), so registering the method-side
+ * key already evicts entries predating the pair. Extending the token to
+ * entity-level fields is tracked separately — see the
+ * `extractor-schema-entity-level-fields` story.
  */
 export const EXTRACTOR_OUTPUT_FIELDS = [
   "name",
