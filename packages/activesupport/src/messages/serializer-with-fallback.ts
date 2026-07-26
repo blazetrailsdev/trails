@@ -121,11 +121,13 @@ const marshalWithFallback: Serializer = {
   },
 
   dump(object: unknown): string {
-    return MARSHAL_SIGNATURE + coder.dump(object);
+    return MARSHAL_SIGNATURE + Buffer.from(coder.dump(object), "utf8").toString("latin1");
   },
 
   _load(dumped: string): unknown {
-    return coder.load(dumped.slice(MARSHAL_SIGNATURE.length));
+    return coder.load(
+      Buffer.from(dumped.slice(MARSHAL_SIGNATURE.length), "latin1").toString("utf8"),
+    );
   },
 
   dumped(dumped: string): boolean {
@@ -143,11 +145,11 @@ const jsonWithFallback: Serializer = {
   },
 
   dump(object: unknown): string {
-    return ActiveSupportJSON.encode(object);
+    return Buffer.from(ActiveSupportJSON.encode(object), "utf8").toString("latin1");
   },
 
   _load(dumped: string): unknown {
-    return ActiveSupportJSON.decode(dumped);
+    return ActiveSupportJSON.decode(Buffer.from(dumped, "latin1").toString("utf8"));
   },
 
   dumped(dumped: string): boolean {

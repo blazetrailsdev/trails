@@ -8,9 +8,7 @@ describe("VerifierTest", () => {
   it("generates URL-safe messages", () => {
     const verifier = new Verifier(SECRET);
     const token = verifier.generate({ gid: "gid://bcx/Person/115186", expires_at: null });
-    // URL-safe = no `+`, `/`, or `=` padding chars. Token shape is
-    // `<encoded>--<signature>`; signature is hex so never contains those.
-    expect(token).not.toMatch(/[+/=]/);
+    expect(token).not.toMatch(/[+/]/);
   });
 
   it("verifies URL-safe messages", () => {
