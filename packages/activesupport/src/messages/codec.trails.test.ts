@@ -2,7 +2,18 @@ import { describe, expect, it } from "vitest";
 
 import { InvalidMessage, MessageEncryptor } from "../message-encryptor.js";
 import { InvalidSignature, MessageVerifier } from "../message-verifier.js";
+import { Codec, type CodecOptions } from "./codec.js";
 import type { Format } from "./serializer-with-fallback.js";
+
+class ExposedCodec extends Codec {
+  constructor(options: CodecOptions = {}) {
+    super(options);
+  }
+
+  exposedDecode(encoded: string): Buffer {
+    return this.decode(encoded);
+  }
+}
 
 const SECRET = "x".repeat(32);
 const FORMATS: Format[] = [
@@ -29,6 +40,26 @@ describe("Messages::Codec (trails)", () => {
     const encryptor = new MessageEncryptor(SECRET, { serializer });
     const value = { greeting: "héllo→😀", n: 42, list: [1, 2, 3] };
     expect(encryptor.decryptAndVerify(encryptor.encryptAndSign(value))).toEqual(value);
+  });
+
+  it.each([
+    [false, "abc"],
+    [false, "ab=c"],
+    [false, "a"],
+    [true, "a"],
+    [true, "ab*cd"],
+  ])("decode rejects a malformed base64 segment (urlSafe: %s)", (urlSafe, encoded) => {
+    const codec = new ExposedCodec({ urlSafe });
+    expect(() => codec.exposedDecode(encoded)).toThrow(
+      expect.objectContaining({ tag: "invalid_message_format" }),
+    );
+  });
+
+  it("decode accepts both padded and unpadded url-safe segments", () => {
+    const codec = new ExposedCodec({ urlSafe: true });
+    expect(codec.exposedDecode("aGVsbG8h").toString("latin1")).toBe("hello!");
+    expect(codec.exposedDecode("aGVsbG8").toString("latin1")).toBe("hello");
+    expect(codec.exposedDecode("aGVsbG8=").toString("latin1")).toBe("hello");
   });
 
   it("decode retries with the opposite url-safe direction", () => {

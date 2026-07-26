@@ -51,9 +51,16 @@ export class Codec {
 
   protected decode(encoded: string, urlSafe: boolean = this.urlSafe): Buffer {
     try {
-      const alphabet = urlSafe ? /^[A-Za-z0-9\-_]*$/ : /^[A-Za-z0-9+/]*={0,2}$/;
-      if (!alphabet.test(encoded)) throw new ArgumentError("invalid base64");
-      return Buffer.from(encoded, urlSafe ? "base64url" : "base64");
+      let str = encoded;
+      if (urlSafe && !str.endsWith("=") && str.length % 4 !== 0) {
+        str = str.padEnd((str.length + 3) & ~3, "=");
+      }
+
+      const alphabet = urlSafe ? /^[A-Za-z0-9\-_]*={0,2}$/ : /^[A-Za-z0-9+/]*={0,2}$/;
+      if (!alphabet.test(str) || str.length % 4 !== 0) {
+        throw new ArgumentError("invalid base64");
+      }
+      return Buffer.from(str, urlSafe ? "base64url" : "base64");
     } catch (error) {
       throw new Thrown("invalid_message_format", error);
     }
