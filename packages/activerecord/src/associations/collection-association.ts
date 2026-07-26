@@ -1376,24 +1376,36 @@ async function replaceOnTargetAsync(
 }
 
 /**
+ * The owner + reflection pair {@link callback} needs. Both the
+ * `CollectionAssociation` and the `CollectionProxy` (which holds the same two
+ * pieces under different field names) satisfy it.
+ * @internal
+ */
+export interface CallbackHost {
+  owner: Base;
+  reflection: { name: string; options: object };
+}
+
+/**
  * Unified association-callback dispatch. Mirrors Rails'
- * `CollectionAssociation#callback`: looks up the registered callbacks for
+ * `CollectionAssociation#callback` (collection_association.rb:492), whose
+ * lookup half is `callbacks_for` (:498): looks up the registered callbacks for
  * `kind` (`beforeAdd`/`afterAdd`/`beforeRemove`/`afterRemove`) and invokes
  * each. Returns `false` if any callback aborts (Rails `throw :abort`,
  * modelled here as a callback returning `false`), so callers can halt the
  * add/remove like Rails' `catch(:abort) ... || return`.
  *
- * Arity note: Rails procs take `(method, owner, record)` and `callback`
- * passes the kind through (so the symbol case can `callback.send(method, ...)`).
- * Here the builder binds the method/symbol at registration time, so the
- * stored procs take `(owner, record)` — the same 2-arg shape consumed by
- * `fireAssocCallbacks` on the CollectionProxy add/remove paths, which read
- * the identical callback array. Keeping the 2-arg convention lets both
- * dispatch sites share one proc array; passing `kind` here would break the
- * proxy's `cb(owner, record)` call site.
+ * Arity note: like Rails, the stored procs take `(method, owner, record)` and
+ * this dispatcher passes `kind` through as `method`. The symbol and proc arms
+ * ignore it, but the object arm needs it — Rails' `callback.send(method, owner,
+ * record)` (builder/collection_association.rb:51) dispatches the callback kind
+ * as a method ON the callback object, so binding it at registration time would
+ * silently drop object callbacks.
+ *
+ * `callback` is private in Rails, hence `@internal`.
  * @internal
  */
-function callback(assoc: CollectionAssociation, kind: string, record: Base): boolean {
+export function callback(assoc: CallbackHost, kind: string, record: Base): boolean {
   // Rails wraps only `before_add`/`before_remove` in `catch(:abort)`
   // (collection_association.rb:400-402, 462-464); after callbacks run outside
   // the catch (:408, :485), so a `throw :abort` from after_add/after_remove
@@ -1405,21 +1417,21 @@ function callback(assoc: CollectionAssociation, kind: string, record: Base): boo
     // (faithful `throw :abort`); a `false` return no longer halts (Rails 5+).
     if (catchAbort) {
       try {
-        (cb as any)(assoc.owner, record);
+        (cb as any)(kind, assoc.owner, record);
       } catch (e) {
         if (!isAbortSignal(e)) throw e;
         return false;
       }
     } else {
       // after callbacks run outside the catch; their return value is ignored.
-      (cb as any)(assoc.owner, record);
+      (cb as any)(kind, assoc.owner, record);
     }
   }
   return true;
 }
 
 /** @internal */
-function callbacksFor(assoc: CollectionAssociation, callbackName: string): unknown[] {
+function callbacksFor(assoc: CallbackHost, callbackName: string): unknown[] {
   // The builder stores normalized callbacks both as the
   // `<kind>For<Name>` class attribute (Rails parity) and on the reflection
   // options; either is the same array. Prefer the class attribute, matching
@@ -1429,7 +1441,7 @@ function callbacksFor(assoc: CollectionAssociation, callbackName: string): unkno
   const stored = owner[fullName];
   if (typeof stored === "function") return stored();
   if (Array.isArray(stored)) return stored;
-  const fromOptions = (assoc.reflection.options as any)[callbackName];
+  const fromOptions = (assoc.reflection.options as Record<string, unknown>)[callbackName];
   return Array.isArray(fromOptions) ? fromOptions : fromOptions != null ? [fromOptions] : [];
 }
 

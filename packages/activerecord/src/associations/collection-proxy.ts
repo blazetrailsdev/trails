@@ -1,6 +1,11 @@
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
-import { CollectionAssociation, concatRecordsLoop } from "./collection-association.js";
+import {
+  CollectionAssociation,
+  callback as assocCallback,
+  concatRecordsLoop,
+  type CallbackHost,
+} from "./collection-association.js";
 import type { PrettyPrinter } from "../pretty-print.js";
 import type { AssociationRelation as AssociationRelationType } from "../association-relation.js";
 import {
@@ -61,7 +66,6 @@ import {
   association,
   resolveModel,
   resolveAssocClass,
-  fireAssocCallbacks,
   buildHasManyRelation,
   buildThroughJoinScope,
   loadHasMany,
@@ -280,6 +284,15 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /** @internal Association definition — used by AssociationRelation. */
   get reflection(): AssociationDefinition {
     return this._assocDef;
+  }
+
+  /**
+   * The owner/reflection pair `CollectionAssociation#callback` dispatches on.
+   * The proxy holds the same two pieces under different field names.
+   * @internal
+   */
+  private get _callbackHost(): CallbackHost {
+    return { owner: this._record, reflection: this._assocDef };
   }
 
   /** @internal Association name — used by AssociationRelation. */
@@ -1495,16 +1508,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   ): Promise<T | null> {
     const { skipCallbacks = false, replace = false } = options;
     const index = this._targetReplaceIndex(record, replace);
-    if (
-      !skipCallbacks &&
-      !fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record, true)
-    ) {
+    if (!skipCallbacks && !assocCallback(this._callbackHost, "beforeAdd", record)) {
       return null;
     }
     _setCollectionInverseInstance(this._record, this._assocName, this._assocDef.options, record);
     if (save) await save();
     this._commitToTarget(record, index);
-    if (!skipCallbacks) fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+    if (!skipCallbacks) assocCallback(this._callbackHost, "afterAdd", record);
     return record;
   }
 
@@ -1522,15 +1532,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   ): T | null {
     const { skipCallbacks = false, replace = false } = options;
     const index = this._targetReplaceIndex(record, replace);
-    if (
-      !skipCallbacks &&
-      !fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record, true)
-    ) {
+    if (!skipCallbacks && !assocCallback(this._callbackHost, "beforeAdd", record)) {
       return null;
     }
     _setCollectionInverseInstance(this._record, this._assocName, this._assocDef.options, record);
     this._commitToTarget(record, index);
-    if (!skipCallbacks) fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+    if (!skipCallbacks) assocCallback(this._callbackHost, "afterAdd", record);
     return record;
   }
 
@@ -2651,7 +2658,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // return`: if any record's before_remove halts, the entire operation aborts
       // and nothing is deleted (the transaction commits with no work done).
       for (const record of modelRecords) {
-        if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record, true)) {
+        if (!assocCallback(this._callbackHost, "beforeRemove", record)) {
           aborted = true;
           return;
         }
@@ -2722,7 +2729,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // Remove from target first, then fire after_remove for all records.
       this._removeFromTarget(modelRecords as Base[]);
       for (const record of modelRecords) {
-        fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
+        assocCallback(this._callbackHost, "afterRemove", record);
       }
     };
 
@@ -4098,7 +4105,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     if (this._isThrough) {
       const record = this._buildThrough(attrs) as T;
       if (block) block(record);
-      if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record, true)) {
+      if (!assocCallback(this._callbackHost, "beforeAdd", record)) {
         throw new RecordNotSaved("Callback prevented record creation", record);
       }
       const saved = await record.save();
@@ -4108,7 +4115,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       if (this._target.length === targetBefore) {
         throw new RecordNotSaved("Failed to create join record for through association", record);
       }
-      fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+      assocCallback(this._callbackHost, "afterAdd", record);
       return record;
     }
     const record = this._buildRaw(attrs) as T;
