@@ -7,6 +7,7 @@ import {
   tsShouldIncludeInIndex,
   flattenIncludedMethodInfos,
   resolveModuleName,
+  buildModuleIncluderFqns,
   dedupeRubyMethodInto,
   selectMisplacedFile,
   MISPLACED_MIN_HITS,
@@ -1000,6 +1001,61 @@ describe("resolveModuleName", () => {
       byShort,
     );
     expect(result).toEqual(["AR::ConnectionAdapters::PostgreSQL::Quoting"]);
+  });
+
+  it("binds a class's own nested module over an identically-named sibling's", () => {
+    // `class Rack::Request; include Helpers; end` where both Request and
+    // Response nest a `Helpers`: Ruby binds Request's.
+    const byShort = new Map([["Helpers", ["Rack::Request::Helpers", "Rack::Response::Helpers"]]]);
+    expect(resolveModuleName("Helpers", "Rack::Request", byShort)).toEqual([
+      "Rack::Request::Helpers",
+    ]);
+    expect(resolveModuleName("Helpers", "Rack::Response::Raw", byShort)).toEqual([
+      "Rack::Response::Helpers",
+    ]);
+  });
+});
+
+describe("buildModuleIncluderFqns", () => {
+  function entity(name: string, includes: string[] = [], extendsList: string[] = []): ClassInfo {
+    return {
+      name: name.split("::").pop()!,
+      file: `${name.split("::").pop()!.toLowerCase()}.rb`,
+      includes,
+      extends: extendsList,
+      instanceMethods: [],
+      classMethods: [],
+    };
+  }
+
+  const byShort = new Map([
+    ["Helpers", ["Rack::Request::Helpers", "Rack::Response::Helpers"]],
+    ["Env", ["Rack::Request::Env"]],
+  ]);
+
+  it("registers an includer only against the module Ruby's lookup binds", () => {
+    // Regression: resolving unqualified names against the raw short-name map
+    // registered Rack::Request as an includer of Rack::Response::Helpers,
+    // which made response.ts an implementation site for Request's headers.
+    const graph = buildModuleIncluderFqns(
+      [
+        { fqn: "Rack::Request", info: entity("Rack::Request", ["Env", "Helpers"]) },
+        { fqn: "Rack::Response", info: entity("Rack::Response", ["Helpers"]) },
+      ],
+      byShort,
+    );
+    expect([...(graph.get("Rack::Request::Helpers") ?? [])]).toEqual(["Rack::Request"]);
+    expect([...(graph.get("Rack::Response::Helpers") ?? [])]).toEqual(["Rack::Response"]);
+    expect([...(graph.get("Rack::Request::Env") ?? [])]).toEqual(["Rack::Request"]);
+  });
+
+  it("registers extends alongside includes and keeps unknown names verbatim", () => {
+    const graph = buildModuleIncluderFqns(
+      [{ fqn: "Rack::Request", info: entity("Rack::Request", ["Helpers"], ["Comparable"]) }],
+      byShort,
+    );
+    expect([...(graph.get("Comparable") ?? [])]).toEqual(["Rack::Request"]);
+    expect(graph.has("Rack::Response::Helpers")).toBe(false);
   });
 });
 
