@@ -37,6 +37,20 @@
   {
     "package": "activerecord",
     "tsFile": "result.ts",
+    "rubyName": "column_type",
+    "call": "default_value",
+    "reason": "Newly comparable (RFC 0072 arity sweep): Rails' final fallback is `Type.default_value`; the port returns the module-level IDENTITY_TYPE constant, which is that same default value memoized rather than re-fetched. Equivalent."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "result.ts",
+    "rubyName": "column_type",
+    "call": "fetch",
+    "reason": "Newly comparable (RFC 0072 arity sweep): Rails expresses the override/index/name lookup as nested `Hash#fetch` blocks; JS objects have no fetch-with-default, so the port uses `in` checks in the same order. Equivalent."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "result.ts",
     "rubyName": "each",
     "call": "hash_rows",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -61,19 +75,5 @@
     "rubyName": "last",
     "call": "hash_rows",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "result.ts",
-    "rubyName": "column_type",
-    "call": "fetch",
-    "reason": "Newly comparable (RFC 0072 arity sweep): Rails expresses the override/index/name lookup as nested `Hash#fetch` blocks; JS objects have no fetch-with-default, so the port uses `in` checks in the same order. Equivalent."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "result.ts",
-    "rubyName": "column_type",
-    "call": "default_value",
-    "reason": "Newly comparable (RFC 0072 arity sweep): Rails' final fallback is `Type.default_value`; the port returns the module-level IDENTITY_TYPE constant, which is that same default value memoized rather than re-fetched. Equivalent."
   }
 ]

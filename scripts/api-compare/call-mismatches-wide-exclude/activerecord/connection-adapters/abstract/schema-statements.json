@@ -431,7 +431,7 @@
     "tsFile": "connection-adapters/abstract/schema-statements.ts",
     "rubyName": "foreign_keys_enabled?",
     "call": "fetch",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails schema_statements.rb:1783-1785 is `@config.fetch(:foreign_keys, true)` \u2014 key-present semantics, so an explicitly configured nil stays falsy; trails schema-statements.ts:2487-2493 reads `adapter._config?.foreignKeys !== false`, which coerces null (and any non-false value) to true. Divergence tracked in story fetch-nil-presence-divergences-globalid-rack."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails schema_statements.rb:1783-1785 is `@config.fetch(:foreign_keys, true)` — key-present semantics, so an explicitly configured nil stays falsy; trails schema-statements.ts:2487-2493 reads `adapter._config?.foreignKeys !== false`, which coerces null (and any non-false value) to true. Divergence tracked in story fetch-nil-presence-divergences-globalid-rack."
   },
   {
     "package": "activerecord",
@@ -779,6 +779,13 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/schema-statements.ts",
+    "rubyName": "table_exists?",
+    "call": "tables",
+    "reason": "Newly comparable (RFC 0072 arity sweep): Rails calls `tables` only from the `rescue NotImplementedError` fallback arm; trails' tableExists issues the data-source query per adapter and has no such fallback. Pre-existing gap — converge by porting the rescue arm."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-statements.ts",
     "rubyName": "tables",
     "call": "data_source_sql",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -838,12 +845,5 @@
     "rubyName": "views",
     "call": "query_values",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-statements.ts",
-    "rubyName": "table_exists?",
-    "call": "tables",
-    "reason": "Newly comparable (RFC 0072 arity sweep): Rails calls `tables` only from the `rescue NotImplementedError` fallback arm; trails' tableExists issues the data-source query per adapter and has no such fallback. Pre-existing gap \u2014 converge by porting the rescue arm."
   }
 ]

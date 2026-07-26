@@ -11,6 +11,6 @@
     "tsFile": "migration/join-table.ts",
     "rubyName": "join_table_name",
     "call": "derive_join_table_name",
-    "reason": "Verified (RFC 0072 arity sweep): Rails delegates to ModelSchema.derive_join_table_name; this module must stay import-leaf \u2014 the model-schema.js edge reorders module init and trips scripts/test-deps/adapter-graph-import-tdz.test.ts \u2014 so it inlines the identical three lines. See the comment on joinTableName."
+    "reason": "Verified (RFC 0072 arity sweep): Rails delegates to ModelSchema.derive_join_table_name; this module must stay import-leaf — the model-schema.js edge reorders module init and trips scripts/test-deps/adapter-graph-import-tdz.test.ts — so it inlines the identical three lines. See the comment on joinTableName."
   }
 ]
