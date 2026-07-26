@@ -174,6 +174,11 @@ export class HasManyAssociation extends CollectionAssociation {
     }
   }
 
+  /**
+   * The older trails spelling, kept for the callers that reach the query
+   * without going through `loadTarget` (`CollectionAssociation#isEmptyAsync`).
+   * `loadTarget` itself runs `findTarget` directly, as Rails does.
+   */
   protected override async doAsyncFindTarget(): Promise<Base[]> {
     return this.findTarget();
   }

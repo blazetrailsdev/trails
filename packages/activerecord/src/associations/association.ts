@@ -489,11 +489,14 @@ export class Association {
   }
 
   /**
-   * Mirrors Rails' `find_target` DB load: issues a query (never the in-memory
-   * cache) and applies `set_strict_loading` per freshly loaded record.
+   * Runs `find_target` and stores what it fetched: issues a query (never the
+   * in-memory cache) and applies `set_strict_loading` per freshly loaded
+   * record. Rails inlines this in `load_target` / `async_load_target`
+   * (association.rb:189, :198); the split exists only because the assignment
+   * is shared by both call sites above.
    */
   private async _findTarget(): Promise<void> {
-    const result = await this.doAsyncFindTarget();
+    const result = await this.findTarget();
     if (result !== undefined) {
       // Rails applies set_strict_loading per record in find_target's DB
       // execute block — only freshly loaded records, never cached ones.
@@ -786,10 +789,13 @@ export class Association {
 
   /**
    * Mirrors: ActiveRecord::Associations::Association#find_target
-   * (association.rb:248) — the seam `load_target` runs to fetch the target.
-   * Subclasses override it with the actual query; the trails hook they have
-   * historically overridden is `doAsyncFindTarget`, which this delegates to so
-   * both spellings resolve to one implementation per subclass.
+   * (association.rb:248) — the seam `load_target` (association.rb:189) and
+   * `CollectionAssociation#load_target` (collection_association.rb:272) run to
+   * fetch the target. Subclasses override it with the actual query.
+   *
+   * Subclasses that still override the older trails hook
+   * (`doAsyncFindTarget`) rather than this reach their query through the
+   * delegation below, so there is one implementation per subclass either way.
    *
    * (Was previously a private stub that called `loadTarget()` — the inverse of
    * Rails' direction, and unreachable.)
