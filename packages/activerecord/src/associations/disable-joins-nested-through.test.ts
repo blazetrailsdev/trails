@@ -22,7 +22,8 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, MigrationContext, registerModel } from "../index.js";
-import { Associations, loadHasMany } from "../associations.js";
+import { Associations } from "../associations.js";
+import { findTarget } from "./has-many-association.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 
 function migrationCtx() {
@@ -148,7 +149,7 @@ describe("DJAS routing widening — nested-through", () => {
     });
     try {
       const reflection = (NtAuthor as any)._reflectOnAssociation("noJoinsNtRatings");
-      const ratings = await loadHasMany(author, "noJoinsNtRatings", reflection.options);
+      const ratings = await findTarget(author, "noJoinsNtRatings", reflection.options);
       expect(ratings.map((r: any) => r.id).sort()).toEqual([r1.id, r2.id, r3.id].sort());
     } finally {
       Notifications.unsubscribe(sub);
@@ -183,7 +184,7 @@ describe("DJAS routing widening — nested-through", () => {
     await NtRating.create({ nt_comment_id: ca.id, value: 2 });
 
     const reflection = (NtAuthor as any)._reflectOnAssociation("noJoinsNtRatingsOrdered");
-    const ratings = await loadHasMany(author, "noJoinsNtRatingsOrdered", reflection.options);
+    const ratings = await findTarget(author, "noJoinsNtRatingsOrdered", reflection.options);
     expect(ratings.map((r: any) => r.value)).toEqual([2, 1]);
   });
 });

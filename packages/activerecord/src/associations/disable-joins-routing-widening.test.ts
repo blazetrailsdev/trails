@@ -21,7 +21,8 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, MigrationContext, registerModel } from "../index.js";
-import { Associations, association, loadHasMany } from "../associations.js";
+import { Associations, association } from "../associations.js";
+import { findTarget } from "./has-many-association.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 
 function migrationCtx() {
@@ -149,7 +150,7 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
     });
     try {
       const reflection = (RwAuthor as any)._reflectOnAssociation("noJoinsRwMembers");
-      const members = await loadHasMany(author, "noJoinsRwMembers", reflection.options);
+      const members = await findTarget(author, "noJoinsRwMembers", reflection.options);
       expect(members.map((m: any) => m.id).sort()).toEqual([m1.id, m2.id].sort());
       const count = await association(author, "noJoinsRwMembers").count();
       expect(count).toBe(2);

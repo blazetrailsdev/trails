@@ -53,7 +53,7 @@ export class Association {
    *  collection proxy that it can hydrate from this instance's target. */
   _loadedViaAsync = false;
   /**
-   * Nonzero while THIS holder is itself driving a loader (`loadHasMany` &c.)
+   * Nonzero while THIS holder is itself driving a loader (`findTarget` &c.)
    * through `doAsyncFindTarget`, so the loader's own `setTarget` writeback
    * into this holder must be skipped — the driving caller assigns the result
    * itself the moment its `await` resumes.
@@ -68,12 +68,12 @@ export class Association {
    * **Scoping — this flag is holder-scoped, not loader-scoped.** While it is
    * set, `syncToAssociationInstance` suppresses *every* writeback into this
    * holder, not just the driving loader's own. A concurrent
-   * `loadHasMany(owner, sameName, differentOptions)` carrying differently
+   * `findTarget(owner, sameName, differentOptions)` carrying differently
    * scoped rows is therefore dropped from the holder too (it still returns its
    * rows to its own caller; only the holder cache goes unwritten, and the
    * driving load assigns the holder immediately after). Making it
    * loader-scoped would require threading a per-load token through
-   * `loadHasMany`; the holder-scoped version is what the guard needs, since a
+   * `findTarget`; the holder-scoped version is what the guard needs, since a
    * collection that legitimately mutates its own target mid-load (dirty
    * targets, in-memory built/pushed records, target merging) is unaffected
    * either way.
@@ -489,11 +489,14 @@ export class Association {
   }
 
   /**
-   * Mirrors Rails' `find_target` DB load: issues a query (never the in-memory
-   * cache) and applies `set_strict_loading` per freshly loaded record.
+   * Runs `find_target` and stores what it fetched: issues a query (never the
+   * in-memory cache) and applies `set_strict_loading` per freshly loaded
+   * record. Rails inlines this in `load_target` / `async_load_target`
+   * (association.rb:189, :198); the split exists only because the assignment
+   * is shared by both call sites above.
    */
   private async _findTarget(): Promise<void> {
-    const result = await this.doAsyncFindTarget();
+    const result = await this.findTarget();
     if (result !== undefined) {
       // Rails applies set_strict_loading per record in find_target's DB
       // execute block — only freshly loaded records, never cached ones.
@@ -784,8 +787,21 @@ export class Association {
     return k;
   }
 
-  private async findTarget(): Promise<Base | Base[] | null> {
-    return this.loadTarget();
+  /**
+   * Mirrors: ActiveRecord::Associations::Association#find_target
+   * (association.rb:248) — the seam `load_target` (association.rb:189) and
+   * `CollectionAssociation#load_target` (collection_association.rb:272) run to
+   * fetch the target. Subclasses override it with the actual query.
+   *
+   * Subclasses that still override the older trails hook
+   * (`doAsyncFindTarget`) rather than this reach their query through the
+   * delegation below, so there is one implementation per subclass either way.
+   *
+   * (Was previously a private stub that called `loadTarget()` — the inverse of
+   * Rails' direction, and unreachable.)
+   */
+  protected async findTarget(): Promise<Base | Base[] | null> {
+    return this.doAsyncFindTarget();
   }
 
   private skipStrictLoading<T>(block: () => T): T {

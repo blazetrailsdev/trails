@@ -7,7 +7,7 @@
  *   - `has_many :through` whose source reflection is a polymorphic
  *     belongs_to, disambiguated by `source_type:` ("polymorphic
  *     has_many through"). The fixture layers this on top of a
- *     nested through (Hotel → Departments → Chefs), so `loadHasMany`
+ *     nested through (Hotel → Departments → Chefs), so `findTarget`
  *     routes through `loadHasManyThrough`'s walker rather than the
  *     final-step JOIN/AssociationScope path. Both that walker and
  *     the `includes()` preloader must filter through-records by the

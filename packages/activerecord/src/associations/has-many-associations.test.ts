@@ -37,12 +37,8 @@ import { Car } from "../test-helpers/models/car.js";
 import { Bulb } from "../test-helpers/models/bulb.js";
 import { Developer, AuditLog } from "../test-helpers/models/developer.js";
 import { Project } from "../test-helpers/models/project.js";
-import {
-  Associations,
-  loadHasMany,
-  loadHasManyThrough,
-  isAssociationCached,
-} from "../associations.js";
+import { Associations, loadHasManyThrough, isAssociationCached } from "../associations.js";
+import { findTarget as findHasManyTarget } from "./has-many-association.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 
@@ -935,7 +931,7 @@ describe("HasManyAssociationsTest", () => {
     await DestroyAllPost.create({ author_id: author.id, title: "A", body: "body" });
     await DestroyAllPost.create({ author_id: author.id, title: "B", body: "body" });
     await author.destroy();
-    const remaining = await loadHasMany(author, "destroy_all_posts", {
+    const remaining = await findHasManyTarget(author, "destroy_all_posts", {
       className: "DestroyAllPost",
       foreignKey: "author_id",
     });
@@ -973,7 +969,7 @@ describe("HasManyAssociationsTest", () => {
     await DeleteAllUnloadedPost.create({ author_id: author.id, title: "A", body: "body" });
     // delete all without pre-loading the collection
     await author.destroy();
-    const remaining = await loadHasMany(author, "delete_all_unloaded_posts", {
+    const remaining = await findHasManyTarget(author, "delete_all_unloaded_posts", {
       className: "DeleteAllUnloadedPost",
       foreignKey: "author_id",
     });
@@ -1104,7 +1100,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     const p1 = await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     const p2 = await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -1116,7 +1112,7 @@ describe("HasManyAssociationsTest", () => {
   it("get ids for loaded associations", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     const p1 = await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -1136,7 +1132,7 @@ describe("HasManyAssociationsTest", () => {
   it("included in collection", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     const post = await HmPost.create({ author_id: author.id, title: "Included", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -1148,7 +1144,7 @@ describe("HasManyAssociationsTest", () => {
     const newPost = HmPost.new({ author_id: author.id, title: "New" });
     expect(newPost.isNewRecord()).toBe(true);
     // Not in DB yet
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -1188,7 +1184,7 @@ describe("HasManyAssociationsTest", () => {
     await ClearPost.create({ author_id: author.id, title: "A", body: "body" });
     await ClearPost.create({ author_id: author.id, title: "B", body: "body" });
     await author.destroy();
-    const posts = await loadHasMany(author, "clear_posts", {
+    const posts = await findHasManyTarget(author, "clear_posts", {
       className: "ClearPost",
       foreignKey: "author_id",
     });
@@ -1225,7 +1221,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await ClearDepAuthor.create({ name: "Alice" });
     await ClearDepPost.create({ author_id: author.id, title: "A", body: "body" });
     await author.destroy();
-    const remaining = await loadHasMany(author, "clear_dep_posts", {
+    const remaining = await findHasManyTarget(author, "clear_dep_posts", {
       className: "ClearDepPost",
       foreignKey: "author_id",
     });
@@ -1470,11 +1466,11 @@ describe("HasManyAssociationsTest", () => {
   it("no sql should be fired if association already loaded", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts1 = await loadHasMany(author, "posts", {
+    const posts1 = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
-    const posts2 = await loadHasMany(author, "posts", {
+    const posts2 = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -1515,11 +1511,11 @@ describe("HasManyAssociationsTest", () => {
   it("does not duplicate associations when used with natural primary keys", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts1 = await loadHasMany(author, "posts", {
+    const posts1 = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
-    const posts2 = await loadHasMany(author, "posts", {
+    const posts2 = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -1535,7 +1531,7 @@ describe("HasManyAssociationsTest", () => {
   it("prevent double insertion of new object when the parent association loaded in the after save callback", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -1548,7 +1544,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -1583,7 +1579,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(AnonPost);
     const author = await AnonAuthor.create({ name: "Alice" });
     await AnonPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "anon_posts", {
+    const posts = await findHasManyTarget(author, "anon_posts", {
       className: "AnonPost",
       foreignKey: "author_id",
     });
@@ -1815,7 +1811,7 @@ describe("HasManyAssociationsTest", () => {
     await DelAllPost.create({ author_id: author.id, title: "A", body: "body" });
     await DelAllPost.create({ author_id: author.id, title: "B", body: "body" });
     await author.destroy();
-    const remaining = await loadHasMany(author, "del_all_posts", {
+    const remaining = await findHasManyTarget(author, "del_all_posts", {
       className: "DelAllPost",
       foreignKey: "author_id",
     });
@@ -2185,7 +2181,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(FinderDirtyPost);
     const author = await FinderDirtyAuthor.create({ name: "Alice" });
     const post = await FinderDirtyPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "finder_dirty_posts", {
+    const posts = await findHasManyTarget(author, "finder_dirty_posts", {
       className: "FinderDirtyPost",
       foreignKey: "author_id",
     });
@@ -2197,7 +2193,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -2233,7 +2229,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await MergedAuthor.create({ name: "Alice" });
     const p1 = await MergedPost.create({ author_id: author.id, title: "A", body: "body" });
     const p2 = await MergedPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await loadHasMany(author, "merged_posts", {
+    const posts = await findHasManyTarget(author, "merged_posts", {
       className: "MergedPost",
       foreignKey: "author_id",
     });
@@ -2266,7 +2262,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await AppOrdAuthor.create({ name: "Alice" });
     await AppOrdPost.create({ author_id: author.id, title: "B", body: "body" });
     await AppOrdPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "app_ord_posts", {
+    const posts = await findHasManyTarget(author, "app_ord_posts", {
       className: "AppOrdPost",
       foreignKey: "author_id",
     });
@@ -2296,7 +2292,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await DynOrdAuthor.create({ name: "Alice" });
     await DynOrdPost.create({ author_id: author.id, title: "Z", body: "body" });
     await DynOrdPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "dyn_ord_posts", {
+    const posts = await findHasManyTarget(author, "dyn_ord_posts", {
       className: "DynOrdPost",
       foreignKey: "author_id",
     });
@@ -2337,7 +2333,7 @@ describe("HasManyAssociationsTest", () => {
   it("taking with inverse of", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -2384,7 +2380,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: 9999, title: "B", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -2473,7 +2469,7 @@ describe("HasManyAssociationsTest", () => {
     // Update via explicit FK
     post.title = "Updated";
     await post.save();
-    const posts = await loadHasMany(author, "upd_all_fk_posts", {
+    const posts = await findHasManyTarget(author, "upd_all_fk_posts", {
       className: "UpdAllFkPost",
       foreignKey: "author_id",
     });
@@ -2496,7 +2492,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     const p1 = await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     const p2 = await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -2508,7 +2504,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "match", body: "body" });
     await HmPost.create({ author_id: author.id, title: "other", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -2550,7 +2546,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -2559,7 +2555,7 @@ describe("HasManyAssociationsTest", () => {
   it("find first sanitized", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "First", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -2588,7 +2584,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ResetPost);
     const author = await ResetAuthor.create({ name: "Alice" });
     await ResetPost.create({ author_id: author.id, title: "First", body: "body" });
-    const posts = await loadHasMany(author, "reset_posts", {
+    const posts = await findHasManyTarget(author, "reset_posts", {
       className: "ResetPost",
       foreignKey: "author_id",
     });
@@ -2619,13 +2615,13 @@ describe("HasManyAssociationsTest", () => {
     const author = await ReloadAuthor.create({ name: "Alice" });
     await ReloadPost.create({ author_id: author.id, title: "First", body: "body" });
     // Load once
-    const posts1 = await loadHasMany(author, "reload_posts", {
+    const posts1 = await findHasManyTarget(author, "reload_posts", {
       className: "ReloadPost",
       foreignKey: "author_id",
     });
     expect(posts1[0]).toBeDefined();
     // Load again (simulating reload)
-    const posts2 = await loadHasMany(author, "reload_posts", {
+    const posts2 = await findHasManyTarget(author, "reload_posts", {
       className: "ReloadPost",
       foreignKey: "author_id",
     });
@@ -2725,7 +2721,7 @@ describe("HasManyAssociationsTest", () => {
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -2745,7 +2741,7 @@ describe("HasManyAssociationsTest", () => {
     await HmPost.create({ author_id: author.id, title: "X", body: "body" });
     await HmPost.create({ author_id: author.id, title: "X", body: "body" });
     await HmPost.create({ author_id: author.id, title: "Y", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -2755,7 +2751,7 @@ describe("HasManyAssociationsTest", () => {
   it("default select", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -2766,7 +2762,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -2776,7 +2772,7 @@ describe("HasManyAssociationsTest", () => {
   it("select without foreign key", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -2882,7 +2878,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(SizeDirtyPost);
     const author = await SizeDirtyAuthor.create({ name: "Alice" });
     await SizeDirtyPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "size_dirty_posts", {
+    const posts = await findHasManyTarget(author, "size_dirty_posts", {
       className: "SizeDirtyPost",
       foreignKey: "author_id",
     });
@@ -2911,7 +2907,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(EmptyDirtyAuthor);
     registerModel(EmptyDirtyPost);
     const author = await EmptyDirtyAuthor.create({ name: "Alice" });
-    const posts = await loadHasMany(author, "empty_dirty_posts", {
+    const posts = await findHasManyTarget(author, "empty_dirty_posts", {
       className: "EmptyDirtyPost",
       foreignKey: "author_id",
     });
@@ -2942,12 +2938,12 @@ describe("HasManyAssociationsTest", () => {
     const author = await SizeTwiceAuthor.create({ name: "Alice" });
     await SizeTwicePost.create({ author_id: author.id, title: "A", body: "body" });
     await SizeTwicePost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts1 = await loadHasMany(author, "size_twice_posts", {
+    const posts1 = await findHasManyTarget(author, "size_twice_posts", {
       className: "SizeTwicePost",
       foreignKey: "author_id",
     });
     expect(posts1.length).toBe(2);
-    const posts2 = await loadHasMany(author, "size_twice_posts", {
+    const posts2 = await findHasManyTarget(author, "size_twice_posts", {
       className: "SizeTwicePost",
       foreignKey: "author_id",
     });
@@ -2979,7 +2975,7 @@ describe("HasManyAssociationsTest", () => {
     const post = BuildSavePost.new({ author_id: author.id, title: "Built", body: "body" });
     await post.save();
     expect(post.isNewRecord()).toBe(false);
-    const posts = await loadHasMany(author, "build_save_posts", {
+    const posts = await findHasManyTarget(author, "build_save_posts", {
       className: "BuildSavePost",
       foreignKey: "author_id",
     });
@@ -3042,7 +3038,7 @@ describe("HasManyAssociationsTest", () => {
     });
     post.title = "Updated";
     await post.save();
-    const posts = await loadHasMany(author, "create_save_posts", {
+    const posts = await findHasManyTarget(author, "create_save_posts", {
       className: "CreateSavePost",
       foreignKey: "author_id",
     });
@@ -3079,7 +3075,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await ExclDepAuthor.create({ name: "Alice" });
     await ExclDepPost.create({ author_id: author.id, title: "A", body: "body" });
     await author.destroy();
-    const remaining = await loadHasMany(author, "excl_dep_posts", {
+    const remaining = await findHasManyTarget(author, "excl_dep_posts", {
       className: "ExclDepPost",
       foreignKey: "author_id",
     });
@@ -3118,7 +3114,7 @@ describe("HasManyAssociationsTest", () => {
     await DcClient.create({ firm_id: firm.id, name: "BigShot Inc." });
     await DcClient.create({ firm_id: firm.id, name: "SmallTime Inc." });
     expect((await DcClient.where({ firm_id: firm.id })).length).toBe(2);
-    const scoped = await loadHasMany(firm, "conditionalClients", {
+    const scoped = await findHasManyTarget(firm, "conditionalClients", {
       className: "DcClient",
       foreignKey: "firm_id",
       scope: (rel: any) => rel.where({ name: "BigShot Inc." }),
@@ -3227,11 +3223,11 @@ describe("HasManyAssociationsTest", () => {
     await DelPkPost.create({ author_id: author1.id, title: "A1", body: "body" });
     await DelPkPost.create({ author_id: author2.id, title: "A2", body: "body" });
     await author1.destroy();
-    const remaining1 = await loadHasMany(author1, "del_pk_posts", {
+    const remaining1 = await findHasManyTarget(author1, "del_pk_posts", {
       className: "DelPkPost",
       foreignKey: "author_id",
     });
-    const remaining2 = await loadHasMany(author2, "del_pk_posts", {
+    const remaining2 = await findHasManyTarget(author2, "del_pk_posts", {
       className: "DelPkPost",
       foreignKey: "author_id",
     });
@@ -3270,7 +3266,7 @@ describe("HasManyAssociationsTest", () => {
     await ClearNoAccessPost.create({ author_id: author.id, title: "B", body: "body" });
     // Clear without having loaded the association first
     await author.destroy();
-    const remaining = await loadHasMany(author, "clear_no_access_posts", {
+    const remaining = await findHasManyTarget(author, "clear_no_access_posts", {
       className: "ClearNoAccessPost",
       foreignKey: "author_id",
     });
@@ -3282,7 +3278,7 @@ describe("HasManyAssociationsTest", () => {
     const otherPost = await HmPost.create({ author_id: 9999, title: "Other", body: "body" });
     // Deleting something not in the collection shouldn't affect it
     await otherPost.destroy();
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -3293,7 +3289,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     const post = await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.destroy(String(post.id) as any);
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -3339,7 +3335,7 @@ describe("HasManyAssociationsTest", () => {
     await DestroyAllScopePost.create({ author_id: author.id, title: "A", body: "body" });
     await DestroyAllScopePost.create({ author_id: author.id, title: "B", body: "body" });
     await author.destroy();
-    const remaining = await loadHasMany(author, "destroy_all_scope_posts", {
+    const remaining = await findHasManyTarget(author, "destroy_all_scope_posts", {
       className: "DestroyAllScopePost",
       foreignKey: "author_id",
     });
@@ -3370,7 +3366,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await DestroyScopeAuthor.create({ name: "Alice" });
     const post = await DestroyScopePost.create({ author_id: author.id, title: "A", body: "body" });
     await post.destroy();
-    const remaining = await loadHasMany(author, "destroy_scope_posts", {
+    const remaining = await findHasManyTarget(author, "destroy_scope_posts", {
       className: "DestroyScopePost",
       foreignKey: "author_id",
     });
@@ -3401,7 +3397,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await DeleteScopeAuthor.create({ name: "Alice" });
     const post = await DeleteScopePost.create({ author_id: author.id, title: "A", body: "body" });
     await DeleteScopePost.destroy(post.id!);
-    const remaining = await loadHasMany(author, "delete_scope_posts", {
+    const remaining = await findHasManyTarget(author, "delete_scope_posts", {
       className: "DeleteScopePost",
       foreignKey: "author_id",
     });
@@ -3515,7 +3511,7 @@ describe("HasManyAssociationsTest", () => {
     await DepTxPost.create({ author_id: author.id, title: "A", body: "body" });
     // Even if transaction semantics aren't fully implemented, destroy should work
     await author.destroy();
-    const remaining = await loadHasMany(author, "dep_tx_posts", {
+    const remaining = await findHasManyTarget(author, "dep_tx_posts", {
       className: "DepTxPost",
       foreignKey: "author_id",
     });
@@ -3586,7 +3582,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(InclPost);
     const author = await InclAuthor.create({ name: "Alice" });
     const post = await InclPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "incl_posts", {
+    const posts = await findHasManyTarget(author, "incl_posts", {
       className: "InclPost",
       foreignKey: "author_id",
     });
@@ -3617,7 +3613,7 @@ describe("HasManyAssociationsTest", () => {
     await ArrPost.create({ author_id: author.id, title: "A", body: "body" });
     await ArrPost.create({ author_id: author.id, title: "B", body: "body" });
     await ArrPost.create({ author_id: author.id, title: "C", body: "body" });
-    const loaded = await loadHasMany(author, "arr_posts", {
+    const loaded = await findHasManyTarget(author, "arr_posts", {
       className: "ArrPost",
       foreignKey: "author_id",
     });
@@ -3649,7 +3645,7 @@ describe("HasManyAssociationsTest", () => {
     // Replacing FK with invalid value
     post.author_id = 999999;
     await post.save();
-    const posts = await loadHasMany(author, "repl_fail_posts", {
+    const posts = await findHasManyTarget(author, "repl_fail_posts", {
       className: "ReplFailPost",
       foreignKey: "author_id",
     });
@@ -3681,11 +3677,11 @@ describe("HasManyAssociationsTest", () => {
     const post = await TxReplPost.create({ author_id: author1.id, title: "A", body: "body" });
     post.author_id = author2.id as number;
     await post.save();
-    const posts1 = await loadHasMany(author1, "tx_repl_posts", {
+    const posts1 = await findHasManyTarget(author1, "tx_repl_posts", {
       className: "TxReplPost",
       foreignKey: "author_id",
     });
-    const posts2 = await loadHasMany(author2, "tx_repl_posts", {
+    const posts2 = await findHasManyTarget(author2, "tx_repl_posts", {
       className: "TxReplPost",
       foreignKey: "author_id",
     });
@@ -3743,7 +3739,7 @@ describe("HasManyAssociationsTest", () => {
     const p1 = await UnloadedPost.create({ author_id: author.id, title: "A", body: "body" });
     const p2 = await UnloadedPost.create({ author_id: author.id, title: "B", body: "body" });
     // Getting IDs directly via loadHasMany
-    const posts = await loadHasMany(author, "unloaded_posts", {
+    const posts = await findHasManyTarget(author, "unloaded_posts", {
       className: "UnloadedPost",
       foreignKey: "author_id",
     });
@@ -3775,14 +3771,14 @@ describe("HasManyAssociationsTest", () => {
     registerModel(DirtyIdPost);
     const author = await DirtyIdAuthor.create({ name: "Writer" });
     await DirtyIdPost.create({ author_id: author.id, title: "P1", body: "body" });
-    const posts = await loadHasMany(author, "dirty_id_posts", {
+    const posts = await findHasManyTarget(author, "dirty_id_posts", {
       className: "DirtyIdPost",
       foreignKey: "author_id",
     });
     expect(posts).toHaveLength(1);
     // Add another post
     await DirtyIdPost.create({ author_id: author.id, title: "P2", body: "body" });
-    const posts2 = await loadHasMany(author, "dirty_id_posts", {
+    const posts2 = await findHasManyTarget(author, "dirty_id_posts", {
       className: "DirtyIdPost",
       foreignKey: "author_id",
     });
@@ -3811,13 +3807,13 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ClrIdPost);
     const author = await ClrIdAuthor.create({ name: "Writer" });
     const post = await ClrIdPost.create({ author_id: author.id, title: "P1", body: "body" });
-    let posts = await loadHasMany(author, "clr_id_posts", {
+    let posts = await findHasManyTarget(author, "clr_id_posts", {
       className: "ClrIdPost",
       foreignKey: "author_id",
     });
     expect(posts).toHaveLength(1);
     await post.destroy();
-    posts = await loadHasMany(author, "clr_id_posts", {
+    posts = await findHasManyTarget(author, "clr_id_posts", {
       className: "ClrIdPost",
       foreignKey: "author_id",
     });
@@ -3846,7 +3842,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(GiiPost);
     const author = await GiiAuthor.create({ name: "Writer" });
     const p = await GiiPost.create({ author_id: author.id, title: "P1", body: "body" });
-    const posts = await loadHasMany(author, "gii_posts", {
+    const posts = await findHasManyTarget(author, "gii_posts", {
       className: "GiiPost",
       foreignKey: "author_id",
     });
@@ -3877,7 +3873,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await OrdIdAuthor.create({ name: "Alice" });
     const p1 = await OrdIdPost.create({ author_id: author.id, title: "A", body: "body" });
     const p2 = await OrdIdPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await loadHasMany(author, "ord_id_posts", {
+    const posts = await findHasManyTarget(author, "ord_id_posts", {
       className: "OrdIdPost",
       foreignKey: "author_id",
     });
@@ -3909,7 +3905,7 @@ describe("HasManyAssociationsTest", () => {
     const author = new SetIdAuthor({ name: "Alice" });
     await author.save();
     const post = await SetIdPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "set_id_posts", {
+    const posts = await findHasManyTarget(author, "set_id_posts", {
       className: "SetIdPost",
       foreignKey: "author_id",
     });
@@ -3940,7 +3936,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await BlankIdAuthor.create({ name: "Alice" });
     const p1 = await BlankIdPost.create({ author_id: author.id, title: "A", body: "body" });
     // Blank/null IDs should be ignored
-    const posts = await loadHasMany(author, "blank_id_posts", {
+    const posts = await findHasManyTarget(author, "blank_id_posts", {
       className: "BlankIdPost",
       foreignKey: "author_id",
     });
@@ -4061,7 +4057,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await OrdThrAuthor.create({ name: "Alice" });
     await OrdThrPost.create({ author_id: author.id, title: "B", body: "body" });
     await OrdThrPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "ord_thr_posts", {
+    const posts = await findHasManyTarget(author, "ord_thr_posts", {
       className: "OrdThrPost",
       foreignKey: "author_id",
     });
@@ -4091,7 +4087,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await DynThrAuthor.create({ name: "Alice" });
     await DynThrPost.create({ author_id: author.id, title: "First", body: "body" });
     await DynThrPost.create({ author_id: author.id, title: "Second", body: "body" });
-    const posts = await loadHasMany(author, "dyn_thr_posts", {
+    const posts = await findHasManyTarget(author, "dyn_thr_posts", {
       className: "DynThrPost",
       foreignKey: "author_id",
     });
@@ -4157,7 +4153,7 @@ describe("HasManyAssociationsTest", () => {
     await HcComment.create({ post_id: post.id, body: "hello" });
     await HcComment.create({ post_id: post.id, body: "goodbye" });
 
-    const comments = await loadHasMany(author, "helloPostComments", {
+    const comments = await findHasManyTarget(author, "helloPostComments", {
       className: "HcComment",
       through: "hcPosts",
       source: "hcComments",
@@ -4257,7 +4253,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await FnlAuthor.create({ name: "Alice" });
     await FnlPost.create({ author_id: author.id, title: "A", body: "body" });
     await FnlPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await loadHasMany(author, "fnl_posts", {
+    const posts = await findHasManyTarget(author, "fnl_posts", {
       className: "FnlPost",
       foreignKey: "author_id",
     });
@@ -4288,7 +4284,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await FlLoadAuthor.create({ name: "Alice" });
     await FlLoadPost.create({ author_id: author.id, title: "A", body: "body" });
     await FlLoadPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await loadHasMany(author, "fl_load_posts", {
+    const posts = await findHasManyTarget(author, "fl_load_posts", {
       className: "FlLoadPost",
       foreignKey: "author_id",
     });
@@ -4322,7 +4318,7 @@ describe("HasManyAssociationsTest", () => {
     // Build a new one (not saved)
     FnlBuildPost.new({ author_id: author.id, title: "B" });
     // Loading the association should get only persisted records
-    const posts = await loadHasMany(author, "fnl_build_posts", {
+    const posts = await findHasManyTarget(author, "fnl_build_posts", {
       className: "FnlBuildPost",
       foreignKey: "author_id",
     });
@@ -4352,7 +4348,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(FnlCreatePost);
     const author = await FnlCreateAuthor.create({ name: "Alice" });
     await FnlCreatePost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "fnl_create_posts", {
+    const posts = await findHasManyTarget(author, "fnl_create_posts", {
       className: "FnlCreatePost",
       foreignKey: "author_id",
     });
@@ -4382,7 +4378,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(FnlNewPost);
     const author = FnlNewAuthor.new({ name: "Unsaved" });
     // New record has no id, so loading association returns empty
-    const posts = await loadHasMany(author, "fnl_new_posts", {
+    const posts = await findHasManyTarget(author, "fnl_new_posts", {
       className: "FnlNewPost",
       foreignKey: "author_id",
     });
@@ -4413,7 +4409,7 @@ describe("HasManyAssociationsTest", () => {
     await FlIntPost.create({ author_id: author.id, title: "A", body: "body" });
     await FlIntPost.create({ author_id: author.id, title: "B", body: "body" });
     await FlIntPost.create({ author_id: author.id, title: "C", body: "body" });
-    const posts = await loadHasMany(author, "fl_int_posts", {
+    const posts = await findHasManyTarget(author, "fl_int_posts", {
       className: "FlIntPost",
       foreignKey: "author_id",
     });
@@ -4708,7 +4704,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(OneCountPost);
     const author = await OneCountAuthor.create({ name: "Alice" });
     await OneCountPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "one_count_posts", {
+    const posts = await findHasManyTarget(author, "one_count_posts", {
       className: "OneCountPost",
       foreignKey: "author_id",
     });
@@ -4737,7 +4733,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(OneLoadPost);
     const author = await OneLoadAuthor.create({ name: "Alice" });
     await OneLoadPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "one_load_posts", {
+    const posts = await findHasManyTarget(author, "one_load_posts", {
       className: "OneLoadPost",
       foreignKey: "author_id",
     });
@@ -4766,13 +4762,13 @@ describe("HasManyAssociationsTest", () => {
     registerModel(OneSubPost);
     const author = await OneSubAuthor.create({ name: "Alice" });
     await OneSubPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts1 = await loadHasMany(author, "one_sub_posts", {
+    const posts1 = await findHasManyTarget(author, "one_sub_posts", {
       className: "OneSubPost",
       foreignKey: "author_id",
     });
     expect(posts1.length === 1).toBe(true);
     await OneSubPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts2 = await loadHasMany(author, "one_sub_posts", {
+    const posts2 = await findHasManyTarget(author, "one_sub_posts", {
       className: "OneSubPost",
       foreignKey: "author_id",
     });
@@ -4802,7 +4798,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await OneBlkAuthor.create({ name: "Alice" });
     await OneBlkPost.create({ author_id: author.id, title: "A", body: "body" });
     await OneBlkPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await loadHasMany(author, "one_blk_posts", {
+    const posts = await findHasManyTarget(author, "one_blk_posts", {
       className: "OneBlkPost",
       foreignKey: "author_id",
     });
@@ -4831,7 +4827,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(OneZeroAuthor);
     registerModel(OneZeroPost);
     const author = await OneZeroAuthor.create({ name: "Alice" });
-    const posts = await loadHasMany(author, "one_zero_posts", {
+    const posts = await findHasManyTarget(author, "one_zero_posts", {
       className: "OneZeroPost",
       foreignKey: "author_id",
     });
@@ -4863,7 +4859,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await OneMultiAuthor.create({ name: "Alice" });
     await OneMultiPost.create({ author_id: author.id, title: "A", body: "body" });
     await OneMultiPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await loadHasMany(author, "one_multi_posts", {
+    const posts = await findHasManyTarget(author, "one_multi_posts", {
       className: "OneMultiPost",
       foreignKey: "author_id",
     });
@@ -4948,7 +4944,7 @@ describe("HasManyAssociationsTest", () => {
     const post = await PkPost.create({ author_id: author.id, title: "PK Created", body: "body" });
     expect(post.isNewRecord()).toBe(false);
     expect((post as any).author_id).toBe(Number(author.id));
-    const posts = await loadHasMany(author, "pk_posts", {
+    const posts = await findHasManyTarget(author, "pk_posts", {
       className: "PkPost",
       foreignKey: "author_id",
     });
@@ -4985,7 +4981,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await LazyDelAuthor.create({ name: "Alice" });
     await LazyDelPost.create({ author_id: author.id, title: "A", body: "body" });
     await author.destroy();
-    const remaining = await loadHasMany(author, "lazy_del_posts", {
+    const remaining = await findHasManyTarget(author, "lazy_del_posts", {
       className: "LazyDelPost",
       foreignKey: "author_id",
     });
@@ -5085,7 +5081,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ProtPost);
     const author = await ProtAuthor.create({ name: "Alice" });
     await ProtPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "prot_posts", {
+    const posts = await findHasManyTarget(author, "prot_posts", {
       className: "ProtPost",
       foreignKey: "author_id",
     });
@@ -5211,7 +5207,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(KernelPost);
     const author = await KernelAuthor.create({ name: "Alice" });
     await KernelPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "kernel_posts", {
+    const posts = await findHasManyTarget(author, "kernel_posts", {
       className: "KernelPost",
       foreignKey: "author_id",
     });
@@ -5240,7 +5236,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(OrPost);
     const author = await OrAuthor.create({ name: "Alice" });
     await OrPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "or_posts", {
+    const posts = await findHasManyTarget(author, "or_posts", {
       className: "OrPost",
       foreignKey: "author_id",
     });
@@ -5269,7 +5265,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(RewherePost);
     const author = await RewhereAuthor.create({ name: "Alice" });
     await RewherePost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "rewhere_posts", {
+    const posts = await findHasManyTarget(author, "rewhere_posts", {
       className: "RewherePost",
       foreignKey: "author_id",
     });
@@ -5298,7 +5294,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(FoiPost);
     const author = await FoiAuthor.create({ name: "Alice" });
     // No posts exist yet, so first_or_initialize creates a new (unsaved) record
-    const posts = await loadHasMany(author, "foi_posts", {
+    const posts = await findHasManyTarget(author, "foi_posts", {
       className: "FoiPost",
       foreignKey: "author_id",
     });
@@ -5330,14 +5326,14 @@ describe("HasManyAssociationsTest", () => {
     registerModel(FocPost);
     const author = await FocAuthor.create({ name: "Alice" });
     // No posts exist, so first_or_create creates and saves
-    const posts1 = await loadHasMany(author, "foc_posts", {
+    const posts1 = await findHasManyTarget(author, "foc_posts", {
       className: "FocPost",
       foreignKey: "author_id",
     });
     expect(posts1.length).toBe(0);
     const post = await FocPost.create({ author_id: author.id, title: "Created", body: "body" });
     expect(post.isNewRecord()).toBe(false);
-    const posts2 = await loadHasMany(author, "foc_posts", {
+    const posts2 = await findHasManyTarget(author, "foc_posts", {
       className: "FocPost",
       foreignKey: "author_id",
     });
@@ -5365,7 +5361,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(FocBangAuthor);
     registerModel(FocBangPost);
     const author = await FocBangAuthor.create({ name: "Alice" });
-    const posts1 = await loadHasMany(author, "foc_bang_posts", {
+    const posts1 = await findHasManyTarget(author, "foc_bang_posts", {
       className: "FocBangPost",
       foreignKey: "author_id",
     });
@@ -5376,7 +5372,7 @@ describe("HasManyAssociationsTest", () => {
       body: "body",
     });
     expect(post.isNewRecord()).toBe(false);
-    const posts2 = await loadHasMany(author, "foc_bang_posts", {
+    const posts2 = await findHasManyTarget(author, "foc_bang_posts", {
       className: "FocBangPost",
       foreignKey: "author_id",
     });
@@ -5414,7 +5410,7 @@ describe("HasManyAssociationsTest", () => {
     await NoLoadDelPost.create({ author_id: author.id, title: "B", body: "body" });
     // Delete without loading first
     await author.destroy();
-    const remaining = await loadHasMany(author, "no_load_del_posts", {
+    const remaining = await findHasManyTarget(author, "no_load_del_posts", {
       className: "NoLoadDelPost",
       foreignKey: "author_id",
     });
@@ -5448,7 +5444,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ExtPost);
     const author = await ExtAuthor.create({ name: "Alice" });
     await ExtPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "ext_posts", {
+    const posts = await findHasManyTarget(author, "ext_posts", {
       className: "ExtPost",
       foreignKey: "author_id",
     });
@@ -5482,7 +5478,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ExtPerPost);
     const author = await ExtPerAuthor.create({ name: "Alice" });
     await ExtPerPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "ext_per_posts", {
+    const posts = await findHasManyTarget(author, "ext_per_posts", {
       className: "ExtPerPost",
       foreignKey: "author_id",
     });
@@ -5512,7 +5508,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await CjAuthor.create({ name: "Alice" });
     const post = await CjPost.create({ author_id: author.id, title: "A", body: "body" });
     await post.destroy();
-    const posts = await loadHasMany(author, "cj_posts", {
+    const posts = await findHasManyTarget(author, "cj_posts", {
       className: "CjPost",
       foreignKey: "author_id",
     });
@@ -5541,7 +5537,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(UsInclPost);
     const author = await UsInclAuthor.create({ name: "Alice" });
     await UsInclPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "us_incl_posts", {
+    const posts = await findHasManyTarget(author, "us_incl_posts", {
       className: "UsInclPost",
       foreignKey: "author_id",
     });
@@ -5609,7 +5605,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(InstScopePost);
     const author = await InstScopeAuthor.create({ name: "Alice" });
     await InstScopePost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "inst_scope_posts", {
+    const posts = await findHasManyTarget(author, "inst_scope_posts", {
       className: "InstScopePost",
       foreignKey: "author_id",
     });
@@ -5643,7 +5639,7 @@ describe("HasManyAssociationsTest", () => {
       body: "body",
     });
     // Load once
-    const posts1 = await loadHasMany(author, "repl_mem_posts", {
+    const posts1 = await findHasManyTarget(author, "repl_mem_posts", {
       className: "ReplMemPost",
       foreignKey: "author_id",
     });
@@ -5653,7 +5649,7 @@ describe("HasManyAssociationsTest", () => {
     post.title = "Updated";
     await post.save();
     // Reload - should get updated version
-    const posts2 = await loadHasMany(author, "repl_mem_posts", {
+    const posts2 = await findHasManyTarget(author, "repl_mem_posts", {
       className: "ReplMemPost",
       foreignKey: "author_id",
     });
@@ -5767,11 +5763,11 @@ describe("HasManyAssociationsTest", () => {
     await post.save();
     const reloaded = await ReattachPost.find(post.id!);
     expect((reloaded as any).author_id).toBe(Number(author2.id));
-    const oldPosts = await loadHasMany(author1, "reattach_posts", {
+    const oldPosts = await findHasManyTarget(author1, "reattach_posts", {
       className: "ReattachPost",
       foreignKey: "author_id",
     });
-    const newPosts = await loadHasMany(author2, "reattach_posts", {
+    const newPosts = await findHasManyTarget(author2, "reattach_posts", {
       className: "ReattachPost",
       foreignKey: "author_id",
     });
@@ -5862,12 +5858,12 @@ describe("HasManyAssociationsTest", () => {
     const author = await MemoAuthor.create({ name: "Alice" });
     await MemoPost.create({ author_id: author.id, title: "A", body: "body" });
     await MemoPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts1 = await loadHasMany(author, "memo_posts", {
+    const posts1 = await findHasManyTarget(author, "memo_posts", {
       className: "MemoPost",
       foreignKey: "author_id",
     });
     const ids1 = posts1.map((p: any) => p.id);
-    const posts2 = await loadHasMany(author, "memo_posts", {
+    const posts2 = await findHasManyTarget(author, "memo_posts", {
       className: "MemoPost",
       foreignKey: "author_id",
     });
@@ -5898,7 +5894,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await LoadValAuthor.create({ name: "Alice" });
     const post = await LoadValPost.create({ author_id: author.id, title: "A", body: "body" });
     // Loading association during validation shouldn't prevent persistence
-    const posts = await loadHasMany(author, "load_val_posts", {
+    const posts = await findHasManyTarget(author, "load_val_posts", {
       className: "LoadValPost",
       foreignKey: "author_id",
     });
@@ -5930,7 +5926,7 @@ describe("HasManyAssociationsTest", () => {
     const post = await RollbackPost.create({ author_id: author.id, title: "A", body: "body" });
     expect(post.isPersisted()).toBe(true);
     // Verify the child exists
-    const posts = await loadHasMany(author, "rollback_posts", {
+    const posts = await findHasManyTarget(author, "rollback_posts", {
       className: "RollbackPost",
       foreignKey: "author_id",
     });
@@ -5939,7 +5935,7 @@ describe("HasManyAssociationsTest", () => {
   it("has many with out of range value", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: 999999999, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -5973,11 +5969,11 @@ describe("HasManyAssociationsTest", () => {
     registerModel(SameFkPost);
     const author = await SameFkAuthor.create({ name: "Alice" });
     await SameFkPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "SameFkPost",
       foreignKey: "author_id",
     });
-    const pubPosts = await loadHasMany(author, "published_posts", {
+    const pubPosts = await findHasManyTarget(author, "published_posts", {
       className: "SameFkPost",
       foreignKey: "author_id",
     });
@@ -6013,7 +6009,7 @@ describe("HasManyAssociationsTest", () => {
     // Association without dependent option
     const author = await KeyValAuthor.create({ name: "Alice" });
     await KeyValPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "key_val_posts", {
+    const posts = await findHasManyTarget(author, "key_val_posts", {
       className: "KeyValPost",
       foreignKey: "author_id",
     });
@@ -6067,7 +6063,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await AsyncDepAuthor.create({ name: "Alice" });
     await AsyncDepPost.create({ author_id: author.id, title: "A", body: "body" });
     await author.destroy();
-    const remaining = await loadHasMany(author, "async_dep_posts", {
+    const remaining = await findHasManyTarget(author, "async_dep_posts", {
       className: "AsyncDepPost",
       foreignKey: "author_id",
     });
@@ -6125,7 +6121,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await PreCpkAuthor.create({ name: "Alice" });
     const p1 = await PreCpkPost.create({ author_id: author.id, title: "A", body: "body" });
     const p2 = await PreCpkPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await loadHasMany(author, "pre_cpk_posts", {
+    const posts = await findHasManyTarget(author, "pre_cpk_posts", {
       className: "PreCpkPost",
       foreignKey: "author_id",
     });
@@ -6164,7 +6160,7 @@ describe("HasManyAssociationsTest", () => {
     await DelAllOptPost.create({ author_id: author.id, title: "A", body: "body" });
     await DelAllOptPost.create({ author_id: author.id, title: "B", body: "body" });
     await author.destroy();
-    const remaining = await loadHasMany(author, "del_all_opt_posts", {
+    const remaining = await findHasManyTarget(author, "del_all_opt_posts", {
       className: "DelAllOptPost",
       foreignKey: "author_id",
     });
@@ -6224,7 +6220,7 @@ describe("HasManyAssociationsTest", () => {
     const post = await HmPost.create({ title: "New", body: "body" });
     post.author_id = author.id as number;
     await post.save();
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -6239,7 +6235,7 @@ describe("HasManyAssociationsTest", () => {
       p.author_id = author.id as number;
       await p.save();
     }
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -6249,7 +6245,7 @@ describe("HasManyAssociationsTest", () => {
   it("adding using create", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "Created", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -6279,7 +6275,7 @@ describe("HasManyAssociationsTest", () => {
   it("collection not empty after building", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -6343,7 +6339,7 @@ describe("HasManyAssociationsTest", () => {
     await HmPost.create({ author_id: author.id, title: "Old", body: "body" });
     await author.destroy();
     const newPost = await HmPost.create({ author_id: author.id, title: "New", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -6354,12 +6350,12 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
     await (posts[0] as any).destroy();
-    const remaining = await loadHasMany(author, "posts", {
+    const remaining = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });
@@ -6369,7 +6365,7 @@ describe("HasManyAssociationsTest", () => {
   it("replace with same content", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     const post = await HmPost.create({ author_id: author.id, title: "Same", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
+    const posts = await findHasManyTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
     });

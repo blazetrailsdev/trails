@@ -6,7 +6,7 @@
  * loudly the first time the association is touched. We mirror that
  * via `validateThroughReflection`, called from
  * `Association#constructor`, `association(record, name)`, and the
- * loader entry points (`loadHasMany` / `loadHasOne`).
+ * loader entry points (`findTarget` / `loadHasOne`).
  *
  * Coverage in this suite:
  *   - polymorphic source without `source_type`
@@ -31,7 +31,8 @@
  */
 import { describe, it, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { Associations, association, loadHasMany } from "../associations.js";
+import { Associations, association } from "../associations.js";
+import { findTarget } from "./has-many-association.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 
 // Local model classes for testing invalid through-association configurations.
@@ -132,7 +133,7 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
 
   it("fires at the loadHasMany entry point too (not just association() / Association#ctor)", async () => {
     freshAssociations();
-    // loadHasMany is the loader path direct callers (preloader,
+    // findTarget is the loader path direct callers (preloader,
     // tests) hit without going through `association()`. The
     // validation has to surface there too — matching Rails'
     // Association#initialize check_validity! which runs on every
@@ -152,7 +153,7 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
       source: "origin",
     });
     await expect(
-      loadHasMany(author(), "originFromComments", {
+      findTarget(author(), "originFromComments", {
         className: "StvMember",
         through: "stvComments",
         source: "origin",

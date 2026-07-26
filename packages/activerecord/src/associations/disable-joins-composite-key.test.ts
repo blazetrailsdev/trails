@@ -17,7 +17,8 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, MigrationContext, registerModel } from "../index.js";
-import { Associations, loadHasMany } from "../associations.js";
+import { Associations } from "../associations.js";
+import { findTarget } from "./has-many-association.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 
@@ -127,7 +128,7 @@ describe("DJAS — composite key support", () => {
     });
     try {
       const reflection = (CkShop as any)._reflectOnAssociation("ckLineItemsThroughOrders");
-      const items = await loadHasMany(shop, "ckLineItemsThroughOrders", reflection.options);
+      const items = await findTarget(shop, "ckLineItemsThroughOrders", reflection.options);
       expect(items.map((i: any) => i.sku).sort()).toEqual(["sku-1", "sku-2"]);
     } finally {
       Notifications.unsubscribe(sub);
@@ -171,7 +172,7 @@ describe("DJAS — composite key support", () => {
     });
 
     const reflection = (CkShop as any)._reflectOnAssociation("ckLineItemsOrdered");
-    const items = await loadHasMany(shop, "ckLineItemsOrdered", reflection.options);
+    const items = await findTarget(shop, "ckLineItemsOrdered", reflection.options);
     expect(items.map((i: any) => i.sku)).toEqual(["from-a", "from-b"]);
   });
 
@@ -194,7 +195,7 @@ describe("DJAS — composite key support", () => {
     });
 
     const reflection = (CkShop as any)._reflectOnAssociation("ckLineItemsThroughOrders");
-    const items = await loadHasMany(shop, "ckLineItemsThroughOrders", reflection.options);
+    const items = await findTarget(shop, "ckLineItemsThroughOrders", reflection.options);
     expect(items.map((i: any) => i.sku)).toEqual(["valid"]);
   });
 
@@ -333,7 +334,7 @@ describe("DJAS — composite key support", () => {
     });
     try {
       const reflection = (CkShop as any)._reflectOnAssociation("ckLineItemsEmpty");
-      const items = await loadHasMany(shop, "ckLineItemsEmpty", reflection.options);
+      const items = await findTarget(shop, "ckLineItemsEmpty", reflection.options);
       expect(items).toEqual([]);
     } finally {
       Notifications.unsubscribe(sub);
@@ -348,7 +349,7 @@ describe("DJAS — composite key support", () => {
   it("returns no rows when the composite-key tuple list is empty (owner has no through records)", async () => {
     const shop = await CkShop.create({ name: "Lonely" });
     const reflection = (CkShop as any)._reflectOnAssociation("ckLineItemsThroughOrders");
-    const items = await loadHasMany(shop, "ckLineItemsThroughOrders", reflection.options);
+    const items = await findTarget(shop, "ckLineItemsThroughOrders", reflection.options);
     expect(items).toEqual([]);
   });
 });

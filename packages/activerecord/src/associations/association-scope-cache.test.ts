@@ -17,7 +17,8 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import { findTarget } from "./singular-association.js";
 import { registerModel, enableSti, registerSubclass } from "../index.js";
-import { loadHasMany, loadHasOne } from "../associations.js";
+import { loadHasOne } from "../associations.js";
+import { findTarget as findHasManyTarget } from "./has-many-association.js";
 import { AssociationScope } from "./association-scope.js";
 import { StatementCache } from "../statement-cache.js";
 import { fixtures } from "../test-helpers/fixtures.js";
@@ -85,7 +86,7 @@ describe("Association scope cache", () => {
 
     const spy = vi.spyOn(AssociationScope, "scope");
     const reflection = (Author as any)._reflectOnAssociation("noJoinsComments");
-    const records = await loadHasMany(author, "noJoinsComments", reflection.options);
+    const records = await findHasManyTarget(author, "noJoinsComments", reflection.options);
     expect(records.length).toBeGreaterThan(0);
     // JOIN-based AssociationScope was never invoked — DJAS handled it.
     expect(spy).not.toHaveBeenCalled();
@@ -104,13 +105,13 @@ describe("Association scope cache", () => {
     const opts = { className: "Post", foreignKey: "author_id" };
 
     // First loader call populates the Association-instance cache.
-    await loadHasMany(author, "posts", opts);
+    await findHasManyTarget(author, "posts", opts);
     const afterFirst = spy.mock.calls.length;
     expect(afterFirst).toBeGreaterThan(0);
 
     // Second loader call — different caches would rebuild the scope.
     // With our cache, AssociationScope.scope count is unchanged.
-    await loadHasMany(author, "posts", opts);
+    await findHasManyTarget(author, "posts", opts);
     expect(spy.mock.calls.length).toBe(afterFirst);
   });
 

@@ -305,7 +305,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("toArray honors direct bang-mutation of inherited Relation state", async () => {
     // In-place bang mutations on CP (cp.whereBang/orderBang/limitBang)
     // change the inherited Relation state. `toArray()` routes through
-    // `loadHasMany` with a scope-override executor so the query honors the
+    // `findTarget` with a scope-override executor so the query honors the
     // mutations, bypassing the association cache.
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts") as any;
@@ -317,7 +317,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("await proxy (load) honors direct bang-mutation of inherited Relation state", async () => {
     // `await proxy` calls load(), which uses the same unified _execLoad() path
     // as toArray(). When the proxy state has been mutated (whereBang/orderBang),
-    // the scope-override executor is passed to loadHasMany so the mutated
+    // the scope-override executor is passed to findTarget so the mutated
     // scope is executed directly rather than falling back to the association cache.
     const author = await Author.create({ name: "Diverged" });
     for (const title of ["x", "y", "z"]) {

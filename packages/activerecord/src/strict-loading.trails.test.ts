@@ -10,7 +10,8 @@
 import { describe, it, expect } from "vitest";
 import { findTarget } from "./associations/singular-association.js";
 import { StrictLoadingViolationError, registerModel } from "./index.js";
-import { loadHasOne, loadHasMany, loadHabtm } from "./associations.js";
+import { loadHasOne, loadHabtm } from "./associations.js";
+import { findTarget as findHasManyTarget } from "./associations/has-many-association.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { Developer, AuditLog } from "./test-helpers/models/developer.js";
 import { Ship } from "./test-helpers/models/ship.js";
@@ -49,7 +50,9 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
     const developer = new Developer({ name: "New Dev" });
     developer.strictLoadingBang();
     expect(developer.isNewRecord()).toBe(true);
-    await expect(loadHasMany(developer, "auditLogs", optionsFor("auditLogs"))).resolves.toEqual([]);
+    await expect(
+      findHasManyTarget(developer, "auditLogs", optionsFor("auditLogs")),
+    ).resolves.toEqual([]);
   });
 
   it("does not raise on lazy loading a has_one on a new strict-loading owner without the foreign key", async () => {
@@ -94,17 +97,17 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
     const developer = new Developer({ name: "New Dev", id: 1 });
     developer.strictLoadingBang();
     expect(developer.isNewRecord()).toBe(true);
-    await expect(loadHasMany(developer, "auditLogs", optionsFor("auditLogs"))).rejects.toThrow(
-      StrictLoadingViolationError,
-    );
+    await expect(
+      findHasManyTarget(developer, "auditLogs", optionsFor("auditLogs")),
+    ).rejects.toThrow(StrictLoadingViolationError);
   });
 
   it("still raises on lazy loading a strict-loading has_many on a persisted owner", async () => {
     const developer = await Developer.find(developers("david").id);
     developer.strictLoadingBang();
     expect(developer.isNewRecord()).toBe(false);
-    await expect(loadHasMany(developer, "auditLogs", optionsFor("auditLogs"))).rejects.toThrow(
-      StrictLoadingViolationError,
-    );
+    await expect(
+      findHasManyTarget(developer, "auditLogs", optionsFor("auditLogs")),
+    ).rejects.toThrow(StrictLoadingViolationError);
   });
 });

@@ -487,7 +487,7 @@ export class Relation<T extends Base> {
    * Per-record loader block, run on each freshly instantiated record BEFORE
    * its find/initialize callbacks fire — the trails analog of the block Rails
    * threads through `find_by_sql`/`init_with_attributes`. The collection load
-   * path (`loadHasMany`) sets this to wire `inverse_of` so an `after_find` hook
+   * path (`findTarget`) sets this to wire `inverse_of` so an `after_find` hook
    * already sees the inverse association loaded.
    * Not copied across `spawn()`: it is set immediately before `toArray()` on
    * the exact relation that will execute.

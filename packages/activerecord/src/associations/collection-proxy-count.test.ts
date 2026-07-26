@@ -2,7 +2,7 @@
  * CollectionProxy#count emits a real COUNT query (task #16).
  *
  * Previously the non-diverged branch of CP#count called
- * `loadHasMany(...)` and returned `results.length`, instantiating
+ * `findTarget(...)` and returned `results.length`, instantiating
  * every associated record just to get a cardinality. For large
  * collections that's a significant perf regression. This test
  * captures emitted SQL via `Notifications.subscribe("sql.active_record")`

@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, MigrationContext, registerModel } from "../index.js";
-import { Associations, loadHasMany } from "../associations.js";
+import { Associations } from "../associations.js";
+import { findTarget } from "./has-many-association.js";
 import { DisableJoinsAssociationScope } from "./disable-joins-association-scope.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
 import { fixtures } from "../test-helpers/fixtures.js";
@@ -163,7 +164,7 @@ describe("DisableJoinsAssociationScope", () => {
     await DjsComment.create({ djs_post_id: post.id, body: "hi" });
 
     const reflection = (DjsAuthor as any)._reflectOnAssociation("djsComments");
-    const comments = await loadHasMany(author, "djsComments", reflection.options);
+    const comments = await findTarget(author, "djsComments", reflection.options);
     expect(comments.map((c: any) => c.body)).toEqual(["hi"]);
   });
 

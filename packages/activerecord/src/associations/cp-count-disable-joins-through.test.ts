@@ -2,7 +2,7 @@
  * `CollectionProxy#count` on `disable_joins: true` through-
  * associations (task #22).
  *
- * Before this PR, CP#count fell back to `loadHasMany(...).length`
+ * Before this PR, CP#count fell back to `findTarget(...).length`
  * for every disable-joins through shape — the chain walk runs
  * intermediate pluck queries either way, but the final step
  * would SELECT every target row and `.length` the array. On
