@@ -799,8 +799,9 @@ describe("buildReport — novel vs moved classification", () => {
     // globalid's railtie does `on_load(:active_record) { include
     // GlobalID::Identification }` — a dynamic include the static extractor
     // can't see, plus the module lives in a *different* package. Its instance
-    // methods (toGid/toSgid family) and the trails-side Locator-backed finders
-    // (findGlobalId/findSignedGlobalId[Bang]) must NOT be flagged as novel.
+    // methods (toGid/toSgid family) must NOT be flagged as novel. The
+    // trails-side Locator-backed finders (findGlobalId/findSignedGlobalId[Bang])
+    // have no Rails counterpart at all and carry inline tags instead.
     const ruby: ApiManifest = {
       source: "ruby",
       generatedAt: "",
@@ -846,9 +847,11 @@ describe("buildReport — novel vs moved classification", () => {
                 method("toSignedGlobalId"),
               ],
               classMethods: [
-                method("findGlobalId"), // ambient railtie finder (no static Ruby def)
-                method("findSignedGlobalId"),
-                method("findSignedGlobalIdBang"),
+                // trails-only model-side finders — justified by their own
+                // `@noRailsEquivalent` tags, not by the railtie mixin.
+                { ...method("findGlobalId"), noRailsEquivalent: "trails-side finder" },
+                { ...method("findSignedGlobalId"), noRailsEquivalent: "trails-side finder" },
+                { ...method("findSignedGlobalIdBang"), noRailsEquivalent: "trails-side finder" },
                 method("genuinelyNovel"), // the only real extra
               ],
             },

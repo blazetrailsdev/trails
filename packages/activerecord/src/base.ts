@@ -4146,7 +4146,12 @@ export class Base extends Model {
    * the `only:` filter rejects it. If the record doesn't exist, `find`
    * raises (Rails parity: RecordNotFound).
    *
-   * Mirrors: ActiveRecord::Base.find_global_id (via GlobalID::Locator.locate)
+   * @noRailsEquivalent trails-only model-side finder: Rails apps call
+   * `GlobalID::Locator.locate` directly and globalid's railtie injects only
+   * `GlobalID::Identification` (the instance-side `to_gid` family) onto
+   * `ActiveRecord::Base`, so there is no `find_global_id` `def` anywhere in
+   * Rails or globalid. trails' globalid `wire` module registers this ergonomic
+   * class-method form onto Base; it delegates straight to the ported Locator.
    */
   static findGlobalId(
     input: string | import("@blazetrails/globalid").GlobalID,
@@ -4155,7 +4160,14 @@ export class Base extends Model {
     return _Locator.locate(input, options);
   }
 
-  /** Mirrors: ActiveRecord::Base.find_signed_global_id — uses signedIdVerifier(this). */
+  /**
+   * Signed counterpart of {@link findGlobalId} — uses signedIdVerifier(this).
+   *
+   * @noRailsEquivalent trails-only model-side finder: Rails apps call
+   * `GlobalID::Locator.locate_signed` directly, so there is no
+   * `find_signed_global_id` `def` in Rails or globalid. Same invention as
+   * {@link findGlobalId}, carrying the verifier this model signs with.
+   */
   static async findSignedGlobalId(
     input: string | _SignedGlobalIDType,
     options?: Omit<import("@blazetrails/globalid").LocateSignedOptions, "verifier">,
@@ -4164,7 +4176,14 @@ export class Base extends Model {
     return _Locator.locateSigned(input, { ...options, verifier });
   }
 
-  /** Mirrors: ActiveRecord::Base.find_signed_global_id! — throws on miss. */
+  /**
+   * Raising counterpart of {@link findSignedGlobalId} — throws on miss.
+   *
+   * @noRailsEquivalent trails-only model-side finder: Rails apps call
+   * `GlobalID::Locator.locate_signed` directly, so there is no
+   * `find_signed_global_id!` `def` in Rails or globalid. Same invention as
+   * {@link findGlobalId}, in the bang shape.
+   */
   static async findSignedGlobalIdBang(
     input: string | _SignedGlobalIDType,
     options?: Omit<import("@blazetrails/globalid").LocateSignedOptions, "verifier">,

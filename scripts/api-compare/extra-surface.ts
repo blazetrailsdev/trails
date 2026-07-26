@@ -99,16 +99,15 @@ interface RubyEntity {
  * contributes its instance methods to the host's allowed set.
  *
  * `methods` are raw Ruby method names the railtie surface implies but which
- * have no static `def` anywhere (so they can't be reached via a module): the
- * trails-side ergonomic finders that the globalid `wire` side-effect module
- * registers onto `Base` (`find_global_id` → `GlobalID::Locator.locate`,
- * `find_signed_global_id[!]` → `locateSigned`). Rails apps call
- * `GlobalID::Locator.locate` directly; trails surfaces the model-side form.
+ * have no static `def` anywhere (so they can't be reached via a module). Only
+ * use it when the missing counterpart is a Ruby-extractor blind spot: a
+ * trails-only method with no Rails counterpart at all belongs on its own
+ * declaration as `@noRailsEquivalent` instead (that is where the model-side
+ * `findGlobalId` / `findSignedGlobalId[!]` finders are justified).
  */
 const AMBIENT_RAILTIE_MIXINS: Record<string, { includes?: string[]; methods?: string[] }> = {
   "ActiveRecord::Base": {
     includes: ["GlobalID::Identification"],
-    methods: ["find_global_id", "find_signed_global_id", "find_signed_global_id!"],
   },
 };
 

@@ -115,18 +115,6 @@
   },
   {
     "package": "activerecord",
-    "tsFile": "associations.ts",
-    "name": "registerModel",
-    "reason": "trails-only model registry with no Rails analogue: `register_model` is defined nowhere in the Rails source (verified by grep over vendor/rails). Ruby resolves an association's class through constant lookup — Reflection#compute_class (reflection.rb:434 and :490) into Object.const_get, backed by ActiveSupport autoloading — so Rails never registers models anywhere. ESM has no constant namespace to walk and no autoload hook, so trails must be told which classes exist. Deliberately public (re-exported from index.ts) because application code has to call it, which is why @internal would be a lie rather than a fix. Kept in associations.ts because association class resolution is its only consumer path."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations.ts",
-    "name": "initializeAssociations",
-    "reason": "trails-only ESM module-cycle escape hatch with no Rails analogue: `initialize_associations` is defined nowhere in the Rails source (verified by grep over vendor/rails). The associations -> CollectionProxy -> Relation -> Base -> associations cycle forces CollectionProxy registration to be late-bound; the package entry does it eagerly, and this is the supported explicit hook for consumers who deep-import `@blazetrails/activerecord/associations` without touching the entry. Ruby's require/autoload resolves such cycles at load time, so there is nothing to port. Public by intent (documented consumer hook), so @internal is not appropriate."
-  },
-  {
-    "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
     "name": "Version",
     "reason": "`AbstractAdapter::Version` is a real Rails nested class (abstract_adapter.rb:243); `static readonly Version = Version` is the TS spelling of that nested Ruby constant, so this is public Rails API parity, not drift. It reads as extra surface only because extra-surface skips nested Ruby classes when building a file's allow-set (the `primaryClassPerFile` filter) while still counting the TS nested class. Nothing to converge. AbstractMysqlAdapter's redundant re-pin of the same constant was deleted rather than allowlisted — JS statics are inherited, so it shadowed nothing and had no readers."
