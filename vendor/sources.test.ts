@@ -16,7 +16,7 @@ describe("vendor/sources.ts", () => {
     expect(SOURCES.length).toBeGreaterThan(0);
   });
 
-  it("declares the rails source with all 9 wave-1 packages", () => {
+  it("declares the rails source with all 10 packages (9 wave-1 + actionpackversion)", () => {
     const rails = SOURCES.find((s) => s.name === "rails");
     expect(rails).toBeDefined();
     expect(rails!.origin).toEqual({
@@ -175,7 +175,7 @@ describe("vendor/sources.ts", () => {
     expect(pkgs).toContain("abstractcontroller");
   });
 
-  it("apiComparePackages returns exactly the wave-6 11-entry api-compare set", () => {
+  it("apiComparePackages returns exactly the current api-compare set", () => {
     // Bulletproofs against a future PR that accidentally toggles compareApi
     // on a package, or adds/drops a source from SOURCES without updating
     // extract-ruby-api.rb. extract-ruby-api.rb's PACKAGE_DIRS is now derived
@@ -186,12 +186,12 @@ describe("vendor/sources.ts", () => {
         "abstractcontroller",
         "actioncontroller",
         "actiondispatch",
+        "actionpackversion",
         "actionview",
         "activemodel",
         "activerecord",
         "activesupport",
         "arel",
-        "actionpackversion",
         "did-you-mean",
         "globalid",
         "rack",
@@ -211,7 +211,7 @@ describe("vendor/sources.ts", () => {
     expect(m["globalid"].endsWith("vendor/globalid/lib/global_id")).toBe(true);
   });
 
-  it("testPathsManifest returns absolute test dirs for the wave-5 set", () => {
+  it("testPathsManifest returns absolute test dirs for every test-compared package", () => {
     const m = testPathsManifest();
     expect(Object.keys(m).sort()).toEqual(
       [
