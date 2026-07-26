@@ -333,12 +333,14 @@ describe("buildReport — novel vs moved classification", () => {
     expect(pkg.totalMoved).toBe(1);
   });
 
-  it("doesn't flag predicate-Q, column-DSL, value-method, or JS-protocol names as novel", () => {
+  it("doesn't flag predicate-Q, column-DSL, value-method, or SKIP-mirror names as novel", () => {
     // Rails foo.rb defines a `?` predicate; the column-type DSL
     // (`define_column_methods`) and Relation value-method accessors
     // (`VALUE_METHODS.each`) are now modeled by the Ruby extractor, so they
-    // appear in the manifest like ordinary methods. JS-protocol methods are
-    // language-level and filtered TS-side.
+    // appear in the manifest like ordinary methods. A TS method mirroring a
+    // `conventions.SKIP` method the SAME Ruby file defines (`freeze`, `to_a`)
+    // is the faithful port, not drift — but a JS-only protocol name
+    // (`catch`) has no Ruby counterpart and stays flagged.
     const ruby: ApiManifest = {
       source: "ruby",
       generatedAt: "",
@@ -353,6 +355,10 @@ describe("buildReport — novel vs moved classification", () => {
                 method("bar"),
                 method("integer"), // define_column_methods macro
                 method("limit_value"), // Relation::VALUE_METHODS accessor
+                method("freeze"), // conventions.SKIP, but Rails defines it here
+                method("to_a"), // conventions.SKIP, spelled `toArray` in TS
+                method("=="), // operator — spelled `equals` in TS
+                method("initialize_copy"), // copy hook — spelled `clone`/`dup` in TS
               ],
             }),
           },
@@ -376,8 +382,12 @@ describe("buildReport — novel vs moved classification", () => {
                 method("connectedToQ"), // predicate `?` → Q suffix
                 method("integer"), // define_column_methods macro (matched in-file)
                 method("limitValue"), // Relation::VALUE_METHODS accessor (matched in-file)
-                method("catch"), // JS Promise protocol
-                method("genuinelyNovel"), // the only real extra
+                method("freeze"), // SKIP mirror — foo.rb defines `freeze`
+                method("toArray"), // SKIP mirror — foo.rb defines `to_a`
+                method("equals"), // SKIP mirror — foo.rb defines `==`
+                method("clone"), // SKIP mirror — foo.rb defines `initialize_copy`
+                method("catch"), // JS Promise protocol, no Ruby counterpart
+                method("genuinelyNovel"),
               ],
               classMethods: [],
             },
@@ -392,7 +402,58 @@ describe("buildReport — novel vs moved classification", () => {
       novelOnly: false,
       topN: 50,
     });
-    expect(report.packages[0].extraFiles[0].extras.map((e) => e.name)).toEqual(["genuinelyNovel"]);
+    expect(report.packages[0].extraFiles[0].extras.map((e) => e.name)).toEqual([
+      "catch",
+      "genuinelyNovel",
+    ]);
+  });
+
+  it("keeps flagging Ruby-hook names — a TS `inherited` is drift, not a mirror", () => {
+    // `inherited` is on a SKIP group marked `tsMirrorIsDrift`: Ruby module
+    // hooks have no TS equivalent, so a same-named TS method is a trails
+    // invention even though validations.rb really does `def self.inherited`.
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activerecord: {
+          classes: {
+            "ActiveRecord::Foo": rubyClass({
+              name: "Foo",
+              file: "foo.rb",
+              instance: [method("inherited"), method("freeze")],
+            }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activerecord: {
+          classes: {
+            Foo: {
+              name: "Foo",
+              file: "foo.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("inherited"), method("freeze")],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    expect(report.packages[0].extraFiles[0].extras.map((e) => e.name)).toEqual(["inherited"]);
   });
 
   it("skips _-prefixed and internal TS members, doesn't flag them as extras", () => {

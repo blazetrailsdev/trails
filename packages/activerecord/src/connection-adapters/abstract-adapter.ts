@@ -1319,6 +1319,7 @@ export class AbstractAdapter implements Quoting {
     return `#<${this.constructor.name}:${hex} env_name=${q(envName)}${nameField} role=${q(this.role)}${shardField}>`;
   }
 
+  /** @noRailsEquivalent Node inspection hook — a JS runtime protocol, not a Rails method */
   [Symbol.for("nodejs.util.inspect.custom")](): string {
     return this.inspect();
   }

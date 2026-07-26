@@ -2907,6 +2907,8 @@ export class Relation<T extends Base> {
 
   /**
    * Async iterator support — allows `for await (const record of relation)`.
+   *
+   * @noRailsEquivalent JS async-iteration protocol — Ruby's Enumerable#each is synchronous
    */
   async *[Symbol.asyncIterator](): AsyncIterableIterator<T> {
     const records = await this.toArray();
@@ -7630,9 +7632,11 @@ export interface Relation<T extends Base> {
     onfulfilled?: ((value: T[]) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
   ): Promise<TResult1 | TResult2>;
+  /** @noRailsEquivalent JS Promise protocol — Ruby has no thenable */
   catch<TResult = never>(
     onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | null,
   ): Promise<T[] | TResult>;
+  /** @noRailsEquivalent JS Promise protocol — Ruby has no thenable */
   finally(onfinally?: (() => void) | null): Promise<T[]>;
 }
 

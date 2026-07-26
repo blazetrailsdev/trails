@@ -1131,6 +1131,7 @@ export class JoinDependency {
     this.nodes.forEach(callback);
   }
 
+  /** @noRailsEquivalent JS iteration protocol — Ruby reaches iteration through Enumerable#each */
   [Symbol.iterator](): Iterator<JoinPart> {
     return this.nodes[Symbol.iterator]();
   }

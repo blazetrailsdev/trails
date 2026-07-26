@@ -30,6 +30,7 @@ export class StringInquirer {
   toString(): string {
     return this._value;
   }
+  /** @noRailsEquivalent JS primitive-coercion protocol — Ruby coerces through to_s/to_i instead */
   valueOf(): string {
     return this._value;
   }

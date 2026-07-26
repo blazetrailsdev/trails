@@ -14,7 +14,10 @@
  *      that Ruby file — any visibility, since a TS method mirroring a
  *      Rails-private method exists in Rails (a visibility divergence, not
  *      extra surface). Map each to its TS-candidate name set via
- *      `rubyMethodToTs`. Union = the "allowed" TS name set.
+ *      `rubyMethodCandidates`, which also resolves `conventions.SKIP`
+ *      mirrors (`freeze`, `to_a`, `lookup_cast_type`) so a TS override is
+ *      allowed in the file where Ruby defines the method. Union = the
+ *      "allowed" TS name set.
  *   3. Collect public TS names declared in the matching TS file — each
  *      class/module's *own* methods (skipping inherited surface so the
  *      diff measures this file's drift, not its ancestor's) plus top-level
@@ -60,7 +63,14 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
 import { OUTPUT_DIR } from "./config.js";
-import { rubyFileToTs, rubyMethodToTs, snakeToCamel } from "./conventions.js";
+import {
+  SKIP,
+  SKIP_TS_MIRROR_IS_DRIFT,
+  rubyFileToTs,
+  rubyMethodToTs,
+  rubyMethodToTsIgnoringSkip,
+  snakeToCamel,
+} from "./conventions.js";
 import { resolveModuleName } from "./compare.js";
 import { isSourceUnported } from "./unported-files.js";
 
@@ -74,56 +84,6 @@ interface RubyEntity {
   fqn: string;
   info: ClassInfo;
 }
-
-/**
- * TS-side method names that mirror Ruby methods on `conventions.SKIP`.
- * `rubyMethodToTs` returns null for SKIP entries (they have no clean TS
- * mapping at scoring time), so they never enter `allowed` even when the
- * Ruby method exists in the matched file — but a TS override of e.g.
- * `freeze`/`inspect` IS Rails-faithful (Rails AR `Base#freeze` lives in
- * core.rb, AM `model#inspect` in attribute_methods.rb). Filtering these
- * from the TS-side name set prevents them from showing up as "novel
- * drift" when in fact they're carrying-the-pattern through.
- */
-const TS_ALWAYS_ALLOWED = new Set([
-  "dup",
-  "clone",
-  "freeze",
-  "inspect",
-  "prettyPrint",
-  "tap",
-  "then",
-  "eql",
-  "equals",
-  "initializeDup",
-  "initializeClone",
-  "initializeCopy",
-  "encodeWith",
-  "initWith",
-  "toArray",
-  "toH",
-  "toHash",
-  "valueOf",
-  "klasses",
-  // `lookup_cast_type` is a real Rails method — abstract/quoting.rb:234 and
-  // postgresql/quoting.rb:195 — but it sits on `conventions.SKIP` because the
-  // *PostgreSQL* one issues an async `SELECT oid` our standalone-function
-  // quoting module can't run. SKIP is global, so that one unportable adapter
-  // variant was making every faithful `lookupCastType` (abstract/quoting.ts,
-  // abstract-mysql-adapter.ts, sqlite3-adapter.ts) read as novel drift. This
-  // is exactly the carrying-the-pattern-through case the list exists for.
-  "lookupCastType",
-  // JS-only protocol surface on the thenable/iterable Relation — Promise
-  // (`catch`/`finally`; `then` is above) and the iteration protocols. Pure
-  // language-level conventions with no Rails counterpart.
-  "catch",
-  "finally",
-  "[Symbol.iterator]",
-  "[Symbol.asyncIterator]",
-  // Node.js / V8 inspection hook — the canonical TS analog of Ruby
-  // `inspect`. Pure language-level convention; never has a Rails counterpart.
-  '[Symbol.for("nodejs.util.inspect.custom")]',
-]);
 
 /**
  * Mixins (and methods) a host class gains at *runtime* via a gem's railtie
@@ -183,7 +143,50 @@ const PORTED_UNPORTED_MIXIN_METHODS: Record<string, string[]> = {
 };
 
 /**
- * `rubyMethodToTs` for any method, plus the trails `Q`-suffix predicate form.
+ * Extra TS candidates for Ruby names the normal case-transform can't spell.
+ *
+ * `to_a`/`to_ary` camelize to `toA`/`toAry`; the JS spelling of that protocol
+ * is `toArray`. `==` is an operator — TS has no operator overloading, so the
+ * port is a named `equals`. Ruby copy semantics come from `Object#clone`/`#dup`
+ * (never `def`ed in Rails) plus the `initialize_copy` hook the class DOES
+ * define; JS has no `Object#clone`, so the faithful port of that pair is a
+ * `clone`/`dup` method on the class.
+ */
+const MIRROR_CANDIDATE_OVERRIDES: Record<string, string[]> = {
+  to_a: ["toArray"],
+  to_ary: ["toArray"],
+  "==": ["equals"],
+  initialize_copy: ["clone", "dup"],
+  initialize_dup: ["dup"],
+  initialize_clone: ["clone"],
+};
+
+/**
+ * TS candidates for a Ruby method `rubyMethodToTs` refuses to map.
+ *
+ * `conventions.SKIP` means api:compare never expects a TS counterpart, but the
+ * Ruby method still EXISTS in the file — so a TS override of it (`freeze`,
+ * `inspect`, `lookupCastType`) is Rails-faithful, not drift. Mapping those
+ * names here keeps the allowance *file-scoped*: `freeze` is allowed in core.ts
+ * because core.rb defines `freeze`, and stays flagged anywhere Ruby doesn't.
+ * That's strictly tighter than the blanket in-file allow-set this replaced.
+ *
+ * Two exclusions: `SKIP_TS_MIRROR_IS_DRIFT` names (Ruby hooks — a same-named
+ * TS method is a trails invention, not a port), and anything neither on SKIP
+ * nor in the override map, so ordinary unmapped names (operators other than
+ * `==`) stay unmapped.
+ */
+function skipMirrorCandidates(rubyName: string): string[] | null {
+  if (SKIP_TS_MIRROR_IS_DRIFT.has(rubyName)) return null;
+  const overrides = MIRROR_CANDIDATE_OVERRIDES[rubyName];
+  if (!SKIP.has(rubyName) && !overrides) return null;
+  const candidates = [...(rubyMethodToTsIgnoringSkip(rubyName) ?? []), ...(overrides ?? [])];
+  return candidates.length > 0 ? candidates : null;
+}
+
+/**
+ * `rubyMethodToTs` for any method, falling back to `skipMirrorCandidates` for
+ * the names it refuses, plus the trails `Q`-suffix predicate form.
  * trails encodes a Ruby `?` predicate with a trailing `Q` in TS
  * (`connected_to?` → `connectedToQ`), sometimes stacked on the is-prefix form
  * (`connected?` → `isConnectedQ`). The base mapper only emits the is-prefix
@@ -191,7 +194,7 @@ const PORTED_UNPORTED_MIXIN_METHODS: Record<string, string[]> = {
  * mis-flagged as novel. Append `Q` to each candidate of a `?` method.
  */
 function rubyMethodCandidates(rubyName: string): string[] | null {
-  const base = rubyMethodToTs(rubyName);
+  const base = rubyMethodToTs(rubyName) ?? skipMirrorCandidates(rubyName);
   if (!base) return null;
   if (!rubyName.endsWith("?")) return base;
   return [...base, ...base.map((c) => c + "Q")];
@@ -485,7 +488,6 @@ export function collectTsFileNames(
   const push = (m: MethodInfo): void => {
     if (m.internal === true) return;
     if (m.name.startsWith("_")) return;
-    if (TS_ALWAYS_ALLOWED.has(m.name)) return;
     out.add(m.name);
   };
   for (const c of classes) {

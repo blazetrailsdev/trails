@@ -201,6 +201,7 @@ export class CookieJar implements Iterable<[string, string]> {
     return this;
   }
 
+  /** @noRailsEquivalent JS iteration protocol — Ruby reaches iteration through Enumerable#each */
   [Symbol.iterator](): Iterator<[string, string]> {
     return this._cookies[Symbol.iterator]();
   }

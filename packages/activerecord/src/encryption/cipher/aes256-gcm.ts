@@ -50,6 +50,7 @@ export class Aes256Gcm {
   // Mirrors Rails' inspect override — never expose the secret in debug output.
   // Symbol.for("nodejs.util.inspect.custom") is the stable public symbol
   // used by Node's util.inspect without importing "util" directly.
+  /** @noRailsEquivalent Node inspection hook — a JS runtime protocol, not a Rails method */
   [Symbol.for("nodejs.util.inspect.custom")](): string {
     return `Cipher {}`;
   }

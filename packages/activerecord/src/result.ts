@@ -116,6 +116,7 @@ export class Result {
     return new Result(columns, rowArrays);
   }
 
+  /** @noRailsEquivalent JS iteration protocol — Ruby reaches iteration through Enumerable#each */
   [Symbol.iterator](): IterableIterator<Record<string, unknown>> {
     return this.hashRows()[Symbol.iterator]();
   }

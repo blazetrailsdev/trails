@@ -345,6 +345,8 @@ export class Errors<TBase extends object = object> {
    * its `def_delegators :@errors, :each, :clear, :empty?, :size, :uniq!`
    * (errors.rb:103) — `each` powers the Enumerable surface in Ruby; the
    * TS analog is the iterator protocol.
+   *
+   * @noRailsEquivalent JS iteration protocol — Ruby reaches iteration through Enumerable#each
    */
   [Symbol.iterator](): IterableIterator<ActiveModelError> {
     return this._errors[Symbol.iterator]();
