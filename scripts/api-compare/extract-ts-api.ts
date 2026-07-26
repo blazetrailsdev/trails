@@ -1251,24 +1251,26 @@ export function hasInternalJsDocTag(node: ts.Node): boolean {
 }
 
 /**
- * True when the callable a mixin-object entry references (`qux,` /
- * `foo: NS.bar`) is itself declared `@internal`. A Rails-style mixin object
- * re-exports one declaration under many hosts — model-schema.ts's
- * `ClassMethods` entry, base.ts's `Base` class surface, index.ts's re-export —
- * so the internal-ness has to be read off the single declaration rather than
- * re-tagged at every install site.
+ * True when `symbol` resolves to a declaration tagged `@internal`. A mixin
+ * object re-exports one declaration under many hosts (ClassMethods, the Base
+ * class surface, the index re-export), so the tag is read once at the
+ * declaration rather than re-applied at every install site. Callers must pass
+ * the *value* symbol — a shorthand's own name resolves to the property symbol.
  */
 function isInternalSymbol(symbol: ts.Symbol | undefined, checker: ts.TypeChecker): boolean {
-  // A shorthand's own name resolves to the *property* symbol, so callers must
-  // hand in the value symbol; an import binding resolves to an alias, whose
-  // JSDoc lives on the aliased declaration.
   let target = symbol;
   if (target && target.flags & ts.SymbolFlags.Alias) target = checker.getAliasedSymbol(target);
   return (target?.declarations ?? []).some((d) => hasInternalJsDocTag(d));
 }
 
 function isInternalCallableRef(expr: ts.Expression, checker: ts.TypeChecker): boolean {
-  return isInternalSymbol(checker.getSymbolAtLocation(expr), checker);
+  if (isInternalSymbol(checker.getSymbolAtLocation(expr), checker)) return true;
+  // A property access resolves to the property, not the function it holds;
+  // fall through to the call signature's declaration, as paramsOfCallableRef does.
+  return checker
+    .getTypeAtLocation(expr)
+    .getCallSignatures()
+    .some((sig) => sig.declaration != null && hasInternalJsDocTag(sig.declaration));
 }
 
 /**
