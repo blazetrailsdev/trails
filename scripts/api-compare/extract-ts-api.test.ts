@@ -1308,3 +1308,99 @@ describe("extractFromProgram — re-export attribution", () => {
     expect(info.classes["adapters.ts:LocalHelper"].reExportedFrom).toBeUndefined();
   });
 });
+
+describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
+  it("records the reason on a tagged class member and leaves its sibling bare", () => {
+    const info = extractFromSource(`
+      class Foo {
+        /**
+         * Registry hook — public by design; @internal would be a lie.
+         *
+         * @noRailsEquivalent trails-only model registry seam
+         */
+        registerModel(): void {}
+
+        save(): void {}
+      }
+    `);
+    const registerModel = info.instanceMethods.find((m) => m.name === "registerModel")!;
+    expect(registerModel.noRailsEquivalent).toBe("trails-only model registry seam");
+    expect(registerModel.internal).toBeUndefined();
+    expect(info.instanceMethods.find((m) => m.name === "save")!.noRailsEquivalent).toBeUndefined();
+  });
+
+  it("records the reason on a tagged getter and a tagged static method", () => {
+    const info = extractFromSource(`
+      class Foo {
+        /** @noRailsEquivalent JS thenable protocol */
+        get pending(): boolean { return true; }
+
+        /** @noRailsEquivalent TS-only ergonomic finder */
+        static findGlobalId(): void {}
+      }
+    `);
+    expect(info.instanceMethods.find((m) => m.name === "pending")!.noRailsEquivalent).toBe(
+      "JS thenable protocol",
+    );
+    expect(info.classMethods.find((m) => m.name === "findGlobalId")!.noRailsEquivalent).toBe(
+      "TS-only ergonomic finder",
+    );
+  });
+
+  it("records the reason on a tagged top-level exported function", () => {
+    const info = extractFromFiles("/p", {
+      "associations.ts": `
+        /** @noRailsEquivalent public registration surface, no Rails counterpart */
+        export function registerModel(): void {}
+
+        export function hasMany(): void {}
+      `,
+    });
+    const fns = info.fileFunctions["associations.ts"];
+    expect(fns.find((f) => f.name === "registerModel")!.noRailsEquivalent).toBe(
+      "public registration surface, no Rails counterpart",
+    );
+    expect(fns.find((f) => f.name === "hasMany")!.noRailsEquivalent).toBeUndefined();
+  });
+
+  it("records the reason on a tagged object-literal module member", () => {
+    const methods = objectLiteralMethods(`
+      export const QueryMethods = {
+        /** @noRailsEquivalent async iteration protocol, JS-only */
+        eachAsync() {},
+        where() {},
+      };
+    `);
+    expect(methods.find((m) => m.name === "eachAsync")!.noRailsEquivalent).toBe(
+      "async iteration protocol, JS-only",
+    );
+    expect(methods.find((m) => m.name === "where")!.noRailsEquivalent).toBeUndefined();
+  });
+
+  it("joins continuation lines into one reason", () => {
+    const info = extractFromSource(`
+      class Foo {
+        /**
+         * @noRailsEquivalent Rails reaches this through the connection
+         *   adapter; trails exposes it directly because the pool is async.
+         */
+        withConnection(): void {}
+      }
+    `);
+    expect(info.instanceMethods.find((m) => m.name === "withConnection")!.noRailsEquivalent).toBe(
+      "Rails reaches this through the connection adapter; trails exposes it " +
+        "directly because the pool is async.",
+    );
+  });
+
+  it("throws when the tag carries no reason", () => {
+    expect(() =>
+      extractFromSource(`
+        class Foo {
+          /** @noRailsEquivalent */
+          registerModel(): void {}
+        }
+      `),
+    ).toThrow(/@noRailsEquivalent needs a reason/);
+  });
+});
