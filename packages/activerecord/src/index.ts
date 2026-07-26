@@ -53,7 +53,6 @@ export {
   loadHasManyThrough,
   association,
   isAssociationCached,
-  updateCounterCaches,
   eagerLoadBang,
 } from "./associations.js";
 export { CollectionProxy } from "./associations/collection-proxy.js";

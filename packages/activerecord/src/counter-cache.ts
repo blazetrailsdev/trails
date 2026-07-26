@@ -1,6 +1,7 @@
 import type { Base } from "./base.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
+import { underscore } from "@blazetrails/activesupport";
 import { pendingCounterCacheColumns } from "./counter-cache-state.js";
 import {
   touchAttributesWithTime,
@@ -324,6 +325,25 @@ function counterCachedAssociationNames(ctor: typeof Base): string[] {
 }
 
 /**
+ * Resolve a reflection's foreign key. Rails reads `reflection.foreign_key`
+ * directly; trails' association reflections may still be raw definitions
+ * (`{ name, options }`) with no derived key, so fall back to the same
+ * derivation Reflection uses — explicit `foreignKey`/`queryConstraints`, then
+ * `<as>_id` for a polymorphic `has_many ... as:`, then `<name>_id`.
+ */
+function reflectionForeignKey(
+  reflection: { foreignKey?: unknown; options?: Record<string, unknown> } | null | undefined,
+  nameFallback: string,
+): unknown {
+  if (reflection?.foreignKey != null) return reflection.foreignKey;
+  const options = reflection?.options ?? {};
+  if (options.foreignKey != null) return options.foreignKey;
+  if (options.queryConstraints != null) return options.queryConstraints;
+  if (options.as != null) return `${underscore(String(options.as))}_id`;
+  return `${underscore(nameFallback)}_id`;
+}
+
+/**
  * @internal
  * Mirrors: ActiveRecord::CounterCache#_create_record
  */
@@ -350,8 +370,17 @@ export async function destroyRow(
   if (affectedRows > 0) {
     for (const name of counterCachedAssociationNames(this.constructor)) {
       const assoc = this.association(name);
-      const dba = this.destroyedByAssociation as any;
-      if (!dba || !_foreignKeysEqual(dba.foreignKey, assoc.reflection?.foreignKey)) {
+      const dba = this.destroyedByAssociation as {
+        foreignKey?: unknown;
+        options?: Record<string, unknown>;
+      } | null;
+      if (
+        !dba ||
+        !_foreignKeysEqual(
+          reflectionForeignKey(dba, this.constructor.name),
+          reflectionForeignKey(assoc.reflection, name),
+        )
+      ) {
         await assoc.decrementCounters();
       }
     }

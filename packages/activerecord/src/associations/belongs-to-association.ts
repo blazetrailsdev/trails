@@ -462,6 +462,19 @@ export class BelongsToAssociation extends SingularAssociation {
     if (!counterCol) return;
     if (!this.owner.isPersisted()) return;
     if (!this.foreignKeyPresent()) return;
+    // A scalar foreign key cannot address a composite-primary-key target row —
+    // the counter UPDATE would need a value for every PK column. Rails' own
+    // suite never pairs a composite-PK model with a counter cache reached
+    // through a scalar FK (only the polymorphic `taggable` case does, and only
+    // in trails' tests), and the pre-relocation counter-cache path skipped it
+    // with this same PK/FK arity check; it travels with the body.
+    const targetPrimaryKey =
+      (this.klass as any)?.primaryKey ?? (this.target as any)?.constructor?.primaryKey;
+    if (
+      Array.isArray(targetPrimaryKey) &&
+      targetPrimaryKey.length !== this.foreignKeyNames().length
+    )
+      return;
 
     const touch = (this.reflection.options as any).touch;
 

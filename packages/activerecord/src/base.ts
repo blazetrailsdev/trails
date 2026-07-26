@@ -306,7 +306,6 @@ import {
 import * as NamedScoping from "./scoping/named.js";
 import {
   Associations as _Associations,
-  updateCounterCaches,
   isAssociationCached as _isAssociationCached,
   associationInstanceGet as _associationInstanceGet,
   associationInstanceSet as _associationInstanceSet,
@@ -3502,7 +3501,7 @@ export class Base extends Model {
 
     if (saved) {
       if (wasNewRecord) {
-        await updateCounterCaches(this, "increment");
+        await CounterCache._createRecord.call(this as any, async () => undefined);
       }
 
       await flushPendingReplaces(this);
@@ -3992,7 +3991,11 @@ export class Base extends Model {
         if (ctor.lockingEnabled && affected !== 1) {
           throw new StaleObjectError(this, "destroy");
         }
-        didDelete = affected > 0;
+        // Mirrors Rails CounterCache#destroy_row, which wraps
+        // Persistence#destroy_row and decrements the belongs_to counter caches
+        // from the affected-row count — before `@destroyed = true`, so the
+        // owner is still `persisted?` when `decrement_counters` runs.
+        didDelete = (await CounterCache.destroyRow.call(this as any, async () => affected)) > 0;
       }
 
       this._destroyed = true;
@@ -4015,7 +4018,6 @@ export class Base extends Model {
       (this as any)._triggerDestroyCallback = true;
       (this as any)._newRecordBeforeLastCommit = false;
       (this as any)._triggerUpdateCallback = false;
-      await updateCounterCaches(this, "decrement");
     }
 
     return true;
