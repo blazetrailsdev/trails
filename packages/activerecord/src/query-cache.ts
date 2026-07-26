@@ -208,8 +208,9 @@ export const ClassMethods = {
   /**
    * Mirrors: ActiveRecord::QueryCache::ClassMethods#cache
    * (`connection_pool.enable_query_cache(&block)` with the
-   * `clear_query_cache unless was_enabled` ensure — both owned by the pool's
-   * `withQueryCache`, which `QueryCache.cache` drives).
+   * `clear_query_cache unless was_enabled` ensure — both owned by
+   * {@link QueryCache.cache}, which this delegates to once the
+   * "is Active Record configured?" guard passes).
    */
   cache<T>(this: typeof Base, block: () => T | Promise<T>): Promise<T> {
     if (this.isConnectedQ() || !configurationsEmpty(this)) {
