@@ -3,13 +3,6 @@
     "package": "actiondispatch",
     "tsFile": "middleware/exception-wrapper.ts",
     "rubyName": "build_backtrace",
-    "call": "key?",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails exception_wrapper.rb:254-275 decorates backtrace locations with compiled ActionView template methods (each/map/key?/to_s/method_name over PathRegistry resolvers); trails exception-wrapper.ts:297-299 returns `this.traces` — there are no compiled template methods in trails, so the whole decoration loop is inapplicable."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/exception-wrapper.ts",
-    "rubyName": "build_backtrace",
     "call": "map",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails exception_wrapper.rb:254-275 decorates backtrace locations with compiled ActionView template methods (each/map/key?/to_s/method_name over PathRegistry resolvers); trails exception-wrapper.ts:297-299 returns `this.traces` — there are no compiled template methods in trails, so the whole decoration loop is inapplicable."
   },
@@ -67,13 +60,6 @@
     "tsFile": "middleware/exception-wrapper.ts",
     "rubyName": "initialize",
     "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/exception-wrapper.ts",
-    "rubyName": "rescue_response?",
-    "call": "key?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

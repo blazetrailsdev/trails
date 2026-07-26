@@ -9,41 +9,6 @@
   {
     "package": "actionview",
     "tsFile": "helpers/tag-helper.ts",
-    "rubyName": "raw",
-    "call": "html_safe",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actionview",
-    "tsFile": "helpers/tag-helper.ts",
-    "rubyName": "safe_join",
-    "call": "flatten",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actionview",
-    "tsFile": "helpers/tag-helper.ts",
-    "rubyName": "safe_join",
-    "call": "html_safe",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actionview",
-    "tsFile": "helpers/tag-helper.ts",
-    "rubyName": "safe_join",
-    "call": "join",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actionview",
-    "tsFile": "helpers/tag-helper.ts",
-    "rubyName": "safe_join",
-    "call": "unwrapped_html_escape",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actionview",
-    "tsFile": "helpers/tag-helper.ts",
     "rubyName": "tag_builder",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -60,20 +25,6 @@
     "tsFile": "helpers/tag-helper.ts",
     "rubyName": "to_sentence",
     "call": "html_escape",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actionview",
-    "tsFile": "helpers/tag-helper.ts",
-    "rubyName": "to_sentence",
-    "call": "html_safe",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actionview",
-    "tsFile": "helpers/tag-helper.ts",
-    "rubyName": "to_sentence",
-    "call": "safe_join",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

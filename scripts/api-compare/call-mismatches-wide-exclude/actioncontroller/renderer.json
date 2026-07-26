@@ -3,13 +3,6 @@
     "package": "actioncontroller",
     "tsFile": "renderer.ts",
     "rubyName": "env_for_request",
-    "call": "key?",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails renderer.rb:153-159 uses `@env.key?` and `default_env.merge(@env)`; trails renderer.ts:107-117 uses the `\"HTTP_HOST\" in this._env` operator and object spread `{...routes.defaultEnv, ...this._env}`."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "renderer.ts",
-    "rubyName": "env_for_request",
     "call": "merge",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails renderer.rb:153-159 uses `@env.key?` and `default_env.merge(@env)`; trails renderer.ts:107-117 uses the `\"HTTP_HOST\" in this._env` operator and object spread `{...routes.defaultEnv, ...this._env}`."
   },

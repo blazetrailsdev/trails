@@ -4,7 +4,7 @@
     "tsFile": "signed-global-id.ts",
     "rubyName": "pick_purpose",
     "call": "fetch",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails signed_global_id.rb:24-26 uses `options.fetch :for, DEFAULT_PURPOSE` \u2014 key-present semantics; trails pickPurpose mirrors it with `options.for !== undefined ? options.for : DEFAULT_PURPOSE`, so an explicit `for: null` yields a null purpose and only an absent key takes the default. Converged; no Hash#fetch analogue in TS, hence the flagged call."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails signed_global_id.rb:24-26 uses `options.fetch :for, DEFAULT_PURPOSE` — key-present semantics; trails pickPurpose mirrors it with `options.for !== undefined ? options.for : DEFAULT_PURPOSE`, so an explicit `for: null` yields a null purpose and only an absent key takes the default. Converged; no Hash#fetch analogue in TS, hence the flagged call."
   },
   {
     "package": "globalid",

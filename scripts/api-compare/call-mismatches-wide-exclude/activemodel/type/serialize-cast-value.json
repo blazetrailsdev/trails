@@ -2,13 +2,6 @@
   {
     "package": "activemodel",
     "tsFile": "type/serialize-cast-value.ts",
-    "rubyName": "itself_if_serialize_cast_value_compatible",
-    "call": "serialize_cast_value_compatible?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "type/serialize-cast-value.ts",
     "rubyName": "serialize_cast_value_compatible?",
     "call": "index",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

@@ -16,6 +16,8 @@ import {
   JS_ENUMERABLE_ALIASES,
   WIDE_SIGNIFICANT_CALLS,
   WIDE_NO_JS_CALL_FORM,
+  isDelegatingWrapper,
+  effectiveTsCalls,
   narrowCallsApplies,
 } from "./compare.js";
 import { rubyMethodToTs } from "./conventions.js";
@@ -209,6 +211,95 @@ describe("significantMissingCalls", () => {
     ]) {
       expect(WIDE_SIGNIFICANT_CALLS.has(call)).toBe(true);
     }
+  });
+
+  it("suppresses key?/has_key? — an options-hash port tests membership with `in`", () => {
+    // Rails `options.key?(:status)` ports to `"status" in options` / `options.status
+    // !== undefined`; the idiom table's only JS form is Map#has, which an object
+    // literal never calls, so no TS body could ever discharge the flag.
+    const missing = significantMissingCalls(
+      "_extract_redirect_to_status",
+      ["key?", "has_key?", "to_str"],
+      new Set(),
+      () => true,
+      map,
+      WIDE_SIGNIFICANT_CALLS,
+    );
+    expect(missing).toEqual([]);
+  });
+
+  describe("delegation transparency", () => {
+    // PostgreSQLAdapter#indexes is `return this.pgSchemaStatements().indexes(t)`.
+    const wrapper = new Set(["indexes", "pgSchemaStatements"]);
+    // The real port, in the collaborator the wrapper forwards to.
+    const delegate = ["schemaQuery", "map", "join", "columnNamesFromColumnNumbers"];
+
+    it("reads a one-line forwarder as a delegating wrapper", () => {
+      expect(isDelegatingWrapper("indexes", wrapper)).toBe(true);
+    });
+
+    it("does not read a body doing its own work as a delegating wrapper", () => {
+      // A self-named call inside a real body (recursion, or a same-named call on
+      // a collected object) must not buy transparency for the rest of the body.
+      const own = new Set(["indexes", "schemaQuery", "map", "split", "join"]);
+      expect(isDelegatingWrapper("indexes", own)).toBe(false);
+    });
+
+    it("does not read a body without a self-named call as a delegating wrapper", () => {
+      expect(isDelegatingWrapper("indexes", new Set(["pgSchemaStatements"]))).toBe(false);
+    });
+
+    it("stops reading a body as a wrapper past the call-count threshold", () => {
+      // The threshold is the whole safety mechanism: it is what keeps a real body
+      // that happens to call its own name from buying transparency. Pin both
+      // sides of the boundary so widening it is a deliberate edit.
+      const atLimit = new Set(["indexes", "pgSchemaStatements", "clearDataSourceCacheBang"]);
+      expect(isDelegatingWrapper("indexes", atLimit)).toBe(true);
+      expect(isDelegatingWrapper("indexes", new Set([...atLimit, "schemaQuery"]))).toBe(false);
+    });
+
+    it("compares a wrapper against the delegate's call-set", () => {
+      const merged = effectiveTsCalls("indexes", wrapper, () => delegate);
+      // The wrapper's own calls survive; the delegate's are added.
+      expect(merged).toEqual(new Set([...wrapper, ...delegate]));
+    });
+
+    it("leaves a non-wrapper body's call-set untouched", () => {
+      const own = new Set(["indexes", "schemaQuery", "map", "split", "join"]);
+      expect(effectiveTsCalls("indexes", own, () => delegate)).toBe(own);
+    });
+
+    it("discharges a mixin flag the wrapper drops but the delegate makes", () => {
+      // Rails' PostgreSQL::SchemaStatements#indexes is attributed to the
+      // INCLUDING class's file, so the gate matches it against the adapter's
+      // forwarder. Charging that `return` with the mixin's call set was the bulk
+      // of the ratchet expansion #5334's include resolution produced.
+      const tsCalls = effectiveTsCalls("indexes", wrapper, () => delegate);
+      const missing = significantMissingCalls(
+        "indexes",
+        ["column_names_from_column_numbers"],
+        tsCalls,
+        () => true,
+        map,
+        WIDE_SIGNIFICANT_CALLS,
+      );
+      expect(missing).toEqual([]);
+    });
+
+    it("still flags a call the delegate omits too", () => {
+      // Transparency, not suppression: the delegate is the port, so its own
+      // omissions remain the gate's business.
+      const tsCalls = effectiveTsCalls("indexes", wrapper, () => delegate);
+      const missing = significantMissingCalls(
+        "indexes",
+        ["unquote_identifier"],
+        tsCalls,
+        () => true,
+        map,
+        WIDE_SIGNIFICANT_CALLS,
+      );
+      expect(missing).toEqual(["unquote_identifier → unquoteIdentifier"]);
+    });
   });
 
   it("does not flag each — its faithful port is a for-of loop, not a callee", () => {

@@ -30,22 +30,8 @@
   {
     "package": "activerecord",
     "tsFile": "migration/command-recorder.ts",
-    "rubyName": "find_join_table_name",
-    "call": "join_table_name",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration/command-recorder.ts",
     "rubyName": "invert_add_check_constraint",
     "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration/command-recorder.ts",
-    "rubyName": "invert_add_check_constraint",
-    "call": "key?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -67,27 +53,6 @@
     "tsFile": "migration/command-recorder.ts",
     "rubyName": "invert_add_foreign_key",
     "call": "last",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration/command-recorder.ts",
-    "rubyName": "invert_change_column_comment",
-    "call": "has_key?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration/command-recorder.ts",
-    "rubyName": "invert_change_column_default",
-    "call": "has_key?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration/command-recorder.ts",
-    "rubyName": "invert_change_table_comment",
-    "call": "has_key?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -123,13 +88,6 @@
     "tsFile": "migration/command-recorder.ts",
     "rubyName": "invert_remove_check_constraint",
     "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration/command-recorder.ts",
-    "rubyName": "invert_remove_check_constraint",
-    "call": "key?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -156,13 +114,6 @@
   {
     "package": "activerecord",
     "tsFile": "migration/command-recorder.ts",
-    "rubyName": "invert_remove_columns",
-    "call": "has_key?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration/command-recorder.ts",
     "rubyName": "invert_remove_exclusion_constraint",
     "call": "size",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -179,13 +130,6 @@
     "tsFile": "migration/command-recorder.ts",
     "rubyName": "invert_remove_index",
     "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration/command-recorder.ts",
-    "rubyName": "invert_rename_enum_value",
-    "call": "has_key?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

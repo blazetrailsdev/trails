@@ -17,21 +17,7 @@
     "package": "actiondispatch",
     "tsFile": "http/response.ts",
     "rubyName": "generate_strong_etag",
-    "call": "expand_cache_key",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/response.ts",
-    "rubyName": "generate_strong_etag",
     "call": "hexdigest",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/response.ts",
-    "rubyName": "generate_weak_etag",
-    "call": "generate_strong_etag",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -39,13 +25,6 @@
     "tsFile": "http/response.ts",
     "rubyName": "handle_no_content!",
     "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/response.ts",
-    "rubyName": "has_header?",
-    "call": "key?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

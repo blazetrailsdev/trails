@@ -17,21 +17,7 @@
     "package": "activemodel",
     "tsFile": "attributes.ts",
     "rubyName": "attribute_method?",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attributes.ts",
-    "rubyName": "attribute_method?",
     "call": "respond_to_without_attributes?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attributes.ts",
-    "rubyName": "matched_attribute_method",
-    "call": "attribute_method?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

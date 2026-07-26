@@ -12,19 +12,5 @@
     "rubyName": "cast",
     "call": "value_from_multiparameter_assignment",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "type/helpers/accepts-multiparameter-time.ts",
-    "rubyName": "serialize",
-    "call": "cast",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "type/helpers/accepts-multiparameter-time.ts",
-    "rubyName": "serialize",
-    "call": "serialize_cast_value",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]
