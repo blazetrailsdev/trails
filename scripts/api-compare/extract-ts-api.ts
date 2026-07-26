@@ -1679,12 +1679,18 @@ function extractInterface(
               const propType = checker.getTypeOfSymbolAtLocation(prop, type);
               const signatures = propType.getCallSignatures();
               if (signatures.length > 0) {
+                // Unlike the `__mixin` and inherited-interface-property cases
+                // elsewhere, these entries carry no `declaredIn`, so
+                // `collectTsFileNames` counts them as THIS file's surface —
+                // they need the resolved declaration's tag to be justifiable.
+                const noRailsEquivalent = noRailsEquivalentOfSymbol(prop, checker);
                 instanceMethods.push({
                   name: propName,
                   visibility: "public",
                   params: [],
                   line: 0,
                   file,
+                  ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
                 });
               }
             }

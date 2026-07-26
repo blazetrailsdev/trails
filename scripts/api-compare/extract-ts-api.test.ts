@@ -1481,6 +1481,28 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     ).toBeUndefined();
   });
 
+  it("carries a tag through an interface's resolved extends members", () => {
+    const info = extractFromFiles("/p", {
+      "relation-base.ts": `
+        export interface RelationBase {
+          /** @noRailsEquivalent JS thenable protocol on Relation */
+          then(onFulfilled: () => void): void;
+
+          where(): void;
+        }
+      `,
+      "relation.ts": `
+        import type { RelationBase } from "./relation-base.js";
+        export interface Relation extends RelationBase {}
+      `,
+    });
+    const rel = info.classes["relation.ts:Relation"] ?? info.modules["relation.ts:Relation"];
+    expect(rel.instanceMethods.find((m) => m.name === "then")!.noRailsEquivalent).toBe(
+      "JS thenable protocol on Relation",
+    );
+    expect(rel.instanceMethods.find((m) => m.name === "where")!.noRailsEquivalent).toBeUndefined();
+  });
+
   it("throws when the tag carries no reason", () => {
     expect(() =>
       extractFromSource(`
