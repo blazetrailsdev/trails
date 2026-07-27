@@ -1448,7 +1448,6 @@ describe("buildReport — @noRailsEquivalent tags", () => {
     expect(pkg.totalAllowlisted).toBe(1);
     expect(pkg.extraFiles).toEqual([]);
     expect(report.tagged).toEqual({ total: 1, matched: 1, stale: [] });
-    // `tagged` is the only summary key: the retired `allowlist` alias is gone.
     expect(report).not.toHaveProperty("allowlist");
   });
 
