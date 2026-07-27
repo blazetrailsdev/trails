@@ -3204,8 +3204,6 @@ export class SQLite3Integer {
   }
 }
 
-// Mirrors the `case dependency` arms of action_sql (schema_creation.rb:175);
-// Rails supports exactly these three, matched exactly (no case folding).
 const REFERENTIAL_ACTION_MAP: Record<string, string> = {
   nullify: "SET NULL",
   cascade: "CASCADE",
@@ -3214,9 +3212,6 @@ const REFERENTIAL_ACTION_MAP: Record<string, string> = {
 
 function normalizeReferentialAction(action: string): string {
   const sql = REFERENTIAL_ACTION_MAP[action];
-  // Rails reaches action_sql (schema_creation.rb:175) even on SQLite's
-  // table-rebuild path, so an unsupported :on_delete/:on_update raises
-  // ArgumentError rather than emitting invalid SQL (foreign_key_test.rb:302).
   if (sql === undefined) {
     throw new ArgumentError(
       `'${action}' is not supported for :on_update or :on_delete.\n` +

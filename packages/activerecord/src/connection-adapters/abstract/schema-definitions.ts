@@ -61,11 +61,6 @@ export type ColumnType =
 
 export type PrimaryKeyType = "uuid";
 
-/**
- * The dependency values `action_sql` (schema_creation.rb:175) accepts:
- * exactly `:nullify`, `:cascade`, `:restrict`. Anything else raises
- * ArgumentError.
- */
 export type ReferentialAction = "cascade" | "nullify" | "restrict";
 
 /**

@@ -618,9 +618,6 @@ export class SchemaCreation {
       case "restrict":
         return `ON ${action} RESTRICT`;
       default:
-        // Rails raises ArgumentError here (schema_creation.rb:181), which
-        // foreign_key_test.rb:302 asserts on. The message reproduces the
-        // heredoc verbatim, trailing newline included.
         throw new ArgumentError(
           `'${String(dependency)}' is not supported for :on_update or :on_delete.\n` +
             `Supported values are: :nullify, :cascade, :restrict\n`,
