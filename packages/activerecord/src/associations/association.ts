@@ -27,17 +27,9 @@ export class Association {
   owner: Base;
   readonly reflection: AssociationDefinition;
   readonly disableJoins: boolean;
-  /**
-   * Backing store for `loaded` / `target`. These are accessors rather than
-   * plain fields so `CollectionAssociation` can override them and delegate to
-   * the canonical `CollectionProxy` — Rails keeps a single `@target` on the
-   * association and has `CollectionProxy` forward to it; trails inverts the
-   * ownership (RFC 0022 makes the proxy canonical) but the invariant is the
-   * same: ONE in-memory target per association, not two.
-   * @internal
-   */
+  /** @internal */
   protected _targetStore: Base | Base[] | null = null;
-  /** @internal Backing store for `loaded`. See {@link _targetStore}. */
+  /** @internal */
   protected _loadedStore = false;
 
   get loaded(): boolean {
@@ -56,18 +48,12 @@ export class Association {
     this._targetStore = value;
   }
 
-  /**
-   * The un-delegated backing store, for the few callers that must NOT trip a
-   * subclass's proxy delegation — notably `association()`'s proxy factory,
-   * which would otherwise recurse (proxy lookup → `target` getter → proxy
-   * lookup) while the proxy is still being built.
-   * @internal
-   */
+  /** @internal */
   get _rawTarget(): Base | Base[] | null {
     return this._targetStore;
   }
 
-  /** @internal See {@link _rawTarget}. */
+  /** @internal */
   get _rawLoaded(): boolean {
     return this._loadedStore;
   }
@@ -214,16 +200,7 @@ export class Association {
     this._staleStateSnapshotted = true;
   }
 
-  /**
-   * Whether `loadedBang` has taken its `@stale_state` snapshot since the last
-   * `reset`. A collection's `loaded` flag lives on the shared `CollectionProxy`
-   * (see `CollectionAssociation`), which flips it without going through
-   * `loadedBang`, so the snapshot `isStaleTarget` diffs against can be missing
-   * — and a missing one reads as "stale". Lets `record.association(name)` fill
-   * that gap in without *re*-snapshotting a real load-time capture, which
-   * would mask genuine staleness.
-   * @internal
-   */
+  /** @internal */
   get _staleStateIsSnapshotted(): boolean {
     return this._staleStateSnapshotted;
   }

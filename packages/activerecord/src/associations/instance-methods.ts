@@ -41,23 +41,7 @@ function buildAssociationInstance(this: Base, assocDef: AssocDef): AssociationIn
 }
 
 function syncAssociationInstance(this: Base, name: string, instance: AssociationInstance): void {
-  // A collection instance shares its target array and loaded flag with the
-  // canonical CollectionProxy (see CollectionAssociation's `target`/`loaded`
-  // accessors), so there is nothing to copy — and copying would be actively
-  // wrong: the `_setTargetFromLoader` arm below would mark a merely-populated
-  // proxy loaded. Preload hydration for collections happens inside the proxy
-  // factory (`association()` in associations.ts), which the accessors reach.
-  //
-  // The one thing that is NOT shared is `@stale_state`: the proxy flips the
-  // shared loaded flag directly, so `loadedBang` — which takes the snapshot
-  // `isStaleTarget` diffs against — may never have run. Fill it in here, but
-  // only when it is genuinely missing: `CollectionProxy#load` re-snapshots at
-  // its own load point, and re-capturing after a foreign-key change would
-  // reset the detector and mask real staleness.
   if (instance.isCollection()) {
-    // Read `_collectionProxies` directly rather than `instance.isLoaded()`:
-    // the delegating getter would *build* the proxy, and this runs while the
-    // proxy's own constructor may be resolving its through-scope.
     const proxy = this._collectionProxies.get(name) as { loaded?: boolean } | undefined;
     if (proxy?.loaded === true && !instance._staleStateIsSnapshotted) instance.loadedBang();
     return;
@@ -159,10 +143,6 @@ export function association(this: Base, name: string): AssociationInstance {
   }
 
   const instance = buildAssociationInstance.call(this, assocDef);
-  // Cache before syncing: a collection's sync reaches the CollectionProxy,
-  // whose constructor can call back into `association(name)` while building a
-  // through-scope. Without the instance in the map that re-entry builds a
-  // second one and recurses.
   this._associationInstances.set(name, instance);
   syncAssociationInstance.call(this, name, instance);
   return instance;

@@ -1311,11 +1311,6 @@ export function syncToAssociationInstance(record: Base, assocName: string, resul
       }
     | undefined;
   if (!holder || holder._loaderWritebackSuppressed) return;
-  // A collection holder's target IS the canonical CollectionProxy's array, and
-  // Rails assigns `@target = merge_target_lists(find_target, target)` — never
-  // the raw rows. Writing them straight through here would drop the in-memory
-  // built/pushed records the loader's caller is about to merge them with
-  // (Rails' `load_target`, collection_association.rb:50).
   if (holder.isCollection?.()) {
     holder._mergeLoaderResults?.((result ?? []) as Base[]);
     return;
@@ -2044,9 +2039,6 @@ export function association<T extends Base = Base>(
         const records = Array.isArray(preloaded) ? preloaded : [preloaded];
         existing._hydrateFromPreload(records as T[]);
       }
-      // A collection `AssociationInstance` no longer needs hydrating from:
-      // `CollectionAssociation#target` IS this proxy's target, so an
-      // `asyncLoadTarget()` load has already landed here.
     }
     return existing;
   }
@@ -2095,20 +2087,12 @@ export function association<T extends Base = Base>(
     _adoptSharedTarget: (records: Base[], loaded: boolean) => void;
   };
 
-  // Take over the OO association's in-memory target — the SAME array object, so
-  // any reference a caller already holds keeps pointing at the live store. Until
-  // this moment the OO instance was the only surface and wrote there directly
-  // (its `target`/`loaded` accessors fall back to the inherited store while no
-  // proxy exists); from here on both surfaces read and write this proxy.
-  // Read the RAW store, not `instance.target`: this proxy is not in
-  // `_collectionProxies` yet, so the accessor would still see "no proxy".
   const instance = record._associationInstances.get(assocName);
   if (instance?.isCollection?.()) {
     const raw = instance._rawTarget;
     proxy._adoptSharedTarget(Array.isArray(raw) ? raw : [], instance._rawLoaded);
   }
 
-  // Preloaded data wins over whatever the OO instance had.
   const preloaded = _preloadedHolderTarget(record, assocName)?.value;
   if (preloaded != null) {
     const records = Array.isArray(preloaded) ? preloaded : [preloaded];

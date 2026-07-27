@@ -188,10 +188,7 @@ function assertValidLimit(n: number): void {
   }
 }
 
-/**
- * The owner's `Association` wrapper, as far as staleness handling needs it.
- * @internal
- */
+/** @internal */
 interface StaleWrapper {
   isStaleTarget?: () => boolean;
   resetScope?: () => void;
@@ -253,15 +250,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return this._target;
   }
 
-  /**
-   * @internal The single in-memory target this proxy shares with its OO
-   * `CollectionAssociation` (`record.association(name)`), whose `target` /
-   * `loaded` accessors read and write through here. Rails has one `@target`
-   * per association with the proxy forwarding to it; trails makes the proxy
-   * the owner of that store (RFC 0022) and the OO object the forwarder, so
-   * `replace_on_target` / `add_to_target` land in the array every reader
-   * consults instead of a parallel mirror.
-   */
+  /** @internal */
   get _sharedTarget(): T[] {
     return this._target;
   }
@@ -270,17 +259,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._target = records;
   }
 
-  /**
-   * @internal Rails' `@replaced_or_added_targets` — part of the same store as
-   * `_sharedTarget`, since `replace_on_target`'s dedup rule reads both. The OO
-   * `CollectionAssociation` shares this set so a record added through one
-   * surface is not appended a second time through the other.
-   */
+  /** @internal */
   get _sharedReplacedOrAddedTargets(): Set<T> {
     return this._replacedOrAddedTargets;
   }
 
-  /** @internal Loaded flag for the shared target. See {@link _sharedTarget}. */
+  /** @internal */
   get _sharedLoaded(): boolean {
     return this._targetLoaded;
   }
@@ -289,12 +273,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._targetLoaded = value;
   }
 
-  /**
-   * @internal Take over the target the OO `CollectionAssociation` was holding
-   * before this proxy existed, keeping the array identity so references
-   * handed out earlier stay live. Called once, from `association()`, right
-   * after construction.
-   */
+  /** @internal */
   _adoptSharedTarget(records: T[], loaded: boolean): void {
     this._target = records;
     this._targetLoaded = loaded;
@@ -973,12 +952,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       if (!(wrapper?.isStaleTarget?.() ?? false)) return this._target;
       // Stale (owner FK changed since load): fall through to re-query. Clear
       // the CP's cached target so the stale records don't survive
-      // `merge_target_lists`. Clearing `_targetLoaded` also clears the
-      // wrapper's `loaded` (one shared flag), which would leave
-      // `Association#association_scope` no longer *seeing* the staleness and
-      // happily reusing its cached JOIN scope built from the old foreign key —
-      // so drop that memo explicitly, exactly as Rails' `reload` does
-      // (`reset; reset_scope; load_target`, association.rb:72).
+      // `merge_target_lists`; drop the wrapper's memoized association scope
+      // too, as Rails' `reload` does (`reset; reset_scope; load_target`,
+      // association.rb:72), since the shared `loaded` flag this clears is what
+      // `Association#association_scope` used to read the staleness from.
       this._target = [];
       this._targetLoaded = false;
       wrapper?.resetScope?.();
@@ -987,9 +964,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._target = this._mergeTargetLists(results);
     this._targetLoaded = true;
     // Snapshot the owner's `@stale_state` NOW (while owner FKs still reflect
-    // the load time). The wrapper shares this proxy's `loaded` flag but not
-    // `@stale_state`, and letting the snapshot happen later — after a FK
-    // change — would capture the wrong state and mask the staleness.
+    // the load time). Letting it happen later — after a FK change — would
+    // capture the wrong state and mask the staleness.
     this._staleWrapper()?.loadedBang?.();
     return this._target;
   }
@@ -2572,11 +2548,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     if (assocInstance) {
       assocInstance._associationIds = null;
       // Rails' `insert_record` ends in `reset_scope` (collection_association.rb),
-      // which drops the memoized `@association_scope` — NOT `reset`, which would
-      // also drop `@target`. trails used to call the full `reset` here to stop
-      // the OO instance serving a stale copy of the target; now that the two
-      // surfaces share one array there is no copy to go stale, and resetting it
-      // would discard the very record we just added.
+      // which drops the memoized `@association_scope` — NOT `reset`, which now
+      // shares one array with this proxy and would discard the record just added.
       if (typeof assocInstance.resetScope === "function") {
         assocInstance.resetScope();
       }
