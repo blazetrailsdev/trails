@@ -33,19 +33,11 @@ import { threadedConnectionFor, connectionPool } from "./connection-handling.js"
  * `with_connection` block parameter (`model_schema.rb`) rather than
  * re-resolving `.connection`.
  *
- * Without a wrap this resolves the pool directly instead of going through the
- * deprecated `Model.connection` getter, because that getter *leases* — inside a
- * plain `withConnection` body (lease sticky still `null`) it would flip the
- * lease permanent purely to read a column hash, which Rails' reflection never
- * does. The already-leased `activeConnection` is the common case; only a
- * genuinely cold pool falls through to `leaseConnectionSync`, which is what the
- * getter would have done anyway (trails' Rails-named `leaseConnection` is async
- * and these reflection callers are synchronous).
- *
- * `connectionPool` still throws `ConnectionNotEstablished` for a model with no
- * pool, so the throw-free contract the `try`/`catch` call sites rely on
- * (`columnsHash`, `loadSchemaFromAdapter`, `cachedColumnNames`,
- * `loadSchemaFromCacheSync`, `cachedTableExists`) is unchanged.
+ * Without a wrap it resolves the pool directly rather than through the
+ * deprecated `Model.connection` getter, which leases: inside a plain
+ * `withConnection` body it flips the lease permanent just to read a column
+ * hash. `connectionPool` still throws `ConnectionNotEstablished` for a
+ * pool-less model, keeping the throw the `try`/`catch` call sites rely on.
  */
 function reflectionAdapter(klass: any): any {
   const threaded = threadedConnectionFor(klass);
