@@ -17,10 +17,12 @@ import {
   extractFileConstants,
   extractFileLocalHelpers,
   extractFromProgram,
+  getAllTsFiles,
   harvestObjectLiteralMethods,
   packageFingerprint,
   tsLiteralValue,
 } from "./extract-ts-api.js";
+import { overlappingSubDirs, packageSrcDir } from "./config.js";
 import type { ClassInfo, MethodInfo, PackageInfo } from "./types.js";
 
 const VIRTUAL = "virtual.ts";
@@ -1594,5 +1596,71 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     expect(foo.instanceMethods.find((m) => m.name === "registerModel")!.noRailsEquivalent).toBe(
       "wiring seam with no Rails counterpart",
     );
+  });
+});
+
+describe("sub-package de-overlap", () => {
+  const tmpDirs: string[] = [];
+  afterEach(() => {
+    while (tmpDirs.length > 0) {
+      fs.rmSync(tmpDirs.pop()!, { recursive: true, force: true });
+    }
+  });
+
+  /** src/{parent.ts, support/{helper.ts}} — `support` is the sub-package root. */
+  function fixture(): { srcDir: string; subDir: string } {
+    const srcDir = fs.mkdtempSync(path.join(os.tmpdir(), "deoverlap-"));
+    tmpDirs.push(srcDir);
+    const subDir = path.join(srcDir, "support");
+    fs.mkdirSync(subDir);
+    fs.writeFileSync(
+      path.join(srcDir, "parent.ts"),
+      'import { Helper } from "./support/helper.js";\nexport class Parent {\n  use(): typeof Helper {\n    return Helper;\n  }\n}\n',
+    );
+    fs.writeFileSync(
+      path.join(subDir, "helper.ts"),
+      "export class Helper {\n  ddl(): void {}\n}\n",
+    );
+    return { srcDir, subDir };
+  }
+
+  it("maps activerecord's src/support to the activerecord-test-support package", () => {
+    expect(overlappingSubDirs("activerecord")).toEqual([
+      packageSrcDir("activerecord-test-support"),
+    ]);
+    expect(packageSrcDir("activerecord-test-support")).toBe(
+      path.join(packageSrcDir("activerecord"), "support"),
+    );
+  });
+
+  it("leaves sibling sub-packages (actionpack) with nothing to exclude", () => {
+    expect(overlappingSubDirs("actiondispatch")).toEqual([]);
+    expect(overlappingSubDirs("actioncontroller")).toEqual([]);
+  });
+
+  it("omits an excluded subdir from the walked file list", () => {
+    const { srcDir, subDir } = fixture();
+    expect(getAllTsFiles(srcDir)).toContain(path.join(subDir, "helper.ts"));
+    expect(getAllTsFiles(srcDir, [subDir])).toEqual([path.join(srcDir, "parent.ts")]);
+  });
+
+  it("omits an excluded subdir's classes even when the parent imports them", () => {
+    const { srcDir, subDir } = fixture();
+    const options: ts.CompilerOptions = {
+      target: ts.ScriptTarget.ESNext,
+      module: ts.ModuleKind.NodeNext,
+      moduleResolution: ts.ModuleResolutionKind.NodeNext,
+      skipLibCheck: true,
+    };
+    const entry = [path.join(srcDir, "parent.ts")];
+
+    const withOverlap = extractFromProgram(ts.createProgram(entry, options), srcDir);
+    expect(Object.keys(withOverlap.classes).sort()).toEqual([
+      "parent.ts:Parent",
+      "support/helper.ts:Helper",
+    ]);
+
+    const deOverlapped = extractFromProgram(ts.createProgram(entry, options), srcDir, [subDir]);
+    expect(Object.keys(deOverlapped.classes)).toEqual(["parent.ts:Parent"]);
   });
 });

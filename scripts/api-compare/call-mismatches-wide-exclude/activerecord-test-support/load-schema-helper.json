@@ -1,0 +1,23 @@
+[
+  {
+    "package": "activerecord-test-support",
+    "tsFile": "load-schema-helper.ts",
+    "rubyName": "load_schema",
+    "call": "load",
+    "reason": "Ruby's Kernel#load evaluates schema.rb as source. trails' mirror of schema.rb is the canonical registry, so loading it means laying that registry onto the adapter — `loadCanonicalSchema(adapter)`. No JS analogue of `load` exists."
+  },
+  {
+    "package": "activerecord-test-support",
+    "tsFile": "load-schema-helper.ts",
+    "rubyName": "load_schema",
+    "call": "exist?",
+    "reason": "`File.exist?(adapter_specific_schema_file)` asks whether a Ruby schema file is on disk. trails resolves adapter-specific schemas through the ADAPTER_SPECIFIC_SCHEMAS lookup instead of the filesystem, so the presence check is a key lookup, not a stat."
+  },
+  {
+    "package": "activerecord-test-support",
+    "tsFile": "load-schema-helper.ts",
+    "rubyName": "load_schema",
+    "call": "new",
+    "reason": "`StringIO.new` backs the `$stdout` silencing around Ruby's `load`, which prints a migration line per statement. Laying the schema through the adapter prints nothing, so there is no output to silence."
+  }
+]

@@ -20,6 +20,7 @@ export const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
   actioncontroller: "actionpack",
   abstractcontroller: "actionpack",
   actionpackversion: "actionpack",
+  "activerecord-test-support": "activerecord",
 };
 
 /**
@@ -30,10 +31,27 @@ export const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
  */
 export const DIR_TO_PACKAGES: Record<string, string[]> = Object.entries(
   PACKAGE_DIR_OVERRIDES,
-).reduce<Record<string, string[]>>((acc, [pkg, dir]) => {
-  (acc[dir] ??= []).push(pkg);
-  return acc;
-}, {});
+).reduce<Record<string, string[]>>(
+  (acc, [pkg, dir]) => {
+    (acc[dir] ??= []).push(pkg);
+    return acc;
+  },
+  // A dir can host both a package of its own name and overriding pseudo-packages
+  // (`activerecord` + `activerecord-test-support`); seed the self-mapping so
+  // resolving the npm dep `@blazetrails/activerecord` doesn't lose `activerecord`.
+  Object.fromEntries(
+    PACKAGES.filter((pkg) => !PACKAGE_DIR_OVERRIDES[pkg]).map((pkg) => [pkg, [pkg]]),
+  ),
+);
+
+/**
+ * Packages that pair against a framework's *test* helpers rather than its lib.
+ * They live inside another package's src dir and are not part of anyone's
+ * dependency surface, so `blazetrailsDepKeys` filters them out of sibling
+ * packages' entity index — a Rails lib method must never satisfy its
+ * inheritance/arity lookup against a test helper.
+ */
+export const TEST_SUPPORT_PACKAGES = new Set(["activerecord-test-support"]);
 
 /** Override package → src subdirectory when package shares a dir */
 export const PACKAGE_SRC_SUBDIR: Record<string, string> = {
@@ -41,7 +59,24 @@ export const PACKAGE_SRC_SUBDIR: Record<string, string> = {
   actioncontroller: "action-controller",
   abstractcontroller: "abstract-controller",
   actionpackversion: "action-pack",
+  "activerecord-test-support": "support",
 };
+
+/**
+ * Src dirs of the packages nested inside `pkg`'s own src dir. The container's
+ * extraction walk skips them so each file lands in exactly one package manifest
+ * (`activerecord` must not also extract `src/support/`, which belongs to
+ * `activerecord-test-support`).
+ *
+ * Actionpack's four packages are siblings under `src/`, with no package rooted
+ * at `src/` itself, so nothing is excluded there.
+ */
+export function overlappingSubDirs(pkg: string): string[] {
+  const own = packageSrcDir(pkg);
+  return PACKAGES.filter((other) => other !== pkg)
+    .map(packageSrcDir)
+    .filter((dir) => dir.startsWith(own + path.sep));
+}
 
 /** A package's extraction roots, as the freshness guards need them. */
 export interface PackageRoots {

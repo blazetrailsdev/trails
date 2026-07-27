@@ -76,6 +76,15 @@ export const SOURCES: readonly UpstreamSource[] = [
         testPath: "activerecord/test/cases",
       },
       {
+        // Rails' test-support helpers (`test/support/*.rb`) — DDL/schema-dump/
+        // connection helpers our suite ports into
+        // `packages/activerecord/src/support/`. A pseudo-package rather than a
+        // second root on `activerecord` because api-compare keys one lib dir
+        // per package. No `testPath`: these are helpers, not test cases.
+        name: "activerecord-test-support",
+        libPath: "activerecord/test/support",
+      },
+      {
         name: "activemodel",
         libPath: "activemodel/lib/active_model",
         testPath: "activemodel/test/cases",

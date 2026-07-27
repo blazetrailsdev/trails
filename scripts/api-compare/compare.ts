@@ -73,6 +73,7 @@ import * as path from "path";
 import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo, ParamInfo } from "./types.js";
 import {
   DIR_TO_PACKAGES,
+  TEST_SUPPORT_PACKAGES,
   OUTPUT_DIR,
   PACKAGE_DIR_OVERRIDES,
   PACKAGES,
@@ -1005,9 +1006,14 @@ export function blazetrailsDepKeys(pkg: string): string[] {
       // A single npm package may map to multiple api-compare keys
       // (e.g. actionpack → actiondispatch + actioncontroller).
       for (const depKey of DIR_TO_PACKAGES[depDir] ?? [depDir]) {
-        if (depKey !== pkg) keys.push(depKey);
+        if (depKey !== pkg && !TEST_SUPPORT_PACKAGES.has(depKey)) keys.push(depKey);
       }
     }
+    // A test-support package shares its container's npm package, so the
+    // container never shows up as a dependency — add it explicitly, or helpers
+    // that extend a Rails class (FakeAdapter → AbstractAdapter) resolve
+    // against nothing.
+    if (TEST_SUPPORT_PACKAGES.has(pkg) && dirName !== pkg) keys.push(dirName);
     return keys;
   } catch {
     return []; // Non-fatal: fall back to same-package only.

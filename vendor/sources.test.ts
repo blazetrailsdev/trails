@@ -16,7 +16,7 @@ describe("vendor/sources.ts", () => {
     expect(SOURCES.length).toBeGreaterThan(0);
   });
 
-  it("declares the rails source with all 10 packages (9 wave-1 + actionpackversion)", () => {
+  it("declares the rails source with all 11 packages (9 wave-1 + actionpackversion + test-support)", () => {
     const rails = SOURCES.find((s) => s.name === "rails");
     expect(rails).toBeDefined();
     expect(rails!.origin).toEqual({
@@ -33,6 +33,7 @@ describe("vendor/sources.ts", () => {
         "actionview",
         "activemodel",
         "activerecord",
+        "activerecord-test-support",
         "activesupport",
         "arel",
         "trailties",
@@ -190,6 +191,7 @@ describe("vendor/sources.ts", () => {
         "actionview",
         "activemodel",
         "activerecord",
+        "activerecord-test-support",
         "activesupport",
         "arel",
         "did-you-mean",

@@ -1129,6 +1129,14 @@ export const UNPORTED_FILES: UnportedFile[] = [
       'in Rails), so `"foo"` is a missing-env lookup, not a malformed URL. ' +
       "See packages/activerecord/src/database-configurations/resolver.test.ts.",
   },
+  {
+    pattern: "tools.rb",
+    package: "activerecord-test-support",
+    reason:
+      "Rails' rake/minitest test-runner plumbing: prepends adapter globbing onto " +
+      "Rails::TestUnit::Runner and invokes it with ARGV. vitest fills that role in " +
+      "trails — no port intended.",
+  },
 ];
 
 export function isSourceUnported(file: string, pkg?: string): boolean {
