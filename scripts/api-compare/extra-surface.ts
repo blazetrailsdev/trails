@@ -843,11 +843,13 @@ function buildPackageReport(
     moduleFqnByShort.set(short, list);
   }
 
-  // compare.ts's nested-class filter (compare.ts:738-755) says a class nested
-  // in another class in the same file is not a Rails counterpart *file* of its
-  // own. That's a statement about file matching only: the nested class is
-  // still surface the enclosing file declares, so it enters that file's
-  // allow-set flagged `nestedInEnclosingClass` rather than being dropped.
+  // compare.ts drops a class nested in a same-file parent from `allRuby`
+  // outright (compare.ts:1321-1339), so its methods never count toward the
+  // coverage denominator. Extra surface is the inverse question and needs the
+  // opposite answer: the nested class IS surface the enclosing file declares,
+  // so counting the TS port of it as drift is wrong. It therefore enters the
+  // file's allow-set flagged `nestedInEnclosingClass` rather than being
+  // dropped — deliberately NOT mirroring compare.ts's use of the same filter.
   const classFqnsPerFile = new Map<string, Set<string>>();
   for (const [fqn, info] of Object.entries(rubyPkg.classes) as [string, ClassInfo][]) {
     if (!info.file) continue;
