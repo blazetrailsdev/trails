@@ -54,6 +54,24 @@ describe("nested-attributes displacement removal failure", () => {
     registerModel(Ship);
   });
 
+  it("detaches the displaced row at the assignment through the awaitable writer", async () => {
+    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
+    const displaced = (await Ship.create({
+      name: "Nights Dirty Lightning",
+      pirate_id: (pirate as unknown as { id: number }).id,
+    })) as Base;
+    await (pirate as unknown as { ship: Promise<Base | null> }).ship;
+
+    await (
+      pirate as unknown as { setShipAttributes: (a: unknown) => Promise<void> }
+    ).setShipAttributes({ name: "Davy Jones Gold Dagger" });
+
+    // The owner is deliberately NOT saved: Rails' `replace` has already run
+    // `remove_target!` by the time the assignment expression returns.
+    const reloaded = (await Ship.find((displaced as unknown as { id: number }).id)) as Base;
+    expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(null);
+  });
+
   it("raises at the assignment through the awaitable writer, with no save", async () => {
     const pirate = await pirateWithFailingRemoval();
 

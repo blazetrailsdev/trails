@@ -582,6 +582,9 @@ function generateAssociationWriter(
   // assignment expression; a JS property setter cannot await, so this is the
   // surface that reproduces that timing (RFC 0068's `set#{Name}` sugar, applied
   // to nested attributes). See `detachDisplacedAtAssignment` for the contract.
+  // Collections get it too, for one uniform awaitable writer per association —
+  // only a one-to-one assignment ever queues a removal, so the drain is a no-op
+  // there.
   Object.defineProperty(modelClass.prototype, `set${camelize(attrName, true)}`, {
     async value(this: Base, value: any): Promise<void> {
       assign(this, associationName, value);
@@ -708,6 +711,12 @@ interface OneToOneAssociation {
  *   (`save()`, an awaitable writer, another assignment's drain) rethrows it. An
  *   owner that is never saved therefore still carries the failure; nothing
  *   silently discards it.
+ *
+ * The sticky failure is deliberately terminal for that instance: the in-memory
+ * replacement landed while the displaced row did not detach, so persisting the
+ * owner would produce exactly the two-FK-matching-rows state RFC 0068 exists to
+ * eliminate. Recovery is a fresh load of the owner, not a retry on the poisoned
+ * instance.
  * @internal
  */
 function detachDisplacedAtAssignment(
@@ -762,9 +771,7 @@ async function awaitPendingDisplacedRemovals(record: Base): Promise<void> {
       if (error) recordDisplacedRemovalFailure(host, error);
     }
   }
-  if ("_displacedRemovalFailure" in host && host._displacedRemovalFailure !== undefined) {
-    throw host._displacedRemovalFailure;
-  }
+  if (host._displacedRemovalFailure !== undefined) throw host._displacedRemovalFailure;
 }
 
 /** @internal */
