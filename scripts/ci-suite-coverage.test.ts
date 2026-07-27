@@ -91,6 +91,15 @@ function ciVitestFilters(yml: string): string[] {
   return filters;
 }
 
+/** The `unit-tests:` job block, sliced out at the next job at the same indent. */
+function unitTestsJob(yml: string): string {
+  const lines = yml.split("\n");
+  const start = lines.findIndex((l) => l === "  unit-tests:");
+  if (start === -1) throw new Error("no unit-tests job in ci.yml");
+  const end = lines.findIndex((l, i) => i > start && /^ {2}[\w-]+:/.test(l));
+  return lines.slice(start, end === -1 ? undefined : end).join("\n");
+}
+
 describe("CI runs every tooling test suite", () => {
   it("covers each scripts/eslint/vendor test file with a ci.yml vitest filter", async () => {
     const yml = await readFile(CI_YML, "utf8");
@@ -109,6 +118,27 @@ describe("CI runs every tooling test suite", () => {
       .filter((f) => !(f in KNOWN_UNRUN))
       .filter((f) => !filters.some((filter) => f.startsWith(filter)));
     expect(uncovered).toEqual([]);
+  });
+
+  // A path filter in a gated job only runs when the gate fires. unit-tests is
+  // gated on `unit_tests_affected`, which the changes job computes from
+  // UNIT_TESTS_PKGS_RE — so a filter naming a tree the regex does not match is
+  // dead for any PR confined to that tree: the suite it points at is skipped
+  // exactly when it is the thing that changed.
+  it("matches every unit-tests filter against the gate that runs the job", async () => {
+    const yml = await readFile(CI_YML, "utf8");
+    const gateSource = yml.match(/UNIT_TESTS_PKGS_RE='([^']+)'/)?.[1];
+    expect(gateSource).toBeDefined();
+    const gate = new RegExp(gateSource as string);
+
+    const filters = ciVitestFilters(unitTestsJob(yml));
+    expect(filters.length).toBeGreaterThan(5);
+
+    // A filter is a path prefix, so probe it with a file that lives under it.
+    const ungated = filters.filter(
+      (f) => !gate.test(f.endsWith(".ts") ? f : `${f.replace(/\/?$/, "/")}probe.test.ts`),
+    );
+    expect(ungated).toEqual([]);
   });
 
   it("keeps KNOWN_UNRUN free of entries CI already runs", async () => {

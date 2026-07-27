@@ -194,7 +194,10 @@ jobs:
           # confined to one of them would run none of its own tests.
           # schema-compare/ is deliberately absent — its suite parses the real
           # vendored schema.rb, so it runs in rails-comparison (COMPARISON_RE).
-          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport)/|scripts/(tasks|guides-typecheck|parity|api-compare|test-compare|fixtures-compare|test-deps|rails-find)/|scripts/(strip-asany|rails-file-structure-mixins|ci-suite-coverage)(\.test)?\.ts$)'
+          # eslint/ rides on it because the custom rules' own RuleTester suites
+          # are in the same invocation: without this clause a PR that only
+          # touches a rule or its test would skip the only job that runs them.
+          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport)/|eslint/|scripts/(tasks|guides-typecheck|parity|api-compare|test-compare|fixtures-compare|test-deps|rails-find)/|scripts/(strip-asany|rails-file-structure-mixins|ci-suite-coverage)(\.test)?\.ts$)'
           # guides_affected gates the Guides Code Type Check job, which
           # compiles fenced TS blocks in packages/website/docs/guides/**.
           # Today guides only import @blazetrails/activerecord,
