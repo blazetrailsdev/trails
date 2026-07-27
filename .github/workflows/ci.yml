@@ -119,10 +119,6 @@ jobs:
           #                     - guards this file's own wiring; its only
           #                       consumer is unit-tests, which names it in
           #                       UNIT_TESTS_PKGS_RE.
-          #   eslint/no-raw-sql-scope.mjs
-          #                     - the shared scope-out glob list; a plain vitest
-          #                       suite (not a RuleTester one), so unlike the
-          #                       rest of eslint/ it runs in unit-tests.
           # IMPORTANT: carving a subtree out of the infra sweep does NOT mean
           # its own tests can go unnamed. unit-tests runs the compare/parity
           # tooling's vitest suites — api-compare, test-compare,
@@ -198,6 +194,10 @@ jobs:
           # confined to one of them would run none of its own tests.
           # schema-compare/ is deliberately absent — its suite parses the real
           # vendored schema.rb, so it runs in rails-comparison (COMPARISON_RE).
+          # eslint/no-raw-sql-scope is the one eslint/ entry here: it is a plain
+          # vitest suite rather than a RuleTester one, so unit-tests runs it (the
+          # RuleTester suites are on ci-suite-coverage's KNOWN_UNRUN instead).
+          # eslint/ is outside INFRA_RE's sweep, so this gate is its only trigger.
           UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport)/|scripts/(tasks|guides-typecheck|parity|api-compare|test-compare|fixtures-compare|test-deps|rails-find)/|scripts/(strip-asany|rails-file-structure-mixins|ci-suite-coverage)(\.test)?\.ts$|eslint/no-raw-sql-scope(\.test)?\.mjs$)'
           # guides_affected gates the Guides Code Type Check job, which
           # compiles fenced TS blocks in packages/website/docs/guides/**.
