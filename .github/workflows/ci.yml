@@ -136,7 +136,7 @@ jobs:
           # Deliberately NOT carved (genuinely cross-cutting): typecheck.mjs
           # (root `pnpm typecheck`), start-worktree.sh, and the remaining
           # top-level scripts/*.ts one-offs.
-          INFRA_CARVEOUT_RE='^scripts/((tasks|ci|guides-typecheck|rails-find|sync-stats|phase-g-hunt|fixtures-inventory|test-deps|__fixtures__|api-compare|test-compare|fixtures-compare|schema-compare|parity)/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|strip-asany|ci-suite-coverage)(\.test)?\.ts$)'
+          INFRA_CARVEOUT_RE='^scripts/((tasks|ci|guides-typecheck|rails-find|sync-stats|phase-g-hunt|fixtures-inventory|test-deps|__fixtures__|api-compare|test-compare|fixtures-compare|schema-compare|parity)/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|strip-asany|ci-suite-coverage|deprecated-manifest-diff)(\.test)?\.ts$)'
           # AR workspace deps: arel/activemodel/activesupport/globalid/
           # did-you-mean (per packages/activerecord/package.json). Also
           # consumes @blazetrails/trails-tsc at runtime via the tsc-wrapper
@@ -201,7 +201,7 @@ jobs:
           # eslint/rails-private-jsdoc.config.test.mjs is a drift guard between
           # it and eslint/rails-private-jsdoc.config.mjs, so an isolated change
           # to the root config must still run the guard.
-          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport)/|eslint/|scripts/(tasks|guides-typecheck|parity|api-compare|test-compare|fixtures-compare|test-deps|rails-find)/|scripts/(strip-asany|rails-file-structure-mixins|ci-suite-coverage)(\.test)?\.ts$|eslint\.config\.mjs$)'
+          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport)/|eslint/|scripts/(tasks|guides-typecheck|parity|api-compare|test-compare|fixtures-compare|test-deps|rails-find)/|scripts/(strip-asany|rails-file-structure-mixins|ci-suite-coverage|deprecated-manifest-diff)(\.test)?\.ts$|eslint\.config\.mjs$)'
           # guides_affected gates the Guides Code Type Check job, which
           # compiles fenced TS blocks in packages/website/docs/guides/**.
           # Today guides only import @blazetrails/activerecord,
@@ -243,13 +243,20 @@ jobs:
           # PR that edits ONLY that file matches neither INFRA_RE nor the
           # package/vendor clauses, so without this it would skip the very
           # check the docs_only exception was built to preserve.
+          # eslint/rails-deprecated-methods.json is matched directly for the
+          # same reason as ruby-ts-conventions.md: it is the generated artifact
+          # the `--check-deprecated` step guards, and `eslint/` appears in
+          # neither INFRA_RE nor the package/vendor clauses. Without this, the
+          # one change shape the guard exists to catch — a commit that ONLY
+          # drops manifest entries — would skip rails-comparison entirely and
+          # never run the recompute.
           # schema-compare/ (the Schema comparison step, ci.yml:1272) and the
           # two Rails manifest builders + their shared mixin resolver (the
           # privates/file-structure steps, ci.yml:1279/1293) are named
           # explicitly: all are carved out of the infra sweep
           # (INFRA_CARVEOUT_RE), so this clause is the only thing that still
           # runs rails-comparison on a change confined to them.
-          COMPARISON_RE='^(packages/|scripts/((api|test|fixtures|schema)-compare/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins)\.ts$)|vendor/|docs/ruby-ts-conventions\.md$)'
+          COMPARISON_RE='^(packages/|scripts/((api|test|fixtures|schema)-compare/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|deprecated-manifest-diff)\.ts$)|vendor/|docs/ruby-ts-conventions\.md$|eslint/rails-deprecated-methods\.json$)'
           force_all_affected() {
             echo "activerecord_affected=true" >> "$GITHUB_OUTPUT"
             echo "actionpack_affected=true"   >> "$GITHUB_OUTPUT"
@@ -701,6 +708,7 @@ jobs:
           eslint/
           scripts/strip-asany.test.ts
           scripts/rails-file-structure-mixins.test.ts
+          scripts/deprecated-manifest-diff.test.ts
           scripts/ci-suite-coverage.test.ts
 
   # Consolidated leaf-test job. The cheapest sub-minute leaf suites — rack
@@ -1363,6 +1371,12 @@ jobs:
         # in conventions.ts; fail if it drifts so the agent-facing doc can't
         # go stale. Regenerate with `pnpm api:conventions`.
         run: pnpm exec tsx scripts/api-compare/conventions-doc.ts --check
+      - name: Deprecation manifest up to date
+        # eslint/rails-deprecated-methods.json is generated from the vendored
+        # Ruby; fail if it drifts — a partial regeneration silently DROPS
+        # entries and with them the rails-deprecated-jsdoc coverage for those
+        # methods. Regenerate with `pnpm rails-privates:manifest`.
+        run: pnpm exec tsx scripts/build-rails-privates-manifest.ts --check-deprecated
       - name: Schema comparison
         # Structural parity of TEST_SCHEMA against the vendored
         # test/schema/schema.rb it mirrors (RFC 0025). Fails on a table or
