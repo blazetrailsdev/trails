@@ -28,11 +28,6 @@ import {
   TEST_KEY_DERIVATION_SALT,
 } from "../encryption/test-keys.js";
 
-// Rails' AR test suite never calls `config.load_defaults` — it runs on the gem
-// framework defaults, so `partial_inserts` stays `true` (dirty.rb:50). Keep the
-// same ambient here rather than modelling a 7.0 app; the versioned-defaults
-// mechanism itself is covered by trailtie.test.ts.
-
 // Mirror Rails activerecord/test/cases/helper.rb:46 — register the fake adapter
 // for the whole suite, before any model calls establish_connection(adapter:
 // "fake") at load time (test/models/contact.rb:6).
