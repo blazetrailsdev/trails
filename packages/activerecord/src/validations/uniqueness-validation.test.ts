@@ -30,7 +30,7 @@ import { Essay } from "../test-helpers/models/essay.js";
 import { CpkAuthor, CpkBook } from "../test-helpers/models/cpk.js";
 // Zeitwerk analog: Cpk::Book's counter-cached/association targets (Cpk::Order)
 // are resolved by name, as Rails resolves them from the autoloaded models tree.
-import "../test-helpers/canonical-model-index.js";
+import "../support/canonical-model-index.js";
 
 const INT_MAX_VALUE = 2147483647;
 
