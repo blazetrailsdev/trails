@@ -245,10 +245,6 @@ describe("ActiveRecord::Migration::ForeignKeyTest", () => {
     });
   });
 
-  // Rails distinguishes `column: :rocket_id` from `column: "rocket_id"` because
-  // Ruby symbols and strings are different objects; TypeScript has only the
-  // string, so this is the same call as the case above — kept because
-  // test:compare matches Rails test names one-for-one.
   it("remove foreign key by symbol column", async () => {
     const conn = await ambientConnection();
     await withRocketTables(conn, async () => {
@@ -260,8 +256,6 @@ describe("ActiveRecord::Migration::ForeignKeyTest", () => {
     });
   });
 
-  // Rails: `skip if current_adapter?(:SQLite3Adapter)` — SQLite's
-  // PRAGMA foreign_key_list exposes no constraint name to look up.
   it.skipIf(!unlessSqlite3Adapter)("remove foreign key by name", async () => {
     const conn = await ambientConnection();
     await withRocketTables(conn, async () => {

@@ -130,11 +130,7 @@ export interface AddForeignKeyOptions {
   ifNotExists?: boolean;
 }
 
-/**
- * Options accepted by `remove_foreign_key(from_table, to_table = nil, **options)`.
- * Rails forwards whatever `add_foreign_key` took and only slices out the keys it
- * resolves the constraint on, so leftovers (e.g. `on_delete:`) ride along unused.
- */
+/** Mirrors: the keyword args of `remove_foreign_key(from_table, to_table = nil, **options)` */
 export interface RemoveForeignKeyOptions extends AddForeignKeyOptions {
   toTable?: string;
   ifExists?: boolean;

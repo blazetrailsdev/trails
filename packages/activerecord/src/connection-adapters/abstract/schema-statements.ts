@@ -849,9 +849,6 @@ export class SchemaStatements {
   async removeForeignKey(
     fromTable: string,
     toTableOrOptions?: string | RemoveForeignKeyOptions,
-    // Rails' `remove_foreign_key(from_table, to_table = nil, **options)` accepts
-    // whatever add_foreign_key took (e.g. `on_delete:`) and only slices out the
-    // keys it matches on, so unrecognized options are carried, not rejected.
     options: RemoveForeignKeyOptions = {},
   ): Promise<void> {
     const adapter = this.adapter as any;

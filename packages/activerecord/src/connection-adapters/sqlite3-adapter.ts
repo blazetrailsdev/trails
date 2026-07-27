@@ -64,6 +64,7 @@ import {
   getFs,
   getPath,
   Notifications,
+  pluralize,
   runLoadHooks,
   trailsRoot,
 } from "@blazetrails/activesupport";
@@ -103,6 +104,7 @@ import {
   ForeignKeyDefinition,
   type AddForeignKeyOptions,
   type RemoveForeignKeyOptions,
+  type ForeignKeyLookupOptions,
 } from "./abstract/schema-definitions.js";
 import { Column } from "./column.js";
 import { Column as Sqlite3Column } from "./sqlite3/column.js";
@@ -2269,42 +2271,37 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     toTableOrOptions?: string | RemoveForeignKeyOptions,
     options: RemoveForeignKeyOptions = {},
   ): Promise<void> {
-    // Rails' `remove_foreign_key(from_table, to_table = nil, **options)` reads
-    // to_table and the options independently, so a positional to_table can be
-    // narrowed by a `column:` option (test_remove_foreign_key_by_the_select_one_on_the_same_table).
+    const positionalToTable = typeof toTableOrOptions === "string" ? toTableOrOptions : undefined;
     const opts: RemoveForeignKeyOptions =
       typeof toTableOrOptions === "object" && toTableOrOptions !== null
         ? { ...toTableOrOptions, ...options }
         : { ...options };
-    const explicitToTable = typeof toTableOrOptions === "string" ? toTableOrOptions : opts.toTable;
-    const column = typeof opts.column === "string" ? opts.column : undefined;
-    const name = opts.name;
     const ifExists = opts.ifExists === true;
+    delete opts.ifExists;
 
-    if (!explicitToTable && !column && !name) {
-      throw new Error("removeForeignKey requires a target table or options");
-    }
+    if (ifExists && !(await this.foreignKeyExists(fromTable, positionalToTable))) return;
+
+    const toTable = positionalToTable ?? opts.toTable;
+    const matchOptions: ForeignKeyLookupOptions = { ...opts };
+    delete matchOptions.name;
+    delete matchOptions.toTable;
+    delete matchOptions.validate;
 
     const existingFks = await this.foreignKeys(fromTable);
-    const fkNames = await this._parseForeignKeyNames(fromTable);
-    const { bare: bareFrom } = this._splitTableName(fromTable);
-
     const fkToRemove = existingFks.find((fk) => {
-      const fkCols = Array.isArray(fk.column) ? fk.column : [fk.column];
-      const fkKey = fkCols.join(",");
-      if (name) {
-        const parsedName = fkNames.get(fkKey) ?? `fk_${bareFrom}_${fkCols.join("_")}`;
-        return parsedName === name;
-      }
-      if (explicitToTable && fk.toTable !== explicitToTable) return false;
-      if (column) return fkCols.includes(column);
-      return explicitToTable != null;
+      const inferred = String(matchOptions.column ?? "").replace(/_id$/, "");
+      const table = this.schemaStatements().stripTableNamePrefixAndSuffix(
+        toTable ?? pluralize(inferred),
+      );
+      return (
+        this.schemaStatements().stripTableNamePrefixAndSuffix(fk.toTable) === table &&
+        fk.isDefinedFor(matchOptions)
+      );
     });
 
     if (!fkToRemove) {
-      if (ifExists) return;
       throw new ArgumentError(
-        `Table '${fromTable}' has no foreign key for ${explicitToTable || JSON.stringify(opts)}`,
+        `Table '${fromTable}' has no foreign key for ${toTable ?? JSON.stringify(matchOptions)}`,
       );
     }
 
