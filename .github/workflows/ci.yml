@@ -197,7 +197,11 @@ jobs:
           # eslint/ rides on it because the custom rules' own RuleTester suites
           # are in the same invocation: without this clause a PR that only
           # touches a rule or its test would skip the only job that runs them.
-          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport)/|eslint/|scripts/(tasks|guides-typecheck|parity|api-compare|test-compare|fixtures-compare|test-deps|rails-find)/|scripts/(strip-asany|rails-file-structure-mixins|ci-suite-coverage)(\.test)?\.ts$)'
+          # eslint.config.mjs is named separately (it is not under eslint/):
+          # eslint/rails-private-jsdoc.config.test.mjs is a drift guard between
+          # it and eslint/rails-private-jsdoc.config.mjs, so an isolated change
+          # to the root config must still run the guard.
+          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport)/|eslint/|scripts/(tasks|guides-typecheck|parity|api-compare|test-compare|fixtures-compare|test-deps|rails-find)/|scripts/(strip-asany|rails-file-structure-mixins|ci-suite-coverage)(\.test)?\.ts$|eslint\.config\.mjs$)'
           # guides_affected gates the Guides Code Type Check job, which
           # compiles fenced TS blocks in packages/website/docs/guides/**.
           # Today guides only import @blazetrails/activerecord,
@@ -1377,16 +1381,27 @@ jobs:
         run: pnpm exec tsx scripts/api-compare/lint-deps.ts
       - name: Rails-private JSDoc lint
         # Needs rails-api.json (extracted above) to enforce
-        # blazetrails/rails-private-jsdoc. The standalone Lint job has
-        # no Ruby and intentionally no-ops this rule.
-        run: pnpm exec tsx scripts/build-rails-privates-manifest.ts && pnpm exec eslint packages/arel/src
+        # blazetrails/rails-private-jsdoc. The standalone Lint job has no Ruby
+        # and intentionally no-ops this rule via `--allow-missing`; here the
+        # builder runs WITHOUT that flag, so a missing extraction fails the job
+        # instead of quietly producing an empty manifest the rule can't match.
+        # Uses the standalone eslint/rails-private-jsdoc.config.mjs so this step
+        # runs that ONE rule over every package the root config enables it for,
+        # rather than re-running the whole ruleset (which would duplicate the
+        # Lint job). Linting only packages/arel/src here left activesupport,
+        # activemodel, actionpack, actionview and activerecord unenforced.
+        run: |
+          pnpm exec tsx scripts/build-rails-privates-manifest.ts
+          pnpm exec eslint --no-inline-config --config eslint/rails-private-jsdoc.config.mjs packages
       - name: Rails file-structure method-order lint
         # Needs rails-api.json (extracted above) to build the per-class
         # method-order manifest, then enforce
         # blazetrails/rails-file-structure-method-order. The manifest is
         # gitignored and only exists here (never committed), so the
-        # standalone Lint job intentionally no-ops this rule — this is the
-        # only job where it goes live. Enabled per-package via
+        # standalone Lint job intentionally no-ops this rule via
+        # `--allow-missing` — this is the only job where it goes live, and here
+        # the builder runs without that flag so a missing extraction fails
+        # loudly rather than emptying the manifest. Enabled per-package via
         # eslint.config.mjs (arel + activemodel). RAILS_STRUCTURE_REPORT=1 prints
         # (to stderr, non-failing) any manifest bucket that matched no container
         # — a renamed class past the fallback, or a module ported as a class —

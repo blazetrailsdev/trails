@@ -36,6 +36,7 @@ import {
   beginManifestBatch,
   flushManifestBatch,
 } from "./api-compare/write-json-manifest.js";
+import { railsApiAvailable } from "./api-compare/require-rails-api.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -57,6 +58,16 @@ const PACKAGE_DIRS: Record<string, string> = {
 const RAILS_API_PATH = path.join(ROOT, "scripts/api-compare/output/rails-api.json");
 const OUT = path.join(ROOT, "eslint/rails-private-methods.json");
 
+// Resolved before any manifest is written: without `--allow-missing` this
+// throws, and we would rather abort than half-write the batch below.
+const hasRailsApi = railsApiAvailable({
+  scriptName: "build-rails-privates-manifest",
+  railsApiPath: RAILS_API_PATH,
+  manifestName: "eslint/rails-private-methods.json",
+  ruleName: "rails-private-jsdoc",
+  argv: process.argv.slice(2),
+});
+
 // This script emits three manifests per run. Collect their writes and format
 // them all in one prettier spawn (~330ms of startup, once instead of thrice).
 beginManifestBatch();
@@ -71,13 +82,9 @@ emitDeprecatedManifest();
 // so emit it here too — before the rails-api.json early exit.
 emitCallbackInvocationsManifest();
 
-if (!fs.existsSync(RAILS_API_PATH)) {
+if (!hasRailsApi) {
   writeJsonManifest(OUT, { files: {} });
   flushManifestBatch();
-  console.warn(
-    `[build-rails-privates-manifest] ${RAILS_API_PATH} missing; wrote empty manifest. ` +
-      `Run \`pnpm api:compare\` to regenerate with real data.`,
-  );
   process.exit(0);
 }
 
