@@ -323,6 +323,12 @@ export interface AbstractAdapter {
     columns: string | string[] | null | undefined,
     options?: { name?: string; unique?: boolean; valid?: boolean },
   ): Promise<boolean>;
+  /** @internal */
+  indexNameForRemove(
+    tableName: string,
+    columnName: string | null | undefined,
+    options: { name?: string; column?: string | string[] },
+  ): Promise<string>;
   tableExists(tableName: string): Promise<boolean>;
   // Options SchemaMigration / InternalMetadata pass to `t.string` for their
   // primary key. Mixed in from SchemaStatements; declared here so those
