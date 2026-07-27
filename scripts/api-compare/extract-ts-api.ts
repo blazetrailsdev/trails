@@ -6,15 +6,11 @@
  *
  * ## Adding a per-method field derived from a declaration
  *
- * A `MethodInfo` is constructed in ~10 places here (class members, the
- * `__mixin` synthesis, the named-export list, object literals, file-local
- * helpers, interface signatures, interface `extends`-resolved members,
- * namespace functions and consts, top-level functions). Whether a
+ * A `MethodInfo` is constructed in ~10 places here. Whether a
  * declaration-derived field (`internal`, `noRailsEquivalent`, …) must be
  * copied at a given site is decided by ONE thing: whether
- * `collectTsFileNames` (extra-surface.ts) counts that entry as the file's
- * own surface. That function is the authority — read it, don't reason by
- * analogy.
+ * `collectTsFileNames` (extra-surface.ts) counts that entry as the file's own
+ * surface. That function is the authority — read it, don't reason by analogy.
  *
  * - counted → the site MUST read the declaration's metadata.
  * - not counted → it MUST NOT: the copied value can never match this file's

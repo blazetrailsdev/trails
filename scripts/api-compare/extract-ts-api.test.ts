@@ -22,6 +22,7 @@ import {
   packageFingerprint,
   tsLiteralValue,
 } from "./extract-ts-api.js";
+import { collectTsFileNames } from "./extra-surface.js";
 import { overlappingSubDirs, packageSrcDir } from "./config.js";
 import type { ClassInfo, MethodInfo, PackageInfo } from "./types.js";
 
@@ -1668,17 +1669,12 @@ describe("sub-package de-overlap", () => {
 /**
  * Every `MethodInfo` emit site in the extractor, pinned in one fixture.
  *
- * Adding a per-method declaration-derived field (`@missingRailsCall` is the
- * obvious next one) means visiting every site that must copy it. There is no
- * mechanical way to enumerate those sites from the source, so PR #5358 found
- * them one review round at a time and guessed wrong twice. This fixture tags
- * EVERY declaration the extractor can reach and asserts, per emitted entry,
- * whether the tag came through — so a new field with a missed site fails here
- * instead of in review.
- *
- * The rule (see the emit-site comment block in extract-ts-api.ts): an entry
- * must carry declaration-derived metadata iff `collectTsFileNames`
- * (extra-surface.ts) counts it as the file's own surface.
+ * Adding a per-method declaration-derived field means visiting every site that
+ * must copy it, and there is no mechanical way to enumerate those sites from
+ * the source — PR #5358 found them one review round at a time and guessed
+ * wrong twice. This fixture tags EVERY declaration the extractor can reach, so
+ * a new field with a missed site fails here instead of in review. The rule it
+ * encodes lives in the extract-ts-api.ts module comment.
  */
 const EMIT_SITE_FIXTURE: Record<string, string> = {
   "mixin-base.ts": `
@@ -1771,7 +1767,7 @@ interface EmitEntry {
   /** Container key, or `<fileFunctions>` for the per-file function list. */
   container: string;
   name: string;
-  /** Does `collectTsFileNames` count this entry as `emit-sites.ts`'s surface? */
+  /** Does `collectTsFileNames` count this entry as the file's own surface? */
   counted: boolean;
   /** Did the declaration's `@noRailsEquivalent` tag reach this entry? */
   hasReason: boolean;
@@ -1779,9 +1775,10 @@ interface EmitEntry {
 
 /**
  * Flatten every entry the extractor emitted for `file`, tagging each with the
- * `collectTsFileNames` counted-ness that decides whether it must carry
- * declaration-derived metadata. Mirrors that function's filter deliberately:
- * if the two drift, this fixture's expectations stop meaning what they say.
+ * counted-ness that decides whether it must carry declaration-derived
+ * metadata. `collectTsFileNames` only exposes a per-file name Set, so the
+ * filter is restated here for per-entry granularity; the drift that invites is
+ * caught by the cross-check test below.
  */
 function emitInventory(info: PackageInfo, file: string): EmitEntry[] {
   const out: EmitEntry[] = [];
@@ -1799,8 +1796,8 @@ function emitInventory(info: PackageInfo, file: string): EmitEntry[] {
     for (const m of c.classMethods) push(key, m, skipForeign);
   }
   for (const m of info.fileFunctions[file] ?? []) push("<fileFunctions>", m, false);
-  // Plain code-unit ordering, not localeCompare: the expected table below is
-  // written out by hand and must not shift with the host's collation.
+  // Code-unit ordering, not localeCompare: the hand-written table below must
+  // not shift with the host's collation.
   return out.sort((a, b) => {
     const ka = `${a.container}#${a.name}`;
     const kb = `${b.container}#${b.name}`;
@@ -1809,18 +1806,18 @@ function emitInventory(info: PackageInfo, file: string): EmitEntry[] {
 }
 
 /**
- * The pinned inventory. Every entry below has a tagged declaration behind it
- * except the three noted:
+ * The pinned inventory. Every entry has a tagged declaration behind it and so
+ * expects `hasReason: true`, except four:
  *
- * - `<fileFunctions>#Attributes` — the mixin factory itself, left untagged so
- *   an untagged counted site is represented too.
+ * - `<fileFunctions>#Attributes` — the mixin factory, left untagged so an
+ *   untagged counted site is represented too.
  * - `<fileFunctions>#aliasTarget` / `#shorthandRef` — `extractFileLocalHelpers`
- *   output, always `internal: true`, so not counted and never metadata-bearing.
+ *   output, always `internal: true`, so uncounted and never metadata-bearing.
  * - `Attributes__mixin#constructor` — synthesized from the factory's construct
  *   signature; counted, but there is no member declaration to read a tag off.
  * - `<fileFunctions>#renamedExport` — an untagged `export { x as y }` alias
- *   deliberately drops the declaration's reason: the reason justifies the
- *   declared spelling, not the alias. `#taggedAlias` is the tagged form.
+ *   drops the declaration's reason: the reason justifies the declared
+ *   spelling, not the alias. `#taggedAlias` is the tagged form.
  */
 const EMIT_SITE_INVENTORY: EmitEntry[] = [
   { container: "<fileFunctions>", name: "Attributes", counted: true, hasReason: false },
@@ -1866,30 +1863,26 @@ const EMIT_SITE_INVENTORY: EmitEntry[] = [
 describe("extract-ts-api — MethodInfo emit-site inventory", () => {
   it("pins every emit site and whether declaration-derived metadata reaches it", () => {
     const info = extractFromFiles("/p", EMIT_SITE_FIXTURE);
-    // An exact match, not a superset: a NEW emit site shows up here as an
-    // unexpected entry, which is the whole point of the fixture.
+    // Exact match, not a superset: a NEW emit site shows up as an unexpected
+    // entry, and a field that misses an existing site flips `hasReason`.
     expect(emitInventory(info, "emit-sites.ts")).toEqual(EMIT_SITE_INVENTORY);
   });
 
-  it("keeps declaration-derived metadata off entries collectTsFileNames does not count", () => {
+  it("agrees with collectTsFileNames about which entries the file owns", () => {
     const info = extractFromFiles("/p", EMIT_SITE_FIXTURE);
-    // A tag on an uncounted entry can never match its file's Rails surface —
-    // it reads as a stale allowlist entry on top of the correct match on the
-    // declaring file. See the `__mixin` foreign-member case in #5358.
-    const leaked = emitInventory(info, "emit-sites.ts").filter((e) => !e.counted && e.hasReason);
-    expect(leaked).toEqual([]);
-  });
-
-  it("carries the tag onto every counted entry whose declaration has one", () => {
-    const info = extractFromFiles("/p", EMIT_SITE_FIXTURE);
-    const missing = emitInventory(info, "emit-sites.ts").filter(
-      (e) =>
-        e.counted &&
-        !e.hasReason &&
-        !(e.container === "<fileFunctions>" && e.name === "Attributes") &&
-        !(e.container === "<fileFunctions>" && e.name === "renamedExport") &&
-        !(e.container.endsWith("__mixin") && e.name === "constructor"),
+    const file = "emit-sites.ts";
+    const counted = new Set(
+      emitInventory(info, file)
+        .filter((e) => e.counted)
+        .map((e) => e.name),
     );
-    expect(missing).toEqual([]);
+    expect(counted).toEqual(
+      collectTsFileNames(
+        file,
+        Object.values(info.classes),
+        Object.values(info.modules),
+        info.fileFunctions[file],
+      ),
+    );
   });
 });
