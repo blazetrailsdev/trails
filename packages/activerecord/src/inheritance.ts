@@ -845,8 +845,16 @@ export function discriminateClassForRecord(
   if (usingSingleTableInheritance(modelClass, record)) {
     const inheritCol = modelClass.inheritanceColumn;
     if (inheritCol === null) return modelClass;
-    // Rails: subclass = base_class.type_for_attribute(inheritCol).cast(record[inheritCol])
-    const castValue = castInheritanceColumnValue(modelClass, inheritCol, record[inheritCol]);
+    // Rails casts through `base_class`, not the receiver (find_sti_class,
+    // inheritance.rb:312), so a subclass that overrides the inheritance column's
+    // attribute type still resolves against the hierarchy's own type. Only the
+    // subclass lookup and its `subclass == self || descendants.include?` check
+    // stay on the receiver.
+    const castValue = castInheritanceColumnValue(
+      baseClass.call(modelClass),
+      inheritCol,
+      record[inheritCol],
+    );
     // A present-but-unmapped enum value casts to null; Rails keeps such values
     // (EnumType#cast's `value.presence` fallback) so find_sti_class still
     // raises SubclassNotFound rather than masking it as the base class.
