@@ -92,6 +92,23 @@ export async function withNativeDatabaseTypeOverrides<T>(
 export { PostgreSQLAdapter };
 
 /**
+ * Suffixes an inline DDL table name so concurrent suites cannot drop each
+ * other's copy of it.
+ *
+ * Rails creates `samples`/`bits` inline in each transaction test's `setup`
+ * (transaction_test.rb, transaction_nested_test.rb) and runs single-process, so
+ * the shared name is harmless there. Trails forks 6 vitest workers onto ONE
+ * shared CI database, and vitest puts these two files in different workers: one
+ * file's `afterEach` `DROP TABLE IF EXISTS samples` can drop the table the
+ * other file is mid-test against, surfacing as 42P01 on an innocent test. A
+ * per-suite physical name keeps the DDL isolated; the Rails-facing surface
+ * (test names, the columns, the semantics) is untouched.
+ */
+export function suiteTable(name: string, suite: string): string {
+  return `${name}_${suite}`;
+}
+
+/**
  * Mirrors Rails' SQLSubscriber test helper from activerecord/test/cases/helper.rb.
  * Records sql.active_record notifications so tests can assert on payload fields.
  */

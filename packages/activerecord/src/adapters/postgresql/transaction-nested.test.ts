@@ -14,7 +14,11 @@
  * from the aborted state — see assertConnectionRecovers.
  */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, suiteTable } from "./test-helper.js";
+
+// See suiteTable: cross-worker DDL isolation for Rails' inline `samples`/`bits`.
+const SAMPLES = suiteTable("samples", "transaction_nested");
+const BITS = suiteTable("bits", "transaction_nested");
 import { SerializationFailure, Deadlocked } from "../../errors.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -29,20 +33,20 @@ describeIfPg("PostgreSQLAdapter", () => {
   describe("PostgreSQLTransactionNestedTest", () => {
     // Mirrors Rails' setup (samples + bits, value col); created post-reset.
     beforeEach(async () => {
-      await adapter.exec("DROP TABLE IF EXISTS samples, bits");
-      await adapter.exec("CREATE TABLE samples (id int PRIMARY KEY, value integer)");
-      await adapter.exec("CREATE TABLE bits (id int PRIMARY KEY, value integer)");
-      await adapter.execute("INSERT INTO samples VALUES (1, 0), (2, 0)");
-      await adapter.execute("INSERT INTO bits VALUES (1, 0)");
+      await adapter.exec(`DROP TABLE IF EXISTS ${SAMPLES}, ${BITS}`);
+      await adapter.exec(`CREATE TABLE ${SAMPLES} (id int PRIMARY KEY, value integer)`);
+      await adapter.exec(`CREATE TABLE ${BITS} (id int PRIMARY KEY, value integer)`);
+      await adapter.execute(`INSERT INTO ${SAMPLES} VALUES (1, 0), (2, 0)`);
+      await adapter.execute(`INSERT INTO ${BITS} VALUES (1, 0)`);
     });
     afterEach(async () => {
-      await adapter.exec("DROP TABLE IF EXISTS samples, bits");
+      await adapter.exec(`DROP TABLE IF EXISTS ${SAMPLES}, ${BITS}`);
     });
 
     // Mirrors make_parent_transaction_dirty (Bit.take): reads `bits`, not the
     // contended `samples` rows.
     async function makeParentTransactionDirty(conn: PostgreSQLAdapter): Promise<void> {
-      await conn.execute("SELECT * FROM bits LIMIT 1");
+      await conn.execute(`SELECT * FROM ${BITS} LIMIT 1`);
     }
 
     // Serializable parent on each connection, dirty each, savepoint on
@@ -52,12 +56,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
       await other.beginIsolatedDbTransaction("serializable");
       await makeParentTransactionDirty(other);
-      await other.execute("SELECT sum(value) FROM samples");
+      await other.execute(`SELECT sum(value) FROM ${SAMPLES}`);
       await adapter.beginIsolatedDbTransaction("serializable");
       await makeParentTransactionDirty(adapter);
-      await adapter.execute("SELECT sum(value) FROM samples");
+      await adapter.execute(`SELECT sum(value) FROM ${SAMPLES}`);
       await adapter.createSavepoint("sp1");
-      await other.execute("UPDATE samples SET value = 1 WHERE id = 1");
+      await other.execute(`UPDATE ${SAMPLES} SET value = 1 WHERE id = 1`);
       await other.commitDbTransaction();
       return other;
     }
@@ -70,11 +74,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       await makeParentTransactionDirty(other);
       await adapter.createSavepoint("sp1");
       await other.createSavepoint("sp1");
-      await adapter.execute("UPDATE samples SET value = 1 WHERE id = 1");
-      await other.execute("UPDATE samples SET value = 2 WHERE id = 2");
+      await adapter.execute(`UPDATE ${SAMPLES} SET value = 1 WHERE id = 1`);
+      await other.execute(`UPDATE ${SAMPLES} SET value = 2 WHERE id = 2`);
       const [r1, r2] = await Promise.allSettled([
-        adapter.execute("UPDATE samples SET value = 3 WHERE id = 2"),
-        other.execute("UPDATE samples SET value = 4 WHERE id = 1"),
+        adapter.execute(`UPDATE ${SAMPLES} SET value = 3 WHERE id = 2`),
+        other.execute(`UPDATE ${SAMPLES} SET value = 4 WHERE id = 1`),
       ]);
       const errs = [r1, r2].filter((r) => r.status === "rejected");
       return errs.length === 1 && errs[0].reason instanceof Deadlocked;
@@ -84,18 +88,18 @@ describeIfPg("PostgreSQLAdapter", () => {
     // transaction commits and persists (fails if state was left stuck).
     async function assertConnectionRecovers(): Promise<void> {
       await adapter.beginDbTransaction();
-      await adapter.execute("UPDATE samples SET value = 7 WHERE id = 2");
+      await adapter.execute(`UPDATE ${SAMPLES} SET value = 7 WHERE id = 2`);
       await adapter.commitDbTransaction();
-      const rows = await adapter.execute("SELECT value FROM samples WHERE id = 2");
+      const rows = await adapter.execute(`SELECT value FROM ${SAMPLES} WHERE id = 2`);
       expect((rows[0] as { value: number }).value).toBe(7);
     }
 
     it("unserializable transaction raises SerializationFailure inside nested SavepointTransaction", async () => {
       const other = await serializationConflict();
       try {
-        await expect(adapter.execute("UPDATE samples SET value = 2 WHERE id = 1")).rejects.toThrow(
-          SerializationFailure,
-        );
+        await expect(
+          adapter.execute(`UPDATE ${SAMPLES} SET value = 2 WHERE id = 1`),
+        ).rejects.toThrow(SerializationFailure);
       } finally {
         await adapter.rollbackDbTransaction().catch(() => {});
         await other.rollbackDbTransaction().catch(() => {});
@@ -106,9 +110,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("SerializationFailure inside nested SavepointTransaction is recoverable", async () => {
       const other = await serializationConflict();
       try {
-        await expect(adapter.execute("UPDATE samples SET value = 2 WHERE id = 1")).rejects.toThrow(
-          SerializationFailure,
-        );
+        await expect(
+          adapter.execute(`UPDATE ${SAMPLES} SET value = 2 WHERE id = 1`),
+        ).rejects.toThrow(SerializationFailure);
       } finally {
         await adapter.rollbackDbTransaction().catch(() => {});
         await other.rollbackDbTransaction().catch(() => {});
