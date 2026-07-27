@@ -62,6 +62,12 @@ file whose contents it changes and leaves the rest alone, so "some source is
 newer than the newest declaration in `dist`" is precisely "this package's build
 predates the checked-out sources".
 
+Directory mtimes count as sources too. A checkout that only _deletes_ a file
+leaves every surviving file's mtime untouched but bumps the parent directory, so
+without this the deletion would slip past. The side effect is that a checkout
+touching any non-`.ts` file under `src` also flags the package — conservative in
+the fail-loud direction, and a `pnpm build` clears it either way.
+
 A package with **no** `dist` is not stale — nothing was built, so nothing can be
 out of date, and cross-package imports fail to resolve uniformly at every
 commit. A worktree that has never run `pnpm build` therefore measures

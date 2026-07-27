@@ -3,28 +3,22 @@
  * belongs to a different commit than the checked-out sources.
  *
  * The TS extractor compiles each package with the real module resolver, so an
- * `import { … } from "@blazetrails/activesupport"` resolves through pnpm's
- * `node_modules` symlink into `packages/activesupport/dist/*.d.ts`. The
- * extracted surface of the IMPORTER therefore depends on the sibling's BUILD
- * OUTPUT, not on its sources.
+ * `import … from "@blazetrails/activesupport"` resolves through pnpm's
+ * `node_modules` symlink into `packages/activesupport/dist/*.d.ts` — the
+ * extracted surface of the IMPORTER depends on the sibling's BUILD OUTPUT.
  *
- * `dist/` is untracked build output, so `git checkout` does not update it. The
- * documented way to take an `api:extra` baseline — `git checkout --detach
- * origin/main` in the same worktree, run, then check the branch back out — thus
- * measures `origin/main`'s sources against the BRANCH's `dist`. Nothing in the
- * cache layer can repair this: the shared cache is content-keyed and the entries
- * record their resolved read-set, so the caches correctly serve what a fresh
- * extraction would produce — a fresh extraction of a mismatched tree. The result
- * is a phantom delta on packages the diff never touched, which is exactly the
- * failure this module exists to make loud.
+ * `dist/` is untracked, so `git checkout` never updates it. Taking an
+ * `api:extra` baseline the documented way (check out `origin/main`, measure,
+ * check the branch back out) therefore measures one commit's sources against
+ * the other commit's build, and packages the diff never touched move. No cache
+ * layer can repair that: the shared cache is content-keyed and its entries
+ * record their resolved read-set, so it already serves exactly what a fresh
+ * extraction of the same mismatched tree would produce.
  *
- * Detection is mtime-based on purpose. `git checkout` rewrites the mtime of
- * every file whose contents it changes and leaves the rest alone, so "some
- * source under `packages/<dir>` is newer than the newest declaration in
- * `packages/<dir>/dist`" is precisely "this package's build predates the
- * checked-out sources". A package with no `dist` at all is NOT stale: nothing
- * was built, so nothing can be out of date, and cross-package imports simply
- * fail to resolve uniformly at every commit.
+ * Detection is mtime-based because `git checkout` rewrites the mtime of exactly
+ * the paths whose contents it changes. Directory mtimes are folded in so a
+ * checkout that only DELETES a source file — which leaves every surviving
+ * file's mtime alone but bumps its parent directory — is still caught.
  *
  * Constraints: async fs only, no `node:` specifiers, no `process` references.
  */
@@ -35,25 +29,45 @@ import * as path from "path";
 export interface StaleBuild {
   /** Directory name under `packages/` (not the api-compare package key). */
   dir: string;
-  /** Repo-relative path of the newest source file, for the error message. */
+  /** Repo-relative path of the newest source path, for the error message. */
   newestSource: string;
 }
 
-/** Newest mtime under `dir` for files passing `keep`, or null if there are none. */
+interface Newest {
+  mtimeMs: number;
+  file: string;
+}
+
+function later(a: Newest | null, b: Newest | null): Newest | null {
+  if (!a) return b;
+  if (!b) return a;
+  return b.mtimeMs > a.mtimeMs ? b : a;
+}
+
+/**
+ * Newest mtime at or under `dir` among files passing `keep`, and — when
+ * `includeDirs` — the directories themselves. Null if `dir` is unreadable.
+ */
 async function newestMtime(
   dir: string,
   keep: (name: string) => boolean,
-): Promise<{ mtimeMs: number; file: string } | null> {
+  includeDirs: boolean,
+): Promise<Newest | null> {
   let entries;
+  let self: Newest | null = null;
   try {
     entries = await fs.readdir(dir, { withFileTypes: true });
+    if (includeDirs) {
+      const stat = await fs.stat(dir);
+      self = { mtimeMs: stat.mtimeMs, file: dir };
+    }
   } catch {
     return null;
   }
   const found = await Promise.all(
-    entries.map(async (entry) => {
+    entries.map(async (entry): Promise<Newest | null> => {
       const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) return newestMtime(full, keep);
+      if (entry.isDirectory()) return newestMtime(full, keep, includeDirs);
       if (!keep(entry.name)) return null;
       try {
         const stat = await fs.stat(full);
@@ -63,22 +77,17 @@ async function newestMtime(
       }
     }),
   );
-  let best: { mtimeMs: number; file: string } | null = null;
-  for (const candidate of found) {
-    if (candidate && (!best || candidate.mtimeMs > best.mtimeMs)) best = candidate;
-  }
-  return best;
+  return found.reduce(later, self);
 }
 
 const isSource = (name: string) => name.endsWith(".ts") && !name.endsWith(".d.ts");
 const isDeclaration = (name: string) => name.endsWith(".d.ts");
 
 /**
- * Every package under `packagesDir` that HAS a `dist` whose newest declaration
- * is older than the newest file in its `src`. Packages without a `dist`, or
- * without a `src`, are skipped (see the module comment).
- *
- * `rootDir` only anchors the reported path so the message is repo-relative.
+ * Every package under `packagesDir` whose `dist` was built before its current
+ * `src`. A package with no `dist` is NOT stale — nothing was built, so nothing
+ * can be out of date and cross-package imports fail to resolve uniformly at
+ * every commit. `rootDir` only anchors the reported path.
  */
 export async function staleBuilds(packagesDir: string, rootDir: string): Promise<StaleBuild[]> {
   let dirs: string[];
@@ -91,27 +100,23 @@ export async function staleBuilds(packagesDir: string, rootDir: string): Promise
     dirs.map(async (dir): Promise<StaleBuild | null> => {
       const packageDir = path.join(packagesDir, dir);
       const [source, built] = await Promise.all([
-        newestMtime(path.join(packageDir, "src"), isSource),
-        newestMtime(path.join(packageDir, "dist"), isDeclaration),
+        newestMtime(path.join(packageDir, "src"), isSource, true),
+        newestMtime(path.join(packageDir, "dist"), isDeclaration, false),
       ]);
-      if (!source || !built) return null;
-      if (source.mtimeMs <= built.mtimeMs) return null;
+      if (!source || !built || source.mtimeMs <= built.mtimeMs) return null;
       return { dir, newestSource: path.relative(rootDir, source.file).replace(/\\/g, "/") };
     }),
   );
-  return checked.filter((entry): entry is StaleBuild => entry !== null).sort(byDir);
-}
-
-function byDir(a: StaleBuild, b: StaleBuild): number {
-  return a.dir < b.dir ? -1 : a.dir > b.dir ? 1 : 0;
+  return checked
+    .filter((entry): entry is StaleBuild => entry !== null)
+    .sort((a, b) => (a.dir < b.dir ? -1 : a.dir > b.dir ? 1 : 0));
 }
 
 /** The operator-facing failure text for a non-empty `staleBuilds` result. */
 export function staleBuildMessage(stale: StaleBuild[]): string {
-  const lines = stale.map((entry) => `  packages/${entry.dir} — newer: ${entry.newestSource}`);
   return [
     `api:compare would measure ${stale.length} package(s) against a stale build:`,
-    ...lines,
+    ...stale.map((entry) => `  packages/${entry.dir} — newer: ${entry.newestSource}`),
     "",
     "Cross-package imports resolve through packages/<pkg>/dist/*.d.ts, which git",
     "does not update on checkout, so these totals would mix one commit's sources",

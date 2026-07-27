@@ -19,26 +19,51 @@ afterEach(() => {
   for (const dir of tmpDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
+function setMtime(target: string, seconds: number): void {
+  fs.utimesSync(target, seconds, seconds);
+}
+
+/** Age every directory at or under `dir` — creating files leaves them at "now". */
+function ageDirs(dir: string, seconds: number): void {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) ageDirs(path.join(dir, entry.name), seconds);
+  }
+  setMtime(dir, seconds);
+}
+
 /** A package whose `dist` was built AFTER its sources — the healthy state. */
-function buildPackage(packagesDir: string, name: string, body = "export const a = 1;\n"): string {
+function buildPackage(packagesDir: string, name: string, sources = ["index.ts"]): string {
   const pkg = path.join(packagesDir, name);
-  fs.mkdirSync(path.join(pkg, "src"), { recursive: true });
   fs.mkdirSync(path.join(pkg, "dist"), { recursive: true });
-  fs.writeFileSync(path.join(pkg, "src", "index.ts"), body);
+  for (const source of sources) {
+    const file = path.join(pkg, "src", source);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, "export const a = 1;\n");
+    setMtime(file, 1000);
+  }
+  ageDirs(path.join(pkg, "src"), 1000);
   fs.writeFileSync(path.join(pkg, "dist", "index.d.ts"), "export declare const a: number;\n");
-  setMtime(path.join(pkg, "src", "index.ts"), 1000);
   setMtime(path.join(pkg, "dist", "index.d.ts"), 2000);
   return pkg;
 }
 
-/** Stand-in for what `git checkout` does to a file it rewrites. */
-function checkoutSource(pkg: string, body: string, seconds: number): void {
-  fs.writeFileSync(path.join(pkg, "src", "index.ts"), body);
-  setMtime(path.join(pkg, "src", "index.ts"), seconds);
+/** Stand-in for `git checkout` rewriting a tracked file's contents. */
+function checkoutRewrite(pkg: string, source: string, seconds: number): void {
+  const file = path.join(pkg, "src", source);
+  fs.writeFileSync(file, "export const a = 2;\n");
+  setMtime(file, seconds);
 }
 
-function setMtime(file: string, seconds: number): void {
-  fs.utimesSync(file, seconds, seconds);
+/** Stand-in for `git checkout` deleting a tracked file: only the dir mtime moves. */
+function checkoutDelete(pkg: string, source: string, seconds: number): void {
+  const file = path.join(pkg, "src", source);
+  fs.rmSync(file);
+  setMtime(path.dirname(file), seconds);
+}
+
+/** Stand-in for `pnpm build` refreshing the package's declarations. */
+function rebuild(pkg: string, seconds: number): void {
+  setMtime(path.join(pkg, "dist", "index.d.ts"), seconds);
 }
 
 describe("staleBuilds", () => {
@@ -46,7 +71,7 @@ describe("staleBuilds", () => {
     const root = mkTmp();
     const packagesDir = path.join(root, "packages");
     buildPackage(packagesDir, "activesupport");
-    buildPackage(packagesDir, "trailties");
+    buildPackage(packagesDir, "trailties", ["index.ts", "railtie/configuration.ts"]);
     expect(await staleBuilds(packagesDir, root)).toEqual([]);
   });
 
@@ -55,7 +80,7 @@ describe("staleBuilds", () => {
     const packagesDir = path.join(root, "packages");
     const pkg = buildPackage(packagesDir, "activesupport");
     buildPackage(packagesDir, "trailties");
-    checkoutSource(pkg, "export const a = 2;\n", 3000);
+    checkoutRewrite(pkg, "index.ts", 3000);
 
     expect(await staleBuilds(packagesDir, root)).toEqual([
       { dir: "activesupport", newestSource: "packages/activesupport/src/index.ts" },
@@ -65,14 +90,23 @@ describe("staleBuilds", () => {
   it("finds the newest source in a nested directory", async () => {
     const root = mkTmp();
     const packagesDir = path.join(root, "packages");
-    const pkg = buildPackage(packagesDir, "activerecord");
-    const nested = path.join(pkg, "src", "relation");
-    fs.mkdirSync(nested);
-    fs.writeFileSync(path.join(nested, "query-methods.ts"), "export const b = 1;\n");
-    setMtime(path.join(nested, "query-methods.ts"), 3000);
+    const pkg = buildPackage(packagesDir, "activerecord", ["base.ts", "relation/query-methods.ts"]);
+    checkoutRewrite(pkg, "relation/query-methods.ts", 3000);
 
     expect(await staleBuilds(packagesDir, root)).toEqual([
       { dir: "activerecord", newestSource: "packages/activerecord/src/relation/query-methods.ts" },
+    ]);
+  });
+
+  it("catches a checkout that only DELETES a source file", async () => {
+    const root = mkTmp();
+    const packagesDir = path.join(root, "packages");
+    const pkg = buildPackage(packagesDir, "arel", ["index.ts", "nodes/casted.ts"]);
+    // Every surviving file keeps its old mtime; only the parent dir moves.
+    checkoutDelete(pkg, "nodes/casted.ts", 3000);
+
+    expect(await staleBuilds(packagesDir, root)).toEqual([
+      { dir: "arel", newestSource: "packages/arel/src/nodes" },
     ]);
   });
 
@@ -96,6 +130,22 @@ describe("staleBuilds", () => {
     expect(await staleBuilds(packagesDir, root)).toEqual([]);
   });
 
+  it("ignores non-source files under src and non-declarations under dist", async () => {
+    const root = mkTmp();
+    const packagesDir = path.join(root, "packages");
+    const pkg = buildPackage(packagesDir, "activemodel");
+    const fixture = path.join(pkg, "src", "fixtures.json");
+    fs.writeFileSync(fixture, "{}\n");
+    setMtime(fixture, 3000);
+    ageDirs(path.join(pkg, "src"), 1000);
+    // A .d.ts is what resolution reads; a stray .js must not vouch for it.
+    const emitted = path.join(pkg, "dist", "index.js");
+    fs.writeFileSync(emitted, "export const a = 1;\n");
+    setMtime(emitted, 4000);
+
+    expect(await staleBuilds(packagesDir, root)).toEqual([]);
+  });
+
   it("returns an empty list when there is no packages directory", async () => {
     const root = mkTmp();
     expect(await staleBuilds(path.join(root, "packages"), root)).toEqual([]);
@@ -105,7 +155,7 @@ describe("staleBuilds", () => {
     const root = mkTmp();
     const packagesDir = path.join(root, "packages");
     for (const name of ["trailties", "actionview", "activesupport"]) {
-      checkoutSource(buildPackage(packagesDir, name), "export const a = 2;\n", 3000);
+      checkoutRewrite(buildPackage(packagesDir, name), "index.ts", 3000);
     }
     const stale = await staleBuilds(packagesDir, root);
     expect(stale.map((entry) => entry.dir)).toEqual(["actionview", "activesupport", "trailties"]);
@@ -117,16 +167,16 @@ describe("staleBuilds", () => {
     const pkg = buildPackage(packagesDir, "activesupport");
     buildPackage(packagesDir, "trailties");
 
-    // checkout origin/main, rebuild, measure
-    checkoutSource(pkg, "export const a = 2;\n", 3000);
+    // check out origin/main
+    checkoutRewrite(pkg, "index.ts", 3000);
     expect(await staleBuilds(packagesDir, root)).toHaveLength(1);
-    setMtime(path.join(pkg, "dist", "index.d.ts"), 4000);
+    rebuild(pkg, 4000);
     expect(await staleBuilds(packagesDir, root)).toEqual([]);
 
-    // checkout the branch back, rebuild, measure
-    checkoutSource(pkg, "export const a = 1;\n", 5000);
+    // check the branch back out
+    checkoutRewrite(pkg, "index.ts", 5000);
     expect(await staleBuilds(packagesDir, root)).toHaveLength(1);
-    setMtime(path.join(pkg, "dist", "index.d.ts"), 6000);
+    rebuild(pkg, 6000);
     expect(await staleBuilds(packagesDir, root)).toEqual([]);
   });
 });
