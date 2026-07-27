@@ -29,6 +29,35 @@ describe("parseJsdoc", () => {
     expect(rest.join("\n")).toContain("Mirrors Rails");
     expect(rest.join("\n")).not.toContain("@missingRailsCall");
   });
+
+  it("rejects a bare tag with a file:line message", () => {
+    const comment = [
+      "/**",
+      " * Mirrors Rails `Base.all`.",
+      " * @missingRailsCall merge!",
+      " */",
+    ].join("\n");
+    expect(() => parseJsdoc(comment, { fileName: "foo.ts", startLine: 10 })).toThrow(
+      /@missingRailsCall needs a reason: foo\.ts:12 — state why the Rails call `merge!`/,
+    );
+  });
+
+  it("rejects a tag whose em-dash carries no prose, with no location when unknown", () => {
+    expect(() => parseJsdoc("/**\n * @missingRailsCall merge! — \n */")).toThrow(
+      "@missingRailsCall needs a reason: — state why the Rails call `merge!` is not made here.",
+    );
+  });
+
+  it("rejects a reason that is only whitespace after the em-dash", () => {
+    expect(() => parseJsdoc("/**\n * @missingRailsCall merge! —   \n */")).toThrow(
+      "@missingRailsCall needs a reason",
+    );
+  });
+
+  it("accepts the generator's placeholder reason", () => {
+    const { entries } = parseJsdoc(`/**\n * @missingRailsCall a — ${DEFAULT_TAG_REASON}\n */`);
+    expect(entries[0]!.reason).toBe(DEFAULT_TAG_REASON);
+  });
 });
 
 describe("reconcile", () => {
@@ -41,6 +70,11 @@ describe("reconcile", () => {
     expect(r.dropped).toEqual([]);
     const r2 = reconcile(entries, new Set(), reasonFor);
     expect(r2.dropped.map((e) => e.call)).toEqual(["a"]);
+  });
+
+  it("falls back to the placeholder when a curated reason is blank", () => {
+    const r = reconcile([], new Set(["a"]), () => "  ");
+    expect(r.added[0]!.reason).toBe(DEFAULT_TAG_REASON);
   });
 });
 
@@ -152,5 +186,19 @@ describe("reconcileFileText", () => {
     expect(text!).not.toContain("@missingRailsCall");
     expect(text!).not.toContain("/**");
     expect(text!).toContain("  bar(): void {}");
+  });
+
+  it("rejects a hand-authored bare tag, naming the tag's own line", () => {
+    const src = [
+      "export class Foo {",
+      "  /**",
+      "   * @missingRailsCall bare_call",
+      "   */",
+      "  bar(): void {}",
+      "}",
+    ].join("\n");
+    expect(() => reconcileFileText("foo.ts", src, new Map(), () => "x")).toThrow(
+      /@missingRailsCall needs a reason: foo\.ts:3 —/,
+    );
   });
 });
