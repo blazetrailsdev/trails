@@ -709,7 +709,22 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
                 : undefined;
             const calls = extractCalls(body);
             const internal = hasInternalJsDocTag(decl);
-            const noRailsEquivalent = noRailsEquivalentReason(decl);
+            // A renamed export (`export { withRoutesHelpers as with }`) is its
+            // own surface entry: the declaration's tag justifies the DECLARED
+            // spelling, and inheriting it would manufacture a stale tag on the
+            // alias whenever the alias is the Rails-matching name. So a renamed
+            // alias carries only a tag written on the export itself — on the
+            // specifier or on the `export { ... }` statement — which keeps an
+            // alias that is genuinely extra surface taggable.
+            const renamedSpecifier = sym.declarations?.find(
+              (d): d is ts.ExportSpecifier =>
+                ts.isExportSpecifier(d) && d.propertyName !== undefined,
+            );
+            const noRailsEquivalent =
+              renamedSpecifier === undefined
+                ? noRailsEquivalentReason(decl)
+                : (noRailsEquivalentReason(renamedSpecifier) ??
+                  noRailsEquivalentReason(renamedSpecifier.parent.parent));
             fileFunctions.push({
               name: sym.name,
               visibility: "public",
