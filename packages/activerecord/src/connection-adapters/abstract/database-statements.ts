@@ -115,14 +115,19 @@ export interface DatabaseStatementsHost {
   internalExecute?(
     sql: string,
     name?: string,
-    opts?: { materializeTransactions?: boolean; binds?: unknown[] },
+    opts?: {
+      materializeTransactions?: boolean;
+      allowRetry?: boolean;
+      prepare?: boolean;
+      binds?: unknown[];
+    },
   ): Promise<unknown>;
   /** @internal */
   internalExecQuery?(
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    opts?: { prepare?: boolean; allowRetry?: boolean },
+    opts?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<Result>;
   /** @internal */
   dirtyCurrentTransaction?(): void;
@@ -1418,17 +1423,24 @@ export async function internalExecQuery(
   sql: string,
   name?: string | null,
   binds?: unknown[],
+  options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
 ): Promise<Result> {
   const sqlName = name ?? "SQL";
   return logSql(this, sql, sqlName, binds, async () => {
     // Materialize lazy transactions before executing SQL
     const tm = (this as any)._transactionManager as TransactionManager | undefined;
-    if (tm) await tm.materializeTransactions();
+    if (tm && (options?.materializeTransactions ?? true)) await tm.materializeTransactions();
     if (this?.internalExecute) {
-      // Thread binds through so a bound INSERT ... RETURNING reaches the driver
-      // (Rails internal_exec_query(sql, name, binds) → internal_execute). trails
-      // carries binds in the opts object rather than positionally.
-      const rawResult = await this.internalExecute(sql, sqlName, { binds });
+      // Thread binds and exec options through so a bound INSERT ... RETURNING
+      // reaches the driver and allow_retry / materialize_transactions survive
+      // (Rails internal_exec_query(...) → internal_execute(...) → raw_execute).
+      // trails carries all of them in the opts object rather than positionally.
+      const rawResult = await this.internalExecute(sql, sqlName, {
+        binds,
+        prepare: options?.prepare,
+        allowRetry: options?.allowRetry,
+        materializeTransactions: options?.materializeTransactions,
+      });
       return this.castResult ? this.castResult(rawResult) : normalizeResult(rawResult);
     }
     if (binds && binds.length > 0) {
@@ -1524,13 +1536,13 @@ interface DatabaseStatementsDefaultsHost {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    options?: { prepare?: boolean; allowRetry?: boolean },
+    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<Result>;
   internalExecQuery(
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    options?: { prepare?: boolean; allowRetry?: boolean },
+    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<Result>;
 }
 
@@ -1680,7 +1692,7 @@ export const DatabaseStatements = {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    options?: { prepare?: boolean; allowRetry?: boolean },
+    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<Result> {
     // options.allowRetry is captured here and will flow to withRawConnection
     // once pool integration lands (connection-pool track). Real adapters that
@@ -1941,11 +1953,17 @@ export function internalExecute(
   this: DatabaseStatementsHost,
   sql: string,
   name: string = "SQL",
-  binds: unknown[] = [],
-  prepare = false,
-  _async = false,
-  allowRetry = false,
-  materializeTransactions = true,
+  {
+    binds = [],
+    prepare = false,
+    allowRetry = false,
+    materializeTransactions = true,
+  }: {
+    binds?: unknown[];
+    prepare?: boolean;
+    allowRetry?: boolean;
+    materializeTransactions?: boolean;
+  } = {},
 ): Promise<unknown> {
   const processed = preprocessQuery.call(this, sql);
   return (this as any).rawExecute(

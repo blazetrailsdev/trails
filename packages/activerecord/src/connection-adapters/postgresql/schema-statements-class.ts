@@ -15,6 +15,7 @@ import {
   type ColumnType,
 } from "../abstract/schema-definitions.js";
 import { HashLookupTypeMap } from "../../type/hash-lookup-type-map.js";
+import type { Result } from "../../result.js";
 import { Column } from "./column.js";
 import { quoteColumnName as pgQuoteColumnName } from "./quoting.js";
 import { unquoteIdentifier, splitQuotedIdentifier, Name, Utils } from "./utils.js";
@@ -35,6 +36,15 @@ import {
  */
 interface PgSchemaAdapter {
   schemaQuery(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]>;
+  internalExecQuery(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
+  ): Promise<Result>;
+  query(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[][]>;
+  queryValue(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown>;
+  queryValues(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[]>;
   exec(sql: string): Promise<void>;
   execute(sql: string): Promise<unknown>;
   clearCacheBang(): void;
@@ -237,8 +247,9 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   async indexNameExists(tableName: string, indexName: string): Promise<boolean> {
     const table = this.pg.quotedScope(tableName);
     const index = this.pg.quotedScope(indexName);
-    const rows = await this.pg.schemaQuery(`
-      SELECT COUNT(*) AS cnt
+    const count = await this.pg.queryValue(
+      `
+      SELECT COUNT(*)
       FROM pg_class t
       INNER JOIN pg_index d ON t.oid = d.indrelid
       INNER JOIN pg_class i ON d.indexrelid = i.oid
@@ -247,8 +258,10 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         AND i.relname = ${index.name}
         AND t.relname = ${table.name}
         AND n.nspname = ${table.schema}
-    `);
-    return Number(rows[0].cnt) > 0;
+    `,
+      "SCHEMA",
+    );
+    return Number(count) > 0;
   }
 
   quotedIncludeColumnsForIndex(columnNames: string | string[]): string {
@@ -378,48 +391,50 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   }
 
   override async tableComment(tableName: string): Promise<string | null> {
-    const { schema, name } = this.pg.quotedScope(tableName);
-    if (!name) return null;
-    const rows = await this.pg.schemaQuery(`
-      SELECT pg_catalog.obj_description(c.oid, 'pg_class') AS comment
+    const scope = this.pg.quotedScope(tableName, { type: "BASE TABLE" });
+    if (!scope.name) return null;
+    const comment = await this.pg.queryValue(
+      `
+      SELECT pg_catalog.obj_description(c.oid, 'pg_class')
       FROM pg_catalog.pg_class c
       LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE c.relname = ${name}
-        AND c.relkind IN ('r','p')
-        AND n.nspname = ${schema}
-    `);
-    return (rows[0]?.comment as string | null) ?? null;
+      WHERE c.relname = ${scope.name}
+        AND c.relkind IN (${scope.type})
+        AND n.nspname = ${scope.schema}
+    `,
+      "SCHEMA",
+    );
+    return (comment as string | null) ?? null;
   }
 
   async tablePartitionDefinition(tableName: string): Promise<string | null> {
-    const { schema, name } = this.pg.quotedScope(tableName);
-    if (!name) return null;
-    const rows = await this.pg.schemaQuery(`
-      SELECT pg_catalog.pg_get_partkeydef(c.oid) AS def
-      FROM pg_catalog.pg_class c
-      LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE c.relname = ${name}
-        AND c.relkind IN ('r','p')
-        AND n.nspname = ${schema}
-    `);
-    return (rows[0]?.def as string | null) ?? null;
+    const scope = this.pg.quotedScope(tableName, { type: "BASE TABLE" });
+    const def = await this.pg.queryValue(
+      `SELECT pg_catalog.pg_get_partkeydef(c.oid)
+       FROM pg_catalog.pg_class c
+       LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE c.relname = ${scope.name}
+         AND c.relkind IN (${scope.type})
+         AND n.nspname = ${scope.schema}`,
+      "SCHEMA",
+    );
+    return (def as string | null) ?? null;
   }
 
   async inheritedTableNames(tableName: string): Promise<string[]> {
-    const { schema, name } = this.pg.quotedScope(tableName);
-    if (!name) return [];
-    const rows = await this.pg.schemaQuery(`
-      SELECT parent.relname AS name
-      FROM pg_catalog.pg_inherits i
-      JOIN pg_catalog.pg_class child  ON i.inhrelid  = child.oid
-      JOIN pg_catalog.pg_class parent ON i.inhparent = parent.oid
-      LEFT JOIN pg_namespace n ON n.oid = child.relnamespace
-      WHERE child.relname = ${name}
-        AND child.relkind IN ('r','p')
-        AND n.nspname = ${schema}
-      ORDER BY i.inhseqno
-    `);
-    return rows.map((r) => r.name as string);
+    const scope = this.pg.quotedScope(tableName, { type: "BASE TABLE" });
+    const names = await this.pg.queryValues(
+      `SELECT parent.relname
+       FROM pg_catalog.pg_inherits i
+       JOIN pg_catalog.pg_class child ON i.inhrelid = child.oid
+       JOIN pg_catalog.pg_class parent ON i.inhparent = parent.oid
+       LEFT JOIN pg_namespace n ON n.oid = child.relnamespace
+       WHERE child.relname = ${scope.name}
+         AND child.relkind IN (${scope.type})
+         AND n.nspname = ${scope.schema}`,
+      "SCHEMA",
+    );
+    return names as string[];
   }
 
   override async tableOptions(tableName: string): Promise<Record<string, unknown>> {
@@ -492,10 +507,15 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   // ---------------------------------------------------------------------------
 
   async schemaNames(): Promise<string[]> {
-    const rows = await this.pg.schemaQuery(
-      `SELECT nspname FROM pg_namespace WHERE nspname !~ '^pg_' AND nspname != 'information_schema' ORDER BY nspname`,
+    const names = await this.pg.queryValues(
+      `SELECT nspname
+         FROM pg_namespace
+        WHERE nspname !~ '^pg_.*'
+          AND nspname NOT IN ('information_schema')
+        ORDER by nspname`,
+      "SCHEMA",
     );
-    return rows.map((r) => r.nspname as string);
+    return names as string[];
   }
 
   async createSchema(
@@ -773,11 +793,15 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         throw new TypeError("columnNumbers must contain only safe integers");
       return n;
     });
-    const rows = await this.pg.schemaQuery(
-      `SELECT a.attnum, a.attname FROM pg_attribute a WHERE a.attrelid = ${tableOid} AND a.attnum IN (${safeNums.join(", ")})`,
+    const rows = await this.pg.query(
+      `SELECT a.attnum, a.attname
+       FROM pg_attribute a
+       WHERE a.attrelid = ${tableOid}
+       AND a.attnum IN (${safeNums.join(", ")})`,
+      "SCHEMA",
     );
-    const map = Object.fromEntries(rows.map((r) => [Number(r.attnum), r.attname as string]));
-    return safeNums.map((n) => map[n]).filter(Boolean);
+    const map = new Map(rows.map((r) => [Number(r[0]), r[1] as string]));
+    return safeNums.map((n) => map.get(n)).filter((name): name is string => name != null);
   }
 
   override columnsForDistinct(
@@ -1142,7 +1166,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
 
   override async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
     const scope = this.pg.quotedScope(tableName);
-    const rows = await this.pg.schemaQuery(`
+    const fkInfo = await this.pg.internalExecQuery(
+      `
       SELECT t2.oid::regclass::text AS to_table, a1.attname AS column, a2.attname AS primary_key,
              c.conname AS name, c.confupdtype AS on_update, c.confdeltype AS on_delete,
              c.convalidated AS valid, c.condeferrable AS deferrable, c.condeferred AS deferred,
@@ -1157,9 +1182,13 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         AND t1.relname = ${scope.name!}
         AND t3.nspname = ${scope.schema}
       ORDER BY c.conname
-    `);
+    `,
+      "SCHEMA",
+      [],
+      { allowRetry: true, materializeTransactions: false },
+    );
     return Promise.all(
-      rows.map(async (row) => {
+      fkInfo.toArray().map(async (row) => {
         const toTable = unquoteIdentifier(row.to_table as string);
         const conkey = String(row.conkey).replace(/[{}]/g, "").split(",").map(Number);
         const confkey = String(row.confkey).replace(/[{}]/g, "").split(",").map(Number);
@@ -1234,7 +1263,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
 
   override async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
     const scope = this.pg.quotedScope(tableName);
-    const rows = await this.pg.schemaQuery(
+    const checkInfo = await this.pg.internalExecQuery(
       `SELECT conname, pg_get_constraintdef(c.oid, true) AS constraintdef, c.convalidated AS valid
        FROM pg_constraint c
        JOIN pg_class t ON c.conrelid = t.oid
@@ -1242,8 +1271,11 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
        WHERE c.contype = 'c'
          AND t.relname = ${scope.name!}
          AND n.nspname = ${scope.schema}`,
+      "SCHEMA",
+      [],
+      { allowRetry: true, materializeTransactions: false },
     );
-    return rows.map((row) => {
+    return checkInfo.toArray().map((row) => {
       const expression = (row.constraintdef as string).match(/CHECK \((.+)\)/s)?.[1] ?? "";
       return new CheckConstraintDefinition(
         tableName,
@@ -1299,7 +1331,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
 
   async exclusionConstraints(tableName: string): Promise<ExclusionConstraintDefinition[]> {
     const scope = this.pg.quotedScope(tableName);
-    const rows = await this.pg.schemaQuery(`
+    const exclusionInfo = await this.pg.internalExecQuery(
+      `
       SELECT conname, pg_get_constraintdef(c.oid) AS constraintdef, c.condeferrable, c.condeferred
       FROM pg_constraint c
       JOIN pg_class t ON c.conrelid = t.oid
@@ -1307,8 +1340,10 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       WHERE c.contype = 'x'
         AND t.relname = ${scope.name}
         AND n.nspname = ${scope.schema}
-    `);
-    return rows.map((row) => {
+    `,
+      "SCHEMA",
+    );
+    return exclusionInfo.toArray().map((row) => {
       const r = row;
       const constraintdef = r.constraintdef as string;
       const whereIdx = constraintdef.search(/ WHERE /i);
@@ -1318,10 +1353,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         predicate = constraintdef.slice(whereIdx + 7);
         excludePart = constraintdef.slice(0, whereIdx);
         predicate = predicate.replace(/ DEFERRABLE(?: INITIALLY (?:IMMEDIATE|DEFERRED))?/i, "");
-        // strip outer parentheses added by pg_get_constraintdef
-        if (predicate.startsWith("((") && predicate.endsWith("))")) {
-          predicate = predicate.slice(1, -1);
-        }
+        predicate = predicate.slice(2, -2);
       }
       const parts = excludePart.match(/EXCLUDE(?:\s+USING\s+(\S+))?\s+\((.+)\)/s);
       const using = parts?.[1];
@@ -1441,7 +1473,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
 
   async uniqueConstraints(tableName: string): Promise<UniqueConstraintDefinition[]> {
     const scope = this.pg.quotedScope(tableName);
-    const rows = await this.pg.schemaQuery(`
+    const uniqueInfo = await this.pg.internalExecQuery(
+      `
       SELECT c.conname, c.conrelid, c.conkey, c.condeferrable, c.condeferred,
              pg_get_constraintdef(c.oid) AS constraintdef
       FROM pg_constraint c
@@ -1450,9 +1483,13 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       WHERE c.contype = 'u'
         AND t.relname = ${scope.name}
         AND n.nspname = ${scope.schema}
-    `);
+    `,
+      "SCHEMA",
+      [],
+      { allowRetry: true, materializeTransactions: false },
+    );
     return Promise.all(
-      rows.map(async (row) => {
+      uniqueInfo.toArray().map(async (row) => {
         const r = row;
         const conkey = String(r.conkey).replace(/[{}]/g, "").split(",").map(Number);
         const columns = await this.columnNamesFromColumnNumbers(Number(r.conrelid), conkey);
@@ -1759,20 +1796,21 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   }
 
   async primaryKeys(tableName: string): Promise<string[]> {
-    const rows = await this.pg.schemaQuery(
-      `SELECT a.attname AS name
+    const names = await this.pg.queryValues(
+      `SELECT a.attname
        FROM (
          SELECT indrelid, indkey, generate_subscripts(indkey, 1) idx
            FROM pg_index
-          WHERE indrelid = ${this.pg.quoteLiteral(this.adapter.quoteTableName(tableName))}::regclass
+          WHERE indrelid = ${this.adapter.quote(this.adapter.quoteTableName(tableName))}::regclass
             AND indisprimary
        ) i
        JOIN pg_attribute a
          ON a.attrelid = i.indrelid
         AND a.attnum = i.indkey[i.idx]
        ORDER BY i.idx`,
+      "SCHEMA",
     );
-    return rows.map((r) => r.name as string);
+    return names as string[];
   }
 
   async pkAndSequenceFor(

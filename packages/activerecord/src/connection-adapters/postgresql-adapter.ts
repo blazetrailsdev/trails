@@ -1061,7 +1061,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    options?: { prepare?: boolean; allowRetry?: boolean },
+    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<Result> {
     return this.internalExecQuery(sql, name, binds, options);
   }
@@ -1070,7 +1070,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    options?: { prepare?: boolean; allowRetry?: boolean },
+    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<Result> {
     sql = this.preprocessQuery(sql);
     // Release the query client BEFORE any loadAdditionalTypes call —
@@ -1108,7 +1108,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           // matching sqlite/MySQL and the Rails
           // `unprepared statement materializes transaction` assertion.
           const r = await this.withRawConnection(
-            { materializeTransactions: true, allowRetry: options?.allowRetry ?? false },
+            {
+              materializeTransactions: options?.materializeTransactions ?? true,
+              allowRetry: options?.allowRetry ?? false,
+            },
             async (conn) => {
               const client = conn as unknown as pg.Client;
               try {
@@ -4010,14 +4013,20 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async foreignTables(): Promise<string[]> {
-    const rows = await this.schemaQuery(this.dataSourceSql(null, { type: "FOREIGN TABLE" }));
-    return rows.map((r) => r.relname as string);
+    const names = await this.queryValues(
+      this.dataSourceSql(null, { type: "FOREIGN TABLE" }),
+      "SCHEMA",
+    );
+    return names as string[];
   }
 
   async foreignTableExists(tableName: string): Promise<boolean> {
     if (!tableName) return false;
-    const rows = await this.schemaQuery(this.dataSourceSql(tableName, { type: "FOREIGN TABLE" }));
-    return rows.length > 0;
+    const names = await this.queryValues(
+      this.dataSourceSql(tableName, { type: "FOREIGN TABLE" }),
+      "SCHEMA",
+    );
+    return names.length > 0;
   }
 
   quotedIncludeColumnsForIndex(columnNames: string | string[]): string {
