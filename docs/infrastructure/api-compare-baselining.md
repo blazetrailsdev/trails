@@ -80,6 +80,14 @@ like every package is stale. The first version of this guard did compare mtimes
 and failed all 13 packages on every CI run while contradicting the build that
 had just succeeded.
 
+The build guard follows each package's transitive `references`, so a workspace
+that is NOT api-compared but whose declarations an api-compared package imports
+— `actionview` references `@blazetrails/tse-compiler` — is checked too. tsc
+reports the IMPORTER as `UpToDateWithUpstreamTypes` when such a reference goes
+stale, which is not an out-of-date status, so the referenced project has to be
+asked about directly. This is reachability, not "every workspace": something
+nothing references is still never consulted.
+
 Both guards are scoped to the packages `api:compare` actually extracts
 (`apiComparePackageRoots()` in `scripts/api-compare/config.ts`, derived from
 `vendor/sources.ts`) — down to the `src` subdir for the four packages that share

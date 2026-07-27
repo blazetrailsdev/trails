@@ -71,6 +71,66 @@ const STALE_STATUSES: ReadonlySet<ts.UpToDateStatusType> = new Set([
   ts.UpToDateStatusType.TsVersionOutputOfDate,
 ]);
 
+/** A project in the reference closure: where it builds to, and what to call it. */
+interface Project {
+  dir: string;
+  configPath: string;
+  distDir: string;
+}
+
+const PARSE_HOST: ts.ParseConfigFileHost = {
+  ...ts.sys,
+  onUnRecoverableConfigFileDiagnostic: () => {},
+};
+
+/**
+ * Every project reachable from `seeds` through `references`, including the
+ * seeds themselves.
+ *
+ * Checking only the api-compared packages is not enough: a package can import
+ * declaration output from a workspace that is NOT api-compared — `actionview`
+ * references `@blazetrails/tse-compiler` — and tsc reports the IMPORTER as
+ * `UpToDateWithUpstreamTypes` when such a reference goes stale, which is not an
+ * out-of-date status. The stale `dist/*.d.ts` would still be what the extractor
+ * reads, so the referenced project has to be asked about directly.
+ *
+ * This does not undo the scoping: the closure is reachability from packages
+ * api-compare actually extracts, so a workspace nothing references
+ * (`activerecord-cli`, `website`) is still never consulted.
+ */
+function referenceClosure(seeds: readonly Project[]): Project[] {
+  const found = new Map<string, Project>();
+  const queue = [...seeds];
+  while (queue.length > 0) {
+    const project = queue.pop()!;
+    if (found.has(project.configPath)) continue;
+    found.set(project.configPath, project);
+    const parsed = ts.getParsedCommandLineOfConfigFile(project.configPath, {}, PARSE_HOST);
+    for (const reference of parsed?.projectReferences ?? []) {
+      const configPath = resolveProjectConfig(reference.path);
+      if (configPath && !found.has(configPath)) queue.push(toProject(configPath));
+    }
+  }
+  return [...found.values()];
+}
+
+/** A `references` entry may name a directory or the tsconfig itself. */
+function resolveProjectConfig(referencePath: string): string | null {
+  if (referencePath.endsWith(".json")) return referencePath;
+  const candidate = path.join(referencePath, "tsconfig.json");
+  return ts.sys.fileExists(candidate) ? candidate : null;
+}
+
+function toProject(configPath: string): Project {
+  const projectDir = path.dirname(configPath);
+  const parsed = ts.getParsedCommandLineOfConfigFile(configPath, {}, PARSE_HOST);
+  return {
+    dir: path.basename(projectDir),
+    configPath,
+    distDir: parsed?.options.outDir ?? path.join(projectDir, "dist"),
+  };
+}
+
 /** Whether `dir` holds at least one `.d.ts` — i.e. the package was ever built. */
 async function hasDeclarations(dir: string): Promise<boolean> {
   let entries;
@@ -104,21 +164,31 @@ async function hasDeclarations(dir: string): Promise<boolean> {
  * so deferring to it would let a half-removed build through.
  */
 export async function staleBuilds(roots: readonly PackageRoots[]): Promise<StaleBuild[]> {
-  const byDir = new Map<string, PackageRoots>();
-  for (const root of roots) byDir.set(root.dir, root);
-  const candidates = await Promise.all(
-    [...byDir.values()].map(async (root) => ((await hasDeclarations(root.distDir)) ? root : null)),
+  const seeds = new Map<string, Project>();
+  for (const root of roots) {
+    seeds.set(root.configPath, {
+      dir: root.dir,
+      configPath: root.configPath,
+      distDir: root.distDir,
+    });
+  }
+  const candidates = referenceClosure([...seeds.values()]);
+  const checked = await Promise.all(
+    candidates.map(async (project) => ((await hasDeclarations(project.distDir)) ? project : null)),
   );
-  const built = candidates.filter((root): root is PackageRoots => root !== null);
+  const built = checked.filter((project): project is Project => project !== null);
   if (built.length === 0) return [];
 
-  const projects = built.map((root) => root.configPath);
-  const builder = ts.createSolutionBuilder(ts.createSolutionBuilderHost(ts.sys), projects, {});
+  const builder = ts.createSolutionBuilder(
+    ts.createSolutionBuilderHost(ts.sys),
+    built.map((project) => project.configPath),
+    {},
+  );
   const stale: StaleBuild[] = [];
-  for (const root of built) {
-    const status = builder.getUpToDateStatusOfProject(root.configPath);
+  for (const project of built) {
+    const status = builder.getUpToDateStatusOfProject(project.configPath);
     if (STALE_STATUSES.has(status.type)) {
-      stale.push({ dir: root.dir, status: ts.UpToDateStatusType[status.type] });
+      stale.push({ dir: project.dir, status: ts.UpToDateStatusType[status.type] });
     }
   }
   return stale.sort((a, b) => (a.dir < b.dir ? -1 : a.dir > b.dir ? 1 : 0));

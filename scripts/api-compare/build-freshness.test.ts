@@ -41,7 +41,8 @@ function rootFor(packagesDir: string, dir: string, subDir?: string): PackageRoot
 function buildPackage(
   packagesDir: string,
   name: string,
-  sources = { "index.ts": "export const a = 1;\n" },
+  sources: Record<string, string> = { "index.ts": "export const a = 1;\n" },
+  references: string[] = [],
 ): string {
   const pkg = path.join(packagesDir, name);
   fs.mkdirSync(path.join(pkg, "src"), { recursive: true });
@@ -64,8 +65,10 @@ function buildPackage(
         skipLibCheck: true,
       },
       include: ["src"],
+      references: references.map((ref) => ({ path: path.join(packagesDir, ref) })),
     }),
   );
+  for (const ref of references) build(path.join(packagesDir, ref, "tsconfig.json"));
   build(path.join(pkg, "tsconfig.json"));
   return pkg;
 }
@@ -179,6 +182,46 @@ describe("staleBuilds", () => {
     );
 
     expect(await staleBuilds([rootFor(packagesDir, "activerecord")])).toEqual([]);
+  });
+
+  it("reports a REFERENCED workspace that api-compare does not extract", async () => {
+    const root = mkTmp();
+    const packagesDir = path.join(root, "packages");
+    // actionview references @blazetrails/tse-compiler, which is not in
+    // PACKAGES. tsc calls the importer UpToDateWithUpstreamTypes when such a
+    // reference goes stale — not an out-of-date status — so asking only about
+    // the api-compared package would let the stale dist/*.d.ts through.
+    buildPackage(packagesDir, "tse-compiler", { "index.ts": "export const compileJs = 1;\n" });
+    buildPackage(packagesDir, "actionview", { "index.ts": "export const a = 1;\n" }, [
+      "tse-compiler",
+    ]);
+    checkoutRewrite(
+      path.join(packagesDir, "tse-compiler"),
+      "index.ts",
+      "export const compileJs = 2;\n",
+    );
+
+    expect(await staleBuilds([rootFor(packagesDir, "actionview")])).toEqual([
+      { dir: "tse-compiler", status: "OutOfDateWithSelf" },
+    ]);
+  });
+
+  it("does not consult a workspace nothing references", async () => {
+    const root = mkTmp();
+    const packagesDir = path.join(root, "packages");
+    buildPackage(packagesDir, "tse-compiler", { "index.ts": "export const compileJs = 1;\n" });
+    buildPackage(packagesDir, "actionview", { "index.ts": "export const a = 1;\n" }, [
+      "tse-compiler",
+    ]);
+    // Reachability, not "every workspace": activerecord-cli is referenced by
+    // nothing api-compared, so its build state is none of the guard's business.
+    checkoutRewrite(
+      buildPackage(packagesDir, "activerecord-cli"),
+      "index.ts",
+      "export const a = 2;\n",
+    );
+
+    expect(await staleBuilds([rootFor(packagesDir, "actionview")])).toEqual([]);
   });
 
   it("collapses roots that share one package directory into a single report", async () => {
