@@ -1719,8 +1719,11 @@ export const TEST_SCHEMA: Schema = {
   // loads them on the default adapter; per-connection placement is the
   // responsibility of multi-DB tests.
   courses: {
-    name: { type: "string", null: false },
-    college_id: "integer",
+    columns: {
+      name: { type: "string", null: false },
+      college_id: "integer",
+    },
+    indexes: [{ columns: "college_id" }],
   },
   colleges: { name: { type: "string", null: false } },
   professors: { name: { type: "string", null: false } },

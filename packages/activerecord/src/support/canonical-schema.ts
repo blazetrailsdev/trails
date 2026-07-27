@@ -1746,6 +1746,9 @@ async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("courses", {}, (t) => {
     t.string("name", { null: false });
     t.integer("college_id");
+    // `t.column :college_id, :integer, index: true` (schema.rb:1446); `column`
+    // turns `index: true` into an index entry (schema_definitions.rb:499-501).
+    t.index("college_id");
   });
 
   await define("colleges", {}, (t) => {
