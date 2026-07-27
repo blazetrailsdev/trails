@@ -1,3 +1,4 @@
+import { afterAll, beforeAll } from "vitest";
 import { Base } from "../base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { registerModel } from "../associations.js";
@@ -8,6 +9,7 @@ import { College } from "../test-helpers/models/college.js";
 import { Entrant } from "../test-helpers/models/entrant.js";
 import { Professor } from "../test-helpers/models/professor.js";
 import { activeLane } from "./connection.js";
+import { isSqliteRun } from "./sqlite-template.js";
 
 /**
  * The tables `schema.rb:1444-1460` creates through the second connection
@@ -73,10 +75,8 @@ export async function provisionSecondDatabase(): Promise<void> {
  * database ours is shared with every sibling suite in the worker.
  *
  * Fixture data is seeded separately via `useFixtures` in the test file.
- *
- * @internal
  */
-export async function setupSecondPool(): Promise<void> {
+async function setupSecondPool(): Promise<void> {
   registerModel(College);
   registerModel(Course);
   registerModel(Entrant);
@@ -98,9 +98,20 @@ export async function setupSecondPool(): Promise<void> {
  * Undoes `setupSecondPool`'s primary-database surgery: Rails' two-database
  * split dies with the process, but ours shares one primary database with every
  * sibling suite in the worker, so the dropped tables must be put back.
- *
+ */
+async function teardownSecondPool(): Promise<void> {
+  await rebuildCanonicalTables(await Base.leaseConnection(), [...ARUNIT2_TABLES, "entrants"]);
+}
+
+/**
  * @internal
  */
-export async function teardownSecondPool(): Promise<void> {
-  await rebuildCanonicalTables(await Base.leaseConnection(), [...ARUNIT2_TABLES, "entrants"]);
+export function withSecondPool(): void {
+  beforeAll(async () => {
+    if (isSqliteRun()) await setupSecondPool();
+  });
+
+  afterAll(async () => {
+    if (isSqliteRun()) await teardownSecondPool();
+  });
 }

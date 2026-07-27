@@ -1,9 +1,9 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import "./index.js";
 import { Base } from "./base.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { setupSecondPool, teardownSecondPool } from "./support/setup-second-pool.js";
+import { withSecondPool } from "./support/setup-second-pool.js";
 import { isSqliteRun } from "./support/sqlite-template.js";
 import { Course } from "./test-helpers/models/course.js";
 import { Entrant } from "./test-helpers/models/entrant.js";
@@ -18,13 +18,7 @@ function event(): { set: () => void; wait: Promise<void> } {
 
 describe.skipIf(!isSqliteRun())("PreparedStatementStatusTest", () => {
   fixtures({}, { useTransactionalTests: false });
-  beforeAll(async () => {
-    await setupSecondPool();
-  });
-
-  afterAll(async () => {
-    await teardownSecondPool();
-  });
+  withSecondPool();
 
   it("prepared statement status is thread and instance specific", async () => {
     const courseConn = await Course.leaseConnection();
