@@ -236,7 +236,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
 
   async indexNameExists(tableName: string, indexName: string): Promise<boolean> {
     const table = this.pg.quotedScope(tableName);
-    const idxName = this.pg.quoteLiteral(indexName);
+    const index = this.pg.quotedScope(indexName);
     const rows = await this.pg.schemaQuery(`
       SELECT COUNT(*) AS cnt
       FROM pg_class t
@@ -244,7 +244,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       INNER JOIN pg_class i ON d.indexrelid = i.oid
       LEFT JOIN pg_namespace n ON n.oid = t.relnamespace
       WHERE i.relkind IN ('i', 'I')
-        AND i.relname = ${idxName}
+        AND i.relname = ${index.name}
         AND t.relname = ${table.name}
         AND n.nspname = ${table.schema}
     `);
@@ -1811,76 +1811,82 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   async pkAndSequenceFor(
     tableName: string,
   ): Promise<[string, { schema: string; name: string } | null] | null> {
-    // Mirrors Rails pk_and_sequence_for's `#{quote(quote_table_name(table))}::regclass`:
-    // regclass resolves a schema-qualified or bare name itself, and the quoting
-    // keeps a mixed-case name like "CamelCase" case-sensitive.
-    //
-    // Deviation: `to_regclass(...)` rather than a bare `::regclass` cast. Rails
-    // wraps the whole method in `rescue nil`, so an unknown table yields nil;
-    // to_regclass yields NULL (hence no rows, hence nil) without raising, which
-    // matters here because a raised PG error would abort an enclosing
-    // transaction that Ruby's rescue leaves untouched.
-    const tableCondition = `t.oid = to_regclass(${this.pg.quote(this.pg.quoteTableName(tableName))})`;
+    // Rails wraps the whole of `pk_and_sequence_for` in a bare `rescue nil`, so
+    // ANY error — not just an unknown table — yields nil.
+    try {
+      // Mirrors Rails pk_and_sequence_for's `#{quote(quote_table_name(table))}::regclass`:
+      // regclass resolves a schema-qualified or bare name itself, and the quoting
+      // keeps a mixed-case name like "CamelCase" case-sensitive.
+      //
+      // Deviation: `to_regclass(...)` rather than a bare `::regclass` cast. The
+      // outer `rescue nil` already turns an unknown table into nil either way,
+      // but PG aborts the enclosing transaction when the cast raises — and a
+      // Ruby rescue leaves the transaction untouched. to_regclass yields NULL
+      // (hence no rows, hence nil) without ever entering the aborted state.
+      const tableCondition = `t.oid = to_regclass(${this.pg.quote(this.pg.quoteTableName(tableName))})`;
 
-    const rows = await this.pg.schemaQuery(
-      `SELECT a.attname AS pk,
-              pg_get_serial_sequence(quote_ident(n.nspname) || '.' || quote_ident(t.relname), a.attname) AS seq,
-              pg_get_expr(ad.adbin, ad.adrelid) AS default_expr,
-              n.nspname AS schema_name
-       FROM pg_index i
-       JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
-       JOIN pg_class t ON t.oid = i.indrelid
-       JOIN pg_namespace n ON n.oid = t.relnamespace
-       LEFT JOIN pg_attrdef ad ON ad.adrelid = t.oid AND ad.adnum = a.attnum
-       WHERE ${tableCondition}
-         AND i.indisprimary = true
-       -- Resolve the FIRST primary-key column deterministically (mirrors Rails
-       -- pk_and_sequence_for's cons.conkey[1]); without the ORDER BY a composite
-       -- PK's ANY(i.indkey) join could return an arbitrary column under LIMIT 1.
-       ORDER BY array_position(i.indkey, a.attnum)
-       LIMIT 1`,
-    );
+      const rows = await this.pg.schemaQuery(
+        `SELECT a.attname AS pk,
+                pg_get_serial_sequence(quote_ident(n.nspname) || '.' || quote_ident(t.relname), a.attname) AS seq,
+                pg_get_expr(ad.adbin, ad.adrelid) AS default_expr,
+                n.nspname AS schema_name
+         FROM pg_index i
+         JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+         JOIN pg_class t ON t.oid = i.indrelid
+         JOIN pg_namespace n ON n.oid = t.relnamespace
+         LEFT JOIN pg_attrdef ad ON ad.adrelid = t.oid AND ad.adnum = a.attnum
+         WHERE ${tableCondition}
+           AND i.indisprimary = true
+         -- Resolve the FIRST primary-key column deterministically (mirrors Rails
+         -- pk_and_sequence_for's cons.conkey[1]); without the ORDER BY a composite
+         -- PK's ANY(i.indkey) join could return an arbitrary column under LIMIT 1.
+         ORDER BY array_position(i.indkey, a.attnum)
+         LIMIT 1`,
+      );
 
-    if (rows.length === 0) return null;
+      if (rows.length === 0) return null;
 
-    const pk = rows[0].pk as string;
-    const tableSchema = rows[0].schema_name as string;
-    let seq: { schema: string; name: string } | null = null;
+      const pk = rows[0].pk as string;
+      const tableSchema = rows[0].schema_name as string;
+      let seq: { schema: string; name: string } | null = null;
 
-    if (rows[0].seq) {
-      const fullSeq = rows[0].seq as string;
-      const parts = splitQuotedIdentifier(fullSeq);
-      seq =
-        parts.length > 1
-          ? { schema: parts[0], name: parts[1] }
-          : { schema: tableSchema, name: parts[0] };
-    } else {
-      const defaultExpr = rows[0].default_expr as string | null;
-      if (defaultExpr) {
-        const match = defaultExpr.match(/nextval\('([^']+)'::regclass\)/);
-        if (match) {
-          const seqRef = match[1];
-          const parts = splitQuotedIdentifier(seqRef);
-          seq =
-            parts.length > 1
-              ? { schema: parts[0], name: parts[1] }
-              : { schema: tableSchema, name: parts[0] };
+      if (rows[0].seq) {
+        const fullSeq = rows[0].seq as string;
+        const parts = splitQuotedIdentifier(fullSeq);
+        seq =
+          parts.length > 1
+            ? { schema: parts[0], name: parts[1] }
+            : { schema: tableSchema, name: parts[0] };
+      } else {
+        const defaultExpr = rows[0].default_expr as string | null;
+        if (defaultExpr) {
+          const match = defaultExpr.match(/nextval\('([^']+)'::regclass\)/);
+          if (match) {
+            // Rails' fallback query pairs `nsp.nspname` — the TABLE's namespace —
+            // with a CASE that strips everything through the dot, so a
+            // `nextval('other_schema.seq')` default still yields
+            // `Name.new(table_schema, "seq")`. Keep the sequence identifier only.
+            const parts = splitQuotedIdentifier(match[1]);
+            seq = { schema: tableSchema, name: parts[parts.length - 1] };
+          }
         }
       }
-    }
 
-    if (seq) return [pk, seq];
+      if (seq) return [pk, seq];
 
-    // No owning sequence. Mirrors Rails pk_and_sequence_for: its fallback query
-    // matches `nextval|uuid_generate|gen_random_uuid` defaults, so a uuid-default
-    // pk still returns a row (with a nil sequence) → `[pk, nil]`, whereas a pk
-    // with no such default matches neither query and yields nil (the whole
-    // result). See uuid_test.rb#test_pk_and_sequence_for_with_uuid_primary_key.
-    const defaultExpr = rows[0].default_expr as string | null;
-    if (defaultExpr && /uuid_generate|gen_random_uuid/i.test(defaultExpr)) {
-      return [pk, null];
+      // No owning sequence. Mirrors Rails pk_and_sequence_for: its fallback query
+      // matches `nextval|uuid_generate|gen_random_uuid` defaults, so a uuid-default
+      // pk still returns a row (with a nil sequence) → `[pk, nil]`, whereas a pk
+      // with no such default matches neither query and yields nil (the whole
+      // result). See uuid_test.rb#test_pk_and_sequence_for_with_uuid_primary_key.
+      const defaultExpr = rows[0].default_expr as string | null;
+      if (defaultExpr && /uuid_generate|gen_random_uuid/i.test(defaultExpr)) {
+        return [pk, null];
+      }
+      return null;
+    } catch {
+      return null;
     }
-    return null;
   }
 
   async serialSequence(tableName: string, column: string): Promise<string | null> {
@@ -1985,8 +1991,10 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
           : await this.adapter.queryValue(`SELECT min_value FROM ${quotedSequence}`, "SCHEMA");
     }
 
+    // Ruby's `max_pk ? true : false` is a nil check — 0 is truthy in Ruby, so a
+    // table whose max primary key is 0 must still emit `true`.
     await this.adapter.queryValue(
-      `SELECT setval(${this.pg.quote(quotedSequence)}, ${maxPk ?? minvalue}, ${maxPk ? "true" : "false"})`,
+      `SELECT setval(${this.pg.quote(quotedSequence)}, ${maxPk ?? minvalue}, ${maxPk == null ? "false" : "true"})`,
       "SCHEMA",
     );
   }
