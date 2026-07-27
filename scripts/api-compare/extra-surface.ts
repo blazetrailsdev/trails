@@ -29,6 +29,11 @@
  *      should not count toward extra surface.
  *   4. Extra = TS names \ allowed names. Emit per-file, per-package, and
  *      top-N reports.
+ *   5. Subtract the reasoned exceptions: a declaration carrying a
+ *      `@noRailsEquivalent <reason>` JSDoc tag counts as `Allowed` rather
+ *      than extra. Since RFC 0080 the tag is the ONLY such source — the
+ *      former extra-surface-allow.json sidecar is gone — and a tag on a name
+ *      that no longer flags is STALE and fails the run.
  *
  * Manifests are produced by `pnpm api:compare`; if they're missing the
  * script bails with a hint (same convention as `api:moves`).
@@ -257,7 +262,8 @@ function pushTo<K, V>(map: Map<K, V[]>, key: K, value: V): void {
  */
 export type ExtraKind = "novel" | "moved";
 
-export interface AllowEntry {
+/** One `@noRailsEquivalent`-tagged declaration, keyed by package + TS file + name. */
+export interface TaggedEntry {
   package: string;
   tsFile: string;
   name: string;
@@ -269,16 +275,16 @@ export function allowKeyOf(e: { package: string; tsFile: string; name: string })
 }
 
 /**
- * Every `@noRailsEquivalent`-tagged declaration in the TS manifest — the ONLY
+ * Every `@noRailsEquivalent`-tagged declaration in the TS manifest — the sole
  * source of allowed extra surface since RFC 0080 retired
- * extra-surface-allow.json. Keyed by the CONTAINER's
- * file, matching how `collectTsFileNames` gathers the names it compares.
+ * extra-surface-allow.json. Keyed by the CONTAINER's file, matching how
+ * `collectTsFileNames` gathers the names it compares.
  * Keys are deduped: one declaration reaches many hosts (the mixin object, the
  * install site, the auto-synthesized file module), so the same key arrives
  * repeatedly and would otherwise inflate the tag total.
  */
-export function collectTaggedEntries(ts: ApiManifest): AllowEntry[] {
-  const out: AllowEntry[] = [];
+export function collectTaggedEntries(ts: ApiManifest): TaggedEntry[] {
+  const out: TaggedEntry[] = [];
   const seen = new Set<string>();
   const push = (pkg: string, tsFile: string, m: MethodInfo): void => {
     if (m.noRailsEquivalent === undefined) return;
@@ -332,7 +338,7 @@ interface PackageTotals {
 interface AllowlistSummary {
   total: number;
   matched: number;
-  stale: AllowEntry[];
+  stale: TaggedEntry[];
 }
 
 interface Report {
