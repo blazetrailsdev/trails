@@ -581,6 +581,13 @@ as a passing one. Previously the rule was registered against an empty
 manifest and passed every file, so a violation was invisible to the job
 named "Lint" — the condition this decision records.
 
+Because that leaves exactly one enforcing job, that job must not be able to
+degrade quietly. Omitting `--allow-missing` covers a missing
+`rails-api.json`; the builder additionally fails when a real extract yields a
+manifest with zero entries, which would leave the rule unregistered and the
+step green. Restricting enforcement to one job is only safe while that job
+cannot silently stop enforcing.
+
 ## 6. Wave-based rollout
 
 Each PR sized to ≤500 LOC per [CLAUDE.md](../../CLAUDE.md). Estimates are
