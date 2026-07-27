@@ -170,7 +170,7 @@ export function setDatabaseCli(value: Record<string, string | string[]>): void {
   databaseCli = value;
 }
 
-let _asyncQueryExecutor: "thread_pool" | "multi_thread_pool" | null = null;
+let _asyncQueryExecutor: "global_thread_pool" | "multi_thread_pool" | null = null;
 let _queues: Record<string, unknown> = {};
 let _maintainTestSchema: boolean | null = null;
 
@@ -188,15 +188,17 @@ let _maintainTestSchema: boolean | null = null;
 export const ActiveRecord = {
   /**
    * Selects the async query executor backing `load_async`. `null` (the
-   * default) disables background execution; `"thread_pool"` uses a single
-   * shared pool and `"multi_thread_pool"` a per-database pool. Mirrors
-   * `ActiveRecord.async_query_executor` (active_record.rb:283-284, default nil).
+   * default) does not initialize an executor and runs async calls in the
+   * foreground; `"global_thread_pool"` initializes a single pool sized by
+   * `globalExecutorConcurrency` and `"multi_thread_pool"` one per database
+   * connection. Mirrors `ActiveRecord.async_query_executor`
+   * (active_record.rb:270-283, default nil).
    */
-  get asyncQueryExecutor(): "thread_pool" | "multi_thread_pool" | null {
+  get asyncQueryExecutor(): "global_thread_pool" | "multi_thread_pool" | null {
     return _asyncQueryExecutor;
   },
 
-  set asyncQueryExecutor(value: "thread_pool" | "multi_thread_pool" | null) {
+  set asyncQueryExecutor(value: "global_thread_pool" | "multi_thread_pool" | null) {
     _asyncQueryExecutor = value;
   },
 
