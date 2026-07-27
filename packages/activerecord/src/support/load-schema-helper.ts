@@ -47,8 +47,16 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
  * The `File.exist?(adapter_specific_schema_file)` lookup of
  * `load_schema_helper.rb:10,15`: an adapter name resolves to its
  * `<adapter>_specific_schema` loader when trails has one, and to nothing when it
- * does not — the same false branch Rails takes for an adapter whose file is
- * absent.
+ * does not.
+ *
+ * INCOMPLETE, deliberately. Rails has four such files and every one of them has
+ * real content; trails has ported part of one. `sqlite_specific_schema.rb:3-21`
+ * and `mysql2_specific_schema.rb:3-95` have no entry here at all, so the sqlite
+ * and mysql lanes currently boot without the schema Rails gives them. That is a
+ * known gap owned by story `port-adapter-specific-schemas` (RFC 0064), not a
+ * claim that the gap does not exist. `trilogy_specific_schema.rb` is the one
+ * genuine no-op: trails has no Trilogy adapter, so no adapter name ever selects
+ * it.
  */
 const ADAPTER_SPECIFIC_SCHEMAS: Record<string, (adapter: DatabaseAdapter) => Promise<void>> = {
   postgres: (adapter) => loadPostgresqlSpecificSchema(adapter as unknown as PostgreSQLAdapter),
@@ -56,8 +64,9 @@ const ADAPTER_SPECIFIC_SCHEMAS: Record<string, (adapter: DatabaseAdapter) => Pro
 
 /**
  * Port of `LoadSchemaHelper#load_schema`
- * (vendor/rails/activerecord/test/support/load_schema_helper.rb:4-21), arm by
- * arm:
+ * (vendor/rails/activerecord/test/support/load_schema_helper.rb:4-21). The
+ * control flow is complete; the *content* of the adapter-specific arm is not —
+ * see {@link ADAPTER_SPECIFIC_SCHEMAS}. Arm by arm:
  *
  * - `load SCHEMA_ROOT + "/schema.rb"` → `loadCanonicalSchema`. trails' mirror of
  *   schema.rb is the canonical registry rather than a loadable Ruby file, so
