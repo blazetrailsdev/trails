@@ -106,11 +106,7 @@ interface PrimaryKeyInstance {
   writeAttribute(name: string, value: unknown): void;
 }
 
-/**
- * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id
- * @internal
- */
-export function getId(this: PrimaryKeyInstance): unknown {
+function readId(this: PrimaryKeyInstance): unknown {
   const ctor = this.constructor as any;
   const pk = ctor.primaryKey as string | string[] | null;
   if (Array.isArray(pk)) return pk.map((col) => this._readAttribute(col));
@@ -119,11 +115,7 @@ export function getId(this: PrimaryKeyInstance): unknown {
   return this._readAttribute(pk as string);
 }
 
-/**
- * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id=
- * @internal
- */
-export function setId(this: PrimaryKeyInstance, value: unknown): void {
+function writeId(this: PrimaryKeyInstance, value: unknown): void {
   const ctor = this.constructor as any;
   const pk = ctor.primaryKey as string | string[] | null;
   if (Array.isArray(pk)) {
@@ -153,6 +145,19 @@ export function setId(this: PrimaryKeyInstance, value: unknown): void {
     this.writeAttribute("id", value);
   } else {
     this._writeAttribute(pk, value);
+  }
+}
+
+/**
+ * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey
+ */
+export class PrimaryKey {
+  get id(): unknown {
+    return readId.call(this as unknown as PrimaryKeyInstance);
+  }
+
+  set id(value: unknown) {
+    writeId.call(this as unknown as PrimaryKeyInstance, value);
   }
 }
 
@@ -269,10 +274,10 @@ export function primaryKey(this: PrimaryKeyHost, value?: string | string[]): str
  */
 export function id(this: PrimaryKeyInstance, value?: unknown): unknown {
   if (value !== undefined) {
-    setId.call(this, value);
+    writeId.call(this, value);
     return value;
   }
-  return getId.call(this);
+  return readId.call(this);
 }
 
 export function isInstanceMethodAlreadyImplemented(

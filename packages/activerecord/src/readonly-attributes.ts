@@ -184,7 +184,7 @@ export function _writeAttribute(this: Base, name: string, value: unknown): void 
   // Mirrors Rails `_write_attribute`: skip alias resolution, unlike the public
   // `write_attribute` path above. Rails (write.rb:42) reaches `write_from_user`
   // and raises `MissingAttributeError` for an unknown name — including
-  // `id = …` on a key-less table (`setId` →
+  // `id = …` on a key-less table (`PrimaryKey#id=` →
   // `_writeAttribute(@primary_key=null, value)`).
   Model.prototype._writeAttribute.call(this, name, value);
 }
