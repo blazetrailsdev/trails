@@ -42,18 +42,29 @@ describe("config", () => {
   });
 
   it("reads Postgres details from libpq's env vars, with defaults", () => {
+    // Rails' postgresql: entries carry no connection fields at all
+    // (config.example.yml:74-81), so there is no credential to default: an
+    // unset PGUSER stays unset and pg resolves libpq's own default. The
+    // database comes from expand_config (support/config.rb:28-34), not from
+    // PGDATABASE — an entry's own database beats libpq's env in Rails too.
     expect(postgresSettings(reader({}))).toEqual({
       host: "localhost",
       port: 5432,
-      user: "postgres",
+      user: undefined,
       password: undefined,
-      database: "rails_js_test",
+      database: "activerecord_unittest",
     });
     expect(
       postgresSettings(
         reader({ PGHOST: "db", PGPORT: "6543", PGUSER: "u", PGPASSWORD: "p", PGDATABASE: "d" }),
       ),
-    ).toEqual({ host: "db", port: 6543, user: "u", password: "p", database: "d" });
+    ).toEqual({
+      host: "db",
+      port: 6543,
+      user: "u",
+      password: "p",
+      database: "activerecord_unittest",
+    });
   });
 
   it("reads MySQL details from the sub-settings config.example.yml interpolates", () => {
@@ -64,21 +75,20 @@ describe("config", () => {
     ).toEqual({
       host: "db",
       port: 3307,
-      user: "root",
-      password: undefined,
-      database: "rails_js_test",
+      // config.example.yml:4,24 hard-code `username: rails` with no password.
+      user: "rails",
+      database: "activerecord_unittest",
       socket: "/tmp/mysql.sock",
     });
   });
 
-  it("interpolates exactly the accepted sub-setting key set, and no more", () => {
-    // The accepted deviation from config.example.yml, made executable: Rails
-    // interpolates only MYSQL_HOST/MYSQL_PORT/MYSQL_SOCK and hard-codes
-    // `username: rails`; trails also interpolates the credential and database
-    // name, and the postgresql lane reads libpq's own PG* set because Rails'
-    // `postgresql:` entries carry no fields precisely so libpq resolves them
-    // (config.example.yml:74-81). Widening this set again is a decision, not a
-    // detail — see the deviations note in config.ts.
+  it("interpolates exactly the sub-setting key set config.example.yml interpolates", () => {
+    // Rails interpolates only MYSQL_HOST/MYSQL_PORT/MYSQL_SOCK
+    // (config.example.yml:12-20) and hard-codes the credential and database;
+    // its postgresql: entries carry no fields so libpq reads PG* itself
+    // (config.example.yml:74-81). AR_DB_SLOT is the one trails addition — the
+    // per-worker database copy Rails has no analogue for. Re-widening this set
+    // is a decision, not a detail.
     const seen: string[] = [];
     const recording = (env: Record<string, string>) => (key: string) => {
       seen.push(key);
@@ -87,40 +97,30 @@ describe("config", () => {
 
     mysqlSettings(recording({}));
     expect(new Set(seen)).toEqual(
-      new Set([
-        "MYSQL_HOST",
-        "MYSQL_PORT",
-        "MYSQL_USER",
-        "MYSQL_PASSWORD",
-        "MYSQL_DATABASE",
-        "MYSQL_SOCK",
-        "AR_DB_SLOT",
-      ]),
+      new Set(["MYSQL_HOST", "MYSQL_PORT", "MYSQL_SOCK", "AR_DB_SLOT"]),
     );
 
     seen.length = 0;
     postgresSettings(recording({}));
     expect(new Set(seen)).toEqual(
-      new Set(["PGHOST", "PGPORT", "PGUSER", "PGPASSWORD", "PGDATABASE", "AR_DB_SLOT"]),
+      new Set(["PGHOST", "PGPORT", "PGUSER", "PGPASSWORD", "AR_DB_SLOT"]),
     );
   });
 
   it("suffixes the database with the worker isolation slot above slot 1", () => {
-    expect(postgresSettings(reader({ AR_DB_SLOT: "1" })).database).toBe("rails_js_test");
-    expect(postgresSettings(reader({ AR_DB_SLOT: "4" })).database).toBe("rails_js_test_4");
-    expect(mysqlSettings(reader({ AR_DB_SLOT: "2" })).database).toBe("rails_js_test_2");
+    expect(postgresSettings(reader({ AR_DB_SLOT: "1" })).database).toBe("activerecord_unittest");
+    expect(postgresSettings(reader({ AR_DB_SLOT: "4" })).database).toBe("activerecord_unittest_4");
+    expect(mysqlSettings(reader({ AR_DB_SLOT: "2" })).database).toBe("activerecord_unittest_2");
   });
 
   it("treats an empty sub-setting as unset rather than as an empty value", () => {
     // CI routinely sets a var to "" to mean "no value". Taking that literally
-    // yields user: "" and the server answers `Access denied for user ''`.
-    const settings = mysqlSettings(
-      reader({ MYSQL_USER: "", MYSQL_HOST: "", MYSQL_DATABASE: "", MYSQL_SOCK: "" }),
-    );
-    expect(settings.user).toBe("root");
+    // yields host: "" / user: "" and the server answers `Access denied for
+    // user ''`.
+    const settings = mysqlSettings(reader({ MYSQL_HOST: "", MYSQL_SOCK: "" }));
     expect(settings.host).toBe("localhost");
-    expect(settings.database).toBe("rails_js_test");
     expect(settings.socket).toBeUndefined();
+    expect(postgresSettings(reader({ PGUSER: "", PGPASSWORD: "" })).user).toBeUndefined();
   });
 
   it("raises on a malformed slot rather than sharing the base database", () => {
@@ -146,7 +146,7 @@ describe("config", () => {
     // driver, which attempts the socket rather than falling back to TCP.
     const settings = mysqlSettings(reader({ MYSQL_SOCK: "/tmp/mysql.sock" }));
     expect(settingsUrl("mysql", settings)).toBe(
-      "mysql://root@localhost:3306/rails_js_test?socketPath=%2Ftmp%2Fmysql.sock",
+      "mysql://rails@localhost:3306/activerecord_unittest?socketPath=%2Ftmp%2Fmysql.sock",
     );
   });
 
@@ -159,7 +159,7 @@ describe("config", () => {
     // real socket, as was the empty-authority + host= form emitted here.
     const settings = postgresSettings(reader({ PGHOST: "/var/run/postgresql" }));
     expect(settingsUrl("postgres", settings)).toBe(
-      "postgres://postgres@/rails_js_test?host=%2Fvar%2Frun%2Fpostgresql&port=5432",
+      "postgres:///activerecord_unittest?host=%2Fvar%2Frun%2Fpostgresql&port=5432",
     );
   });
 
@@ -171,10 +171,13 @@ describe("config", () => {
   });
 
   it("renders settings as a URL, encoding credentials", () => {
-    expect(mysqlUrl(reader({}))).toBe("mysql://root@localhost:3306/rails_js_test");
-    expect(postgresUrl(reader({ PGPASSWORD: "p@ss word" }))).toBe(
-      "postgres://postgres:p%40ss%20word@localhost:5432/rails_js_test",
+    expect(mysqlUrl(reader({}))).toBe("mysql://rails@localhost:3306/activerecord_unittest");
+    expect(postgresUrl(reader({ PGUSER: "u", PGPASSWORD: "p@ss word" }))).toBe(
+      "postgres://u:p%40ss%20word@localhost:5432/activerecord_unittest",
     );
+    // No PGUSER means no userinfo at all, so pg resolves libpq's default user
+    // rather than seeing an empty username.
+    expect(postgresUrl(reader({}))).toBe("postgres://localhost:5432/activerecord_unittest");
   });
 
   it("withDatabase repoints settings at another database on the same server", () => {
@@ -185,10 +188,8 @@ describe("config", () => {
   it("driverConfig emits Rails' username and socket spellings only", () => {
     // Both keys are Rails' canonical spelling — the adapters map them to the
     // driver-native `user` / `socketPath`.
-    const config = driverConfig(
-      mysqlSettings(reader({ MYSQL_USER: "u", MYSQL_PASSWORD: "p", MYSQL_SOCK: "/tmp/m.sock" })),
-    );
-    expect(config.username).toBe("u");
+    const config = driverConfig(mysqlSettings(reader({ MYSQL_SOCK: "/tmp/m.sock" })));
+    expect(config.username).toBe("rails");
     expect(config).not.toHaveProperty("user");
     expect(config.socket).toBe("/tmp/m.sock");
     expect(config).not.toHaveProperty("socketPath");

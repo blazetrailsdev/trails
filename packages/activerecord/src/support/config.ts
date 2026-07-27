@@ -20,60 +20,39 @@
  *   - **Which backend runs** is chosen by `ARCONN`, naming a key of the
  *     `connections:` hash (`test/support/connection.rb:10,14-19`). Nothing
  *     else selects a backend — there is no "is this env var set?" sniffing.
- *   - **How to reach it** comes from discrete sub-setting env vars interpolated
- *     into that connection's entry: `MYSQL_HOST` / `MYSQL_PORT` / `MYSQL_SOCK`
- *     for the mysql2 lane, and libpq's `PGHOST` / `PGPORT` / `PGUSER` /
- *     `PGPASSWORD` / `PGDATABASE` for the postgresql lane (Rails' `postgresql:`
- *     entries carry no host at all, deferring to libpq's own env).
+ *   - **How to reach it** comes from the connection entry itself, over which
+ *     Rails interpolates exactly three env vars: `MYSQL_HOST` / `MYSQL_PORT` /
+ *     `MYSQL_SOCK` (`config.example.yml:12-20`). The postgresql entries carry
+ *     no connection fields at all (`config.example.yml:74-81`), leaving libpq
+ *     to resolve `PGHOST` / `PGPORT` / `PGUSER` / `PGPASSWORD` itself.
  *
- * ## Deviations from `config.example.yml` — accepted permanently (decision record)
+ * ## Credentials and database names: converged with `config.example.yml`
  *
- * Rails interpolates ONLY `MYSQL_HOST` / `MYSQL_PORT` / `MYSQL_SOCK` from the
- * environment and hard-codes the rest — notably `username: rails` on both
- * `mysql2.arunit` and `mysql2.arunit2` (`config.example.yml:4,24`), because
- * Rails' own CI provisions a `rails` user.
+ * Both come straight from Rails, not from the environment:
  *
- * trails makes the credential and database name env-driven too
- * (`MYSQL_USER` / `MYSQL_PASSWORD` / `MYSQL_DATABASE`, and the `PG*` set), and
- * defaults them to `root` / `postgres` / `rails_js_test` — the users and
- * database the containers in `.github/workflows/ci.yml` and `docker-compose.yml`
- * actually provision. Hard-coding Rails' `rails` user would not authenticate
- * against them.
+ *   - `username: rails`, no password, on `mysql2.arunit` and `mysql2.arunit2`
+ *     (`config.example.yml:4,24`) — see {@link MYSQL_USERNAME}. The user is
+ *     provisioned the way `db:mysql:build_user` provisions it
+ *     (`activerecord/Rakefile:227-235`): `CREATE USER` with no `IDENTIFIED BY`,
+ *     then `GRANT ALL PRIVILEGES`, done here by the container init scripts in
+ *     `.github/workflows/ci.yml` and `docker-compose.yml`.
+ *   - `database: activerecord_unittest`, which `ARTest.expand_config` fills in
+ *     for every entry that carries none (`test/support/config.rb:28-34`) — see
+ *     {@link ARUNIT_DATABASE}.
+ *   - The postgresql lane hard-codes no credential, exactly as Rails' entries
+ *     do not: `PGUSER` / `PGPASSWORD` stay unset unless the environment carries
+ *     them, and `pg` then resolves libpq's defaults.
  *
- * This was weighed against the alternative — provision a `rails` user in the
- * containers so the harness could adopt Rails' literal credential and shrink to
- * Rails' three interpolated keys — and deliberately kept. The reasoning, so it
- * is not re-derived:
- *
- *   - The `PG*` half is not a deviation in substance. Rails' `postgresql:`
- *     entries carry no connection fields precisely so libpq resolves them from
- *     `PGHOST` / `PGPORT` / `PGUSER` / `PGPASSWORD` / `PGDATABASE`
- *     (`config.example.yml:74-81`). trails reads the same variables because it
- *     must *materialize* concrete values — it renders a URL for `pg` and for the
- *     CLI's `--database-url` rather than handing libpq an empty config. Only the
- *     explicit fallbacks (`postgres` / `rails_js_test`) are a trails addition,
- *     and they are what libpq would otherwise resolve from the local role.
- *   - Rails' `rails` user is an artifact of Rails' own CI images, not a
- *     behaviour the port reproduces. Audited: the only places the credential's
- *     *value* is observed are the harness-config tests that spell a whole
- *     rendered URL (`config.test.ts`, `arunit2-config.test.ts`) — no adapter,
- *     task, or suite assertion reads it. Adopting Rails' literal would mean
- *     provisioning a user in three places (CI service containers,
- *     `docker-compose.yml`, and every contributor's local server) to buy no
- *     fidelity in anything under test.
- *   - Configurability is already depended on: CI sets `MYSQL_USER` / `PGUSER` /
- *     `PGPASSWORD` / `*_DATABASE` explicitly, `AR_DB_SLOT` rewrites the database
- *     name per worker, and local servers (Homebrew postgres, socket MySQL) have
- *     no common credential to hard-code.
- *
- * The accepted key set is pinned by a test (`config.test.ts`, "interpolates
- * exactly the accepted sub-setting key set"), so widening it later has to be a
+ * `MYSQL_USER` / `MYSQL_PASSWORD` / `MYSQL_DATABASE` / `PGDATABASE` are
+ * therefore NOT read — Rails interpolates none of them, and an entry's own
+ * `database` beats libpq's env in Rails too. The exact key set each lane reads
+ * is pinned by a test (`config.test.ts`, "interpolates exactly the sub-setting
+ * key set config.example.yml interpolates"), so re-widening it has to be a
  * decision rather than a drift.
  *
- * So: the ARCONN-selects / sub-settings-describe *split* is Rails parity; the
- * particular set of interpolated keys and their defaults is a settled trails
- * choice. Anything relying on Rails' literal credential must set `MYSQL_USER`
- * itself. Revisit only if a test ever needs to assert the credential itself.
+ * The one addition with no Rails counterpart is {@link SLOT_ENV}: Rails runs
+ * one database, trails runs parallel vitest workers and gives each its own
+ * `_N`-suffixed copy of it.
  *
  * trails previously collapsed both into a single `PG_TEST_URL` /
  * `MYSQL_TEST_URL` URL string, which made backend selection a side effect of
@@ -139,7 +118,8 @@ function intSetting(read: EnvReader, key: string, fallback: number): number {
 export interface ServerSettings {
   host: string;
   port: number;
-  user: string;
+  /** Absent on the postgresql lane unless `PGUSER` is set — Rails' entries carry none. */
+  user?: string;
   password?: string;
   database: string;
   /** Unix socket path (`MYSQL_SOCK`); mysql2 prefers it over host/port when set. */
@@ -170,38 +150,59 @@ function applySlot(database: string, read: EnvReader): string {
 }
 
 /**
- * PostgreSQL connection details from libpq's standard env vars — the ones
- * Rails' `postgresql:` entries rely on by carrying no host of their own. Reading
- * them is the parity path; only the explicit defaults (`postgres` /
- * `rails_js_test`) are a trails choice, matching what CI provisions. Accepted
- * permanently — see the deviations note in the module doc.
+ * The `arunit` database name `ARTest.expand_config` fills in when a connection
+ * entry carries none — which is every mysql2 and postgresql entry
+ * (`test/support/config.rb:28-31`, `config.example.yml:2-40,74-81`).
+ */
+export const ARUNIT_DATABASE = "activerecord_unittest";
+
+/**
+ * The credential `config.example.yml` hard-codes on both `mysql2.arunit` and
+ * `mysql2.arunit2` (`config.example.yml:4,24`), provisioned by
+ * `db:mysql:build_user` (`activerecord/Rakefile:227-235`) — `CREATE USER`, no
+ * `IDENTIFIED BY`, hence no password.
+ */
+export const MYSQL_USERNAME = "rails";
+
+/**
+ * PostgreSQL connection details.
+ *
+ * Rails' `postgresql:` entries carry no connection fields at all
+ * (`config.example.yml:74-81`) — no host, port, or credential — so libpq
+ * resolves them from its own `PGHOST` / `PGPORT` / `PGUSER` / `PGPASSWORD`.
+ * Reading those here is that same deferral, not an interpolation of trails'
+ * own: they are the driver's env contract. `user` and `password` are left
+ * unset when the environment carries none, so `pg` applies libpq's defaults
+ * exactly as it would for Rails.
+ *
+ * The database is NOT read from `PGDATABASE`: `expand_config` fills the entry's
+ * `database` in (`support/config.rb:31-34`), and an explicit config value beats
+ * libpq's env in Rails too.
  */
 export function postgresSettings(read: EnvReader = getEnv): ServerSettings {
   return {
     host: present(read, "PGHOST") ?? "localhost",
     port: intSetting(read, "PGPORT", 5432),
-    user: present(read, "PGUSER") ?? "postgres",
+    user: present(read, "PGUSER"),
     password: present(read, "PGPASSWORD"),
-    database: applySlot(present(read, "PGDATABASE") ?? "rails_js_test", read),
+    database: applySlot(ARUNIT_DATABASE, read),
   };
 }
 
 /**
  * MySQL/MariaDB connection details.
  *
- * `MYSQL_HOST` / `MYSQL_PORT` / `MYSQL_SOCK` mirror the keys Rails interpolates
- * (`config.example.yml:12-19`). The credential and database name are a trails
- * extension defaulting to what CI provisions — Rails hard-codes
- * `username: rails` instead. Accepted permanently (no test observes the
- * credential's value); see the deviations note in the module doc.
+ * Exactly the three keys Rails interpolates — `MYSQL_HOST` / `MYSQL_PORT` /
+ * `MYSQL_SOCK` (`config.example.yml:12-20`) — over the hard-coded
+ * `username: rails` (`config.example.yml:4,24`) and the `expand_config`
+ * database. The credential is not env-driven because Rails' is not.
  */
 export function mysqlSettings(read: EnvReader = getEnv): ServerSettings {
   return {
     host: present(read, "MYSQL_HOST") ?? "localhost",
     port: intSetting(read, "MYSQL_PORT", 3306),
-    user: present(read, "MYSQL_USER") ?? "root",
-    password: present(read, "MYSQL_PASSWORD"),
-    database: applySlot(present(read, "MYSQL_DATABASE") ?? "rails_js_test", read),
+    user: MYSQL_USERNAME,
+    database: applySlot(ARUNIT_DATABASE, read),
     socket: present(read, "MYSQL_SOCK"),
   };
 }
@@ -226,8 +227,8 @@ export function driverConfig(settings: ServerSettings): Record<string, unknown> 
   return {
     host,
     port,
-    username: user,
     database,
+    ...(user === undefined ? {} : { username: user }),
     ...(password === undefined ? {} : { password }),
     ...(socket === undefined ? {} : { socket }),
   };
@@ -239,6 +240,10 @@ export function withDatabase(settings: ServerSettings, database: string): Server
 }
 
 function credentials({ user, password }: ServerSettings): string {
+  // No user at all is libpq's own default path (Rails' postgresql: entries carry
+  // no credential): the URL must then carry no authority userinfo either, or the
+  // driver sees an empty username instead of resolving the OS user.
+  if (user === undefined) return "";
   const auth = encodeURIComponent(user);
   return password ? `${auth}:${encodeURIComponent(password)}@` : `${auth}@`;
 }

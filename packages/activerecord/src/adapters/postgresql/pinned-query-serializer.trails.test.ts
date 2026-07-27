@@ -23,7 +23,7 @@ interface SerializerHarness {
 
 function makeAdapter(): { adapter: SerializerHarness; pinned: { query: () => Promise<unknown> } } {
   const adapter = new PostgreSQLAdapter(
-    "postgres://localhost:5432/rails_js_test",
+    "postgres://localhost:5432/activerecord_unittest",
   ) as unknown as SerializerHarness;
   // A minimal fake pinned client. The `_rawConnection` setter registers a
   // dealloc serializer closure over it but never invokes it here.

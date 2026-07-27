@@ -4,9 +4,13 @@ services:
     ports:
       - "${PG_PORT:-25432}:5432"
     environment:
-      POSTGRES_DB: rails_js_test
+      POSTGRES_DB: activerecord_unittest
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      # Rails' postgresql: entries carry no credential (config.example.yml:74-81),
+      # so the `rails` role created by the init script below has no password.
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - ./scripts/db-init/postgres:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 2s
@@ -18,8 +22,10 @@ services:
     ports:
       - "${MYSQL_PORT:-13306}:3306"
     environment:
-      MYSQL_DATABASE: rails_js_test
+      MYSQL_DATABASE: activerecord_unittest
       MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+    volumes:
+      - ./scripts/db-init/mysql:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "--silent"]
       interval: 2s

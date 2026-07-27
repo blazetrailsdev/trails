@@ -253,29 +253,33 @@ Which backend runs is selected by `ARCONN`, naming a connection exactly as
 Rails' `test/config.yml` does — never by the presence of a connection detail.
 Connection _details_ come from discrete sub-setting env vars.
 
-| Backend          | How to run locally                  | Connection sub-settings                                                               |
-| ---------------- | ----------------------------------- | ------------------------------------------------------------------------------------- |
-| SQLite (default) | `pnpm vitest run`                   | (none)                                                                                |
-| PostgreSQL       | `ARCONN=postgresql pnpm vitest run` | `PGHOST` `PGPORT` `PGUSER` `PGPASSWORD` `PGDATABASE`                                  |
-| MySQL/MariaDB    | `ARCONN=mysql2 pnpm vitest run`     | `MYSQL_HOST` `MYSQL_PORT` `MYSQL_SOCK` `MYSQL_USER` `MYSQL_PASSWORD` `MYSQL_DATABASE` |
+| Backend          | How to run locally                  | Connection sub-settings                 |
+| ---------------- | ----------------------------------- | --------------------------------------- |
+| SQLite (default) | `pnpm vitest run`                   | (none)                                  |
+| PostgreSQL       | `ARCONN=postgresql pnpm vitest run` | `PGHOST` `PGPORT` `PGUSER` `PGPASSWORD` |
+| MySQL/MariaDB    | `ARCONN=mysql2 pnpm vitest run`     | `MYSQL_HOST` `MYSQL_PORT` `MYSQL_SOCK`  |
 
-Every sub-setting has a working default (`localhost`, the stock port, and the
-`rails_js_test` database), so a local server on default ports needs only
-`ARCONN`. An empty value counts as unset. `ARCONN=sqlite3_mem` selects the pure
-`:memory:` lane.
+These are exactly the keys Rails interpolates
+(`vendor/rails/activerecord/test/config.example.yml:12-20`), plus the `PG*` set
+its `postgresql:` entries leave to libpq by carrying no connection fields
+(`config.example.yml:74-81`). Each has a working default (`localhost` and the
+stock port), so a local server on default ports needs only `ARCONN`. An empty
+value counts as unset. `ARCONN=sqlite3_mem` selects the pure `:memory:` lane.
 
-Defaults are a trails choice matching what CI provisions, not Rails parity:
-Rails hard-codes `username: rails` and interpolates only host/port/socket
-(`vendor/rails/activerecord/test/config.example.yml`). `ARCONN` selecting the
-backend is the part that mirrors Rails.
+The **credential and database name are not env-driven**, because Rails' are not:
+the harness connects as `username: rails` with no password
+(`config.example.yml:4,24`) to `activerecord_unittest`, the name
+`ARTest.expand_config` fills in (`test/support/config.rb:28-34`).
+`docker-compose.yml` and the CI service containers provision that user the way
+`rake db:mysql:build_user` does (`activerecord/Rakefile:227-235`) — so
+`docker compose up` is all a local run needs. On Postgres, Rails' entries carry
+no credential at all, so `PGUSER` / `PGPASSWORD` stay unset unless you set them
+and `pg` resolves libpq's own defaults.
 
-That divergence is **accepted permanently** rather than closed by provisioning a
-`rails` user: nothing under test observes the credential's value, adopting
-Rails' literal would need a user provisioned in CI, `docker-compose.yml`, and
-every contributor's local server, and the credential already has to stay
-configurable (CI sets it, and `AR_DB_SLOT` rewrites the database per worker).
-The full reasoning lives in the deviations note atop
-`packages/activerecord/src/support/config.ts`.
+The one addition with no Rails counterpart is `AR_DB_SLOT`: Rails runs one
+database, trails runs parallel vitest workers and gives each an `_N`-suffixed
+copy (`activerecord_unittest_2`, `_3`, …). That is why the provisioned user
+carries `CREATEDB` / a global `GRANT` where Rails grants on one database.
 
 The `SchemaAdapter` wrapper auto-creates tables from model attribute definitions, so tests don't need manual DDL.
 

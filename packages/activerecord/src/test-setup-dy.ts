@@ -16,7 +16,7 @@
  *     safe — no other worker shares this file path)
  *   - PG/MySQL slot >1 (AR_PG_EXCLUSIVE_DB / AR_MYSQL_EXCLUSIVE_DB set by
  *     test-setup-worker-db.ts) → reconstructFromSchema; the worker owns its
- *     own suffixed DB (rails_js_test_N), so purge+load is safe.
+ *     own suffixed DB (activerecord_unittest_N), so purge+load is safe.
  *   - PG/MySQL slot 1 → loadSchema (base URL unchanged; the advisory-lock
  *     bootstrap pg.Client / GET_LOCK connection lives in the same DB as the
  *     worker pool, so DROP DATABASE fails with PG error 55006 and releasing
