@@ -320,14 +320,18 @@ can.
 ### Tag configuration
 
 Both tags are machinery, not user documentation, so the docs-site
-registration is one change covering the family —
-`packages/website/typedoc.json` lists both in `blockTags` (so TypeDoc
-recognizes them instead of warning on an unknown tag) and in `excludeTags`
-(so neither renders on the site), the
-same suppression role `excludeInternal` plays for `@internal`. Both arrays
-restate TypeDoc's defaults because setting either option replaces the default
-list rather than extending it. If `jsdoc/check-tag-names` is ever enabled,
-both tags go in its `definedTags` together for the same reason.
+registration is one change covering the family. TypeDoc's config lives at
+`packages/website/typedoc.config.mjs` and adds both tags to `blockTags` (so
+TypeDoc recognizes them instead of warning on an unknown tag) and to
+`excludeTags` (so neither renders on the site) — the same suppression role
+`excludeInternal` plays for `@internal`. Setting either option **replaces**
+TypeDoc's default list rather than extending it, which is why the config is
+`.mjs` rather than `.json`: it spreads `OptionDefaults.blockTags` /
+`OptionDefaults.excludeTags` from the `typedoc` package, so a TypeDoc upgrade
+that adds a default tag is picked up automatically instead of being silently
+dropped by a hand-copied array. A third tag in this family is then a
+one-token edit. If `jsdoc/check-tag-names` is ever enabled, both tags go in
+its `definedTags` together for the same reason.
 
 ## Relationship to the lints — recommendation
 
