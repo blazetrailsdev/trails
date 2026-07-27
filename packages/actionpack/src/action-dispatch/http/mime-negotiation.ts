@@ -5,9 +5,11 @@
  * the content-type / accept-header negotiation helpers that Rails mixes into
  * `ActionDispatch::Request` via `extend ActiveSupport::Concern`.
  *
- * Exposed as `this`-typed functions per the mixin convention in CLAUDE.md so
- * the same code lives in the file matching Rails' layout while being assigned
- * directly onto the host class.
+ * Readers are exposed as `this`-typed functions per the mixin convention in
+ * CLAUDE.md so the same code lives in the file matching Rails' layout while
+ * being assigned directly onto the host class. Writers live on the
+ * {@link MimeNegotiation} class module, which is the only shape that can carry
+ * them under their Rails name (`variant=` → `set variant`).
  */
 
 import { ArrayInquirer } from "@blazetrails/activesupport";
@@ -77,16 +79,19 @@ export interface MimeNegotiationHost {
  * share a name — so a `setVariant`-style export would be surface Rails does
  * not have. The writers therefore live here as `set` accessors under the
  * Rails name, and hosts pick them up by deriving their mixin host from
- * `MimeNegotiation.prototype` (or via `include()`).
+ * `MimeNegotiation.prototype`.
  *
  * The matching readers stay as `this`-typed module functions: `format` takes
  * Rails' optional `_view_path` argument, which a getter cannot express, and
  * the rest are called internally as plain functions.
  */
 export class MimeNegotiation {
-  /** Host surface the writers read; supplied by whoever mixes them in. */
-  declare setHeader: (key: string, value: unknown) => unknown;
-  declare parameters: Record<string, unknown>;
+  /**
+   * Host surface the writers read; supplied by whoever mixes them in. Sourced
+   * from {@link MimeNegotiationHost} so the two can't drift.
+   */
+  declare setHeader: MimeNegotiationHost["setHeader"];
+  declare parameters: MimeNegotiationHost["parameters"];
   /** @internal Backing slot for {@link variant} — Rails' `@variant`. */
   declare _variant?: ArrayInquirer<string> & Record<string, () => boolean>;
 

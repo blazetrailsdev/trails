@@ -1102,10 +1102,10 @@ Request.prototype.fresh = _fresh;
 // header lookup. We adapt via a per-Request host stored in a WeakMap so the
 // mixin's `_variant` slot persists across calls. The mixin's getHeader/
 // setHeader semantics treat `undefined` as "not cached" (calls fall through
-// to compute and `setHeader` writes the value, including `null`).
-// The host derives from `MimeNegotiation.prototype` so the module's writers
-// (`variant=` / `format=` / `formats=`, which TypeScript can only spell as
-// `set` accessors) apply to it by plain assignment.
+// to compute and `setHeader` writes the value, including `null`). The host
+// derives from `MimeNegotiation.prototype` so the module's writers (`variant=`
+// / `format=` / `formats=`, which TypeScript can only spell as `set`
+// accessors) apply to it by plain assignment.
 type MimeHost = MimeNegotiationHost & _MimeNegotiation;
 const MIME_HOSTS = new WeakMap<Request, MimeHost>();
 function mimeHost(req: Request): MimeHost {
@@ -1122,7 +1122,6 @@ function mimeHost(req: Request): MimeHost {
       parameters: { get: () => req.params },
       accept: { get: () => req.accept },
       xhr: { get: () => req.xhr },
-      _variant: { writable: true, value: undefined },
     }) as MimeHost;
     MIME_HOSTS.set(req, h);
   }
