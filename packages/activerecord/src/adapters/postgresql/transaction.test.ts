@@ -6,8 +6,12 @@
  * instances coordinating real conflicts), the idiom for `adapters/postgresql/`.
  */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, suiteTable } from "./test-helper.js";
 import { SerializationFailure, Deadlocked, LockWaitTimeout, QueryCanceled } from "../../errors.js";
+
+// Rails' inline `samples`, renamed per suite — see suiteTable for why the
+// shared name races across vitest workers on the one CI database.
+const SAMPLES = suiteTable("samples", "transaction");
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -22,12 +26,12 @@ describeIfPg("PostgreSQLAdapter", () => {
     // Mirrors Rails' setup/teardown (samples table, value column). Created in
     // beforeEach — after the global reset (cases/helper.ts drops all tables).
     beforeEach(async () => {
-      await adapter.exec("DROP TABLE IF EXISTS samples");
-      await adapter.exec("CREATE TABLE samples (id int PRIMARY KEY, value integer)");
-      await adapter.execute("INSERT INTO samples VALUES (1, 0), (2, 0)");
+      await adapter.exec(`DROP TABLE IF EXISTS ${SAMPLES}`);
+      await adapter.exec(`CREATE TABLE ${SAMPLES} (id int PRIMARY KEY, value integer)`);
+      await adapter.execute(`INSERT INTO ${SAMPLES} VALUES (1, 0), (2, 0)`);
     });
     afterEach(async () => {
-      await adapter.exec("DROP TABLE IF EXISTS samples");
+      await adapter.exec(`DROP TABLE IF EXISTS ${SAMPLES}`);
     });
 
     it("raises SerializationFailure when a serialization failure occurs", async () => {
@@ -37,13 +41,13 @@ describeIfPg("PostgreSQLAdapter", () => {
         await other.beginIsolatedDbTransaction("serializable");
         // Both read the same set, then write based on it — the second writer
         // raises serialization_failure.
-        await adapter.execute("SELECT sum(value) FROM samples");
-        await other.execute("SELECT sum(value) FROM samples");
-        await other.execute("UPDATE samples SET value = 1 WHERE id = 1");
+        await adapter.execute(`SELECT sum(value) FROM ${SAMPLES}`);
+        await other.execute(`SELECT sum(value) FROM ${SAMPLES}`);
+        await other.execute(`UPDATE ${SAMPLES} SET value = 1 WHERE id = 1`);
         await other.commitDbTransaction();
-        await expect(adapter.execute("UPDATE samples SET value = 2 WHERE id = 1")).rejects.toThrow(
-          SerializationFailure,
-        );
+        await expect(
+          adapter.execute(`UPDATE ${SAMPLES} SET value = 2 WHERE id = 1`),
+        ).rejects.toThrow(SerializationFailure);
       } finally {
         await adapter.rollbackDbTransaction().catch(() => {});
         await other.rollbackDbTransaction().catch(() => {});
@@ -88,12 +92,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await adapter.beginDbTransaction();
         await other.beginDbTransaction();
-        await adapter.execute("UPDATE samples SET value = 1 WHERE id = 1");
-        await other.execute("UPDATE samples SET value = 2 WHERE id = 2");
+        await adapter.execute(`UPDATE ${SAMPLES} SET value = 1 WHERE id = 1`);
+        await other.execute(`UPDATE ${SAMPLES} SET value = 2 WHERE id = 2`);
         // Each now waits on the row the other holds — deadlock; PG aborts one.
         const [r1, r2] = await Promise.allSettled([
-          adapter.execute("UPDATE samples SET value = 3 WHERE id = 2"),
-          other.execute("UPDATE samples SET value = 4 WHERE id = 1"),
+          adapter.execute(`UPDATE ${SAMPLES} SET value = 3 WHERE id = 2`),
+          other.execute(`UPDATE ${SAMPLES} SET value = 4 WHERE id = 1`),
         ]);
         const errs = [r1, r2].filter((r) => r.status === "rejected");
         expect(errs).toHaveLength(1);
@@ -113,10 +117,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
       try {
         await adapter.beginDbTransaction();
-        await adapter.execute("SELECT * FROM samples WHERE id = 1 FOR UPDATE");
+        await adapter.execute(`SELECT * FROM ${SAMPLES} WHERE id = 1 FOR UPDATE`);
         await other.execute("SET lock_timeout = '100ms'");
         await expect(
-          other.execute("SELECT * FROM samples WHERE id = 1 FOR UPDATE"),
+          other.execute(`SELECT * FROM ${SAMPLES} WHERE id = 1 FOR UPDATE`),
         ).rejects.toThrow(LockWaitTimeout);
       } finally {
         await adapter.rollbackDbTransaction().catch(() => {});
@@ -128,12 +132,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
       try {
         await adapter.beginDbTransaction();
-        await adapter.execute("SELECT * FROM samples WHERE id = 1 FOR UPDATE");
+        await adapter.execute(`SELECT * FROM ${SAMPLES} WHERE id = 1 FOR UPDATE`);
         const otherRows = await other.execute("SELECT pg_backend_pid() AS pid");
         const otherPid = (otherRows[0] as { pid: number }).pid;
         let blockedError: unknown;
         const blocked = other
-          .execute("SELECT * FROM samples WHERE id = 1 FOR UPDATE")
+          .execute(`SELECT * FROM ${SAMPLES} WHERE id = 1 FOR UPDATE`)
           .catch((e) => {
             blockedError = e;
           });
