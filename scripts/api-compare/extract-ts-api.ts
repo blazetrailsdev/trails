@@ -20,7 +20,14 @@ import type {
   ParamInfo,
   LiteralValue,
 } from "./types.js";
-import { ROOT_DIR, OUTPUT_DIR, PACKAGES, PACKAGE_DIR_OVERRIDES, packageSrcDir } from "./config.js";
+import {
+  ROOT_DIR,
+  OUTPUT_DIR,
+  PACKAGES,
+  PACKAGE_DIR_OVERRIDES,
+  packageSrcDir,
+  apiComparePackageRoots,
+} from "./config.js";
 import {
   sharedCacheDir,
   contentFingerprint,
@@ -183,7 +190,7 @@ export async function main() {
   // checkout` never updates them, so a checkout-based baseline would silently
   // mix two commits (see build-freshness.ts).
   if (process.env.API_COMPARE_ALLOW_STALE_BUILD !== "1") {
-    const stale = await staleBuilds(path.join(ROOT_DIR, "packages"), ROOT_DIR);
+    const stale = await staleBuilds(apiComparePackageRoots(), ROOT_DIR);
     if (stale.length > 0) throw new Error(staleBuildMessage(stale));
   }
   const force = process.env.API_COMPARE_FORCE === "1";

@@ -65,7 +65,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
-import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
+import { OUTPUT_DIR, apiComparePackageRoots } from "./config.js";
 import {
   SKIP,
   SKIP_TS_MIRROR_IS_DRIFT,
@@ -1055,10 +1055,11 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   // exists to stop (see build-freshness.ts).
   if (
     process.env.API_COMPARE_ALLOW_STALE_BUILD !== "1" &&
-    (await manifestIsStale(tsPath, path.join(ROOT_DIR, "packages")))
+    (await manifestIsStale(tsPath, apiComparePackageRoots()))
   ) {
     console.error(
-      "output/ts-api.json predates packages/*/src — it describes a different checkout.\n" +
+      "output/ts-api.json predates the api-compared package sources — it describes a\n" +
+        "different checkout.\n" +
         "Run `pnpm api:compare` to regenerate the manifests before measuring.",
     );
     process.exit(1);

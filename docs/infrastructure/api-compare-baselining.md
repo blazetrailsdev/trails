@@ -74,6 +74,13 @@ without this the deletion would slip past. The side effect is that a checkout
 touching any non-`.ts` file under `src` also flags the package — conservative in
 the fail-loud direction, and a `pnpm build` clears it either way.
 
+Both guards are scoped to the packages `api:compare` actually extracts
+(`apiComparePackageRoots()` in `scripts/api-compare/config.ts`, derived from
+`vendor/sources.ts`) — down to the `src` subdir for the four packages that share
+`packages/actionpack`. A workspace that is not api-compared (`activerecord-cli`,
+`trails-tsc`, `tse-compiler`, `website`, …) cannot affect the TS manifest, so a
+stale build there never blocks a run.
+
 A package with **no** `dist` is not stale — nothing was built, so nothing can be
 out of date, and cross-package imports fail to resolve uniformly at every
 commit. A worktree that has never run `pnpm build` therefore measures

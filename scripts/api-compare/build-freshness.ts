@@ -24,6 +24,7 @@
  */
 import * as fs from "fs/promises";
 import * as path from "path";
+import type { PackageRoots } from "./config.js";
 
 /** One package whose `dist` predates its own sources. */
 export interface StaleBuild {
@@ -84,31 +85,43 @@ const isSource = (name: string) => name.endsWith(".ts") && !name.endsWith(".d.ts
 const isDeclaration = (name: string) => name.endsWith(".d.ts");
 
 /**
- * Every package under `packagesDir` whose `dist` was built before its current
- * `src`. A package with no `dist` is NOT stale — nothing was built, so nothing
- * can be out of date and cross-package imports fail to resolve uniformly at
- * every commit. `rootDir` only anchors the reported path.
+ * Every root in `roots` whose `dist` was built before its current `src`.
+ *
+ * `roots` is the extractor's own package set (`apiComparePackageRoots`), NOT a
+ * listing of `packages/` — a workspace api-compare never extracts cannot affect
+ * the manifest and must not be able to block a run. Roots sharing a directory
+ * (the four actionpack packages) collapse to one report, keeping the newest
+ * source among them.
+ *
+ * A root with no `dist` is NOT stale: nothing was built, so nothing can be out
+ * of date and cross-package imports fail to resolve uniformly at every commit.
+ * `rootDir` only anchors the reported path.
  */
-export async function staleBuilds(packagesDir: string, rootDir: string): Promise<StaleBuild[]> {
-  let dirs: string[];
-  try {
-    dirs = await fs.readdir(packagesDir);
-  } catch {
-    return [];
-  }
+export async function staleBuilds(
+  roots: readonly PackageRoots[],
+  rootDir: string,
+): Promise<StaleBuild[]> {
   const checked = await Promise.all(
-    dirs.map(async (dir): Promise<StaleBuild | null> => {
-      const packageDir = path.join(packagesDir, dir);
+    roots.map(async (root): Promise<{ dir: string; source: Newest } | null> => {
       const [source, built] = await Promise.all([
-        newestMtime(path.join(packageDir, "src"), isSource, true),
-        newestMtime(path.join(packageDir, "dist"), isDeclaration, false),
+        newestMtime(root.srcDir, isSource, true),
+        newestMtime(root.distDir, isDeclaration, false),
       ]);
       if (!source || !built || source.mtimeMs <= built.mtimeMs) return null;
-      return { dir, newestSource: path.relative(rootDir, source.file).replace(/\\/g, "/") };
+      return { dir: root.dir, source };
     }),
   );
-  return checked
-    .filter((entry): entry is StaleBuild => entry !== null)
+  const worstPerDir = new Map<string, Newest>();
+  for (const entry of checked) {
+    if (!entry) continue;
+    const seen = worstPerDir.get(entry.dir);
+    if (!seen || entry.source.mtimeMs > seen.mtimeMs) worstPerDir.set(entry.dir, entry.source);
+  }
+  return [...worstPerDir.entries()]
+    .map(([dir, source]) => ({
+      dir,
+      newestSource: path.relative(rootDir, source.file).replace(/\\/g, "/"),
+    }))
     .sort((a, b) => (a.dir < b.dir ? -1 : a.dir > b.dir ? 1 : 0));
 }
 
@@ -121,22 +134,17 @@ export async function staleBuilds(packagesDir: string, rootDir: string): Promise
  * guard exists to stop, one step further downstream. Missing manifests are not
  * stale; the caller already has a better error for that.
  */
-export async function manifestIsStale(manifestPath: string, packagesDir: string): Promise<boolean> {
+export async function manifestIsStale(
+  manifestPath: string,
+  roots: readonly PackageRoots[],
+): Promise<boolean> {
   let manifestMtime: number;
   try {
     manifestMtime = (await fs.stat(manifestPath)).mtimeMs;
   } catch {
     return false;
   }
-  let dirs: string[];
-  try {
-    dirs = await fs.readdir(packagesDir);
-  } catch {
-    return false;
-  }
-  const newest = await Promise.all(
-    dirs.map((dir) => newestMtime(path.join(packagesDir, dir, "src"), isSource, true)),
-  );
+  const newest = await Promise.all(roots.map((root) => newestMtime(root.srcDir, isSource, true)));
   const newestSource = newest.reduce(later, null);
   return newestSource !== null && newestSource.mtimeMs > manifestMtime;
 }
