@@ -24,7 +24,7 @@ describe("ConnectionSwappingNestedTest", () => {
 
   class ModelInheritingFromNonConnectionAbstractClass extends NonConnectionAbstractClass {}
 
-  let prevConfigs: unknown;
+  let prevConfigs: DatabaseConfigurations;
   let prevDefaultEnv: string;
   let prevCurrent: unknown;
 
@@ -71,7 +71,7 @@ describe("ConnectionSwappingNestedTest", () => {
       await fs.writeFile(dbPaths[name], "");
     }
 
-    prevConfigs = (Base as any).configurations;
+    prevConfigs = Base.configurations();
     prevDefaultEnv = DatabaseConfigurations.defaultEnv;
     prevCurrent = (DatabaseConfigurations as any).current;
     DatabaseConfigurations.defaultEnv = "default_env";
@@ -80,7 +80,7 @@ describe("ConnectionSwappingNestedTest", () => {
 
   afterEach(async () => {
     await Base.connectionHandler.clearAllConnectionsBang();
-    (Base as any).configurations = prevConfigs;
+    Base.configurations(prevConfigs);
     DatabaseConfigurations.defaultEnv = prevDefaultEnv;
     (DatabaseConfigurations as any).current = prevCurrent;
     (PrimaryBase as any).connectionClass = false;
@@ -97,14 +97,14 @@ describe("ConnectionSwappingNestedTest", () => {
   });
 
   it("roles can be swapped granularly", () => {
-    (Base as any).configurations = {
+    Base.configurations({
       default_env: {
         primary: sqliteDb("primary"),
         primary_replica: sqliteDb("primary", { replica: true }),
         secondary: sqliteDb("secondary"),
         secondary_replica: sqliteDb("secondary_replica", { replica: true }),
       },
-    };
+    });
 
     PrimaryBase.connectsTo({ database: { writing: "primary", reading: "primary_replica" } });
     SecondaryBase.connectsTo({ database: { writing: "secondary", reading: "secondary_replica" } });
@@ -156,7 +156,7 @@ describe("ConnectionSwappingNestedTest", () => {
   });
 
   it("shards can be swapped granularly", () => {
-    (Base as any).configurations = {
+    Base.configurations({
       default_env: {
         primary: sqliteDb("primary"),
         primary_replica: sqliteDb("primary", { replica: true }),
@@ -169,7 +169,7 @@ describe("ConnectionSwappingNestedTest", () => {
         secondary_shard_two: sqliteDb("secondary_shard_two"),
         secondary_shard_two_replica: sqliteDb("secondary_shard_two", { replica: true }),
       },
-    };
+    });
 
     PrimaryBase.connectsTo({
       shards: {
@@ -229,7 +229,7 @@ describe("ConnectionSwappingNestedTest", () => {
   });
 
   it("roles and shards can be swapped granularly", () => {
-    (Base as any).configurations = {
+    Base.configurations({
       default_env: {
         primary: sqliteDb("primary"),
         primary_replica: sqliteDb("primary", { replica: true }),
@@ -242,7 +242,7 @@ describe("ConnectionSwappingNestedTest", () => {
         secondary_shard_two: sqliteDb("secondary_shard_two"),
         secondary_shard_two_replica: sqliteDb("secondary_shard_two", { replica: true }),
       },
-    };
+    });
 
     PrimaryBase.connectsTo({
       shards: {
@@ -300,7 +300,7 @@ describe("ConnectionSwappingNestedTest", () => {
   });
 
   it("connected to many", () => {
-    (Base as any).configurations = {
+    Base.configurations({
       default_env: {
         primary: sqliteDb("primary"),
         primary_replica: sqliteDb("primary", { replica: true }),
@@ -309,7 +309,7 @@ describe("ConnectionSwappingNestedTest", () => {
         tertiary: sqliteDb("tertiary"),
         tertiary_replica: sqliteDb("tertiary", { replica: true }),
       },
-    };
+    });
 
     PrimaryBase.connectsTo({ database: { writing: "primary", reading: "primary_replica" } });
     SecondaryBase.connectsTo({ database: { writing: "secondary", reading: "secondary_replica" } });
@@ -339,14 +339,14 @@ describe("ConnectionSwappingNestedTest", () => {
   });
 
   it("prevent writes can be changed granularly", () => {
-    (Base as any).configurations = {
+    Base.configurations({
       default_env: {
         primary: sqliteDb("primary"),
         primary_replica: sqliteDb("primary"),
         secondary: sqliteDb("secondary"),
         secondary_replica: sqliteDb("secondary_replica"),
       },
-    };
+    });
 
     PrimaryBase.connectsTo({ database: { writing: "primary", reading: "primary_replica" } });
     SecondaryBase.connectsTo({ database: { writing: "secondary", reading: "secondary_replica" } });
@@ -395,11 +395,11 @@ describe("ConnectionSwappingNestedTest", () => {
     const prevAppRecord = (globalThis as any).ApplicationRecord;
     (globalThis as any).ApplicationRecord = AppRecord;
 
-    (Base as any).configurations = {
+    Base.configurations({
       default_env: {
         arunit: sqliteDb("arunit"),
       },
-    };
+    });
 
     try {
       AppRecord.connectsTo({ database: { writing: "arunit", reading: "arunit" } });
@@ -422,11 +422,11 @@ describe("ConnectionSwappingNestedTest", () => {
   });
 
   it("prevent writes handles class reloading", async () => {
-    (Base as any).configurations = {
+    Base.configurations({
       default_env: {
         arunit: sqliteDb("arunit"),
       },
-    };
+    });
 
     class ReloadedRecordV1 extends Base {
       static override abstractClass = true;

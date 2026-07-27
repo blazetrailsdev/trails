@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { ConnectionHandler } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
-import { DatabaseConfigurations } from "../database-configurations.js";
+import { DatabaseConfigurations, type RawConfigurations } from "../database-configurations.js";
 import { Base } from "../base.js";
 import { currentRole } from "../core.js";
 
@@ -30,21 +30,21 @@ describe("ConnectionHandlersMultiDbTest", () => {
   });
 
   function withBaseConfigs(
-    raw: Record<string, unknown>,
+    raw: RawConfigurations,
     fn: () => void,
     opts: { defaultEnv?: string } = {},
   ): void {
-    const prevConfigs = (Base as any).configurations;
+    const prevConfigs = Base.configurations();
     const prevDefaultEnv = DatabaseConfigurations.defaultEnv;
     if (opts.defaultEnv) {
       DatabaseConfigurations.defaultEnv = opts.defaultEnv;
       vi.stubEnv("TRAILS_ENV", opts.defaultEnv);
     }
-    (Base as any).configurations = raw;
+    Base.configurations(raw);
     try {
       fn();
     } finally {
-      (Base as any).configurations = prevConfigs;
+      Base.configurations(prevConfigs);
       DatabaseConfigurations.defaultEnv = prevDefaultEnv;
       if (opts.defaultEnv) vi.unstubAllEnvs();
       // Sync helper (fn: () => void); the async clearAllConnectionsBang tears

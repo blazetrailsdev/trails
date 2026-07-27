@@ -483,6 +483,7 @@ describe("ConnectionHandlingTest", () => {
     // DatabaseConfigurations constructor mutates as a side effect.
     // Snapshot it so test ordering can't pin the wrong registry.
     const priorCurrent = (DatabaseConfigurations as any).current;
+    const priorConfigs = Base.configurations();
     try {
       const inMemory = new DatabaseConfigurations([
         new HashConfig(env, "primary", {
@@ -491,13 +492,16 @@ describe("ConnectionHandlingTest", () => {
         }),
       ]);
 
+      // Rails' registry is one class variable, so the config goes on Base
+      // even though the connection is established on the subclass.
+      Base.configurations(inMemory);
       class InMemoryModel extends Base {}
-      (InMemoryModel as any).configurations = inMemory;
 
       await InMemoryModel.establishConnection();
       expect(InMemoryModel.connectionPool().dbConfig.database).toBe("db/common.sqlite3");
       expect(await InMemoryModel.adapterClass()).toBe(await Base.adapterClass());
     } finally {
+      Base.configurations(priorConfigs);
       (DatabaseConfigurations as any).current = priorCurrent;
     }
   });
@@ -512,13 +516,14 @@ describe("ConnectionHandlingTest", () => {
     const env = process.env.NODE_ENV || DatabaseConfigurations.defaultEnv;
 
     const priorCurrent = (DatabaseConfigurations as any).current;
+    const priorConfigs = Base.configurations();
     try {
       const url = new UrlConfig(env, "primary", "sqlite3:db/foo.sqlite3");
       url._database = "db/foo-2.sqlite3"; // mimic worker-suffix mutation
       const inMemory = new DatabaseConfigurations([url]);
 
+      Base.configurations(inMemory);
       class WorkerModel extends Base {}
-      (WorkerModel as any).configurations = inMemory;
 
       await WorkerModel.establishConnection();
       // The connection pool's resolved dbConfig must point at the
@@ -533,6 +538,7 @@ describe("ConnectionHandlingTest", () => {
         await import("./connection-adapters/better-sqlite3-adapter.js");
       expect(Klass).toBe(BetterSQLite3Adapter);
     } finally {
+      Base.configurations(priorConfigs);
       (DatabaseConfigurations as any).current = priorCurrent;
     }
   });
@@ -710,12 +716,12 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
 
 describe("resolveConfigForConnection / connectsTo with unset configurations", () => {
   let prevCurrentConfigs: unknown;
-  let prevBaseConfigs: unknown;
+  let prevBaseConfigs: DatabaseConfigurations;
 
   beforeEach(async () => {
     const { DatabaseConfigurations } = await import("./database-configurations.js");
     prevCurrentConfigs = (DatabaseConfigurations as any).current;
-    prevBaseConfigs = (Base as any).configurations;
+    prevBaseConfigs = Base.configurations();
   });
 
   afterEach(async () => {
@@ -724,7 +730,7 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
     // registry HashConfig#isPrimary consults), so save and restore it here
     // — clearing connections alone leaves a stale primary registry behind.
     (DatabaseConfigurations as any).current = prevCurrentConfigs;
-    (Base as any).configurations = prevBaseConfigs;
+    Base.configurations(prevBaseConfigs);
     await Base.connectionHandler.clearAllConnectionsBang();
     delete (Base as any)._connectionSpecificationName;
   });
@@ -737,10 +743,9 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
         this.abstractClass = true;
       }
     }
-    // No `Untouched.configurations` assigned — normalizeConfigurations falls
-    // back to DatabaseConfigurations.fromEnv({}), so resolving an unknown
-    // env name must surface AdapterNotSpecified rather than passing the
-    // string through.
+    // No `Untouched.configurations` assigned — resolving an unknown env name
+    // against the empty default registry must surface AdapterNotSpecified
+    // rather than passing the string through.
     expect(() => resolveConfigForConnection.call(Untouched, "missing_env")).toThrow(
       AdapterNotSpecified,
     );
@@ -766,10 +771,9 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
       __resetPrimaryAbstractClass();
       primaryAbstractClass(AppRecord);
       const env = DatabaseConfigurations.currentEnv();
-      (AppRecord as any).configurations = {
+      Base.configurations({
         [env]: { primary: { adapter: "sqlite3", database: "db/primary.sqlite3" } },
-      };
-      (SecondaryAbstract as any).configurations = (AppRecord as any).configurations;
+      });
 
       // Exercises the public connectsTo path so the
       // resolveConfigForConnection side effect (planting
@@ -919,7 +923,6 @@ describe("loadConfigFile resolves config/database.* against Trails.root", () => 
     setTrailsRoot(tmpRoot);
 
     class RootConfigModel extends Base {}
-    (RootConfigModel as any).configurations = undefined;
 
     await RootConfigModel.establishConnection();
 

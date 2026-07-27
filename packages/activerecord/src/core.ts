@@ -8,6 +8,8 @@ import { getApplicationRecordClass } from "./inheritance.js";
 import { RecordNotFound, StatementInvalid, StrictLoadingViolationError } from "./errors.js";
 import { actionOnStrictLoadingViolation } from "./ar-config.js";
 import { WRITING_ROLE } from "./roles.js";
+import { DatabaseConfigurations, type RawConfigurations } from "./database-configurations.js";
+import type { DatabaseConfig } from "./database-configurations/database-config.js";
 import {
   Notifications,
   IsolatedExecutionState,
@@ -407,7 +409,7 @@ interface CoreHost {
   _destroyAssociationAsyncJob?: any;
   _findByStatementCache?: Map<boolean, Map<string, any>>;
   _generatedAssociationMethods?: Set<string>;
-  _configurations?: any;
+  _configurations?: DatabaseConfigurations;
   _predicateBuilder?: any;
   arelTable?: any;
   prototype: any;
@@ -429,11 +431,22 @@ export function destroyAssociationAsyncJob(this: CoreHost, value?: any): any {
   return this._destroyAssociationAsyncJob ?? null;
 }
 
-export function configurations(this: CoreHost, config?: any): any {
+/**
+ * Mirrors: ActiveRecord::Base.configurations / .configurations=
+ */
+export function configurations(
+  this: CoreHost,
+  config?: RawConfigurations | DatabaseConfigurations | DatabaseConfig[],
+): DatabaseConfigurations {
   if (config !== undefined) {
-    this._configurations = config;
+    this._configurations =
+      config instanceof DatabaseConfigurations
+        ? config
+        : Array.isArray(config)
+          ? new DatabaseConfigurations(config)
+          : DatabaseConfigurations.fromEnv(config);
   }
-  return this._configurations ?? {};
+  return this._configurations ?? DatabaseConfigurations.fromEnv({});
 }
 
 export function isApplicationRecordClass(this: CoreHost): boolean {

@@ -584,9 +584,8 @@ describe("QueryCacheTest", () => {
     // `Base.configurations` from config.yml, so the not-connected branch still
     // caches. The trails harness establishes connections without registering
     // configurations, so supply that precondition here and restore after.
-    const baseWithConfigs = Base as unknown as { configurations: unknown };
-    const priorConfigurations = baseWithConfigs.configurations;
-    baseWithConfigs.configurations = { arunit: dbConfig.configuration };
+    const priorConfigurations = Base.configurations();
+    Base.configurations({ arunit: dbConfig.configuration });
 
     await Base.establishConnection(dbConfig);
     expect(Task.isConnectedQ()).toBe(false);
@@ -601,7 +600,7 @@ describe("QueryCacheTest", () => {
         });
       });
     } finally {
-      baseWithConfigs.configurations = priorConfigurations;
+      Base.configurations(priorConfigurations);
       await Base.establishConnection(originalConnection);
     }
   });

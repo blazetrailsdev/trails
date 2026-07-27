@@ -8,12 +8,10 @@ import { fixtures } from "./test-helpers/fixtures.js";
 import { SchemaMigration } from "./schema-migration.js";
 
 // Build a (minimal) DatabaseConfigurations whose `configsFor` returns the
-// supplied stubbed configs. Mirrors the production shape — production code
-// calls `(this as any).configurations?.toH?.()` then `fromEnv(...)`, so the
-// real Base.configurations is a raw hash; createAndLoadSchema normalizes
-// either input. Tests use the post-normalization instance directly.
+// supplied stubbed configs. They also go through the array constructor arm so
+// the registry reports itself non-empty.
 const stubConfigurations = (configs: unknown[]): DatabaseConfigurations => {
-  const dc = new DatabaseConfigurations([]);
+  const dc = new DatabaseConfigurations(configs as never);
   vi.spyOn(dc, "configsFor").mockReturnValue(configs as never);
   return dc;
 };
@@ -28,10 +26,15 @@ afterAll(() => {
 describe("TestDatabasesTest", () => {
   fixtures({});
   let priorCurrent: DatabaseConfigurations | null;
+  let priorConfigs: DatabaseConfigurations;
   beforeEach(() => {
     priorCurrent = DatabaseConfigurations.current;
+    priorConfigs = Base.configurations();
   });
+  // Mirrors the Rails case's `ensure ActiveRecord::Base.configurations =
+  // prev_configs` (test_databases_test.rb:51).
   afterEach(() => {
+    Base.configurations(priorConfigs);
     DatabaseConfigurations.current = priorCurrent;
     vi.restoreAllMocks();
   });
@@ -60,11 +63,9 @@ describe("TestDatabasesTest", () => {
 
     const mockConfigurations = stubConfigurations([mockConfig]);
 
-    const mockModelClass = {
-      configurations: mockConfigurations,
-    } as any as typeof Base;
+    Base.configurations(mockConfigurations);
 
-    await createAndLoadSchema(mockModelClass, 2, { envName: "arunit" });
+    await createAndLoadSchema(2, { envName: "arunit" });
 
     expect(mockConfig.database).toBe("test/db/primary.sqlite3-2");
     expect(mockReconstructFromSchema).toHaveBeenCalledWith(
@@ -72,7 +73,7 @@ describe("TestDatabasesTest", () => {
       DatabaseTasks.schemaFormat,
       undefined,
     );
-    expect(mockEstablishConnection).toHaveBeenCalledWith(mockModelClass);
+    expect(mockEstablishConnection).toHaveBeenCalledWith(Base);
   });
 
   it("create databases after fork", async () => {
@@ -99,11 +100,9 @@ describe("TestDatabasesTest", () => {
 
     const mockConfigurations = stubConfigurations([mockConfig]);
 
-    const mockModelClass = {
-      configurations: mockConfigurations,
-    } as any as typeof Base;
+    Base.configurations(mockConfigurations);
 
-    await createAndLoadSchema(mockModelClass, 42, { envName: "arunit" });
+    await createAndLoadSchema(42, { envName: "arunit" });
 
     expect(mockConfig.database).toBe("test/db/primary.sqlite3-42");
     expect(mockReconstructFromSchema).toHaveBeenCalled();
@@ -124,11 +123,9 @@ describe("TestDatabasesTest", () => {
 
     const mockConfigurations = stubConfigurations(configs);
 
-    const mockModelClass = {
-      configurations: mockConfigurations,
-    } as any as typeof Base;
+    Base.configurations(mockConfigurations);
 
-    await createAndLoadSchema(mockModelClass, 42, { envName: "arunit" });
+    await createAndLoadSchema(42, { envName: "arunit" });
 
     expect(mockReconstructFromSchema).toHaveBeenCalledTimes(configs.length);
     const reconstructedNames = mockReconstructFromSchema.mock.calls.map(
@@ -152,11 +149,9 @@ describe("TestDatabasesTest", () => {
       adapter: "sqlite3",
     });
 
-    const mockModelClass = {
-      configurations: stubConfigurations([dbConfig]),
-    } as any as typeof Base;
+    Base.configurations(stubConfigurations([dbConfig]));
 
-    await createAndLoadSchema(mockModelClass, 5, { envName: "arunit" });
+    await createAndLoadSchema(5, { envName: "arunit" });
     expect(dbConfig.database).toBe("test/db/primary.sqlite3-5");
   });
 
@@ -177,28 +172,33 @@ describe("TestDatabasesTest", () => {
     });
     Object.defineProperty(mockConfig, "database", { get: () => ":memory:" });
 
-    const mockModelClass = {
-      configurations: stubConfigurations([mockConfig]),
-    } as any as typeof Base;
+    Base.configurations(stubConfigurations([mockConfig]));
 
-    await createAndLoadSchema(mockModelClass, 7, { envName: "arunit" });
+    await createAndLoadSchema(7, { envName: "arunit" });
     // _database setter must NOT have been called for an in-memory DB —
     // suffixing `:memory:` would turn it into an on-disk path.
     expect(suffixed).toBeUndefined();
     expect(mockReconstructFromSchema).toHaveBeenCalled();
   });
 
-  it("does not overwrite an unset Base.configurations with an empty registry", async () => {
-    vi.spyOn(DatabaseTasks, "reconstructFromSchema").mockResolvedValue(undefined);
-    vi.spyOn(await import("./connection-handling.js"), "establishConnection").mockResolvedValue(
-      undefined,
-    );
+  // Rails has no empty-registry guard: `create_and_load_schema` iterates
+  // whatever `configs_for` yields (possibly nothing) and still runs the
+  // `ensure ActiveRecord::Base.establish_connection`
+  // (test_databases.rb:11-21).
+  it("reconnects through the ensure even when the registry is empty", async () => {
+    const mockReconstructFromSchema = vi
+      .spyOn(DatabaseTasks, "reconstructFromSchema")
+      .mockResolvedValue(undefined);
+    const mockEstablishConnection = vi
+      .spyOn(await import("./connection-handling.js"), "establishConnection")
+      .mockResolvedValue(undefined);
 
-    // No `configurations` — defensive early return; nothing to suffix.
-    // In Rails this never occurs (app boot sets configurations first).
-    const mockModelClass = { configurations: undefined } as any as typeof Base;
-    await createAndLoadSchema(mockModelClass, 1, { envName: "arunit" });
-    expect((mockModelClass as any).configurations).toBeUndefined();
+    Base.configurations({});
+
+    await createAndLoadSchema(1, { envName: "arunit" });
+
+    expect(mockReconstructFromSchema).not.toHaveBeenCalled();
+    expect(mockEstablishConnection).toHaveBeenCalledWith(Base);
   });
 
   it("throws a clear error when neither database nor URL yields a name", async () => {
@@ -211,11 +211,9 @@ describe("TestDatabasesTest", () => {
     Object.defineProperty(mockConfig, "_database", { set() {} });
     Object.defineProperty(mockConfig, "database", { get: () => undefined });
 
-    const mockModelClass = {
-      configurations: stubConfigurations([mockConfig]),
-    } as any as typeof Base;
+    Base.configurations(stubConfigurations([mockConfig]));
 
-    await expect(createAndLoadSchema(mockModelClass, 1, { envName: "arunit" })).rejects.toThrow(
+    await expect(createAndLoadSchema(1, { envName: "arunit" })).rejects.toThrow(
       /Cannot suffix database name/,
     );
   });
@@ -243,18 +241,14 @@ describe("TestDatabasesTest", () => {
     });
     mockConfig.adapter = "sqlite3";
 
-    const mockModelClass = {
-      configurations: stubConfigurations([mockConfig]),
-    } as any as typeof Base;
+    Base.configurations(stubConfigurations([mockConfig]));
 
     const originalVerbose = process.env.VERBOSE;
     process.env.VERBOSE = "1";
 
     try {
-      await expect(createAndLoadSchema(mockModelClass, 7, { envName: "arunit" })).rejects.toThrow(
-        error,
-      );
-      expect(mockEstablishConnection).toHaveBeenCalledWith(mockModelClass);
+      await expect(createAndLoadSchema(7, { envName: "arunit" })).rejects.toThrow(error);
+      expect(mockEstablishConnection).toHaveBeenCalledWith(Base);
       expect(process.env.VERBOSE).toBe("1");
     } finally {
       if (originalVerbose === undefined) {

@@ -12,7 +12,6 @@
 // Import under the qualified TS name so the public surface doesn't leak the
 // generic `Store` symbol into the generated `.d.ts`.
 import { Store as QueryCacheStore } from "./connection-adapters/abstract/query-cache.js";
-import { DatabaseConfigurations } from "./database-configurations.js";
 import type { Base } from "./base.js";
 
 // Deep-import convenience: consumers doing
@@ -124,21 +123,6 @@ export class QueryCache {
 }
 
 /**
- * Mirrors Rails' `connected? || !configurations.empty?` guard. The raw
- * `configurations` static can hold a `DatabaseConfigurations`, a raw config
- * map, an array of configs, or nothing; normalize all of them to the
- * emptiness check Rails performs on its always-`DatabaseConfigurations` reader.
- */
-function configurationsEmpty(klass: typeof Base): boolean {
-  const configs = (klass as { configurations?: unknown }).configurations;
-  if (configs == null) return true;
-  if (configs instanceof DatabaseConfigurations) return configs.empty;
-  if (Array.isArray(configs)) return configs.length === 0;
-  if (typeof configs === "object") return Object.keys(configs).length === 0;
-  return true;
-}
-
-/**
  * Model-level query-cache delegation, mixed into `Base` via `extend`.
  *
  * Mirrors: ActiveRecord::QueryCache::ClassMethods (lib/active_record/query_cache.rb).
@@ -151,7 +135,7 @@ export const ClassMethods = {
    * Mirrors: ActiveRecord::QueryCache::ClassMethods#cache
    */
   async cache<T>(this: typeof Base, block: () => T | Promise<T>): Promise<T> {
-    if (this.isConnected() || !configurationsEmpty(this)) {
+    if (this.isConnected() || !this.configurations().empty) {
       const pool = this.connectionPool();
       const wasEnabled = pool.queryCacheEnabled;
       try {
@@ -174,7 +158,7 @@ export const ClassMethods = {
     block: () => T | Promise<T>,
     options: { dirties?: boolean } = {},
   ): Promise<T> {
-    if (this.isConnected() || !configurationsEmpty(this)) {
+    if (this.isConnected() || !this.configurations().empty) {
       return this.connectionPool().disableQueryCache(block, options);
     }
     return Promise.resolve(block());

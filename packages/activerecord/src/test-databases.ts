@@ -7,8 +7,7 @@
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { MigrationProxy } from "./migration.js";
 import { Migrator } from "./migration.js";
-import type { Base } from "./base.js";
-import { DatabaseConfigurations } from "./database-configurations.js";
+import { Base } from "./base.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 
 /**
@@ -61,29 +60,14 @@ function isInMemorySqlite(name: string): boolean {
  * Mirrors: ActiveRecord::TestDatabases.create_and_load_schema
  */
 export async function createAndLoadSchema(
-  modelClass: typeof Base,
   index: number,
   { envName }: { envName: string } = { envName: "test" },
 ): Promise<void> {
-  // Rails: configurations is always set before create_and_load_schema is
-  // called (app boots first). Guard here is defensive — if null, there is
-  // nothing to suffix and the finally reconnect handles the rest.
-  const raw = (modelClass as any).configurations;
-  if (raw == null) return;
-
-  // Normalize to a DatabaseConfigurations instance. Persist it back so
-  // _database mutations and the finally reconnect see the same registry.
-  const configurations =
-    raw instanceof DatabaseConfigurations
-      ? raw
-      : DatabaseConfigurations.fromEnv(typeof raw.toH === "function" ? raw.toH() : raw);
-  (modelClass as any).configurations = configurations;
-
   const old = process.env.VERBOSE;
   process.env.VERBOSE = "false";
 
   try {
-    const configs = configurations.configsFor({ envName });
+    const configs = Base.configurations().configsFor({ envName });
     for (const dbConfig of configs) {
       // `dbConfig.database` falls back to URL parsing for URL-only configs
       // (UrlConfig.database override landed in #957). Only fails for configs
@@ -109,7 +93,7 @@ export async function createAndLoadSchema(
     // it always runs even if establishConnection throws.
     const { establishConnection } = await import("./connection-handling.js");
     try {
-      await establishConnection(modelClass);
+      await establishConnection(Base);
     } finally {
       if (old !== undefined) {
         process.env.VERBOSE = old;

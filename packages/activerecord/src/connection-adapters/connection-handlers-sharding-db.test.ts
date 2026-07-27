@@ -5,27 +5,27 @@ import * as fs from "node:fs";
 import { randomUUID } from "node:crypto";
 import { Base } from "../base.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
-import { DatabaseConfigurations } from "../database-configurations.js";
+import { DatabaseConfigurations, type RawConfigurations } from "../database-configurations.js";
 import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 import { currentRole, connectedToStack } from "../core.js";
 
 async function withBaseConfigs(
-  raw: Record<string, unknown>,
+  raw: RawConfigurations,
   fn: () => void | Promise<void>,
   opts: { defaultEnv?: string } = {},
 ): Promise<void> {
-  const prevConfigs = (Base as any).configurations;
+  const prevConfigs = Base.configurations();
   const prevDefaultEnv = DatabaseConfigurations.defaultEnv;
   const prevCurrent = (DatabaseConfigurations as any).current;
   if (opts.defaultEnv) {
     DatabaseConfigurations.defaultEnv = opts.defaultEnv;
     vi.stubEnv("TRAILS_ENV", opts.defaultEnv);
   }
-  (Base as any).configurations = raw;
+  Base.configurations(raw);
   try {
     await fn();
   } finally {
-    (Base as any).configurations = prevConfigs;
+    Base.configurations(prevConfigs);
     DatabaseConfigurations.defaultEnv = prevDefaultEnv;
     (DatabaseConfigurations as any).current = prevCurrent;
     if (opts.defaultEnv) vi.unstubAllEnvs();
