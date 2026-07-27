@@ -35,7 +35,11 @@ const KNOWN_UNRUN: Record<string, string> = {
 // of these declares or renames a source; matching the test file alone is not
 // enough, because the file that drifts is the one it asserts over.
 const GATE_INPUTS: Record<string, string[]> = {
-  UNIT_TESTS_PKGS_RE: ["vendor/sources.ts", "vendor/sources.lock.json", "vendor/fetch.ts"],
+  UNIT_TESTS_PKGS_RE: [
+    "vendor/sources.ts",
+    "vendor/sources.lock.json",
+    "scripts/api-compare/config.ts",
+  ],
 };
 
 const SKIP_DIRS = new Set(["node_modules", "dist", ".git"]);
