@@ -54,6 +54,43 @@ describe("has_one displacement via the synchronous build path", () => {
     expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(null);
   });
 
+  it("nullifies the displaced row when nested attributes replace an unloaded child", async () => {
+    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
+    const displaced = (await Ship.create({
+      name: "Nights Dirty Lightning",
+      pirate_id: (pirate as unknown as { id: number }).id,
+    })) as Base;
+
+    // Never load the association: Rails' `build_#{name}` runs `load_target`
+    // regardless, so the writer must discover and detach the row itself.
+    const refetched = (await Pirate.find((pirate as unknown as { id: number }).id)) as Base;
+    (refetched as unknown as { shipAttributes: unknown }).shipAttributes = {
+      name: "Davy Jones Gold Dagger",
+    };
+    await refetched.save();
+
+    const reloaded = (await Ship.find((displaced as unknown as { id: number }).id)) as Base;
+    expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(null);
+  });
+
+  it("awaits the unloaded displacement removal from the awaitable writer", async () => {
+    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
+    const displaced = (await Ship.create({
+      name: "Nights Dirty Lightning",
+      pirate_id: (pirate as unknown as { id: number }).id,
+    })) as Base;
+
+    const refetched = (await Pirate.find((pirate as unknown as { id: number }).id)) as Base;
+    await (
+      refetched as unknown as { setShipAttributes(a: object): Promise<void> }
+    ).setShipAttributes({ name: "Davy Jones Gold Dagger" });
+
+    // The awaitable writer drains the removal, so the row is detached before
+    // the owner is ever saved — Rails' assignment-time timing.
+    const reloaded = (await Ship.find((displaced as unknown as { id: number }).id)) as Base;
+    expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(null);
+  });
+
   it("nullifies the displaced row when association(name).build replaces a loaded child", async () => {
     const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
     const displaced = (await Ship.create({
