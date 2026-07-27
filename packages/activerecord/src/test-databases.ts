@@ -7,7 +7,7 @@
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { MigrationProxy } from "./migration.js";
 import { Migrator } from "./migration.js";
-import type { Base } from "./base.js";
+import { Base } from "./base.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 
 /**
@@ -60,13 +60,12 @@ function isInMemorySqlite(name: string): boolean {
  * Mirrors: ActiveRecord::TestDatabases.create_and_load_schema
  */
 export async function createAndLoadSchema(
-  modelClass: typeof Base,
   index: number,
   { envName }: { envName: string } = { envName: "test" },
 ): Promise<void> {
   // Rails: configurations is always set before create_and_load_schema is
   // called (app boots first); this guard is defensive.
-  const configurations = modelClass.configurations();
+  const configurations = Base.configurations();
   if (configurations.empty) return;
 
   const old = process.env.VERBOSE;
@@ -99,7 +98,7 @@ export async function createAndLoadSchema(
     // it always runs even if establishConnection throws.
     const { establishConnection } = await import("./connection-handling.js");
     try {
-      await establishConnection(modelClass);
+      await establishConnection(Base);
     } finally {
       if (old !== undefined) {
         process.env.VERBOSE = old;
