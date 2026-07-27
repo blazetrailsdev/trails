@@ -251,12 +251,16 @@ export function buildIndexFromOriginMain(cwd?: string): { index: Index; sha: str
 }
 
 // The origin/main-tree export mutates no checkout, so it is served however
-// TASKS_DIR resolved. Only the fallback — syncFromOrigin's `reset --hard` —
-// stays gated on TASKS_DIR_IS_SYMLINK.
-export function readIndexSource(isSymlink: boolean = TASKS_DIR_IS_SYMLINK): ReadIndex {
+// TASKS_DIR resolved. When it is unavailable (offline, no `tar`, no
+// node_modules to borrow) we serve the working-tree index as-is and warn: a
+// read must never mutate the shared canonical checkout, and when origin is
+// unreachable there is nothing fresher to sync to anyway.
+export function readIndexSource(): ReadIndex {
   const fromOrigin = buildIndexFromOriginMain();
   if (fromOrigin) return fromOrigin;
-  syncFromOrigin(isSymlink);
+  console.error(
+    `warning: could not reach origin/main; serving the local tasks index. It may be stale.`,
+  );
   return { index: loadIndex(), sha: null };
 }
 
@@ -623,83 +627,6 @@ function assertCleanWorktree(cwd: string | undefined): void {
       `  or stash them:  git -C "${where}" stash`,
   );
   process.exit(1);
-}
-
-// Fetch + hard-reset the per-worktree tasks checkout to origin/main. This is
-// now only the FALLBACK freshness path for reads: readIndexSource() builds the
-// index straight from the origin/main tree and only lands here when that is
-// unavailable (offline, no `tar`). Only runs when using the per-worktree
-// symlink (TASKS_DIR_IS_SYMLINK); the canonical fallback and explicit
-// $TASKS_DIR overrides are left alone: a read must never reset a checkout the
-// user chose.
-export function syncFromOrigin(isSymlink: boolean = TASKS_DIR_IS_SYMLINK): void {
-  if (!isSymlink) return;
-  syncWorktreeToOrigin();
-}
-
-// The actual fetch + `reset --hard origin/main`, factored out of the
-// TASKS_DIR_IS_SYMLINK guard so it can be exercised directly in tests.
-// `reset --hard` silently discards uncommitted *tracked* edits, so it must
-// never run against a dirty worktree: an agent authoring a story body (editing
-// a tracked story.md) and then running any read before committing would lose
-// it. When the worktree carries such edits we skip the sync entirely, warn
-// loudly, and serve the possibly-stale index — never destroy unsaved work.
-// Untracked new files survive `reset --hard`, so they don't block the sync.
-//
-// LOCKED against mutations: the per-worktree `tasks/` symlinks all resolve to
-// the ONE shared canonical checkout, so this `reset --hard` used to run
-// concurrently with another agent's commitAndPush mutation in the same
-// working tree. A reset landing between that mutation's file write and its
-// commit deletes the staged-new story file (index AND disk → "nothing to
-// commit" crash); landing inside the pre-commit hook's window it empties the
-// index, and git finalizes an EMPTY commit that then gets pushed — the
-// message lands on main with zero files. Take the same tasks-CLI lock the
-// mutators hold; the dirty check must also sit inside the lock, or a mutation
-// could stage its file right after we probed. Reads are best-effort, so on
-// lock timeout we skip the sync and serve the possibly-stale index instead of
-// dying.
-export function syncWorktreeToOrigin(cwd?: string, lockWaitMs = 20_000): void {
-  const lock = acquireTasksLock(cwd, { waitMs: lockWaitMs, onTimeout: "give-up" });
-  // A "busy" give-up means a live mutation is mid-flight in this checkout —
-  // touching it at all (even the status probe) belongs to the lock holder,
-  // and resetting is exactly the clobber the lock prevents. Skip entirely and
-  // serve the stale index. (A `null` lock — no resolvable git dir — falls
-  // through instead: the status probe below throws and returns silently,
-  // preserving the quiet non-repo behavior.)
-  if (lock === "busy") {
-    console.error(
-      `warning: tasks-CLI lock is busy; skipping the pre-read sync to origin/main. ` +
-        `The index may be stale.`,
-    );
-    return;
-  }
-  try {
-    let porcelain: string;
-    try {
-      porcelain = git(["status", "--porcelain"], { silent: true, cwd });
-    } catch {
-      return; // not a git repo / git unavailable — leave the checkout untouched
-    }
-    const dirty = dirtyWorktreeLines(porcelain);
-    if (dirty.length > 0) {
-      const where = cwd ?? TASKS_DIR;
-      console.error(
-        `warning: ${where} has uncommitted changes; skipping the pre-read sync ` +
-          `to origin/main so they aren't discarded by reset --hard:\n` +
-          dirty.map((l) => `  ${l}`).join("\n") +
-          `\n  The index may be stale. Commit or stash these edits, then re-run:\n` +
-          `    git -C "${where}" add -A && git -C "${where}" commit -m "wip"\n` +
-          `  or stash them:  git -C "${where}" stash`,
-      );
-      return;
-    }
-    git(["fetch", "--quiet", "origin"], { silent: true, cwd });
-    git(["reset", "--hard", "--quiet", "origin/main"], { silent: true, cwd });
-  } catch {
-    /* best-effort — stale data is better than a broken CLI */
-  } finally {
-    releaseTasksLock(lock);
-  }
 }
 
 function storyFilePath(index: Index, id: string): string {

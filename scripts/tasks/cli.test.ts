@@ -86,10 +86,8 @@ import {
   StoryEntry,
   TASKS_DIR,
   dirtyWorktreeLines,
-  syncWorktreeToOrigin,
   buildIndexFromOriginMain,
   readIndexSource,
-  syncFromOrigin,
   readIndexedFile,
   claimAgeHours,
   isStaleClaim,
@@ -3507,18 +3505,29 @@ describe("buildIndexFromOriginMain (read path serves the origin/main tree)", () 
     expect(buildIndexFromOriginMain()).toBeNull();
   });
 
-  it("serves the read index when TASKS_DIR did not resolve to the per-worktree symlink", () => {
+  it("serves the read index however TASKS_DIR resolved", () => {
     const { seen } = setup();
-    const got = readIndexSource(false);
+    const got = readIndexSource();
     expect(got.sha).toBe(SHA);
     expect(got.index.generated_at).toBe("2026-01-01");
     expect(seen).not.toContain("reset");
   });
 
-  it("is a no-op fallback for a non-symlink TASKS_DIR", () => {
-    setup();
-    syncFromOrigin(false);
-    expect(execFileSyncMock).not.toHaveBeenCalled();
+  // Regression: the offline fallback used to fetch + `reset --hard origin/main`
+  // in the ONE shared canonical checkout — a read discarding tracked edits and
+  // contending on the mutation lock. Unreachable origin means there is nothing
+  // fresher to sync to, so degrade to the working-tree index plus a warning.
+  it("degrades to the working-tree index with a staleness warning when origin is unreachable", () => {
+    const { seen } = setup({
+      onFetch: () => {
+        throw new Error("offline");
+      },
+    });
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const got = readIndexSource();
+    expect(got.sha).toBeNull();
+    expect(seen).not.toContain("reset");
+    expect(String(err.mock.calls[0][0])).toMatch(/could not reach origin\/main.*may be stale/s);
   });
 });
 
@@ -3547,77 +3556,6 @@ describe("readIndexedFile (body comes from the index's own source)", () => {
     const dir = mkdtempSync(join(tmpdir(), "trails-read-body-"));
     expect(readIndexedFile({ index: emptyIdx, sha: null }, join(dir, "missing.md"))).toBeNull();
     expect(execFileSyncMock).not.toHaveBeenCalled();
-  });
-});
-
-describe("syncWorktreeToOrigin (pre-read sync)", () => {
-  // The sync now takes the tasks-CLI lock around its fetch + reset --hard so
-  // it can't clobber a concurrent mutation in the shared canonical checkout.
-  // Point the lock at a throwaway dir so gitCommonDir (mocked git) is never
-  // consulted and no lock file lands in the repo.
-  afterEach(() => __setLockDirForTest(null));
-  function setup(statusOut = "") {
-    __setLockDirForTest(mkdtempSync(join(tmpdir(), "trails-sync-lock-")));
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    const seen: string[] = [];
-    execFileSyncMock.mockImplementation((_file, args) => {
-      const label = args && args.length >= 3 ? args[2] : "";
-      seen.push(label);
-      if (label === "status") return statusOut as never;
-      return "" as never;
-    });
-    return { seen };
-  }
-
-  it("fetches + resets --hard origin/main when the worktree is clean", () => {
-    const { seen } = setup();
-    syncWorktreeToOrigin();
-    // status probe first, then the freshness sync runs unchanged.
-    expect(seen).toEqual(["status", "fetch", "reset"]);
-  });
-
-  it("skips reset --hard (no silent data loss) when the worktree has tracked edits", () => {
-    const { seen } = setup(" M rfcs/0024/stories/x.md");
-    const err = vi.spyOn(console, "error").mockImplementation(() => {});
-    syncWorktreeToOrigin();
-    // The status probe ran, but the destructive reset --hard never did.
-    expect(seen).toEqual(["status"]);
-    expect(seen).not.toContain("reset");
-    expect(err).toHaveBeenCalled();
-    expect(String(err.mock.calls[0][0])).toMatch(/uncommitted changes/);
-  });
-
-  it("still syncs when only untracked files are present", () => {
-    const { seen } = setup("?? rfcs/0024/stories/new.md");
-    syncWorktreeToOrigin();
-    expect(seen).toEqual(["status", "fetch", "reset"]);
-  });
-
-  it("skips the sync entirely when the tasks-CLI lock is held by a live mutation", () => {
-    const { seen } = setup();
-    // Simulate a mutation mid-flight: hold the lock with this (live) process.
-    const held = acquireTasksLock(undefined);
-    const err = vi.spyOn(console, "error").mockImplementation(() => {});
-    try {
-      syncWorktreeToOrigin(undefined, 300);
-    } finally {
-      releaseTasksLock(held);
-    }
-    // No status probe, no fetch, and above all no reset --hard: the checkout
-    // belongs to the lock holder until it finishes.
-    expect(seen).toEqual([]);
-    expect(err).toHaveBeenCalled();
-    expect(String(err.mock.calls[0][0])).toMatch(/lock is busy/);
-  });
-
-  it("releases the lock after syncing so the next mutation can take it", () => {
-    const { seen } = setup();
-    syncWorktreeToOrigin();
-    expect(seen).toEqual(["status", "fetch", "reset"]);
-    // Lock must be free again: a fresh acquire succeeds without contention.
-    const lock = acquireTasksLock(undefined, { waitMs: 300, onTimeout: "give-up" });
-    expect(lock).not.toBeNull();
-    releaseTasksLock(lock);
   });
 });
 
