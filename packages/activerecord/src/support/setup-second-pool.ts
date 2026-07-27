@@ -1,7 +1,7 @@
 import { Base } from "../base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { registerModel } from "../associations.js";
-import { ensureCanonicalTables, rebuildCanonicalTables } from "./canonical-schema.js";
+import { rebuildCanonicalTables } from "./canonical-schema.js";
 import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
 import { Course } from "../test-helpers/models/course.js";
 import { College } from "../test-helpers/models/college.js";
@@ -40,7 +40,10 @@ async function createOtherDogsTable(adapter: DatabaseAdapter): Promise<void> {
  * The `CREATE DATABASE` goes through the *primary* connection rather than
  * `DatabaseTasks.create`, which re-points `Base`'s own pool at the database it
  * creates. A database left over from an earlier run makes it fail; a genuinely
- * absent one still fails loudly on the `ensureCanonicalTables` below.
+ * absent one still fails loudly on the rebuild below. That rebuild is
+ * drop-and-recreate, not create-if-missing, because `schema.rb:1444-1462`
+ * creates every one of these tables `force: true` — a reused database can be
+ * carrying stale shapes and rows.
  *
  * @internal
  */
@@ -53,7 +56,7 @@ export async function provisionSecondDatabase(): Promise<void> {
     await primary.createDatabase(database).catch(() => undefined);
   }
   const arunit2 = await ARUnit2Model.leaseConnection();
-  await ensureCanonicalTables(arunit2, ARUNIT2_TABLES);
+  await rebuildCanonicalTables(arunit2, ARUNIT2_TABLES);
   await createOtherDogsTable(arunit2);
 }
 
