@@ -5,16 +5,18 @@ import { loadCanonicalSchema } from "./canonical-schema.js";
 
 /**
  * The ported slice of
- * `vendor/rails/activerecord/test/schema/postgresql_specific_schema.rb:4-16` —
- * the `uuid-ossp` / `pgcrypto` extension header and the `chat_messages` /
- * `chat_messages_custom_pk` uuid-primary-key tables. `uuid_default` there is
- * `{}` whenever `supports_pgcrypto_uuid?` (PG >= 9.4, always true on our
- * postgres lane), which leaves the uuid PK on the adapter's `gen_random_uuid()`
- * default.
+ * `vendor/rails/activerecord/test/schema/postgresql_specific_schema.rb:4-25` —
+ * the `uuid-ossp` / `pgcrypto` extension header and the four uuid-primary-key
+ * tables. `uuid_default` there is `{}` whenever `supports_pgcrypto_uuid?`
+ * (PG >= 9.4, always true on our postgres lane), which leaves the uuid PK on the
+ * adapter's `gen_random_uuid()` default.
  *
- * The rest of that file (`uuid_parents`, `uuid_children`, `defaults`,
- * `postgresql_times`, …) and the `mysql2_` / `sqlite_` specific schemas are not
- * ported yet; story `port-adapter-specific-schemas` covers them.
+ * The remainder of that file (`defaults`, `postgresql_times`, the identity,
+ * sequence, partition and constraint tables — lines 27-225) and the `mysql2_` /
+ * `sqlite_` schemas are carried by story `port-adapter-specific-schemas`: the
+ * `defaults` table in particular is contended (`adapters/postgresql/schema.test.ts`
+ * and `schema-dumper.test.ts` create and DROP their own on the shared per-worker
+ * DB), so laying it at boot needs those files repointed in the same change.
  */
 async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise<void> {
   await adapter.enableExtension("uuid-ossp");
@@ -28,6 +30,16 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
     const pg = t as PgTableDefinition;
     pg.uuid("message_id", { primaryKey: true, default: () => "uuid_generate_v4()" });
     pg.text("content");
+  });
+
+  await adapter.createTable("uuid_parents", { id: "uuid", force: true }, (t) => {
+    (t as PgTableDefinition).string("name");
+  });
+
+  await adapter.createTable("uuid_children", { id: "uuid", force: true }, (t) => {
+    const pg = t as PgTableDefinition;
+    pg.string("name");
+    pg.uuid("uuid_parent_id");
   });
 }
 
