@@ -66,9 +66,41 @@ export function finalizeGate(gate: TestGate): TestGate {
   return out;
 }
 
+export const ADAPTER_GATE_WRAPPERS = [
+  "describeIfPg",
+  "describeIfMysql",
+  "describeIfMysqlAdapter",
+  "describeIfSqlite",
+] as const;
+
+const REGISTERED_GATE_WRAPPERS: ReadonlySet<string> = new Set<string>([
+  ...ADAPTER_GATE_WRAPPERS,
+  "describeIfSupports",
+  "itIfSupports",
+]);
+
+function isGateWrapperName(name: string): boolean {
+  return /^(?:describe|it)If[A-Z]/.test(name);
+}
+
+// An unregistered wrapper would otherwise fall through gateFromWrapper's
+// `default` arm to `null` — "no gate" — so every test inside it reads as
+// ungated and surfaces only as an unexplained gate-mismatch count.
+export function assertRegisteredGateWrapper(name: string, file?: string): void {
+  if (!isGateWrapperName(name) || REGISTERED_GATE_WRAPPERS.has(name)) return;
+  const where = file ? ` (used in ${file})` : "";
+  throw new Error(
+    `test-compare: unregistered gate wrapper \`${name}\`${where}. ` +
+      "Tests inside it would silently read as ungated. Register it in " +
+      "`gateFromWrapper` (scripts/test-compare/gates.ts) and, if it takes the " +
+      "title as its first argument, in `ADAPTER_GATE_WRAPPERS` there too.",
+  );
+}
+
 /**
  * Gate implied by a conditional `describe`/`it` wrapper identifier. Returns
- * `null` for plain `describe`/`it`/`test` (no gate). `featureArg` carries the
+ * `null` for plain `describe`/`it`/`test` (no gate) and throws for an
+ * unregistered `describeIf*`/`itIf*` identifier. `featureArg` carries the
  * first string argument for `describeIfSupports("json", …)` /
  * `itIfSupports("json", …)`.
  */
@@ -90,6 +122,7 @@ export function gateFromWrapper(name: string, featureArg?: string | null): TestG
         ? { features: [featureArg], source: ["wrapper"] }
         : { guards: ["unknown"], source: ["wrapper"] };
     default:
+      assertRegisteredGateWrapper(name);
       return null;
   }
 }

@@ -32,6 +32,64 @@ describe("gates.ts pure helpers", () => {
     expect(gateFromWrapper("describe")).toBeNull();
   });
 
+  it("throws on an unregistered describeIf*/itIf* wrapper instead of silently ungating", () => {
+    expect(() => gateFromWrapper("describeIfOracle")).toThrow(
+      /unregistered gate wrapper `describeIfOracle`/,
+    );
+    expect(() => gateFromWrapper("itIfOracle")).toThrow(/gateFromWrapper/);
+    expect(gateFromWrapper("it")).toBeNull();
+    expect(gateFromWrapper("itemHelper")).toBeNull();
+    expect(gateFromWrapper("describeIfying")).toBeNull();
+  });
+
+  it("names the offending file when an unregistered wrapper appears in a test file", () => {
+    const source = `
+      describeIfOracle("suite", () => {
+        it("runs", () => {});
+      });
+    `;
+    expect(() => tsGates(source, "packages/activerecord/src/oracle.test.ts")).toThrow(
+      /`describeIfOracle` \(used in packages\/activerecord\/src\/oracle\.test\.ts\)/,
+    );
+  });
+
+  it("throws for an unregistered wrapper used in its .skipIf form", () => {
+    const source = `
+      describeIfOracle.skipIf(adapterType === "mysql")("suite", () => {
+        it("runs", () => {});
+      });
+    `;
+    expect(() => tsGates(source)).toThrow(/unregistered gate wrapper `describeIfOracle`/);
+  });
+
+  it("throws for an unregistered wrapper used in its .skip form", () => {
+    const source = `
+      describeIfOracle.skip("suite", () => {
+        it("runs", () => {});
+      });
+    `;
+    expect(() => tsGates(source)).toThrow(/unregistered gate wrapper `describeIfOracle`/);
+  });
+
+  it("leaves registered wrappers and their modifier forms extracting normally", () => {
+    const source = `
+      describeIfPg("suite", () => {
+        it("runs on pg", () => {});
+      });
+      describeIfSupports.skipIf(adapterType === "mysql")("json", "supported", () => {
+        it("runs where json works", () => {});
+      });
+    `;
+    expect(tsGates(source)).toEqual({
+      "runs on pg": { adapters: ["postgresql"], source: ["wrapper"] },
+      "runs where json works": {
+        adapters: ["postgresql", "sqlite"],
+        features: ["json"],
+        source: ["test", "wrapper"],
+      },
+    });
+  });
+
   it("maps support wrappers to a feature key", () => {
     expect(gateFromWrapper("describeIfSupports", "json")).toEqual({
       features: ["json"],
