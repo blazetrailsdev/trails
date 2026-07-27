@@ -1,0 +1,1 @@
+bash scripts/lint-rewritten-files.sh "$1"

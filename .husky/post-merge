@@ -1,0 +1,2 @@
+git rev-parse --verify ORIG_HEAD >/dev/null 2>&1 || exit 0
+printf "%s %s\n" "$(git rev-parse ORIG_HEAD)" "$(git rev-parse HEAD)" | bash scripts/lint-rewritten-files.sh merge
