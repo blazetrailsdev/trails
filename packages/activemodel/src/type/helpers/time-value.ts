@@ -6,6 +6,10 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { configuredTimezone } from "./timezone.js";
 
+export interface TimezoneAware {
+  readonly isUtc: boolean;
+}
+
 export interface TimeValue {
   precision?: number;
   serializeCastValue(value: unknown): string | null;
@@ -137,6 +141,7 @@ export function userInputInTimeZone(
  * @internal Rails-private helper.
  */
 export function newTime(
+  this: TimezoneAware | void,
   year: number | null | undefined,
   mon: number | null | undefined,
   mday: number | null | undefined,
@@ -171,7 +176,7 @@ export function newTime(
       return offset === 0 ? instant : instant.subtract({ seconds: offset });
     }
     return Temporal.PlainDateTime.from(components, { overflow: "reject" })
-      .toZonedDateTime(configuredTimezone())
+      .toZonedDateTime(configuredTimezone(this?.isUtc))
       .toInstant();
   } catch {
     return null;
@@ -201,7 +206,7 @@ export function newTime(
  *
  * @internal Rails-private helper.
  */
-export function fastStringToTime(s: string): Temporal.Instant | null {
+export function fastStringToTime(this: TimezoneAware | void, s: string): Temporal.Instant | null {
   if (!s.includes("-")) return null;
   const normalized = s
     .replace(" ", "T")
@@ -213,7 +218,7 @@ export function fastStringToTime(s: string): Temporal.Instant | null {
   try {
     if (hasOffset) return Temporal.Instant.from(datetimeString);
     return Temporal.PlainDateTime.from(datetimeString, { overflow: "reject" })
-      .toZonedDateTime(configuredTimezone())
+      .toZonedDateTime(configuredTimezone(this?.isUtc))
       .toInstant();
   } catch {
     return null;

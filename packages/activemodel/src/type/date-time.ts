@@ -7,7 +7,7 @@ import {
 } from "./internal/sentinels.js";
 import { ArgumentError } from "../attribute-assignment.js";
 import { AcceptsMultiparameterTime, isHash } from "./helpers/accepts-multiparameter-time.js";
-import { configuredTimezone } from "./helpers/timezone.js";
+import { configuredTimezone, isUtc } from "./helpers/timezone.js";
 import { ValueType } from "./value.js";
 
 export type DateTimeCastResult = Temporal.Instant | DateInfinityType | DateNegativeInfinityType;
@@ -113,6 +113,10 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     ) as DateTimeCastResult | null;
   }
 
+  get isUtc(): boolean {
+    return isUtc();
+  }
+
   /**
    * Mirrors: AcceptsMultiparameterTime::InstanceMethods#assert_valid_value.
    * Runs eagerly at write_from_user time — this is how Rails surfaces
@@ -162,12 +166,8 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
       }
     }
     try {
-      // No offset — interpret in the default timezone configured via
-      // ActiveModel's helpers/timezone module (UTC by default, host-system
-      // local when set to "local"). ActiveRecord wires its own
-      // default_timezone setter into ActiveModel's so they stay in sync.
       return Temporal.PlainDateTime.from(datetimeString, { overflow: "reject" })
-        .toZonedDateTime(configuredTimezone())
+        .toZonedDateTime(configuredTimezone(this.isUtc))
         .toInstant();
     } catch {
       return null;

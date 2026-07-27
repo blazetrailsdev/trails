@@ -11,6 +11,6 @@ export function defaultTimezone(): "utc" | "local" {
   return isUtc() ? "utc" : "local";
 }
 
-export function configuredTimezone(): string {
-  return isUtc() ? "UTC" : Temporal.Now.timeZoneId();
+export function configuredTimezone(utc: boolean = isUtc()): string {
+  return utc ? "UTC" : Temporal.Now.timeZoneId();
 }
