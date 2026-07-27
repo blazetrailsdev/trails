@@ -94,6 +94,24 @@ describe("has_one displacement via the synchronous build path", () => {
     expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(null);
   });
 
+  it("raises from the record construction before issuing the displacement query", async () => {
+    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
+    await Ship.create({
+      name: "Nights Dirty Lightning",
+      pirate_id: (pirate as unknown as { id: number }).id,
+    });
+
+    const refetched = (await Pirate.find((pirate as unknown as { id: number }).id)) as Base;
+    const assoc = (
+      refetched as unknown as { association(n: string): { build(a: object): unknown } }
+    ).association("ship");
+
+    // Rails is `build_record(...)` then `set_new_record` → `load_target`, so a
+    // bad attribute raises before anything is queried or displaced. A
+    // synchronous throw (not a rejected promise) is what proves the ordering.
+    expect(() => assoc.build({ bogus_attribute: 1 })).toThrow();
+  });
+
   it("returns the built record synchronously when no query would run", async () => {
     // A new-record owner keys no row, so Rails' `find_target?` is false and
     // `load_target` queries nothing — the build stays fully in memory.

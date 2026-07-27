@@ -70,29 +70,27 @@ export class SingularAssociation extends Association {
     attributes?: Record<string, unknown>,
     block?: (record: Base) => void,
   ): Base | null | Promise<Base | null> {
-    // Rails' `load_target` runs on EVERY build, so a persisted owner whose
-    // target has never been loaded still discovers (and displaces) the row in
-    // the DB. That query has to precede the in-memory build, which overwrites
-    // the target — hence the load-first branch rather than a load inside
-    // `detachDisplacedOnBuild`.
+    // Rails is `record = build_record(attributes, &block); set_new_record(record)`
+    // (singular_association.rb:29-33): construction — and the raise a bad
+    // attribute produces — happens BEFORE `set_new_record` reaches `load_target`,
+    // so an invalid build never queries. Keep that order here.
+    const record = this.buildRecord(attributes);
+    // Rails yields the freshly built record before it's set as the new target
+    // (`build_record(attributes, &block)`), so a passed block can mutate
+    // persisted attributes (e.g. `build_bulb { |b| b.color = ... }`).
+    if (record && block) block(record);
+    // `set_new_record` → `replace(record, false)` runs `load_target` on EVERY
+    // build, so a persisted owner whose target has never been loaded still
+    // discovers (and displaces) the row in the DB. The load has to precede
+    // `setNewRecord`, which overwrites the target and marks it loaded.
     const load = this.loadDisplacedForBuild();
-    if (load) return load.then(() => this.buildAfterDisplacementLoad(attributes, block));
-    return this.buildAfterDisplacementLoad(attributes, block);
+    if (load) return load.then(() => this.setNewRecordDisplacing(record));
+    return this.setNewRecordDisplacing(record);
   }
 
-  private buildAfterDisplacementLoad(
-    attributes?: Record<string, unknown>,
-    block?: (record: Base) => void,
-  ): Base | null | Promise<Base | null> {
+  private setNewRecordDisplacing(record: Base | null): Base | null | Promise<Base | null> {
     const displaced = this.loaded ? this.target : null;
-    const record = this.buildRecord(attributes);
-    if (record) {
-      // Rails yields the freshly built record before it's set as the new
-      // target (`build_record(attributes, &block)`), so a passed block can
-      // mutate persisted attributes (e.g. `build_bulb { |b| b.color = ... }`).
-      if (block) block(record);
-      this.setNewRecord(record);
-    }
+    if (record) this.setNewRecord(record);
     const removal = this.detachDisplacedOnBuild(displaced, record);
     return removal ? removal.then(() => record) : record;
   }
