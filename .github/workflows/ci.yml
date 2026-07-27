@@ -201,7 +201,7 @@ jobs:
           # eslint/rails-private-jsdoc.config.test.mjs is a drift guard between
           # it and eslint/rails-private-jsdoc.config.mjs, so an isolated change
           # to the root config must still run the guard.
-          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport)/|eslint/|scripts/(tasks|guides-typecheck|parity|api-compare|test-compare|fixtures-compare|test-deps|rails-find)/|scripts/(strip-asany|rails-file-structure-mixins|ci-suite-coverage|deprecated-manifest-diff)(\.test)?\.ts$|eslint\.config\.mjs$)'
+          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport)/|eslint/|scripts/(tasks|guides-typecheck|parity|api-compare|test-compare|fixtures-compare|test-deps|rails-find)/|scripts/(strip-asany|rails-file-structure-mixins|ci-suite-coverage|deprecated-manifest-diff)(\.test)?\.ts$|eslint\.config\.mjs$|vendor/(sources\.ts|sources\.lock\.json|sources\.test\.ts|fetch\.ts)$)'
           # guides_affected gates the Guides Code Type Check job, which
           # compiles fenced TS blocks in packages/website/docs/guides/**.
           # Today guides only import @blazetrails/activerecord,
@@ -710,6 +710,7 @@ jobs:
           scripts/rails-file-structure-mixins.test.ts
           scripts/deprecated-manifest-diff.test.ts
           scripts/ci-suite-coverage.test.ts
+          vendor/sources.test.ts
 
   # Consolidated leaf-test job. The cheapest sub-minute leaf suites — rack
   # (~27 s), actionview (~26 s), tse-compiler (~22 s), and the DX type tests
