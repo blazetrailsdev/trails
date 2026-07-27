@@ -320,7 +320,7 @@ report). They therefore share:
 Two things are deliberately **not** shared, and the difference is load-bearing:
 
 - **Reader.** `@noRailsEquivalent` is read through `ts.getJSDocTags`
-  (`noRailsEquivalentReason` in `extract-ts-api.ts:1388`), the same pass that
+  (`noRailsEquivalentReason` in `extract-ts-api.ts:1390`), the same pass that
   already reads `@internal`, because the extractor only needs the flattened
   prose. `@missingRailsCall` is read by `parseJsdoc`'s line regex over the raw
   comment text (`TAG_LINE`, `build.ts:78`) because `api:build` must **write**
