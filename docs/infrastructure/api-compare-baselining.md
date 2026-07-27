@@ -63,16 +63,22 @@ package has a `dist` whose newest `.d.ts` is older than the newest file in its
 `src`, `pnpm api:compare` fails with the list of stale packages instead of
 emitting numbers that cannot be compared to anything.
 
-Detection is mtime-based on purpose: `git checkout` rewrites the mtime of every
-file whose contents it changes and leaves the rest alone, so "some source is
-newer than the newest declaration in `dist`" is precisely "this package's build
-predates the checked-out sources".
+The guard does not compare timestamps. It asks `tsc` itself, via
+`ts.createSolutionBuilder(...).getUpToDateStatusOfProject()` — the same
+up-to-date computation `tsc --build` uses to decide what to emit. By
+construction the guard can never contradict a `pnpm build` that just succeeded,
+and it reports `OutOfDateWithSelf` as soon as a checkout rewrites a source and
+`OutOfDateRoots` when one only deletes a file.
 
-Directory mtimes count as sources too. A checkout that only _deletes_ a file
-leaves every surviving file's mtime untouched but bumps the parent directory, so
-without this the deletion would slip past. The side effect is that a checkout
-touching any non-`.ts` file under `src` also flags the package — conservative in
-the fail-loud direction, and a `pnpm build` clears it either way.
+An mtime comparison ("is some source newer than the newest `.d.ts`?") looks
+equivalent and is not. `.github/actions/cache-build` restores `dist` plus
+`tsconfig.tsbuildinfo` from a tarball keyed on a content hash of every package
+`src/`, so the restored outputs carry their **archive** mtimes while
+`actions/checkout` has just written every source at "now". `pnpm build`
+correctly no-ops, leaving a tree that is perfectly current but looks, by mtime,
+like every package is stale. The first version of this guard did compare mtimes
+and failed all 13 packages on every CI run while contradicting the build that
+had just succeeded.
 
 Both guards are scoped to the packages `api:compare` actually extracts
 (`apiComparePackageRoots()` in `scripts/api-compare/config.ts`, derived from

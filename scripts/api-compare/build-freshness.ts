@@ -15,114 +15,113 @@
  * record their resolved read-set, so it already serves exactly what a fresh
  * extraction of the same mismatched tree would produce.
  *
- * Detection is mtime-based because `git checkout` rewrites the mtime of exactly
- * the paths whose contents it changes. Directory mtimes are folded in so a
- * checkout that only DELETES a source file — which leaves every surviving
- * file's mtime alone but bumps its parent directory — is still caught.
+ * WHY `tsc`'S OWN ORACLE AND NOT mtimes. The obvious check — "is some source
+ * newer than the newest `.d.ts`?" — is wrong, and CI proves it. `cache-build`
+ * restores `packages/<pkg>/dist` plus `tsconfig.tsbuildinfo` from a tarball keyed on
+ * a CONTENT hash of every package `src/`, so the restored outputs carry their
+ * ARCHIVE mtimes while `actions/checkout` has just written every source at
+ * "now". `pnpm build` then correctly no-ops (the buildinfo agrees with the
+ * sources), leaving a tree that is perfectly current but looks, by mtime, like
+ * every package is stale. An mtime guard fails all 13 packages on every CI run
+ * while contradicting the build that just succeeded.
+ *
+ * So we ask the authority instead. `ts.createSolutionBuilder` exposes the same
+ * up-to-date computation `tsc --build` uses, which is what wrote the outputs in
+ * the first place. By construction the guard can never disagree with a build
+ * that just succeeded, and it still reports `OutOfDateWithSelf` the moment a
+ * checkout rewrites a source — including a delete-only checkout, which moves the
+ * project's root file set rather than any surviving file's mtime.
  *
  * Constraints: async fs only, no `node:` specifiers, no `process` references.
+ * The `typescript` import is the one unavoidable exception — its `ts.sys` I/O is
+ * synchronous and internal to the compiler. That is the point: reusing tsc's
+ * own reader is what makes this agree with tsc.
  */
 import * as fs from "fs/promises";
 import * as path from "path";
+import ts from "typescript";
 import type { PackageRoots } from "./config.js";
 
-/** One package whose `dist` predates its own sources. */
+/** One package whose build does not correspond to its checked-out sources. */
 export interface StaleBuild {
   /** Directory name under `packages/` (not the api-compare package key). */
   dir: string;
-  /** Repo-relative path of the newest source path, for the error message. */
-  newestSource: string;
-}
-
-interface Newest {
-  mtimeMs: number;
-  file: string;
-}
-
-function later(a: Newest | null, b: Newest | null): Newest | null {
-  if (!a) return b;
-  if (!b) return a;
-  return b.mtimeMs > a.mtimeMs ? b : a;
+  /** `tsc`'s own verdict, e.g. `OutOfDateWithSelf` — quoted in the message. */
+  status: string;
 }
 
 /**
- * Newest mtime at or under `dir` among files passing `keep`, and — when
- * `includeDirs` — the directories themselves. Null if `dir` is unreadable.
+ * The `UpToDateStatusType`s that mean "the emitted output does not correspond
+ * to these sources". Enumerated positively rather than as "anything that isn't
+ * up to date" so a status we did not anticipate (`ContainerOnly`, `ForceBuild`,
+ * `ComputingUpstream`) cannot start failing runs after a TypeScript upgrade.
+ * `Unbuildable` / `ErrorReadingFile` are likewise excluded: a project that
+ * cannot build is a compile error to surface on its own, not a stale baseline.
  */
-async function newestMtime(
-  dir: string,
-  keep: (name: string) => boolean,
-  includeDirs: boolean,
-): Promise<Newest | null> {
+const STALE_STATUSES: ReadonlySet<ts.UpToDateStatusType> = new Set([
+  ts.UpToDateStatusType.OutputMissing,
+  ts.UpToDateStatusType.OutOfDateWithSelf,
+  ts.UpToDateStatusType.OutOfDateWithUpstream,
+  ts.UpToDateStatusType.OutOfDateBuildInfoWithPendingEmit,
+  ts.UpToDateStatusType.OutOfDateBuildInfoWithErrors,
+  ts.UpToDateStatusType.OutOfDateOptions,
+  ts.UpToDateStatusType.OutOfDateRoots,
+  ts.UpToDateStatusType.UpstreamOutOfDate,
+  ts.UpToDateStatusType.UpstreamBlocked,
+  ts.UpToDateStatusType.TsVersionOutputOfDate,
+]);
+
+/** Whether `dir` holds at least one `.d.ts` — i.e. the package was ever built. */
+async function hasDeclarations(dir: string): Promise<boolean> {
   let entries;
-  let self: Newest | null = null;
   try {
     entries = await fs.readdir(dir, { withFileTypes: true });
-    if (includeDirs) {
-      const stat = await fs.stat(dir);
-      self = { mtimeMs: stat.mtimeMs, file: dir };
-    }
   } catch {
-    return null;
+    return false;
   }
-  const found = await Promise.all(
-    entries.map(async (entry): Promise<Newest | null> => {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) return newestMtime(full, keep, includeDirs);
-      if (!keep(entry.name)) return null;
-      try {
-        const stat = await fs.stat(full);
-        return { mtimeMs: stat.mtimeMs, file: full };
-      } catch {
-        return null;
-      }
-    }),
-  );
-  return found.reduce(later, self);
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      if (await hasDeclarations(path.join(dir, entry.name))) return true;
+    } else if (entry.name.endsWith(".d.ts")) {
+      return true;
+    }
+  }
+  return false;
 }
 
-const isSource = (name: string) => name.endsWith(".ts") && !name.endsWith(".d.ts");
-const isDeclaration = (name: string) => name.endsWith(".d.ts");
-
 /**
- * Every root in `roots` whose `dist` was built before its current `src`.
+ * Every root in `roots` whose build does not correspond to its sources.
  *
  * `roots` is the extractor's own package set (`apiComparePackageRoots`), NOT a
  * listing of `packages/` — a workspace api-compare never extracts cannot affect
  * the manifest and must not be able to block a run. Roots sharing a directory
- * (the four actionpack packages) collapse to one report, keeping the newest
- * source among them.
+ * (the four actionpack packages) share one tsconfig and collapse to one report.
  *
  * A root with no `dist` is NOT stale: nothing was built, so nothing can be out
  * of date and cross-package imports fail to resolve uniformly at every commit.
- * `rootDir` only anchors the reported path.
+ * That check is ours rather than tsc's on purpose — tsc reports a project whose
+ * `dist` was deleted but whose `tsconfig.tsbuildinfo` survives as up to date,
+ * so deferring to it would let a half-removed build through.
  */
-export async function staleBuilds(
-  roots: readonly PackageRoots[],
-  rootDir: string,
-): Promise<StaleBuild[]> {
-  const checked = await Promise.all(
-    roots.map(async (root): Promise<{ dir: string; source: Newest } | null> => {
-      const [source, built] = await Promise.all([
-        newestMtime(root.srcDir, isSource, true),
-        newestMtime(root.distDir, isDeclaration, false),
-      ]);
-      if (!source || !built || source.mtimeMs <= built.mtimeMs) return null;
-      return { dir: root.dir, source };
-    }),
+export async function staleBuilds(roots: readonly PackageRoots[]): Promise<StaleBuild[]> {
+  const byDir = new Map<string, PackageRoots>();
+  for (const root of roots) byDir.set(root.dir, root);
+  const candidates = await Promise.all(
+    [...byDir.values()].map(async (root) => ((await hasDeclarations(root.distDir)) ? root : null)),
   );
-  const worstPerDir = new Map<string, Newest>();
-  for (const entry of checked) {
-    if (!entry) continue;
-    const seen = worstPerDir.get(entry.dir);
-    if (!seen || entry.source.mtimeMs > seen.mtimeMs) worstPerDir.set(entry.dir, entry.source);
+  const built = candidates.filter((root): root is PackageRoots => root !== null);
+  if (built.length === 0) return [];
+
+  const projects = built.map((root) => root.configPath);
+  const builder = ts.createSolutionBuilder(ts.createSolutionBuilderHost(ts.sys), projects, {});
+  const stale: StaleBuild[] = [];
+  for (const root of built) {
+    const status = builder.getUpToDateStatusOfProject(root.configPath);
+    if (STALE_STATUSES.has(status.type)) {
+      stale.push({ dir: root.dir, status: ts.UpToDateStatusType[status.type] });
+    }
   }
-  return [...worstPerDir.entries()]
-    .map(([dir, source]) => ({
-      dir,
-      newestSource: path.relative(rootDir, source.file).replace(/\\/g, "/"),
-    }))
-    .sort((a, b) => (a.dir < b.dir ? -1 : a.dir > b.dir ? 1 : 0));
+  return stale.sort((a, b) => (a.dir < b.dir ? -1 : a.dir > b.dir ? 1 : 0));
 }
 
 /**
@@ -131,7 +130,11 @@ export async function staleBuilds(
  * `api:extra` reads the manifests `api:compare` left behind rather than
  * re-extracting, so running it alone after a checkout reports the PREVIOUS
  * commit's totals with nothing to signal it — the same stale baseline the build
- * guard exists to stop, one step further downstream. Missing manifests are not
+ * guard exists to stop, one step further downstream.
+ *
+ * mtimes ARE the right oracle here, unlike for `dist`: the manifest is written
+ * by a local run that just read those sources, never restored from an archive,
+ * so nothing can rewind its timestamp below theirs. Missing manifests are not
  * stale; the caller already has a better error for that.
  */
 export async function manifestIsStale(
@@ -144,16 +147,46 @@ export async function manifestIsStale(
   } catch {
     return false;
   }
-  const newest = await Promise.all(roots.map((root) => newestMtime(root.srcDir, isSource, true)));
-  const newestSource = newest.reduce(later, null);
-  return newestSource !== null && newestSource.mtimeMs > manifestMtime;
+  const newest = await Promise.all(roots.map((root) => newestSourceMtime(root.srcDir)));
+  const newestSource = newest.reduce((a, b) => (b > a ? b : a), 0);
+  return newestSource > manifestMtime;
+}
+
+/**
+ * Newest mtime at or under `dir` among `.ts` sources AND the directories
+ * themselves, or 0 if unreadable. Directories count so a checkout that only
+ * DELETES a file — every surviving file keeps its mtime, only the parent
+ * directory moves — is still seen.
+ */
+async function newestSourceMtime(dir: string): Promise<number> {
+  let entries;
+  let newest = 0;
+  try {
+    entries = await fs.readdir(dir, { withFileTypes: true });
+    newest = (await fs.stat(dir)).mtimeMs;
+  } catch {
+    return 0;
+  }
+  const found = await Promise.all(
+    entries.map(async (entry) => {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) return newestSourceMtime(full);
+      if (!entry.name.endsWith(".ts") || entry.name.endsWith(".d.ts")) return 0;
+      try {
+        return (await fs.stat(full)).mtimeMs;
+      } catch {
+        return 0;
+      }
+    }),
+  );
+  return found.reduce((a, b) => (b > a ? b : a), newest);
 }
 
 /** The operator-facing failure text for a non-empty `staleBuilds` result. */
 export function staleBuildMessage(stale: StaleBuild[]): string {
   return [
     `api:compare would measure ${stale.length} package(s) against a stale build:`,
-    ...stale.map((entry) => `  packages/${entry.dir} — newer: ${entry.newestSource}`),
+    ...stale.map((entry) => `  packages/${entry.dir} — ${entry.status}`),
     "",
     "Cross-package imports resolve through packages/<pkg>/dist/*.d.ts, which git",
     "does not update on checkout, so these totals would mix one commit's sources",

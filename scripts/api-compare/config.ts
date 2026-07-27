@@ -51,6 +51,8 @@ export interface PackageRoots {
   srcDir: string;
   /** The declarations siblings resolve this package's imports through. */
   distDir: string;
+  /** The project `tsc --build` compiles — the freshness guard's oracle. */
+  configPath: string;
 }
 
 /**
@@ -68,6 +70,7 @@ export function apiComparePackageRoots(): PackageRoots[] {
       dir,
       srcDir: packageSrcDir(pkg),
       distDir: path.join(ROOT_DIR, "packages", dir, "dist"),
+      configPath: path.join(ROOT_DIR, "packages", dir, "tsconfig.json"),
     };
   });
 }

@@ -190,7 +190,7 @@ export async function main() {
   // checkout` never updates them, so a checkout-based baseline would silently
   // mix two commits (see build-freshness.ts).
   if (process.env.API_COMPARE_ALLOW_STALE_BUILD !== "1") {
-    const stale = await staleBuilds(apiComparePackageRoots(), ROOT_DIR);
+    const stale = await staleBuilds(apiComparePackageRoots());
     if (stale.length > 0) throw new Error(staleBuildMessage(stale));
   }
   const force = process.env.API_COMPARE_FORCE === "1";
