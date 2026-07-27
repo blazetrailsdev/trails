@@ -241,13 +241,6 @@ describe("ResponseTest", () => {
     expect(res.isStrongEtag()).toBe(false);
   });
 
-  it("setting etag to undefined removes it", () => {
-    const res = new Response();
-    res.etag = "test";
-    res.etag = undefined;
-    expect(res.etag).toBeUndefined();
-  });
-
   it("etag= delegates to setWeakEtag (Rails parity)", () => {
     const res = new Response();
     res.etag = "abc";
@@ -619,22 +612,6 @@ describe("Response Cache::Response wiring", () => {
     res.handleConditionalGetBang();
     expect(res.getHeader("Cache-Control")).toBe("max-age=0, private, must-revalidate");
     expect(res.getHeader("cache-control")).toBe("max-age=0, private, must-revalidate");
-  });
-
-  it("lastModified = undefined clears the Last-Modified header", () => {
-    const res = new Response();
-    res.lastModified = new Date("1994-11-06T08:49:37Z");
-    res.lastModified = undefined;
-    expect(res.hasLastModified).toBe(false);
-    expect(res.lastModified).toBeUndefined();
-  });
-
-  it("date = undefined clears the Date header", () => {
-    const res = new Response();
-    res.date = new Date("1994-11-06T08:49:37Z");
-    res.date = undefined;
-    expect(res.hasDate).toBe(false);
-    expect(res.date).toBeUndefined();
   });
 
   it("handleConditionalGet is a no-op when Cache-Control is already set", () => {

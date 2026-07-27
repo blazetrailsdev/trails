@@ -81,7 +81,6 @@ export function fresh(this: RequestCacheHost, response: CacheResponseLike): bool
 export interface ResponseCacheHost {
   getHeader(key: string): string | undefined;
   setHeader(key: string, value: string): void;
-  deleteHeader(key: string): void;
   hasHeader?(key: string): boolean;
 }
 
@@ -191,15 +190,13 @@ type R = ResponseCacheHost;
 export class Response {
   declare getHeader: ResponseCacheHost["getHeader"];
   declare setHeader: ResponseCacheHost["setHeader"];
-  declare deleteHeader: ResponseCacheHost["deleteHeader"];
 
   get lastModified(): Date | undefined {
     return parseHttpDate(this.getHeader(LAST_MODIFIED));
   }
 
   set lastModified(t: Date | undefined) {
-    if (t === undefined) this.deleteHeader(LAST_MODIFIED);
-    else this.setHeader(LAST_MODIFIED, t.toUTCString());
+    this.setHeader(LAST_MODIFIED, (t as Date).toUTCString());
   }
 
   get date(): Date | undefined {
@@ -207,8 +204,7 @@ export class Response {
   }
 
   set date(t: Date | undefined) {
-    if (t === undefined) this.deleteHeader(DATE);
-    else this.setHeader(DATE, t.toUTCString());
+    this.setHeader(DATE, (t as Date).toUTCString());
   }
 
   get etag(): string | undefined {
@@ -216,8 +212,7 @@ export class Response {
   }
 
   set etag(v: unknown) {
-    if (v === undefined) this.deleteHeader(ETAG);
-    else weakEtag.call(this, v);
+    weakEtag.call(this, v);
   }
 }
 
