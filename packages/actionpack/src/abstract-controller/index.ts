@@ -45,8 +45,7 @@ export {
 export {
   cache,
   cacheConfigured,
-  cacheStore,
-  setCacheStore,
+  ConfigMethods,
   CACHING_DEFAULTS,
   CACHING_SLOTS,
   viewCacheDependencies,
