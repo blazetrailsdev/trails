@@ -40,7 +40,7 @@ tester.run("no-raw-sql", rule, {
     // test-helpers/ DDL infra renders SQL by design (never migrating to arel).
     {
       code: 'connection.execute("CREATE TABLE posts (id integer)");',
-      filename: "packages/activerecord/src/test-helpers/define-fixtures.ts",
+      filename: "packages/activerecord/src/fixtures.ts",
     },
     // test-setup-*.ts worker-db bootstrap is likewise scoped out.
     {
@@ -69,6 +69,13 @@ tester.run("no-raw-sql", rule, {
     {
       code: 'connection.execute("SELECT * FROM posts");',
       filename: IN,
+      errors: [{ messageId: "noRawSql", data: { sink: "execute" } }],
+    },
+    // The fixture-machinery exemption is anchored to the exact ported files, so
+    // a same-named module elsewhere under activerecord/src is still scanned.
+    {
+      code: 'connection.execute("SELECT * FROM posts");',
+      filename: "packages/activerecord/src/relation/fixtures.ts",
       errors: [{ messageId: "noRawSql", data: { sink: "execute" } }],
     },
     // Template literal with interpolation, anchored on the first quasi.

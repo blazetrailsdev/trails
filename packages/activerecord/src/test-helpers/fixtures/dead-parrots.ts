@@ -1,4 +1,4 @@
-import { ref } from "../define-fixtures.js";
+import { ref } from "../../fixtures.js";
 
 // activerecord/test/fixtures/dead_parrots.yml
 // STI rows for the parrots table.

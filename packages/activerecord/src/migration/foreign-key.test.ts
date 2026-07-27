@@ -13,7 +13,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { StatementInvalid } from "../errors.js";
 import type { ReferentialAction } from "../connection-adapters/abstract/schema-definitions.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { ambientConnection, withRocketTables } from "../test-helpers/rocket-tables.js";
+import { ambientConnection, withRocketTables } from "../support/rocket-tables.js";
 import { adapterType } from "../test-adapter.js";
 
 // Rails' `unless current_adapter?(:SQLite3Adapter)` guard on the `fk.name`

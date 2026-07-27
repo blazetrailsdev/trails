@@ -1,4 +1,4 @@
-import { ref } from "../define-fixtures.js";
+import { ref } from "../../fixtures.js";
 
 // activerecord/test/fixtures/categories_posts.yml
 // HABTM join — Rails sets `_fixture: model_class: Post::CategoryPost`; ports omit metadata rows.

@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { itIfSupports } from "../../support/supports.js";
-import { FixtureSet } from "../../test-helpers/fixture-set.js";
+import { FixtureSet } from "../../fixtures.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
 import { virtualColumnFixtureData } from "../../test-helpers/fixtures/virtual-columns.js";
 import { Base } from "../../index.js";

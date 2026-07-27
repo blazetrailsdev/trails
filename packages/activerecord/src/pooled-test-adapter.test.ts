@@ -8,8 +8,8 @@
  */
 import { describe, it, expect, afterAll } from "vitest";
 
-import { createPooledTestAdapter, _resetPooledTestAdapterForTests } from "../test-adapter.js";
-import { withExecutionContext } from "../connection-adapters/abstract/connection-pool/execution-context.js";
+import { createPooledTestAdapter, _resetPooledTestAdapterForTests } from "./test-adapter.js";
+import { withExecutionContext } from "./connection-adapters/abstract/connection-pool/execution-context.js";
 
 type Execable = { exec(sql: string): Promise<void> };
 const asExec = (a: unknown) => a as Execable;

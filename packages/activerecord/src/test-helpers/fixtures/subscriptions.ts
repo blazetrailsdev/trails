@@ -1,4 +1,4 @@
-import { ref } from "../define-fixtures.js";
+import { ref } from "../../fixtures.js";
 
 // activerecord/test/fixtures/subscriptions.yml
 // subscriber_id holds the Subscriber#nick string PK directly (not a fixture

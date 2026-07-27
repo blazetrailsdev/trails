@@ -7,7 +7,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { association } from "../associations.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { repairValidations } from "../test-helpers/repair-validations.js";
+import { repairValidations } from "../cases/validations-repair-helper.js";
 import { Human } from "../test-helpers/models/human.js";
 import { Face } from "../test-helpers/models/face.js";
 import { Interest } from "../test-helpers/models/interest.js";

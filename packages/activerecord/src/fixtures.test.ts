@@ -7,10 +7,10 @@ import {
   effectiveFixtureKey,
   resolveModelForTable,
   FixtureSetPrimaryKeyError,
-} from "./define-fixtures.js";
-import { primaryKeyErrorFixtureData } from "./fixtures/primary-key-error/primary-key-error.js";
-import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import { Base } from "../base.js";
+} from "./fixtures.js";
+import { primaryKeyErrorFixtureData } from "./test-helpers/fixtures/primary-key-error/primary-key-error.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import { Base } from "./base.js";
 
 function makeAdapter(): DatabaseAdapter {
   return {

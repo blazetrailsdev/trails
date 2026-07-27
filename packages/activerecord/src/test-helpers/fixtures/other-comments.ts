@@ -1,4 +1,4 @@
-import { ref } from "../define-fixtures.js";
+import { ref } from "../../fixtures.js";
 
 // activerecord/test/fixtures/other_comments.yml
 // Rails sets `_fixture: model_class: Comment`. The YAML uses association-name

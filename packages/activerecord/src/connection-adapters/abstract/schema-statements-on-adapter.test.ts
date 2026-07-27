@@ -13,7 +13,7 @@ import { BetterSQLite3Adapter } from "../better-sqlite3-adapter.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { ForeignKeyDefinition } from "./schema-definitions.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
-import { ambientConnection, withRocketTables } from "../../test-helpers/rocket-tables.js";
+import { ambientConnection, withRocketTables } from "../../support/rocket-tables.js";
 
 let adapter: AbstractSQLite3Adapter | undefined;
 

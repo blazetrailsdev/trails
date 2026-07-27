@@ -1,3 +1,11 @@
+/**
+ * No Rails counterpart file. Rails discovers fixture sets by scanning
+ * `fixture_paths` for `test/fixtures/*.yml` (`FixtureSet.create_fixtures`,
+ * `lib/active_record/fixtures.rb`); trails has no YAML loader, so this module
+ * is the hand-written index of `test-helpers/fixtures/` that stands in for that
+ * scan. It stays beside the data it indexes — bucket A, which does not move —
+ * rather than following the fixture *machinery* to the package root.
+ */
 import type { Base } from "../base.js";
 
 import * as FixtureData from "./fixtures/index.js";

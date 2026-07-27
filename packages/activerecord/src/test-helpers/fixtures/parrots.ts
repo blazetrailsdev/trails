@@ -1,4 +1,4 @@
-import { ref } from "../define-fixtures.js";
+import { ref } from "../../fixtures.js";
 
 // activerecord/test/fixtures/parrots.yml
 // Rails' `_fixture: ignore: DEAD_PARROT` skips DEAD_PARROT only; the DEFAULTS

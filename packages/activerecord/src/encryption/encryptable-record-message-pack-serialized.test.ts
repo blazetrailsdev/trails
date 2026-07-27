@@ -9,7 +9,7 @@ import {
   assertEncryptedAttribute,
 } from "./test-helpers.js";
 import { type TestDatabaseAdapter } from "../test-adapter.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { withTransactionalFixtures } from "../test-fixtures/with-transactional-fixtures.js";
 import { Encoding as EncodingError } from "./errors.js";
 
 describe("ActiveRecord::Encryption::EncryptableRecordMessagePackSerializedTest", () => {

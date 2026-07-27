@@ -1,4 +1,4 @@
-import { ref } from "../define-fixtures.js";
+import { ref } from "../../fixtures.js";
 
 // activerecord/test/fixtures/parrots.yml declares the HABTM via the per-parrot
 // `treasures:` lists (george/louis → diamond, sapphire; polly → sapphire, ruby)

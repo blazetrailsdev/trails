@@ -3,7 +3,7 @@
  *
  * Strong-parameters protection: mass assignment, create_with, where, and
  * where.not all reject an un-permitted params object and unwrap a permitted
- * one. Uses the ProtectedParams stub (test-helpers/protected-params.ts),
+ * one. Uses the ProtectedParams stub (support/stubs/strong-parameters.ts),
  * mirroring Rails' test/support/stubs/strong_parameters.rb.
  *
  * Uses the canonical `Person` / `Company` models + `people`/`companies`
@@ -24,7 +24,7 @@ import { Ship } from "./test-helpers/models/ship.js";
 import { Treasure } from "./test-helpers/models/treasure.js";
 import { registerModel } from "./associations.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { ProtectedParams } from "./test-helpers/protected-params.js";
+import { ProtectedParams } from "./support/stubs/strong-parameters.js";
 
 // ShipPart's nested associations resolve `Ship` / `Treasure` from the model
 // registry at build time; ship.ts and treasure.ts don't self-register.

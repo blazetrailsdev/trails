@@ -20,7 +20,7 @@ import { association } from "../associations.js";
 // `registerModel`.
 import "../support/canonical-model-index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { repairValidations } from "../test-helpers/repair-validations.js";
+import { repairValidations } from "../cases/validations-repair-helper.js";
 import { seedAssociationCache } from "../support/seed-association-cache.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Reply } from "../test-helpers/models/reply.js";

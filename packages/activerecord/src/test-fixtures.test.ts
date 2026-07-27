@@ -1,25 +1,20 @@
 import { describe, it, expect, expectTypeOf, vi, beforeAll, afterAll } from "vitest";
-import { resolveFixtureNames } from "./use-fixtures.js";
-import { fixtureRegistry, isJoinTableEntry } from "./fixtures-registry.js";
-import { registerModel } from "../associations.js";
-import { FixtureSet } from "./fixture-set.js";
-import { Base } from "../base.js";
-import "../relation.js"; // registers the Relation ctor so Model.findBy/.all/.count work
-import {
-  fixtureId,
-  defineFixtures,
-  defineJoinTableFixtures,
-  isFixtureRef,
-} from "./define-fixtures.js";
-import { fixtures } from "./fixtures.js";
-import { setupHandlerSuite } from "../support/setup-handler-suite.js";
-import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
-import { Author } from "./models/author.js";
-import { Post } from "./models/post.js";
-import { LiveParrot, DeadParrot } from "./models/parrot.js";
-import { Cucumber, Cabbage, RedCabbage } from "./models/vegetables.js";
-import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import { leaseFixtureConnection } from "./fixture-connection.js";
+import { resolveFixtureNames } from "./test-fixtures.js";
+import { fixtureRegistry, isJoinTableEntry } from "./test-helpers/fixtures-registry.js";
+import { registerModel } from "./associations.js";
+import { FixtureSet } from "./fixtures.js";
+import { Base } from "./base.js";
+import "./relation.js"; // registers the Relation ctor so Model.findBy/.all/.count work
+import { fixtureId, defineFixtures, defineJoinTableFixtures, isFixtureRef } from "./fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
+import { setupHandlerSuite } from "./support/setup-handler-suite.js";
+import { withTransactionalFixtures } from "./test-fixtures/with-transactional-fixtures.js";
+import { Author } from "./test-helpers/models/author.js";
+import { Post } from "./test-helpers/models/post.js";
+import { LiveParrot, DeadParrot } from "./test-helpers/models/parrot.js";
+import { Cucumber, Cabbage, RedCabbage } from "./test-helpers/models/vegetables.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import { leaseFixtureConnection } from "./test-fixtures/fixture-connection.js";
 
 /**
  * Resolves an entry's model thunk to its table-bearing class, registering the
@@ -74,7 +69,7 @@ function makeModel(tableName: string, rows: Map<unknown, Record<string, unknown>
 // ActiveRecord::EncryptionTestCase, scoped to the suite that needs them.
 async function setupScopedEncryption(): Promise<() => void> {
   const { configureEncryption, snapshotEncryptionConfig, restoreEncryptionConfig } =
-    await import("../encryption/test-helpers.js");
+    await import("./encryption/test-helpers.js");
   const snapshot = snapshotEncryptionConfig();
   configureEncryption();
   return () => restoreEncryptionConfig(snapshot);
@@ -834,7 +829,7 @@ describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", 
       expect(rawDbValue).not.toBe("Agile Web Development with Rails");
       expect(typeof rawDbValue).toBe("string");
       // The encrypted attribute type reports it as encrypted.
-      const { EncryptableRecord } = await import("../encryption/encryptable-record.js");
+      const { EncryptableRecord } = await import("./encryption/encryptable-record.js");
       expect(EncryptableRecord.encryptedAttribute(book, "name")).toBe(true);
     });
   });
@@ -860,7 +855,7 @@ describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", 
       const rawOriginal = book.readAttributeBeforeTypeCast?.("original_name");
       expect(rawOriginal).not.toBe("Ruby for Rails");
       expect(typeof rawOriginal).toBe("string");
-      const { EncryptableRecord } = await import("../encryption/encryptable-record.js");
+      const { EncryptableRecord } = await import("./encryption/encryptable-record.js");
       expect(EncryptableRecord.encryptedAttribute(book, "name")).toBe(true);
     });
   });

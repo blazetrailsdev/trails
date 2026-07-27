@@ -1,4 +1,10 @@
 /**
+ * `ActiveRecord::ValidationsRepairHelper` —
+ * `activerecord/test/cases/validations_repair_helper.rb`. Rails keeps it in
+ * `test/cases/`, not `test/support/`, so it moves here alongside `helper.ts`
+ * (RFC 0064 bucket D) rather than into `support/`.
+ */
+/**
  * Structural shape of a model class whose validators can be cleared — the
  * port of Rails' `clear_validators!` (activemodel/lib/active_model/validations.rb).
  */

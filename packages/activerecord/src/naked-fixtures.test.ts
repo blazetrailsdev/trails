@@ -1,16 +1,16 @@
 // Tests for the tableless fixture loader — mirrors Rails' naked/yml fixture test cases.
 // vendor/rails/activerecord/test/cases/fixtures_test.rb (FixturesTest)
 import { describe, it, expect } from "vitest";
-import { defineJoinTableFixtures } from "./define-fixtures.js";
-import { fixtures } from "./fixtures.js";
-import { setupHandlerSuite } from "../support/setup-handler-suite.js";
-import { Tree } from "./models/tree.js";
-import { Base } from "../base.js";
-import "../relation.js";
-import { nakedYmlAccountsFixtureData } from "./fixtures/naked/yml/accounts.js";
-import { nakedYmlCompaniesFixtureData } from "./fixtures/naked/yml/companies.js";
-import { nakedYmlParrotsFixtureData } from "./fixtures/naked/yml/parrots.js";
-import { nakedYmlTreesFixtureData } from "./fixtures/naked/yml/trees.js";
+import { defineJoinTableFixtures } from "./fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
+import { setupHandlerSuite } from "./support/setup-handler-suite.js";
+import { Tree } from "./test-helpers/models/tree.js";
+import { Base } from "./base.js";
+import "./relation.js";
+import { nakedYmlAccountsFixtureData } from "./test-helpers/fixtures/naked/yml/accounts.js";
+import { nakedYmlCompaniesFixtureData } from "./test-helpers/fixtures/naked/yml/companies.js";
+import { nakedYmlParrotsFixtureData } from "./test-helpers/fixtures/naked/yml/parrots.js";
+import { nakedYmlTreesFixtureData } from "./test-helpers/fixtures/naked/yml/trees.js";
 
 // accounts, companies, parrots, and trees are canonical schema.rb tables laid
 // by the boot schema — the tableless tests ride them rather than recreating.

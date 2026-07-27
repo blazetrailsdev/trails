@@ -428,7 +428,14 @@ export default defineConfig(
   //    test. See eslint/require-table-teardown.mjs. ──
   {
     files: ["packages/activerecord/src/**/*.test.ts"],
-    ignores: ["packages/activerecord/src/test-helpers/**", "packages/activerecord/src/support/**"],
+    ignores: [
+      "packages/activerecord/src/test-helpers/**",
+      "packages/activerecord/src/support/**",
+      "packages/activerecord/src/fixtures.test.ts",
+      "packages/activerecord/src/naked-fixtures.test.ts",
+      "packages/activerecord/src/test-fixtures.test.ts",
+      "packages/activerecord/src/test-fixtures/**",
+    ],
     rules: {
       "blazetrails/require-table-teardown": ["error", { rawSql: true }],
     },
@@ -459,6 +466,10 @@ export default defineConfig(
     ignores: [
       "packages/activerecord/src/test-helpers/**",
       "packages/activerecord/src/support/**",
+      "packages/activerecord/src/fixtures.test.ts",
+      "packages/activerecord/src/naked-fixtures.test.ts",
+      "packages/activerecord/src/test-fixtures.test.ts",
+      "packages/activerecord/src/test-fixtures/**",
       ...requireCanonicalRebuildExclude.privateAdapter,
       ...requireCanonicalRebuildExclude.nonExecuting,
     ],
@@ -483,6 +494,9 @@ export default defineConfig(
       // Test-infra DDL helpers render SQL by design (never migrating to arel).
       "packages/activerecord/src/test-helpers/**",
       "packages/activerecord/src/support/**",
+      "packages/activerecord/src/fixtures.ts",
+      "packages/activerecord/src/test-fixtures.ts",
+      "packages/activerecord/src/test-fixtures/**",
       "packages/activerecord/src/test-setup-*.ts",
       "packages/activerecord/src/cases/helper.ts",
     ],

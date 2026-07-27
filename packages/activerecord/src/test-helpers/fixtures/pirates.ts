@@ -1,5 +1,5 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { ref } from "../define-fixtures.js";
+import { ref } from "../../fixtures.js";
 
 // activerecord/test/fixtures/pirates.yml
 const twoWeeksAgo = Temporal.Instant.fromEpochMilliseconds(Date.now() - 14 * 24 * 60 * 60 * 1000);

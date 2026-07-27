@@ -5,7 +5,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { Range } from "../../index.js";
 import { setZone, resetZone } from "@blazetrails/activesupport";
-import { withTransactionalFixtures } from "../../test-helpers/with-transactional-fixtures.js";
+import { withTransactionalFixtures } from "../../test-fixtures/with-transactional-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
