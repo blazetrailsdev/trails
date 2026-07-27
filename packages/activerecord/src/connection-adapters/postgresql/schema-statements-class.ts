@@ -36,7 +36,12 @@ import {
  */
 interface PgSchemaAdapter {
   schemaQuery(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]>;
-  internalExecQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
+  internalExecQuery(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
+  ): Promise<Result>;
   query(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[][]>;
   queryValue(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown>;
   queryValues(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[]>;
@@ -798,8 +803,6 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
        AND a.attnum IN (${safeNums.join(", ")})`,
       "SCHEMA",
     );
-    // Mirrors Rails' `Hash[query(...)].values_at(*column_numbers).compact`:
-    // pairs → hash, read back in the caller's column order, drop misses.
     const map = new Map(rows.map((r) => [Number(r[0]), r[1] as string]));
     return safeNums.map((n) => map.get(n)).filter((name): name is string => name != null);
   }
@@ -1184,6 +1187,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       ORDER BY c.conname
     `,
       "SCHEMA",
+      [],
+      { allowRetry: true, materializeTransactions: false },
     );
     return Promise.all(
       fkInfo.toArray().map(async (row) => {
@@ -1349,8 +1354,6 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         predicate = constraintdef.slice(whereIdx + 7);
         excludePart = constraintdef.slice(0, whereIdx);
         predicate = predicate.replace(/ DEFERRABLE(?: INITIALLY (?:IMMEDIATE|DEFERRED))?/i, "");
-        // Mirrors Rails' `predicate.from(2).to(-3)`: pg_get_constraintdef wraps
-        // the WHERE clause in two paren levels, so strip two on each side.
         predicate = predicate.slice(2, -2);
       }
       const parts = excludePart.match(/EXCLUDE(?:\s+USING\s+(\S+))?\s+\((.+)\)/s);
@@ -1483,6 +1486,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         AND n.nspname = ${scope.schema}
     `,
       "SCHEMA",
+      [],
+      { allowRetry: true, materializeTransactions: false },
     );
     return Promise.all(
       uniqueInfo.toArray().map(async (row) => {

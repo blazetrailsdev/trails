@@ -448,7 +448,7 @@ export interface AbstractAdapter {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    options?: { prepare?: boolean; allowRetry?: boolean },
+    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<Result>;
   execInsertAll(sql: string, name?: string): Promise<Result>;
   execInsert(
@@ -523,7 +523,7 @@ export interface AbstractAdapter {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    options?: { prepare?: boolean; allowRetry?: boolean },
+    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<Result>;
   /** @internal */
   castResult?(rawResult: unknown): Result;

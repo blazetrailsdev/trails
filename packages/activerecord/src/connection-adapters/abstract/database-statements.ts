@@ -122,7 +122,7 @@ export interface DatabaseStatementsHost {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    opts?: { prepare?: boolean; allowRetry?: boolean },
+    opts?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<Result>;
   /** @internal */
   dirtyCurrentTransaction?(): void;
@@ -1418,12 +1418,13 @@ export async function internalExecQuery(
   sql: string,
   name?: string | null,
   binds?: unknown[],
+  options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
 ): Promise<Result> {
   const sqlName = name ?? "SQL";
   return logSql(this, sql, sqlName, binds, async () => {
     // Materialize lazy transactions before executing SQL
     const tm = (this as any)._transactionManager as TransactionManager | undefined;
-    if (tm) await tm.materializeTransactions();
+    if (tm && (options?.materializeTransactions ?? true)) await tm.materializeTransactions();
     if (this?.internalExecute) {
       // Thread binds through so a bound INSERT ... RETURNING reaches the driver
       // (Rails internal_exec_query(sql, name, binds) → internal_execute). trails
@@ -1524,13 +1525,13 @@ interface DatabaseStatementsDefaultsHost {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    options?: { prepare?: boolean; allowRetry?: boolean },
+    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<Result>;
   internalExecQuery(
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    options?: { prepare?: boolean; allowRetry?: boolean },
+    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<Result>;
 }
 
@@ -1680,7 +1681,7 @@ export const DatabaseStatements = {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    options?: { prepare?: boolean; allowRetry?: boolean },
+    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<Result> {
     // options.allowRetry is captured here and will flow to withRawConnection
     // once pool integration lands (connection-pool track). Real adapters that

@@ -1054,7 +1054,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    options?: { prepare?: boolean; allowRetry?: boolean },
+    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<Result> {
     return this.internalExecQuery(sql, name, binds, options);
   }
@@ -1063,7 +1063,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    options?: { prepare?: boolean; allowRetry?: boolean },
+    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<Result> {
     sql = this.preprocessQuery(sql);
     // Release the query client BEFORE any loadAdditionalTypes call —
@@ -1101,7 +1101,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           // matching sqlite/MySQL and the Rails
           // `unprepared statement materializes transaction` assertion.
           const r = await this.withRawConnection(
-            { materializeTransactions: true, allowRetry: options?.allowRetry ?? false },
+            {
+              materializeTransactions: options?.materializeTransactions ?? true,
+              allowRetry: options?.allowRetry ?? false,
+            },
             async (conn) => {
               const client = conn as unknown as pg.Client;
               try {
