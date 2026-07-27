@@ -37,29 +37,8 @@
   {
     "package": "activerecord",
     "tsFile": "inheritance.ts",
-    "rubyName": "descends_from_active_record?",
-    "call": "inheritance_column",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "inheritance.ts",
     "rubyName": "discriminate_class_for_record",
     "call": "find_sti_class",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "inheritance.ts",
-    "rubyName": "discriminate_class_for_record",
-    "call": "inheritance_column",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "inheritance.ts",
-    "rubyName": "ensure_proper_type",
-    "call": "inheritance_column",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -116,27 +95,6 @@
     "tsFile": "inheritance.ts",
     "rubyName": "sti_class_for",
     "call": "compute_type",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "inheritance.ts",
-    "rubyName": "sti_class_for",
-    "call": "inheritance_column",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "inheritance.ts",
-    "rubyName": "subclass_from_attributes",
-    "call": "inheritance_column",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "inheritance.ts",
-    "rubyName": "type_condition",
-    "call": "inheritance_column",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

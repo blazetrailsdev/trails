@@ -36,7 +36,7 @@ import {
   _cacheSingularTarget,
 } from "./associations.js";
 import { applyThenable, stripThenable } from "./relation/thenable.js";
-import { getInheritanceColumn, isStiSubclass } from "./inheritance.js";
+import { isStiSubclass } from "./inheritance.js";
 import { isBaseInstance } from "./relation/predicate-builder/is-base-instance.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
 import {
@@ -748,7 +748,7 @@ export class Relation<T extends Base> {
       const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
       typeNodes.push(tgtTable.get(typeCol).eq(modelClass.name));
     }
-    const inheritanceCol = getInheritanceColumn(targetModel);
+    const inheritanceCol = targetModel.inheritanceColumn;
     if (inheritanceCol && isStiSubclass(targetModel)) {
       const stiNames = [
         targetModel.name,
@@ -782,7 +782,7 @@ export class Relation<T extends Base> {
     } else {
       onClause = `"${targetTable}"."${foreignKey}" = "${sourceTable}"."${pk}"`;
     }
-    const inheritanceCol = getInheritanceColumn(targetModel);
+    const inheritanceCol = targetModel.inheritanceColumn;
     if (inheritanceCol && isStiSubclass(targetModel)) {
       const stiNames = [
         targetModel.name,
@@ -1776,7 +1776,7 @@ export class Relation<T extends Base> {
       const predicates: Nodes.Node[] = pkArr.map((pk, i) => tgt.get(pk).eq(src.get(fkArr[i])));
 
       // STI type condition on target
-      const inheritanceCol = getInheritanceColumn(targetModel);
+      const inheritanceCol = targetModel.inheritanceColumn;
       if (inheritanceCol && isStiSubclass(targetModel)) {
         const stiNames = [
           targetModel.name,
@@ -1821,7 +1821,7 @@ export class Relation<T extends Base> {
       }
 
       // STI type condition on target
-      const inheritanceCol = getInheritanceColumn(targetModel);
+      const inheritanceCol = targetModel.inheritanceColumn;
       if (inheritanceCol && isStiSubclass(targetModel)) {
         const stiNames = [
           targetModel.name,

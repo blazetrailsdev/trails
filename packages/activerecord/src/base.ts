@@ -40,8 +40,6 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 import type { Relation } from "./relation.js";
 import {
-  getInheritanceColumn,
-  inheritanceColumnDisabled,
   getStiBase,
   instantiateSti,
   stiName,
@@ -2232,7 +2230,8 @@ export class Base extends Model {
     // `type`-bearing table scopes
     // by type. The column resolves on the subclass itself (default "type").
     if (isFinderNeedsTypeCondition(this)) {
-      const col = getInheritanceColumn(this);
+      const col = this.inheritanceColumn;
+      if (col === null) return rel;
       // Rails: `([self] + descendants).map(&:sti_name)` (inheritance.rb#type_condition)
       // — `sti_name` honors `store_full_sti_class` / overrides, not the bare class name.
       const stiNames = [stiName(this), ...this.descendants.map((d: typeof Base) => stiName(d))];
@@ -2945,18 +2944,14 @@ export class Base extends Model {
   ): InstanceType<T> {
     // Delegate to the correct STI subclass when the row carries a present
     // inheritance-column value that names a different class. `inheritance_column`
-    // always resolves to a name now (default "type"); a present `row[inheritanceCol]`
+    // resolves to a name (default "type") unless STI is disabled; a present `row[inheritanceCol]`
     // key proves the column is a real attribute (Rails' `_has_attribute?`), so no
     // `stiEnabled` short-circuit is needed — instantiateSti resolves within the
     // base's own tracked subtree and is a no-op for plain models with a stray
     // `type` column.
     const stiBase = getStiBase(this);
-    const inheritanceCol = getInheritanceColumn(stiBase);
-    if (
-      !inheritanceColumnDisabled(stiBase) &&
-      row[inheritanceCol] &&
-      row[inheritanceCol] !== this.name
-    ) {
+    const inheritanceCol = stiBase.inheritanceColumn;
+    if (inheritanceCol !== null && row[inheritanceCol] && row[inheritanceCol] !== this.name) {
       return instantiateSti(
         stiBase,
         row,

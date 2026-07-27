@@ -35,7 +35,6 @@ import { assignAssociationIfMatch } from "./attribute-assignment.js";
 import { threadedConnectionFor } from "./connection-handling.js";
 import {
   getStiBase,
-  getInheritanceColumn,
   isStiSubclass,
   isDescendsFromActiveRecord,
   stiName,
@@ -902,7 +901,7 @@ export async function save<T extends SaveRecord>(
 
       // Auto-set STI type column on new records
       if (this._newRecord && isStiSubclass(ctor)) {
-        const col = getInheritanceColumn(getStiBase(ctor));
+        const col = getStiBase(ctor).inheritanceColumn;
         if (col && !this._readAttribute(col)) {
           this._attributes.set(col, this.constructor.name);
         }
@@ -1721,7 +1720,7 @@ export function becomesBang<
 >(this: T, klass: K): InstanceType<K> {
   const instance = this.becomes(klass);
   const base = getStiBase(klass);
-  const inheritanceCol = getInheritanceColumn(base);
+  const inheritanceCol = base.inheritanceColumn;
   if (inheritanceCol) {
     // Mirrors Rails: `became.public_send("#{inheritance_column}=", sti_type)` —
     // route through the public writer so the change is dirty-tracked and a
