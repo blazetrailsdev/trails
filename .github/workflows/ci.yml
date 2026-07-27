@@ -1381,12 +1381,14 @@ jobs:
         # and intentionally no-ops this rule via `--allow-missing`; here the
         # builder runs WITHOUT that flag, so a missing extraction fails the job
         # instead of quietly producing an empty manifest the rule can't match.
-        # The eslint paths mirror the rule's `files` list in eslint.config.mjs —
-        # linting only arel left the other enabled packages unenforced.
+        # Uses the standalone eslint/rails-private-jsdoc.config.mjs so this step
+        # runs that ONE rule over every package the root config enables it for,
+        # rather than re-running the whole ruleset (which would duplicate the
+        # Lint job). Linting only packages/arel/src here left activesupport,
+        # activemodel, actionpack, actionview and activerecord unenforced.
         run: |
           pnpm exec tsx scripts/build-rails-privates-manifest.ts
-          pnpm exec eslint packages/arel/src packages/activesupport/src packages/activemodel/src \
-            packages/actionpack/src packages/actionview/src packages/activerecord/src
+          pnpm exec eslint --no-inline-config --config eslint/rails-private-jsdoc.config.mjs packages
       - name: Rails file-structure method-order lint
         # Needs rails-api.json (extracted above) to build the per-class
         # method-order manifest, then enforce
