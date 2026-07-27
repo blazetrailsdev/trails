@@ -1513,4 +1513,33 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
       `),
     ).toThrow(/@noRailsEquivalent needs a reason/);
   });
+
+  it("throws when a bare tag name in the reason truncates it", () => {
+    expect(() =>
+      extractFromSource(`
+        class Foo {
+          /**
+           * @noRailsEquivalent wiring seam; @internal is the wrong tool here
+           * because the method is real Rails-facing surface.
+           */
+          initializeAssociations(): void {}
+        }
+      `),
+    ).toThrow(/truncated by a bare `@internal`/);
+  });
+
+  it("accepts a following tag that starts its own line", () => {
+    const foo = extractFromSource(`
+      class Foo {
+        /**
+         * @noRailsEquivalent wiring seam with no Rails counterpart
+         * @param name the model name
+         */
+        registerModel(name: string): void {}
+      }
+    `);
+    expect(foo.instanceMethods.find((m) => m.name === "registerModel")!.noRailsEquivalent).toBe(
+      "wiring seam with no Rails counterpart",
+    );
+  });
 });

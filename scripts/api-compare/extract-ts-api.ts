@@ -1346,7 +1346,42 @@ export function noRailsEquivalentReason(node: ts.Node): string | undefined {
           "state why this surface has no Rails counterpart.",
       );
     }
+    const inlineTag = inlineTagAfter(tag);
+    if (inlineTag !== undefined) {
+      const sf = node.getSourceFile();
+      const line = sf.getLineAndCharacterOfPosition(tag.getStart()).line + 1;
+      throw new Error(
+        `@noRailsEquivalent reason is truncated by a bare \`@${inlineTag}\` in its ` +
+          `prose: ${sf.fileName}:${line} — TypeScript parses it as a real JSDoc tag, ` +
+          "so the reason is cut short and the declaration can drop out of the " +
+          "compared surface entirely. Reword the prose to avoid the tag form.",
+      );
+    }
     return reason;
+  }
+  return undefined;
+}
+
+/**
+ * Name of the first JSDoc tag that follows `tag` in the same comment while
+ * starting mid-line — i.e. a bare `@word` written inside reason prose rather
+ * than a deliberate tag on its own line. TypeScript parses either shape as a
+ * real tag, which silently truncates the reason (and, for `@internal`, drops
+ * the declaration from the extracted surface). Returns undefined when every
+ * following tag starts its own line.
+ */
+function inlineTagAfter(tag: ts.JSDocTag): string | undefined {
+  const jsDoc = tag.parent;
+  if (!ts.isJSDoc(jsDoc) || jsDoc.tags === undefined) return undefined;
+  const text = jsDoc.getSourceFile().text;
+  for (const other of jsDoc.tags) {
+    if (other.getStart() <= tag.getStart()) continue;
+    let i = other.getStart() - 1;
+    while (i >= 0 && text[i] !== "\n") {
+      const ch = text[i];
+      if (ch !== " " && ch !== "\t" && ch !== "*") return other.tagName.text;
+      i--;
+    }
   }
   return undefined;
 }
