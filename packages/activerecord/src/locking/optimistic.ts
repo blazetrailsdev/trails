@@ -25,6 +25,9 @@ export function lockingColumn(modelClass: typeof Base): string {
 
 /**
  * Set the column name used for optimistic locking.
+ *
+ * Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#locking_column=
+ * @internal
  */
 export function setLockingColumn(modelClass: typeof Base, column: string): void {
   reloadSchemaFromCache.call(modelClass as any);
@@ -59,6 +62,7 @@ export function lockOptimistically(modelClass: typeof Base): boolean {
 
 /**
  * Mirrors: ActiveRecord::Locking::Optimistic#lock_optimistically=
+ * @internal
  */
 export function setLockOptimistically(modelClass: typeof Base, value: boolean): void {
   (modelClass as any)._lockOptimistically = value;

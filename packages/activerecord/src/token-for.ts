@@ -228,6 +228,7 @@ export function tokenDefinitions(
  * this class's own registry entry (subclasses still inherit via the reader).
  *
  * Mirrors: ActiveRecord::TokenFor#token_definitions=
+ * @internal
  */
 export function setTokenDefinitions(
   modelClass: typeof Base,
@@ -261,6 +262,7 @@ export function generatedTokenVerifier(modelClass: typeof Base): MessageVerifier
  * builds this class's own verifier.
  *
  * Mirrors: ActiveRecord::TokenFor#generated_token_verifier=
+ * @internal
  */
 export function setGeneratedTokenVerifier(
   modelClass: typeof Base,
