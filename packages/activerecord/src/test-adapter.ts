@@ -232,7 +232,7 @@ export function _resetPooledTestAdapterForTests(): void {
 /**
  * Reset every piece of module-level test-adapter state so the next test
  * starts from a clean slate. Called from a global `beforeEach` hook in
- * test-setup-ar.ts.
+ * cases/helper.ts.
  *
  * Row state is cleared by **truncating** the boot-laid canonical tables (RFC
  * 0059 lays the canonical schema once at boot and keeps it shape-stable, so

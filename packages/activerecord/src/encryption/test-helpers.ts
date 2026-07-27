@@ -30,7 +30,7 @@ export { withEncryptionContext, withoutEncryption, DecryptionError, EncryptionEr
 
 // ─── Test key material ────────────────────────────────────────────────────────
 
-// Single source of truth shared with the suite-wide bootstrap (test-setup-ar.ts).
+// Single source of truth shared with the suite-wide bootstrap (cases/helper.ts).
 export { TEST_PRIMARY_KEY, TEST_DETERMINISTIC_KEY, TEST_KEY_DERIVATION_SALT } from "./test-keys.js";
 import { TEST_PRIMARY_KEY, TEST_DETERMINISTIC_KEY, TEST_KEY_DERIVATION_SALT } from "./test-keys.js";
 

@@ -49,7 +49,7 @@ describe("DelegationTest", () => {
     // is delegated-with-scoping, mutating the global scope — the bug the guard
     // bans from AR's own code.
     // The AR test harness bans base-method delegation suite-wide
-    // (test-setup-ar.ts, mirroring helper.rb:29), so restore that `false`
+    // (cases/helper.ts, mirroring helper.rb:29), so restore that `false`
     // default — not Rails' production `true` — after each case.
     afterEach(() => {
       DelegateCache.delegateBaseMethods = false;

@@ -29,7 +29,7 @@
 
 import pg from "pg";
 import mysql from "mysql2/promise";
-// Eagerly load better-sqlite3 here (not just in test-setup-ar.ts): this
+// Eagerly load better-sqlite3 here (not just in cases/helper.ts): this
 // setupFile runs first, and ensureWorkerClone() needs the driver's
 // restoreFromPath backup primitive to clone the template into the per-worker
 // file.

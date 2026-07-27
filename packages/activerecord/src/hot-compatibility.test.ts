@@ -70,7 +70,7 @@ describe("HotCompatibilityTest", () => {
     // (dirty.rb:50); only attributes assigned away from their default are
     // written, so the dropped `bar` is simply omitted from the INSERT. The
     // trails test harness flips this to false via `load_defaults("7.0")`
-    // (test-setup-ar.ts), so restore the Rails-ambient default for this model.
+    // (cases/helper.ts), so restore the Rails-ambient default for this model.
     HotCompatibility.partialInserts = true;
 
     return { klass: HotCompatibility, adapter };

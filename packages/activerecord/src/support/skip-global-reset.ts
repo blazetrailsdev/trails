@@ -1,6 +1,6 @@
 /**
  * Refcount of active `withTransactionalFixtures` scopes. When > 0, the
- * global beforeEach in test-setup-ar.ts skips resetTestAdapterState() so a
+ * global beforeEach in cases/helper.ts skips resetTestAdapterState() so a
  * one-time schema set up in `beforeAll` survives across tests in the file.
  * Refcounted (not a bool) so nested describes / multiple suites that each
  * call withTransactionalFixtures don't clobber an outer scope's skip when

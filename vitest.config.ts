@@ -80,7 +80,7 @@ const ADAPTER_SPECIFIC_EXCLUDE =
 
 // Low-level SQLite driver wrappers + the adapter driver-binding tests. These
 // are pure unit tests that construct adapters/drivers directly and must NOT
-// load test-setup-ar, whose connection bootstrap opens a DB at module load.
+// load cases/helper.ts, whose connection bootstrap opens a DB at module load.
 // Run them in their own setup-free project.
 const SQLITE_DRIVER_TESTS = [
   "packages/activerecord/src/sqlite/**/*.test.ts",
@@ -362,7 +362,7 @@ export default defineConfig({
           globalSetup: ["./packages/activerecord/src/support/template-global-setup.ts"],
           setupFiles: [
             "./packages/activerecord/src/test-setup-worker-db.ts",
-            "./packages/activerecord/src/test-setup-ar.ts",
+            "./packages/activerecord/src/cases/helper.ts",
             ...(process.env.ARCONN === "mysql2"
               ? ["./packages/activerecord/src/test-setup-mysql.ts"]
               : []),
