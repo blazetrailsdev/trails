@@ -24,6 +24,10 @@ const FORMATS: Format[] = [
   "message_pack_allow_marshal",
 ];
 
+function munge(base64String: string): string {
+  return Buffer.from(Buffer.from(base64String, "base64").reverse()).toString("base64");
+}
+
 describe("Messages::Codec (trails)", () => {
   it("subclasses default to the json serializer", () => {
     expect(MessageEncryptor.defaultSerializer).toBe("json");
@@ -74,18 +78,20 @@ describe("Messages::Codec (trails)", () => {
   it("verify raises InvalidSignature on a tampered message", () => {
     const verifier = new MessageVerifier(SECRET);
     const message = verifier.generate("hello");
+    const [data, hash] = message.split("--");
 
-    expect(() => verifier.verify(message.slice(0, -1) + "0")).toThrow(InvalidSignature);
-    expect(verifier.verified(message.slice(0, -1) + "0")).toBeNull();
-    expect(verifier.validMessage(message.slice(0, -1) + "0")).toBe(false);
+    expect(() => verifier.verify(`${munge(data)}--${hash}`)).toThrow(InvalidSignature);
+    expect(verifier.verified(`${munge(data)}--${hash}`)).toBeNull();
+    expect(verifier.validMessage(`${munge(data)}--${hash}`)).toBe(false);
     expect(verifier.validMessage(message)).toBe(true);
   });
 
   it("decryptAndVerify raises InvalidMessage on a tampered message", () => {
     const encryptor = new MessageEncryptor(SECRET);
     const message = encryptor.encryptAndSign("hello");
+    const [text, hash] = message.split("--");
 
-    expect(() => encryptor.decryptAndVerify(message.slice(0, -1) + "0")).toThrow(InvalidMessage);
+    expect(() => encryptor.decryptAndVerify(`${munge(text)}--${hash}`)).toThrow(InvalidMessage);
     expect(() => encryptor.decryptAndVerify("not-a-message")).toThrow(InvalidMessage);
   });
 });
