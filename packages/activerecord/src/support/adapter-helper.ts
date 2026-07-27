@@ -9,6 +9,13 @@
  * predicates stay synchronous and connection-free, which matters because tests
  * call them at collection time (`describe.skipIf(inMemoryDb())`).
  *
+ * `in_memory_db?` reads `Base.connection_pool.db_config.database` once Base is
+ * connected, exactly as Rails does. Before that there is no pool to ask, so it
+ * falls back to the `connections:` entry `ARCONN` selects: `sqlite3_mem` is the
+ * only one whose database is `":memory:"` (config.example.yml:93 / the
+ * `CONNECTIONS` table in `support/test-database-config.ts`); the default
+ * `sqlite3` lane is file-backed (config.example.yml:83).
+ *
  * `adapter_helper.rb`'s `supports_<feature>?` methods (the `define_method`
  * block plus `supports_default_expression?`,
  * `supports_non_unique_constraint_name?`, `supports_text_column_with_default?`
@@ -21,7 +28,8 @@
  * connection); they stay there for the same reason.
  */
 
-import { adapterType, ambientPoolConfiguration } from "../test-adapter.js";
+import { adapterType } from "../test-adapter.js";
+import { connectionName } from "./test-connection-env.js";
 import { Base } from "../base.js";
 
 export type AdapterClassName =
@@ -41,16 +49,24 @@ export function currentAdapter(...types: AdapterClassName[]): boolean {
   return types.some((type) => ADAPTER_CLASS[type] === adapterType);
 }
 
+function configuredDatabase(): string | undefined {
+  return connectionName() === "sqlite3_mem" ? ":memory:" : undefined;
+}
+
 export function inMemoryDb(): boolean {
   if (!currentAdapter("SQLite3Adapter")) return false;
   const database = Base.isConnectedQ()
     ? Base.connectionPool().dbConfig.database
-    : ambientPoolConfiguration().database;
+    : configuredDatabase();
   return database === ":memory:";
 }
 
 export function sqlite3AdapterStrictStringsDisabled(): boolean {
-  return currentAdapter("SQLite3Adapter") && !ambientPoolConfiguration().strict;
+  if (!currentAdapter("SQLite3Adapter")) return false;
+  const configurationHash = Base.isConnectedQ()
+    ? Base.connectionPool().dbConfig.configurationHash
+    : {};
+  return !(configurationHash as { strict?: unknown }).strict;
 }
 
 export async function mysqlEnforcingGtidConsistency(): Promise<boolean> {
