@@ -129,7 +129,7 @@ describe("PostgreSQLSchemaStatements sequence helpers warn without a sequence", 
 describe("PostgreSQLSchemaStatements#indexNameExists", () => {
   it("parses the index name through quotedScope rather than quoting it raw", async () => {
     const { adapter, sql } = makeAdapter({
-      schemaQuery: async () => [{ cnt: 1 }],
+      queryValue: async () => 1,
     });
     const ss = new PostgreSQLSchemaStatements(adapter);
     expect(await ss.indexNameExists("my_schema.things", "my_schema.index_a")).toBe(true);
