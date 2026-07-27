@@ -32,6 +32,7 @@ import {
   currentRole as coreCurrentRole,
   currentShard as coreCurrentShard,
   isApplicationRecordClass as coreIsApplicationRecordClass,
+  configurations as baseConfigurations,
 } from "./core.js";
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 
@@ -963,7 +964,7 @@ async function autoConnect(modelClass: typeof Base): Promise<void> {
   // `TestDatabases.create_and_load_schema` (which suffixes `_database`
   // per worker before reconnect). Falling back to disk would re-read
   // unmutated configs and reconnect to the wrong database.
-  const inMemory = modelClass.configurations();
+  const inMemory = baseConfigurations();
   let configs: DatabaseConfigurations;
   if (!inMemory.empty) {
     configs = inMemory;
@@ -1115,7 +1116,8 @@ export function resolveConfigForConnection(
   // an own-property check so writing here doesn't bleed through JS static
   // inheritance into unrelated subclasses.
   (this as any)._connectionSpecificationName = isPrimaryClass.call(this) ? "Base" : this.name;
-  // Rails: `Base.configurations.resolve(config_or_env)` — `configurations` is
-  // one process-global registry (core.rb:71-79), so the receiver is immaterial.
-  return this.configurations().resolve(configOrEnv);
+  // Rails: `Base.configurations.resolve(config_or_env)` — the `Base` constant
+  // literally (connection_handling.rb:385-391), never `self`, so a model-local
+  // `configurations` cannot redirect resolution.
+  return baseConfigurations().resolve(configOrEnv);
 }

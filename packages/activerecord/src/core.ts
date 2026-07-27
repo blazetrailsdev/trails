@@ -438,9 +438,13 @@ let _configurations: DatabaseConfigurations | undefined;
 
 /**
  * Mirrors: ActiveRecord::Base.configurations / .configurations=
+ *
+ * Takes no `this`: Rails reads and writes the `@@configurations` class
+ * variable, so the receiver never participates. Callers that Rails spells
+ * `Base.configurations` therefore cannot be redirected by a model-local
+ * override.
  */
 export function configurations(
-  this: CoreHost,
   config?: RawConfigurations | DatabaseConfigurations | DatabaseConfig[],
 ): DatabaseConfigurations {
   if (config !== undefined) {

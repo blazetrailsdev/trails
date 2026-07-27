@@ -151,4 +151,30 @@ describe("configurations is a single process-global registry", () => {
       expect(config.database).toBe("db/global.sqlite3");
     }
   });
+
+  // Rails names the `Base` constant literally in
+  // `resolve_config_for_connection` (connection_handling.rb:385-391), so a
+  // model-local `configurations` is never consulted. JS would otherwise
+  // dispatch the read through the receiver.
+  it("resolveConfigForConnection ignores a model-local configurations override", async () => {
+    const { resolveConfigForConnection } = await import("./connection-handling.js");
+
+    Base.configurations({
+      global_registry_env: { primary: { adapter: "sqlite3", database: "db/global.sqlite3" } },
+    });
+
+    class OverridingModel extends Base {
+      static configurations(): DatabaseConfigurations {
+        return DatabaseConfigurations.fromEnv({
+          global_registry_env: { primary: { adapter: "sqlite3", database: "db/hijacked.sqlite3" } },
+        });
+      }
+    }
+
+    const resolved = resolveConfigForConnection.call(
+      OverridingModel as unknown as typeof Base,
+      "global_registry_env",
+    );
+    expect(resolved.database).toBe("db/global.sqlite3");
+  });
 });
