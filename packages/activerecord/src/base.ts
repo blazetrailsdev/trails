@@ -2348,6 +2348,15 @@ export class Base extends Model {
   declare static cachedFindByStatement: typeof _Core.cachedFindByStatement;
   declare static _findByStatementCache?: Map<boolean, Map<string, unknown>>;
 
+  /**
+   * Mirrors: ActiveRecord::Base.configurations / .configurations=
+   *
+   * Ruby's reader/writer pair collapses to the repo's optional-argument
+   * accessor: `Model.configurations(raw)` writes, `Model.configurations()`
+   * reads, and the reader always answers a `DatabaseConfigurations`.
+   */
+  declare static configurations: typeof _Core.configurations;
+
   // Mirrors Rails `find_by!(arg, *args)`: a Hash of conditions or a raw SQL
   // fragment (`Post.find_by!("1 = 0")`) plus optional bind args.
   declare static findByBang: <T extends typeof Base>(
@@ -4787,6 +4796,10 @@ Object.defineProperty(Base, "connection", {
 
 extend(Base, { collectionCacheKey: _collectionCacheKey });
 extend(Base, { find: _Core.find, findBy: _Core.findBy, findByBang: _Core.findByBang });
+extend(Base, { configurations: _Core.configurations });
+// Mirrors core.rb:74 — `self.configurations = {}` runs at load, so the reader
+// hands back a real (empty) registry before any app config is assigned.
+Base.configurations({});
 extend(Base, {
   initializeFindByCache: _Core.initializeFindByCache,
   cachedFindByStatement: _Core.cachedFindByStatement,

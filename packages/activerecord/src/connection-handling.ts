@@ -963,14 +963,10 @@ async function autoConnect(modelClass: typeof Base): Promise<void> {
   // `TestDatabases.create_and_load_schema` (which suffixes `_database`
   // per worker before reconnect). Falling back to disk would re-read
   // unmutated configs and reconnect to the wrong database.
-  const inMemory = (modelClass as any).configurations;
+  const inMemory = modelClass.configurations();
   let configs: DatabaseConfigurations;
-  if (inMemory instanceof DatabaseConfigurations) {
+  if (!inMemory.empty) {
     configs = inMemory;
-  } else if (inMemory && typeof inMemory.toH === "function") {
-    configs = DatabaseConfigurations.fromEnv(inMemory.toH());
-  } else if (inMemory && typeof inMemory === "object") {
-    configs = DatabaseConfigurations.fromEnv(inMemory);
   } else {
     const raw = await loadConfigFile(modelClass);
     configs = DatabaseConfigurations.fromEnv(raw);
@@ -1119,38 +1115,5 @@ export function resolveConfigForConnection(
   // an own-property check so writing here doesn't bleed through JS static
   // inheritance into unrelated subclasses.
   (this as any)._connectionSpecificationName = isPrimaryClass.call(this) ? "Base" : this.name;
-  return normalizeConfigurations(this).resolve(configOrEnv);
-}
-
-/**
- * Normalize a class's `configurations` static into a DatabaseConfigurations
- * instance. Mirror Rails' `Base.configurations.resolve(...)` entry point by
- * always returning a real configurations object — string env names then
- * surface AdapterNotSpecified with the available-configs hint instead of
- * silently passing through.
- *
- * Not cached: `DatabaseConfigurations.fromEnv(...)` also folds in
- * `DATABASE_URL`/`TRAILS_ENV` and updates `DatabaseConfigurations.current`,
- * so a (class, rawConfigs) cache key would miss later env-state changes
- * and leave `HashConfig.isPrimary()` consulting a stale registry.
- * Rebuilding per resolve mirrors Rails' `Base.configurations.resolve(...)`
- * and keeps the multi-shard `connectsTo` loop honest against later
- * configuration or env shifts — `fromEnv` is a thin per-call build.
- *
- * @internal
- */
-function normalizeConfigurations(klass: typeof Base): DatabaseConfigurations {
-  const rawConfigs = (klass as any).configurations;
-  if (rawConfigs instanceof DatabaseConfigurations) return rawConfigs;
-  if (rawConfigs && typeof rawConfigs === "object") {
-    // Guard the `toH` call: raw config maps can carry arbitrary top-level
-    // keys, so a non-function `toH` entry is real config data — not a
-    // hash-like accessor to unwrap. Mirrors the same guard used in
-    // `establishConnection`'s in-memory branch and in `test-databases.ts`.
-    const toH = (rawConfigs as { toH?: unknown }).toH;
-    const raw =
-      typeof toH === "function" ? (toH.call(rawConfigs) as RawConfigurations) : rawConfigs;
-    return DatabaseConfigurations.fromEnv(raw as RawConfigurations);
-  }
-  return DatabaseConfigurations.fromEnv({});
+  return this.configurations().resolve(configOrEnv);
 }

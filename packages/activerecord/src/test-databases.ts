@@ -8,7 +8,6 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import type { MigrationProxy } from "./migration.js";
 import { Migrator } from "./migration.js";
 import type { Base } from "./base.js";
-import { DatabaseConfigurations } from "./database-configurations.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 
 /**
@@ -66,18 +65,11 @@ export async function createAndLoadSchema(
   { envName }: { envName: string } = { envName: "test" },
 ): Promise<void> {
   // Rails: configurations is always set before create_and_load_schema is
-  // called (app boots first). Guard here is defensive — if null, there is
-  // nothing to suffix and the finally reconnect handles the rest.
-  const raw = (modelClass as any).configurations;
-  if (raw == null) return;
-
-  // Normalize to a DatabaseConfigurations instance. Persist it back so
-  // _database mutations and the finally reconnect see the same registry.
-  const configurations =
-    raw instanceof DatabaseConfigurations
-      ? raw
-      : DatabaseConfigurations.fromEnv(typeof raw.toH === "function" ? raw.toH() : raw);
-  (modelClass as any).configurations = configurations;
+  // called (app boots first). Guard here is defensive — with nothing
+  // configured there is nothing to suffix and the finally reconnect handles
+  // the rest.
+  const configurations = modelClass.configurations();
+  if (configurations.empty) return;
 
   const old = process.env.VERBOSE;
   process.env.VERBOSE = "false";

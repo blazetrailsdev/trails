@@ -13,17 +13,17 @@ describe("ShardsKeysTest", () => {
   }
   class ShardedModel extends ShardedBase {}
 
-  let prevConfigs: unknown;
+  let prevConfigs: DatabaseConfigurations;
   let prevDefaultEnv: string;
   let prevCurrent: unknown;
 
   beforeEach(() => {
-    prevConfigs = (Base as any).configurations;
+    prevConfigs = Base.configurations();
     prevDefaultEnv = DatabaseConfigurations.defaultEnv;
     prevCurrent = (DatabaseConfigurations as any).current;
     DatabaseConfigurations.defaultEnv = "default_env";
     vi.stubEnv("TRAILS_ENV", "default_env");
-    (Base as any).configurations = {
+    Base.configurations({
       default_env: {
         primary: { adapter: "sqlite3", database: ":memory:" },
         shard_one: { adapter: "sqlite3", database: ":memory:" },
@@ -31,7 +31,7 @@ describe("ShardsKeysTest", () => {
         shard_two: { adapter: "sqlite3", database: ":memory:" },
         shard_two_reading: { adapter: "sqlite3", database: ":memory:", replica: true },
       },
-    };
+    });
     (Base as any)._shardKeys = undefined;
 
     UnshardedBase.connectsTo({ database: { writing: "primary" } });
@@ -45,7 +45,7 @@ describe("ShardsKeysTest", () => {
 
   afterEach(async () => {
     await Base.connectionHandler.clearAllConnectionsBang();
-    (Base as any).configurations = prevConfigs;
+    Base.configurations(prevConfigs);
     DatabaseConfigurations.defaultEnv = prevDefaultEnv;
     (DatabaseConfigurations as any).current = prevCurrent;
     (Base as any)._shardKeys = undefined;

@@ -8,12 +8,12 @@ import { fixtures } from "./test-helpers/fixtures.js";
 import { SchemaMigration } from "./schema-migration.js";
 
 // Build a (minimal) DatabaseConfigurations whose `configsFor` returns the
-// supplied stubbed configs. Mirrors the production shape — production code
-// calls `(this as any).configurations?.toH?.()` then `fromEnv(...)`, so the
-// real Base.configurations is a raw hash; createAndLoadSchema normalizes
-// either input. Tests use the post-normalization instance directly.
+// supplied stubbed configs. `Base.configurations()` always hands back a
+// DatabaseConfigurations, so the stubbed model class returns one too. The
+// configs are seeded through the array constructor arm as well as the
+// `configsFor` spy, so the registry reports itself non-empty.
 const stubConfigurations = (configs: unknown[]): DatabaseConfigurations => {
-  const dc = new DatabaseConfigurations([]);
+  const dc = new DatabaseConfigurations(configs as never);
   vi.spyOn(dc, "configsFor").mockReturnValue(configs as never);
   return dc;
 };
@@ -61,7 +61,7 @@ describe("TestDatabasesTest", () => {
     const mockConfigurations = stubConfigurations([mockConfig]);
 
     const mockModelClass = {
-      configurations: mockConfigurations,
+      configurations: () => mockConfigurations,
     } as any as typeof Base;
 
     await createAndLoadSchema(mockModelClass, 2, { envName: "arunit" });
@@ -100,7 +100,7 @@ describe("TestDatabasesTest", () => {
     const mockConfigurations = stubConfigurations([mockConfig]);
 
     const mockModelClass = {
-      configurations: mockConfigurations,
+      configurations: () => mockConfigurations,
     } as any as typeof Base;
 
     await createAndLoadSchema(mockModelClass, 42, { envName: "arunit" });
@@ -125,7 +125,7 @@ describe("TestDatabasesTest", () => {
     const mockConfigurations = stubConfigurations(configs);
 
     const mockModelClass = {
-      configurations: mockConfigurations,
+      configurations: () => mockConfigurations,
     } as any as typeof Base;
 
     await createAndLoadSchema(mockModelClass, 42, { envName: "arunit" });
@@ -153,7 +153,7 @@ describe("TestDatabasesTest", () => {
     });
 
     const mockModelClass = {
-      configurations: stubConfigurations([dbConfig]),
+      configurations: () => stubConfigurations([dbConfig]),
     } as any as typeof Base;
 
     await createAndLoadSchema(mockModelClass, 5, { envName: "arunit" });
@@ -178,7 +178,7 @@ describe("TestDatabasesTest", () => {
     Object.defineProperty(mockConfig, "database", { get: () => ":memory:" });
 
     const mockModelClass = {
-      configurations: stubConfigurations([mockConfig]),
+      configurations: () => stubConfigurations([mockConfig]),
     } as any as typeof Base;
 
     await createAndLoadSchema(mockModelClass, 7, { envName: "arunit" });
@@ -189,16 +189,20 @@ describe("TestDatabasesTest", () => {
   });
 
   it("does not overwrite an unset Base.configurations with an empty registry", async () => {
-    vi.spyOn(DatabaseTasks, "reconstructFromSchema").mockResolvedValue(undefined);
+    const mockReconstructFromSchema = vi
+      .spyOn(DatabaseTasks, "reconstructFromSchema")
+      .mockResolvedValue(undefined);
     vi.spyOn(await import("./connection-handling.js"), "establishConnection").mockResolvedValue(
       undefined,
     );
 
-    // No `configurations` — defensive early return; nothing to suffix.
+    // Nothing configured — defensive early return; nothing to suffix.
     // In Rails this never occurs (app boot sets configurations first).
-    const mockModelClass = { configurations: undefined } as any as typeof Base;
+    const empty = new DatabaseConfigurations({});
+    const mockModelClass = { configurations: () => empty } as any as typeof Base;
     await createAndLoadSchema(mockModelClass, 1, { envName: "arunit" });
-    expect((mockModelClass as any).configurations).toBeUndefined();
+    expect(empty.empty).toBe(true);
+    expect(mockReconstructFromSchema).not.toHaveBeenCalled();
   });
 
   it("throws a clear error when neither database nor URL yields a name", async () => {
@@ -212,7 +216,7 @@ describe("TestDatabasesTest", () => {
     Object.defineProperty(mockConfig, "database", { get: () => undefined });
 
     const mockModelClass = {
-      configurations: stubConfigurations([mockConfig]),
+      configurations: () => stubConfigurations([mockConfig]),
     } as any as typeof Base;
 
     await expect(createAndLoadSchema(mockModelClass, 1, { envName: "arunit" })).rejects.toThrow(
@@ -244,7 +248,7 @@ describe("TestDatabasesTest", () => {
     mockConfig.adapter = "sqlite3";
 
     const mockModelClass = {
-      configurations: stubConfigurations([mockConfig]),
+      configurations: () => stubConfigurations([mockConfig]),
     } as any as typeof Base;
 
     const originalVerbose = process.env.VERBOSE;

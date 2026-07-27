@@ -1,15 +1,30 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { DatabaseConfig } from "./database-configurations/database-config.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
+import { Base } from "./base.js";
 
 describe("DatabaseConfigurationsTest", () => {
   beforeEach(() => {
     DatabaseConfigurations.defaultEnv = "development";
   });
 
+  // Rails round-trips through the `Base.configurations=` writer, which
+  // normalizes the raw hash into a DatabaseConfigurations, and then asserts
+  // the reader answers `empty?` — the pair trails spells as the
+  // optional-argument `Base.configurations()` accessor. Rails' second
+  // assertion (`blank?`) is Object#blank?, an ActiveSupport alias of the same
+  // predicate on this receiver, so `empty` covers both.
   it("empty returns true when db configs are empty", () => {
-    const configs = new DatabaseConfigurations({});
-    expect(configs.empty).toBe(true);
+    const oldConfig = Base.configurations();
+    const config = {};
+
+    Base.configurations(config);
+
+    try {
+      expect(Base.configurations().empty).toBe(true);
+    } finally {
+      Base.configurations(oldConfig);
+    }
   });
 
   it("configs for getter with env name", () => {
