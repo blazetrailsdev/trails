@@ -26,6 +26,7 @@ import { getEnv, getOsAsync } from "@blazetrails/activesupport";
 import { getPathAsync } from "@blazetrails/activesupport/fs-adapter";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../base.js";
+import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
@@ -379,16 +380,10 @@ async function sqliteHash(): Promise<Record<string, unknown>> {
  * `schema.rb` in-process. The registration runs on every call so callers that
  * clear `_registeredTasks` (e.g. `database-tasks.test.ts`) can re-register.
  *
-
- * Rails' next line is `ARUnit2Model.establish_connection :arunit2`
- * (`connection.rb:33`), which this does NOT do. `College` and `Course` extend
- * `ARUnit2Model`, so pointing that base at the arunit2 database here sends
- * every suite's colleges/courses at a database that does not carry them — it
- * reddened all three lanes on #5397 with "no such table: colleges" from
- * `use-fixtures.test.ts`. Rails is safe because its arunit2 genuinely holds
- * those tables; ours only gets them inside `setupSecondPool`, which keeps
- * ownership of the second pool until that provisioning moves earlier (story
- * `arunit2-provisioning-owns-second-pool`).
+ * `ARUnit2Model.establish_connection :arunit2` (`connection.rb:33`) follows it.
+ * The pool is lazy; `provisionSecondDatabase` (`support/setup-second-pool.ts`,
+ * run from `test-setup-dy.ts`) creates the arunit2 database and its tables
+ * before any suite runs.
  */
 export async function connect(): Promise<TestDatabaseConfig> {
   const { adapter, envConfig, configurationHashes } = await testConfigurationHashes();
@@ -417,6 +412,7 @@ export async function connect(): Promise<TestDatabaseConfig> {
   // `connection.rb:32` — established by name, not from a raw hash, so the pool
   // comes from the entry `Base.configurations` publishes.
   await Base.establishConnection("arunit");
+  await ARUnit2Model.establishConnection("arunit2");
 
   return { configs, adapter, envConfig };
 }

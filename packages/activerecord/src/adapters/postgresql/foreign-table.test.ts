@@ -1,16 +1,18 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/foreign_table_test.rb
  *
- * Loopback FDW: foreign_server points back at the same database and
- * foreign_professors is mapped to a local professors table. Rails wires
- * foreign_server at the secondary "arunit2" database; loopback keeps the
- * test infra single-database.
+ * `foreign_server` points at the `arunit2` database, whose `professors` table
+ * `foreign_professors` is mapped to — `ARTest.test_configuration_hashes
+ * ["arunit2"]["database"]` in Rails (`foreign_table_test.rb:24-29`). `Professor`
+ * is an `ARUnit2Model`, so the rows these tests create land in that database and
+ * come back through the foreign table.
  */
 import { describe, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
 import { Base } from "../../index.js";
 import { Professor } from "../../test-helpers/models/professor.js";
+import { ARUnit2Model } from "../../test-helpers/models/arunit2-model.js";
 import { itIfSupports } from "../../support/supports.js";
 
 // Rails: class ForeignProfessor < ActiveRecord::Base; self.table_name = "foreign_professors"
@@ -24,9 +26,7 @@ class ForeignProfessorWithPk extends ForeignProfessor {
 }
 
 const url = new URL(PG_TEST_URL);
-const fdwHost = url.hostname || "localhost";
-const fdwPort = url.port || "5432";
-const fdwDb = url.pathname.replace(/^\//, "") || "postgres";
+
 const fdwPassword = decodeURIComponent(url.password || "");
 
 function quoteLit(s: string): string {
@@ -51,9 +51,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       ctx.skip();
       return;
     }
+    const fdwDb = String(ARUnit2Model.connectionDbConfig().database);
     await adapter.exec(
+      // `dbname` alone, as `foreign_table_test.rb:26-28` spells it: the server
+      // reaches the arunit2 database on itself over its local socket, so no
+      // host/port (which name the address the *client* used, not one the server
+      // can necessarily dial back on).
       `CREATE SERVER foreign_server FOREIGN DATA WRAPPER postgres_fdw ` +
-        `OPTIONS (host ${quoteLit(fdwHost)}, port ${quoteLit(fdwPort)}, dbname ${quoteLit(fdwDb)})`,
+        `OPTIONS (dbname ${quoteLit(fdwDb)})`,
     );
     const currentUserRows = await adapter.execute("SELECT current_user AS u");
     const fdwUser = String((currentUserRows[0] as { u: string }).u);

@@ -9,6 +9,7 @@ import { fixtureId, defineFixtures, defineJoinTableFixtures, isFixtureRef } from
 import { fixtures } from "./test-helpers/fixtures.js";
 import { setupHandlerSuite } from "./support/setup-handler-suite.js";
 import { withTransactionalFixtures } from "./test-fixtures/with-transactional-fixtures.js";
+import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 import { Author } from "./test-helpers/models/author.js";
 import { Post } from "./test-helpers/models/post.js";
 import { LiveParrot, DeadParrot } from "./test-helpers/models/parrot.js";
@@ -771,7 +772,15 @@ describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
         } else {
           if ("addOn" in entry) await entry.addOn?.();
           const ModelClass = await resolvePrimaryModel(entry);
-          await defineFixtures(Base.adapter, ModelClass, data);
+          // Rails' `FixtureSet` seeds through `model_class.connection`; this
+          // loop uses `Base.adapter` because it runs under transactional
+          // fixtures pinned to that connection. arunit2 models hold their own
+          // pool, so seeding them on the primary is invisible to their reload.
+          const seedAdapter =
+            ModelClass.prototype instanceof ARUnit2Model
+              ? await ModelClass.leaseConnection()
+              : Base.adapter;
+          await defineFixtures(seedAdapter, ModelClass, data);
         }
       } catch (e) {
         failures.push(`${name}: ${(e as Error).message.split("\n")[0]}`);

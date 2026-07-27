@@ -73,6 +73,12 @@ if (missingTables.length > 0) {
   );
 }
 
+// `schema.rb:1444-1462` — the arunit2 tables Rails creates through
+// `Course.lease_connection`. Imported lazily so the second-database models load
+// after the canonical schema is in place.
+const { provisionSecondDatabase } = await import("./support/setup-second-pool.js");
+await provisionSecondDatabase();
+
 // Clear DatabaseTasks global state so database-tasks.test.ts sees the null
 // invariant it expects (it tests checkProtectedEnvironmentsBang with no config).
 DatabaseTasks.databaseConfiguration = null;
