@@ -271,9 +271,13 @@ export class HasOneAssociation extends SingularAssociation {
    * and without this flag `build` would start a *second*, concurrent removal of
    * the same row.
    *
+   * `protected` because it is association-internal bookkeeping, not API surface;
+   * the two callers reach it through their existing duck-typed handles on the
+   * association (both live outside the class hierarchy).
+   *
    * @internal
    */
-  buildSkipsDisplacementRemoval = false;
+  protected buildSkipsDisplacementRemoval = false;
 
   /**
    * `build_#{name}` and `association(:name).build` are the same Rails method,
