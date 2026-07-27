@@ -590,6 +590,28 @@ describe("HasOneAssociationsTest", () => {
     expect((await readHasOne(firm, "account")).id).toBe(created.id);
   });
 
+  // Trails deviation guard (no Rails counterpart, RFC 0068 story
+  // has-one-create-deferred-load-error-reraise-untested): the displaced-target
+  // load has to run BEFORE `super._createRecord` (it must precede the new
+  // record's FK write), but Rails reaches `load_target` only from
+  // `set_new_record`, i.e. *after* `build_record` (singular_association.rb:63-68).
+  // So `_createRecord` defers the load error and re-raises it once the build has
+  // succeeded. A build-time failure hides it (covered by "create with inexistent
+  // foreign key failing"); this pins the other branch — build succeeds, load
+  // error still propagates out of `create#{name}`.
+  it("create re-raises a deferred target-load error after a successful build", async () => {
+    const company = (await Company.create({ name: "DeferredLoadCo" })) as any;
+    const found = (await Company.find(company.id)) as any;
+    const association = found.association("account");
+    expect(association.isLoaded()).toBe(false);
+    const loadError = new Error("connection lost while loading the displaced target");
+    association.loadTargetForBuild = () => Promise.reject(loadError);
+
+    await expect(found.createAccount({ credit_limit: 70 })).rejects.toBe(loadError);
+    // The build/save itself succeeded — only the deferred load error is fatal.
+    expect(await Account.where({ firm_id: Number(company.id) }).count()).toBe(1);
+  });
+
   // Same root cause on the build path: `set_new_record` → `replace(record, false)`
   // still runs `remove_target!` on the loaded target (has_one_association.rb:69),
   // whose else-branch nullifies+saves the old row even though the new record is
