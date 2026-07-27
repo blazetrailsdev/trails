@@ -40,6 +40,12 @@ let _secretGeneration = 0;
  * BLAZETRAILS_SIGNED_ID_SECRET env vars. Throws if no secret
  * is configured. Bumps the secret generation so cached verifiers are rebuilt
  * on the next token op (or `generated_token_verifier` read).
+ *
+ * Trails-only seam with no Rails counterpart: Rails resolves the token secret
+ * from `Rails.application.secret_key_base` inside `generated_token_verifier`'s
+ * default (token_for.rb:11 + railtie wiring), which is framework state trails
+ * has no analogue for. It is not a writer for any Ruby attribute — the Ruby
+ * attribute is `generated_token_verifier=`, which trails already ports.
  */
 export function setTokenForSecret(secret: string | (() => string) | null): void {
   _tokenForSecret = secret;

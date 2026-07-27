@@ -225,6 +225,10 @@ export function getPrimaryKeyAttr(this: PrimaryKeyHost): string | string[] | nul
 
 /**
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#primary_key=
+ *
+ * `Base` already exposes the Rails-named `static set primaryKey` accessor
+ * (base.ts:1157) that delegates here, so this export is redundant public
+ * surface; unexporting it is RFC 0081 shape-1 work, not a seam.
  * @internal
  */
 export function setPrimaryKeyAttr(this: PrimaryKeyHost, key: string | string[]): void {

@@ -125,6 +125,12 @@ export function setSchemaCacheIgnoredTables(value: ReadonlyArray<string | RegExp
  */
 export let permanentConnectionCheckout: true | "deprecated" | "disallowed" = true;
 
+/**
+ * Writer for the `ActiveRecord.permanent_connection_checkout=` module attribute
+ * (active_record.rb:314) — needed only because ESM live bindings are read-only
+ * for importers. Converging it onto a module-object accessor is RFC 0081's
+ * `module-level-config-accessor-shape` story, not a trails-only seam.
+ */
 export function setPermanentConnectionCheckout(value: true | "deprecated" | "disallowed"): void {
   if (value !== true && value !== "deprecated" && value !== "disallowed") {
     throw new ArgumentError(
@@ -317,6 +323,12 @@ export function setUseYamlUnsafeLoad(value: boolean): void {
  */
 export let raiseIntWiderThan64bit = true;
 
+/**
+ * Writer for the `ActiveRecord.raise_int_wider_than_64bit=` module attribute
+ * (`singleton_class.attr_accessor`, active_record.rb:446). Same ESM live-binding
+ * constraint as `setPermanentConnectionCheckout`; covered by RFC 0081's
+ * `module-level-config-accessor-shape` story.
+ */
 export function setRaiseIntWiderThan64bit(value: boolean): void {
   raiseIntWiderThan64bit = value;
 }
