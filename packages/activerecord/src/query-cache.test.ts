@@ -573,19 +573,9 @@ describe("QueryCacheTest", () => {
     });
   });
 
-  // Rails skips this in-memory ("In-Memory DB can't test for using a not
-  // connected connection"): re-establishing the pool would discard the schema.
   it.skipIf(inMemoryDb())("cache is available when using a not connected connection", async () => {
     const dbConfig = Base.connectionDbConfig();
     const originalConnection = Base.removeConnection();
-
-    // Rails' `cache` block-helper only engages when `connected? ||
-    // !configurations.empty?` — its harness (ARTest.connect) populates
-    // `Base.configurations` from config.yml, so the not-connected branch still
-    // caches. The trails harness establishes connections without registering
-    // configurations, so supply that precondition here and restore after.
-    const priorConfigurations = Base.configurations();
-    Base.configurations({ arunit: dbConfig.configuration });
 
     await Base.establishConnection(dbConfig);
     expect(Task.isConnectedQ()).toBe(false);
@@ -600,7 +590,6 @@ describe("QueryCacheTest", () => {
         });
       });
     } finally {
-      Base.configurations(priorConfigurations);
       await Base.establishConnection(originalConnection);
     }
   });
