@@ -3985,14 +3985,20 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async foreignTables(): Promise<string[]> {
-    const rows = await this.schemaQuery(this.dataSourceSql(null, { type: "FOREIGN TABLE" }));
-    return rows.map((r) => r.relname as string);
+    const names = await this.queryValues(
+      this.dataSourceSql(null, { type: "FOREIGN TABLE" }),
+      "SCHEMA",
+    );
+    return names as string[];
   }
 
   async foreignTableExists(tableName: string): Promise<boolean> {
     if (!tableName) return false;
-    const rows = await this.schemaQuery(this.dataSourceSql(tableName, { type: "FOREIGN TABLE" }));
-    return rows.length > 0;
+    const names = await this.queryValues(
+      this.dataSourceSql(tableName, { type: "FOREIGN TABLE" }),
+      "SCHEMA",
+    );
+    return names.length > 0;
   }
 
   quotedIncludeColumnsForIndex(columnNames: string | string[]): string {
