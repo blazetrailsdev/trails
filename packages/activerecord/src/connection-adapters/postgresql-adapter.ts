@@ -2161,7 +2161,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._cancelAnyRunningQuery();
     if (!this._client) throw new Error("No active transaction");
     try {
-      await this._client.query("ROLLBACK");
+      await this.internalExecute("ROLLBACK", "TRANSACTION");
     } catch (e) {
       // ROLLBACK on a poisoned socket (e.g. 08P01 after the cancel
       // race) — tear down and reconnect; closing the socket implicitly
@@ -2230,7 +2230,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // Mirrors: DatabaseStatements#exec_restart_db_transaction (database_statements.rb:83)
   async execRestartDbTransaction(): Promise<void> {
     this._cancelAnyRunningQuery();
-    await this.execute("ROLLBACK AND CHAIN");
+    await this.internalExecute("ROLLBACK AND CHAIN", "TRANSACTION");
   }
 
   // Mirrors: PostgreSQL::DatabaseStatements#cancel_any_running_query (database_statements.rb private)
@@ -3724,19 +3724,21 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async extensionEnabled(name: string): Promise<boolean> {
-    const rows = await this.schemaQuery(
-      `SELECT COUNT(*) AS count FROM pg_extension WHERE extname = $1`,
-      [name],
+    return (
+      (await this.queryValue(
+        `SELECT installed_version IS NOT NULL FROM pg_available_extensions WHERE name = ${this.quote(name)}`,
+        "SCHEMA",
+      )) === true
     );
-    return Number(rows[0].count) > 0;
   }
 
   async extensionAvailable(name: string): Promise<boolean> {
-    const rows = await this.schemaQuery(
-      `SELECT COUNT(*) AS count FROM pg_available_extensions WHERE name = $1`,
-      [name],
+    return (
+      (await this.queryValue(
+        `SELECT true FROM pg_available_extensions WHERE name = ${this.quote(name)}`,
+        "SCHEMA",
+      )) === true
     );
-    return Number(rows[0].count) > 0;
   }
 
   async enableExtension(name: string, _options?: Record<string, unknown>): Promise<void> {
@@ -4079,7 +4081,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const [, unqualifiedNew] = this.extractSchemaQualifiedName(newName);
     this.schemaCache.clearDataSourceCacheBang(this.pool, oldName);
     this.schemaCache.clearDataSourceCacheBang(this.pool, newName);
-    await this.exec(
+    await this.execute(
       `ALTER TABLE ${this.quoteTableName(oldName)} RENAME TO ${this.quoteIdentifier(unqualifiedNew)}`,
     );
     // Rails reads max_identifier_length here, which lazily runs the SHOW query

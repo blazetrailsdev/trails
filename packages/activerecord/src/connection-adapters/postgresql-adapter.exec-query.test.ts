@@ -281,7 +281,7 @@ describe("PostgreSQLAdapter#sqlKey", () => {
   it("setSchemaSearchPath re-scopes the key so no stale statement is reused", async () => {
     // Drive the real setSchemaSearchPath path (which issues SET search_path and
     // updates the memo) and confirm sqlKey tracks the active path end-to-end.
-    vi.spyOn(adapter, "execute").mockResolvedValue(undefined as never);
+    vi.spyOn(adapter, "internalExecute").mockResolvedValue(undefined as never);
 
     await adapter.setSchemaSearchPath("schema_a, public");
     const keyA = sqlKey("SELECT * FROM widgets");
