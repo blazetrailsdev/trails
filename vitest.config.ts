@@ -400,6 +400,12 @@ export default defineConfig({
         resolve: { alias },
         test: {
           name: "other",
+          // Projects do NOT inherit the root `test.globals`, and ESLint's
+          // RuleTester registers its cases through whatever describe/it it
+          // finds on globalThis at import time. Without this, every
+          // eslint/*.test.mjs that drives RuleTester alone registers zero
+          // cases and collects as "No test suite found in file".
+          globals: true,
           include: [
             "packages/*/src/**/*.test.ts",
             "scripts/guides-typecheck/*.test.ts",

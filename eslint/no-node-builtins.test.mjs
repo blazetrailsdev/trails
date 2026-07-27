@@ -104,5 +104,3 @@ tester.run("no-node-builtins", rule, {
     },
   ],
 });
-
-console.log("All tests passed.");

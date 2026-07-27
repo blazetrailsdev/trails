@@ -107,6 +107,21 @@ export default defineConfig(
   eslint.configs.recommended,
   tseslint.configs.recommended,
   {
+    // The rule tests run under vitest, where RuleTester picks up the injected
+    // describe/it globals; the hooks around them are equally global.
+    files: ["eslint/*.test.mjs"],
+    languageOptions: {
+      globals: {
+        describe: "readonly",
+        it: "readonly",
+        beforeEach: "readonly",
+        afterEach: "readonly",
+        beforeAll: "readonly",
+        afterAll: "readonly",
+      },
+    },
+  },
+  {
     plugins: {
       "unused-imports": unusedImports,
     },

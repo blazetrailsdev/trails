@@ -2,8 +2,11 @@ import { RuleTester } from "eslint";
 import rule from "./no-standalone-associations.mjs";
 
 // Point the rule at a non-existent exclude baseline so the committed list
-// never grandfathers these synthetic fixtures.
-process.env.NO_STANDALONE_ASSOCIATIONS_EXCLUDE_PATH = "/nonexistent-exclude.json";
+// never grandfathers these synthetic fixtures. The baseline suite at the
+// bottom of this file overrides it in a nested hook.
+beforeEach(() => {
+  process.env.NO_STANDALONE_ASSOCIATIONS_EXCLUDE_PATH = "/nonexistent-exclude.json";
+});
 
 const FILENAME = "packages/activerecord/src/associations.test.ts";
 
@@ -202,22 +205,33 @@ const baselineTester = new RuleTester({
   },
 });
 
-baselineTester.run("no-standalone-associations (baseline)", rule, {
-  valid: [
-    // Grandfathered site (key present in the baseline) → suppressed.
-    { filename: FILENAME, code: "Associations.hasMany.call(P, 'cs', {});" },
-  ],
-  invalid: [
-    // A different site in the same file (key NOT in the baseline) still fires —
-    // proves suppression is site-granular, not file-wide.
-    {
-      filename: FILENAME,
-      code: "Associations.hasMany.call(P, 'other', {});",
-      errors: [{ messageId: "standaloneNoFix" }],
-    },
-  ],
+// RuleTester registers its cases through describe/it, whose bodies run only
+// after this module has finished evaluating — so the env var cannot be aimed
+// at a baseline at module scope: whichever value it lands on would apply to
+// every case in the file. Each suite points it where it needs through hooks
+// instead, and the tmp file is removed once the cases have actually run.
+describe("with a baseline exclude file", () => {
+  beforeEach(() => {
+    process.env.NO_STANDALONE_ASSOCIATIONS_EXCLUDE_PATH = tmpBaseline;
+  });
+
+  baselineTester.run("no-standalone-associations (baseline)", rule, {
+    valid: [
+      // Grandfathered site (key present in the baseline) → suppressed.
+      { filename: FILENAME, code: "Associations.hasMany.call(P, 'cs', {});" },
+    ],
+    invalid: [
+      // A different site in the same file (key NOT in the baseline) still fires
+      // — proves suppression is site-granular, not file-wide.
+      {
+        filename: FILENAME,
+        code: "Associations.hasMany.call(P, 'other', {});",
+        errors: [{ messageId: "standaloneNoFix" }],
+      },
+    ],
+  });
 });
 
-// Restore the non-existent path so any later import sees a clean slate.
-process.env.NO_STANDALONE_ASSOCIATIONS_EXCLUDE_PATH = "/nonexistent-exclude.json";
-fs.rmSync(tmpBaseline, { force: true });
+afterAll(() => {
+  fs.rmSync(tmpBaseline, { force: true });
+});

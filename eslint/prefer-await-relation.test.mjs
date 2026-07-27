@@ -125,5 +125,3 @@ tester.run("prefer-await-relation", rule, {
     },
   ],
 });
-
-console.log("prefer-await-relation: all tests passed");
