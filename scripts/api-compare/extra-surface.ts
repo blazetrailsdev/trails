@@ -291,6 +291,15 @@ export function allowKeyOf(e: { package: string; tsFile: string; name: string })
  * Keys are deduped: one declaration reaches many hosts (the mixin object, the
  * install site, the auto-synthesized file module), so the same key arrives
  * repeatedly and would otherwise inflate the tag total.
+ *
+ * The key space is shared across declaration kinds by necessity, not accident:
+ * it must equal the key the extra set uses, and `collectTsFileNames` collapses
+ * a file's public surface to a Set of bare NAMES. A static and an instance
+ * method called `helper`, or a class and a member both called `Foo`, are one
+ * extra with one allowed/novel verdict, so at most one reason can ever be
+ * reported for them — namespacing a kind's key would simply stop it matching.
+ * The tie-break is first-push-wins, and members are pushed before the
+ * container so the more specific reason is the one kept.
  */
 export function collectTaggedEntries(ts: ApiManifest): TaggedEntry[] {
   const out: TaggedEntry[] = [];
@@ -309,13 +318,16 @@ export function collectTaggedEntries(ts: ApiManifest): TaggedEntry[] {
     for (const container of [tsPkg.classes, tsPkg.modules]) {
       for (const c of Object.values(container) as ClassInfo[]) {
         if (!c.file || c.reExportedFrom) continue;
+        for (const m of c.instanceMethods) pushMethod(pkg, c.file, m);
+        for (const m of c.classMethods) pushMethod(pkg, c.file, m);
         // The container's OWN name, tagged on the class/interface/namespace
         // declaration itself — the only inline form available to an extra that
         // is a declaration rather than a member (e.g. a class TS must export as
         // a sibling because it cannot nest, re-attached as a static property).
+        // LAST on purpose: a member sharing the container's name occupies the
+        // same key (see the dedup note above — one key is all the extra set
+        // has), so the more specific member reason wins the tie.
         push(pkg, c.file, c.name, c.noRailsEquivalent);
-        for (const m of c.instanceMethods) pushMethod(pkg, c.file, m);
-        for (const m of c.classMethods) pushMethod(pkg, c.file, m);
       }
     }
     for (const [file, fns] of Object.entries(tsPkg.fileFunctions ?? {})) {

@@ -1538,6 +1538,34 @@ describe("collectTaggedEntries", () => {
     ]);
   });
 
+  it("keeps the member's reason when a member shares the container's name", () => {
+    // Both spellings occupy the one key the extra set has for the name, so
+    // only one reason can be reported; the member's is the specific one.
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activerecord: {
+          classes: {
+            Foo: {
+              name: "Foo",
+              file: "foo.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [],
+              classMethods: [{ ...method("Foo"), noRailsEquivalent: "the member reason" }],
+              noRailsEquivalent: "the declaration reason",
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    expect(collectTaggedEntries(ts)).toEqual([
+      { package: "activerecord", tsFile: "foo.ts", name: "Foo", reason: "the member reason" },
+    ]);
+  });
+
   it("collects a tag written on the class declaration itself", () => {
     const ts: ApiManifest = {
       source: "typescript",
