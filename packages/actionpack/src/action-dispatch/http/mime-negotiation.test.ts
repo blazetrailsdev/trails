@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { Request } from "../request.js";
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
 import { paramsReadable, type MimeNegotiationHost } from "./mime-negotiation.js";
 import { ParseError } from "./parameters.js";
@@ -46,5 +47,21 @@ describe("MimeNegotiation.paramsReadable", () => {
       throw new RangeError("not a rescuable mime format error");
     });
     expect(() => paramsReadable.call(host)).toThrow(RangeError);
+  });
+});
+
+describe("MimeNegotiation writers", () => {
+  it("format= forces the format regardless of the path extension", () => {
+    const req = new Request({ PATH_INFO: "/posts/5.html" });
+    req.format = "xml";
+    expect(req.format.toString()).toBe("application/xml");
+    expect(req.params["format"]).toBe("xml");
+  });
+
+  it("formats= sets the ordered list and leaves format as the first entry", () => {
+    const req = new Request({ PATH_INFO: "/posts/5.html" });
+    req.formats = ["json", "xml"];
+    expect(req.formats.map((f) => f.toString())).toEqual(["application/json", "application/xml"]);
+    expect(req.format.toString()).toBe("application/json");
   });
 });

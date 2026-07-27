@@ -54,17 +54,13 @@ export {
 } from "./filter-parameters.js";
 export {
   InvalidType,
+  MimeNegotiation,
   NullType,
-  ignoreAcceptHeader,
-  setIgnoreAcceptHeader,
   contentMimeType,
   hasContentType,
   accepts,
   format,
   formats,
-  setFormat,
-  setFormats,
-  setVariant,
   variant,
   negotiateMime,
   shouldApplyVaryHeader,

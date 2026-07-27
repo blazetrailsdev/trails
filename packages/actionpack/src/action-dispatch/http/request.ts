@@ -24,13 +24,9 @@ import {
   formats as _formats,
   formatFromPathExtension as _formatFromPathExtension,
   hasContentType as _hasContentType,
-  ignoreAcceptHeader as _ignoreAcceptHeader,
+  MimeNegotiation as _MimeNegotiation,
   negotiateMime as _negotiateMime,
   paramsReadable as _paramsReadable,
-  setFormat as _setFormat,
-  setFormats as _setFormats,
-  setIgnoreAcceptHeader as _setIgnoreAcceptHeader,
-  setVariant as _setVariant,
   shouldApplyVaryHeader as _shouldApplyVaryHeader,
   useAcceptHeader as _useAcceptHeader,
   validAcceptHeader as _validAcceptHeader,
@@ -381,27 +377,36 @@ export class Request {
   // Mixed in onto Request.prototype below; declared here for typing.
   declare readonly contentMimeType: MimeType | null;
   declare readonly accepts: MimeType[];
-  declare readonly formats: MimeType[];
   declare hasContentType: () => boolean;
   declare negotiateMime: (order: MimeType[]) => MimeType | NullType | null;
   declare shouldApplyVaryHeader: () => boolean;
-  declare setFormat: (extension: unknown) => void;
-  declare setFormats: (extensions: unknown[]) => void;
+  get format(): MimeType | NullType {
+    return _format.call(mimeHost(this));
+  }
+  set format(extension: unknown) {
+    mimeHost(this).format = extension;
+  }
+  get formats(): MimeType[] {
+    return _formats.call(mimeHost(this));
+  }
+  set formats(extensions: unknown[]) {
+    mimeHost(this).formats = extensions;
+  }
   get variant(): ArrayInquirer<string> & Record<string, () => boolean> {
     return _variant.call(mimeHost(this));
   }
   set variant(value: string | string[] | null | undefined) {
-    _setVariant.call(mimeHost(this), value);
+    mimeHost(this).variant = value;
   }
 
   // Class-level attribute mirroring Rails' `mattr_accessor :ignore_accept_header`.
   // Exposed as a static getter/setter so call sites read as `Request.ignoreAcceptHeader`
   // / `Request.ignoreAcceptHeader = true`.
   static get ignoreAcceptHeader(): boolean {
-    return _ignoreAcceptHeader();
+    return _MimeNegotiation.ignoreAcceptHeader;
   }
   static set ignoreAcceptHeader(value: boolean) {
-    _setIgnoreAcceptHeader(value);
+    _MimeNegotiation.ignoreAcceptHeader = value;
   }
 
   // --- Filter Parameters (ActionDispatch::Http::FilterParameters) ---
@@ -618,11 +623,6 @@ export class Request {
     }
     return {};
   }
-
-  // Mixed in from MimeNegotiation onto the prototype below; declared here
-  // for typing. `setFormat` / `setFormats` / `formats` are declared further
-  // up alongside the rest of the MimeNegotiation surface.
-  declare readonly format: MimeType | NullType;
 
   // --- Server software ---
 
@@ -1103,26 +1103,27 @@ Request.prototype.fresh = _fresh;
 // mixin's `_variant` slot persists across calls. The mixin's getHeader/
 // setHeader semantics treat `undefined` as "not cached" (calls fall through
 // to compute and `setHeader` writes the value, including `null`).
-const MIME_HOSTS = new WeakMap<Request, MimeNegotiationHost>();
-function mimeHost(req: Request): MimeNegotiationHost {
+// The host derives from `MimeNegotiation.prototype` so the module's writers
+// (`variant=` / `format=` / `formats=`, which TypeScript can only spell as
+// `set` accessors) apply to it by plain assignment.
+type MimeHost = MimeNegotiationHost & _MimeNegotiation;
+const MIME_HOSTS = new WeakMap<Request, MimeHost>();
+function mimeHost(req: Request): MimeHost {
   let h = MIME_HOSTS.get(req);
   if (!h) {
-    h = {
-      getHeader: (k) => req.env[k],
-      setHeader: (k, v) => {
-        req.env[k] = v;
-        return v;
+    h = Object.create(_MimeNegotiation.prototype, {
+      getHeader: { value: (k: string) => req.env[k] },
+      setHeader: {
+        value: (k: string, v: unknown) => {
+          req.env[k] = v;
+          return v;
+        },
       },
-      get parameters() {
-        return req.params;
-      },
-      get accept() {
-        return req.accept;
-      },
-      get xhr() {
-        return req.xhr;
-      },
-    };
+      parameters: { get: () => req.params },
+      accept: { get: () => req.accept },
+      xhr: { get: () => req.xhr },
+      _variant: { writable: true, value: undefined },
+    }) as MimeHost;
     MIME_HOSTS.set(req, h);
   }
   return h;
@@ -1139,18 +1140,6 @@ Object.defineProperty(Request.prototype, "accepts", {
   },
   configurable: true,
 });
-Object.defineProperty(Request.prototype, "format", {
-  get(this: Request) {
-    return _format.call(mimeHost(this));
-  },
-  configurable: true,
-});
-Object.defineProperty(Request.prototype, "formats", {
-  get(this: Request) {
-    return _formats.call(mimeHost(this));
-  },
-  configurable: true,
-});
 Request.prototype.hasContentType = function (this: Request) {
   return _hasContentType.call(mimeHost(this));
 };
@@ -1159,12 +1148,6 @@ Request.prototype.negotiateMime = function (this: Request, order: MimeType[]) {
 };
 Request.prototype.shouldApplyVaryHeader = function (this: Request) {
   return _shouldApplyVaryHeader.call(mimeHost(this));
-};
-Request.prototype.setFormat = function (this: Request, extension: unknown) {
-  _setFormat.call(mimeHost(this), extension);
-};
-Request.prototype.setFormats = function (this: Request, extensions: unknown[]) {
-  _setFormats.call(mimeHost(this), extensions);
 };
 
 // Mix in ActionDispatch::Http::FilterParameters. The mixin reads the merged
