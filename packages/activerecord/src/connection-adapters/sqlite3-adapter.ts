@@ -2287,17 +2287,18 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     delete matchOptions.toTable;
     delete matchOptions.validate;
 
+    const { Base } = await import("../base.js");
+    const inferred = String(matchOptions.column ?? "").replace(/_id$/, "");
+    const table = this.schemaStatements().stripTableNamePrefixAndSuffix(
+      toTable ?? (Base.pluralizeTableNames ? pluralize(inferred) : inferred),
+    );
+
     const existingFks = await this.foreignKeys(fromTable);
-    const fkToRemove = existingFks.find((fk) => {
-      const inferred = String(matchOptions.column ?? "").replace(/_id$/, "");
-      const table = this.schemaStatements().stripTableNamePrefixAndSuffix(
-        toTable ?? pluralize(inferred),
-      );
-      return (
+    const fkToRemove = existingFks.find(
+      (fk) =>
         this.schemaStatements().stripTableNamePrefixAndSuffix(fk.toTable) === table &&
-        fk.isDefinedFor(matchOptions)
-      );
-    });
+        fk.isDefinedFor(matchOptions),
+    );
 
     if (!fkToRemove) {
       throw new ArgumentError(
