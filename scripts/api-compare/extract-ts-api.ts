@@ -1400,13 +1400,17 @@ export function noRailsEquivalentReason(node: ts.Node): string | undefined {
     }
     const sf = node.getSourceFile();
     const line = sf.getLineAndCharacterOfPosition(tag.getStart()).line + 1;
-    const inlineTag = inlineTagAfter(tag);
-    if (inlineTag !== undefined) {
+    const proseTag = proseTagAfter(tag);
+    if (proseTag !== undefined) {
       throw new Error(
-        `@noRailsEquivalent reason is truncated by a bare \`@${inlineTag}\` in its ` +
+        `@noRailsEquivalent reason is truncated by a bare \`@${proseTag.name}\` in its ` +
           `prose: ${sf.fileName}:${line} — TypeScript parses it as a real JSDoc tag, ` +
           "so the reason is cut short and the declaration can drop out of the " +
-          "compared surface entirely. Reword the prose to avoid the tag form.",
+          "compared surface entirely. Reword the prose to avoid the tag form" +
+          (proseTag.lineLeading
+            ? `, or — if the \`@${proseTag.name}\` is deliberate — move it above ` +
+              "`@noRailsEquivalent`, which every deliberate tag of its kind must precede."
+            : "."),
       );
     }
     return reason;
@@ -1415,30 +1419,63 @@ export function noRailsEquivalentReason(node: ts.Node): string | undefined {
 }
 
 /**
- * Name of the first JSDoc tag that follows `tag` in the same comment while
- * starting mid-line — i.e. a bare `@word` written inside reason prose rather
- * than a deliberate tag on its own line. TypeScript parses either shape as a
- * real tag, which silently truncates the reason (and, for `@internal`, drops
- * the declaration from the extracted surface). Returns undefined when every
- * following tag starts its own line: a line-leading tag can't be told apart
- * from a deliberate one, and `@internal` next to `@noRailsEquivalent` is a real
- * pairing in the tree (schema-cache.ts `recordTouchedTables`), so only the
- * mid-line shape is judged a mistake.
+ * Tags a deliberate JSDoc block may legitimately carry *after*
+ * `@noRailsEquivalent`: the structural ones that document the signature and
+ * conventionally trail the description. Every other tag name after the reason
+ * is prose that TypeScript mis-parsed — see `proseTagAfter`.
  */
-function inlineTagAfter(tag: ts.JSDocTag): string | undefined {
+const TAGS_ALLOWED_AFTER_NO_RAILS_EQUIVALENT = new Set([
+  "param",
+  "returns",
+  "return",
+  "throws",
+  "example",
+  "see",
+  "template",
+  "typeParam",
+  "yields",
+  "defaultValue",
+  "remarks",
+  "deprecated",
+]);
+
+/**
+ * The first JSDoc tag that follows `tag` in the same comment and is a bare
+ * `@word` from the reason prose rather than a deliberate tag. TypeScript parses
+ * either shape as a real tag, which silently truncates the reason (and, for
+ * `@internal`, drops the declaration from the extracted surface).
+ *
+ * A mid-line tag is prose by construction. A *line-leading* one is textually
+ * identical to a deliberate tag, so it is judged by name: the structural tags
+ * in `TAGS_ALLOWED_AFTER_NO_RAILS_EQUIVALENT` are accepted, and anything else
+ * — `@internal` above all — is prose that wrapped onto a continuation line.
+ * That makes tag order load-bearing: a deliberate `@internal` must precede
+ * `@noRailsEquivalent`, as schema-cache.ts `recordTouchedTables` already
+ * writes it. `lineLeading` rides along so the caller can point at the fix that
+ * actually applies.
+ */
+function proseTagAfter(tag: ts.JSDocTag): { name: string; lineLeading: boolean } | undefined {
   const jsDoc = tag.parent;
   if (!ts.isJSDoc(jsDoc) || jsDoc.tags === undefined) return undefined;
   const text = jsDoc.getSourceFile().text;
   for (const other of jsDoc.tags) {
     if (other.getStart() <= tag.getStart()) continue;
-    let i = other.getStart() - 1;
-    while (i >= 0 && text[i] !== "\n") {
-      const ch = text[i];
-      if (ch !== " " && ch !== "\t" && ch !== "*") return other.tagName.text;
-      i--;
+    const name = other.tagName.text;
+    const lineLeading = isLineLeading(text, other.getStart());
+    if (!lineLeading || !TAGS_ALLOWED_AFTER_NO_RAILS_EQUIVALENT.has(name)) {
+      return { name, lineLeading };
     }
   }
   return undefined;
+}
+
+/** True when only comment-frame padding (`*`, spaces, tabs) precedes `pos` on its line. */
+function isLineLeading(text: string, pos: number): boolean {
+  for (let i = pos - 1; i >= 0 && text[i] !== "\n"; i--) {
+    const ch = text[i];
+    if (ch !== " " && ch !== "\t" && ch !== "*") return false;
+  }
+  return true;
 }
 
 /**

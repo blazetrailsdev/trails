@@ -1615,6 +1615,36 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     ).toThrow(/truncated by a bare `@internal`/);
   });
 
+  it("throws when a prose tag name wraps onto the start of a continuation line", () => {
+    expect(() =>
+      extractFromSource(`
+        class Foo {
+          /**
+           * @noRailsEquivalent wiring seam; the method is real Rails-facing
+           * @internal is the wrong tool here because callers depend on it.
+           */
+          initializeAssociations(): void {}
+        }
+      `),
+    ).toThrow(/truncated by a bare `@internal`.*move it above `@noRailsEquivalent`/s);
+  });
+
+  it("accepts a deliberate @internal placed above @noRailsEquivalent", () => {
+    const foo = extractFromSource(`
+      class Foo {
+        /**
+         * @internal
+         *
+         * @noRailsEquivalent test-harness ledger with no Rails counterpart
+         */
+        recordTouchedTables(): void {}
+      }
+    `);
+    expect(
+      foo.instanceMethods.find((m) => m.name === "recordTouchedTables")!.noRailsEquivalent,
+    ).toBe("test-harness ledger with no Rails counterpart");
+  });
+
   it("accepts a following tag that starts its own line", () => {
     const foo = extractFromSource(`
       class Foo {
