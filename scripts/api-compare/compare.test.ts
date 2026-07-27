@@ -16,6 +16,8 @@ import {
   significantMissingCalls,
   jsEnumerableAliases,
   JS_ENUMERABLE_ALIASES,
+  NEGATED_ALIASES,
+  partitionNegatedCalls,
   WIDE_SIGNIFICANT_CALLS,
   WIDE_NO_JS_CALL_FORM,
   isDelegatingWrapper,
@@ -357,6 +359,52 @@ describe("significantMissingCalls", () => {
         wide,
       );
       expect(missing).toEqual(["any? → isAny|any"]);
+    });
+
+    it("does not flag exclude?/none? when the TS body negates the analogue", () => {
+      // ActiveSupport's `exclude?` is `!include?` and `none?` is `!any?`, so
+      // the faithful port is the NEGATED call — the form the extractor records
+      // with the `!` marker.
+      const missing = significantMissingCalls(
+        "check",
+        ["exclude?", "none?"],
+        new Set(["includes", "some"]),
+        () => true,
+        rubyMethodToTs,
+        wide,
+        jsEnumerableAliases,
+        new Set(["includes", "some"]),
+      );
+      expect(missing).toEqual([]);
+    });
+
+    it("flags exclude?/none? when the TS body makes the analogue UNnegated", () => {
+      // The inverted condition: `xs.includes(y)` where Rails wrote `exclude?`.
+      const missing = significantMissingCalls(
+        "check",
+        ["exclude?", "none?"],
+        new Set(["includes", "some"]),
+        () => true,
+        rubyMethodToTs,
+        wide,
+      );
+      expect(missing).toEqual(["exclude? → isExclude|exclude|excludes", "none? → isNone|none"]);
+    });
+
+    it("marks only aliases the alias table itself lists", () => {
+      for (const [rubyCall, negated] of NEGATED_ALIASES) {
+        const aliases = JS_ENUMERABLE_ALIASES.get(rubyCall) ?? [];
+        expect({ rubyCall, unknown: [...negated].filter((a) => !aliases.includes(a)) }).toEqual({
+          rubyCall,
+          unknown: [],
+        });
+      }
+    });
+
+    it("partitions the extractor's negation markers out of the plain call-set", () => {
+      const { calls, negated } = partitionNegatedCalls(["includes", "!includes", "map"]);
+      expect([...calls].sort()).toEqual(["includes", "map"]);
+      expect([...negated]).toEqual(["includes"]);
     });
 
     it("aliases never widen which calls are considered ported", () => {

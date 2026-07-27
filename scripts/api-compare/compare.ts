@@ -105,7 +105,13 @@ import {
   displayLiteral,
 } from "./literals.js";
 import { isSourceUnported } from "./unported-files.js";
-import { JS_ENUMERABLE_ALIASES, jsEnumerableAliases } from "./enumerable-idioms.js";
+import {
+  JS_ENUMERABLE_ALIASES,
+  jsEnumerableAliases,
+  NEGATED_ALIASES,
+  partitionNegatedCalls,
+  requiresNegatedAlias,
+} from "./enumerable-idioms.js";
 
 // Fidelity-critical Ruby calls for the advisory calls-parity check. Omitting
 // one of these from a ported body is almost always a real bug (callback /
@@ -215,7 +221,7 @@ export const WIDE_SIGNIFICANT_CALLS: { has(value: string): boolean } = {
 
 // Re-exported from the shared idiom table so existing importers (compare.test.ts,
 // the redundancy guard) keep resolving these names from compare.ts.
-export { JS_ENUMERABLE_ALIASES, jsEnumerableAliases };
+export { JS_ENUMERABLE_ALIASES, jsEnumerableAliases, NEGATED_ALIASES, partitionNegatedCalls };
 
 /**
  * Core of the advisory calls-parity check (pure, exported for tests). For a
@@ -241,6 +247,7 @@ export function significantMissingCalls(
   mapCall: (rubyCall: string) => string[] | null = rubyMethodToTs,
   significant: { has(value: string): boolean } = SIGNIFICANT_CALLS,
   aliasCall: (rubyCall: string) => string[] = jsEnumerableAliases,
+  negatedTsCalls: Set<string> = new Set(),
 ): string[] {
   const missing: string[] = [];
   for (const rc of rubyCalls) {
@@ -264,7 +271,15 @@ export function significantMissingCalls(
     if (!mapped || mapped.length === 0) continue;
     if (!mapped.some(isPortedWithArgs)) continue;
     if (mapped.some((c) => tsCalls.has(c))) continue;
-    if (aliasCall(rc).some((c) => tsCalls.has(c))) continue;
+    // A NEGATED alias (`exclude? → includes`) is matched against the negated
+    // call-set: a bare `xs.includes(y)` where Rails wrote `exclude?` is the
+    // inverted condition, and must not silence the ratchet. Direct aliases —
+    // including `none? → every`, whose de-Morgan port negates inside the
+    // callback — keep matching the plain call-set (see NEGATED_ALIASES).
+    const aliasMatched = aliasCall(rc).some((c) =>
+      requiresNegatedAlias(rc, c) ? negatedTsCalls.has(c) : tsCalls.has(c),
+    );
+    if (aliasMatched) continue;
     missing.push(`${rc} → ${mapped.join("|")}`);
   }
   return missing;
@@ -1165,6 +1180,9 @@ export function main() {
     // per-file scoping above is what keeps same-named methods on unrelated
     // classes from cross-satisfying.
     const tsCallsByName = new Map<string, Set<string>>();
+    // Same population as tsCallsByName, but the calls the extractor saw NEGATED
+    // (`!xs.includes(y)`), with the marker prefix stripped.
+    const tsNegatedCallsByName = new Map<string, Set<string>>();
     const recordTsParams = (m: MethodInfo, file = m.file ?? "") => {
       const sigs = tsParamsByName.get(m.name) ?? [];
       sigs.push(m.params);
@@ -1181,9 +1199,13 @@ export function main() {
         const byName = tsCallsByFileName.get(file) ?? new Map<string, string[][]>();
         byName.set(m.name, [...(byName.get(m.name) ?? []), m.calls]);
         tsCallsByFileName.set(file, byName);
+        const { calls, negated } = partitionNegatedCalls(m.calls);
         const union = tsCallsByName.get(m.name) ?? new Set<string>();
-        for (const c of m.calls) union.add(c);
+        for (const c of calls) union.add(c);
         tsCallsByName.set(m.name, union);
+        const negatedUnion = tsNegatedCallsByName.get(m.name) ?? new Set<string>();
+        for (const c of negated) negatedUnion.add(c);
+        tsNegatedCallsByName.set(m.name, negatedUnion);
       }
     };
 
@@ -1608,9 +1630,14 @@ export function main() {
         if (!tsCandidateSets || tsCandidateSets.length === 0) return;
         // Delegation transparency: a one-line forwarder is compared against the
         // call-set of the method it forwards to (see effectiveTsCalls).
-        const tsCalls = effectiveTsCalls(tsName, new Set(tsCandidateSets.flat()), (n) =>
-          tsCallsByName.get(n),
-        );
+        const own = partitionNegatedCalls(tsCandidateSets.flat());
+        const tsCalls = effectiveTsCalls(tsName, own.calls, (n) => tsCallsByName.get(n));
+        // A wrapper compared against its delegate's calls inherits its negated
+        // ones too, or the delegate's `!xs.includes(y)` would not count.
+        const negatedTsCalls = new Set(own.negated);
+        if (isDelegatingWrapper(tsName, own.calls)) {
+          for (const c of tsNegatedCallsByName.get(tsName) ?? []) negatedTsCalls.add(c);
+        }
         callsCompared++;
         const missing = significantMissingCalls(
           rubyName,
@@ -1622,6 +1649,8 @@ export function main() {
           (c) => (tsParamsByName.get(c) ?? []).some((sig) => stripThis(sig).length > 0),
           rubyMethodToTs,
           callsSignificant,
+          jsEnumerableAliases,
+          negatedTsCalls,
         );
         if (missing.length === 0) return;
         callMismatches.push({ rubyFile, tsFile, rubyName, tsName, missing });

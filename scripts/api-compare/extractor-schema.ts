@@ -41,7 +41,7 @@ import { hashParts } from "./shared-cache.js";
  * ADDITIONS bump the token on their own (via {@link EXTRACTOR_OUTPUT_FIELDS} and
  * the source-hash inputs), so you rarely need to touch this by hand.
  */
-export const SCHEMA_VERSION_BASE = 8;
+export const SCHEMA_VERSION_BASE = 9;
 
 /**
  * Every per-method field the extractor can emit (mirrors `MethodInfo` in
