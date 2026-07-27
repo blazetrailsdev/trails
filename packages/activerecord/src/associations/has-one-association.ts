@@ -1,13 +1,12 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
-import { loadHasOne } from "../associations.js";
 import { DeleteRestrictionError, HasOnePersistedAssignmentError } from "./errors.js";
 import { RecordNotSaved } from "../errors.js";
 import { underscore } from "@blazetrails/activesupport";
 import { reflectOnAllAssociations } from "../reflection.js";
 import { ForeignAssociation, foreignKeyPresentFor } from "./foreign-association.js";
 import type { AssociationReflection } from "../reflection.js";
-import { SingularAssociation } from "./singular-association.js";
+import { findTarget, SingularAssociation } from "./singular-association.js";
 import { polymorphicName } from "../inheritance.js";
 
 /**
@@ -456,7 +455,7 @@ export class HasOneAssociation extends SingularAssociation {
     // See `Association#_loaderWritebackSuppressed`.
     this._loaderWritebackSuppressed++;
     try {
-      return await loadHasOne(this.owner, this.reflection.name, this.reflection.options);
+      return await findTarget(this.owner, this.reflection.name, this.reflection.options, "hasOne");
     } finally {
       this._loaderWritebackSuppressed--;
     }

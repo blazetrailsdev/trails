@@ -17,7 +17,6 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import { findTarget } from "./singular-association.js";
 import { registerModel, registerSubclass } from "../index.js";
-import { loadHasOne } from "../associations.js";
 import { findTarget as findHasManyTarget } from "./has-many-association.js";
 import { AssociationScope } from "./association-scope.js";
 import { StatementCache } from "../statement-cache.js";
@@ -128,13 +127,13 @@ describe("Association scope cache", () => {
 
     const spy = vi.spyOn(StatementCache, "create");
 
-    const r1 = await findTarget(p1, "author", opts);
+    const r1 = await findTarget(p1, "author", opts, "belongsTo");
     expect((r1 as any)?.id).toBe(authors("david").id);
     const afterFirst = spy.mock.calls.length;
     expect(afterFirst).toBe(1);
 
     // Second owner's load reuses the cached statement — no recompile.
-    const r2 = await findTarget(p2, "author", opts);
+    const r2 = await findTarget(p2, "author", opts, "belongsTo");
     expect((r2 as any)?.id).toBe(authors("bob").id);
     expect(spy.mock.calls.length).toBe(afterFirst);
   });
@@ -184,14 +183,14 @@ describe("Association scope cache — through singular loads", () => {
 
     const spy = vi.spyOn(StatementCache, "create");
 
-    const c1 = await loadHasOne(groucho, "club", { through: "currentMembership" });
+    const c1 = await findTarget(groucho, "club", { through: "currentMembership" }, "hasOne");
     expect((c1 as any)?.id).toBe(clubs("boring_club").id);
     const afterFirst = spy.mock.calls.length;
     expect(afterFirst).toBe(1);
 
     // Second owner's load reuses the compiled statement — no recompile — and
     // still resolves through its OWN current membership.
-    const c2 = await loadHasOne(blarpy, "club", { through: "currentMembership" });
+    const c2 = await findTarget(blarpy, "club", { through: "currentMembership" }, "hasOne");
     expect((c2 as any)?.id).toBe(clubs("outrageous_club").id);
     expect(spy.mock.calls.length).toBe(afterFirst);
   });

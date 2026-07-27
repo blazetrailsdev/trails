@@ -49,7 +49,6 @@ export {
   Associations,
   registerModel,
   modelRegistry,
-  loadHasOne,
   association,
   isAssociationCached,
   eagerLoadBang,

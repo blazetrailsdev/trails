@@ -16,7 +16,6 @@ import { HasManyThroughAssociation } from "./has-many-through-association.js";
 import { HasOneAssociation } from "./has-one-association.js";
 import { HasOneThroughAssociation } from "./has-one-through-association.js";
 import {
-  loadHasOne as _loadHasOneOnce,
   _associationNotFound,
   _preloadedHolderTarget,
   type AssociationDefinition as AssocDef,
@@ -155,7 +154,7 @@ export function association(this: Base, name: string): AssociationInstance {
 export async function loadBelongsTo(this: Base, name: string): Promise<Base | null> {
   const assocDef = assertSingularAssociation.call(this, name, "belongsTo");
   const result = await bypassStrictLoading.call(this, () =>
-    findTarget(this, name, (assocDef.options ?? {}) as any),
+    findTarget(this, name, (assocDef.options ?? {}) as any, "belongsTo"),
   );
   // Loader writeback: this is the tail of this function's own query, not a
   // caller replacing the target. See Association#_setTargetFromLoader.
@@ -173,7 +172,7 @@ export async function loadBelongsTo(this: Base, name: string): Promise<Base | nu
 export async function loadHasOne(this: Base, name: string): Promise<Base | null> {
   const assocDef = assertSingularAssociation.call(this, name, "hasOne");
   const result = await bypassStrictLoading.call(this, () =>
-    _loadHasOneOnce(this, name, (assocDef.options ?? {}) as any),
+    findTarget(this, name, (assocDef.options ?? {}) as any, "hasOne"),
   );
   // Loader writeback: this is the tail of this function's own query, not a
   // caller replacing the target. See Association#_setTargetFromLoader.
