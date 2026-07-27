@@ -83,3 +83,33 @@ describe("NamingTest (Admin::User model_name)", () => {
     expect(AdminUser.modelName.paramKey).toBe("user");
   });
 });
+
+// A name guard (`row[type] !== this.name`) mis-fires for every namespaced STI
+// row, because `sti_name` never equals the flattened JS class name. That was
+// latent while a second hydration path absorbed it; with one path the identity
+// guard is what makes re-entry terminate, so both halves are pinned here.
+describe("namespaced STI hydration goes through the single instantiate path", () => {
+  fixtures([]);
+
+  it("terminates on the namespaced subclass instead of re-dispatching", () => {
+    const record = ClothingItemSized._instantiate({
+      id: "5",
+      clothing_type: "pants",
+      color: "blue",
+      size: "M",
+      type: "ClothingItem::Sized",
+    });
+
+    expect(record).toBeInstanceOf(ClothingItemSized);
+    expect(record.id).toBe(5);
+  });
+
+  it("keeps a projected row without the inheritance column on the receiver", () => {
+    // `discriminateClassForRecord` runs against `this`, as in Rails, not
+    // `base_class` — otherwise a SELECT that omits `type` would demote the
+    // subclass receiver to the STI base.
+    const record = ClothingItemUsed._instantiate({ id: "7", clothing_type: "pants" });
+
+    expect(record).toBeInstanceOf(ClothingItemUsed);
+  });
+});

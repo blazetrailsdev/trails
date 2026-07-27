@@ -8,7 +8,7 @@ import type { Base } from "./base.js";
 import { modelRegistry } from "./associations.js";
 import { ActiveRecordError, NameError, SubclassNotFound } from "./errors.js";
 import { camelize, isPresent, underscore } from "@blazetrails/activesupport";
-import { ArgumentError, runAfterCallbacksOnProto } from "@blazetrails/activemodel";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { applicationRecordClass, setApplicationRecordClass } from "./ar-config.js";
 
 /**
@@ -524,7 +524,7 @@ export function findStiClass(baseClass: typeof Base, typeName: string): typeof B
  * regardless of STI, matching the net result of Rails'
  * `instantiate_instance_of`. (Rails narrows in `build_from_database` before
  * `discriminate_class_for_record`; trails resolves the STI subclass first in
- * `instantiateSti` and narrows here per concrete class — same end state.)
+ * `_instantiate` and narrows here per concrete class — same end state.)
  *
  * `column_names` is the right narrowing set here: in trails every declared
  * attribute is a real DB column (an `attribute()` with no backing column fails
@@ -656,93 +656,6 @@ export function defineDynamicSelectReaders(record: Base): void {
       writable: false,
     });
   }
-}
-
-/**
- * Directly instantiate a record without STI delegation (avoids recursion).
- */
-function directInstantiate(
-  klass: typeof Base,
-  row: Record<string, unknown>,
-  block?: (record: Base) => void,
-  columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-  overrideTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-): Base {
-  const hadOwnSuppress = Object.prototype.hasOwnProperty.call(klass, "_suppressInitializeCallback");
-  const prevSuppress = klass._suppressInitializeCallback;
-  klass._suppressInitializeCallback = true;
-  const hadOwnAbstractSuppress = Object.prototype.hasOwnProperty.call(
-    klass,
-    "_suppressAbstractCheck",
-  );
-  const prevAbstractSuppress = (klass as any)._suppressAbstractCheck;
-  (klass as any)._suppressAbstractCheck = true;
-  let record: Base;
-  try {
-    record = new klass();
-  } finally {
-    if (hadOwnSuppress) {
-      klass._suppressInitializeCallback = prevSuppress;
-    } else {
-      delete (klass as any)._suppressInitializeCallback;
-    }
-    if (hadOwnAbstractSuppress) {
-      (klass as any)._suppressAbstractCheck = prevAbstractSuppress;
-    } else {
-      delete (klass as any)._suppressAbstractCheck;
-    }
-  }
-  // Load DB values through deserialize (not the user cast) so encrypted types
-  // decrypt and raw DB representations (e.g. an enum's integer `0`) are accepted
-  // — mirrors the non-STI Base._instantiate path. Building via `new klass(row)`
-  // instead ran every column through the user cast, which rejects raw DB values.
-  for (const [key, value] of Object.entries(row)) {
-    const override = overrideTypes?.[key];
-    if (override) {
-      record._attributes.overrideFromDatabase(key, value, override);
-    } else {
-      record._attributes.writeFromDatabase(key, value, columnTypes?.[key]);
-    }
-  }
-  narrowToProjectedColumns(klass, record, row, overrideTypes);
-  defineDynamicSelectReaders(record);
-  record._newRecord = false;
-  (record as any)._dirty.snapshot(record._attributes);
-  record.changesApplied();
-  if ((klass as any)._strictLoadingByDefault) {
-    (record as any)._strictLoading = true;
-  }
-  // Rails' init_with_attributes yields to the loader block (inverse wiring)
-  // before firing after_find then after_initialize.
-  block?.(record);
-  // strict:"sync" guarantees synchronous completion — void the settled result.
-  void runAfterCallbacksOnProto((klass as any).prototype, "find", record, { strict: "sync" });
-  void runAfterCallbacksOnProto((klass as any).prototype, "initialize", record, { strict: "sync" });
-  return record;
-}
-
-/**
- * Instantiate the correct STI subclass from a database row.
- *
- * Mirrors Rails' single STI dispatch path: `instantiate` →
- * `discriminate_class_for_record` → `find_sti_class`. The class decision lives
- * entirely in {@link discriminateClassForRecord}; this wrapper only constructs
- * the resolved class.
- */
-export function instantiateSti(
-  baseClass: typeof Base,
-  row: Record<string, unknown>,
-  block?: (record: Base) => void,
-  columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-  overrideTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-): Base {
-  return directInstantiate(
-    discriminateClassForRecord(baseClass, row),
-    row,
-    block,
-    columnTypes,
-    overrideTypes,
-  );
 }
 
 // ---------------------------------------------------------------------------

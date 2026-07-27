@@ -40,8 +40,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 import type { Relation } from "./relation.js";
 import {
-  getStiBase,
-  instantiateSti,
+  discriminateClassForRecord,
   stiName,
   polymorphicName as inheritancePolymorphicName,
   computeType as inheritanceComputeType,
@@ -2942,18 +2941,15 @@ export class Base extends Model {
     columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
     overrideTypes?: Record<string, { deserialize(value: unknown): unknown }>,
   ): InstanceType<T> {
-    // Delegate to the correct STI subclass when the row carries a present
-    // inheritance-column value that names a different class. `inheritance_column`
-    // resolves to a name (default "type") unless STI is disabled; a present `row[inheritanceCol]`
-    // key proves the column is a real attribute (Rails' `_has_attribute?`), so no
-    // `stiEnabled` short-circuit is needed — instantiateSti resolves within the
-    // base's own tracked subtree and is a no-op for plain models with a stray
-    // `type` column.
-    const stiBase = getStiBase(this);
-    const inheritanceCol = stiBase.inheritanceColumn;
-    if (inheritanceCol !== null && row[inheritanceCol] && row[inheritanceCol] !== this.name) {
-      return instantiateSti(
-        stiBase,
+    // Guard on class identity, not on `row[type] !== this.name`: the stored value
+    // is `sti_name`, which for a `store_full_sti_class` namespaced model
+    // ("ClothingItem::Used") never equals the flattened JS class name
+    // (`ClothingItemUsed`). Re-entry terminates because the resolution is
+    // idempotent. Receiver is `this`, as in Rails, not `base_class` — a projected
+    // row that omits the inheritance column must stay on the receiver.
+    const klass = discriminateClassForRecord(this, row);
+    if (klass !== this) {
+      return klass._instantiate(
         row,
         block as ((record: Base) => void) | undefined,
         columnTypes,

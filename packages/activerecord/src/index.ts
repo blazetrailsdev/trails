@@ -135,7 +135,7 @@ export {
 } from "./ar-config.js";
 export { defineEnum, readEnumValue, castEnumValue } from "./enum.js";
 export type { EnumMacroOptions } from "./enum.js";
-export { instantiateSti, registerSubclass, findStiClass } from "./inheritance.js";
+export { registerSubclass, findStiClass } from "./inheritance.js";
 // hasSecurePassword requires node:crypto — use subpath: @blazetrails/activerecord/secure-password
 // CounterCache, ReadonlyAttributes, Timestamp, Locking::Pessimistic, and
 // Translation are consumed via the Base mixins — class methods like
