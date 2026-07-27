@@ -20,6 +20,7 @@ import {
 } from "../ar-config.js";
 import { resetTestAdapterState } from "../test-adapter.js";
 import { shouldSkipGlobalReset } from "../support/skip-global-reset.js";
+import { registerFakeAdapter } from "../support/fake-adapter.js";
 import { Configurable as EncryptionConfigurable } from "../encryption/configurable.js";
 import { installExtendedQueriesIfConfigured } from "../encryption/install.js";
 import {
@@ -33,6 +34,11 @@ import {
 // stays true). Use the versioned-defaults mechanism rather than poking Base
 // directly; this exercises the real code path that a consuming app would use.
 loadDefaults("7.0");
+
+// Mirror Rails activerecord/test/cases/helper.rb:46 — register the fake adapter
+// for the whole suite, before any model calls establish_connection(adapter:
+// "fake") at load time (test/models/contact.rb:6).
+registerFakeAdapter();
 
 // Mirror Rails activerecord/test/cases/helper.rb:29 — ban delegating a
 // relation/collection-proxy call into an `ActiveRecord::Base` method suite-wide
