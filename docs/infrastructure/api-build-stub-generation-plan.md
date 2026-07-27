@@ -283,15 +283,33 @@ report). They therefore share:
   reason it is em-dash-separated (`@missingRailsCall` takes a Ruby call name
   as that token, `@noRailsEquivalent` takes none); continuation lines with no
   `@` attach to the preceding tag, so long curated reasons survive verbatim.
-  An empty reason is an error in both.
-- **Parser toolchain** — `ts.getJSDocTags` in `extract-ts-api.ts`, the same
-  pass that already reads `@internal`.
 - **Structural advantage over the JSON baselines** — the justification
   travels with the declaration across renames and file moves; there is no
   `package + tsFile + name` key to go stale for path reasons.
 - **Only-shrink gating** — a tag whose condition no longer holds (the call is
   now made; the extra is no longer extra) fails the run exactly as a stale
   JSON row does today, and the fix is deleting the tag next to the code.
+
+Two things are deliberately **not** shared, and the difference is load-bearing:
+
+- **Reader.** `@noRailsEquivalent` is read through `ts.getJSDocTags`
+  (`noRailsEquivalentReason` in `extract-ts-api.ts:1352`), the same pass that
+  already reads `@internal`, because the extractor only needs the flattened
+  prose. `@missingRailsCall` is read by `parseJsdoc`'s line regex over the raw
+  comment text (`TAG_LINE`, `build.ts:78`) because `api:build` must **write**
+  the block back: it keeps each tag's `rawLines` verbatim so an unchanged tag
+  round-trips byte-for-byte, which is what makes a re-run with no diff a no-op.
+  A flattened AST read cannot reproduce the original wrapping, so the two
+  readers stay distinct.
+- **Empty-reason handling.** An empty `@noRailsEquivalent` reason is a hard
+  extraction-time error (`extract-ts-api.ts:1356`): the tag is the only thing
+  standing between a name and the extra-surface count, so an unjustified one
+  would suppress drift with no argument for it.
+  `@missingRailsCall` parses a bare tag as `reason: ""` (`build.ts:97`) —
+  reconcile then fills the reason from the curated baseline row or the
+  placeholder, so an empty one is an input state, not an error. Nothing in
+  this section changes that; tightening it would be a change to `api:build`,
+  which RFC 0080 lists as a non-goal.
 
 ### `@noRailsEquivalent` vs `@internal`
 
