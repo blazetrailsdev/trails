@@ -51,6 +51,7 @@ export {
 } from "./migration/compatibility.js";
 
 import { ActiveRecordError } from "./errors.js";
+import { ActiveRecord } from "./ar-config.js";
 
 // Mirrors Rails AbstractAdapter#extract_new_comment_value (alias of extract_new_default_value).
 // For {from,to} hashes, returns `to` (which may be null to clear a comment).
@@ -1509,7 +1510,9 @@ export abstract class Migration {
   }
 
   static async maintainTestSchemaBang(): Promise<void> {
-    await this.checkPendingMigrations();
+    if (ActiveRecord.maintainTestSchema) {
+      await this.loadSchemaIfPendingBang();
+    }
   }
 
   /** @internal */
