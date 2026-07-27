@@ -308,6 +308,35 @@ Different claims, deliberately kept distinct:
 Reaching for `@internal` to silence an extra that is public by design is a
 lie rather than a fix; that is what the sibling tag exists for.
 
+### The bar: matching Rails is the goal; the tag is the last resort
+
+Both tags in this family exist to **document** a gap, never to bless one.
+Trails' end goal is fidelity — same names, same file layout, same behavior as
+Rails — and every `@noRailsEquivalent` in the tree is surface a Rails user
+would not recognize. The tag is warranted only when the extra exists because
+the host language or runtime cannot express what Rails does in Ruby: no
+`const_missing`/autoload, so a registration seam is needed; promises rather
+than blocking IO, so a `catch`/`finally` pair appears on a thenable; JS
+iteration protocols (`[Symbol.iterator]`) standing in for `Enumerable`. The
+reason prose must say which limitation forces the extra, in those terms.
+
+It is **not** for:
+
+- **Convenience.** A nicer API than Rails offers is still a deviation. If it
+  is genuinely valuable, it belongs in a deliberate, RFC-tracked deviation —
+  not smuggled in behind a tag.
+- **Deferred work.** A tag is not a parking spot for surface that ought to
+  converge onto a Rails method later. Converge it now or leave it flagged as
+  an extra; an allowlist entry standing in for unconverged work is exactly
+  the debt the gate is meant to surface.
+- **Silencing a mismatch.** If Rails has the method under a different name or
+  spelling, the fix is the candidate-name mapping in `conventions.ts`, not a
+  tag — the method is not novel, so the tag's claim would be false.
+
+The `api:extra` report keeps tagged extras **visible** in the `Allowed`
+column precisely so the population stays auditable and can shrink; a tag that
+hid them would defeat the purpose.
+
 ### Scope rule: novel extras only
 
 `@noRailsEquivalent` applies to justified **novel** extras — surface with no
