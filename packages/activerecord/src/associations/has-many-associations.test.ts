@@ -6572,16 +6572,17 @@ describe("HasManyAssociationsTest", () => {
     const bad = new Client({ name: "Bad" });
     bad.raiseOnSave = true;
 
-    const firm = companies("first_firm") as any;
-    await firm.clientsOfFirm.replace([good]);
+    await (companies("first_firm") as any).clientsOfFirm.replace([good]);
 
     try {
-      await firm.clientsOfFirm.replace([bad]);
+      await (companies("first_firm") as any).clientsOfFirm.replace([bad]);
     } catch (error) {
       if (!(error instanceof Client.RaisedOnSave)) throw error;
     }
 
-    expect((await firm.clientsOfFirm.reload()).map(recordId)).toEqual([recordId(good)]);
+    expect((await (companies("first_firm") as any).clientsOfFirm.reload()).map(recordId)).toEqual([
+      recordId(good),
+    ]);
   });
 
   it("transactions when replacing on new record", async () => {
