@@ -85,6 +85,7 @@ import type {
   Table,
   ForeignKeyDefinition,
   IndexDefinition,
+  CreateIndexDefinition,
   AddForeignKeyOptions,
   ForeignKeyLookupOptions,
   AddIndexOptions,
@@ -264,6 +265,19 @@ export interface AbstractAdapter {
     columnName: string | string[],
     options?: Record<string, unknown>,
   ): Promise<[IndexDefinition, string | undefined, boolean]>;
+  /**
+   * Concrete adapters may return `undefined` (MySQL short-circuits
+   * `ifNotExists` when the index already exists); the SchemaStatements base
+   * always returns a definition.
+   * @internal
+   */
+  buildCreateIndexDefinition(
+    tableName: string,
+    columnName: string | string[],
+    options?: Record<string, unknown>,
+  ): Promise<CreateIndexDefinition | undefined>;
+  /** @internal */
+  indexAlgorithm(algorithm?: string): string | undefined;
   /** @internal */
   quotedColumnsForIndex(columnNames: string[], options?: Record<string, unknown>): string;
   /** @internal */

@@ -4129,69 +4129,29 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       comment?: string;
     } = {},
   ): Promise<void> {
-    const cols = Array.isArray(columns) ? columns : [columns];
-    const quotedTable = this.quoteTableName(tableName);
+    // Mirrors PostgreSQL::SchemaStatements#add_index: the CREATE INDEX statement
+    // is rendered by the schema-creation visitor off a CreateIndexDefinition
+    // rather than string-built here. The `algorithm: :copy` ArgumentError comes
+    // from index_algorithm inside add_index_options.
+    //
+    // Priming the cached database version is a trails addition: the visitor's
+    // supportsNullsNotDistinct/supportsIndexInclude predicates read
+    // `databaseVersion` synchronously and silently yield false on a cold
+    // connection.
+    await this.getDatabaseVersion();
+    this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
 
-    if (options.algorithm && options.algorithm !== "concurrently") {
-      // Rails raises ArgumentError "Algorithm must be one of the following: :concurrently".
-      throw new ArgumentError(`Algorithm must be one of the following: :concurrently`);
-    }
-    if (options.algorithm === "concurrently" && this._inTransaction) {
-      throw new Error("CREATE INDEX CONCURRENTLY cannot run inside a transaction");
-    }
+    // Called on the adapter, not on pgSchemaStatements(): PG overrides
+    // add_index_options to quote a bare-column-name `:where`, and only the
+    // adapter's override is on this path.
+    const createIndex = (await this.buildCreateIndexDefinition(tableName, columns, options))!;
+    await this.execute(await this.schemaCreation.accept(createIndex));
 
-    // Route through addIndexOptions (Rails' add_index_options) so the
-    // bare-column-name `:where` quoting lives there, matching Rails' structure.
-    // idx.name is resolved via index_name → generate_index_name, applying the
-    // identifier-length/hash fallback so add_index and remove_index agree on the
-    // default name for over-long table+column combinations.
-    const [idx] = await this.addIndexOptions(tableName, columns, options);
-
-    const indexName = idx.name;
-
-    const unique = options.unique ? "UNIQUE " : "";
-    const concurrently = options.algorithm === "concurrently" ? "CONCURRENTLY " : "";
-    const ifNotExists = options.ifNotExists ? "IF NOT EXISTS " : "";
-    const using = options.using ? ` USING ${options.using}` : "";
-
-    const colDefs = cols.map((col) => {
-      const isExpression = col.includes("(") || col.includes(" ");
-      let result = isExpression ? col : this.quoteIdentifier(col);
-      if (options.opclass) {
-        const op = options.opclass[col];
-        if (op) result += ` ${op}`;
-      }
-      if (options.order) {
-        if (typeof options.order === "string") {
-          result += ` ${options.order}`;
-        } else {
-          const o = options.order[col];
-          if (o) result += ` ${o.toUpperCase()}`;
-        }
-      }
-      return result;
-    });
-
-    let sql = `CREATE ${unique}INDEX ${concurrently}${ifNotExists}${this.quoteIdentifier(indexName)} ON ${quotedTable}${using} (${colDefs.join(", ")})`;
-
-    if (options.include) {
-      sql += ` INCLUDE (${options.include.map((c) => this.quoteIdentifier(c)).join(", ")})`;
-    }
-    if (options.nullsNotDistinct) {
-      sql += " NULLS NOT DISTINCT";
-    }
-    if (idx.where) {
-      sql += ` WHERE ${idx.where}`;
-    }
-
-    await this.exec(sql);
-
-    if (options.comment?.trim()) {
-      const [schema] = this.extractSchemaQualifiedName(tableName);
-      const qualifiedIndex = schema
-        ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(indexName)}`
-        : this.quoteIdentifier(indexName);
-      await this.exec(`COMMENT ON INDEX ${qualifiedIndex} IS ${this.quote(options.comment)}`);
+    const index = createIndex.index;
+    if (index.comment) {
+      await this.execute(
+        `COMMENT ON INDEX ${this.quoteColumnName(index.name)} IS ${this.quote(index.comment)}`,
+      );
     }
   }
 
@@ -4221,10 +4181,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       opts = columnOrOptions ?? {};
     }
 
-    if (opts.algorithm && opts.algorithm !== "concurrently") {
-      // Rails raises ArgumentError "Algorithm must be one of the following: :concurrently".
-      throw new ArgumentError(`Algorithm must be one of the following: :concurrently`);
-    }
+    // Mirrors Rails' `index_algorithm(options[:algorithm])`, which raises the
+    // ArgumentError for anything outside `index_algorithms`.
+    const algorithm = this.indexAlgorithm(opts.algorithm);
     if (opts.algorithm === "concurrently" && this._inTransaction) {
       throw new Error("DROP INDEX CONCURRENTLY cannot run inside a transaction");
     }
@@ -4265,11 +4224,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     }
     const indexName = indexNameForRemoveFrom(genName, all, bareTable, columnName, resolveOpts);
 
-    const concurrently = opts.algorithm === "concurrently" ? " CONCURRENTLY" : "";
-    const qualifiedIndex = dropSchema
-      ? `${this.quoteIdentifier(dropSchema)}.${this.quoteIdentifier(indexName)}`
-      : this.quoteIdentifier(indexName);
-    await this.exec(`DROP INDEX${concurrently} ${qualifiedIndex}`);
+    // Rails quotes a PostgreSQL::Name, which quotes the schema and the bare
+    // identifier separately — the index name itself can contain a dot (an index
+    // on a schema-qualified table), so it must not be re-split here.
+    const prefix = dropSchema ? `${this.quoteTableName(dropSchema)}.` : "";
+    await this.execute(
+      `DROP INDEX${algorithm ? ` ${algorithm}` : ""} ${prefix}${this.quoteColumnName(indexName)}`,
+    );
   }
 
   async addForeignKey(
@@ -4896,7 +4857,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     defaultValue?: unknown,
   ): unknown {
     if (defaultValue == null)
-      return `ALTER COLUMN ${this.quoteIdentifier(columnName)} ${nullable ? "DROP" : "SET"} NOT NULL`;
+      return `ALTER COLUMN ${this.quoteColumnName(columnName)} ${nullable ? "DROP" : "SET"} NOT NULL`;
     return () => this.changeColumnNull(tableName, columnName, nullable, defaultValue);
   }
 

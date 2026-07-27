@@ -10,6 +10,7 @@ import {
   ForeignKeyDefinition,
   TableDefinition as AbstractTableDefinition,
   type AddForeignKeyOptions,
+  type ForeignKeyLookupOptions,
   type ColumnOptions,
   type ColumnType,
 } from "../abstract/schema-definitions.js";
@@ -54,7 +55,6 @@ interface PgSchemaAdapter {
     name?: string | null,
     options?: { type?: string },
   ): { schema: string; name: string | null; type: string | null };
-  deferrable(deferrable: "immediate" | "deferred" | undefined): string;
   readonly schemaCreation: {
     actionSql(action: string, dependency: string): string;
     accept(o: unknown): string;
@@ -252,12 +252,14 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   }
 
   quotedIncludeColumnsForIndex(columnNames: string | string[]): string {
-    if (typeof columnNames === "string") return this.pg.quoteIdentifier(columnNames);
-    const quoted: Record<string, string> = {};
-    for (const name of columnNames) {
-      quoted[name] = this.pg.quoteIdentifier(name);
-    }
-    return Object.values(quoted).join(", ");
+    // Mirrors PostgreSQL::SchemaStatements#quoted_include_columns_for_index: the
+    // quoted map is threaded through add_options_for_index_columns so the
+    // opclass/sort-order decoration is applied by the one shared helper.
+    if (typeof columnNames === "string") return this.adapter.quoteColumnName(columnNames);
+    const quotedColumns = new Map(
+      columnNames.map((name) => [name, this.adapter.quoteColumnName(name)]),
+    );
+    return Array.from(this.addOptionsForIndexColumns(quotedColumns).values()).join(", ");
   }
 
   // ---------------------------------------------------------------------------
@@ -1052,7 +1054,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     this.pg.clearCacheBang();
     const comment = this.extractNewCommentValue(commentOrChanges) as string | null;
     await this.adapter.execute(
-      `COMMENT ON COLUMN ${this._qt(tableName)}.${this._qi(columnName)} IS ${this.pg.quote(comment)}`,
+      `COMMENT ON COLUMN ${this.adapter.quoteTableName(tableName)}.${this.adapter.quoteColumnName(columnName)} IS ${this.pg.quote(comment)}`,
     );
   }
 
@@ -1074,41 +1076,31 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
 
   /** @internal */
   async validateConstraint(tableName: string, constraintName: string): Promise<void> {
-    await this.pg.exec(
-      `ALTER TABLE ${this._qt(tableName)} VALIDATE CONSTRAINT ${this.pg.quoteIdentifier(constraintName)}`,
-    );
+    // Mirrors PostgreSQL::SchemaStatements#validate_constraint: the VALIDATE
+    // CONSTRAINT clause is rendered by the schema-creation visitor off an
+    // AlterTable node rather than being string-built here.
+    const at = this.pg.createAlterTable(tableName) as PgAlterTable;
+    at.validateConstraint(constraintName);
+    await this.adapter.execute(await this.pg.schemaCreation.accept(at));
   }
 
   async validateCheckConstraint(
     tableName: string,
-    nameOrOptions: string | { name: string },
+    nameOrOptions: string | { name: string; expression?: string },
   ): Promise<void> {
-    const name = typeof nameOrOptions === "string" ? nameOrOptions : nameOrOptions.name;
-    await this.validateConstraint(tableName, name);
+    const options = typeof nameOrOptions === "string" ? { name: nameOrOptions } : nameOrOptions;
+    const chkNameToValidate = (await this.checkConstraintForBang(tableName, options)).name;
+    await this.validateConstraint(tableName, chkNameToValidate);
   }
 
   async validateForeignKey(
     fromTable: string,
     toTable?: string,
-    options?: { name?: string },
+    options: ForeignKeyLookupOptions = {},
   ): Promise<void> {
-    if (options?.name) {
-      await this.validateConstraint(fromTable, options.name);
-      return;
-    }
-    if (!toTable) throw new ArgumentError("validateForeignKey requires toTable or options.name");
-    const fks = await this.foreignKeys(fromTable);
-    const [toSchema, toTbl] = this.pg.extractSchemaQualifiedName(toTable);
-    const fk = (fks as any[]).find((f) => {
-      const [fSchema, fTbl] = this.pg.extractSchemaQualifiedName(String(f.toTable));
-      if (fTbl !== toTbl) return false;
-      // When the FK record has no schema prefix (PostgreSQL omits "public." when it
-      // is on the search_path), treat it as matching any schema lookup or "public".
-      if (!fSchema) return !toSchema || toSchema === "public";
-      return fSchema === toSchema;
-    });
-    if (!fk) throw new ArgumentError(`No foreign key found from ${fromTable} to ${toTable}`);
-    await this.validateConstraint(fromTable, fk.name);
+    const fkNameToValidate = (await this.foreignKeyForBang(fromTable, { ...options, toTable }))
+      .name;
+    await this.validateConstraint(fromTable, fkNameToValidate);
   }
 
   override foreignKeyColumnFor(tableName: string, columnName = "id"): string {
@@ -1243,7 +1235,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // (now converged): it applies table_name_prefix/suffix and re-runs
     // foreign_key_options idempotently (column/name already filled above).
     at.addForeignKey(toTable, fkOptions as Partial<AddForeignKeyOptions>);
-    await this.pg.exec(await this.pg.schemaCreation.accept(at));
+    await this.adapter.execute(await this.pg.schemaCreation.accept(at));
   }
 
   override async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
@@ -1286,14 +1278,12 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     expression: string,
     options: ExclusionConstraintOptions = {},
   ): Promise<void> {
+    // Mirrors PostgreSQL::SchemaStatements#add_exclusion_constraint: the EXCLUDE
+    // clause is rendered by the schema-creation visitor off an AlterTable node.
     const opts = this.exclusionConstraintOptions(tableName, expression, options);
-    const name = this.pg.quoteIdentifier(opts.name as string);
-    const using = opts.using ? ` USING ${opts.using}` : "";
-    const where = opts.where ? ` WHERE (${opts.where})` : "";
-    const deferParts = this.pg.deferrable(opts.deferrable as "immediate" | "deferred" | undefined);
-    await this.pg.exec(
-      `ALTER TABLE ${this._qt(tableName)} ADD CONSTRAINT ${name} EXCLUDE${using} (${expression})${where}${deferParts}`,
-    );
+    const at = this.pg.createAlterTable(tableName) as PgAlterTable;
+    at.addExclusionConstraint(expression, opts);
+    await this.adapter.execute(await this.pg.schemaCreation.accept(at));
   }
 
   async removeExclusionConstraint(
@@ -1314,10 +1304,10 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         "Either expression or `name` option must be provided for removeExclusionConstraint.",
       );
     }
-    const excl = await this.exclusionConstraintForBang(tableName, expression ?? null, opts);
-    await this.pg.exec(
-      `ALTER TABLE ${this._qt(tableName)} DROP CONSTRAINT ${this.pg.quoteIdentifier(excl.name!)}`,
-    );
+    const exclNameToDelete = (
+      await this.exclusionConstraintForBang(tableName, expression ?? null, opts)
+    ).name!;
+    await this.removeConstraint(tableName, exclNameToDelete);
   }
 
   async exclusionConstraints(tableName: string): Promise<ExclusionConstraintDefinition[]> {
@@ -1357,7 +1347,10 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         name: r.conname as string,
         using: using,
         where: predicate,
-        deferrable: deferrable || undefined,
+        // Rails passes `deferrable:` straight through: a non-deferrable
+        // constraint reads back as `false`, not absent (Ruby truthiness would
+        // otherwise collapse it to nil here).
+        deferrable,
       });
     });
   }
@@ -1440,7 +1433,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     const opts = this.uniqueConstraintOptions(tableName, columnName, options);
     const at = this.pg.createAlterTable(tableName) as PgAlterTable;
     at.addUniqueConstraint(columnName as string | string[], opts);
-    await this.pg.exec(await this.pg.schemaCreation.accept(at));
+    await this.adapter.execute(await this.pg.schemaCreation.accept(at));
   }
 
   async removeUniqueConstraint(
@@ -1466,10 +1459,9 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         "Either `columnName`, `name`, or `usingIndex` option must be provided for removeUniqueConstraint.",
       );
     }
-    const uniq = await this.uniqueConstraintForBang(tableName, columnName, opts);
-    await this.pg.exec(
-      `ALTER TABLE ${this._qt(tableName)} DROP CONSTRAINT ${this.pg.quoteIdentifier(uniq.name!)}`,
-    );
+    const uniqueNameToDelete = (await this.uniqueConstraintForBang(tableName, columnName, opts))
+      .name!;
+    await this.removeConstraint(tableName, uniqueNameToDelete);
   }
 
   async uniqueConstraints(tableName: string): Promise<UniqueConstraintDefinition[]> {
@@ -1499,7 +1491,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         return new UniqueConstraintDefinition(tableName, columns, {
           name: r.conname as string,
           nullsNotDistinct: nullsNotDistinct || undefined,
-          deferrable: deferrable || undefined,
+          deferrable,
         });
       }),
     );
@@ -1797,7 +1789,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
        FROM (
          SELECT indrelid, indkey, generate_subscripts(indkey, 1) idx
            FROM pg_index
-          WHERE indrelid = ${this.pg.quoteLiteral(this._qt(tableName))}::regclass
+          WHERE indrelid = ${this.pg.quoteLiteral(this.adapter.quoteTableName(tableName))}::regclass
             AND indisprimary
        ) i
        JOIN pg_attribute a
