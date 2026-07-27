@@ -128,7 +128,7 @@ export function configuredConnectionHash(): Record<string, unknown> {
     case "sqlite3_mem":
       return { adapter: "sqlite3", database: ":memory:", pool: 1 };
     case "sqlite3":
-      return { adapter: "sqlite3" };
+      return { adapter: "sqlite3", timeout: 5000, strict: true };
     case "postgresql":
       return serverHash("postgresql", postgresSettings());
     case "mysql2":
@@ -197,9 +197,14 @@ async function fallbackDatabasePath(): Promise<string> {
   return dbPath;
 }
 
-async function sqliteHash(): Promise<{ adapter: string; database: string }> {
+async function sqliteHash(): Promise<Record<string, unknown>> {
   const workerDb = getEnv("AR_TEST_WORKER_DB");
-  return { adapter: "sqlite3", database: workerDb || (await fallbackDatabasePath()) };
+  return {
+    adapter: "sqlite3",
+    database: workerDb || (await fallbackDatabasePath()),
+    timeout: 5000,
+    strict: true,
+  };
 }
 
 /**
