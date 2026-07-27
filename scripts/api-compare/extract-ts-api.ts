@@ -1402,11 +1402,14 @@ export function noRailsEquivalentReason(node: ts.Node): string | undefined {
     const proseTag = proseTagAfter(tag);
     if (proseTag !== undefined) {
       throw new Error(
-        `@noRailsEquivalent reason is truncated by a bare \`@${proseTag}\` in its ` +
+        `@noRailsEquivalent reason is truncated by a bare \`@${proseTag.name}\` in its ` +
           `prose: ${sf.fileName}:${line} — TypeScript parses it as a real JSDoc tag, ` +
           "so the reason is cut short and the declaration can drop out of the " +
           "compared surface entirely. Reword the prose to avoid the tag form" +
-          ", or — for a deliberate tag — move it above `@noRailsEquivalent`.",
+          (proseTag.lineLeading
+            ? `, or — if the \`@${proseTag.name}\` is deliberate — move it above ` +
+              "`@noRailsEquivalent`, which every deliberate tag of its kind must precede."
+            : "."),
       );
     }
     return reason;
@@ -1436,10 +1439,10 @@ const TAGS_ALLOWED_AFTER_NO_RAILS_EQUIVALENT = new Set([
 ]);
 
 /**
- * Name of the first JSDoc tag that follows `tag` in the same comment and is a
- * bare `@word` from the reason prose rather than a deliberate tag. TypeScript
- * parses either shape as a real tag, which silently truncates the reason (and,
- * for `@internal`, drops the declaration from the extracted surface).
+ * The first JSDoc tag that follows `tag` in the same comment and is a bare
+ * `@word` from the reason prose rather than a deliberate tag. TypeScript parses
+ * either shape as a real tag, which silently truncates the reason (and, for
+ * `@internal`, drops the declaration from the extracted surface).
  *
  * A mid-line tag is prose by construction. A *line-leading* one is textually
  * identical to a deliberate tag, so it is judged by name: the structural tags
@@ -1447,26 +1450,31 @@ const TAGS_ALLOWED_AFTER_NO_RAILS_EQUIVALENT = new Set([
  * — `@internal` above all — is prose that wrapped onto a continuation line.
  * That makes tag order load-bearing: a deliberate `@internal` must precede
  * `@noRailsEquivalent`, as schema-cache.ts `recordTouchedTables` already
- * writes it.
+ * writes it. `lineLeading` rides along so the caller can point at the fix that
+ * actually applies.
  */
-function proseTagAfter(tag: ts.JSDocTag): string | undefined {
+function proseTagAfter(tag: ts.JSDocTag): { name: string; lineLeading: boolean } | undefined {
   const jsDoc = tag.parent;
   if (!ts.isJSDoc(jsDoc) || jsDoc.tags === undefined) return undefined;
   const text = jsDoc.getSourceFile().text;
   for (const other of jsDoc.tags) {
     if (other.getStart() <= tag.getStart()) continue;
     const name = other.tagName.text;
-    let lineLeading = true;
-    for (let i = other.getStart() - 1; i >= 0 && text[i] !== "\n"; i--) {
-      const ch = text[i];
-      if (ch !== " " && ch !== "\t" && ch !== "*") {
-        lineLeading = false;
-        break;
-      }
+    const lineLeading = isLineLeading(text, other.getStart());
+    if (!lineLeading || !TAGS_ALLOWED_AFTER_NO_RAILS_EQUIVALENT.has(name)) {
+      return { name, lineLeading };
     }
-    if (!lineLeading || !TAGS_ALLOWED_AFTER_NO_RAILS_EQUIVALENT.has(name)) return name;
   }
   return undefined;
+}
+
+/** True when only comment-frame padding (`*`, spaces, tabs) precedes `pos` on its line. */
+function isLineLeading(text: string, pos: number): boolean {
+  for (let i = pos - 1; i >= 0 && text[i] !== "\n"; i--) {
+    const ch = text[i];
+    if (ch !== " " && ch !== "\t" && ch !== "*") return false;
+  }
+  return true;
 }
 
 /**

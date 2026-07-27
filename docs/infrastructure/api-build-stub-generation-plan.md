@@ -315,6 +315,16 @@ Two things are deliberately **not** shared, and the difference is load-bearing:
   this section changes that; tightening it would be a change to `api:build`,
   which RFC 0080 lists as a non-goal.
 
+- **Tag order after the reason.** Because the reason wraps freely, a bare
+  `@word` in its prose is parsed as a real tag and truncates the reason —
+  fatally so for `@internal`, which drops the declaration from the compared
+  surface. The extractor therefore rejects any tag after `@noRailsEquivalent`
+  that is not one of the structural, signature-documenting tags (`@param`,
+  `@returns`, `@throws`, `@example`, `@see`, `@template`, …). Deliberate tags
+  outside that set — `@internal` above all — must be written **above**
+  `@noRailsEquivalent`, which is how the tree already writes them (see
+  `schema-cache.ts` `recordTouchedTables`).
+
 ### `@noRailsEquivalent` vs `@internal`
 
 Different claims, deliberately kept distinct:

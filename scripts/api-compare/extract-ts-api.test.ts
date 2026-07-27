@@ -1594,7 +1594,7 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
           initializeAssociations(): void {}
         }
       `),
-    ).toThrow(/truncated by a bare `@internal`/);
+    ).toThrow(/truncated by a bare `@internal`.*move it above `@noRailsEquivalent`/s);
   });
 
   it("accepts a deliberate @internal placed above @noRailsEquivalent", () => {
