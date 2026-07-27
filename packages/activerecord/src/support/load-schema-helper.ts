@@ -1,0 +1,95 @@
+import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
+import type { TableDefinition as PgTableDefinition } from "../connection-adapters/postgresql/schema-definitions.js";
+import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
+import { loadCanonicalSchema } from "./canonical-schema.js";
+
+/**
+ * The ported slice of
+ * `vendor/rails/activerecord/test/schema/postgresql_specific_schema.rb:4-25` —
+ * the `uuid-ossp` / `pgcrypto` extension header and the four uuid-primary-key
+ * tables. `uuid_default` there is `{}` whenever `supports_pgcrypto_uuid?`
+ * (PG >= 9.4, always true on our postgres lane), which leaves the uuid PK on the
+ * adapter's `gen_random_uuid()` default.
+ *
+ * The remainder of that file (`defaults`, `postgresql_times`, the identity,
+ * sequence, partition and constraint tables — lines 27-225) and the `mysql2_` /
+ * `sqlite_` schemas are carried by story `port-adapter-specific-schemas`: the
+ * `defaults` table in particular is contended (`adapters/postgresql/schema.test.ts`
+ * and `schema-dumper.test.ts` create and DROP their own on the shared per-worker
+ * DB), so laying it at boot needs those files repointed in the same change.
+ */
+async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise<void> {
+  await adapter.enableExtension("uuid-ossp");
+  await adapter.enableExtension("pgcrypto");
+
+  await adapter.createTable("chat_messages", { id: "uuid", force: true }, (t) => {
+    (t as PgTableDefinition).text("content");
+  });
+
+  await adapter.createTable("chat_messages_custom_pk", { id: false, force: true }, (t) => {
+    const pg = t as PgTableDefinition;
+    pg.uuid("message_id", { primaryKey: true, default: () => "uuid_generate_v4()" });
+    pg.text("content");
+  });
+
+  await adapter.createTable("uuid_parents", { id: "uuid", force: true }, (t) => {
+    (t as PgTableDefinition).string("name");
+  });
+
+  await adapter.createTable("uuid_children", { id: "uuid", force: true }, (t) => {
+    const pg = t as PgTableDefinition;
+    pg.string("name");
+    pg.uuid("uuid_parent_id");
+  });
+}
+
+/**
+ * The `File.exist?(adapter_specific_schema_file)` lookup of
+ * `load_schema_helper.rb:10,15`: an adapter name resolves to its
+ * `<adapter>_specific_schema` loader when trails has one, and to nothing when it
+ * does not.
+ *
+ * INCOMPLETE, deliberately. Rails has four such files and every one of them has
+ * real content; trails has ported part of one. `sqlite_specific_schema.rb:3-21`
+ * and `mysql2_specific_schema.rb:3-95` have no entry here at all, so the sqlite
+ * and mysql lanes currently boot without the schema Rails gives them. That is a
+ * known gap owned by story `port-adapter-specific-schemas` (RFC 0064), not a
+ * claim that the gap does not exist. `trilogy_specific_schema.rb` is the one
+ * genuine no-op: trails has no Trilogy adapter, so no adapter name ever selects
+ * it.
+ */
+const ADAPTER_SPECIFIC_SCHEMAS: Record<string, (adapter: DatabaseAdapter) => Promise<void>> = {
+  postgres: (adapter) => loadPostgresqlSpecificSchema(adapter as unknown as PostgreSQLAdapter),
+};
+
+/**
+ * Port of `LoadSchemaHelper#load_schema`
+ * (vendor/rails/activerecord/test/support/load_schema_helper.rb:4-21). The
+ * control flow is complete; the *content* of the adapter-specific arm is not —
+ * see {@link ADAPTER_SPECIFIC_SCHEMAS}. Arm by arm:
+ *
+ * - `load SCHEMA_ROOT + "/schema.rb"` → `loadCanonicalSchema`. trails' mirror of
+ *   schema.rb is the canonical registry rather than a loadable Ruby file, so
+ *   `load` means laying that registry onto the database.
+ * - `load adapter_specific_schema_file if File.exist?(...)` →
+ *   {@link ADAPTER_SPECIFIC_SCHEMAS}.
+ * - `ActiveRecord::FixtureSet.reset_cache` (fixtures.rb:556) clears
+ *   `@@all_cached_fixtures`, which Rails fills in `FixtureSet.create_fixtures`
+ *   (fixtures.rb:611) so a re-loaded schema cannot be served rows built against
+ *   the old one. trails' `FixtureSet.createFixtures` delegates straight to
+ *   `defineFixtures`, which caches nothing, so the arm is empty here rather than
+ *   unimplemented.
+ * - Silencing `$stdout` has no counterpart: `load`ing a Ruby schema file prints
+ *   every migration line, whereas laying the schema through the adapter prints
+ *   nothing.
+ *
+ * @internal Boot/template setup paths only. Test files wire the canonical schema
+ * + fixtures through `fixtures({ ... })`; the
+ * `blazetrails/no-internal-canonical-loaders` ESLint rule enforces that.
+ */
+export async function loadSchema(adapter: DatabaseAdapter): Promise<void> {
+  await loadCanonicalSchema(adapter);
+
+  const adapterSpecificSchema = ADAPTER_SPECIFIC_SCHEMAS[adapter.adapterName];
+  if (adapterSpecificSchema) await adapterSpecificSchema(adapter);
+}

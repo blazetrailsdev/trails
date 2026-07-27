@@ -30,6 +30,11 @@ tester.run("no-internal-canonical-loaders", rule, {
       filename: OWN_TEST,
       code: 'import { ensureCanonicalTables, loadCanonicalSchema } from "./canonical-schema.js";',
     },
+    // load-schema-helper's own unit test may import loadSchema directly.
+    {
+      filename: "packages/activerecord/src/support/load-schema-helper.test.ts",
+      code: 'import { loadSchema } from "./load-schema-helper.js";',
+    },
     // A banned symbol imported from an unrelated module is not the loader.
     {
       filename: FILENAME,
@@ -46,6 +51,13 @@ tester.run("no-internal-canonical-loaders", rule, {
       filename: FILENAME,
       code: 'import { loadCanonicalSchema } from "./support/canonical-schema.js";',
       errors: [{ messageId: "banned", data: { name: "loadCanonicalSchema" } }],
+    },
+    // `loadSchema` wraps `loadCanonicalSchema`, so the Rails-named entry point
+    // is banned in test files too.
+    {
+      filename: FILENAME,
+      code: 'import { loadSchema } from "./support/load-schema-helper.js";',
+      errors: [{ messageId: "banned", data: { name: "loadSchema" } }],
     },
     // Deeper relative path (adapters/mysql2/*.test.ts reaching up two levels).
     {

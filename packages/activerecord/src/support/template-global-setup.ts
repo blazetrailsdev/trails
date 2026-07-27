@@ -20,7 +20,7 @@ import { getFsAsync } from "@blazetrails/activesupport/fs-adapter";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
-import { loadCanonicalSchema } from "./canonical-schema.js";
+import { loadSchema } from "./load-schema-helper.js";
 import { generateSchemaFile } from "./schema-file-generator.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { InternalMetadata } from "../internal-metadata.js";
@@ -59,7 +59,7 @@ async function buildTemplateSchema(
   close: () => Promise<void>,
 ): Promise<void> {
   try {
-    await loadCanonicalSchema(adapter);
+    await loadSchema(adapter);
   } finally {
     await close();
   }
@@ -152,7 +152,7 @@ const pgAdapter: DbTemplateAdapter = {
       max: 1,
     }) as unknown as DatabaseAdapter;
     try {
-      await loadCanonicalSchema(adapter);
+      await loadSchema(adapter);
       // Stamp ar_internal_metadata so every slot cloned from this template
       // reports `schemaUpToDate` → each worker's reconstructFromSchema only
       // TRUNCATEs (no DDL) instead of paying a full purge+reload per test

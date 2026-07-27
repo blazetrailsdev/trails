@@ -1,6 +1,6 @@
 import { beforeAll, afterAll } from "vitest";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import { loadCanonicalSchema } from "./canonical-schema.js";
+import { loadSchema } from "./load-schema-helper.js";
 import {
   withTransactionalFixtures,
   type TransactionalFixturesAdapter,
@@ -41,7 +41,7 @@ export interface AdapterSuiteHandle<A extends TransactionalFixturesAdapter> {
  * Boilerplate-free wrapper around the canonical adapter-cluster test pattern:
  *
  * ```
- * beforeAll(() => adapter = factory(); loadCanonicalSchema(adapter); setup(adapter));
+ * beforeAll(() => adapter = factory(); loadSchema(adapter); setup(adapter));
  * withTransactionalFixtures(() => adapter);
  * afterAll(() => teardown(adapter); adapter.close());
  * ```
@@ -72,7 +72,7 @@ export function setupAdapterSuite<A extends TransactionalFixturesAdapter>(
 
   beforeAll(async () => {
     adapter = await opts.factory();
-    await loadCanonicalSchema(adapter as unknown as DatabaseAdapter);
+    await loadSchema(adapter as unknown as DatabaseAdapter);
     if (opts.setup) await opts.setup(adapter);
   });
 
