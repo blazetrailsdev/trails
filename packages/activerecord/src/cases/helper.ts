@@ -1,9 +1,8 @@
 /**
  * AR-only vitest setupFile, mirroring Rails'
- * `activerecord/test/cases/helper.rb`. Wired into the `activerecord` project
- * in `vitest.config.ts`; anything that imports the AR test adapter (and thus
- * opens a DB connection at module load) belongs here rather than in a setup
- * file shared with non-AR projects.
+ * `activerecord/test/cases/helper.rb`. Anything that imports the AR test
+ * adapter (and thus opens a DB connection at module load) belongs here rather
+ * than in a setup file shared with non-AR projects.
  */
 
 // Eagerly load the better-sqlite3 driver so the AR test adapter
@@ -75,8 +74,6 @@ EncryptionConfigurable.configure({
 EncryptionConfigurable.config.extendQueries = true;
 installExtendedQueriesIfConfigured();
 
-// Wipe shared test-adapter state before every test so each test starts
-// from a clean slate.
 beforeEach(async () => {
   if (shouldSkipGlobalReset()) return;
   await resetTestAdapterState();
