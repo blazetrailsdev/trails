@@ -31,7 +31,6 @@ import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { UrlConfig } from "../database-configurations/url-config.js";
 import { arunitDatabaseNames } from "./arunit2-config.js";
-import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
 import {
   CONNECTION_LANES,
   DEFAULT_CONNECTION,
@@ -381,10 +380,15 @@ async function sqliteHash(): Promise<Record<string, unknown>> {
  * clear `_registeredTasks` (e.g. `database-tasks.test.ts`) can re-register.
  *
 
- * `ARUnit2Model` is established on `arunit2` as `connection.rb:33` does. The
- * pool is lazy, so this costs nothing on the lanes where no one has run
- * `CREATE DATABASE` for the second database — `setupSecondPool` still owns that
- * provisioning question (see `arunit2-config.ts`).
+ * Rails' next line is `ARUnit2Model.establish_connection :arunit2`
+ * (`connection.rb:33`), which this does NOT do. `College` and `Course` extend
+ * `ARUnit2Model`, so pointing that base at the arunit2 database here sends
+ * every suite's colleges/courses at a database that does not carry them — it
+ * reddened all three lanes on #5397 with "no such table: colleges" from
+ * `use-fixtures.test.ts`. Rails is safe because its arunit2 genuinely holds
+ * those tables; ours only gets them inside `setupSecondPool`, which keeps
+ * ownership of the second pool until that provisioning moves earlier (story
+ * `arunit2-provisioning-owns-second-pool`).
  */
 export async function connect(): Promise<TestDatabaseConfig> {
   const { adapter, envConfig, configurationHashes } = await testConfigurationHashes();
@@ -410,19 +414,9 @@ export async function connect(): Promise<TestDatabaseConfig> {
     }
   }
 
-  // `connection.rb:32-33` — both bases established by name, not from a raw
-  // hash, so each pool comes from the entry `Base.configurations` publishes.
+  // `connection.rb:32` — established by name, not from a raw hash, so the pool
+  // comes from the entry `Base.configurations` publishes.
   await Base.establishConnection("arunit");
-  await ARUnit2Model.establishConnection("arunit2");
-
-  // Rails' sqlite3 lane gives arunit2 its own file (config.example.yml:83-87),
-  // and ours derives one from the worker database. Nothing else knows to sweep
-  // it, so it rides the same exit cleanup as the fallback database.
-  const arunit2Database = String(configurationHashes[1].database);
-  if (adapter === "sqlite" && arunit2Database !== ":memory:") {
-    const { registerDbFileCleanupOnExit } = await import("./sqlite-template.js");
-    await registerDbFileCleanupOnExit(arunit2Database);
-  }
 
   return { configs, adapter, envConfig };
 }
