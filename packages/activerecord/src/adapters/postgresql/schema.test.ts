@@ -537,7 +537,6 @@ describeIfPg("PostgreSQLAdapter", () => {
           `CREATE INDEX "things_Index" ON ${SCHEMA_NAME}.${TABLE_NAME} (${INDEX_A_COLUMN})`,
         );
 
-      // Rails: assert_nothing_raised { @connection.remove_index "things", name: "test_schema.things_Index" }
       await createIndex();
       await adapter.removeIndex(TABLE_NAME, { name: `${SCHEMA_NAME}.things_Index` });
 
@@ -549,8 +548,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         name: `${SCHEMA_NAME}.things_Index`,
       });
 
-      // Rails: assert_raises(ArgumentError) — the index schema does not match the
-      // table schema.
       await createIndex();
       await expect(
         adapter.removeIndex(`${SCHEMA2_NAME}.${TABLE_NAME}`, {

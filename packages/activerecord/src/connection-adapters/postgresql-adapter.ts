@@ -3958,11 +3958,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
-   * Mirrors Rails `new_column_from_field`'s serial detection: a column is
-   * serial only when its `nextval()` default references the very sequence name
-   * `sequenceNameFromParts` would generate for this table+column. A plain
-   * `default: -> { "nextval('some_seq')" }` whose sequence doesn't follow the
-   * `<table>_<column>_seq` convention is NOT serial.
+   * The serial detection Rails inlines in `new_column_from_field`, extracted so
+   * PostgreSQLSchemaStatements#columns can share it: that path cannot delegate
+   * to newColumnFromField because it batch-preloads the row OIDs and resolves
+   * types through lookupCastTypeFromColumn, where fetchTypeMetadata would issue
+   * a per-column pg_type query.
    * @internal
    */
   serialFromDefaultFunction(
@@ -3970,10 +3970,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     columnName: string,
     defaultFunction: string | null,
   ): boolean {
-    if (defaultFunction == null) return false;
-    const match = /^nextval\('"?(.+_(seq\d*))"?'::regclass\)$/.exec(defaultFunction);
+    const match = defaultFunction?.match(SERIAL_SEQUENCE_RE);
     if (!match) return false;
-    const [, sequenceName, suffix] = match;
+    const { sequenceName, suffix } = match.groups!;
     return this.sequenceNameFromParts(tableName, columnName, suffix) === sequenceName;
   }
 
@@ -4200,10 +4199,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       throw new Error("DROP INDEX CONCURRENTLY cannot run inside a transaction");
     }
 
-    // Rails: `table = Utils.extract_schema_qualified_name(table_name.to_s)`, and
-    // when a name is given its schema is split off: the bare identifier becomes
-    // the name to match, the index is dropped in the table's schema (or the
-    // name's schema when the table is unqualified), and a conflicting pair raises.
     let table = Utils.extractSchemaQualifiedName(tableName);
     let resolveOpts = opts;
     if (opts.name != null) {
@@ -4218,14 +4213,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       }
     }
 
-    // Rails: `return if options[:if_exists] && !index_exists?(table_name, column_name, **options)`.
     if (opts.ifExists && !(await this.indexExists(tableName, columnName, resolveOpts))) {
       return;
     }
 
-    // Rails: `index_name_for_remove(table.to_s, column_name, options)` — the
-    // schema-qualified name, so a generated index name matches the one addIndex
-    // would have produced for the same argument.
+    // Rails resolves the name against `table.to_s` — the SCHEMA-QUALIFIED name,
+    // so a generated index name matches the one addIndex produced for the same
+    // argument. Passing the bare identifier here silently misses those.
     const positional = typeof columnName === "string" ? columnName : null;
     const nameOpts = Array.isArray(columnName)
       ? { ...resolveOpts, column: columnName }
@@ -4817,9 +4811,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         string | null,
       ];
     const typeMetadata = await this.fetchTypeMetadata(columnName, type, Number(oid), Number(fmod));
-    // Store the raw default literal verbatim (Rails' extract_value_from_default);
-    // deserialization is deferred to Attribute.from_database so
-    // *_before_type_cast for a column default returns the raw String.
+    // The literal stays a raw String: deserialization is deferred to
+    // Attribute.from_database so *_before_type_cast reads back the raw default.
     const defaultValue = this.extractValueFromDefault(default_);
 
     let defaultFunction: string | null;
@@ -4829,12 +4822,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       defaultFunction = this.extractDefaultFunction(defaultValue, default_);
     }
 
-    // Rails: a column is serial only when its `nextval()` default names the very
-    // sequence `sequence_name_from_parts` would generate for this table+column.
     let serial: boolean | undefined;
-    const match = defaultFunction?.match(
-      /^nextval\('"?(?<sequenceName>.+_(?<suffix>seq\d*))"?'::regclass\)$/,
-    );
+    const match = defaultFunction?.match(SERIAL_SEQUENCE_RE);
     if (match) {
       const { sequenceName, suffix } = match.groups!;
       serial = this.sequenceNameFromParts(tableName, columnName, suffix) === sequenceName;
@@ -5045,8 +5034,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // a literal default there, so the multi-cast numeric forms are parsed here.
     const parenNum = /^\((-?\d+(?:\.\d+)?)\)(?:::[\w"\s.]+)+$/.exec(defaultExpr);
     if (parenNum) return parenNum[1];
-    // N::type[::type2...] — PG normalizes multi-cast numerics to the parens form
-    // above; this branch is defensive.
     const castNum = /^(-?\d+(?:\.\d+)?)(?:::[\w"\s.]+)+$/.exec(defaultExpr);
     if (castNum) return castNum[1];
     return null;
@@ -5413,6 +5400,9 @@ function _pgAdvisoryLockSql(
  * unrecognized expression and does not populate Column#default_function.
  */
 const DEFAULT_FUNCTION_RE = /\w+\(.*\)|\(.*\)::\w+|CURRENT_DATE|CURRENT_TIMESTAMP/;
+
+/** Mirrors the `nextval(...)` match inlined in Rails' `new_column_from_field`. */
+const SERIAL_SEQUENCE_RE = /^nextval\('"?(?<sequenceName>.+_(?<suffix>seq\d*))"?'::regclass\)$/;
 
 (PostgreSQLAdapter.prototype as any).performQuery = performQuery;
 (PostgreSQLAdapter.prototype as any).castResult = castResult;
