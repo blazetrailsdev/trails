@@ -84,27 +84,21 @@ _registry.register("text", Text, { override: false });
 _registry.register("time", Time, { override: false });
 _registry.register("value", ValueType, { override: false });
 
-/** Mirrors Rails' `ActiveRecord::Type.registry` (attr_accessor getter). */
-export function registry(): AdapterSpecificRegistry {
-  return _registry;
-}
-
 /**
- * Mirrors Rails' `ActiveRecord::Type.registry=` (attr_accessor setter).
+ * Mirrors: ActiveRecord::Type.registry, registry= (type.rb:26)
  *
- * Not converged onto a getter/setter pair under the Rails name: Rails hangs
- * `attr_accessor :registry` off the `ActiveRecord::Type` module object, whose
- * trails analogue is this ES module — and an ES module namespace is read-only
- * from the importer's side, so there is no object to define an accessor on.
- *
- * Replaces the active registry wholesale. Callers are responsible for
- * re-registering any types they need — this is intentional: Rails' own
- * TypeTest swaps in a blank AdapterSpecificRegistry per test and restores
- * the original in teardown, so a pre-populated registry is not the default.
+ * Not a `get`/`set` pair: Rails hangs `attr_accessor :registry` off the
+ * `ActiveRecord::Type` module object, whose trails analogue is this ES module,
+ * and a module namespace is read-only from the importer's side — there is no
+ * object to define an accessor on. Same constraint, same shape as
+ * `Core.configurations` and `PrimaryKey#primary_key`.
  */
-export function setRegistry(r: AdapterSpecificRegistry): void {
-  _registry = r;
-  _defaultValue = undefined;
+export function registry(r?: AdapterSpecificRegistry): AdapterSpecificRegistry {
+  if (r !== undefined) {
+    _registry = r;
+    _defaultValue = undefined;
+  }
+  return _registry;
 }
 
 /**
@@ -127,7 +121,7 @@ export function register(
   options?: { adapter?: string; override?: boolean },
   block?: (...args: unknown[]) => Type,
 ): void {
-  _registry.register(typeName, klass, options, block);
+  registry().register(typeName, klass, options, block);
 }
 
 /** Mirrors: ActiveRecord::Type.add_modifier */
@@ -136,7 +130,7 @@ export function addModifier(
   klass: new (subtype: Type) => Type,
   registrationOptions?: { adapter?: string },
 ): void {
-  _registry.addModifier(options, klass, registrationOptions);
+  registry().addModifier(options, klass, registrationOptions);
 }
 
 export function lookup(
@@ -144,7 +138,7 @@ export function lookup(
   options?: { adapter?: string; [key: string]: unknown },
 ): Type {
   const adapter = options?.adapter ?? currentAdapterName();
-  return _registry.lookup(symbol, { ...options, adapter });
+  return registry().lookup(symbol, { ...options, adapter });
 }
 
 export function defaultValue(): Type {

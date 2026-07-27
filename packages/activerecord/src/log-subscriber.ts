@@ -71,11 +71,14 @@ function getBase(): any {
   return _baseResolver?.() ?? null;
 }
 
-/** Module-level config mirroring `ActiveRecord.verbose_query_logs`. */
+// Backs Base.verboseQueryLogs; the flag lives here because log-subscriber.ts
+// cannot import base.ts (the cycle the _baseResolver seam above breaks).
 let _verboseQueryLogs = false;
+/** @internal */
 export function getVerboseQueryLogs(): boolean {
   return _verboseQueryLogs;
 }
+/** @internal */
 export function setVerboseQueryLogs(value: boolean): void {
   _verboseQueryLogs = value;
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
-import { LogSubscriber, setVerboseQueryLogs } from "./log-subscriber.js";
+import { LogSubscriber } from "./log-subscriber.js";
 import { Base } from "./index.js";
 import {
   LogSubscriber as BaseLogSubscriber,
@@ -114,7 +114,7 @@ describe("LogSubscriberTest", () => {
   afterEach(() => {
     LogSubscriber.logger = null;
     Base.logger = oldBaseLogger;
-    setVerboseQueryLogs(false);
+    Base.verboseQueryLogs = false;
   });
 
   it("schema statements are ignored", () => {
@@ -302,14 +302,14 @@ describe("LogSubscriberTest", () => {
   });
 
   it("verbose query logs", () => {
-    setVerboseQueryLogs(true);
+    Base.verboseQueryLogs = true;
     subscriber.sql(makeEvent({ sql: "hi mom!" }));
     expect(mockLogger.logged("debug").length).toBe(2);
     expect(mockLogger.logged("debug")[mockLogger.logged("debug").length - 1]).toMatch(/↳/);
   });
 
   it("verbose query with ignored callstack", () => {
-    setVerboseQueryLogs(true);
+    Base.verboseQueryLogs = true;
     const original = (subscriber as any).querySourceLocation;
     (subscriber as any).querySourceLocation = () => null;
     subscriber.sql(makeEvent({ sql: "hi mom!" }));

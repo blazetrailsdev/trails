@@ -2,6 +2,13 @@
   {
     "package": "activerecord",
     "tsFile": "log-subscriber.ts",
+    "rubyName": "debug",
+    "call": "verbose_query_logs",
+    "reason": "verbose_query_logs is read through getVerboseQueryLogs(), the module-local backing binding that the Rails-named Base.verboseQueryLogs accessor writes; log-subscriber.ts cannot import base.ts (the cycle the _baseResolver seam exists to break)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "log-subscriber.ts",
     "rubyName": "query_source_location",
     "call": "clean_frame",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

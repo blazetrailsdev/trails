@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql/type-metadata.ts",
+    "rubyName": "deduplicate",
+    "call": "registry",
+    "reason": "PostgreSQL::TypeMetadata overrides deduplicate to skip the Deduplicable registry: it implements no deduplicateKey(), so there is no registry key to look itself up under. Rails reaches the registry through the shared Deduplicable#deduplicate, which trails ports in connection-adapters/deduplicable.ts."
+  }
+]

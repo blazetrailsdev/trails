@@ -65,8 +65,6 @@ export type { AssociationOptions } from "./associations.js";
 export { Transaction } from "./transaction.js";
 export {
   LogSubscriber,
-  getVerboseQueryLogs,
-  setVerboseQueryLogs,
   setBaseResolver as setLogSubscriberBaseResolver,
 } from "./log-subscriber.js";
 export { ExplainSubscriber } from "./explain-subscriber.js";

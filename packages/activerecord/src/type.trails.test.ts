@@ -3,7 +3,6 @@ import {
   register,
   lookup,
   registry,
-  setRegistry,
   currentAdapterName,
   adapterNameFrom,
   AdapterSpecificRegistry,
@@ -75,12 +74,12 @@ describe("Type.lookup under a non-sqlite configuration", () => {
 
   beforeEach(() => {
     oldRegistry = registry();
-    setRegistry(new AdapterSpecificRegistry());
+    registry(new AdapterSpecificRegistry());
     oldDbConfig = (Base as unknown as { connectionDbConfig: unknown }).connectionDbConfig;
   });
 
   afterEach(() => {
-    setRegistry(oldRegistry);
+    registry(oldRegistry);
     (Base as unknown as { connectionDbConfig: unknown }).connectionDbConfig = oldDbConfig;
   });
 
@@ -106,7 +105,7 @@ describe("Type.lookup under a non-sqlite configuration", () => {
   });
 
   it("reaches the mysql2 adapter's own string registration", () => {
-    setRegistry(oldRegistry);
+    registry(oldRegistry);
     stubAdapter("mysql2");
 
     const type = lookup("string");
