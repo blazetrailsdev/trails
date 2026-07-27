@@ -198,8 +198,12 @@ On every run, for every **existing** matched method, `api:build`:
    `compare.ts --wide-calls` writes to `output/call-mismatches-wide.json`).
    `api:build` does not re-derive; it reads the artifact and fails if stale
    or partial-scope, using the same `missingScope` guard as the lints.
-2. Parses the method's existing `@missingRailsCall` tags (TS compiler API,
-   same toolchain `extract-ts-api.ts` already uses — no new parser dep).
+2. Parses the method's existing `@missingRailsCall` tags — `parseJsdoc`'s
+   line regex over the raw comment text (`build.ts:78`), not the TS compiler
+   API, so each tag's `rawLines` survive verbatim for the byte-for-byte
+   round-trip idempotency depends on (see "Sibling tag: `@noRailsEquivalent`"
+   below for why the sibling tag reads differently). No new parser dep
+   either way.
 3. Diffs:
    - **newly missing** (in artifact, not tagged): add a tag. Reason source
      precedence: (a) the curated `reason` from the matching
@@ -431,7 +435,8 @@ Reused as-is (no forks, no reimplementation):
 
 Genuinely new (the whole of `scripts/api-compare/build.ts` + friends):
 
-- `@missingRailsCall` tag parser/emitter (TS compiler API, JSDoc-node level).
+- `@missingRailsCall` tag parser/emitter (`parseJsdoc` over raw JSDoc text,
+  preserving `rawLines`).
 - Stub emitter (signature synthesis, `@nie`-annotated throw, per-package
   `NotImplementedError` import map).
 - Reconcile engine (diff, reason-precedence, harvest report).
