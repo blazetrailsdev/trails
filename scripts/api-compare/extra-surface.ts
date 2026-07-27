@@ -355,7 +355,7 @@ interface PackageTotals {
   extraFiles: ExtraFile[];
 }
 
-interface AllowlistSummary {
+interface TaggedSummary {
   total: number;
   matched: number;
   stale: TaggedEntry[];
@@ -365,14 +365,8 @@ interface Report {
   generatedAt: string;
   packages: PackageTotals[];
   topN: ExtraFile[];
-  /**
-   * Retained key name for the stats-DB consumer. Since RFC 0080 retired
-   * extra-surface-allow.json it is fed solely by `@noRailsEquivalent` tags,
-   * and is identical to `tagged`.
-   */
-  allowlist: AllowlistSummary;
   /** `@noRailsEquivalent` tags found in the TS manifest. */
-  tagged: AllowlistSummary;
+  tagged: TaggedSummary;
 }
 
 const HELP = `extra-surface — TS files with public API exceeding their Rails counterpart
@@ -1161,7 +1155,7 @@ export function buildReport(
     (e) => scannedPkgs.has(e.package) && !matchedTagKeys.has(allowKeyOf(e)),
   );
 
-  const taggedSummary: AllowlistSummary = {
+  const taggedSummary: TaggedSummary = {
     total: tagged.length,
     matched: matchedTagKeys.size,
     stale: staleTagged,
@@ -1170,7 +1164,6 @@ export function buildReport(
     generatedAt: new Date().toISOString(),
     packages,
     topN: allExtras.slice(0, opts.topN),
-    allowlist: taggedSummary,
     tagged: taggedSummary,
   };
 }
