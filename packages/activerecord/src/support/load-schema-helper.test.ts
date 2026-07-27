@@ -18,6 +18,7 @@ describe("LoadSchemaHelper", () => {
       expect(tables.length).toBeGreaterThan(300);
       expect(tables).toContain("topics");
       expect(tables).toContain("posts");
+      expect(tables).not.toContain("chat_messages");
     } finally {
       await (adapter as unknown as BetterSQLite3Adapter).close();
     }
