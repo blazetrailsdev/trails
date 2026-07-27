@@ -121,7 +121,9 @@ export class ClassMethods {
 
   static set lockingColumn(column: string) {
     reloadSchemaFromCache.call(this as any);
-    (this as any)._lockingColumn = column;
+    // Rails stores `value.to_s`, and every call site assigns a Symbol
+    // (`self.locking_column = :version`). `nil.to_s` is "", not "null".
+    (this as any)._lockingColumn = column == null ? "" : String(column);
   }
 
   /** Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#locking_enabled? */
