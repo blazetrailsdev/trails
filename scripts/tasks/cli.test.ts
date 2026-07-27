@@ -96,6 +96,16 @@ import {
   staleClaims,
   formatStaleClaims,
   DEFAULT_STALE_HOURS,
+  RfcEntry,
+  comparePriority,
+  priorityContext,
+  remainingStoryCounts,
+  applyRfcPriorities,
+  effectivePriority,
+  parseRfcPriority,
+  readRfcPriority,
+  rfcPriorityFlag,
+  rfcPriorityMap,
 } from "./cli.ts";
 
 function story(over: Partial<StoryEntry>): StoryEntry {
@@ -3449,11 +3459,24 @@ describe("buildIndexFromOriginMain (read path serves the origin/main tree)", () 
     const cacheDir = join(gitDir, "trails-tasks-read-index");
     mkdirSync(cacheDir, { recursive: true });
     const cached = { ...emptyIndex, generated_at: "cached" };
-    writeFileSync(join(cacheDir, `${SHA}.json`), JSON.stringify(cached));
+    writeFileSync(join(cacheDir, `${SHA}.v2.json`), JSON.stringify(cached));
     const got = buildIndexFromOriginMain();
     expect(got?.sha).toBe(SHA);
     expect(got?.index.generated_at).toBe("cached");
     expect(seen).toEqual(["fetch", "rev-parse"]);
+  });
+
+  it("ignores a pre-v2 entry for the same sha (it carries no RFC priorities)", () => {
+    const { gitDir, seen } = setup();
+    const cacheDir = join(gitDir, "trails-tasks-read-index");
+    mkdirSync(cacheDir, { recursive: true });
+    writeFileSync(
+      join(cacheDir, `${SHA}.json`),
+      JSON.stringify({ ...emptyIndex, generated_at: "v1-cached" }),
+    );
+    const got = buildIndexFromOriginMain();
+    expect(got?.index.generated_at).toBe("2026-01-01");
+    expect(seen).toContain("build-index");
   });
 
   it("exports the tree, builds the index there, and caches it by sha", () => {
@@ -3468,7 +3491,7 @@ describe("buildIndexFromOriginMain (read path serves the origin/main tree)", () 
     expect(got?.index.generated_at).toBe("2026-01-01");
     expect(seen).toEqual(["fetch", "rev-parse", "archive", "tar", "build-index"]);
     // Cached for the next reader, and the superseded sha is pruned.
-    expect(existsSync(join(gitDir, "trails-tasks-read-index", `${SHA}.json`))).toBe(true);
+    expect(existsSync(join(gitDir, "trails-tasks-read-index", `${SHA}.v2.json`))).toBe(true);
     expect(existsSync(stale)).toBe(false);
     // Another agent's half-written entry is not a superseded index — pruning it
     // would break its rename.
@@ -3595,5 +3618,376 @@ describe("syncWorktreeToOrigin (pre-read sync)", () => {
     const lock = acquireTasksLock(undefined, { waitMs: 300, onTimeout: "give-up" });
     expect(lock).not.toBeNull();
     releaseTasksLock(lock);
+  });
+});
+
+describe("RFC-level priority", () => {
+  function idxWith(stories: StoryEntry[], priorities: Record<string, number> = {}): Index {
+    const idx = index(stories);
+    idx.rfcs.push({
+      id: "0003-r",
+      title: "R3",
+      status: "active",
+      owner: "@x",
+      packages: [],
+      clusters: ["c1", "c2"],
+      file_path: "0003-r/README.md",
+    });
+    for (const r of idx.rfcs) r.priority = priorities[r.id] ?? null;
+    return idx;
+  }
+
+  describe("effectivePriority", () => {
+    it("uses the story's own priority when it sets one", () => {
+      const m = new Map([["0001-r", 5]]);
+      expect(effectivePriority(story({ priority: 2 }), m)).toBe(2);
+    });
+
+    it("falls back to the story's RFC priority when the story sets none", () => {
+      const m = new Map([["0001-r", 5]]);
+      expect(effectivePriority(story({ priority: null }), m)).toBe(5);
+    });
+
+    it("is Infinity when neither the story nor its RFC sets a priority", () => {
+      expect(effectivePriority(story({ priority: null }), new Map())).toBe(Infinity);
+    });
+
+    it("takes a story priority of 0 literally rather than inheriting", () => {
+      const m = new Map([["0001-r", 5]]);
+      expect(effectivePriority(story({ priority: 0 }), m)).toBe(0);
+    });
+  });
+
+  describe("rfcPriorityMap", () => {
+    it("maps only the RFCs that declare a priority", () => {
+      const idx = idxWith([], { "0001-r": 4 });
+      expect([...rfcPriorityMap(idx)]).toEqual([["0001-r", 4]]);
+    });
+  });
+
+  describe("ready ordering", () => {
+    it("orders a story with no priority of its own by its RFC's priority", () => {
+      const idx = idxWith(
+        [story({ id: "plain", rfc: "0003-r" }), story({ id: "inherits", rfc: "0001-r" })],
+        { "0001-r": 5 },
+      );
+      expect(ready(idx).map((s) => s.id)).toEqual(["inherits", "plain"]);
+    });
+
+    it("treats a story-set priority as absolute, never clamped to its RFC's band", () => {
+      const idx = idxWith(
+        [
+          story({ id: "high", rfc: "0001-r", priority: null }),
+          story({ id: "low", rfc: "0003-r", priority: 2 }),
+        ],
+        { "0001-r": 3, "0003-r": 9 },
+      );
+      expect(ready(idx).map((s) => s.id)).toEqual(["low", "high"]);
+    });
+
+    it("lets a story's own priority sort it BELOW its RFC's inherited default", () => {
+      const idx = idxWith(
+        [story({ id: "own", rfc: "0001-r", priority: 8 }), story({ id: "inh", rfc: "0001-r" })],
+        { "0001-r": 1 },
+      );
+      expect(ready(idx).map((s) => s.id)).toEqual(["inh", "own"]);
+    });
+
+    it("leaves ordering byte-identical to index order when no RFC sets a priority", () => {
+      const ids = ["z", "m", "a", "q"];
+      const idx = idxWith(ids.map((id) => story({ id })));
+      expect(ready(idx).map((s) => s.id)).toEqual(ids);
+    });
+
+    it("still honors story priority alone when no RFC sets a priority", () => {
+      const idx = idxWith([story({ id: "b", priority: 9 }), story({ id: "a", priority: 1 })]);
+      expect(ready(idx).map((s) => s.id)).toEqual(["a", "b"]);
+    });
+  });
+
+  describe("equal-priority RFC tie-break (fewer stories remaining wins)", () => {
+    it("counts only stories that are neither done nor closed as remaining", () => {
+      const idx = idxWith([
+        story({ id: "a", rfc: "0001-r", status: "ready" }),
+        story({ id: "b", rfc: "0001-r", status: "in-progress" }),
+        story({ id: "c", rfc: "0001-r", status: "done" }),
+        story({ id: "d", rfc: "0001-r", status: "closed" }),
+        story({ id: "e", rfc: "0003-r", status: "blocked" }),
+      ]);
+      expect([...remainingStoryCounts(idx)]).toEqual([
+        ["0001-r", 2],
+        ["0003-r", 1],
+      ]);
+    });
+
+    it("orders the RFC with fewer stories left first when priorities are equal", () => {
+      const idx = idxWith(
+        [
+          story({ id: "big1", rfc: "0001-r" }),
+          story({ id: "big2", rfc: "0001-r" }),
+          story({ id: "big3", rfc: "0001-r" }),
+          story({ id: "small1", rfc: "0003-r" }),
+        ],
+        { "0001-r": 2, "0003-r": 2 },
+      );
+      expect(ready(idx)[0].id).toBe("small1");
+    });
+
+    it("ignores shipped work: an RFC with many done stories still counts as near-empty", () => {
+      const idx = idxWith(
+        [
+          story({ id: "lean1", rfc: "0001-r", status: "done" }),
+          story({ id: "lean2", rfc: "0001-r", status: "done" }),
+          story({ id: "lean3", rfc: "0001-r", status: "ready" }),
+          story({ id: "fat1", rfc: "0003-r" }),
+          story({ id: "fat2", rfc: "0003-r" }),
+        ],
+        { "0001-r": 1, "0003-r": 1 },
+      );
+      expect(ready(idx)[0].id).toBe("lean3");
+    });
+
+    it("breaks a tie between two stories that set the same priority themselves", () => {
+      const idx = idxWith(
+        [
+          story({ id: "fromBig", rfc: "0001-r", priority: 4 }),
+          story({ id: "fromBigB", rfc: "0001-r" }),
+          story({ id: "fromSmall", rfc: "0003-r", priority: 4 }),
+        ],
+        { "0001-r": 7, "0003-r": 7 },
+      );
+      expect(ready(idx)[0].id).toBe("fromSmall");
+    });
+
+    it("does not apply when the two RFC priorities differ", () => {
+      const idx = idxWith(
+        [
+          story({ id: "bigRfcFirst", rfc: "0001-r", priority: 4 }),
+          story({ id: "bigRfcSecond", rfc: "0001-r", priority: 4 }),
+          story({ id: "smallRfc", rfc: "0003-r", priority: 4 }),
+        ],
+        { "0001-r": 1, "0003-r": 2 },
+      );
+      expect(ready(idx).map((s) => s.id)).toEqual(["bigRfcFirst", "bigRfcSecond", "smallRfc"]);
+    });
+
+    it("does not reshuffle unprioritized RFCs by size", () => {
+      const idx = idxWith([
+        story({ id: "big1", rfc: "0001-r" }),
+        story({ id: "big2", rfc: "0001-r" }),
+        story({ id: "small1", rfc: "0003-r" }),
+      ]);
+      expect(ready(idx).map((s) => s.id)).toEqual(["big1", "big2", "small1"]);
+    });
+
+    it("leaves stories of one RFC in index order", () => {
+      const idx = idxWith(
+        [
+          story({ id: "s1", rfc: "0001-r" }),
+          story({ id: "s2", rfc: "0001-r" }),
+          story({ id: "s3", rfc: "0001-r" }),
+        ],
+        { "0001-r": 1 },
+      );
+      expect(ready(idx).map((s) => s.id)).toEqual(["s1", "s2", "s3"]);
+    });
+
+    it("returns 0 for two unprioritized stories rather than NaN", () => {
+      const idx = idxWith([story({ id: "a" }), story({ id: "b", rfc: "0003-r" })]);
+      const ctx = priorityContext(idx);
+      expect(comparePriority(idx.stories[0], idx.stories[1], ctx)).toBe(0);
+    });
+  });
+
+  describe("nextBundle", () => {
+    it("leads the bundle with the nearer-to-done of two equal-priority RFCs", () => {
+      const idx = idxWith(
+        [
+          story({ id: "big1", rfc: "0001-r", cluster: "c1", est_loc: 100 }),
+          story({ id: "big2", rfc: "0001-r", cluster: "c1", est_loc: 100 }),
+          story({ id: "small1", rfc: "0003-r", cluster: "c2", est_loc: 100 }),
+        ],
+        { "0001-r": 3, "0003-r": 3 },
+      );
+      expect(nextBundle(idx, { maxLoc: 250 })[0].id).toBe("small1");
+    });
+
+    it("leads with a story that inherits its RFC's priority, overriding LOC packing", () => {
+      const idx = idxWith(
+        [
+          story({ id: "a1", rfc: "0001-r", cluster: "c1", est_loc: 100 }),
+          story({ id: "a2", rfc: "0001-r", cluster: "c1", est_loc: 100 }),
+          story({ id: "b1", rfc: "0003-r", cluster: "c2", est_loc: 240 }),
+        ],
+        { "0001-r": 2 },
+      );
+      const bundle = nextBundle(idx, { maxLoc: 250 });
+      expect(bundle[0].id).toBe("a1");
+      expect(bundle.map((s) => s.id).sort()).toEqual(["a1", "a2"]);
+    });
+
+    it("packs by cluster LOC exactly as before when no RFC sets a priority", () => {
+      const idx = idxWith([
+        story({ id: "a1", cluster: "c1", est_loc: 100 }),
+        story({ id: "a2", cluster: "c1", est_loc: 100 }),
+        story({ id: "b1", cluster: "c2", est_loc: 240 }),
+      ]);
+      expect(nextBundle(idx, { maxLoc: 250 }).map((s) => s.id)).toEqual(["b1"]);
+    });
+  });
+
+  describe("parseRfcPriority / readRfcPriority / applyRfcPriorities", () => {
+    function rfcDir(readme?: string): string {
+      const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+      mkdirSync(join(dir, "rfcs", "0005-gaps"), { recursive: true });
+      if (readme !== undefined) {
+        writeFileSync(join(dir, "rfcs", "0005-gaps", "README.md"), readme);
+      }
+      return dir;
+    }
+
+    it("reads the priority scalar from an RFC README", () => {
+      expect(
+        readRfcPriority(rfcDir(`---\nstatus: active\npriority: 3\n---\nbody\n`), "0005-gaps"),
+      ).toBe(3);
+    });
+
+    it("reads 0 as a real priority, not as absent", () => {
+      expect(parseRfcPriority(`---\npriority: 0\n---\nbody\n`)).toBe(0);
+    });
+
+    it("returns null for an absent, malformed, negative, or non-integer priority", () => {
+      expect(parseRfcPriority(`---\nstatus: active\n---\nbody\n`)).toBeNull();
+      expect(parseRfcPriority(`---\npriority: high\n---\n`)).toBeNull();
+      expect(parseRfcPriority(`---\npriority: -1\n---\n`)).toBeNull();
+      expect(parseRfcPriority(`---\npriority: 1.5\n---\n`)).toBeNull();
+      expect(parseRfcPriority(`no frontmatter here\n`)).toBeNull();
+    });
+
+    it("returns null when the README is missing", () => {
+      expect(readRfcPriority(rfcDir(), "0005-gaps")).toBeNull();
+    });
+
+    function idxOf(...rfcs: Partial<RfcEntry>[]): Index {
+      return {
+        generated_at: "now",
+        rfcs: rfcs.map((r) => ({
+          id: "0005-gaps",
+          title: "G",
+          status: "active",
+          owner: "@x",
+          packages: [],
+          clusters: [],
+          file_path: `rfcs/${r.id ?? "0005-gaps"}/README.md`,
+          ...r,
+        })),
+        stories: [],
+      };
+    }
+
+    it("fills rfcs[].priority from each README, leaving unreadable ones null", () => {
+      const dir = rfcDir(`---\nstatus: active\npriority: 7\n---\nbody\n`);
+      const idx = idxOf({ id: "0005-gaps" }, { id: "0006-missing" });
+      applyRfcPriorities(idx, dir);
+      expect(idx.rfcs.map((r) => r.priority)).toEqual([7, null]);
+    });
+
+    it("does not re-read an RFC whose priority is already populated", () => {
+      const idx = idxOf({ id: "0005-gaps", priority: 2 });
+      applyRfcPriorities(idx, mkdtempSync(join(tmpdir(), "tasks-test-")));
+      expect(idx.rfcs[0].priority).toBe(2);
+    });
+
+    const REAL_README = [
+      "---",
+      'rfc: "0005-gaps"',
+      'title: "Gaps"',
+      "status: active",
+      "created: 2026-07-04",
+      "updated: 2026-07-25",
+      'owner: "@your-handle"',
+      "packages: []",
+      "clusters: []",
+      "---",
+      "",
+      "# RFC 0005 — Gaps",
+      "",
+    ].join("\n");
+
+    it("round-trips a set then a clear on a real-shaped RFC README", () => {
+      const dir = rfcDir(REAL_README);
+      const readme = join(dir, "rfcs", "0005-gaps", "README.md");
+      editFrontmatter(readme, { priority: "4" });
+      expect(readRfcPriority(dir, "0005-gaps")).toBe(4);
+      removeFrontmatterKey(readme, "priority");
+      expect(readRfcPriority(dir, "0005-gaps")).toBeNull();
+      expect(readFileSync(readme, "utf8")).toBe(REAL_README);
+    });
+
+    it("leaves the RFC\'s other frontmatter keys untouched by a priority set", () => {
+      const dir = rfcDir(REAL_README);
+      const readme = join(dir, "rfcs", "0005-gaps", "README.md");
+      editFrontmatter(readme, { priority: "0" });
+      const out = readFileSync(readme, "utf8");
+      for (const line of REAL_README.split("\n")) expect(out).toContain(line);
+      expect(out).toContain("priority: 0");
+      expect(out).toContain("# RFC 0005 — Gaps");
+    });
+  });
+
+  describe("rfcPriorityFlag (rfc --priority argument)", () => {
+    const parse = (args: string[]) => rfcPriorityFlag(parseFlags(args).flags);
+
+    it("returns undefined when --priority is absent (the RFC is left untouched)", () => {
+      expect(parse(["0001-r", "--status", "active"])).toBeUndefined();
+    });
+
+    it("parses --priority <N>", () => {
+      expect(parse(["0001-r", "--priority", "3"])).toBe(3);
+      expect(parse(["0001-r", "--priority", "0"])).toBe(0);
+    });
+
+    it("returns null for --priority --clear", () => {
+      expect(parse(["0001-r", "--priority", "--clear"])).toBeNull();
+    });
+
+    it("rejects a non-integer or negative N, a valueless --priority, and <N> --clear", () => {
+      expect(parse(["0001-r", "--priority", "high"])).toBe("invalid");
+      expect(parse(["0001-r", "--priority", "1.5"])).toBe("invalid");
+      expect(parse(["0001-r", "--priority", "-2"])).toBe("invalid");
+      expect(parse(["0001-r", "--priority"])).toBe("invalid");
+      expect(parse(["0001-r", "--priority", "3", "--clear"])).toBe("invalid");
+    });
+  });
+
+  describe("formatRows surface", () => {
+    it("marks an inherited priority with a trailing *", () => {
+      const out = formatRows(
+        [story({ id: "a", priority: null })],
+        new Set(),
+        new Map([["0001-r", 6]]),
+      );
+      expect(out.split("\n").find((l) => l.startsWith("a"))!).toContain("6*");
+    });
+
+    it("shows a story's own priority unmarked, even under a prioritized RFC", () => {
+      const out = formatRows(
+        [story({ id: "a", priority: 2 })],
+        new Set(),
+        new Map([["0001-r", 6]]),
+      );
+      const dataLine = out.split("\n").find((l) => l.startsWith("a"))!;
+      expect(dataLine).toContain("2");
+      expect(dataLine).not.toContain("*");
+    });
+
+    it("renders an em dash when neither the story nor its RFC is prioritized", () => {
+      const out = formatRows([story({ id: "a", priority: null })]);
+      expect(out.split("\n").find((l) => l.startsWith("a"))!).toContain("—");
+    });
+
+    it("documents the inherited marker in the legend", () => {
+      expect(PRIORITY_LEGEND).toContain("N* = inherited");
+    });
   });
 });

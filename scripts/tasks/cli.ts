@@ -103,6 +103,7 @@ export interface RfcEntry {
   owner: string | null;
   packages: string[];
   clusters: string[];
+  priority?: number | null;
   file_path: string;
 }
 export interface StoryEntry {
@@ -150,12 +151,14 @@ export function loadIndex(): Index {
       stdio: "inherit",
     });
   }
-  return JSON.parse(readFileSync(indexPath, "utf8")) as Index;
+  return applyRfcPriorities(JSON.parse(readFileSync(indexPath, "utf8")) as Index, TASKS_DIR);
 }
 
 // ──────────────────── read path (origin/main tree) ────────────────────
 
 const READ_INDEX_CACHE_DIRNAME = "trails-tasks-read-index";
+
+const READ_INDEX_CACHE_VERSION = "v2";
 
 export interface ReadIndex {
   index: Index;
@@ -216,7 +219,7 @@ export function buildIndexFromOriginMain(cwd?: string): { index: Index; sha: str
   }
   if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(sha) || !gitDir) return null;
   const cacheDir = join(gitDir, READ_INDEX_CACHE_DIRNAME);
-  const entryName = `${sha}.json`;
+  const entryName = `${sha}.${READ_INDEX_CACHE_VERSION}.json`;
   const cached = join(cacheDir, entryName);
   if (existsSync(cached)) {
     try {
@@ -234,9 +237,11 @@ export function buildIndexFromOriginMain(cwd?: string): { index: Index; sha: str
     execFileSync("tar", ["-xf", tarPath, "-C", treeDir], { stdio: "ignore" });
     linkNodeModules(treeDir, cwd ?? TASKS_DIR);
     execFileSync(process.execPath, ["scripts/build-index.mjs"], { cwd: treeDir, stdio: "ignore" });
-    const built = readFileSync(join(treeDir, "index.json"), "utf8");
-    const index = JSON.parse(built) as Index;
-    writeCacheEntryAtomically(cacheDir, entryName, built);
+    const index = applyRfcPriorities(
+      JSON.parse(readFileSync(join(treeDir, "index.json"), "utf8")) as Index,
+      treeDir,
+    );
+    writeCacheEntryAtomically(cacheDir, entryName, JSON.stringify(index));
     return { index, sha };
   } catch {
     return null;
@@ -328,7 +333,48 @@ export function isDepResolved(status: string | null | undefined): boolean {
   return status === "done" || status === "closed";
 }
 
+export function rfcPriorityMap(index: Index): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const r of index.rfcs) if (typeof r.priority === "number") m.set(r.id, r.priority);
+  return m;
+}
+
+export function effectivePriority(s: StoryEntry, rfcPriority: ReadonlyMap<string, number>): number {
+  return s.priority ?? rfcPriority.get(s.rfc) ?? Infinity;
+}
+
+export interface PriorityContext {
+  rfcPriority: ReadonlyMap<string, number>;
+  remaining: ReadonlyMap<string, number>;
+}
+
+export function remainingStoryCounts(index: Index): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const s of index.stories) {
+    if (isDepResolved(s.status)) continue;
+    m.set(s.rfc, (m.get(s.rfc) ?? 0) + 1);
+  }
+  return m;
+}
+
+export function priorityContext(index: Index): PriorityContext {
+  return { rfcPriority: rfcPriorityMap(index), remaining: remainingStoryCounts(index) };
+}
+
+export function comparePriority(a: StoryEntry, b: StoryEntry, ctx: PriorityContext): number {
+  const ea = effectivePriority(a, ctx.rfcPriority);
+  const eb = effectivePriority(b, ctx.rfcPriority);
+  if (ea !== eb) return ea < eb ? -1 : 1;
+  const pa = ctx.rfcPriority.get(a.rfc);
+  const pb = ctx.rfcPriority.get(b.rfc);
+  if (pa === undefined || pa !== pb) return 0;
+  const ra = ctx.remaining.get(a.rfc) ?? 0;
+  const rb = ctx.remaining.get(b.rfc) ?? 0;
+  return ra === rb ? 0 : ra - rb;
+}
+
 export function ready(index: Index, opts: { rfc?: string } = {}): StoryEntry[] {
+  const ctx = priorityContext(index);
   const rfcStatus = new Map(index.rfcs.map((r) => [r.id, r.status]));
   const storyStatus = new Map(index.stories.map((s) => [s.id, s.status]));
   return (
@@ -352,14 +398,14 @@ export function ready(index: Index, opts: { rfc?: string } = {}): StoryEntry[] {
         if (s.deps_rfc.some((d) => rfcStatus.get(d) !== "closed")) return false;
         return true;
       })
-      // Order the ready queue by priority (lower N first), honoring the
-      // `priority` frontmatter's documented contract ("ready-queue priority").
-      // Unprioritized stories (null) sort last. Array.sort is stable, so ties —
-      // including the all-null common case — keep index order, leaving callers
-      // that don't set priority (and their tests) unaffected. `next-bundle`
-      // re-derives its own ordering on top of this; the gain here is that the
-      // `ready` command's output reflects priority too.
-      .sort((a, b) => (a.priority ?? Infinity) - (b.priority ?? Infinity))
+      // Order the ready queue by effective priority (lower N first), honoring
+      // the `priority` frontmatter's documented contract ("ready-queue
+      // priority"). Unprioritized stories sort last. Array.sort is stable, so
+      // ties — including the all-unprioritized common case — keep index order,
+      // leaving callers that don't set priority (and their tests) unaffected.
+      // `next-bundle` re-derives its own ordering on top of this; the gain here
+      // is that the `ready` command's output reflects priority too.
+      .sort((a, b) => comparePriority(a, b, ctx))
   );
 }
 
@@ -411,16 +457,15 @@ export function nextBundle(
   // `.filter()` preserves order, so `prioritized[0]` is the highest-priority
   // candidate without re-sorting here — the ordering source of truth stays in
   // `ready()`.
-  const prioritized = inScope.filter((s) => s.priority !== null);
+  const ctx = priorityContext(index);
+  const prioritized = inScope.filter((s) => effectivePriority(s, ctx.rfcPriority) !== Infinity);
   if (prioritized.length > 0) {
     const lead = prioritized[0];
     const leadLoc = lead.est_loc ?? 0;
     const rest = inScope.filter(
       (s) => s.id !== lead.id && s.cluster === lead.cluster && s.est_loc !== null,
     );
-    const fill = bestBundle(rest, opts.maxLoc - leadLoc).sort(
-      (a, b) => (a.priority ?? Infinity) - (b.priority ?? Infinity),
-    );
+    const fill = bestBundle(rest, opts.maxLoc - leadLoc).sort((a, b) => comparePriority(a, b, ctx));
     return [lead, ...fill];
   }
   // Unprioritized path: knapsack same-cluster stories by est_loc, so stories
@@ -1711,6 +1756,7 @@ function rfc(
     relate?: string;
     clusters?: string;
     packages?: string;
+    priority?: number | null;
   },
 ): void {
   inGitTasks();
@@ -1737,14 +1783,31 @@ function rfc(
   const clusters = opts.clusters !== undefined ? parseCsv(opts.clusters) : undefined;
   const packages = opts.packages !== undefined ? parseCsv(opts.packages) : undefined;
 
-  if (
-    status === undefined &&
-    relate === undefined &&
-    clusters === undefined &&
-    packages === undefined
-  ) {
+  const otherEdits =
+    status !== undefined ||
+    relate !== undefined ||
+    clusters !== undefined ||
+    packages !== undefined;
+  if (!otherEdits && opts.priority === undefined) {
     restoreGeneratedFiles(TASKS_DIR);
     usage();
+  }
+
+  let priority = opts.priority;
+  if (priority !== undefined) {
+    const current = index.rfcs.find((r) => r.id === slug)?.priority ?? null;
+    if (current === priority) {
+      console.log(
+        priority === null
+          ? `priority already clear on rfc ${slug}`
+          : `rfc ${slug} already priority ${priority}`,
+      );
+      priority = undefined;
+      if (!otherEdits) {
+        restoreGeneratedFiles(TASKS_DIR);
+        return;
+      }
+    }
   }
 
   // Warn (don't block) on a clusters change that drops a cluster still referenced
@@ -1771,6 +1834,9 @@ function rfc(
   if (relate !== undefined) changes.push(`relate [${relate.join(", ")}]`);
   if (clusters !== undefined) changes.push(`clusters [${clusters.join(", ")}]`);
   if (packages !== undefined) changes.push(`packages [${packages.join(", ")}]`);
+  if (priority !== undefined) {
+    changes.push(priority === null ? "priority clear" : `priority ${priority}`);
+  }
 
   commitAndPush({
     message: `rfc ${slug}: ${changes.join(", ")}`,
@@ -1787,6 +1853,8 @@ function rfc(
       if (relate !== undefined) setFrontmatterList(file, "related-rfcs", relate);
       if (clusters !== undefined) setFrontmatterList(file, "clusters", clusters);
       if (packages !== undefined) setFrontmatterList(file, "packages", packages);
+      if (priority === null) removeFrontmatterKey(file, "priority");
+      else if (priority !== undefined) editFrontmatter(file, { priority: String(priority) });
       editFrontmatter(file, { updated: today() });
     },
   });
@@ -2139,6 +2207,38 @@ export function readRfcStatus(tasksDir: string, rfcSlug: string): RfcStatus | nu
   } catch {
     return null;
   }
+}
+
+export function parseRfcPriority(text: string): number | null {
+  const fmMatch = text.match(/^---\n([\s\S]*?)\n---/);
+  if (!fmMatch) return null;
+  try {
+    const fm = parseYaml(fmMatch[1]) as { priority?: unknown } | null;
+    const p = fm?.priority;
+    return Number.isInteger(p) && (p as number) >= 0 ? (p as number) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function readRfcPriority(tasksDir: string, rfcSlug: string): number | null {
+  try {
+    return parseRfcPriority(readFileSync(join(tasksDir, "rfcs", rfcSlug, "README.md"), "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+export function applyRfcPriorities(index: Index, rootDir: string): Index {
+  for (const r of index.rfcs) {
+    if (r.priority !== undefined) continue;
+    try {
+      r.priority = parseRfcPriority(readFileSync(join(rootDir, r.file_path), "utf8"));
+    } catch {
+      r.priority = null;
+    }
+  }
+  return index;
 }
 
 // Pure content generator — exported so tests can verify the exact file format
@@ -2807,9 +2907,11 @@ export function prLocDelta(pr: number, estLoc: number | null): string | null {
 
 // One-line legend printed above every story table so the priority column's
 // direction is documented wherever the ordering is shown (`ready`, `list`,
-// `next-bundle`). Ties at the same priority have no defined order.
+// `next-bundle`). Ties break toward the equal-priority RFC with fewer stories
+// left; anything still tied after that has no defined order.
 export const PRIORITY_LEGEND =
-  "priority: lower N = higher priority; absent = unprioritized; ties have undefined order";
+  "priority: lower N = higher priority; absent = unprioritized; N* = inherited from the " +
+  "story's RFC; equal-priority RFCs: fewer stories remaining first";
 
 // Default age (hours) past which a `claimed` story with no PR is flagged stale.
 // Overridable via `--stale-hours N`. Read once per command so `status` and
@@ -2863,10 +2965,18 @@ export function formatStaleClaims(rows: StoryEntry[], nowMs: number): string {
 // content (e.g. est_loc rendered from a numeric value, priority shown) without
 // capturing stdout. `null` cells render as an em dash. Ids in `staleIds` get a
 // `!` suffix in the status column, computed by the caller via staleClaims().
-export function formatRows(rows: StoryEntry[], staleIds: ReadonlySet<string> = new Set()): string {
+export function formatRows(
+  rows: StoryEntry[],
+  staleIds: ReadonlySet<string> = new Set(),
+  rfcPriority: ReadonlyMap<string, number> = new Map(),
+): string {
   if (!rows.length) return "(none)";
   const cols = ["id", "rfc", "status", "priority", "est_loc", "cluster"] as const;
   const cell = (r: StoryEntry, c: (typeof cols)[number]) => {
+    if (c === "priority" && r.priority === null) {
+      const inherited = rfcPriority.get(r.rfc);
+      return inherited === undefined ? "—" : `${inherited}*`;
+    }
     const v = String(r[c] ?? "—");
     return c === "status" && staleIds.has(r.id) ? `${v}!` : v;
   };
@@ -2879,8 +2989,12 @@ export function formatRows(rows: StoryEntry[], staleIds: ReadonlySet<string> = n
   ].join("\n");
 }
 
-function fmt(rows: StoryEntry[], staleIds?: ReadonlySet<string>): void {
-  console.log(formatRows(rows, staleIds));
+function fmt(
+  rows: StoryEntry[],
+  staleIds?: ReadonlySet<string>,
+  rfcPriority?: ReadonlyMap<string, number>,
+): void {
+  console.log(formatRows(rows, staleIds, rfcPriority));
 }
 
 // Pure renderer for `show <id>`: the resolved file path followed by the story's
@@ -2938,6 +3052,15 @@ export function numberFlag(flags: Record<string, string | boolean>, name: string
   const v = flags[name];
   if (typeof v !== "string" || !/^\d+$/.test(v)) return null;
   return Number(v);
+}
+
+export function rfcPriorityFlag(
+  flags: Record<string, string | boolean>,
+): number | null | undefined | "invalid" {
+  if (flags.priority === undefined) return undefined;
+  const raw = stringFlag(flags, "priority");
+  if (flags.clear === true) return raw === undefined ? null : "invalid";
+  return raw !== undefined && /^\d+$/.test(raw) ? Number(raw) : "invalid";
 }
 
 export function stringFlag(
@@ -3009,19 +3132,26 @@ function main(): void {
     "packages",
     "stale-hours",
   ];
-  for (const k of valueFlags) if (flags[k] === true) usage();
+  const rfcPriorityClear = cmd === "rfc" && flags.priority === true && flags.clear === true;
+  for (const k of valueFlags) {
+    if (flags[k] === true && !(k === "priority" && rfcPriorityClear)) usage();
+  }
 
   switch (cmd) {
     case "ready": {
-      const rows = ready(readIndexSource().index, { rfc: stringFlag(flags, "rfc") });
-      flags.json ? console.log(JSON.stringify(rows, null, 2)) : fmt(rows);
+      const idx = readIndexSource().index;
+      const rows = ready(idx, { rfc: stringFlag(flags, "rfc") });
+      flags.json
+        ? console.log(JSON.stringify(rows, null, 2))
+        : fmt(rows, undefined, rfcPriorityMap(idx));
       break;
     }
     case "next-bundle": {
       const maxLocRaw = stringFlag(flags, "max-loc") ?? "250";
       if (!/^\d+$/.test(maxLocRaw) || Number(maxLocRaw) <= 0) usage();
       const maxLoc = Number(maxLocRaw);
-      const rows = nextBundle(readIndexSource().index, {
+      const idx = readIndexSource().index;
+      const rows = nextBundle(idx, {
         maxLoc,
         cluster: stringFlag(flags, "cluster"),
         rfc: stringFlag(flags, "rfc"),
@@ -3035,7 +3165,7 @@ function main(): void {
         console.log(`no ready stories within ${maxLoc} LOC`);
       } else {
         console.log(`bundle (sum ${total} / max ${maxLoc}):`);
-        fmt(rows);
+        fmt(rows, undefined, rfcPriorityMap(idx));
       }
       break;
     }
@@ -3051,7 +3181,9 @@ function main(): void {
           (s) => s.id,
         ),
       );
-      flags.json ? console.log(JSON.stringify(rows, null, 2)) : fmt(rows, staleIds);
+      flags.json
+        ? console.log(JSON.stringify(rows, null, 2))
+        : fmt(rows, staleIds, rfcPriorityMap(idx));
       break;
     }
     case "show": {
@@ -3216,7 +3348,10 @@ function main(): void {
     case "rfc": {
       const slug = pos[0];
       if (!slug) usage();
+      const priority = rfcPriorityFlag(flags);
+      if (priority === "invalid") usage();
       rfc(slug, {
+        priority,
         status: stringFlag(flags, "status"),
         supersede: stringFlag(flags, "supersede"),
         relate: stringFlag(flags, "relate"),
@@ -3259,6 +3394,7 @@ function usage(): never {
   priority <id> <N> | priority <id> --clear    (lower N = higher priority)
   status-set <id> <status>                     (draft ↔ ready, blocked → ready, closed → ready; validates the transition)
   rfc <slug> [--status <s>] [--supersede <other-slug>] [--relate <csv>] [--clusters <csv>] [--packages <csv>]
+             [--priority <N> | --priority --clear]   (RFC-level default priority for its un-prioritized stories)
   set-deps <id> <csv>                          (replace deps; checks references + cycles; empty csv clears)
   set-deps-rfc <id> <csv>                      (replace deps-rfc; checks references; empty csv clears)
   new <rfc-slug> <story-slug> [--title "text"] [--status <v>] [--cluster <name>] [--est-loc <N>] [--deps <csv>] [--priority <N>] [--body-file <path>] [--allow-empty]
