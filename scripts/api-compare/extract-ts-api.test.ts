@@ -1381,6 +1381,41 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     expect(fns.find((f) => f.name === "hasMany")!.noRailsEquivalent).toBeUndefined();
   });
 
+  it("drops the reason on a renamed export of a tagged declaration", () => {
+    const info = extractFromFiles("/p", {
+      "routes-helpers.ts": `
+        /** @noRailsEquivalent \`with\` is an ES strict-mode reserved word */
+        export function withRoutesHelpers(): void {}
+
+        export { withRoutesHelpers as with };
+      `,
+    });
+    const fns = info.fileFunctions["routes-helpers.ts"];
+    expect(fns.find((f) => f.name === "withRoutesHelpers")!.noRailsEquivalent).toBe(
+      "`with` is an ES strict-mode reserved word",
+    );
+    expect(fns.find((f) => f.name === "with")!.noRailsEquivalent).toBeUndefined();
+  });
+
+  it("reads a renamed export's own reason instead of the declaration's", () => {
+    const info = extractFromFiles("/p", {
+      "registry.ts": `
+        /** @noRailsEquivalent declared spelling, no Rails counterpart */
+        export function registerModelClass(): void {}
+
+        /** @noRailsEquivalent alias is trails-only sugar */
+        export { registerModelClass as registerModel };
+      `,
+    });
+    const fns = info.fileFunctions["registry.ts"];
+    expect(fns.find((f) => f.name === "registerModelClass")!.noRailsEquivalent).toBe(
+      "declared spelling, no Rails counterpart",
+    );
+    expect(fns.find((f) => f.name === "registerModel")!.noRailsEquivalent).toBe(
+      "alias is trails-only sugar",
+    );
+  });
+
   it("records the reason on a tagged object-literal module member", () => {
     const methods = objectLiteralMethods(`
       export const QueryMethods = {
