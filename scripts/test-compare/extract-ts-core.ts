@@ -293,6 +293,17 @@ function collectAssertionKinds(
 // as arg 0 and the title as arg 1, matching the support/supports.ts API.
 const ADAPTER_SUITE_WRAPPERS = new Set<string>(["describe", ...ADAPTER_GATE_WRAPPERS]);
 
+// The identifier at the head of a call's callee, across the three shapes the
+// suite uses: `describeIfPg(…)`, `describeIfPg.skipIf(…)(…)`, `it.skip(…)`.
+function calleeRootName(expression: ts.Expression): string | null {
+  if (ts.isIdentifier(expression)) return expression.text;
+  const inner = ts.isCallExpression(expression) ? expression.expression : expression;
+  if (ts.isPropertyAccessExpression(inner) && ts.isIdentifier(inner.expression)) {
+    return inner.expression.text;
+  }
+  return null;
+}
+
 /**
  * Parse a single test file's source into a {@link TestFileInfo}, including each
  * test's adapter/feature {@link TestGate}. Conditional `describe` wrappers
@@ -358,9 +369,10 @@ export function extractTestsFromSource(content: string, relativePath: string): T
   function visit(node: ts.Node) {
     if (ts.isCallExpression(node)) {
       const expression = node.expression;
+      const root = calleeRootName(expression);
+      if (root) assertRegisteredGateWrapper(root, relativePath);
       if (ts.isIdentifier(expression)) {
         const funcName = expression.text;
-        assertRegisteredGateWrapper(funcName, relativePath);
 
         if (ADAPTER_SUITE_WRAPPERS.has(funcName)) {
           const title = getArgString(node, 0);
@@ -401,7 +413,6 @@ export function extractTestsFromSource(content: string, relativePath: string): T
         const base = inner.expression;
         const modifier = inner.name.text;
         if (ts.isIdentifier(base) && GATING_MODIFIERS.has(modifier)) {
-          assertRegisteredGateWrapper(base.text, relativePath);
           const guardExpr = expression.arguments[0]?.getText(sourceFile) ?? "";
           const inlineGate = gateFromGuardExpr(guardExpr, modifier === "runIf");
           if (ADAPTER_SUITE_WRAPPERS.has(base.text)) {
@@ -452,7 +463,6 @@ export function extractTestsFromSource(content: string, relativePath: string): T
       } else if (ts.isPropertyAccessExpression(expression)) {
         // Handle describe.skip, it.skip, it.todo, it.only, etc.
         const base = expression.expression;
-        if (ts.isIdentifier(base)) assertRegisteredGateWrapper(base.text, relativePath);
         if (ts.isIdentifier(base) && base.text === "describe") {
           const title = getArgString(node, 0);
           if (title) {

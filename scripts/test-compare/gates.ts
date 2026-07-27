@@ -66,11 +66,6 @@ export function finalizeGate(gate: TestGate): TestGate {
   return out;
 }
 
-/**
- * Adapter gate wrappers — the ones taking the suite title as their FIRST
- * argument. The extractor derives its own wrapper set from this so a new
- * wrapper only has to be registered here and in {@link gateFromWrapper}.
- */
 export const ADAPTER_GATE_WRAPPERS = [
   "describeIfPg",
   "describeIfMysql",
@@ -78,25 +73,19 @@ export const ADAPTER_GATE_WRAPPERS = [
   "describeIfSqlite",
 ] as const;
 
-/** Every wrapper identifier {@link gateFromWrapper} knows how to gate. */
-export const REGISTERED_GATE_WRAPPERS: ReadonlySet<string> = new Set<string>([
+const REGISTERED_GATE_WRAPPERS: ReadonlySet<string> = new Set<string>([
   ...ADAPTER_GATE_WRAPPERS,
   "describeIfSupports",
   "itIfSupports",
 ]);
 
-/** An identifier shaped like a conditional wrapper (`describeIfX` / `itIfX`). */
-export function isGateWrapperName(name: string): boolean {
+function isGateWrapperName(name: string): boolean {
   return /^(?:describe|it)If[A-Z]/.test(name);
 }
 
-/**
- * Fail loudly when a test file calls a `describeIf*` / `itIf*` wrapper the gate
- * registry doesn't know. Without this the unknown identifier falls through
- * {@link gateFromWrapper}'s `default` arm to `null` — "no gate" — and every test
- * inside it silently reads as ungated, surfacing later as an unexplained
- * gate-mismatch count with no pointer to the real cause.
- */
+// An unregistered wrapper would otherwise fall through gateFromWrapper's
+// `default` arm to `null` — "no gate" — so every test inside it reads as
+// ungated and surfaces only as an unexplained gate-mismatch count.
 export function assertRegisteredGateWrapper(name: string, file?: string): void {
   if (!isGateWrapperName(name) || REGISTERED_GATE_WRAPPERS.has(name)) return;
   const where = file ? ` (used in ${file})` : "";

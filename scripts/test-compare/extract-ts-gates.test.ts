@@ -37,7 +37,6 @@ describe("gates.ts pure helpers", () => {
       /unregistered gate wrapper `describeIfOracle`/,
     );
     expect(() => gateFromWrapper("itIfOracle")).toThrow(/gateFromWrapper/);
-    // Plain wrappers and unrelated helpers are untouched.
     expect(gateFromWrapper("it")).toBeNull();
     expect(gateFromWrapper("itemHelper")).toBeNull();
     expect(gateFromWrapper("describeIfying")).toBeNull();
@@ -61,6 +60,34 @@ describe("gates.ts pure helpers", () => {
       });
     `;
     expect(() => tsGates(source)).toThrow(/unregistered gate wrapper `describeIfOracle`/);
+  });
+
+  it("throws for an unregistered wrapper used in its .skip form", () => {
+    const source = `
+      describeIfOracle.skip("suite", () => {
+        it("runs", () => {});
+      });
+    `;
+    expect(() => tsGates(source)).toThrow(/unregistered gate wrapper `describeIfOracle`/);
+  });
+
+  it("leaves registered wrappers and their modifier forms extracting normally", () => {
+    const source = `
+      describeIfPg("suite", () => {
+        it("runs on pg", () => {});
+      });
+      describeIfSupports.skipIf(adapterType === "mysql")("json", "supported", () => {
+        it("runs where json works", () => {});
+      });
+    `;
+    expect(tsGates(source)).toEqual({
+      "runs on pg": { adapters: ["postgresql"], source: ["wrapper"] },
+      "runs where json works": {
+        adapters: ["postgresql", "sqlite"],
+        features: ["json"],
+        source: ["test", "wrapper"],
+      },
+    });
   });
 
   it("maps support wrappers to a feature key", () => {
