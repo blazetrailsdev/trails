@@ -519,6 +519,10 @@ export class HasOneAssociation extends SingularAssociation {
    * issue no query at all (`find_target?`) or when the target is already loaded,
    * which keeps the writer synchronous on those paths.
    *
+   * `protected` for the same reason as `buildDisplacementOwnedByCaller`: this is
+   * association-internal bookkeeping, not API surface. The writer lives outside
+   * the class hierarchy and reaches it through its duck-typed handle.
+   *
    * The find deliberately goes through `doAsyncFindTarget` rather than
    * `loadTargetForBuild`: by the time it resolves, the build has already
    * installed the replacement as `this.target`, and `load_target`'s writeback
@@ -526,7 +530,7 @@ export class HasOneAssociation extends SingularAssociation {
    *
    * @internal
    */
-  detachDisplacedForSyncBuild(): Promise<void> | null {
+  protected detachDisplacedForSyncBuild(): Promise<void> | null {
     if (this.loaded) return null;
     if (!this.needsTargetLoadForBuild()) return null;
     return this.findThenDetachDisplaced();

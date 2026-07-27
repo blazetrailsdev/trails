@@ -919,6 +919,15 @@ export function assignNestedAttributesForOneToOneAssociation(
         // SELECT is issued here, at assignment (Rails' timing), and only its
         // completion is deferred to the same drain — see
         // `HasOneAssociation#detachDisplacedForSyncBuild`.
+        //
+        // Rails reaches `load_target` from `set_new_record`, i.e. just AFTER
+        // `build_record`; this issues it just before. It has to: the load is
+        // gated on `find_target?`, which `build` falsifies by marking the
+        // association loaded, so there is no post-build moment at which the
+        // decision is still observable. The window the swap opens is a build
+        // that throws after a query Rails would not have run —
+        // `assertNestedAttributesAreKnown` above already raised for the
+        // attribute errors that reach this path.
         const unloadedRemoval = assoc.detachDisplacedForSyncBuild?.() ?? null;
         if (unloadedRemoval) parkDisplacedRemoval(record, unloadedRemoval);
         // `HasOneAssociation#build` runs the removal itself for direct callers
