@@ -582,9 +582,14 @@ function generateAssociationWriter(
   // assignment expression; a JS property setter cannot await, so this is the
   // surface that reproduces that timing (RFC 0068's `set#{Name}` sugar, applied
   // to nested attributes). See `detachDisplacedAtAssignment` for the contract.
-  // Collections get it too, for one uniform awaitable writer per association —
-  // only a one-to-one assignment ever queues a removal, so the drain is a no-op
-  // there.
+  // Collections get it too, for one uniform awaitable writer per association. A
+  // collection assignment never queues a removal of its own, but the drain is
+  // NOT a no-op there: the pending list and the sticky failure are per-*owner*,
+  // so `await pirate.setBirdsAttributes(...)` rethrows an undrained
+  // `pirate.shipAttributes = ...` failure. That is the contract, not a leak —
+  // the failure poisons the owner instance (see `detachDisplacedAtAssignment`),
+  // and an awaitable write to a poisoned owner must not silently proceed toward
+  // a `save()` that would persist the two-row state.
   Object.defineProperty(modelClass.prototype, `set${camelize(attrName, true)}`, {
     async value(this: Base, value: any): Promise<void> {
       assign(this, associationName, value);
