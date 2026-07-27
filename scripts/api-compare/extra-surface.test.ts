@@ -1685,6 +1685,31 @@ describe("buildReport — TS files with no Rails counterpart", () => {
     expect(pkg.noCounterpartNovel).toBe(1);
   });
 
+  it("treats a Ruby file known only by its file-level constants as a counterpart", () => {
+    const { ruby, ts: ts_ } = makeManifests("cipher.ts");
+    // cipher.rb declares a constant and no class the extractor picked up; the
+    // literal pass still maps it through rubyFileToTs (compare.ts:1838-1841).
+    ruby.packages["activerecord"].fileConstants = {
+      "cipher.rb": { DEFAULT_ENCODING: { kind: "expr" } },
+    };
+    ts_.packages["activerecord"].fileFunctions = {
+      "cipher.ts": [method("DEFAULT_ENCODING"), method("setFoo")],
+    };
+    const report = buildReport(ruby, ts_, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles[0];
+    expect(f.tsFile).toBe("cipher.ts");
+    expect(f.rubyFile).toBe("cipher.rb");
+    // The constant is allowed by its own Rails file, so only `setFoo` flags —
+    // and the file is NOT counted against the no-counterpart population.
+    expect(f.extras.map((e) => e.name)).toEqual(["setFoo"]);
+    expect(report.packages[0].noCounterpartFiles).toBe(0);
+  });
+
   it("holds out trees that mirror Rails test code rather than lib", () => {
     const { ruby, ts: ts_ } = makeManifests("test-helpers/models/post.ts");
     const report = buildReport(ruby, ts_, {

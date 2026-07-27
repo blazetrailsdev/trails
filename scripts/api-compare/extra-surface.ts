@@ -762,6 +762,9 @@ export function isTestSupportFile(tsFile: string): boolean {
 
 /**
  * TS files in the package that no Ruby file maps onto via `rubyFileToTs`.
+ * "Ruby file" includes a file the extractor knows only through its file-level
+ * constants — `coveredTsFiles` unions those in, so a constant-only Rails file
+ * is a counterpart here exactly as it is in the literal pass.
  *
  * Before this, such a file was invisible: the report iterates Ruby files, so a
  * TS file nothing points at was never visited and its whole public surface went
@@ -875,11 +878,21 @@ function buildPackageReport(
   }
   const tsFileFunctions = tsPkg.fileFunctions ?? {};
 
+  // A Ruby file can declare file-level constants and no class/module at all
+  // (rails/engine/commands.rb:3-9 is `Rails::Command::…` constants only), so it
+  // never lands in `rubyFiles` — but it IS a Rails counterpart, and the literal
+  // pass already treats it as one by mapping every `fileConstants` key through
+  // `rubyFileToTs` (compare.ts:1838-1841). Score it here the same way: with an
+  // empty entity list, so `collectAllowedNames` allows exactly its constants.
+  const rubyFileNames = new Set<string>([
+    ...rubyFiles.keys(),
+    ...Object.keys(rubyPkg.fileConstants ?? {}),
+  ]);
   const coveredTsFiles = new Set<string>();
-  for (const rubyFile of rubyFiles.keys()) coveredTsFiles.add(rubyFileToTs(rubyFile, pkg));
+  for (const rubyFile of rubyFileNames) coveredTsFiles.add(rubyFileToTs(rubyFile, pkg));
 
   const scoreTargets: { tsFile: string; rubyFile: string | null }[] = [
-    ...[...rubyFiles.keys()].map((rubyFile) => ({
+    ...[...rubyFileNames].map((rubyFile) => ({
       tsFile: rubyFileToTs(rubyFile, pkg),
       rubyFile,
     })),
