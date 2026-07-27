@@ -674,17 +674,23 @@ async function _findHasOneTarget(
  * Mirrors: ActiveRecord::Associations::SingularAssociation#find_target
  * (`singular_association.rb:47`).
  *
- * Rails dispatches on the receiver's class — `BelongsToAssociation` and
- * `HasOneAssociation` inherit this one method and differ only in the `scope`
- * their reflection builds. trails' loaders are free functions with no
- * receiver, and the two bodies have not yet converged, so `macro` stands in
- * for "which SingularAssociation subclass am I". It is required rather than
- * defaulted: the loaders are also called with association names that have no
- * registered reflection, where `options` alone cannot tell a belongs_to from
- * a has_one, and a silent default would mis-dispatch those.
+ * DEVIATION: Rails' `find_target(async: false)` takes no macro parameter and
+ * has no dispatcher layer — it is the loader body itself, and
+ * `BelongsToAssociation` overrides only the `find_target?` predicate
+ * (`belongs_to_association.rb:124-126`), never `find_target`. One Rails body
+ * serves both macros because the difference lives entirely in the `scope` the
+ * reflection builds.
  *
- * Collapsing the two arms into one Rails-shaped body is the remaining
- * convergence step and is tracked separately.
+ * trails' two loaders arrived as separate engine functions and have not
+ * converged, so `macro` stands in for the receiver class Rails dispatches on.
+ * It is required rather than defaulted because both loaders are also called
+ * for association names with no registered reflection, where `options` alone
+ * cannot tell a belongs_to from a has_one and a default would silently
+ * mis-dispatch.
+ *
+ * Collapsing the two arms into one Rails-shaped body — dropping this
+ * parameter — is story `converge-singular-find-target-dispatcher`
+ * (RFC 0072).
  *
  * @internal
  */

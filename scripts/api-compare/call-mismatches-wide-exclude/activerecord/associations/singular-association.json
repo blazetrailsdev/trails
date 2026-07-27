@@ -4,13 +4,13 @@
     "tsFile": "associations/singular-association.ts",
     "rubyName": "find_target",
     "call": "first",
-    "reason": "Rails' `super.then(&:first)` is Array#first over the array Association#find_target already loaded, not Relation#first; the take() (unordered LIMIT 1) in the _findHasOneTarget / _findBelongsToTarget arms is the SQL-level equivalent — Relation#first would route through ordered_relation and add the ORDER BY that has_one_associations_test `test_has_one_does_not_use_order_by` forbids. The statement-cache branch's literal .first() lives in the extracted _loadSingularViaStatementCache helper (associations.ts)."
+    "reason": "Rails' `super.then(&:first)` is Array#first over the array Association#find_target already loaded, not Relation#first; the take() (unordered LIMIT 1) in the _findHasOneTarget / _findBelongsToTarget arms is the SQL-level equivalent \u2014 Relation#first would route through ordered_relation and add the ORDER BY that has_one_associations_test `test_has_one_does_not_use_order_by` forbids. The statement-cache branch's literal .first() lives in the extracted _loadSingularViaStatementCache helper (associations.ts)."
   },
   {
     "package": "activerecord",
     "tsFile": "associations/singular-association.ts",
     "rubyName": "find_target",
     "call": "scope",
-    "reason": "findTarget is the macro dispatcher; the scope construction Rails does inline lives in the two private arms it delegates to (_findBelongsToTarget / _findHasOneTarget), which call _builtAssociationScope / _scopeForAssociation. Same satisfied-via-extracted-helper shape as the foreign_key_present? entries in has-one-association.json."
+    "reason": "findTarget is currently a macro dispatcher, so the scope construction Rails does inline lives in the two private arms it delegates to (_findBelongsToTarget / _findHasOneTarget), which call _builtAssociationScope / _scopeForAssociation. Same satisfied-via-extracted-helper shape as the foreign_key_present? entries in has-one-association.json. This entry is temporary: story converge-singular-find-target-dispatcher (RFC 0072) collapses the arms into one Rails-shaped body that makes the call directly, and removes this entry."
   }
 ]
