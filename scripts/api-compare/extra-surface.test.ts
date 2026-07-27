@@ -1448,8 +1448,8 @@ describe("buildReport — @noRailsEquivalent tags", () => {
     expect(pkg.totalAllowlisted).toBe(1);
     expect(pkg.extraFiles).toEqual([]);
     expect(report.tagged).toEqual({ total: 1, matched: 1, stale: [] });
-    // `allowlist` is the retained stats-DB key, now fed solely by tags.
-    expect(report.allowlist).toEqual(report.tagged);
+    // `tagged` is the only summary key: the retired `allowlist` alias is gone.
+    expect(report).not.toHaveProperty("allowlist");
   });
 
   it("reports the tagged extra as novel when the tag is absent", () => {
