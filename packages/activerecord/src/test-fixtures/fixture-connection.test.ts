@@ -11,17 +11,12 @@
  * Run this file only (not the whole suite):
  *   pnpm vitest run packages/activerecord/src/test-fixtures/fixture-connection.test.ts
  */
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "../base.js";
 import { setPermanentConnectionCheckout } from "../ar-config.js";
-import { establishFromTestConfig } from "../support/connection.js";
 import { leaseFixtureConnection } from "./fixture-connection.js";
 
 describe("fixture connection source", () => {
-  beforeAll(async () => {
-    await establishFromTestConfig();
-  });
-
   afterEach(() => {
     setPermanentConnectionCheckout(true);
   });

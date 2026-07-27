@@ -420,27 +420,3 @@ export async function connect(): Promise<TestDatabaseConfig> {
 
   return { configs, adapter, envConfig };
 }
-
-/**
- * Re-establish `Base`'s connection handler from the resolved test config if not
- * already connected. Called by `setupHandlerSuite` so handler-path test files
- * get a live pool without knowing which adapter the worker is using.
- * Idempotent — a no-op when already connected.
- *
- * `establishFromTestConfig` keeps its trails name: Rails has no counterpart,
- * because its suite connects once from `cases/helper.rb` and never needs an
- * idempotent re-establish for individual files.
- *
- * Intentionally does NOT call `connect` — that would set
- * `DatabaseTasks.databaseConfiguration`, contaminating tests in
- * `database-tasks.test.ts` that rely on it being null. This function installs
- * the same configuration entries and re-establishes by name, so a suite
- * re-opening the pool travels `connect`'s path; only `DatabaseTasks` state is
- * left as-is.
- */
-export async function establishFromTestConfig(): Promise<void> {
-  if (Base.isConnectedQ()) return;
-  const { configurationHashes } = await testConfigurationHashes();
-  Base.configurations(new DatabaseConfigurations(configurationHashes));
-  await Base.establishConnection("arunit");
-}

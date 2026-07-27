@@ -6,17 +6,12 @@
  * `DatabaseConfig#newConnection` is the same seam, pre-warmed via
  * `loadAdapter()` because ESM adapter resolution is async.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../index.js";
-import { establishFromTestConfig } from "../support/connection.js";
 import type { AbstractAdapter } from "./abstract-adapter.js";
 
 describe("StandaloneConnectionTest", () => {
   let connection: AbstractAdapter;
-
-  beforeAll(async () => {
-    await establishFromTestConfig();
-  });
 
   beforeEach(async () => {
     const dbConfig = Base.connectionDbConfig();

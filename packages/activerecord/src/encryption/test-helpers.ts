@@ -7,7 +7,6 @@
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import type { TestDatabaseAdapter } from "../test-adapter.js";
-import { establishFromTestConfig } from "../support/connection.js";
 import { ensureCanonicalTables } from "../support/canonical-schema.js";
 import { Base } from "../index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
@@ -154,10 +153,7 @@ export async function installEncryptionSchema(adapter: DatabaseAdapter): Promise
 export async function freshAdapter(): Promise<TestDatabaseAdapter> {
   // Resolve the adapter from the primary, schema-loaded pool (`Base.connection`)
   // rather than the divergent sidecar `_pool`. Rails wires encryption tests off
-  // the primary connection; there is no sidecar pool. `establishFromTestConfig`
-  // is idempotent, so the first caller boots the primary pool and later callers
-  // reuse it.
-  await establishFromTestConfig();
+  // the primary connection; there is no sidecar pool.
   const adapter = await Base.leaseConnection();
   await installEncryptionSchema(adapter);
   return adapter;

@@ -6,17 +6,14 @@ import {
   type TestDatabaseAdapter,
 } from "../test-adapter.js";
 import { Base } from "../base.js";
-import { establishFromTestConfig } from "../support/connection.js";
 import { AbstractSQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import { NullTransaction } from "../connection-adapters/abstract/transaction.js";
 import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
 
 // Resolve a pool-leased adapter from the primary (schema-loaded) pool rather
-// than the divergent sidecar `_pool`. Rails has no sidecar test pool;
-// `establishFromTestConfig` is idempotent so this returns `Base.connection`.
+// than the divergent sidecar `_pool`. Rails has no sidecar test pool.
 async function primaryAdapter(): Promise<TestDatabaseAdapter> {
-  await establishFromTestConfig();
   return Base.connection;
 }
 

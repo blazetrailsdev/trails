@@ -133,16 +133,12 @@ let _inTestPool: ConnectionPool | null = null;
 let _inTestPoolPromise: Promise<ConnectionPool> | null = null;
 
 async function buildInTestPool(): Promise<ConnectionPool> {
-  const { establishFromTestConfig } = await import("./support/connection.js");
   const { HashConfig } = await import("./database-configurations/hash-config.js");
   const { PoolConfig } = await import("./connection-adapters/pool-config.js");
   const { ConnectionPool } = await import("./connection-adapters/abstract/connection-pool.js");
   const { ConnectionDescriptor } =
     await import("./connection-adapters/abstract/connection-descriptor.js");
 
-  // Ensure the primary pool exists so we can duplicate its db_config
-  // (idempotent — a no-op when a fixtures file already connected Base).
-  await establishFromTestConfig();
   const src = Base.connectionPool().dbConfig;
 
   // Duplicate the primary config with a short checkout_timeout so pool-mechanics
@@ -223,10 +219,12 @@ export function _resetPooledTestAdapterForTests(): void {
  * dropped. See {@link resetTestTables}.
  *
  * The DDL runs on the primary `Base.connection` pool — the schema-loaded
- * database every test rides — but only when Base is connected. Worker boot
- * (`test-setup-dy.ts`) deliberately disconnects Base between files, so a file
- * that never connected Base did no DB work and has nothing to reset; the
- * global JS caches below are still cleared unconditionally.
+ * database every test rides. Worker boot (`test-setup-dy.ts`) connects once
+ * and stays connected for the whole worker, mirroring `ARTest.connect`
+ * (`vendor/rails/activerecord/test/support/connection.rb:31-32`), so that pool
+ * is normally live for every test. The `isConnectedQ` guard remains for the
+ * window where a suite has removed the pool and not yet re-established it; the
+ * global JS caches below are cleared unconditionally either way.
  *
  *   - PG: `resetTestTables` enumerates every user schema via
  *     `current_schemas(false)`, not just `public`.

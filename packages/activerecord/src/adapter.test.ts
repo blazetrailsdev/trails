@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import { Notifications } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -24,7 +24,6 @@ import { fixtures } from "./test-helpers/fixtures.js";
 import { adapterType } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import { itIfSupports } from "./support/supports.js";
-import { establishFromTestConfig } from "./support/connection.js";
 import { runWithoutConnection } from "./support/connection-helper.js";
 // Opt into the canonical-model autoload index so association targets resolve by
 // name on first reference — no manual `registerModel`.
@@ -1306,10 +1305,6 @@ describe("AdvisoryLocksEnabledTest", () => {
   // `run_without_connection` so the worker's pool is restored afterward.
   // `supports_advisory_locks?` is true on PostgreSQL + MySQL, so the gate is
   // feature-only.
-  beforeAll(async () => {
-    await establishFromTestConfig();
-  });
-
   itIfSupports("advisory_locks", "advisory locks enabled?", async () => {
     expect((await Base.leaseConnection()).isAdvisoryLocksEnabled()).toBe(true);
 

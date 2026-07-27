@@ -17,11 +17,14 @@ import {
 } from "./core.js";
 import { setTrailsRoot } from "@blazetrails/activesupport";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
-import { establishFromTestConfig } from "./support/connection.js";
 import { adapterType } from "./test-adapter.js";
 import * as nodeFs from "node:fs";
 import * as nodeOs from "node:os";
 import * as nodePath from "node:path";
+
+async function restoreWorkerConnection(): Promise<void> {
+  await Base.establishConnection("arunit");
+}
 
 describe("ConnectionHandlingTest", () => {
   let ambientDbConfig: DatabaseConfig;
@@ -31,7 +34,6 @@ describe("ConnectionHandlingTest", () => {
   }
 
   beforeAll(async () => {
-    await establishFromTestConfig();
     ambientDbConfig = Base.connectionDbConfig();
   });
 
@@ -43,9 +45,11 @@ describe("ConnectionHandlingTest", () => {
     connectedToStack().length = 0;
     await Base.connectionHandler.clearAllConnectionsBang();
     setPermanentConnectionCheckout(true);
+    await setupConnection();
   });
 
   it("#with_connection lease the connection for the duration of the block", async () => {
+    Base.releaseConnection();
     const pool = Base.connectionPool();
     expect(pool.activeConnection).toBeNull();
     await Base.withConnection((conn) => {
@@ -733,6 +737,7 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
     Base.configurations(prevBaseConfigs);
     await Base.connectionHandler.clearAllConnectionsBang();
     delete (Base as any)._connectionSpecificationName;
+    await restoreWorkerConnection();
   });
 
   it("unknown string config name raises AdapterNotSpecified with available-configs hint", async () => {
@@ -761,6 +766,7 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
 
   it("connectsTo plants _connectionSpecificationName (primary class normalizes to 'Base')", async () => {
     const { __resetPrimaryAbstractClass, primaryAbstractClass } = await import("./inheritance.js");
+    let priorConfigs: ReturnType<typeof Base.configurations> | undefined;
     class AppRecord extends Base {}
     class SecondaryAbstract extends Base {
       static {
@@ -771,6 +777,7 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
       __resetPrimaryAbstractClass();
       primaryAbstractClass(AppRecord);
       const env = DatabaseConfigurations.currentEnv();
+      priorConfigs = Base.configurations();
       Base.configurations({
         [env]: { primary: { adapter: "sqlite3", database: "db/primary.sqlite3" } },
       });
@@ -785,6 +792,7 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
       expect((SecondaryAbstract as any)._connectionSpecificationName).toBe("SecondaryAbstract");
     } finally {
       __resetPrimaryAbstractClass();
+      if (priorConfigs) Base.configurations(priorConfigs);
     }
   });
 });
@@ -851,6 +859,7 @@ describe("threadedConnectionFor pool-identity guard", () => {
   afterEach(async () => {
     await Base.connectionHandler.clearAllConnectionsBang();
     Base.connectionSpecificationName = "Base";
+    await restoreWorkerConnection();
   });
 
   it("adopts the threaded connection for its own pool but not a foreign pool", async () => {
@@ -874,6 +883,7 @@ describe("threadedConnectionFor pool-identity guard", () => {
 describe("establish_connection accepts a DatabaseConfig", () => {
   afterEach(async () => {
     await Base.connectionHandler.clearAllConnectionsBang();
+    await restoreWorkerConnection();
   });
 
   // Mirrors Rails `establish_connection(db_config)` (the faithful
@@ -917,6 +927,7 @@ describe("loadConfigFile resolves config/database.* against Trails.root", () => 
     setTrailsRoot(null);
     Base.configurations(originalConfigurations);
     await Base.connectionHandler.clearAllConnectionsBang();
+    await restoreWorkerConnection();
     if (tmpRoot) nodeFs.rmSync(tmpRoot, { recursive: true, force: true });
   });
 

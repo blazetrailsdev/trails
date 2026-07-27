@@ -6,7 +6,6 @@ import { arunitDatabaseNames } from "../../support/arunit2-config.js";
 import { mysqlSettings, mysqlUrl } from "../../support/config.js";
 import { adapterType } from "../../test-adapter.js";
 import { Base } from "../../base.js";
-import { establishFromTestConfig } from "../../support/connection.js";
 
 // `dbWarningsAction` is a single global setting on the base adapter, so the
 // shared helper toggles it for every adapter (including MySQL). Re-exported
@@ -123,12 +122,10 @@ export const describeIfMysqlAdapter =
 /**
  * Port of these suites' `setup` line
  * `@connection = ActiveRecord::Base.lease_connection`: leases the ambient pool
- * connection (establishing it first when the file runs without `fixtures()`),
- * so the leased connection's config plumbing — `configureConnection`, pool
+ * connection, so the leased connection's config plumbing — `configureConnection`, pool
  * settings, `preparedStatements` — is what the test exercises.
  */
 export async function leaseMysqlAdapter(): Promise<Mysql2Adapter> {
-  await establishFromTestConfig();
   const adapter = (await Base.leaseConnection()) as unknown as Mysql2Adapter;
   await adapter.materializeTransactions();
   return adapter;
