@@ -58,6 +58,7 @@ doesn't forward `--package` to `compare.ts`). Test numbers come from
 
 ## Verification harnesses
 
-| Doc                                                             | Priority | Work | Notes                                                                                                                                     |
-| --------------------------------------------------------------- | -------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| [`parity-verification.md`](activerecord/parity-verification.md) | P1       | —    | Schema + query parity pipelines (`pnpm parity:schema` / `pnpm parity:query`). Both shipped; reference for adding fixtures + format bumps. |
+| Doc                                                                     | Priority | Work | Notes                                                                                                                                     |
+| ----------------------------------------------------------------------- | -------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| [`parity-verification.md`](activerecord/parity-verification.md)         | P1       | —    | Schema + query parity pipelines (`pnpm parity:schema` / `pnpm parity:query`). Both shipped; reference for adding fixtures + format bumps. |
+| [`api-compare-baselining.md`](infrastructure/api-compare-baselining.md) | P1       | —    | How to take a trustworthy `api:compare` / `api:extra` baseline, and why every checkout needs a rebuild.                                   |

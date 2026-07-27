@@ -34,6 +34,7 @@ import {
   type ReadSet,
 } from "./shared-cache.js";
 import { extractorSchemaToken } from "./extractor-schema.js";
+import { staleBuilds, staleBuildMessage } from "./build-freshness.js";
 
 // Per-package cache: extracting all packages with the TS Compiler API
 // takes ~16s; only a handful of packages typically change between
@@ -177,6 +178,14 @@ export async function main() {
   };
 
   fs.mkdirSync(CACHE_DIR, { recursive: true });
+  // Fail before any extraction if a sibling package's `dist` predates its
+  // sources: cross-package resolution reads those declarations, and `git
+  // checkout` never updates them, so a checkout-based baseline would silently
+  // mix two commits (see build-freshness.ts).
+  if (process.env.API_COMPARE_ALLOW_STALE_BUILD !== "1") {
+    const stale = await staleBuilds(path.join(ROOT_DIR, "packages"), ROOT_DIR);
+    if (stale.length > 0) throw new Error(staleBuildMessage(stale));
+  }
   const force = process.env.API_COMPARE_FORCE === "1";
   // Output-schema token folded into every cache key (local + shared). Stale
   // entries from a prior output shape carry a different token and are re-extracted.
