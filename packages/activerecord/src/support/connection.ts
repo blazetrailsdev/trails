@@ -31,6 +31,7 @@ import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { UrlConfig } from "../database-configurations/url-config.js";
 import { arunitDatabaseNames } from "./arunit2-config.js";
+import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
 import {
   CONNECTION_LANES,
   DEFAULT_CONNECTION,
@@ -300,9 +301,11 @@ async function sqliteHash(): Promise<Record<string, unknown>> {
  * `schema.rb` in-process. The registration runs on every call so callers that
  * clear `_registeredTasks` (e.g. `database-tasks.test.ts`) can re-register.
  *
- * Rails also establishes `ARUnit2Model` on `:arunit2` here; trails does that
- * from `setupSecondPool` instead, since only the sqlite lane provisions a
- * second database today (see `arunit2-config.ts`).
+
+ * `ARUnit2Model` is established on `arunit2` as `connection.rb:33` does. The
+ * pool is lazy, so this costs nothing on the lanes where no one has run
+ * `CREATE DATABASE` for the second database — `setupSecondPool` still owns that
+ * provisioning question (see `arunit2-config.ts`).
  */
 export async function connect(): Promise<TestDatabaseConfig> {
   const { adapter, envConfig, configurationHashes } = await testConfigurationHashes();
@@ -328,9 +331,19 @@ export async function connect(): Promise<TestDatabaseConfig> {
     }
   }
 
-  // `connection.rb:32` — established by name, not from the raw hash, so the
-  // pool comes from the same `arunit` entry `Base.configurations` publishes.
+  // `connection.rb:32-33` — both bases established by name, not from a raw
+  // hash, so each pool comes from the entry `Base.configurations` publishes.
   await Base.establishConnection("arunit");
+  await ARUnit2Model.establishConnection("arunit2");
+
+  // Rails' sqlite3 lane gives arunit2 its own file (config.example.yml:83-87),
+  // and ours derives one from the worker database. Nothing else knows to sweep
+  // it, so it rides the same exit cleanup as the fallback database.
+  const arunit2Database = String(configurationHashes[1].database);
+  if (adapter === "sqlite" && arunit2Database !== ":memory:") {
+    const { registerDbFileCleanupOnExit } = await import("./sqlite-template.js");
+    await registerDbFileCleanupOnExit(arunit2Database);
+  }
 
   return { configs, adapter, envConfig };
 }
@@ -347,15 +360,14 @@ export async function connect(): Promise<TestDatabaseConfig> {
  *
  * Intentionally does NOT call `connect` — that would set
  * `DatabaseTasks.databaseConfiguration`, contaminating tests in
- * `database-tasks.test.ts` that rely on it being null. This function only
- * re-establishes `Base`'s connection; `DatabaseTasks` state is left as-is.
+ * `database-tasks.test.ts` that rely on it being null. This function installs
+ * the same configuration entries and re-establishes by name, so a suite
+ * re-opening the pool travels `connect`'s path; only `DatabaseTasks` state is
+ * left as-is.
  */
 export async function establishFromTestConfig(): Promise<void> {
   if (Base.isConnectedQ()) return;
-  const { envConfig } = await testConfigurationHashes();
-  if (envConfig instanceof UrlConfig) {
-    await Base.establishConnection(envConfig.url);
-    return;
-  }
-  await Base.establishConnection(envConfig.configurationHash);
+  const { configurationHashes } = await testConfigurationHashes();
+  Base.configurations(new DatabaseConfigurations(configurationHashes));
+  await Base.establishConnection("arunit");
 }
