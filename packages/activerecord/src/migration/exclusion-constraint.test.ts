@@ -12,16 +12,13 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-  PG_TEST_URL,
-} from "../adapters/postgresql/test-helper.js";
+import { PostgreSQLAdapter, PG_TEST_URL } from "../adapters/postgresql/test-helper.js";
+import { describeIfSupports } from "../support/supports.js";
 import { rebuildCanonicalTables } from "../support/canonical-schema.js";
 
 const EXPRESSION = "daterange(start_date, end_date) WITH &&";
 
-describeIfPg("ActiveRecord::Migration", () => {
+describeIfSupports("exclusion_constraints", "Migration", () => {
   let connection: PostgreSQLAdapter;
 
   beforeEach(async () => {

@@ -7,14 +7,11 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-  PG_TEST_URL,
-} from "../adapters/postgresql/test-helper.js";
+import { PostgreSQLAdapter, PG_TEST_URL } from "../adapters/postgresql/test-helper.js";
+import { describeIfSupports } from "../support/supports.js";
 import { rebuildCanonicalTables } from "../support/canonical-schema.js";
 
-describeIfPg("ActiveRecord::Migration", () => {
+describeIfSupports("unique_constraints", "Migration", () => {
   let connection: PostgreSQLAdapter;
 
   beforeEach(async () => {
