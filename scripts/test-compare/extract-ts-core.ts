@@ -7,7 +7,14 @@ import * as path from "path";
 import * as ts from "typescript";
 import { normalizeTrailsKind } from "./assertion-kinds.js";
 import { VALUE_BEARING_KINDS } from "./assertion-values.js";
-import { finalizeGate, gateFromGuardExpr, gateFromWrapper, mergeGate } from "./gates.js";
+import {
+  ADAPTER_GATE_WRAPPERS,
+  assertRegisteredGateWrapper,
+  finalizeGate,
+  gateFromGuardExpr,
+  gateFromWrapper,
+  mergeGate,
+} from "./gates.js";
 import type { TestFileInfo, TestGate } from "./types.js";
 
 const GATING_MODIFIERS = new Set(["skipIf", "runIf"]);
@@ -284,13 +291,7 @@ function collectAssertionKinds(
 // Adapter wrappers that take the title as their FIRST argument. The feature
 // wrappers (`describeIfSupports`/`itIfSupports`) instead take the feature key
 // as arg 0 and the title as arg 1, matching the support/supports.ts API.
-const ADAPTER_SUITE_WRAPPERS = new Set([
-  "describe",
-  "describeIfPg",
-  "describeIfMysql",
-  "describeIfMysqlAdapter",
-  "describeIfSqlite",
-]);
+const ADAPTER_SUITE_WRAPPERS = new Set<string>(["describe", ...ADAPTER_GATE_WRAPPERS]);
 
 /**
  * Parse a single test file's source into a {@link TestFileInfo}, including each
@@ -359,6 +360,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
       const expression = node.expression;
       if (ts.isIdentifier(expression)) {
         const funcName = expression.text;
+        assertRegisteredGateWrapper(funcName, relativePath);
 
         if (ADAPTER_SUITE_WRAPPERS.has(funcName)) {
           const title = getArgString(node, 0);
@@ -399,6 +401,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
         const base = inner.expression;
         const modifier = inner.name.text;
         if (ts.isIdentifier(base) && GATING_MODIFIERS.has(modifier)) {
+          assertRegisteredGateWrapper(base.text, relativePath);
           const guardExpr = expression.arguments[0]?.getText(sourceFile) ?? "";
           const inlineGate = gateFromGuardExpr(guardExpr, modifier === "runIf");
           if (ADAPTER_SUITE_WRAPPERS.has(base.text)) {
@@ -449,6 +452,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
       } else if (ts.isPropertyAccessExpression(expression)) {
         // Handle describe.skip, it.skip, it.todo, it.only, etc.
         const base = expression.expression;
+        if (ts.isIdentifier(base)) assertRegisteredGateWrapper(base.text, relativePath);
         if (ts.isIdentifier(base) && base.text === "describe") {
           const title = getArgString(node, 0);
           if (title) {
