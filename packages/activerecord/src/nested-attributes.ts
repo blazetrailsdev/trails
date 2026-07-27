@@ -566,21 +566,38 @@ function generateAssociationWriter(
     (modelClass as any)._nestedAttributeSetterKeys = new Set<string>();
   }
   (modelClass as any)._nestedAttributeSetterKeys.add(attrName);
-  if (type === "collection") {
-    Object.defineProperty(modelClass.prototype, attrName, {
-      set(this: Base, value: any) {
-        assignNestedAttributesForCollectionAssociation(this, associationName, value);
-      },
-      configurable: true,
-    });
-  } else {
-    Object.defineProperty(modelClass.prototype, attrName, {
-      set(this: Base, value: any) {
-        assignNestedAttributesForOneToOneAssociation(this, associationName, value);
-      },
-      configurable: true,
-    });
-  }
+  const assign: (record: Base, name: string, value: any) => void =
+    type === "collection"
+      ? assignNestedAttributesForCollectionAssociation
+      : assignNestedAttributesForOneToOneAssociation;
+  Object.defineProperty(modelClass.prototype, attrName, {
+    set(this: Base, value: any) {
+      assign(this, associationName, value);
+    },
+    configurable: true,
+  });
+
+  // The awaitable counterpart of the Rails-named `#{name}_attributes=` setter.
+  // Rails' writer removes the displaced record inline and raises at the
+  // assignment expression; a JS property setter cannot await, so this is the
+  // surface that reproduces that timing (RFC 0068's `set#{Name}` sugar, applied
+  // to nested attributes). See `detachDisplacedAtAssignment` for the contract.
+  // Collections get it too, for one uniform awaitable writer per association. A
+  // collection assignment never queues a removal of its own, but the drain is
+  // NOT a no-op there: the pending list and the sticky failure are per-*owner*,
+  // so `await pirate.setBirdsAttributes(...)` rethrows an undrained
+  // `pirate.shipAttributes = ...` failure. That is the contract, not a leak —
+  // the failure poisons the owner instance (see `detachDisplacedAtAssignment`),
+  // and an awaitable write to a poisoned owner must not silently proceed toward
+  // a `save()` that would persist the two-row state.
+  Object.defineProperty(modelClass.prototype, `set${camelize(attrName, true)}`, {
+    async value(this: Base, value: any): Promise<void> {
+      assign(this, associationName, value);
+      await awaitPendingDisplacedRemovals(this);
+    },
+    writable: true,
+    configurable: true,
+  });
 }
 
 /** @internal */
@@ -680,6 +697,31 @@ interface OneToOneAssociation {
  *
  * The rejection is captured rather than left floating: a never-drained removal
  * must not surface as an unhandled rejection, and a drained one must rethrow.
+ *
+ * ## The contract for a removal that fails
+ *
+ * Rails raises `RecordNotSaved` at the assignment expression itself, so the
+ * failure is observable whether or not the owner is ever saved. A synchronous
+ * property setter cannot do that, so trails splits the guarantee in two, and a
+ * failure is **retained on the owner forever** rather than consumed by whoever
+ * happens to drain first:
+ *
+ * - `await owner.set#{Name}Attributes({...})` — the awaitable nested-attributes
+ *   writer (the analogue of RFC 0068's `set#{Name}`) assigns and then awaits the
+ *   removal, so it raises at the assignment point exactly as Rails does. This is
+ *   the sanctioned surface when the failure matters.
+ * - `owner.#{name}Attributes = {...}` — the Rails-named synchronous setter still
+ *   works, and its failure is *sticky*: {@link recordDisplacedRemovalFailure}
+ *   parks the first error on the owner, and **every** subsequent drain
+ *   (`save()`, an awaitable writer, another assignment's drain) rethrows it. An
+ *   owner that is never saved therefore still carries the failure; nothing
+ *   silently discards it.
+ *
+ * The sticky failure is deliberately terminal for that instance: the in-memory
+ * replacement landed while the displaced row did not detach, so persisting the
+ * owner would produce exactly the two-FK-matching-rows state RFC 0068 exists to
+ * eliminate. Recovery is a fresh load of the owner, not a retry on the poisoned
+ * instance.
  * @internal
  */
 function detachDisplacedAtAssignment(
@@ -693,24 +735,48 @@ function detachDisplacedAtAssignment(
     () => null,
     (error: unknown) => error ?? new Error("displaced record removal failed"),
   );
-  const host = record as unknown as { _pendingDisplacedRemovals?: Promise<unknown>[] };
+  const host = record as unknown as DisplacedRemovalHost;
   (host._pendingDisplacedRemovals ??= []).push(settled);
 }
 
 /**
+ * The owner-side state {@link detachDisplacedAtAssignment} parks: the in-flight
+ * removals plus the sticky first failure among them.
+ * @internal
+ */
+interface DisplacedRemovalHost {
+  _pendingDisplacedRemovals?: Promise<unknown>[];
+  _displacedRemovalFailure?: unknown;
+}
+
+/**
+ * Park a displacement-removal failure on the owner permanently. Draining
+ * consumes the *promise*, never the error — see the contract on
+ * {@link detachDisplacedAtAssignment}.
+ * @internal
+ */
+function recordDisplacedRemovalFailure(host: DisplacedRemovalHost, error: unknown): void {
+  host._displacedRemovalFailure ??= error;
+}
+
+/**
  * Await the removals started by `detachDisplacedAtAssignment`, rethrowing the
- * first failure — the deferred half of Rails' inline `remove_target!`.
+ * first failure — the deferred half of Rails' inline `remove_target!`. A failure
+ * already parked by an earlier drain is rethrown before anything is awaited, so
+ * it cannot be observed once and then forgotten.
  * @internal
  */
 async function awaitPendingDisplacedRemovals(record: Base): Promise<void> {
-  const host = record as unknown as { _pendingDisplacedRemovals?: Promise<unknown>[] };
+  const host = record as unknown as DisplacedRemovalHost;
   const pending = host._pendingDisplacedRemovals;
-  if (!pending?.length) return;
-  host._pendingDisplacedRemovals = [];
-  for (const settled of pending) {
-    const error = await settled;
-    if (error) throw error;
+  if (pending?.length) {
+    host._pendingDisplacedRemovals = [];
+    for (const settled of pending) {
+      const error = await settled;
+      if (error) recordDisplacedRemovalFailure(host, error);
+    }
   }
+  if (host._displacedRemovalFailure !== undefined) throw host._displacedRemovalFailure;
 }
 
 /** @internal */
