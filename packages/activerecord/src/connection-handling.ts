@@ -92,19 +92,6 @@ function isBaseClass(klass: typeof Base): boolean {
   return Object.prototype.hasOwnProperty.call(klass, "_isActiveRecordBase");
 }
 
-// Ruby's `ActiveRecord::Base` constant, reached by walking the static
-// prototype chain rather than importing base.js (a runtime cycle). Rails'
-// registry is one class variable, so the sites Rails spells
-// `Base.configurations` must not pick up a subclass-local shadow.
-function activeRecordBase(klass: typeof Base): typeof Base {
-  for (let current: typeof Base = klass; ; ) {
-    if (isBaseClass(current)) return current;
-    const parent: unknown = Object.getPrototypeOf(current);
-    if (typeof parent !== "function") return current;
-    current = parent as typeof Base;
-  }
-}
-
 export function connectsTo(
   this: typeof Base,
   options: {
@@ -976,7 +963,7 @@ async function autoConnect(modelClass: typeof Base): Promise<void> {
   // `TestDatabases.create_and_load_schema` (which suffixes `_database`
   // per worker before reconnect). Falling back to disk would re-read
   // unmutated configs and reconnect to the wrong database.
-  const inMemory = activeRecordBase(modelClass).configurations();
+  const inMemory = modelClass.configurations();
   let configs: DatabaseConfigurations;
   if (!inMemory.empty) {
     configs = inMemory;
@@ -1128,7 +1115,7 @@ export function resolveConfigForConnection(
   // an own-property check so writing here doesn't bleed through JS static
   // inheritance into unrelated subclasses.
   (this as any)._connectionSpecificationName = isPrimaryClass.call(this) ? "Base" : this.name;
-  // Rails: `Base.configurations.resolve(config_or_env)` — the global registry,
-  // not the receiver's (connection_handling.rb:391).
-  return activeRecordBase(this).configurations().resolve(configOrEnv);
+  // Rails: `Base.configurations.resolve(config_or_env)` — `configurations` is
+  // one process-global registry (core.rb:71-79), so the receiver is immaterial.
+  return this.configurations().resolve(configOrEnv);
 }

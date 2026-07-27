@@ -409,7 +409,6 @@ interface CoreHost {
   _destroyAssociationAsyncJob?: any;
   _findByStatementCache?: Map<boolean, Map<string, any>>;
   _generatedAssociationMethods?: Set<string>;
-  _configurations?: DatabaseConfigurations;
   _predicateBuilder?: any;
   arelTable?: any;
   prototype: any;
@@ -431,6 +430,12 @@ export function destroyAssociationAsyncJob(this: CoreHost, value?: any): any {
   return this._destroyAssociationAsyncJob ?? null;
 }
 
+// Rails backs `configurations` with the class variable `@@configurations`
+// (core.rb:71-79), so there is exactly one registry for the whole process:
+// assigning through any model class replaces `ActiveRecord::Base`'s value.
+// A per-class static would instead shadow through the JS prototype chain.
+let _configurations: DatabaseConfigurations | undefined;
+
 /**
  * Mirrors: ActiveRecord::Base.configurations / .configurations=
  */
@@ -439,14 +444,14 @@ export function configurations(
   config?: RawConfigurations | DatabaseConfigurations | DatabaseConfig[],
 ): DatabaseConfigurations {
   if (config !== undefined) {
-    this._configurations =
+    _configurations =
       config instanceof DatabaseConfigurations
         ? config
         : Array.isArray(config)
           ? new DatabaseConfigurations(config)
           : DatabaseConfigurations.fromEnv(config);
   }
-  return this._configurations ?? DatabaseConfigurations.fromEnv({});
+  return _configurations ?? DatabaseConfigurations.fromEnv({});
 }
 
 export function isApplicationRecordClass(this: CoreHost): boolean {
