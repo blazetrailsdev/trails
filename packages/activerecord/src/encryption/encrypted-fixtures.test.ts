@@ -20,7 +20,7 @@ describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
 
   it("fixtures get encrypted automatically", async () => {
     const { EncryptableRecord } = await import("./encryptable-record.js");
-    expect(EncryptableRecord.isEncryptedAttribute(encryptedBooks("awdr"), "name")).toBe(true);
+    expect(EncryptableRecord.encryptedAttribute(encryptedBooks("awdr"), "name")).toBe(true);
   });
 });
 
@@ -47,6 +47,6 @@ describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
     const book = encryptedBookThatIgnoresCases("rfr");
     expect((book as any).name).toBe("Ruby for Rails");
     const { EncryptableRecord } = await import("./encryptable-record.js");
-    expect(EncryptableRecord.isEncryptedAttribute(book, "name")).toBe(true);
+    expect(EncryptableRecord.encryptedAttribute(book, "name")).toBe(true);
   });
 });

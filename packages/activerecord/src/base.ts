@@ -1935,7 +1935,7 @@ export class Base extends Model {
    * @internal
    */
   encryptedAttribute(attributeName: string): boolean {
-    return encryptionHooks.encryptedAttributeQ(this, attributeName);
+    return encryptionHooks.encryptedAttribute(this, attributeName);
   }
 
   /**
@@ -1955,7 +1955,7 @@ export class Base extends Model {
    * @internal
    */
   async encrypt(): Promise<void> {
-    return encryptionHooks.encryptRecord(this);
+    return encryptionHooks.encrypt(this);
   }
 
   /**
@@ -1965,7 +1965,7 @@ export class Base extends Model {
    * @internal
    */
   async decrypt(): Promise<void> {
-    return encryptionHooks.decryptRecord(this);
+    return encryptionHooks.decrypt(this);
   }
 
   static async suppress<R>(fn: () => R | Promise<R>): Promise<R> {
