@@ -1,7 +1,8 @@
 /**
  * `ActiveRecord::FixtureSet` — fixture-row preparation and insertion.
  *
- * Rails home: `activerecord/lib/active_record/fixtures.rb` (plus the row
+ * Rails home: `activerecord/lib/active_record/fixtures.rb:527` — `class
+ * FixtureSet`, whose `create_fixtures` is `:595` (plus the row
  * helpers in `lib/active_record/fixture_set/table_row.rb`). **Library** code,
  * not test support, so it sits at the package root under the kebab rendering
  * of `fixtures.rb`; it was misfiled as `test-helpers/define-fixtures.ts`

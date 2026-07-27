@@ -2,7 +2,8 @@
  * `ActiveRecord::TestFixtures` — the `fixtures()` DSL and the setup/teardown
  * that seeds and pins a fixture set for a test scope.
  *
- * Rails home: `activerecord/lib/active_record/test_fixtures.rb`. This is
+ * Rails home: `activerecord/lib/active_record/test_fixtures.rb` — `module
+ * TestFixtures` (`:6`), `use_transactional_tests` (`:34`), `fixtures` (`:56`). This is
  * **library** code, not test support: Rails ships it inside `lib/`, so this
  * file sits at the package root under the kebab rendering of that filename
  * rather than under `test-helpers/`. It was misfiled as
