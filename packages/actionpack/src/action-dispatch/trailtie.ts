@@ -30,10 +30,7 @@ import {
   ContentSecurityPolicy,
   type NonceGenerator,
   type CspRequestHost,
-  setContentSecurityPolicy,
-  setContentSecurityPolicyReportOnly,
-  setContentSecurityPolicyNonceGenerator,
-  setContentSecurityPolicyNonceDirectives,
+  ContentSecurityPolicyRequest as CspRequest,
 } from "./http/content-security-policy.js";
 import { ContentSecurityPolicyMiddleware } from "./middleware/content-security-policy.js";
 import { MiddlewareStack } from "./middleware/stack.js";
@@ -132,6 +129,13 @@ function defaultContentSecurityPolicyConfig(): ContentSecurityPolicyConfig {
   return { policy: null, reportOnly: false, nonceGenerator: null, nonceDirectives: null };
 }
 
+function cspAccessors(host: CspRequestHost): CspRequest {
+  return Object.create(CspRequest.prototype, {
+    getHeader: { value: (k: string) => host.getHeader(k) },
+    setHeader: { value: (k: string, v: unknown) => host.setHeader(k, v) },
+  }) as CspRequest;
+}
+
 export class Trailtie extends BaseRailtie {
   static {
     registerRailtie(this);
@@ -174,6 +178,7 @@ export class Trailtie extends BaseRailtie {
 
   /**
    * Seed per-request CSP env keys from `config.contentSecurityPolicy`.
+   *
    * Called by hosts at the start of request processing — mirrors the
    * `env_config` propagation in `railties/lib/rails/application.rb:342-346`.
    */
@@ -182,9 +187,10 @@ export class Trailtie extends BaseRailtie {
     // Mirror Rails application.rb:342-346 — all four slots are copied
     // unconditionally so toggling app config back to a falsy value
     // overwrites any stale env carried over from a prior request.
-    setContentSecurityPolicy.call(request, cfg.policy);
-    setContentSecurityPolicyReportOnly.call(request, cfg.reportOnly);
-    setContentSecurityPolicyNonceGenerator.call(request, cfg.nonceGenerator);
-    setContentSecurityPolicyNonceDirectives.call(request, cfg.nonceDirectives);
+    const csp = cspAccessors(request);
+    csp.contentSecurityPolicy = cfg.policy;
+    csp.contentSecurityPolicyReportOnly = cfg.reportOnly;
+    csp.contentSecurityPolicyNonceGenerator = cfg.nonceGenerator;
+    csp.contentSecurityPolicyNonceDirectives = cfg.nonceDirectives;
   }
 }

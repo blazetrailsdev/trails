@@ -2,10 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { bodyFromString } from "@blazetrails/rack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { ContentSecurityPolicyMiddleware } from "./content-security-policy.js";
-import {
-  ContentSecurityPolicy,
-  contentSecurityPolicyNonce,
-} from "../http/content-security-policy.js";
+import { ContentSecurityPolicy } from "../http/content-security-policy.js";
 import { Request } from "../http/request.js";
 import { CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_REPORT_ONLY } from "../constants.js";
 
@@ -109,9 +106,9 @@ describe("ContentSecurityPolicyMiddleware", () => {
       return "abc";
     };
     const request = new Request(env);
-    expect(contentSecurityPolicyNonce.call(request)).toBe("abc");
-    expect(contentSecurityPolicyNonce.call(request)).toBe("abc");
-    expect(contentSecurityPolicyNonce.call(request)).toBe("abc");
+    expect(request.contentSecurityPolicyNonce).toBe("abc");
+    expect(request.contentSecurityPolicyNonce).toBe("abc");
+    expect(request.contentSecurityPolicyNonce).toBe("abc");
     expect(calls).toBe(1);
   });
 

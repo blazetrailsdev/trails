@@ -9,12 +9,6 @@
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_REPORT_ONLY } from "../constants.js";
 import { Request } from "../http/request.js";
-import {
-  contentSecurityPolicy,
-  contentSecurityPolicyNonce,
-  contentSecurityPolicyNonceDirectives,
-  contentSecurityPolicyReportOnly,
-} from "../http/content-security-policy.js";
 
 export class ContentSecurityPolicyMiddleware {
   private app: RackApp;
@@ -33,11 +27,11 @@ export class ContentSecurityPolicyMiddleware {
     if (this.policyPresent(headers)) return response;
 
     const request = new Request(env);
-    const policy = contentSecurityPolicy.call(request);
+    const policy = request.contentSecurityPolicy;
     if (!policy) return response;
 
-    const nonce = contentSecurityPolicyNonce.call(request);
-    const nonceDirectives = contentSecurityPolicyNonceDirectives.call(request);
+    const nonce = request.contentSecurityPolicyNonce;
+    const nonceDirectives = request.contentSecurityPolicyNonceDirectives;
     // Rails: `context = request.controller_instance || request`
     // (content_security_policy.rb:51).
     const context = request.controllerInstance ?? request;
@@ -47,7 +41,7 @@ export class ContentSecurityPolicyMiddleware {
   }
 
   private headerName(request: Request): string {
-    return contentSecurityPolicyReportOnly.call(request)
+    return request.contentSecurityPolicyReportOnly
       ? CONTENT_SECURITY_POLICY_REPORT_ONLY
       : CONTENT_SECURITY_POLICY;
   }
