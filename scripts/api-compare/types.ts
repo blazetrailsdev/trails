@@ -119,6 +119,14 @@ export interface ClassInfo {
    * consult `MethodInfo.declaredIn`. See extract-ts-api.ts.
    */
   synthesizedMixin?: boolean;
+  /**
+   * Reason prose of an `@noRailsEquivalent` tag written on the class /
+   * interface / namespace DECLARATION itself, justifying the declared name as
+   * deliberate trails-only surface. Members carry their own tag on
+   * `MethodInfo.noRailsEquivalent`; this is the container-level form, needed
+   * for extras that are declarations rather than members (RFC 0080).
+   */
+  noRailsEquivalent?: string;
 }
 
 export interface PackageInfo {

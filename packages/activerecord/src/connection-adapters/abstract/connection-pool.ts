@@ -58,6 +58,12 @@ export interface AbstractPool {
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::NullPool::NullConfig
+ *
+ * @noRailsEquivalent Rails nests this class inside `NullPool` (`class NullPool; class NullConfig`
+ *   — connection_pool.rb:14-22), and the Ruby extractor records only the outer `NullPool`. TS
+ *   cannot declare a nested class, so it is a sibling export re-attached as `NullPool.NullConfig`
+ *   (a static, matching Rails' constant lookup path). Same class, same file, same semantics — an
+ *   extractor-shape artifact, not added surface.
  */
 export class NullConfig {
   [key: string]: unknown;
@@ -110,13 +116,6 @@ const ADAPTER_PROXY_PROBE_KEYS = new Set<string>([
  * Mirrors: ActiveRecord::ConnectionAdapters::NullPool
  */
 export class NullPool implements AbstractPool {
-  /**
-   * @noRailsEquivalent Rails nests this class inside `NullPool` (`class NullPool; class NullConfig`
-   *   — connection_pool.rb:14-22), and the Ruby extractor records only the outer `NullPool`. TS
-   *   cannot declare a nested class, so it is a sibling export re-attached as `NullPool.NullConfig`
-   *   (a static, matching Rails' constant lookup path). Same class, same file, same semantics — an
-   *   extractor-shape artifact, not added surface.
-   */
   static readonly NullConfig = NullConfig;
   static readonly NULL_CONFIG = NULL_CONFIG;
 

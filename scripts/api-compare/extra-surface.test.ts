@@ -1529,6 +1529,45 @@ describe("collectTaggedEntries", () => {
       },
     ]);
   });
+
+  it("collects a tag written on the class declaration itself", () => {
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activerecord: {
+          classes: {
+            NullConfig: {
+              name: "NullConfig",
+              file: "connection-pool.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [],
+              classMethods: [],
+              noRailsEquivalent: "Rails nests this class inside NullPool",
+            },
+            NullPool: {
+              name: "NullPool",
+              file: "connection-pool.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [],
+              classMethods: [method("NullConfig")],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    expect(collectTaggedEntries(ts)).toEqual([
+      {
+        package: "activerecord",
+        tsFile: "connection-pool.ts",
+        name: "NullConfig",
+        reason: "Rails nests this class inside NullPool",
+      },
+    ]);
+  });
 });
 
 describe("@noRailsEquivalent — extractor to report", () => {
@@ -1604,6 +1643,48 @@ describe("@noRailsEquivalent — extractor to report", () => {
     expect(report.packages[0].totalAllowlisted).toBe(1);
     expect(report.packages[0].totalNovel).toBe(0);
     expect(report.packages[0].extraFiles).toEqual([]);
+  });
+
+  it("carries a tag written on a class DECLARATION through to the Allowed totals", () => {
+    // The live NullPool/NullConfig shape: Rails nests the class, TS exports it
+    // as a sibling and re-attaches it as a static, so the extra name is the
+    // class's own — and the declaration is the only place to justify it.
+    const tsPkg = extract({
+      "connection-pool.ts": `
+        /** @noRailsEquivalent Rails nests this class inside NullPool; TS cannot */
+        export class NullConfig {}
+
+        export class NullPool {
+          static readonly NullConfig = NullConfig;
+
+          schemaCache(): void {}
+        }
+      `,
+    });
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activerecord: {
+          classes: {
+            "ActiveRecord::ConnectionAdapters::NullPool": rubyClass({
+              name: "NullPool",
+              file: "connection_pool.rb",
+              instance: [method("schema_cache")],
+            }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(
+      ruby,
+      { source: "typescript", generatedAt: "", packages: { activerecord: tsPkg } },
+      { filterPkg: null, excludeGlobs: [], novelOnly: false, topN: 50 },
+    );
+    expect(report.tagged).toEqual({ total: 1, matched: 1, stale: [] });
+    expect(report.packages[0].totalAllowlisted).toBe(1);
+    expect(report.packages[0].totalNovel).toBe(0);
   });
 });
 

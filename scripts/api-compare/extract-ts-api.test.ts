@@ -1558,6 +1558,93 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     expect(rel.instanceMethods.find((m) => m.name === "where")!.noRailsEquivalent).toBeUndefined();
   });
 
+  it("records the reason on a tagged class declaration", () => {
+    const info = extractFromFiles("/p", {
+      "connection-pool.ts": `
+        /** @noRailsEquivalent Rails nests this class inside NullPool; TS cannot */
+        export class NullConfig {}
+
+        export class NullPool {}
+      `,
+    });
+    expect(info.classes["connection-pool.ts:NullConfig"].noRailsEquivalent).toBe(
+      "Rails nests this class inside NullPool; TS cannot",
+    );
+    expect(info.classes["connection-pool.ts:NullPool"].noRailsEquivalent).toBeUndefined();
+  });
+
+  it("records the reason on a tagged interface and namespace declaration", () => {
+    const info = extractFromFiles("/p", {
+      "seams.ts": `
+        /** @noRailsEquivalent structural seam, no Rails counterpart */
+        export interface Quoting {}
+
+        /** @noRailsEquivalent trails-only locator namespace */
+        export namespace Locator {}
+
+        export interface Plain {}
+      `,
+    });
+    expect(info.modules["seams.ts:Quoting"].noRailsEquivalent).toBe(
+      "structural seam, no Rails counterpart",
+    );
+    expect(info.modules["seams.ts:Locator"].noRailsEquivalent).toBe(
+      "trails-only locator namespace",
+    );
+    expect(info.modules["seams.ts:Plain"].noRailsEquivalent).toBeUndefined();
+  });
+
+  it("keeps a declaration-merged interface's tag when the untagged half is walked first", () => {
+    const info = extractFromFiles("/p", {
+      "seams.ts": `
+        export interface Quoting {
+          quote(value: unknown): string;
+        }
+
+        /** @noRailsEquivalent structural seam, no Rails counterpart */
+        export interface Quoting {
+          quoteAsync(value: unknown): Promise<string>;
+        }
+      `,
+    });
+    expect(info.modules["seams.ts:Quoting"].noRailsEquivalent).toBe(
+      "structural seam, no Rails counterpart",
+    );
+  });
+
+  it("throws when a class declaration's tag carries no reason", () => {
+    expect(() =>
+      extractFromFiles("/p", {
+        "connection-pool.ts": `
+          /** @noRailsEquivalent */
+          export class NullConfig {}
+        `,
+      }),
+    ).toThrow(/@noRailsEquivalent needs a reason/);
+  });
+
+  it("throws when an interface declaration's tag carries no reason", () => {
+    expect(() =>
+      extractFromFiles("/p", {
+        "seams.ts": `
+          /** @noRailsEquivalent */
+          export interface Quoting {}
+        `,
+      }),
+    ).toThrow(/@noRailsEquivalent needs a reason/);
+  });
+
+  it("throws when a namespace declaration's tag carries no reason", () => {
+    expect(() =>
+      extractFromFiles("/p", {
+        "seams.ts": `
+          /** @noRailsEquivalent */
+          export namespace Locator {}
+        `,
+      }),
+    ).toThrow(/@noRailsEquivalent needs a reason/);
+  });
+
   it("throws when the tag carries no reason", () => {
     expect(() =>
       extractFromSource(`
