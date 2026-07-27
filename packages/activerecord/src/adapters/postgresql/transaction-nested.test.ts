@@ -15,11 +15,12 @@
  */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, suiteTable } from "./test-helper.js";
+import { SerializationFailure, Deadlocked } from "../../errors.js";
 
-// See suiteTable: cross-worker DDL isolation for Rails' inline `samples`/`bits`.
+// Rails' inline `samples`/`bits`, renamed per suite — see suiteTable for why the
+// shared names race across vitest workers on the one CI database.
 const SAMPLES = suiteTable("samples", "transaction_nested");
 const BITS = suiteTable("bits", "transaction_nested");
-import { SerializationFailure, Deadlocked } from "../../errors.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;

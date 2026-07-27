@@ -7,10 +7,11 @@
  */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, suiteTable } from "./test-helper.js";
-
-// See suiteTable: cross-worker DDL isolation for Rails' inline `samples` table.
-const SAMPLES = suiteTable("samples", "transaction");
 import { SerializationFailure, Deadlocked, LockWaitTimeout, QueryCanceled } from "../../errors.js";
+
+// Rails' inline `samples`, renamed per suite — see suiteTable for why the
+// shared name races across vitest workers on the one CI database.
+const SAMPLES = suiteTable("samples", "transaction");
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
