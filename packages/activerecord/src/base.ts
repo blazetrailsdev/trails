@@ -2230,8 +2230,9 @@ export class Base extends Model {
     // `inheritanceColumn` assignment — so any non-abstract subclass over a
     // `type`-bearing table scopes
     // by type. The column resolves on the subclass itself (default "type").
-    const col = this.inheritanceColumn;
-    if (col !== null && isFinderNeedsTypeCondition(this)) {
+    if (isFinderNeedsTypeCondition(this)) {
+      const col = this.inheritanceColumn;
+      if (col === null) return rel;
       // Rails: `([self] + descendants).map(&:sti_name)` (inheritance.rb#type_condition)
       // — `sti_name` honors `store_full_sti_class` / overrides, not the bare class name.
       const stiNames = [stiName(this), ...this.descendants.map((d: typeof Base) => stiName(d))];

@@ -908,9 +908,9 @@ export function initializeInternalsCallback(this: Base): void {
  */
 export function ensureProperType(this: Base): void {
   const klass = this.constructor as typeof Base;
+  if (!isFinderNeedsTypeCondition(klass)) return;
   const inheritCol = klass.inheritanceColumn;
   if (inheritCol === null) return;
-  if (!isFinderNeedsTypeCondition(klass)) return;
   // Only write when the column is a declared attribute — otherwise the value
   // wouldn't persist or serialize correctly. Mirrors usingSingleTableInheritance.
   if (!(klass as any)._attributeDefinitions?.has(inheritCol)) return;
@@ -929,8 +929,9 @@ export function discriminateClassForRecord(
   modelClass: typeof Base,
   record: Record<string, unknown>,
 ): typeof Base {
-  const inheritCol = modelClass.inheritanceColumn;
-  if (inheritCol !== null && usingSingleTableInheritance(modelClass, record)) {
+  if (usingSingleTableInheritance(modelClass, record)) {
+    const inheritCol = modelClass.inheritanceColumn;
+    if (inheritCol === null) return modelClass;
     // Rails: subclass = base_class.type_for_attribute(inheritCol).cast(record[inheritCol])
     const castValue = castInheritanceColumnValue(modelClass, inheritCol, record[inheritCol]);
     // A present-but-unmapped enum value casts to null; Rails keeps such values
@@ -1001,8 +1002,6 @@ function stiColumnIsAttribute(
  */
 export function typeCondition(modelClass: typeof Base, arelTable?: any): any {
   const inheritCol = modelClass.inheritanceColumn;
-  // Unreachable with STI disabled: finderNeedsTypeCondition? is false there, and
-  // every caller gates on it.
   if (inheritCol === null) {
     throw new ActiveRecordError("Cannot build type condition without an inheritance column");
   }
