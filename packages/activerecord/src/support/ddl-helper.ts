@@ -27,8 +27,8 @@ export async function withExampleTable<T>(
   const fn = (typeof definitionOrFn === "function" ? definitionOrFn : maybeFn)!;
 
   const ddl = connection as unknown as DdlConnection;
-  await ddl.execute(`CREATE TABLE ${tableName}(${definition ?? ""})`);
   try {
+    await ddl.execute(`CREATE TABLE ${tableName}(${definition ?? ""})`);
     return await fn();
   } finally {
     await ddl.dropTable(tableName);

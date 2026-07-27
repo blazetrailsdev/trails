@@ -38,6 +38,26 @@ describe("DdlHelper#with_example_table", () => {
     expect(calls).toEqual(["CREATE TABLE ex(id int)", "DROP ex"]);
   });
 
+  it("drops the table in the ensure even when the create raises", async () => {
+    const calls: string[] = [];
+    const connection = {
+      execute: vi.fn(async () => {
+        throw new Error("bad ddl");
+      }),
+      dropTable: vi.fn(async (name: string) => {
+        calls.push(`DROP ${name}`);
+      }),
+    } as unknown as DatabaseAdapter;
+
+    await expect(
+      withExampleTable(connection, "ex", "id int", () => {
+        calls.push("yielded");
+      }),
+    ).rejects.toThrow("bad ddl");
+
+    expect(calls).toEqual(["DROP ex"]);
+  });
+
   it("defaults the definition to nil", async () => {
     const { connection, calls } = recordingConnection();
 

@@ -77,4 +77,7 @@ export class FakeActiveRecordAdapter extends FakeAdapterBase {
   }
 }
 
-register("fake", async () => FakeActiveRecordAdapter as unknown as new () => AbstractAdapter);
+/** Mirrors: activerecord/test/cases/helper.rb:46 */
+export function registerFakeAdapter(): void {
+  register("fake", async () => FakeActiveRecordAdapter as unknown as new () => AbstractAdapter);
+}
