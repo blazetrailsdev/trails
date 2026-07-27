@@ -1607,3 +1607,141 @@ describe("@noRailsEquivalent — extractor to report", () => {
     expect(report.packages[0].extraFiles).toEqual([]);
   });
 });
+
+describe("buildReport — TS files with no Rails counterpart", () => {
+  function makeManifests(tsFile: string): { ruby: ApiManifest; ts: ApiManifest } {
+    // Rails: active_record.rb declares the umbrella writer `foo=`; it maps
+    // onto base.ts, so nothing in the file map points at `tsFile`.
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activerecord: {
+          classes: {
+            "ActiveRecord::Base": rubyClass({
+              name: "Base",
+              file: "base.rb",
+              instance: [method("foo=")],
+            }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const ts_: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activerecord: {
+          classes: {
+            Base: {
+              name: "Base",
+              file: "base.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("foo")],
+              classMethods: [],
+            },
+          },
+          modules: {},
+          fileFunctions: { [tsFile]: [method("setFoo"), method("foo")] },
+        },
+      },
+    };
+    return { ruby, ts: ts_ };
+  }
+
+  it("scores a file no Ruby file maps onto instead of skipping it", () => {
+    const { ruby, ts: ts_ } = makeManifests("ar-config.ts");
+    const report = buildReport(ruby, ts_, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const files = report.packages[0].extraFiles;
+    expect(files.map((f) => f.tsFile)).toEqual(["ar-config.ts"]);
+    // `foo=` maps to `foo`, so the `setX` re-spelling is novel and the reader
+    // is moved (base.ts owns it) — the whole file is measured, not skipped.
+    expect(files[0].rubyFile).toBeNull();
+    expect(files[0].extras.map((e) => [e.name, e.kind])).toEqual([
+      ["setFoo", "novel"],
+      ["foo", "moved"],
+    ]);
+  });
+
+  it("breaks the no-counterpart slice out of the package totals", () => {
+    const { ruby, ts: ts_ } = makeManifests("ar-config.ts");
+    const report = buildReport(ruby, ts_, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const pkg = report.packages[0];
+    expect(pkg.totalExtras).toBe(2);
+    expect(pkg.noCounterpartFiles).toBe(1);
+    expect(pkg.noCounterpartExtras).toBe(2);
+    expect(pkg.noCounterpartNovel).toBe(1);
+  });
+
+  it("treats a Ruby file known only by its file-level constants as a counterpart", () => {
+    const { ruby, ts: ts_ } = makeManifests("cipher.ts");
+    // cipher.rb declares a constant and no class the extractor picked up; the
+    // literal pass still maps it through rubyFileToTs (compare.ts:1838-1841).
+    ruby.packages["activerecord"].fileConstants = {
+      "cipher.rb": { DEFAULT_ENCODING: { kind: "expr" } },
+    };
+    ts_.packages["activerecord"].fileFunctions = {
+      "cipher.ts": [method("DEFAULT_ENCODING"), method("setFoo")],
+    };
+    const report = buildReport(ruby, ts_, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles[0];
+    expect(f.tsFile).toBe("cipher.ts");
+    expect(f.rubyFile).toBe("cipher.rb");
+    // The constant is allowed by its own Rails file, so only `setFoo` flags —
+    // and the file is NOT counted against the no-counterpart population.
+    expect(f.extras.map((e) => e.name)).toEqual(["setFoo"]);
+    expect(report.packages[0].noCounterpartFiles).toBe(0);
+  });
+
+  it("holds out trees that mirror Rails test code rather than lib", () => {
+    const { ruby, ts: ts_ } = makeManifests("test-helpers/models/post.ts");
+    const report = buildReport(ruby, ts_, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    expect(report.packages[0].extraFiles).toEqual([]);
+  });
+
+  it("still scores test-fixtures/, the split of lib's test_fixtures.rb", () => {
+    const { ruby, ts: ts_ } = makeManifests("test-fixtures/fixture-connection.ts");
+    const report = buildReport(ruby, ts_, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    expect(report.packages[0].extraFiles.map((f) => f.tsFile)).toEqual([
+      "test-fixtures/fixture-connection.ts",
+    ]);
+  });
+
+  it("honours --exclude-glob for a file with no counterpart", () => {
+    const { ruby, ts: ts_ } = makeManifests("ar-config.ts");
+    const report = buildReport(ruby, ts_, {
+      filterPkg: null,
+      excludeGlobs: ["ar-config"],
+      novelOnly: false,
+      topN: 50,
+    });
+    expect(report.packages[0].extraFiles).toEqual([]);
+  });
+});
