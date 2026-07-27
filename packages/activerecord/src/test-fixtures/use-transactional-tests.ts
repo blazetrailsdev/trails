@@ -20,12 +20,18 @@ import {
  * `resetTestAdapterState` runs exactly once to clean up for the next file.
  *
  * **When to use this vs `setupHandlerSuite + withTransactionalFixtures`:**
- * Use `useTransactionalTests()` for self-contained test files that want the
- * handler bootstrapped automatically. Use `setupHandlerSuite()` +
- * `withTransactionalFixtures(leaseFixtureConnection)` when the file is part of a suite that
- * shares a long-lived handler across multiple describes — `setupHandlerSuite`
- * keeps the adapter alive across files whereas `useTransactionalTests` fires
- * `resetTestAdapterState` on exit (depth reaches zero), tearing down the pool.
+ * Both ride the worker's own pool, which `test-setup-dy.ts` establishes once
+ * and leaves up for the whole worker, as `ARTest.connect` does for the whole
+ * Rails process (`support/connection.rb:31-32`). Neither opens or closes it.
+ * The difference is only what happens between tests: `useTransactionalTests()`
+ * wraps each test in a transaction that rolls back, then runs
+ * `resetTestAdapterState` once when the scope exits (depth reaches zero) —
+ * Rails' `teardown_fixtures` shape, which rolls the transaction back and
+ * clears active connections without removing the pool
+ * (`test_fixtures.rb:125-158`). `setupHandlerSuite()` +
+ * `withTransactionalFixtures(leaseFixtureConnection)` instead holds the
+ * global-reset shield for the whole file, for suites whose describes share
+ * state that the between-test reset would otherwise clear.
  *
  * Call once at file/describe scope to opt in:
  *
