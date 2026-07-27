@@ -24,8 +24,6 @@ class HostClass {
   greeting = "hello";
 }
 
-// Rails: `include ConfigMethods` / `extend ConfigMethods` in Caching's
-// `included` block — installs the `cacheStore` accessor pair on the host.
 include(HostClass, ConfigMethods);
 
 function makeHost(store?: MemoryStore | null): HostClass & CachingHost & ConfigMethods {

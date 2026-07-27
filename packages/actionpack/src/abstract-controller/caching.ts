@@ -56,28 +56,11 @@ export interface CachingHost {
   constructor: CachingClassMethods;
 }
 
-/**
- * `AbstractController::Caching::ConfigMethods` — the `cache_store` /
- * `cache_store=` pair. Rails delegates both to `config.cache_store`; trails
- * stores the slot directly on the class, so each half walks the prototype
- * chain via `host.constructor`.
- *
- * It's a class rather than two exported functions so the reader and writer
- * share one name, which is the repo-wide mapping for a Ruby `foo=` writer
- * (see `scripts/api-compare/conventions.ts`). Mix it into a host with
- * `include(HostClass, ConfigMethods)` — `include` copies accessor
- * descriptors from class modules intact.
- */
 export class ConfigMethods {
   get cacheStore(): CacheStore | null {
     return (this as unknown as CachingHost).constructor.cacheStore ?? null;
   }
 
-  /**
-   * Rails wraps the assignment via `ActiveSupport::Cache.lookup_store(*store)`;
-   * that helper isn't ported yet, so for now we accept a fully-constructed
-   * `CacheStore` (or `null`) and assign it onto the class slot directly.
-   */
   set cacheStore(store: CacheStore | null) {
     (this as unknown as CachingHost).constructor.cacheStore = store;
   }
