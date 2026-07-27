@@ -57,6 +57,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, PACKAGES, ROOT_DIR, SCRIPT_DIR } from "./config.js";
+import { serializeBaseline } from "./lint-call-mismatches.js";
 
 export const ARTIFACT_PATH = path.join(OUTPUT_DIR, "body-hashes.json");
 export const MANIFEST_PATH = path.join(SCRIPT_DIR, "body-pins.json");
@@ -242,7 +243,7 @@ export async function loadArtifact(): Promise<Artifact> {
 }
 
 export async function saveManifest(pins: BodyPin[]): Promise<void> {
-  await fs.writeFile(MANIFEST_PATH, JSON.stringify(sortPins(pins), null, 2) + "\n");
+  await fs.writeFile(MANIFEST_PATH, serializeBaseline(sortPins(pins)));
 }
 
 async function main(args: string[]): Promise<number> {
