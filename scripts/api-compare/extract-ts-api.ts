@@ -3,6 +3,27 @@
  * Extracts the public API surface from our TypeScript packages.
  * Uses the TypeScript Compiler API.
  * Outputs output/ts-api.json
+ *
+ * ## Adding a per-method field derived from a declaration
+ *
+ * A `MethodInfo` is constructed in ~10 places here. Whether a
+ * declaration-derived field (`internal`, `noRailsEquivalent`, …) must be
+ * copied at a given site is decided by ONE thing: whether
+ * `collectTsFileNames` (extra-surface.ts) counts that entry as the file's own
+ * surface. That function is the authority — read it, don't reason by analogy.
+ *
+ * - counted → the site MUST read the declaration's metadata.
+ * - not counted → it MUST NOT: the copied value can never match this file's
+ *   Rails surface, so it reads as stale on top of the correct match on the
+ *   declaring file. Only two populations are uncounted: `__mixin` members
+ *   carrying `declaredIn` (skipped via `synthesizedMixin`) and
+ *   `extractFileLocalHelpers` output (always `internal: true`).
+ *
+ * Interface `extends`-resolved members are the trap: they carry no
+ * `declaredIn`, so they ARE counted — the `__mixin` analogy gets it backwards.
+ *
+ * The full inventory is pinned by "MethodInfo emit-site inventory" in
+ * extract-ts-api.test.ts; extend that fixture when you add a field.
  */
 
 import * as ts from "typescript";

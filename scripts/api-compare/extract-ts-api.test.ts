@@ -22,6 +22,7 @@ import {
   packageFingerprint,
   tsLiteralValue,
 } from "./extract-ts-api.js";
+import { collectTsFileNames } from "./extra-surface.js";
 import { overlappingSubDirs, packageSrcDir } from "./config.js";
 import type { ClassInfo, MethodInfo, PackageInfo } from "./types.js";
 
@@ -1811,5 +1812,226 @@ describe("sub-package de-overlap", () => {
 
     const deOverlapped = extractFromProgram(ts.createProgram(entry, options), srcDir, [subDir]);
     expect(Object.keys(deOverlapped.classes)).toEqual(["parent.ts:Parent"]);
+  });
+});
+
+/**
+ * Every `MethodInfo` emit site in the extractor, pinned in one fixture.
+ *
+ * Adding a per-method declaration-derived field means visiting every site that
+ * must copy it, and there is no mechanical way to enumerate those sites from
+ * the source — PR #5358 found them one review round at a time and guessed
+ * wrong twice. This fixture tags EVERY declaration the extractor can reach, so
+ * a new field with a missed site fails here instead of in review. The rule it
+ * encodes lives in the extract-ts-api.ts module comment.
+ */
+const EMIT_SITE_FIXTURE: Record<string, string> = {
+  "mixin-base.ts": `
+    export class MixinBase {
+      /** @noRailsEquivalent mixin foreign member */
+      foreign(): void {}
+    }
+  `,
+  "iface-base.ts": `
+    export interface IfaceBase {
+      /** @noRailsEquivalent interface extends-resolved member */
+      inherited(): void;
+    }
+  `,
+  "emit-sites.ts": `
+    import { MixinBase } from "./mixin-base.js";
+    import type { IfaceBase } from "./iface-base.js";
+
+    export class Widget {
+      /** @noRailsEquivalent class constructor */
+      constructor() {}
+
+      /** @noRailsEquivalent class method */
+      render(): void {}
+
+      /** @noRailsEquivalent class getter */
+      get sizeRead(): number { return 1; }
+
+      /** @noRailsEquivalent class setter */
+      set sizeWrite(value: number) {}
+
+      /** @noRailsEquivalent class property */
+      label: string = "";
+
+      /** @noRailsEquivalent class static method */
+      static build(): void {}
+    }
+
+    /** @noRailsEquivalent top-level exported function */
+    export function topLevel(): void {}
+
+    /** @noRailsEquivalent export-list alias target */
+    export function renameSource(): void {}
+    export { renameSource as renamedExport };
+
+    /** @noRailsEquivalent export-list alias own reason */
+    export { renameSource as taggedAlias };
+
+    /** @noRailsEquivalent object-literal shorthand target */
+    function shorthandRef(): void {}
+
+    function aliasTarget(): void {}
+
+    const NS = {
+      /** @noRailsEquivalent object-literal alias target */
+      target: aliasTarget,
+    };
+
+    export const Registry = {
+      /** @noRailsEquivalent object-literal inline method */
+      inline(): void {},
+      shorthandRef,
+      aliasRef: NS.target,
+    };
+
+    export namespace Locator {
+      /** @noRailsEquivalent namespace function */
+      export function findIt(): void {}
+
+      /** @noRailsEquivalent namespace const */
+      export const findConst = (): void => {};
+    }
+
+    export interface Quoting extends IfaceBase {
+      /** @noRailsEquivalent interface method signature */
+      quoteAsync(value: unknown): Promise<string>;
+    }
+
+    export function Attributes(Base: typeof MixinBase) {
+      class M extends Base {
+        /** @noRailsEquivalent mixin own member */
+        ownMember(): void {}
+      }
+      return M;
+    }
+  `,
+};
+
+interface EmitEntry {
+  /** Container key, or `<fileFunctions>` for the per-file function list. */
+  container: string;
+  name: string;
+  /** Does `collectTsFileNames` count this entry as the file's own surface? */
+  counted: boolean;
+  /** Did the declaration's `@noRailsEquivalent` tag reach this entry? */
+  hasReason: boolean;
+}
+
+/**
+ * Flatten every entry the extractor emitted for `file`, tagging each with the
+ * counted-ness that decides whether it must carry declaration-derived
+ * metadata. `collectTsFileNames` only exposes a per-file name Set, so the
+ * filter is restated here for per-entry granularity; the drift that invites is
+ * caught by the cross-check test below.
+ */
+function emitInventory(info: PackageInfo, file: string): EmitEntry[] {
+  const out: EmitEntry[] = [];
+  const push = (container: string, m: MethodInfo, skipForeign: boolean): void => {
+    const counted =
+      m.internal !== true &&
+      !m.name.startsWith("_") &&
+      !(skipForeign && m.declaredIn !== undefined);
+    out.push({ container, name: m.name, counted, hasReason: m.noRailsEquivalent !== undefined });
+  };
+  for (const [key, c] of Object.entries({ ...info.classes, ...info.modules })) {
+    if (c.file !== file) continue;
+    const skipForeign = c.synthesizedMixin === true;
+    for (const m of c.instanceMethods) push(key, m, skipForeign);
+    for (const m of c.classMethods) push(key, m, skipForeign);
+  }
+  for (const m of info.fileFunctions[file] ?? []) push("<fileFunctions>", m, false);
+  // Code-unit ordering, not localeCompare: the hand-written table below must
+  // not shift with the host's collation.
+  return out.sort((a, b) => {
+    const ka = `${a.container}#${a.name}`;
+    const kb = `${b.container}#${b.name}`;
+    return ka < kb ? -1 : ka > kb ? 1 : 0;
+  });
+}
+
+/**
+ * The pinned inventory. Every entry has a tagged declaration behind it and so
+ * expects `hasReason: true`, except four:
+ *
+ * - `<fileFunctions>#Attributes` — the mixin factory, left untagged so an
+ *   untagged counted site is represented too.
+ * - `<fileFunctions>#aliasTarget` / `#shorthandRef` — `extractFileLocalHelpers`
+ *   output, always `internal: true`, so uncounted and never metadata-bearing.
+ * - `Attributes__mixin#constructor` — synthesized from the factory's construct
+ *   signature; counted, but there is no member declaration to read a tag off.
+ * - `<fileFunctions>#renamedExport` — an untagged `export { x as y }` alias
+ *   drops the declaration's reason: the reason justifies the declared
+ *   spelling, not the alias. `#taggedAlias` is the tagged form.
+ */
+const EMIT_SITE_INVENTORY: EmitEntry[] = [
+  { container: "<fileFunctions>", name: "Attributes", counted: true, hasReason: false },
+  { container: "<fileFunctions>", name: "aliasTarget", counted: false, hasReason: false },
+  { container: "<fileFunctions>", name: "renameSource", counted: true, hasReason: true },
+  { container: "<fileFunctions>", name: "renamedExport", counted: true, hasReason: false },
+  { container: "<fileFunctions>", name: "shorthandRef", counted: false, hasReason: false },
+  { container: "<fileFunctions>", name: "taggedAlias", counted: true, hasReason: true },
+  { container: "<fileFunctions>", name: "topLevel", counted: true, hasReason: true },
+  {
+    container: "emit-sites.ts:Attributes__mixin",
+    name: "constructor",
+    counted: true,
+    hasReason: false,
+  },
+  {
+    container: "emit-sites.ts:Attributes__mixin",
+    name: "foreign",
+    counted: false,
+    hasReason: false,
+  },
+  {
+    container: "emit-sites.ts:Attributes__mixin",
+    name: "ownMember",
+    counted: true,
+    hasReason: true,
+  },
+  { container: "emit-sites.ts:Locator", name: "findConst", counted: true, hasReason: true },
+  { container: "emit-sites.ts:Locator", name: "findIt", counted: true, hasReason: true },
+  { container: "emit-sites.ts:Quoting", name: "inherited", counted: true, hasReason: true },
+  { container: "emit-sites.ts:Quoting", name: "quoteAsync", counted: true, hasReason: true },
+  { container: "emit-sites.ts:Registry", name: "aliasRef", counted: true, hasReason: true },
+  { container: "emit-sites.ts:Registry", name: "inline", counted: true, hasReason: true },
+  { container: "emit-sites.ts:Registry", name: "shorthandRef", counted: true, hasReason: true },
+  { container: "emit-sites.ts:Widget", name: "build", counted: true, hasReason: true },
+  { container: "emit-sites.ts:Widget", name: "constructor", counted: true, hasReason: true },
+  { container: "emit-sites.ts:Widget", name: "label", counted: true, hasReason: true },
+  { container: "emit-sites.ts:Widget", name: "render", counted: true, hasReason: true },
+  { container: "emit-sites.ts:Widget", name: "sizeRead", counted: true, hasReason: true },
+  { container: "emit-sites.ts:Widget", name: "sizeWrite", counted: true, hasReason: true },
+];
+
+describe("extract-ts-api — MethodInfo emit-site inventory", () => {
+  it("pins every emit site and whether declaration-derived metadata reaches it", () => {
+    const info = extractFromFiles("/p", EMIT_SITE_FIXTURE);
+    // Exact match, not a superset: a NEW emit site shows up as an unexpected
+    // entry, and a field that misses an existing site flips `hasReason`.
+    expect(emitInventory(info, "emit-sites.ts")).toEqual(EMIT_SITE_INVENTORY);
+  });
+
+  it("agrees with collectTsFileNames about which entries the file owns", () => {
+    const info = extractFromFiles("/p", EMIT_SITE_FIXTURE);
+    const file = "emit-sites.ts";
+    const counted = new Set(
+      emitInventory(info, file)
+        .filter((e) => e.counted)
+        .map((e) => e.name),
+    );
+    expect(counted).toEqual(
+      collectTsFileNames(
+        file,
+        Object.values(info.classes),
+        Object.values(info.modules),
+        info.fileFunctions[file],
+      ),
+    );
   });
 });
