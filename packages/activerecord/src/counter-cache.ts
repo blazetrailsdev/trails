@@ -1,6 +1,7 @@
 import type { Base } from "./base.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
+import { underscore } from "@blazetrails/activesupport";
 import { pendingCounterCacheColumns } from "./counter-cache-state.js";
 import {
   touchAttributesWithTime,
@@ -318,9 +319,40 @@ function counterCachedAssociationNames(ctor: typeof Base): string[] {
   // registry was wired (or via dynamic _associations entries with counterCache).
   const associations: Array<{ type: string; name: string; options: any }> =
     (ctor as any)._associations ?? [];
-  return associations
-    .filter((a) => a.type === "belongsTo" && a.options?.counterCache)
-    .map((a) => a.name);
+  // Rails keys reflections by name, so a subclass redeclaring `belongs_to :post`
+  // replaces the inherited one; trails' `_associations` keeps both entries, so
+  // dedupe by name here or the counter fires once per duplicate definition.
+  return [
+    ...new Set(
+      associations
+        .filter((a) => a.type === "belongsTo" && a.options?.counterCache)
+        .map((a) => a.name),
+    ),
+  ];
+}
+
+/**
+ * Derive a foreign key for a reflection that has none. Rails always has
+ * `reflection.foreign_key`; trails' association reflections may still be raw
+ * definitions (`{ name, options }`), so callers read `.foreignKey` first and
+ * fall back here to the derivation Reflection itself uses — explicit
+ * `foreignKey`/`queryConstraints`, then `<as>_id` for a polymorphic
+ * `has_many ... as:`, then `<name>_id`.
+ *
+ * `nameFallback` is the last resort only: for the `destroyed_by_association`
+ * side it is the destroyed record's class name, which matches Rails' derived
+ * `<owner>_id` for the common `has_many` (a parent whose has_many names a
+ * different foreign key always carries it explicitly in `options`).
+ */
+function derivedForeignKey(
+  reflection: { options?: Record<string, unknown> } | null | undefined,
+  nameFallback: string,
+): unknown {
+  const options = reflection?.options ?? {};
+  if (options.foreignKey != null) return options.foreignKey;
+  if (options.queryConstraints != null) return options.queryConstraints;
+  if (options.as != null) return `${underscore(String(options.as))}_id`;
+  return `${underscore(nameFallback)}_id`;
 }
 
 /**
@@ -350,8 +382,15 @@ export async function destroyRow(
   if (affectedRows > 0) {
     for (const name of counterCachedAssociationNames(this.constructor)) {
       const assoc = this.association(name);
-      const dba = this.destroyedByAssociation as any;
-      if (!dba || !_foreignKeysEqual(dba.foreignKey, assoc.reflection?.foreignKey)) {
+      const dba = this.destroyedByAssociation as {
+        foreignKey?: unknown;
+        options?: Record<string, unknown>;
+      } | null;
+      const destroyedByForeignKey =
+        dba?.foreignKey ?? derivedForeignKey(dba, this.constructor.name);
+      const reflectionForeignKey =
+        assoc.reflection?.foreignKey ?? derivedForeignKey(assoc.reflection, name);
+      if (!dba || !_foreignKeysEqual(destroyedByForeignKey, reflectionForeignKey)) {
         await assoc.decrementCounters();
       }
     }

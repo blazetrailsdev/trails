@@ -16,6 +16,7 @@ import {
   restoreCallbacksOnProto,
 } from "@blazetrails/activemodel";
 import { subclasses as _subclasses } from "./inheritance.js";
+import { _createRecord as counterCacheCreateRecord } from "./counter-cache.js";
 import {
   allTimestampAttributesInModel,
   currentTimeFromProperTimezone,
@@ -304,36 +305,43 @@ export async function _createRecord(this: any): Promise<boolean> {
   // Our signature is Promise<boolean>, so that predicate is applied here.
   const ctor = this.constructor;
   return (
-    (await runAllCallbacks(ctor.prototype, "create", this, async () => {
-      if (!this._performInsert) throw new Error("_performInsert not implemented");
-      // Reinstate constructor-assigned attrs as dirty vs schema defaults BEFORE the
-      // insert. Rails new records are dirty from construction, so partial_inserts'
-      // `attribute_names & changed_attribute_names_to_save` (attributesForCreate)
-      // correctly includes attrs the user set to a non-default value — e.g. an
-      // hstore column with a DB default of "" that was assigned {key: null}.
-      // Running this after the insert would leave the dirty set empty at column-
-      // selection time and wrongly drop such columns. Only a *null* PK column is
-      // skipped: that's the auto-populated key, tracked via
-      // _writeAttribute(pk, insertedId) in _performInsert. A user-assigned
-      // (non-null) PK column — e.g. a composite key — must stay dirty so it's
-      // inserted; otherwise the row is written with a missing key and
-      // find/destroy by that key raises RecordNotFound.
-      const _pk = ctor.primaryKey;
-      const _pkSet = new Set(
-        (Array.isArray(_pk) ? _pk : [_pk]).filter((n) => this._readAttribute?.(n) == null),
-      );
-      this._dirty.reinstateNewRecordChanges(this._attributes, _pkSet);
-      await this._performInsert();
-      if (this._pendingOperation) {
-        await this._pendingOperation;
-        this._pendingOperation = null;
-      }
-      this._previouslyNewRecord = true;
-      this._newRecord = false;
-      this.changesApplied();
-      // Rails' block is `super`, whose truthy return becomes run_callbacks' value.
-      return true;
-    })) !== false
+    (await runAllCallbacks(ctor.prototype, "create", this, async () =>
+      // Rails includes CounterCache BEFORE Callbacks (base.rb:309 vs :315), so
+      // Callbacks#_create_record's `super` reaches CounterCache#_create_record,
+      // which increments the belongs_to counter caches after the INSERT and
+      // before the after_create callbacks run. Threading the insert body as its
+      // `super` reproduces that ordering.
+      counterCacheCreateRecord.call(this, async () => {
+        if (!this._performInsert) throw new Error("_performInsert not implemented");
+        // Reinstate constructor-assigned attrs as dirty vs schema defaults BEFORE the
+        // insert. Rails new records are dirty from construction, so partial_inserts'
+        // `attribute_names & changed_attribute_names_to_save` (attributesForCreate)
+        // correctly includes attrs the user set to a non-default value — e.g. an
+        // hstore column with a DB default of "" that was assigned {key: null}.
+        // Running this after the insert would leave the dirty set empty at column-
+        // selection time and wrongly drop such columns. Only a *null* PK column is
+        // skipped: that's the auto-populated key, tracked via
+        // _writeAttribute(pk, insertedId) in _performInsert. A user-assigned
+        // (non-null) PK column — e.g. a composite key — must stay dirty so it's
+        // inserted; otherwise the row is written with a missing key and
+        // find/destroy by that key raises RecordNotFound.
+        const _pk = ctor.primaryKey;
+        const _pkSet = new Set(
+          (Array.isArray(_pk) ? _pk : [_pk]).filter((n) => this._readAttribute?.(n) == null),
+        );
+        this._dirty.reinstateNewRecordChanges(this._attributes, _pkSet);
+        await this._performInsert();
+        if (this._pendingOperation) {
+          await this._pendingOperation;
+          this._pendingOperation = null;
+        }
+        this._previouslyNewRecord = true;
+        this._newRecord = false;
+        this.changesApplied();
+        // Rails' block is `super`, whose truthy return becomes run_callbacks' value.
+        return true;
+      }),
+    )) !== false
   );
 }
 

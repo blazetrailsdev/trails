@@ -33,6 +33,9 @@ import {
 } from "../test-helpers/models/company.js";
 import { Account } from "../test-helpers/models/account.js";
 import { Car } from "../test-helpers/models/car.js";
+// Rails: `require "models/person"` (has_one_associations_test.rb:10) — Car
+// belongs_to :person with a counter cache, so creating a Car resolves Person.
+import "../test-helpers/models/person.js";
 import { Bulb } from "../test-helpers/models/bulb.js";
 import { Club } from "../test-helpers/models/club.js";
 import { Membership } from "../test-helpers/models/membership.js";
