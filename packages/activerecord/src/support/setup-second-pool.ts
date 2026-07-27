@@ -9,7 +9,6 @@ import { College } from "../test-helpers/models/college.js";
 import { Entrant } from "../test-helpers/models/entrant.js";
 import { Professor } from "../test-helpers/models/professor.js";
 import { activeLane } from "./connection.js";
-import { isSqliteRun } from "./sqlite-template.js";
 
 /**
  * The tables `schema.rb:1444-1460` creates through the second connection
@@ -107,11 +106,6 @@ async function teardownSecondPool(): Promise<void> {
  * @internal
  */
 export function withSecondPool(): void {
-  beforeAll(async () => {
-    if (isSqliteRun()) await setupSecondPool();
-  });
-
-  afterAll(async () => {
-    if (isSqliteRun()) await teardownSecondPool();
-  });
+  beforeAll(setupSecondPool);
+  afterAll(teardownSecondPool);
 }

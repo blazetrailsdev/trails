@@ -4,7 +4,6 @@ import { Base } from "./base.js";
 import { StatementInvalid } from "./errors.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { withSecondPool } from "./support/setup-second-pool.js";
-import { isSqliteRun } from "./support/sqlite-template.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 import { Course } from "./test-helpers/models/course.js";
 import { College } from "./test-helpers/models/college.js";
@@ -12,9 +11,9 @@ import { Entrant } from "./test-helpers/models/entrant.js";
 import { Bird } from "./test-helpers/models/bird.js";
 
 // Rails runs MultipleDbTest against two real databases (arunit / arunit2), as
-// does trails now that `connect` establishes ARUnit2Model on a provisioned
-// arunit2. Un-gating this suite for PG/MySQL is its own story.
-describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
+// does trails on every lane: `connect` establishes ARUnit2Model on arunit2 and
+// `provisionSecondDatabase` creates that database before any suite runs.
+describe("MultipleDbTest", () => {
   // Rails sets `self.use_transactional_tests = false`; fixtures() pins
   // the schema/fixtures across the file (skips the global per-test reset).
   fixtures({}, { useTransactionalTests: false });
