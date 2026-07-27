@@ -1346,10 +1346,10 @@ export function noRailsEquivalentReason(node: ts.Node): string | undefined {
           "state why this surface has no Rails counterpart.",
       );
     }
+    const sf = node.getSourceFile();
+    const line = sf.getLineAndCharacterOfPosition(tag.getStart()).line + 1;
     const inlineTag = inlineTagAfter(tag);
     if (inlineTag !== undefined) {
-      const sf = node.getSourceFile();
-      const line = sf.getLineAndCharacterOfPosition(tag.getStart()).line + 1;
       throw new Error(
         `@noRailsEquivalent reason is truncated by a bare \`@${inlineTag}\` in its ` +
           `prose: ${sf.fileName}:${line} — TypeScript parses it as a real JSDoc tag, ` +
@@ -1368,7 +1368,10 @@ export function noRailsEquivalentReason(node: ts.Node): string | undefined {
  * than a deliberate tag on its own line. TypeScript parses either shape as a
  * real tag, which silently truncates the reason (and, for `@internal`, drops
  * the declaration from the extracted surface). Returns undefined when every
- * following tag starts its own line.
+ * following tag starts its own line: a line-leading tag can't be told apart
+ * from a deliberate one, and `@internal` next to `@noRailsEquivalent` is a real
+ * pairing in the tree (schema-cache.ts `recordTouchedTables`), so only the
+ * mid-line shape is judged a mistake.
  */
 function inlineTagAfter(tag: ts.JSDocTag): string | undefined {
   const jsDoc = tag.parent;
