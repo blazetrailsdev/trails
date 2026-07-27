@@ -180,6 +180,19 @@ export function configuredConnectionHash(): Record<string, unknown> {
  * Rails returns the raw hash and lets `connect` derive the adapter from the
  * established pool; trails builds the config object here, so the resolved lane
  * comes back alongside it rather than being re-read from a live connection.
+ *
+ * KNOWN DIVERGENCE (story `arunit-named-configuration-entries`): Rails'
+ * `expand_config` gives every connection three named entries — `arunit`,
+ * `arunit2` and `arunit_without_prepared_statements` (`config.rb:26-37`) — and
+ * those names are *environments* in the configurations hash, which is why
+ * `connect` can say `establish_connection :arunit` (`connection.rb:32-33`).
+ * trails synthesizes a single `test`/`primary` entry instead, so
+ * `Base.configurations` carries no `arunit` name and an ARTest-style
+ * `Base.establishConnection("arunit")` does not resolve. Converging means
+ * renaming the env every lookup in the harness uses (`DatabaseTasks`,
+ * `test-databases.ts`, `findDbConfig("test")`, the second-pool setup), and
+ * `arunit2` additionally needs the `CREATE DATABASE` provisioning that is only
+ * done on the sqlite lane today — both larger than this file.
  */
 export async function testConfigurationHashes(): Promise<{
   adapter: TestAdapterName;
