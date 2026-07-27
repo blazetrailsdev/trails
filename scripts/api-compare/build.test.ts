@@ -42,10 +42,15 @@ describe("parseJsdoc", () => {
     );
   });
 
-  it("rejects a tag whose em-dash carries no prose", () => {
+  it("rejects a tag whose em-dash carries no prose, with no location when unknown", () => {
     expect(() => parseJsdoc("/**\n * @missingRailsCall merge! — \n */")).toThrow(
-      /@missingRailsCall needs a reason/,
+      "@missingRailsCall needs a reason: — state why the Rails call `merge!` is not made here.",
     );
+  });
+
+  it("accepts the generator's placeholder reason", () => {
+    const { entries } = parseJsdoc(`/**\n * @missingRailsCall a — ${DEFAULT_TAG_REASON}\n */`);
+    expect(entries[0]!.reason).toBe(DEFAULT_TAG_REASON);
   });
 });
 
@@ -59,6 +64,11 @@ describe("reconcile", () => {
     expect(r.dropped).toEqual([]);
     const r2 = reconcile(entries, new Set(), reasonFor);
     expect(r2.dropped.map((e) => e.call)).toEqual(["a"]);
+  });
+
+  it("falls back to the placeholder when a curated reason is blank", () => {
+    const r = reconcile([], new Set(["a"]), () => "  ");
+    expect(r.added[0]!.reason).toBe(DEFAULT_TAG_REASON);
   });
 });
 

@@ -312,7 +312,10 @@ report). They therefore share:
 
   The placeholder path is unaffected: a generator-authored placeholder is a
   non-empty reason, so it parses, round-trips byte-for-byte via `rawLines`,
-  and still drops without a harvest report when the call converges.
+  and still drops without a harvest report when the call converges. Reason
+  precedence (3a) falls back to the placeholder if a curated baseline row's
+  `reason` is ever blank, so the generator can never write a tag its own
+  parser would reject on the next run.
 
 Two things are deliberately **not** shared, and the difference is load-bearing:
 

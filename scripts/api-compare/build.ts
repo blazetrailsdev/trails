@@ -14,6 +14,8 @@
  *     harvested to stdout, never destroyed unseen);
  *   - existing tags that still apply are kept byte-for-byte (idempotent:
  *     a second run produces zero edits);
+ *   - a tag with no reason fails the run (see the empty-reason contract in
+ *     docs/infrastructure/api-build-stub-generation-plan.md);
  *   - reasons for newly-added tags migrate from the committed baselines
  *     (call-mismatches-wide-exclude/, call-mismatches-exclude.json).
  *
@@ -131,11 +133,11 @@ export function parseJsdoc(
   for (const entry of entries) {
     if (entry.reason !== "") continue;
     const at = origin
-      ? `${origin.fileName}:${origin.startLine + (tagLineOf.get(entry) ?? 0)}`
-      : entry.call;
+      ? ` ${origin.fileName}:${origin.startLine + (tagLineOf.get(entry) ?? 0)}`
+      : "";
     throw new Error(
-      `${TAG} needs a reason: ${at} — state why the Rails call \`${entry.call}\` ` +
-        "is not made here.",
+      `${TAG} needs a reason:${at} — state why the Rails call ` +
+        `\`${entry.call}\` is not made here.`,
     );
   }
   return { rest, entries };
@@ -159,7 +161,9 @@ export function reconcile(
   for (const call of [...expected].sort()) {
     const have = byCall.get(call);
     if (have) kept.push(have);
-    else added.push({ call, reason: reasonFor(call), rawLines: [] });
+    // A blank curated reason would emit a tag this tool's own parser rejects
+    // on the next run; the placeholder keeps the generated path round-trippable.
+    else added.push({ call, reason: reasonFor(call).trim() || DEFAULT_TAG_REASON, rawLines: [] });
   }
   const dropped = existing.filter((e) => !expected.has(e.call));
   return { kept, added, dropped };
@@ -378,17 +382,22 @@ async function main(argv: string[]): Promise<number> {
     } catch {
       continue; // expected TS file not ported yet — stub phase, not this slice
     }
-    const {
-      text: next,
-      harvested,
-      unmatched,
-    } = reconcileFileText(
-      tsFile,
-      text,
-      expectations,
-      (rubyName, call) =>
-        reasons.get(keyOf({ package: pkg, tsFile, rubyName, call })) ?? DEFAULT_TAG_REASON,
-    );
+    let reconciled;
+    try {
+      reconciled = reconcileFileText(
+        // Repo-relative so an unjustified-tag error names a path the operator
+        // can open; the artifact key stays `tsFile`.
+        path.relative(ROOT_DIR, abs),
+        text,
+        expectations,
+        (rubyName, call) =>
+          reasons.get(keyOf({ package: pkg, tsFile, rubyName, call })) ?? DEFAULT_TAG_REASON,
+      );
+    } catch (err) {
+      console.error(`api:build: ${err instanceof Error ? err.message : String(err)}`);
+      return 1;
+    }
+    const { text: next, harvested, unmatched } = reconciled;
     for (const h of harvested) {
       console.log(`harvested (${tsFile} ${h.tsName} ${h.entry.call}): ${h.entry.reason}`);
     }
