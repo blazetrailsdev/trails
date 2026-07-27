@@ -206,13 +206,7 @@ export class TimeZoneConverter extends ValueType<unknown> {
   }
 }
 
-/**
- * Rails' time types branch on `is_utc?` between `::Time.utc` and `::Time.local`
- * (time_value.rb:51-60). Temporal has no `Time.local`, so the local arm has to
- * name the host zone explicitly.
- *
- * @internal
- */
+/** @internal */
 function zoneForIsUtc(subtypeIsUtc?: boolean): string {
   return (subtypeIsUtc ?? isUtcTimezone()) ? "UTC" : Temporal.Now.timeZoneId();
 }
