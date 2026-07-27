@@ -1054,21 +1054,6 @@ class ApiExtractor
     maybe_update_module_file(fqn, target)
   end
 
-  # Aliases are recorded with empty params (the `alias`/`alias_method` form
-  # names no parameters), but at runtime an alias shares its target method's
-  # arity. A faithful TS port spells the delegator with the real parameters, so
-  # the advisory arity check would false-flag the alias as a mismatch
-  # (ruby min:0,max:0 vs ts min:N,max:N). Resolve each alias to its target's
-  # param list — searching the same class/module bucket — so the comparison
-  # sees the true arity. Runs after all package files are processed (targets may
-  # be in a different file of a reopened class) and iterates to follow alias
-  # chains (`alias a b; alias b c`). Cross-class/inherited targets that aren't in
-  # the package stay empty (best-effort — the static walker can't see another
-  # gem's source) and are left WITHOUT the `aliasResolved` flag, which is what
-  # distinguishes them from an alias whose target legitimately takes zero
-  # arguments. Drops the transient `alias_target` key afterward so it never
-  # reaches the manifest.
-  # Public: invoked by `run` per package and by the extractor unit test.
   # Drop a `define_method` entry when a literal `def` of the same name already
   # occupies the same bucket. Ruby source can define a method both ways in
   # mutually exclusive branches the extractor walks unconditionally — rack's
@@ -1088,6 +1073,21 @@ class ApiExtractor
     end
   end
 
+  # Aliases are recorded with empty params (the `alias`/`alias_method` form
+  # names no parameters), but at runtime an alias shares its target method's
+  # arity. A faithful TS port spells the delegator with the real parameters, so
+  # the advisory arity check would false-flag the alias as a mismatch
+  # (ruby min:0,max:0 vs ts min:N,max:N). Resolve each alias to its target's
+  # param list — searching the same class/module bucket — so the comparison
+  # sees the true arity. Runs after all package files are processed (targets may
+  # be in a different file of a reopened class) and iterates to follow alias
+  # chains (`alias a b; alias b c`). Cross-class/inherited targets that aren't in
+  # the package stay empty (best-effort — the static walker can't see another
+  # gem's source) and are left WITHOUT the `aliasResolved` flag, which is what
+  # distinguishes them from an alias whose target legitimately takes zero
+  # arguments. Drops the transient `alias_target` key afterward so it never
+  # reaches the manifest.
+  # Public: invoked by `run` per package and by the extractor unit test.
   public def resolve_aliases!
     all = @classes.merge(@modules)
     # Candidate table per (fqn, bucket): the bucket's own methods first, then —
@@ -2405,9 +2405,11 @@ def run
     umbrella_file = "#{pkg_dir.sub(%r{/\z}, '')}.rb"
     extractor.scan_umbrella_file(umbrella_file, pkg_dir) if File.file?(umbrella_file)
 
+    # Drop define_method entries a literal `def` in the same bucket supersedes.
+    extractor.dedupe_define_methods!
+
     # Fill alias param lists from their targets now that every file in the
     # package has been seen (a reopened class may define the target elsewhere).
-    extractor.dedupe_define_methods!
     extractor.resolve_aliases!
 
     # Normalize into the JSON shape. Non-public methods are kept (tagged
