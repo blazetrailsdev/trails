@@ -1,9 +1,9 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import "./index.js";
 import { Base } from "./base.js";
 import { StatementInvalid } from "./errors.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { setupSecondPool, teardownSecondPool } from "./support/setup-second-pool.js";
+import { withSecondPool } from "./support/setup-second-pool.js";
 import { isSqliteRun } from "./support/sqlite-template.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 import { Course } from "./test-helpers/models/course.js";
@@ -18,13 +18,7 @@ describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
   // Rails sets `self.use_transactional_tests = false`; fixtures() pins
   // the schema/fixtures across the file (skips the global per-test reset).
   fixtures({}, { useTransactionalTests: false });
-  beforeAll(async () => {
-    await setupSecondPool();
-  });
-
-  afterAll(async () => {
-    await teardownSecondPool();
-  });
+  withSecondPool();
 
   // Rails: `fixtures :colleges, :courses, :entrants`.
   // Colleges + courses live in arunit2; entrants in the primary pool.
@@ -33,7 +27,7 @@ describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
   // ref("courses", …) which can't cross adapter registries (arunit2 ↔ primary).
   // Seed each set through its model-specific connection via `fixtures()`'
   // caller-supplied `connection` knob. `use_transactional_tests = false`
-  // (Rails). The tables are created by `setupSecondPool` (colleges/courses in
+  // (Rails). The tables are created by `withSecondPool` (colleges/courses in
   // arunit2, entrants in primary), not from the canonical template clone.
   const seedOpts = { useTransactionalTests: false } as const;
   const { colleges } = fixtures(["colleges"], {
@@ -148,7 +142,7 @@ describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
 
   // Rails guards these two with `unless in_memory_db?` (multiple_db_test.rb): its
   // in-memory harness can't give arunit2 a genuinely separate pool, so College
-  // would resolve to Base's connection. setupSecondPool establishes an explicitly
+  // would resolve to Base's connection. withSecondPool establishes an explicitly
   // independent arunit2 pool (its own `:memory:` DB), so the assertions hold and we
   // run them. This differs from the primary-class pair, which stay skipped because
   // `connects_to(arunit/arunit)` is *expected* to share Base's connection — which
