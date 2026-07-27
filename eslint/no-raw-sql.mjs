@@ -42,7 +42,6 @@ function isExcludedPath(rel) {
   if (/(^|\/)support\//.test(rel)) return true;
   if (/(^|\/)test-setup-[^/]*\.ts$/.test(rel)) return true;
   if (/(^|\/)cases\/helper\.ts$/.test(rel)) return true;
-  if (/(^|\/)cases\/helper\.ts$/.test(rel)) return true;
   return false;
 }
 
