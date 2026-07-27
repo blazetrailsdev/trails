@@ -41,6 +41,7 @@ import {
   ARUNIT_DATABASE,
   ARUNIT2_DATABASE,
 } from "./adapters/abstract-mysql-adapter/test-helper.js";
+import { provisionSecondDatabase } from "./support/setup-second-pool.js";
 
 // Drives Rails' AdapterTest casted/non-casted bind probes against the leased
 // connection and the canonical `events` table. The insert return value is
@@ -1294,6 +1295,10 @@ describe.runIf(adapterType === "mysql")("AdapterTest", () => {
       for (const database of [ARUNIT_DATABASE, ARUNIT2_DATABASE]) {
         await connection.execute(`DROP DATABASE IF EXISTS ${database}`);
       }
+      // ARUNIT2_DATABASE is this worker's real second database, which
+      // `ARUnit2Model` holds a pool on for the whole run — put it back rather
+      // than leaving later suites in the worker with colleges/courses gone.
+      await provisionSecondDatabase();
     }
   });
 });

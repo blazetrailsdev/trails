@@ -379,16 +379,14 @@ async function sqliteHash(): Promise<Record<string, unknown>> {
  * `schema.rb` in-process. The registration runs on every call so callers that
  * clear `_registeredTasks` (e.g. `database-tasks.test.ts`) can re-register.
  *
-
- * Rails' next line is `ARUnit2Model.establish_connection :arunit2`
- * (`connection.rb:33`), which this does NOT do. `College` and `Course` extend
- * `ARUnit2Model`, so pointing that base at the arunit2 database here sends
- * every suite's colleges/courses at a database that does not carry them — it
- * reddened all three lanes on #5397 with "no such table: colleges" from
- * `use-fixtures.test.ts`. Rails is safe because its arunit2 genuinely holds
- * those tables; ours only gets them inside `setupSecondPool`, which keeps
- * ownership of the second pool until that provisioning moves earlier (story
- * `arunit2-provisioning-owns-second-pool`).
+ * `ARUnit2Model.establish_connection :arunit2` (`connection.rb:33`) follows, so
+ * the second base owns its pool for the whole worker the way Rails' does,
+ * rather than having it opened per suite. The pool is lazy: the arunit2
+ * database and its tables are laid down by `provisionSecondDatabase`
+ * (`support/setup-second-pool.ts`, run from `test-setup-dy.ts`) before any
+ * suite runs — trails' stand-in for `schema.rb:1444-1460`, where
+ * `Course.lease_connection.create_table` puts colleges/courses/professors in
+ * arunit2.
  */
 export async function connect(): Promise<TestDatabaseConfig> {
   const { adapter, envConfig, configurationHashes } = await testConfigurationHashes();
@@ -417,6 +415,11 @@ export async function connect(): Promise<TestDatabaseConfig> {
   // `connection.rb:32` — established by name, not from a raw hash, so the pool
   // comes from the entry `Base.configurations` publishes.
   await Base.establishConnection("arunit");
+  // `connection.rb:33`. Imported lazily: the model modules pull in the
+  // association machinery, and a static import here would run that at
+  // config-build time, before the primary pool exists.
+  const { ARUnit2Model } = await import("../test-helpers/models/arunit2-model.js");
+  await ARUnit2Model.establishConnection("arunit2");
 
   return { configs, adapter, envConfig };
 }
