@@ -4,7 +4,7 @@ import { PostgreSQLAdapter } from "../../connection-adapters/postgresql-adapter.
 import { pgDatetimeConfig } from "../../connection-adapters/postgresql/pg-datetime-config.js";
 import { Notifications, squish } from "@blazetrails/activesupport";
 import type { NotificationSubscriber, NotificationEvent } from "@blazetrails/activesupport";
-import { postgresUrl } from "../../support/test-connection-env.js";
+import { postgresUrl } from "../../support/config.js";
 
 // A *serialization* of the PG sub-settings (PGHOST/PGPORT/PGUSER/PGPASSWORD/
 // PGDATABASE), not an env var of its own: these adapter suites probe the server

@@ -17,7 +17,7 @@ import {
 } from "./core.js";
 import { setTrailsRoot } from "@blazetrails/activesupport";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
-import { establishFromTestConfig } from "./support/test-database-config.js";
+import { establishFromTestConfig } from "./support/connection.js";
 import { adapterType } from "./test-adapter.js";
 import * as nodeFs from "node:fs";
 import * as nodeOs from "node:os";

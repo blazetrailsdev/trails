@@ -1,26 +1,25 @@
 /**
- * Builds the test-environment `DatabaseConfigurations` from a Rails-faithful
- * named-connections map (the `config.yml`-analogue) selected purely by
- * `ARCONN`, and wires it into `DatabaseTasks`, routing schema load through the
- * real Rails-mirrored path (`loadSchema` / `reconstructFromSchema`).
- *
- * Mirrors `vendor/rails/activerecord/test/support/connection.rb`:
+ * The test harness' connection bootstrap, mirroring
+ * `vendor/rails/activerecord/test/support/connection.rb`:
  *   - `connection_name = ENV["ARCONN"] || config["default_connection"]`
  *     (`connection.rb:10`),
- *   - `config.fetch("connections").fetch(connection_name) { ... exit 1 }`
- *     (`connection.rb:14-19`) — a hard failure when `ARCONN` names an
- *     unconfigured connection,
- *   - `unless connection_name.include?(arunit_adapter) raise ArgumentError`
- *     (`connection.rb:35-37`) — a loud raise when `ARCONN` and the resolved
- *     adapter diverge.
+ *   - `test_configuration_hashes` — `config.fetch("connections").fetch(
+ *     connection_name) { ... exit 1 }` (`connection.rb:13-20`), a hard failure
+ *     when `ARCONN` names an unconfigured connection,
+ *   - `connect` (`connection.rb:22-38`) — assigns the configurations and
+ *     establishes `Base`'s connection, including the
+ *     `unless connection_name.include?(arunit_adapter) raise ArgumentError`
+ *     guard (`connection.rb:35-37`) when `ARCONN` and the resolved adapter
+ *     diverge.
+ *
+ * On top of Rails' three methods it wires the resolved configurations into
+ * `DatabaseTasks`, so schema load runs through the real Rails-mirrored path
+ * (`loadSchema` / `reconstructFromSchema`). Rails has no equivalent because its
+ * suite loads `schema.rb` directly from `cases/helper.rb`.
  *
  * As in `config.example.yml`, `ENV` only feeds connection *sub-settings*
- * (host/port/socket/credentials, via `test-connection-env.ts`); it never
+ * (host/port/socket/credentials, via `config.ts`); it never
  * selects the backend.
- *
- * Phase 1 of RFC 0002 — new file, no consumer changes.
- * Phase 2 of RFC 0002 — adds `establishFromTestConfig` for setupHandlerSuite.
- * Phase 4 of RFC 0002 — sole env-sniff source after bootstrap-test-handler deleted.
  */
 
 import { getEnv, getOsAsync } from "@blazetrails/activesupport";
@@ -31,18 +30,48 @@ import { DatabaseConfigurations } from "../database-configurations.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { UrlConfig } from "../database-configurations/url-config.js";
-import { registerDbFileCleanupOnExit } from "./sqlite-template.js";
 import {
-  connectionName,
+  CONNECTION_LANES,
+  DEFAULT_CONNECTION,
   driverConfig,
   mysqlSettings,
   postgresSettings,
+  present,
   type ConnectionName,
+  type EnvReader,
   type ServerSettings,
   type TestAdapterName,
-} from "./test-connection-env.js";
+} from "./config.js";
 
 export type { TestAdapterName };
+
+/**
+ * The connection name selected by `ARCONN`, falling back to
+ * `config["default_connection"]`. Mirrors `connection.rb:9-11`.
+ *
+ * Returns a bare `string`, not a `ConnectionName`: `ARCONN` is arbitrary user
+ * input, and asserting it into the union here would be a type lie that makes
+ * the unknown-name branch look unreachable to every caller.
+ * {@link testConfigurationHashes} owns Rails' "Connection not found" failure,
+ * so the error surfaces once, at config-build time.
+ */
+export function connectionName(read: EnvReader = getEnv): string {
+  return present(read, "ARCONN") ?? DEFAULT_CONNECTION;
+}
+
+/**
+ * The backend lane the current `ARCONN` drives. Unknown names resolve to the
+ * default connection's lane; the loud failure for those belongs to
+ * {@link testConfigurationHashes}, not to every lane predicate in the harness.
+ *
+ * `activeLane` keeps its trails name: Rails has no counterpart, because Ruby
+ * dispatches on the live adapter object and never needs a coarse
+ * sqlite/postgres/mysql bucket to gate helpers on.
+ */
+export function activeLane(read: EnvReader = getEnv): TestAdapterName {
+  const lanes: Partial<Record<string, TestAdapterName>> = CONNECTION_LANES;
+  return lanes[connectionName(read)] ?? CONNECTION_LANES[DEFAULT_CONNECTION];
+}
 
 export interface TestDatabaseConfig {
   /** The `DatabaseConfigurations` instance wired into `DatabaseTasks`. */
@@ -60,7 +89,7 @@ export interface TestDatabaseConfig {
  *
  * `build()` returns `null` when the backend's connection details are absent
  * (the live-backend analogue of a `config.yml` entry with no reachable server);
- * `resolve()` turns that into Rails' loud adapter-mismatch failure rather than
+ * `testConfigurationHashes()` turns that into Rails' loud adapter-mismatch failure rather than
  * silently falling back to SQLite.
  */
 interface NamedConnection {
@@ -139,12 +168,18 @@ export function configuredConnectionHash(): Record<string, unknown> {
 }
 
 /**
- * Resolve the named connection selected by `ARCONN` into an adapter + config.
+ * The configuration hashes for the connection `ARCONN` selects, mirroring
+ * `ARTest.test_configuration_hashes` (`connection.rb:13-20`) plus the
+ * adapter-name guard `connect` applies (`connection.rb:35-37`).
  *
- * Mirrors `ARTest.connection_name` / `test_configuration_hashes` / the
- * adapter-name guard in `connection.rb`.
+ * Rails returns the raw hash and lets `connect` derive the adapter from the
+ * established pool; trails builds the config object here, so the resolved lane
+ * comes back alongside it rather than being re-read from a live connection.
  */
-async function resolve(): Promise<{ adapter: TestAdapterName; envConfig: HashConfig | UrlConfig }> {
+export async function testConfigurationHashes(): Promise<{
+  adapter: TestAdapterName;
+  envConfig: HashConfig | UrlConfig;
+}> {
   const name = connectionName();
   // `name` is arbitrary user input from ARCONN, so the lookup is a partial one;
   // the miss below is Rails' "Connection not found" exit (connection.rb:14-19).
@@ -192,6 +227,9 @@ async function fallbackDatabasePath(): Promise<string> {
   const slot = getEnv("VITEST_POOL_ID") || getEnv("VITEST_WORKER_ID") || "1";
   const token = `${runToken}-${slot}`;
   const dbPath = path.join(os.tmpdir(), `ar-test-fallback-${token}.sqlite`);
+  // Imported lazily: `sqlite-template.ts` imports `activeLane` from this
+  // module, and a static import here would close that cycle at module-init time.
+  const { registerDbFileCleanupOnExit } = await import("./sqlite-template.js");
   await registerDbFileCleanupOnExit(dbPath);
   g.__arFallbackDbPath = dbPath;
   return dbPath;
@@ -208,14 +246,20 @@ async function sqliteHash(): Promise<Record<string, unknown>> {
 }
 
 /**
- * Build the test `DatabaseConfigurations`, assign it to
- * `DatabaseTasks.databaseConfiguration`, and register the adapter task
- * handler. Called once from `test-setup-dy.ts` during worker startup;
- * the registration runs on every call so callers that clear
- * `_registeredTasks` (e.g. `database-tasks.test.ts`) can re-register.
+ * Assign the test `DatabaseConfigurations` and establish `Base`'s connection,
+ * mirroring `ARTest.connect` (`connection.rb:22-38`).
+ *
+ * Beyond Rails it registers the adapter's `DatabaseTasks` handler, because
+ * trails loads the schema through `DatabaseTasks` rather than by evaluating
+ * `schema.rb` in-process. The registration runs on every call so callers that
+ * clear `_registeredTasks` (e.g. `database-tasks.test.ts`) can re-register.
+ *
+ * Rails also establishes `ARUnit2Model` on `:arunit2` here; trails does that
+ * from `setupSecondPool` instead, since only the sqlite lane provisions a
+ * second database today (see `arunit2-config.ts`).
  */
-export async function buildTestDatabaseConfig(): Promise<TestDatabaseConfig> {
-  const { adapter, envConfig } = await resolve();
+export async function connect(): Promise<TestDatabaseConfig> {
+  const { adapter, envConfig } = await testConfigurationHashes();
   const configs = new DatabaseConfigurations([envConfig]);
   DatabaseTasks.databaseConfiguration = configs;
 
@@ -237,6 +281,8 @@ export async function buildTestDatabaseConfig(): Promise<TestDatabaseConfig> {
     }
   }
 
+  await Base.establishConnection(envConfig.configuration as Record<string, unknown>);
+
   return { configs, adapter, envConfig };
 }
 
@@ -246,14 +292,18 @@ export async function buildTestDatabaseConfig(): Promise<TestDatabaseConfig> {
  * get a live pool without knowing which adapter the worker is using.
  * Idempotent — a no-op when already connected.
  *
- * Intentionally does NOT call `buildTestDatabaseConfig` — that would set
+ * `establishFromTestConfig` keeps its trails name: Rails has no counterpart,
+ * because its suite connects once from `cases/helper.rb` and never needs an
+ * idempotent re-establish for individual files.
+ *
+ * Intentionally does NOT call `connect` — that would set
  * `DatabaseTasks.databaseConfiguration`, contaminating tests in
  * `database-tasks.test.ts` that rely on it being null. This function only
  * re-establishes `Base`'s connection; `DatabaseTasks` state is left as-is.
  */
 export async function establishFromTestConfig(): Promise<void> {
   if (Base.isConnectedQ()) return;
-  const { envConfig } = await resolve();
+  const { envConfig } = await testConfigurationHashes();
   if (envConfig instanceof UrlConfig) {
     await Base.establishConnection(envConfig.url);
     return;

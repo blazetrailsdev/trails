@@ -7,7 +7,7 @@
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import type { TestDatabaseAdapter } from "../test-adapter.js";
-import { establishFromTestConfig } from "../support/test-database-config.js";
+import { establishFromTestConfig } from "../support/connection.js";
 import { ensureCanonicalTables } from "../support/canonical-schema.js";
 import { Base } from "../index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";

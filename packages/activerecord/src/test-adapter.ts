@@ -3,7 +3,7 @@
  *
  * Resolves which backend the active lane uses the way Rails does — from
  * `ARCONN` naming a key of the `connections:` hash, never from the presence of
- * a connection detail (see `support/test-connection-env.ts`):
+ * a connection detail (see `support/config.ts`):
  *   - ARCONN=postgresql → PostgreSQLAdapter
  *   - ARCONN=mysql2     → Mysql2Adapter
  *   - (default)         → SQLite3Adapter (the per-worker template clone, or
@@ -29,12 +29,8 @@ import type { TransactionManager } from "./connection-adapters/abstract/transact
 import { resetTestTables } from "./support/drop-all-tables.js";
 import { Base } from "./base.js";
 import { getEnv } from "@blazetrails/activesupport";
-import {
-  activeLane,
-  driverConfig,
-  mysqlSettings,
-  postgresSettings,
-} from "./support/test-connection-env.js";
+import { driverConfig, mysqlSettings, postgresSettings } from "./support/config.js";
+import { activeLane } from "./support/connection.js";
 
 /**
  * Which adapter backend is active. Read once at module load — the worker's
@@ -137,7 +133,7 @@ let _inTestPool: ConnectionPool | null = null;
 let _inTestPoolPromise: Promise<ConnectionPool> | null = null;
 
 async function buildInTestPool(): Promise<ConnectionPool> {
-  const { establishFromTestConfig } = await import("./support/test-database-config.js");
+  const { establishFromTestConfig } = await import("./support/connection.js");
   const { HashConfig } = await import("./database-configurations/hash-config.js");
   const { PoolConfig } = await import("./connection-adapters/pool-config.js");
   const { ConnectionPool } = await import("./connection-adapters/abstract/connection-pool.js");

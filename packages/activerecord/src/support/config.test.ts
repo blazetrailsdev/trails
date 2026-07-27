@@ -1,22 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
-  activeLane,
   driverConfig,
   settingsUrl,
-  connectionName,
   mysqlSettings,
   mysqlUrl,
   postgresSettings,
   postgresUrl,
   withDatabase,
-} from "./test-connection-env.js";
+} from "./config.js";
+import { activeLane, connectionName } from "./connection.js";
 
 /** A stub env reader backed by a fixed map (no ambient env mutation). */
 function reader(env: Record<string, string | undefined>): (key: string) => string | undefined {
   return (key) => env[key];
 }
 
-describe("test-connection-env", () => {
+describe("config", () => {
   it("selects the connection named by ARCONN", () => {
     expect(connectionName(reader({ ARCONN: "mysql2" }))).toBe("mysql2");
     expect(activeLane(reader({ ARCONN: "mysql2" }))).toBe("mysql");

@@ -24,7 +24,7 @@ import { fixtures } from "./test-helpers/fixtures.js";
 import { adapterType } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import { itIfSupports } from "./support/supports.js";
-import { establishFromTestConfig } from "./support/test-database-config.js";
+import { establishFromTestConfig } from "./support/connection.js";
 import { runWithoutConnection } from "./support/connection-helper.js";
 // Opt into the canonical-model autoload index so association targets resolve by
 // name on first reference — no manual `registerModel`.
