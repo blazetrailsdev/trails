@@ -879,11 +879,9 @@ export class SchemaStatements {
     if (opts.ifExists === true && !(await this.foreignKeyExists(fromTable, { toTable }))) {
       return;
     }
-    const fk = await this.foreignKeyForBang(fromTable, {
-      toTable,
-      column: opts.column,
-      name: opts.name,
-    });
+    const lookup: ForeignKeyLookupOptions = { ...opts, toTable };
+    delete (lookup as RemoveForeignKeyOptions).ifExists;
+    const fk = await this.foreignKeyForBang(fromTable, lookup);
     // Rails: at = create_alter_table from_table; at.drop_foreign_key fk.name;
     //        execute schema_creation.accept(at)
     // Route through AlterTable so adapters emit dialect-specific DROP syntax
