@@ -110,6 +110,14 @@ describe("ContentSecurityPolicyMiddleware", () => {
     expect(request.contentSecurityPolicyNonce).toBe("abc");
     expect(request.contentSecurityPolicyNonce).toBe("abc");
     expect(calls).toBe(1);
+
+    // Ruby truthiness: `if nonce = get_header(NONCE)` regenerates on a nil or
+    // false slot, so a stale falsy value must not suppress generation.
+    for (const stale of [null, false, undefined]) {
+      const staleEnv = { ...env, "action_dispatch.content_security_policy_nonce": stale };
+      expect(new Request(staleEnv).contentSecurityPolicyNonce).toBe("abc");
+    }
+    expect(calls).toBe(4);
   });
 
   it("respects custom nonce-directives env override", async () => {

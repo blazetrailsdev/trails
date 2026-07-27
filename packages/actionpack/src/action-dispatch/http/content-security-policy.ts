@@ -440,8 +440,10 @@ export class ContentSecurityPolicyRequest {
 
   get contentSecurityPolicyNonce(): string | undefined {
     if (!this.contentSecurityPolicyNonceGenerator) return undefined;
-    const existing = this.getHeader(NONCE) as string | undefined;
-    if (existing !== undefined) return existing;
+    const existing = this.getHeader(NONCE);
+    if (existing !== null && existing !== undefined && existing !== false) {
+      return existing as string;
+    }
     const generated = this.generateContentSecurityPolicyNonce();
     this.setHeader(NONCE, generated);
     return generated;
