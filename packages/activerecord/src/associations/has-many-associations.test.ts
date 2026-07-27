@@ -3656,69 +3656,6 @@ describe("HasManyAssociationsTest", () => {
     });
     expect(posts.length).toBe(0);
   });
-  it("transactions when replacing on persisted", async () => {
-    class TxReplAuthor extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class TxReplPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(TxReplAuthor);
-    registerModel(TxReplPost);
-    const author1 = await TxReplAuthor.create({ name: "Alice" });
-    const author2 = await TxReplAuthor.create({ name: "Bob" });
-    const post = await TxReplPost.create({ author_id: author1.id, title: "A", body: "body" });
-    post.author_id = author2.id as number;
-    await post.save();
-    const posts1 = await findHasManyTarget(author1, "tx_repl_posts", {
-      className: "TxReplPost",
-      foreignKey: "author_id",
-    });
-    const posts2 = await findHasManyTarget(author2, "tx_repl_posts", {
-      className: "TxReplPost",
-      foreignKey: "author_id",
-    });
-    expect(posts1.length).toBe(0);
-    expect(posts2.length).toBe(1);
-  });
-  it("transactions when replacing on new record", async () => {
-    class TxReplNewAuthor extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class TxReplNewPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(TxReplNewAuthor);
-    registerModel(TxReplNewPost);
-    const author = new TxReplNewAuthor({ name: "Alice" });
-    expect(author.isNewRecord()).toBe(true);
-    const post = new TxReplNewPost({ author_id: null, title: "A" });
-    expect(post.isNewRecord()).toBe(true);
-  });
   it("get ids for unloaded associations does not load them", async () => {
     class UnloadedAuthor extends Base {
       declare name: string | null;
@@ -5182,13 +5119,6 @@ describe("HasManyAssociationsTest", () => {
     const bulb = await car.bulbs.where({ name: "headlight" }).firstOrInitialize();
     expect(bulb.name).toBe("headlight");
   });
-  it("replace returns target", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    const post = await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    // Reassigning FK returns the target value
-    post.author_id = author.id as number;
-    expect((post as any).author_id).toBe(Number(author.id));
-  });
   it("collection association with private kernel method", async () => {
     class KernelAuthor extends Base {
       declare name: string | null;
@@ -6336,47 +6266,6 @@ describe("HasManyAssociationsTest", () => {
       scopedBulbs.map((b: any) => Number(b.id)),
     );
   });
-
-  // -- Replace --
-
-  it("replace", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    await HmPost.create({ author_id: author.id, title: "Old", body: "body" });
-    await author.destroy();
-    const newPost = await HmPost.create({ author_id: author.id, title: "New", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.some((p: any) => p.id === newPost.id)).toBe(true);
-  });
-
-  it("replace with less", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    await (posts[0] as any).destroy();
-    const remaining = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(remaining.length).toBe(1);
-  });
-
-  it("replace with same content", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    const post = await HmPost.create({ author_id: author.id, title: "Same", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.length).toBe(1);
-    expect(posts[0].id).toBe(post.id);
-  });
 });
 
 // Mirrors Rails Bulb (`default_scope { where(name: "defaulty") }`) and
@@ -6543,6 +6432,8 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
   });
 });
 
+const recordId = (record: any): number => Number(record.id);
+
 describe("HasManyAssociationsTest", () => {
   const { companies, topics } = fixtures([
     "companies",
@@ -6566,6 +6457,7 @@ describe("HasManyAssociationsTest", () => {
     registerSubclass(Client);
     registerSubclass(DependentFirm);
     registerModel(HmCar);
+    registerModel(HmBulb);
     registerModel(HmFunkyBulb);
     registerSubclass(HmFunkyBulb);
     registerModel(HmTopic);
@@ -6624,11 +6516,80 @@ describe("HasManyAssociationsTest", () => {
     expect(await firm.clients.size()).toBe(2);
   });
 
+  it("replace", async () => {
+    const car = (await HmCar.create({ name: "honda" })) as any;
+    const bulb1 = await car.bulbs.create({});
+    const bulb2 = await HmBulb.create({});
+
+    expect((await car.bulbs).map(recordId)).toEqual([recordId(bulb1)]);
+    await car.bulbs.replace([bulb2]);
+    expect((await car.bulbs).map(recordId)).toEqual([recordId(bulb2)]);
+    const reloaded = await car.reload();
+    expect((await reloaded.bulbs).map(recordId)).toEqual([recordId(bulb2)]);
+  });
+
+  it("replace returns target", async () => {
+    const car = (await HmCar.create({ name: "honda" })) as any;
+    const bulb1 = await car.bulbs.create({});
+    const bulb2 = await car.bulbs.create({});
+    const bulb3 = await HmBulb.create({});
+
+    expect((await car.bulbs).map(recordId)).toEqual([recordId(bulb1), recordId(bulb2)]);
+    const result = await car.bulbs.replace([bulb3, bulb1]);
+    expect((await car.bulbs).map(recordId)).toEqual([recordId(bulb1), recordId(bulb3)]);
+    expect(result.map(recordId)).toEqual([recordId(bulb1), recordId(bulb3)]);
+  });
+
+  it("replace with less", async () => {
+    const firm = (await HmFirm.first()) as any;
+    await firm.clients.replace([companies("first_client")]);
+    expect(await firm.save()).toBe(true);
+    await firm.reload();
+    expect((await firm.clients).length).toBe(1);
+  });
+
   it("replace with less and dependent nullify", async () => {
     const numCompanies = await Company.count();
     const railsCore = companies("rails_core") as any;
     await railsCore.companies.replace([]);
     expect(await Company.count()).toBe(numCompanies);
+  });
+
+  it("replace with same content", async () => {
+    const firm = (await HmFirm.first()) as any;
+    await firm.clients.replace([]);
+    await firm.save();
+
+    await assertNoQueries(false, async () => {
+      await firm.clients.replace([]);
+    });
+
+    expect(await firm.clients.replace([])).toEqual([]);
+  });
+
+  it("transactions when replacing on persisted", async () => {
+    const good = new Client({ name: "Good" });
+    const bad = new Client({ name: "Bad" });
+    bad.raiseOnSave = true;
+
+    await (companies("first_firm") as any).clientsOfFirm.replace([good]);
+
+    try {
+      await (companies("first_firm") as any).clientsOfFirm.replace([bad]);
+    } catch (error) {
+      if (!(error instanceof Client.RaisedOnSave)) throw error;
+    }
+
+    expect((await (companies("first_firm") as any).clientsOfFirm.reload()).map(recordId)).toEqual([
+      recordId(good),
+    ]);
+  });
+
+  it("transactions when replacing on new record", async () => {
+    const firm = HmFirm.new() as any;
+    await assertQueriesCount(0, false, async () => {
+      await firm.clientsOfFirm.replace([new Client({ name: "New Client" })]);
+    });
   });
 
   it("calling one should return true if one", async () => {
