@@ -4,6 +4,7 @@ import {
   protectingEncryptedData as _protecting,
   getEncryptionContext,
   getDefaultContext,
+  setDefaultContext as _setDefaultContext,
   getCurrentCustomContext,
   resetDefaultContext as _resetDefaultContext,
   type EncryptionContext,
@@ -38,6 +39,10 @@ export class Contexts {
 
   static get defaultContext(): EncryptionContext {
     return getDefaultContext();
+  }
+
+  static set defaultContext(value: EncryptionContext) {
+    _setDefaultContext(value);
   }
 
   static resetDefaultContext(): void {

@@ -30,14 +30,14 @@ export function registry(): Map<string, WeakRef<object>> {
 
 export function deduplicate<T extends Deduplicable>(obj: T): T {
   const key = `${obj.constructor.name}:${obj.deduplicateKey()}`;
-  const cached = registries.get(key);
+  const cached = registry().get(key);
   if (cached) {
     const existing = cached.deref();
     if (existing) return existing as T;
   }
   const deduped = obj.deduplicated();
   const weakRef = new WeakRef(deduped);
-  registries.set(key, weakRef);
+  registry().set(key, weakRef);
   _finalizer?.register(deduped, key);
   return deduped;
 }

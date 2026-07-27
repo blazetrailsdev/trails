@@ -27,12 +27,7 @@ export { Cipher } from "./encryption/cipher.js";
 import { EncryptableRecord, encryptedTypeOf } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
 import { Contexts } from "./encryption/contexts.js";
-import {
-  getEncryptionContext,
-  getDefaultContext,
-  setDefaultContext,
-  type EncryptionContext,
-} from "./encryption/context.js";
+import { getEncryptionContext, type EncryptionContext } from "./encryption/context.js";
 import type { Config } from "./encryption/config.js";
 
 /**
@@ -364,9 +359,9 @@ export function currentCustomContext(): EncryptionContext | null {
  */
 export function defaultContext(value?: EncryptionContext): EncryptionContext {
   if (value !== undefined) {
-    setDefaultContext(value);
+    Contexts.defaultContext = value;
   }
-  return getDefaultContext();
+  return Contexts.defaultContext;
 }
 
 /** @internal */

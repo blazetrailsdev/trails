@@ -71,11 +71,21 @@ function getBase(): any {
   return _baseResolver?.() ?? null;
 }
 
-/** Module-level config mirroring `ActiveRecord.verbose_query_logs`. */
+/**
+ * Module-level storage for `ActiveRecord.verbose_query_logs`
+ * (active_record.rb:329, `singleton_class.attr_accessor`). The Rails-named
+ * surface is the `Base.verboseQueryLogs` accessor; these two back it from here
+ * so the flag stays next to its only reader without log-subscriber.ts importing
+ * `base.ts` (which would close the cycle the `_baseResolver` seam above exists
+ * to break).
+ * @internal
+ */
 let _verboseQueryLogs = false;
+/** @internal */
 export function getVerboseQueryLogs(): boolean {
   return _verboseQueryLogs;
 }
+/** @internal */
 export function setVerboseQueryLogs(value: boolean): void {
   _verboseQueryLogs = value;
 }

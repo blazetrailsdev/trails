@@ -75,6 +75,11 @@ export function getDefaultContext(): EncryptionContext {
   return _defaultContext;
 }
 
+/**
+ * Backs the `Contexts.defaultContext` accessor (contexts.ts), which is the
+ * Rails-named surface for `mattr_accessor :default_context` (contexts.rb:17).
+ * @internal
+ */
 export function setDefaultContext(context: EncryptionContext): void {
   _defaultContext = context;
 }

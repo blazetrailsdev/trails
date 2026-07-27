@@ -129,6 +129,10 @@ import {
 } from "./token-for.js";
 import type { TokenDefinition as _TokenDefinition } from "./token-for.js";
 import type { MessageVerifier as _MessageVerifier } from "@blazetrails/activesupport/message-verifier";
+import {
+  getVerboseQueryLogs as _getVerboseQueryLogs,
+  setVerboseQueryLogs as _setVerboseQueryLogs,
+} from "./log-subscriber.js";
 import { registerMigrationArConfig } from "./migration.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 import * as LockingOptimistic from "./locking/optimistic.js";
@@ -1846,6 +1850,21 @@ export class Base extends Model {
 
   static set signedIdVerifierSecret(value: string | (() => string | null | undefined) | null) {
     _setSignedIdVerifierSecret(value);
+  }
+
+  /**
+   * Whether SQL log lines are annotated with the application-code line that
+   * issued the query. The storage lives in log-subscriber.ts, next to its only
+   * reader; this is the Rails-named surface for it.
+   *
+   * Mirrors: ActiveRecord.verbose_query_logs, verbose_query_logs=
+   */
+  static get verboseQueryLogs(): boolean {
+    return _getVerboseQueryLogs();
+  }
+
+  static set verboseQueryLogs(value: boolean) {
+    _setVerboseQueryLogs(value);
   }
 
   /**
