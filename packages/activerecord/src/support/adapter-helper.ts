@@ -71,27 +71,22 @@ type ExtensionConnection = {
 export async function enableExtensionBang(
   extension: string,
   connection: ExtensionConnection,
-): Promise<boolean> {
+): Promise<false | void> {
   if (!connection.supportsExtensions()) return false;
-  if (await connection.extensionEnabled(extension)) {
-    await connection.reconnectBang();
-    return true;
-  }
+  if (await connection.extensionEnabled(extension)) return connection.reconnectBang();
 
   await connection.enableExtension(extension);
   if (connection.isTransactionOpen()) await connection.commitDbTransaction();
-  await connection.reconnectBang();
-  return true;
+  return connection.reconnectBang();
 }
 
 export async function disableExtensionBang(
   extension: string,
   connection: ExtensionConnection,
-): Promise<boolean> {
+): Promise<boolean | void> {
   if (!connection.supportsExtensions()) return false;
   if (!(await connection.extensionEnabled(extension))) return true;
 
   await connection.disableExtension(extension, { force: "cascade" });
-  await connection.reconnectBang();
-  return true;
+  return connection.reconnectBang();
 }

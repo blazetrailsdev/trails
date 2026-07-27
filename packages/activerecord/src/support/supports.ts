@@ -110,6 +110,14 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // `supports_text_column_with_default?`: MySQL only for MariaDB ≥ 10.2.1 (mysql:8 is not
   // MariaDB → false); all other adapters true. (adapter_helper.rb:42)
   text_column_with_default: ["postgres", "sqlite"],
+  // `supports_non_unique_constraint_name?`: MySQL family only, and only on
+  // MariaDB (mysql:8 is not MariaDB → false); every other adapter false.
+  // (adapter_helper.rb:33)
+  non_unique_constraint_name: [],
+  // `supports_sql_standard_drop_constraint?`: SQLite false; MySQL family needs
+  // ≥ 8.0.19 non-MariaDB (mysql:8 qualifies → true); all other adapters true.
+  // (adapter_helper.rb:51)
+  sql_standard_drop_constraint: ["postgres", "mysql"],
   // `supports_common_table_expressions?`: PostgreSQL true; MySQL ≥ 8.0.1 (mysql:8 qualifies);
   // SQLite ≥ 3.8.3 (current node sqlite qualifies). (postgresql_adapter.rb:451,
   // abstract_mysql_adapter.rb:153, sqlite3_adapter.rb:183)
