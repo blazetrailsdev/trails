@@ -297,7 +297,7 @@ report). They therefore share:
   tags.** This is the single statement of the family's empty-reason contract;
   neither tag's reader has a permissive mode.
   - `@noRailsEquivalent`: raised at extraction time by
-    `noRailsEquivalentReason` (`extract-ts-api.ts:1356`). The tag is the only
+    `noRailsEquivalentReason` (`extract-ts-api.ts:1398`). The tag is the only
     thing standing between a name and the extra-surface count, so an
     unjustified one would suppress drift with no argument for it.
   - `@missingRailsCall`: raised by `parseJsdoc` (`build.ts`), with the same
@@ -320,7 +320,7 @@ report). They therefore share:
 Two things are deliberately **not** shared, and the difference is load-bearing:
 
 - **Reader.** `@noRailsEquivalent` is read through `ts.getJSDocTags`
-  (`noRailsEquivalentReason` in `extract-ts-api.ts:1352`), the same pass that
+  (`noRailsEquivalentReason` in `extract-ts-api.ts:1388`), the same pass that
   already reads `@internal`, because the extractor only needs the flattened
   prose. `@missingRailsCall` is read by `parseJsdoc`'s line regex over the raw
   comment text (`TAG_LINE`, `build.ts:78`) because `api:build` must **write**

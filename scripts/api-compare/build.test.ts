@@ -48,6 +48,12 @@ describe("parseJsdoc", () => {
     );
   });
 
+  it("rejects a reason that is only whitespace after the em-dash", () => {
+    expect(() => parseJsdoc("/**\n * @missingRailsCall merge! —   \n */")).toThrow(
+      "@missingRailsCall needs a reason",
+    );
+  });
+
   it("accepts the generator's placeholder reason", () => {
     const { entries } = parseJsdoc(`/**\n * @missingRailsCall a — ${DEFAULT_TAG_REASON}\n */`);
     expect(entries[0]!.reason).toBe(DEFAULT_TAG_REASON);

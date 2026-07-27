@@ -116,7 +116,11 @@ export function parseJsdoc(
   for (const [index, line] of lines.entries()) {
     const m = line.match(TAG_LINE);
     if (m) {
-      open = { call: m[1]!, reason: m[2] ?? "", rawLines: [line] };
+      // Trimmed at capture: `TAG_LINE` absorbs only one space after the
+      // em-dash, so trailing whitespace would otherwise read as a non-empty
+      // reason and slide past the empty-reason gate below. `rawLines` keeps
+      // the line verbatim, so idempotency is unaffected.
+      open = { call: m[1]!, reason: (m[2] ?? "").trim(), rawLines: [line] };
       entries.push(open);
       tagLineOf.set(open, index);
       continue;
