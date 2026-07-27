@@ -1,8 +1,9 @@
 /**
  * Tests for the cross-worktree shared cache helpers: content-keying
  * (mtime-independent, so hits survive across checkouts), git-common-dir
- * resolution for a main checkout and a linked worktree, and the read/write
- * round-trip.
+ * resolution for a main checkout and a linked worktree, the read/write
+ * round-trip, and read-set validation (an entry is served only while every
+ * input its extraction actually resolved still hashes the same).
  */
 import { describe, it, expect, afterEach } from "vitest";
 import * as fs from "node:fs";
@@ -16,10 +17,10 @@ import {
   readShared,
   writeShared,
   pruneSharedCache,
-  readWorkspaceGraph,
-  transitiveDeps,
-  widenKeyWithDeps,
-  dependencyInputFiles,
+  normalizeReadSet,
+  hashReadSet,
+  readSetMatches,
+  resolutionShapeKey,
   CACHE_VERSION,
 } from "./shared-cache.js";
 
@@ -197,106 +198,121 @@ describe("readShared / writeShared", () => {
   });
 });
 
-describe("cross-package cache inputs", () => {
-  function writePackage(packagesDir: string, dir: string, deps: string[]): void {
-    fs.mkdirSync(path.join(packagesDir, dir), { recursive: true });
-    fs.writeFileSync(
-      path.join(packagesDir, dir, "package.json"),
-      JSON.stringify({
-        name: `@blazetrails/${dir}`,
-        dependencies: Object.fromEntries(
-          deps.map((d) => [`@blazetrails/${d}`, "workspace:*"] as const),
+describe("resolved read-set", () => {
+  it("keeps repo files, drops node_modules, symlinks, and own inputs", async () => {
+    const root = mkTmp();
+    fs.mkdirSync(path.join(root, "packages", "activesupport", "dist"), { recursive: true });
+    fs.mkdirSync(path.join(root, "packages", "actionview", "src"), { recursive: true });
+    fs.mkdirSync(path.join(root, "packages", "actionview", "node_modules", "@blazetrails"), {
+      recursive: true,
+    });
+    fs.mkdirSync(path.join(root, "node_modules", "typescript"), { recursive: true });
+    const dist = path.join(root, "packages", "activesupport", "dist", "index.d.ts");
+    fs.writeFileSync(dist, "export declare const a: number;");
+    fs.writeFileSync(path.join(root, "packages", "actionview", "src", "own.ts"), "");
+    fs.writeFileSync(path.join(root, "node_modules", "typescript", "lib.d.ts"), "");
+    fs.symlinkSync(
+      path.join(root, "packages", "activesupport"),
+      path.join(root, "packages", "actionview", "node_modules", "@blazetrails", "activesupport"),
+    );
+    const outside = path.join(mkTmp(), "elsewhere.ts");
+    fs.writeFileSync(outside, "");
+
+    const readSet = await normalizeReadSet(
+      [
+        // resolved through the pnpm workspace symlink — recorded by real path
+        path.join(
+          root,
+          "packages/actionview/node_modules/@blazetrails/activesupport/dist/index.d.ts",
         ),
-      }),
+        path.join(root, "packages/actionview/src/own.ts"),
+        path.join(root, "node_modules/typescript/lib.d.ts"),
+        outside,
+      ],
+      root,
+      new Set(["packages/actionview/src/own.ts"]),
     );
-  }
-
-  it("resolves workspace dependency names to directories", async () => {
-    const packagesDir = mkTmp();
-    writePackage(packagesDir, "actionview", ["activesupport"]);
-    writePackage(packagesDir, "activesupport", []);
-    const graph = await readWorkspaceGraph(packagesDir);
-    expect(graph.dirOfName["@blazetrails/activesupport"]).toBe("activesupport");
-    expect(graph.depsOfDir.actionview).toEqual(["activesupport"]);
+    expect(readSet).toEqual(["packages/activesupport/dist/index.d.ts"]);
   });
 
-  it("ignores non-workspace dependencies", async () => {
-    const packagesDir = mkTmp();
-    writePackage(packagesDir, "activesupport", []);
-    fs.writeFileSync(
-      path.join(packagesDir, "activesupport", "package.json"),
-      JSON.stringify({ name: "@blazetrails/activesupport", dependencies: { yaml: "^2" } }),
-    );
-    const graph = await readWorkspaceGraph(packagesDir);
-    expect(graph.depsOfDir.activesupport).toEqual([]);
+  it("serves an entry only while every recorded input hashes the same", async () => {
+    const root = mkTmp();
+    fs.mkdirSync(path.join(root, "pkg"));
+    const read = path.join(root, "pkg", "read.ts");
+    const unread = path.join(root, "pkg", "unread.ts");
+    fs.writeFileSync(read, "export const a = 1;");
+    fs.writeFileSync(unread, "export const b = 1;");
+    const recorded = await hashReadSet(["pkg/read.ts"], root);
+    expect(await readSetMatches(recorded, root)).toBe(true);
+
+    // The output-safety case: editing a file this package never resolved must
+    // NOT invalidate its entry.
+    fs.writeFileSync(unread, "export const b = 2;");
+    expect(await readSetMatches(recorded, root)).toBe(true);
+
+    fs.writeFileSync(read, "export const a = 2;");
+    expect(await readSetMatches(recorded, root)).toBe(false);
   });
 
-  it("closes over transitive dependencies without looping on cycles", async () => {
-    const packagesDir = mkTmp();
-    writePackage(packagesDir, "trailties", ["activerecord"]);
-    writePackage(packagesDir, "activerecord", ["arel", "trailties"]);
-    writePackage(packagesDir, "arel", ["activesupport"]);
-    writePackage(packagesDir, "activesupport", []);
-    const graph = await readWorkspaceGraph(packagesDir);
-    expect(transitiveDeps(graph, "trailties")).toEqual(
-      ["activerecord", "arel", "activesupport"].sort(),
-    );
+  it("invalidates when a recorded input disappears", async () => {
+    const root = mkTmp();
+    fs.writeFileSync(path.join(root, "dep.d.ts"), "declare const a: number;");
+    const recorded = await hashReadSet(["dep.d.ts"], root);
+    fs.rmSync(path.join(root, "dep.d.ts"));
+    expect(await readSetMatches(recorded, root)).toBe(false);
   });
 
-  it("widens a package key when a dependency's fingerprint changes", () => {
-    // The divergence this pins: actionview re-exports activesupport symbols, so
-    // its extracted surface moves when activesupport does. A key built from
-    // actionview's own files alone kept serving the pre-change extraction from
-    // cache while API_COMPARE_FORCE=1 produced the post-change one.
-    const own = "actionview-own-fingerprint";
-    const before = widenKeyWithDeps(own, [["activesupport", "aaa"]]);
-    const after = widenKeyWithDeps(own, [["activesupport", "bbb"]]);
-    expect(before).not.toBe(own);
-    expect(after).not.toBe(before);
-  });
-
-  it("is order-independent and a no-op without dependencies", () => {
-    const own = "own";
-    expect(widenKeyWithDeps(own, [])).toBe(own);
-    expect(
-      widenKeyWithDeps(own, [
-        ["arel", "a"],
-        ["activesupport", "b"],
-      ]),
-    ).toBe(
-      widenKeyWithDeps(own, [
-        ["activesupport", "b"],
-        ["arel", "a"],
-      ]),
-    );
+  it("omits inputs that no longer exist and hashes through the memo cache", async () => {
+    const root = mkTmp();
+    fs.writeFileSync(path.join(root, "here.ts"), "x");
+    const cache = new Map<string, Promise<string | null>>();
+    const recorded = await hashReadSet(["here.ts", "gone.ts"], root, cache);
+    expect(Object.keys(recorded)).toEqual(["here.ts"]);
+    expect(cache.size).toBe(2);
+    // A cached hash is reused even after the file changes underneath — the memo
+    // is per-run, which is what keeps one run's view of the tree consistent.
+    fs.writeFileSync(path.join(root, "here.ts"), "y");
+    expect(await readSetMatches(recorded, root, cache)).toBe(true);
+    expect(await readSetMatches(recorded, root)).toBe(false);
   });
 });
 
-describe("dependencyInputFiles", () => {
-  it("collects src sources and built declarations, skipping tests", async () => {
-    const root = mkTmp();
-    fs.mkdirSync(path.join(root, "src", "core-ext"), { recursive: true });
-    fs.mkdirSync(path.join(root, "dist", "core-ext"), { recursive: true });
-    fs.writeFileSync(path.join(root, "src", "core-ext", "string.ts"), "export const a = 1;");
-    fs.writeFileSync(path.join(root, "src", "core-ext", "string.test.ts"), "");
-    fs.writeFileSync(
-      path.join(root, "dist", "core-ext", "string.d.ts"),
-      "export declare const a: number;",
-    );
-    fs.writeFileSync(path.join(root, "dist", "core-ext", "string.js"), "");
-    fs.writeFileSync(path.join(root, "tsconfig.json"), "{}");
-    const files = (await dependencyInputFiles(root)).map((f) => path.relative(root, f)).sort();
-    expect(files).toEqual([
-      path.join("dist", "core-ext", "string.d.ts"),
-      path.join("src", "core-ext", "string.ts"),
-      "tsconfig.json",
-    ]);
+describe("resolutionShapeKey", () => {
+  function writeDist(packagesDir: string, dir: string, files: Record<string, string>): void {
+    for (const [name, body] of Object.entries(files)) {
+      const file = path.join(packagesDir, dir, "dist", name);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, body);
+    }
+  }
+
+  it("tracks which declarations exist, not what they say", async () => {
+    const packagesDir = mkTmp();
+    writeDist(packagesDir, "activesupport", { "index.d.ts": "export declare const a: number;" });
+    const built = await resolutionShapeKey(packagesDir);
+
+    // A rebuild that only changes contents leaves the shape alone — those
+    // changes are the read-set's job, and re-keying on them would invalidate
+    // every package again.
+    writeDist(packagesDir, "activesupport", { "index.d.ts": "export declare const a: string;" });
+    expect(await resolutionShapeKey(packagesDir)).toBe(built);
+
+    // A dependency that was unbuilt at extraction time resolves to nothing, so
+    // no read-set can see it become resolvable — the shape must.
+    const unbuilt = mkTmp();
+    fs.mkdirSync(path.join(unbuilt, "activesupport"), { recursive: true });
+    expect(await resolutionShapeKey(unbuilt)).not.toBe(built);
+
+    writeDist(packagesDir, "activesupport", { "extra.d.ts": "export declare const b: number;" });
+    expect(await resolutionShapeKey(packagesDir)).not.toBe(built);
   });
 
-  it("tolerates an unbuilt package with no dist and no tsconfig", async () => {
-    const root = mkTmp();
-    fs.mkdirSync(path.join(root, "src"));
-    fs.writeFileSync(path.join(root, "src", "index.ts"), "");
-    expect(await dependencyInputFiles(root)).toEqual([path.join(root, "src", "index.ts")]);
+  it("ignores non-declaration output and a missing packages dir", async () => {
+    const packagesDir = mkTmp();
+    writeDist(packagesDir, "arel", { "index.d.ts": "" });
+    const before = await resolutionShapeKey(packagesDir);
+    writeDist(packagesDir, "arel", { "index.js": "", "nested/index.js.map": "" });
+    expect(await resolutionShapeKey(packagesDir)).toBe(before);
+    expect(await resolutionShapeKey(path.join(packagesDir, "nope"))).toMatch(/^[0-9a-f]{40}$/);
   });
 });

@@ -20,23 +20,18 @@ import type {
   ParamInfo,
   LiteralValue,
 } from "./types.js";
-import {
-  ROOT_DIR,
-  OUTPUT_DIR,
-  PACKAGES,
-  PACKAGE_DIR_OVERRIDES,
-  PACKAGE_SRC_SUBDIR,
-  packageSrcDir,
-} from "./config.js";
+import { ROOT_DIR, OUTPUT_DIR, PACKAGES, PACKAGE_DIR_OVERRIDES, packageSrcDir } from "./config.js";
 import {
   sharedCacheDir,
   contentFingerprint,
-  widenKeyWithDeps,
-  dependencyInputFiles,
   readShared,
   writeShared,
-  readWorkspaceGraph,
-  transitiveDeps,
+  normalizeReadSet,
+  hashReadSet,
+  readSetMatches,
+  resolutionShapeKey,
+  hashParts,
+  type ReadSet,
 } from "./shared-cache.js";
 import { extractorSchemaToken } from "./extractor-schema.js";
 
@@ -47,9 +42,11 @@ import { extractorSchemaToken } from "./extractor-schema.js";
 // (SHA-1 over sorted (relPath, mtimeMs, size) triples) plus the
 // extractor SCHEMA_VERSION token (see extractor-schema.ts), which changes
 // whenever a new per-method output field is added so stale entries missing
-// the field are evicted automatically. Both keys are widened with the
-// TRANSITIVE workspace dependencies' fingerprints — a package's extraction
-// resolves imports into sibling packages, so its surface changes when they do.
+// the field are evicted automatically. A package's extraction also resolves
+// imports into sibling packages, which its own fingerprint can't see; each
+// entry therefore records the RESOLVED READ-SET of the extraction that produced
+// it (see shared-cache.ts) and is served only while every recorded input still
+// hashes the same.
 // Set `API_COMPARE_FORCE=1` to skip the cache entirely. The token is computed
 // async (it hashes the extractor
 // sources), so it lives on `main()` rather than as a module const.
@@ -68,6 +65,14 @@ let currentImportAliases: ReadonlyMap<string, string> | undefined;
 interface CacheEntry {
   schemaVersion: string;
   fingerprint: string;
+  /**
+   * Cross-package inputs the compiler actually read during this extraction,
+   * repo-relative → content hash. Files covered by `fingerprint` itself (the
+   * package's own sources) are excluded, so this is exactly the remainder the
+   * own-fingerprint can't see. Absent on a pre-read-set entry, which is then
+   * treated as a miss.
+   */
+  inputs?: ReadSet;
   package: PackageInfo;
 }
 
@@ -109,11 +114,12 @@ interface WorkerInput {
 }
 interface WorkerOutput {
   package: PackageInfo;
+  /** Absolute file names of every source file the program read. */
+  inputs: string[];
 }
 if (!isMainThread && parentPort) {
   const { package: pkgName, srcDir } = workerData as WorkerInput;
-  const data = extractPackage(pkgName, srcDir);
-  const out: WorkerOutput = { package: data };
+  const out: WorkerOutput = extractPackage(pkgName, srcDir);
   parentPort.postMessage(out);
 }
 
@@ -124,12 +130,12 @@ if (!isMainThread && parentPort) {
 // extractPackage and posts the result back.
 const WORKER_BOOTSTRAP = path.join(SCRIPT_DIR, "extract-ts-api-worker.mjs");
 
-function extractInWorker(pkgName: string, srcDir: string): Promise<PackageInfo> {
+function extractInWorker(pkgName: string, srcDir: string): Promise<WorkerOutput> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(WORKER_BOOTSTRAP, {
       workerData: { package: pkgName, srcDir } satisfies WorkerInput,
     });
-    worker.once("message", (msg: WorkerOutput) => resolve(msg.package));
+    worker.once("message", (msg: WorkerOutput) => resolve(msg));
     worker.once("error", reject);
     worker.once("exit", (code) => {
       if (code !== 0)
@@ -183,66 +189,23 @@ export async function main() {
   const sharedTag = path.basename(ROOT_DIR);
   const sharedHits = new Set<string>();
 
-  // Cross-package inputs. `extractPackage` compiles with the real module
-  // resolver, so a package's extracted surface also depends on the workspace
-  // packages it imports from (see readWorkspaceGraph). Fingerprint every
-  // package DIRECTORY once, then fold each package's transitive dependency
-  // fingerprints into its cache keys — otherwise an activesupport edit leaves
-  // actionview's entry cached and stale, and a cached run disagrees with an
-  // `API_COMPARE_FORCE=1` one on an unchanged tree.
-  const PACKAGES_DIR = path.join(ROOT_DIR, "packages");
-  const graph = await readWorkspaceGraph(PACKAGES_DIR);
-  const dirInputs = new Map<string, Promise<{ root: string; files: string[] }>>();
-  function dependencyInputs(dir: string): Promise<{ root: string; files: string[] }> {
-    let pending = dirInputs.get(dir);
-    if (!pending) {
-      const root = path.join(PACKAGES_DIR, dir);
-      pending = dependencyInputFiles(root).then((files) => ({ root, files }));
-      dirInputs.set(dir, pending);
-    }
-    return pending;
-  }
-  const dirMtimeFingerprints = new Map<string, Promise<string>>();
-  function dirMtimeFingerprint(dir: string): Promise<string> {
-    let pending = dirMtimeFingerprints.get(dir);
-    if (!pending) {
-      pending = dependencyInputs(dir).then(({ root, files }) => packageFingerprint(files, root));
-      dirMtimeFingerprints.set(dir, pending);
-    }
-    return pending;
-  }
-  // Content hashing reads every byte of the dependency, so it stays lazy: only
-  // a LOCAL cache miss (which then consults the shared cache) ever needs it.
-  const dirContentFingerprints = new Map<string, Promise<string>>();
-  function dirContentFingerprint(dir: string): Promise<string> {
-    let pending = dirContentFingerprints.get(dir);
-    if (!pending) {
-      pending = dependencyInputs(dir).then(({ root, files }) => contentFingerprint(files, root));
-      dirContentFingerprints.set(dir, pending);
-    }
-    return pending;
-  }
-  /** `own` key widened with the fingerprints of `deps` (package DIRECTORIES). */
-  async function withDeps(own: string, deps: string[], kind: "mtime" | "content"): Promise<string> {
-    const pairs = await Promise.all(
-      deps.map(
-        async (dep) =>
-          [
-            dep,
-            kind === "mtime" ? await dirMtimeFingerprint(dep) : await dirContentFingerprint(dep),
-          ] as [string, string],
-      ),
-    );
-    return widenKeyWithDeps(own, pairs);
-  }
+  // Content hashes of read-set files, memoised per absolute path: sibling
+  // packages resolve many of the same declarations, and validating every
+  // package's read-set must not read the same file 13 times.
+  const inputHashes = new Map<string, Promise<string | null>>();
+  // Read-sets record what WAS resolvable; this covers what BECOMES resolvable
+  // (an unbuilt dependency gaining a `dist`) — see resolutionShapeKey.
+  const shapeKey = await resolutionShapeKey(path.join(ROOT_DIR, "packages"));
 
-  // Pass 1: serve every cache hit synchronously and record the
-  // metadata needed to extract the misses below.
+  // Pass 1: serve every cache hit and record the metadata needed to extract the
+  // misses below. `ownRel` is the package's own fingerprint inputs (already
+  // covered by `fingerprint`), excluded from the recorded read-set.
   interface PendingExtract {
     pkg: string;
     srcDir: string;
     fingerprint: string;
     cachePath: string;
+    ownRel: Set<string>;
     sharedKey: string | null;
   }
   const pending: PendingExtract[] = [];
@@ -258,23 +221,21 @@ export async function main() {
     // Anchor relative paths at the package root so tsconfig.json
     // doesn't show up as `../tsconfig.json` (which it would if we
     // anchored at the src dir).
-    // Packages that share a directory (actionpack hosts abstractcontroller,
-    // actioncontroller, actiondispatch) import across the sibling src subdirs
-    // that their own fingerprint — scoped to one subdir — doesn't cover, so the
-    // whole directory joins their dependency set.
-    const inputDirs = transitiveDeps(graph, dirName);
-    if (PACKAGE_SRC_SUBDIR[pkg]) inputDirs.push(dirName);
-    const fingerprint = await withDeps(
-      packageFingerprint(fingerprintInputs, pkgRoot),
-      inputDirs,
-      "mtime",
+    const fingerprint = hashParts([packageFingerprint(fingerprintInputs, pkgRoot), shapeKey]);
+    const ownRel = new Set(
+      fingerprintInputs.map((file) => path.relative(ROOT_DIR, file).replace(/\\/g, "/")),
     );
     const cachePath = path.join(CACHE_DIR, `${pkg}.json`);
 
     if (!force && fs.existsSync(cachePath)) {
       try {
         const cached = JSON.parse(fs.readFileSync(cachePath, "utf-8")) as CacheEntry;
-        if (cached.schemaVersion === SCHEMA_VERSION && cached.fingerprint === fingerprint) {
+        if (
+          cached.schemaVersion === SCHEMA_VERSION &&
+          cached.fingerprint === fingerprint &&
+          cached.inputs &&
+          (await readSetMatches(cached.inputs, ROOT_DIR, inputHashes))
+        ) {
           manifest.packages[pkg] = cached.package;
           cacheHits.add(pkg);
           continue;
@@ -291,19 +252,26 @@ export async function main() {
     let sharedKey: string | null = null;
     if (sharedDir) {
       const ownContent = await contentFingerprint(fingerprintInputs, pkgRoot);
-      const contentKey = `${SCHEMA_VERSION}-${await withDeps(ownContent, inputDirs, "content")}`;
+      const contentKey = `${SCHEMA_VERSION}-${hashParts([ownContent, shapeKey])}`;
       const body = await readShared(sharedDir, `ts-${pkg}`, contentKey);
       if (body) {
         try {
           const cached = JSON.parse(body) as CacheEntry;
-          manifest.packages[pkg] = cached.package;
-          fs.writeFileSync(
-            cachePath,
-            JSON.stringify({ schemaVersion: SCHEMA_VERSION, fingerprint, package: cached.package }),
-          );
-          cacheHits.add(pkg);
-          sharedHits.add(pkg);
-          continue;
+          if (cached.inputs && (await readSetMatches(cached.inputs, ROOT_DIR, inputHashes))) {
+            manifest.packages[pkg] = cached.package;
+            fs.writeFileSync(
+              cachePath,
+              JSON.stringify({
+                schemaVersion: SCHEMA_VERSION,
+                fingerprint,
+                inputs: cached.inputs,
+                package: cached.package,
+              } satisfies CacheEntry),
+            );
+            cacheHits.add(pkg);
+            sharedHits.add(pkg);
+            continue;
+          }
         } catch {
           // Corrupt shared entry — fall through to re-extract.
         }
@@ -311,26 +279,36 @@ export async function main() {
       sharedKey = contentKey;
     }
 
-    pending.push({ pkg, srcDir: pkgDir, fingerprint, cachePath, sharedKey });
+    pending.push({ pkg, srcDir: pkgDir, fingerprint, cachePath, ownRel, sharedKey });
   }
 
   // Pass 2: extract cache misses in parallel via worker threads.
   if (pending.length > 0) {
     const concurrency = Math.max(1, Math.min(pending.length, cpus().length));
     const tasks = pending.map((p) => async () => {
-      const data = await extractInWorker(p.pkg, p.srcDir);
+      const { package: data, inputs } = await extractInWorker(p.pkg, p.srcDir);
+      const readSet = await hashReadSet(
+        await normalizeReadSet(inputs, ROOT_DIR, p.ownRel),
+        ROOT_DIR,
+        inputHashes,
+      );
       const entry: CacheEntry = {
         schemaVersion: SCHEMA_VERSION,
         fingerprint: p.fingerprint,
+        inputs: readSet,
         package: data,
       };
       fs.writeFileSync(p.cachePath, JSON.stringify(entry));
       // Publish to the shared cache under the content key so sibling worktrees
       // reuse this extraction (the shared entry's fingerprint is the content key).
+      // The key covers only the package's own files, so a worktree whose
+      // dependencies differ can overwrite this entry — harmless, because the
+      // recorded read-set is what decides whether a reader may serve it.
       if (sharedDir && p.sharedKey) {
         const shared: CacheEntry = {
           schemaVersion: SCHEMA_VERSION,
           fingerprint: p.sharedKey,
+          inputs: readSet,
           package: data,
         };
         await writeShared(sharedDir, `ts-${p.pkg}`, p.sharedKey, JSON.stringify(shared), sharedTag);
@@ -378,7 +356,7 @@ interface PendingReExport {
   moduleSpecifier: string; // e.g. "./migration-errors.js"
 }
 
-function extractPackage(pkgName: string, srcDir: string): PackageInfo {
+function extractPackage(pkgName: string, srcDir: string): WorkerOutput {
   const files = getAllTsFiles(srcDir);
 
   // Create a TypeScript program
@@ -407,7 +385,10 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
   }
 
   const program = ts.createProgram(files, compilerOptions);
-  return extractFromProgram(program, srcDir);
+  return {
+    package: extractFromProgram(program, srcDir),
+    inputs: program.getSourceFiles().map((sourceFile) => sourceFile.fileName),
+  };
 }
 
 /**
