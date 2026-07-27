@@ -12,7 +12,6 @@ import {
   resolveAssocClass,
   association as collectionProxyFor,
   applyAssociationScope,
-  loadHasOne,
   _hmtNotFound,
 } from "../associations.js";
 import {
@@ -1111,10 +1110,15 @@ export async function findTarget(
       throughRecords = await findHasManyTarget(record, throughAssoc.name, throughAssoc.options);
     }
   } else if (throughAssoc.type === "hasOne") {
-    const one = await loadHasOne(record, throughAssoc.name, throughAssoc.options);
+    const one = await findSingularTarget(record, throughAssoc.name, throughAssoc.options, "hasOne");
     throughRecords = one ? [one] : [];
   } else if (throughAssoc.type === "belongsTo") {
-    const one = await findSingularTarget(record, throughAssoc.name, throughAssoc.options);
+    const one = await findSingularTarget(
+      record,
+      throughAssoc.name,
+      throughAssoc.options,
+      "belongsTo",
+    );
     throughRecords = one ? [one] : [];
   } else {
     throughRecords = [];

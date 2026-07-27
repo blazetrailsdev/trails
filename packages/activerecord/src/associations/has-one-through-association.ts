@@ -3,7 +3,7 @@ import type { AssociationDefinition, AssociationOptions } from "../associations.
 import { findTarget as findSingularTarget } from "./singular-association.js";
 import { findTarget as findHasManyTarget } from "./has-many-association.js";
 import { camelize, underscore } from "@blazetrails/activesupport";
-import { resolveAssocClass, loadHasOne, _hmtNotFound } from "../associations.js";
+import { resolveAssocClass, _hmtNotFound } from "../associations.js";
 import { HasOneAssociation, sameRecord } from "./has-one-association.js";
 import {
   HasOneThroughCantAssociateThroughHasOneOrManyReflection,
@@ -706,9 +706,19 @@ export async function findTarget(
 
   let throughRecord: Base | null;
   if (throughAssoc.type === "hasOne") {
-    throughRecord = await loadHasOne(record, throughAssoc.name, throughAssoc.options);
+    throughRecord = await findSingularTarget(
+      record,
+      throughAssoc.name,
+      throughAssoc.options,
+      "hasOne",
+    );
   } else if (throughAssoc.type === "belongsTo") {
-    throughRecord = await findSingularTarget(record, throughAssoc.name, throughAssoc.options);
+    throughRecord = await findSingularTarget(
+      record,
+      throughAssoc.name,
+      throughAssoc.options,
+      "belongsTo",
+    );
   } else if (throughAssoc.type === "hasMany") {
     const throughRecords = await findHasManyTarget(record, throughAssoc.name, throughAssoc.options);
     throughRecord = throughRecords[0] ?? null;
@@ -725,9 +735,9 @@ export async function findTarget(
 
   if (sourceAssoc) {
     if (sourceAssoc.type === "belongsTo") {
-      return findSingularTarget(throughRecord, sourceName, sourceAssoc.options);
+      return findSingularTarget(throughRecord, sourceName, sourceAssoc.options, "belongsTo");
     } else if (sourceAssoc.type === "hasOne") {
-      return loadHasOne(throughRecord, sourceName, sourceAssoc.options);
+      return findSingularTarget(throughRecord, sourceName, sourceAssoc.options, "hasOne");
     }
   }
 

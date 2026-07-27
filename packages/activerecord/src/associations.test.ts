@@ -33,7 +33,7 @@ import { Member } from "./test-helpers/models/member.js";
 import { Membership } from "./test-helpers/models/membership.js";
 import { Human } from "./test-helpers/models/human.js";
 import { Interest } from "./test-helpers/models/interest.js";
-import { buildHasManyRelation, loadHasOne } from "./associations.js";
+import { buildHasManyRelation } from "./associations.js";
 import { findTarget as findHasManyTarget } from "./associations/has-many-association.js";
 import "./test-helpers/models/ship.js";
 import "./test-helpers/models/bird.js";
@@ -879,10 +879,15 @@ describe("PreloaderTest", () => {
     // that on `has_many_inversing` (BelongsToAssociation#invertible_for?), which
     // is unset here, so the loaded author carries no inverse collection.
     spy.mockClear();
-    const reloadedAuthor = (await findTarget(fav, "author", {
-      inverseOf: "authorFavorites",
-    })) as any;
-    const reloadedFavorite = (await findTarget(fav, "favoriteAuthor", {})) as any;
+    const reloadedAuthor = (await findTarget(
+      fav,
+      "author",
+      {
+        inverseOf: "authorFavorites",
+      },
+      "belongsTo",
+    )) as any;
+    const reloadedFavorite = (await findTarget(fav, "favoriteAuthor", {}, "belongsTo")) as any;
     expect(reloadedAuthor.name).toBe("Mary");
     expect(reloadedFavorite.name).toBe("Bob");
     expect(spy).not.toHaveBeenCalled();
@@ -1120,7 +1125,7 @@ describe("PreloaderTest", () => {
     const maryPost = (await Post.where({ id: maryPostId }))[0];
 
     // Force-load bob's author; mary's stays unloaded.
-    const loadedBob = await findTarget(bobPost, "author", {});
+    const loadedBob = await findTarget(bobPost, "author", {}, "belongsTo");
     expect(bobPost.association("author").isLoaded()).toBe(true);
     expect(maryPost.association("author").isLoaded()).toBe(false);
 
@@ -1367,7 +1372,7 @@ describe("PreloaderTest", () => {
     });
 
     // Load the blogPost on the comment instance first (warms the association cache).
-    await findTarget(comment, "blogPost", { className: "ShardedBlogPost" });
+    await findTarget(comment, "blogPost", { className: "ShardedBlogPost" }, "belongsTo");
 
     // Preloading on the already-loaded record must not fire any SQL queries
     // (mirrors Rails' assert_no_queries block).
@@ -2560,10 +2565,15 @@ describe("AssociationsTest", () => {
   it("has one loads via inline fallback resolving composite owner key from query constraints", async () => {
     const post = await ShardedBlogPost.create({ blog_id: 7, title: "Post" });
     await ShardedComment.create({ blog_id: 7, blog_post_id: (post as any).id, body: "Only" });
-    const comment = await loadHasOne(post, "freshComment", {
-      className: "ShardedComment",
-      foreignKey: ["blog_id", "blog_post_id"],
-    });
+    const comment = await findTarget(
+      post,
+      "freshComment",
+      {
+        className: "ShardedComment",
+        foreignKey: ["blog_id", "blog_post_id"],
+      },
+      "hasOne",
+    );
     expect((comment as any)?.body).toBe("Only");
   });
 
@@ -2591,10 +2601,15 @@ describe("AssociationsTest", () => {
     const order = await CpkOrder.create({ shop_id: 1 });
     const [, orderId] = order.id as [number, number];
     await CpkOrderAgreement.create({ order_id: orderId, signature: "only" });
-    const agreement = await loadHasOne(order, "freshAgreement", {
-      className: "CpkOrderAgreement",
-      foreignKey: "order_id",
-    });
+    const agreement = await findTarget(
+      order,
+      "freshAgreement",
+      {
+        className: "CpkOrderAgreement",
+        foreignKey: "order_id",
+      },
+      "hasOne",
+    );
     expect((agreement as any)?.signature).toBe("only");
   });
 
@@ -2665,10 +2680,15 @@ describe("AssociationsTest", () => {
       parent_type: "ShardedBlogPost",
       title: "wrongShard",
     });
-    const child = await loadHasOne(post, "freshChild", {
-      className: "ShardedBlogPost",
-      as: "parent",
-    });
+    const child = await findTarget(
+      post,
+      "freshChild",
+      {
+        className: "ShardedBlogPost",
+        as: "parent",
+      },
+      "hasOne",
+    );
     expect((child as any)?.title).toBe("match");
   });
 

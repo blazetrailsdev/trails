@@ -1,7 +1,8 @@
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect } from "vitest";
 import { Base, registerModel, registerSubclass } from "../index.js";
-import { Associations, loadHasOne } from "../associations.js";
+import { Associations } from "../associations.js";
+import { findTarget as findSingularTarget } from "./singular-association.js";
 import { findTarget } from "./has-many-association.js";
 import { AssociationScope, ReflectionProxy } from "./association-scope.js";
 import { fixtures } from "../test-helpers/fixtures.js";
@@ -729,11 +730,16 @@ describe("AssociationScope", () => {
     const membership = await Membership.create({ member_id: member.id });
     const memberDetail = await MemberDetail.create({ member_id: member.id });
 
-    const loaded = (await loadHasOne(memberDetail, "membership", {
-      className: "Membership",
-      through: "member",
-      source: "membership",
-    })) as Membership | null;
+    const loaded = (await findSingularTarget(
+      memberDetail,
+      "membership",
+      {
+        className: "Membership",
+        through: "member",
+        source: "membership",
+      },
+      "hasOne",
+    )) as Membership | null;
     expect(loaded).not.toBeNull();
     expect(loaded!.id).toBe(membership.id);
   });
@@ -773,11 +779,16 @@ describe("AssociationScope", () => {
     const club = await Club.create({ name: "Great club" });
     await CurrentMembership.create({ member_id: member.id, club_id: club.id });
 
-    const loaded = (await loadHasOne(member, "club", {
-      className: "Club",
-      through: "currentMembership",
-      source: "club",
-    })) as Club | null;
+    const loaded = (await findSingularTarget(
+      member,
+      "club",
+      {
+        className: "Club",
+        through: "currentMembership",
+        source: "club",
+      },
+      "hasOne",
+    )) as Club | null;
     expect(loaded).not.toBeNull();
     expect(loaded!.name).toBe("Great club");
   });
