@@ -178,14 +178,12 @@ let _maintainTestSchema: boolean | null = null;
  * The `ActiveRecord` module itself, as far as its singleton configuration
  * attributes are concerned. Rails declares these with
  * `singleton_class.attr_accessor` on `module ActiveRecord`
- * (active_record.rb:283-321), so the call site reads and writes them as plain
+ * (active_record.rb:283-339), so the call site reads and writes them as plain
  * attributes: `ActiveRecord.maintain_test_schema = true`.
  *
  * ESM live bindings are read-only for importers, so a bare `export let` cannot
- * carry the writer half — hence an object with `get`/`set` accessors, which is
- * the one TS shape that spells the Ruby writer under its Rails name rather
- * than as a `setX` re-spelling. Flags still declared as `export let` below have
- * not been migrated yet; they keep their `setX` companion until they move here.
+ * carry the writer half — hence the `get`/`set` accessors. Flags still declared
+ * as `export let` below have not been migrated yet.
  */
 export const ActiveRecord = {
   /**
@@ -205,7 +203,7 @@ export const ActiveRecord = {
   /**
    * Names of the queues used by background jobs (e.g.
    * `destroy_association_async`). Mirrors `ActiveRecord.queues`
-   * (active_record.rb:317-318, default `{}`).
+   * (active_record.rb:336-337, default `{}`).
    */
   get queues(): Record<string, unknown> {
     return _queues;
@@ -219,7 +217,7 @@ export const ActiveRecord = {
    * When the test suite should keep the test schema current against
    * `schema.rb`/`structure.sql`. `null` (the default) defers to the
    * framework's `maintainTestSchemaBang` opt-in. Mirrors
-   * `ActiveRecord.maintain_test_schema` (active_record.rb:320-321, default nil).
+   * `ActiveRecord.maintain_test_schema` (active_record.rb:339-340, default nil).
    */
   get maintainTestSchema(): boolean | null {
     return _maintainTestSchema;
