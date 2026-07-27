@@ -4,7 +4,6 @@ import "./index.js";
 import { Base } from "./base.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { withSecondPool } from "./support/setup-second-pool.js";
-import { isSqliteRun } from "./support/sqlite-template.js";
 import { Course } from "./test-helpers/models/course.js";
 import { Entrant } from "./test-helpers/models/entrant.js";
 
@@ -16,7 +15,7 @@ function event(): { set: () => void; wait: Promise<void> } {
   return { set, wait };
 }
 
-describe.skipIf(!isSqliteRun())("PreparedStatementStatusTest", () => {
+describe("PreparedStatementStatusTest", () => {
   fixtures({}, { useTransactionalTests: false });
   withSecondPool();
 

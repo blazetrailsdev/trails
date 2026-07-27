@@ -21,8 +21,6 @@ export { withDbWarningsAction } from "../../support/with-db-warnings-action.js";
 // deliberately build a second, differently configured adapter.
 export const MYSQL_TEST_URL = mysqlUrl();
 
-export { databaseName } from "../../support/arunit2-config.js";
-
 /**
  * ARTest models the AR suite as two databases — `arunit` (primary) and
  * `arunit2` — and reads both names from `ARTest.test_configuration_hashes`.
