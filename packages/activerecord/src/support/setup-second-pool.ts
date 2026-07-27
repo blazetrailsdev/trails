@@ -23,11 +23,11 @@ export const ARUNIT2_TABLES = ["colleges", "courses", "professors", "courses_pro
  * Unlike {@link ARUNIT2_TABLES}, `dogs` exists in *both* databases: the primary
  * one carries the canonical shape (`schema.rb:559`), arunit2 a bare id-only
  * table, so it is laid down here rather than from the canonical registry.
+ * `force: true` as Rails spells it: a reused arunit2 database can be carrying
+ * the canonical shape from an earlier run.
  */
 async function createOtherDogsTable(adapter: DatabaseAdapter): Promise<void> {
-  const ss = adapter.schemaStatements();
-  if (await ss.tableExists("dogs")) return;
-  await ss.createTable("dogs", {}, () => {});
+  await adapter.schemaStatements().createTable("dogs", { force: true }, () => {});
 }
 
 /**
