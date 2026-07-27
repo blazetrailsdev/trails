@@ -268,7 +268,7 @@ export class HasOneAssociation extends SingularAssociation {
    * (builder/has-one.ts, which runs `loadTargetForBuild` and awaits
    * `detachDisplacedTarget`) and the nested-attributes writer
    * (nested-attributes.ts, a synchronous property setter that starts
-   * `detachDisplacedRecord` at assignment and drains it in its `save` wrapper).
+   * `detachDisplacedTarget` at assignment and drains it in its `save` wrapper).
    * Both call `build` on their way through, and without this flag `build` would
    * re-run the load and start a *second*, concurrent removal of the same row.
    *
@@ -326,7 +326,7 @@ export class HasOneAssociation extends SingularAssociation {
     // keeps repeated `build`s (the common `assoc.build()` twice shape)
     // synchronous.
     if ((displaced as { isPersisted?: () => boolean }).isPersisted?.() !== true) return null;
-    return this.detachDisplacedTarget(displaced, record);
+    return this.detachDisplacedTarget(displaced);
   }
 
   /**
@@ -423,7 +423,7 @@ export class HasOneAssociation extends SingularAssociation {
     // `super._createRecord` ran `setNewRecord` → `replace`, so `this.target` is
     // now the freshly created record; detach the displaced (previously attached)
     // one, matching `remove_target!` inside Rails' `replace`.
-    await this.detachDisplacedTarget(displaced, record);
+    await this.detachDisplacedTarget(displaced);
     return record;
   }
 
@@ -459,59 +459,46 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   /**
-   * Detach the record displaced by a `create#{name}` / `build#{name}` over an
-   * already-**loaded** has_one target — the awaitable analog of the
-   * `remove_target!` Rails runs inside `HasOneAssociation#replace`
-   * (has_one_association.rb:69) whenever another record is assigned. Nullifies
-   * the displaced record's foreign key (or destroys/deletes it per
-   * `:dependent`). Our sync `replace`/`setNewRecord` cannot `await` that removal,
-   * so the async create/build accessors run it here after materializing the
-   * replacement. A no-op unless a *different*, non-destroyed record was loaded.
+   * The single awaitable analog of the `remove_target!` Rails runs inside
+   * `HasOneAssociation#replace` (has_one_association.rb:69) whenever another
+   * record is assigned: nullify the displaced record's foreign key (or
+   * destroy/delete it per `:dependent`). Our sync `replace`/`setNewRecord`
+   * cannot `await` that write, so every caller that materializes a replacement
+   * — the `build#{name}` / `create#{name}` accessors, `association(name).build`,
+   * and the nested-attributes writer — runs it here, *after* the replacement is
+   * already cached as `this.target`. A no-op unless a *different*,
+   * non-destroyed record was displaced.
+   *
+   * The removal names `displaced` explicitly instead of parking it on
+   * `this.target` for the duration: the nested-attributes property setter is
+   * synchronous and returns to its caller mid-removal, so a parked target would
+   * be briefly observable as `assoc.target` reverting to the displaced record
+   * (Rails' own nested-attributes tests read the new target right after the
+   * assignment). Rails' target-on-failure semantics — `self.target = record`
+   * runs only after the transaction block, so a raising `remove_target!` (e.g.
+   * a failed nullify save, has_one_association.rb:102-108) leaves the OLD
+   * record cached — are preserved by restoring the target in the `catch`
+   * instead, which is observable at exactly the same moment the caller sees the
+   * error.
+   *
+   * No `isPersisted` pre-screen: Rails' `remove_target!` gates on persistence
+   * only inside its `:destroy` and nullify arms; the `:delete` arm calls
+   * `target.delete` unconditionally, and `Persistence#delete` still marks the
+   * record destroyed and freezes it when the row does not exist
+   * (persistence.rb:439-444). Let `removeTargetBang`'s arms make that call.
    *
    * @internal
    */
-  async detachDisplacedTarget(displaced: Base | null, replacement: Base | null): Promise<void> {
-    if (!displaced) return;
-    if ((displaced as { isDestroyed?: () => boolean }).isDestroyed?.()) return;
-    if (sameRecord(displaced, replacement)) return;
-    // Mirror Rails' `HasOneAssociation#replace`, where `self.target = record` runs
-    // only after the transaction block: if `remove_target!` raises (e.g. a failed
-    // nullify save, which restores the old record's owner attributes before
-    // raising — has_one_association.rb:102-108), the cached target stays the OLD
-    // record. So point the target at `displaced` across the removal and only
-    // promote the `replacement` on success — a throw leaves `displaced` cached.
-    this.target = displaced;
-    await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "");
-    this.target = replacement;
-  }
-
-  /**
-   * `remove_target!` for a record displaced by the *synchronous* `assoc.build()`
-   * path (nested attributes), run without disturbing `this.target`.
-   *
-   * `detachDisplacedTarget` parks the target on `displaced` for the duration of
-   * the removal to reproduce Rails' target-on-failure semantics — safe for the
-   * `build#{name}` accessors, whose callers `await` before observing anything.
-   * The nested-attributes writer is a synchronous property setter: it returns to
-   * the caller while this removal is still in flight, so a parked target would
-   * be visible as `assoc.target` briefly reverting to the displaced record.
-   * Name the record instead and leave the cached target alone.
-   *
-   * The parked target is the ONLY intended difference: the guards below
-   * deliberately match `detachDisplacedTarget`'s, and neither pre-screens
-   * `isPersisted`. Rails' `remove_target!` gates on persistence only inside its
-   * `:destroy` and nullify arms; the `:delete` arm calls `target.delete`
-   * unconditionally, and `Persistence#delete` still marks the record destroyed
-   * and freezes it when the row does not exist (persistence.rb:439-444). Let
-   * `removeTargetBang`'s arms make that call.
-   *
-   * @internal
-   */
-  async detachDisplacedRecord(displaced: Base | null): Promise<void> {
+  async detachDisplacedTarget(displaced: Base | null): Promise<void> {
     if (!displaced) return;
     if ((displaced as { isDestroyed?: () => boolean }).isDestroyed?.()) return;
     if (sameRecord(displaced, this.target)) return;
-    await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "", displaced);
+    try {
+      await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "", displaced);
+    } catch (error) {
+      this.target = displaced;
+      throw error;
+    }
   }
 
   protected override async doAsyncFindTarget(): Promise<Base | null> {
@@ -613,7 +600,7 @@ export class HasOneAssociation extends SingularAssociation {
    * an `await` this synchronous method cannot issue, so every caller that can
    * displace a persisted record issues it itself — `detachDisplacedTarget` from
    * the `build#{name}` / `create#{name}` accessors (builder/has-one.ts,
-   * `_createRecord`), `detachDisplacedRecord` from the nested-attributes writer
+   * `_createRecord`), and the same method from the nested-attributes writer
    * (nested-attributes.ts, `detachDisplacedAtAssignment`). Nothing is queued
    * here: a queue drained at the owner's `save` would defer a write Rails makes
    * at assignment, and would double-remove records the awaiting callers have
@@ -728,10 +715,12 @@ async function preloadDestroyInverseBelongsTo(
 async function removeTargetBang(
   assoc: HasOneAssociation,
   method: string,
-  // Rails' `remove_target!` always acts on `self.target`. The nested-attributes
-  // displacement path removes a record while `assoc.target` is already the
-  // replacement (it must not flip the cached target back mid-await, which is
-  // observable to synchronous readers), so it names the record explicitly.
+  // Rails' `remove_target!` always acts on `self.target`, which is still the
+  // displaced record inside `replace`'s transaction (persistImmediate keeps that
+  // shape, so it takes the default). Every deferred displacement path instead
+  // removes a record while `assoc.target` is already the replacement — flipping
+  // the cached target back mid-await is observable to synchronous readers — so
+  // `detachDisplacedTarget` names the record explicitly.
   target: Base | null = assoc.target,
 ): Promise<void> {
   if (!target) return;

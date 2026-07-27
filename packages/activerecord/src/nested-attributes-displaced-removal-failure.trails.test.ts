@@ -41,9 +41,9 @@ async function pirateWithFailingRemoval(): Promise<Base> {
   await (pirate as unknown as { ship: Promise<Base | null> }).ship;
 
   const assoc = pirate.association("ship") as unknown as {
-    detachDisplacedRecord: () => Promise<void>;
+    detachDisplacedTarget: () => Promise<void>;
   };
-  assoc.detachDisplacedRecord = () => Promise.reject(new Error("removal exploded"));
+  assoc.detachDisplacedTarget = () => Promise.reject(new Error("removal exploded"));
   return pirate;
 }
 

@@ -77,7 +77,7 @@ export class HasOne extends SingularAssociation {
           // `displaced` here is inert.
           return assoc.loadTargetForBuild().then((displaced: unknown) => {
             const record = buildOwningDisplacement(assoc, args);
-            return assoc.detachDisplacedTarget(displaced, record).then(() => record);
+            return assoc.detachDisplacedTarget(displaced).then(() => record);
           });
         }
         // The target may already be loaded (so `needsTargetLoadForBuild` is
@@ -90,7 +90,7 @@ export class HasOne extends SingularAssociation {
           typeof assoc.isLoaded === "function" && assoc.isLoaded() ? assoc.target : null;
         const record = buildOwningDisplacement(assoc, args);
         if (displaced && typeof assoc.detachDisplacedTarget === "function") {
-          return assoc.detachDisplacedTarget(displaced, record).then(() => record);
+          return assoc.detachDisplacedTarget(displaced).then(() => record);
         }
         return record;
       },
