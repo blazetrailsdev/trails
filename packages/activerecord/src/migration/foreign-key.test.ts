@@ -301,7 +301,13 @@ describe("ActiveRecord::Migration::ForeignKeyTest", () => {
     });
   });
 
-  it("remove foreign key with restrict action", async () => {
+  // Unreachable on the MySQL family: `extract_foreign_key_action` is overridden
+  // with `super unless specifier == "RESTRICT"` (mysql/schema_statements.rb:224-226),
+  // so the reflected fk stores `on_delete` as nil — the same fact Rails asserts in
+  // test_add_on_delete_restrict_foreign_key. `defined_for?` then compares
+  // `Array(nil)` against `["restrict"]` and never matches, so the removal raises.
+  // Rails leaves the case ungated because its own suite does not run it here.
+  it.skipIf(adapterType === "mysql")("remove foreign key with restrict action", async () => {
     const conn = await ambientConnection();
     await withRocketTables(conn, async () => {
       await conn.addForeignKey("astronauts", "rockets", { onDelete: "restrict" });
