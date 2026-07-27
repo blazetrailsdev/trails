@@ -1,6 +1,6 @@
 /**
  * Canonical encryption test key material — the single source of truth shared by
- * the suite-wide bootstrap (`test-setup-ar.ts`, mirroring Rails'
+ * the suite-wide bootstrap (`cases/helper.ts`, mirroring Rails'
  * `activerecord/test/cases/helper.rb:99-102`) and the encryption test helpers
  * (`configureEncryption`). Keeping one copy means fixtures encrypted at load
  * and rows written/read across suites always use the same keys.

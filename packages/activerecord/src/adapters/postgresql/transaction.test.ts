@@ -20,7 +20,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgreSQLTransactionTest", () => {
     // Mirrors Rails' setup/teardown (samples table, value column). Created in
-    // beforeEach — after the global reset (test-setup-ar drops all tables).
+    // beforeEach — after the global reset (cases/helper.ts drops all tables).
     beforeEach(async () => {
       await adapter.exec("DROP TABLE IF EXISTS samples");
       await adapter.exec("CREATE TABLE samples (id int PRIMARY KEY, value integer)");

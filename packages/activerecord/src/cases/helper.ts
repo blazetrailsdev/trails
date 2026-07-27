@@ -1,33 +1,32 @@
 /**
- * AR-only vitest setupFile. Wired into the `activerecord` project in
- * `vitest.config.ts`; the sibling `test-setup.ts` is shared with the
- * non-AR `other` project, so anything that imports the AR test adapter
- * (and thus opens a DB connection at module load) belongs here, not
- * there.
+ * AR-only vitest setupFile, mirroring Rails'
+ * `activerecord/test/cases/helper.rb`. Anything that imports the AR test
+ * adapter (and thus opens a DB connection at module load) belongs here rather
+ * than in a setup file shared with non-AR projects.
  */
 
 // Eagerly load the better-sqlite3 driver so the AR test adapter
 // (BetterSQLite3Adapter) can open a connection at module load. Lives here (not
 // in activerecord/index.ts) to keep better-sqlite3 a true optional peer for
 // non-test consumers.
-import "./sqlite/better-sqlite3.js";
+import "../sqlite/better-sqlite3.js";
 import { beforeEach } from "vitest";
-import { Base } from "./base.js";
-import { DelegateCache } from "./relation/delegation.js";
-import { loadDefaults } from "./trailtie.js";
+import { Base } from "../base.js";
+import { DelegateCache } from "../relation/delegation.js";
+import { loadDefaults } from "../trailtie.js";
 import {
   setBelongsToRequiredValidatesForeignKey,
   setRaiseOnAssignToAttrReadonly,
-} from "./ar-config.js";
-import { resetTestAdapterState } from "./test-adapter.js";
-import { shouldSkipGlobalReset } from "./support/skip-global-reset.js";
-import { Configurable as EncryptionConfigurable } from "./encryption/configurable.js";
-import { installExtendedQueriesIfConfigured } from "./encryption/install.js";
+} from "../ar-config.js";
+import { resetTestAdapterState } from "../test-adapter.js";
+import { shouldSkipGlobalReset } from "../support/skip-global-reset.js";
+import { Configurable as EncryptionConfigurable } from "../encryption/configurable.js";
+import { installExtendedQueriesIfConfigured } from "../encryption/install.js";
 import {
   TEST_PRIMARY_KEY,
   TEST_DETERMINISTIC_KEY,
   TEST_KEY_DERIVATION_SALT,
-} from "./encryption/test-keys.js";
+} from "../encryption/test-keys.js";
 
 // The test app runs with the Rails 7.0+ defaults (`config.load_defaults 7.0`),
 // which sets `config.active_record.partial_inserts = false` (partial_updates
@@ -75,8 +74,6 @@ EncryptionConfigurable.configure({
 EncryptionConfigurable.config.extendQueries = true;
 installExtendedQueriesIfConfigured();
 
-// Wipe shared test-adapter state before every test so each test starts
-// from a clean slate.
 beforeEach(async () => {
   if (shouldSkipGlobalReset()) return;
   await resetTestAdapterState();

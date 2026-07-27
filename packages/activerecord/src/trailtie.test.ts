@@ -65,7 +65,7 @@ describe("RailtieTest", () => {
     Base.partialInserts = savedPartialInserts;
     setRaiseOnAssignToAttrReadonly(savedRaiseOnAssignToAttrReadonly);
     // The suite boots with extended query support installed
-    // (test-setup-ar.ts, mirroring helper.rb:104-107); tests here uninstall it
+    // (cases/helper.ts, mirroring helper.rb:104-107); tests here uninstall it
     // to observe the initializer doing the install, so put it back.
     EncryptionConfigurable.config.extendQueries = savedExtendQueries;
     installExtendedQueriesIfConfigured();

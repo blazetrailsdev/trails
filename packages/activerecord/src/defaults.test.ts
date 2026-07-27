@@ -44,7 +44,7 @@ afterAll(() => {
 // tables are not in `schema.rb` and have no canonical home, so they are created
 // per-test through the migration DSL on `Base.connection` and dropped in
 // `afterEach`. Building in `beforeEach` (not `beforeAll`) because the shared
-// per-worker DB is reset by the global `beforeEach` in test-setup-ar.ts.
+// per-worker DB is reset by the global `beforeEach` in cases/helper.ts.
 
 // Rails asserts string equality on binary-column defaults; a binary column
 // deserializes to bytes in trails (BinaryType → Uint8Array), so decode the
@@ -486,7 +486,7 @@ describeIfMysql("DefaultsTestWithoutTransactionalFixtures", () => {
         static override tableName = "test_mysql_not_null_defaults";
         // Rails' AR test suite runs with the framework default
         // `partial_inserts = true` (dirty.rb:50), which the trails harness flips
-        // to false via `load_defaults 7.0` (test-setup-ar.ts). Restore the Rails
+        // to false via `load_defaults 7.0` (cases/helper.ts). Restore the Rails
         // test-env value here so `new` (no attrs) omits the NOT NULL columns from
         // the INSERT — letting the DB apply implicit 0/"" defaults in non-strict
         // mode — exactly as Rails exercises this test.

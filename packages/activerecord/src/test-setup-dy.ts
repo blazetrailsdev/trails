@@ -8,7 +8,7 @@
  * Handler-path test files re-establish the connection in their own beforeAll
  * via setupHandlerSuite() → establishFromTestConfig().
  *
- * Must run AFTER test-setup-ar.ts so better-sqlite3 is registered and
+ * Must run AFTER cases/helper.ts so better-sqlite3 is registered and
  * Base.establishConnection can open the pool.
  *
  * Driver gate (RFC 0002 §Design):

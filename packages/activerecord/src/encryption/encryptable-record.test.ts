@@ -502,7 +502,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     // Rides the canonical reflection-based `EncryptedBook` (name via schema
     // reflection, non-null default `<untitled>`), mirroring Rails'
     // `EncryptedBook.create!`. Encryption is configured suite-wide before the
-    // model loads (test-setup-ar.ts), so the reflected column default is
+    // model loads (cases/helper.ts), so the reflected column default is
     // threaded into the EncryptedAttributeType and round-trips through the
     // plaintext-default guard on first read — no `Failed to deserialize`.
     await freshAdapter();
@@ -801,7 +801,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     // Rides the canonical reflection-based `EncryptedBookNormalized{First,Second}`
     // (name obtained via schema reflection, non-null default `<untitled>`), not
     // an explicit `attribute("name", ...)` declaration. Encryption is configured
-    // suite-wide before these models load (test-setup-ar.ts), so the bare
+    // suite-wide before these models load (cases/helper.ts), so the bare
     // `encrypts` builds its scheme against real key material.
     await freshAdapter();
     await assertEncryptedAttribute(

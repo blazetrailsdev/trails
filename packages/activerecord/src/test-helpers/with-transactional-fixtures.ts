@@ -120,7 +120,7 @@ function pooledAdapterPool(adapter: TransactionalFixturesAdapter): ConnectionPoo
  * `setup_fixtures` opens a transaction; `teardown_fixtures` rolls back).
  *
  * Files calling this helper opt out of the global `resetTestAdapterState`
- * beforeEach (in `test-setup-ar.ts`) for their duration, so a one-time
+ * beforeEach (in `cases/helper.ts`) for their duration, so a one-time
  * schema set up in `beforeAll` survives across tests. The helper runs
  * `resetTestAdapterState` in its own `afterAll` so other files are
  * unaffected.

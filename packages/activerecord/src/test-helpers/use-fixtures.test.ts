@@ -81,7 +81,7 @@ async function setupScopedEncryption(): Promise<() => void> {
 }
 
 // Shield the WHOLE file from the global `resetTestAdapterState()` beforeEach
-// (test-setup-ar.ts), which drops every table on `Base.connection` — the
+// (cases/helper.ts), which drops every table on `Base.connection` — the
 // boot-laid canonical worker DB. The real-seeding describes below each shield
 // themselves (their `withTransactionalFixtures` push/pops the skip), but
 // the mock-adapter describes above them do NOT: their tests trigger the reset

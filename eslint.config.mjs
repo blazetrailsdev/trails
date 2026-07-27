@@ -484,6 +484,7 @@ export default defineConfig(
       "packages/activerecord/src/test-helpers/**",
       "packages/activerecord/src/support/**",
       "packages/activerecord/src/test-setup-*.ts",
+      "packages/activerecord/src/cases/helper.ts",
     ],
     rules: {
       "blazetrails/no-raw-sql": "error",

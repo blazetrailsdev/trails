@@ -227,7 +227,7 @@ describe("UpdateableViewTest", () => {
     static override _primaryKey = "id";
     // Rails' AR test suite runs with the class default `partial_inserts = true`
     // (helper.rb never flips it — only a `config.load_defaults 7.0+` app does),
-    // while our test-setup-ar.ts deliberately runs loadDefaults("7.0"), i.e.
+    // while our cases/helper.ts deliberately runs loadDefaults("7.0"), i.e.
     // partialInserts=false. That difference is fatal here on MySQL only: the
     // updatable view reports its NOT-NULL `id` with a fabricated default "0"
     // (SHOW FULL FIELDS strips `auto_increment` from Extra, so the column is
