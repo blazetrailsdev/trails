@@ -16,8 +16,6 @@ describe("AsyncHelper#assert_async_equal", () => {
 
   it("takes the assert_nil arm when expected is nil", async () => {
     await assertAsyncEqual(null, Promise.resolve(null));
-    // The nil arm is assert_nil, not assert_equal — a non-nil value fails even
-    // though `expected` is nil.
     await expect(assertAsyncEqual(null, Promise.resolve(0))).rejects.toThrow();
   });
 });

@@ -4,8 +4,6 @@ import { resolve } from "../connection-adapters.js";
 
 describe("FakeActiveRecordAdapter", () => {
   it("is registered under the name fake", async () => {
-    // Mirrors cases/helper.rb:46's suite-wide
-    // ConnectionAdapters.register("fake", "FakeActiveRecordAdapter", ...)
     await expect(resolve("fake")).resolves.toBe(
       FakeActiveRecordAdapter as unknown as Awaited<ReturnType<typeof resolve>>,
     );
