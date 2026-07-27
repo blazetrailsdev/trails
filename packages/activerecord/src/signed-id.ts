@@ -33,6 +33,7 @@ export function signedIdVerifierSecret(): string | (() => string | null | undefi
  * Clears any cached verifiers so they pick up the new secret.
  *
  * Mirrors: ActiveRecord::Base.signed_id_verifier_secret=
+ * @internal
  */
 export function setSignedIdVerifierSecret(
   secret: string | (() => string | null | undefined) | null,
