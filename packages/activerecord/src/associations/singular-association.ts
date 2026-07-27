@@ -59,16 +59,69 @@ export class SingularAssociation extends Association {
     this.replace(record);
   }
 
-  build(attributes?: Record<string, unknown>, block?: (record: Base) => void): Base | null {
+  // has_one widens the return to a Promise: Rails' `set_new_record` →
+  // `replace(record, false)` opens with `load_target` (the `unless load_target
+  // || record` guard, has_one_association.rb:62, always evaluates its left
+  // operand) and then removes the displaced row inline (`remove_target!`), and a
+  // synchronous JS return has no other way to expose either query for `await`.
+  // belongs_to keeps the plain synchronous return — its `set_new_record` only
+  // writes the owner's foreign key in memory.
+  build(
+    attributes?: Record<string, unknown>,
+    block?: (record: Base) => void,
+  ): Base | null | Promise<Base | null> {
+    // Rails is `record = build_record(attributes, &block); set_new_record(record)`
+    // (singular_association.rb:29-33): construction — and the raise a bad
+    // attribute produces — happens BEFORE `set_new_record` reaches `load_target`,
+    // so an invalid build never queries. Keep that order here.
     const record = this.buildRecord(attributes);
-    if (record) {
-      // Rails yields the freshly built record before it's set as the new
-      // target (`build_record(attributes, &block)`), so a passed block can
-      // mutate persisted attributes (e.g. `build_bulb { |b| b.color = ... }`).
-      if (block) block(record);
-      this.setNewRecord(record);
-    }
-    return record;
+    // Rails yields the freshly built record before it's set as the new target
+    // (`build_record(attributes, &block)`), so a passed block can mutate
+    // persisted attributes (e.g. `build_bulb { |b| b.color = ... }`).
+    if (record && block) block(record);
+    // `set_new_record` → `replace(record, false)` runs `load_target` on EVERY
+    // build, so a persisted owner whose target has never been loaded still
+    // discovers (and displaces) the row in the DB. The load has to precede
+    // `setNewRecord`, which overwrites the target and marks it loaded.
+    const setNewRecord = (): Base | null | Promise<Base | null> => {
+      const displaced = this.loaded ? this.target : null;
+      if (record) this.setNewRecord(record);
+      const removal = this.detachDisplacedOnBuild(displaced, record);
+      return removal ? removal.then(() => record) : record;
+    };
+    const load = this.loadDisplacedForBuild();
+    if (load) return load.then(setNewRecord);
+    return setNewRecord();
+  }
+
+  /**
+   * Rails' leading `load_target` (has_one_association.rb:59-62), when it would
+   * actually query — null otherwise, which is always the case for belongs_to
+   * (`BelongsToAssociation#replace` neither loads nor removes anything).
+   * Overridden by has_one; the promise returned here is what makes `build`
+   * awaitable for the direct `record.association(name).build(...)` caller.
+   *
+   * @internal
+   */
+  protected loadDisplacedForBuild(): Promise<unknown> | null {
+    return null;
+  }
+
+  /**
+   * The DB half of the `remove_target!` Rails' has_one `set_new_record` runs
+   * inline — null when there is nothing to remove, which is always the case for
+   * belongs_to (`BelongsToAssociation#replace` only writes the owner's foreign
+   * key in memory). Overridden by has_one, where the returned promise both
+   * performs the removal and is what widens `build`'s return so a direct
+   * `record.association(name).build(...)` caller can `await` the write.
+   *
+   * @internal
+   */
+  protected detachDisplacedOnBuild(
+    _displaced: Base | null,
+    _record: Base | null,
+  ): Promise<void> | null {
+    return null;
   }
 
   async forceReloadReader(): Promise<Base | null> {

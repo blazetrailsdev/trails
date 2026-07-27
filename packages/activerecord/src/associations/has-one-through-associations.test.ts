@@ -284,7 +284,11 @@ describe("HasOneThroughAssociationsTest", () => {
     // be cleared afterward: a later independent write to `currentMembership` on
     // the SAME instance must still autosave, not be silently skipped forever.
     const laterClub = await Club.create({ name: "Later Club" });
-    const newMembership = (refetched.association("currentMembership") as any).build({
+    // `currentMembership`'s target is loaded and persisted here, so `build`
+    // displaces it: Rails' `set_new_record` → `replace(record, false)` runs
+    // `remove_target!` inline, and our `build` returns the record wrapped in
+    // that removal's promise.
+    const newMembership = await (refetched.association("currentMembership") as any).build({
       club: laterClub,
     });
     expect(await refetched.save()).toBe(true);

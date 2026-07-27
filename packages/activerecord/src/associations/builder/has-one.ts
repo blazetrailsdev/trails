@@ -76,7 +76,7 @@ export class HasOne extends SingularAssociation {
           // `detachDisplacedTarget` is a no-op, so the proxy passed as
           // `displaced` here is inert.
           return assoc.loadTargetForBuild().then((displaced: unknown) => {
-            const record = assoc.build(...args);
+            const record = buildOwningDisplacement(assoc, args);
             return assoc.detachDisplacedTarget(displaced, record).then(() => record);
           });
         }
@@ -88,7 +88,7 @@ export class HasOne extends SingularAssociation {
         // synchronous return (the shape the STI-build tests assert).
         const displaced =
           typeof assoc.isLoaded === "function" && assoc.isLoaded() ? assoc.target : null;
-        const record = assoc.build(...args);
+        const record = buildOwningDisplacement(assoc, args);
         if (displaced && typeof assoc.detachDisplacedTarget === "function") {
           return assoc.detachDisplacedTarget(displaced, record).then(() => record);
         }
@@ -246,5 +246,24 @@ export class HasOne extends SingularAssociation {
         }
       });
     }
+  }
+}
+
+/**
+ * Run `association.build` with the association's own displaced-record removal
+ * suppressed: this accessor awaits `detachDisplacedTarget` itself (with Rails'
+ * target-on-failure semantics), and a second, concurrent removal of the same
+ * row would double-destroy it. `HasOneAssociation#build` keeps the removal for
+ * the direct `record.association(name).build(...)` callers, which have no other
+ * hook to run it from.
+ *
+ * @internal
+ */
+function buildOwningDisplacement(assoc: any, args: unknown[]): any {
+  assoc.buildDisplacementOwnedByCaller = true;
+  try {
+    return assoc.build(...args);
+  } finally {
+    assoc.buildDisplacementOwnedByCaller = false;
   }
 }

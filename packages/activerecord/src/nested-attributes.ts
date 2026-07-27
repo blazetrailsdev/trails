@@ -674,7 +674,9 @@ function assertNestedAttributesAreKnown(
  */
 interface OneToOneAssociation {
   target: Base | null;
-  build(attrs: Record<string, unknown>): Base | null;
+  build(attrs: Record<string, unknown>): Base | null | Promise<Base | null>;
+  /** has_one only — see `HasOneAssociation#buildDisplacementOwnedByCaller`. */
+  buildDisplacementOwnedByCaller?: boolean;
   initializeAttributes(record: Base): void;
   isLoaded?(): boolean;
   detachDisplacedRecord?(displaced: Base | null): Promise<void>;
@@ -902,7 +904,18 @@ export function assignNestedAttributesForOneToOneAssociation(
         // what `load_target` surfaced, so an unloaded association displaces
         // nothing; `detachDisplacedRecord` owns the remaining guards.
         const displaced = assoc.isLoaded?.() === false ? null : existing;
-        assoc.build(assignable);
+        // `HasOneAssociation#build` runs the removal itself for direct callers
+        // (returning a promise they can await). This writer is synchronous and
+        // owns the removal through `detachDisplacedAtAssignment` below, so
+        // suppress the association's own — two concurrent removals of the same
+        // row would double-destroy it under `dependent: :destroy`.
+        assoc.buildDisplacementOwnedByCaller = true;
+        try {
+          // Never a promise with the flag set — `void` states that statically.
+          void assoc.build(assignable);
+        } finally {
+          assoc.buildDisplacementOwnedByCaller = false;
+        }
         detachDisplacedAtAssignment(record, assoc, displaced);
       }
     }

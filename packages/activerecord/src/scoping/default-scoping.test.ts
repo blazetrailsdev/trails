@@ -919,8 +919,15 @@ describe("DefaultScopingTest", () => {
       expect(Number(assigned._readAttribute("post_id"))).toBe(Number(post.id));
 
       // Association#buildRecord sets the declaring-class FK on the built target.
-      const built = post.association("verySpecialComment").build({ body: "built sti has_one" });
-      expect(Number(built._readAttribute("post_id"))).toBe(Number(post.id));
+      // Build on an owner with no comment: Rails' `build` runs `load_target` +
+      // `remove_target!`, and nullifying a displaced comment's `post_id` would
+      // hit the column's NOT NULL constraint rather than exercise the FK
+      // derivation this asserts.
+      const builder = (await SpecialPost.create({ title: "sti builder", body: "x" })) as any;
+      const built = await builder
+        .association("verySpecialComment")
+        .build({ body: "built sti has_one" });
+      expect(Number(built._readAttribute("post_id"))).toBe(Number(builder.id));
     });
   });
 

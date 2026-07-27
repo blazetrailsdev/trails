@@ -154,6 +154,34 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   }
 
   /**
+   * A through `build` displaces nothing: Rails'
+   * `HasOneThroughAssociation#replace` has no `load_target`/`remove_target!`
+   * (has_one_through_association.rb:15-42) — the join row, not the end record,
+   * carries the association, and displacement is `createThroughRecord` /
+   * `persistReplace`'s job. Same reason as `detachDisplacedTarget` above; this
+   * also keeps `build`'s return synchronous for the through builders.
+   *
+   * @internal
+   */
+  protected override detachDisplacedOnBuild(): Promise<void> | null {
+    return null;
+  }
+
+  /**
+   * No load either: `HasOneThroughAssociation#replace` has no `load_target`
+   * (has_one_through_association.rb:9-13) — Rails loads the *through* proxy
+   * from `create_through_record` (:15-19), which our `build#{name}` accessor
+   * drives via `loadTargetForBuild`. Building through `association(name).build`
+   * must not issue that join-model SELECT here, so return null and keep the
+   * synchronous return the through builders expect.
+   *
+   * @internal
+   */
+  protected override loadDisplacedForBuild(): Promise<unknown> | null {
+    return null;
+  }
+
+  /**
    * No-op for the same reason as `detachDisplacedTarget` above: the
    * nested-attributes displacement path must not nullify/destroy a displaced
    * *end* record of a through association.
@@ -372,7 +400,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
       // duplicate. So queue this association's own deferred `createThroughRecord`,
       // whose `persistReplace` resets the through proxy and re-reads the join row
       // from the DB, then reconciles (update existing / create when absent).
-      throughProxy.build?.(attrs);
+      buildThroughProxyRecord(throughProxy, attrs);
       if (!((this.owner as any).isNewRecord?.() ?? true)) {
         if (this._pendingReplace) {
           this._pendingReplace.record = record;
@@ -512,7 +540,7 @@ async function createThroughRecord(
         await throughRecord.update?.(attrs);
       }
     } else if ((assoc.owner as any).isNewRecord?.() || !save) {
-      throughProxy.build?.(attrs);
+      buildThroughProxyRecord(throughProxy, attrs);
     } else {
       await throughProxy.create?.(attrs);
     }
@@ -747,4 +775,24 @@ export async function findTarget(
   if (fkValue === null || fkValue === undefined) return null;
   const targetModel = resolveAssocClass(throughRecord, sourceName, className);
   return targetModel.findBy({ [targetModel.primaryKey as string]: fkValue });
+}
+
+/**
+ * Build the join record on the through proxy without its own `load_target` /
+ * `remove_target!`: a has_one through proxy is itself a has_one association, and
+ * Rails' `create_through_record` (has_one_through_association.rb:15-40) — not
+ * `SingularAssociation#build` — owns the join row's displacement, loading the
+ * proxy and updating/destroying the existing row. Letting the proxy's own build
+ * query here would both duplicate that load and make this synchronous
+ * reconstruction return a promise.
+ *
+ * @internal
+ */
+function buildThroughProxyRecord(throughProxy: any, attrs: Record<string, unknown>): void {
+  throughProxy.buildDisplacementOwnedByCaller = true;
+  try {
+    throughProxy.build?.(attrs);
+  } finally {
+    throughProxy.buildDisplacementOwnedByCaller = false;
+  }
 }
