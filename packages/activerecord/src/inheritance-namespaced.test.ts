@@ -83,3 +83,24 @@ describe("NamingTest (Admin::User model_name)", () => {
     expect(AdminUser.modelName.paramKey).toBe("user");
   });
 });
+
+// A name guard (`row[type] !== this.name`) mis-fires for every namespaced STI
+// row, because `sti_name` never equals the flattened JS class name. That was
+// latent while a second hydration path absorbed it; with one path the identity
+// guard is the only thing making re-entry terminate here.
+describe("namespaced STI hydration goes through the single instantiate path", () => {
+  fixtures([]);
+
+  it("terminates on the namespaced subclass instead of re-dispatching", () => {
+    const record = ClothingItemSized._instantiate({
+      id: "5",
+      clothing_type: "pants",
+      color: "blue",
+      size: "M",
+      type: "ClothingItem::Sized",
+    });
+
+    expect(record).toBeInstanceOf(ClothingItemSized);
+    expect(record.id).toBe(5);
+  });
+});
