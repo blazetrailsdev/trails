@@ -307,14 +307,9 @@ describe("resolutionShape", () => {
     writeDist(packagesDir, "activesupport", { "index.d.ts": "export declare const a: number;" });
     const built = await keyOf(packagesDir, "activesupport");
 
-    // A rebuild that only changes contents leaves the shape alone — those
-    // changes are the read-set's job, and re-keying on them would invalidate
-    // every package again.
     writeDist(packagesDir, "activesupport", { "index.d.ts": "export declare const a: string;" });
     expect(await keyOf(packagesDir, "activesupport")).toBe(built);
 
-    // A dependency that was unbuilt at extraction time resolves to nothing, so
-    // no read-set can see it become resolvable — the shape must.
     const unbuilt = mkTmp();
     fs.mkdirSync(path.join(unbuilt, "activesupport"), { recursive: true });
     expect(await keyOf(unbuilt, "activesupport")).not.toBe(built);
@@ -348,8 +343,6 @@ describe("resolutionShape", () => {
       before.keyFor(dir),
     );
 
-    // Adding a file to a package nobody in this closure depends on must leave
-    // that closure's key alone — this is the whole point of the graph walk.
     writeDist(packagesDir, "actionview", { "extra.d.ts": "" });
     const after = await resolutionShape(packagesDir);
     expect(["activesupport", "arel", "activerecord"].map((dir) => after.keyFor(dir))).toEqual(
@@ -357,7 +350,6 @@ describe("resolutionShape", () => {
     );
     expect(after.keyFor("actionview")).not.toBe(keys[3]);
 
-    // A transitive dependency two hops down still invalidates the dependent.
     writeDist(packagesDir, "activesupport", { "extra.d.ts": "" });
     const later = await resolutionShape(packagesDir);
     expect(later.keyFor("activerecord")).not.toBe(keys[2]);
@@ -371,13 +363,32 @@ describe("resolutionShape", () => {
     writeDist(packagesDir, "arel", { "index.d.ts": "" });
     writeDist(packagesDir, "actionview", { "index.d.ts": "" });
 
-    // `actionview` has no manifest, so nothing bounds what it resolves: its key
-    // must move when ANY package's shape does.
     const before = await resolutionShape(packagesDir);
     writeDist(packagesDir, "arel", { "extra.d.ts": "" });
     expect((await resolutionShape(packagesDir)).keyFor("actionview")).not.toBe(
       before.keyFor("actionview"),
     );
+  });
+
+  it("follows a workspace link that the manifest does not declare", async () => {
+    const packagesDir = mkTmp();
+    writeManifest(packagesDir, "arel", []);
+    writeManifest(packagesDir, "activesupport", []);
+    writeDist(packagesDir, "arel", { "index.d.ts": "" });
+    writeDist(packagesDir, "activesupport", { "index.d.ts": "" });
+    fs.mkdirSync(path.join(packagesDir, "arel", "node_modules", "@blazetrails"), {
+      recursive: true,
+    });
+    fs.symlinkSync(
+      path.join(packagesDir, "activesupport"),
+      path.join(packagesDir, "arel", "node_modules", "@blazetrails", "activesupport"),
+    );
+
+    const before = await resolutionShape(packagesDir);
+    writeDist(packagesDir, "activesupport", { "extra.d.ts": "" });
+    const after = await resolutionShape(packagesDir);
+    expect(after.keyFor("arel")).not.toBe(before.keyFor("arel"));
+    expect(after.keyFor("activesupport")).not.toBe(before.keyFor("activesupport"));
   });
 
   it("terminates on a dependency cycle", async () => {

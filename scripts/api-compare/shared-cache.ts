@@ -116,32 +116,7 @@ export async function fileHash(file: string): Promise<string | null> {
  */
 export type ReadSet = Record<string, string>;
 
-/**
- * Per-package hash of the SHAPE of what that package can resolve: the sorted
- * names (not contents) of every built `dist/**\/*.d.ts` under the package's own
- * directory and its TRANSITIVE workspace dependencies.
- *
- * A read-set records what the compiler DID read, so it cannot notice a file
- * that was not resolvable at extraction time and is now. An unbuilt dependency
- * is exactly that case: with no `dist`, the import resolves to nothing and the
- * entry records nothing for it; a later `tsc --build` would silently change the
- * extraction while every recorded hash still matched. Folding this key into the
- * cache keys closes that hole without giving up the read-set's precision —
- * building or rebuilding does not change the file NAMES, so the common case
- * (contents changed) still invalidates only the packages that read them.
- *
- * Scoping it to the dependency closure is what keeps the remaining case —
- * adding, deleting or renaming a source file, ~20% of commits touching
- * `packages/` — from invalidating all 13 packages including the ones that
- * cannot resolve the changed package at all. `keyFor` is sync so a caller can
- * key every package off one walk of the workspace.
- */
 export interface ResolutionShape {
-  /**
-   * Shape key for the package directory `dirName`. A directory the workspace
-   * graph doesn't know falls back to the workspace-global key: we can't bound
-   * what it resolves, so nothing may be assumed invariant.
-   */
   keyFor(dirName: string): string;
 }
 
@@ -173,38 +148,11 @@ export async function resolutionShape(packagesDir: string): Promise<ResolutionSh
   return { keyFor: (dirName) => keys.get(dirName) ?? globalKey };
 }
 
-/**
- * Workspace dependency graph as package DIRECTORY → directories of its direct
- * `@blazetrails/*` dependencies. Directories, not npm names, because that is
- * what indexes `dist` — and several api-compare packages (actiondispatch,
- * actioncontroller, …) share one directory. Unparseable or nameless
- * `package.json`s are skipped; they simply don't appear in the graph and their
- * callers fall back to the global key.
- */
 async function readWorkspaceGraph(
   packagesDir: string,
   dirs: string[],
 ): Promise<Map<string, string[]>> {
-  const manifests = await Promise.all(
-    dirs.map(async (dir) => {
-      try {
-        const body = await fs.readFile(path.join(packagesDir, dir, "package.json"), "utf-8");
-        const json = JSON.parse(body) as {
-          name?: string;
-          dependencies?: Record<string, string>;
-          peerDependencies?: Record<string, string>;
-        };
-        if (!json.name) return null;
-        return {
-          dir,
-          name: json.name,
-          deps: Object.keys({ ...json.dependencies, ...json.peerDependencies }),
-        };
-      } catch {
-        return null;
-      }
-    }),
-  );
+  const manifests = await Promise.all(dirs.map(async (dir) => readManifest(packagesDir, dir)));
   const dirOfName = new Map<string, string>();
   for (const manifest of manifests) {
     if (manifest) dirOfName.set(manifest.name, manifest.dir);
@@ -220,12 +168,65 @@ async function readWorkspaceGraph(
   return graph;
 }
 
-/** `dir` plus every directory reachable from it, cycle-safe (the graph may have any). */
+interface PackageManifest {
+  dir: string;
+  name: string;
+  deps: string[];
+}
+
+async function readManifest(packagesDir: string, dir: string): Promise<PackageManifest | null> {
+  let json: {
+    name?: string;
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+    peerDependencies?: Record<string, string>;
+    optionalDependencies?: Record<string, string>;
+  };
+  try {
+    json = JSON.parse(await fs.readFile(path.join(packagesDir, dir, "package.json"), "utf-8"));
+  } catch {
+    return null;
+  }
+  if (typeof json.name !== "string" || json.name.length === 0) return null;
+  const declared = Object.keys({
+    ...json.dependencies,
+    ...json.devDependencies,
+    ...json.peerDependencies,
+    ...json.optionalDependencies,
+  });
+  return { dir, name: json.name, deps: [...declared, ...(await linkedPackages(packagesDir, dir))] };
+}
+
+async function linkedPackages(packagesDir: string, dir: string): Promise<string[]> {
+  const scopesDir = path.join(packagesDir, dir, "node_modules");
+  let scopes: string[];
+  try {
+    scopes = (await fs.readdir(scopesDir, { withFileTypes: true }))
+      .filter((entry) => entry.name.startsWith("@"))
+      .map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+  const nested = await Promise.all(
+    scopes.map(async (scope) => {
+      try {
+        const members = await fs.readdir(path.join(scopesDir, scope));
+        return members.map((member) => `${scope}/${member}`);
+      } catch {
+        return [];
+      }
+    }),
+  );
+  return nested.flat();
+}
+
 function transitiveDeps(graph: Map<string, string[]>, dir: string): string[] {
   const seen = new Set<string>([dir]);
   const queue = [dir];
   while (queue.length > 0) {
-    for (const dep of graph.get(queue.pop() as string) ?? []) {
+    const next = queue.pop();
+    if (next === undefined) break;
+    for (const dep of graph.get(next) ?? []) {
       if (seen.has(dep)) continue;
       seen.add(dep);
       queue.push(dep);

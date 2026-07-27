@@ -210,10 +210,6 @@ export async function main() {
   // packages resolve many of the same declarations, and validating every
   // package's read-set must not read the same file 13 times.
   const inputHashes = new Map<string, Promise<string | null>>();
-  // Read-sets record what WAS resolvable; this covers what BECOMES resolvable
-  // (an unbuilt dependency gaining a `dist`) — see resolutionShape. Keyed per
-  // package over its own dependency closure, so adding a file to a package
-  // this one cannot resolve leaves its entry valid.
   const shape = await resolutionShape(path.join(ROOT_DIR, "packages"));
   // Neither of those can see `node_modules`, which is most of what the compiler
   // reads; the lockfile stands in for all of it — coarse (any bump invalidates
