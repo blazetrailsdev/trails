@@ -71,6 +71,13 @@ tester.run("no-raw-sql", rule, {
       filename: IN,
       errors: [{ messageId: "noRawSql", data: { sink: "execute" } }],
     },
+    // The fixture-machinery exemption is anchored to the exact ported files, so
+    // a same-named module elsewhere under activerecord/src is still scanned.
+    {
+      code: 'connection.execute("SELECT * FROM posts");',
+      filename: "packages/activerecord/src/relation/fixtures.ts",
+      errors: [{ messageId: "noRawSql", data: { sink: "execute" } }],
+    },
     // Template literal with interpolation, anchored on the first quasi.
     {
       code: "connection.selectAll(`SELECT ${cols} FROM posts`);",
