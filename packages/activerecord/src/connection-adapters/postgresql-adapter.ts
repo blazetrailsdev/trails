@@ -3791,11 +3791,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
     this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
     this.pgSchemaStatements().validateIndexLengthBang(tableName, newName);
-    const { schema } = this.parseSchemaQualifiedName(tableName);
-    const qualifiedOld = schema
-      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(oldName)}`
-      : this.quoteIdentifier(oldName);
-    await this.exec(`ALTER INDEX ${qualifiedOld} RENAME TO ${this.quoteIdentifier(newName)}`);
+    const [schema] = this.extractSchemaQualifiedName(tableName);
+    const qualifier = schema ? `${this.quoteTableName(schema)}.` : "";
+    await this.execute(
+      `ALTER INDEX ${qualifier}${this.quoteColumnName(oldName)} RENAME TO ${this.quoteTableName(newName)}`,
+    );
   }
 
   async columns(tableName: string): Promise<Column[]> {
@@ -4015,7 +4015,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     name?: string | null,
     options: { type?: string } = {},
   ): { schema: string; name: string | null; type: string | null } {
-    const { schema, table } = this.parseSchemaQualifiedName(name ?? "");
+    const [schema, table] = this.extractSchemaQualifiedName(name ?? "");
     let type: string | null = null;
     switch (options.type) {
       case "BASE TABLE":
@@ -4029,15 +4029,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         break;
     }
     return {
-      schema: schema ? this.quoteLiteral(schema) : "ANY (current_schemas(false))",
-      name: table ? this.quoteLiteral(table) : null,
+      schema: schema ? this.quote(schema) : "ANY (current_schemas(false))",
+      name: table ? this.quote(table) : null,
       type,
     };
   }
 
   /** @internal */
   referenceNameForTable(tableName: string): string {
-    const { table } = this.parseSchemaQualifiedName(tableName);
+    const [, table] = this.extractSchemaQualifiedName(tableName);
     return singularize(table);
   }
 
@@ -4047,8 +4047,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async renameTable(oldName: string, newName: string): Promise<void> {
-    const { schema: oldSchema, table: unqualifiedOld } = this.parseSchemaQualifiedName(oldName);
-    const { table: unqualifiedNew } = this.parseSchemaQualifiedName(newName);
+    const [oldSchema, unqualifiedOld] = this.extractSchemaQualifiedName(oldName);
+    const [, unqualifiedNew] = this.extractSchemaQualifiedName(newName);
     this.schemaCache.clearDataSourceCacheBang(this.pool, oldName);
     this.schemaCache.clearDataSourceCacheBang(this.pool, newName);
     await this.exec(
@@ -4187,7 +4187,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     await this.exec(sql);
 
     if (options.comment?.trim()) {
-      const { schema } = this.parseSchemaQualifiedName(tableName);
+      const [schema] = this.extractSchemaQualifiedName(tableName);
       const qualifiedIndex = schema
         ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(indexName)}`
         : this.quoteIdentifier(indexName);
@@ -4234,11 +4234,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // the bare identifier becomes the name to match, the index is dropped in the
     // table's schema (or the name's schema when the table is unqualified), and a
     // conflicting schema pair raises.
-    const { schema: tableSchema, table: bareTable } = this.parseSchemaQualifiedName(tableName);
+    const [tableSchema, bareTable] = this.extractSchemaQualifiedName(tableName);
     let dropSchema = tableSchema;
     let resolveOpts = opts;
     if (opts.name != null) {
-      const { schema: nameSchema, table: nameIdent } = this.parseSchemaQualifiedName(opts.name);
+      const [nameSchema, nameIdent] = this.extractSchemaQualifiedName(opts.name);
       resolveOpts = { ...opts, name: nameIdent };
       if (!tableSchema) dropSchema = nameSchema;
       if (nameSchema && tableSchema && nameSchema !== tableSchema) {
@@ -4351,7 +4351,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async enumValues(name: string): Promise<string[]> {
-    const { schema, table: enumName } = this.parseSchemaQualifiedName(name);
+    const [schema, enumName] = this.extractSchemaQualifiedName(name);
     let sql = `SELECT e.enumlabel AS value
        FROM pg_enum e
        JOIN pg_type t ON t.oid = e.enumtypid
@@ -4378,14 +4378,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
-
-  private parseSchemaQualifiedName(name: string): {
-    schema: string | null;
-    table: string;
-  } {
-    const pgName = Utils.extractSchemaQualifiedName(name);
-    return { schema: pgName.schema, table: pgName.identifier };
-  }
 
   // quoteIdentifier is NOT overridden: PG's identifier quoting is
   // byte-identical to AbstractAdapter's double-quote form (`"x"` with
@@ -4729,7 +4721,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // name from the bare table (postgresql/schema_statements.rb), so a
     // `my_schema.values` table indexes as `index_values_on_value` — created in
     // `my_schema` via the schema-qualified table, keeping add/remove symmetric.
-    const { table } = this.parseSchemaQualifiedName(tableName);
+    const [, table] = this.extractSchemaQualifiedName(tableName);
     if (options.column != null) {
       if (options._usesLegacyIndexName) {
         const cols = Array.isArray(options.column) ? options.column : [options.column];

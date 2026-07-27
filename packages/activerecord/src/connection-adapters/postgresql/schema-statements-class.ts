@@ -16,7 +16,7 @@ import {
 import { HashLookupTypeMap } from "../../type/hash-lookup-type-map.js";
 import { Column } from "./column.js";
 import { quoteColumnName as pgQuoteColumnName } from "./quoting.js";
-import { unquoteIdentifier, splitQuotedIdentifier, Utils } from "./utils.js";
+import { unquoteIdentifier, splitQuotedIdentifier, Name, Utils } from "./utils.js";
 import { splitPgDefault } from "../postgresql-adapter.js";
 import type { CreateDatabaseOptions, PgIndexDefinition } from "./schema-statements.js";
 import {
@@ -39,12 +39,14 @@ interface PgSchemaAdapter {
   clearCacheBang(): void;
   quote(value: unknown): string;
   quoteIdentifier(name: string): string;
+  quoteColumnName(name: string): string;
   quoteTableName(name: string): string;
+  readonly logger: unknown;
   quoteLiteral(value: unknown): string;
   supportsNativePartitioning(): boolean;
   supportsIdentityColumns(): boolean;
   supportsVirtualColumns(): boolean;
-  parseSchemaQualifiedName(name: string): { schema: string | null; table: string };
+  extractSchemaQualifiedName(string: string): [string | null, string];
   getDatabaseVersion(): Promise<number>;
   supportsIndexInclude(): boolean;
   pgQuotedScope(name: string, type: "BASE TABLE" | null): { schema: string; name: string | null };
@@ -85,6 +87,12 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     return this.adapter as unknown as PgSchemaAdapter;
   }
 
+  // Mirrors Rails' `@logger` reader; the sequence helpers guard on it before
+  // warning, so a nil logger stays silent.
+  private get pgLogger(): { warn?: (msg: string) => void } | null {
+    return this.pg.logger as { warn?: (msg: string) => void } | null;
+  }
+
   override async dropTable(...args: Parameters<SchemaStatements["dropTable"]>): Promise<void> {
     const [tableNames, options] = this._splitTableNamesAndOptions(args);
     if (tableNames.length === 0) {
@@ -106,7 +114,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   async indexes(tableName: string): Promise<PgIndexDefinition[]> {
     // supportsIndexInclude() reads databaseVersion; ensure it's populated.
     await this.pg.getDatabaseVersion();
-    const { schema, table } = this.pg.parseSchemaQualifiedName(tableName);
+    const [schema, table] = this.pg.extractSchemaQualifiedName(tableName);
 
     let tableCondition: string;
     const binds: unknown[] = [];
@@ -301,7 +309,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   }
 
   async dataSourceExists(name: string): Promise<boolean> {
-    const { schema, table } = this.pg.parseSchemaQualifiedName(name);
+    const [schema, table] = this.pg.extractSchemaQualifiedName(name);
     if (schema) {
       const rows = await this.pg.schemaQuery(
         `SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = $1 AND table_name = $2`,
@@ -344,9 +352,9 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
    */
   private async relkindExists(name: string, relkinds: string[]): Promise<boolean> {
     // Rails' table_exists?(nil) / "" returns false; a null/empty name has no
-    // identifier to parse, so short-circuit before parseSchemaQualifiedName.
+    // identifier to parse, so short-circuit before extractSchemaQualifiedName.
     if (!name) return false;
-    const { schema, table } = this.pg.parseSchemaQualifiedName(name);
+    const [schema, table] = this.pg.extractSchemaQualifiedName(name);
     if (schema) {
       // $1=schema, $2=table, $3..=relkinds
       const relPlaceholders = relkinds.map((_, i) => `$${i + 3}`).join(", ");
@@ -361,7 +369,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       return rows.length > 0;
     }
     // $1=table, $2..=relkinds. Bind `table` (the unquoted identifier
-    // returned by parseSchemaQualifiedName), not the raw `name`
+    // returned by extractSchemaQualifiedName), not the raw `name`
     // argument — otherwise a quoted input like `"widgets"` gets
     // compared against `relname = '"widgets"'` in pg_class, which
     // never matches (the catalog stores names unquoted).
@@ -648,7 +656,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   // ---------------------------------------------------------------------------
 
   override async columns(tableName: string): Promise<Column[]> {
-    const { schema, table } = this.pg.parseSchemaQualifiedName(tableName);
+    const [schema, table] = this.pg.extractSchemaQualifiedName(tableName);
 
     let tableCondition: string;
     const binds: unknown[] = [];
@@ -1097,9 +1105,9 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     }
     if (!toTable) throw new ArgumentError("validateForeignKey requires toTable or options.name");
     const fks = await this.foreignKeys(fromTable);
-    const { schema: toSchema, table: toTbl } = this.pg.parseSchemaQualifiedName(toTable);
+    const [toSchema, toTbl] = this.pg.extractSchemaQualifiedName(toTable);
     const fk = (fks as any[]).find((f) => {
-      const { schema: fSchema, table: fTbl } = this.pg.parseSchemaQualifiedName(String(f.toTable));
+      const [fSchema, fTbl] = this.pg.extractSchemaQualifiedName(String(f.toTable));
       if (fTbl !== toTbl) return false;
       // When the FK record has no schema prefix (PostgreSQL omits "public." when it
       // is on the search_path), treat it as matching any schema lookup or "public".
@@ -1111,7 +1119,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   }
 
   override foreignKeyColumnFor(tableName: string, columnName = "id"): string {
-    const { table } = this.pg.parseSchemaQualifiedName(tableName);
+    const [, table] = this.pg.extractSchemaQualifiedName(tableName);
     return `${singularize(table)}_${columnName}`;
   }
 
@@ -1591,7 +1599,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     values: string[],
     _options?: Record<string, unknown>,
   ): Promise<void> {
-    const { schema, table: enumName } = this.pg.parseSchemaQualifiedName(name);
+    const [schema, enumName] = this.pg.extractSchemaQualifiedName(name);
     const qualifiedName = schema
       ? `${this.pg.quoteIdentifier(schema)}.${this.pg.quoteIdentifier(enumName)}`
       : this.pg.quoteIdentifier(enumName);
@@ -1619,7 +1627,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   }
 
   async dropEnum(name: string, options: { ifExists?: boolean } = {}): Promise<void> {
-    const { schema, table: enumName } = this.pg.parseSchemaQualifiedName(name);
+    const [schema, enumName] = this.pg.extractSchemaQualifiedName(name);
     const qualifiedName = schema
       ? `${this.pg.quoteIdentifier(schema)}.${this.pg.quoteIdentifier(enumName)}`
       : this.pg.quoteIdentifier(enumName);
@@ -1634,13 +1642,13 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
 
   async renameEnum(name: string, newNameOrOptions: string | { to: string }): Promise<void> {
     const newName = typeof newNameOrOptions === "string" ? newNameOrOptions : newNameOrOptions.to;
-    const { schema: newSchema } = this.pg.parseSchemaQualifiedName(newName);
+    const [newSchema] = this.pg.extractSchemaQualifiedName(newName);
     if (newSchema) {
       throw new Error(
         "PostgreSQLAdapter#renameEnum does not support changing enum schema; pass an unqualified type name.",
       );
     }
-    const { schema, table: enumName } = this.pg.parseSchemaQualifiedName(name);
+    const [schema, enumName] = this.pg.extractSchemaQualifiedName(name);
     const qualifiedName = schema
       ? `${this.pg.quoteIdentifier(schema)}.${this.pg.quoteIdentifier(enumName)}`
       : this.pg.quoteIdentifier(enumName);
@@ -1655,7 +1663,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     value: string,
     options: { before?: string; after?: string; ifNotExists?: boolean } = {},
   ): Promise<void> {
-    const { schema, table: enumName } = this.pg.parseSchemaQualifiedName(name);
+    const [schema, enumName] = this.pg.extractSchemaQualifiedName(name);
     const qualifiedName = schema
       ? `${this.pg.quoteIdentifier(schema)}.${this.pg.quoteIdentifier(enumName)}`
       : this.pg.quoteIdentifier(enumName);
@@ -1678,7 +1686,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   }
 
   async renameEnumValue(name: string, options: { from: string; to: string }): Promise<void> {
-    const { schema, table: enumName } = this.pg.parseSchemaQualifiedName(name);
+    const [schema, enumName] = this.pg.extractSchemaQualifiedName(name);
     const qualifiedName = schema
       ? `${this.pg.quoteIdentifier(schema)}.${this.pg.quoteIdentifier(enumName)}`
       : this.pg.quoteIdentifier(enumName);
@@ -1698,7 +1706,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     name: string,
     options: { subtype: string; subtypeDiff?: string },
   ): Promise<void> {
-    const { schema, table: rangeName } = this.pg.parseSchemaQualifiedName(name);
+    const [schema, rangeName] = this.pg.extractSchemaQualifiedName(name);
     const qualifiedName = schema
       ? `${this.pg.quoteIdentifier(schema)}.${this.pg.quoteIdentifier(rangeName)}`
       : this.pg.quoteIdentifier(rangeName);
@@ -1715,7 +1723,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
           `PostgreSQLAdapter#createRange: ${param} must have 1 or 2 dot-separated parts, got ${parts.length}: "${identifier}".`,
         );
       }
-      const { schema: s, table: t } = this.pg.parseSchemaQualifiedName(identifier);
+      const [s, t] = this.pg.extractSchemaQualifiedName(identifier);
       return s
         ? `${this.pg.quoteIdentifier(s)}.${this.pg.quoteIdentifier(t)}`
         : this.pg.quoteIdentifier(t);
@@ -1737,7 +1745,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   }
 
   async dropRange(name: string, options: { ifExists?: boolean } = {}): Promise<void> {
-    const { schema, table: rangeName } = this.pg.parseSchemaQualifiedName(name);
+    const [schema, rangeName] = this.pg.extractSchemaQualifiedName(name);
     const qualifiedName = schema
       ? `${this.pg.quoteIdentifier(schema)}.${this.pg.quoteIdentifier(rangeName)}`
       : this.pg.quoteIdentifier(rangeName);
@@ -1752,7 +1760,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   // ---------------------------------------------------------------------------
 
   override async primaryKey(tableName: string): Promise<string | string[] | null> {
-    const { schema, table } = this.pg.parseSchemaQualifiedName(tableName);
+    const [schema, table] = this.pg.extractSchemaQualifiedName(tableName);
 
     let tableCondition: string;
     const binds: unknown[] = [];
@@ -1810,21 +1818,16 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   async pkAndSequenceFor(
     tableName: string,
   ): Promise<[string, { schema: string; name: string } | null] | null> {
-    const { schema, table } = this.pg.parseSchemaQualifiedName(tableName);
-
-    let tableCondition: string;
-    const binds: unknown[] = [];
-
-    if (schema) {
-      binds.push(table, schema);
-      tableCondition = `t.relname = $1 AND n.nspname = $2`;
-    } else {
-      // Quote the identifier (mirrors Rails quote(quote_table_name(table)) in
-      // pk_and_sequence_for) so a mixed-case name like "CamelCase" resolves
-      // case-sensitively instead of folding to lowercase via a bare to_regclass.
-      binds.push(table);
-      tableCondition = `t.oid = to_regclass(quote_ident($1))`;
-    }
+    // Mirrors Rails pk_and_sequence_for's `#{quote(quote_table_name(table))}::regclass`:
+    // regclass resolves a schema-qualified or bare name itself, and the quoting
+    // keeps a mixed-case name like "CamelCase" case-sensitive.
+    //
+    // Deviation: `to_regclass(...)` rather than a bare `::regclass` cast. Rails
+    // wraps the whole method in `rescue nil`, so an unknown table yields nil;
+    // to_regclass yields NULL (hence no rows, hence nil) without raising, which
+    // matters here because a raised PG error would abort an enclosing
+    // transaction that Ruby's rescue leaves untouched.
+    const tableCondition = `t.oid = to_regclass(${this.pg.quote(this.pg.quoteTableName(tableName))})`;
 
     const rows = await this.pg.schemaQuery(
       `SELECT a.attname AS pk,
@@ -1843,7 +1846,6 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
        -- PK's ANY(i.indkey) join could return an arbitrary column under LIMIT 1.
        ORDER BY array_position(i.indkey, a.attnum)
        LIMIT 1`,
-      binds,
     );
 
     if (rows.length === 0) return null;
@@ -1906,14 +1908,14 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       if (!result) return null;
       return Utils.extractSchemaQualifiedName(result).toString();
     } catch {
-      return `${tableName}_${pk}_seq`;
+      return new Name(null, `${tableName}_${pk}_seq`).toString();
     }
   }
 
   /** @internal */
   sequenceNameFromParts(tableName: string, columnName: string, suffix: string): string {
     const maxLen = 63;
-    const { table: unqualifiedTable } = this.pg.parseSchemaQualifiedName(tableName);
+    const [, unqualifiedTable] = this.pg.extractSchemaQualifiedName(tableName);
     let overLength = unqualifiedTable.length + columnName.length + suffix.length + 2 - maxLen;
     let col = columnName;
     let tbl = unqualifiedTable;
@@ -1934,43 +1936,26 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   }
 
   async setPkSequence(tableName: string, value: number): Promise<void> {
-    const result = await this.pkAndSequenceFor(tableName);
-    if (!result) return;
-    const [, seq] = result;
-    if (!seq) return;
-    const seqName = `${seq.schema}.${seq.name}`;
-    await this.pg.schemaQuery(`SELECT setval($1::regclass, $2)`, [this._qt(seqName), value]);
+    await this.setPkSequenceBang(tableName, value);
   }
 
   async setPkSequenceBang(tableName: string, value: number): Promise<void> {
     const result = await this.pkAndSequenceFor(tableName);
-    if (!result) return;
-    const [, seq] = result;
-    if (!seq) return;
-    const seqName = `${seq.schema}.${seq.name}`;
-    await this.pg.schemaQuery(`SELECT setval($1::regclass, $2)`, [this._qt(seqName), value]);
+    const [pk, seq] = result ?? [null, null];
+    if (!pk) return;
+    if (seq) {
+      const quotedSequence = this.pg.quoteTableName(`${seq.schema}.${seq.name}`);
+      await this.adapter.queryValue(
+        `SELECT setval(${this.pg.quote(quotedSequence)}, ${value})`,
+        "SCHEMA",
+      );
+    } else {
+      this.pgLogger?.warn?.(`${tableName} has primary key ${pk} with no default sequence.`);
+    }
   }
 
   async resetPkSequence(tableName: string): Promise<void> {
-    const result = await this.pkAndSequenceFor(tableName);
-    if (!result) return;
-    const [pk, seq] = result;
-    if (!seq) return;
-    const qualifiedTable = this._qt(tableName);
-    const seqName = `${seq.schema}.${seq.name}`;
-
-    const maxRows = await this.pg.schemaQuery(
-      `SELECT COALESCE(MAX(${this._qi(pk)}), 0) AS max_val FROM ${qualifiedTable}`,
-    );
-    const maxVal = Number(maxRows[0].max_val);
-    if (maxVal === 0) {
-      await this.pg.schemaQuery(`SELECT setval($1::regclass, 1, false)`, [this._qt(seqName)]);
-    } else {
-      await this.pg.schemaQuery(`SELECT setval($1::regclass, $2, true)`, [
-        this._qt(seqName),
-        maxVal,
-      ]);
-    }
+    await this.resetPkSequenceBang(tableName);
   }
 
   async resetPkSequenceBang(
@@ -1979,33 +1964,37 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     sequence: string | null = null,
   ): Promise<void> {
     if (!pk || !sequence) {
-      const result = await this.pkAndSequenceFor(tableName);
-      if (!result) return;
-      const [defaultPk, defaultSeq] = result;
+      const [defaultPk, defaultSeq] = (await this.pkAndSequenceFor(tableName)) ?? [null, null];
       pk = pk ?? defaultPk;
       sequence = sequence ?? (defaultSeq ? `${defaultSeq.schema}.${defaultSeq.name}` : null);
     }
-    if (!pk || !sequence) return;
-    const quotedSeq = this._qt(sequence);
-    const maxRows = await this.pg.schemaQuery(
-      `SELECT MAX(${this._qi(pk)}) AS max_val FROM ${this._qt(tableName)}`,
-    );
-    const maxVal = maxRows[0]?.max_val;
-    if (maxVal == null) {
-      const dbVersion = await this.pg.getDatabaseVersion();
-      const minRows =
-        dbVersion >= 100000
-          ? await this.pg.schemaQuery(
-              `SELECT seqmin AS minvalue FROM pg_sequence WHERE seqrelid = $1::regclass`,
-              [quotedSeq],
-            )
-          : await this.pg.schemaQuery(`SELECT min_value AS minvalue FROM ${quotedSeq}`);
-      await this.pg.schemaQuery(`SELECT setval($1::regclass, $2, false)`, [
-        quotedSeq,
-        minRows[0]?.minvalue ?? 1,
-      ]);
-    } else {
-      await this.pg.schemaQuery(`SELECT setval($1::regclass, $2, true)`, [quotedSeq, maxVal]);
+
+    if (pk && !sequence) {
+      this.pgLogger?.warn?.(`${tableName} has primary key ${pk} with no default sequence.`);
     }
+
+    if (!pk || !sequence) return;
+
+    const quotedSequence = this.pg.quoteTableName(sequence);
+    const maxPk = await this.adapter.queryValue(
+      `SELECT MAX(${this.pg.quoteColumnName(pk)}) FROM ${this.pg.quoteTableName(tableName)}`,
+      "SCHEMA",
+    );
+    let minvalue: unknown = null;
+    if (maxPk == null) {
+      const dbVersion = await this.pg.getDatabaseVersion();
+      minvalue =
+        dbVersion >= 100000
+          ? await this.adapter.queryValue(
+              `SELECT seqmin FROM pg_sequence WHERE seqrelid = ${this.pg.quote(quotedSequence)}::regclass`,
+              "SCHEMA",
+            )
+          : await this.adapter.queryValue(`SELECT min_value FROM ${quotedSequence}`, "SCHEMA");
+    }
+
+    await this.adapter.queryValue(
+      `SELECT setval(${this.pg.quote(quotedSequence)}, ${maxPk ?? minvalue}, ${maxPk ? "true" : "false"})`,
+      "SCHEMA",
+    );
   }
 }
