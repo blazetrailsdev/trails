@@ -611,22 +611,16 @@ export class SchemaCreation {
   /** @internal */
   actionSql(action: string, dependency: ReferentialAction): string {
     switch (dependency) {
-      case "cascade":
-        return `ON ${action} CASCADE`;
       case "nullify":
         return `ON ${action} SET NULL`;
+      case "cascade":
+        return `ON ${action} CASCADE`;
       case "restrict":
         return `ON ${action} RESTRICT`;
-      case "no_action":
-        return `ON ${action} NO ACTION`;
-      case "set_default":
-        return `ON ${action} SET DEFAULT`;
       default:
-        // Rails raises ArgumentError here (schema_creation.rb:181), which
-        // foreign_key_test.rb:302 asserts on.
         throw new ArgumentError(
-          `'${String(dependency)}' is not supported for on_update or on_delete. ` +
-            `Supported values are: cascade, nullify, restrict, no_action, set_default`,
+          `'${String(dependency)}' is not supported for :on_update or :on_delete.\n` +
+            `Supported values are: :nullify, :cascade, :restrict\n`,
         );
     }
   }

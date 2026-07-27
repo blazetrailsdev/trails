@@ -61,7 +61,7 @@ export type ColumnType =
 
 export type PrimaryKeyType = "uuid";
 
-export type ReferentialAction = "cascade" | "nullify" | "restrict" | "no_action" | "set_default";
+export type ReferentialAction = "cascade" | "nullify" | "restrict";
 
 /**
  * The adapter surface {@link TableDefinition.newForeignKeyDefinition} reads

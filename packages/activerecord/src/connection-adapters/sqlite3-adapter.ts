@@ -3208,19 +3208,14 @@ const REFERENTIAL_ACTION_MAP: Record<string, string> = {
   nullify: "SET NULL",
   cascade: "CASCADE",
   restrict: "RESTRICT",
-  set_default: "SET DEFAULT",
-  no_action: "NO ACTION",
 };
 
 function normalizeReferentialAction(action: string): string {
-  const sql = REFERENTIAL_ACTION_MAP[action.toLowerCase()];
-  // Rails reaches action_sql (schema_creation.rb:175) even on SQLite's
-  // table-rebuild path, so an unsupported :on_delete/:on_update raises
-  // ArgumentError rather than emitting invalid SQL (foreign_key_test.rb:302).
+  const sql = REFERENTIAL_ACTION_MAP[action];
   if (sql === undefined) {
     throw new ArgumentError(
-      `'${action}' is not supported for on_update or on_delete. ` +
-        `Supported values are: cascade, nullify, restrict, no_action, set_default`,
+      `'${action}' is not supported for :on_update or :on_delete.\n` +
+        `Supported values are: :nullify, :cascade, :restrict\n`,
     );
   }
   return sql;
