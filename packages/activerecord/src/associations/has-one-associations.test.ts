@@ -6,7 +6,7 @@
  * have been replaced with the real Rails `Company`/`Firm`/`DependentFirm`/
  * `Account` models and the `companies`/`accounts` fixtures. No `defineSchema`.
  */
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { ArgumentError, I18n, UnknownAttributeError } from "@blazetrails/activemodel";
 import { throwAbort } from "@blazetrails/activesupport";
 import {
@@ -588,6 +588,27 @@ describe("HasOneAssociationsTest", () => {
     const created = await firm.createAccount({ credit_limit: 70 });
     await expect(Account.find(originalId)).rejects.toThrow(RecordNotFound);
     expect((await readHasOne(firm, "account")).id).toBe(created.id);
+  });
+
+  // Trails deviation guard (no Rails counterpart, RFC 0068 story
+  // has-one-create-deferred-load-error-reraise-untested): the displaced-target
+  // load has to run BEFORE `super._createRecord` (it must precede the new
+  // record's FK write), but Rails reaches `load_target` only from
+  // `set_new_record`, i.e. *after* `build_record` (singular_association.rb:63-68).
+  // So `_createRecord` defers the load error and re-raises it once the build has
+  // succeeded. A build-time failure hides it (covered by "create with inexistent
+  // foreign key failing"); this pins the other branch — build succeeds, load
+  // error still propagates out of `create#{name}`.
+  it("create re-raises a deferred target-load error after a successful build", async () => {
+    const company = (await Company.create({ name: "DeferredLoadCo" })) as any;
+    const found = (await Company.find(company.id)) as any;
+    const association = found.association("account");
+    expect(association.isLoaded()).toBe(false);
+    const loadError = new Error("connection lost while loading the displaced target");
+    vi.spyOn(association, "loadTargetForBuild").mockRejectedValue(loadError);
+
+    await expect(found.createAccount({ credit_limit: 70 })).rejects.toBe(loadError);
+    expect(await Account.where({ firm_id: Number(company.id) }).count()).toBe(1);
   });
 
   // Same root cause on the build path: `set_new_record` → `replace(record, false)`
