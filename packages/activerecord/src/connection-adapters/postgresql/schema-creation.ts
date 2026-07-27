@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation
  */
 
+import { wrap } from "@blazetrails/activesupport";
 import { SchemaCreation as AbstractSchemaCreation } from "../abstract/schema-creation.js";
 import {
   type ForeignKeyDefinition,
@@ -165,7 +166,10 @@ export class SchemaCreation extends AbstractSchemaCreation {
     if (o.usingIndex) {
       p.push(`USING INDEX ${this.adapter.quoteIdentifier(o.usingIndex)}`);
     } else {
-      const cols = (Array.isArray(o.column) ? o.column : [o.column])
+      // Rails wraps with `Array(o.column)`, so a nil column renders `UNIQUE ()`
+      // and PostgreSQL owns the rejection — `[null]` would throw in the quoter
+      // first (add_unique_constraint has no pre-raise for the empty case).
+      const cols = wrap(o.column)
         .map((c) => this.adapter.quoteIdentifier(c))
         .join(", ");
       p.push(`(${cols})`);
