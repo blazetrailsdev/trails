@@ -1,4 +1,5 @@
 import { Base } from "../base.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { registerModel } from "../associations.js";
 import { ensureCanonicalTables, rebuildCanonicalTables } from "./canonical-schema.js";
 import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
@@ -16,6 +17,18 @@ import { activeLane } from "./connection.js";
  * @internal
  */
 export const ARUNIT2_TABLES = ["colleges", "courses", "professors", "courses_professors"] as const;
+
+/**
+ * `schema.rb:1462` — `OtherDog.lease_connection.create_table :dogs, force: true`.
+ * Unlike {@link ARUNIT2_TABLES}, `dogs` exists in *both* databases: the primary
+ * one carries the canonical shape (`schema.rb:559`), arunit2 a bare id-only
+ * table, so it is laid down here rather than from the canonical registry.
+ */
+async function createOtherDogsTable(adapter: DatabaseAdapter): Promise<void> {
+  const ss = adapter.schemaStatements();
+  if (await ss.tableExists("dogs")) return;
+  await ss.createTable("dogs", {}, () => {});
+}
 
 /**
  * Creates the `arunit2` database and lays {@link ARUNIT2_TABLES} in it, so the
@@ -39,7 +52,9 @@ export async function provisionSecondDatabase(): Promise<void> {
     };
     await primary.createDatabase(database).catch(() => undefined);
   }
-  await ensureCanonicalTables(await ARUnit2Model.leaseConnection(), ARUNIT2_TABLES);
+  const arunit2 = await ARUnit2Model.leaseConnection();
+  await ensureCanonicalTables(arunit2, ARUNIT2_TABLES);
+  await createOtherDogsTable(arunit2);
 }
 
 /**
