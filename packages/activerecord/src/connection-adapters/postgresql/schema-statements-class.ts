@@ -252,9 +252,6 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   }
 
   quotedIncludeColumnsForIndex(columnNames: string | string[]): string {
-    // Mirrors PostgreSQL::SchemaStatements#quoted_include_columns_for_index: the
-    // quoted map is threaded through add_options_for_index_columns so the
-    // opclass/sort-order decoration is applied by the one shared helper.
     if (typeof columnNames === "string") return this.adapter.quoteColumnName(columnNames);
     const quotedColumns = new Map(
       columnNames.map((name) => [name, this.adapter.quoteColumnName(name)]),
@@ -1076,9 +1073,6 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
 
   /** @internal */
   async validateConstraint(tableName: string, constraintName: string): Promise<void> {
-    // Mirrors PostgreSQL::SchemaStatements#validate_constraint: the VALIDATE
-    // CONSTRAINT clause is rendered by the schema-creation visitor off an
-    // AlterTable node rather than being string-built here.
     const at = this.pg.createAlterTable(tableName) as PgAlterTable;
     at.validateConstraint(constraintName);
     await this.adapter.execute(await this.pg.schemaCreation.accept(at));
@@ -1278,8 +1272,6 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     expression: string,
     options: ExclusionConstraintOptions = {},
   ): Promise<void> {
-    // Mirrors PostgreSQL::SchemaStatements#add_exclusion_constraint: the EXCLUDE
-    // clause is rendered by the schema-creation visitor off an AlterTable node.
     const opts = this.exclusionConstraintOptions(tableName, expression, options);
     const at = this.pg.createAlterTable(tableName) as PgAlterTable;
     at.addExclusionConstraint(expression, opts);
@@ -1409,7 +1401,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   ): Record<string, unknown> {
     this.assertValidDeferrable(options.deferrable);
     if (columnName && options.usingIndex) {
-      throw new Error("Cannot specify both `columnName` and `usingIndex` options.");
+      throw new ArgumentError("Cannot specify both `columnName` and `usingIndex` options.");
     }
     const opts = { ...options };
     if (!opts.name) {
@@ -1424,12 +1416,10 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     options: UniqueConstraintOptions = {},
   ): Promise<void> {
     if (!columnName && !options.usingIndex) {
-      throw new Error("Either columnName or usingIndex must be provided for addUniqueConstraint.");
+      throw new ArgumentError(
+        "Either columnName or usingIndex must be provided for addUniqueConstraint.",
+      );
     }
-    // Mirrors Rails postgresql/schema_statements.rb#add_unique_constraint:
-    // build the constraint through create_alter_table + schema_creation so the
-    // UNIQUE clause (NULLS NOT DISTINCT, USING INDEX, deferrable) is rendered by
-    // the schema-creation visitor rather than inline SQL.
     const opts = this.uniqueConstraintOptions(tableName, columnName, options);
     const at = this.pg.createAlterTable(tableName) as PgAlterTable;
     at.addUniqueConstraint(columnName as string | string[], opts);

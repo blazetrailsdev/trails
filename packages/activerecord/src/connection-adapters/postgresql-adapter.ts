@@ -4129,11 +4129,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       comment?: string;
     } = {},
   ): Promise<void> {
-    // Mirrors PostgreSQL::SchemaStatements#add_index: the CREATE INDEX statement
-    // is rendered by the schema-creation visitor off a CreateIndexDefinition
-    // rather than string-built here. The `algorithm: :copy` ArgumentError comes
-    // from index_algorithm inside add_index_options.
-    //
     // Priming the cached database version is a trails addition: the visitor's
     // supportsNullsNotDistinct/supportsIndexInclude predicates read
     // `databaseVersion` synchronously and silently yield false on a cold
@@ -4181,9 +4176,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       opts = columnOrOptions ?? {};
     }
 
-    // Mirrors Rails' `index_algorithm(options[:algorithm])`, which raises the
-    // ArgumentError for anything outside `index_algorithms`.
-    const algorithm = this.indexAlgorithm(opts.algorithm);
     if (opts.algorithm === "concurrently" && this._inTransaction) {
       throw new Error("DROP INDEX CONCURRENTLY cannot run inside a transaction");
     }
@@ -4228,6 +4220,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // identifier separately — the index name itself can contain a dot (an index
     // on a schema-qualified table), so it must not be re-split here.
     const prefix = dropSchema ? `${this.quoteTableName(dropSchema)}.` : "";
+    const algorithm = this.indexAlgorithm(opts.algorithm);
     await this.execute(
       `DROP INDEX${algorithm ? ` ${algorithm}` : ""} ${prefix}${this.quoteColumnName(indexName)}`,
     );
