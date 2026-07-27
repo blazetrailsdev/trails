@@ -972,7 +972,12 @@ describe("Ruby extractor file constants", () => {
 describe("Ruby extractor metaprogrammed method surface", () => {
   const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
 
-  type MetaMethod = { name: string; notes?: string; params: { kind: string }[] };
+  type MetaMethod = {
+    name: string;
+    notes?: string;
+    visibility: string;
+    params: { kind: string }[];
+  };
 
   // Returns "<fqn>" -> instance methods, so a test can assert both the
   // generated names and the params lifted off the define_method block.
@@ -985,9 +990,11 @@ describe("Ruby extractor metaprogrammed method surface", () => {
         require "json"
         ex = ApiExtractor.new
         ex.process_file(File.join(${JSON.stringify(dir)}, "meta.rb"), ${JSON.stringify(dir)})
+        ex.dedupe_define_methods!
         out = {}
         (ex.classes.to_a + ex.modules.to_a).each do |fqn, info|
           out[fqn] = info[:instanceMethods]
+          out["#{fqn}.self"] = info[:classMethods]
         end
         puts JSON.generate(out)
       `;
@@ -1049,6 +1056,40 @@ describe("Ruby extractor metaprogrammed method surface", () => {
     expect(appendBefore.notes).toBe("alias");
   });
 
+  it("buckets a `class << self` define_method as a class method", () => {
+    const m = metaMethods(`
+      class Base
+        class << self
+          define_method(:configure) { nil }
+        end
+
+        private
+
+        define_method(:normalize) { nil }
+      end
+    `);
+    expect(m["Base.self"].map((x) => x.name)).toEqual(["configure"]);
+    const normalize = m["Base"].find((x) => x.name === "normalize")!;
+    expect(normalize.visibility).toBe("private");
+  });
+
+  it("keeps the literal def when a branch defines the same name both ways", () => {
+    // rack utils.rb:183 — `define_method(:escape_html, …)` or `def escape_html`
+    // off an `if defined?(…)`; the extractor walks both branches, only one is live.
+    const m = metaMethods(`
+      module Utils
+        if defined?(ERB::Escape)
+          define_method(:escape_html, ERB::Escape.instance_method(:html_escape))
+        else
+          def escape_html(string)
+            CGI.escapeHTML(string.to_s)
+          end
+        end
+      end
+    `);
+    expect(m["Utils"].map((x) => [x.name, x.notes])).toEqual([["escape_html", undefined]]);
+  });
+
   it("skips a define_method whose name cannot be resolved to literals", () => {
     const m = metaMethods(`
       module Unresolvable
@@ -1070,5 +1111,6 @@ describe("Ruby extractor metaprogrammed method surface", () => {
       end
     `);
     expect(m["Unresolvable"] ?? []).toEqual([]);
+    expect(m["Unresolvable.self"] ?? []).toEqual([]);
   });
 });

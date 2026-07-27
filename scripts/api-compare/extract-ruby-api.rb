@@ -468,9 +468,12 @@ class ApiExtractor
       # the literal-name form here, and the loop-unrolled interpolated form via
       # process_each_metaprogramming. Both leave the generic descent intact.
       process_each_metaprogramming(node)
-      process_define_method_block(node)
+      # When the call part is a recorded `define_method`, descend into the block
+      # only: re-walking the call would reach process_method_add_arg's
+      # define_method arm and record the same method a second time.
+      consumed_call = process_define_method_block(node)
       unless process_each_codegen(node)
-        node.each { |child| walk(child) if child.is_a?(Array) }
+        (consumed_call ? [node[2]] : node).each { |child| walk(child) if child.is_a?(Array) }
       end
     when :sclass
       process_sclass(node)
@@ -1066,6 +1069,25 @@ class ApiExtractor
   # arguments. Drops the transient `alias_target` key afterward so it never
   # reaches the manifest.
   # Public: invoked by `run` per package and by the extractor unit test.
+  # Drop a `define_method` entry when a literal `def` of the same name already
+  # occupies the same bucket. Ruby source can define a method both ways in
+  # mutually exclusive branches the extractor walks unconditionally — rack's
+  # `utils.rb:183` picks `define_method(:escape_html, ERB…)` or `def
+  # escape_html` off an `if defined?(ERB::Escape)` — and only one of the two is
+  # ever live. The literal `def` wins: it carries the deps, calls and body
+  # digest a metaprogrammed entry has no way to supply.
+  public def dedupe_define_methods!
+    (@classes.to_a + @modules.to_a).each do |_fqn, info|
+      [:instanceMethods, :classMethods].each do |bucket|
+        next unless info[bucket].any? { |m| m[:notes] == "define_method" }
+        literal = info[bucket].each_with_object(Set.new) do |m, acc|
+          acc << m[:name] unless m[:notes]
+        end
+        info[bucket].reject! { |m| m[:notes] == "define_method" && literal.include?(m[:name]) }
+      end
+    end
+  end
+
   public def resolve_aliases!
     all = @classes.merge(@modules)
     # Candidate table per (fqn, bucket): the bucket's own methods first, then —
@@ -1436,6 +1458,10 @@ class ApiExtractor
   end
 
   def process_define_method(args, params_node)
+    # Umbrella scans harvest only module-level singleton config (see
+    # process_def); anything else recorded there surfaces as false-missing.
+    return false if @scanning_umbrella
+
     list = positional_arg_list(args)
     return false unless list.is_a?(Array)
     name = literal_method_name(list[0])
@@ -1445,7 +1471,7 @@ class ApiExtractor
     target = @classes[fqn] || @modules[fqn]
     return false unless target
 
-    record_metaprogrammed_method(target, name, extract_params(params_node), "define_method")
+    record_metaprogrammed_method(fqn, target, name, extract_params(params_node), "define_method")
     maybe_update_module_file(fqn, target)
     true
   end
@@ -1464,6 +1490,8 @@ class ApiExtractor
   # picked up by the plain define_method/alias_method recorders during the
   # generic descent. Returns true when it emitted anything.
   def process_each_metaprogramming(node)
+    return false if @scanning_umbrella
+
     call = node[1]
     return false unless call.is_a?(Array) && call[0] == :call
     return false unless ident_name(call[3]) == "each"
@@ -1488,10 +1516,10 @@ class ApiExtractor
         name = unrolled_name(list[0], loop_var, member)
         next unless name
         if kind == "define_method"
-          record_metaprogrammed_method(target, name, extract_params(params_node), "define_method")
+          record_metaprogrammed_method(fqn, target, name, extract_params(params_node), "define_method")
         else
           old = list[1] && unrolled_name(list[1], loop_var, member)
-          record_metaprogrammed_method(target, name, [], "alias", alias_target: old)
+          record_metaprogrammed_method(fqn, target, name, [], "alias", alias_target: old)
         end
         emitted = true
       end
@@ -1500,7 +1528,7 @@ class ApiExtractor
     emitted
   end
 
-  def record_metaprogrammed_method(target, name, params, notes, alias_target: nil)
+  def record_metaprogrammed_method(fqn, target, name, params, notes, alias_target: nil)
     entry = {
       name: name,
       visibility: current_visibility.to_s,
@@ -1512,7 +1540,10 @@ class ApiExtractor
     # Same as process_alias_method: the alias inherits the target's arity, so
     # record the target for resolve_aliases! to copy params from.
     entry[:alias_target] = alias_target if alias_target
-    target[@in_sclass ? :classMethods : :instanceMethods] << entry
+    # Same bucketing rule as process_def: `class << self` and `module_function`
+    # both make the generated method a class method.
+    on_class = @in_sclass || (@module_function_stack.last && @modules[fqn])
+    target[on_class ? :classMethods : :instanceMethods] << entry
   end
 
   # Members of a literal `[:a, :b]` / `%w[a b]` receiver, as strings. Any
@@ -2376,6 +2407,7 @@ def run
 
     # Fill alias param lists from their targets now that every file in the
     # package has been seen (a reopened class may define the target elsewhere).
+    extractor.dedupe_define_methods!
     extractor.resolve_aliases!
 
     # Normalize into the JSON shape. Non-public methods are kept (tagged
