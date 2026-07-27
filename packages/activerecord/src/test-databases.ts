@@ -63,16 +63,11 @@ export async function createAndLoadSchema(
   index: number,
   { envName }: { envName: string } = { envName: "test" },
 ): Promise<void> {
-  // Rails: configurations is always set before create_and_load_schema is
-  // called (app boots first); this guard is defensive.
-  const configurations = Base.configurations();
-  if (configurations.empty) return;
-
   const old = process.env.VERBOSE;
   process.env.VERBOSE = "false";
 
   try {
-    const configs = configurations.configsFor({ envName });
+    const configs = Base.configurations().configsFor({ envName });
     for (const dbConfig of configs) {
       // `dbConfig.database` falls back to URL parsing for URL-only configs
       // (UrlConfig.database override landed in #957). Only fails for configs

@@ -181,21 +181,24 @@ describe("TestDatabasesTest", () => {
     expect(mockReconstructFromSchema).toHaveBeenCalled();
   });
 
-  it("does not overwrite an unset Base.configurations with an empty registry", async () => {
+  // Rails has no empty-registry guard: `create_and_load_schema` iterates
+  // whatever `configs_for` yields (possibly nothing) and still runs the
+  // `ensure ActiveRecord::Base.establish_connection`
+  // (test_databases.rb:11-21).
+  it("reconnects through the ensure even when the registry is empty", async () => {
     const mockReconstructFromSchema = vi
       .spyOn(DatabaseTasks, "reconstructFromSchema")
       .mockResolvedValue(undefined);
-    vi.spyOn(await import("./connection-handling.js"), "establishConnection").mockResolvedValue(
-      undefined,
-    );
+    const mockEstablishConnection = vi
+      .spyOn(await import("./connection-handling.js"), "establishConnection")
+      .mockResolvedValue(undefined);
 
-    // Nothing configured — defensive early return; nothing to suffix.
-    // In Rails this never occurs (app boot sets configurations first).
-    const empty = new DatabaseConfigurations({});
-    Base.configurations(empty);
+    Base.configurations({});
+
     await createAndLoadSchema(1, { envName: "arunit" });
-    expect(empty.empty).toBe(true);
+
     expect(mockReconstructFromSchema).not.toHaveBeenCalled();
+    expect(mockEstablishConnection).toHaveBeenCalledWith(Base);
   });
 
   it("throws a clear error when neither database nor URL yields a name", async () => {
