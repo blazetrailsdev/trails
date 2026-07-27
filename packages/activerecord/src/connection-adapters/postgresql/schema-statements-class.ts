@@ -1401,7 +1401,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   ): Record<string, unknown> {
     this.assertValidDeferrable(options.deferrable);
     if (columnName && options.usingIndex) {
-      throw new ArgumentError("Cannot specify both `columnName` and `usingIndex` options.");
+      throw new ArgumentError("Cannot specify both column_name and :using_index options.");
     }
     const opts = { ...options };
     if (!opts.name) {
@@ -1415,11 +1415,6 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     columnName?: string | string[] | null,
     options: UniqueConstraintOptions = {},
   ): Promise<void> {
-    if (!columnName && !options.usingIndex) {
-      throw new ArgumentError(
-        "Either columnName or usingIndex must be provided for addUniqueConstraint.",
-      );
-    }
     const opts = this.uniqueConstraintOptions(tableName, columnName, options);
     const at = this.pg.createAlterTable(tableName) as PgAlterTable;
     at.addUniqueConstraint(columnName as string | string[], opts);
