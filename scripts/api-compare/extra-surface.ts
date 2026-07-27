@@ -93,6 +93,8 @@ import { manifestIsStale } from "./build-freshness.js";
 interface RubyEntity {
   fqn: string;
   info: ClassInfo;
+  /** Declared inside another class in the same Ruby file (`class Outer; class Inner`). */
+  nestedInEnclosingClass?: boolean;
 }
 
 /**
@@ -635,7 +637,14 @@ function collectAllowedNames(
     for (const inc of mod.includes ?? []) walkMixin(inc, fqn);
   };
 
-  for (const { fqn, info } of entities) {
+  for (const { fqn, info, nestedInEnclosingClass } of entities) {
+    // A nested class is a constant ON its enclosing class, so a member of that
+    // name is the faithful port — spelled either as a real TS nested class or
+    // as `static readonly Inner = Inner` re-attaching a sibling export.
+    if (nestedInEnclosingClass) {
+      const short = fqn.split("::").pop();
+      if (short) for (const c of rubyConstantCandidates(short)) allowed.add(c);
+    }
     addMethods(info.instanceMethods);
     addMethods(info.classMethods);
     for (const inc of info.includes ?? []) walkMixin(inc, fqn);
@@ -834,26 +843,38 @@ function buildPackageReport(
     moduleFqnByShort.set(short, list);
   }
 
-  // Match compare.ts's nested-class filter: for each file, keep only the
-  // shortest-named class as the "primary" and skip nested classes that
-  // share the same file (e.g. `Preloader::Association::LoaderQuery` in
-  // `preloader/association.rb` is an implementation detail — its methods
-  // shouldn't inflate the parent file's allowed-name set).
-  const primaryClassPerFile = new Map<string, string>();
+  // compare.ts drops a class nested in a same-file parent from `allRuby`
+  // outright (compare.ts:1321-1339), so its methods never count toward the
+  // coverage denominator. Extra surface is the inverse question and needs the
+  // opposite answer: the nested class IS surface the enclosing file declares,
+  // so counting the TS port of it as drift is wrong. It therefore enters the
+  // file's allow-set flagged `nestedInEnclosingClass` rather than being
+  // dropped — deliberately NOT mirroring compare.ts's use of the same filter.
+  const classFqnsPerFile = new Map<string, Set<string>>();
   for (const [fqn, info] of Object.entries(rubyPkg.classes) as [string, ClassInfo][]) {
     if (!info.file) continue;
-    const existing = primaryClassPerFile.get(info.file);
-    if (!existing || fqn.split("::").length < existing.split("::").length) {
-      primaryClassPerFile.set(info.file, fqn);
-    }
+    const set = classFqnsPerFile.get(info.file) ?? new Set<string>();
+    set.add(fqn);
+    classFqnsPerFile.set(info.file, set);
   }
+  const hasEnclosingClassInFile = (fqn: string, file: string): boolean => {
+    const siblings = classFqnsPerFile.get(file);
+    if (!siblings) return false;
+    const parts = fqn.split("::");
+    for (let i = parts.length - 1; i > 0; i--) {
+      if (siblings.has(parts.slice(0, i).join("::"))) return true;
+    }
+    return false;
+  };
 
   const rubyFiles = new Map<string, RubyEntity[]>();
   for (const [fqn, info] of Object.entries(rubyPkg.classes) as [string, ClassInfo][]) {
     if (!info.file) continue;
-    const primary = primaryClassPerFile.get(info.file);
-    if (primary && primary !== fqn && fqn.startsWith(primary + "::")) continue;
-    pushTo(rubyFiles, info.file, { fqn, info });
+    pushTo(rubyFiles, info.file, {
+      fqn,
+      info,
+      nestedInEnclosingClass: hasEnclosingClassInFile(fqn, info.file),
+    });
   }
   for (const [fqn, info] of Object.entries(rubyPkg.modules) as [string, ClassInfo][]) {
     if (!info.file) continue;
