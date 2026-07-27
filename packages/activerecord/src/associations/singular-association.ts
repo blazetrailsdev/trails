@@ -39,7 +39,16 @@ import { RecordInvalid } from "../validations.js";
  * Mirrors: ActiveRecord::Associations::SingularAssociation
  */
 export class SingularAssociation extends Association {
-  declare target: Base | null;
+  // Narrows the inherited accessor pair to the singular shape. A `declare`
+  // field would shadow the base accessors (TS2610) now that `Association`
+  // backs `target` with a getter/setter so collections can delegate theirs.
+  override get target(): Base | null {
+    return super.target as Base | null;
+  }
+
+  override set target(value: Base | Base[] | null) {
+    super.target = value;
+  }
 
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);

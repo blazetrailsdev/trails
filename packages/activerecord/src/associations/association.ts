@@ -27,8 +27,51 @@ export class Association {
   owner: Base;
   readonly reflection: AssociationDefinition;
   readonly disableJoins: boolean;
-  loaded: boolean;
-  target: Base | Base[] | null;
+  /**
+   * Backing store for `loaded` / `target`. These are accessors rather than
+   * plain fields so `CollectionAssociation` can override them and delegate to
+   * the canonical `CollectionProxy` — Rails keeps a single `@target` on the
+   * association and has `CollectionProxy` forward to it; trails inverts the
+   * ownership (RFC 0022 makes the proxy canonical) but the invariant is the
+   * same: ONE in-memory target per association, not two.
+   * @internal
+   */
+  protected _targetStore: Base | Base[] | null = null;
+  /** @internal Backing store for `loaded`. See {@link _targetStore}. */
+  protected _loadedStore = false;
+
+  get loaded(): boolean {
+    return this._loadedStore;
+  }
+
+  set loaded(value: boolean) {
+    this._loadedStore = value;
+  }
+
+  get target(): Base | Base[] | null {
+    return this._targetStore;
+  }
+
+  set target(value: Base | Base[] | null) {
+    this._targetStore = value;
+  }
+
+  /**
+   * The un-delegated backing store, for the few callers that must NOT trip a
+   * subclass's proxy delegation — notably `association()`'s proxy factory,
+   * which would otherwise recurse (proxy lookup → `target` getter → proxy
+   * lookup) while the proxy is still being built.
+   * @internal
+   */
+  get _rawTarget(): Base | Base[] | null {
+    return this._targetStore;
+  }
+
+  /** @internal See {@link _rawTarget}. */
+  get _rawLoaded(): boolean {
+    return this._loadedStore;
+  }
+
   /**
    * True when `target` was set by an *explicit* assignment / inverse-of seed
    * (the writer paths routed through `_cacheSingularTarget`), as opposed to a
@@ -82,6 +125,7 @@ export class Association {
   _loaderWritebackSuppressed = 0;
 
   private _staleState: unknown = undefined;
+  private _staleStateSnapshotted = false;
   /**
    * Memoized result of `scope()` — Rails' `@association_scope`
    * (association.rb:300-308). Built lazily on first access; reset by
@@ -97,8 +141,6 @@ export class Association {
     this.owner = owner;
     this.reflection = reflection;
     this.disableJoins = reflection.options.disableJoins || false;
-    this.loaded = false;
-    this.target = null;
 
     // Rails' `check_validity! → klass → compute_class` raises NameError
     // synchronously in the constructor, so `record.association(:name)` itself
@@ -169,6 +211,21 @@ export class Association {
   loadedBang(): void {
     this.loaded = true;
     this._staleState = this.staleState();
+    this._staleStateSnapshotted = true;
+  }
+
+  /**
+   * Whether `loadedBang` has taken its `@stale_state` snapshot since the last
+   * `reset`. A collection's `loaded` flag lives on the shared `CollectionProxy`
+   * (see `CollectionAssociation`), which flips it without going through
+   * `loadedBang`, so the snapshot `isStaleTarget` diffs against can be missing
+   * — and a missing one reads as "stale". Lets `record.association(name)` fill
+   * that gap in without *re*-snapshotting a real load-time capture, which
+   * would mask genuine staleness.
+   * @internal
+   */
+  get _staleStateIsSnapshotted(): boolean {
+    return this._staleStateSnapshotted;
   }
 
   isStaleTarget(): boolean {
@@ -179,6 +236,7 @@ export class Association {
     this.loaded = false;
     this.target = null;
     this._staleState = undefined;
+    this._staleStateSnapshotted = false;
     this._explicitTarget = false;
     this._loadedFromPreload = false;
     this._loadedViaAsync = false;

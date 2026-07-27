@@ -32,8 +32,17 @@ export interface ReplacePlan {
  *
  * Mirrors: ActiveRecord::Associations::CollectionAssociation
  */
+/**
+ * The slice of `CollectionProxy` the shared-target delegation needs.
+ * @internal
+ */
+interface SharedTargetStore {
+  _sharedTarget: Base[];
+  _sharedLoaded: boolean;
+  _sharedReplacedOrAddedTargets: Set<Base>;
+}
+
 export class CollectionAssociation extends Association {
-  declare target: Base[];
   // A `null` entry is a placeholder for a rejected new record, preserving the
   // 1:1 ordering with the assigned attributes collection (Rails
   // nested_attributes.rb:487-547).
@@ -58,10 +67,84 @@ export class CollectionAssociation extends Association {
   // `CollectionProxy`.
   _namedScopeRelations?: Map<string, unknown>;
 
+  /**
+   * Off until the constructor has finished, so the base `Association`
+   * constructor and our own `this.target = []` seed write to the inherited
+   * backing store instead of building — and immediately clearing — the
+   * canonical `CollectionProxy`.
+   */
+  private _sharedTargetEnabled = false;
+
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
     this.target = [];
+    this._sharedTargetEnabled = true;
   }
+
+  /**
+   * The canonical `CollectionProxy` backing this association's target — the one
+   * already cached on the owner, if any. Deliberately a plain cache *lookup*
+   * rather than `association()`: building a proxy here would be re-entrant
+   * (the proxy constructor resolves through-scopes that read back through this
+   * association) and would make an OO-only path fail wherever proxy
+   * construction can't run at all. Until a proxy exists there is no second
+   * store to keep coherent, so the inherited one serves; `association()` hands
+   * that very array to the proxy it builds (`_adoptSharedTarget`), so no
+   * reference a caller already holds goes stale.
+   */
+  private _sharedStore(): SharedTargetStore | null {
+    if (!this._sharedTargetEnabled) return null;
+    return (
+      (this.owner._collectionProxies.get(this.reflection.name) as SharedTargetStore | undefined) ??
+      null
+    );
+  }
+
+  /**
+   * One target, two surfaces. Rails' `CollectionProxy` forwards `target` /
+   * `loaded` to its `@association`; trails inverts the ownership (the proxy is
+   * the canonical has_many store per RFC 0022) so the OO association forwards
+   * the other way. Either direction gives the invariant that matters: a record
+   * added through `add_to_target` / `replace_on_target` is visible to every
+   * reader that goes through the proxy, and vice versa, with no sync step.
+   */
+  override get target(): Base[] {
+    const store = this._sharedStore();
+    return store ? store._sharedTarget : (this._targetStore as Base[]);
+  }
+
+  override set target(records: Base | Base[] | null) {
+    // `Association#reset` assigns `null`; a collection's empty target is `[]`.
+    const value = Array.isArray(records) ? records : records == null ? [] : [records];
+    const store = this._sharedStore();
+    if (store) store._sharedTarget = value;
+    else this._targetStore = value;
+  }
+
+  override get loaded(): boolean {
+    const store = this._sharedStore();
+    return store ? store._sharedLoaded : this._loadedStore;
+  }
+
+  override set loaded(value: boolean) {
+    const store = this._sharedStore();
+    if (store) store._sharedLoaded = value;
+    else this._loadedStore = value;
+  }
+
+  /**
+   * Rails' `@replaced_or_added_targets` (a `Set.new.compare_by_identity`), the
+   * other half of `replace_on_target`'s state: it decides whether a re-added
+   * record replaces in place or appends. It has to travel with the target —
+   * two sets over one array means a record added via the proxy and then via
+   * `add_to_target` lands twice.
+   * @internal
+   */
+  get _replacedOrAddedTargets(): Set<Base> {
+    return this._sharedStore()?._sharedReplacedOrAddedTargets ?? this._replacedOrAddedTargetsStore;
+  }
+
+  private _replacedOrAddedTargetsStore = new Set<Base>();
 
   /**
    * Implements the writer method, e.g. foo.items= for Foo.has_many :items.
@@ -1125,6 +1208,21 @@ export class CollectionAssociation extends Association {
   }
 
   /**
+   * The collection form of `_setTargetFromLoader`: fold a loader's rows into
+   * the shared target the way Rails' `load_target` does — `@target =
+   * merge_target_lists(find_target, target); loaded!` — rather than
+   * overwriting, which would discard in-memory builds. `loaded!` is what
+   * snapshots `@stale_state`, and `association_scope` reads that snapshot to
+   * decide whether its memoized scope was built from a since-changed foreign
+   * key, so it has to happen on every load, not just the proxy's own.
+   * @internal
+   */
+  _mergeLoaderResults(rows: Base[]): void {
+    this.target = this.mergeTargetLists(rows, this.target);
+    this.loadedBang();
+  }
+
+  /**
    * Merge persisted records from DB with in-memory target records.
    * Preserves order of persisted, deduplicates, and keeps
    * attribute changes from in-memory versions.
@@ -1315,7 +1413,14 @@ function beginReplaceOnTarget(
   skipCallbacks: boolean,
   replace: boolean,
 ): number | null {
-  const index = replace ? assoc.target.indexOf(record) : -1;
+  // Rails: `index = @target.index(record) if replace && (!record.new_record? ||
+  // @replaced_or_added_targets.include?(record))` (collection_association.rb:478).
+  // The bare `indexOf` this used to be both ignored that guard and matched by
+  // JS reference instead of `Core#==`.
+  const index =
+    replace && (!record.isNewRecord() || assoc._replacedOrAddedTargets.has(record))
+      ? indexInTarget(assoc, record)
+      : -1;
   if (!skipCallbacks && !callback(assoc, "beforeAdd", record)) return null;
   assoc.setInverseInstance(record);
   (assoc as any)._associationIds = null;
@@ -1334,13 +1439,28 @@ function finishReplaceOnTarget(
   index: number,
 ): Base {
   const target = assoc.target;
-  if (index !== -1) {
-    target[index] = record;
+  // Rails re-runs `@target.index(record)` after the `yield` — the block (a
+  // save) can have added the record to `@replaced_or_added_targets` in between.
+  let at = index;
+  if (at === -1 && assoc._replacedOrAddedTargets.has(record)) at = indexInTarget(assoc, record);
+  if (at !== -1 || record.isNewRecord()) assoc._replacedOrAddedTargets.add(record);
+  if (at !== -1) {
+    target[at] = record;
   } else {
     target.push(record);
   }
   if (!skipCallbacks) callback(assoc, "afterAdd", record);
   return record;
+}
+
+/**
+ * Ruby's `@target.index(record)` inside `replace_on_target`: `Core#==`, not JS
+ * reference identity, so a re-fetched persisted record dedups against the one
+ * already buffered.
+ * @internal
+ */
+function indexInTarget(assoc: CollectionAssociation, record: Base): number {
+  return assoc.target.findIndex((r) => r === record || r.isEqual(record));
 }
 
 /** @internal */
