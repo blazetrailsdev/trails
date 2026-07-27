@@ -3,6 +3,9 @@ import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import rule, { isManifestAvailable } from "./rails-file-structure-method-order.mjs";
+// describe/it/afterAll come from the vitest globals the RuleTester cases rely
+// on; `expect` is not in that global set here, so import it.
+import { expect } from "vitest";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
