@@ -37,7 +37,7 @@ import { Guitar } from "./test-helpers/models/guitar.js";
 import { TuningPeg } from "./test-helpers/models/tuning-peg.js";
 import { Entry } from "./test-helpers/models/entry.js";
 import { Message } from "./test-helpers/models/message.js";
-import { repairValidations } from "./test-helpers/repair-validations.js";
+import { repairValidations } from "./cases/validations-repair-helper.js";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 
 // The canonical models these tests exercise, declared as (data-less) fixture

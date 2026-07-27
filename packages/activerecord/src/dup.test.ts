@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { repairValidations } from "./test-helpers/repair-validations.js";
+import { repairValidations } from "./cases/validations-repair-helper.js";
 import { clearTimestampAttributes } from "./timestamp.js";
 import { DefaultScope } from "./scoping/default.js";
 import type { Relation } from "./relation.js";

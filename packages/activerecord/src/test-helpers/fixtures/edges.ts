@@ -1,4 +1,4 @@
-import { ref, type FixtureRef } from "../define-fixtures.js";
+import { ref, type FixtureRef } from "../../fixtures.js";
 
 // activerecord/test/fixtures/edges.yml
 // Rails YAML uses ERB to generate edge_1..edge_4 with source/sink ids 1..4 / 2..5.

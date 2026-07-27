@@ -18,7 +18,7 @@ import { fixtures } from "./test-helpers/fixtures.js";
 import { rebuildCanonicalTables } from "./support/canonical-schema.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
-import { defineFixtures, defineJoinTableFixtures } from "./test-helpers/define-fixtures.js";
+import { defineFixtures, defineJoinTableFixtures } from "./fixtures.js";
 import { reservedWordsGroupFixtureData } from "./test-helpers/fixtures/reserved-words/group.js";
 import { reservedWordsSelectFixtureData } from "./test-helpers/fixtures/reserved-words/select.js";
 import { reservedWordsValuesFixtureData } from "./test-helpers/fixtures/reserved-words/values.js";

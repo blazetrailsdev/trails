@@ -42,7 +42,7 @@ import {
 import { Result } from "../../result.js";
 import { queryTransformers, type QueryTransformer } from "../../query-transformers.js";
 import type { Quoting } from "./quoting-interface.js";
-import { fixtures } from "../../test-helpers/use-fixtures.js";
+import { fixtures } from "../../test-fixtures.js";
 
 describe("DatabaseStatements", () => {
   // `to_sql` compiles through `Table.engine`'s connection (arel/nodes/node.rb:148-153),

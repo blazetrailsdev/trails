@@ -7,5 +7,6 @@
   "packages/activerecord/src/batches.test.ts",
   "packages/activerecord/src/calculations.test.ts",
   "packages/activerecord/src/enum.test.ts",
-  "packages/activerecord/src/finder.test.ts"
+  "packages/activerecord/src/finder.test.ts",
+  "packages/activerecord/src/fixtures.test.ts"
 ]

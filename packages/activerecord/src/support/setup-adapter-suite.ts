@@ -4,7 +4,7 @@ import { loadSchema } from "./load-schema-helper.js";
 import {
   withTransactionalFixtures,
   type TransactionalFixturesAdapter,
-} from "../test-helpers/with-transactional-fixtures.js";
+} from "../test-fixtures/with-transactional-fixtures.js";
 
 export interface AdapterSuiteOptions<A extends TransactionalFixturesAdapter> {
   /** Builds the adapter once per file in `beforeAll`. */

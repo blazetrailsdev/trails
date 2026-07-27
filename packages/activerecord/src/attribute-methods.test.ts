@@ -9,7 +9,7 @@ import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 
 import { GeneratedAttributeMethods } from "./attribute-methods.js";
-import { inTimeZone } from "./test-helpers/in-time-zone.js";
+import { inTimeZone } from "./cases/helper.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { adapterType } from "./test-adapter.js";
 import { registerModel } from "./associations.js";

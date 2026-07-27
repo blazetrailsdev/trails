@@ -39,6 +39,12 @@ function isExcludedPath(rel) {
   // @blazetrails/arel — scope them out rather than baseline them so the
   // RFC-0022 burndown worklist reflects only real arel migration targets.
   if (/(^|\/)test-helpers\//.test(rel)) return true;
+  // The fixture machinery is `lib/active_record/fixtures.rb` /
+  // `test_fixtures.rb` code (RFC 0064 bucket D); it renders DDL/DML directly
+  // for the same reason the rest of the test-infra does.
+  if (/(^|\/)fixtures\.ts$/.test(rel)) return true;
+  if (/(^|\/)test-fixtures\.ts$/.test(rel)) return true;
+  if (/(^|\/)test-fixtures\//.test(rel)) return true;
   if (/(^|\/)support\//.test(rel)) return true;
   if (/(^|\/)test-setup-[^/]*\.ts$/.test(rel)) return true;
   if (/(^|\/)cases\/helper\.ts$/.test(rel)) return true;

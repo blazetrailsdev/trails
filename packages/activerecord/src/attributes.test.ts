@@ -17,7 +17,7 @@ import { BigDecimal } from "@blazetrails/activesupport";
 import { registerModel } from "./associations.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { inTimeZone } from "./test-helpers/in-time-zone.js";
+import { inTimeZone } from "./cases/helper.js";
 import { adapterType } from "./test-adapter.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");

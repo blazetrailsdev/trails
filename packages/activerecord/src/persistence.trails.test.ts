@@ -11,7 +11,7 @@
 import { describe, it, expect } from "vitest";
 import { RecordInvalid, registerModel } from "./index.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { repairValidations } from "./test-helpers/repair-validations.js";
+import { repairValidations } from "./cases/validations-repair-helper.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { Developer as CanonicalDeveloper } from "./test-helpers/models/developer.js";
 import { Item as CanonicalItem } from "./test-helpers/models/item.js";

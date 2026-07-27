@@ -1,16 +1,25 @@
+/**
+ * `ActiveRecord::FixtureSet` — fixture-row preparation and insertion.
+ *
+ * Rails home: `activerecord/lib/active_record/fixtures.rb` (plus the row
+ * helpers in `lib/active_record/fixture_set/table_row.rb`). **Library** code,
+ * not test support, so it sits at the package root under the kebab rendering
+ * of `fixtures.rb`; it was misfiled as `test-helpers/define-fixtures.ts`
+ * (RFC 0064 bucket D).
+ */
 import {
   insertFixturesSet,
   type DatabaseStatementsHost,
-} from "../connection-adapters/abstract/database-statements.js";
-import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import { Base } from "../base.js";
-import { findStiClass } from "../inheritance.js";
-import type { Quoting } from "../connection-adapters/abstract/quoting-interface.js";
-import { currentTimeFromProperTimezone } from "../timestamp.js";
+} from "./connection-adapters/abstract/database-statements.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import { Base } from "./base.js";
+import { findStiClass } from "./inheritance.js";
+import type { Quoting } from "./connection-adapters/abstract/quoting-interface.js";
+import { currentTimeFromProperTimezone } from "./timestamp.js";
 import { singularize, underscore } from "@blazetrails/activesupport";
-import { EncryptedAttributeType } from "../encryption/encrypted-attribute-type.js";
-import { EncryptableRecord } from "../encryption/encryptable-record.js";
-import { Configurable } from "../encryption/configurable.js";
+import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
+import { EncryptableRecord } from "./encryption/encryptable-record.js";
+import { Configurable } from "./encryption/configurable.js";
 import type { Type } from "@blazetrails/activemodel";
 
 /**
@@ -214,7 +223,7 @@ let staticDeclaredIds: Map<string, Map<string, number | string>> | null = null;
 
 async function ensureStaticDeclaredIds(): Promise<void> {
   if (staticDeclaredIds) return;
-  const { fixtureRegistry, isJoinTableEntry } = await import("./fixtures-registry.js");
+  const { fixtureRegistry, isJoinTableEntry } = await import("./test-helpers/fixtures-registry.js");
   const map = new Map<string, Map<string, number | string>>();
   const ambiguous = new Set<string>();
   for (const [key, entry] of Object.entries(fixtureRegistry)) {
@@ -1408,4 +1417,21 @@ export async function prepareJoinTableFixtures(
     rollback: () => {},
     finalize: async () => resolved,
   };
+}
+
+/**
+ * Static wrapper around `defineFixtures` that mirrors the Rails
+ * `ActiveRecord::FixtureSet` class surface (fixtures.rb `class FixtureSet`,
+ * `.create_fixtures`). Lives in this file because Rails declares it here — it
+ * was split out into an invented `test-helpers/fixture-set.ts` before the
+ * fixture machinery was recognised as `lib/active_record/fixtures.rb` code.
+ */
+export class FixtureSet {
+  static async createFixtures<T extends BaseClass, K extends string>(
+    adapter: DatabaseAdapter,
+    ModelClass: T,
+    fixtures: Record<K, FixtureAttrs>,
+  ): Promise<{ [P in K]: InstanceType<T> }> {
+    return defineFixtures(adapter, ModelClass, fixtures);
+  }
 }

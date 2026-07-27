@@ -5,7 +5,7 @@
 import { describe, it, expect } from "vitest";
 import { Table, Nodes } from "@blazetrails/arel";
 import { WhereClause } from "./where-clause.js";
-import { fixtures } from "../test-helpers/use-fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 // Mirrors Rails' private helpers in WhereClauseTest
 function table(): Table {

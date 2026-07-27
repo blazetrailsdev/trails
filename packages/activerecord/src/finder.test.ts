@@ -46,7 +46,7 @@ import {
 } from "./test-helpers/models/company.js";
 import { PreparedStatementInvalid, StatementInvalid } from "./index.js";
 import { ForbiddenAttributesError } from "@blazetrails/activemodel";
-import { ProtectedParams } from "./test-helpers/protected-params.js";
+import { ProtectedParams } from "./support/stubs/strong-parameters.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 

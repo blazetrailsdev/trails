@@ -1,4 +1,4 @@
-import { ref } from "../define-fixtures.js";
+import { ref } from "../../fixtures.js";
 
 // activerecord/test/fixtures/interests.yml
 // Rails YAML uses association-name keys (`human:`, `zine:`,

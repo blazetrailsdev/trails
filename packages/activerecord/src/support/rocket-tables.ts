@@ -1,3 +1,11 @@
+/**
+ * No Rails counterpart file: `ActiveRecord::Migration::ForeignKeyTest` creates
+ * and drops `rockets` / `astronauts` inline
+ * (`test/cases/migration/foreign_key_test.rb:178-194`). Two trails test files
+ * need the same tables, so the helper is shared rather than duplicated, and
+ * lives in `support/` with its invented name (RFC 0064 bucket C rule) instead
+ * of being inlined into one of them.
+ */
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import { Base } from "../index.js";
 

@@ -1,4 +1,4 @@
-import { ref } from "../define-fixtures.js";
+import { ref } from "../../fixtures.js";
 
 // activerecord/test/fixtures/treasures.yml
 // `looter: <row> (<Type>)` is Rails' polymorphic shorthand → looter_id +

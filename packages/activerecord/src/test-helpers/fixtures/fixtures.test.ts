@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type { AbstractAdapter as DatabaseAdapter } from "../../connection-adapters/abstract-adapter.js";
-import { defineFixtures, fixtureId, isFixtureRef } from "../define-fixtures.js";
+import { defineFixtures, fixtureId, isFixtureRef } from "../../fixtures.js";
 import { adminAccountsFixtureData } from "./admin/accounts.js";
 import { adminUsersFixtureData } from "./admin/users.js";
 import { adminRandomlyNamedA9FixtureData } from "./admin/randomly-named-a9.js";

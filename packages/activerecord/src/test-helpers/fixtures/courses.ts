@@ -1,4 +1,4 @@
-import { ref } from "../define-fixtures.js";
+import { ref } from "../../fixtures.js";
 
 // activerecord/test/fixtures/courses.yml
 // Rails `college: FIU` is the belongs_to association name; it sets college_id.

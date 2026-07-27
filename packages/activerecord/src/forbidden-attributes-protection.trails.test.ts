@@ -17,7 +17,7 @@ import { ForbiddenAttributesError } from "@blazetrails/activemodel";
 import "./index.js";
 import { Person } from "./test-helpers/models/person.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { ProtectedParams } from "./test-helpers/protected-params.js";
+import { ProtectedParams } from "./support/stubs/strong-parameters.js";
 
 describe("ForbiddenAttributesProtectionUpdateTest", () => {
   fixtures(["people"]);

@@ -1,4 +1,4 @@
-import { ref } from "../define-fixtures.js";
+import { ref } from "../../fixtures.js";
 
 // activerecord/test/fixtures/price_estimates.yml
 // `estimate_of: <row> (<Type>)` is Rails' polymorphic shorthand → estimate_of_id

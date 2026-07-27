@@ -5,7 +5,7 @@ import { expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfSqlite } from "./test-helper.js";
 import { Base } from "../../index.js";
 import { SchemaDumper } from "../../schema-dumper.js";
-import { FixtureSet } from "../../test-helpers/fixture-set.js";
+import { FixtureSet } from "../../fixtures.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
 import { virtualColumnFixtureData } from "../../test-helpers/fixtures/virtual-columns.js";
 import { itIfSupports } from "../../support/supports.js";

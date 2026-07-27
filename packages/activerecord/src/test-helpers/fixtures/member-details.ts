@@ -1,4 +1,4 @@
-import { ref } from "../define-fixtures.js";
+import { ref } from "../../fixtures.js";
 
 // activerecord/test/fixtures/member_details.yml
 // Rails YAML uses the association name `organization:` (belongs_to

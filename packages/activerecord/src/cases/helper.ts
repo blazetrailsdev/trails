@@ -12,6 +12,7 @@
 import "../sqlite/better-sqlite3.js";
 import { beforeEach } from "vitest";
 import { Base } from "../base.js";
+import { getZone, setZone, resetZone, isZoneExplicit } from "@blazetrails/activesupport";
 import { DelegateCache } from "../relation/delegation.js";
 import { loadDefaults } from "../trailtie.js";
 import {
@@ -84,3 +85,48 @@ beforeEach(async () => {
   if (shouldSkipGlobalReset()) return;
   await resetTestAdapterState();
 });
+
+/**
+ * Rails declares `module InTimeZone` inside this very file —
+ * activerecord/test/cases/helper.rb:66-79 — so it lives here rather than in a
+ * standalone module of its own. Importing this file from a test is free: it is
+ * already the AR setupFile, so the module is loaded before any test runs.
+ *
+ *   module InTimeZone
+ *     private
+ *       def in_time_zone(zone)
+ *         old_zone = Time.zone
+ *         old_tz   = ActiveRecord::Base.time_zone_aware_attributes
+ *         Time.zone = zone ? ActiveSupport::TimeZone[zone] : nil
+ *         ActiveRecord::Base.time_zone_aware_attributes = !zone.nil?
+ *         yield
+ *       ensure
+ *         Time.zone = old_zone
+ *         ActiveRecord::Base.time_zone_aware_attributes = old_tz
+ *       end
+ *   end
+ *
+ * Runs `fn` with `Time.zone` set to `zone` and `Base.timeZoneAwareAttributes`
+ * toggled to `zone != null`, restoring both afterwards. A `null` zone clears
+ * the zone and disables time-zone-aware attributes (the Rails `zone.nil?` path).
+ */
+export async function inTimeZone(
+  zone: string | null,
+  fn: () => Promise<void> | void,
+): Promise<void> {
+  const wasExplicit = isZoneExplicit();
+  const oldZone = getZone();
+  const oldAware = Base.timeZoneAwareAttributes;
+
+  if (zone != null) setZone(zone);
+  else resetZone();
+  Base.timeZoneAwareAttributes = zone != null;
+
+  try {
+    await fn();
+  } finally {
+    if (wasExplicit && oldZone) setZone(oldZone);
+    else resetZone();
+    Base.timeZoneAwareAttributes = oldAware;
+  }
+}

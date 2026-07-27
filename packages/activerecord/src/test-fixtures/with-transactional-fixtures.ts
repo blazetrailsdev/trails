@@ -1,3 +1,9 @@
+/**
+ * The per-test transaction wrap behind `use_transactional_tests` — Rails'
+ * `TestFixtures#setup_fixtures` / `#teardown_fixtures`
+ * (`activerecord/lib/active_record/test_fixtures.rb`). Split into its own
+ * module for size only; see the header of `../test-fixtures.ts`.
+ */
 import { beforeAll, beforeEach, afterEach, afterAll, type TaskContext } from "vitest";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { resetTestAdapterState } from "../test-adapter.js";

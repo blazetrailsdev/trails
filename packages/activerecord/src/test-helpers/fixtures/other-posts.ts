@@ -1,4 +1,4 @@
-import { ref } from "../define-fixtures.js";
+import { ref } from "../../fixtures.js";
 
 // activerecord/test/fixtures/other_posts.yml
 // Rails sets `_fixture: model_class: Post`.
