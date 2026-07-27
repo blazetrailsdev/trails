@@ -801,7 +801,8 @@ describe("buildReport — novel vs moved classification", () => {
     // can't see, plus the module lives in a *different* package. Its instance
     // methods (toGid/toSgid family) must NOT be flagged as novel. The
     // trails-side Locator-backed finders (findGlobalId/findSignedGlobalId[Bang])
-    // have no Rails counterpart at all and carry inline tags instead.
+    // are NOT covered by the mixin — they have no Rails counterpart at all, so
+    // they keep reporting as extras until they are removed or justified.
     const ruby: ApiManifest = {
       source: "ruby",
       generatedAt: "",
@@ -847,12 +848,12 @@ describe("buildReport — novel vs moved classification", () => {
                 method("toSignedGlobalId"),
               ],
               classMethods: [
-                // trails-only model-side finders — justified by their own
-                // `@noRailsEquivalent` tags, not by the railtie mixin.
-                { ...method("findGlobalId"), noRailsEquivalent: "trails-side finder" },
-                { ...method("findSignedGlobalId"), noRailsEquivalent: "trails-side finder" },
-                { ...method("findSignedGlobalIdBang"), noRailsEquivalent: "trails-side finder" },
-                method("genuinelyNovel"), // the only real extra
+                // trails-only model-side finders: no Rails counterpart and no
+                // justification, so they stay visible as extra surface.
+                method("findGlobalId"),
+                method("findSignedGlobalId"),
+                method("findSignedGlobalIdBang"),
+                method("genuinelyNovel"),
               ],
             },
           },
@@ -868,7 +869,12 @@ describe("buildReport — novel vs moved classification", () => {
     });
     const f = report.packages[0].extraFiles.find((x) => x.tsFile === "base.ts");
     expect(f).toBeDefined();
-    expect(f!.extras.map((e) => e.name)).toEqual(["genuinelyNovel"]);
+    expect(f!.extras.map((e) => e.name)).toEqual([
+      "findGlobalId",
+      "findSignedGlobalId",
+      "findSignedGlobalIdBang",
+      "genuinelyNovel",
+    ]);
   });
 
   it("cross-package fallback does NOT let a bare short-name include pollute across gems", () => {

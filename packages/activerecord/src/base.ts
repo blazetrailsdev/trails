@@ -4146,12 +4146,12 @@ export class Base extends Model {
    * the `only:` filter rejects it. If the record doesn't exist, `find`
    * raises (Rails parity: RecordNotFound).
    *
-   * @noRailsEquivalent trails-only model-side finder: Rails apps call
-   * `GlobalID::Locator.locate` directly and globalid's railtie injects only
-   * `GlobalID::Identification` (the instance-side `to_gid` family) onto
-   * `ActiveRecord::Base`, so there is no `find_global_id` `def` anywhere in
-   * Rails or globalid. trails adds the ergonomic class-method form here and
-   * delegates straight to the ported Locator.
+   * NOT Rails: `find_global_id` exists nowhere in Rails or globalid — apps call
+   * `GlobalID::Locator.locate` directly, and globalid's railtie injects only the
+   * instance-side `GlobalID::Identification`. Left deliberately un-suppressed in
+   * `api:extra` so it keeps reporting as extra surface until it is removed or a
+   * caller justifies it (tasks 0023 globalid-model-side-finders-are-uncalled-
+   * trails-invention).
    */
   static findGlobalId(
     input: string | import("@blazetrails/globalid").GlobalID,
@@ -4163,10 +4163,8 @@ export class Base extends Model {
   /**
    * Signed counterpart of {@link findGlobalId} — uses signedIdVerifier(this).
    *
-   * @noRailsEquivalent trails-only model-side finder: Rails apps call
-   * `GlobalID::Locator.locate_signed` directly, so there is no
-   * `find_signed_global_id` `def` in Rails or globalid. Same invention as
-   * {@link findGlobalId}, carrying the verifier this model signs with.
+   * NOT Rails: same invention as {@link findGlobalId}, carrying the verifier
+   * this model signs with; Rails apps call `GlobalID::Locator.locate_signed`.
    */
   static async findSignedGlobalId(
     input: string | _SignedGlobalIDType,
@@ -4179,10 +4177,7 @@ export class Base extends Model {
   /**
    * Raising counterpart of {@link findSignedGlobalId} — throws on miss.
    *
-   * @noRailsEquivalent trails-only model-side finder: Rails apps call
-   * `GlobalID::Locator.locate_signed` directly, so there is no
-   * `find_signed_global_id!` `def` in Rails or globalid. Same invention as
-   * {@link findGlobalId}, in the bang shape.
+   * NOT Rails: same invention as {@link findGlobalId}, in the bang shape.
    */
   static async findSignedGlobalIdBang(
     input: string | _SignedGlobalIDType,
