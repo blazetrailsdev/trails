@@ -83,16 +83,15 @@ export class SingularAssociation extends Association {
     // build, so a persisted owner whose target has never been loaded still
     // discovers (and displaces) the row in the DB. The load has to precede
     // `setNewRecord`, which overwrites the target and marks it loaded.
+    const setNewRecord = (): Base | null | Promise<Base | null> => {
+      const displaced = this.loaded ? this.target : null;
+      if (record) this.setNewRecord(record);
+      const removal = this.detachDisplacedOnBuild(displaced, record);
+      return removal ? removal.then(() => record) : record;
+    };
     const load = this.loadDisplacedForBuild();
-    if (load) return load.then(() => this.setNewRecordDisplacing(record));
-    return this.setNewRecordDisplacing(record);
-  }
-
-  private setNewRecordDisplacing(record: Base | null): Base | null | Promise<Base | null> {
-    const displaced = this.loaded ? this.target : null;
-    if (record) this.setNewRecord(record);
-    const removal = this.detachDisplacedOnBuild(displaced, record);
-    return removal ? removal.then(() => record) : record;
+    if (load) return load.then(setNewRecord);
+    return setNewRecord();
   }
 
   /**
