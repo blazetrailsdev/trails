@@ -19,7 +19,6 @@ import {
   withExecutionContext,
 } from "./connection-adapters/abstract/connection-pool.js";
 import { Store } from "./connection-adapters/abstract/query-cache.js";
-import { QueryCache } from "./query-cache.js";
 import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-descriptor.js";
 import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { SchemaReflection, BoundSchemaReflection } from "./connection-adapters/schema-cache.js";
@@ -994,10 +993,10 @@ describe("ConnectionPoolConfiguration query cache", () => {
       pool.checkin(conn);
     });
 
-    it("QueryCache.cache enables for the duration of fn and clears on exit", async () => {
+    it("enableQueryCache enables for the duration of fn and clears on exit", async () => {
       const pool = makePool(1);
       let observed: Store | null = null;
-      await QueryCache.cache(pool, async () => {
+      await pool.enableQueryCache(async () => {
         const conn = await pool.checkout();
         observed = (conn as unknown as { _queryCache: Store | null })._queryCache;
         expect(observed!.enabled).toBe(true);
@@ -1005,6 +1004,7 @@ describe("ConnectionPoolConfiguration query cache", () => {
         expect(observed!.size).toBe(1);
         pool.checkin(conn);
       });
+      pool.clearQueryCache();
       expect(observed!.enabled).toBe(false);
       expect(observed!.size).toBe(0);
     });

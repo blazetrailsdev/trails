@@ -835,7 +835,7 @@ describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", 
       expect(typeof rawDbValue).toBe("string");
       // The encrypted attribute type reports it as encrypted.
       const { EncryptableRecord } = await import("../encryption/encryptable-record.js");
-      expect(EncryptableRecord.isEncryptedAttribute(book, "name")).toBe(true);
+      expect(EncryptableRecord.encryptedAttribute(book, "name")).toBe(true);
     });
   });
 
@@ -861,7 +861,7 @@ describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", 
       expect(rawOriginal).not.toBe("Ruby for Rails");
       expect(typeof rawOriginal).toBe("string");
       const { EncryptableRecord } = await import("../encryption/encryptable-record.js");
-      expect(EncryptableRecord.isEncryptedAttribute(book, "name")).toBe(true);
+      expect(EncryptableRecord.encryptedAttribute(book, "name")).toBe(true);
     });
   });
 });

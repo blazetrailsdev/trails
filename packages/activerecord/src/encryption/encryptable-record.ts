@@ -548,24 +548,34 @@ export class EncryptableRecord {
    * the stored value is actually encrypted (calls `type.isEncrypted`).
    * Distinct from `encryption.ts#isEncryptedAttribute(klass, attr)` which is
    * a class-level check (is the attribute declared encrypted on this class?).
+   *
+   * Mirrors: ActiveRecord::Encryption::EncryptableRecord#encrypted_attribute?
    * @internal
    */
-  static isEncryptedAttribute(record: any, attributeName: string): boolean {
+  static encryptedAttribute(record: any, attributeName: string): boolean {
     const klass = record.constructor;
     // Resolve attribute aliases before checking encrypted set.
-    const resolvedName = klass._attributeAliases?.[attributeName] ?? attributeName;
-    if (!klass._encryptedAttributes?.has(resolvedName)) return false;
-    const type = encryptedTypeOf(getAttributeType(klass, resolvedName));
+    const name = klass._attributeAliases?.[attributeName] ?? attributeName;
+    if (!this.encryptedAttributes(klass).has(name)) return false;
+    // `encryptedTypeOf` unwraps the resolved type: unlike Ruby's DelegateClass,
+    // a TS `Serialized(Encrypted(...))` does not forward `encrypted?`.
+    const type = encryptedTypeOf(
+      // Rails reads the type with `type_for_attribute(name)`; `getAttributeType`
+      // is the fallback for hosts that don't expose it (bare attribute-definition
+      // maps in unit tests).
+      typeof klass.typeForAttribute === "function"
+        ? klass.typeForAttribute(name)
+        : getAttributeType(klass, name),
+    );
     if (!type) return false;
-    const raw = record.readAttributeBeforeTypeCast?.(resolvedName);
-    return type.isEncrypted(raw);
+    return type.isEncrypted(record.readAttributeBeforeTypeCast?.(name));
   }
 
   /** @internal */
   static ciphertextFor(record: any, attributeName: string): unknown {
     const klass = record.constructor;
     const resolvedName = klass._attributeAliases?.[attributeName] ?? attributeName;
-    if (this.isEncryptedAttribute(record, attributeName)) {
+    if (this.encryptedAttribute(record, attributeName)) {
       return record.readAttributeBeforeTypeCast?.(resolvedName);
     }
     // Unencrypted — return the DB-serialized value (mirrors read_attribute_for_database).

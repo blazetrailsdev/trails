@@ -42,65 +42,7 @@ export interface QueryCacheCompleteTarget {
   clearQueryCache(): void;
 }
 
-/**
- * A connection pool whose query cache `cache`/`uncached` block helpers can
- * drive. Mirrors the `connection_pool` that Rails'
- * `ActiveRecord::QueryCache::ClassMethods` operate on — the same four members
- * its `cache` / `uncached` touch.
- */
-export interface QueryCacheBlockPool {
-  readonly queryCacheEnabled: boolean;
-  enableQueryCache<T>(fn: () => T | Promise<T>): Promise<T>;
-  clearQueryCache(): void;
-  disableQueryCache<T>(fn: () => T | Promise<T>, options?: { dirties?: boolean }): Promise<T>;
-}
-
 export class QueryCache {
-  /**
-   * Enable the query cache on `pool` for the duration of `block`, then restore
-   * the prior state — clearing the cache on exit unless it was already enabled.
-   *
-   * Mirrors: ActiveRecord::QueryCache::ClassMethods#cache
-   * (`active_record/query_cache.rb:9-21`):
-   *
-   *     was_enabled = pool.query_cache_enabled
-   *     begin
-   *       pool.enable_query_cache(&block)
-   *     ensure
-   *       pool.clear_query_cache unless was_enabled
-   *     end
-   *
-   * The `was_enabled` bookkeeping lives here, as in Rails, rather than behind a
-   * pool-side helper: `enableQueryCache` already restores the prior
-   * enabled/dirties state in its own `finally` (matching Rails'
-   * `enable_query_cache`), so the only thing left for this layer is the
-   * clear-on-exit, and every member it needs is public pool surface.
-   */
-  static async cache<T>(pool: QueryCacheBlockPool, block: () => T | Promise<T>): Promise<T> {
-    const wasEnabled = pool.queryCacheEnabled;
-    try {
-      return await pool.enableQueryCache(block);
-    } finally {
-      if (!wasEnabled) pool.clearQueryCache();
-    }
-  }
-
-  /**
-   * Disable the query cache on `pool` within `block`. Pass `dirties: false` to
-   * stop write operations from clearing every connection's query cache (the
-   * default dirties them in case they are replicas with now-stale caches).
-   *
-   * Mirrors: ActiveRecord::QueryCache::ClassMethods#uncached
-   * (`connection_pool.disable_query_cache(dirties: dirties, &block)`).
-   */
-  static uncached<T>(
-    pool: QueryCacheBlockPool,
-    block: () => T | Promise<T>,
-    options: { dirties?: boolean } = {},
-  ): Promise<T> {
-    return pool.disableQueryCache(block, options);
-  }
-
   /**
    * Enable query cache on all provided pools/adapters that are not already
    * enabled, skipping (without enabling) those disabled by configuration.
@@ -207,16 +149,24 @@ function configurationsEmpty(klass: typeof Base): boolean {
 export const ClassMethods = {
   /**
    * Mirrors: ActiveRecord::QueryCache::ClassMethods#cache
-   * (`connection_pool.enable_query_cache(&block)` with the
-   * `clear_query_cache unless was_enabled` ensure — both owned by
-   * {@link QueryCache.cache}, which this delegates to once the
-   * "is Active Record configured?" guard passes).
+   * (`pool = connection_pool; was_enabled = pool.query_cache_enabled;
+   * pool.enable_query_cache(&block) ensure pool.clear_query_cache unless
+   * was_enabled`). `enableQueryCache` already restores the prior
+   * enabled/dirties state in its own `finally` (matching Rails'
+   * `enable_query_cache`), so the only bookkeeping left here is the
+   * clear-on-exit.
    */
-  cache<T>(this: typeof Base, block: () => T | Promise<T>): Promise<T> {
-    if (this.isConnectedQ() || !configurationsEmpty(this)) {
-      return QueryCache.cache(this.connectionPool(), block);
+  async cache<T>(this: typeof Base, block: () => T | Promise<T>): Promise<T> {
+    if (this.isConnected() || !configurationsEmpty(this)) {
+      const pool = this.connectionPool();
+      const wasEnabled = pool.queryCacheEnabled;
+      try {
+        return await pool.enableQueryCache(block);
+      } finally {
+        if (!wasEnabled) pool.clearQueryCache();
+      }
     }
-    return Promise.resolve(block());
+    return block();
   },
 
   /**
@@ -230,8 +180,8 @@ export const ClassMethods = {
     block: () => T | Promise<T>,
     options: { dirties?: boolean } = {},
   ): Promise<T> {
-    if (this.isConnectedQ() || !configurationsEmpty(this)) {
-      return QueryCache.uncached(this.connectionPool(), block, options);
+    if (this.isConnected() || !configurationsEmpty(this)) {
+      return this.connectionPool().disableQueryCache(block, options);
     }
     return Promise.resolve(block());
   },

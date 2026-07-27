@@ -32,13 +32,13 @@ export interface EncryptionHooks {
    */
   buildScheme?(options: any): any;
 
-  encryptedAttributeQ(klass: any, name: string): boolean;
+  encryptedAttribute(record: any, name: string): boolean;
 
   ciphertextFor(record: any, name: string): unknown;
 
-  encryptRecord(record: any): Promise<void>;
+  encrypt(record: any): Promise<void>;
 
-  decryptRecord(record: any): Promise<void>;
+  decrypt(record: any): Promise<void>;
 }
 
 function notLoaded(method: string): never {
@@ -51,10 +51,10 @@ function notLoaded(method: string): never {
 export const encryptionHooks: EncryptionHooks = {
   encrypts: (klass: any) => notLoaded(`${klass?.name ?? "Model"}.encrypts()`),
   applyPendingEncryptions: () => {},
-  encryptedAttributeQ: () => false,
+  encryptedAttribute: () => false,
   ciphertextFor: () => undefined,
-  encryptRecord: async () => {},
-  decryptRecord: async () => {},
+  encrypt: async () => {},
+  decrypt: async () => {},
 };
 
 /** @internal */

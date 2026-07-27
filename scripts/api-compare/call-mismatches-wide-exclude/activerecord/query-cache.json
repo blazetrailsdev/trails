@@ -4,14 +4,7 @@
     "tsFile": "query-cache.ts",
     "rubyName": "cache",
     "call": "configurations",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "query-cache.ts",
-    "rubyName": "cache",
-    "call": "connected?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Bucket (b): Rails' `configurations.empty?` is a call on the `Base.configurations` class_attribute reader; trails stores it as a plain static property, so `configurationsEmpty(this)` reads it — there is no `configurations()` call to match. Converges when the Core.configurations accessor (core.ts:432, currently unwired) becomes the real read path."
   },
   {
     "package": "activerecord",
@@ -39,13 +32,6 @@
     "tsFile": "query-cache.ts",
     "rubyName": "uncached",
     "call": "configurations",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "query-cache.ts",
-    "rubyName": "uncached",
-    "call": "connected?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Bucket (b): Rails' `configurations.empty?` is a call on the `Base.configurations` class_attribute reader; trails stores it as a plain static property, so `configurationsEmpty(this)` reads it — there is no `configurations()` call to match. Converges when the Core.configurations accessor (core.ts:432, currently unwired) becomes the real read path."
   }
 ]
