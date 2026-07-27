@@ -75,8 +75,6 @@ export async function provisionSecondDatabase(): Promise<void> {
  * database ours is shared with every sibling suite in the worker.
  *
  * Fixture data is seeded separately via `useFixtures` in the test file.
- *
- * @internal
  */
 async function setupSecondPool(): Promise<void> {
   registerModel(College);
@@ -100,8 +98,6 @@ async function setupSecondPool(): Promise<void> {
  * Undoes `setupSecondPool`'s primary-database surgery: Rails' two-database
  * split dies with the process, but ours shares one primary database with every
  * sibling suite in the worker, so the dropped tables must be put back.
- *
- * @internal
  */
 async function teardownSecondPool(): Promise<void> {
   await rebuildCanonicalTables(await Base.leaseConnection(), [...ARUNIT2_TABLES, "entrants"]);
