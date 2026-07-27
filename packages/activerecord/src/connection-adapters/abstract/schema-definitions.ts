@@ -4,6 +4,7 @@ import type { Column } from "../column.js";
 import { singularize, pluralize, getCrypto } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { SchemaDumper } from "../../schema-dumper.js";
+import { globalTableNamePrefix, globalTableNameSuffix } from "./table-name-options.js";
 
 /**
  * @internal Shared identifier guard for MySQL bare-identifier emission
@@ -1139,8 +1140,8 @@ export class TableDefinition {
     // table_name_prefix/suffix to to_table, then route the column/name defaults
     // through the adapter's foreign_key_options (SHA256 `fk_rails_<hex>` name).
     const adapter = this._adapter as Partial<ForeignKeyOptionsAdapter>;
-    const prefix = adapter.tableNamePrefix ?? "";
-    const suffix = adapter.tableNameSuffix ?? "";
+    const prefix = adapter.tableNamePrefix ?? globalTableNamePrefix();
+    const suffix = adapter.tableNameSuffix ?? globalTableNameSuffix();
     const prefixedToTable = `${prefix}${toTable}${suffix}`;
     const opts = this._foreignKeyOptions(prefixedToTable, options);
     return new ForeignKeyDefinition(
@@ -1181,8 +1182,8 @@ export class TableDefinition {
     // trails schema-qualifier) before singularizing, so a prefixed to_table
     // still yields the bare `<singular>_<pk>` default column.
     const columnFor = (pk: string): string => {
-      const prefix = adapter.tableNamePrefix ?? "";
-      const suffix = adapter.tableNameSuffix ?? "";
+      const prefix = adapter.tableNamePrefix ?? globalTableNamePrefix();
+      const suffix = adapter.tableNameSuffix ?? globalTableNameSuffix();
       let base = toTable.replace(/^.*\./, "");
       if (prefix || suffix) {
         const stripped = base.match(new RegExp(`^${prefix}(.+)${suffix}$`));
