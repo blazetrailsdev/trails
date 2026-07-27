@@ -608,7 +608,6 @@ describe("HasOneAssociationsTest", () => {
     association.loadTargetForBuild = () => Promise.reject(loadError);
 
     await expect(found.createAccount({ credit_limit: 70 })).rejects.toBe(loadError);
-    // The build/save itself succeeded — only the deferred load error is fatal.
     expect(await Account.where({ firm_id: Number(company.id) }).count()).toBe(1);
   });
 
