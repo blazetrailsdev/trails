@@ -3535,8 +3535,12 @@ describe("buildIndexFromOriginMain (read path serves the origin/main tree)", () 
     } catch {
       /* no working-tree index here — the handoff is all we needed to observe */
     }
+    // `reset` is the whole invariant. A `status` probe may or may not appear
+    // depending on whether this machine's TASKS_DIR has an index.json to serve
+    // (the no-index rebuild branch probes index.md's cleanliness first), and it
+    // is read-only either way — asserting on it just couples the test to the
+    // runner's checkout.
     expect(seen).not.toContain("reset");
-    expect(seen).not.toContain("status");
     expect(String(err.mock.calls[0][0])).toMatch(/could not reach origin\/main.*may be stale/s);
   });
 });
