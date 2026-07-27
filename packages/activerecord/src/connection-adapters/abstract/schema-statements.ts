@@ -31,6 +31,7 @@ import {
   type IdHashOptions,
   type SchemaStatementsLike,
   type ForeignKeyLookupOptions,
+  type RemoveForeignKeyOptions,
 } from "./schema-definitions.js";
 import { SchemaCreation } from "./schema-creation.js";
 import { maxIdentifierLength } from "./database-limits.js";
@@ -847,10 +848,8 @@ export class SchemaStatements {
 
   async removeForeignKey(
     fromTable: string,
-    toTableOrOptions?:
-      | string
-      | { column?: string; name?: string; toTable?: string; ifExists?: boolean },
-    options: { column?: string; name?: string; ifExists?: boolean } = {},
+    toTableOrOptions?: string | RemoveForeignKeyOptions,
+    options: RemoveForeignKeyOptions = {},
   ): Promise<void> {
     const adapter = this.adapter as any;
     if (
@@ -866,7 +865,7 @@ export class SchemaStatements {
     // name / to_table against the live foreign keys) rather than deriving a
     // name, so a hashed `fk_rails_<hex>` name drops correctly.
     let toTable: string | undefined;
-    let opts: { column?: string; name?: string; toTable?: string; ifExists?: boolean };
+    let opts: RemoveForeignKeyOptions;
     if (typeof toTableOrOptions === "object" && toTableOrOptions !== null) {
       opts = { ...toTableOrOptions };
       toTable = opts.toTable;
@@ -880,11 +879,9 @@ export class SchemaStatements {
     if (opts.ifExists === true && !(await this.foreignKeyExists(fromTable, { toTable }))) {
       return;
     }
-    const fk = await this.foreignKeyForBang(fromTable, {
-      toTable,
-      column: opts.column,
-      name: opts.name,
-    });
+    const lookup: ForeignKeyLookupOptions = { ...opts, toTable };
+    delete (lookup as RemoveForeignKeyOptions).ifExists;
+    const fk = await this.foreignKeyForBang(fromTable, lookup);
     // Rails: at = create_alter_table from_table; at.drop_foreign_key fk.name;
     //        execute schema_creation.accept(at)
     // Route through AlterTable so adapters emit dialect-specific DROP syntax

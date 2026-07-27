@@ -64,6 +64,7 @@ import {
   getFs,
   getPath,
   Notifications,
+  pluralize,
   runLoadHooks,
   trailsRoot,
 } from "@blazetrails/activesupport";
@@ -102,7 +103,10 @@ import {
   CheckConstraintDefinition,
   ForeignKeyDefinition,
   type AddForeignKeyOptions,
+  type RemoveForeignKeyOptions,
+  type ForeignKeyLookupOptions,
 } from "./abstract/schema-definitions.js";
+import { Base } from "../base.js";
 import { Column } from "./column.js";
 import { Column as Sqlite3Column } from "./sqlite3/column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
@@ -1824,24 +1828,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     await this.addColumn(tableName, "updated_at", "datetime", opts);
   }
 
-  async addReference(
-    tableName: string,
-    refName: string,
-    options?: Record<string, unknown>,
-  ): Promise<void> {
-    const type = (options?.type as string) ?? "integer";
-    await this.addColumn(tableName, `${refName}_id`, type, options);
-  }
-
-  /** Alias of addReference (Rails: `alias :add_belongs_to :add_reference`). */
-  async addBelongsTo(
-    tableName: string,
-    refName: string,
-    options?: Record<string, unknown>,
-  ): Promise<void> {
-    return this.addReference(tableName, refName, options);
-  }
-
   async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
     const { schema, bare } = this._splitTableName(tableName);
     const prefix = schema ? `${quoteColumnName(schema)}.` : "";
@@ -2283,48 +2269,47 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    */
   async removeForeignKey(
     fromTable: string,
-    toTableOrOptions?:
-      | string
-      | { column?: string; name?: string; toTable?: string; ifExists?: boolean },
+    toTableOrOptions?: string | RemoveForeignKeyOptions,
+    options: RemoveForeignKeyOptions = {},
   ): Promise<void> {
-    let explicitToTable: string | undefined;
-    let column: string | undefined;
-    let name: string | undefined;
-    let ifExists = false;
+    const positionalToTable = typeof toTableOrOptions === "string" ? toTableOrOptions : undefined;
+    const opts: RemoveForeignKeyOptions =
+      typeof toTableOrOptions === "object" && toTableOrOptions !== null
+        ? { ...toTableOrOptions, ...options }
+        : { ...options };
+    const ifExists = opts.ifExists === true;
+    delete opts.ifExists;
 
-    if (typeof toTableOrOptions === "string") {
-      explicitToTable = toTableOrOptions;
-    } else if (toTableOrOptions) {
-      column = toTableOrOptions.column;
-      name = toTableOrOptions.name;
-      explicitToTable = toTableOrOptions.toTable;
-      ifExists = toTableOrOptions.ifExists === true;
-    }
+    if (ifExists && !(await this.foreignKeyExists(fromTable, positionalToTable))) return;
 
-    if (!explicitToTable && !column && !name) {
-      throw new Error("removeForeignKey requires a target table or options");
-    }
+    const toTable = positionalToTable ?? opts.toTable;
+    const matchOptions: ForeignKeyLookupOptions = { ...opts };
+    delete matchOptions.name;
+    delete matchOptions.toTable;
+    delete matchOptions.validate;
+
+    const inferred = String(matchOptions.column ?? "").replace(/_id$/, "");
+    const table = this.schemaStatements().stripTableNamePrefixAndSuffix(
+      toTable ?? (Base.pluralizeTableNames ? pluralize(inferred) : inferred),
+    );
 
     const existingFks = await this.foreignKeys(fromTable);
-    const fkNames = await this._parseForeignKeyNames(fromTable);
-    const { bare: bareFrom } = this._splitTableName(fromTable);
-
-    const fkToRemove = existingFks.find((fk) => {
-      const fkCols = Array.isArray(fk.column) ? fk.column : [fk.column];
-      const fkKey = fkCols.join(",");
-      if (name) {
-        const parsedName = fkNames.get(fkKey) ?? `fk_${bareFrom}_${fkCols.join("_")}`;
-        return parsedName === name;
-      }
-      if (column) return fkCols.includes(column);
-      if (explicitToTable) return fk.toTable === explicitToTable;
-      return false;
-    });
+    // Rails' SQLite override hand-rolls `options.slice(*fk.options.keys)` +
+    // `fk.options[k].to_s == v.to_s` (sqlite3/schema_statements.rb:79-80) rather
+    // than calling defined_for?. isDefinedFor is that same slice-and-compare,
+    // differing only for array-valued options, where Ruby's Array#to_s compares
+    // the `["a", "b"]` inspect form. Reproducing that would mean porting Ruby
+    // inspect formatting, and it is unreachable here: SQLite add_foreign_key is
+    // single-column.
+    const fkToRemove = existingFks.find(
+      (fk) =>
+        this.schemaStatements().stripTableNamePrefixAndSuffix(fk.toTable) === table &&
+        fk.isDefinedFor(matchOptions),
+    );
 
     if (!fkToRemove) {
-      if (ifExists) return;
-      throw new Error(
-        `Table '${fromTable}' has no foreign key for ${explicitToTable || JSON.stringify(toTableOrOptions)}`,
+      throw new ArgumentError(
+        `Table '${fromTable}' has no foreign key for ${toTable ?? JSON.stringify(matchOptions)}`,
       );
     }
 

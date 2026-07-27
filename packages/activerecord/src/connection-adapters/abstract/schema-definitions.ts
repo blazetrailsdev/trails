@@ -156,6 +156,12 @@ export interface AddForeignKeyOptions {
   ifNotExists?: boolean;
 }
 
+/** Mirrors: the keyword args of `remove_foreign_key(from_table, to_table = nil, **options)` */
+export interface RemoveForeignKeyOptions extends AddForeignKeyOptions {
+  toTable?: string;
+  ifExists?: boolean;
+}
+
 /** Options accepted by the `foreignKey` field of `ReferenceDefinition`. */
 export interface ReferenceForeignKeyOptions extends AddForeignKeyOptions {
   toTable?: string;
