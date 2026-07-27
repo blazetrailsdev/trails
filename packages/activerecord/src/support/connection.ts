@@ -30,6 +30,7 @@ import { DatabaseConfigurations } from "../database-configurations.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { UrlConfig } from "../database-configurations/url-config.js";
+import { arunitDatabaseNames } from "./arunit2-config.js";
 import {
   CONNECTION_LANES,
   DEFAULT_CONNECTION,
@@ -102,7 +103,8 @@ interface NamedConnection {
   adapter: string;
   /** The public {@link TestAdapterName} lane this connection drives. */
   lane: TestAdapterName;
-  build(): Promise<HashConfig>;
+  /** The `arunit` hash; `expandConfig` derives the other named entries from it. */
+  build(): Promise<Record<string, unknown>>;
 }
 
 /**
@@ -129,24 +131,22 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
   sqlite3: {
     adapter: "sqlite3",
     lane: "sqlite",
-    build: async () => new HashConfig("test", "primary", await sqliteHash()),
+    build: async () => await sqliteHash(),
   },
   sqlite3_mem: {
     adapter: "sqlite3",
     lane: "sqlite",
-    build: async () =>
-      new HashConfig("test", "primary", { adapter: "sqlite3", database: ":memory:", pool: 1 }),
+    build: async () => ({ adapter: "sqlite3", database: ":memory:", pool: 1 }),
   },
   postgresql: {
     adapter: "postgresql",
     lane: "postgres",
-    build: async () =>
-      new HashConfig("test", "primary", serverHash("postgresql", postgresSettings())),
+    build: async () => serverHash("postgresql", postgresSettings()),
   },
   mysql2: {
     adapter: "mysql2",
     lane: "mysql",
-    build: async () => new HashConfig("test", "primary", serverHash("mysql2", mysqlSettings())),
+    build: async () => serverHash("mysql2", mysqlSettings()),
   },
 };
 
@@ -173,6 +173,36 @@ export function configuredConnectionHash(): Record<string, unknown> {
 }
 
 /**
+ * The three named entries every connection carries, mirroring `expand_config`
+ * (`config.rb:26-37`): `arunit`, `arunit2` and
+ * `arunit_without_prepared_statements`. Rails spells them as keys of the
+ * connection's hash, and because `Base.configurations` treats top-level keys as
+ * environments, `establish_connection :arunit` resolves one by name — which is
+ * why they are the `envName` here, with Rails' `primary` spec name.
+ *
+ * Rails defaults the databases to `activerecord_unittest` /
+ * `activerecord_unittest2` / `activerecord_unittest`; trails takes them from
+ * the sub-settings instead, so `arunit` is the worker database the canonical
+ * schema is loaded into and `arunit2` the derived second database
+ * (`arunitDatabaseNames`). `arunit_without_prepared_statements` shares
+ * `arunit`'s database and only turns prepared statements off, as in
+ * `config.example.yml:74-79`.
+ */
+function expandConfig(arunit: Record<string, unknown>): HashConfig[] {
+  const database = String(arunit.database ?? "");
+  const arunit2 = database === ":memory:" ? database : arunitDatabaseNames(database).arunit2;
+
+  return [
+    new HashConfig("arunit", "primary", arunit),
+    new HashConfig("arunit2", "primary", { ...arunit, database: arunit2 }),
+    new HashConfig("arunit_without_prepared_statements", "primary", {
+      ...arunit,
+      preparedStatements: false,
+    }),
+  ];
+}
+
+/**
  * The configuration hashes for the connection `ARCONN` selects, mirroring
  * `ARTest.test_configuration_hashes` (`connection.rb:13-20`) plus the
  * adapter-name guard `connect` applies (`connection.rb:35-37`).
@@ -181,22 +211,13 @@ export function configuredConnectionHash(): Record<string, unknown> {
  * established pool; trails builds the config object here, so the resolved lane
  * comes back alongside it rather than being re-read from a live connection.
  *
- * KNOWN DIVERGENCE (story `arunit-named-configuration-entries`): Rails'
- * `expand_config` gives every connection three named entries — `arunit`,
- * `arunit2` and `arunit_without_prepared_statements` (`config.rb:26-37`) — and
- * those names are *environments* in the configurations hash, which is why
- * `connect` can say `establish_connection :arunit` (`connection.rb:32-33`).
- * trails synthesizes a single `test`/`primary` entry instead, so
- * `Base.configurations` carries no `arunit` name and an ARTest-style
- * `Base.establishConnection("arunit")` does not resolve. Converging means
- * renaming the env every lookup in the harness uses (`DatabaseTasks`,
- * `test-databases.ts`, `findDbConfig("test")`, the second-pool setup), and
- * `arunit2` additionally needs the `CREATE DATABASE` provisioning that is only
- * done on the sqlite lane today — both larger than this file.
  */
 export async function testConfigurationHashes(): Promise<{
   adapter: TestAdapterName;
-  envConfig: HashConfig | UrlConfig;
+  /** The `arunit` entry — the one `connect` establishes as the primary pool. */
+  envConfig: HashConfig;
+  /** All three named entries, as `ARTest.test_configuration_hashes` returns them. */
+  configurationHashes: HashConfig[];
 }> {
   const name = connectionName();
   // `name` is arbitrary user input from ARCONN, so the lookup is a partial one;
@@ -214,7 +235,8 @@ export async function testConfigurationHashes(): Promise<{
     );
   }
 
-  const envConfig = await connection.build();
+  const configurationHashes = expandConfig(await connection.build());
+  const envConfig = configurationHashes[0];
   // Rails: `unless connection_name.include?(arunit_adapter) raise ArgumentError`
   // (connection.rb:35-37). Previously this fired on a missing `*_TEST_URL` — an
   // env-presence proxy, since absent connection details silently resolved to
@@ -231,7 +253,7 @@ export async function testConfigurationHashes(): Promise<{
     );
   }
 
-  return { adapter: connection.lane, envConfig };
+  return { adapter: connection.lane, envConfig, configurationHashes };
 }
 
 async function fallbackDatabasePath(): Promise<string> {
@@ -267,9 +289,11 @@ async function sqliteHash(): Promise<Record<string, unknown>> {
  * Assign the test `DatabaseConfigurations` and establish `Base`'s connection,
  * mirroring `ARTest.connect` (`connection.rb:22-38`).
  *
- * `Base.configurations` is assigned as Rails does (`connection.rb:31`) so
- * no-arg `Base.establishConnection()` and later configuration lookups resolve
- * against the same test configuration the pool was opened from.
+ * `Base.configurations` is assigned as Rails does (`connection.rb:31`) — all
+ * three named entries — and the primary pool is established by name
+ * (`establish_connection :arunit`, `connection.rb:32`), so ARTest-style lookups
+ * such as `Base.establishConnection("arunit")` resolve against the same test
+ * configuration the pool was opened from.
  *
  * Beyond Rails it registers the adapter's `DatabaseTasks` handler, because
  * trails loads the schema through `DatabaseTasks` rather than by evaluating
@@ -281,8 +305,8 @@ async function sqliteHash(): Promise<Record<string, unknown>> {
  * second database today (see `arunit2-config.ts`).
  */
 export async function connect(): Promise<TestDatabaseConfig> {
-  const { adapter, envConfig } = await testConfigurationHashes();
-  const configs = new DatabaseConfigurations([envConfig]);
+  const { adapter, envConfig, configurationHashes } = await testConfigurationHashes();
+  const configs = new DatabaseConfigurations(configurationHashes);
   Base.configurations(configs);
   DatabaseTasks.databaseConfiguration = configs;
 
@@ -304,7 +328,9 @@ export async function connect(): Promise<TestDatabaseConfig> {
     }
   }
 
-  await Base.establishConnection(envConfig.configuration as Record<string, unknown>);
+  // `connection.rb:32` — established by name, not from the raw hash, so the
+  // pool comes from the same `arunit` entry `Base.configurations` publishes.
+  await Base.establishConnection("arunit");
 
   return { configs, adapter, envConfig };
 }

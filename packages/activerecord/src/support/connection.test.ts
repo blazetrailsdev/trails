@@ -23,11 +23,37 @@ describe("connect", () => {
     vi.unstubAllEnvs();
   });
 
-  it("sets databaseConfiguration and returns a test-env config", async () => {
+  it("sets databaseConfiguration and returns the arunit config", async () => {
     const { configs, envConfig } = await connect();
     expect(DatabaseTasks.databaseConfiguration).toBeInstanceOf(DatabaseConfigurations);
-    expect(envConfig.envName).toBe("test");
-    expect(configs.findDbConfig("test")).toBeDefined();
+    expect(envConfig.envName).toBe("arunit");
+    expect(configs.findDbConfig("arunit")).toBeDefined();
+  });
+
+  it("publishes the three named entries expand_config builds", async () => {
+    const { configurationHashes } = await testConfigurationHashes();
+    expect(configurationHashes.map((c) => c.envName)).toEqual([
+      "arunit",
+      "arunit2",
+      "arunit_without_prepared_statements",
+    ]);
+    expect(configurationHashes.every((c) => c.name === "primary")).toBe(true);
+  });
+
+  it("gives arunit2 its own database and disables prepared statements on the third entry", async () => {
+    vi.stubEnv("ARCONN", "postgresql");
+    const { configurationHashes } = await testConfigurationHashes();
+    const [arunit, arunit2, withoutPrepared] = configurationHashes;
+    expect(arunit2.database).not.toBe(arunit.database);
+    expect(arunit2.database).toMatch(/_arunit2$/);
+    expect(withoutPrepared.database).toBe(arunit.database);
+    expect(withoutPrepared.configurationHash.preparedStatements).toBe(false);
+  });
+
+  it("resolves the established pool from the arunit entry by name", async () => {
+    vi.stubEnv("ARCONN", "sqlite3");
+    await connect();
+    expect(Base.connectionDbConfig().envName).toBe("arunit");
   });
 
   it("selects the sqlite3 connection named by ARCONN", async () => {
