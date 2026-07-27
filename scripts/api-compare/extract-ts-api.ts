@@ -2051,6 +2051,12 @@ function collectImportAliases(sourceFile: ts.SourceFile): Map<string, string> {
  * resolved to the dispatched/original name (see the visit body) so indirect
  * invocations of a ported method still count toward its call set.
  *
+ * A call made under a `!` is recorded TWICE — plainly and with the
+ * NEGATED_CALL_PREFIX marker (`includes` + `!includes`) — so a consumer that
+ * cares about the negation can see it while every consumer that tests
+ * membership by plain name is unaffected. `partitionNegatedCalls` (compare.ts)
+ * splits the two populations back apart.
+ *
  * Wired into method/function bodies (class methods, exported + export-list
  * functions, object-literal mixin methods). Get/set accessor bodies are not
  * captured: the calls-parity check only acts on SIGNIFICANT_CALLS, none of
@@ -2094,11 +2100,10 @@ function isAssignmentWriteTarget(access: ts.PropertyAccessExpression): boolean {
 }
 
 // Whether an expression is the operand of a logical negation — `!xs.includes(y)`,
-// `!(set.has(k))`. Ruby's NEGATING Enumerable idioms (`none?`, `exclude?`) port
-// to a negated JS containment/predicate call, and the wide call ratchet needs to
-// tell `!xs.includes(y)` from a bare `xs.includes(y)` (the inverted condition) —
-// see NEGATED_CALL_PREFIX. Only the immediate parent (through parentheses) counts:
-// `!a && b.has(x)` does not negate the `has`.
+// `!(set.has(k))`. Ruby's negating Enumerable idioms (`none?`, `exclude?`) port to
+// a negated JS call, and the wide call ratchet must tell that from the inverted
+// condition (see NEGATED_CALL_PREFIX). Two shapes are deliberately NOT negations:
+// `!a && b.has(x)` (the `!` binds to `a`), and `!!x`, which is a truthiness cast.
 function isNegatedOperand(expr: ts.Node): boolean {
   let node: ts.Node = expr;
   let parent = node.parent as ts.Node | undefined;
@@ -2106,12 +2111,15 @@ function isNegatedOperand(expr: ts.Node): boolean {
     node = parent;
     parent = node.parent;
   }
-  return (
-    parent !== undefined &&
-    ts.isPrefixUnaryExpression(parent) &&
-    parent.operator === ts.SyntaxKind.ExclamationToken &&
-    parent.operand === node
-  );
+  if (
+    parent === undefined ||
+    !ts.isPrefixUnaryExpression(parent) ||
+    parent.operator !== ts.SyntaxKind.ExclamationToken ||
+    parent.operand !== node
+  ) {
+    return false;
+  }
+  return !isNegatedOperand(parent);
 }
 
 function extractCalls(node: ts.Node | undefined): string[] | undefined {

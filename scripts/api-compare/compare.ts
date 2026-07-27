@@ -109,7 +109,7 @@ import {
   JS_ENUMERABLE_ALIASES,
   jsEnumerableAliases,
   NEGATED_ALIASES,
-  NEGATED_CALL_PREFIX,
+  partitionNegatedCalls,
   requiresNegatedAlias,
 } from "./enumerable-idioms.js";
 
@@ -221,27 +221,7 @@ export const WIDE_SIGNIFICANT_CALLS: { has(value: string): boolean } = {
 
 // Re-exported from the shared idiom table so existing importers (compare.test.ts,
 // the redundancy guard) keep resolving these names from compare.ts.
-export { JS_ENUMERABLE_ALIASES, jsEnumerableAliases, NEGATED_ALIASES };
-
-/**
- * Split a raw TS call-set into the plain call names and the names the extractor
- * saw in a NEGATED position (`!includes` → `includes`). The marked entries are
- * kept OUT of the plain set: they are a second record of a call already in it,
- * so leaving them in would double-count against DELEGATION_MAX_CALLS in
- * {@link isDelegatingWrapper} and make wrapper detection body-shape dependent.
- */
-export function partitionNegatedCalls(raw: Iterable<string>): {
-  calls: Set<string>;
-  negated: Set<string>;
-} {
-  const calls = new Set<string>();
-  const negated = new Set<string>();
-  for (const c of raw) {
-    if (c.startsWith(NEGATED_CALL_PREFIX)) negated.add(c.slice(NEGATED_CALL_PREFIX.length));
-    else calls.add(c);
-  }
-  return { calls, negated };
-}
+export { JS_ENUMERABLE_ALIASES, jsEnumerableAliases, NEGATED_ALIASES, partitionNegatedCalls };
 
 /**
  * Core of the advisory calls-parity check (pure, exported for tests). For a
@@ -1652,10 +1632,10 @@ export function main() {
         // call-set of the method it forwards to (see effectiveTsCalls).
         const own = partitionNegatedCalls(tsCandidateSets.flat());
         const tsCalls = effectiveTsCalls(tsName, own.calls, (n) => tsCallsByName.get(n));
-        // A delegating wrapper is held to its delegate's call-set, so the
-        // delegate's NEGATED calls come along too (unioned the same way).
+        // A wrapper compared against its delegate's calls inherits its negated
+        // ones too, or the delegate's `!xs.includes(y)` would not count.
         const negatedTsCalls = new Set(own.negated);
-        if (tsCalls !== own.calls) {
+        if (isDelegatingWrapper(tsName, own.calls)) {
           for (const c of tsNegatedCallsByName.get(tsName) ?? []) negatedTsCalls.add(c);
         }
         callsCompared++;

@@ -207,11 +207,14 @@ describe("body call capture", () => {
     expect(check.calls).toEqual(["!has", "!includes", "!loaded", "has", "includes", "loaded"]);
   });
 
-  it("does not mark a call whose negation applies to a surrounding expression", () => {
-    // `!a && xs.includes(y)` negates `a`, not the containment call.
+  it("does not mark a call the ! does not actually negate", () => {
+    // `!a &&` binds the negation to `a`; `!!` is a truthiness cast, not a
+    // negation — crediting either would be the same false positive the marker
+    // exists to prevent.
     const cls = extractFromSource(
       `class Foo {
         check(a: boolean, xs: string[]) {
+          if (!!xs.includes("a")) return true;
           return !a && xs.includes("b");
         }
       }`,

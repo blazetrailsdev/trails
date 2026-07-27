@@ -88,3 +88,23 @@ export const NEGATED_CALL_PREFIX = "!";
 export function requiresNegatedAlias(rubyCall: string, tsCall: string): boolean {
   return NEGATED_ALIASES.get(rubyCall)?.has(tsCall) ?? false;
 }
+
+/**
+ * Split a raw TS call-set into the plain call names and the names the extractor
+ * saw in a NEGATED position (`!includes` → `includes`). The marked entries are
+ * kept OUT of the plain set: they are a second record of a call already in it,
+ * so leaving them in would double-count against DELEGATION_MAX_CALLS in
+ * `isDelegatingWrapper` (compare.ts) and make wrapper detection body-shape dependent.
+ */
+export function partitionNegatedCalls(raw: Iterable<string>): {
+  calls: Set<string>;
+  negated: Set<string>;
+} {
+  const calls = new Set<string>();
+  const negated = new Set<string>();
+  for (const c of raw) {
+    if (c.startsWith(NEGATED_CALL_PREFIX)) negated.add(c.slice(NEGATED_CALL_PREFIX.length));
+    else calls.add(c);
+  }
+  return { calls, negated };
+}
