@@ -14,7 +14,6 @@ import { beforeEach } from "vitest";
 import { Base } from "../base.js";
 import { getZone, setZone, resetZone, isZoneExplicit } from "@blazetrails/activesupport";
 import { DelegateCache } from "../relation/delegation.js";
-import { loadDefaults } from "../trailtie.js";
 import {
   setBelongsToRequiredValidatesForeignKey,
   setRaiseOnAssignToAttrReadonly,
@@ -29,12 +28,6 @@ import {
   TEST_DETERMINISTIC_KEY,
   TEST_KEY_DERIVATION_SALT,
 } from "../encryption/test-keys.js";
-
-// The test app runs with the Rails 7.0+ defaults (`config.load_defaults 7.0`),
-// which sets `config.active_record.partial_inserts = false` (partial_updates
-// stays true). Use the versioned-defaults mechanism rather than poking Base
-// directly; this exercises the real code path that a consuming app would use.
-loadDefaults("7.0");
 
 // Mirror Rails activerecord/test/cases/helper.rb:46 — register the fake adapter
 // for the whole suite, before any model calls establish_connection(adapter:

@@ -66,13 +66,6 @@ describe("HotCompatibilityTest", () => {
     class HotCompatibility extends Base {}
     HotCompatibility.tableName = "hot_compatibilities";
     (HotCompatibility as unknown as { adapter: DatabaseAdapter }).adapter = adapter;
-    // Rails' AR test suite runs with the gem default `partial_inserts = true`
-    // (dirty.rb:50); only attributes assigned away from their default are
-    // written, so the dropped `bar` is simply omitted from the INSERT. The
-    // trails test harness flips this to false via `load_defaults("7.0")`
-    // (cases/helper.ts), so restore the Rails-ambient default for this model.
-    HotCompatibility.partialInserts = true;
-
     return { klass: HotCompatibility, adapter };
   }
 
