@@ -31,6 +31,7 @@ import {
   type IdHashOptions,
   type SchemaStatementsLike,
   type ForeignKeyLookupOptions,
+  type RemoveForeignKeyOptions,
 } from "./schema-definitions.js";
 import { SchemaCreation } from "./schema-creation.js";
 import { maxIdentifierLength } from "./database-limits.js";
@@ -847,10 +848,11 @@ export class SchemaStatements {
 
   async removeForeignKey(
     fromTable: string,
-    toTableOrOptions?:
-      | string
-      | { column?: string; name?: string; toTable?: string; ifExists?: boolean },
-    options: { column?: string; name?: string; ifExists?: boolean } = {},
+    toTableOrOptions?: string | RemoveForeignKeyOptions,
+    // Rails' `remove_foreign_key(from_table, to_table = nil, **options)` accepts
+    // whatever add_foreign_key took (e.g. `on_delete:`) and only slices out the
+    // keys it matches on, so unrecognized options are carried, not rejected.
+    options: RemoveForeignKeyOptions = {},
   ): Promise<void> {
     const adapter = this.adapter as any;
     if (
@@ -866,7 +868,7 @@ export class SchemaStatements {
     // name / to_table against the live foreign keys) rather than deriving a
     // name, so a hashed `fk_rails_<hex>` name drops correctly.
     let toTable: string | undefined;
-    let opts: { column?: string; name?: string; toTable?: string; ifExists?: boolean };
+    let opts: RemoveForeignKeyOptions;
     if (typeof toTableOrOptions === "object" && toTableOrOptions !== null) {
       opts = { ...toTableOrOptions };
       toTable = opts.toTable;

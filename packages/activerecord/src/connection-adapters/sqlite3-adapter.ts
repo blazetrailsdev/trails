@@ -102,6 +102,7 @@ import {
   CheckConstraintDefinition,
   ForeignKeyDefinition,
   type AddForeignKeyOptions,
+  type RemoveForeignKeyOptions,
 } from "./abstract/schema-definitions.js";
 import { Column } from "./column.js";
 import { Column as Sqlite3Column } from "./sqlite3/column.js";
@@ -1824,24 +1825,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     await this.addColumn(tableName, "updated_at", "datetime", opts);
   }
 
-  async addReference(
-    tableName: string,
-    refName: string,
-    options?: Record<string, unknown>,
-  ): Promise<void> {
-    const type = (options?.type as string) ?? "integer";
-    await this.addColumn(tableName, `${refName}_id`, type, options);
-  }
-
-  /** Alias of addReference (Rails: `alias :add_belongs_to :add_reference`). */
-  async addBelongsTo(
-    tableName: string,
-    refName: string,
-    options?: Record<string, unknown>,
-  ): Promise<void> {
-    return this.addReference(tableName, refName, options);
-  }
-
   async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
     const { schema, bare } = this._splitTableName(tableName);
     const prefix = schema ? `${quoteColumnName(schema)}.` : "";
@@ -2283,23 +2266,20 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    */
   async removeForeignKey(
     fromTable: string,
-    toTableOrOptions?:
-      | string
-      | { column?: string; name?: string; toTable?: string; ifExists?: boolean },
+    toTableOrOptions?: string | RemoveForeignKeyOptions,
+    options: RemoveForeignKeyOptions = {},
   ): Promise<void> {
-    let explicitToTable: string | undefined;
-    let column: string | undefined;
-    let name: string | undefined;
-    let ifExists = false;
-
-    if (typeof toTableOrOptions === "string") {
-      explicitToTable = toTableOrOptions;
-    } else if (toTableOrOptions) {
-      column = toTableOrOptions.column;
-      name = toTableOrOptions.name;
-      explicitToTable = toTableOrOptions.toTable;
-      ifExists = toTableOrOptions.ifExists === true;
-    }
+    // Rails' `remove_foreign_key(from_table, to_table = nil, **options)` reads
+    // to_table and the options independently, so a positional to_table can be
+    // narrowed by a `column:` option (test_remove_foreign_key_by_the_select_one_on_the_same_table).
+    const opts: RemoveForeignKeyOptions =
+      typeof toTableOrOptions === "object" && toTableOrOptions !== null
+        ? { ...toTableOrOptions, ...options }
+        : { ...options };
+    const explicitToTable = typeof toTableOrOptions === "string" ? toTableOrOptions : opts.toTable;
+    const column = typeof opts.column === "string" ? opts.column : undefined;
+    const name = opts.name;
+    const ifExists = opts.ifExists === true;
 
     if (!explicitToTable && !column && !name) {
       throw new Error("removeForeignKey requires a target table or options");
@@ -2316,15 +2296,15 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         const parsedName = fkNames.get(fkKey) ?? `fk_${bareFrom}_${fkCols.join("_")}`;
         return parsedName === name;
       }
+      if (explicitToTable && fk.toTable !== explicitToTable) return false;
       if (column) return fkCols.includes(column);
-      if (explicitToTable) return fk.toTable === explicitToTable;
-      return false;
+      return explicitToTable != null;
     });
 
     if (!fkToRemove) {
       if (ifExists) return;
-      throw new Error(
-        `Table '${fromTable}' has no foreign key for ${explicitToTable || JSON.stringify(toTableOrOptions)}`,
+      throw new ArgumentError(
+        `Table '${fromTable}' has no foreign key for ${explicitToTable || JSON.stringify(opts)}`,
       );
     }
 

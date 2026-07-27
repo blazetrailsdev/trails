@@ -88,6 +88,7 @@ import type {
   CreateIndexDefinition,
   AddForeignKeyOptions,
   ForeignKeyLookupOptions,
+  RemoveForeignKeyOptions,
   AddIndexOptions,
   ColumnType,
   ColumnOptions,
@@ -365,9 +366,8 @@ export interface AbstractAdapter {
   addForeignKey(fromTable: string, toTable: string, options?: AddForeignKeyOptions): Promise<void>;
   removeForeignKey(
     fromTable: string,
-    toTableOrOptions?:
-      | string
-      | { column?: string; name?: string; toTable?: string; ifExists?: boolean },
+    toTableOrOptions?: string | RemoveForeignKeyOptions,
+    options?: RemoveForeignKeyOptions,
   ): Promise<void>;
   addReference(
     tableName: string,

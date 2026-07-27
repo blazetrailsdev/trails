@@ -35,6 +35,7 @@ interface SQLite3SchemaAdapter extends DatabaseAdapter {
   removeForeignKey(
     fromTable: string,
     toTableOrOptions?: string | Record<string, unknown>,
+    options?: Record<string, unknown>,
   ): Promise<void>;
   checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]>;
   addCheckConstraint(
@@ -62,8 +63,9 @@ export async function removeForeignKey(
   adapter: SQLite3SchemaAdapter,
   fromTable: string,
   toTableOrOptions?: string | Record<string, unknown>,
+  options?: Record<string, unknown>,
 ): Promise<void> {
-  return adapter.removeForeignKey(fromTable, toTableOrOptions);
+  return adapter.removeForeignKey(fromTable, toTableOrOptions, options);
 }
 
 export async function checkConstraints(

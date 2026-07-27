@@ -1,7 +1,9 @@
 /**
- * Port of the `add_foreign_key` half of
+ * Port of the `add_foreign_key` and `remove_foreign_key` halves of
  * `ActiveRecord::Migration::ForeignKeyTest`
- * (vendor/rails/activerecord/test/cases/migration/foreign_key_test.rb:209-330).
+ * (vendor/rails/activerecord/test/cases/migration/foreign_key_test.rb:209-330
+ * and :393-451, :749-773). The `SchemaDumpingHelper`-driven dumper cases in the
+ * same Rails class are still unported.
  *
  * Driven by the ambient connection, mirroring Rails'
  * `@connection = ActiveRecord::Base.lease_connection`. The rockets/astronauts
@@ -218,6 +220,130 @@ describe("ActiveRecord::Migration::ForeignKeyTest", () => {
       );
       expect(e).toBeInstanceOf(StatementInvalid);
       expect((e as Error).message).toMatch(/missions/);
+    });
+  });
+
+  it("remove foreign key inferes column", async () => {
+    const conn = await ambientConnection();
+    await withRocketTables(conn, async () => {
+      await conn.addForeignKey("astronauts", "rockets");
+
+      expect((await conn.foreignKeys("astronauts")).length).toBe(1);
+      await conn.removeForeignKey("astronauts", "rockets");
+      expect(await conn.foreignKeys("astronauts")).toEqual([]);
+    });
+  });
+
+  it("remove foreign key by column", async () => {
+    const conn = await ambientConnection();
+    await withRocketTables(conn, async () => {
+      await conn.addForeignKey("astronauts", "rockets", { column: "rocket_id" });
+
+      expect((await conn.foreignKeys("astronauts")).length).toBe(1);
+      await conn.removeForeignKey("astronauts", { column: "rocket_id" });
+      expect(await conn.foreignKeys("astronauts")).toEqual([]);
+    });
+  });
+
+  // Rails distinguishes `column: :rocket_id` from `column: "rocket_id"` because
+  // Ruby symbols and strings are different objects; TypeScript has only the
+  // string, so this is the same call as the case above — kept because
+  // test:compare matches Rails test names one-for-one.
+  it("remove foreign key by symbol column", async () => {
+    const conn = await ambientConnection();
+    await withRocketTables(conn, async () => {
+      await conn.addForeignKey("astronauts", "rockets", { column: "rocket_id" });
+
+      expect((await conn.foreignKeys("astronauts")).length).toBe(1);
+      await conn.removeForeignKey("astronauts", { column: "rocket_id" });
+      expect(await conn.foreignKeys("astronauts")).toEqual([]);
+    });
+  });
+
+  // Rails: `skip if current_adapter?(:SQLite3Adapter)` — SQLite's
+  // PRAGMA foreign_key_list exposes no constraint name to look up.
+  it.skipIf(!unlessSqlite3Adapter)("remove foreign key by name", async () => {
+    const conn = await ambientConnection();
+    await withRocketTables(conn, async () => {
+      await conn.addForeignKey("astronauts", "rockets", {
+        column: "rocket_id",
+        name: "fancy_named_fk",
+      });
+
+      expect((await conn.foreignKeys("astronauts")).length).toBe(1);
+      await conn.removeForeignKey("astronauts", { name: "fancy_named_fk" });
+      expect(await conn.foreignKeys("astronauts")).toEqual([]);
+    });
+  });
+
+  it("remove foreign non existing foreign key raises", async () => {
+    const conn = await ambientConnection();
+    await withRocketTables(conn, async () => {
+      const e = await conn.removeForeignKey("astronauts", "rockets").then(
+        () => undefined,
+        (err: unknown) => err,
+      );
+      expect(e).toBeInstanceOf(ArgumentError);
+      expect((e as Error).message).toBe("Table 'astronauts' has no foreign key for rockets");
+    });
+  });
+
+  it("remove foreign key by the select one on the same table", async () => {
+    const conn = await ambientConnection();
+    await withRocketTables(conn, async () => {
+      await conn.addForeignKey("astronauts", "rockets");
+      await conn.addReference("astronauts", "myrocket", {
+        foreignKey: { toTable: "rockets" },
+      });
+
+      expect((await conn.foreignKeys("astronauts")).length).toBe(2);
+
+      await conn.removeForeignKey("astronauts", "rockets", { column: "myrocket_id" });
+
+      const remaining = await conn.foreignKeys("astronauts");
+      expect(remaining.map((fk) => [fk.fromTable, fk.toTable, fk.column])).toEqual([
+        ["astronauts", "rockets", "rocket_id"],
+      ]);
+    });
+  });
+
+  it("remove foreign key with restrict action", async () => {
+    const conn = await ambientConnection();
+    await withRocketTables(conn, async () => {
+      await conn.addForeignKey("astronauts", "rockets", { onDelete: "restrict" });
+      expect((await conn.foreignKeys("astronauts")).length).toBe(1);
+      await conn.removeForeignKey("astronauts", "rockets", { onDelete: "restrict" });
+      expect(await conn.foreignKeys("astronauts")).toEqual([]);
+    });
+  });
+
+  it("remove foreign key with if exists not set", async () => {
+    const conn = await ambientConnection();
+    await withRocketTables(conn, async () => {
+      await conn.addForeignKey("astronauts", "rockets");
+      expect((await conn.foreignKeys("astronauts")).length).toBe(1);
+
+      await conn.removeForeignKey("astronauts", "rockets");
+      expect(await conn.foreignKeys("astronauts")).toEqual([]);
+
+      const error = await conn.removeForeignKey("astronauts", "rockets").then(
+        () => undefined,
+        (err: unknown) => err,
+      );
+      expect((error as Error).message).toBe("Table 'astronauts' has no foreign key for rockets");
+    });
+  });
+
+  it("remove foreign key with if exists set", async () => {
+    const conn = await ambientConnection();
+    await withRocketTables(conn, async () => {
+      await conn.addForeignKey("astronauts", "rockets");
+      expect((await conn.foreignKeys("astronauts")).length).toBe(1);
+
+      await conn.removeForeignKey("astronauts", "rockets", { ifExists: true });
+      expect(await conn.foreignKeys("astronauts")).toEqual([]);
+
+      await conn.removeForeignKey("astronauts", "rockets", { ifExists: true });
     });
   });
 });
