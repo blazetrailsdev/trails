@@ -1384,6 +1384,8 @@ export function hasInternalJsDocTag(node: ts.Node): boolean {
  * is otherwise preserved verbatim. An empty reason is a hard error: the tag is
  * the only thing standing between a name and the extra-surface count, so an
  * unjustified one would suppress drift with no argument for it (RFC 0080).
+ * The family's empty-reason contract (shared with `@missingRailsCall`) is
+ * stated in docs/infrastructure/api-build-stub-generation-plan.md.
  */
 export function noRailsEquivalentReason(node: ts.Node): string | undefined {
   for (const tag of ts.getJSDocTags(node)) {

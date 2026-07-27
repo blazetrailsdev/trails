@@ -83,19 +83,40 @@ const TAG_LINE = /^\s*\*?\s*@missingRailsCall\s+(\S+)(?:\s+—\s?(.*))?$/;
 // run: core.ts initInternals).
 const ANY_TAG_LINE = /^\s*\*?\s?@\S/;
 
+/** Where a JSDoc comment starts, so an empty-reason error can name a
+ *  `file:line` the way `noRailsEquivalentReason` does. */
+export interface JsdocOrigin {
+  fileName: string;
+  /** 1-based line of the comment's first line in `fileName`. */
+  startLine: number;
+}
+
 /** Parse a JSDoc comment's text (including delimiters) into its non-tag lines
  *  and its `@missingRailsCall` entries. Continuation lines (not starting a new
- *  `@` tag) attach to the preceding entry. */
-export function parseJsdoc(comment: string): { rest: string[]; entries: TagEntry[] } {
+ *  `@` tag) attach to the preceding entry.
+ *
+ *  An empty reason is a hard error, matching `@noRailsEquivalent` (RFC 0080):
+ *  every tag in the tree is written with a reason — the generator always emits
+ *  the curated baseline row's prose or a placeholder — so a bare tag is
+ *  necessarily hand-authored, and backfilling it with a placeholder would turn
+ *  an unjustified allowlist entry into a silently blessed one. The family's
+ *  empty-reason contract is stated in
+ *  docs/infrastructure/api-build-stub-generation-plan.md. */
+export function parseJsdoc(
+  comment: string,
+  origin?: JsdocOrigin,
+): { rest: string[]; entries: TagEntry[] } {
   const lines = comment.split("\n");
   const rest: string[] = [];
   const entries: TagEntry[] = [];
+  const tagLineOf = new Map<TagEntry, number>();
   let open: TagEntry | null = null;
-  for (const line of lines) {
+  for (const [index, line] of lines.entries()) {
     const m = line.match(TAG_LINE);
     if (m) {
       open = { call: m[1]!, reason: m[2] ?? "", rawLines: [line] };
       entries.push(open);
+      tagLineOf.set(open, index);
       continue;
     }
     const closes = line.trim() === "*/" || line.trim().endsWith("*/");
@@ -106,6 +127,16 @@ export function parseJsdoc(comment: string): { rest: string[]; entries: TagEntry
     }
     open = null;
     rest.push(line);
+  }
+  for (const entry of entries) {
+    if (entry.reason !== "") continue;
+    const at = origin
+      ? `${origin.fileName}:${origin.startLine + (tagLineOf.get(entry) ?? 0)}`
+      : entry.call;
+    throw new Error(
+      `${TAG} needs a reason: ${at} — state why the Rails call \`${entry.call}\` ` +
+        "is not made here.",
+    );
   }
   return { rest, entries };
 }
@@ -250,7 +281,15 @@ export function reconcileFileText(
       if (exp || (comment && comment.includes(TAG))) {
         const lineStart = text.lastIndexOf("\n", node.getStart(sf)) + 1;
         const indent = text.slice(lineStart, node.getStart(sf)).match(/^\s*/)?.[0] ?? "";
-        const { rest, entries } = parseJsdoc(comment ?? "");
+        const { rest, entries } = parseJsdoc(
+          comment ?? "",
+          jsdocRange
+            ? {
+                fileName,
+                startLine: sf.getLineAndCharacterOfPosition(jsdocRange.pos).line + 1,
+              }
+            : undefined,
+        );
         const expected = exp?.calls ?? new Set<string>();
         const r = reconcile(entries, expected, (c) =>
           exp ? reasonFor(exp.rubyName, c) : DEFAULT_TAG_REASON,

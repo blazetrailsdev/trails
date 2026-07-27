@@ -293,6 +293,26 @@ report). They therefore share:
 - **Only-shrink gating** — a tag whose condition no longer holds (the call is
   now made; the extra is no longer extra) fails the run exactly as a stale
   JSON row does today, and the fix is deleting the tag next to the code.
+- **Empty-reason handling — a tag with no reason is a hard error, for both
+  tags.** This is the single statement of the family's empty-reason contract;
+  neither tag's reader has a permissive mode.
+  - `@noRailsEquivalent`: raised at extraction time by
+    `noRailsEquivalentReason` (`extract-ts-api.ts:1356`). The tag is the only
+    thing standing between a name and the extra-surface count, so an
+    unjustified one would suppress drift with no argument for it.
+  - `@missingRailsCall`: raised by `parseJsdoc` (`build.ts`), with the same
+    `<tag> needs a reason: <file>:<line> — <what to write>` message shape. A
+    bare tag in the tree is necessarily **hand-authored**: the generator
+    always writes a reason — either the curated baseline row's prose or a
+    placeholder (`unported (api:build stub)` / the wide `DEFAULT_REASON`) —
+    so there is no generated bare tag to protect. Backfilling a hand-written
+    bare tag with a placeholder would silently convert an unjustified
+    allowlist entry into a blessed one, which is exactly the failure mode the
+    sibling tag rejects.
+
+  The placeholder path is unaffected: a generator-authored placeholder is a
+  non-empty reason, so it parses, round-trips byte-for-byte via `rawLines`,
+  and still drops without a harvest report when the call converges.
 
 Two things are deliberately **not** shared, and the difference is load-bearing:
 
@@ -305,15 +325,10 @@ Two things are deliberately **not** shared, and the difference is load-bearing:
   round-trips byte-for-byte, which is what makes a re-run with no diff a no-op.
   A flattened AST read cannot reproduce the original wrapping, so the two
   readers stay distinct.
-- **Empty-reason handling.** An empty `@noRailsEquivalent` reason is a hard
-  extraction-time error (`extract-ts-api.ts:1356`): the tag is the only thing
-  standing between a name and the extra-surface count, so an unjustified one
-  would suppress drift with no argument for it.
-  `@missingRailsCall` parses a bare tag as `reason: ""` (`build.ts:97`) —
-  reconcile then fills the reason from the curated baseline row or the
-  placeholder, so an empty one is an input state, not an error. Nothing in
-  this section changes that; tightening it would be a change to `api:build`,
-  which RFC 0080 lists as a non-goal.
+- **Where the error is raised.** `@noRailsEquivalent` fails during extraction;
+  `@missingRailsCall` fails when `api:build` parses the block it is about to
+  rewrite, because nothing else reads that tag. Same contract (above), two
+  entry points.
 
 ### `@noRailsEquivalent` vs `@internal`
 

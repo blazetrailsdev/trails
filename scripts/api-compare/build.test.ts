@@ -29,6 +29,24 @@ describe("parseJsdoc", () => {
     expect(rest.join("\n")).toContain("Mirrors Rails");
     expect(rest.join("\n")).not.toContain("@missingRailsCall");
   });
+
+  it("rejects a bare tag with a file:line message", () => {
+    const comment = [
+      "/**",
+      " * Mirrors Rails `Base.all`.",
+      " * @missingRailsCall merge!",
+      " */",
+    ].join("\n");
+    expect(() => parseJsdoc(comment, { fileName: "foo.ts", startLine: 10 })).toThrow(
+      /@missingRailsCall needs a reason: foo\.ts:12 — state why the Rails call `merge!`/,
+    );
+  });
+
+  it("rejects a tag whose em-dash carries no prose", () => {
+    expect(() => parseJsdoc("/**\n * @missingRailsCall merge! — \n */")).toThrow(
+      /@missingRailsCall needs a reason/,
+    );
+  });
 });
 
 describe("reconcile", () => {
@@ -152,5 +170,19 @@ describe("reconcileFileText", () => {
     expect(text!).not.toContain("@missingRailsCall");
     expect(text!).not.toContain("/**");
     expect(text!).toContain("  bar(): void {}");
+  });
+
+  it("rejects a hand-authored bare tag, naming the tag's own line", () => {
+    const src = [
+      "export class Foo {",
+      "  /**",
+      "   * @missingRailsCall bare_call",
+      "   */",
+      "  bar(): void {}",
+      "}",
+    ].join("\n");
+    expect(() => reconcileFileText("foo.ts", src, new Map(), () => "x")).toThrow(
+      /@missingRailsCall needs a reason: foo\.ts:3 —/,
+    );
   });
 });
