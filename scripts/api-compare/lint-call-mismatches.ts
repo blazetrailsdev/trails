@@ -64,6 +64,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, PACKAGES, ROOT_DIR } from "./config.js";
+import { reportNonCanonicalBaselines, serializeBaseline } from "./baseline-json.js";
 
 const BASELINE_PATH = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -286,10 +287,12 @@ async function main(write: boolean): Promise<number> {
 
   if (write) {
     const next = reseed(current, baseline);
-    await fs.writeFile(BASELINE_PATH, JSON.stringify(next, null, 2) + "\n");
+    await fs.writeFile(BASELINE_PATH, serializeBaseline(next));
     console.log(`Wrote ${BASELINE_PATH}: ${next.length} baselined call mismatches`);
     return 0;
   }
+
+  if (await reportNonCanonicalBaselines([BASELINE_PATH], "call-mismatches ratchet")) return 1;
 
   const { added, stale } = diffAgainstBaseline(current, baseline);
 

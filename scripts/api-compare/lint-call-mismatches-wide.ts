@@ -64,6 +64,7 @@ import {
   missingScope,
   reseed,
 } from "./lint-call-mismatches.js";
+import { reportNonCanonicalBaselines, serializeBaseline } from "./baseline-json.js";
 
 // The baseline is a directory of per-source-file JSON arrays (see header),
 // not a single file. Each entry lives at <BASELINE_DIR>/<package>/<tsFile
@@ -151,7 +152,7 @@ export async function writeSplitBaseline(entries: ExcludeEntry[], dir: string): 
   for (const [rel, arr] of byFile) {
     const dest = path.join(dir, rel);
     await fs.mkdir(path.dirname(dest), { recursive: true });
-    await fs.writeFile(dest, JSON.stringify(sortKeys(arr), null, 2) + "\n");
+    await fs.writeFile(dest, serializeBaseline(sortKeys(arr)));
     existing.delete(rel);
   }
 
@@ -240,6 +241,9 @@ async function main(write: boolean): Promise<number> {
     );
     return 0;
   }
+
+  const files = await listJsonFiles(BASELINE_DIR);
+  if (await reportNonCanonicalBaselines(files, "wide call-mismatches ratchet")) return 1;
 
   const { added, stale } = diffAgainstBaseline(current, baseline);
 
