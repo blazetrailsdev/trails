@@ -33,11 +33,17 @@ export function repoRel(filename) {
   return m ? m[1] : null;
 }
 
-// Symbols that must not be imported directly into a test file.
-export const BANNED = new Set(["ensureCanonicalTables", "loadCanonicalSchema"]);
+// Symbols that must not be imported directly into a test file. `loadSchema`
+// (support/load-schema-helper.ts, the port of `LoadSchemaHelper#load_schema`)
+// wraps `loadCanonicalSchema`, so banning only the wrapped symbol would leave
+// the same schema-wiring backdoor open under a different name.
+export const BANNED = new Set(["ensureCanonicalTables", "loadCanonicalSchema", "loadSchema"]);
 
 // Test files permitted to import the banned loaders (they test them directly).
-export const ALLOW = new Set(["packages/activerecord/src/support/canonical-schema.test.ts"]);
+export const ALLOW = new Set([
+  "packages/activerecord/src/support/canonical-schema.test.ts",
+  "packages/activerecord/src/support/load-schema-helper.test.ts",
+]);
 
 /** True when `source` resolves to the canonical-schema test helper module. */
 function isCanonicalSchemaModule(source) {
@@ -45,7 +51,7 @@ function isCanonicalSchemaModule(source) {
   // same-directory import from inside support/ (`./canonical-schema.js`)
   // is caught, not just the `../../support/canonical-schema.js` form. The
   // repo has a single canonical-schema module, so basename matching is safe.
-  return /(?:^|\/)canonical-schema(?:\.js)?$/.test(source);
+  return /(?:^|\/)(?:canonical-schema|load-schema-helper)(?:\.js)?$/.test(source);
 }
 
 /** @type {import("eslint").Rule.RuleModule} */
