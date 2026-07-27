@@ -106,11 +106,7 @@ interface PrimaryKeyInstance {
   writeAttribute(name: string, value: unknown): void;
 }
 
-/**
- * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id
- * @internal
- */
-export function getId(this: PrimaryKeyInstance): unknown {
+function readId(this: PrimaryKeyInstance): unknown {
   const ctor = this.constructor as any;
   const pk = ctor.primaryKey as string | string[] | null;
   if (Array.isArray(pk)) return pk.map((col) => this._readAttribute(col));
@@ -119,11 +115,7 @@ export function getId(this: PrimaryKeyInstance): unknown {
   return this._readAttribute(pk as string);
 }
 
-/**
- * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id=
- * @internal
- */
-export function setId(this: PrimaryKeyInstance, value: unknown): void {
+function writeId(this: PrimaryKeyInstance, value: unknown): void {
   const ctor = this.constructor as any;
   const pk = ctor.primaryKey as string | string[] | null;
   if (Array.isArray(pk)) {
@@ -153,6 +145,32 @@ export function setId(this: PrimaryKeyInstance, value: unknown): void {
     this.writeAttribute("id", value);
   } else {
     this._writeAttribute(pk, value);
+  }
+}
+
+/**
+ * Home for the module's `id` accessor pair. Ruby names a writer after its
+ * reader (`id` / `id=`); TypeScript can only spell that pair as a `get`/`set`
+ * on a prototype, and two exported functions in one module can't share a name —
+ * so a `setId`-style export would be surface Rails does not have. Hosts pick
+ * the pair up with `include()` from `@blazetrails/activesupport`, which copies
+ * accessor descriptors intact.
+ *
+ * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey
+ */
+export class PrimaryKey {
+  // The host surface is asserted at the call, not declared as class fields:
+  // a `declare writeAttribute` here would register as TS surface this Rails
+  // module does not have (api:extra flags it as moved from write.rb).
+
+  /** Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id */
+  get id(): unknown {
+    return readId.call(this as unknown as PrimaryKeyInstance);
+  }
+
+  /** Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id= */
+  set id(value: unknown) {
+    writeId.call(this as unknown as PrimaryKeyInstance, value);
   }
 }
 
@@ -269,10 +287,10 @@ export function primaryKey(this: PrimaryKeyHost, value?: string | string[]): str
  */
 export function id(this: PrimaryKeyInstance, value?: unknown): unknown {
   if (value !== undefined) {
-    setId.call(this, value);
+    writeId.call(this, value);
     return value;
   }
-  return getId.call(this);
+  return readId.call(this);
 }
 
 export function isInstanceMethodAlreadyImplemented(

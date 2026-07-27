@@ -194,8 +194,7 @@ import {
 import { normalizedAttributes as _normalizedAttributes } from "./normalization.js";
 import {
   toKey as _toKey,
-  getId as _getId,
-  setId as _setId,
+  PrimaryKey as _PrimaryKey,
   getPrimaryKeyAttr as _getPrimaryKeyAttr,
   setPrimaryKeyAttr as _setPrimaryKeyAttr,
   isCompositePrimaryKey as _isCompositePrimaryKey,
@@ -796,7 +795,7 @@ function _collectNestedAttributeSetterKeys(ctor: typeof Base | undefined): Set<s
  * handling: trails holds the `id` key out of super()'s attribute loop and
  * re-dispatches it here, once `initInternals` has run.
  *
- * `id: [a, b]` goes through the `id=` setter (`setId`, mirroring
+ * `id: [a, b]` goes through the `id=` setter (`PrimaryKey#id=`, mirroring
  * `CompositePrimaryKey#id=`), which zips the Enumerable (array/set) across the
  * key columns. A scalar `id` on a model-level composite PK raises `TypeError`
  * there, matching Rails (which wants `id: [author_id, id]`, not a bare scalar).
@@ -809,7 +808,7 @@ function _applyCompositePrimaryKey(
 ): void {
   const pk = (ctor as { primaryKey?: unknown }).primaryKey;
   if (!Array.isArray(pk) || !Object.prototype.hasOwnProperty.call(attrs, "id")) return;
-  // Dispatch through the `id=` setter (`setId`): an array spreads across the key
+  // Dispatch through the `id=` setter (`PrimaryKey#id=`): an array spreads across the key
   // columns; a scalar raises TypeError, matching `CompositePrimaryKey#id=`.
   (record as unknown as { id: unknown }).id = (attrs as { id: unknown }).id;
 }
@@ -3417,13 +3416,9 @@ export class Base extends Model {
 
   declare writeAttribute: typeof ReadonlyAttributes.writeAttribute;
 
-  get id(): PrimaryKeyValue {
-    return _getId.call(this) as PrimaryKeyValue;
-  }
-
-  set id(value: PrimaryKeyValue) {
-    _setId.call(this, value);
-  }
+  // `id` / `id=` are the PrimaryKey module's accessor pair; wired onto the
+  // prototype via include() below so they keep their Rails name.
+  declare id: PrimaryKeyValue;
 
   // increment/decrement/toggle + bang variants wired via include() below;
   // signatures live on the merged `interface Base` at the bottom of this file.
@@ -4962,6 +4957,7 @@ include(Base, {
   writeStoreAttribute: _writeStoreAttributeMethod,
   storeAccessorFor: _storeAccessorForMethod,
 });
+include(Base, _PrimaryKey);
 include(Base, LockingPessimistic.InstanceMethods);
 include(Base, LockingOptimistic.InstanceMethods);
 include(Base, Timestamp.InstanceMethods);

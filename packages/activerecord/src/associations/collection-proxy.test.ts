@@ -685,7 +685,7 @@ describe("CollectionProxy#delete / #destroy through has_many :through — nil on
 });
 
 // RFC 0006 S1 — targetsByPrimaryKey() across non-default primary keys. The
-// token routes through `record.id` → `_getId` → `_readAttribute(primaryKey)`,
+// token routes through `record.id` → `PrimaryKey#id` → `_readAttribute(primaryKey)`,
 // so a custom single-column PK and a composite PK must key correctly, and a
 // composite new record (an `id` array with null parts) must be skipped.
 // Canonical models: `CpkAuthor has_many :books` (CpkBook PK `[author_id, id]`)
