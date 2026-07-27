@@ -12,7 +12,7 @@ import {
   PostgreSQLAdapter,
   PG_TEST_URL,
 } from "../adapters/postgresql/test-helper.js";
-import { rebuildCanonicalTables } from "../test-helpers/canonical-schema.js";
+import { rebuildCanonicalTables } from "../support/canonical-schema.js";
 
 describeIfPg("ActiveRecord::Migration", () => {
   let connection: PostgreSQLAdapter;

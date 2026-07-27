@@ -17,7 +17,7 @@ import {
   PostgreSQLAdapter,
   PG_TEST_URL,
 } from "../adapters/postgresql/test-helper.js";
-import { rebuildCanonicalTables } from "../test-helpers/canonical-schema.js";
+import { rebuildCanonicalTables } from "../support/canonical-schema.js";
 
 const EXPRESSION = "daterange(start_date, end_date) WITH &&";
 
