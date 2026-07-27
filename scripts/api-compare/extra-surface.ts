@@ -342,6 +342,15 @@ interface PackageTotals {
   totalNovel: number;
   totalMoved: number;
   totalAllowlisted: number;
+  /**
+   * The `rubyFile === null` slice of the totals above — files no Rails file
+   * maps onto. Broken out so a consumer can tell how much of a package's
+   * extra surface comes from that population (it was unmeasured before this
+   * existed, so folding it in silently would read as a regression).
+   */
+  noCounterpartFiles: number;
+  noCounterpartExtras: number;
+  noCounterpartNovel: number;
   extraFiles: ExtraFile[];
 }
 
@@ -381,6 +390,11 @@ Options:
   --max-detail <N>     Per-file detail listing cap (default 40 names;
                        0 = unlimited)
   --help               This message
+
+TS files that no Rails file maps onto are scored too, with an empty allowed
+set — every public name in them is extra. Trees mirroring Rails' test/ code
+(test-helpers/, support/, cases/, fixture corpora) are held out, since the Ruby
+extractor reads lib/ only. The NoCntrp column reports that slice separately.
 
 Reasoned exceptions: an extra is allowed by tagging its TS declaration
 \`@noRailsEquivalent <reason>\` in JSDoc. Allowed extras are subtracted from the
@@ -801,6 +815,9 @@ function buildPackageReport(
     totalNovel: 0,
     totalMoved: 0,
     totalAllowlisted: 0,
+    noCounterpartFiles: 0,
+    noCounterpartExtras: 0,
+    noCounterpartNovel: 0,
     extraFiles: [],
   };
   if (!rubyPkg || !tsPkg) return result;
@@ -935,6 +952,11 @@ function buildPackageReport(
     result.totalExtras += extras.length;
     result.totalNovel += novelCount;
     result.totalMoved += movedCount;
+    if (rubyFile === null) {
+      result.noCounterpartFiles++;
+      result.noCounterpartExtras += extras.length;
+      result.noCounterpartNovel += novelCount;
+    }
   }
 
   // Rank order: novel-first when --novel-only is on (only novel exists),
@@ -1010,17 +1032,20 @@ function printHumanReport(report: Report, topN: number, maxDetail: number): void
 
   console.log(`${p.bold}Per-package totals${p.reset}`);
   console.log(
-    `  ${"Package".padEnd(20)} ${"Files".padStart(7)} ${"Novel".padStart(7)} ${"Moved".padStart(7)} ${"Total".padStart(7)} ${"Allowed".padStart(7)}`,
+    `  ${"Package".padEnd(20)} ${"Files".padStart(7)} ${"Novel".padStart(7)} ${"Moved".padStart(7)} ${"Total".padStart(7)} ${"Allowed".padStart(7)} ${"NoCntrp".padStart(7)}`,
   );
   console.log(
-    `  ${"-".repeat(20)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)}`,
+    `  ${"-".repeat(20)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)}`,
   );
   for (const pkg of report.packages) {
     const novel = padNumCell(pkg.totalNovel, colorCount(pkg.totalNovel, p), 7);
     console.log(
-      `  ${pkg.package.padEnd(20)} ${String(pkg.filesWithDrift).padStart(7)} ${novel} ${String(pkg.totalMoved).padStart(7)} ${String(pkg.totalExtras).padStart(7)} ${String(pkg.totalAllowlisted).padStart(7)}`,
+      `  ${pkg.package.padEnd(20)} ${String(pkg.filesWithDrift).padStart(7)} ${novel} ${String(pkg.totalMoved).padStart(7)} ${String(pkg.totalExtras).padStart(7)} ${String(pkg.totalAllowlisted).padStart(7)} ${String(pkg.noCounterpartExtras).padStart(7)}`,
     );
   }
+  console.log(
+    `${p.dim}  NoCntrp = the slice of Total from TS files no Rails file maps onto (scored with an empty allowed set).${p.reset}`,
+  );
   console.log(
     `\n${p.dim}@noRailsEquivalent tags: ${report.tagged.total} tag(s), ` +
       `${report.tagged.matched} matched — allowed extras are subtracted from the counts above.${p.reset}`,

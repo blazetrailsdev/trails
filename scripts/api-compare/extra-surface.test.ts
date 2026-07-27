@@ -1670,6 +1670,21 @@ describe("buildReport — TS files with no Rails counterpart", () => {
     ]);
   });
 
+  it("breaks the no-counterpart slice out of the package totals", () => {
+    const { ruby, ts: ts_ } = makeManifests("ar-config.ts");
+    const report = buildReport(ruby, ts_, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const pkg = report.packages[0];
+    expect(pkg.totalExtras).toBe(2);
+    expect(pkg.noCounterpartFiles).toBe(1);
+    expect(pkg.noCounterpartExtras).toBe(2);
+    expect(pkg.noCounterpartNovel).toBe(1);
+  });
+
   it("holds out trees that mirror Rails test code rather than lib", () => {
     const { ruby, ts: ts_ } = makeManifests("test-helpers/models/post.ts");
     const report = buildReport(ruby, ts_, {
