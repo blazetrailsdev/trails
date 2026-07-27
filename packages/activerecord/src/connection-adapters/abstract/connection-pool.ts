@@ -110,11 +110,6 @@ const ADAPTER_PROXY_PROBE_KEYS = new Set<string>([
  * Mirrors: ActiveRecord::ConnectionAdapters::NullPool
  */
 export class NullPool implements AbstractPool {
-  /**
-   * Rails nests this class inside `NullPool` (`class NullPool; class NullConfig`
-   * — connection_pool.rb:14-22). TS cannot declare a nested class, so it is a
-   * sibling export re-attached here, matching Rails' constant lookup path.
-   */
   static readonly NullConfig = NullConfig;
   static readonly NULL_CONFIG = NULL_CONFIG;
 

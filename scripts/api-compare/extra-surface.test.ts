@@ -262,7 +262,6 @@ describe("buildReport — novel vs moved classification", () => {
   });
 
   it("a Ruby class nested in the matched file contributes its constant and methods to the allow-set", () => {
-    // Rails outer.rb: `class Outer; class Inner; def inner_only; end; end; end`.
     const ruby: ApiManifest = {
       source: "ruby",
       generatedAt: "",
@@ -284,8 +283,6 @@ describe("buildReport — novel vs moved classification", () => {
         },
       },
     };
-    // TS outer.ts: `Outer` carrying the nested constant as a static, plus the
-    // nested class's own method and one genuinely novel helper.
     const ts: ApiManifest = {
       source: "typescript",
       generatedAt: "",
@@ -297,8 +294,16 @@ describe("buildReport — novel vs moved classification", () => {
               file: "outer.ts",
               includes: [],
               extends: [],
-              instanceMethods: [method("bar"), method("innerOnly"), method("tsOnlyHelper")],
+              instanceMethods: [method("bar"), method("tsOnlyHelper")],
               classMethods: [method("Inner")],
+            },
+            Inner: {
+              name: "Inner",
+              file: "outer.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("innerOnly")],
+              classMethods: [],
             },
           },
           modules: {},
@@ -616,10 +621,6 @@ describe("buildReport — novel vs moved classification", () => {
   });
 
   it("a nested class sharing a file with a shorter-named parent is not its own counterpart file", () => {
-    // Nested Preloader::Association::LoaderQuery in association.rb never
-    // becomes a Rails counterpart *file* of its own (per compare.ts:738-755),
-    // but it is surface association.rb declares, so its `nested_helper` joins
-    // that file's allow-set.
     const ruby: ApiManifest = {
       source: "ruby",
       generatedAt: "",
@@ -666,8 +667,6 @@ describe("buildReport — novel vs moved classification", () => {
       novelOnly: false,
       topN: 50,
     });
-    // No file scored at all: both names are allowed, and the nested class did
-    // not spawn a second counterpart file of its own.
     expect(report.packages[0].extraFiles).toEqual([]);
   });
 

@@ -93,14 +93,8 @@ import { manifestIsStale } from "./build-freshness.js";
 interface RubyEntity {
   fqn: string;
   info: ClassInfo;
-  /**
-   * True when this class is declared *inside* another class in the same Ruby
-   * file (`class Outer; class Inner`). The nested constant itself is surface
-   * Rails declares, so the enclosing TS class may legitimately carry a member
-   * of that name — either a real nested class or the `static Inner = Inner`
-   * spelling trails uses for a sibling-exported port.
-   */
-  nested?: boolean;
+  /** Declared inside another class in the same Ruby file (`class Outer; class Inner`). */
+  nestedInEnclosingClass?: boolean;
 }
 
 /**
@@ -643,12 +637,11 @@ function collectAllowedNames(
     for (const inc of mod.includes ?? []) walkMixin(inc, fqn);
   };
 
-  for (const { fqn, info, nested } of entities) {
-    // A class nested in an enclosing class is a constant on that enclosing
-    // class, so the enclosing TS class carrying a member of the same name is
-    // the faithful port — whether spelled as a real nested class or as
-    // `static readonly Inner = Inner` re-attaching a sibling export.
-    if (nested) {
+  for (const { fqn, info, nestedInEnclosingClass } of entities) {
+    // A nested class is a constant ON its enclosing class, so a member of that
+    // name is the faithful port — spelled either as a real TS nested class or
+    // as `static readonly Inner = Inner` re-attaching a sibling export.
+    if (nestedInEnclosingClass) {
       const short = fqn.split("::").pop();
       if (short) for (const c of rubyConstantCandidates(short)) allowed.add(c);
     }
@@ -850,13 +843,11 @@ function buildPackageReport(
     moduleFqnByShort.set(short, list);
   }
 
-  // A class declared inside another class in the same Ruby file (e.g.
-  // `Preloader::Association::LoaderQuery` in `preloader/association.rb`,
-  // `NullPool::NullConfig` in `abstract/connection_pool.rb`) is not a Rails
-  // counterpart *file* of its own — that's what compare.ts's nested-class
-  // filter encodes. It IS Rails-declared surface inside the enclosing class's
-  // file, so it enters that file's allow-set flagged `nested` (see
-  // `RubyEntity.nested`) rather than being dropped.
+  // compare.ts's nested-class filter (compare.ts:738-755) says a class nested
+  // in another class in the same file is not a Rails counterpart *file* of its
+  // own. That's a statement about file matching only: the nested class is
+  // still surface the enclosing file declares, so it enters that file's
+  // allow-set flagged `nestedInEnclosingClass` rather than being dropped.
   const classFqnsPerFile = new Map<string, Set<string>>();
   for (const [fqn, info] of Object.entries(rubyPkg.classes) as [string, ClassInfo][]) {
     if (!info.file) continue;
@@ -864,7 +855,7 @@ function buildPackageReport(
     set.add(fqn);
     classFqnsPerFile.set(info.file, set);
   }
-  const enclosingClassInFile = (fqn: string, file: string): boolean => {
+  const hasEnclosingClassInFile = (fqn: string, file: string): boolean => {
     const siblings = classFqnsPerFile.get(file);
     if (!siblings) return false;
     const parts = fqn.split("::");
@@ -877,7 +868,11 @@ function buildPackageReport(
   const rubyFiles = new Map<string, RubyEntity[]>();
   for (const [fqn, info] of Object.entries(rubyPkg.classes) as [string, ClassInfo][]) {
     if (!info.file) continue;
-    pushTo(rubyFiles, info.file, { fqn, info, nested: enclosingClassInFile(fqn, info.file) });
+    pushTo(rubyFiles, info.file, {
+      fqn,
+      info,
+      nestedInEnclosingClass: hasEnclosingClassInFile(fqn, info.file),
+    });
   }
   for (const [fqn, info] of Object.entries(rubyPkg.modules) as [string, ClassInfo][]) {
     if (!info.file) continue;

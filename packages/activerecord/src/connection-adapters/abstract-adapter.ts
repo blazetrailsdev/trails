@@ -682,7 +682,6 @@ export const ABSTRACT_COLUMN_METHOD_NAMES: readonly string[] = [
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AbstractAdapter implements Quoting {
-  /** The TS spelling of Rails' nested `AbstractAdapter::Version` (abstract_adapter.rb:243). */
   static readonly Version = Version;
 
   /**
