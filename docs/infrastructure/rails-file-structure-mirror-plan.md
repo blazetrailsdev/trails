@@ -561,6 +561,33 @@ need to swap, the fix is one range covering both.
 - Tests in `eslint/rails-file-structure.test.mjs` follow the
   `RuleTester` pattern used by sibling rules.
 
+#### Which CI job enforces method order (decided)
+
+Enforcement is **deliberately restricted to the Rails API/Test Comparison
+job**, which runs `pnpm api:compare` and therefore has a real
+`scripts/api-compare/output/rails-api.json` to build the manifest from. The
+Lint job has no Ruby toolchain and no `rails-api.json`, so its manifest is
+the builder's empty fallback — reproducing one there would mean running the
+whole extractor in a second job for no additional coverage.
+
+What changed is that the fallback no longer masquerades as enforcement.
+`scripts/api-compare/require-rails-api.ts` already makes a missing
+`rails-api.json` a hard error unless the caller opts in with
+`--allow-missing` (the `prelint` chain, hence the Lint job). On top of that,
+`eslint.config.mjs` (via `isManifestAvailable()`) leaves the rule
+**unregistered** whenever the manifest has no entries, and prints a notice
+naming the job that does enforce it — so an inert run cannot present itself
+as a passing one. Previously the rule was registered against an empty
+manifest and passed every file, so a violation was invisible to the job
+named "Lint" — the condition this decision records.
+
+Because that leaves exactly one enforcing job, that job must not be able to
+degrade quietly. Omitting `--allow-missing` covers a missing
+`rails-api.json`; the builder additionally fails when a real extract yields a
+manifest with zero entries, which would leave the rule unregistered and the
+step green. Restricting enforcement to one job is only safe while that job
+cannot silently stop enforcing.
+
 ## 6. Wave-based rollout
 
 Each PR sized to ≤500 LOC per [CLAUDE.md](../../CLAUDE.md). Estimates are

@@ -17,7 +17,9 @@ import noNativeDate from "./eslint/no-native-date.mjs";
 import noGetterCalledAsMethod from "./eslint/no-getter-called-as-method.mjs";
 import sqliteDriverAwait from "./eslint/sqlite-driver-await.mjs";
 import preferAwaitRelation from "./eslint/prefer-await-relation.mjs";
-import railsFileStructureMethodOrder from "./eslint/rails-file-structure-method-order.mjs";
+import railsFileStructureMethodOrder, {
+  isManifestAvailable as railsFileStructureManifestAvailable,
+} from "./eslint/rails-file-structure-method-order.mjs";
 import expectedFixtures from "./eslint/expected-fixtures.mjs";
 import manifestComplete from "./eslint/manifest-complete.mjs";
 import testFixtureParity from "./eslint/test-fixture-parity.mjs";
@@ -29,6 +31,19 @@ import noStandaloneAssociations from "./eslint/no-standalone-associations.mjs";
 import noInternalCanonicalLoaders from "./eslint/no-internal-canonical-loaders.mjs";
 import noExplicitAnyDisable from "./eslint/no-explicit-any-disable.mjs";
 import { readFileSync } from "node:fs";
+
+// See the rails-file-structure-method-order block below: without real order
+// data the rule passes every file, so we register it only when the manifest
+// has data, and announce the skip instead of pretending to enforce.
+const railsFileStructureManifestReady = railsFileStructureManifestAvailable();
+if (!railsFileStructureManifestReady) {
+  console.warn(
+    "[eslint.config] rails-file-structure-method-order NOT registered: " +
+      "eslint/rails-file-structure-method-order.json has no order data " +
+      "(run `pnpm api:compare` to build it). Method order is enforced by the " +
+      "Rails API/Test Comparison CI job, not this run.",
+  );
+}
 
 /** @type {string[]} */
 const noExplicitAnySrcExclude = JSON.parse(
@@ -387,13 +402,23 @@ export default defineConfig(
   // documented in `eslint/rails-file-structure-method-order.json` (built
   // by `pnpm tsx scripts/build-rails-file-structure-manifest.ts`,
   // invoked by `pnpm api:compare`). Autofixable.
-  {
-    files: ["packages/arel/src/**/*.ts", "packages/activemodel/src/**/*.ts"],
-    ignores: ["**/*.test.ts"],
-    rules: {
-      "blazetrails/rails-file-structure-method-order": "error",
-    },
-  },
+  //
+  // Enforcement lives in the Rails API/Test Comparison job, the only job that
+  // builds rails-api.json. Everywhere else (the Lint job, a local `pnpm lint`
+  // without a compare run) the manifest is the builder's empty fallback, under
+  // which the rule passes every file. Registering it there would advertise
+  // enforcement that cannot happen, so we skip the block and say so out loud.
+  ...(railsFileStructureManifestReady
+    ? [
+        {
+          files: ["packages/arel/src/**/*.ts", "packages/activemodel/src/**/*.ts"],
+          ignores: ["**/*.test.ts"],
+          rules: {
+            "blazetrails/rails-file-structure-method-order": "error",
+          },
+        },
+      ]
+    : []),
 
   // ── nie-requires-annotation: every `throw new NotImplementedError` must
   // carry a `// @nie disposition=…` comment. Tracks the elimination

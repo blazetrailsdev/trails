@@ -340,6 +340,18 @@ const nameCount = Object.values(final.files).reduce(
 );
 console.log(`Wrote ${OUT} — ${fileCount} files (${nameCount} ordered names)`);
 
+// A manifest with no entries reads as unavailable to eslint.config.mjs, which
+// then leaves the rule unregistered — silently, and green. Reaching here means
+// rails-api.json WAS present, so an empty result is a broken extract, not the
+// documented `--allow-missing` path.
+if (fileCount === 0) {
+  throw new Error(
+    `[build-rails-file-structure-manifest] built manifest has no entries, so ` +
+      `blazetrails/rails-file-structure-method-order would not be registered. ` +
+      `Check that ${RAILS_API_PATH} holds a real extract.`,
+  );
+}
+
 // Every package has been visited, so an operator entry that never resolved names a
 // class/operator the Ruby extract does not have. Unlike a last-segment collision
 // (which follows from Rails' own structure and only warns), a dead entry is always
