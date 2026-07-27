@@ -34,6 +34,13 @@ const KNOWN_UNRUN: Record<string, string> = {
 // sources.test.ts asserts exact sets over SOURCES, so it rots the moment one
 // of these declares or renames a source; matching the test file alone is not
 // enough, because the file that drifts is the one it asserts over.
+//
+// vendor/fetch.ts is in UNIT_TESTS_PKGS_RE but deliberately NOT here:
+// vendor/sources.test.ts never reads it. It is gated for vendor/fetch.test.ts,
+// still KNOWN_UNRUN above. This note lives here rather than in ci.yml because
+// the changes job's inline `run:` script is ~200 bytes under a hard Actions
+// size limit — pushing it over makes the whole workflow fail at startup, with
+// no jobs and no checks reported at all.
 const GATE_INPUTS: Record<string, string[]> = {
   UNIT_TESTS_PKGS_RE: [
     "vendor/sources.ts",
