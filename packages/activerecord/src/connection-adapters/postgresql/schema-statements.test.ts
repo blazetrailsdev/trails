@@ -483,7 +483,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const expectedConstraints = [
         {
           name: "test_unique_constraints_position_deferrable_false",
-          deferrable: undefined,
+          deferrable: false,
           column: ["position_1"],
         },
         {
@@ -545,7 +545,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           expression: "daterange(start_date, end_date) WITH &&",
           where: "(start_date IS NOT NULL) AND (end_date IS NOT NULL)",
           using: "gist",
-          deferrable: undefined,
+          deferrable: false,
         },
         {
           name: "test_exclusion_constraints_valid_overlap",
