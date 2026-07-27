@@ -50,6 +50,29 @@ describe("connect", () => {
     expect(withoutPrepared.configurationHash.preparedStatements).toBe(false);
   });
 
+  it("keeps per-entry options rather than cloning arunit onto the others", async () => {
+    vi.stubEnv("ARCONN", "mysql2");
+    const [arunit, arunit2, withoutPrepared] = (await testConfigurationHashes())
+      .configurationHashes;
+    // config.example.yml:5,25 — the two entries differ in collation, and only
+    // arunit carries the time_zone variable.
+    expect(arunit.configurationHash.collation).toBe("utf8mb4_unicode_ci");
+    expect(arunit2.configurationHash.collation).toBe("utf8mb4_general_ci");
+    expect(arunit.configurationHash.variables).toEqual({ time_zone: "+00:00" });
+    expect(arunit2.configurationHash.variables).toBeUndefined();
+    // mysql2 omits the third entry, so expand_config synthesizes it.
+    expect(withoutPrepared.configurationHash.collation).toBeUndefined();
+    expect(withoutPrepared.adapter).toBe("mysql2");
+  });
+
+  it("carries min_messages on every postgresql entry", async () => {
+    vi.stubEnv("ARCONN", "postgresql");
+    const { configurationHashes } = await testConfigurationHashes();
+    expect(configurationHashes.every((c) => c.configurationHash.minMessages === "warning")).toBe(
+      true,
+    );
+  });
+
   it("resolves the established pool from the arunit entry by name", async () => {
     vi.stubEnv("ARCONN", "sqlite3");
     await connect();

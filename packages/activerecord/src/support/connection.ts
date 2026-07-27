@@ -104,9 +104,21 @@ interface NamedConnection {
   adapter: string;
   /** The public {@link TestAdapterName} lane this connection drives. */
   lane: TestAdapterName;
-  /** The `arunit` hash; `expandConfig` derives the other named entries from it. */
-  build(): Promise<Record<string, unknown>>;
+  /**
+   * The connection's own named entries, as `config.example.yml` spells them.
+   * Sparse on purpose: `expandConfig` fills in a missing `database` / `adapter`
+   * and creates any entry the yml omits, exactly as `expand_config` does.
+   */
+  build(): Promise<Partial<Record<ArunitEntryName, Record<string, unknown>>>>;
 }
+
+/**
+ * The three entry names `expand_config` iterates (`config.rb:27-28`). Rails
+ * creates every one of them for every connection, defaulting the database and
+ * adapter when the yml leaves the key out.
+ */
+const ARUNIT_ENTRY_NAMES = ["arunit", "arunit2", "arunit_without_prepared_statements"] as const;
+type ArunitEntryName = (typeof ARUNIT_ENTRY_NAMES)[number];
 
 /**
  * Turn {@link ServerSettings} into the `configuration_hash` a `HashConfig`
@@ -132,22 +144,75 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
   sqlite3: {
     adapter: "sqlite3",
     lane: "sqlite",
-    build: async () => await sqliteHash(),
+    // `config.example.yml:82-89`: two file databases, both `timeout`/`strict`.
+    // Rails names them under FIXTURES_ROOT; ours are the worker database and
+    // its derived sibling, filled in by `expandConfig`.
+    build: async () => {
+      const shared = { ...(await sqliteHash()), timeout: 5000, strict: true };
+      return { arunit: shared, arunit2: { ...shared, database: undefined } };
+    },
   },
   sqlite3_mem: {
     adapter: "sqlite3",
     lane: "sqlite",
-    build: async () => ({ adapter: "sqlite3", database: ":memory:", pool: 1 }),
+    // `config.example.yml:91-97` — both entries are their own `:memory:` database.
+    build: async () => ({
+      arunit: { adapter: "sqlite3", database: ":memory:", pool: 1 },
+      arunit2: { adapter: "sqlite3", database: ":memory:", pool: 1 },
+    }),
   },
   postgresql: {
     adapter: "postgresql",
     lane: "postgres",
-    build: async () => serverHash("postgresql", postgresSettings()),
+    // `config.example.yml:74-81` — all three entries carry `min_messages`, and
+    // only `arunit_without_prepared_statements` turns prepared statements off.
+    build: async () => {
+      const shared = serverHash("postgresql", postgresSettings());
+      return {
+        arunit: { ...shared, minMessages: "warning" },
+        arunit2: { ...shared, database: undefined, minMessages: "warning" },
+        arunit_without_prepared_statements: {
+          ...shared,
+          minMessages: "warning",
+          preparedStatements: false,
+        },
+      };
+    },
   },
   mysql2: {
     adapter: "mysql2",
     lane: "mysql",
-    build: async () => serverHash("mysql2", mysqlSettings()),
+    // `config.example.yml:3-40`: `arunit` and `arunit2` differ — unicode vs
+    // general collation, and only `arunit` carries the `time_zone` variable.
+    // Rails leaves `arunit_without_prepared_statements` out for mysql2, so
+    // `expandConfig` synthesizes it from the defaults alone.
+    //
+    // `buildAdapterArg` forwards the whole hash to mysql2, which logs
+    // "Ignoring invalid configuration option" for the keys it does not know
+    // (`collation`, `variables`, `encoding`, and `preparedStatements` before
+    // this) and warns that a future version will throw. The config is the Rails
+    // port surface, so the keys stay; whitelisting them at the adapter boundary
+    // the way the sqlite branch already does is story
+    // `mysql-adapter-arg-whitelist`.
+    build: async () => {
+      const shared = serverHash("mysql2", mysqlSettings());
+      return {
+        arunit: {
+          ...shared,
+          encoding: "utf8mb4",
+          collation: "utf8mb4_unicode_ci",
+          preparedStatements: false,
+          variables: { time_zone: "+00:00" },
+        },
+        arunit2: {
+          ...shared,
+          database: undefined,
+          encoding: "utf8mb4",
+          collation: "utf8mb4_general_ci",
+          preparedStatements: false,
+        },
+      };
+    },
   },
 };
 
@@ -174,33 +239,47 @@ export function configuredConnectionHash(): Record<string, unknown> {
 }
 
 /**
- * The three named entries every connection carries, mirroring `expand_config`
- * (`config.rb:26-37`): `arunit`, `arunit2` and
- * `arunit_without_prepared_statements`. Rails spells them as keys of the
- * connection's hash, and because `Base.configurations` treats top-level keys as
- * environments, `establish_connection :arunit` resolves one by name — which is
- * why they are the `envName` here, with Rails' `primary` spec name.
+ * Expand a connection's entries into the three named configs, mirroring
+ * `expand_config` (`config.rb:26-37`): iterate `arunit`, `arunit2` and
+ * `arunit_without_prepared_statements`, creating any the connection omits, then
+ * fill in only a missing `database` or `adapter`. Options a connection does
+ * declare are preserved per entry — mysql2's two collations, postgresql's
+ * `min_messages` — rather than being cloned from one entry onto the others.
+ *
+ * The names are the `envName` because `Base.configurations` treats top-level
+ * keys as environments, which is what lets `connect` say
+ * `establish_connection :arunit` (`connection.rb:32`), with Rails' `primary`
+ * spec name.
  *
  * Rails defaults the databases to `activerecord_unittest` /
- * `activerecord_unittest2` / `activerecord_unittest`; trails takes them from
- * the sub-settings instead, so `arunit` is the worker database the canonical
- * schema is loaded into and `arunit2` the derived second database
- * (`arunitDatabaseNames`). `arunit_without_prepared_statements` shares
- * `arunit`'s database and only turns prepared statements off, as in
- * `config.example.yml:74-79`.
+ * `activerecord_unittest2` / `activerecord_unittest` (`config.rb:27-28`);
+ * trails takes them from the sub-settings instead, so `arunit` is the worker
+ * database the canonical schema is loaded into, `arunit2` its derived sibling,
+ * and `arunit_without_prepared_statements` shares `arunit`'s database as it
+ * shares `activerecord_unittest` in Rails.
  */
-function expandConfig(arunit: Record<string, unknown>): HashConfig[] {
-  const database = String(arunit.database ?? "");
-  const arunit2 = database === ":memory:" ? database : arunitDatabaseNames(database).arunit2;
+function expandConfig(
+  connection: NamedConnection,
+  entries: Partial<Record<ArunitEntryName, Record<string, unknown>>>,
+): HashConfig[] {
+  const primaryDatabase = String(entries.arunit?.database ?? "");
+  const secondDatabase =
+    primaryDatabase === ":memory:" ? primaryDatabase : arunitDatabaseNames(primaryDatabase).arunit2;
+  const defaultDatabase: Record<ArunitEntryName, string> = {
+    arunit: primaryDatabase,
+    arunit2: secondDatabase,
+    arunit_without_prepared_statements: primaryDatabase,
+  };
 
-  return [
-    new HashConfig("arunit", "primary", arunit),
-    new HashConfig("arunit2", "primary", { ...arunit, database: arunit2 }),
-    new HashConfig("arunit_without_prepared_statements", "primary", {
-      ...arunit,
-      preparedStatements: false,
-    }),
-  ];
+  return ARUNIT_ENTRY_NAMES.map((name) => {
+    const entry = { ...(entries[name] ?? {}) };
+    entry.database ??= defaultDatabase[name];
+    entry.adapter ??= connection.adapter;
+    // Rails' third entry exists to turn prepared statements off, so a
+    // connection that does not spell the entry out still gets the flag.
+    if (name === "arunit_without_prepared_statements") entry.preparedStatements ??= false;
+    return new HashConfig(name, "primary", entry);
+  });
 }
 
 /**
@@ -236,7 +315,7 @@ export async function testConfigurationHashes(): Promise<{
     );
   }
 
-  const configurationHashes = expandConfig(await connection.build());
+  const configurationHashes = expandConfig(connection, await connection.build());
   const envConfig = configurationHashes[0];
   // Rails: `unless connection_name.include?(arunit_adapter) raise ArgumentError`
   // (connection.rb:35-37). Previously this fired on a missing `*_TEST_URL` — an
