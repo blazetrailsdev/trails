@@ -251,13 +251,52 @@ export function buildIndexFromOriginMain(cwd?: string): { index: Index; sha: str
 }
 
 // The origin/main-tree export mutates no checkout, so it is served however
-// TASKS_DIR resolved. Only the fallback — syncFromOrigin's `reset --hard` —
-// stays gated on TASKS_DIR_IS_SYMLINK.
-export function readIndexSource(isSymlink: boolean = TASKS_DIR_IS_SYMLINK): ReadIndex {
+// TASKS_DIR resolved. When it is unavailable (offline, no `tar`, no
+// node_modules to borrow) we serve the working-tree index as-is and warn: a
+// read must never mutate the shared canonical checkout, and when origin is
+// unreachable there is nothing fresher to sync to anyway.
+export function readIndexSource(): ReadIndex {
   const fromOrigin = buildIndexFromOriginMain();
   if (fromOrigin) return fromOrigin;
-  syncFromOrigin(isSymlink);
-  return { index: loadIndex(), sha: null };
+  console.error(
+    `warning: could not reach origin/main; serving the local tasks index. It may be stale.`,
+  );
+  return { index: loadIndexWithoutDirtyingTree(), sha: null };
+}
+
+// The on-disk index.json exactly as it sits in the working tree, or null when
+// there is none. Deliberately NOT loadIndex(): that one rebuilds a stale index
+// by running build-index.mjs, which rewrites the tracked index.md — the read
+// path must not leave that behind in the shared checkout. Staleness is what
+// the caller's warning already announces, so serving a stale index untouched
+// is the honest answer here.
+export function readWorkingTreeIndex(tasksDir: string): Index | null {
+  const indexPath = join(tasksDir, "index.json");
+  if (!existsSync(indexPath)) return null;
+  try {
+    return applyRfcPriorities(JSON.parse(readFileSync(indexPath, "utf8")) as Index, tasksDir);
+  } catch {
+    return null; // truncated/absent — fall back to a rebuild
+  }
+}
+
+// With no index.json at all there is nothing to serve, so a rebuild is the only
+// way to answer the read. It dirties the tracked index.md, so restore it —
+// but only when our own rebuild is what dirtied it, or a read would discard a
+// hand-edit that was already sitting there.
+function loadIndexWithoutDirtyingTree(): Index {
+  const onDisk = readWorkingTreeIndex(TASKS_DIR);
+  if (onDisk) return onDisk;
+  let generatedWereClean = false;
+  try {
+    generatedWereClean =
+      git(["status", "--porcelain", "--", ...GENERATED_INDEX_FILES], { silent: true }) === "";
+  } catch {
+    /* not a git repo / git unavailable — leave whatever the rebuild writes */
+  }
+  const index = loadIndex();
+  if (generatedWereClean) restoreGeneratedFiles(TASKS_DIR);
+  return index;
 }
 
 export function readIndexedFile(src: ReadIndex, filePath: string): string | null {
@@ -580,13 +619,13 @@ function restoreGeneratedFiles(cwd: string | undefined): void {
   }
 }
 
-// Parse `git status --porcelain` into the dirty lines that a rebase or
-// `reset --hard` would corrupt or discard — i.e. tracked edits the user would
-// lose. git() trims its output, so the first line loses porcelain's leading
-// status column space (" M foo" → "M foo"); re-trim every line and strip the
-// 1–2 char XY code + whitespace to recover the path, rather than slicing a
-// fixed offset. Untracked files (`??`) survive both a rebase and `reset --hard`,
-// so they're ignored, as are GENERATED_INDEX_FILES (restoreGeneratedFiles
+// Parse `git status --porcelain` into the dirty lines the mutation path's
+// `git pull --rebase` would corrupt or discard — i.e. tracked edits the user
+// would lose. git() trims its output, so the first line loses porcelain's
+// leading status column space (" M foo" → "M foo"); re-trim every line and
+// strip the 1–2 char XY code + whitespace to recover the path, rather than
+// slicing a fixed offset. Untracked files (`??`) survive a rebase, so they're
+// ignored, as are GENERATED_INDEX_FILES (restoreGeneratedFiles
 // resets them to HEAD and the tasks pre-commit hook rebuilds + re-stages them).
 export function dirtyWorktreeLines(porcelain: string): string[] {
   return porcelain
@@ -623,83 +662,6 @@ function assertCleanWorktree(cwd: string | undefined): void {
       `  or stash them:  git -C "${where}" stash`,
   );
   process.exit(1);
-}
-
-// Fetch + hard-reset the per-worktree tasks checkout to origin/main. This is
-// now only the FALLBACK freshness path for reads: readIndexSource() builds the
-// index straight from the origin/main tree and only lands here when that is
-// unavailable (offline, no `tar`). Only runs when using the per-worktree
-// symlink (TASKS_DIR_IS_SYMLINK); the canonical fallback and explicit
-// $TASKS_DIR overrides are left alone: a read must never reset a checkout the
-// user chose.
-export function syncFromOrigin(isSymlink: boolean = TASKS_DIR_IS_SYMLINK): void {
-  if (!isSymlink) return;
-  syncWorktreeToOrigin();
-}
-
-// The actual fetch + `reset --hard origin/main`, factored out of the
-// TASKS_DIR_IS_SYMLINK guard so it can be exercised directly in tests.
-// `reset --hard` silently discards uncommitted *tracked* edits, so it must
-// never run against a dirty worktree: an agent authoring a story body (editing
-// a tracked story.md) and then running any read before committing would lose
-// it. When the worktree carries such edits we skip the sync entirely, warn
-// loudly, and serve the possibly-stale index — never destroy unsaved work.
-// Untracked new files survive `reset --hard`, so they don't block the sync.
-//
-// LOCKED against mutations: the per-worktree `tasks/` symlinks all resolve to
-// the ONE shared canonical checkout, so this `reset --hard` used to run
-// concurrently with another agent's commitAndPush mutation in the same
-// working tree. A reset landing between that mutation's file write and its
-// commit deletes the staged-new story file (index AND disk → "nothing to
-// commit" crash); landing inside the pre-commit hook's window it empties the
-// index, and git finalizes an EMPTY commit that then gets pushed — the
-// message lands on main with zero files. Take the same tasks-CLI lock the
-// mutators hold; the dirty check must also sit inside the lock, or a mutation
-// could stage its file right after we probed. Reads are best-effort, so on
-// lock timeout we skip the sync and serve the possibly-stale index instead of
-// dying.
-export function syncWorktreeToOrigin(cwd?: string, lockWaitMs = 20_000): void {
-  const lock = acquireTasksLock(cwd, { waitMs: lockWaitMs, onTimeout: "give-up" });
-  // A "busy" give-up means a live mutation is mid-flight in this checkout —
-  // touching it at all (even the status probe) belongs to the lock holder,
-  // and resetting is exactly the clobber the lock prevents. Skip entirely and
-  // serve the stale index. (A `null` lock — no resolvable git dir — falls
-  // through instead: the status probe below throws and returns silently,
-  // preserving the quiet non-repo behavior.)
-  if (lock === "busy") {
-    console.error(
-      `warning: tasks-CLI lock is busy; skipping the pre-read sync to origin/main. ` +
-        `The index may be stale.`,
-    );
-    return;
-  }
-  try {
-    let porcelain: string;
-    try {
-      porcelain = git(["status", "--porcelain"], { silent: true, cwd });
-    } catch {
-      return; // not a git repo / git unavailable — leave the checkout untouched
-    }
-    const dirty = dirtyWorktreeLines(porcelain);
-    if (dirty.length > 0) {
-      const where = cwd ?? TASKS_DIR;
-      console.error(
-        `warning: ${where} has uncommitted changes; skipping the pre-read sync ` +
-          `to origin/main so they aren't discarded by reset --hard:\n` +
-          dirty.map((l) => `  ${l}`).join("\n") +
-          `\n  The index may be stale. Commit or stash these edits, then re-run:\n` +
-          `    git -C "${where}" add -A && git -C "${where}" commit -m "wip"\n` +
-          `  or stash them:  git -C "${where}" stash`,
-      );
-      return;
-    }
-    git(["fetch", "--quiet", "origin"], { silent: true, cwd });
-    git(["reset", "--hard", "--quiet", "origin/main"], { silent: true, cwd });
-  } catch {
-    /* best-effort — stale data is better than a broken CLI */
-  } finally {
-    releaseTasksLock(lock);
-  }
 }
 
 function storyFilePath(index: Index, id: string): string {
@@ -944,16 +906,14 @@ function installLockSignalHandlers(): void {
 // poll. A holder whose process is gone (ESRCH) is reclaimed automatically — its
 // lock can never be released, so making a human/agent `rm` it was only busywork
 // (and a racy one: concurrent rm+retry can delete a freshly-taken live lock).
-// Only the wait timeout against a *live* holder still fails loudly — unless
-// the caller opts into `onTimeout: "give-up"`, which returns the distinct
-// sentinel "busy" so a best-effort caller (the pre-read sync) can skip its
-// critical section rather than kill a read command with LOCK_TIMEOUT_EXIT.
-// "busy" is deliberately not null: null means "nothing to lock against"
-// (proceed unlocked), while "busy" means a live holder owns the checkout.
+// Only the wait timeout against a *live* holder still fails loudly. A null
+// handle means "nothing to lock against" (proceed unlocked), not contention:
+// every caller is a mutator, and a mutator must never proceed past a live
+// holder.
 export function acquireTasksLock(
   cwd: string | undefined,
-  opts: { waitMs?: number; pollMs?: number; onTimeout?: "exit" | "give-up" } = {},
-): LockHandle | null | "busy" {
+  opts: { waitMs?: number; pollMs?: number } = {},
+): LockHandle | null {
   const waitMs = opts.waitMs ?? LOCK_WAIT_MS;
   const pollMs = opts.pollMs ?? LOCK_POLL_MS;
   let lockPath: string;
@@ -1000,7 +960,6 @@ export function acquireTasksLock(
         continue;
       }
       if (waited >= waitMs) {
-        if (opts.onTimeout === "give-up") return "busy";
         console.error(
           `error: timed out after ${Math.round(waitMs / 1000)}s waiting for the tasks-CLI ` +
             `lock at ${lockPath}. Another mutation is holding it; retry shortly.`,
@@ -1017,8 +976,8 @@ export function acquireTasksLock(
 // so the signal handlers don't try to re-release a handle we've let go. The
 // read-then-unlink is race-free because no waiter removes/recreates a lock it
 // didn't create (acquire only `wx`s onto a free path, or reclaims a dead one).
-export function releaseTasksLock(lock: LockHandle | null | "busy"): void {
-  if (!lock || lock === "busy") return;
+export function releaseTasksLock(lock: LockHandle | null): void {
+  if (!lock) return;
   activeLocks.delete(lock);
   try {
     if (readFileSync(lock.path, "utf8").trim() === lock.token) unlinkSync(lock.path);
@@ -1229,8 +1188,8 @@ export function commitAndPush(opts: {
         git(["add", reconciled ? "-A" : opts.fileToStage], { cwd });
         // RFCS_NO_AUTOPUSH: the tasks repo's .husky/post-commit hook otherwise
         // pushes `main` after this commit, racing the explicit push below (and,
-        // before the pre-read sync took the lock, occasionally pushing a
-        // clobbered EMPTY commit before we could reset it away). The CLI owns
+        // back when the CLI still hard-reset the checkout on reads, occasionally
+        // pushing a clobbered EMPTY commit before we could reset it away). The CLI owns
         // its own push; silence the hook's. The rejected-push handling below
         // depends on this — with the hook silenced nothing else pushes our SHA,
         // so a rejection can only be a lost race.
@@ -1273,7 +1232,7 @@ export function commitAndPush(opts: {
         throw e;
       }
       // Never push an empty commit. A concurrent `reset --hard` in this shared
-      // checkout (a pre-read sync from a process predating the lock there, or
+      // checkout (historically the CLI's own pre-read sync, now retired; today
       // any out-of-band reset) that lands inside `git commit`'s pre-commit-hook
       // window empties the index after the emptiness check, so git finalizes a
       // commit whose tree equals its parent — the mutation's file is silently
