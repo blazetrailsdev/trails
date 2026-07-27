@@ -31,11 +31,14 @@ describe("ConnectionSwappingNestedTest", () => {
   const DB_NAMES = [
     "primary",
     "primary_shard_one",
+    "primary_shard_two",
     "secondary",
     "secondary_replica",
     "secondary_shard_one",
     "secondary_shard_two",
     "tertiary",
+    "tertiary_shard_one",
+    "tertiary_shard_two",
     "arunit",
   ] as const;
 
@@ -162,6 +165,8 @@ describe("ConnectionSwappingNestedTest", () => {
         primary_replica: sqliteDb("primary", { replica: true }),
         primary_shard_one: sqliteDb("primary_shard_one"),
         primary_shard_one_replica: sqliteDb("primary_shard_one", { replica: true }),
+        primary_shard_two: sqliteDb("primary_shard_two"),
+        primary_shard_two_replica: sqliteDb("primary_shard_two", { replica: true }),
         secondary: sqliteDb("secondary"),
         secondary_replica: sqliteDb("secondary", { replica: true }),
         secondary_shard_one: sqliteDb("secondary_shard_one"),
@@ -235,6 +240,8 @@ describe("ConnectionSwappingNestedTest", () => {
         primary_replica: sqliteDb("primary", { replica: true }),
         primary_shard_one: sqliteDb("primary_shard_one"),
         primary_shard_one_replica: sqliteDb("primary_shard_one", { replica: true }),
+        primary_shard_two: sqliteDb("primary_shard_two"),
+        primary_shard_two_replica: sqliteDb("primary_shard_two", { replica: true }),
         secondary: sqliteDb("secondary"),
         secondary_replica: sqliteDb("secondary", { replica: true }),
         secondary_shard_one: sqliteDb("secondary_shard_one"),
@@ -304,16 +311,47 @@ describe("ConnectionSwappingNestedTest", () => {
       default_env: {
         primary: sqliteDb("primary"),
         primary_replica: sqliteDb("primary", { replica: true }),
+        primary_shard_one: sqliteDb("primary_shard_one"),
+        primary_shard_one_replica: sqliteDb("primary_shard_one", { replica: true }),
+        primary_shard_two: sqliteDb("primary_shard_two"),
+        primary_shard_two_replica: sqliteDb("primary_shard_two", { replica: true }),
         secondary: sqliteDb("secondary"),
         secondary_replica: sqliteDb("secondary", { replica: true }),
+        secondary_shard_one: sqliteDb("secondary_shard_one"),
+        secondary_shard_one_replica: sqliteDb("secondary_shard_one", { replica: true }),
+        secondary_shard_two: sqliteDb("secondary_shard_two"),
+        secondary_shard_two_replica: sqliteDb("secondary_shard_two", { replica: true }),
         tertiary: sqliteDb("tertiary"),
         tertiary_replica: sqliteDb("tertiary", { replica: true }),
+        tertiary_shard_one: sqliteDb("tertiary_shard_one"),
+        tertiary_shard_one_replica: sqliteDb("tertiary_shard_one", { replica: true }),
+        tertiary_shard_two: sqliteDb("tertiary_shard_two"),
+        tertiary_shard_two_replica: sqliteDb("tertiary_shard_two", { replica: true }),
       },
     });
 
-    PrimaryBase.connectsTo({ database: { writing: "primary", reading: "primary_replica" } });
-    SecondaryBase.connectsTo({ database: { writing: "secondary", reading: "secondary_replica" } });
-    TertiaryBase.connectsTo({ database: { writing: "tertiary", reading: "tertiary_replica" } });
+    PrimaryBase.connectsTo({
+      shards: {
+        default: { writing: "primary", reading: "primary_replica" },
+        shard_one: { writing: "primary_shard_one", reading: "primary_shard_one_replica" },
+      },
+    });
+
+    SecondaryBase.connectsTo({
+      shards: {
+        default: { writing: "secondary", reading: "secondary_replica" },
+        shard_one: { writing: "secondary_shard_one", reading: "secondary_shard_one_replica" },
+        shard_two: { writing: "secondary_shard_two", reading: "secondary_shard_two_replica" },
+      },
+    });
+
+    TertiaryBase.connectsTo({
+      shards: {
+        default: { writing: "tertiary", reading: "tertiary_replica" },
+        shard_one: { writing: "tertiary_shard_one", reading: "tertiary_shard_one_replica" },
+        shard_two: { writing: "tertiary_shard_two", reading: "tertiary_shard_two_replica" },
+      },
+    });
 
     Base.connectedTo({ role: "writing", shard: "default" }, () => {
       expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary");
