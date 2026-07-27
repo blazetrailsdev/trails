@@ -11,7 +11,7 @@
     "prepare": "husky",
     "typecheck": "node scripts/typecheck.mjs",
     "guides:typecheck": "tsx scripts/guides-typecheck/check.ts",
-    "prelint": "pnpm tsx scripts/build-rails-privates-manifest.ts && pnpm tsx scripts/build-rails-error-manifest.ts && pnpm tsx scripts/build-rails-tosql-manifest.ts && pnpm tsx scripts/build-rails-file-structure-manifest.ts && pnpm tsx scripts/test-deps/rails-test-deps.ts >/dev/null",
+    "prelint": "pnpm tsx scripts/build-rails-privates-manifest.ts --allow-missing && pnpm tsx scripts/build-rails-error-manifest.ts && pnpm tsx scripts/build-rails-tosql-manifest.ts && pnpm tsx scripts/build-rails-file-structure-manifest.ts --allow-missing && pnpm tsx scripts/test-deps/rails-test-deps.ts >/dev/null",
     "lint": "eslint .",
     "lint:no-explicit-any:allowlist": "pnpm tsx scripts/generate-no-explicit-any-allowlist.ts",
     "test": "vitest run",

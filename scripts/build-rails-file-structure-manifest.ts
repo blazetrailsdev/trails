@@ -32,6 +32,7 @@ import {
   unusedOperatorSpellings,
 } from "./api-compare/operator-order-spelling.js";
 import { resolveMixinParent } from "./rails-file-structure-mixins.js";
+import { railsApiAvailable } from "./api-compare/require-rails-api.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -51,13 +52,17 @@ const PACKAGE_DIRS: Record<string, string> = {
 const RAILS_API_PATH = path.join(ROOT, "scripts/api-compare/output/rails-api.json");
 const OUT = path.join(ROOT, "eslint/rails-file-structure-method-order.json");
 
-if (!fs.existsSync(RAILS_API_PATH)) {
+if (
+  !railsApiAvailable({
+    scriptName: "build-rails-file-structure-manifest",
+    railsApiPath: RAILS_API_PATH,
+    manifestName: "eslint/rails-file-structure-method-order.json",
+    ruleName: "rails-file-structure-method-order",
+    argv: process.argv.slice(2),
+  })
+) {
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   writeJsonManifest(OUT, { files: {} });
-  console.warn(
-    `[build-rails-file-structure-manifest] ${RAILS_API_PATH} missing; wrote empty manifest. ` +
-      `Run \`pnpm api:compare\` to regenerate with real data.`,
-  );
   process.exit(0);
 }
 
