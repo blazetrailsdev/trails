@@ -37,7 +37,7 @@ import {
   normalizeReadSet,
   hashReadSet,
   readSetMatches,
-  resolutionShapeKey,
+  resolutionShape,
   dependencyKey,
   hashParts,
   type ReadSet,
@@ -211,9 +211,7 @@ export async function main() {
   // packages resolve many of the same declarations, and validating every
   // package's read-set must not read the same file 13 times.
   const inputHashes = new Map<string, Promise<string | null>>();
-  // Read-sets record what WAS resolvable; this covers what BECOMES resolvable
-  // (an unbuilt dependency gaining a `dist`) — see resolutionShapeKey.
-  const shapeKey = await resolutionShapeKey(path.join(ROOT_DIR, "packages"));
+  const shape = await resolutionShape(path.join(ROOT_DIR, "packages"));
   // Neither of those can see `node_modules`, which is most of what the compiler
   // reads; the lockfile stands in for all of it — coarse (any bump invalidates
   // every package) but ~2 ms a run against ~23 ms for the precise alternative,
@@ -241,6 +239,7 @@ export async function main() {
     const tsConfigPath = path.join(pkgRoot, "tsconfig.json");
     const fingerprintInputs = [...files];
     if (fs.existsSync(tsConfigPath)) fingerprintInputs.push(tsConfigPath);
+    const shapeKey = shape.keyFor(dirName);
     // Anchor relative paths at the package root so tsconfig.json
     // doesn't show up as `../tsconfig.json` (which it would if we
     // anchored at the src dir).

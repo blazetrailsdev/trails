@@ -116,34 +116,123 @@ export async function fileHash(file: string): Promise<string | null> {
  */
 export type ReadSet = Record<string, string>;
 
-/**
- * Hash of the SHAPE of what the workspace can resolve: the sorted names (not
- * contents) of every built `packages/<dir>/dist/**\/*.d.ts`.
- *
- * A read-set records what the compiler DID read, so it cannot notice a file
- * that was not resolvable at extraction time and is now. An unbuilt dependency
- * is exactly that case: with no `dist`, the import resolves to nothing and the
- * entry records nothing for it; a later `tsc --build` would silently change the
- * extraction while every recorded hash still matched. Folding this key into the
- * cache keys closes that hole without giving up the read-set's precision —
- * building or rebuilding does not change the file NAMES, so the common case
- * (contents changed) still invalidates only the packages that read them.
- */
-export async function resolutionShapeKey(packagesDir: string): Promise<string> {
+export interface ResolutionShape {
+  keyFor(dirName: string): string;
+}
+
+export async function resolutionShape(packagesDir: string): Promise<ResolutionShape> {
   let dirs: string[];
   try {
     dirs = await fs.readdir(packagesDir);
   } catch {
-    return hashParts([]);
+    dirs = [];
   }
-  const perPackage = await Promise.all(
+  const names = new Map<string, string[]>();
+  await Promise.all(
     dirs.map(async (dir) => {
       const dist = path.join(packagesDir, dir, "dist");
       const files = await declarationsUnder(dist);
-      return files.map((file) => `${dir}/${path.relative(dist, file).replace(/\\/g, "/")}`);
+      names.set(
+        dir,
+        files.map((file) => `${dir}/${path.relative(dist, file).replace(/\\/g, "/")}`),
+      );
     }),
   );
-  return hashParts(perPackage.flat().sort());
+  const graph = await readWorkspaceGraph(packagesDir, dirs);
+  const globalKey = hashParts([...names.values()].flat().sort());
+  const keys = new Map<string, string>();
+  for (const dir of graph.keys()) {
+    const closure = transitiveDeps(graph, dir);
+    keys.set(dir, hashParts(closure.flatMap((dep) => names.get(dep) ?? []).sort()));
+  }
+  return { keyFor: (dirName) => keys.get(dirName) ?? globalKey };
+}
+
+async function readWorkspaceGraph(
+  packagesDir: string,
+  dirs: string[],
+): Promise<Map<string, string[]>> {
+  const manifests = await Promise.all(dirs.map(async (dir) => readManifest(packagesDir, dir)));
+  const dirOfName = new Map<string, string>();
+  for (const manifest of manifests) {
+    if (manifest) dirOfName.set(manifest.name, manifest.dir);
+  }
+  const graph = new Map<string, string[]>();
+  for (const manifest of manifests) {
+    if (!manifest) continue;
+    const deps = manifest.deps
+      .map((dep) => dirOfName.get(dep))
+      .filter((dir): dir is string => dir !== undefined && dir !== manifest.dir);
+    graph.set(manifest.dir, [...new Set(deps)]);
+  }
+  return graph;
+}
+
+interface PackageManifest {
+  dir: string;
+  name: string;
+  deps: string[];
+}
+
+async function readManifest(packagesDir: string, dir: string): Promise<PackageManifest | null> {
+  let json: {
+    name?: string;
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+    peerDependencies?: Record<string, string>;
+    optionalDependencies?: Record<string, string>;
+  };
+  try {
+    json = JSON.parse(await fs.readFile(path.join(packagesDir, dir, "package.json"), "utf-8"));
+  } catch {
+    return null;
+  }
+  if (typeof json.name !== "string" || json.name.length === 0) return null;
+  const declared = Object.keys({
+    ...json.dependencies,
+    ...json.devDependencies,
+    ...json.peerDependencies,
+    ...json.optionalDependencies,
+  });
+  return { dir, name: json.name, deps: [...declared, ...(await linkedPackages(packagesDir, dir))] };
+}
+
+async function linkedPackages(packagesDir: string, dir: string): Promise<string[]> {
+  const scopesDir = path.join(packagesDir, dir, "node_modules");
+  let scopes: string[];
+  try {
+    scopes = (await fs.readdir(scopesDir, { withFileTypes: true }))
+      .filter((entry) => entry.name.startsWith("@"))
+      .map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+  const nested = await Promise.all(
+    scopes.map(async (scope) => {
+      try {
+        const members = await fs.readdir(path.join(scopesDir, scope));
+        return members.map((member) => `${scope}/${member}`);
+      } catch {
+        return [];
+      }
+    }),
+  );
+  return nested.flat();
+}
+
+function transitiveDeps(graph: Map<string, string[]>, dir: string): string[] {
+  const seen = new Set<string>([dir]);
+  const queue = [dir];
+  while (queue.length > 0) {
+    const next = queue.pop();
+    if (next === undefined) break;
+    for (const dep of graph.get(next) ?? []) {
+      if (seen.has(dep)) continue;
+      seen.add(dep);
+      queue.push(dep);
+    }
+  }
+  return [...seen];
 }
 
 /**
@@ -151,7 +240,7 @@ export async function resolutionShapeKey(packagesDir: string): Promise<string> {
  * `pnpm-lock.yaml`.
  *
  * Neither of the other two keys can see `node_modules`: `normalizeReadSet`
- * drops every path under it and `resolutionShapeKey` only walks
+ * drops every path under it and `resolutionShape` only walks
  * `packages/*\/dist`. Yet most of what the compiler reads is third-party — on
  * actionview, 197 of 241 resolved files (`@types/node`, `typescript`'s
  * `lib.*.d.ts`, `undici-types`, `@types/pg`) — so a dependency bump changes the

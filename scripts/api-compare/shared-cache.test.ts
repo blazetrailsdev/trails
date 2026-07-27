@@ -20,7 +20,7 @@ import {
   normalizeReadSet,
   hashReadSet,
   readSetMatches,
-  resolutionShapeKey,
+  resolutionShape,
   dependencyKey,
   CACHE_VERSION,
 } from "./shared-cache.js";
@@ -278,7 +278,7 @@ describe("resolved read-set", () => {
   });
 });
 
-describe("resolutionShapeKey", () => {
+describe("resolutionShape", () => {
   function writeDist(packagesDir: string, dir: string, files: Record<string, string>): void {
     for (const [name, body] of Object.entries(files)) {
       const file = path.join(packagesDir, dir, "dist", name);
@@ -287,61 +287,117 @@ describe("resolutionShapeKey", () => {
     }
   }
 
+  function writeManifest(packagesDir: string, dir: string, deps: string[]): void {
+    fs.mkdirSync(path.join(packagesDir, dir), { recursive: true });
+    fs.writeFileSync(
+      path.join(packagesDir, dir, "package.json"),
+      JSON.stringify({
+        name: `@blazetrails/${dir}`,
+        dependencies: Object.fromEntries(deps.map((dep) => [`@blazetrails/${dep}`, "workspace:*"])),
+      }),
+    );
+  }
+
+  async function keyOf(packagesDir: string, dir: string): Promise<string> {
+    return (await resolutionShape(packagesDir)).keyFor(dir);
+  }
+
   it("tracks which declarations exist, not what they say", async () => {
     const packagesDir = mkTmp();
     writeDist(packagesDir, "activesupport", { "index.d.ts": "export declare const a: number;" });
-    const built = await resolutionShapeKey(packagesDir);
+    const built = await keyOf(packagesDir, "activesupport");
 
-    // A rebuild that only changes contents leaves the shape alone — those
-    // changes are the read-set's job, and re-keying on them would invalidate
-    // every package again.
     writeDist(packagesDir, "activesupport", { "index.d.ts": "export declare const a: string;" });
-    expect(await resolutionShapeKey(packagesDir)).toBe(built);
+    expect(await keyOf(packagesDir, "activesupport")).toBe(built);
 
-    // A dependency that was unbuilt at extraction time resolves to nothing, so
-    // no read-set can see it become resolvable — the shape must.
     const unbuilt = mkTmp();
     fs.mkdirSync(path.join(unbuilt, "activesupport"), { recursive: true });
-    expect(await resolutionShapeKey(unbuilt)).not.toBe(built);
+    expect(await keyOf(unbuilt, "activesupport")).not.toBe(built);
 
     writeDist(packagesDir, "activesupport", { "extra.d.ts": "export declare const b: number;" });
-    expect(await resolutionShapeKey(packagesDir)).not.toBe(built);
+    expect(await keyOf(packagesDir, "activesupport")).not.toBe(built);
   });
 
   it("ignores non-declaration output and a missing packages dir", async () => {
     const packagesDir = mkTmp();
     writeDist(packagesDir, "arel", { "index.d.ts": "" });
-    const before = await resolutionShapeKey(packagesDir);
+    const before = await keyOf(packagesDir, "arel");
     writeDist(packagesDir, "arel", { "index.js": "", "nested/index.js.map": "" });
-    expect(await resolutionShapeKey(packagesDir)).toBe(before);
-    expect(await resolutionShapeKey(path.join(packagesDir, "nope"))).toMatch(/^[0-9a-f]{40}$/);
-  });
-});
-
-describe("dependencyKey", () => {
-  it("changes when a dependency bump rewrites the lockfile", async () => {
-    const root = mkTmp();
-    const lock = path.join(root, "pnpm-lock.yaml");
-    fs.writeFileSync(lock, "'@types/node': 22.0.0\n");
-    const before = await dependencyKey(root);
-    expect(before).toMatch(/^[0-9a-f]{40}$/);
-
-    // Third-party declarations live under node_modules, which the read-set
-    // drops and the shape key never walks — without this key an install that
-    // changes what `@types/node` declares would serve every stale entry.
-    fs.writeFileSync(lock, "'@types/node': 24.0.0\n");
-    expect(await dependencyKey(root)).not.toBe(before);
-
-    fs.writeFileSync(lock, "'@types/node': 22.0.0\n");
-    expect(await dependencyKey(root)).toBe(before);
+    expect(await keyOf(packagesDir, "arel")).toBe(before);
+    expect(await keyOf(path.join(packagesDir, "nope"), "arel")).toMatch(/^[0-9a-f]{40}$/);
   });
 
-  it("keys a lockfile-less tree stably and distinctly", async () => {
-    const root = mkTmp();
-    const missing = await dependencyKey(root);
-    expect(missing).toBe(await dependencyKey(mkTmp()));
+  it("keys each package over its own transitive dependencies only", async () => {
+    const packagesDir = mkTmp();
+    for (const [dir, deps] of [
+      ["activesupport", []],
+      ["arel", ["activesupport"]],
+      ["activerecord", ["arel"]],
+      ["actionview", []],
+    ] as [string, string[]][]) {
+      writeManifest(packagesDir, dir, deps);
+      writeDist(packagesDir, dir, { "index.d.ts": "" });
+    }
+    const before = await resolutionShape(packagesDir);
+    const keys = ["activesupport", "arel", "activerecord", "actionview"].map((dir) =>
+      before.keyFor(dir),
+    );
 
-    fs.writeFileSync(path.join(root, "pnpm-lock.yaml"), "");
-    expect(await dependencyKey(root)).not.toBe(missing);
+    writeDist(packagesDir, "actionview", { "extra.d.ts": "" });
+    const after = await resolutionShape(packagesDir);
+    expect(["activesupport", "arel", "activerecord"].map((dir) => after.keyFor(dir))).toEqual(
+      keys.slice(0, 3),
+    );
+    expect(after.keyFor("actionview")).not.toBe(keys[3]);
+
+    writeDist(packagesDir, "activesupport", { "extra.d.ts": "" });
+    const later = await resolutionShape(packagesDir);
+    expect(later.keyFor("activerecord")).not.toBe(keys[2]);
+    expect(later.keyFor("arel")).not.toBe(keys[1]);
+    expect(later.keyFor("actionview")).toBe(after.keyFor("actionview"));
+  });
+
+  it("falls back to the workspace-global key for an unknown package dir", async () => {
+    const packagesDir = mkTmp();
+    writeManifest(packagesDir, "arel", []);
+    writeDist(packagesDir, "arel", { "index.d.ts": "" });
+    writeDist(packagesDir, "actionview", { "index.d.ts": "" });
+
+    const before = await resolutionShape(packagesDir);
+    writeDist(packagesDir, "arel", { "extra.d.ts": "" });
+    expect((await resolutionShape(packagesDir)).keyFor("actionview")).not.toBe(
+      before.keyFor("actionview"),
+    );
+  });
+
+  it("follows a workspace link that the manifest does not declare", async () => {
+    const packagesDir = mkTmp();
+    writeManifest(packagesDir, "arel", []);
+    writeManifest(packagesDir, "activesupport", []);
+    writeDist(packagesDir, "arel", { "index.d.ts": "" });
+    writeDist(packagesDir, "activesupport", { "index.d.ts": "" });
+    fs.mkdirSync(path.join(packagesDir, "arel", "node_modules", "@blazetrails"), {
+      recursive: true,
+    });
+    fs.symlinkSync(
+      path.join(packagesDir, "activesupport"),
+      path.join(packagesDir, "arel", "node_modules", "@blazetrails", "activesupport"),
+    );
+
+    const before = await resolutionShape(packagesDir);
+    writeDist(packagesDir, "activesupport", { "extra.d.ts": "" });
+    const after = await resolutionShape(packagesDir);
+    expect(after.keyFor("arel")).not.toBe(before.keyFor("arel"));
+    expect(after.keyFor("activesupport")).not.toBe(before.keyFor("activesupport"));
+  });
+
+  it("terminates on a dependency cycle", async () => {
+    const packagesDir = mkTmp();
+    writeManifest(packagesDir, "arel", ["activesupport"]);
+    writeManifest(packagesDir, "activesupport", ["arel"]);
+    writeDist(packagesDir, "arel", { "index.d.ts": "" });
+    writeDist(packagesDir, "activesupport", { "index.d.ts": "" });
+    const shape = await resolutionShape(packagesDir);
+    expect(shape.keyFor("arel")).toBe(shape.keyFor("activesupport"));
   });
 });
