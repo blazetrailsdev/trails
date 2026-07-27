@@ -432,13 +432,6 @@ export function destroyAssociationAsyncJob(this: CoreHost, value?: any): any {
 }
 
 /**
- * Reader/writer for the database configuration registry.
- *
- * Rails normalizes on assignment (`@@configurations =
- * ActiveRecord::DatabaseConfigurations.new(config)`) and its reader therefore
- * always hands back a `DatabaseConfigurations`. Callers get that guarantee
- * here too, so nothing downstream has to re-sniff a raw hash.
- *
  * Mirrors: ActiveRecord::Base.configurations / .configurations=
  */
 export function configurations(
@@ -451,11 +444,7 @@ export function configurations(
         ? config
         : Array.isArray(config)
           ? new DatabaseConfigurations(config)
-          : // `fromEnv` is trails' build entry point: like Rails'
-            // `DatabaseConfigurations.new` it folds `DATABASE_URL` in, but it
-            // resolves the env through `currentEnv()`, which is what every
-            // runtime config selector looks the result up by.
-            DatabaseConfigurations.fromEnv(config);
+          : DatabaseConfigurations.fromEnv(config);
   }
   return this._configurations ?? DatabaseConfigurations.fromEnv({});
 }

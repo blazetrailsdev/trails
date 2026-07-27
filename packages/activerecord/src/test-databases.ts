@@ -65,9 +65,7 @@ export async function createAndLoadSchema(
   { envName }: { envName: string } = { envName: "test" },
 ): Promise<void> {
   // Rails: configurations is always set before create_and_load_schema is
-  // called (app boots first). Guard here is defensive — with nothing
-  // configured there is nothing to suffix and the finally reconnect handles
-  // the rest.
+  // called (app boots first); this guard is defensive.
   const configurations = modelClass.configurations();
   if (configurations.empty) return;
 

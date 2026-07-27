@@ -8,12 +8,8 @@ describe("DatabaseConfigurationsTest", () => {
     DatabaseConfigurations.defaultEnv = "development";
   });
 
-  // Rails round-trips through the `Base.configurations=` writer, which
-  // normalizes the raw hash into a DatabaseConfigurations, and then asserts
-  // the reader answers `empty?` — the pair trails spells as the
-  // optional-argument `Base.configurations()` accessor. Rails' second
-  // assertion (`blank?`) is Object#blank?, an ActiveSupport alias of the same
-  // predicate on this receiver, so `empty` covers both.
+  // Rails' second assertion (`blank?`) is Object#blank?, an ActiveSupport
+  // alias of the same predicate on this receiver, so `empty` covers both.
   it("empty returns true when db configs are empty", () => {
     const oldConfig = Base.configurations();
     const config = {};

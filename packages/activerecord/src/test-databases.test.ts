@@ -8,10 +8,8 @@ import { fixtures } from "./test-helpers/fixtures.js";
 import { SchemaMigration } from "./schema-migration.js";
 
 // Build a (minimal) DatabaseConfigurations whose `configsFor` returns the
-// supplied stubbed configs. `Base.configurations()` always hands back a
-// DatabaseConfigurations, so the stubbed model class returns one too. The
-// configs are seeded through the array constructor arm as well as the
-// `configsFor` spy, so the registry reports itself non-empty.
+// supplied stubbed configs. They also go through the array constructor arm so
+// the registry reports itself non-empty.
 const stubConfigurations = (configs: unknown[]): DatabaseConfigurations => {
   const dc = new DatabaseConfigurations(configs as never);
   vi.spyOn(dc, "configsFor").mockReturnValue(configs as never);

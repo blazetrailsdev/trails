@@ -737,10 +737,9 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
         this.abstractClass = true;
       }
     }
-    // No `Untouched.configurations` assigned — the empty default registry falls
-    // back to DatabaseConfigurations.fromEnv({}), so resolving an unknown
-    // env name must surface AdapterNotSpecified rather than passing the
-    // string through.
+    // No `Untouched.configurations` assigned — resolving an unknown env name
+    // against the empty default registry must surface AdapterNotSpecified
+    // rather than passing the string through.
     expect(() => resolveConfigForConnection.call(Untouched, "missing_env")).toThrow(
       AdapterNotSpecified,
     );
