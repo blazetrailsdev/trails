@@ -51,6 +51,17 @@ export async function eagerLoadBang(): Promise<void> {
  * Uses a dynamic `import()` so it doesn't participate in the static
  * dependency cycle (associations → CP → Relation → Base →
  * associations) that forced the late-binding in the first place.
+ *
+ * @noRailsEquivalent trails-only ESM module-cycle escape hatch with no Rails
+ * analogue: `initialize_associations` is defined nowhere in the Rails source
+ * (verified by grep over vendor/rails). The associations -> CollectionProxy ->
+ * Relation -> Base -> associations cycle forces CollectionProxy registration to
+ * be late-bound; the package entry does it eagerly, and this is the supported
+ * explicit hook for consumers who deep-import
+ * `@blazetrails/activerecord/associations` without touching the entry. Ruby's
+ * require/autoload resolves such cycles at load time, so there is nothing to
+ * port. Public by intent (a documented consumer hook), so marking it internal
+ * would be inaccurate.
  */
 export async function initializeAssociations(): Promise<void> {
   // Load all late-binding slots. `association-relation.js` imports
@@ -301,6 +312,17 @@ function guardCanonicalNameShadow(name: string, model: typeof Base): void {
  *   routed through {@link registerSubclass} so it lands in its parent's
  *   `_subclasses`. STI on the parent must still be enabled explicitly via
  *   `Parent.inheritanceColumn = ...` — the array form does not set it.
+ *
+ * @noRailsEquivalent trails-only model registry with no Rails analogue:
+ * `register_model` is defined nowhere in the Rails source (verified by grep over
+ * vendor/rails). Ruby resolves an association's class through constant lookup —
+ * Reflection#compute_class (reflection.rb:434 and :490) into Object.const_get,
+ * backed by ActiveSupport autoloading — so Rails never registers models
+ * anywhere. ESM has no constant namespace to walk and no autoload hook, so
+ * trails must be told which classes exist. Deliberately public (re-exported from
+ * index.ts) because application code has to call it, so marking it internal
+ * would be a lie rather than a fix. Kept in associations.ts because association
+ * class resolution is its only consumer path.
  */
 export function registerModel(model: typeof Base): void;
 export function registerModel(name: string, model: typeof Base): void;

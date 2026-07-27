@@ -799,8 +799,10 @@ describe("buildReport — novel vs moved classification", () => {
     // globalid's railtie does `on_load(:active_record) { include
     // GlobalID::Identification }` — a dynamic include the static extractor
     // can't see, plus the module lives in a *different* package. Its instance
-    // methods (toGid/toSgid family) and the trails-side Locator-backed finders
-    // (findGlobalId/findSignedGlobalId[Bang]) must NOT be flagged as novel.
+    // methods (toGid/toSgid family) must NOT be flagged as novel. The
+    // trails-side Locator-backed finders (findGlobalId/findSignedGlobalId[Bang])
+    // are NOT covered by the mixin — they have no Rails counterpart at all, so
+    // they keep reporting as extras until they are removed or justified.
     const ruby: ApiManifest = {
       source: "ruby",
       generatedAt: "",
@@ -846,10 +848,12 @@ describe("buildReport — novel vs moved classification", () => {
                 method("toSignedGlobalId"),
               ],
               classMethods: [
-                method("findGlobalId"), // ambient railtie finder (no static Ruby def)
+                // trails-only model-side finders: no Rails counterpart and no
+                // justification, so they stay visible as extra surface.
+                method("findGlobalId"),
                 method("findSignedGlobalId"),
                 method("findSignedGlobalIdBang"),
-                method("genuinelyNovel"), // the only real extra
+                method("genuinelyNovel"),
               ],
             },
           },
@@ -865,7 +869,12 @@ describe("buildReport — novel vs moved classification", () => {
     });
     const f = report.packages[0].extraFiles.find((x) => x.tsFile === "base.ts");
     expect(f).toBeDefined();
-    expect(f!.extras.map((e) => e.name)).toEqual(["genuinelyNovel"]);
+    expect(f!.extras.map((e) => e.name)).toEqual([
+      "findGlobalId",
+      "findSignedGlobalId",
+      "findSignedGlobalIdBang",
+      "genuinelyNovel",
+    ]);
   });
 
   it("cross-package fallback does NOT let a bare short-name include pollute across gems", () => {

@@ -4141,7 +4141,12 @@ export class Base extends Model {
    * the `only:` filter rejects it. If the record doesn't exist, `find`
    * raises (Rails parity: RecordNotFound).
    *
-   * Mirrors: ActiveRecord::Base.find_global_id (via GlobalID::Locator.locate)
+   * NOT Rails: `find_global_id` exists nowhere in Rails or globalid — apps call
+   * `GlobalID::Locator.locate` directly, and globalid's railtie injects only the
+   * instance-side `GlobalID::Identification`. Left deliberately un-suppressed in
+   * `api:extra` so it keeps reporting as extra surface until it is removed or a
+   * caller justifies it (tasks 0023 globalid-model-side-finders-are-uncalled-
+   * trails-invention).
    */
   static findGlobalId(
     input: string | import("@blazetrails/globalid").GlobalID,
@@ -4150,7 +4155,12 @@ export class Base extends Model {
     return _Locator.locate(input, options);
   }
 
-  /** Mirrors: ActiveRecord::Base.find_signed_global_id — uses signedIdVerifier(this). */
+  /**
+   * Signed counterpart of {@link findGlobalId} — uses signedIdVerifier(this).
+   *
+   * NOT Rails: same invention as {@link findGlobalId}, carrying the verifier
+   * this model signs with; Rails apps call `GlobalID::Locator.locate_signed`.
+   */
   static async findSignedGlobalId(
     input: string | _SignedGlobalIDType,
     options?: Omit<import("@blazetrails/globalid").LocateSignedOptions, "verifier">,
@@ -4159,7 +4169,11 @@ export class Base extends Model {
     return _Locator.locateSigned(input, { ...options, verifier });
   }
 
-  /** Mirrors: ActiveRecord::Base.find_signed_global_id! — throws on miss. */
+  /**
+   * Raising counterpart of {@link findSignedGlobalId} — throws on miss.
+   *
+   * NOT Rails: same invention as {@link findGlobalId}, in the bang shape.
+   */
   static async findSignedGlobalIdBang(
     input: string | _SignedGlobalIDType,
     options?: Omit<import("@blazetrails/globalid").LocateSignedOptions, "verifier">,
