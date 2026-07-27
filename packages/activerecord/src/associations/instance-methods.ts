@@ -41,7 +41,11 @@ function buildAssociationInstance(this: Base, assocDef: AssocDef): AssociationIn
 }
 
 function syncAssociationInstance(this: Base, name: string, instance: AssociationInstance): void {
-  if (instance.isCollection()) {
+  // Optional call: `_associationInstances` also holds minimal ad-hoc holders
+  // for undeclared inverses (`associations.ts`'s literal, seed-association-cache)
+  // that implement only `target` / `isLoaded` / `setTarget`. Those are singular
+  // by construction, so falling through is right.
+  if ((instance as { isCollection?(): boolean }).isCollection?.()) {
     const proxy = this._collectionProxies.get(name) as { loaded?: boolean } | undefined;
     if (proxy?.loaded === true && !instance._staleStateIsSnapshotted) instance.loadedBang();
     return;
