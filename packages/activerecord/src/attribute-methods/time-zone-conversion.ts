@@ -42,8 +42,7 @@ export class TimeZoneConverter extends ValueType<unknown> {
   }
 
   private get _subtypeIsUtc(): boolean | undefined {
-    const subtype = this._subtype as { isUtc?: boolean };
-    return typeof subtype.isUtc === "boolean" ? subtype.isUtc : undefined;
+    return resolveIsUtc(this._subtype);
   }
 
   override cast(value: unknown): unknown {
@@ -205,6 +204,25 @@ export class TimeZoneConverter extends ValueType<unknown> {
       ? sub.equals(other._subtype)
       : this._subtype === other._subtype;
   }
+}
+
+/**
+ * Walks the `subtype` chain the way Rails' OID::Range / OID::Array delegate to
+ * their subtype (range.rb:8-10, array.rb:12-13), so a wrapped
+ * ActiveRecord::Type::DateTime still supplies the `is_utc?` that
+ * Internal::Timezone gives it.
+ *
+ * @internal
+ */
+function resolveIsUtc(type: unknown): boolean | undefined {
+  let current = type as { isUtc?: unknown; subtype?: unknown } | null | undefined;
+  const seen = new Set<unknown>();
+  while (current != null && typeof current === "object" && !seen.has(current)) {
+    if (typeof current.isUtc === "boolean") return current.isUtc;
+    seen.add(current);
+    current = current.subtype as { isUtc?: unknown; subtype?: unknown } | undefined;
+  }
+  return undefined;
 }
 
 /** @internal */

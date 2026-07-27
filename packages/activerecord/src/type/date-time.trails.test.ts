@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { TimeZone, TimeWithZone, setZone, resetZone } from "@blazetrails/activesupport";
 import { TimeZoneConverter } from "../attribute-methods/time-zone-conversion.js";
+import { Range, RangeType } from "../connection-adapters/postgresql/oid/range.js";
 import { DateTime } from "./date-time.js";
 import { setDefaultTimezone } from "./internal/timezone.js";
 
@@ -56,5 +57,25 @@ describe("ActiveRecord::Type::DateTime timezone dispatch", () => {
     expect(casted).toBeInstanceOf(TimeWithZone);
     expect((casted as TimeWithZone).hour).toBe(12);
     expect((casted as TimeWithZone).day).toBe(2);
+  });
+
+  it("resolves is_utc? through a wrapping range subtype", () => {
+    setZone(TimeZone.find("America/New_York"));
+    const converter = TimeZoneConverter.wrap(
+      new RangeType(new DateTime({ timezone: "local" }), "tsrange"),
+    );
+
+    const casted = converter.cast(
+      new Range(
+        Temporal.PlainDateTime.from("2024-01-02T12:00:00"),
+        Temporal.PlainDateTime.from("2024-01-03T12:00:00"),
+        false,
+      ),
+    );
+
+    const begin = (casted as { begin: TimeWithZone }).begin;
+    expect(begin).toBeInstanceOf(TimeWithZone);
+    expect(begin.hour).toBe(12);
+    expect(begin.day).toBe(2);
   });
 });
