@@ -1291,11 +1291,6 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       typeof expressionOrOptions === "object" && expressionOrOptions !== null
         ? expressionOrOptions
         : options;
-    if (!expression && !opts.name) {
-      throw new ArgumentError(
-        "Either expression or `name` option must be provided for removeExclusionConstraint.",
-      );
-    }
     const exclNameToDelete = (
       await this.exclusionConstraintForBang(tableName, expression ?? null, opts)
     ).name!;
@@ -1439,11 +1434,6 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       !Array.isArray(columnNameOrOptions)
         ? columnNameOrOptions
         : options;
-    if (!columnName && !opts.name && !opts.usingIndex) {
-      throw new ArgumentError(
-        "Either `columnName`, `name`, or `usingIndex` option must be provided for removeUniqueConstraint.",
-      );
-    }
     const uniqueNameToDelete = (await this.uniqueConstraintForBang(tableName, columnName, opts))
       .name!;
     await this.removeConstraint(tableName, uniqueNameToDelete);
