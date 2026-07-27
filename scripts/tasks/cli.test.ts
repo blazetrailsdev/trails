@@ -1192,7 +1192,7 @@ describe("commitAndPush (git mutation flow)", () => {
   });
 
   // Regression: a concurrent `reset --hard` in the shared canonical checkout
-  // (a pre-read sync from a process predating the sync lock) could empty the
+  // (historically the CLI's own pre-read sync, since retired) could empty the
   // index inside `git commit`'s pre-commit-hook window, producing a commit
   // whose tree equals its parent — which then got PUSHED, landing the message
   // on main with zero files (RFC 0063's stories, 2026-07-07). commitAndPush
@@ -3402,7 +3402,7 @@ describe("dirtyWorktreeLines", () => {
     const porcelain = [
       " M rfcs/0024/stories/x.md", // tracked, unstaged edit
       "A  rfcs/0024/stories/y.md", // staged add
-      "?? rfcs/0024/stories/new.md", // untracked — survives reset --hard
+      "?? rfcs/0024/stories/new.md", // untracked — survives a rebase
       " M index.md", // generated — rebuilt + re-staged on demand
     ].join("\n");
     expect(dirtyWorktreeLines(porcelain)).toEqual([

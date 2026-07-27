@@ -584,13 +584,13 @@ function restoreGeneratedFiles(cwd: string | undefined): void {
   }
 }
 
-// Parse `git status --porcelain` into the dirty lines that a rebase or
-// `reset --hard` would corrupt or discard — i.e. tracked edits the user would
-// lose. git() trims its output, so the first line loses porcelain's leading
-// status column space (" M foo" → "M foo"); re-trim every line and strip the
-// 1–2 char XY code + whitespace to recover the path, rather than slicing a
-// fixed offset. Untracked files (`??`) survive both a rebase and `reset --hard`,
-// so they're ignored, as are GENERATED_INDEX_FILES (restoreGeneratedFiles
+// Parse `git status --porcelain` into the dirty lines the mutation path's
+// `git pull --rebase` would corrupt or discard — i.e. tracked edits the user
+// would lose. git() trims its output, so the first line loses porcelain's
+// leading status column space (" M foo" → "M foo"); re-trim every line and
+// strip the 1–2 char XY code + whitespace to recover the path, rather than
+// slicing a fixed offset. Untracked files (`??`) survive a rebase, so they're
+// ignored, as are GENERATED_INDEX_FILES (restoreGeneratedFiles
 // resets them to HEAD and the tasks pre-commit hook rebuilds + re-stages them).
 export function dirtyWorktreeLines(porcelain: string): string[] {
   return porcelain
@@ -871,16 +871,14 @@ function installLockSignalHandlers(): void {
 // poll. A holder whose process is gone (ESRCH) is reclaimed automatically — its
 // lock can never be released, so making a human/agent `rm` it was only busywork
 // (and a racy one: concurrent rm+retry can delete a freshly-taken live lock).
-// Only the wait timeout against a *live* holder still fails loudly — unless
-// the caller opts into `onTimeout: "give-up"`, which returns the distinct
-// sentinel "busy" so a best-effort caller (the pre-read sync) can skip its
-// critical section rather than kill a read command with LOCK_TIMEOUT_EXIT.
-// "busy" is deliberately not null: null means "nothing to lock against"
-// (proceed unlocked), while "busy" means a live holder owns the checkout.
+// Only the wait timeout against a *live* holder still fails loudly. A null
+// handle means "nothing to lock against" (proceed unlocked), not contention:
+// every caller is a mutator, and a mutator must never proceed past a live
+// holder.
 export function acquireTasksLock(
   cwd: string | undefined,
-  opts: { waitMs?: number; pollMs?: number; onTimeout?: "exit" | "give-up" } = {},
-): LockHandle | null | "busy" {
+  opts: { waitMs?: number; pollMs?: number } = {},
+): LockHandle | null {
   const waitMs = opts.waitMs ?? LOCK_WAIT_MS;
   const pollMs = opts.pollMs ?? LOCK_POLL_MS;
   let lockPath: string;
@@ -927,7 +925,6 @@ export function acquireTasksLock(
         continue;
       }
       if (waited >= waitMs) {
-        if (opts.onTimeout === "give-up") return "busy";
         console.error(
           `error: timed out after ${Math.round(waitMs / 1000)}s waiting for the tasks-CLI ` +
             `lock at ${lockPath}. Another mutation is holding it; retry shortly.`,
@@ -944,8 +941,8 @@ export function acquireTasksLock(
 // so the signal handlers don't try to re-release a handle we've let go. The
 // read-then-unlink is race-free because no waiter removes/recreates a lock it
 // didn't create (acquire only `wx`s onto a free path, or reclaims a dead one).
-export function releaseTasksLock(lock: LockHandle | null | "busy"): void {
-  if (!lock || lock === "busy") return;
+export function releaseTasksLock(lock: LockHandle | null): void {
+  if (!lock) return;
   activeLocks.delete(lock);
   try {
     if (readFileSync(lock.path, "utf8").trim() === lock.token) unlinkSync(lock.path);
@@ -1156,8 +1153,8 @@ export function commitAndPush(opts: {
         git(["add", reconciled ? "-A" : opts.fileToStage], { cwd });
         // RFCS_NO_AUTOPUSH: the tasks repo's .husky/post-commit hook otherwise
         // pushes `main` after this commit, racing the explicit push below (and,
-        // before the pre-read sync took the lock, occasionally pushing a
-        // clobbered EMPTY commit before we could reset it away). The CLI owns
+        // back when the CLI still hard-reset the checkout on reads, occasionally
+        // pushing a clobbered EMPTY commit before we could reset it away). The CLI owns
         // its own push; silence the hook's. The rejected-push handling below
         // depends on this — with the hook silenced nothing else pushes our SHA,
         // so a rejection can only be a lost race.
@@ -1200,7 +1197,7 @@ export function commitAndPush(opts: {
         throw e;
       }
       // Never push an empty commit. A concurrent `reset --hard` in this shared
-      // checkout (a pre-read sync from a process predating the lock there, or
+      // checkout (historically the CLI's own pre-read sync, now retired; today
       // any out-of-band reset) that lands inside `git commit`'s pre-commit-hook
       // window empties the index after the emptiness check, so git finalizes a
       // commit whose tree equals its parent — the mutation's file is silently
