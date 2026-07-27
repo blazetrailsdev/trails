@@ -1480,6 +1480,14 @@ describe("buildReport — @noRailsEquivalent tags", () => {
     expect(report.tagged.matched).toBe(1);
   });
 
+  it("reports a class-declaration tag on a name that does not flag as extra surface as stale", () => {
+    const m = makeManifests("no counterpart");
+    m.ts.packages.activemodel.classes.Foo.noRailsEquivalent = "no counterpart";
+    const report = run(m);
+    expect(report.tagged.stale.map((e) => e.name)).toEqual(["Foo"]);
+    expect(report.tagged.matched).toBe(1);
+  });
+
   it("does not judge tags of packages this run never scanned", () => {
     const report = buildReport(
       makeManifests("no counterpart").ruby,

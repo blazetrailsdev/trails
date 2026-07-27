@@ -282,7 +282,11 @@ that known, and why?" — for two different gates (`api:calls` /
 report). They therefore share:
 
 - **Placement** — leading JSDoc on the declaration (class/module member,
-  getter, or top-level function).
+  getter, or top-level function). `@noRailsEquivalent` additionally reads on
+  a class, interface, or namespace DECLARATION, where it justifies the
+  declared name itself — the only inline form available to an extra that is a
+  declaration rather than a member (e.g. a class Rails nests but TS must
+  export as a sibling).
 - **Grammar** — free prose after the tag; where a key token precedes the
   reason it is em-dash-separated (`@missingRailsCall` takes a Ruby call name
   as that token, `@noRailsEquivalent` takes none); continuation lines with no
