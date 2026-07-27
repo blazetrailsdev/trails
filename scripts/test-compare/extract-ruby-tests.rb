@@ -41,7 +41,12 @@ rescue JSON::ParserError => e
         "If you set it manually, re-run via `TEST_PATHS_JSON=$(pnpm -s vendor:fetch --print-test-paths)`."
 end
 
-# Files/directories to skip (infrastructure, not actual tests)
+# Files/directories to skip (infrastructure, not actual tests).
+#
+# Match FILES, not directories: `test/cases/migration/` looks like a support
+# tree but is ~20 real test files, and skipping the whole directory silently
+# demoted every ported case there to a TS-only "extra". Its one infrastructure
+# file, migration/helper.rb, is already covered by the /helper\.rb$/ entry.
 SKIP_PATTERNS = [
   /\/helper\.rb$/,
   /\/support\//,
