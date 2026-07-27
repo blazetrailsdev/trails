@@ -10,7 +10,7 @@ import { SchemaMigration } from "../schema-migration.js";
 import { Base } from "../base.js";
 import { adapterType, ambientPoolConfiguration } from "../test-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
-import { establishFromTestConfig } from "../support/test-database-config.js";
+import { establishFromTestConfig } from "../support/connection.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 
 describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {

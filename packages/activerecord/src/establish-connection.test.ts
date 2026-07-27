@@ -103,8 +103,15 @@ describe("Base.establishConnection with config file", () => {
   const tempDir = join(tmpdir(), `trails-test-${process.pid}`);
   const configPath = join(tempDir, "database.json");
 
+  // These cases exercise the no-configurations bootstrap (config file /
+  // DATABASE_URL). The worker's setup file runs ARTest.connect's port, which
+  // assigns `Base.configurations` as `connection.rb:31` does, so it has to be
+  // cleared for the fallback path to be reachable at all.
+  const originalConfigurations = Base.configurations();
+
   beforeEach(async () => {
     await resetConnection();
+    Base.configurations({});
     mkdirSync(tempDir, { recursive: true });
     Base._configPath = configPath;
   });
@@ -121,6 +128,7 @@ describe("Base.establishConnection with config file", () => {
       process.env.NODE_ENV = originalNodeEnv;
     }
     Base._configPath = null;
+    Base.configurations(originalConfigurations);
     await resetConnection();
     try {
       rmSync(tempDir, { recursive: true });
@@ -207,9 +215,11 @@ describe("Base.establishConnection with JS config file", () => {
   const originalCwd = process.cwd();
   const tempDir = join(tmpdir(), `trails-jsconfig-${process.pid}`);
   const configDir = join(tempDir, "config");
+  const originalConfigurations = Base.configurations();
 
   beforeEach(async () => {
     await resetConnection();
+    Base.configurations({});
     mkdirSync(configDir, { recursive: true });
     process.chdir(tempDir);
   });
@@ -227,6 +237,7 @@ describe("Base.establishConnection with JS config file", () => {
     }
     process.chdir(originalCwd);
     Base._configPath = null;
+    Base.configurations(originalConfigurations);
     await resetConnection();
     try {
       rmSync(tempDir, { recursive: true });

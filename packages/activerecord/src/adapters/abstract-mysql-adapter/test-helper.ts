@@ -3,10 +3,10 @@ import mysql from "mysql2/promise";
 import { Mysql2Adapter } from "../../connection-adapters/mysql2-adapter.js";
 import { Version } from "../../connection-adapters/abstract-adapter.js";
 import { arunitDatabaseNames } from "../../support/arunit2-config.js";
-import { mysqlSettings, mysqlUrl } from "../../support/test-connection-env.js";
+import { mysqlSettings, mysqlUrl } from "../../support/config.js";
 import { adapterType } from "../../test-adapter.js";
 import { Base } from "../../base.js";
-import { establishFromTestConfig } from "../../support/test-database-config.js";
+import { establishFromTestConfig } from "../../support/connection.js";
 
 // `dbWarningsAction` is a single global setting on the base adapter, so the
 // shared helper toggles it for every adapter (including MySQL). Re-exported

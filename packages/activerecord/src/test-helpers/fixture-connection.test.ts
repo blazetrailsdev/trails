@@ -14,7 +14,7 @@
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { Base } from "../base.js";
 import { setPermanentConnectionCheckout } from "../ar-config.js";
-import { establishFromTestConfig } from "../support/test-database-config.js";
+import { establishFromTestConfig } from "../support/connection.js";
 import { leaseFixtureConnection } from "./fixture-connection.js";
 
 describe("fixture connection source", () => {

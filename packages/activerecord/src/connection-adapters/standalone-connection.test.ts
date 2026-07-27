@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Base } from "../index.js";
-import { establishFromTestConfig } from "../support/test-database-config.js";
+import { establishFromTestConfig } from "../support/connection.js";
 import type { AbstractAdapter } from "./abstract-adapter.js";
 
 describe("StandaloneConnectionTest", () => {

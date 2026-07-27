@@ -1,8 +1,8 @@
 /**
- * D-Y vitest setupFile for the activerecord project: establishes Base from
- * the Phase-1 test config, loads the canonical fixture schema once per worker
- * via `DatabaseTasks`, then tears the handler down so old-path test files
- * (those that never call `setupHandlerSuite`) are not affected by a
+ * D-Y vitest setupFile for the activerecord project: calls `ARTest.connect`'s
+ * port (`support/connection.ts`), loads the canonical fixture schema once per
+ * worker via `DatabaseTasks`, then tears the handler down so old-path test
+ * files (those that never call `setupHandlerSuite`) are not affected by a
  * globally-installed handler pool.
  *
  * Handler-path test files re-establish the connection in their own beforeAll
@@ -24,9 +24,10 @@
  *     GET_LOCK would allow slot races on MySQL. The schema file uses
  *     force:"cascade" for per-table drop+recreate instead.)
  */
-import { buildTestDatabaseConfig } from "./support/test-database-config.js";
+import { connect } from "./support/connection.js";
 import { generateSchemaFile } from "./support/schema-file-generator.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
+import { getEnv } from "@blazetrails/activesupport";
 import { Base } from "./base.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 // Registers _RelationCtor so Model.first()/.all()/.where() etc. work in
@@ -34,9 +35,7 @@ import { DatabaseTasks } from "./tasks/database-tasks.js";
 // re-exports relation.js as a side effect).
 import "./relation.js";
 
-const { adapter, envConfig } = await buildTestDatabaseConfig();
-
-await Base.establishConnection(envConfig.configuration as Record<string, unknown>);
+const { adapter, envConfig } = await connect();
 
 // Resolve `supports_expression_index?` from the live connection BEFORE
 // generating the schema file: without it the generator falls back to its
@@ -50,8 +49,8 @@ const schemaFilePath = await generateSchemaFile(
   await supportsExpressionIndex(await Base.leaseConnection()),
 );
 
-const pgExclusive = adapter === "postgres" && !!process.env.AR_PG_EXCLUSIVE_DB;
-const mysqlExclusive = adapter === "mysql" && !!process.env.AR_MYSQL_EXCLUSIVE_DB;
+const pgExclusive = adapter === "postgres" && !!getEnv("AR_PG_EXCLUSIVE_DB");
+const mysqlExclusive = adapter === "mysql" && !!getEnv("AR_MYSQL_EXCLUSIVE_DB");
 if ((adapter === "sqlite" && envConfig.database !== ":memory:") || pgExclusive || mysqlExclusive) {
   await DatabaseTasks.reconstructFromSchema(envConfig, "ts", schemaFilePath);
 } else {

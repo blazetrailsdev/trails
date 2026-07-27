@@ -10,7 +10,7 @@
  * (lock released automatically on disconnect).
  *
  * The slot is published as a *number*, not as a rewritten connection URL:
- * `support/test-connection-env.ts` applies the `_N` database suffix, so
+ * `support/config.ts` applies the `_N` database suffix, so
  * every consumer derives the same worker database from one signal instead of
  * reading a mutated string.
  *
@@ -36,12 +36,8 @@ import mysql from "mysql2/promise";
 import "./sqlite/better-sqlite3.js";
 import { WORKER_DB_ENV, ensureWorkerClone } from "./support/sqlite-template.js";
 import { slotPoolSize, workerForkCount } from "./support/ar-db-slots.js";
-import {
-  SLOT_ENV,
-  activeLane,
-  mysqlSettings,
-  postgresSettings,
-} from "./support/test-connection-env.js";
+import { SLOT_ENV, mysqlSettings, postgresSettings } from "./support/config.js";
+import { activeLane } from "./support/connection.js";
 
 // Shared by all evaluations of this module within the same worker process.
 const g = globalThis as typeof globalThis & {

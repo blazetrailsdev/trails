@@ -13,7 +13,7 @@ import {
   dumpTableSchema,
   FULL_DUMP_TIMEOUT_MS,
 } from "./support/schema-dumping-helper.js";
-import { establishFromTestConfig } from "./support/test-database-config.js";
+import { establishFromTestConfig } from "./support/connection.js";
 
 // The first describe uses `fixtures({})` (canonical schema + reset shield);
 // the later bespoke-table describes deliberately keep the global per-test reset,

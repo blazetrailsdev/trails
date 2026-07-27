@@ -1,22 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
-  activeLane,
   driverConfig,
   settingsUrl,
-  connectionName,
   mysqlSettings,
   mysqlUrl,
   postgresSettings,
   postgresUrl,
   withDatabase,
-} from "./test-connection-env.js";
+} from "./config.js";
+import { activeLane, connectionName } from "./connection.js";
 
 /** A stub env reader backed by a fixed map (no ambient env mutation). */
 function reader(env: Record<string, string | undefined>): (key: string) => string | undefined {
   return (key) => env[key];
 }
 
-describe("test-connection-env", () => {
+describe("config", () => {
   it("selects the connection named by ARCONN", () => {
     expect(connectionName(reader({ ARCONN: "mysql2" }))).toBe("mysql2");
     expect(activeLane(reader({ ARCONN: "mysql2" }))).toBe("mysql");
@@ -24,9 +23,14 @@ describe("test-connection-env", () => {
     expect(activeLane(reader({ ARCONN: "sqlite3_mem" }))).toBe("sqlite");
   });
 
-  it("falls back to the default_connection when ARCONN is unset or empty", () => {
+  it("falls back to the default_connection when ARCONN is unset", () => {
     expect(connectionName(reader({}))).toBe("sqlite3");
-    expect(activeLane(reader({ ARCONN: "" }))).toBe("sqlite");
+  });
+
+  it("treats an empty ARCONN as a connection name, not as unset", () => {
+    // Ruby's `ENV["ARCONN"] || config["default_connection"]` falls back on nil
+    // alone, so "" is a selected name and takes the unknown-name path.
+    expect(connectionName(reader({ ARCONN: "" }))).toBe("");
   });
 
   it("never selects a backend from a connection sub-setting", () => {
@@ -83,7 +87,6 @@ describe("test-connection-env", () => {
     expect(settings.host).toBe("localhost");
     expect(settings.database).toBe("rails_js_test");
     expect(settings.socket).toBeUndefined();
-    expect(activeLane(reader({ ARCONN: "" }))).toBe("sqlite");
   });
 
   it("raises on a malformed slot rather than sharing the base database", () => {

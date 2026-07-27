@@ -1,6 +1,19 @@
 /**
- * The environment surface of the test harness, mirroring
- * `vendor/rails/activerecord/test/config.example.yml`.
+ * The test harness' configuration, mirroring
+ * `vendor/rails/activerecord/test/support/config.rb` — Rails' `ARTest.config`,
+ * i.e. the parsed `test/config.yml` (whose shape is
+ * `vendor/rails/activerecord/test/config.example.yml`).
+ *
+ * Rails reads a YAML file off disk; trails has no `config.yml` to read, so the
+ * `connections:` hash is expressed directly here as `DEFAULT_CONNECTION` /
+ * `CONNECTION_LANES` plus the sub-setting readers below, and the named-entry
+ * builders live in `connection.ts` next to the code that fetches them. There is
+ * therefore no `configFile` / `readConfig` pair to port: those are the file IO
+ * `ARTest.config` memoizes, and with no file there is nothing to read or copy
+ * from `config.example.yml`. The `test/config.rb` path constants (`TEST_ROOT`,
+ * `FIXTURES_ROOT`, `SCHEMA_ROOT`, …) are likewise absent — nothing in trails
+ * resolves fixtures or schema by path from a test root; `test-helpers/` is
+ * imported as modules.
  *
  * Rails splits the two concerns this module keeps apart:
  *
@@ -88,30 +101,6 @@ function intSetting(read: EnvReader, key: string, fallback: number): number {
     throw new Error(`${key} must be an integer, got ${JSON.stringify(raw)}`);
   }
   return parsed;
-}
-
-/**
- * The connection name selected by `ARCONN`, falling back to
- * {@link DEFAULT_CONNECTION}. Mirrors `connection.rb:10`.
- *
- * Returns a bare `string`, not a {@link ConnectionName}: `ARCONN` is arbitrary
- * user input, and asserting it into the union here would be a type lie that
- * makes the unknown-name branch look unreachable to every caller.
- * `test-database-config.ts` owns Rails' "Connection not found" failure, so the
- * error surfaces once, at config-build time.
- */
-export function connectionName(read: EnvReader = getEnv): string {
-  return present(read, "ARCONN") ?? DEFAULT_CONNECTION;
-}
-
-/**
- * The backend lane the current `ARCONN` drives. Unknown names resolve to the
- * default connection's lane; the loud failure for those belongs to
- * `test-database-config.ts`, not to every lane predicate in the harness.
- */
-export function activeLane(read: EnvReader = getEnv): TestAdapterName {
-  const lanes: Partial<Record<string, TestAdapterName>> = CONNECTION_LANES;
-  return lanes[connectionName(read)] ?? CONNECTION_LANES[DEFAULT_CONNECTION];
 }
 
 /** Connection details for a server-backed lane, assembled from sub-settings. */

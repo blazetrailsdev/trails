@@ -1,5 +1,5 @@
 import { beforeAll, afterAll } from "vitest";
-import { establishFromTestConfig } from "./test-database-config.js";
+import { establishFromTestConfig } from "./connection.js";
 import { pushSkipGlobalReset, popSkipGlobalReset } from "./skip-global-reset.js";
 
 /**

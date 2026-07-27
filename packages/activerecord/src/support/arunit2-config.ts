@@ -23,14 +23,14 @@
 
 import { getEnv } from "@blazetrails/activesupport";
 import {
-  activeLane,
   mysqlSettings,
   postgresSettings,
   settingsUrl,
   withDatabase,
   type EnvReader,
   type TestAdapterName,
-} from "./test-connection-env.js";
+} from "./config.js";
+import { activeLane } from "./connection.js";
 
 export type { TestAdapterName };
 

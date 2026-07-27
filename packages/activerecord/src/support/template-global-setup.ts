@@ -34,13 +34,13 @@ import {
 } from "./sqlite-template.js";
 import { slotPoolSize, workerForkCount } from "./ar-db-slots.js";
 import {
-  activeLane,
   driverConfig,
   mysqlSettings,
   postgresSettings,
   settingsUrl,
   withDatabase,
-} from "./test-connection-env.js";
+} from "./config.js";
+import { activeLane } from "./connection.js";
 
 // ---------------------------------------------------------------------------
 // Shared helpers

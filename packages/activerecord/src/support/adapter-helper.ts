@@ -30,7 +30,7 @@
  */
 
 import { adapterType } from "../test-adapter.js";
-import { configuredConnectionHash } from "./test-database-config.js";
+import { configuredConnectionHash } from "./connection.js";
 import { Base } from "../base.js";
 
 export type AdapterClassName =

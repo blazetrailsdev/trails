@@ -40,7 +40,7 @@ import type { FsAdapter } from "@blazetrails/activesupport/fs-adapter";
 import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
 import { getOsAsync } from "@blazetrails/activesupport";
 import { betterSqlite3Driver } from "../sqlite/better-sqlite3.js";
-import { activeLane } from "./test-connection-env.js";
+import { activeLane } from "./connection.js";
 
 /** WAL sidecars sqlite writes alongside a file DB, plus the DB file itself. */
 const DB_FILE_SUFFIXES = ["", "-wal", "-shm"] as const;
@@ -65,7 +65,7 @@ const cleanupG = globalThis as typeof globalThis & { __arDbCleanupPaths?: Set<st
  * Register a best-effort `process.on("exit")` unlink of a sqlite file DB and
  * its WAL sidecars, at most once per path per process.
  *
- * Callers that must stay `process`-free (`test-database-config.ts`, whose
+ * Callers that must stay `process`-free (`support/connection.ts`, whose
  * fallback DB otherwise lingers in tmpdir after every setup-free run) route
  * their cleanup through here — this module already carries the `process`
  * exception documented at the top of the file.
