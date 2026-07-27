@@ -1,4 +1,3 @@
-import { establishFromTestConfig } from "../support/connection.js";
 import { leaseFixtureConnection } from "./fixture-connection.js";
 import {
   withTransactionalFixtures,
@@ -59,13 +58,5 @@ import {
  * This is a no-arg opt-in *function*; that is `{ useTransactionalTests: false }`.
  */
 export function useTransactionalTests(options?: WithTransactionalFixturesOptions): void {
-  // establishFromTestConfig and pushSkipGlobalReset run in the same beforeAll
-  // hook so a bootstrap failure does not leave pushSkipGlobalReset orphaned
-  // (matches the idiom in setupHandlerSuite). establishFromTestConfig is
-  // idempotent (guarded by Base.isConnectedQ()), so calling it from both
-  // setupHandlerSuite and useTransactionalTests in the same file is safe.
-  withTransactionalFixtures(leaseFixtureConnection, {
-    ...options,
-    _beforeAll: establishFromTestConfig,
-  });
+  withTransactionalFixtures(leaseFixtureConnection, options);
 }

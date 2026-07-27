@@ -1,12 +1,17 @@
 /**
  * D-Y vitest setupFile for the activerecord project: calls `ARTest.connect`'s
- * port (`support/connection.ts`), loads the canonical fixture schema once per
- * worker via `DatabaseTasks`, then tears the handler down so old-path test
- * files (those that never call `setupHandlerSuite`) are not affected by a
- * globally-installed handler pool.
+ * port (`support/connection.ts`) and loads the canonical fixture schema once
+ * per worker via `DatabaseTasks`.
  *
- * Handler-path test files re-establish the connection in their own beforeAll
- * via setupHandlerSuite() → establishFromTestConfig().
+ * The pool it opens then lives for the whole worker, as Rails' does for the
+ * whole process (`cases/helper.rb` calls `ARTest.connect` at load and never
+ * disconnects — `vendor/rails/activerecord/test/support/connection.rb:22-38`).
+ * This file used to call `Base.removeConnection()` here so that test files
+ * which never call `setupHandlerSuite` would not inherit a globally-installed
+ * handler pool, which forced every handler-path suite to re-open the pool
+ * through a `establishFromTestConfig` helper with no Rails counterpart. That
+ * teardown was unnecessary: those files either build their own adapter or
+ * connect themselves, and none of them observes the ambient pool.
  *
  * Must run AFTER cases/helper.ts so better-sqlite3 is registered and
  * Base.establishConnection can open the pool.
@@ -74,16 +79,6 @@ if (missingTables.length > 0) {
   );
 }
 
-// Remove the connection pool from the handler so old-path workers don't
-// inherit an active pool.  isConnectedQ() returns false after this, so
-// handler-path files reinstall it cleanly via setupHandlerSuite() →
-// establishFromTestConfig().
-Base.removeConnection();
-// Also clear the cached checkout: Base.adapter caches a pool-leased
-// connection in Base._adapter; subclasses without their own _adapter
-// resolve through the prototype chain and would inherit the MySQL/PG
-// adapter from this preload on MariaDB/PG CI workers.
-Base._adapter = null;
 // Clear DatabaseTasks global state so database-tasks.test.ts sees the null
 // invariant it expects (it tests checkProtectedEnvironmentsBang with no config).
 DatabaseTasks.databaseConfiguration = null;

@@ -143,7 +143,6 @@ function pooledAdapterPool(adapter: TransactionalFixturesAdapter): ConnectionPoo
  * @example
  *   let adapter: DatabaseAdapter;
  *   beforeAll(async () => {
- *     await establishFromTestConfig();
  *     adapter = Base.connection;
  *     await loadCanonicalSchema(adapter);
  *   });
@@ -217,17 +216,6 @@ export interface WithTransactionalFixturesOptions {
    * `Base.connection` path). This is a boolean option; that is a helper call.
    */
   useTransactionalTests?: boolean;
-
-  /**
-   * Optional async hook that runs at the very start of the `beforeAll`
-   * registered by this helper — before `pushSkipGlobalReset()`. Used by
-   * {@link useTransactionalTests} to co-locate `establishFromTestConfig` and
-   * `pushSkipGlobalReset` in a single `beforeAll` (matches the idiom in
-   * `setupHandlerSuite`).
-   *
-   * @internal
-   */
-  _beforeAll?: () => Promise<void>;
 }
 
 export function withTransactionalFixtures(
@@ -238,7 +226,6 @@ export function withTransactionalFixtures(
     invalidateSchemaCache = true,
     eagerWarmSchemaCache: eagerWarm = true,
     usesTransaction: usesTransactionNames = [],
-    _beforeAll: beforeAllHook,
   } = options;
   // Eager warm runs lazily before the first test rather than in this helper's
   // beforeAll: callers register their schema-setup beforeAll *after* calling
@@ -254,8 +241,7 @@ export function withTransactionalFixtures(
   // hook to ConnectionPool#newConnection (production code change).
   let _txnOpenedForTest = false;
 
-  beforeAll(async () => {
-    await beforeAllHook?.();
+  beforeAll(() => {
     pushSkipGlobalReset();
   });
 

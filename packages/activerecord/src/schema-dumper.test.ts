@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 import { Base } from "./base.js";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
@@ -13,17 +13,11 @@ import {
   dumpTableSchema,
   FULL_DUMP_TIMEOUT_MS,
 } from "./support/schema-dumping-helper.js";
-import { establishFromTestConfig } from "./support/connection.js";
 
 // The first describe uses `fixtures({})` (canonical schema + reset shield);
 // the later bespoke-table describes deliberately keep the global per-test reset,
-// so they only need `Base.connection` *established*. Establish it at file scope
-// (idempotent — `fixtures({})` re-uses the same worker connection) so those
-// describes and the file-level afterAll don't depend on the first describe's
-// beforeAll having already run (e.g. when run in isolation via `-t`).
-beforeAll(async () => {
-  await establishFromTestConfig();
-});
+// so they only need `Base.connection` *established* — which the worker setup
+// file already did, as Rails' `cases/helper.rb` does for the whole process.
 
 // Mirrors: ActiveRecord::TestCase#with_postgresql_datetime_type. Temporarily
 // flips PostgreSQLAdapter.datetimeType so :datetime resolves to :timestamptz.

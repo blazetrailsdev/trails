@@ -133,16 +133,12 @@ let _inTestPool: ConnectionPool | null = null;
 let _inTestPoolPromise: Promise<ConnectionPool> | null = null;
 
 async function buildInTestPool(): Promise<ConnectionPool> {
-  const { establishFromTestConfig } = await import("./support/connection.js");
   const { HashConfig } = await import("./database-configurations/hash-config.js");
   const { PoolConfig } = await import("./connection-adapters/pool-config.js");
   const { ConnectionPool } = await import("./connection-adapters/abstract/connection-pool.js");
   const { ConnectionDescriptor } =
     await import("./connection-adapters/abstract/connection-descriptor.js");
 
-  // Ensure the primary pool exists so we can duplicate its db_config
-  // (idempotent — a no-op when a fixtures file already connected Base).
-  await establishFromTestConfig();
   const src = Base.connectionPool().dbConfig;
 
   // Duplicate the primary config with a short checkout_timeout so pool-mechanics
