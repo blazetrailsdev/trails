@@ -110,17 +110,15 @@ describe("PrimaryClassTest", () => {
 
   // Both tests are gated behind Rails' `unless in_memory_db?`
   // (primary_class_test.rb): re-establishing an in-memory pool would discard
-  // its schema. Rails passes `:arunit`; the trails harness registers no named
-  // configurations, so the current db config stands in for that lookup.
+  // its schema.
   it.skipIf(inMemoryDb())(
     "application record shares a connection with active record by default",
     async () => {
       (globalThis as Record<string, unknown>)["ApplicationRecord"] = ApplicationRecord;
       const original = Base.connectionDbConfig();
       try {
-        const arunit = original as unknown as Record<string, unknown>;
         const pools = ApplicationRecord.connectsTo({
-          database: { writing: arunit, reading: arunit },
+          database: { writing: "arunit", reading: "arunit" },
         });
         await Promise.all(pools.map((p) => p.adapterReady));
 
@@ -140,9 +138,8 @@ describe("PrimaryClassTest", () => {
       PrimaryAppRecord.primaryAbstractClass();
       const original = Base.connectionDbConfig();
       try {
-        const arunit = original as unknown as Record<string, unknown>;
         const pools = PrimaryAppRecord.connectsTo({
-          database: { writing: arunit, reading: arunit },
+          database: { writing: "arunit", reading: "arunit" },
         });
         await Promise.all(pools.map((p) => p.adapterReady));
 
