@@ -37,6 +37,7 @@ import {
   flushManifestBatch,
 } from "./api-compare/write-json-manifest.js";
 import { railsApiAvailable } from "./api-compare/require-rails-api.js";
+import { diffDeprecatedManifest } from "./deprecated-manifest-diff.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -402,32 +403,26 @@ function emitDeprecatedManifest(): void {
   console.log(`Wrote ${DEPRECATED_OUT} — ${fc} files (${nc} names)`);
 }
 
-// Compares the committed manifest against a full recompute. Byte comparison is
-// deliberately avoided (prettier formatting is gated separately by
-// `prettier --check .`); this compares the data, and reports lost entries
-// explicitly since that is the failure mode a partial regeneration produces.
+// Compares the committed manifest against a full recompute (see
+// scripts/deprecated-manifest-diff.ts for the comparison itself).
 function checkDeprecatedManifest(): void {
+  const rel = path.relative(ROOT, DEPRECATED_OUT);
   const expected = buildDeprecatedManifest();
   if (!expected) {
-    console.error(
-      `Cannot verify ${DEPRECATED_OUT}: vendored Ruby is incomplete. Run \`pnpm vendor:fetch\`.`,
-    );
+    console.error(`Cannot verify ${rel}: vendored Ruby is incomplete. Run \`pnpm vendor:fetch\`.`);
     process.exit(1);
   }
   const actual = fs.existsSync(DEPRECATED_OUT)
     ? JSON.parse(fs.readFileSync(DEPRECATED_OUT, "utf8"))
     : { files: {} };
-  const lost: string[] = [];
-  for (const [file, names] of Object.entries(expected.files)) {
-    const have = new Set<string>(actual.files?.[file] ?? []);
-    for (const n of names) if (!have.has(n)) lost.push(`${file}: ${n}`);
-  }
-  if (JSON.stringify(actual) === JSON.stringify(expected)) {
-    console.log(`${path.relative(ROOT, DEPRECATED_OUT)} is up to date.`);
+  const { lost, extra, drifted } = diffDeprecatedManifest(expected, actual);
+  if (!drifted) {
+    console.log(`${rel} is up to date.`);
     return;
   }
-  console.error(`${path.relative(ROOT, DEPRECATED_OUT)} is out of date.`);
+  console.error(`${rel} is out of date.`);
   if (lost.length > 0) console.error(`Missing entries:\n  ${lost.join("\n  ")}`);
+  if (extra.length > 0) console.error(`Stale entries:\n  ${extra.join("\n  ")}`);
   console.error("Regenerate with `pnpm rails-privates:manifest` and commit the result.");
   process.exit(1);
 }

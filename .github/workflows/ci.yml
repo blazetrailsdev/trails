@@ -249,7 +249,7 @@ jobs:
           # explicitly: all are carved out of the infra sweep
           # (INFRA_CARVEOUT_RE), so this clause is the only thing that still
           # runs rails-comparison on a change confined to them.
-          COMPARISON_RE='^(packages/|scripts/((api|test|fixtures|schema)-compare/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins)\.ts$)|vendor/|docs/ruby-ts-conventions\.md$)'
+          COMPARISON_RE='^(packages/|scripts/((api|test|fixtures|schema)-compare/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|deprecated-manifest-diff)\.ts$)|vendor/|docs/ruby-ts-conventions\.md$)'
           force_all_affected() {
             echo "activerecord_affected=true" >> "$GITHUB_OUTPUT"
             echo "actionpack_affected=true"   >> "$GITHUB_OUTPUT"
