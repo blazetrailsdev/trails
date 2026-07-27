@@ -146,6 +146,30 @@ export async function resolutionShapeKey(packagesDir: string): Promise<string> {
   return hashParts(perPackage.flat().sort());
 }
 
+/**
+ * Hash of the workspace's THIRD-PARTY declaration state: the content of
+ * `pnpm-lock.yaml`.
+ *
+ * Neither of the other two keys can see `node_modules`: `normalizeReadSet`
+ * drops every path under it and `resolutionShapeKey` only walks
+ * `packages/*\/dist`. Yet most of what the compiler reads is third-party — on
+ * actionview, 197 of 241 resolved files (`@types/node`, `typescript`'s
+ * `lib.*.d.ts`, `undici-types`, `@types/pg`) — so a dependency bump changes the
+ * extracted surface with every cache entry still valid.
+ *
+ * Keeping those paths in the read-set would be precise but costs ~23 ms per
+ * warm run (228 unique third-party files hashed, memoised across the 13
+ * packages) plus a `realpath` and a cache-entry line for each of ~200 paths per
+ * package; the lockfile is one 400 KB read, ~2 ms per run, once. Third-party
+ * declarations only move on an install, and an install rewrites the lockfile,
+ * so the coarse key catches every real case at a tenth of the cost. Returns a
+ * sentinel when there is no lockfile so a lockfile-less tree still keys stably.
+ */
+export async function dependencyKey(rootDir: string): Promise<string> {
+  const hash = await fileHash(path.join(rootDir, "pnpm-lock.yaml"));
+  return hashParts([hash ?? "no-lockfile"]);
+}
+
 async function declarationsUnder(dir: string): Promise<string[]> {
   let entries;
   try {
@@ -168,8 +192,7 @@ async function declarationsUnder(dir: string): Promise<string[]> {
  * worth validating: real paths (pnpm resolves `@blazetrails/<dep>` through a
  * `node_modules` symlink into `packages/<dep>/dist`, and the symlinked spelling
  * would be an unstable key), inside `rootDir`, and outside `node_modules` —
- * third-party declarations only move on an install, which rewrites the lockfile
- * and the packages themselves. `exclude` drops paths already covered by the
+ * third-party declarations are covered instead by `dependencyKey`. `exclude` drops paths already covered by the
  * caller's own fingerprint, so the recorded set is the CROSS-package remainder.
  */
 export async function normalizeReadSet(

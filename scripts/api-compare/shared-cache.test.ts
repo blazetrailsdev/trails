@@ -21,6 +21,7 @@ import {
   hashReadSet,
   readSetMatches,
   resolutionShapeKey,
+  dependencyKey,
   CACHE_VERSION,
 } from "./shared-cache.js";
 
@@ -314,5 +315,33 @@ describe("resolutionShapeKey", () => {
     writeDist(packagesDir, "arel", { "index.js": "", "nested/index.js.map": "" });
     expect(await resolutionShapeKey(packagesDir)).toBe(before);
     expect(await resolutionShapeKey(path.join(packagesDir, "nope"))).toMatch(/^[0-9a-f]{40}$/);
+  });
+});
+
+describe("dependencyKey", () => {
+  it("changes when a dependency bump rewrites the lockfile", async () => {
+    const root = mkTmp();
+    const lock = path.join(root, "pnpm-lock.yaml");
+    fs.writeFileSync(lock, "'@types/node': 22.0.0\n");
+    const before = await dependencyKey(root);
+    expect(before).toMatch(/^[0-9a-f]{40}$/);
+
+    // Third-party declarations live under node_modules, which the read-set
+    // drops and the shape key never walks — without this key an install that
+    // changes what `@types/node` declares would serve every stale entry.
+    fs.writeFileSync(lock, "'@types/node': 24.0.0\n");
+    expect(await dependencyKey(root)).not.toBe(before);
+
+    fs.writeFileSync(lock, "'@types/node': 22.0.0\n");
+    expect(await dependencyKey(root)).toBe(before);
+  });
+
+  it("keys a lockfile-less tree stably and distinctly", async () => {
+    const root = mkTmp();
+    const missing = await dependencyKey(root);
+    expect(missing).toBe(await dependencyKey(mkTmp()));
+
+    fs.writeFileSync(path.join(root, "pnpm-lock.yaml"), "");
+    expect(await dependencyKey(root)).not.toBe(missing);
   });
 });

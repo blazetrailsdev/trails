@@ -30,6 +30,7 @@ import {
   hashReadSet,
   readSetMatches,
   resolutionShapeKey,
+  dependencyKey,
   hashParts,
   type ReadSet,
 } from "./shared-cache.js";
@@ -196,6 +197,12 @@ export async function main() {
   // Read-sets record what WAS resolvable; this covers what BECOMES resolvable
   // (an unbuilt dependency gaining a `dist`) — see resolutionShapeKey.
   const shapeKey = await resolutionShapeKey(path.join(ROOT_DIR, "packages"));
+  // Most of what the compiler reads is third-party, and neither the read-set
+  // nor the shape key can see `node_modules`. The lockfile stands in for all of
+  // it: coarse (any bump invalidates every package) but ~2 ms per run against
+  // ~23 ms for keeping the ~200 third-party paths per package in the read-set,
+  // and third-party declarations only move on an install anyway.
+  const depKey = await dependencyKey(ROOT_DIR);
 
   // Pass 1: serve every cache hit and record the metadata needed to extract the
   // misses below. `ownRel` is the package's own fingerprint inputs (already
@@ -221,7 +228,11 @@ export async function main() {
     // Anchor relative paths at the package root so tsconfig.json
     // doesn't show up as `../tsconfig.json` (which it would if we
     // anchored at the src dir).
-    const fingerprint = hashParts([packageFingerprint(fingerprintInputs, pkgRoot), shapeKey]);
+    const fingerprint = hashParts([
+      packageFingerprint(fingerprintInputs, pkgRoot),
+      shapeKey,
+      depKey,
+    ]);
     const ownRel = new Set(
       fingerprintInputs.map((file) => path.relative(ROOT_DIR, file).replace(/\\/g, "/")),
     );
@@ -252,7 +263,7 @@ export async function main() {
     let sharedKey: string | null = null;
     if (sharedDir) {
       const ownContent = await contentFingerprint(fingerprintInputs, pkgRoot);
-      const contentKey = `${SCHEMA_VERSION}-${hashParts([ownContent, shapeKey])}`;
+      const contentKey = `${SCHEMA_VERSION}-${hashParts([ownContent, shapeKey, depKey])}`;
       const body = await readShared(sharedDir, `ts-${pkg}`, contentKey);
       if (body) {
         try {
