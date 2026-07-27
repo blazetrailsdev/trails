@@ -702,10 +702,6 @@ jobs:
           scripts/strip-asany.test.ts
           scripts/rails-file-structure-mixins.test.ts
           scripts/ci-suite-coverage.test.ts
-          # A real vitest suite, unlike the RuleTester-driven eslint/*.test.mjs
-          # on ci-suite-coverage's KNOWN_UNRUN list — so it gets a filter here
-          # rather than an exemption there.
-          eslint/rails-private-jsdoc.config.test.mjs
 
   # Consolidated leaf-test job. The cheapest sub-minute leaf suites — rack
   # (~27 s), actionview (~26 s), tse-compiler (~22 s), and the DX type tests
