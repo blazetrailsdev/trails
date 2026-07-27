@@ -35,6 +35,46 @@ TypeDoc build runs with `excludeInternal: true`, and the
 Active across all Rails-mirroring packages (`arel`, `activesupport`,
 `activemodel`, `activerecord`, `actionpack`, `actionview`).
 
+## After a rebase: lint the auto-merged files
+
+The pre-commit hook runs `lint-staged`, which lints only what is staged for
+that commit. A `git rebase` replays commits **without** running pre-commit, so
+files git auto-merged never get linted locally — and a defect can exist in the
+merged result while existing in neither parent branch. Two sibling PRs each
+deleting a different caller of the same import orphans that import; the first
+signal is the `Lint` CI job (this bit #5356).
+
+The `post-rewrite` and `post-merge` husky hooks now lint the files each
+**replayed commit** touches (`scripts/lint-rewritten-files.sh` — for each
+`<old> <new>` pair git reports, it lints `git diff <new>^!`). That is
+deliberately narrower than `<old>..<new>`, which is a tree diff across the base
+move and would also name every file the new upstream changed and your commit
+never did. They **report and never block** — a rebase is not a commit you can
+amend in flight — so read the output: a failure prints a red banner. A plain
+`git commit --amend` is skipped, since pre-commit already linted its staged
+files.
+
+Manual fallback, for when the hook did not run (a rebase driven by a tool that
+skips hooks, `--no-verify`, a hooks-less clone) — this one lints the whole
+`ORIG_HEAD..HEAD` span, upstream-only files included, so it is noisier than the
+hook:
+
+```bash
+# 1. lint what the rebase moved
+# The empty check is load-bearing: a bare `eslint` with no paths lints the whole
+# repo (the >2min run this replaces). Don't reach for `xargs -r` — that flag is
+# GNU-only and BSD/macOS xargs rejects it.
+moved=$(git diff --name-only ORIG_HEAD..HEAD -- '*.ts' '*.tsx' '*.jsx' '*.js' '*.mjs' '*.cjs')
+if [ -n "$moved" ]; then echo "$moved" | xargs pnpm exec eslint; fi
+
+# 2. re-read each file you believe you changed, against the new base
+git diff origin/main -- <file>
+```
+
+Step 2 matters as much as step 1: lint catches orphaned imports, but a
+duplicated guard — the same fix landed twice at slightly different offsets and
+merged cleanly, the second copy unreachable — needs a human reading the diff.
+
 ## Measuring progress
 
 Primary signals: `pnpm run api:compare` (use `--package <name>` for one
