@@ -12,7 +12,7 @@
  * loaded `Company`, not the async reader's Promise.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
+import { Base, registerModel, registerSubclass } from "../index.js";
 import {
   Company,
   Firm,
@@ -87,7 +87,7 @@ describe("destroy belongs_to preload through arrow-field helper", () => {
     registerModel(RestrictedWithExceptionFirm);
     registerModel(RestrictedWithErrorFirm);
     registerModel(Client);
-    enableSti(Company);
+    Company.inheritanceColumn = "type";
     registerSubclass(Firm);
     registerSubclass(DependentFirm);
     registerSubclass(ExclusivelyDependentFirm);

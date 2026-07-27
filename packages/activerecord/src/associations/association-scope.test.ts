@@ -1,6 +1,6 @@
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect } from "vitest";
-import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
+import { Base, registerModel, registerSubclass } from "../index.js";
 import { Associations, loadHasOne } from "../associations.js";
 import { findTarget } from "./has-many-association.js";
 import { AssociationScope, ReflectionProxy } from "./association-scope.js";
@@ -207,7 +207,7 @@ describe("AssociationScope", () => {
         this.attribute("type", "string");
         this.attribute("sti_owner_id", "integer");
         this._tableName = "sti_things";
-        enableSti(StiBase);
+        StiBase.inheritanceColumn = "type";
       }
     }
     class StiSpecial extends StiBase {
@@ -388,7 +388,7 @@ describe("AssociationScope", () => {
       }
     }
     class StiAsSubOwner extends StiAsOwner {}
-    enableSti(StiAsOwner);
+    StiAsOwner.inheritanceColumn = "type";
     registerSubclass(StiAsSubOwner);
     class StiAsComment extends Base {
       declare commentable_id: number | null;

@@ -9,7 +9,7 @@
  * canonical association tables.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel, registerSubclass, enableSti } from "../index.js";
+import { registerModel, registerSubclass } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Table, Nodes } from "@blazetrails/arel";
 import { captureSql } from "../testing/sql-capture.js";
@@ -49,11 +49,11 @@ describe("InnerJoinAssociationTest", () => {
       "shardedBlogPosts",
     ]);
 
-  enableSti(Category);
+  Category.inheritanceColumn = "type";
   registerModel(Author);
   registerModel(AuthorAddress);
   registerModel(Post);
-  enableSti(Comment);
+  Comment.inheritanceColumn = "type";
   registerModel(Comment);
   registerModel(SpecialComment);
   registerSubclass(SpecialComment);

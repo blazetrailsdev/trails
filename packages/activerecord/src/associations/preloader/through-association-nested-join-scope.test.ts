@@ -19,7 +19,7 @@
  * the canonical Member model (mirroring `general_club`).
  */
 import { describe, it, expect } from "vitest";
-import { registerModel, enableSti } from "../../index.js";
+import { registerModel } from "../../index.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
 import { Preloader } from "../preloader.js";
 import { ThroughAssociation } from "./through-association.js";
@@ -32,10 +32,10 @@ import { quoteTableName, escapeRegExp } from "../../test-helpers/quote-regex.js"
 
 registerModel(Member);
 registerModel(Club);
-enableSti(Membership);
+Membership.inheritanceColumn = "type";
 registerModel(Membership);
 registerModel(CurrentMembership);
-enableSti(Category);
+Category.inheritanceColumn = "type";
 registerModel(Category);
 registerModel(Categorization);
 

@@ -20,7 +20,7 @@
  * never calls `member.save()`, so a deferred implementation fails outright.
  */
 import { describe, it, expect } from "vitest";
-import { registerModel, enableSti } from "../index.js";
+import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Member } from "../test-helpers/models/member.js";
 import { Club } from "../test-helpers/models/club.js";
@@ -33,7 +33,7 @@ describe("HasOneThroughSetterTrails", () => {
 
   registerModel(Member);
   registerModel(Club);
-  enableSti(Membership);
+  Membership.inheritanceColumn = "type";
   registerModel(Membership);
   registerModel(CurrentMembership);
 

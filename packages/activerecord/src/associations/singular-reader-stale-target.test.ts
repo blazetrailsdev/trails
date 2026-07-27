@@ -9,7 +9,7 @@
  * `companies` fixtures — no `defineSchema`.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel, enableSti, registerSubclass } from "../index.js";
+import { registerModel, registerSubclass } from "../index.js";
 import { Company, Firm, Client } from "../test-helpers/models/company.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 
@@ -26,7 +26,7 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Company);
     registerModel(Firm);
     registerModel(Client);
-    enableSti(Company);
+    Company.inheritanceColumn = "type";
     registerSubclass(Firm);
     registerSubclass(Client);
     await Company.loadSchema();

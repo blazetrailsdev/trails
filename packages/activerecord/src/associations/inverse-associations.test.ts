@@ -8,7 +8,6 @@ import {
   association,
   registerModel,
   registerSubclass,
-  enableSti,
   InverseOfAssociationNotFoundError,
   InverseOfAssociationRecursiveError,
 } from "../index.js";
@@ -331,7 +330,7 @@ describe("InverseAssociationTests", () => {
     [Human, Face, Interest, Club, Sponsor, Company, Firm, Developer, Project, AuditLog].forEach(
       (m) => registerModel(m),
     );
-    enableSti(Company);
+    Company.inheritanceColumn = "type";
     registerSubclass(Firm);
   });
 

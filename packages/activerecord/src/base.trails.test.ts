@@ -180,8 +180,7 @@ describe("_applyScopeAttributes — STI type column wins over scope", () => {
         this.attribute("type", "string");
       }
     }
-    const { enableSti } = await import("./inheritance.js");
-    enableSti(Vehicle);
+    Vehicle.inheritanceColumn = "type";
     class Car extends Vehicle {}
 
     // Scope includes type: "Vehicle" — but new Car() should still have type: "Car"

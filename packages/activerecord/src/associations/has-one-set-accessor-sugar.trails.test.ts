@@ -13,7 +13,6 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import {
   registerModel,
-  enableSti,
   registerSubclass,
   RecordNotSaved,
   RecordNotFound,
@@ -60,7 +59,7 @@ describe("has_one set#{Name} awaitable accessor", () => {
     registerModel(RestrictedWithErrorFirm);
     registerModel(Client);
     registerModel(Account);
-    enableSti(Company);
+    Company.inheritanceColumn = "type";
     registerSubclass(Firm);
     registerSubclass(DependentFirm);
     registerSubclass(ExclusivelyDependentFirm);
@@ -133,7 +132,7 @@ describe("has_one :through set#{Name} awaitable accessor", () => {
   beforeAll(() => {
     registerModel(Member);
     registerModel(Club);
-    enableSti(Membership);
+    Membership.inheritanceColumn = "type";
     registerModel(Membership);
     registerModel(CurrentMembership);
   });

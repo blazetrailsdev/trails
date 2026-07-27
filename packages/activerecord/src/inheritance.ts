@@ -129,8 +129,9 @@ export function descendants(modelClass: typeof Base): (typeof Base)[] {
  * {@link isFinderNeedsTypeCondition} memoize the stable structural answer without
  * caching a transient cold-schema column miss.
  *
- * Independent of the explicit `enableSti` sentinel that {@link isStiSubclass}
- * keys off — that sentinel still gates the registry-resolved row-dispatch paths.
+ * Independent of the explicit `inheritanceColumn` sentinel that
+ * {@link isStiSubclass} keys off — that sentinel still gates the
+ * registry-resolved row-dispatch paths.
  *
  * @internal
  */
@@ -154,8 +155,9 @@ function descendsFromActiveRecordByHierarchy(modelClass: typeof Base): boolean {
  * actually carry the inheritance column, or STI is disabled. trails uses the
  * column-aware {@link classHasAttribute} (declared attribute or reflected column)
  * in place of Rails' `columns_hash.include?`, since schema reflection is lazy.
- * Decoupled from the explicit `enableSti` sentinel ({@link isStiSubclass}), which
- * still gates the registry-resolved row-dispatch paths.
+ * Decoupled from the explicit `inheritanceColumn` sentinel
+ * ({@link isStiSubclass}), which still gates the registry-resolved row-dispatch
+ * paths.
  *
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#descends_from_active_record?
  */
@@ -375,24 +377,6 @@ export function registerSubclass(klass: typeof Base): void {
   if (!(parent as any)._subclasses.includes(klass)) {
     (parent as any)._subclasses.push(klass);
   }
-}
-
-/**
- * Single Table Inheritance support.
- *
- * When a model has an inheritance column (default: "type"), subclasses
- * share the parent's table and auto-set the type column.
- *
- * Mirrors: ActiveRecord::Inheritance
- */
-
-/**
- * Configure STI on a base model class.
- * Call this on the parent class to enable STI.
- */
-export function enableSti(modelClass: typeof Base, options: { column?: string } = {}): void {
-  const column = options.column ?? "type";
-  (modelClass as any)._inheritanceColumn = column;
 }
 
 /**
@@ -1193,9 +1177,10 @@ function namesSelfOrStiAncestor(modelClass: typeof Base, typeName: string): bool
  *     uniquely-named subclass registered via `registerModel` or raises
  *     `SubclassNotFound` for a genuinely bad type, mirroring Rails' `find_sti_class`.
  *   - A canonical base that merely reflects a `type` column and tracks subclasses
- *     (no explicit `enableSti`): DEGRADE to the base class on a miss rather than
- *     raise. trails has no autoloader, so an unloaded-but-valid subclass (e.g. a
- *     `type: "Reply"` row when `reply.ts` hasn't been imported) is
+ *     (no explicit `inheritanceColumn` assignment): DEGRADE to the base class
+ *     on a miss rather than raise. trails has no autoloader, so an
+ *     unloaded-but-valid subclass (e.g. a `type: "Reply"` row when `reply.ts`
+ *     hasn't been imported) is
  *     indistinguishable from a genuinely bad type; raising would break unrelated
  *     queries over a shared table (`Topic.all` seeing a `Reply` row). This is the
  *     same graceful-degradation deviation the `new` path takes.
@@ -1230,12 +1215,13 @@ function findStiClassForRow(baseClass: typeof Base, typeName: string): typeof Ba
  * `Company.new(type: "Account")` or an unknown `"InvalidType"`) rather than
  * silently building the receiver as-is. The no-match handling mirrors the row
  * path ({@link findStiClassForRow}): the subtree walk resolves in-hierarchy
- * types registry-safely, then only an `enableSti` hierarchy defers to the
- * global `find_sti_class` (which also resolves a registered subclass not tracked
+ * types registry-safely, then only an explicitly STI-enabled hierarchy defers to
+ * the global `find_sti_class` (which also resolves a registered subclass not tracked
  * as a descendant, and raises for a genuine out-of-hierarchy/unknown type). A
- * model that merely reflects a `type` column without `enableSti` degrades to
- * build-as-is — trails has no autoloader to tell an unloaded-but-valid subclass
- * from a bad type, the same graceful deviation the row path takes.
+ * model that merely reflects a `type` column without an explicit
+ * `inheritanceColumn` assignment degrades to build-as-is — trails has no
+ * autoloader to tell an unloaded-but-valid subclass from a bad type, the same
+ * graceful deviation the row path takes.
  *
  * @internal Used by Base's constructor to dispatch `new` to a subclass.
  */
@@ -1275,8 +1261,9 @@ export function subclassFromAttributesForNew(
     // resolves a registered subclass (incl. one not tracked as a descendant) or
     // raises SubclassNotFound for an out-of-hierarchy/unknown type — matching Rails'
     // Inheritance#new → subclass_from_attributes → find_sti_class. A model that
-    // merely reflects a `type` column without enableSti degrades to build-as-is:
-    // trails has no autoloader, so an unloaded-but-valid subclass is indistinguishable
+    // merely reflects a `type` column without an explicit inheritanceColumn
+    // assignment degrades to build-as-is: trails has no autoloader, so an
+    // unloaded-but-valid subclass is indistinguishable
     // from a genuinely bad type, and raising would break unrelated construction.
     if (stiEnabled(modelClass)) return findStiClass(modelClass, typeName);
     return null;

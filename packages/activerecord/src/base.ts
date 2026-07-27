@@ -2228,8 +2228,9 @@ export class Base extends Model {
    *  default-scoped path carry it; we layer it onto the base relation. */
   private static _applyStiTypeCondition(rel: any): any {
     // Rails gates the finder type-condition on `finder_needs_type_condition?`
-    // (hierarchical + inheritance-column presence), not on an explicit enableSti
-    // sentinel — so any non-abstract subclass over a `type`-bearing table scopes
+    // (hierarchical + inheritance-column presence), not on an explicit
+    // `inheritanceColumn` assignment — so any non-abstract subclass over a
+    // `type`-bearing table scopes
     // by type. The column resolves on the subclass itself (default "type").
     if (isFinderNeedsTypeCondition(this)) {
       const col = getInheritanceColumn(this);

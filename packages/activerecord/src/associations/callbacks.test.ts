@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, association, registerModel, enableSti, registerSubclass } from "../index.js";
+import { Base, association, registerModel, registerSubclass } from "../index.js";
 import { throwAbort } from "@blazetrails/activesupport";
 
 import { fixtures } from "../test-helpers/fixtures.js";
@@ -536,7 +536,7 @@ describe("AssociationCallbacksTest", () => {
     registerModel(Firm);
     registerModel(Client);
     registerModel(Account);
-    enableSti(Company);
+    Company.inheritanceColumn = "type";
     registerSubclass(Firm);
     registerSubclass(Client);
   });
