@@ -41,6 +41,15 @@ function buildAssociationInstance(this: Base, assocDef: AssocDef): AssociationIn
 }
 
 function syncAssociationInstance(this: Base, name: string, instance: AssociationInstance): void {
+  // Optional call: `_associationInstances` also holds minimal ad-hoc holders
+  // for undeclared inverses (`associations.ts`'s literal, seed-association-cache)
+  // that implement only `target` / `isLoaded` / `setTarget`. Those are singular
+  // by construction, so falling through is right.
+  if ((instance as { isCollection?(): boolean }).isCollection?.()) {
+    const proxy = this._collectionProxies.get(name) as { loaded?: boolean } | undefined;
+    if (proxy?.loaded === true && !instance._staleStateIsSnapshotted) instance.loadedBang();
+    return;
+  }
   // Reads the loaded target through the association cache
   // (`Base#_associationCache`): a loaded collection proxy's canonical target
   // array or a loaded singular holder's target. A cached "nil association"
@@ -138,8 +147,8 @@ export function association(this: Base, name: string): AssociationInstance {
   }
 
   const instance = buildAssociationInstance.call(this, assocDef);
-  syncAssociationInstance.call(this, name, instance);
   this._associationInstances.set(name, instance);
+  syncAssociationInstance.call(this, name, instance);
   return instance;
 }
 

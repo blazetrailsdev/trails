@@ -39,7 +39,13 @@ import { RecordInvalid } from "../validations.js";
  * Mirrors: ActiveRecord::Associations::SingularAssociation
  */
 export class SingularAssociation extends Association {
-  declare target: Base | null;
+  override get target(): Base | null {
+    return super.target as Base | null;
+  }
+
+  override set target(value: Base | Base[] | null) {
+    super.target = value;
+  }
 
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);

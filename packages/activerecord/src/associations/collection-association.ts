@@ -23,6 +23,13 @@ export interface ReplacePlan {
   wasLoaded: boolean;
 }
 
+/** @internal */
+interface SharedTargetStore {
+  _sharedTarget: Base[];
+  _sharedLoaded: boolean;
+  _sharedReplacedOrAddedTargets: Set<Base>;
+}
+
 /**
  * Base class for has_many and has_and_belongs_to_many associations.
  *
@@ -33,7 +40,6 @@ export interface ReplacePlan {
  * Mirrors: ActiveRecord::Associations::CollectionAssociation
  */
 export class CollectionAssociation extends Association {
-  declare target: Base[];
   // A `null` entry is a placeholder for a rejected new record, preserving the
   // 1:1 ordering with the assigned attributes collection (Rails
   // nested_attributes.rb:487-547).
@@ -58,10 +64,70 @@ export class CollectionAssociation extends Association {
   // `CollectionProxy`.
   _namedScopeRelations?: Map<string, unknown>;
 
+  private _sharedTargetEnabled = false;
+
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
     this.target = [];
+    this._sharedTargetEnabled = true;
   }
+
+  /**
+   * A cache *lookup*, never a build: constructing a proxy here would be
+   * re-entrant (its constructor resolves through-scopes that read back through
+   * this association). Until one exists there is no second store to keep
+   * coherent, and `association()` hands the proxy this very array
+   * (`_adoptSharedTarget`), so no reference already handed out goes stale.
+   */
+  private _sharedStore(): SharedTargetStore | null {
+    if (!this._sharedTargetEnabled) return null;
+    return (
+      (this.owner._collectionProxies.get(this.reflection.name) as SharedTargetStore | undefined) ??
+      null
+    );
+  }
+
+  /**
+   * Rails' `CollectionProxy` forwards `target`/`loaded` to its `@association`;
+   * trails inverts the ownership (RFC 0022 makes the proxy the canonical
+   * has_many store) so the association forwards the other way. Either
+   * direction gives the one invariant that matters: ONE in-memory target.
+   */
+  override get target(): Base[] {
+    const store = this._sharedStore();
+    return store ? store._sharedTarget : (this._targetStore as Base[]);
+  }
+
+  override set target(records: Base | Base[] | null) {
+    // `Association#reset` assigns `null`; a collection's empty target is `[]`.
+    const value = Array.isArray(records) ? records : records == null ? [] : [records];
+    const store = this._sharedStore();
+    if (store) store._sharedTarget = value;
+    else this._targetStore = value;
+  }
+
+  override get loaded(): boolean {
+    const store = this._sharedStore();
+    return store ? store._sharedLoaded : this._loadedStore;
+  }
+
+  override set loaded(value: boolean) {
+    const store = this._sharedStore();
+    if (store) store._sharedLoaded = value;
+    else this._loadedStore = value;
+  }
+
+  /**
+   * Rails' `@replaced_or_added_targets`, the other half of
+   * `replace_on_target`'s state — it has to travel with the target, since two
+   * sets over one array double-append.
+   * @internal
+   */
+  get _replacedOrAddedTargets(): Set<Base> {
+    return this._sharedStore()?._sharedReplacedOrAddedTargets ?? this._replacedOrAddedTargetsStore;
+  }
+
+  private _replacedOrAddedTargetsStore = new Set<Base>();
 
   /**
    * Implements the writer method, e.g. foo.items= for Foo.has_many :items.
@@ -1125,6 +1191,17 @@ export class CollectionAssociation extends Association {
   }
 
   /**
+   * The collection form of `_setTargetFromLoader`, mirroring Rails'
+   * `load_target`: `@target = merge_target_lists(find_target, target);
+   * loaded!`. Overwriting instead would discard in-memory builds.
+   * @internal
+   */
+  _mergeLoaderResults(rows: Base[]): void {
+    this.target = this.mergeTargetLists(rows, this.target);
+    this.loadedBang();
+  }
+
+  /**
    * Merge persisted records from DB with in-memory target records.
    * Preserves order of persisted, deduplicates, and keeps
    * attribute changes from in-memory versions.
@@ -1315,7 +1392,12 @@ function beginReplaceOnTarget(
   skipCallbacks: boolean,
   replace: boolean,
 ): number | null {
-  const index = replace ? assoc.target.indexOf(record) : -1;
+  // Rails: `index = @target.index(record) if replace && (!record.new_record? ||
+  // @replaced_or_added_targets.include?(record))` (collection_association.rb:478).
+  const index =
+    replace && (!record.isNewRecord() || assoc._replacedOrAddedTargets.has(record))
+      ? indexInTarget(assoc, record)
+      : -1;
   if (!skipCallbacks && !callback(assoc, "beforeAdd", record)) return null;
   assoc.setInverseInstance(record);
   (assoc as any)._associationIds = null;
@@ -1334,13 +1416,28 @@ function finishReplaceOnTarget(
   index: number,
 ): Base {
   const target = assoc.target;
-  if (index !== -1) {
-    target[index] = record;
+  // Rails re-runs `@target.index(record)` after the `yield` — the block (a
+  // save) can have added the record to `@replaced_or_added_targets` in between.
+  let at = index;
+  if (at === -1 && assoc._replacedOrAddedTargets.has(record)) at = indexInTarget(assoc, record);
+  if (at !== -1 || record.isNewRecord()) assoc._replacedOrAddedTargets.add(record);
+  if (at !== -1) {
+    target[at] = record;
   } else {
     target.push(record);
   }
   if (!skipCallbacks) callback(assoc, "afterAdd", record);
   return record;
+}
+
+/**
+ * Ruby's `@target.index(record)` inside `replace_on_target`: `Core#==`, not JS
+ * reference identity, so a re-fetched persisted record dedups against the one
+ * already buffered.
+ * @internal
+ */
+function indexInTarget(assoc: CollectionAssociation, record: Base): number {
+  return assoc.target.findIndex((r) => r === record || r.isEqual(record));
 }
 
 /** @internal */

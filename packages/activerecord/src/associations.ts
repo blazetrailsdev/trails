@@ -1303,9 +1303,18 @@ export async function _loadSingularThroughViaDisableJoinsScope(
  */
 export function syncToAssociationInstance(record: Base, assocName: string, result: unknown): void {
   const holder = record._associationInstances.get(assocName) as
-    | { _setTargetFromLoader(t: Base | Base[] | null): void; _loaderWritebackSuppressed?: number }
+    | {
+        _setTargetFromLoader(t: Base | Base[] | null): void;
+        _loaderWritebackSuppressed?: number;
+        isCollection?(): boolean;
+        _mergeLoaderResults?(rows: Base[]): void;
+      }
     | undefined;
   if (!holder || holder._loaderWritebackSuppressed) return;
+  if (holder.isCollection?.()) {
+    holder._mergeLoaderResults?.((result ?? []) as Base[]);
+    return;
+  }
   holder._setTargetFromLoader(result as Base | Base[] | null);
 }
 
@@ -2029,14 +2038,6 @@ export function association<T extends Base = Base>(
       if (preloaded != null) {
         const records = Array.isArray(preloaded) ? preloaded : [preloaded];
         existing._hydrateFromPreload(records as T[]);
-      } else {
-        // Hydrate from an AssociationInstance loaded via asyncLoadTarget()
-        const instance = record._associationInstances.get(assocName);
-        if (instance?.loaded && instance._loadedViaAsync && instance.isCollection?.()) {
-          const target = instance.target;
-          const records = Array.isArray(target) ? target : target != null ? [target] : [];
-          existing._hydrateFromPreload(records as T[]);
-        }
       }
     }
     return existing;
@@ -2083,20 +2084,19 @@ export function association<T extends Base = Base>(
     }
   )._create(record, assocName, assocDef) as CollectionProxy<T> & {
     _hydrateFromPreload: (records: T[]) => void;
+    _adoptSharedTarget: (records: Base[], loaded: boolean) => void;
   };
 
-  // Hydrate from preloaded data or from an asyncLoadTarget()-loaded AssociationInstance
+  const instance = record._associationInstances.get(assocName);
+  if (instance?.isCollection?.()) {
+    const raw = instance._rawTarget;
+    proxy._adoptSharedTarget(Array.isArray(raw) ? raw : [], instance._rawLoaded);
+  }
+
   const preloaded = _preloadedHolderTarget(record, assocName)?.value;
   if (preloaded != null) {
     const records = Array.isArray(preloaded) ? preloaded : [preloaded];
     proxy._hydrateFromPreload(records as T[]);
-  } else {
-    const instance = record._associationInstances.get(assocName);
-    if (instance?.loaded && instance._loadedViaAsync && instance.isCollection?.()) {
-      const target = instance.target;
-      const records = Array.isArray(target) ? target : target != null ? [target] : [];
-      proxy._hydrateFromPreload(records as T[]);
-    }
   }
 
   const wrapped = wrapCollectionProxy<T>(proxy);

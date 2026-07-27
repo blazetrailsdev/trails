@@ -27,8 +27,37 @@ export class Association {
   owner: Base;
   readonly reflection: AssociationDefinition;
   readonly disableJoins: boolean;
-  loaded: boolean;
-  target: Base | Base[] | null;
+  /** @internal */
+  protected _targetStore: Base | Base[] | null = null;
+  /** @internal */
+  protected _loadedStore = false;
+
+  get loaded(): boolean {
+    return this._loadedStore;
+  }
+
+  set loaded(value: boolean) {
+    this._loadedStore = value;
+  }
+
+  get target(): Base | Base[] | null {
+    return this._targetStore;
+  }
+
+  set target(value: Base | Base[] | null) {
+    this._targetStore = value;
+  }
+
+  /** @internal */
+  get _rawTarget(): Base | Base[] | null {
+    return this._targetStore;
+  }
+
+  /** @internal */
+  get _rawLoaded(): boolean {
+    return this._loadedStore;
+  }
+
   /**
    * True when `target` was set by an *explicit* assignment / inverse-of seed
    * (the writer paths routed through `_cacheSingularTarget`), as opposed to a
@@ -82,6 +111,7 @@ export class Association {
   _loaderWritebackSuppressed = 0;
 
   private _staleState: unknown = undefined;
+  private _staleStateSnapshotted = false;
   /**
    * Memoized result of `scope()` — Rails' `@association_scope`
    * (association.rb:300-308). Built lazily on first access; reset by
@@ -97,8 +127,6 @@ export class Association {
     this.owner = owner;
     this.reflection = reflection;
     this.disableJoins = reflection.options.disableJoins || false;
-    this.loaded = false;
-    this.target = null;
 
     // Rails' `check_validity! → klass → compute_class` raises NameError
     // synchronously in the constructor, so `record.association(:name)` itself
@@ -169,6 +197,12 @@ export class Association {
   loadedBang(): void {
     this.loaded = true;
     this._staleState = this.staleState();
+    this._staleStateSnapshotted = true;
+  }
+
+  /** @internal */
+  get _staleStateIsSnapshotted(): boolean {
+    return this._staleStateSnapshotted;
   }
 
   isStaleTarget(): boolean {
@@ -179,6 +213,7 @@ export class Association {
     this.loaded = false;
     this.target = null;
     this._staleState = undefined;
+    this._staleStateSnapshotted = false;
     this._explicitTarget = false;
     this._loadedFromPreload = false;
     this._loadedViaAsync = false;
