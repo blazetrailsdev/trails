@@ -1198,9 +1198,9 @@ describe("PersistenceTest", () => {
     await expect(Topic.destroy([99999])).rejects.toThrow();
   });
 
-  // Guard for partial_inserts=true (Rails' test ambient; harness currently runs
-  // false via load_defaults 7.0). Pins the callbacks.ts null-only PK skip-set;
-  // flip-the-ambient or a refactor that drops it regresses this without a guard.
+  // Guard for partial_inserts=true (Rails' test ambient, which the harness now
+  // runs). Pins the callbacks.ts null-only PK skip-set; a refactor that drops
+  // it regresses this without a guard.
   // Mirrors Rails _create_record writing a returning column back only when
   // _read_attribute(column) is nil.
   it("create prefetched pk", async () => {
