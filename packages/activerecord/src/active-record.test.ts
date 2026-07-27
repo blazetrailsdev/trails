@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Base, disconnectAllBang } from "./index.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { inMemoryDb } from "./test-adapter.js";
+import { inMemoryDb } from "./support/adapter-helper.js";
 
 describe("ActiveRecordTest", () => {
   // Rails: `self.use_transactional_tests = false` (active_record_test.rb).

@@ -14,6 +14,16 @@ import { adapterType } from "../test-adapter.js";
  * live `supports_*?` method) — for the backends our matrix runs: CI's
  * postgres:17, mysql:8, and the in-memory sqlite default.
  *
+ * This file stays separate from `support/adapter-helper.ts` (the port of
+ * `test/support/adapter_helper.rb`): only a handful of the keys below have an
+ * `adapter_helper.rb` counterpart — the rest are the adapters' own
+ * `supports_*?` methods that Rails tests call straight on the connection, so
+ * there is no Rails helper file to fold them into. Keeping the whole set in
+ * one feature-keyed table also keeps the test:compare gate extractor reading a
+ * single source; splitting the adapter_helper-owned keys out would duplicate
+ * the resolution logic. `adapter-helper.ts` holds the predicates that ARE
+ * `adapter_helper.rb`'s own (`currentAdapter`, `inMemoryDb`, …).
+ *
  * Feature keys match Rails' `supports_<key>?` (and the keys the test:compare
  * gate extractor derives), so a flagged `it.skip` of a Rails feature-gated
  * test converts directly to `itIfSupports("<key>", …)`. Add a key when a
@@ -100,6 +110,14 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // `supports_text_column_with_default?`: MySQL only for MariaDB ≥ 10.2.1 (mysql:8 is not
   // MariaDB → false); all other adapters true. (adapter_helper.rb:42)
   text_column_with_default: ["postgres", "sqlite"],
+  // `supports_non_unique_constraint_name?`: MySQL family only, and only on
+  // MariaDB (mysql:8 is not MariaDB → false); every other adapter false.
+  // (adapter_helper.rb:33)
+  non_unique_constraint_name: [],
+  // `supports_sql_standard_drop_constraint?`: SQLite false; MySQL family needs
+  // ≥ 8.0.19 non-MariaDB (mysql:8 qualifies → true); all other adapters true.
+  // (adapter_helper.rb:51)
+  sql_standard_drop_constraint: ["postgres", "mysql"],
   // `supports_common_table_expressions?`: PostgreSQL true; MySQL ≥ 8.0.1 (mysql:8 qualifies);
   // SQLite ≥ 3.8.3 (current node sqlite qualifies). (postgresql_adapter.rb:451,
   // abstract_mysql_adapter.rb:153, sqlite3_adapter.rb:183)

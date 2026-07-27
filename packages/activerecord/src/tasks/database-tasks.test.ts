@@ -8,7 +8,8 @@ import { DatabaseConfigurations } from "../database-configurations.js";
 import { NoEnvironmentInSchemaError, ProtectedEnvironmentError } from "../migration.js";
 import { SchemaMigration } from "../schema-migration.js";
 import { Base } from "../base.js";
-import { adapterType, ambientPoolConfiguration, inMemoryDb } from "../test-adapter.js";
+import { adapterType, ambientPoolConfiguration } from "../test-adapter.js";
+import { inMemoryDb } from "../support/adapter-helper.js";
 import { establishFromTestConfig } from "../support/test-database-config.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 
