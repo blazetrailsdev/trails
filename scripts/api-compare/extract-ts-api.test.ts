@@ -191,6 +191,35 @@ describe("body call capture", () => {
     expect(save.calls).toEqual(["helper", "nested", "runCallbacks", "touch"]);
   });
 
+  it("marks a call made in a negated position with the ! prefix", () => {
+    // The faithful port of ActiveSupport's `exclude?` (`!include?`); the wide
+    // call ratchet requires the marker before crediting a negating alias.
+    const cls = extractFromSource(
+      `class Foo {
+        check(xs: string[], set: Set<string>) {
+          if (!xs.includes("a")) return true;
+          if (!(set.has("b"))) return true;
+          return set.has("c") || !this.loaded;
+        }
+      }`,
+    );
+    const check = cls.instanceMethods.find((m) => m.name === "check")!;
+    expect(check.calls).toEqual(["!has", "!includes", "!loaded", "has", "includes", "loaded"]);
+  });
+
+  it("does not mark a call whose negation applies to a surrounding expression", () => {
+    // `!a && xs.includes(y)` negates `a`, not the containment call.
+    const cls = extractFromSource(
+      `class Foo {
+        check(a: boolean, xs: string[]) {
+          return !a && xs.includes("b");
+        }
+      }`,
+    );
+    const check = cls.instanceMethods.find((m) => m.name === "check")!;
+    expect(check.calls).toEqual(["includes"]);
+  });
+
   it("omits calls entirely for a body that invokes nothing", () => {
     // No calls and no property reads — a pure arithmetic return.
     const cls = extractFromSource(`class Foo { id() { return 1 + 2; } }`);

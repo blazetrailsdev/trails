@@ -44,6 +44,7 @@ import {
 } from "./shared-cache.js";
 import { extractorSchemaToken } from "./extractor-schema.js";
 import { staleBuilds, staleBuildMessage } from "./build-freshness.js";
+import { NEGATED_CALL_PREFIX } from "./enumerable-idioms.js";
 
 // Per-package cache: extracting all packages with the TS Compiler API
 // takes ~16s; only a handful of packages typically change between
@@ -2092,11 +2093,36 @@ function isAssignmentWriteTarget(access: ts.PropertyAccessExpression): boolean {
   return false;
 }
 
+// Whether an expression is the operand of a logical negation — `!xs.includes(y)`,
+// `!(set.has(k))`. Ruby's NEGATING Enumerable idioms (`none?`, `exclude?`) port
+// to a negated JS containment/predicate call, and the wide call ratchet needs to
+// tell `!xs.includes(y)` from a bare `xs.includes(y)` (the inverted condition) —
+// see NEGATED_CALL_PREFIX. Only the immediate parent (through parentheses) counts:
+// `!a && b.has(x)` does not negate the `has`.
+function isNegatedOperand(expr: ts.Node): boolean {
+  let node: ts.Node = expr;
+  let parent = node.parent as ts.Node | undefined;
+  while (parent !== undefined && ts.isParenthesizedExpression(parent)) {
+    node = parent;
+    parent = node.parent;
+  }
+  return (
+    parent !== undefined &&
+    ts.isPrefixUnaryExpression(parent) &&
+    parent.operator === ts.SyntaxKind.ExclamationToken &&
+    parent.operand === node
+  );
+}
+
 function extractCalls(node: ts.Node | undefined): string[] | undefined {
   if (!node) return undefined;
   const aliases = currentImportAliases;
   const resolve = (name: string): string => aliases?.get(name) ?? name;
   const names = new Set<string>();
+  const addNegated = (expr: ts.Node, ...called: string[]): void => {
+    if (!isNegatedOperand(expr)) return;
+    for (const c of called) names.add(`${NEGATED_CALL_PREFIX}${c}`);
+  };
   const visit = (n: ts.Node): void => {
     if (ts.isNewExpression(n)) {
       // `new Foo(...)` is Ruby's `Foo.new(...)`. The Ruby extractor records the
@@ -2112,9 +2138,11 @@ function extractCalls(node: ts.Node | undefined): string[] | undefined {
         // Renamed-import call (`import { a as b }; b()`): also credit the
         // original imported name so it matches the ported call set.
         names.add(resolve(callee.text));
+        addNegated(n, callee.text, resolve(callee.text));
       } else if (ts.isPropertyAccessExpression(callee)) {
         const prop = callee.name.text;
         names.add(prop);
+        addNegated(n, prop);
         // `X.call(...)` / `X.apply(...)` also dispatch the function bound to
         // `X` (the project's `this`-typed mixin convention, plus Ruby's
         // `meth.call`/`send` indirection). Additionally credit the dispatched
@@ -2149,6 +2177,7 @@ function extractCalls(node: ts.Node | undefined): string[] | undefined {
         parent !== undefined && ts.isCallExpression(parent) && parent.expression === n;
       if (!isCallCallee && !isAssignmentWriteTarget(n)) {
         names.add(n.name.text);
+        addNegated(n, n.name.text);
       }
     }
     ts.forEachChild(n, visit);

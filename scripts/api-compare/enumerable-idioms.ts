@@ -18,6 +18,9 @@
 export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
   ["any?", ["some"]],
   ["all?", ["every"]],
+  // `none?` is `!any?`: the `some` analogue must be NEGATED (see
+  // NEGATED_ALIASES), while `every` is the de-Morgan form `!xs.every(...)` OR
+  // `xs.every((x) => !p(x))`, so it counts either way.
   ["none?", ["some", "every"]],
   ["one?", ["filter"]],
   // `includes` is omitted here on purpose: it is now a naming-convention
@@ -26,9 +29,8 @@ export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
   ["include?", ["has"]],
   ["member?", ["has"]],
   // ActiveSupport's `exclude?` is `!include?`, so the containment call is the
-  // whole call — ports spell it `!xs.includes(y)` / `!set.has(y)`. As with
-  // `none? → some/every` above, the ratchet only checks that the file makes a
-  // call by that NAME; the leading `!` is not verified. (The convention
+  // whole call — ports spell it `!xs.includes(y)` / `!set.has(y)`, and the
+  // leading `!` IS required (see NEGATED_ALIASES). (The convention
   // candidate for a method NAMED `exclude?` is `excludes`, so no overlap.)
   ["exclude?", ["includes", "has"]],
   ["key?", ["has"]],
@@ -51,4 +53,38 @@ export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
 /** JS-native call names that count as making Ruby call `rubyCall`. */
 export function jsEnumerableAliases(rubyCall: string): string[] {
   return JS_ENUMERABLE_ALIASES.get(rubyCall) ?? [];
+}
+
+/**
+ * Aliases whose faithful port carries a leading `!` — the Ruby call is the
+ * NEGATION of that JS analogue, so only a NEGATED TS call counts:
+ * `none?` → `!xs.some(p)`, `exclude?` → `!xs.includes(y)` / `!set.has(y)`.
+ * Without this, a port that INVERTED the condition (a bare `xs.includes(y)`
+ * where Rails wrote `exclude?`) silenced the wide ratchet just as well as the
+ * faithful one.
+ *
+ * Keyed per-ALIAS, not per Ruby call, because a negating Ruby call can also
+ * have a de-Morgan analogue that is faithful UNnegated: `xs.none?(&:dirty?)`
+ * ports to `xs.every((t) => !t.isDirty())` (transaction.ts `isRestorable`),
+ * where the `!` sits inside the callback, not on the call. So `none? → every`
+ * stays a direct alias while `none? → some` requires the marker.
+ */
+export const NEGATED_ALIASES = new Map<string, Set<string>>([
+  ["none?", new Set(["some"])],
+  ["exclude?", new Set(["includes", "has"])],
+]);
+
+/**
+ * Prefix the TS extractor uses to mark a call it saw in a NEGATED position
+ * (`!xs.includes(y)` → `!includes`). Marked names are recorded IN ADDITION to
+ * the plain name, so every consumer that tests membership by plain name is
+ * unaffected; only the {@link NEGATED_ALIASES} check reads the marked form.
+ * Lives here, not in extract-ts-api.ts, so compare.ts can read it without
+ * importing the extractor (and its TypeScript-compiler dependency).
+ */
+export const NEGATED_CALL_PREFIX = "!";
+
+/** Whether alias `tsCall` counts for `rubyCall` only when the TS call is negated. */
+export function requiresNegatedAlias(rubyCall: string, tsCall: string): boolean {
+  return NEGATED_ALIASES.get(rubyCall)?.has(tsCall) ?? false;
 }
