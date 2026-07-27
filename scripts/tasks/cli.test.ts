@@ -88,6 +88,7 @@ import {
   dirtyWorktreeLines,
   buildIndexFromOriginMain,
   readIndexSource,
+  readWorkingTreeIndex,
   readIndexedFile,
   claimAgeHours,
   isStaleClaim,
@@ -3524,11 +3525,11 @@ describe("buildIndexFromOriginMain (read path serves the origin/main tree)", () 
       },
     });
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
-    // The fallback hands off to loadIndex(), which reads the REAL TASKS_DIR
-    // checkout — absent on CI runners. What this test owns is the degradation
-    // itself: warn, then serve the working tree, without ever touching the
-    // shared checkout. Let the handoff fail; the assertions below still fail
-    // on the baseline, where the fallback fetched + reset --hard instead.
+    // The fallback hands off to the working-tree index, which lives in the REAL
+    // TASKS_DIR checkout — absent on CI runners. What this test owns is the
+    // degradation itself: warn, then serve the working tree, without ever
+    // touching the shared checkout. Let the handoff fail; the assertions below
+    // still fail on the baseline, which fetched + reset --hard instead.
     try {
       expect(readIndexSource().sha).toBeNull();
     } catch {
@@ -3537,6 +3538,31 @@ describe("buildIndexFromOriginMain (read path serves the origin/main tree)", () 
     expect(seen).not.toContain("reset");
     expect(seen).not.toContain("status");
     expect(String(err.mock.calls[0][0])).toMatch(/could not reach origin\/main.*may be stale/s);
+  });
+});
+
+describe("readWorkingTreeIndex (the offline fallback never rebuilds)", () => {
+  // Regression: the fallback used to go through loadIndex(), which rebuilds a
+  // stale index by running build-index.mjs — and that rewrites the TRACKED
+  // index.md in the shared canonical checkout. A read must not mutate it; a
+  // stale index is exactly what the caller's staleness warning announces.
+  it("serves the on-disk index.json as-is without spawning a rebuild", () => {
+    const dir = mkdtempSync(join(tmpdir(), "trails-wt-index-"));
+    writeFileSync(join(dir, "index.json"), JSON.stringify({ ...emptyIdx, generated_at: "stale" }));
+    const got = readWorkingTreeIndex(dir);
+    expect(got?.generated_at).toBe("stale");
+    expect(execFileSyncMock).not.toHaveBeenCalled();
+  });
+
+  it("returns null when there is no index.json to serve", () => {
+    const dir = mkdtempSync(join(tmpdir(), "trails-wt-index-"));
+    expect(readWorkingTreeIndex(dir)).toBeNull();
+  });
+
+  it("returns null for an index.json a crashed writer truncated", () => {
+    const dir = mkdtempSync(join(tmpdir(), "trails-wt-index-"));
+    writeFileSync(join(dir, "index.json"), '{"stories":[');
+    expect(readWorkingTreeIndex(dir)).toBeNull();
   });
 });
 

@@ -261,7 +261,42 @@ export function readIndexSource(): ReadIndex {
   console.error(
     `warning: could not reach origin/main; serving the local tasks index. It may be stale.`,
   );
-  return { index: loadIndex(), sha: null };
+  return { index: loadIndexWithoutDirtyingTree(), sha: null };
+}
+
+// The on-disk index.json exactly as it sits in the working tree, or null when
+// there is none. Deliberately NOT loadIndex(): that one rebuilds a stale index
+// by running build-index.mjs, which rewrites the tracked index.md — the read
+// path must not leave that behind in the shared checkout. Staleness is what
+// the caller's warning already announces, so serving a stale index untouched
+// is the honest answer here.
+export function readWorkingTreeIndex(tasksDir: string): Index | null {
+  const indexPath = join(tasksDir, "index.json");
+  if (!existsSync(indexPath)) return null;
+  try {
+    return applyRfcPriorities(JSON.parse(readFileSync(indexPath, "utf8")) as Index, tasksDir);
+  } catch {
+    return null; // truncated/absent — fall back to a rebuild
+  }
+}
+
+// With no index.json at all there is nothing to serve, so a rebuild is the only
+// way to answer the read. It dirties the tracked index.md, so restore it —
+// but only when our own rebuild is what dirtied it, or a read would discard a
+// hand-edit that was already sitting there.
+function loadIndexWithoutDirtyingTree(): Index {
+  const onDisk = readWorkingTreeIndex(TASKS_DIR);
+  if (onDisk) return onDisk;
+  let generatedWereClean = false;
+  try {
+    generatedWereClean =
+      git(["status", "--porcelain", "--", ...GENERATED_INDEX_FILES], { silent: true }) === "";
+  } catch {
+    /* not a git repo / git unavailable — leave whatever the rebuild writes */
+  }
+  const index = loadIndex();
+  if (generatedWereClean) restoreGeneratedFiles(TASKS_DIR);
+  return index;
 }
 
 export function readIndexedFile(src: ReadIndex, filePath: string): string | null {
