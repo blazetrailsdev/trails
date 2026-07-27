@@ -72,21 +72,14 @@ export interface ParametersHost {
 
 /**
  * Home for the module's *writers*. Ruby names a writer after its reader
- * (`path_parameters` / `path_parameters=`); TypeScript can only spell that
- * pair as a `get`/`set` on a prototype, and two exported functions in one
- * module can't share a name — so a `setPathParameters`-style export would be
- * surface Rails does not have. The writers therefore live here under the
- * Rails name, and hosts pick them up by deriving their mixin host from
- * `Parameters.prototype`.
- *
- * The matching readers stay as `this`-typed module functions since they are
- * called internally as plain functions.
+ * (`path_parameters=`), which TypeScript can only spell as a `set` accessor on
+ * a prototype — so the writers live here and hosts pick them up by deriving
+ * their mixin host from `Parameters.prototype`. The matching readers stay as
+ * `this`-typed module functions since they are called internally as plain
+ * functions.
  */
 export class Parameters {
-  /**
-   * Host surface the writers read; supplied by whoever mixes them in. Sourced
-   * from {@link ParametersHost} so the two can't drift.
-   */
+  /** Host surface the writers read, sourced from {@link ParametersHost}. */
   declare setHeader: ParametersHost["setHeader"];
   declare deleteHeader: ParametersHost["deleteHeader"];
 
@@ -128,7 +121,7 @@ export class Parameters {
 
   /**
    * Sets the path parameters, invalidating the merged-parameters cache.
-   * Mirrors Rails' `path_parameters=`. Encoding-normalization (Rails calls
+   * Encoding-normalization (Rails calls
    * `Request::Utils.set_binary_encoding` + `check_param_encoding`) is omitted —
    * JS strings are UTF-16 and TS lacks Ruby's ASCII-8BIT vs UTF-8 distinction,
    * so there's nothing to coerce. Callers that need encoding validation should

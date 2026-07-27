@@ -582,9 +582,8 @@ export class Request {
   }
 
   /**
-   * Host for the `Http::Parameters` mixin. Its prototype is
-   * `Parameters.prototype` so the module's writer (`path_parameters=`, which
-   * TypeScript can only spell as a `set` accessor) applies by assignment.
+   * Prototyped on `Parameters.prototype` so the mixin's `path_parameters=`
+   * writer applies by plain assignment.
    * @internal
    */
   private get _paramsHost(): ParametersHost & _Parameters {
