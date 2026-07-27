@@ -41,11 +41,16 @@ let _secretGeneration = 0;
  * is configured. Bumps the secret generation so cached verifiers are rebuilt
  * on the next token op (or `generated_token_verifier` read).
  *
- * Trails-only seam with no Rails counterpart: Rails resolves the token secret
- * from `Rails.application.secret_key_base` inside `generated_token_verifier`'s
- * default (token_for.rb:11 + railtie wiring), which is framework state trails
- * has no analogue for. It is not a writer for any Ruby attribute — the Ruby
- * attribute is `generated_token_verifier=`, which trails already ports.
+ * Trails-only seam with no Rails counterpart. `token_for.rb` itself resolves no
+ * secret — line 11 only declares the `generated_token_verifier` class_attribute.
+ * The verifier is supplied by the railtie initializer
+ * `"active_record.generated_token_verifier"` (railtie.rb:328-334), which assigns
+ * `app.message_verifier("active_record/token_for")`; that resolves through
+ * `Rails::Application#message_verifiers` (application.rb:208-213) down to
+ * `#secret_key_base` (application.rb:477-479). All of that is railtie/application
+ * state trails has no analogue for, so the secret is injected here instead. Not a
+ * writer for any Ruby attribute — the Ruby attribute is
+ * `generated_token_verifier=`, which trails already ports.
  */
 export function setTokenForSecret(secret: string | (() => string) | null): void {
   _tokenForSecret = secret;
