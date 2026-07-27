@@ -190,8 +190,6 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     "priceEstimates",
   ]);
 
-  // The "alternate database" test below needs the arunit2 split; declaring it
-  // at suite scope keeps the primary-database restore paired with the setup.
   withSecondPool();
 
   beforeAll(async () => {

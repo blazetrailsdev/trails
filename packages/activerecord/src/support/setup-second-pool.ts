@@ -71,14 +71,12 @@ export async function provisionSecondDatabase(): Promise<void> {
  * The primary copies exist because trails loads one canonical schema into the
  * primary database while Rails' `arunit` never carries these tables. Dropping
  * them is what lets `MultipleDbTest` assert that a `SELECT` on the wrong pool
- * raises; the restore half of {@link withSecondPool} puts them back, because
- * unlike Rails' second database ours is shared with every sibling suite in the
- * worker.
+ * raises; `teardownSecondPool` puts them back, because unlike Rails' second
+ * database ours is shared with every sibling suite in the worker.
  *
  * Fixture data is seeded separately via `useFixtures` in the test file.
  *
- * Module-private on purpose: the surgery is only safe when paired with the
- * restore, so the only way to ask for it is {@link withSecondPool}.
+ * @internal
  */
 async function setupSecondPool(): Promise<void> {
   registerModel(College);
@@ -102,36 +100,22 @@ async function setupSecondPool(): Promise<void> {
  * Undoes `setupSecondPool`'s primary-database surgery: Rails' two-database
  * split dies with the process, but ours shares one primary database with every
  * sibling suite in the worker, so the dropped tables must be put back.
+ *
+ * @internal
  */
 async function teardownSecondPool(): Promise<void> {
   await rebuildCanonicalTables(await Base.leaseConnection(), [...ARUNIT2_TABLES, "entrants"]);
 }
 
 /**
- * Declares the two-database split for the enclosing `describe` (or file): the
- * primary-database surgery runs in a `beforeAll` and is always undone in a
- * matching `afterAll`. Call it at suite scope, next to `fixtures()`.
- *
- * The pairing is the whole point. Rails' `arunit`/`arunit2` split is per
- * process, so it needs no restore; ours shares one primary database with every
- * sibling suite in the worker, and a caller that took the setup without the
- * restore left the schema drift RFC 0070's repair worker exists to paper over.
- * Registering both hooks here makes that impossible to get wrong.
- *
- * A no-op off the sqlite lane, where the arunit2 suites are gated off
- * (`describe.skipIf(!isSqliteRun())`) because no one provisions a second named
- * database on the PG/MySQL servers yet.
- *
  * @internal
  */
 export function withSecondPool(): void {
   beforeAll(async () => {
-    if (!isSqliteRun()) return;
-    await setupSecondPool();
+    if (isSqliteRun()) await setupSecondPool();
   });
 
   afterAll(async () => {
-    if (!isSqliteRun()) return;
-    await teardownSecondPool();
+    if (isSqliteRun()) await teardownSecondPool();
   });
 }
