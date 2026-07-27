@@ -1693,48 +1693,15 @@ describe("PersistenceTest", () => {
 // PersistenceTest — PostgreSQL-only uuid primary-key create coverage.
 // Both Rails tests are guarded `if current_adapter?(:PostgreSQLAdapter)`; the
 // `chat_messages` / `chat_messages_custom_pk` tables live only in
-// postgresql_specific_schema.rb and use uuid PKs, which defineSchema rejects on
-// SQLite/MySQL — so the schema setup and both tests are gated to the postgres
-// adapter (the tests stay in a `PersistenceTest` describe to mirror Rails).
+// postgresql_specific_schema.rb and use uuid PKs, so they are laid at boot by
+// loadSchema's adapter-specific arm on the postgres lane only, and both tests
+// are gated to that adapter (the tests stay in a `PersistenceTest` describe to
+// mirror Rails).
 // ==========================================================================
 describe("PersistenceTest", () => {
   registerModel(ChatMessage);
   registerModel(ChatMessageCustomPk);
   fixtures([]);
-  beforeAll(async () => {
-    // uuid is a PG-only defineSchema type, so the schema is only applied on
-    // postgres; the tests below are individually gated to the same adapter.
-    if (adapterType !== "postgres") return;
-    // Mirror Rails' postgresql_specific_schema.rb header:
-    //   enable_extension!("uuid-ossp", connection)
-    //   enable_extension!("pgcrypto", connection) if supports_pgcrypto_uuid?
-    // uuid-ossp supplies uuid_generate_v4() for chat_messages_custom_pk.
-    const connection = Base.connection as PostgreSQLAdapter;
-    await connection.enableExtension("uuid-ossp");
-    await connection.enableExtension("pgcrypto");
-    // Mirror postgresql_specific_schema.rb:
-    //   create_table :chat_messages, id: :uuid, force: true, **uuid_default
-    // With pgcrypto available, uuid_default is {} → the adapter defaults the
-    // uuid PK to gen_random_uuid().
-    await connection.createTable("chat_messages", { id: "uuid", force: true }, (t) => {
-      t.text("content");
-    });
-    //   create_table :chat_messages_custom_pk, id: false, force: true do |t|
-    //     t.uuid :message_id, primary_key: true, default: "uuid_generate_v4()"
-    //     t.text :content
-    //   end
-    await connection.createTable("chat_messages_custom_pk", { id: false, force: true }, (t) => {
-      const pg = t as PgTableDefinition;
-      pg.uuid("message_id", { primaryKey: true, default: () => "uuid_generate_v4()" });
-      pg.text("content");
-    });
-  });
-
-  afterAll(async () => {
-    if (adapterType !== "postgres") return;
-    const connection = Base.connection as PostgreSQLAdapter;
-    await connection.dropTable("chat_messages_custom_pk", "chat_messages", { ifExists: true });
-  });
 
   it.skipIf(adapterType !== "postgres")("create model with uuid pk populates id", async () => {
     const message = await ChatMessage.create({ content: "New Message" });
