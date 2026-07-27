@@ -186,26 +186,41 @@ export function parseHttpDate(s: string | undefined): Date | undefined {
 }
 
 type R = ResponseCacheHost;
-export function getLastModified(this: R) {
-  return parseHttpDate(this.getHeader(LAST_MODIFIED));
+
+export class Response {
+  declare getHeader: ResponseCacheHost["getHeader"];
+  declare setHeader: ResponseCacheHost["setHeader"];
+
+  get lastModified(): Date | undefined {
+    return parseHttpDate(this.getHeader(LAST_MODIFIED));
+  }
+
+  set lastModified(t: Date | undefined) {
+    this.setHeader(LAST_MODIFIED, (t as Date).toUTCString());
+  }
+
+  get date(): Date | undefined {
+    return parseHttpDate(this.getHeader(DATE));
+  }
+
+  set date(t: Date | undefined) {
+    this.setHeader(DATE, (t as Date).toUTCString());
+  }
+
+  get etag(): string | undefined {
+    return this.getHeader(ETAG);
+  }
+
+  set etag(v: unknown) {
+    weakEtag.call(this, v);
+  }
 }
+
 export function hasLastModified(this: R) {
   return hdrSet(this, LAST_MODIFIED);
 }
-export function setLastModified(this: R, t: Date) {
-  this.setHeader(LAST_MODIFIED, t.toUTCString());
-}
-export function getDate(this: R) {
-  return parseHttpDate(this.getHeader(DATE));
-}
 export function hasDate(this: R) {
   return hdrSet(this, DATE);
-}
-export function setDate(this: R, t: Date) {
-  this.setHeader(DATE, t.toUTCString());
-}
-export function setEtag(this: R, v: unknown) {
-  weakEtag.call(this, v);
 }
 /** Rails' `Cache::Response#weak_etag=`. */
 export function weakEtag(this: R, v: unknown) {
@@ -215,14 +230,11 @@ export function weakEtag(this: R, v: unknown) {
 export function strongEtag(this: R, v: unknown) {
   this.setHeader(ETAG, generateStrongEtag(v));
 }
-export function getEtag(this: R) {
-  return this.getHeader(ETAG);
-}
 export function hasEtag(this: R) {
-  return !!getEtag.call(this);
+  return !!this.getHeader(ETAG);
 }
 export function isWeakEtag(this: R) {
-  const e = getEtag.call(this);
+  const e = this.getHeader(ETAG);
   return !!e && e.startsWith('W/"');
 }
 export function isStrongEtag(this: R) {

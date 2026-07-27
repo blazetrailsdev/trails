@@ -6,13 +6,10 @@ import {
   fresh,
   generateStrongEtag,
   generateWeakEtag,
-  getLastModified,
   handleConditionalGetBang,
   isWeakEtag,
   mergeAndNormalizeCacheControlBang,
   notModified,
-  setEtag,
-  setLastModified,
   type RequestCacheHost,
 } from "./cache.js";
 
@@ -66,39 +63,31 @@ describe("Cache::Request", () => {
 
 describe("Cache::Response", () => {
   it("last_modified parses strict RFC 1123 (Time.httpdate parity)", () => {
-    expect(getLastModified.call(res({ "Last-Modified": "Sun, 06 Nov 1994 08:49:37 GMT" }))).toEqual(
+    expect(res({ "Last-Modified": "Sun, 06 Nov 1994 08:49:37 GMT" }).lastModified).toEqual(
       new Date("1994-11-06T08:49:37Z"),
     );
   });
 
   it("last_modified rejects RFC 850 / asctime / numeric-zone forms (httpdate is strict)", () => {
     // RFC 850 form
-    expect(
-      getLastModified.call(res({ "Last-Modified": "Sunday, 06-Nov-94 08:49:37 GMT" })),
-    ).toBeUndefined();
+    expect(res({ "Last-Modified": "Sunday, 06-Nov-94 08:49:37 GMT" }).lastModified).toBeUndefined();
     // asctime form
-    expect(
-      getLastModified.call(res({ "Last-Modified": "Sun Nov  6 08:49:37 1994" })),
-    ).toBeUndefined();
+    expect(res({ "Last-Modified": "Sun Nov  6 08:49:37 1994" }).lastModified).toBeUndefined();
     // Numeric zone offset — valid RFC 2822 but rejected by Time.httpdate
     expect(
-      getLastModified.call(res({ "Last-Modified": "Sun, 06 Nov 1994 08:49:37 -0500" })),
+      res({ "Last-Modified": "Sun, 06 Nov 1994 08:49:37 -0500" }).lastModified,
     ).toBeUndefined();
   });
 
   it("last_modified rejects out-of-range and impossible-calendar values", () => {
-    expect(
-      getLastModified.call(res({ "Last-Modified": "Sun, 99 Nov 1994 08:49:37 GMT" })),
-    ).toBeUndefined();
+    expect(res({ "Last-Modified": "Sun, 99 Nov 1994 08:49:37 GMT" }).lastModified).toBeUndefined();
     // 31 Feb — Date.UTC would silently roll into March
-    expect(
-      getLastModified.call(res({ "Last-Modified": "Tue, 31 Feb 2015 08:49:37 GMT" })),
-    ).toBeUndefined();
+    expect(res({ "Last-Modified": "Tue, 31 Feb 2015 08:49:37 GMT" }).lastModified).toBeUndefined();
   });
 
   it("etag= sets weak validator", () => {
     const r = res();
-    setEtag.call(r, "foo");
+    r.etag = "foo";
     expect(r.getHeader("ETag")?.startsWith('W/"')).toBe(true);
     expect(isWeakEtag.call(r)).toBe(true);
   });
@@ -110,12 +99,12 @@ describe("Cache::Response", () => {
 
   it("handle_conditional_get! sets default only when validator present and header missing", () => {
     const r = res();
-    setEtag.call(r, "x");
+    r.etag = "x";
     handleConditionalGetBang.call(r);
     expect(r.getHeader("Cache-Control")).toBe("max-age=0, private, must-revalidate");
 
     const r2 = res({ "Cache-Control": "public" });
-    setEtag.call(r2, "x");
+    r2.etag = "x";
     handleConditionalGetBang.call(r2);
     expect(r2.getHeader("Cache-Control")).toBe("public");
   });
@@ -136,7 +125,7 @@ describe("Cache::Response", () => {
 
   it("last_modified= writes httpdate", () => {
     const r = res();
-    setLastModified.call(r, new Date(Date.UTC(1994, 10, 6, 8, 49, 37)));
+    r.lastModified = new Date(Date.UTC(1994, 10, 6, 8, 49, 37));
     expect(r.getHeader("Last-Modified")).toBe("Sun, 06 Nov 1994 08:49:37 GMT");
   });
 });
