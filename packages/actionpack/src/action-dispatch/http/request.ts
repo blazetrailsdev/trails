@@ -68,12 +68,10 @@ import { RequestUtils, type ParamValue } from "../request/utils.js";
 import { COOKIES_APP_OPTIONS_KEY, type CookieJarOptions } from "../middleware/cookies.js";
 import {
   parameters as _parameters,
-  parameterParsers as _parameterParsers,
+  Parameters as _Parameters,
   paramsParsers as _paramsParsers,
   parseFormattedParameters as _parseFormattedParameters,
   pathParameters as _pathParameters,
-  setParameterParsers as _setParameterParsers,
-  setPathParameters as _setPathParameters,
   logParseErrorOnce as _logParseErrorOnce,
   type ParameterParser,
   type ParameterParsers,
@@ -569,25 +567,29 @@ export class Request {
   }
 
   set pathParameters(params: Record<string, unknown>) {
-    _setPathParameters.call(this._paramsHost, params);
+    this._paramsHost.pathParameters = params;
   }
 
   /** Class-level parameter parser registry. Mirrors Rails `Request.parameter_parsers`. */
   static get parameterParsers(): ParameterParsers {
-    return _parameterParsers();
+    return _Parameters.parameterParsers;
   }
 
   static set parameterParsers(
     parsers: Record<string | symbol, ParameterParser> | Map<unknown, ParameterParser>,
   ) {
-    _setParameterParsers(parsers);
+    _Parameters.parameterParsers = parsers;
   }
 
-  /** @internal */
-  private get _paramsHost(): ParametersHost {
+  /**
+   * Prototyped on `Parameters.prototype` so the mixin's `path_parameters=`
+   * writer applies by plain assignment.
+   * @internal
+   */
+  private get _paramsHost(): ParametersHost & _Parameters {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const req = this;
-    return {
+    const host: ParametersHost = {
       getHeader: (k) => req.env[k],
       setHeader: (k, v) => ((req.env[k] = v), v),
       deleteHeader: (k) => void delete req.env[k],
@@ -611,6 +613,7 @@ export class Request {
         return (l as { debug(m: string): void } | null | undefined) ?? null;
       },
     };
+    return Object.setPrototypeOf(host, _Parameters.prototype) as ParametersHost & _Parameters;
   }
 
   /** @internal */

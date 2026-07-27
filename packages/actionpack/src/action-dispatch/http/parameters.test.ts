@@ -7,19 +7,17 @@ import {
   ParseError,
   type ParameterParser,
   type ParametersHost,
+  Parameters,
   logParseErrorOnce,
-  parameterParsers,
   parameters,
   paramsParsers,
   parseFormattedParameters,
   pathParameters,
-  setParameterParsers,
-  setPathParameters,
 } from "./parameters.js";
 
-function makeHost(overrides: Partial<ParametersHost> = {}): ParametersHost {
+function makeHost(overrides: Partial<ParametersHost> = {}): ParametersHost & Parameters {
   const headers = new Map<string, unknown>();
-  return {
+  const host: ParametersHost = {
     getHeader: (k) => headers.get(k),
     setHeader: (k, v) => {
       headers.set(k, v);
@@ -35,6 +33,7 @@ function makeHost(overrides: Partial<ParametersHost> = {}): ParametersHost {
     rawPost: "",
     ...overrides,
   };
+  return Object.setPrototypeOf(host, Parameters.prototype) as ParametersHost & Parameters;
 }
 
 describe("PARAMETERS_KEY", () => {
@@ -72,7 +71,7 @@ describe("parameters", () => {
       queryParameters: { q: "1", shared: "query" },
       requestParameters: { r: "1", shared: "request" },
     });
-    setPathParameters.call(host, { controller: "posts", action: "index" });
+    host.pathParameters = { controller: "posts", action: "index" };
     const result = parameters.call(host);
     expect(result).toEqual({
       r: "1",
@@ -111,39 +110,41 @@ describe("pathParameters", () => {
   });
 });
 
-describe("setPathParameters", () => {
+describe("Parameters#pathParameters=", () => {
   it("stores under PARAMETERS_KEY and invalidates the merged cache", () => {
     const host = makeHost({ queryParameters: { q: 1 } });
     parameters.call(host); // populates cache
-    setPathParameters.call(host, { controller: "x" });
+    host.pathParameters = { controller: "x" };
     expect(host.getHeader(PARAMETERS_KEY)).toEqual({ controller: "x" });
     expect(host.getHeader("action_dispatch.request.parameters")).toBeUndefined();
   });
 });
 
 describe("parameterParsers registry", () => {
-  afterEach(() => setParameterParsers(DEFAULT_PARSERS));
-
-  it("starts at DEFAULT_PARSERS", () => {
-    expect(parameterParsers()).toBe(DEFAULT_PARSERS);
+  afterEach(() => {
+    Parameters.parameterParsers = DEFAULT_PARSERS;
   });
 
-  it("setParameterParsers replaces the registry", () => {
+  it("starts at DEFAULT_PARSERS", () => {
+    expect(Parameters.parameterParsers).toEqual(DEFAULT_PARSERS);
+  });
+
+  it("Parameters.parameterParsers= replaces the registry", () => {
     const xml: ParameterParser = (raw) => ({ xml: raw });
-    setParameterParsers({ xml });
-    expect(parameterParsers()).toEqual({ xml });
+    Parameters.parameterParsers = { xml };
+    expect(Parameters.parameterParsers).toEqual({ xml });
   });
 
   it("normalizes MimeType keys via .symbol (Rails transform_keys parity)", () => {
     const xml: ParameterParser = () => ({});
     const fakeMime = { symbol: "xml" };
-    setParameterParsers(new Map<unknown, ParameterParser>([[fakeMime, xml]]));
-    expect(parameterParsers()).toEqual({ xml });
+    Parameters.parameterParsers = new Map<unknown, ParameterParser>([[fakeMime, xml]]);
+    expect(Parameters.parameterParsers).toEqual({ xml });
   });
 
   it("paramsParsers host helper forwards to the registry", () => {
     const xml: ParameterParser = () => ({});
-    setParameterParsers({ xml });
+    Parameters.parameterParsers = { xml };
     const host = makeHost();
     expect(paramsParsers.call(host)).toEqual({ xml });
   });

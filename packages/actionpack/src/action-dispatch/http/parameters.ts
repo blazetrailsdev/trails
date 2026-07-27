@@ -3,8 +3,8 @@
  *
  * Port of `actionpack/lib/action_dispatch/http/parameters.rb`. Provides the
  * parameter-parser registry, the {@link ParseError} class, and the host
- * functions (`parameters`, `pathParameters`, `setPathParameters`,
- * `parseFormattedParameters`) that Rails mixes into `ActionDispatch::Request`
+ * functions (`parameters`, `pathParameters`, `parseFormattedParameters`) plus
+ * the {@link Parameters} writer module that Rails mixes into `ActionDispatch::Request`
  * via `extend ActiveSupport::Concern`.
  *
  * In Ruby these are mixed into `Request`. In TypeScript we expose them as
@@ -71,36 +71,66 @@ export interface ParametersHost {
 }
 
 /**
- * Class-level parameter-parser registry. Mirrors Rails'
- * `Request.parameter_parsers` attr_accessor. Symbol keys are normalized via
- * `key.symbol` (`MimeType#symbol`) when present, matching the Ruby setter.
+ * Home for the module's *writers*. Ruby names a writer after its reader
+ * (`path_parameters=`), which TypeScript can only spell as a `set` accessor on
+ * a prototype — so the writers live here and hosts pick them up by deriving
+ * their mixin host from `Parameters.prototype`. The matching readers stay as
+ * `this`-typed module functions since they are called internally as plain
+ * functions.
  */
-let _parameterParsers: ParameterParsers = DEFAULT_PARSERS;
+export class Parameters {
+  /** Host surface the writers read, sourced from {@link ParametersHost}. */
+  declare setHeader: ParametersHost["setHeader"];
+  declare deleteHeader: ParametersHost["deleteHeader"];
 
-export function parameterParsers(): ParameterParsers {
-  return _parameterParsers;
-}
+  /** @internal Backing slot for {@link parameterParsers}. */
+  private static _parameterParsers: ParameterParsers = DEFAULT_PARSERS;
 
-export function setParameterParsers(
-  parsers: Record<string | symbol, ParameterParser> | Map<unknown, ParameterParser>,
-): void {
-  const normalized: ParameterParsers = {};
-  const entries: Iterable<[unknown, ParameterParser]> =
-    parsers instanceof Map
-      ? parsers.entries()
-      : (Reflect.ownKeys(parsers).map((k) => [k, parsers[k as never]]) as Array<
-          [unknown, ParameterParser]
-        >);
-  for (const [key, value] of entries) {
-    const sym =
-      key !== null && typeof key === "object" && "symbol" in key
-        ? String((key as { symbol: unknown }).symbol)
-        : typeof key === "symbol"
-          ? (key.description ?? String(key))
-          : String(key);
-    normalized[sym] = value;
+  /**
+   * Class-level parameter-parser registry. Mirrors the
+   * `Parameters::ClassMethods` pair (`attr_reader :parameter_parsers` plus
+   * `parameter_parsers=`) exposed as `ActionDispatch::Request.parameter_parsers`.
+   * Symbol keys are normalized via `key.symbol` (`MimeType#symbol`) when
+   * present, matching the Ruby setter's `transform_keys`.
+   */
+  static get parameterParsers(): ParameterParsers {
+    return Parameters._parameterParsers;
   }
-  _parameterParsers = normalized;
+
+  static set parameterParsers(
+    parsers: Record<string | symbol, ParameterParser> | Map<unknown, ParameterParser>,
+  ) {
+    const normalized: ParameterParsers = {};
+    const entries: Iterable<[unknown, ParameterParser]> =
+      parsers instanceof Map
+        ? parsers.entries()
+        : (Reflect.ownKeys(parsers).map((k) => [k, parsers[k as never]]) as Array<
+            [unknown, ParameterParser]
+          >);
+    for (const [key, value] of entries) {
+      const sym =
+        key !== null && typeof key === "object" && "symbol" in key
+          ? String((key as { symbol: unknown }).symbol)
+          : typeof key === "symbol"
+            ? (key.description ?? String(key))
+            : String(key);
+      normalized[sym] = value;
+    }
+    Parameters._parameterParsers = normalized;
+  }
+
+  /**
+   * Sets the path parameters, invalidating the merged-parameters cache.
+   * Encoding-normalization (Rails calls
+   * `Request::Utils.set_binary_encoding` + `check_param_encoding`) is omitted —
+   * JS strings are UTF-16 and TS lacks Ruby's ASCII-8BIT vs UTF-8 distinction,
+   * so there's nothing to coerce. Callers that need encoding validation should
+   * apply it themselves before invoking this setter.
+   */
+  set pathParameters(parameters: Record<string, unknown>) {
+    this.deleteHeader("action_dispatch.request.parameters");
+    this.setHeader(PARAMETERS_KEY, parameters);
+  }
 }
 
 /**
@@ -133,19 +163,6 @@ export function pathParameters(this: ParametersHost): Record<string, unknown> {
   const empty: Record<string, unknown> = {};
   this.setHeader(PARAMETERS_KEY, empty);
   return empty;
-}
-
-/**
- * Sets the path parameters, invalidating the merged-parameters cache. Mirrors
- * Rails' `path_parameters=` setter. Encoding-normalization (Rails calls
- * `Request::Utils.set_binary_encoding` + `check_param_encoding`) is omitted —
- * JS strings are UTF-16 and TS lacks Ruby's ASCII-8BIT vs UTF-8 distinction,
- * so there's nothing to coerce. Callers that need encoding validation should
- * apply it themselves before invoking this setter.
- */
-export function setPathParameters(this: ParametersHost, parameters: Record<string, unknown>): void {
-  this.deleteHeader("action_dispatch.request.parameters");
-  this.setHeader(PARAMETERS_KEY, parameters);
 }
 
 /**
@@ -232,5 +249,5 @@ const PARSE_ERROR_LOGGED_KEY = "action_dispatch.request.parse_error_logged";
  * @internal
  */
 export function paramsParsers(this: ParametersHost): ParameterParsers {
-  return parameterParsers();
+  return Parameters.parameterParsers;
 }
