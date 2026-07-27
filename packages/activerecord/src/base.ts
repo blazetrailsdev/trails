@@ -1852,13 +1852,7 @@ export class Base extends Model {
     _setSignedIdVerifierSecret(value);
   }
 
-  /**
-   * Whether SQL log lines are annotated with the application-code line that
-   * issued the query. The storage lives in log-subscriber.ts, next to its only
-   * reader; this is the Rails-named surface for it.
-   *
-   * Mirrors: ActiveRecord.verbose_query_logs, verbose_query_logs=
-   */
+  /** Mirrors: ActiveRecord.verbose_query_logs, verbose_query_logs= */
   static get verboseQueryLogs(): boolean {
     return _getVerboseQueryLogs();
   }

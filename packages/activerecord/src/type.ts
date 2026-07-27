@@ -85,22 +85,13 @@ _registry.register("time", Time, { override: false });
 _registry.register("value", ValueType, { override: false });
 
 /**
- * Mirrors Rails' `ActiveRecord::Type.registry` / `registry=` (type.rb:26,
- * `attr_accessor :registry`). Called with no argument it reads; called with a
- * value it writes.
+ * Mirrors: ActiveRecord::Type.registry, registry= (type.rb:26)
  *
- * Reader and writer share one function rather than becoming a `get`/`set` pair:
- * Rails hangs the accessor off the `ActiveRecord::Type` *module* object, whose
- * trails analogue is this ES module, and an ES module namespace is read-only
- * from the importer's side — there is no object to define an accessor on. The
- * reader-with-optional-argument shape is what the same constraint produced for
- * `Core.configurations` (PR #5381) and `PrimaryKey#primary_key`, and it keeps
- * the writer under the Rails name instead of re-spelling it `setRegistry`.
- *
- * Assigning replaces the active registry wholesale. Callers are responsible for
- * re-registering any types they need — this is intentional: Rails' own
- * TypeTest swaps in a blank AdapterSpecificRegistry per test and restores
- * the original in teardown, so a pre-populated registry is not the default.
+ * Not a `get`/`set` pair: Rails hangs `attr_accessor :registry` off the
+ * `ActiveRecord::Type` module object, whose trails analogue is this ES module,
+ * and a module namespace is read-only from the importer's side — there is no
+ * object to define an accessor on. Same constraint, same shape as
+ * `Core.configurations` and `PrimaryKey#primary_key`.
  */
 export function registry(r?: AdapterSpecificRegistry): AdapterSpecificRegistry {
   if (r !== undefined) {
