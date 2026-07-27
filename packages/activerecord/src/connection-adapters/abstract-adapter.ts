@@ -516,7 +516,12 @@ export interface AbstractAdapter {
   internalExecute(
     sql: string,
     name?: string,
-    opts?: { materializeTransactions?: boolean; allowRetry?: boolean },
+    opts?: {
+      materializeTransactions?: boolean;
+      allowRetry?: boolean;
+      prepare?: boolean;
+      binds?: unknown[];
+    },
   ): Promise<unknown>;
   /** @internal */
   internalExecQuery(
