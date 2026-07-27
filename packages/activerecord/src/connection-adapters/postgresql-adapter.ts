@@ -534,6 +534,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    *
    * Mirrors: `database.yml`'s `statement_limit` — read by Rails as
    * `config[:statement_limit]` in PostgreSQLAdapter#initialize.
+   *
+   * @noRailsEquivalent `statement_limit` is a `database.yml` config key Rails reads as
+   *   `config[:statement_limit]` in
+   *   each adapter's `initialize` (abstract_mysql_adapter.rb, postgresql_adapter.rb,
+   *   sqlite3_adapter.rb) — a config option, never a Ruby `def`, so there is nothing for the
+   *   extractor to match. trails exposes the same setting as a validated accessor on the adapter,
+   *   identically on all three.
    */
   get statementLimit(): number {
     return this._statementLimit;
@@ -2554,6 +2561,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // are SERIAL/BIGSERIAL pseudo-types and the range/geometric/network types are all
   // exposed as `change_table` shorthands. Multi-word names use the camelCase form of
   // the trails TableDefinition method (e.g. `bit_varying` -> `bitVarying`).
+  /**
+   * @noRailsEquivalent Rails spells this list as the `ColumnMethods` modules'
+   *   `define_column_methods` metaprogramming
+   *   (abstract/schema_definitions.rb:324 plus the per-adapter ColumnMethods modules), not as a
+   *   `def`, so the Ruby extractor records no counterpart. TypeScript has no `define_method`, so
+   *   trails reifies the list; each adapter appends to `super.columnMethodNames()` exactly where
+   *   Rails' adapter-specific ColumnMethods module extends the abstract one.
+   */
   override columnMethodNames(): string[] {
     return [
       ...super.columnMethodNames(),
@@ -2745,7 +2760,17 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return pgReturningColumnValues(result);
   }
 
-  /** Returns true for raw pg errors that indicate the database doesn't exist (SQLSTATE 3D000). */
+  /**
+   * Returns true for raw pg errors that indicate the database doesn't exist (SQLSTATE 3D000).
+   *
+   * @noRailsEquivalent Rails recognizes the no-such-database condition inline at the connect site
+   *   and raises
+   *   `ActiveRecord::NoDatabaseError` there (postgresql_adapter.rb:63, sqlite3_adapter.rb:38,120) —
+   *   there is no named predicate to mirror. trails needs the predicate separated from raising
+   *   because `DatabaseTasks._isMissingDatabaseError` (tasks/database-tasks.ts) classifies an
+   *   already-raised raw driver error, after the adapter failed to construct. Identical shape on all
+   *   three: the base returns false, each concrete adapter overrides with its driver check.
+   */
   isNoDatabaseError(error: unknown): boolean {
     if (!error || typeof error !== "object") return false;
     return (error as { code?: unknown }).code === "3D000";
@@ -4323,6 +4348,16 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // Range types
   // ---------------------------------------------------------------------------
 
+  /**
+   * @noRailsEquivalent Rails has no range-type DDL helper anywhere — ranges are created with a raw
+   *   `execute("CREATE
+   *   TYPE … AS RANGE")`. trails adds `createRange`/`dropRange` following Rails' own type-DDL helpers
+   *   (create_enum/drop_enum/rename_enum, postgresql_adapter.rb:541-615), including their
+   *   `reload_type_map` epilogue; the implementation and the full justification live at the emitting
+   *   call site, connection-adapters/postgresql/schema-statements-class.ts. Deliberately
+   *   PostgreSQL-only: the no-op stubs that shadowed these on AbstractAdapter were deleted rather
+   *   than allowlisted, since Rails stubs only the enum quartet on the base.
+   */
   async createRange(
     name: string,
     options: { subtype: string; subtypeDiff?: string },
@@ -4330,6 +4365,16 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     await this.pgSchemaStatements().createRange(name, options);
   }
 
+  /**
+   * @noRailsEquivalent Rails has no range-type DDL helper anywhere — ranges are created with a raw
+   *   `execute("CREATE
+   *   TYPE … AS RANGE")`. trails adds `createRange`/`dropRange` following Rails' own type-DDL helpers
+   *   (create_enum/drop_enum/rename_enum, postgresql_adapter.rb:541-615), including their
+   *   `reload_type_map` epilogue; the implementation and the full justification live at the emitting
+   *   call site, connection-adapters/postgresql/schema-statements-class.ts. Deliberately
+   *   PostgreSQL-only: the no-op stubs that shadowed these on AbstractAdapter were deleted rather
+   *   than allowlisted, since Rails stubs only the enum quartet on the base.
+   */
   async dropRange(name: string, options: { ifExists?: boolean } = {}): Promise<void> {
     await this.pgSchemaStatements().dropRange(name, options);
   }
@@ -4558,6 +4603,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     await this.pgSchemaStatements().recreateDatabase(name, options);
   }
 
+  /**
+   * @noRailsEquivalent Rails gains these bodies with `include SchemaStatements` on the adapter, so
+   *   there is no
+   *   accessor to mirror. The schema-statement surface is far too large for the repo's `this`-typed
+   *   module-mixin pattern to stay readable, so trails keeps it in a companion class;
+   *   `schemaStatements(host?)` is the accessor that returns it bound to a host adapter. It is the TS
+   *   stand-in for the `include`, not new capability — mysql2-adapter.ts overrides it to return the
+   *   MySQL companion the same way Rails includes `MySQL::SchemaStatements`.
+   */
   override schemaStatements(host?: DatabaseAdapter): SchemaStatements {
     return new PostgreSQLSchemaStatements((host ?? this) as unknown as DatabaseAdapter);
   }
