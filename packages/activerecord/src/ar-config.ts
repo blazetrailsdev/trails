@@ -170,39 +170,65 @@ export function setDatabaseCli(value: Record<string, string | string[]>): void {
   databaseCli = value;
 }
 
-/**
- * Selects the async query executor backing `load_async`. `null` (the default)
- * disables background execution; `"thread_pool"` uses a single shared pool and
- * `"multi_thread_pool"` a per-database pool. Mirrors
- * `ActiveRecord.async_query_executor` (active_record.rb:283-284, default nil).
- */
-export let asyncQueryExecutor: "thread_pool" | "multi_thread_pool" | null = null;
-
-export function setAsyncQueryExecutor(value: "thread_pool" | "multi_thread_pool" | null): void {
-  asyncQueryExecutor = value;
-}
+let _asyncQueryExecutor: "thread_pool" | "multi_thread_pool" | null = null;
+let _queues: Record<string, unknown> = {};
+let _maintainTestSchema: boolean | null = null;
 
 /**
- * Names of the queues used by background jobs (e.g. `destroy_association_async`).
- * Mirrors `ActiveRecord.queues` (active_record.rb:317-318, default `{}`).
+ * The `ActiveRecord` module itself, as far as its singleton configuration
+ * attributes are concerned. Rails declares these with
+ * `singleton_class.attr_accessor` on `module ActiveRecord`
+ * (active_record.rb:283-321), so the call site reads and writes them as plain
+ * attributes: `ActiveRecord.maintain_test_schema = true`.
+ *
+ * ESM live bindings are read-only for importers, so a bare `export let` cannot
+ * carry the writer half — hence an object with `get`/`set` accessors, which is
+ * the one TS shape that spells the Ruby writer under its Rails name rather
+ * than as a `setX` re-spelling. Flags still declared as `export let` below have
+ * not been migrated yet; they keep their `setX` companion until they move here.
  */
-export let queues: Record<string, unknown> = {};
+export const ActiveRecord = {
+  /**
+   * Selects the async query executor backing `load_async`. `null` (the
+   * default) disables background execution; `"thread_pool"` uses a single
+   * shared pool and `"multi_thread_pool"` a per-database pool. Mirrors
+   * `ActiveRecord.async_query_executor` (active_record.rb:283-284, default nil).
+   */
+  get asyncQueryExecutor(): "thread_pool" | "multi_thread_pool" | null {
+    return _asyncQueryExecutor;
+  },
 
-export function setQueues(value: Record<string, unknown>): void {
-  queues = value;
-}
+  set asyncQueryExecutor(value: "thread_pool" | "multi_thread_pool" | null) {
+    _asyncQueryExecutor = value;
+  },
 
-/**
- * When the test suite should keep the test schema current against
- * `schema.rb`/`structure.sql`. `null` (the default) defers to the framework's
- * `maintainTestSchemaBang` opt-in. Mirrors `ActiveRecord.maintain_test_schema`
- * (active_record.rb:320-321, default nil).
- */
-export let maintainTestSchema: boolean | null = null;
+  /**
+   * Names of the queues used by background jobs (e.g.
+   * `destroy_association_async`). Mirrors `ActiveRecord.queues`
+   * (active_record.rb:317-318, default `{}`).
+   */
+  get queues(): Record<string, unknown> {
+    return _queues;
+  },
 
-export function setMaintainTestSchema(value: boolean | null): void {
-  maintainTestSchema = value;
-}
+  set queues(value: Record<string, unknown>) {
+    _queues = value;
+  },
+
+  /**
+   * When the test suite should keep the test schema current against
+   * `schema.rb`/`structure.sql`. `null` (the default) defers to the
+   * framework's `maintainTestSchemaBang` opt-in. Mirrors
+   * `ActiveRecord.maintain_test_schema` (active_record.rb:320-321, default nil).
+   */
+  get maintainTestSchema(): boolean | null {
+    return _maintainTestSchema;
+  },
+
+  set maintainTestSchema(value: boolean | null) {
+    _maintainTestSchema = value;
+  },
+};
 
 /**
  * When true (the default), a required `belongs_to` also validates that the

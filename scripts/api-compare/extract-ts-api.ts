@@ -1435,6 +1435,17 @@ export function harvestObjectLiteralMethods(
       const valueSymbol = checker.getShorthandAssignmentValueSymbol(prop);
       internal = isInternalSymbol(valueSymbol, checker);
       noRailsEquivalent ??= noRailsEquivalentOfSymbol(valueSymbol, checker);
+    } else if (ts.isGetAccessorDeclaration(prop) && prop.name && ts.isIdentifier(prop.name)) {
+      // `export const ActiveRecord = { get maintainTestSchema() {...} }` — the
+      // module-object form a Ruby `singleton_class.attr_accessor` ports to
+      // (ar-config.ts). Same accounting as a class accessor: the reader has no
+      // params, the writer carries the assigned value.
+      mname = prop.name.text;
+      calls = extractCalls(prop.body);
+    } else if (ts.isSetAccessorDeclaration(prop) && prop.name && ts.isIdentifier(prop.name)) {
+      mname = prop.name.text;
+      params = extractParameters(prop.parameters);
+      calls = extractCalls(prop.body);
     } else if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
       const init = prop.initializer;
       if (ts.isFunctionExpression(init) || ts.isArrowFunction(init)) {
