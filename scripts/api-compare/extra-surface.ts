@@ -9,7 +9,8 @@
  * can prune toward Rails-faithful shape; it never modifies source.
  *
  * Algorithm, per Rails-mirroring package:
- *   1. For each Ruby file, resolve its expected TS file via `rubyFileToTs`.
+ *   1. For each Ruby file, resolve its expected TS file via `rubyFileToTs`;
+ *      TS files nothing resolves to are scored separately (step 4b).
  *   2. Collect Ruby methods declared in (or `include`d into) the entities in
  *      that Ruby file — any visibility, since a TS method mirroring a
  *      Rails-private method exists in Rails (a visibility divergence, not
@@ -29,6 +30,11 @@
  *      should not count toward extra surface.
  *   4. Extra = TS names \ allowed names. Emit per-file, per-package, and
  *      top-N reports.
+ *   4b. TS files that NO Ruby file maps onto are scored too, with an empty
+ *      allowed set — see `uncoveredTsFiles`. Rails-test-mirroring trees
+ *      (`test-helpers/`, `support/`, `cases/`, fixture corpora) are held out
+ *      because the Ruby extractor reads `lib/` only, so they could never have
+ *      a counterpart.
  *   5. Subtract the reasoned exceptions: a declaration carrying a
  *      `@noRailsEquivalent <reason>` JSDoc tag counts as `Allowed` rather
  *      than extra. Since RFC 0080 the tag is the ONLY such source — the
@@ -317,7 +323,11 @@ export interface ExtraName {
 interface ExtraFile {
   package: string;
   tsFile: string;
-  rubyFile: string;
+  /**
+   * `null` for a TS file no Rails file maps onto — every public name in it is
+   * extra by construction (see `uncoveredTsFiles`).
+   */
+  rubyFile: string | null;
   extraCount: number;
   novelCount: number;
   movedCount: number;
@@ -700,6 +710,76 @@ export function buildCrossPackageModules(ruby: ApiManifest): {
   return { modules, pkgByFqn };
 }
 
+/**
+ * Path segments marking a TS tree that mirrors Rails' `test/` (or a codegen
+ * fixture corpus) rather than its `lib/`. The Ruby extractor only reads `lib/`,
+ * so nothing under these can ever have a counterpart in the file map — scoring
+ * them as uncovered would flag every faithfully ported test model
+ * (`test-helpers/models/post.ts` alone mirrors 168 members of
+ * `activerecord/test/models/post.rb`) as drift. `support/` and `cases/` mirror
+ * `activerecord/test/support` and `test/cases`; `fixtures/` covers both the
+ * ported Rails fixture data and `type-virtualization/fixtures` codegen
+ * input/expected pairs.
+ *
+ * Matching is per path SEGMENT, not substring: `test-fixtures/` is the split of
+ * `lib/active_record/test_fixtures.rb` and stays scored.
+ *
+ * This is the same lib-only boundary the Ruby side already draws, not an
+ * allowance for unconverged surface — a `lib/`-mirroring file with no
+ * counterpart IS scored.
+ */
+const TEST_SUPPORT_SEGMENTS = new Set([
+  "test-helpers",
+  "dx-tests",
+  "support",
+  "cases",
+  "fixtures",
+  "__fixtures__",
+]);
+
+/** Basenames of per-adapter test helper modules that sit outside those trees. */
+const TEST_SUPPORT_BASENAMES = new Set(["test-helper.ts", "test-helpers.ts"]);
+
+export function isTestSupportFile(tsFile: string): boolean {
+  const segments = tsFile.split("/");
+  const base = segments.pop() ?? "";
+  return segments.some((s) => TEST_SUPPORT_SEGMENTS.has(s)) || TEST_SUPPORT_BASENAMES.has(base);
+}
+
+/**
+ * TS files in the package that no Ruby file maps onto via `rubyFileToTs`.
+ *
+ * Before this, such a file was invisible: the report iterates Ruby files, so a
+ * TS file nothing points at was never visited and its whole public surface went
+ * unmeasured — neither novel nor moved nor allowed. That is exactly backwards,
+ * since a file Rails has no counterpart for is where extra surface is MOST
+ * likely (`ar-config.ts`'s 20+ `setX` re-spellings of Ruby `foo=` writers
+ * reported zero extras because `active_record.rb` redirects onto `base.ts`).
+ *
+ * These files are scored with an EMPTY allowed set — there is no Rails file to
+ * take allowed names from — so every public name lands as an extra, classed
+ * novel vs moved against the package-wide Rails candidates like any other. In
+ * particular the umbrella-config attribution `compare.ts` applies (crediting
+ * `setProtocolAdapters` to `ActiveRecord.protocol_adapters=` as a *move*) is
+ * deliberately NOT mirrored here: `rubyMethodToTs` maps `foo=` to `foo`, so the
+ * `setX` spelling is novel surface, which is the finding, not noise to absorb.
+ */
+export function uncoveredTsFiles(
+  coveredTsFiles: Set<string>,
+  tsClassesByFile: Map<string, ClassInfo[]>,
+  tsModulesByFile: Map<string, ClassInfo[]>,
+  tsFileFunctions: Record<string, MethodInfo[]>,
+): string[] {
+  const files = new Set<string>([
+    ...tsClassesByFile.keys(),
+    ...tsModulesByFile.keys(),
+    ...Object.keys(tsFileFunctions),
+  ]);
+  return [...files]
+    .filter((f) => !coveredTsFiles.has(f) && !isTestSupportFile(f))
+    .sort((a, b) => a.localeCompare(b));
+}
+
 function buildPackageReport(
   pkg: string,
   ruby: ApiManifest,
@@ -778,8 +858,20 @@ function buildPackageReport(
   }
   const tsFileFunctions = tsPkg.fileFunctions ?? {};
 
-  for (const [rubyFile, entities] of rubyFiles) {
-    const expectedTs = rubyFileToTs(rubyFile, pkg);
+  const coveredTsFiles = new Set<string>();
+  for (const rubyFile of rubyFiles.keys()) coveredTsFiles.add(rubyFileToTs(rubyFile, pkg));
+
+  const scoreTargets: { tsFile: string; rubyFile: string | null }[] = [
+    ...[...rubyFiles.keys()].map((rubyFile) => ({
+      tsFile: rubyFileToTs(rubyFile, pkg),
+      rubyFile,
+    })),
+    ...uncoveredTsFiles(coveredTsFiles, tsClassesByFile, tsModulesByFile, tsFileFunctions).map(
+      (tsFile) => ({ tsFile, rubyFile: null }),
+    ),
+  ];
+
+  for (const { tsFile: expectedTs, rubyFile } of scoreTargets) {
     if (excludeGlobs.some((g) => expectedTs.includes(g))) continue;
 
     const classes = tsClassesByFile.get(expectedTs) ?? [];
@@ -790,15 +882,18 @@ function buildPackageReport(
     const tsNames = collectTsFileNames(expectedTs, classes, modules, fileFns);
     if (tsNames.size === 0) continue;
 
-    const allowed = collectAllowedNames(
-      entities,
-      pkg,
-      rubyPkg.modules as Record<string, ClassInfo>,
-      moduleFqnByShort,
-      crossPackageModules,
-      crossPackagePkgByFqn,
-      Object.keys(rubyPkg.fileConstants?.[rubyFile] ?? {}),
-    );
+    const allowed =
+      rubyFile === null
+        ? new Set<string>()
+        : collectAllowedNames(
+            rubyFiles.get(rubyFile) ?? [],
+            pkg,
+            rubyPkg.modules as Record<string, ClassInfo>,
+            moduleFqnByShort,
+            crossPackageModules,
+            crossPackagePkgByFqn,
+            Object.keys(rubyPkg.fileConstants?.[rubyFile] ?? {}),
+          );
 
     const extras: ExtraName[] = [];
     let novelCount = 0;
@@ -955,7 +1050,10 @@ function printHumanReport(report: Report, topN: number, maxDetail: number): void
     if (pkg.extraFiles.length === 0) continue;
     console.log(`${p.bold}${pkg.package}${p.reset}`);
     for (const f of pkg.extraFiles) {
-      console.log(`  ${f.tsFile} — ${colorCount(f.novelCount, p)} novel, ${f.movedCount} moved`);
+      const noCounterpart = f.rubyFile === null ? ` ${p.dim}[no Rails counterpart]${p.reset}` : "";
+      console.log(
+        `  ${f.tsFile} — ${colorCount(f.novelCount, p)} novel, ${f.movedCount} moved${noCounterpart}`,
+      );
       const shown = maxDetail > 0 ? f.extras.slice(0, maxDetail) : f.extras;
       const cols = 4;
       for (let i = 0; i < shown.length; i += cols) {
