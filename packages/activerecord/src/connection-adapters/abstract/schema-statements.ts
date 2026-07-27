@@ -897,8 +897,6 @@ export class SchemaStatements {
   async addCheckConstraint(
     tableName: string,
     expression: string,
-    // Rails forwards unrecognized options (`**options`) rather than rejecting
-    // them; only :name / :validate are consumed here.
     options: {
       name?: string;
       validate?: boolean;
@@ -913,25 +911,21 @@ export class SchemaStatements {
     ) {
       return adapter.addCheckConstraint(tableName, expression, options);
     }
-    // Mirrors Rails add_check_constraint: route the options hash through
-    // check_constraint_options (which derives :name) and let :if_not_exists
-    // short-circuit against the live constraint before emitting any DDL.
+    if (
+      typeof adapter.supportsCheckConstraints === "function" &&
+      !adapter.supportsCheckConstraints()
+    )
+      return;
+
     const resolved = this.checkConstraintOptions(tableName, expression, options) as {
       name?: string;
       validate?: boolean;
-      ifNotExists?: boolean;
     };
-    if (
-      options.ifNotExists &&
-      (await this.isCheckConstraintExists(tableName, { name: resolved.name! }))
-    ) {
-      return;
-    }
-    const validate = resolved.validate !== false;
-    const chkDef = new CheckConstraintDefinition(tableName, expression, resolved.name!, validate);
-    await this.adapter.execute(
-      `ALTER TABLE ${this._qi(tableName)} ADD ${await this.schemaCreation.accept(chkDef)}`,
-    );
+    if (options.ifNotExists && (await this.isCheckConstraintExists(tableName, resolved))) return;
+
+    const at = this.createAlterTable(tableName);
+    at.addCheckConstraint(expression, resolved);
+    await this.adapter.execute(await this.schemaCreation.accept(at));
   }
 
   async removeCheckConstraint(

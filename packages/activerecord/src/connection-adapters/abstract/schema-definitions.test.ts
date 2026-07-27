@@ -262,8 +262,6 @@ describe("TableDefinition#new_check_constraint_definition", () => {
     } as any;
     const td = new TableDefinition("products", { adapter });
     const chk = td.newCheckConstraintDefinition("price > 0", { validate: false });
-    // The carried expression and options must reach the adapter, not be
-    // recomputed locally — that bypass is what let the name derivation drift.
     expect(calls).toEqual([["products", "price > 0", { validate: false }]]);
     expect(chk.name).toBe("chk_products");
     expect(chk.validate).toBe(false);

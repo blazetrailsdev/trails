@@ -168,15 +168,12 @@ describe("SchemaStatements privates (PR 8)", () => {
 
   it("checkConstraintOptions", () => {
     const ss = makeStatements();
-    // Rails: `options[:name] ||= check_constraint_name(table_name, expression:, **options)`
     expect(ss.checkConstraintOptions("users", "age > 0", {})).toEqual({
       name: ss.checkConstraintName("users", { expression: "age > 0" }),
     });
-    // An explicit :name wins, and unrelated keys survive the dup.
     expect(
       ss.checkConstraintOptions("users", "age > 0", { name: "my_chk", validate: false }),
     ).toEqual({ name: "my_chk", validate: false });
-    // The caller's hash is duplicated, not mutated.
     const options = {};
     ss.checkConstraintOptions("users", "age > 0", options);
     expect(options).toEqual({});
@@ -198,7 +195,6 @@ describe("SchemaStatements privates (PR 8)", () => {
     await ss.addCheckConstraint("users", "age > 0", { ifNotExists: true });
     expect((ss as any).adapter.execute).not.toHaveBeenCalled();
 
-    // Without the flag the DDL is still emitted.
     await ss.addCheckConstraint("users", "age > 0", {});
     expect((ss as any).adapter.execute).toHaveBeenCalled();
   });
