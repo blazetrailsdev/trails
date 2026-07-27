@@ -93,6 +93,14 @@ import { manifestIsStale } from "./build-freshness.js";
 interface RubyEntity {
   fqn: string;
   info: ClassInfo;
+  /**
+   * True when this class is declared *inside* another class in the same Ruby
+   * file (`class Outer; class Inner`). The nested constant itself is surface
+   * Rails declares, so the enclosing TS class may legitimately carry a member
+   * of that name — either a real nested class or the `static Inner = Inner`
+   * spelling trails uses for a sibling-exported port.
+   */
+  nested?: boolean;
 }
 
 /**
@@ -635,7 +643,15 @@ function collectAllowedNames(
     for (const inc of mod.includes ?? []) walkMixin(inc, fqn);
   };
 
-  for (const { fqn, info } of entities) {
+  for (const { fqn, info, nested } of entities) {
+    // A class nested in an enclosing class is a constant on that enclosing
+    // class, so the enclosing TS class carrying a member of the same name is
+    // the faithful port — whether spelled as a real nested class or as
+    // `static readonly Inner = Inner` re-attaching a sibling export.
+    if (nested) {
+      const short = fqn.split("::").pop();
+      if (short) for (const c of rubyConstantCandidates(short)) allowed.add(c);
+    }
     addMethods(info.instanceMethods);
     addMethods(info.classMethods);
     for (const inc of info.includes ?? []) walkMixin(inc, fqn);
@@ -834,26 +850,34 @@ function buildPackageReport(
     moduleFqnByShort.set(short, list);
   }
 
-  // Match compare.ts's nested-class filter: for each file, keep only the
-  // shortest-named class as the "primary" and skip nested classes that
-  // share the same file (e.g. `Preloader::Association::LoaderQuery` in
-  // `preloader/association.rb` is an implementation detail — its methods
-  // shouldn't inflate the parent file's allowed-name set).
-  const primaryClassPerFile = new Map<string, string>();
+  // A class declared inside another class in the same Ruby file (e.g.
+  // `Preloader::Association::LoaderQuery` in `preloader/association.rb`,
+  // `NullPool::NullConfig` in `abstract/connection_pool.rb`) is not a Rails
+  // counterpart *file* of its own — that's what compare.ts's nested-class
+  // filter encodes. It IS Rails-declared surface inside the enclosing class's
+  // file, so it enters that file's allow-set flagged `nested` (see
+  // `RubyEntity.nested`) rather than being dropped.
+  const classFqnsPerFile = new Map<string, Set<string>>();
   for (const [fqn, info] of Object.entries(rubyPkg.classes) as [string, ClassInfo][]) {
     if (!info.file) continue;
-    const existing = primaryClassPerFile.get(info.file);
-    if (!existing || fqn.split("::").length < existing.split("::").length) {
-      primaryClassPerFile.set(info.file, fqn);
-    }
+    const set = classFqnsPerFile.get(info.file) ?? new Set<string>();
+    set.add(fqn);
+    classFqnsPerFile.set(info.file, set);
   }
+  const enclosingClassInFile = (fqn: string, file: string): boolean => {
+    const siblings = classFqnsPerFile.get(file);
+    if (!siblings) return false;
+    const parts = fqn.split("::");
+    for (let i = parts.length - 1; i > 0; i--) {
+      if (siblings.has(parts.slice(0, i).join("::"))) return true;
+    }
+    return false;
+  };
 
   const rubyFiles = new Map<string, RubyEntity[]>();
   for (const [fqn, info] of Object.entries(rubyPkg.classes) as [string, ClassInfo][]) {
     if (!info.file) continue;
-    const primary = primaryClassPerFile.get(info.file);
-    if (primary && primary !== fqn && fqn.startsWith(primary + "::")) continue;
-    pushTo(rubyFiles, info.file, { fqn, info });
+    pushTo(rubyFiles, info.file, { fqn, info, nested: enclosingClassInFile(fqn, info.file) });
   }
   for (const [fqn, info] of Object.entries(rubyPkg.modules) as [string, ClassInfo][]) {
     if (!info.file) continue;

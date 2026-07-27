@@ -261,6 +261,61 @@ describe("buildReport — novel vs moved classification", () => {
     ]);
   });
 
+  it("a Ruby class nested in the matched file contributes its constant and methods to the allow-set", () => {
+    // Rails outer.rb: `class Outer; class Inner; def inner_only; end; end; end`.
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            "ActiveModel::Outer": rubyClass({
+              name: "Outer",
+              file: "outer.rb",
+              instance: [method("bar")],
+            }),
+            "ActiveModel::Outer::Inner": rubyClass({
+              name: "Inner",
+              file: "outer.rb",
+              instance: [method("inner_only")],
+            }),
+          },
+          modules: {},
+        },
+      },
+    };
+    // TS outer.ts: `Outer` carrying the nested constant as a static, plus the
+    // nested class's own method and one genuinely novel helper.
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            Outer: {
+              name: "Outer",
+              file: "outer.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("bar"), method("innerOnly"), method("tsOnlyHelper")],
+              classMethods: [method("Inner")],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const pkg = report.packages[0];
+    expect(pkg.extraFiles).toHaveLength(1);
+    expect(pkg.extraFiles[0].extras.map((e) => e.name)).toEqual(["tsOnlyHelper"]);
+  });
+
   it("a TS public method mirroring a Rails-PRIVATE method is not extra surface", () => {
     // Rails foo.rb has private `same_file_secret`; baz.rb has private
     // `other_file_secret`. TS foo.ts exposes both publicly plus a true novel.
@@ -560,10 +615,11 @@ describe("buildReport — novel vs moved classification", () => {
     expect(f!.extras.map((e) => e.name)).toContain("pgOnlyMethod");
   });
 
-  it("skips nested classes sharing a file with a shorter-named parent (matches compare.ts)", () => {
-    // Nested Preloader::Association::LoaderQuery in association.rb is an
-    // impl detail; its `nestedHelper` must NOT count as allowed for the
-    // matched TS file. Per compare.ts:738-755.
+  it("a nested class sharing a file with a shorter-named parent is not its own counterpart file", () => {
+    // Nested Preloader::Association::LoaderQuery in association.rb never
+    // becomes a Rails counterpart *file* of its own (per compare.ts:738-755),
+    // but it is surface association.rb declares, so its `nested_helper` joins
+    // that file's allow-set.
     const ruby: ApiManifest = {
       source: "ruby",
       generatedAt: "",
@@ -610,10 +666,9 @@ describe("buildReport — novel vs moved classification", () => {
       novelOnly: false,
       topN: 50,
     });
-    const f = report.packages[0].extraFiles.find((x) => x.tsFile === "preloader/association.ts");
-    expect(f).toBeDefined();
-    // primaryMethod allowed; nestedHelper flagged (nested class is skipped).
-    expect(f!.extras.map((e) => e.name)).toEqual(["nestedHelper"]);
+    // No file scored at all: both names are allowed, and the nested class did
+    // not spawn a second counterpart file of its own.
+    expect(report.packages[0].extraFiles).toEqual([]);
   });
 
   it("admits scanned umbrella module config (Base class methods) over novel ports", () => {

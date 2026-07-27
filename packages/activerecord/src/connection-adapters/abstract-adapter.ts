@@ -682,16 +682,7 @@ export const ABSTRACT_COLUMN_METHOD_NAMES: readonly string[] = [
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AbstractAdapter implements Quoting {
-  /**
-   * @noRailsEquivalent `AbstractAdapter::Version` is a real Rails nested class
-   *   (abstract_adapter.rb:243); `static
-   *   readonly Version = Version` is the TS spelling of that nested Ruby constant, so this is public
-   *   Rails API parity, not drift. It reads as extra surface only because extra-surface skips nested
-   *   Ruby classes when building a file's allow-set (the `primaryClassPerFile` filter) while still
-   *   counting the TS nested class. Nothing to converge. AbstractMysqlAdapter's redundant re-pin of
-   *   the same constant was deleted rather than allowlisted — JS statics are inherited, so it
-   *   shadowed nothing and had no readers.
-   */
+  /** The TS spelling of Rails' nested `AbstractAdapter::Version` (abstract_adapter.rb:243). */
   static readonly Version = Version;
 
   /**
