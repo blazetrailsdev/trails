@@ -807,13 +807,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "inherited_table_names",
-    "call": "quoted_scope",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "initialize",
     "call": "compact",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -1306,13 +1299,6 @@
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "table_partition_definition",
     "call": "query_value",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "table_partition_definition",
-    "call": "quoted_scope",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

@@ -41,7 +41,7 @@ interface PgSchemaAdapter {
   quoteIdentifier(name: string): string;
   quoteColumnName(name: string): string;
   quoteTableName(name: string): string;
-  readonly logger: unknown;
+  readonly logger: { warn?(message: string): void } | null;
   quoteLiteral(value: unknown): string;
   supportsNativePartitioning(): boolean;
   supportsIdentityColumns(): boolean;
@@ -49,7 +49,6 @@ interface PgSchemaAdapter {
   extractSchemaQualifiedName(string: string): [string | null, string];
   getDatabaseVersion(): Promise<number>;
   supportsIndexInclude(): boolean;
-  pgQuotedScope(name: string, type: "BASE TABLE" | null): { schema: string; name: string | null };
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
   quotedScope(
     name?: string | null,
@@ -85,12 +84,6 @@ interface PgSchemaAdapter {
 export class PostgreSQLSchemaStatements extends SchemaStatements {
   private get pg(): PgSchemaAdapter {
     return this.adapter as unknown as PgSchemaAdapter;
-  }
-
-  // Mirrors Rails' `@logger` reader; the sequence helpers guard on it before
-  // warning, so a nil logger stays silent.
-  private get pgLogger(): { warn?: (msg: string) => void } | null {
-    return this.pg.logger as { warn?: (msg: string) => void } | null;
   }
 
   override async dropTable(...args: Parameters<SchemaStatements["dropTable"]>): Promise<void> {
@@ -242,7 +235,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   }
 
   async indexNameExists(tableName: string, indexName: string): Promise<boolean> {
-    const table = this.pg.pgQuotedScope(tableName, "BASE TABLE");
+    const table = this.pg.quotedScope(tableName);
     const idxName = this.pg.quoteLiteral(indexName);
     const rows = await this.pg.schemaQuery(`
       SELECT COUNT(*) AS cnt
@@ -386,7 +379,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   }
 
   override async tableComment(tableName: string): Promise<string | null> {
-    const { schema, name } = this.pg.pgQuotedScope(tableName, "BASE TABLE");
+    const { schema, name } = this.pg.quotedScope(tableName);
     if (!name) return null;
     const rows = await this.pg.schemaQuery(`
       SELECT pg_catalog.obj_description(c.oid, 'pg_class') AS comment
@@ -400,7 +393,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   }
 
   async tablePartitionDefinition(tableName: string): Promise<string | null> {
-    const { schema, name } = this.pg.pgQuotedScope(tableName, "BASE TABLE");
+    const { schema, name } = this.pg.quotedScope(tableName);
     if (!name) return null;
     const rows = await this.pg.schemaQuery(`
       SELECT pg_catalog.pg_get_partkeydef(c.oid) AS def
@@ -414,7 +407,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   }
 
   async inheritedTableNames(tableName: string): Promise<string[]> {
-    const { schema, name } = this.pg.pgQuotedScope(tableName, "BASE TABLE");
+    const { schema, name } = this.pg.quotedScope(tableName);
     if (!name) return [];
     const rows = await this.pg.schemaQuery(`
       SELECT parent.relname AS name
@@ -1950,7 +1943,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         "SCHEMA",
       );
     } else {
-      this.pgLogger?.warn?.(`${tableName} has primary key ${pk} with no default sequence.`);
+      this.pg.logger?.warn?.(`${tableName} has primary key ${pk} with no default sequence.`);
     }
   }
 
@@ -1970,7 +1963,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     }
 
     if (pk && !sequence) {
-      this.pgLogger?.warn?.(`${tableName} has primary key ${pk} with no default sequence.`);
+      this.pg.logger?.warn?.(`${tableName} has primary key ${pk} with no default sequence.`);
     }
 
     if (!pk || !sequence) return;

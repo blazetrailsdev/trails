@@ -14,13 +14,10 @@ function makeAdapter(logger?: { warn: (msg: string) => void }) {
   } as unknown as DatabaseAdapter;
 }
 
-// Rails derives the generated constraint names from a SHA256 digest of an
-// identifier string (`postgresql/schema_statements.rb#exclusion_constraint_name`
-// / `#unique_constraint_name`). The expected digests are the literals asserted
-// in Rails' own migration/exclusion_constraint_test.rb and
-// migration/unique_constraint_test.rb, so any drift in the identifier shape or
-// the digest slice fails here rather than silently changing emitted DDL and
-// dumped schema.
+// Expected digests are the literals Rails asserts in
+// migration/exclusion_constraint_test.rb and migration/unique_constraint_test.rb,
+// so drift in the identifier shape or digest slice fails here rather than
+// silently changing emitted DDL and dumped schema.
 describe("PostgreSQLSchemaStatements constraint name digests", () => {
   it("derives the exclusion constraint name Rails derives", () => {
     const ss = new PostgreSQLSchemaStatements(makeAdapter());
@@ -56,8 +53,6 @@ describe("PostgreSQLSchemaStatements constraint name digests", () => {
   });
 });
 
-// Mirrors Rails' `@logger.warn "#{table} has primary key #{pk} with no default
-// sequence."` in set_pk_sequence! / reset_pk_sequence!.
 describe("PostgreSQLSchemaStatements sequence helpers warn without a sequence", () => {
   it("setPkSequenceBang warns when the table has a primary key but no sequence", async () => {
     const warn = vi.fn();

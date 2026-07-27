@@ -4999,18 +4999,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return ` DEFERRABLE INITIALLY ${deferrable.toUpperCase()}`;
   }
 
-  private pgQuotedScope(
-    name: string,
-    _type: "BASE TABLE" | null,
-  ): { schema: string; name: string | null } {
-    const pgName = Utils.extractSchemaQualifiedName(name);
-    const schema = pgName.schema
-      ? this.quoteLiteral(pgName.schema)
-      : "ANY (current_schemas(false))";
-    const quotedName = pgName.identifier ? this.quoteLiteral(pgName.identifier) : null;
-    return { schema, name: quotedName };
-  }
-
   /**
    * Parse a raw `pg_attrdef` expression into a scalar default value.
    * Mirrors: PostgreSQLAdapter#extract_value_from_default
