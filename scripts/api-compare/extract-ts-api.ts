@@ -197,11 +197,10 @@ export async function main() {
   // Read-sets record what WAS resolvable; this covers what BECOMES resolvable
   // (an unbuilt dependency gaining a `dist`) — see resolutionShapeKey.
   const shapeKey = await resolutionShapeKey(path.join(ROOT_DIR, "packages"));
-  // Most of what the compiler reads is third-party, and neither the read-set
-  // nor the shape key can see `node_modules`. The lockfile stands in for all of
-  // it: coarse (any bump invalidates every package) but ~2 ms per run against
-  // ~23 ms for keeping the ~200 third-party paths per package in the read-set,
-  // and third-party declarations only move on an install anyway.
+  // Neither of those can see `node_modules`, which is most of what the compiler
+  // reads; the lockfile stands in for all of it — coarse (any bump invalidates
+  // every package) but ~2 ms a run against ~23 ms for the precise alternative,
+  // and third-party declarations only move on an install. See dependencyKey.
   const depKey = await dependencyKey(ROOT_DIR);
 
   // Pass 1: serve every cache hit and record the metadata needed to extract the

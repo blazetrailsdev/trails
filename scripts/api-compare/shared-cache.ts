@@ -192,8 +192,9 @@ async function declarationsUnder(dir: string): Promise<string[]> {
  * worth validating: real paths (pnpm resolves `@blazetrails/<dep>` through a
  * `node_modules` symlink into `packages/<dep>/dist`, and the symlinked spelling
  * would be an unstable key), inside `rootDir`, and outside `node_modules` —
- * third-party declarations are covered instead by `dependencyKey`. `exclude` drops paths already covered by the
- * caller's own fingerprint, so the recorded set is the CROSS-package remainder.
+ * third-party declarations are covered instead by `dependencyKey`. `exclude`
+ * drops paths already covered by the caller's own fingerprint, so the recorded
+ * set is the CROSS-package remainder.
  */
 export async function normalizeReadSet(
   fileNames: string[],
