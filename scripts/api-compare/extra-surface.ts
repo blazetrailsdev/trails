@@ -65,7 +65,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
-import { OUTPUT_DIR } from "./config.js";
+import { OUTPUT_DIR, apiComparePackageRoots } from "./config.js";
 import {
   SKIP,
   SKIP_TS_MIRROR_IS_DRIFT,
@@ -76,6 +76,7 @@ import {
 } from "./conventions.js";
 import { resolveModuleName } from "./compare.js";
 import { isSourceUnported } from "./unported-files.js";
+import { manifestIsStale } from "./build-freshness.js";
 
 /**
  * Track the FQN alongside the entity so namespace-scoped include resolution
@@ -1046,6 +1047,20 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   if (!fs.existsSync(rubyPath) || !fs.existsSync(tsPath)) {
     console.error(
       `Missing ${path.basename(fs.existsSync(rubyPath) ? tsPath : rubyPath)}. Run \`pnpm api:compare\` first to generate the manifests.`,
+    );
+    process.exit(1);
+  }
+  // A manifest older than the sources describes a different commit — reporting
+  // its totals as this checkout's is exactly the stale baseline this guard
+  // exists to stop (see build-freshness.ts).
+  if (
+    process.env.API_COMPARE_ALLOW_STALE_BUILD !== "1" &&
+    (await manifestIsStale(tsPath, apiComparePackageRoots()))
+  ) {
+    console.error(
+      "output/ts-api.json predates the api-compared package sources — it describes a\n" +
+        "different checkout.\n" +
+        "Run `pnpm api:compare` to regenerate the manifests before measuring.",
     );
     process.exit(1);
   }

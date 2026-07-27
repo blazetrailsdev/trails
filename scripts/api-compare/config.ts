@@ -43,6 +43,38 @@ export const PACKAGE_SRC_SUBDIR: Record<string, string> = {
   actionpackversion: "action-pack",
 };
 
+/** A package's extraction roots, as the freshness guards need them. */
+export interface PackageRoots {
+  /** Directory name under `packages/` — several packages can share one. */
+  dir: string;
+  /** Exactly the tree the extractor compiles (`packageSrcDir`). */
+  srcDir: string;
+  /** The declarations siblings resolve this package's imports through. */
+  distDir: string;
+  /** The project `tsc --build` compiles — the freshness guard's oracle. */
+  configPath: string;
+}
+
+/**
+ * The extraction roots of every package `api:compare` actually extracts.
+ *
+ * Derived from `PACKAGES` rather than a `packages/` listing so the freshness
+ * guards see the same tree the extractor does: workspaces that are not
+ * api-compared (`activerecord-cli`, `trails-tsc`, `tse-compiler`, `website`, …)
+ * cannot affect the TS manifest and so must not be able to block a run.
+ */
+export function apiComparePackageRoots(): PackageRoots[] {
+  return PACKAGES.map((pkg) => {
+    const dir = PACKAGE_DIR_OVERRIDES[pkg] ?? pkg;
+    return {
+      dir,
+      srcDir: packageSrcDir(pkg),
+      distDir: path.join(ROOT_DIR, "packages", dir, "dist"),
+      configPath: path.join(ROOT_DIR, "packages", dir, "tsconfig.json"),
+    };
+  });
+}
+
 export function packageSrcDir(pkg: string): string {
   const dirName = PACKAGE_DIR_OVERRIDES[pkg] ?? pkg;
   const subDir = PACKAGE_SRC_SUBDIR[pkg];
