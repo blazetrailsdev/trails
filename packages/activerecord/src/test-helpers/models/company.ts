@@ -664,8 +664,12 @@ for (const klass of [NamespacedCompany, NamespacedFirm, NamespacedClient]) {
   registerModel(klass);
 }
 
-// Rails: companies.type column drives STI across the Company hierarchy
-// (Firm/Client/etc.). Setting the column scopes `Firm.all` to `WHERE type IN (...)`.
+// Rails: companies.type drives STI across the Company hierarchy (Firm/Client/etc.)
+// with no assignment in company.rb — `inheritance_column` already defaults to
+// "type" and the autoloader resolves a row's type name on demand. trails has no
+// autoloader, so the assignment doubles as the sentinel that opts this hierarchy
+// into registry-resolved dispatch (`stiEnabled` in inheritance.ts) and scopes
+// `Firm.all` to `WHERE type IN (...)`.
 Company.inheritanceColumn = "type";
 
 // Track the STI subtree so registry-safe subclass resolution (STI dispatch at
