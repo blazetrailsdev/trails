@@ -463,8 +463,17 @@ class ApiExtractor
       # (e.g. relation/query_methods.rb's VALUE_METHODS loop). Falls through to
       # the generic child-walk when it isn't a recognized codegen loop so normal
       # blocks (`included do … end`, `scope :x do … end`) keep working.
+      #
+      # `define_method`/`alias_method` metaprogramming is recorded alongside:
+      # the literal-name form here, and the loop-unrolled interpolated form via
+      # process_each_metaprogramming. Both leave the generic descent intact.
+      process_each_metaprogramming(node)
+      # When the call part is a recorded `define_method`, descend into the block
+      # only: re-walking the call would reach process_method_add_arg's
+      # define_method arm and record the same method a second time.
+      consumed_call = process_define_method_block(node)
       unless process_each_codegen(node)
-        node.each { |child| walk(child) if child.is_a?(Array) }
+        (consumed_call ? [node[2]] : node).each { |child| walk(child) if child.is_a?(Array) }
       end
     when :sclass
       process_sclass(node)
@@ -715,6 +724,14 @@ class ApiExtractor
       process_attr(args, :accessor, force_class: on_singleton)
     when "alias_method"
       process_alias_method(args)
+    when "define_method"
+      # Block-less bare-command form, `define_method :foo, &blk`. The block
+      # forms (`define_method :foo do … end`, `define_method(:foo) { … }`) do
+      # NOT arrive here: they are method_add_block nodes consumed by
+      # process_define_method_block, which needs the block to read the params
+      # off. This arm and the method_add_arg one below it exist so the two
+      # block-less shapes are handled as symmetrically as alias_method's.
+      process_define_method(args, nil)
     when "class_attribute"
       process_mattr(args, reader: true, writer: true, predicate: true, class_attr: true)
     when "cattr_accessor", "mattr_accessor"
@@ -793,6 +810,12 @@ class ApiExtractor
         process_delegate(node[2])
       when "module_function"
         process_module_function(node[2])
+      when "define_method"
+        # Block-less parenthesized form, `define_method(:foo, some_proc)` —
+        # the counterpart of process_command's bare-command arm. The far
+        # commoner `define_method(:foo) { … }` is a method_add_block instead,
+        # and the descent guard in walk keeps it from reaching here twice.
+        process_define_method(node[2], nil)
       end
     else
       walk(node[1]) if node[1].is_a?(Array)
@@ -1039,6 +1062,25 @@ class ApiExtractor
     entry[:alias_target] = old_name if old_name
     target[bucket] << entry
     maybe_update_module_file(fqn, target)
+  end
+
+  # Drop a `define_method` entry when a literal `def` of the same name already
+  # occupies the same bucket. Ruby source can define a method both ways in
+  # mutually exclusive branches the extractor walks unconditionally — rack's
+  # `utils.rb:183` picks `define_method(:escape_html, ERB…)` or `def
+  # escape_html` off an `if defined?(ERB::Escape)` — and only one of the two is
+  # ever live. The literal `def` wins: it carries the deps, calls and body
+  # digest a metaprogrammed entry has no way to supply.
+  public def dedupe_define_methods!
+    (@classes.to_a + @modules.to_a).each do |_fqn, info|
+      [:instanceMethods, :classMethods].each do |bucket|
+        next unless info[bucket].any? { |m| m[:notes] == "define_method" }
+        literal = info[bucket].each_with_object(Set.new) do |m, acc|
+          acc << m[:name] unless m[:notes]
+        end
+        info[bucket].reject! { |m| m[:notes] == "define_method" && literal.include?(m[:name]) }
+      end
+    end
   end
 
   # Aliases are recorded with empty params (the `alias`/`alias_method` form
@@ -1411,6 +1453,219 @@ class ApiExtractor
       }
     end
     maybe_update_module_file(fqn, target)
+  end
+
+  # `define_method "<name>" do … end` / `define_method(:name) { … }` with a name
+  # that is a plain literal. The block's parameters become the method's params,
+  # so a metaprogrammed method carries the same arity information a literal
+  # `def` would. A name that isn't a bare literal (an interpolation, a local
+  # variable, a constant) is skipped, never guessed — the loop-unrolled
+  # interpolation case is handled by process_each_metaprogramming instead.
+  def process_define_method_block(node)
+    name, args = meta_call_parts(node[1])
+    return false unless name == "define_method"
+    process_define_method(args, block_params_node(node[2]))
+  end
+
+  def process_define_method(args, params_node)
+    # Umbrella scans harvest only module-level singleton config (see
+    # process_def); anything else recorded there surfaces as false-missing.
+    return false if @scanning_umbrella
+
+    list = positional_arg_list(args)
+    return false unless list.is_a?(Array)
+    name = literal_method_name(list[0])
+    return false unless name
+
+    fqn = current_fqn
+    target = @classes[fqn] || @modules[fqn]
+    return false unless target
+
+    record_metaprogrammed_method(fqn, target, name, extract_params(params_node), "define_method")
+    maybe_update_module_file(fqn, target)
+    true
+  end
+
+  # Unrolls a literal-array `.each` loop that metaprograms methods whose names
+  # interpolate the loop variable (abstract_controller/callbacks.rb:230):
+  #
+  #   [:before, :after, :around].each do |callback|
+  #     define_method "#{callback}_action" do |*names, &blk| … end
+  #     alias_method :"append_#{callback}_action", :"#{callback}_action"
+  #   end
+  #
+  # Emits one entry per generated name (twelve, above). Only names that
+  # actually interpolate the loop variable are unrolled: a loop-invariant
+  # literal name would otherwise be recorded once per member, and it is already
+  # picked up by the plain define_method/alias_method recorders during the
+  # generic descent. Returns true when it emitted anything.
+  def process_each_metaprogramming(node)
+    return false if @scanning_umbrella
+
+    call = node[1]
+    return false unless call.is_a?(Array) && call[0] == :call
+    return false unless ident_name(call[3]) == "each"
+    members = literal_array_members(call[1])
+    return false unless members && !members.empty?
+
+    block = node[2]
+    return false unless block.is_a?(Array) &&
+                        [:do_block, :brace_block].include?(block[0])
+    loop_var = block_param_name(block)
+    return false unless loop_var
+
+    fqn = current_fqn
+    target = @classes[fqn] || @modules[fqn]
+    return false unless target
+
+    emitted = false
+    each_metaprogramming_call(block[2]) do |kind, args, params_node|
+      list = positional_arg_list(args)
+      next unless list.is_a?(Array)
+      members.each do |member|
+        name = unrolled_name(list[0], loop_var, member)
+        next unless name
+        if kind == "define_method"
+          record_metaprogrammed_method(fqn, target, name, extract_params(params_node), "define_method")
+        else
+          old = list[1] && unrolled_name(list[1], loop_var, member)
+          record_metaprogrammed_method(fqn, target, name, [], "alias", alias_target: old)
+        end
+        emitted = true
+      end
+    end
+    maybe_update_module_file(fqn, target) if emitted
+    emitted
+  end
+
+  def record_metaprogrammed_method(fqn, target, name, params, notes, alias_target: nil)
+    entry = {
+      name: name,
+      visibility: current_visibility.to_s,
+      params: params,
+      file: @current_file,
+      line: @current_line,
+      notes: notes,
+    }
+    # Same as process_alias_method: the alias inherits the target's arity, so
+    # record the target for resolve_aliases! to copy params from.
+    entry[:alias_target] = alias_target if alias_target
+    # Same bucketing rule as process_def: `class << self` and `module_function`
+    # both make the generated method a class method.
+    on_class = @in_sclass || (@module_function_stack.last && @modules[fqn])
+    target[on_class ? :classMethods : :instanceMethods] << entry
+  end
+
+  # Members of a literal `[:a, :b]` / `%w[a b]` receiver, as strings. Any
+  # non-literal element (a constant, a splat, an interpolation) disqualifies the
+  # whole array — an unrollable loop must be fully known.
+  def literal_array_members(node)
+    return nil unless node.is_a?(Array) && node[0] == :array
+    elems = node[1]
+    return nil unless elems.is_a?(Array)
+    members = []
+    elems.each do |el|
+      name = literal_method_name(el)
+      return nil unless name
+      members << name
+    end
+    members
+  end
+
+  # A bare literal name: `:foo`, `"foo"`, or a `%w[]`/`%i[]` element. Returns
+  # nil for anything interpolated or computed.
+  def literal_method_name(node)
+    return nil unless node.is_a?(Array)
+    case node[0]
+    when :symbol_literal
+      symbol_name(node)
+    when :@tstring_content
+      node[1]
+    when :string_literal, :dyna_symbol
+      content = node[1]
+      return nil unless content.is_a?(Array) && content[0] == :string_content
+      parts = content[1..]
+      return nil unless parts.length == 1
+      part = parts[0]
+      part.is_a?(Array) && part[0] == :@tstring_content ? part[1] : nil
+    end
+  end
+
+  # Resolve a name node for one unrolled loop member. Every part must be either
+  # literal text or an interpolation of exactly `loop_var`, and at least one
+  # such interpolation must be present; anything else returns nil.
+  def unrolled_name(node, loop_var, member)
+    return nil unless node.is_a?(Array)
+    return nil unless [:string_literal, :dyna_symbol].include?(node[0])
+    content = node[1]
+    return nil unless content.is_a?(Array) && content[0] == :string_content
+    out = +""
+    saw_var = false
+    content[1..].each do |part|
+      return nil unless part.is_a?(Array)
+      case part[0]
+      when :@tstring_content
+        out << part[1]
+      when :string_embexpr
+        return nil unless embexpr_var(part) == loop_var
+        saw_var = true
+        out << member
+      else
+        return nil
+      end
+    end
+    saw_var && !out.empty? ? out : nil
+  end
+
+  # Yield each `define_method`/`alias_method` call in a loop body as
+  # [command_name, args_node, block_params_node]. Does not descend into literal
+  # `def`s (those are the extractor's normal business, not codegen).
+  def each_metaprogramming_call(node, &blk)
+    return unless node.is_a?(Array)
+    return if [:def, :defs].include?(node[0])
+    if node[0] == :method_add_block
+      name, args = meta_call_parts(node[1])
+      if name
+        yield name, args, block_params_node(node[2])
+        return
+      end
+    else
+      name, args = meta_call_parts(node)
+      if name
+        yield name, args, nil
+        return
+      end
+    end
+    node.each { |child| each_metaprogramming_call(child, &blk) if child.is_a?(Array) }
+  end
+
+  # [command_name, args_node] when `node` is a `define_method`/`alias_method`
+  # call in either the command (`define_method :x`) or paren
+  # (`define_method(:x)`) form; [nil, nil] otherwise.
+  def meta_call_parts(node)
+    return [nil, nil] unless node.is_a?(Array)
+    case node[0]
+    when :command
+      name = ident_name(node[1])
+      %w[define_method alias_method].include?(name) ? [name, node[2]] : [nil, nil]
+    when :method_add_arg
+      fcall = node[1]
+      return [nil, nil] unless fcall.is_a?(Array) && fcall[0] == :fcall
+      name = ident_name(fcall[1])
+      %w[define_method alias_method].include?(name) ? [name, node[2]] : [nil, nil]
+    else
+      [nil, nil]
+    end
+  end
+
+  # The `[:params, …]` node of a `do`/`{}` block, or nil when it takes none.
+  def block_params_node(block)
+    return nil unless block.is_a?(Array) &&
+                      [:do_block, :brace_block].include?(block[0])
+    block_var = block[1]
+    return nil unless block_var.is_a?(Array) && block_var[0] == :block_var
+    params = block_var[1]
+    params.is_a?(Array) && params[0] == :params ? params : nil
   end
 
   # Models the enumerable `class_eval`/`define_method` codegen loop
@@ -2159,6 +2414,9 @@ def run
     # already exists. See ApiExtractor#scan_umbrella_file.
     umbrella_file = "#{pkg_dir.sub(%r{/\z}, '')}.rb"
     extractor.scan_umbrella_file(umbrella_file, pkg_dir) if File.file?(umbrella_file)
+
+    # Drop define_method entries a literal `def` in the same bucket supersedes.
+    extractor.dedupe_define_methods!
 
     # Fill alias param lists from their targets now that every file in the
     # package has been seen (a reopened class may define the target elsewhere).
