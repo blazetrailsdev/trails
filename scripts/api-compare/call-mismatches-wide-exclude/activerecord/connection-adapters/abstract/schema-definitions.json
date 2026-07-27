@@ -51,13 +51,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
-    "rubyName": "add_check_constraint",
-    "call": "new_check_constraint_definition",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "add_to",
     "call": "columns",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -81,13 +74,6 @@
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "change_null",
     "call": "change_column_null",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-definitions.ts",
-    "rubyName": "check_constraint",
-    "call": "new_check_constraint_definition",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -152,13 +138,6 @@
     "rubyName": "integer_like_primary_key?",
     "call": "include?",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails schema_definitions.rb:605-607 uses `[:integer, :bigint].include?(type)` and `!options.key?(:default)`; trails schema-definitions.ts:1031-1037 inlines the type equality checks and tests `options.default === undefined`. The presence check is preserved under the nil↔null mapping: an explicit `default: null` is !== undefined, so it disables the rewrite exactly as Rails' key?-present nil does; the only unmatched shape is an explicit `default: undefined`, which has no Ruby analogue and conventionally means absent in JS."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-definitions.ts",
-    "rubyName": "new_check_constraint_definition",
-    "call": "check_constraint_options",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",

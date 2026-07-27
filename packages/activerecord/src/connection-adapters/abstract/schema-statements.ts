@@ -897,8 +897,6 @@ export class SchemaStatements {
   async addCheckConstraint(
     tableName: string,
     expression: string,
-    // Rails forwards unrecognized options (`**options`) rather than rejecting
-    // them; only :name / :validate are consumed here.
     options: {
       name?: string;
       validate?: boolean;
@@ -913,12 +911,21 @@ export class SchemaStatements {
     ) {
       return adapter.addCheckConstraint(tableName, expression, options);
     }
-    const name = this.checkConstraintName(tableName, { name: options.name, expression });
-    const validate = options.validate !== false;
-    const chkDef = new CheckConstraintDefinition(tableName, expression, name, validate);
-    await this.adapter.execute(
-      `ALTER TABLE ${this._qi(tableName)} ADD ${await this.schemaCreation.accept(chkDef)}`,
-    );
+    if (
+      typeof adapter.supportsCheckConstraints === "function" &&
+      !adapter.supportsCheckConstraints()
+    )
+      return;
+
+    const resolved = this.checkConstraintOptions(tableName, expression, options) as {
+      name?: string;
+      validate?: boolean;
+    };
+    if (options.ifNotExists && (await this.isCheckConstraintExists(tableName, resolved))) return;
+
+    const at = this.createAlterTable(tableName);
+    at.addCheckConstraint(expression, resolved);
+    await this.adapter.execute(await this.schemaCreation.accept(at));
   }
 
   async removeCheckConstraint(
@@ -1765,11 +1772,16 @@ export class SchemaStatements {
   }
 
   checkConstraintOptions(
-    _tableName: string,
-    _expression: string,
+    tableName: string,
+    expression: string,
     options: Record<string, unknown> = {},
   ): Record<string, unknown> {
-    return { ...options };
+    const dup = { ...options };
+    dup.name ??= this.checkConstraintName(tableName, { ...dup, expression } as {
+      name?: string;
+      expression?: string;
+    });
+    return dup;
   }
 
   async isCheckConstraintExists(

@@ -166,6 +166,39 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(() => ss.checkConstraintName("users", {})).toThrow(/expression/);
   });
 
+  it("checkConstraintOptions", () => {
+    const ss = makeStatements();
+    expect(ss.checkConstraintOptions("users", "age > 0", {})).toEqual({
+      name: ss.checkConstraintName("users", { expression: "age > 0" }),
+    });
+    expect(
+      ss.checkConstraintOptions("users", "age > 0", { name: "my_chk", validate: false }),
+    ).toEqual({ name: "my_chk", validate: false });
+    const options = {};
+    ss.checkConstraintOptions("users", "age > 0", options);
+    expect(options).toEqual({});
+  });
+
+  it("addCheckConstraint routes its options through checkConstraintOptions", async () => {
+    const ss = makeStatements();
+    const spy = vi.spyOn(ss, "checkConstraintOptions");
+    await ss.addCheckConstraint("users", "age > 0", { name: "my_chk" });
+    expect(spy).toHaveBeenCalledWith("users", "age > 0", { name: "my_chk" });
+  });
+
+  it("addCheckConstraint skips the DDL when ifNotExists and the constraint exists", async () => {
+    const ss = makeStatements();
+    const name = ss.checkConstraintName("users", { expression: "age > 0" });
+    vi.spyOn(ss, "checkConstraints").mockResolvedValue([
+      { tableName: "users", expression: "age > 0", name, validate: true } as any,
+    ]);
+    await ss.addCheckConstraint("users", "age > 0", { ifNotExists: true });
+    expect((ss as any).adapter.execute).not.toHaveBeenCalled();
+
+    await ss.addCheckConstraint("users", "age > 0", {});
+    expect((ss as any).adapter.execute).toHaveBeenCalled();
+  });
+
   // PR 8b helpers
   it("validateIndexLengthBang throws when name too long", () => {
     const ss = makeStatements();

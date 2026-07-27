@@ -83,6 +83,32 @@ export interface ForeignKeyOptionsAdapter {
 }
 
 /**
+ * The `@conn` surface `new_check_constraint_definition` reaches for.
+ *
+ * @internal
+ */
+export interface CheckConstraintOptionsAdapter {
+  /** @internal */
+  checkConstraintOptions(
+    tableName: string,
+    expression: string,
+    options: Record<string, unknown>,
+  ): Record<string, unknown>;
+}
+
+/**
+ * Mirrors Rails' check_constraint_name default. Used only as the fallback for a
+ * bare quoter that carries no `checkConstraintOptions`.
+ *
+ * @internal
+ */
+function defaultCheckConstraintName(tableName: string, expression: string): string {
+  const identifier = `${tableName}_${expression}_chk`;
+  const hex = getCrypto().createHash("sha256").update(identifier).digest("hex").slice(0, 10);
+  return `chk_rails_${hex}`;
+}
+
+/**
  * Mirrors: ActiveRecord::ConnectionAdapters::ColumnDefinition
  */
 export class ColumnDefinition {
@@ -816,8 +842,16 @@ export class AlterTable {
     this.foreignKeyDrops.push(name);
   }
 
-  addCheckConstraint(constraint: CheckConstraintDefinition): void {
-    this.checkConstraintAdds.push(constraint);
+  addCheckConstraint(
+    expression: string,
+    options: { name?: string; validate?: boolean } = {},
+  ): void {
+    if (!this._td) {
+      throw new Error(
+        "AlterTable#addCheckConstraint requires a backing TableDefinition (construct via createAlterTable)",
+      );
+    }
+    this.checkConstraintAdds.push(this._td.newCheckConstraintDefinition(expression, options));
   }
 
   dropCheckConstraint(name: string): void {
@@ -1082,24 +1116,8 @@ export class TableDefinition {
   }
 
   checkConstraint(expression: string, options: { name?: string; validate?: boolean } = {}): this {
-    this.checkConstraints.push(
-      new CheckConstraintDefinition(
-        this.tableName,
-        expression,
-        options.name ?? this._checkConstraintName(expression),
-        options.validate ?? true,
-      ),
-    );
+    this.checkConstraints.push(this.newCheckConstraintDefinition(expression, options));
     return this;
-  }
-
-  // Mirrors Rails' check_constraint_name: sha256 of `<table>_<expression>_chk`,
-  // first 10 hex, prefixed `chk_rails_`. The schema dumper's chkIgnorePattern
-  // (`^chk_rails_[0-9a-f]{10}$`) omits names matching this default, matching Rails.
-  private _checkConstraintName(expression: string): string {
-    const identifier = `${this.tableName}_${expression}_chk`;
-    const hex = getCrypto().createHash("sha256").update(identifier).digest("hex").slice(0, 10);
-    return `chk_rails_${hex}`;
   }
 
   foreignKey(toTable: string, options: Partial<AddForeignKeyOptions> = {}): this {
@@ -1188,11 +1206,14 @@ export class TableDefinition {
     expression: string,
     options: { name?: string; validate?: boolean } = {},
   ): CheckConstraintDefinition {
+    const conn = this._adapter as Partial<CheckConstraintOptionsAdapter>;
+    const resolved = (conn.checkConstraintOptions?.(this.tableName, expression, options) ??
+      options) as { name?: string; validate?: boolean };
     return new CheckConstraintDefinition(
       this.tableName,
       expression,
-      options.name ?? this._checkConstraintName(expression),
-      options.validate ?? true,
+      resolved.name ?? defaultCheckConstraintName(this.tableName, expression),
+      resolved.validate ?? true,
     );
   }
 
