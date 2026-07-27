@@ -481,6 +481,10 @@ export function extractFromProgram(
           for (const e of extracted.extends) {
             if (!existing.extends.includes(e)) existing.extends.push(e);
           }
+          // A declaration-merged interface only needs the tag on ONE of its
+          // declarations; without this the reason is lost whenever the tagged
+          // half is not the first one walked.
+          existing.noRailsEquivalent ??= extracted.noRailsEquivalent;
         } else {
           info.modules[modKey] = extracted;
         }
@@ -1381,6 +1385,10 @@ export function hasInternalJsDocTag(node: ts.Node): boolean {
  * the tag is absent. Unlike `@internal` (which removes the method from the
  * compared surface), this tag keeps the method counted and justifies it as
  * deliberate trails-only surface — extra-surface.ts reports it as allowlisted.
+ * Read on members, statements and properties, and on class / interface /
+ * namespace declarations (where it lands on `ClassInfo.noRailsEquivalent`) —
+ * the latter is the only inline form available to an extra whose declaration
+ * is the extra name itself.
  * Continuation lines belong to the tag and are joined into one line; the prose
  * is otherwise preserved verbatim. An empty reason is a hard error: the tag is
  * the only thing standing between a name and the extra-surface count, so an
@@ -1842,6 +1850,8 @@ export function extractClass(
     method.calls = [...merged].sort();
   }
 
+  const noRailsEquivalent = noRailsEquivalentReason(node);
+
   return {
     name,
     superclass,
@@ -1850,6 +1860,7 @@ export function extractClass(
     extends: extendsArr,
     instanceMethods,
     classMethods,
+    ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
   };
 }
 
@@ -1921,6 +1932,8 @@ function extractInterface(
     }
   }
 
+  const noRailsEquivalent = noRailsEquivalentReason(node);
+
   return {
     name,
     file,
@@ -1928,6 +1941,7 @@ function extractInterface(
     extends: extendsArr,
     instanceMethods,
     classMethods: [],
+    ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
   };
 }
 
@@ -1991,6 +2005,8 @@ function extractNamespace(
     }
   }
 
+  const noRailsEquivalent = noRailsEquivalentReason(node);
+
   return {
     name,
     file,
@@ -1998,6 +2014,7 @@ function extractNamespace(
     extends: [],
     instanceMethods,
     classMethods: [],
+    ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
   };
 }
 

@@ -39,7 +39,9 @@
  *      `@noRailsEquivalent <reason>` JSDoc tag counts as `Allowed` rather
  *      than extra. Since RFC 0080 the tag is the ONLY such source — the
  *      former extra-surface-allow.json sidecar is gone — and a tag on a name
- *      that no longer flags is STALE and fails the run.
+ *      that no longer flags is STALE and fails the run. The tag is read on
+ *      members AND on class / interface / namespace declarations, so an extra
+ *      that is a declaration rather than a member still has an inline form.
  *
  * Manifests are produced by `pnpm api:compare`; if they're missing the
  * script bails with a hint (same convention as `api:moves`).
@@ -291,28 +293,47 @@ export function allowKeyOf(e: { package: string; tsFile: string; name: string })
  * Keys are deduped: one declaration reaches many hosts (the mixin object, the
  * install site, the auto-synthesized file module), so the same key arrives
  * repeatedly and would otherwise inflate the tag total.
+ *
+ * The key space is shared across declaration kinds by necessity, not accident:
+ * it must equal the key the extra set uses, and `collectTsFileNames` collapses
+ * a file's public surface to a Set of bare NAMES. A static and an instance
+ * method called `helper`, or a class and a member both called `Foo`, are one
+ * extra with one allowed/novel verdict, so at most one reason can ever be
+ * reported for them — namespacing a kind's key would simply stop it matching.
+ * The tie-break is first-push-wins, and members are pushed before the
+ * container so the more specific reason is the one kept.
  */
 export function collectTaggedEntries(ts: ApiManifest): TaggedEntry[] {
   const out: TaggedEntry[] = [];
   const seen = new Set<string>();
-  const push = (pkg: string, tsFile: string, m: MethodInfo): void => {
-    if (m.noRailsEquivalent === undefined) return;
-    const entry = { package: pkg, tsFile, name: m.name, reason: m.noRailsEquivalent };
+  const push = (pkg: string, tsFile: string, name: string, reason: string | undefined): void => {
+    if (reason === undefined) return;
+    const entry = { package: pkg, tsFile, name, reason };
     const key = allowKeyOf(entry);
     if (seen.has(key)) return;
     seen.add(key);
     out.push(entry);
   };
+  const pushMethod = (pkg: string, tsFile: string, m: MethodInfo): void =>
+    push(pkg, tsFile, m.name, m.noRailsEquivalent);
   for (const [pkg, tsPkg] of Object.entries(ts.packages)) {
     for (const container of [tsPkg.classes, tsPkg.modules]) {
       for (const c of Object.values(container) as ClassInfo[]) {
         if (!c.file || c.reExportedFrom) continue;
-        for (const m of c.instanceMethods) push(pkg, c.file, m);
-        for (const m of c.classMethods) push(pkg, c.file, m);
+        for (const m of c.instanceMethods) pushMethod(pkg, c.file, m);
+        for (const m of c.classMethods) pushMethod(pkg, c.file, m);
+        // The container's OWN name, tagged on the class/interface/namespace
+        // declaration itself — the only inline form available to an extra that
+        // is a declaration rather than a member (e.g. a class TS must export as
+        // a sibling because it cannot nest, re-attached as a static property).
+        // LAST on purpose: a member sharing the container's name occupies the
+        // same key (see the dedup note above — one key is all the extra set
+        // has), so the more specific member reason wins the tie.
+        push(pkg, c.file, c.name, c.noRailsEquivalent);
       }
     }
     for (const [file, fns] of Object.entries(tsPkg.fileFunctions ?? {})) {
-      for (const fn of fns) push(pkg, file, fn);
+      for (const fn of fns) pushMethod(pkg, file, fn);
     }
   }
   return out;

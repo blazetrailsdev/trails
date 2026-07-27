@@ -55,7 +55,11 @@ export const SCHEMA_VERSION_BASE = 9;
  * input when it can change WITHOUT any per-method field changing; every one
  * added so far has shipped alongside the per-method field its consumer reads
  * (`synthesizedMixin` pairs with `declaredIn`), so registering the method-side
- * key already evicts entries predating the pair. Extending the token to
+ * key already evicts entries predating the pair. The one exception is
+ * `ClassInfo.noRailsEquivalent` (a tag on the class/interface/namespace
+ * DECLARATION), which can appear with no per-method field changing; it is
+ * covered by input (2) alone — the extractor edit that introduced it changed
+ * the source hashes, evicting every entry predating it. Extending the token to
  * entity-level fields is tracked separately — see the
  * `extractor-schema-entity-level-fields` story.
  */
