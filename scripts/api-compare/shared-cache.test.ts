@@ -20,6 +20,7 @@ import {
   normalizeReadSet,
   hashReadSet,
   readSetMatches,
+  resolutionShapeKey,
   CACHE_VERSION,
 } from "./shared-cache.js";
 
@@ -273,5 +274,45 @@ describe("resolved read-set", () => {
     fs.writeFileSync(path.join(root, "here.ts"), "y");
     expect(await readSetMatches(recorded, root, cache)).toBe(true);
     expect(await readSetMatches(recorded, root)).toBe(false);
+  });
+});
+
+describe("resolutionShapeKey", () => {
+  function writeDist(packagesDir: string, dir: string, files: Record<string, string>): void {
+    for (const [name, body] of Object.entries(files)) {
+      const file = path.join(packagesDir, dir, "dist", name);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, body);
+    }
+  }
+
+  it("tracks which declarations exist, not what they say", async () => {
+    const packagesDir = mkTmp();
+    writeDist(packagesDir, "activesupport", { "index.d.ts": "export declare const a: number;" });
+    const built = await resolutionShapeKey(packagesDir);
+
+    // A rebuild that only changes contents leaves the shape alone — those
+    // changes are the read-set's job, and re-keying on them would invalidate
+    // every package again.
+    writeDist(packagesDir, "activesupport", { "index.d.ts": "export declare const a: string;" });
+    expect(await resolutionShapeKey(packagesDir)).toBe(built);
+
+    // A dependency that was unbuilt at extraction time resolves to nothing, so
+    // no read-set can see it become resolvable — the shape must.
+    const unbuilt = mkTmp();
+    fs.mkdirSync(path.join(unbuilt, "activesupport"), { recursive: true });
+    expect(await resolutionShapeKey(unbuilt)).not.toBe(built);
+
+    writeDist(packagesDir, "activesupport", { "extra.d.ts": "export declare const b: number;" });
+    expect(await resolutionShapeKey(packagesDir)).not.toBe(built);
+  });
+
+  it("ignores non-declaration output and a missing packages dir", async () => {
+    const packagesDir = mkTmp();
+    writeDist(packagesDir, "arel", { "index.d.ts": "" });
+    const before = await resolutionShapeKey(packagesDir);
+    writeDist(packagesDir, "arel", { "index.js": "", "nested/index.js.map": "" });
+    expect(await resolutionShapeKey(packagesDir)).toBe(before);
+    expect(await resolutionShapeKey(path.join(packagesDir, "nope"))).toMatch(/^[0-9a-f]{40}$/);
   });
 });

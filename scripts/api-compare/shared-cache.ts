@@ -117,6 +117,53 @@ export async function fileHash(file: string): Promise<string | null> {
 export type ReadSet = Record<string, string>;
 
 /**
+ * Hash of the SHAPE of what the workspace can resolve: the sorted names (not
+ * contents) of every built `packages/<dir>/dist/**\/*.d.ts`.
+ *
+ * A read-set records what the compiler DID read, so it cannot notice a file
+ * that was not resolvable at extraction time and is now. An unbuilt dependency
+ * is exactly that case: with no `dist`, the import resolves to nothing and the
+ * entry records nothing for it; a later `tsc --build` would silently change the
+ * extraction while every recorded hash still matched. Folding this key into the
+ * cache keys closes that hole without giving up the read-set's precision —
+ * building or rebuilding does not change the file NAMES, so the common case
+ * (contents changed) still invalidates only the packages that read them.
+ */
+export async function resolutionShapeKey(packagesDir: string): Promise<string> {
+  let dirs: string[];
+  try {
+    dirs = await fs.readdir(packagesDir);
+  } catch {
+    return hashParts([]);
+  }
+  const perPackage = await Promise.all(
+    dirs.map(async (dir) => {
+      const dist = path.join(packagesDir, dir, "dist");
+      const files = await declarationsUnder(dist);
+      return files.map((file) => `${dir}/${path.relative(dist, file).replace(/\\/g, "/")}`);
+    }),
+  );
+  return hashParts(perPackage.flat().sort());
+}
+
+async function declarationsUnder(dir: string): Promise<string[]> {
+  let entries;
+  try {
+    entries = await fs.readdir(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const nested = await Promise.all(
+    entries.map(async (entry) => {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) return declarationsUnder(full);
+      return entry.name.endsWith(".d.ts") ? [full] : [];
+    }),
+  );
+  return nested.flat();
+}
+
+/**
  * Reduce raw `program.getSourceFiles()` file names to the repo-relative paths
  * worth validating: real paths (pnpm resolves `@blazetrails/<dep>` through a
  * `node_modules` symlink into `packages/<dep>/dist`, and the symlinked spelling

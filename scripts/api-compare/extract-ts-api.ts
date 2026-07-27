@@ -29,6 +29,8 @@ import {
   normalizeReadSet,
   hashReadSet,
   readSetMatches,
+  resolutionShapeKey,
+  hashParts,
   type ReadSet,
 } from "./shared-cache.js";
 import { extractorSchemaToken } from "./extractor-schema.js";
@@ -191,6 +193,9 @@ export async function main() {
   // packages resolve many of the same declarations, and validating every
   // package's read-set must not read the same file 13 times.
   const inputHashes = new Map<string, Promise<string | null>>();
+  // Read-sets record what WAS resolvable; this covers what BECOMES resolvable
+  // (an unbuilt dependency gaining a `dist`) — see resolutionShapeKey.
+  const shapeKey = await resolutionShapeKey(path.join(ROOT_DIR, "packages"));
 
   // Pass 1: serve every cache hit and record the metadata needed to extract the
   // misses below. `ownRel` is the package's own fingerprint inputs (already
@@ -216,7 +221,7 @@ export async function main() {
     // Anchor relative paths at the package root so tsconfig.json
     // doesn't show up as `../tsconfig.json` (which it would if we
     // anchored at the src dir).
-    const fingerprint = packageFingerprint(fingerprintInputs, pkgRoot);
+    const fingerprint = hashParts([packageFingerprint(fingerprintInputs, pkgRoot), shapeKey]);
     const ownRel = new Set(
       fingerprintInputs.map((file) => path.relative(ROOT_DIR, file).replace(/\\/g, "/")),
     );
@@ -246,7 +251,8 @@ export async function main() {
     // mtime-keyed cache so the next same-worktree run takes the fast path.
     let sharedKey: string | null = null;
     if (sharedDir) {
-      const contentKey = `${SCHEMA_VERSION}-${await contentFingerprint(fingerprintInputs, pkgRoot)}`;
+      const ownContent = await contentFingerprint(fingerprintInputs, pkgRoot);
+      const contentKey = `${SCHEMA_VERSION}-${hashParts([ownContent, shapeKey])}`;
       const body = await readShared(sharedDir, `ts-${pkg}`, contentKey);
       if (body) {
         try {
