@@ -7,7 +7,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { staleBuilds, staleBuildMessage } from "./build-freshness.js";
+import { staleBuilds, staleBuildMessage, manifestIsStale } from "./build-freshness.js";
 
 const tmpDirs: string[] = [];
 function mkTmp(): string {
@@ -178,6 +178,45 @@ describe("staleBuilds", () => {
     expect(await staleBuilds(packagesDir, root)).toHaveLength(1);
     rebuild(pkg, 6000);
     expect(await staleBuilds(packagesDir, root)).toEqual([]);
+  });
+});
+
+describe("manifestIsStale", () => {
+  function writeManifest(root: string, seconds: number): string {
+    const manifest = path.join(root, "ts-api.json");
+    fs.writeFileSync(manifest, "{}\n");
+    setMtime(manifest, seconds);
+    return manifest;
+  }
+
+  it("is false for a manifest written after the last checkout", async () => {
+    const root = mkTmp();
+    const packagesDir = path.join(root, "packages");
+    buildPackage(packagesDir, "activesupport");
+    expect(await manifestIsStale(writeManifest(root, 5000), packagesDir)).toBe(false);
+  });
+
+  it("is true when a checkout landed after the manifest was written", async () => {
+    const root = mkTmp();
+    const packagesDir = path.join(root, "packages");
+    const pkg = buildPackage(packagesDir, "activesupport");
+    const manifest = writeManifest(root, 5000);
+    checkoutRewrite(pkg, "index.ts", 6000);
+    expect(await manifestIsStale(manifest, packagesDir)).toBe(true);
+  });
+
+  it("is false when the manifest does not exist", async () => {
+    const root = mkTmp();
+    const packagesDir = path.join(root, "packages");
+    buildPackage(packagesDir, "activesupport");
+    expect(await manifestIsStale(path.join(root, "missing.json"), packagesDir)).toBe(false);
+  });
+
+  it("is false when there are no packages to compare against", async () => {
+    const root = mkTmp();
+    expect(await manifestIsStale(writeManifest(root, 5000), path.join(root, "packages"))).toBe(
+      false,
+    );
   });
 });
 

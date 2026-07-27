@@ -43,6 +43,12 @@ never touched can move. That is a phantom delta, and it cuts both ways: it can
 force an agent to argue that a delta it just measured is not real, or it can
 mask a real regression.
 
+This is measurable at a single commit. With no package built, `api:extra`
+reports `trailties 147` and `actionview 90`; after `pnpm build`, the same commit
+reports `trailties 149` and `actionview 92` — the extra two in each are the
+surface that only resolves once the sibling's declarations exist. Those are the
+exact totals that were originally mistaken for a `origin/main`-vs-branch delta.
+
 None of this is a cache bug. The shared cache is content-keyed and each entry
 records the resolved read-set of the extraction that produced it, so the caches
 correctly serve exactly what a fresh extraction would produce — a fresh
@@ -74,5 +80,10 @@ commit. A worktree that has never run `pnpm build` therefore measures
 consistently, which is why the guard is silent in a fresh
 `scripts/start-worktree.sh` checkout.
 
-`API_COMPARE_ALLOW_STALE_BUILD=1` skips the guard. Use it only when you are not
-producing a baseline.
+A second guard covers the downstream half: `pnpm api:extra` reads the manifests
+`pnpm api:compare` left behind rather than re-extracting, so running it alone
+after a checkout would report the previous commit's totals. It now fails if
+`output/ts-api.json` predates `packages/*/src`.
+
+`API_COMPARE_ALLOW_STALE_BUILD=1` skips both guards. Use it only when you are
+not producing a baseline.

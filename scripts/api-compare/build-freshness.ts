@@ -112,6 +112,35 @@ export async function staleBuilds(packagesDir: string, rootDir: string): Promise
     .sort((a, b) => (a.dir < b.dir ? -1 : a.dir > b.dir ? 1 : 0));
 }
 
+/**
+ * Whether `manifestPath` predates the sources it claims to describe.
+ *
+ * `api:extra` reads the manifests `api:compare` left behind rather than
+ * re-extracting, so running it alone after a checkout reports the PREVIOUS
+ * commit's totals with nothing to signal it — the same stale baseline the build
+ * guard exists to stop, one step further downstream. Missing manifests are not
+ * stale; the caller already has a better error for that.
+ */
+export async function manifestIsStale(manifestPath: string, packagesDir: string): Promise<boolean> {
+  let manifestMtime: number;
+  try {
+    manifestMtime = (await fs.stat(manifestPath)).mtimeMs;
+  } catch {
+    return false;
+  }
+  let dirs: string[];
+  try {
+    dirs = await fs.readdir(packagesDir);
+  } catch {
+    return false;
+  }
+  const newest = await Promise.all(
+    dirs.map((dir) => newestMtime(path.join(packagesDir, dir, "src"), isSource, true)),
+  );
+  const newestSource = newest.reduce(later, null);
+  return newestSource !== null && newestSource.mtimeMs > manifestMtime;
+}
+
 /** The operator-facing failure text for a non-empty `staleBuilds` result. */
 export function staleBuildMessage(stale: StaleBuild[]): string {
   return [
