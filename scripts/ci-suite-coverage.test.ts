@@ -30,6 +30,14 @@ const KNOWN_UNRUN: Record<string, string> = {
   "vendor/fetch.test.ts": "run-vendor-fetch-tests-in-ci",
 };
 
+// Non-test inputs whose change must re-run a suite CI names. vendor/
+// sources.test.ts asserts exact sets over SOURCES, so it rots the moment one
+// of these declares or renames a source; matching the test file alone is not
+// enough, because the file that drifts is the one it asserts over.
+const GATE_INPUTS: Record<string, string[]> = {
+  UNIT_TESTS_PKGS_RE: ["vendor/sources.ts", "vendor/sources.lock.json", "vendor/fetch.ts"],
+};
+
 const SKIP_DIRS = new Set(["node_modules", "dist", ".git"]);
 
 async function collectTestFiles(dir: string, acc: string[]): Promise<string[]> {
@@ -99,6 +107,13 @@ function unitTestsJob(yml: string): string {
   return lines.slice(start, end === -1 ? undefined : end).join("\n");
 }
 
+/** The changed-path regex a gate name resolves to in the `changes` job. */
+function gateRegex(yml: string, name: string): RegExp {
+  const source = yml.match(new RegExp(`${name}='([^']+)'`))?.[1];
+  if (source === undefined) throw new Error(`no ${name} in ci.yml`);
+  return new RegExp(source);
+}
+
 describe("CI runs every tooling test suite", () => {
   it("covers each scripts/eslint/vendor test file with a ci.yml vitest filter", async () => {
     const yml = await readFile(CI_YML, "utf8");
@@ -126,9 +141,7 @@ describe("CI runs every tooling test suite", () => {
   // exactly when it is the thing that changed.
   it("matches every unit-tests filter against the gate that runs the job", async () => {
     const yml = await readFile(CI_YML, "utf8");
-    const gateSource = yml.match(/UNIT_TESTS_PKGS_RE='([^']+)'/)?.[1];
-    expect(gateSource).toBeDefined();
-    const gate = new RegExp(gateSource as string);
+    const gate = gateRegex(yml, "UNIT_TESTS_PKGS_RE");
 
     const filters = ciVitestFilters(unitTestsJob(yml));
     expect(filters.length).toBeGreaterThan(5);
@@ -138,6 +151,16 @@ describe("CI runs every tooling test suite", () => {
       (f) => !gate.test(f.endsWith(".ts") ? f : `${f.replace(/\/?$/, "/")}probe.test.ts`),
     );
     expect(ungated).toEqual([]);
+  });
+
+  it("matches each gate against the non-test inputs its suites assert over", async () => {
+    const yml = await readFile(CI_YML, "utf8");
+    const unmatched: string[] = [];
+    for (const [name, inputs] of Object.entries(GATE_INPUTS)) {
+      const gate = gateRegex(yml, name);
+      unmatched.push(...inputs.filter((input) => !gate.test(input)));
+    }
+    expect(unmatched).toEqual([]);
   });
 
   it("keeps KNOWN_UNRUN free of entries CI already runs", async () => {
