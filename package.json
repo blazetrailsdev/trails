@@ -37,6 +37,7 @@
     "schema:compare": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/schema-compare/compare.ts",
     "schema:compare:reseed": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/schema-compare/compare.ts --write",
     "rails-privates:manifest": "pnpm tsx scripts/build-rails-privates-manifest.ts",
+    "rails-deprecated:check": "pnpm tsx scripts/build-rails-privates-manifest.ts --check-deprecated",
     "rails-errors:manifest": "pnpm tsx scripts/build-rails-error-manifest.ts",
     "rails-tosql:manifest": "pnpm tsx scripts/build-rails-tosql-manifest.ts",
     "api:moves": "pnpm tsx scripts/api-compare/moves.ts",

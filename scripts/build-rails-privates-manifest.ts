@@ -58,6 +58,17 @@ const PACKAGE_DIRS: Record<string, string> = {
 const RAILS_API_PATH = path.join(ROOT, "scripts/api-compare/output/rails-api.json");
 const OUT = path.join(ROOT, "eslint/rails-private-methods.json");
 
+const DEPRECATED_OUT = path.join(ROOT, "eslint/rails-deprecated-methods.json");
+
+// `--check-deprecated` (CI): recompute the deprecation-parity manifest from the
+// vendored Ruby and fail if the committed file has drifted — in particular if
+// it has LOST entries. Runs before anything else because it must not depend on
+// rails-api.json, and it never writes.
+if (process.argv.slice(2).includes("--check-deprecated")) {
+  checkDeprecatedManifest();
+  process.exit(0);
+}
+
 // Resolved before any manifest is written: without `--allow-missing` this
 // throws, and we would rather abort than half-write the batch below.
 const hasRailsApi = railsApiAvailable({
@@ -349,13 +360,18 @@ function walkRubyFiles(dir: string, out: string[]): void {
   }
 }
 
-function emitDeprecatedManifest(): void {
-  const DEPRECATED_OUT = path.join(ROOT, "eslint/rails-deprecated-methods.json");
+// Returns null when the vendored Ruby is incomplete: every package this
+// manifest covers must be scannable, because a missing lib dir silently drops
+// EVERY entry sourced from it. A truncated manifest is indistinguishable from
+// "Rails deprecates nothing here" and would quietly retire the
+// `rails-deprecated-jsdoc` coverage for those methods, so callers write
+// nothing rather than replace the committed file with a partial one.
+function buildDeprecatedManifest(): { files: Record<string, string[]> } | null {
   const libPaths = libPathsManifest();
   const files: Record<string, string[]> = {};
   for (const [pkg, pkgDir] of Object.entries(PACKAGE_DIRS)) {
     const libDir = libPaths[pkg];
-    if (!libDir || !fs.existsSync(libDir)) continue;
+    if (!libDir || !fs.existsSync(libDir)) return null;
     const rubyFiles: string[] = [];
     walkRubyFiles(libDir, rubyFiles);
     for (const rubyAbs of rubyFiles) {
@@ -371,10 +387,49 @@ function emitDeprecatedManifest(): void {
 
   const sorted: Record<string, string[]> = {};
   for (const k of Object.keys(files).sort()) sorted[k] = files[k];
-  writeJsonManifest(DEPRECATED_OUT, { files: sorted });
-  const fc = Object.keys(sorted).length;
-  const nc = Object.values(sorted).reduce((n, a) => n + a.length, 0);
+  return { files: sorted };
+}
+
+function emitDeprecatedManifest(): void {
+  const manifest = buildDeprecatedManifest();
+  if (!manifest) {
+    console.log(`Skipped ${DEPRECATED_OUT} — vendored Ruby incomplete (\`pnpm vendor:fetch\`)`);
+    return;
+  }
+  writeJsonManifest(DEPRECATED_OUT, manifest);
+  const fc = Object.keys(manifest.files).length;
+  const nc = Object.values(manifest.files).reduce((n, a) => n + a.length, 0);
   console.log(`Wrote ${DEPRECATED_OUT} — ${fc} files (${nc} names)`);
+}
+
+// Compares the committed manifest against a full recompute. Byte comparison is
+// deliberately avoided (prettier formatting is gated separately by
+// `prettier --check .`); this compares the data, and reports lost entries
+// explicitly since that is the failure mode a partial regeneration produces.
+function checkDeprecatedManifest(): void {
+  const expected = buildDeprecatedManifest();
+  if (!expected) {
+    console.error(
+      `Cannot verify ${DEPRECATED_OUT}: vendored Ruby is incomplete. Run \`pnpm vendor:fetch\`.`,
+    );
+    process.exit(1);
+  }
+  const actual = fs.existsSync(DEPRECATED_OUT)
+    ? JSON.parse(fs.readFileSync(DEPRECATED_OUT, "utf8"))
+    : { files: {} };
+  const lost: string[] = [];
+  for (const [file, names] of Object.entries(expected.files)) {
+    const have = new Set<string>(actual.files?.[file] ?? []);
+    for (const n of names) if (!have.has(n)) lost.push(`${file}: ${n}`);
+  }
+  if (JSON.stringify(actual) === JSON.stringify(expected)) {
+    console.log(`${path.relative(ROOT, DEPRECATED_OUT)} is up to date.`);
+    return;
+  }
+  console.error(`${path.relative(ROOT, DEPRECATED_OUT)} is out of date.`);
+  if (lost.length > 0) console.error(`Missing entries:\n  ${lost.join("\n  ")}`);
+  console.error("Regenerate with `pnpm rails-privates:manifest` and commit the result.");
+  process.exit(1);
 }
 
 // --- Callback-invocation parity pass ---

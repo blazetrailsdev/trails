@@ -1363,6 +1363,12 @@ jobs:
         # in conventions.ts; fail if it drifts so the agent-facing doc can't
         # go stale. Regenerate with `pnpm api:conventions`.
         run: pnpm exec tsx scripts/api-compare/conventions-doc.ts --check
+      - name: Deprecation manifest up to date
+        # eslint/rails-deprecated-methods.json is generated from the vendored
+        # Ruby; fail if it drifts — a partial regeneration silently DROPS
+        # entries and with them the rails-deprecated-jsdoc coverage for those
+        # methods. Regenerate with `pnpm rails-privates:manifest`.
+        run: pnpm exec tsx scripts/build-rails-privates-manifest.ts --check-deprecated
       - name: Schema comparison
         # Structural parity of TEST_SCHEMA against the vendored
         # test/schema/schema.rb it mirrors (RFC 0025). Fails on a table or
