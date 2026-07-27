@@ -49,7 +49,6 @@ SKIP_PATTERNS = [
   /\/test_case\.rb$/,
   /\/abstract_unit\.rb$/,
   /\/config\.rb$/,
-  /\/migration\//,  # Migration test infrastructure (not test cases themselves)
 ]
 
 # Is `name` an assertion call? Matched by PREFIX (not a fixed list), the twin of

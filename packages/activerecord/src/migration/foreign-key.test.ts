@@ -8,20 +8,21 @@
  * setup/teardown is shared with schema-statements-on-adapter.test.ts via
  * `withRocketTables`.
  */
-import { describe, it, expect } from "vitest";
+import { it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { StatementInvalid } from "../errors.js";
 import type { ReferentialAction } from "../connection-adapters/abstract/schema-definitions.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { ambientConnection, withRocketTables } from "../support/rocket-tables.js";
 import { adapterType } from "../test-adapter.js";
+import { describeIfSupports } from "../support/supports.js";
 
 // Rails' `unless current_adapter?(:SQLite3Adapter)` guard on the `fk.name`
 // assertions: PRAGMA foreign_key_list exposes no constraint name, so SQLite
 // has no name to compare.
 const unlessSqlite3Adapter = adapterType !== "sqlite";
 
-describe("ActiveRecord::Migration::ForeignKeyTest", () => {
+describeIfSupports("foreign_keys", "ActiveRecord::Migration::ForeignKeyTest", () => {
   // DDL can't run inside the transactional-fixtures wrapper (PG aborts the
   // outer transaction on a failed statement), matching the schema-statements
   // suite's setup.
