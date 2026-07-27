@@ -11,7 +11,9 @@
  * `assoc.build()`, which nested attributes calls directly, the nested-attributes
  * writer uses `detachDisplacedRecord` — starting the removal inline at
  * assignment and awaiting it in its `save` wrapper before the replacement is
- * inserted.
+ * inserted. A *direct* `record.association(name).build(...)` has no such
+ * wrapper, so `HasOneAssociation#build` runs the removal itself and returns the
+ * record wrapped in that promise for the caller to `await`.
  *
  * Rails' own `test_should_replace_an_existing_record_if_there_is_no_id`
  * (nested_attributes_test.rb:288) asserts only in-memory state and never saves
@@ -50,5 +52,36 @@ describe("has_one displacement via the synchronous build path", () => {
 
     const reloaded = (await Ship.find((displaced as unknown as { id: number }).id)) as Base;
     expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(null);
+  });
+
+  it("nullifies the displaced row when association(name).build replaces a loaded child", async () => {
+    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
+    const displaced = (await Ship.create({
+      name: "Nights Dirty Lightning",
+      pirate_id: (pirate as unknown as { id: number }).id,
+    })) as Base;
+
+    await (pirate as unknown as { ship: Promise<Base | null> }).ship;
+
+    const assoc = (
+      pirate as unknown as { association(n: string): { build(a: object): unknown } }
+    ).association("ship");
+    const built = (await assoc.build({ name: "Davy Jones Gold Dagger" })) as Base;
+
+    expect((built as unknown as { name: string }).name).toBe("Davy Jones Gold Dagger");
+    const reloaded = (await Ship.find((displaced as unknown as { id: number }).id)) as Base;
+    expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(null);
+  });
+
+  it("returns the built record synchronously when nothing is displaced", async () => {
+    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
+    const assoc = (
+      pirate as unknown as { association(n: string): { build(a: object): unknown } }
+    ).association("ship");
+
+    const built = assoc.build({ name: "Black Pearl" });
+
+    expect(built).not.toBeInstanceOf(Promise);
+    expect((built as { name: string }).name).toBe("Black Pearl");
   });
 });

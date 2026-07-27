@@ -263,6 +263,50 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   /**
+   * Set by the callers that own the displaced record's removal themselves — the
+   * `build#{name}` accessor (builder/has-one.ts, which awaits
+   * `detachDisplacedTarget`) and the nested-attributes writer
+   * (nested-attributes.ts, which starts `detachDisplacedRecord` at assignment
+   * and drains it in its `save` wrapper). Both call `build` on their way through,
+   * and without this flag `build` would start a *second*, concurrent removal of
+   * the same row.
+   *
+   * @internal
+   */
+  buildSkipsDisplacementRemoval = false;
+
+  /**
+   * `build_#{name}` and `association(:name).build` are the same Rails method,
+   * and both run `set_new_record` → `replace(record, false)` → `remove_target!`
+   * (has_one_association.rb:87-93, 59-69): the displaced row's foreign key is
+   * nullified (or the row destroyed/deleted per `:dependent`) inline. Our
+   * `setNewRecord` is synchronous and does only the in-memory half, so a direct
+   * `record.association("ship").build({...})` over a loaded, persisted target
+   * used to leave that row attached in the DB. Returning the removal here makes
+   * `build` hand the caller a promise to `await` — the only way a synchronous
+   * return can expose an inline write in JS.
+   *
+   * `detachDisplacedTarget` supplies the remaining guards (a different,
+   * non-destroyed record) and Rails' target-on-failure semantics.
+   *
+   * @internal
+   */
+  protected override detachDisplacedOnBuild(
+    displaced: Base | null,
+    record: Base | null,
+  ): Promise<void> | null {
+    if (this.buildSkipsDisplacementRemoval) return null;
+    if (!displaced || sameRecord(displaced, record)) return null;
+    // A displaced record that was never persisted keys no row: `remove_target!`'s
+    // in-memory half already ran in `setNewRecord`, and its `target.save` is
+    // gated on `target.persisted?` (has_one_association.rb:108). Returning null
+    // keeps repeated `build`s (the common `assoc.build()` twice shape)
+    // synchronous.
+    if ((displaced as { isPersisted?: () => boolean }).isPersisted?.() !== true) return null;
+    return this.detachDisplacedTarget(displaced, record);
+  }
+
+  /**
    * Whether a `build#{name}` accessor call must first run Rails'
    * `load_target` — mirrors `HasOneAssociation#set_new_record` →
    * `replace(record, false)`, whose leading `load_target`

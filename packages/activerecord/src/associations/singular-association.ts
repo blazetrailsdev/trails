@@ -59,7 +59,20 @@ export class SingularAssociation extends Association {
     this.replace(record);
   }
 
-  build(attributes?: Record<string, unknown>, block?: (record: Base) => void): Base | null {
+  // has_one widens the return to a Promise when the freshly built record
+  // displaces a loaded, persisted target: Rails' `set_new_record` →
+  // `replace(record, false)` removes that row inline (`remove_target!`), and a
+  // synchronous JS return has no other way to expose the write for `await`.
+  // belongs_to keeps the plain synchronous return — its `set_new_record` only
+  // writes the owner's foreign key in memory.
+  build(
+    attributes?: Record<string, unknown>,
+    block?: (record: Base) => void,
+  ): Base | null | Promise<Base | null> {
+    // Rails' `set_new_record` → `replace(record, false)` opens with
+    // `load_target`, so only an ALREADY-loaded target can be displaced here (the
+    // `build#{name}` accessor, which can await, runs the load itself).
+    const displaced = this.loaded ? this.target : null;
     const record = this.buildRecord(attributes);
     if (record) {
       // Rails yields the freshly built record before it's set as the new
@@ -68,7 +81,25 @@ export class SingularAssociation extends Association {
       if (block) block(record);
       this.setNewRecord(record);
     }
-    return record;
+    const removal = this.detachDisplacedOnBuild(displaced, record);
+    return removal ? removal.then(() => record) : record;
+  }
+
+  /**
+   * The DB half of the `remove_target!` Rails' has_one `set_new_record` runs
+   * inline — null when there is nothing to remove, which is always the case for
+   * belongs_to (`BelongsToAssociation#replace` only writes the owner's foreign
+   * key in memory). Overridden by has_one, where the returned promise both
+   * performs the removal and is what widens `build`'s return so a direct
+   * `record.association(name).build(...)` caller can `await` the write.
+   *
+   * @internal
+   */
+  protected detachDisplacedOnBuild(
+    _displaced: Base | null,
+    _record: Base | null,
+  ): Promise<void> | null {
+    return null;
   }
 
   async forceReloadReader(): Promise<Base | null> {

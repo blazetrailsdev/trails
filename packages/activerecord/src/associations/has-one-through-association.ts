@@ -154,6 +154,20 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   }
 
   /**
+   * A through `build` displaces nothing: Rails'
+   * `HasOneThroughAssociation#replace` has no `load_target`/`remove_target!`
+   * (has_one_through_association.rb:15-42) — the join row, not the end record,
+   * carries the association, and displacement is `createThroughRecord` /
+   * `persistReplace`'s job. Same reason as `detachDisplacedTarget` above; this
+   * also keeps `build`'s return synchronous for the through builders.
+   *
+   * @internal
+   */
+  protected override detachDisplacedOnBuild(): Promise<void> | null {
+    return null;
+  }
+
+  /**
    * No-op for the same reason as `detachDisplacedTarget` above: the
    * nested-attributes displacement path must not nullify/destroy a displaced
    * *end* record of a through association.
