@@ -2,7 +2,7 @@ import { RuleTester } from "eslint";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import rule from "./rails-file-structure-method-order.mjs";
+import rule, { isManifestAvailable } from "./rails-file-structure-method-order.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -532,3 +532,28 @@ try {
   // restore is scheduled even if registration above throws.
   afterAll(restoreManifest);
 }
+
+// isManifestAvailable() — what eslint.config.mjs gates registration on. A
+// manifest with no order data must read as unavailable however it got that
+// way (absent file, or the `--allow-missing` builder's empty `files` map), so
+// the rule is never registered against data that would pass every file. Each case
+// passes an explicit path, so none of this touches the shared manifest the
+// RuleTester cases above depend on.
+describe("isManifestAvailable", () => {
+  const tmp = path.join(__dirname, ".tmp-availability.json");
+  afterAll(() => fs.rmSync(tmp, { force: true }));
+
+  it("is false when the manifest file is absent", () => {
+    expect(isManifestAvailable(path.join(__dirname, ".tmp-absent.json"))).toBe(false);
+  });
+
+  it("is false for the --allow-missing builder's empty manifest", () => {
+    fs.writeFileSync(tmp, JSON.stringify({ files: {} }));
+    expect(isManifestAvailable(tmp)).toBe(false);
+  });
+
+  it("is true for a manifest carrying order data", () => {
+    fs.writeFileSync(tmp, JSON.stringify(fixture));
+    expect(isManifestAvailable(tmp)).toBe(true);
+  });
+});

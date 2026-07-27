@@ -47,14 +47,32 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MANIFEST_PATH = path.resolve(__dirname, "rails-file-structure-method-order.json");
 
+/**
+ * True when the manifest on disk carries real order data.
+ *
+ * The manifest is generated from `scripts/api-compare/output/rails-api.json`,
+ * which only exists after `pnpm api:compare` (Ruby + vendored Rails). Runs
+ * without it pass `--allow-missing` to the builder (see
+ * scripts/api-compare/require-rails-api.ts) and get an empty manifest, under
+ * which this rule would pass every file. `eslint.config.mjs` uses this to
+ * leave the rule unregistered for those runs rather than registering it
+ * inert — see docs/infrastructure/rails-file-structure-mirror-plan.md.
+ */
+export function isManifestAvailable(manifestPath = MANIFEST_PATH) {
+  // The real manifest is megabytes; go through the cache for the default path
+  // so config-time gating and rule-time lookups parse it once.
+  const manifest = manifestPath === MANIFEST_PATH ? loadManifest() : readManifest(manifestPath);
+  return Object.keys(manifest.files ?? {}).length > 0;
+}
+
+function readManifest(manifestPath) {
+  if (!fs.existsSync(manifestPath)) return { files: {} };
+  return JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+}
+
 let manifestCache = null;
 function loadManifest() {
-  if (manifestCache) return manifestCache;
-  if (!fs.existsSync(MANIFEST_PATH)) {
-    manifestCache = { files: {} };
-    return manifestCache;
-  }
-  manifestCache = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"));
+  if (!manifestCache) manifestCache = readManifest(MANIFEST_PATH);
   return manifestCache;
 }
 
