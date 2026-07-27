@@ -106,6 +106,7 @@ import {
   type RemoveForeignKeyOptions,
   type ForeignKeyLookupOptions,
 } from "./abstract/schema-definitions.js";
+import { Base } from "../base.js";
 import { Column } from "./column.js";
 import { Column as Sqlite3Column } from "./sqlite3/column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
@@ -2287,13 +2288,19 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     delete matchOptions.toTable;
     delete matchOptions.validate;
 
-    const { Base } = await import("../base.js");
     const inferred = String(matchOptions.column ?? "").replace(/_id$/, "");
     const table = this.schemaStatements().stripTableNamePrefixAndSuffix(
       toTable ?? (Base.pluralizeTableNames ? pluralize(inferred) : inferred),
     );
 
     const existingFks = await this.foreignKeys(fromTable);
+    // Rails' SQLite override hand-rolls `options.slice(*fk.options.keys)` +
+    // `fk.options[k].to_s == v.to_s` (sqlite3/schema_statements.rb:79-80) rather
+    // than calling defined_for?. isDefinedFor is that same slice-and-compare,
+    // differing only for array-valued options, where Ruby's Array#to_s compares
+    // the `["a", "b"]` inspect form. Reproducing that would mean porting Ruby
+    // inspect formatting, and it is unreachable here: SQLite add_foreign_key is
+    // single-column.
     const fkToRemove = existingFks.find(
       (fk) =>
         this.schemaStatements().stripTableNamePrefixAndSuffix(fk.toTable) === table &&
