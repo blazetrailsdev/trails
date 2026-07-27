@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Base } from "./index.js";
+import { DatabaseConfigurations } from "./database-configurations.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 
 describe("frozen / isFrozen", () => {
@@ -119,5 +120,61 @@ describe("connection checkout for directly-assigned adapters", () => {
   it("insertAll resolves through the assigned adapter without a pool", async () => {
     await DirectTopic.insertAll([{ title: "Bob" }]);
     expect(await DirectTopic.count()).toBe(1);
+  });
+});
+
+// Rails stores the registry in the class variable `@@configurations`
+// (core.rb:71-79), so there is one registry per process. JS statics would
+// instead shadow per class, which has no Rails counterpart test — hence
+// this trails-side guard.
+describe("configurations is a single process-global registry", () => {
+  let priorConfigs: DatabaseConfigurations;
+
+  beforeEach(() => {
+    priorConfigs = Base.configurations();
+  });
+
+  afterEach(() => {
+    Base.configurations(priorConfigs);
+  });
+
+  it("an assignment on a subclass replaces the registry for Base and its siblings", () => {
+    class LeftModel extends Base {}
+    class RightModel extends Base {}
+
+    LeftModel.configurations({
+      global_registry_env: { primary: { adapter: "sqlite3", database: "db/global.sqlite3" } },
+    });
+
+    for (const klass of [Base, LeftModel, RightModel]) {
+      const config = klass.configurations().configsFor({ envName: "global_registry_env" })[0];
+      expect(config.database).toBe("db/global.sqlite3");
+    }
+  });
+
+  // Rails names the `Base` constant literally in
+  // `resolve_config_for_connection` (connection_handling.rb:385-391), so a
+  // model-local `configurations` is never consulted. JS would otherwise
+  // dispatch the read through the receiver.
+  it("resolveConfigForConnection ignores a model-local configurations override", async () => {
+    const { resolveConfigForConnection } = await import("./connection-handling.js");
+
+    Base.configurations({
+      global_registry_env: { primary: { adapter: "sqlite3", database: "db/global.sqlite3" } },
+    });
+
+    class OverridingModel extends Base {
+      static configurations(): DatabaseConfigurations {
+        return DatabaseConfigurations.fromEnv({
+          global_registry_env: { primary: { adapter: "sqlite3", database: "db/hijacked.sqlite3" } },
+        });
+      }
+    }
+
+    const resolved = resolveConfigForConnection.call(
+      OverridingModel as unknown as typeof Base,
+      "global_registry_env",
+    );
+    expect(resolved.database).toBe("db/global.sqlite3");
   });
 });
