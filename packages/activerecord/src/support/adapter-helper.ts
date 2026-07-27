@@ -23,7 +23,6 @@
 
 import { adapterType, ambientPoolConfiguration } from "../test-adapter.js";
 import { Base } from "../base.js";
-import { getEnv } from "@blazetrails/activesupport";
 
 export type AdapterClassName =
   | "SQLite3Adapter"
@@ -43,7 +42,11 @@ export function currentAdapter(...types: AdapterClassName[]): boolean {
 }
 
 export function inMemoryDb(): boolean {
-  return currentAdapter("SQLite3Adapter") && !getEnv("AR_TEST_WORKER_DB");
+  if (!currentAdapter("SQLite3Adapter")) return false;
+  const database = Base.isConnectedQ()
+    ? Base.connectionPool().dbConfig.database
+    : ambientPoolConfiguration().database;
+  return database === ":memory:";
 }
 
 export function sqlite3AdapterStrictStringsDisabled(): boolean {
