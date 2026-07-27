@@ -29,15 +29,30 @@ import { threadedConnectionFor, connectionPool } from "./connection-handling.js"
 /**
  * Adapter for a schema-reflection read: prefer the connection threaded by the
  * enclosing internal `with_connection` wrap ({@link threadedConnectionFor}) —
- * matching Rails, which threads the block's `connection` through schema
- * reflection — and only fall back to the deprecated `Model.connection` getter
- * when no wrap is active (or the wrap belongs to a different pool). Reading the
- * threaded connection keeps these reads off the getter so they never flip the
- * lease permanent. `threadedConnectionFor` never throws (returns `null`), so the
- * `.connection` fallback still throws where callers rely on a `try`/`catch`.
+ * matching Rails, whose `load_schema!` and friends take the connection as the
+ * `with_connection` block parameter (`model_schema.rb`) rather than
+ * re-resolving `.connection`.
+ *
+ * Without a wrap this resolves the pool directly instead of going through the
+ * deprecated `Model.connection` getter, because that getter *leases* — inside a
+ * plain `withConnection` body (lease sticky still `null`) it would flip the
+ * lease permanent purely to read a column hash, which Rails' reflection never
+ * does. The already-leased `activeConnection` is the common case; only a
+ * genuinely cold pool falls through to `leaseConnectionSync`, which is what the
+ * getter would have done anyway (trails' Rails-named `leaseConnection` is async
+ * and these reflection callers are synchronous).
+ *
+ * `connectionPool` still throws `ConnectionNotEstablished` for a model with no
+ * pool, so the throw-free contract the `try`/`catch` call sites rely on
+ * (`columnsHash`, `loadSchemaFromAdapter`, `cachedColumnNames`,
+ * `loadSchemaFromCacheSync`, `cachedTableExists`) is unchanged.
  */
 function reflectionAdapter(klass: any): any {
-  return threadedConnectionFor(klass) ?? klass.connection;
+  const threaded = threadedConnectionFor(klass);
+  if (threaded) return threaded;
+  if (klass._adapter) return klass._adapter;
+  const pool = connectionPool.call(klass);
+  return pool.activeConnection ?? pool.leaseConnectionSync();
 }
 
 /**
