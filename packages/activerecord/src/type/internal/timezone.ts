@@ -22,6 +22,14 @@ export function getDefaultTimezone(): "utc" | "local" {
   return defaultTimezone;
 }
 
+/**
+ * This is the port of `ActiveRecord.default_timezone=` (active_record.rb:218) —
+ * not of anything in `type/internal/timezone.rb`, which carries readers only.
+ * It lives here because the module-level state it writes is read by `isUtc` /
+ * `Timezone#defaultTimezone` below. Converging it onto `ar-config.ts` (where
+ * the rest of the `active_record.rb` module attributes live) is tracked by RFC
+ * 0081's `relocate-ar-default-timezone-to-ar-config` story.
+ */
 export function setDefaultTimezone(tz: "utc" | "local"): void {
   if (tz !== "utc" && tz !== "local")
     throw new ArgumentError(

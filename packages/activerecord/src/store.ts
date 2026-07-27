@@ -30,7 +30,17 @@ interface CoderLike {
  */
 const _storeCoders = new WeakMap<typeof Base, Map<string, IndifferentCoder>>();
 
-/** @internal */
+/**
+ * Trails-only seam with no Rails counterpart. Rails gets implicit store
+ * serialization inside `ActiveRecord::Store::ClassMethods#store`
+ * (store.rb:106-109), which builds the coder and hands it straight to
+ * `serialize store_attribute, coder: IndifferentCoder.new(...)` (store.rb:108),
+ * installing it as the attribute's type; trails resolves the coder separately
+ * at read time, so the mapping needs its own per-class registry. Not a writer
+ * for any Ruby attribute.
+ *
+ * @internal
+ */
 export function setStoreCoder(klass: typeof Base, attr: string, coder: IndifferentCoder): void {
   let map = _storeCoders.get(klass);
   if (!map) {

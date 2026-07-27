@@ -55,6 +55,13 @@ let _baseResolver: (() => any) | null = null;
 /**
  * Set the resolver for ActiveRecord::Base, avoiding circular imports.
  * Called from index.ts during module initialization.
+ *
+ * Trails-only seam with no Rails counterpart: Rails' LogSubscriber references
+ * the `ActiveRecord::Base` constant directly (log_subscriber.rb), which Ruby
+ * resolves at call time; a static TS import would close the cycle
+ * `log-subscriber → base → index → log-subscriber`.
+ *
+ * @internal
  */
 export function setBaseResolver(resolver: () => any): void {
   _baseResolver = resolver;

@@ -107,6 +107,16 @@ export function setRegistry(r: AdapterSpecificRegistry): void {
   _defaultValue = undefined;
 }
 
+/**
+ * Trails-only seam with no Rails counterpart. Rails' `Type.lookup` reads the
+ * current adapter straight off `ActiveRecord::Base.connection_db_config.adapter`
+ * (type.rb:41), but a static import of `base.ts` from here would close the cycle
+ * `type.ts → base.ts → attributes → type.ts` and leave `Base` undefined at eval
+ * time. `base.ts` injects the resolver at module end instead (base.ts:5244), and
+ * `lookup` reads it lazily inside the call.
+ *
+ * @internal
+ */
 export function setCurrentAdapterResolver(resolver: () => AdapterNameSource): void {
   _currentAdapterResolver = resolver;
 }

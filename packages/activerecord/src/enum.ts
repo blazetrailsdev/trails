@@ -1226,6 +1226,14 @@ export function assertValidEnumOptions(options: unknown): void {
 /** Default warn sink — overridable via setEnumWarn so hosts can route warnings. */
 let _enumWarn: (msg: string) => void = (msg) => console.warn(msg);
 
+/**
+ * Trails-only seam with no Rails counterpart. Rails writes the `not_`-prefix
+ * conflict warning through `logger.warn` (enum.rb:404), where the logger is
+ * already a swappable global; trails has no equivalent ambient logger at this
+ * layer, so the sink is injected instead. Not a writer for any Ruby attribute.
+ *
+ * @internal
+ */
 export function setEnumWarn(fn: (msg: string) => void): void {
   _enumWarn = fn;
 }
