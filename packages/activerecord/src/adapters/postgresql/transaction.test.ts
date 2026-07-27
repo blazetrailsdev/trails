@@ -129,23 +129,35 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await adapter.beginDbTransaction();
         await adapter.execute("SELECT * FROM samples WHERE id = 1 FOR UPDATE");
-        // `other` blocks on `adapter`'s row; a third connection cancels it via
-        // pg_stat_activity (mirrors Rails). Handler attached at creation (vitest).
+        const otherRows = await other.execute("SELECT pg_backend_pid() AS pid");
+        const otherPid = (otherRows[0] as { pid: number }).pid;
         let blockedError: unknown;
         const blocked = other
           .execute("SELECT * FROM samples WHERE id = 1 FOR UPDATE")
           .catch((e) => {
             blockedError = e;
           });
-        await new Promise<void>((r) => setTimeout(r, 200));
         const canceler = new PostgreSQLAdapter(PG_TEST_URL);
         try {
-          // Assert the cancel matched, else a no-op leaves `blocked` to timeout.
-          const sent = await canceler.execute(
-            "SELECT pg_cancel_backend(pid) AS ok FROM pg_stat_activity " +
-              "WHERE state = 'active' AND query LIKE '% FOR UPDATE'",
-          );
-          expect(sent.length).toBe(1);
+          // Under vitest's 5s default testTimeout, so a stuck poll fails the
+          // `waiting` assertion instead of dying as an opaque test timeout.
+          const deadline = Date.now() + 3000;
+          let waiting = false;
+          while (Date.now() < deadline) {
+            const rows = await canceler.execute(
+              "SELECT 1 AS n FROM pg_stat_activity " +
+                "WHERE pid = ? AND state = 'active' AND wait_event_type = 'Lock'",
+              [otherPid],
+            );
+            if (rows.length === 1) {
+              waiting = true;
+              break;
+            }
+            await new Promise<void>((r) => setTimeout(r, 50));
+          }
+          expect(waiting).toBe(true);
+          const sent = await canceler.execute("SELECT pg_cancel_backend(?) AS ok", [otherPid]);
+          expect((sent[0] as { ok: boolean }).ok).toBe(true);
           await blocked;
           expect(blockedError).toBeInstanceOf(QueryCanceled);
         } finally {
