@@ -28,7 +28,6 @@ const KNOWN_UNRUN: Record<string, string> = {
   // vendor/fetch.test.ts fails outside a freshly fetched vendor/ tree.
   // Story: run-vendor-fetch-tests-in-ci.
   "vendor/fetch.test.ts": "run-vendor-fetch-tests-in-ci",
-  "vendor/sources.test.ts": "run-vendor-fetch-tests-in-ci",
 };
 
 const SKIP_DIRS = new Set(["node_modules", "dist", ".git"]);
