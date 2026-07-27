@@ -12,7 +12,7 @@ import { throwAbort } from "@blazetrails/activesupport";
 // vendor/rails/activerecord/test/models/company.rb
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { registerModel } from "../../associations.js";
-import { enableSti, registerSubclass } from "../../inheritance.js";
+import { registerSubclass } from "../../inheritance.js";
 import { Rollback } from "../../errors.js";
 import { Base } from "../../base.js";
 import type { CollectionProxy } from "../../associations/collection-proxy.js";
@@ -665,8 +665,8 @@ for (const klass of [NamespacedCompany, NamespacedFirm, NamespacedClient]) {
 }
 
 // Rails: companies.type column drives STI across the Company hierarchy
-// (Firm/Client/etc.). enableSti scopes `Firm.all` to `WHERE type IN (...)`.
-enableSti(Company);
+// (Firm/Client/etc.). Setting the column scopes `Firm.all` to `WHERE type IN (...)`.
+Company.inheritanceColumn = "type";
 
 // Track the STI subtree so registry-safe subclass resolution (STI dispatch at
 // `new`, `descendants`) can find these classes through Company's own subtree

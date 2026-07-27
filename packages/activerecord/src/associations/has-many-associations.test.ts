@@ -13,7 +13,6 @@ import {
   CollectionProxy,
   association,
   registerModel,
-  enableSti,
   registerSubclass,
   RecordNotFound,
   RecordNotSaved,
@@ -191,7 +190,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(HmFirm);
     registerModel(Client);
     registerModel(Account);
-    enableSti(Company);
+    Company.inheritanceColumn = "type";
     registerSubclass(HmFirm);
     registerSubclass(Client);
     await Company.loadSchema();
@@ -433,7 +432,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(HmTag);
     registerModel(HmTagging);
     registerModel(PersonWithPolymorphicDependentNullifyComments);
-    enableSti(HmEssay);
+    HmEssay.inheritanceColumn = "type";
     registerSubclass(TypedEssay);
     await HmPost.loadSchema();
     await Comment.loadSchema();
@@ -580,7 +579,7 @@ describe("HasManyAssociationsTest", () => {
   registerModel(Client);
   registerModel(Account);
   registerModel(RestrictedWithErrorFirm);
-  enableSti(Company);
+  Company.inheritanceColumn = "type";
   registerSubclass(HmFirm);
   registerSubclass(Client);
   registerSubclass(RestrictedWithErrorFirm);
@@ -642,7 +641,7 @@ describe("HasManyAssociationsTest", () => {
   registerModel(Developer);
   registerModel(AuditLog);
   registerModel(Project);
-  enableSti(Company);
+  Company.inheritanceColumn = "type";
   registerSubclass(HmFirm);
   registerSubclass(Client);
 
@@ -1268,7 +1267,7 @@ describe("HasManyAssociationsTest", () => {
   registerModel(Company);
   registerModel(HmFirm);
   registerModel(Client);
-  enableSti(Company);
+  Company.inheritanceColumn = "type";
   registerSubclass(HmFirm);
   registerSubclass(Client);
   // -- Calling size/empty --
@@ -1370,7 +1369,7 @@ describe("HasManyAssociationsTest", () => {
   registerModel(Comment);
   registerModel(Car);
   registerModel(Bulb);
-  enableSti(Company);
+  Company.inheritanceColumn = "type";
   registerSubclass(HmFirm);
   registerSubclass(Client);
 
@@ -1865,7 +1864,7 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("firm_id", "integer");
       }
     }
-    enableSti(StiCompany);
+    StiCompany.inheritanceColumn = "type";
     class StiFirm extends StiCompany {}
     registerSubclass(StiFirm);
     class StiClient extends StiCompany {}
@@ -1914,7 +1913,7 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("firm_id", "integer");
       }
     }
-    enableSti(StiCompany2);
+    StiCompany2.inheritanceColumn = "type";
     class StiClient2 extends StiCompany2 {}
     registerSubclass(StiClient2);
     registerModel(StiCompany2);
@@ -1952,7 +1951,7 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("firm_id", "integer");
       }
     }
-    enableSti(StiCompany3);
+    StiCompany3.inheritanceColumn = "type";
     class StiClient3 extends StiCompany3 {}
     registerSubclass(StiClient3);
     registerModel(StiCompany3);
@@ -1990,7 +1989,7 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("firm_id", "integer");
       }
     }
-    enableSti(StiCompany4);
+    StiCompany4.inheritanceColumn = "type";
     registerModel(StiCompany4);
 
     class DepFirm4 extends Base {
@@ -2024,7 +2023,7 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("firm_id", "integer");
       }
     }
-    enableSti(StiCompany5);
+    StiCompany5.inheritanceColumn = "type";
     class UnrelatedModel extends Base {
       declare name: string | null;
 
@@ -6556,7 +6555,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(Client);
     registerModel(DependentFirm);
     registerModel(Account);
-    enableSti(Company);
+    Company.inheritanceColumn = "type";
     registerSubclass(HmFirm);
     registerSubclass(Client);
     registerSubclass(DependentFirm);
@@ -6568,7 +6567,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(HmSillyReply);
     registerModel(HmUniqueReply);
     registerModel(HmSillyUniqueReply);
-    enableSti(HmTopic);
+    HmTopic.inheritanceColumn = "type";
     registerSubclass(HmReply);
     registerSubclass(HmSillyReply);
     registerSubclass(HmUniqueReply);
@@ -6793,7 +6792,7 @@ describe("AsyncHasManyAssociationsTest", () => {
     registerModel(HmFirm);
     registerModel(Client);
     registerModel(Account);
-    enableSti(Company);
+    Company.inheritanceColumn = "type";
     registerSubclass(HmFirm);
     registerSubclass(Client);
     await Company.loadSchema();
@@ -6825,7 +6824,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(Client);
     registerModel(DependentFirm);
     registerModel(RestrictedWithExceptionFirm);
-    enableSti(Company);
+    Company.inheritanceColumn = "type";
     registerSubclass(HmFirm);
     registerSubclass(Client);
     registerSubclass(DependentFirm);
@@ -6833,7 +6832,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(HmTopic);
     registerModel(HmReply);
     registerModel(HmDefaultRejectedTopic);
-    enableSti(HmTopic);
+    HmTopic.inheritanceColumn = "type";
     registerSubclass(HmReply);
     registerSubclass(HmDefaultRejectedTopic);
   });
@@ -6928,7 +6927,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(HmReply);
     registerModel(HmPost);
     registerModel(Comment);
-    enableSti(HmTopic);
+    HmTopic.inheritanceColumn = "type";
     registerSubclass(HmReply);
   });
 

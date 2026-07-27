@@ -12,7 +12,6 @@ import { throwAbort } from "@blazetrails/activesupport";
 import {
   Base,
   registerModel,
-  enableSti,
   registerSubclass,
   SubclassNotFound,
   AssociationTypeMismatch,
@@ -82,7 +81,7 @@ function registerCompanyModels(): void {
   registerModel(RestrictedWithErrorFirm);
   registerModel(Client);
   registerModel(Account);
-  enableSti(Company);
+  Company.inheritanceColumn = "type";
   registerSubclass(Firm);
   registerSubclass(DependentFirm);
   registerSubclass(ExclusivelyDependentFirm);

@@ -138,7 +138,6 @@ export {
 export { defineEnum, readEnumValue, castEnumValue } from "./enum.js";
 export type { EnumMacroOptions } from "./enum.js";
 export {
-  enableSti,
   getInheritanceColumn,
   instantiateSti,
   registerSubclass,

@@ -13,7 +13,7 @@
  * dedicated shape assertion here.
  */
 import { describe, it, expect } from "vitest";
-import { registerModel, enableSti } from "../index.js";
+import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Notifications, NotificationEvent } from "@blazetrails/activesupport";
 import { SQLCounter, type SqlPayload } from "../testing/query-assertions.js";
@@ -26,7 +26,7 @@ describe("HasOneThroughBuildTrails", () => {
 
   registerModel(Member);
   registerModel(Club);
-  enableSti(Membership);
+  Membership.inheritanceColumn = "type";
   registerModel(Membership);
   registerModel(CurrentMembership);
 

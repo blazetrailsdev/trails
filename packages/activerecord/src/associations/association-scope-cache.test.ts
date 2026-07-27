@@ -16,7 +16,7 @@
  */
 import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import { findTarget } from "./singular-association.js";
-import { registerModel, enableSti, registerSubclass } from "../index.js";
+import { registerModel, registerSubclass } from "../index.js";
 import { loadHasOne } from "../associations.js";
 import { findTarget as findHasManyTarget } from "./has-many-association.js";
 import { AssociationScope } from "./association-scope.js";
@@ -159,7 +159,7 @@ describe("Association scope cache — through singular loads", () => {
   beforeAll(async () => {
     registerModel(Member);
     registerModel(Club);
-    enableSti(Membership);
+    Membership.inheritanceColumn = "type";
     registerModel(Membership);
     registerModel(CurrentMembership);
     registerSubclass(CurrentMembership);

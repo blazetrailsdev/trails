@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { registerModel, enableSti, registerSubclass } from "../index.js";
+import { registerModel, registerSubclass } from "../index.js";
 import { Member } from "../test-helpers/models/member.js";
 import { Organization } from "../test-helpers/models/organization.js";
 import { MemberDetail } from "../test-helpers/models/member-detail.js";
@@ -33,7 +33,7 @@ registerModel(Member);
 registerModel(Organization);
 registerModel(MemberDetail);
 registerModel(Club);
-enableSti(Membership);
+Membership.inheritanceColumn = "type";
 registerModel(Membership);
 registerModel(CurrentMembership);
 registerModel(SuperMembership);
@@ -50,7 +50,7 @@ registerModel(Account);
 registerModel(Project);
 registerModel(Developer);
 registerModel(AuditLog);
-enableSti(Company);
+Company.inheritanceColumn = "type";
 registerSubclass(Firm);
 registerSubclass(DependentFirm);
 registerSubclass(ExclusivelyDependentFirm);

@@ -8,7 +8,7 @@
  * join-dependency-through-aliasing.test.ts.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
+import { Base, registerModel, registerSubclass } from "../index.js";
 import { Associations } from "../associations.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
@@ -84,7 +84,7 @@ describe("JoinDependency Arel node construction", () => {
       }
     }
     class StiSubOwner extends StiOwner {}
-    enableSti(StiOwner);
+    StiOwner.inheritanceColumn = "type";
     registerSubclass(StiSubOwner);
     (StiOwner as any)._associations = [];
     (StiSubOwner as any)._associations = [];
@@ -120,7 +120,7 @@ describe("JoinDependency Arel node construction", () => {
     }
     class Car extends Vehicle {}
     class ElectricCar extends Car {}
-    enableSti(Vehicle);
+    Vehicle.inheritanceColumn = "type";
     registerSubclass(Car);
     registerSubclass(ElectricCar);
     (Vehicle as any)._associations = [];

@@ -307,7 +307,7 @@ function guardCanonicalNameShadow(name: string, model: typeof Base): void {
  *   prototype is another AR model rather than `Base` itself) is additionally
  *   routed through {@link registerSubclass} so it lands in its parent's
  *   `_subclasses`. STI on the parent must still be enabled explicitly via
- *   `enableSti` — the array form does not call it.
+ *   `Parent.inheritanceColumn = ...` — the array form does not set it.
  */
 export function registerModel(model: typeof Base): void;
 export function registerModel(name: string, model: typeof Base): void;

@@ -5,7 +5,6 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
   Base,
   registerModel,
-  enableSti,
   registerSubclass,
   AssociationNotFoundError,
   EagerLoadPolymorphicError,
@@ -2369,8 +2368,8 @@ describe("EagerAssociationTest", () => {
     });
   });
 
-  enableSti(Post);
-  enableSti(Comment);
+  Post.inheritanceColumn = "type";
+  Comment.inheritanceColumn = "type";
   registerSubclass(SpecialPost);
   registerSubclass(StiPost);
   registerSubclass(SpecialComment);
@@ -2418,9 +2417,9 @@ describe("EagerAssociationTest", () => {
     expect(author.association("specialNonexistentPostComments").target).toEqual([]);
   });
 
-  enableSti(Post);
+  Post.inheritanceColumn = "type";
   registerSubclass(SpecialPost);
-  enableSti(Comment);
+  Comment.inheritanceColumn = "type";
   registerSubclass(SpecialComment);
   registerSubclass(SubSpecialComment);
   registerSubclass(VerySpecialComment);
@@ -2444,7 +2443,7 @@ describe("EagerAssociationTest", () => {
     }
   });
 
-  enableSti(Post);
+  Post.inheritanceColumn = "type";
   registerSubclass(SpecialPost);
   registerSubclass(StiPost);
 
@@ -2555,14 +2554,14 @@ describe("EagerAssociationTest", () => {
     expect(error).toBeUndefined();
   });
 
-  enableSti(Membership);
+  Membership.inheritanceColumn = "type";
 
   it("eager with has one through join model with conditions on the through", async () => {
     const member = await Member.all().includes("favoriteClub").find(members("some_other_guy").id);
     expect(member.association("favoriteClub").target ?? null).toBeNull();
   });
 
-  enableSti(Company);
+  Company.inheritanceColumn = "type";
   registerSubclass(Firm);
   registerSubclass(Client);
 
@@ -2582,8 +2581,8 @@ describe("EagerAssociationTest", () => {
     );
   });
 
-  enableSti(Comment);
-  enableSti(Membership);
+  Comment.inheritanceColumn = "type";
+  Membership.inheritanceColumn = "type";
 
   it("preloading has many through with implicit source", async () => {
     const authorList = (await Author.includes("verySpecialComments")).sort(

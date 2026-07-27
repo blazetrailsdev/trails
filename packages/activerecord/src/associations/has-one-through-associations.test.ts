@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Base, registerModel, enableSti, registerSubclass, RecordInvalid } from "../index.js";
+import { Base, registerModel, registerSubclass, RecordInvalid } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { assertQueriesMatch, assertQueriesCount } from "../testing/query-assertions.js";
 import {
@@ -93,7 +93,7 @@ describe("HasOneThroughAssociationsTest", () => {
 
   registerModel(Member);
   registerModel(Club);
-  enableSti(Membership);
+  Membership.inheritanceColumn = "type";
   registerModel(Membership);
   registerModel(CurrentMembership);
   registerModel(SuperMembership);
@@ -106,7 +106,7 @@ describe("HasOneThroughAssociationsTest", () => {
   registerModel(Minivan);
   registerModel(Dashboard);
   registerModel(Speedometer);
-  enableSti(Category);
+  Category.inheritanceColumn = "type";
   registerModel(Category);
   registerModel(SpecialCategory);
   registerSubclass(SpecialCategory);

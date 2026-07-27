@@ -8,7 +8,7 @@
  * one `fixtures` call seeding the canonical association tables.
  */
 import { describe, it, expect } from "vitest";
-import { registerModel, enableSti, registerSubclass, resetCallbacks } from "../index.js";
+import { registerModel, registerSubclass, resetCallbacks } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Base } from "../base.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -46,13 +46,13 @@ describe("CascadedEagerLoadingTest", () => {
     "people",
   ]);
 
-  enableSti(Topic);
+  Topic.inheritanceColumn = "type";
   registerModel(Person);
   registerModel(Author);
   registerModel(Post);
   registerModel(SpecialPost);
   registerModel(FirstPost);
-  enableSti(Comment);
+  Comment.inheritanceColumn = "type";
   registerModel(Comment);
   registerModel(SpecialComment);
   registerSubclass(SpecialComment);

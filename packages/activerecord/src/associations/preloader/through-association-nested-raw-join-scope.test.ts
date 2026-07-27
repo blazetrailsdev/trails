@@ -22,7 +22,7 @@
  * pins the behavior by declaring the chain on the canonical Member/Club models.
  */
 import { describe, it, expect } from "vitest";
-import { registerModel, enableSti } from "../../index.js";
+import { registerModel } from "../../index.js";
 import { ConfigurationError } from "../../errors.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
 import { Preloader } from "../preloader.js";
@@ -34,10 +34,10 @@ import { Category } from "../../test-helpers/models/category.js";
 
 registerModel(Member);
 registerModel(Club);
-enableSti(Membership);
+Membership.inheritanceColumn = "type";
 registerModel(Membership);
 registerModel(CurrentMembership);
-enableSti(Category);
+Category.inheritanceColumn = "type";
 registerModel(Category);
 
 type JoinWhere = {

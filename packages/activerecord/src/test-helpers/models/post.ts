@@ -1007,7 +1007,7 @@ export class PostRecord extends Base {
 // classes through Post's own subtree rather than the global model registry.
 // Rails: `posts` carries a `type` column, so Post's non-abstract descendants
 // auto-layer a `type IN (...)` finder condition (`finder_needs_type_condition?`,
-// column-presence detected) with no explicit enableSti opt-in.
+// column-presence detected) with no explicit inheritanceColumn assignment.
 for (const klass of [
   SpecialPost,
   StiPost,
