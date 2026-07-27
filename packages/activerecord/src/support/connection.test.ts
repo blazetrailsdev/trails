@@ -2,12 +2,24 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { registerDbFileCleanupOnExit } from "./sqlite-template.js";
-import { connect } from "./connection.js";
+import { Base } from "../base.js";
+import { connect, testConfigurationHashes } from "./connection.js";
 
+// Only the cases asserting `connect`'s own side effects call it; everything
+// that merely checks which entry `ARCONN` resolves to uses
+// `testConfigurationHashes`, which is the resolver alone. `connect` mirrors
+// `ARTest.connect` and so establishes the primary pool (`connection.rb:31-33`),
+// and a resolver assertion has no business opening one for a backend this
+// worker is not running against.
 describe("connect", () => {
+  const originalConfigurations = Base.configurations();
+
   afterEach(() => {
     DatabaseTasks.databaseConfiguration = null;
     DatabaseTasks.clearRegisteredTasks();
+    Base.configurations(originalConfigurations);
+    Base.removeConnection();
+    Base._adapter = null;
     vi.unstubAllEnvs();
   });
 
@@ -35,14 +47,14 @@ describe("connect", () => {
   it("inherits Rails' default pool size (5) on the file-backed lane", async () => {
     vi.stubEnv("ARCONN", "sqlite3");
     vi.stubEnv("AR_TEST_WORKER_DB", "/tmp/ar-test-worker.sqlite3");
-    const { envConfig } = await connect();
+    const { envConfig } = await testConfigurationHashes();
     expect(envConfig.pool).toBe(5);
   });
 
   it("falls back to a file-backed sqlite DB when AR_TEST_WORKER_DB is unset", async () => {
     vi.stubEnv("ARCONN", "sqlite3");
     vi.stubEnv("AR_TEST_WORKER_DB", "");
-    const { envConfig } = await connect();
+    const { envConfig } = await testConfigurationHashes();
     expect(envConfig.database).not.toBe(":memory:");
     expect(envConfig.database).toMatch(/\.sqlite$/);
     expect(envConfig.pool).toBe(5);
@@ -51,15 +63,15 @@ describe("connect", () => {
   it("reuses one fallback database path across calls", async () => {
     vi.stubEnv("ARCONN", "sqlite3");
     vi.stubEnv("AR_TEST_WORKER_DB", "");
-    const first = (await connect()).envConfig.database;
-    const second = (await connect()).envConfig.database;
+    const first = (await testConfigurationHashes()).envConfig.database;
+    const second = (await testConfigurationHashes()).envConfig.database;
     expect(second).toBe(first);
   });
 
   it("registers the fallback database for cleanup on exit", async () => {
     vi.stubEnv("ARCONN", "sqlite3");
     vi.stubEnv("AR_TEST_WORKER_DB", "");
-    const database = String((await connect()).envConfig.database);
+    const database = String((await testConfigurationHashes()).envConfig.database);
 
     const before = new Set(process.listeners("exit"));
     await registerDbFileCleanupOnExit(database);
@@ -69,33 +81,33 @@ describe("connect", () => {
   it("prefers AR_TEST_WORKER_DB over the fallback database", async () => {
     vi.stubEnv("ARCONN", "sqlite3");
     vi.stubEnv("AR_TEST_WORKER_DB", "/tmp/ar-test-worker.sqlite3");
-    const { envConfig } = await connect();
+    const { envConfig } = await testConfigurationHashes();
     expect(envConfig.database).toBe("/tmp/ar-test-worker.sqlite3");
   });
 
   it("pins pool 1 on the sqlite3_mem :memory: connection", async () => {
     vi.stubEnv("ARCONN", "sqlite3_mem");
     vi.stubEnv("AR_TEST_WORKER_DB", "");
-    const { adapter, envConfig } = await connect();
+    const { adapter, envConfig } = await testConfigurationHashes();
     expect(adapter).toBe("sqlite");
     expect(envConfig.pool).toBe(1);
   });
 
   it("selects the postgresql connection named by ARCONN", async () => {
     vi.stubEnv("ARCONN", "postgresql");
-    const { adapter } = await connect();
+    const { adapter } = await testConfigurationHashes();
     expect(adapter).toBe("postgres");
   });
 
   it("selects the mysql2 connection named by ARCONN", async () => {
     vi.stubEnv("ARCONN", "mysql2");
-    const { adapter } = await connect();
+    const { adapter } = await testConfigurationHashes();
     expect(adapter).toBe("mysql");
   });
 
   it("fails loudly when ARCONN names an unconfigured connection", async () => {
     vi.stubEnv("ARCONN", "oracle");
-    await expect(connect()).rejects.toThrow(/Connection "oracle" not found/);
+    await expect(testConfigurationHashes()).rejects.toThrow(/Connection "oracle" not found/);
   });
 
   // The adapter-name guard (`connection.rb:35-37`) used to be tripped by a
@@ -106,7 +118,7 @@ describe("connect", () => {
     "builds an adapter whose name is contained in the connection name (%s)",
     async (name) => {
       vi.stubEnv("ARCONN", name);
-      const { envConfig } = await connect();
+      const { envConfig } = await testConfigurationHashes();
       expect(name).toContain(String(envConfig.adapter));
     },
   );
