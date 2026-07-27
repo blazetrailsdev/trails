@@ -71,6 +71,40 @@ describe("config", () => {
     });
   });
 
+  it("interpolates exactly the accepted sub-setting key set, and no more", () => {
+    // The accepted deviation from config.example.yml, made executable: Rails
+    // interpolates only MYSQL_HOST/MYSQL_PORT/MYSQL_SOCK and hard-codes
+    // `username: rails`; trails also interpolates the credential and database
+    // name, and the postgresql lane reads libpq's own PG* set because Rails'
+    // `postgresql:` entries carry no fields precisely so libpq resolves them
+    // (config.example.yml:74-81). Widening this set again is a decision, not a
+    // detail — see the deviations note in config.ts.
+    const seen: string[] = [];
+    const recording = (env: Record<string, string>) => (key: string) => {
+      seen.push(key);
+      return env[key];
+    };
+
+    mysqlSettings(recording({}));
+    expect(new Set(seen)).toEqual(
+      new Set([
+        "MYSQL_HOST",
+        "MYSQL_PORT",
+        "MYSQL_USER",
+        "MYSQL_PASSWORD",
+        "MYSQL_DATABASE",
+        "MYSQL_SOCK",
+        "AR_DB_SLOT",
+      ]),
+    );
+
+    seen.length = 0;
+    postgresSettings(recording({}));
+    expect(new Set(seen)).toEqual(
+      new Set(["PGHOST", "PGPORT", "PGUSER", "PGPASSWORD", "PGDATABASE", "AR_DB_SLOT"]),
+    );
+  });
+
   it("suffixes the database with the worker isolation slot above slot 1", () => {
     expect(postgresSettings(reader({ AR_DB_SLOT: "1" })).database).toBe("rails_js_test");
     expect(postgresSettings(reader({ AR_DB_SLOT: "4" })).database).toBe("rails_js_test_4");

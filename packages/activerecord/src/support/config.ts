@@ -26,7 +26,7 @@
  *     `PGPASSWORD` / `PGDATABASE` for the postgresql lane (Rails' `postgresql:`
  *     entries carry no host at all, deferring to libpq's own env).
  *
- * ## Deviations from `config.example.yml` — ACCEPTED PERMANENTLY
+ * ## Deviations from `config.example.yml` — accepted permanently (decision record)
  *
  * Rails interpolates ONLY `MYSQL_HOST` / `MYSQL_PORT` / `MYSQL_SOCK` from the
  * environment and hard-codes the rest — notably `username: rails` on both
@@ -54,14 +54,21 @@
  *     explicit fallbacks (`postgres` / `rails_js_test`) are a trails addition,
  *     and they are what libpq would otherwise resolve from the local role.
  *   - Rails' `rails` user is an artifact of Rails' own CI images, not a
- *     behaviour the port reproduces: no adapter, task, or assertion observes the
- *     credential's *value*. Adopting it would mean provisioning a user in three
- *     places (CI service containers, `docker-compose.yml`, and every
- *     contributor's local server) to buy no fidelity in anything under test.
+ *     behaviour the port reproduces. Audited: the only places the credential's
+ *     *value* is observed are the harness-config tests that spell a whole
+ *     rendered URL (`config.test.ts`, `arunit2-config.test.ts`) — no adapter,
+ *     task, or suite assertion reads it. Adopting Rails' literal would mean
+ *     provisioning a user in three places (CI service containers,
+ *     `docker-compose.yml`, and every contributor's local server) to buy no
+ *     fidelity in anything under test.
  *   - Configurability is already depended on: CI sets `MYSQL_USER` / `PGUSER` /
  *     `PGPASSWORD` / `*_DATABASE` explicitly, `AR_DB_SLOT` rewrites the database
  *     name per worker, and local servers (Homebrew postgres, socket MySQL) have
  *     no common credential to hard-code.
+ *
+ * The accepted key set is pinned by a test (`config.test.ts`, "interpolates
+ * exactly the accepted sub-setting key set"), so widening it later has to be a
+ * decision rather than a drift.
  *
  * So: the ARCONN-selects / sub-settings-describe *split* is Rails parity; the
  * particular set of interpolated keys and their defaults is a settled trails
