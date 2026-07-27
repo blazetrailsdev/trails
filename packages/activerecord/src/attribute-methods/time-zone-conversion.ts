@@ -167,7 +167,7 @@ export class TimeZoneConverter extends ValueType<unknown> {
     return oldValue !== newValue;
   }
 
-  // Same floor-style truncation as DateTimeType._nsAtPrecision / _applySecondsPrecision.
+  // Same floor-style truncation as DateTimeType._nsAtPrecision / applySecondsPrecision.
   // Uses the wrapped subtype's precision so behavior matches the column's serialize output.
   private _nsAtPrecision(ns: bigint): bigint {
     const raw = this._subtype.precision ?? 6;

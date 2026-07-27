@@ -67,8 +67,14 @@ describe("Helpers::Numeric private predicates", () => {
     });
 
     it("returns false for non-number inputs", () => {
-      expect(isEqualNan("NaN", "NaN")).toBe(false);
       expect(isEqualNan(null, null)).toBe(false);
+      expect(isEqualNan("nan", "nan")).toBe(false);
+      expect(isEqualNan("NaN", NaN)).toBe(false);
+      expect(isEqualNan(NaN, "NaN")).toBe(false);
+    });
+
+    it('treats the decimal "NaN" sentinel as BigDecimal NaN on both sides', () => {
+      expect(isEqualNan("NaN", "NaN")).toBe(true);
     });
   });
 });

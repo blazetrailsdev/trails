@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { Model, Types } from "../index.js";
+import { Types } from "../index.js";
 
 // DecimalType#cast returns a BigDecimal (Rails: cast_value -> BigDecimal), so
 // decimal binds quote in fixed "F" form rather than as a 'string' literal.
@@ -102,14 +102,18 @@ describe("DecimalTest", () => {
   });
 
   it("changed?", () => {
-    class MyModel extends Model {
-      static {
-        this.attribute("price", "decimal");
-      }
-    }
-    const m = new MyModel({ price: "1.0" });
-    m.writeAttribute("price", "1.0");
-    expect(m.attributeChanged("price")).toBe(false);
+    const type = new Types.DecimalType();
+
+    expect(type.isChanged(0.0, 0, "wibble")).toBe(true);
+    expect(type.isChanged(5.0, 0, "wibble")).toBe(true);
+    expect(type.isChanged(5.0, 5.0, "5.0wibble")).toBe(false);
+    expect(type.isChanged(5.0, 5.0, "5.0")).toBe(false);
+    expect(type.isChanged(-5.0, -5.0, "-5.0")).toBe(false);
+    expect(type.isChanged(5.0, 5.0, "0.5e+1")).toBe(false);
+    // Rails passes `BigDecimal("0.0") / 0`; trails' NaN decimal is the "NaN" sentinel.
+    expect(type.isChanged("NaN", "NaN", "NaN")).toBe(false);
+    // Float NaN over BigDecimal NaN: still a change (`instance_of?` guard).
+    expect(type.isChanged("NaN", NaN, NaN)).toBe(true);
   });
 
   it("type cast decimal from float with large precision", () => {

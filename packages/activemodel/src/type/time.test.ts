@@ -148,4 +148,12 @@ describe("TimeTest", () => {
     expect(result).toBeInstanceOf(Temporal.PlainTime);
     expect((result as Temporal.PlainTime).hour).toBe(10);
   });
+
+  it("serialize_cast_value is equivalent to serialize after cast", () => {
+    const type = new Types.TimeType({ precision: 1 });
+    const value = type.cast("1999-12-31T12:34:56.789-10:00");
+
+    expect(type.serializeCastValue(value)).toEqual(type.serialize(value));
+    expect(type.serializeCastValue(value)?.toString()).toBe("12:34:56.7");
+  });
 });

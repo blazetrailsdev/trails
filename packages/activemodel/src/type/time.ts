@@ -37,10 +37,10 @@ export class TimeType extends ValueType<Temporal.PlainTime> {
 
   /** @internal Rails-private helper. */
   protected castValue(value: unknown): Temporal.PlainTime | null {
-    if (value instanceof Temporal.PlainTime) return this._applySecondsPrecision(value);
+    if (value instanceof Temporal.PlainTime) return this.applySecondsPrecision(value);
     // Accept PlainDateTime from multiparameter assignment — extract the time part.
     if (value instanceof Temporal.PlainDateTime)
-      return this._applySecondsPrecision(value.toPlainTime());
+      return this.applySecondsPrecision(value.toPlainTime());
     if (isHash(value)) return this.valueFromMultiparameterAssignment(value);
     const str = String(value).trim();
     if (str === "") return null;
@@ -62,7 +62,7 @@ export class TimeType extends ValueType<Temporal.PlainTime> {
     }
   }
 
-  private _applySecondsPrecision(value: Temporal.PlainTime): Temporal.PlainTime {
+  private applySecondsPrecision(value: Temporal.PlainTime): Temporal.PlainTime {
     if (
       this.precision == null ||
       !Number.isInteger(this.precision) ||
@@ -94,7 +94,7 @@ export class TimeType extends ValueType<Temporal.PlainTime> {
 
   // Mirrors ActiveModel::Type::Helpers::TimeValue#serialize_cast_value (apply_seconds_precision).
   serializeCastValue(value: Temporal.PlainTime | null): Temporal.PlainTime | null {
-    return value === null ? null : this._applySecondsPrecision(value);
+    return value === null ? null : this.applySecondsPrecision(value);
   }
 
   /**

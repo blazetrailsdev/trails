@@ -121,22 +121,6 @@ export class DecimalType extends NumericValueType {
     return roundHalfUpToScale(value, this.scale);
   }
 
-  /**
-   * Dirty-tracking compares cast values for equality. Cast decimals are
-   * {@link BigDecimal} instances, so a bare `!==` (object identity) would
-   * report every revert as a change. Rails compares with `==` (value
-   * equality); normalize both operands to their fixed-form string before
-   * delegating to the numeric mixin's `isChanged`.
-   */
-  override isChanged(
-    oldValue: unknown,
-    newValue: unknown,
-    newValueBeforeTypeCast?: unknown,
-  ): boolean {
-    const normalize = (v: unknown) => (v instanceof BigDecimal ? v.toString("F") : v);
-    return super.isChanged(normalize(oldValue), normalize(newValue), newValueBeforeTypeCast);
-  }
-
   private _castWithoutScale(value: unknown): string | null {
     if (value === null || value === undefined) return null;
     // A BigDecimal re-cast (e.g. through serialize) round-trips via its

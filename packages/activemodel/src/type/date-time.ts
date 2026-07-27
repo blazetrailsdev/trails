@@ -23,10 +23,10 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
   protected castValue(value: unknown): DateTimeCastResult | null {
     if (value === DateInfinity) return DateInfinity;
     if (value === DateNegativeInfinity) return DateNegativeInfinity;
-    if (value instanceof Temporal.Instant) return this._applySecondsPrecision(value);
+    if (value instanceof Temporal.Instant) return this.applySecondsPrecision(value);
     // boundary: JS Date assigned to a datetime attribute (e.g. aircraft.manufactured_at = new Date())
     if (value instanceof Date) {
-      return this._applySecondsPrecision(Temporal.Instant.fromEpochMilliseconds(value.getTime()));
+      return this.applySecondsPrecision(Temporal.Instant.fromEpochMilliseconds(value.getTime()));
     }
     if (isHash(value)) return this.valueFromMultiparameterAssignment(value);
     const str = String(value).trim();
@@ -127,7 +127,7 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     return isHash(value);
   }
 
-  private _applySecondsPrecision(value: Temporal.Instant): Temporal.Instant {
+  private applySecondsPrecision(value: Temporal.Instant): Temporal.Instant {
     if (
       this.precision == null ||
       !Number.isInteger(this.precision) ||
@@ -184,7 +184,7 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     return oldValue !== newValue;
   }
 
-  // Truncate epoch nanoseconds to column precision, matching _applySecondsPrecision /
+  // Truncate epoch nanoseconds to column precision, matching applySecondsPrecision /
   // Temporal.toString() floor-style sub-second truncation. Used by isChanged so that
   // sub-precision nanosecond noise from Temporal.Now (when precision=null) doesn't
   // produce spurious dirty marks after serialize → cast round-trips.
@@ -215,6 +215,6 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
   // Mirrors ActiveModel::Type::Helpers::TimeValue#serialize_cast_value (apply_seconds_precision).
   serializeCastValue(value: DateTimeCastResult | null): DateTimeCastResult | null {
     if (value === null || value === DateInfinity || value === DateNegativeInfinity) return value;
-    return this._applySecondsPrecision(value as Temporal.Instant);
+    return this.applySecondsPrecision(value as Temporal.Instant);
   }
 }

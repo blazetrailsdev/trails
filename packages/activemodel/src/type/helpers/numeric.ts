@@ -3,6 +3,7 @@
  *
  * Mirrors: ActiveModel::Type::Helpers::Numeric (numeric.rb:7-34)
  */
+import { BigDecimal } from "@blazetrails/activesupport";
 import { ValueType } from "../value.js";
 
 /** Mirrors: ActiveModel::Type::Helpers::Numeric::NUMERIC_REGEX */
@@ -11,18 +12,22 @@ const NUMERIC_REGEX = /^\s*[+-]?\d/;
 /**
  * Mirrors: ActiveModel::Type::Helpers::Numeric#equal_nan?
  *
- * Trails has no BigDecimal class, so the constructor-equality check
- * collapses to "both are JS numbers and both are NaN".
+ * Trails' BigDecimal carries no non-finite state, so `DecimalType#cast`
+ * represents a NaN decimal as the sentinel string `"NaN"` — that sentinel is
+ * this port's BigDecimal NaN. Requiring the same representation on both sides
+ * is how Rails' `old_value.instance_of?(new_value.class)` guard lands here.
+ *
+ * Deviation: the second argument is the CAST new value, not Rails'
+ * `new_value_before_type_cast` — pre-existing, pinned by `float.test.ts`
+ * ("equal_nan? uses cast value") and five `dirty.test.ts` cases.
  *
  * @internal Rails-private helper.
  */
 export function isEqualNan(oldValue: unknown, newValue: unknown): boolean {
-  return (
-    typeof oldValue === "number" &&
-    Number.isNaN(oldValue) &&
-    typeof newValue === "number" &&
-    Number.isNaN(newValue)
-  );
+  if (typeof oldValue === "number") {
+    return Number.isNaN(oldValue) && typeof newValue === "number" && Number.isNaN(newValue);
+  }
+  return oldValue === "NaN" && newValue === "NaN";
 }
 
 /**
@@ -45,6 +50,10 @@ export function isNumberToNonNumber(oldValue: unknown, newValueBeforeTypeCast: u
  */
 export function isNonNumericString(value: unknown): boolean {
   return !NUMERIC_REGEX.test(String(value));
+}
+
+function normalizeBigDecimal(value: unknown): unknown {
+  return value instanceof BigDecimal ? value.toString("F") : value;
 }
 
 // Constructor rest args must be `any[]` — idiomatic in TypeScript mixin
@@ -108,10 +117,14 @@ export function applyNumericMixin<TBase extends AbstractValueTypeCtor>(
       newValue: unknown,
       newValueBeforeTypeCast?: unknown,
     ): boolean {
+      // `super` is Value#changed? — Ruby `!=` on BigDecimal is value equality,
+      // JS `!==` is object identity, so normalize before comparing.
+      const old = normalizeBigDecimal(oldValue);
+      const fresh = normalizeBigDecimal(newValue);
       return (
-        (super.isChanged(oldValue, newValue, newValueBeforeTypeCast) ||
-          isNumberToNonNumber(oldValue, newValueBeforeTypeCast)) &&
-        !isEqualNan(oldValue, newValue)
+        (super.isChanged(old, fresh, newValueBeforeTypeCast) ||
+          isNumberToNonNumber(old, newValueBeforeTypeCast)) &&
+        !isEqualNan(old, fresh)
       );
     }
   }

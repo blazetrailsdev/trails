@@ -39,14 +39,14 @@
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "build_explain_clause",
     "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Deliberate: `AbstractMysqlAdapter#buildExplainClause` builds the printed EXPLAIN *header* (`\"... for:\"`) and routes option rendering through `_validateExplainOptions`, which rejects unknown flags/formats instead of blindly `join`ing them; the faithful `join` + `include?(\"ANALYZE\")` body lives in the Rails-layout file `connection-adapters/mysql/database-statements.ts` (`buildExplainClause`)."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "build_explain_clause",
     "call": "join",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Deliberate: `AbstractMysqlAdapter#buildExplainClause` builds the printed EXPLAIN *header* (`\"... for:\"`) and routes option rendering through `_validateExplainOptions`, which rejects unknown flags/formats instead of blindly `join`ing them; the faithful `join` + `include?(\"ANALYZE\")` body lives in the Rails-layout file `connection-adapters/mysql/database-statements.ts` (`buildExplainClause`)."
   },
   {
     "package": "activerecord",
@@ -417,7 +417,7 @@
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "returning_column_values",
     "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Include stand-in: `MySQL::DatabaseStatements#returning_column_values` is ported in the Rails-layout file `connection-adapters/mysql/database-statements.ts` (`returningColumnValues`, which does read `result.rows[0]`); the adapter method is the `include` resolution point and only delegates."
   },
   {
     "package": "activerecord",
@@ -501,20 +501,20 @@
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "type_cast",
     "call": "getlocal",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Include stand-in plus Temporal semantics: `MySQL::Quoting#type_cast` is ported in `connection-adapters/mysql/quoting.ts` and the adapter method only delegates. Ruby's `getlocal`/`utc?` re-attach a zone to a Time; a Temporal.Instant is absolute and a PlainDateTime zoneless, so the `default_timezone` branch is resolved by `quotedDate` instead."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "type_cast",
     "call": "utc?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Include stand-in plus Temporal semantics: `MySQL::Quoting#type_cast` is ported in `connection-adapters/mysql/quoting.ts` and the adapter method only delegates. Ruby's `getlocal`/`utc?` re-attach a zone to a Time; a Temporal.Instant is absolute and a PlainDateTime zoneless, so the `default_timezone` branch is resolved by `quotedDate` instead."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "write_query?",
     "call": "match?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Include stand-in: `MySQL::DatabaseStatements#write_query?` is ported in the Rails-layout file `connection-adapters/mysql/database-statements.ts` (`isWriteQuery`, which does run `READ_QUERY.test(sql)`); the adapter method is the `include` resolution point and only delegates."
   }
 ]
