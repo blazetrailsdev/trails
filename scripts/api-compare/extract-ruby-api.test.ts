@@ -968,3 +968,107 @@ describe("Ruby extractor file constants", () => {
     expect(c["VALID_OPTIONS"]).toEqual({ kind: "expr" });
   });
 });
+
+describe("Ruby extractor metaprogrammed method surface", () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+  type MetaMethod = { name: string; notes?: string; params: { kind: string }[] };
+
+  // Returns "<fqn>" -> instance methods, so a test can assert both the
+  // generated names and the params lifted off the define_method block.
+  function metaMethods(src: string): Record<string, MetaMethod[]> {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "meta-rb-"));
+    try {
+      fs.writeFileSync(path.join(dir, "meta.rb"), src);
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        ex.process_file(File.join(${JSON.stringify(dir)}, "meta.rb"), ${JSON.stringify(dir)})
+        out = {}
+        (ex.classes.to_a + ex.modules.to_a).each do |fqn, info|
+          out[fqn] = info[:instanceMethods]
+        end
+        puts JSON.generate(out)
+      `;
+      return JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it("records define_method with a literal name", () => {
+    const m = metaMethods(`
+      module Engine
+        define_method(:railtie_routes_url_helpers) { |include_path_helpers = true| nil }
+        define_method "railtie_helpers_paths" do
+          nil
+        end
+      end
+    `);
+    const names = m["Engine"].map((x) => x.name);
+    expect(names).toContain("railtie_routes_url_helpers");
+    expect(names).toContain("railtie_helpers_paths");
+    const urlHelpers = m["Engine"].find((x) => x.name === "railtie_routes_url_helpers")!;
+    expect(urlHelpers.notes).toBe("define_method");
+    // The block's params are the generated method's params.
+    expect(urlHelpers.params.map((p) => p.kind)).toEqual(["optional"]);
+  });
+
+  it("unrolls a literal-array each loop that interpolates the loop variable", () => {
+    const m = metaMethods(`
+      module ClassMethods
+        [:before, :after, :around].each do |callback|
+          define_method "#{callback}_action" do |*names, &blk|
+            nil
+          end
+
+          define_method "skip_#{callback}_action" do |*names|
+            nil
+          end
+
+          alias_method :"append_#{callback}_action", :"#{callback}_action"
+        end
+      end
+    `);
+    const names = m["ClassMethods"].map((x) => x.name);
+    expect(names).toEqual([
+      "before_action",
+      "after_action",
+      "around_action",
+      "skip_before_action",
+      "skip_after_action",
+      "skip_around_action",
+      "append_before_action",
+      "append_after_action",
+      "append_around_action",
+    ]);
+    const beforeAction = m["ClassMethods"].find((x) => x.name === "before_action")!;
+    expect(beforeAction.params.map((p) => p.kind)).toEqual(["rest", "block"]);
+    const appendBefore = m["ClassMethods"].find((x) => x.name === "append_before_action")!;
+    expect(appendBefore.notes).toBe("alias");
+  });
+
+  it("skips a define_method whose name cannot be resolved to literals", () => {
+    const m = metaMethods(`
+      module Unresolvable
+        SUFFIXES.each do |suffix|
+          define_method "reader_#{suffix}" do
+            nil
+          end
+        end
+
+        [:a, :b].each do |member|
+          define_method "#{member}_#{prefix}" do
+            nil
+          end
+        end
+
+        column_names.each do |name|
+          define_method(name) { nil }
+        end
+      end
+    `);
+    expect(m["Unresolvable"] ?? []).toEqual([]);
+  });
+});
