@@ -724,6 +724,14 @@ class ApiExtractor
       process_attr(args, :accessor, force_class: on_singleton)
     when "alias_method"
       process_alias_method(args)
+    when "define_method"
+      # Block-less bare-command form, `define_method :foo, &blk`. The block
+      # forms (`define_method :foo do … end`, `define_method(:foo) { … }`) do
+      # NOT arrive here: they are method_add_block nodes consumed by
+      # process_define_method_block, which needs the block to read the params
+      # off. This arm and the method_add_arg one below it exist so the two
+      # block-less shapes are handled as symmetrically as alias_method's.
+      process_define_method(args, nil)
     when "class_attribute"
       process_mattr(args, reader: true, writer: true, predicate: true, class_attr: true)
     when "cattr_accessor", "mattr_accessor"
@@ -803,8 +811,10 @@ class ApiExtractor
       when "module_function"
         process_module_function(node[2])
       when "define_method"
-        # Block-less `define_method(:foo, some_proc)`; the far commoner
-        # `define_method(:foo) { … }` arrives as a method_add_block instead.
+        # Block-less parenthesized form, `define_method(:foo, some_proc)` —
+        # the counterpart of process_command's bare-command arm. The far
+        # commoner `define_method(:foo) { … }` is a method_add_block instead,
+        # and the descent guard in walk keeps it from reaching here twice.
         process_define_method(node[2], nil)
       end
     else

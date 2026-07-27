@@ -1056,6 +1056,30 @@ describe("Ruby extractor metaprogrammed method surface", () => {
     expect(appendBefore.notes).toBe("alias");
   });
 
+  it("records both block-less define_method shapes exactly once", () => {
+    // Bare command (action_view/layouts.rb:311's shape) and parenthesized
+    // (rack/utils.rb:183's). The block forms below must not be recorded twice
+    // by the generic descent re-reaching process_command / method_add_arg.
+    const m = metaMethods(`
+      module Shapes
+        define_method :from_proc, &_layout
+        define_method(:from_method, Kernel.instance_method(:inspect))
+        define_method :with_do_block do |a|
+          nil
+        end
+        define_method(:with_brace_block) { |a| nil }
+      end
+    `);
+    expect(m["Shapes"].map((x) => x.name)).toEqual([
+      "from_proc",
+      "from_method",
+      "with_do_block",
+      "with_brace_block",
+    ]);
+    // Only the block forms can supply params; the block-less ones stay empty.
+    expect(m["Shapes"].map((x) => x.params.length)).toEqual([0, 0, 1, 1]);
+  });
+
   it("buckets a `class << self` define_method as a class method", () => {
     const m = metaMethods(`
       class Base
