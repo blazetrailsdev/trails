@@ -38,9 +38,9 @@ export function delegate(
 
         let target: Base | null = null;
         if (assocDef.type === "belongsTo") {
-          target = await findTarget(this, assocName, assocDef.options, "belongsTo");
+          target = await findTarget(this, assocName, assocDef.options);
         } else if (assocDef.type === "hasOne") {
-          target = await findTarget(this, assocName, assocDef.options, "hasOne");
+          target = await findTarget(this, assocName, assocDef.options);
         }
 
         if (!target) return null;

@@ -2847,16 +2847,11 @@ describe("HasManyAssociationsTest", () => {
     registerModel(InvValPost);
     const author = await InvValAuthor.create({ name: "Alice" });
     const post = await InvValPost.create({ author_id: author.id, title: "A", body: "body" });
-    const loaded = await findTarget(
-      post,
-      "author",
-      {
-        className: "InvValAuthor",
-        foreignKey: "author_id",
-        inverseOf: "inv_val_posts",
-      },
-      "belongsTo",
-    );
+    const loaded = await findTarget(post, "author", {
+      className: "InvValAuthor",
+      foreignKey: "author_id",
+      inverseOf: "inv_val_posts",
+    });
     expect(loaded).not.toBeNull();
     expect(loaded!.name).toBe("Alice");
   });

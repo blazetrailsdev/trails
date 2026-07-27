@@ -69,15 +69,13 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
   it("does not raise on lazy loading a has_one on a new strict-loading owner without the foreign key", async () => {
     const developer = new Developer({ name: "New Dev" });
     developer.strictLoadingBang();
-    await expect(findTarget(developer, "ship", optionsFor("ship"), "hasOne")).resolves.toBeNull();
+    await expect(findTarget(developer, "ship", optionsFor("ship"))).resolves.toBeNull();
   });
 
   it("does not raise on lazy loading a belongs_to on a new strict-loading owner without the foreign key", async () => {
     const developer = new Developer({ name: "New Dev" });
     developer.strictLoadingBang();
-    await expect(
-      findTarget(developer, "firm", optionsFor("firm"), "belongsTo"),
-    ).resolves.toBeNull();
+    await expect(findTarget(developer, "firm", optionsFor("firm"))).resolves.toBeNull();
   });
 
   it("does not raise on lazy loading a habtm on a new strict-loading owner without the foreign key", async () => {
@@ -94,16 +92,14 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
     developer.firm_id = null as unknown as number;
     developer.strictLoadingBang();
     expect(developer.isNewRecord()).toBe(false);
-    await expect(
-      findTarget(developer, "firm", optionsFor("firm"), "belongsTo"),
-    ).resolves.toBeNull();
+    await expect(findTarget(developer, "firm", optionsFor("firm"))).resolves.toBeNull();
   });
 
   it("raises on lazy loading a belongs_to on a new strict-loading owner with the foreign key present", async () => {
     const developer = new Developer({ name: "New Dev", firm_id: 1 });
     developer.strictLoadingBang();
     expect(developer.isNewRecord()).toBe(true);
-    await expect(findTarget(developer, "firm", optionsFor("firm"), "belongsTo")).rejects.toThrow(
+    await expect(findTarget(developer, "firm", optionsFor("firm"))).rejects.toThrow(
       StrictLoadingViolationError,
     );
   });

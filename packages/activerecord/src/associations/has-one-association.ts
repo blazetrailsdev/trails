@@ -455,7 +455,7 @@ export class HasOneAssociation extends SingularAssociation {
     // See `Association#_loaderWritebackSuppressed`.
     this._loaderWritebackSuppressed++;
     try {
-      return await findTarget(this.owner, this.reflection.name, this.reflection.options, "hasOne");
+      return await findTarget(this.owner, this.reflection.name, this.reflection.options);
     } finally {
       this._loaderWritebackSuppressed--;
     }

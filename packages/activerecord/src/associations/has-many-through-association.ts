@@ -1110,15 +1110,10 @@ export async function findTarget(
       throughRecords = await findHasManyTarget(record, throughAssoc.name, throughAssoc.options);
     }
   } else if (throughAssoc.type === "hasOne") {
-    const one = await findSingularTarget(record, throughAssoc.name, throughAssoc.options, "hasOne");
+    const one = await findSingularTarget(record, throughAssoc.name, throughAssoc.options);
     throughRecords = one ? [one] : [];
   } else if (throughAssoc.type === "belongsTo") {
-    const one = await findSingularTarget(
-      record,
-      throughAssoc.name,
-      throughAssoc.options,
-      "belongsTo",
-    );
+    const one = await findSingularTarget(record, throughAssoc.name, throughAssoc.options);
     throughRecords = one ? [one] : [];
   } else {
     throughRecords = [];

@@ -879,15 +879,10 @@ describe("PreloaderTest", () => {
     // that on `has_many_inversing` (BelongsToAssociation#invertible_for?), which
     // is unset here, so the loaded author carries no inverse collection.
     spy.mockClear();
-    const reloadedAuthor = (await findTarget(
-      fav,
-      "author",
-      {
-        inverseOf: "authorFavorites",
-      },
-      "belongsTo",
-    )) as any;
-    const reloadedFavorite = (await findTarget(fav, "favoriteAuthor", {}, "belongsTo")) as any;
+    const reloadedAuthor = (await findTarget(fav, "author", {
+      inverseOf: "authorFavorites",
+    })) as any;
+    const reloadedFavorite = (await findTarget(fav, "favoriteAuthor", {})) as any;
     expect(reloadedAuthor.name).toBe("Mary");
     expect(reloadedFavorite.name).toBe("Bob");
     expect(spy).not.toHaveBeenCalled();
@@ -1125,7 +1120,7 @@ describe("PreloaderTest", () => {
     const maryPost = (await Post.where({ id: maryPostId }))[0];
 
     // Force-load bob's author; mary's stays unloaded.
-    const loadedBob = await findTarget(bobPost, "author", {}, "belongsTo");
+    const loadedBob = await findTarget(bobPost, "author", {});
     expect(bobPost.association("author").isLoaded()).toBe(true);
     expect(maryPost.association("author").isLoaded()).toBe(false);
 
@@ -1372,7 +1367,7 @@ describe("PreloaderTest", () => {
     });
 
     // Load the blogPost on the comment instance first (warms the association cache).
-    await findTarget(comment, "blogPost", { className: "ShardedBlogPost" }, "belongsTo");
+    await findTarget(comment, "blogPost", { className: "ShardedBlogPost" });
 
     // Preloading on the already-loaded record must not fire any SQL queries
     // (mirrors Rails' assert_no_queries block).
@@ -2565,15 +2560,10 @@ describe("AssociationsTest", () => {
   it("has one loads via inline fallback resolving composite owner key from query constraints", async () => {
     const post = await ShardedBlogPost.create({ blog_id: 7, title: "Post" });
     await ShardedComment.create({ blog_id: 7, blog_post_id: (post as any).id, body: "Only" });
-    const comment = await findTarget(
-      post,
-      "freshComment",
-      {
-        className: "ShardedComment",
-        foreignKey: ["blog_id", "blog_post_id"],
-      },
-      "hasOne",
-    );
+    const comment = await findTarget(post, "freshComment", {
+      className: "ShardedComment",
+      foreignKey: ["blog_id", "blog_post_id"],
+    });
     expect((comment as any)?.body).toBe("Only");
   });
 
@@ -2601,15 +2591,10 @@ describe("AssociationsTest", () => {
     const order = await CpkOrder.create({ shop_id: 1 });
     const [, orderId] = order.id as [number, number];
     await CpkOrderAgreement.create({ order_id: orderId, signature: "only" });
-    const agreement = await findTarget(
-      order,
-      "freshAgreement",
-      {
-        className: "CpkOrderAgreement",
-        foreignKey: "order_id",
-      },
-      "hasOne",
-    );
+    const agreement = await findTarget(order, "freshAgreement", {
+      className: "CpkOrderAgreement",
+      foreignKey: "order_id",
+    });
     expect((agreement as any)?.signature).toBe("only");
   });
 
@@ -2680,15 +2665,10 @@ describe("AssociationsTest", () => {
       parent_type: "ShardedBlogPost",
       title: "wrongShard",
     });
-    const child = await findTarget(
-      post,
-      "freshChild",
-      {
-        className: "ShardedBlogPost",
-        as: "parent",
-      },
-      "hasOne",
-    );
+    const child = await findTarget(post, "freshChild", {
+      className: "ShardedBlogPost",
+      as: "parent",
+    });
     expect((child as any)?.title).toBe("match");
   });
 

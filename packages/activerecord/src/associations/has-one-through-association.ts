@@ -706,19 +706,9 @@ export async function findTarget(
 
   let throughRecord: Base | null;
   if (throughAssoc.type === "hasOne") {
-    throughRecord = await findSingularTarget(
-      record,
-      throughAssoc.name,
-      throughAssoc.options,
-      "hasOne",
-    );
+    throughRecord = await findSingularTarget(record, throughAssoc.name, throughAssoc.options);
   } else if (throughAssoc.type === "belongsTo") {
-    throughRecord = await findSingularTarget(
-      record,
-      throughAssoc.name,
-      throughAssoc.options,
-      "belongsTo",
-    );
+    throughRecord = await findSingularTarget(record, throughAssoc.name, throughAssoc.options);
   } else if (throughAssoc.type === "hasMany") {
     const throughRecords = await findHasManyTarget(record, throughAssoc.name, throughAssoc.options);
     throughRecord = throughRecords[0] ?? null;
@@ -735,9 +725,9 @@ export async function findTarget(
 
   if (sourceAssoc) {
     if (sourceAssoc.type === "belongsTo") {
-      return findSingularTarget(throughRecord, sourceName, sourceAssoc.options, "belongsTo");
+      return findSingularTarget(throughRecord, sourceName, sourceAssoc.options);
     } else if (sourceAssoc.type === "hasOne") {
-      return findSingularTarget(throughRecord, sourceName, sourceAssoc.options, "hasOne");
+      return findSingularTarget(throughRecord, sourceName, sourceAssoc.options);
     }
   }
 

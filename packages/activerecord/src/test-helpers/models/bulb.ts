@@ -36,7 +36,7 @@ export class Bulb extends Base {
     });
     this.afterCreate(async (record: Bulb) => {
       record.countAfterCreate = await Bulb.unscoped(async () => {
-        const car = await findTarget(record, "car", {}, "belongsTo");
+        const car = await findTarget(record, "car", {});
         return car ? await association(car, "bulbs").count() : undefined;
       });
     });

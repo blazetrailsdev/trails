@@ -366,12 +366,12 @@ describe("StrictLoadingTest", () => {
 
       const preloaded = (await Developer.all().includes("ship").first())!;
       expect(preloaded.isStrictLoading()).toBe(true);
-      const loaded = await findTarget(preloaded, "ship", { className: "Ship" }, "hasOne");
+      const loaded = await findTarget(preloaded, "ship", { className: "Ship" });
       expect(loaded?.id).toBe(ship.id);
 
       await preloaded.reload();
 
-      const reloaded = await findTarget(preloaded, "ship", { className: "Ship" }, "hasOne");
+      const reloaded = await findTarget(preloaded, "ship", { className: "Ship" });
       expect(reloaded?.id).toBe(ship.id);
     });
   });
@@ -434,7 +434,7 @@ describe("StrictLoadingTest", () => {
     await expect(association(loaded!, "contracts").toArray()).rejects.toThrow(
       StrictLoadingViolationError,
     );
-    await expect(findTarget(loaded!, "ship", { className: "Ship" }, "hasOne")).rejects.toThrow(
+    await expect(findTarget(loaded!, "ship", { className: "Ship" })).rejects.toThrow(
       StrictLoadingViolationError,
     );
   });
@@ -569,16 +569,11 @@ describe("StrictLoadingTest", () => {
     await developer!.updateColumn("mentor_id", mentor.id);
 
     await expect(
-      findTarget(
-        developer!,
-        "strictLoadingMentor",
-        {
-          className: "Mentor",
-          foreignKey: "mentor_id",
-          strictLoading: true,
-        },
-        "belongsTo",
-      ),
+      findTarget(developer!, "strictLoadingMentor", {
+        className: "Mentor",
+        foreignKey: "mentor_id",
+        strictLoading: true,
+      }),
     ).rejects.toThrow(StrictLoadingViolationError);
   });
 
@@ -589,9 +584,9 @@ describe("StrictLoadingTest", () => {
       const developer = await Developer.first();
       await developer!.updateColumn("mentor_id", mentor.id);
 
-      await expect(
-        findTarget(developer!, "mentor", { className: "Mentor" }, "belongsTo"),
-      ).rejects.toThrow(StrictLoadingViolationError);
+      await expect(findTarget(developer!, "mentor", { className: "Mentor" })).rejects.toThrow(
+        StrictLoadingViolationError,
+      );
     });
   });
 
@@ -602,16 +597,11 @@ describe("StrictLoadingTest", () => {
       const developer = await Developer.first();
       await developer!.updateColumn("mentor_id", mentor.id);
 
-      const loaded = await findTarget(
-        developer!,
-        "strictLoadingOffMentor",
-        {
-          className: "Mentor",
-          foreignKey: "mentor_id",
-          strictLoading: false,
-        },
-        "belongsTo",
-      );
+      const loaded = await findTarget(developer!, "strictLoadingOffMentor", {
+        className: "Mentor",
+        foreignKey: "mentor_id",
+        strictLoading: false,
+      });
       expect(loaded?.id).toBe(mentor.id);
     });
   });
@@ -624,16 +614,11 @@ describe("StrictLoadingTest", () => {
 
     const developer = (await Developer.all().includes("strictLoadingMentor").first())!;
 
-    const loaded = await findTarget(
-      developer,
-      "strictLoadingMentor",
-      {
-        className: "Mentor",
-        foreignKey: "mentor_id",
-        strictLoading: true,
-      },
-      "belongsTo",
-    );
+    const loaded = await findTarget(developer, "strictLoadingMentor", {
+      className: "Mentor",
+      foreignKey: "mentor_id",
+      strictLoading: true,
+    });
     expect(loaded?.id).toBe(mentor.id);
   });
 
@@ -645,7 +630,7 @@ describe("StrictLoadingTest", () => {
       await first!.updateColumn("mentor_id", mentor.id);
 
       const developer = (await Developer.all().includes("mentor").first())!;
-      const loaded = await findTarget(developer, "mentor", { className: "Mentor" }, "belongsTo");
+      const loaded = await findTarget(developer, "mentor", { className: "Mentor" });
       expect(loaded?.id).toBe(mentor.id);
     });
   });
@@ -657,15 +642,10 @@ describe("StrictLoadingTest", () => {
     await ship!.updateColumn("developer_id", developer!.id);
 
     await expect(
-      findTarget(
-        developer!,
-        "strictLoadingShip",
-        {
-          className: "Ship",
-          strictLoading: true,
-        },
-        "hasOne",
-      ),
+      findTarget(developer!, "strictLoadingShip", {
+        className: "Ship",
+        strictLoading: true,
+      }),
     ).rejects.toThrow(StrictLoadingViolationError);
   });
 
@@ -676,7 +656,7 @@ describe("StrictLoadingTest", () => {
       const ship = await Ship.first();
       await ship!.updateColumn("developer_id", developer!.id);
 
-      await expect(findTarget(developer!, "ship", { className: "Ship" }, "hasOne")).rejects.toThrow(
+      await expect(findTarget(developer!, "ship", { className: "Ship" })).rejects.toThrow(
         StrictLoadingViolationError,
       );
     });
@@ -688,15 +668,10 @@ describe("StrictLoadingTest", () => {
     await ship!.updateColumn("developer_id", developers("david").id);
 
     const developer = (await Developer.all().includes("strictLoadingShip").first())!;
-    const loaded = await findTarget(
-      developer,
-      "strictLoadingShip",
-      {
-        className: "Ship",
-        strictLoading: true,
-      },
-      "hasOne",
-    );
+    const loaded = await findTarget(developer, "strictLoadingShip", {
+      className: "Ship",
+      strictLoading: true,
+    });
     expect(loaded).not.toBeNull();
   });
 
@@ -707,7 +682,7 @@ describe("StrictLoadingTest", () => {
       await ship!.updateColumn("developer_id", developers("david").id);
 
       const developer = (await Developer.all().includes("ship").first())!;
-      const loaded = await findTarget(developer, "ship", { className: "Ship" }, "hasOne");
+      const loaded = await findTarget(developer, "ship", { className: "Ship" });
       expect(loaded).not.toBeNull();
     });
   });
@@ -858,9 +833,7 @@ describe("StrictLoadingTest", () => {
     treasure.strictLoadingBang();
     expect(treasure.isStrictLoading()).toBe(true);
 
-    await expect(
-      findTarget(treasure, "looter", { polymorphic: true }, "belongsTo"),
-    ).rejects.toThrow(
+    await expect(findTarget(treasure, "looter", { polymorphic: true })).rejects.toThrow(
       "`Treasure` is marked for strict_loading. " +
         "The polymorphic association named `:looter` cannot be lazily loaded.",
     );
@@ -881,7 +854,7 @@ describe("StrictLoadingTest", () => {
       logged = event.payload.reflection.strictLoadingViolationMessage(event.payload.owner);
     });
     try {
-      await findTarget(treasure, "looter", { polymorphic: true }, "belongsTo");
+      await findTarget(treasure, "looter", { polymorphic: true });
       expect(logged).toBe(
         "`Treasure` is marked for strict_loading. " +
           "The polymorphic association named `:looter` cannot be lazily loaded.",
