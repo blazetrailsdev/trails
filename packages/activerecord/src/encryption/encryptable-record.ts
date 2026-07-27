@@ -544,29 +544,16 @@ export class EncryptableRecord {
   }
 
   /**
-   * Instance-level encrypted-attribute check: resolves aliases and verifies
-   * the stored value is actually encrypted (calls `type.isEncrypted`).
-   * Distinct from `encryption.ts#isEncryptedAttribute(klass, attr)` which is
-   * a class-level check (is the attribute declared encrypted on this class?).
-   *
    * Mirrors: ActiveRecord::Encryption::EncryptableRecord#encrypted_attribute?
    * @internal
    */
   static encryptedAttribute(record: any, attributeName: string): boolean {
     const klass = record.constructor;
-    // Resolve attribute aliases before checking encrypted set.
     const name = klass._attributeAliases?.[attributeName] ?? attributeName;
     if (!this.encryptedAttributes(klass).has(name)) return false;
     // `encryptedTypeOf` unwraps the resolved type: unlike Ruby's DelegateClass,
     // a TS `Serialized(Encrypted(...))` does not forward `encrypted?`.
-    const type = encryptedTypeOf(
-      // Rails reads the type with `type_for_attribute(name)`; `getAttributeType`
-      // is the fallback for hosts that don't expose it (bare attribute-definition
-      // maps in unit tests).
-      typeof klass.typeForAttribute === "function"
-        ? klass.typeForAttribute(name)
-        : getAttributeType(klass, name),
-    );
+    const type = encryptedTypeOf(klass.typeForAttribute(name));
     if (!type) return false;
     return type.isEncrypted(record.readAttributeBeforeTypeCast?.(name));
   }

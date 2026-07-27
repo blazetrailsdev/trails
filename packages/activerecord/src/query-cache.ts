@@ -149,12 +149,6 @@ function configurationsEmpty(klass: typeof Base): boolean {
 export const ClassMethods = {
   /**
    * Mirrors: ActiveRecord::QueryCache::ClassMethods#cache
-   * (`pool = connection_pool; was_enabled = pool.query_cache_enabled;
-   * pool.enable_query_cache(&block) ensure pool.clear_query_cache unless
-   * was_enabled`). `enableQueryCache` already restores the prior
-   * enabled/dirties state in its own `finally` (matching Rails'
-   * `enable_query_cache`), so the only bookkeeping left here is the
-   * clear-on-exit.
    */
   async cache<T>(this: typeof Base, block: () => T | Promise<T>): Promise<T> {
     if (this.isConnected() || !configurationsEmpty(this)) {

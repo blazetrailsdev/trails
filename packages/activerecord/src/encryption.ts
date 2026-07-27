@@ -275,12 +275,6 @@ export function isEncryptedAttribute(klass: any, attr: string): boolean {
   return false;
 }
 
-// ─── Instance-level encryption API ──────────────────────────────────────────
-//
-// The bodies live in `encryption/encryptable-record.ts`, the file matching
-// Rails' `encryption/encryptable_record.rb`; base.ts reaches them through the
-// hook registry below.
-
 /** Mirrors: ActiveRecord::Encryption.key_length */
 export function keyLength(): number {
   return AesGcmCipher.keyLength;
