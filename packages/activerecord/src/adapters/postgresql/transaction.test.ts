@@ -129,8 +129,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await adapter.beginDbTransaction();
         await adapter.execute("SELECT * FROM samples WHERE id = 1 FOR UPDATE");
-        // `other` blocks on `adapter`'s row; a third connection cancels it via
-        // pg_stat_activity (mirrors Rails). Handler attached at creation (vitest).
+        // `other` blocks on `adapter`'s row; a third connection cancels it by
+        // pid. Rails cancels its own session's thread; matching a
+        // pg_stat_activity query pattern would cancel sibling workers' `FOR
+        // UPDATE` queries on the shared CI database.
+        const otherRows = await other.execute("SELECT pg_backend_pid() AS pid");
+        const otherPid = (otherRows[0] as { pid: number }).pid;
+        // Handler attached at creation (vitest fails on unhandled rejections).
         let blockedError: unknown;
         const blocked = other
           .execute("SELECT * FROM samples WHERE id = 1 FOR UPDATE")
@@ -140,12 +145,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         await new Promise<void>((r) => setTimeout(r, 200));
         const canceler = new PostgreSQLAdapter(PG_TEST_URL);
         try {
-          // Assert the cancel matched, else a no-op leaves `blocked` to timeout.
-          const sent = await canceler.execute(
-            "SELECT pg_cancel_backend(pid) AS ok FROM pg_stat_activity " +
-              "WHERE state = 'active' AND query LIKE '% FOR UPDATE'",
-          );
-          expect(sent.length).toBe(1);
+          // Assert the cancel landed, else a no-op leaves `blocked` to timeout.
+          const sent = await canceler.execute("SELECT pg_cancel_backend(?) AS ok", [otherPid]);
+          expect((sent[0] as { ok: boolean }).ok).toBe(true);
           await blocked;
           expect(blockedError).toBeInstanceOf(QueryCanceled);
         } finally {
