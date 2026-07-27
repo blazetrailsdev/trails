@@ -365,18 +365,6 @@ export class SignedGlobalID {
   inspect(): string {
     return `#<SignedGlobalID:0x${this._objectId}>`;
   }
-
-  /**
-   * @internal
-   * @noRailsEquivalent TS analogue of Ruby's implicit string coercion: Rails
-   * relies on `to_s`/`to_param` being called whenever an SGID is interpolated
-   * into a string or a URL. `Symbol.toPrimitive` is the only hook that makes
-   * `String(sgid)` and template interpolation reach `toString()` for every
-   * hint.
-   */
-  [Symbol.toPrimitive](_hint: string): string {
-    return this.toString();
-  }
 }
 
 /** @internal */
