@@ -573,8 +573,6 @@ describe("QueryCacheTest", () => {
     });
   });
 
-  // Rails skips this in-memory ("In-Memory DB can't test for using a not
-  // connected connection"): re-establishing the pool would discard the schema.
   it.skipIf(inMemoryDb())("cache is available when using a not connected connection", async () => {
     const dbConfig = Base.connectionDbConfig();
     const originalConnection = Base.removeConnection();

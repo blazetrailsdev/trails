@@ -108,14 +108,10 @@ describe("PrimaryClassTest", () => {
     expect(ApplicationRecord.abstractClass).toBe(true);
   });
 
-  // Both tests are gated behind Rails' `unless in_memory_db?`
-  // (primary_class_test.rb): re-establishing an in-memory pool would discard
-  // its schema.
   it.skipIf(inMemoryDb())(
     "application record shares a connection with active record by default",
     async () => {
       (globalThis as Record<string, unknown>)["ApplicationRecord"] = ApplicationRecord;
-      const original = Base.connectionDbConfig();
       try {
         const pools = ApplicationRecord.connectsTo({
           database: { writing: "arunit", reading: "arunit" },
@@ -127,7 +123,7 @@ describe("PrimaryClassTest", () => {
         expect(await ApplicationRecord.leaseConnection()).toBe(await Base.leaseConnection());
       } finally {
         ApplicationRecord.removeConnection();
-        await Base.establishConnection(original);
+        await Base.establishConnection("arunit");
       }
     },
   );
@@ -136,7 +132,6 @@ describe("PrimaryClassTest", () => {
     "application record shares a connection with the primary abstract class if set",
     async () => {
       PrimaryAppRecord.primaryAbstractClass();
-      const original = Base.connectionDbConfig();
       try {
         const pools = PrimaryAppRecord.connectsTo({
           database: { writing: "arunit", reading: "arunit" },
@@ -149,7 +144,7 @@ describe("PrimaryClassTest", () => {
         expect(await PrimaryAppRecord.leaseConnection()).toBe(await Base.leaseConnection());
       } finally {
         PrimaryAppRecord.removeConnection();
-        await Base.establishConnection(original);
+        await Base.establishConnection("arunit");
       }
     },
   );
