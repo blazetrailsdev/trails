@@ -409,7 +409,6 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
 
   async tablePartitionDefinition(tableName: string): Promise<string | null> {
     const scope = this.pg.quotedScope(tableName, { type: "BASE TABLE" });
-    if (!scope.name) return null;
     const def = await this.pg.queryValue(
       `SELECT pg_catalog.pg_get_partkeydef(c.oid)
        FROM pg_catalog.pg_class c
@@ -424,7 +423,6 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
 
   async inheritedTableNames(tableName: string): Promise<string[]> {
     const scope = this.pg.quotedScope(tableName, { type: "BASE TABLE" });
-    if (!scope.name) return [];
     const names = await this.pg.queryValues(
       `SELECT parent.relname
        FROM pg_catalog.pg_inherits i
@@ -433,8 +431,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
        LEFT JOIN pg_namespace n ON n.oid = child.relnamespace
        WHERE child.relname = ${scope.name}
          AND child.relkind IN (${scope.type})
-         AND n.nspname = ${scope.schema}
-       ORDER BY i.inhseqno`,
+         AND n.nspname = ${scope.schema}`,
       "SCHEMA",
     );
     return names as string[];

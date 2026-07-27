@@ -115,7 +115,12 @@ export interface DatabaseStatementsHost {
   internalExecute?(
     sql: string,
     name?: string,
-    opts?: { materializeTransactions?: boolean; allowRetry?: boolean; binds?: unknown[] },
+    opts?: {
+      materializeTransactions?: boolean;
+      allowRetry?: boolean;
+      prepare?: boolean;
+      binds?: unknown[];
+    },
   ): Promise<unknown>;
   /** @internal */
   internalExecQuery?(
@@ -1432,6 +1437,7 @@ export async function internalExecQuery(
       // trails carries all of them in the opts object rather than positionally.
       const rawResult = await this.internalExecute(sql, sqlName, {
         binds,
+        prepare: options?.prepare,
         allowRetry: options?.allowRetry,
         materializeTransactions: options?.materializeTransactions,
       });
@@ -1947,11 +1953,17 @@ export function internalExecute(
   this: DatabaseStatementsHost,
   sql: string,
   name: string = "SQL",
-  binds: unknown[] = [],
-  prepare = false,
-  _async = false,
-  allowRetry = false,
-  materializeTransactions = true,
+  {
+    binds = [],
+    prepare = false,
+    allowRetry = false,
+    materializeTransactions = true,
+  }: {
+    binds?: unknown[];
+    prepare?: boolean;
+    allowRetry?: boolean;
+    materializeTransactions?: boolean;
+  } = {},
 ): Promise<unknown> {
   const processed = preprocessQuery.call(this, sql);
   return (this as any).rawExecute(
