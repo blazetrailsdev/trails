@@ -21,7 +21,7 @@
  * guard rather than a change to the mirrored test.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel, type Base } from "../index.js";
+import { registerModel, RecordNotSaved, type Base } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Pirate } from "../test-helpers/models/pirate.js";
 import { Ship } from "../test-helpers/models/ship.js";
@@ -110,6 +110,29 @@ describe("has_one displacement via the synchronous build path", () => {
     // bad attribute raises before anything is queried or displaced. A
     // synchronous throw (not a rejected promise) is what proves the ordering.
     expect(() => assoc.build({ bogus_attribute: 1 })).toThrow();
+  });
+
+  it("leaves the displaced record cached when its removal fails", async () => {
+    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
+    await Ship.create({
+      name: "Nights Dirty Lightning",
+      pirate_id: (pirate as unknown as { id: number }).id,
+    });
+
+    const displaced = (await (pirate as unknown as { ship: Promise<Base | null> }).ship) as Base;
+    // An invalid displaced record makes `remove_target!`'s nullify save return
+    // false, which raises RecordNotSaved (has_one_association.rb:102-108).
+    (displaced as unknown as { name: string | null }).name = null;
+
+    await expect(
+      (pirate as unknown as { buildShip(a: object): Promise<Base> }).buildShip({
+        name: "Davy Jones Gold Dagger",
+      }),
+    ).rejects.toThrow(RecordNotSaved);
+
+    // Rails reaches `self.target = record` only after the transaction block, so
+    // a raising `remove_target!` leaves the OLD record cached.
+    expect(pirate.association("ship").target).toBe(displaced);
   });
 
   it("returns the built record synchronously when no query would run", async () => {
