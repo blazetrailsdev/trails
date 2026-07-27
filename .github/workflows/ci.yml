@@ -1188,9 +1188,9 @@ jobs:
           MYSQL_DATABASE: rails_js_test
           # AR_DB_FORKS deliberately unset: vitest.config.ts derives both the
           # worker count and the slot-DB pool from the runner's vCPU count.
-      # No MySQL connection env: no mysql-happy-path E2E exists yet. This run
-      # covers the SQLite E2E until a mysql suite lands and can be wired up.
       - run: pnpm vitest run packages/activerecord-cli
+        env:
+          MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
 
   # MariaDB stand-in runner. mysql-tests is temporarily disabled (see above);
   # this provides MySQL/MariaDB-family coverage via the mysql2 adapter against
@@ -1256,11 +1256,11 @@ jobs:
           MYSQL_DATABASE: rails_js_test
           # AR_DB_FORKS deliberately unset: vitest.config.ts derives both the
           # worker count and the slot-DB pool from the runner's vCPU count.
-      # No MySQL connection env: no mysql-happy-path E2E exists yet. This run
-      # covers the SQLite E2E until a mysql suite lands and can be wired up.
       # CLI E2E is not sharded — run it once, on shard 1 only.
       - if: ${{ matrix.shard == 1 }}
         run: pnpm vitest run packages/activerecord-cli
+        env:
+          MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
 
   website:
     name: Website
