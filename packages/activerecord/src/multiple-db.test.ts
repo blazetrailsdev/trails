@@ -10,9 +10,6 @@ import { College } from "./test-helpers/models/college.js";
 import { Entrant } from "./test-helpers/models/entrant.js";
 import { Bird } from "./test-helpers/models/bird.js";
 
-// Rails runs MultipleDbTest against two real databases (arunit / arunit2), as
-// does trails on every lane: `connect` establishes ARUnit2Model on arunit2 and
-// `provisionSecondDatabase` creates that database before any suite runs.
 describe("MultipleDbTest", () => {
   // Rails sets `self.use_transactional_tests = false`; fixtures() pins
   // the schema/fixtures across the file (skips the global per-test reset).
@@ -141,11 +138,12 @@ describe("MultipleDbTest", () => {
 
   // Rails guards these two with `unless in_memory_db?` (multiple_db_test.rb): its
   // in-memory harness can't give arunit2 a genuinely separate pool, so College
-  // would resolve to Base's connection. withSecondPool establishes an explicitly
-  // independent arunit2 pool (its own `:memory:` DB), so the assertions hold and we
-  // run them. This differs from the primary-class pair, which stay skipped because
-  // `connects_to(arunit/arunit)` is *expected* to share Base's connection — which
-  // independent in-memory DBs can't do.
+  // would resolve to Base's connection. trails' arunit2 is always a genuinely
+  // separate pool — a provisioned database on PG/MySQL, its own `:memory:` DB on
+  // sqlite — so the assertions hold and we run them. This differs from the
+  // primary-class pair, which stay skipped because `connects_to(arunit/arunit)`
+  // is *expected* to share Base's connection — which independent in-memory DBs
+  // can't do.
   it("count on custom connection", async () => {
     expect(await ARUnit2Model.leaseConnection()).toBe(await College.leaseConnection());
     expect(await Base.leaseConnection()).not.toBe(await College.leaseConnection());

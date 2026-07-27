@@ -10,9 +10,6 @@ describe("arunit2-config", () => {
   });
 
   it("carries the worker isolation slot into the arunit2 database name", () => {
-    // The slot is already baked into the primary database name by the
-    // sub-settings, so the derived arunit2 name inherits it and parallel
-    // workers never share a second database.
     expect(arunitDatabaseNames("rails_js_test_3").arunit2).toBe("rails_js_test_3_arunit2");
   });
 });
