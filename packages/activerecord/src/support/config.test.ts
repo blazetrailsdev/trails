@@ -41,7 +41,7 @@ describe("config", () => {
     );
   });
 
-  it("reads Postgres details from libpq's env vars, with defaults", () => {
+  it("reads Postgres details from libpq's env vars, defaulting no credential", () => {
     // Rails' postgresql: entries carry no connection fields at all
     // (config.example.yml:74-81), so there is no credential to default: an
     // unset PGUSER stays unset and pg resolves libpq's own default. The

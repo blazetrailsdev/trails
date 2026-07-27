@@ -10,6 +10,8 @@ describe("arunit2-config", () => {
   });
 
   it("carries the worker isolation slot into the arunit2 database name", () => {
-    expect(arunitDatabaseNames("activerecord_unittest_3").arunit2).toBe("activerecord_unittest_3_arunit2");
+    expect(arunitDatabaseNames("activerecord_unittest_3").arunit2).toBe(
+      "activerecord_unittest_3_arunit2",
+    );
   });
 });
