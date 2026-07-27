@@ -4,7 +4,7 @@
  * Mirrors: ActiveModel::Type::Helpers::TimeValue
  */
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { configuredTimezone } from "./timezone.js";
+import { isUtc } from "./timezone.js";
 
 export interface TimezoneAware {
   readonly isUtc: boolean;
@@ -175,9 +175,13 @@ export function newTime(
         .toInstant();
       return offset === 0 ? instant : instant.subtract({ seconds: offset });
     }
-    return Temporal.PlainDateTime.from(components, { overflow: "reject" })
-      .toZonedDateTime(configuredTimezone(this?.isUtc))
-      .toInstant();
+    return (
+      Temporal.PlainDateTime.from(components, { overflow: "reject" })
+        // Rails branches on `is_utc?` between `::Time.utc` and `::Time.local`;
+        // Temporal has no `Time.local`, so the local arm names the host zone.
+        .toZonedDateTime((this?.isUtc ?? isUtc()) ? "UTC" : Temporal.Now.timeZoneId())
+        .toInstant()
+    );
   } catch {
     return null;
   }
@@ -217,9 +221,13 @@ export function fastStringToTime(this: TimezoneAware | void, s: string): Tempora
   const hasOffset = /Z$|[+-]\d{2}:\d{2}$/.test(datetimeString);
   try {
     if (hasOffset) return Temporal.Instant.from(datetimeString);
-    return Temporal.PlainDateTime.from(datetimeString, { overflow: "reject" })
-      .toZonedDateTime(configuredTimezone(this?.isUtc))
-      .toInstant();
+    return (
+      Temporal.PlainDateTime.from(datetimeString, { overflow: "reject" })
+        // Rails branches on `is_utc?` between `::Time.utc` and `::Time.local`;
+        // Temporal has no `Time.local`, so the local arm names the host zone.
+        .toZonedDateTime((this?.isUtc ?? isUtc()) ? "UTC" : Temporal.Now.timeZoneId())
+        .toInstant()
+    );
   } catch {
     return null;
   }
