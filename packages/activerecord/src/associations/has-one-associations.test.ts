@@ -6,7 +6,7 @@
  * have been replaced with the real Rails `Company`/`Firm`/`DependentFirm`/
  * `Account` models and the `companies`/`accounts` fixtures. No `defineSchema`.
  */
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { ArgumentError, I18n, UnknownAttributeError } from "@blazetrails/activemodel";
 import { throwAbort } from "@blazetrails/activesupport";
 import {
@@ -605,7 +605,7 @@ describe("HasOneAssociationsTest", () => {
     const association = found.association("account");
     expect(association.isLoaded()).toBe(false);
     const loadError = new Error("connection lost while loading the displaced target");
-    association.loadTargetForBuild = () => Promise.reject(loadError);
+    vi.spyOn(association, "loadTargetForBuild").mockRejectedValue(loadError);
 
     await expect(found.createAccount({ credit_limit: 70 })).rejects.toBe(loadError);
     expect(await Account.where({ firm_id: Number(company.id) }).count()).toBe(1);
