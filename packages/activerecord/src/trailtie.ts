@@ -39,10 +39,9 @@ import {
 } from "./trailties/controller-runtime.js";
 import { instrument } from "./trailties/job-runtime.js";
 import {
+  ActiveRecord,
   setBelongsToRequiredValidatesForeignKey,
   setGenerateSecureTokenOn,
-  setMaintainTestSchema,
-  setQueues,
   setRaiseOnAssignToAttrReadonly,
 } from "./ar-config.js";
 
@@ -235,11 +234,11 @@ export class Trailtie extends BaseRailtie {
       // config is the boot-time staging copy. Forward them so there is a single
       // source of truth at runtime.
       const cfg = this.config["activeRecord"] as ActiveRecordConfig;
-      setMaintainTestSchema(cfg.maintainTestSchema);
+      ActiveRecord.maintainTestSchema = cfg.maintainTestSchema;
       setRaiseOnAssignToAttrReadonly(cfg.raiseOnAssignToAttrReadonly);
       setBelongsToRequiredValidatesForeignKey(cfg.belongsToRequiredValidatesForeignKey);
       setGenerateSecureTokenOn(cfg.generateSecureTokenOn);
-      setQueues(cfg.queues);
+      ActiveRecord.queues = cfg.queues;
     });
 
     this.initializer("active_record_encryption.configuration", () => {

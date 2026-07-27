@@ -114,6 +114,7 @@ export {
 export { resetCallbacks } from "./callbacks.js";
 export { delegate } from "./delegate.js";
 export {
+  ActiveRecord,
   indexNestedAttributeErrors,
   setIndexNestedAttributeErrors,
   schemaCacheIgnoredTables,

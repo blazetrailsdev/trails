@@ -95,6 +95,24 @@ describe("harvestObjectLiteralMethods", () => {
     });
   });
 
+  it("captures get/set accessors as the Rails-named reader and writer pair", () => {
+    const methods = objectLiteralMethods(
+      `let backing: boolean | null = null;
+      export const ActiveRecord = {
+        get maintainTestSchema(): boolean | null {
+          return backing;
+        },
+        set maintainTestSchema(value: boolean | null) {
+          backing = value;
+        },
+      };`,
+    );
+    expect(methods.map((m) => [m.name, m.params.length])).toEqual([
+      ["maintainTestSchema", 0],
+      ["maintainTestSchema", 1],
+    ]);
+  });
+
   it("captures params for inline method and function-property forms", () => {
     const methods = objectLiteralMethods(
       `export const Reg = {
