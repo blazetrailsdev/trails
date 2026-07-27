@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { ReadOnlyError, StatementInvalid } from "./errors.js";
-import { itIfSupports } from "./test-helpers/supports.js";
+import { itIfSupports } from "./support/supports.js";
 import { adapterType } from "./test-adapter.js";
 import { PostgreSQLAdapter, PG_TEST_URL } from "./adapters/postgresql/test-helper.js";
 

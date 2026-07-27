@@ -29,7 +29,7 @@ import type { TableDefinition as PgTableDefinition } from "./connection-adapters
 
 import { fixtures } from "./test-helpers/fixtures.js";
 import { adapterType } from "./test-adapter.js";
-import { adapterSupports } from "./test-helpers/supports.js";
+import { adapterSupports } from "./support/supports.js";
 import { ChatMessage, ChatMessageCustomPk } from "./test-helpers/models/chat-message.js";
 import { captureSql } from "./testing/sql-capture.js";
 import { ClothingItem, ClothingItemSized } from "./test-helpers/models/clothing-item.js";

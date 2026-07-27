@@ -11,7 +11,7 @@ import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
 import { Base } from "../../index.js";
 import { Professor } from "../../test-helpers/models/professor.js";
-import { itIfSupports } from "../../test-helpers/supports.js";
+import { itIfSupports } from "../../support/supports.js";
 
 // Rails: class ForeignProfessor < ActiveRecord::Base; self.table_name = "foreign_professors"
 class ForeignProfessor extends Base {

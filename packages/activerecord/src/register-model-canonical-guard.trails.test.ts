@@ -9,7 +9,7 @@
  * The guard is only armed once the canonical autoload index is installed, so
  * this file imports it for its side effect.
  */
-import "./test-helpers/canonical-model-index.js";
+import "./support/canonical-model-index.js";
 import { describe, it, expect } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { Author } from "./test-helpers/models/author.js";

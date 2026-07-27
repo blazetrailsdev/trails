@@ -3,7 +3,7 @@
  *
  * Resolves which backend the active lane uses the way Rails does — from
  * `ARCONN` naming a key of the `connections:` hash, never from the presence of
- * a connection detail (see `test-helpers/test-connection-env.ts`):
+ * a connection detail (see `support/test-connection-env.ts`):
  *   - ARCONN=postgresql → PostgreSQLAdapter
  *   - ARCONN=mysql2     → Mysql2Adapter
  *   - (default)         → SQLite3Adapter (the per-worker template clone, or
@@ -26,7 +26,7 @@
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { TransactionManager } from "./connection-adapters/abstract/transaction.js";
-import { resetTestTables } from "./test-helpers/drop-all-tables.js";
+import { resetTestTables } from "./support/drop-all-tables.js";
 import { Base } from "./base.js";
 import { getEnv } from "@blazetrails/activesupport";
 import {
@@ -34,7 +34,7 @@ import {
   driverConfig,
   mysqlSettings,
   postgresSettings,
-} from "./test-helpers/test-connection-env.js";
+} from "./support/test-connection-env.js";
 
 /**
  * Which adapter backend is active. Read once at module load — the worker's
@@ -49,7 +49,7 @@ export const adapterType: "sqlite" | "postgres" | "mysql" = activeLane();
  * && db_config.database == ":memory:"`.
  *
  * The `db_config.database` analog here is the `database` field of the
- * `DatabaseConfigurations` entry built in `test-helpers/test-database-config.ts`,
+ * `DatabaseConfigurations` entry built in `support/test-database-config.ts`,
  * which is `AR_TEST_WORKER_DB ?? ":memory:"` — i.e. literally `":memory:"` on the
  * default lane and a real on-disk clone path when a per-worker template exists.
  * So `!AR_TEST_WORKER_DB` is exactly `db_config.database == ":memory:"`.
@@ -152,7 +152,7 @@ let _inTestPool: ConnectionPool | null = null;
 let _inTestPoolPromise: Promise<ConnectionPool> | null = null;
 
 async function buildInTestPool(): Promise<ConnectionPool> {
-  const { establishFromTestConfig } = await import("./test-helpers/test-database-config.js");
+  const { establishFromTestConfig } = await import("./support/test-database-config.js");
   const { HashConfig } = await import("./database-configurations/hash-config.js");
   const { PoolConfig } = await import("./connection-adapters/pool-config.js");
   const { ConnectionPool } = await import("./connection-adapters/abstract/connection-pool.js");

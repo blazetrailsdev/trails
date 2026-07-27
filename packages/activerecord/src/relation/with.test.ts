@@ -10,7 +10,7 @@ import { fixtures } from "../test-helpers/fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Company } from "../test-helpers/models/company.js";
-import { describeIfSupports } from "../test-helpers/supports.js";
+import { describeIfSupports } from "../support/supports.js";
 
 const SPECIAL_POSTS = [2];
 const POSTS_WITH_TAGS = [1, 2, 7, 8, 9, 10, 11];

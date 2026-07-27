@@ -3,7 +3,7 @@ import { Base } from "../base.js";
 import { setupHandlerSuite } from "./setup-handler-suite.js";
 import { dropAllTables, resetTestTables } from "./drop-all-tables.js";
 import { rebuildCanonicalTables } from "./canonical-schema.js";
-import { TEST_SCHEMA } from "./test-schema.js";
+import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
 let adapter: DatabaseAdapter;

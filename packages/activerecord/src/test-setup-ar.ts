@@ -20,7 +20,7 @@ import {
   setRaiseOnAssignToAttrReadonly,
 } from "./ar-config.js";
 import { resetTestAdapterState } from "./test-adapter.js";
-import { shouldSkipGlobalReset } from "./test-helpers/skip-global-reset.js";
+import { shouldSkipGlobalReset } from "./support/skip-global-reset.js";
 import { Configurable as EncryptionConfigurable } from "./encryption/configurable.js";
 import { installExtendedQueriesIfConfigured } from "./encryption/install.js";
 import {

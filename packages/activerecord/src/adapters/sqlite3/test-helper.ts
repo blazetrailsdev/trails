@@ -5,7 +5,7 @@
 import { describe, expect } from "vitest";
 import { Notifications, squish } from "@blazetrails/activesupport";
 import type { NotificationEvent } from "@blazetrails/activesupport";
-import { isSqliteRun } from "../../test-helpers/sqlite-template.js";
+import { isSqliteRun } from "../../support/sqlite-template.js";
 
 /**
  * Scope a suite to the SQLite backend, mirroring Rails'

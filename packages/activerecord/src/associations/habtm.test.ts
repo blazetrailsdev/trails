@@ -13,7 +13,7 @@ import { fixtures } from "../test-helpers/fixtures.js";
 // Opt into the canonical-model autoload index so the `Developer`/`Project`
 // association targets resolve by name on first reference — no manual
 // `registerModel`.
-import "../test-helpers/canonical-model-index.js";
+import "../support/canonical-model-index.js";
 import { Developer as CanonicalDeveloper } from "../test-helpers/models/developer.js";
 import { Project as CanonicalProject } from "../test-helpers/models/project.js";
 

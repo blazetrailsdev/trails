@@ -6,7 +6,7 @@
  * that wires the handler, transactional fixtures, and the canonical schema.
  *
  * The lower-level canonical loaders in
- * `packages/activerecord/src/test-helpers/canonical-schema.ts` —
+ * `packages/activerecord/src/support/canonical-schema.ts` —
  * `ensureCanonicalTables` and `loadCanonicalSchema` — are internal plumbing that
  * `fixtures()` and a couple of internal setup paths (the boot/template global
  * setup, the adapter-suite setup, `encryption/test-helpers.ts`) call. They are
@@ -37,13 +37,13 @@ export function repoRel(filename) {
 export const BANNED = new Set(["ensureCanonicalTables", "loadCanonicalSchema"]);
 
 // Test files permitted to import the banned loaders (they test them directly).
-export const ALLOW = new Set(["packages/activerecord/src/test-helpers/canonical-schema.test.ts"]);
+export const ALLOW = new Set(["packages/activerecord/src/support/canonical-schema.test.ts"]);
 
 /** True when `source` resolves to the canonical-schema test helper module. */
 function isCanonicalSchemaModule(source) {
   // Match on the module basename regardless of directory depth so a
-  // same-directory import from inside test-helpers/ (`./canonical-schema.js`)
-  // is caught, not just the `../../test-helpers/canonical-schema.js` form. The
+  // same-directory import from inside support/ (`./canonical-schema.js`)
+  // is caught, not just the `../../support/canonical-schema.js` form. The
   // repo has a single canonical-schema module, so basename matching is safe.
   return /(?:^|\/)canonical-schema(?:\.js)?$/.test(source);
 }

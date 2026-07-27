@@ -17,7 +17,7 @@ import { fixtures } from "./test-helpers/fixtures.js";
 import { postFixtureData } from "./test-helpers/fixtures/posts.js";
 import { Account } from "./test-helpers/models/account.js";
 import { Client } from "./test-helpers/models/company.js";
-import "./test-helpers/canonical-model-index.js";
+import "./support/canonical-model-index.js";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 import { adapterType } from "./test-adapter.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
@@ -26,7 +26,7 @@ import {
   assertQueriesMatch,
   assertNoQueries,
 } from "./testing/query-assertions.js";
-import { quoteTableName, escapeRegExp } from "./test-helpers/quote-regex.js";
+import { quoteTableName, escapeRegExp } from "./support/quote-regex.js";
 // Reply STI subclass + its belongs_to :topic, needed when touching STI Reply
 // rows (topics(:second), topics(:fourth)).
 import { Reply as CanonicalReply } from "./test-helpers/models/reply.js";

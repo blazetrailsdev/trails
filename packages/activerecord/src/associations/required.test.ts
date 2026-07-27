@@ -7,7 +7,7 @@ import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { MigrationContext } from "../migration.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { rebuildCanonicalTables } from "../test-helpers/canonical-schema.js";
+import { rebuildCanonicalTables } from "../support/canonical-schema.js";
 
 describe("RequiredAssociationsTest", () => {
   fixtures([]);

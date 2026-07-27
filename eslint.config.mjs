@@ -428,7 +428,7 @@ export default defineConfig(
   //    test. See eslint/require-table-teardown.mjs. ──
   {
     files: ["packages/activerecord/src/**/*.test.ts"],
-    ignores: ["packages/activerecord/src/test-helpers/**"],
+    ignores: ["packages/activerecord/src/test-helpers/**", "packages/activerecord/src/support/**"],
     rules: {
       "blazetrails/require-table-teardown": ["error", { rawSql: true }],
     },
@@ -458,6 +458,7 @@ export default defineConfig(
     files: ["packages/activerecord/src/**/*.test.ts"],
     ignores: [
       "packages/activerecord/src/test-helpers/**",
+      "packages/activerecord/src/support/**",
       ...requireCanonicalRebuildExclude.privateAdapter,
       ...requireCanonicalRebuildExclude.nonExecuting,
     ],
@@ -481,6 +482,7 @@ export default defineConfig(
       "packages/activerecord/src/**/schema-*.ts",
       // Test-infra DDL helpers render SQL by design (never migrating to arel).
       "packages/activerecord/src/test-helpers/**",
+      "packages/activerecord/src/support/**",
       "packages/activerecord/src/test-setup-*.ts",
     ],
     rules: {

@@ -25,7 +25,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { itIfSupports } from "../../test-helpers/supports.js";
+import { itIfSupports } from "../../support/supports.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
 import * as Arel from "@blazetrails/arel";
 import {
@@ -38,7 +38,7 @@ import {
 import { NullPool } from "../../connection-adapters/abstract/connection-pool.js";
 import { QueryAttribute } from "../../relation/query-attribute.js";
 import { Value, Integer } from "../../type.js";
-import { withSecondAdapter } from "../../test-helpers/second-connection.js";
+import { withSecondAdapter } from "../../support/second-connection.js";
 
 const EX_DEFAULT = "id serial primary key, number integer, data character varying(255)";
 

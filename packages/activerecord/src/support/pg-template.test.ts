@@ -16,7 +16,7 @@ import { describe, it, expect } from "vitest";
 import pg from "pg";
 import { generateSchemaFile } from "./schema-file-generator.js";
 import { schemaSha1 } from "../tasks/database-tasks.js";
-import { TEST_SCHEMA } from "./test-schema.js";
+import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { PG_TEMPLATE_ENV } from "./template-global-setup.js";
 import { activeLane, postgresSettings, settingsUrl, withDatabase } from "./test-connection-env.js";
 

@@ -3,7 +3,7 @@
  */
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
-import { describeIfSupports } from "../../test-helpers/supports.js";
+import { describeIfSupports } from "../../support/supports.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {

@@ -5,7 +5,7 @@ import { lookupCastTypeFromJoinDependencies, typeFor } from "./relation/calculat
 import { fixtures } from "./test-helpers/fixtures.js";
 // Opt into the canonical-model autoload index so the `topics` association target
 // (`Topic`) resolves by name on first reference — no manual `registerModel`.
-import "./test-helpers/canonical-model-index.js";
+import "./support/canonical-model-index.js";
 
 // ==========================================================================
 // lookupCastTypeFromJoinDependencies unit tests

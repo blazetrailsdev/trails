@@ -11,7 +11,7 @@ import { fixtures } from "../test-helpers/fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Reply } from "../test-helpers/models/reply.js";
 import { Author } from "../test-helpers/models/author.js";
-import { quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
+import { quoteTableName, escapeRegExp } from "../support/quote-regex.js";
 import { ValueType } from "@blazetrails/activemodel";
 
 // Same shape as Rails' `fake_pg_caster` (homogeneous_in_test.rb:44-50) — a map

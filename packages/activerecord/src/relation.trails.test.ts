@@ -27,7 +27,7 @@ import { Rating as CanonRating } from "./test-helpers/models/rating.js";
 import { Author as CanonAuthor } from "./test-helpers/models/author.js";
 import { Categorization as CanonCategorization } from "./test-helpers/models/categorization.js";
 import { captureSql } from "./testing/sql-capture.js";
-import { quoteTableName, quoteColumnName } from "./test-helpers/quote-regex.js";
+import { quoteTableName, quoteColumnName } from "./support/quote-regex.js";
 
 describe("isBlank / isPresent", () => {
   // `developers` is canonical (schema.rb `create_table :developers`) and

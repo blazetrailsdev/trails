@@ -3,7 +3,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 import { resetTestAdapterState } from "../test-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { realPool } from "../connection-adapters/abstract/connection-pool.js";
-import { popSkipGlobalReset, pushSkipGlobalReset } from "./skip-global-reset.js";
+import { popSkipGlobalReset, pushSkipGlobalReset } from "../support/skip-global-reset.js";
 
 interface TxnHost {
   transactionManager: {

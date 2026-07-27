@@ -25,7 +25,7 @@ import {
   Base,
 } from "./test-helpers.js";
 import { Configurable } from "./configurable.js";
-import { itIfSupports } from "../test-helpers/supports.js";
+import { itIfSupports } from "../support/supports.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { EncryptableRecord } from "./encryptable-record.js";
 import {

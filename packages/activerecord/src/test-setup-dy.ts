@@ -24,8 +24,8 @@
  *     GET_LOCK would allow slot races on MySQL. The schema file uses
  *     force:"cascade" for per-table drop+recreate instead.)
  */
-import { buildTestDatabaseConfig } from "./test-helpers/test-database-config.js";
-import { generateSchemaFile } from "./test-helpers/schema-file-generator.js";
+import { buildTestDatabaseConfig } from "./support/test-database-config.js";
+import { generateSchemaFile } from "./support/schema-file-generator.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { Base } from "./base.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
@@ -43,7 +43,7 @@ await Base.establishConnection(envConfig.configuration as Record<string, unknown
 // coarse `adapterName === "mysql"` skip and this per-worker rebuild silently
 // strips the canonical expression indexes a MySQL-8 template DB carries
 // (company_expression_index / full_name_index), diverging from schema.rb.
-const { supportsExpressionIndex } = await import("./test-helpers/schema-types.js");
+const { supportsExpressionIndex } = await import("./support/schema-types.js");
 const schemaFilePath = await generateSchemaFile(
   TEST_SCHEMA,
   adapter,

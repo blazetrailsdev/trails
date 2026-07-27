@@ -9,7 +9,7 @@ import { Base } from "./index.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 // Opt into the canonical-model autoload index so association targets resolve by
 // name on first reference — no manual `registerModel`.
-import "./test-helpers/canonical-model-index.js";
+import "./support/canonical-model-index.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Author } from "./test-helpers/models/author.js";
 import { ClothingItem } from "./test-helpers/models/clothing-item.js";

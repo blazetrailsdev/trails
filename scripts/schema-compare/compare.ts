@@ -14,11 +14,8 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { TEST_SCHEMA } from "../../packages/activerecord/src/test-helpers/test-schema.js";
-import type {
-  ColumnSpec,
-  Schema,
-} from "../../packages/activerecord/src/test-helpers/schema-types.js";
-import { columnsOf } from "../../packages/activerecord/src/test-helpers/schema-types.js";
+import type { ColumnSpec, Schema } from "../../packages/activerecord/src/support/schema-types.js";
+import { columnsOf } from "../../packages/activerecord/src/support/schema-types.js";
 import type { RailsColumnOptions, RailsTable } from "./parse-schema-rb.js";
 import { parseSchemaRbWithCoverage } from "./parse-schema-rb.js";
 import { writeJsonManifest } from "../api-compare/write-json-manifest.js";

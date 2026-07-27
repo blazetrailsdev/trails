@@ -1,5 +1,5 @@
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import { TEST_SCHEMA } from "./test-schema.js";
+import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
 /**
  * Table names the boot-time canonical schema

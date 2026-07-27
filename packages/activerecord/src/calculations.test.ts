@@ -8,7 +8,7 @@ import { captureSql } from "./testing/sql-capture.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 // Opt into the canonical-model autoload index so association targets resolve by
 // name on first reference — no manual `registerModel`.
-import "./test-helpers/canonical-model-index.js";
+import "./support/canonical-model-index.js";
 import { Account } from "./test-helpers/models/account.js";
 import { Company, DependentFirm, Client } from "./test-helpers/models/company.js";
 import { Topic } from "./test-helpers/models/topic.js";

@@ -8,14 +8,11 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parse as parseYaml } from "yaml";
 import { TEST_SCHEMA } from "../../packages/activerecord/src/test-helpers/test-schema.js";
-import type {
-  Schema,
-  TableSchema,
-} from "../../packages/activerecord/src/test-helpers/schema-types.js";
+import type { Schema, TableSchema } from "../../packages/activerecord/src/support/schema-types.js";
 import {
   isWrappedSchema,
   columnsOf,
-} from "../../packages/activerecord/src/test-helpers/schema-types.js";
+} from "../../packages/activerecord/src/support/schema-types.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");

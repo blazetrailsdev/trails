@@ -283,7 +283,7 @@ function collectAssertionKinds(
 
 // Adapter wrappers that take the title as their FIRST argument. The feature
 // wrappers (`describeIfSupports`/`itIfSupports`) instead take the feature key
-// as arg 0 and the title as arg 1, matching the test-helpers/supports.ts API.
+// as arg 0 and the title as arg 1, matching the support/supports.ts API.
 const ADAPTER_SUITE_WRAPPERS = new Set([
   "describe",
   "describeIfPg",

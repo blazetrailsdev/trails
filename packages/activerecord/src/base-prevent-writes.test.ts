@@ -3,9 +3,9 @@ import { beforeAll, describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 import { ReadOnlyError } from "./errors.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { isSqliteRun } from "./test-helpers/sqlite-template.js";
-import { resolveSecondDatabaseConfig } from "./test-helpers/arunit2-config.js";
-import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
+import { isSqliteRun } from "./support/sqlite-template.js";
+import { resolveSecondDatabaseConfig } from "./support/arunit2-config.js";
+import { rebuildCanonicalTables } from "./support/canonical-schema.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 import { Professor } from "./test-helpers/models/professor.js";
 

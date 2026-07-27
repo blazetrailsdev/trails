@@ -8,7 +8,7 @@ import { adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./schema-dumper.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { itIfSupports } from "./test-helpers/supports.js";
+import { itIfSupports } from "./support/supports.js";
 
 function nsec(v: Temporal.Instant): number {
   let ns = v.epochNanoseconds % 1_000_000_000n;

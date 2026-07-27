@@ -161,7 +161,7 @@ export function adapterSupports(feature: string): boolean {
   if (!backends) {
     throw new Error(
       `adapterSupports: unknown feature "${feature}". Add it to ` +
-        `test-helpers/supports.ts (mirror the adapter's supports_${feature}? method). ` +
+        `support/supports.ts (mirror the adapter's supports_${feature}? method). ` +
         `Known: ${Object.keys(SUPPORTS).sort().join(", ")}.`,
     );
   }

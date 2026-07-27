@@ -8,7 +8,7 @@ import {
   leaseMysqlAdapter,
   Mysql2Adapter,
 } from "../abstract-mysql-adapter/test-helper.js";
-import { describeIfSupports } from "../../test-helpers/supports.js";
+import { describeIfSupports } from "../../support/supports.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;

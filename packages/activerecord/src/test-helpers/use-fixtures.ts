@@ -18,7 +18,7 @@ export type { FixtureName } from "./fixtures-registry.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { Base } from "../base.js";
 import { registerModel } from "../associations.js";
-import { setupHandlerSuite } from "./setup-handler-suite.js";
+import { setupHandlerSuite } from "../support/setup-handler-suite.js";
 import {
   withTransactionalFixtures,
   type WithTransactionalFixturesOptions,

@@ -11,7 +11,7 @@ import type { NotificationEvent } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import { StatementInvalid } from "./errors.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import "./test-helpers/canonical-model-index.js";
+import "./support/canonical-model-index.js";
 
 describe("Instrumentation exception payload (trails)", () => {
   fixtures(["books"]);

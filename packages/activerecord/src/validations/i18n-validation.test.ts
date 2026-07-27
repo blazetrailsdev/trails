@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Error as ActiveModelError, I18n } from "@blazetrails/activemodel";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { seedAssociationCache } from "../test-helpers/seed-association-cache.js";
+import { seedAssociationCache } from "../support/seed-association-cache.js";
 
 fixtures([]);
 // The canonical `topics` table is laid at boot by loadCanonicalSchema.

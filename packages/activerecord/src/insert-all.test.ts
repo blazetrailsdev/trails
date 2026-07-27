@@ -23,11 +23,11 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { fixtures } from "./test-helpers/fixtures.js";
 // Opt into the canonical-model autoload index so association targets resolve by
 // name on first reference — no manual `registerModel`.
-import "./test-helpers/canonical-model-index.js";
-import { withDbWarningsAction } from "./test-helpers/with-db-warnings-action.js";
+import "./support/canonical-model-index.js";
+import { withDbWarningsAction } from "./support/with-db-warnings-action.js";
 import { assertQueriesMatch, assertNoQueriesMatch } from "./testing/query-assertions.js";
 import { captureLogOutput } from "./testing/sql-capture.js";
-import { adapterSupports, itIfSupports } from "./test-helpers/supports.js";
+import { adapterSupports, itIfSupports } from "./support/supports.js";
 import { Base } from "./base.js";
 import { Result } from "./result.js";
 import { Author } from "./test-helpers/models/author.js";

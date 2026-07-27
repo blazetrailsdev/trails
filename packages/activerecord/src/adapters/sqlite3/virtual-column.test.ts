@@ -8,7 +8,7 @@ import { SchemaDumper } from "../../schema-dumper.js";
 import { FixtureSet } from "../../test-helpers/fixture-set.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
 import { virtualColumnFixtureData } from "../../test-helpers/fixtures/virtual-columns.js";
-import { itIfSupports } from "../../test-helpers/supports.js";
+import { itIfSupports } from "../../support/supports.js";
 import type { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import type { Column } from "../../connection-adapters/sqlite3/column.js";
 

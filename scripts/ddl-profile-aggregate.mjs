@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Opt-in DDL profiler companion — aggregate the per-worker DDL-profile
-// JSON dumps (written by test-helpers/ddl-profile.ts, collected as CI
+// JSON dumps (written by support/ddl-profile.ts, collected as CI
 // artifacts) into a single summary. Usage:
 //   node scripts/ddl-profile-aggregate.mjs <dir-of-json> [<dir2> ...]
 import fs from "node:fs";

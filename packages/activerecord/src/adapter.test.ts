@@ -22,12 +22,12 @@ import {
 import { Result } from "./result.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { adapterType, inMemoryDb } from "./test-adapter.js";
-import { itIfSupports } from "./test-helpers/supports.js";
-import { establishFromTestConfig } from "./test-helpers/test-database-config.js";
-import { runWithoutConnection } from "./test-helpers/connection-helper.js";
+import { itIfSupports } from "./support/supports.js";
+import { establishFromTestConfig } from "./support/test-database-config.js";
+import { runWithoutConnection } from "./support/connection-helper.js";
 // Opt into the canonical-model autoload index so association targets resolve by
 // name on first reference — no manual `registerModel`.
-import "./test-helpers/canonical-model-index.js";
+import "./support/canonical-model-index.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Author, AuthorAddress } from "./test-helpers/models/author.js";

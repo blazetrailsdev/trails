@@ -9,7 +9,7 @@ import { qualifiedName } from "../inheritance.js";
 // lives in its own module because ESM hoists sibling `import`s ahead of any
 // top-level statement, so an inline config call would run too late.
 import "./canonical-model-index-encryption-setup.js";
-import * as canonicalModels from "./models/index.js";
+import * as canonicalModels from "../test-helpers/models/index.js";
 
 /**
  * Zeitwerk analog for the canonical test models.

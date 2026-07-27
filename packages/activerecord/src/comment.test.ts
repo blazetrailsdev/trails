@@ -8,7 +8,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { MigrationContext } from "./migration.js";
 import { adapterType } from "./test-adapter.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { itIfSupports } from "./test-helpers/supports.js";
+import { itIfSupports } from "./support/supports.js";
 import { SchemaDumper } from "./schema-dumper.js";
 
 describe("CommentTest", () => {

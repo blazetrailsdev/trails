@@ -9,9 +9,9 @@ import { sql as arelSql } from "@blazetrails/arel";
 
 import { registerModel, Range } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { itIfSupports } from "../test-helpers/supports.js";
+import { itIfSupports } from "../support/supports.js";
 import { assertQueriesCount, assertQueriesMatch } from "../testing/query-assertions.js";
-import { quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
+import { quoteTableName, escapeRegExp } from "../support/quote-regex.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Developer } from "../test-helpers/models/developer.js";
 import { Comment, CommentThatAutomaticallyAltersPostBody } from "../test-helpers/models/comment.js";

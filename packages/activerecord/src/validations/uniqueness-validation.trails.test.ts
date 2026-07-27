@@ -12,7 +12,7 @@ import { fixtures } from "../test-helpers/fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { newRawTestAdapter } from "../test-adapter.js";
 import type { TestDatabaseAdapter } from "../test-adapter.js";
-import { rebuildCanonicalTables } from "../test-helpers/canonical-schema.js";
+import { rebuildCanonicalTables } from "../support/canonical-schema.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 
 describe("UniquenessValidationContextTest", () => {

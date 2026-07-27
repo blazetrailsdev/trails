@@ -18,10 +18,10 @@ import { association } from "../associations.js";
 // Opt into the canonical-model autoload index so association targets
 // (`Human`/`Interest`) resolve by name on first reference — no manual
 // `registerModel`.
-import "../test-helpers/canonical-model-index.js";
+import "../support/canonical-model-index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { repairValidations } from "../test-helpers/repair-validations.js";
-import { seedAssociationCache } from "../test-helpers/seed-association-cache.js";
+import { seedAssociationCache } from "../support/seed-association-cache.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Reply } from "../test-helpers/models/reply.js";
 import { Human } from "../test-helpers/models/human.js";
