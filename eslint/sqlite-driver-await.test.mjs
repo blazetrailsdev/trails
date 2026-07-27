@@ -83,5 +83,3 @@ tester.run("sqlite-driver-await", rule, {
     },
   ],
 });
-
-console.log("sqlite-driver-await: all tests passed");

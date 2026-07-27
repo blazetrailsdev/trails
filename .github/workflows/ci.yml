@@ -691,7 +691,7 @@ jobs:
           scripts/test-deps
           scripts/rails-find
           scripts/parity
-          eslint
+          eslint/
           scripts/strip-asany.test.ts
           scripts/rails-file-structure-mixins.test.ts
           scripts/ci-suite-coverage.test.ts

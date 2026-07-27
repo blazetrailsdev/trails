@@ -525,11 +525,10 @@ try {
     ],
   });
 } finally {
-  // RuleTester registers its cases through describe/it, whose bodies run only
-  // AFTER this module has finished evaluating. Restoring the manifest here
-  // would pull the fixture out from under every case before the first one
-  // runs, and the rule would then read the real manifest and report nothing.
+  // Restoring here would pull the fixture manifest out from under every case:
+  // RuleTester only REGISTERS its cases through describe/it, whose bodies run
+  // after this module finishes evaluating, so the rule would read the real
+  // manifest and report nothing. The finally still matters — it guarantees the
+  // restore is scheduled even if registration above throws.
   afterAll(restoreManifest);
 }
-
-console.log("rails-file-structure-method-order tests passed");

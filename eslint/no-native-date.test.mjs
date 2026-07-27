@@ -95,5 +95,3 @@ function f(x: unknown) {
     },
   ],
 });
-
-console.log("no-native-date: all tests passed");
