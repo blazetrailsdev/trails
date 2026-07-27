@@ -241,6 +241,50 @@ describe("TableDefinition#new_foreign_key_definition", () => {
   });
 });
 
+describe("TableDefinition#new_check_constraint_definition", () => {
+  it("defaults the name to chk_rails_<hex> (bare-adapter fallback)", () => {
+    const chk = new TableDefinition("products").newCheckConstraintDefinition("price > 0");
+    expect(chk.name).toMatch(/^chk_rails_[0-9a-f]{10}$/);
+    expect(chk.validate).toBe(true);
+  });
+
+  it("routes the options hash through the adapter's checkConstraintOptions", () => {
+    const calls: unknown[][] = [];
+    const adapter = {
+      checkConstraintOptions(
+        tableName: string,
+        expression: string,
+        options: Record<string, unknown>,
+      ) {
+        calls.push([tableName, expression, options]);
+        return { ...options, name: `chk_${tableName}` };
+      },
+    } as any;
+    const td = new TableDefinition("products", { adapter });
+    const chk = td.newCheckConstraintDefinition("price > 0", { validate: false });
+    // The carried expression and options must reach the adapter, not be
+    // recomputed locally — that bypass is what let the name derivation drift.
+    expect(calls).toEqual([["products", "price > 0", { validate: false }]]);
+    expect(chk.name).toBe("chk_products");
+    expect(chk.validate).toBe(false);
+  });
+
+  it("check_constraint routes through new_check_constraint_definition", () => {
+    const adapter = {
+      checkConstraintOptions(
+        tableName: string,
+        _expression: string,
+        options: Record<string, unknown>,
+      ) {
+        return { ...options, name: `chk_${tableName}` };
+      },
+    } as any;
+    const td = new TableDefinition("products", { adapter });
+    td.checkConstraint("price > 0");
+    expect(td.checkConstraints.map((c) => c.name)).toEqual(["chk_products"]);
+  });
+});
+
 describe("ReferenceDefinition helpers", () => {
   it("addTo adds id column by default", () => {
     const ref = new ReferenceDefinition("user", { index: false });

@@ -913,9 +913,22 @@ export class SchemaStatements {
     ) {
       return adapter.addCheckConstraint(tableName, expression, options);
     }
-    const name = this.checkConstraintName(tableName, { name: options.name, expression });
-    const validate = options.validate !== false;
-    const chkDef = new CheckConstraintDefinition(tableName, expression, name, validate);
+    // Mirrors Rails add_check_constraint: route the options hash through
+    // check_constraint_options (which derives :name) and let :if_not_exists
+    // short-circuit against the live constraint before emitting any DDL.
+    const resolved = this.checkConstraintOptions(tableName, expression, options) as {
+      name?: string;
+      validate?: boolean;
+      ifNotExists?: boolean;
+    };
+    if (
+      options.ifNotExists &&
+      (await this.isCheckConstraintExists(tableName, { name: resolved.name! }))
+    ) {
+      return;
+    }
+    const validate = resolved.validate !== false;
+    const chkDef = new CheckConstraintDefinition(tableName, expression, resolved.name!, validate);
     await this.adapter.execute(
       `ALTER TABLE ${this._qi(tableName)} ADD ${await this.schemaCreation.accept(chkDef)}`,
     );
@@ -1765,11 +1778,16 @@ export class SchemaStatements {
   }
 
   checkConstraintOptions(
-    _tableName: string,
-    _expression: string,
+    tableName: string,
+    expression: string,
     options: Record<string, unknown> = {},
   ): Record<string, unknown> {
-    return { ...options };
+    const dup = { ...options };
+    dup.name ??= this.checkConstraintName(tableName, { ...dup, expression } as {
+      name?: string;
+      expression?: string;
+    });
+    return dup;
   }
 
   async isCheckConstraintExists(
