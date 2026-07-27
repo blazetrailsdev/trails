@@ -58,7 +58,7 @@ import {
 } from "../test-helpers/models/post.js";
 import { Project } from "../test-helpers/models/project.js";
 import { Lion } from "../test-helpers/models/cat.js";
-import { inMemoryDb } from "../test-adapter.js";
+import { inMemoryDb } from "../support/adapter-helper.js";
 
 // Register the models whose associations are resolved by active tests
 // (Developer's `projects` HABTM is dereferenced in the eager_load/preload ports).

@@ -6,7 +6,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationSubscriber } from "@blazetrails/activesupport";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { topicFixtureData } from "./test-helpers/fixtures/topics.js";
-import { inMemoryDb } from "./test-adapter.js";
+import { inMemoryDb } from "./support/adapter-helper.js";
 
 // Mirrors `transaction_instrumentation_test.rb`, which runs under
 // `ActiveRecord::TestCase` with `self.use_transactional_tests = false` and

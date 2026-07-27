@@ -19,7 +19,7 @@ import { Store } from "./connection-adapters/abstract/query-cache.js";
 import { LogSubscriber } from "./log-subscriber.js";
 import { Notifications, Logger, type NotificationEvent } from "@blazetrails/activesupport";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
-import { inMemoryDb } from "./test-adapter.js";
+import { inMemoryDb } from "./support/adapter-helper.js";
 
 for (const m of [Task, Topic, Category, Post]) registerModel(m as never);
 

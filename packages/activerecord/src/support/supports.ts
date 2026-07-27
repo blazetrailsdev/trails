@@ -14,6 +14,16 @@ import { adapterType } from "../test-adapter.js";
  * live `supports_*?` method) — for the backends our matrix runs: CI's
  * postgres:17, mysql:8, and the in-memory sqlite default.
  *
+ * This file stays separate from `support/adapter-helper.ts` (the port of
+ * `test/support/adapter_helper.rb`): only a handful of the keys below have an
+ * `adapter_helper.rb` counterpart — the rest are the adapters' own
+ * `supports_*?` methods that Rails tests call straight on the connection, so
+ * there is no Rails helper file to fold them into. Keeping the whole set in
+ * one feature-keyed table also keeps the test:compare gate extractor reading a
+ * single source; splitting the adapter_helper-owned keys out would duplicate
+ * the resolution logic. `adapter-helper.ts` holds the predicates that ARE
+ * `adapter_helper.rb`'s own (`currentAdapter`, `inMemoryDb`, …).
+ *
  * Feature keys match Rails' `supports_<key>?` (and the keys the test:compare
  * gate extractor derives), so a flagged `it.skip` of a Rails feature-gated
  * test converts directly to `itIfSupports("<key>", …)`. Add a key when a

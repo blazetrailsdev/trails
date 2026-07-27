@@ -6,7 +6,8 @@ import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-
 import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { SchemaCache, SchemaReflection } from "./connection-adapters/schema-cache.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
-import { newRawTestAdapter, ambientPoolConfiguration, inMemoryDb } from "./test-adapter.js";
+import { newRawTestAdapter, ambientPoolConfiguration } from "./test-adapter.js";
+import { inMemoryDb } from "./support/adapter-helper.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import type {
   AdapterName,

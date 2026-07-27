@@ -21,7 +21,8 @@ import {
 } from "./index.js";
 import { Result } from "./result.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { adapterType, inMemoryDb } from "./test-adapter.js";
+import { adapterType } from "./test-adapter.js";
+import { inMemoryDb } from "./support/adapter-helper.js";
 import { itIfSupports } from "./support/supports.js";
 import { establishFromTestConfig } from "./support/test-database-config.js";
 import { runWithoutConnection } from "./support/connection-helper.js";
