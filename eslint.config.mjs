@@ -24,6 +24,7 @@ import testFixtureParity from "./eslint/test-fixture-parity.mjs";
 import requireTableTeardown from "./eslint/require-table-teardown.mjs";
 import requireCanonicalRebuild from "./eslint/require-canonical-rebuild.mjs";
 import noRawSql from "./eslint/no-raw-sql.mjs";
+import { noRawSqlFiles, noRawSqlIgnores } from "./eslint/no-raw-sql-scope.mjs";
 import noStandaloneAssociations from "./eslint/no-standalone-associations.mjs";
 import noInternalCanonicalLoaders from "./eslint/no-internal-canonical-loaders.mjs";
 import noExplicitAnyDisable from "./eslint/no-explicit-any-disable.mjs";
@@ -482,24 +483,11 @@ export default defineConfig(
   //    RFC-0022 `sql.replace`/`sql.concat` string-surgery pattern) outside the
   //    adapter/DDL layer. Build queries with @blazetrails/arel. The adapter
   //    layer, migrations, and schema dumpers legitimately render SQL and are
-  //    excluded. See eslint/no-raw-sql.mjs. ──
+  //    excluded. The scope globs are the single source of truth shared with the
+  //    rule's own filename check — see eslint/no-raw-sql-scope.mjs. ──
   {
-    files: ["packages/activerecord/src/**/*.ts"],
-    ignores: [
-      "packages/activerecord/src/**/*.test.ts",
-      "packages/activerecord/src/connection-adapters/**",
-      "packages/activerecord/src/adapters/**",
-      "packages/activerecord/src/tasks/**",
-      "packages/activerecord/src/**/schema-*.ts",
-      // Test-infra DDL helpers render SQL by design (never migrating to arel).
-      "packages/activerecord/src/test-helpers/**",
-      "packages/activerecord/src/support/**",
-      "packages/activerecord/src/fixtures.ts",
-      "packages/activerecord/src/test-fixtures.ts",
-      "packages/activerecord/src/test-fixtures/**",
-      "packages/activerecord/src/test-setup-*.ts",
-      "packages/activerecord/src/cases/helper.ts",
-    ],
+    files: noRawSqlFiles,
+    ignores: noRawSqlIgnores,
     rules: {
       "blazetrails/no-raw-sql": "error",
     },

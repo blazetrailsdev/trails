@@ -1,3 +1,5 @@
+import { isExcludedPath, repoRel } from "./no-raw-sql-scope.mjs";
+
 /**
  * ESLint rule: no-raw-sql
  *
@@ -15,43 +17,10 @@
  *       ✗ connection.execute("SELECT …")   ✓ throw new Error("SELECT failed")
  *   - noSqlSurgery: `.replace(`/`.concat(` on a variable named `sql` (RFC-0022).
  *
- * Scope (also set in eslint.config.mjs; re-checked here so the rule is testable
- * by filename): activerecord src .ts, excluding test files, connection-adapters,
- * adapters, tasks, schema-*.ts, and the test-infra DDL helpers (test-helpers/, support/
- * and test-setup-*.ts) — those legitimately render SQL by design.
+ * Scope lives in eslint/no-raw-sql-scope.mjs — a single glob list shared with
+ * eslint.config.mjs — and is re-checked here so the rule is testable by
+ * filename.
  */
-
-/** Repo-relative path under packages/activerecord/src; null if outside it. */
-function repoRel(filename) {
-  const norm = filename.replace(/\\/g, "/");
-  const m = norm.match(/(?:^|\/)(packages\/activerecord\/src\/.+\.ts)$/);
-  return m ? m[1] : null;
-}
-
-/** Directories / file patterns that legitimately render SQL → out of scope. */
-function isExcludedPath(rel) {
-  if (rel.endsWith(".test.ts")) return true;
-  if (/(^|\/)connection-adapters\//.test(rel)) return true;
-  if (/(^|\/)adapters\//.test(rel)) return true;
-  if (/(^|\/)tasks\//.test(rel)) return true;
-  if (/(^|\/)schema-[^/]*\.ts$/.test(rel)) return true;
-  // Test-infra DDL helpers render SQL by design and will never migrate to
-  // @blazetrails/arel — scope them out rather than baseline them so the
-  // RFC-0022 burndown worklist reflects only real arel migration targets.
-  if (/(^|\/)test-helpers\//.test(rel)) return true;
-  // The fixture machinery is `lib/active_record/fixtures.rb:595` /
-  // `test_fixtures.rb:113` code (RFC 0064 bucket D); it renders DDL/DML
-  // directly for the same reason the rest of the test-infra does. Anchored to
-  // the exact ported files — matching `fixtures.ts` by basename would also
-  // exempt any future same-named module elsewhere under activerecord/src.
-  if (rel === "packages/activerecord/src/fixtures.ts") return true;
-  if (rel === "packages/activerecord/src/test-fixtures.ts") return true;
-  if (rel.startsWith("packages/activerecord/src/test-fixtures/")) return true;
-  if (/(^|\/)support\//.test(rel)) return true;
-  if (/(^|\/)test-setup-[^/]*\.ts$/.test(rel)) return true;
-  if (/(^|\/)cases\/helper\.ts$/.test(rel)) return true;
-  return false;
-}
 
 const SQL_RE = /^\s*(SELECT|INSERT|UPDATE|DELETE|ALTER|CREATE|DROP|TRUNCATE)\b/i;
 
