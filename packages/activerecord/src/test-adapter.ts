@@ -219,10 +219,12 @@ export function _resetPooledTestAdapterForTests(): void {
  * dropped. See {@link resetTestTables}.
  *
  * The DDL runs on the primary `Base.connection` pool — the schema-loaded
- * database every test rides — but only when Base is connected. Worker boot
- * (`test-setup-dy.ts`) deliberately disconnects Base between files, so a file
- * that never connected Base did no DB work and has nothing to reset; the
- * global JS caches below are still cleared unconditionally.
+ * database every test rides. Worker boot (`test-setup-dy.ts`) connects once
+ * and stays connected for the whole worker, mirroring `ARTest.connect`
+ * (`vendor/rails/activerecord/test/support/connection.rb:31-32`), so that pool
+ * is normally live for every test. The `isConnectedQ` guard remains for the
+ * window where a suite has removed the pool and not yet re-established it; the
+ * global JS caches below are cleared unconditionally either way.
  *
  *   - PG: `resetTestTables` enumerates every user schema via
  *     `current_schemas(false)`, not just `public`.
