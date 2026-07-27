@@ -117,8 +117,9 @@ export async function fileHash(file: string): Promise<string | null> {
 export type ReadSet = Record<string, string>;
 
 /**
- * Hash of the SHAPE of what the workspace can resolve: the sorted names (not
- * contents) of every built `packages/<dir>/dist/**\/*.d.ts`.
+ * Per-package hash of the SHAPE of what that package can resolve: the sorted
+ * names (not contents) of every built `dist/**\/*.d.ts` under the package's own
+ * directory and its TRANSITIVE workspace dependencies.
  *
  * A read-set records what the compiler DID read, so it cannot notice a file
  * that was not resolvable at extraction time and is now. An unbuilt dependency
@@ -128,22 +129,109 @@ export type ReadSet = Record<string, string>;
  * cache keys closes that hole without giving up the read-set's precision —
  * building or rebuilding does not change the file NAMES, so the common case
  * (contents changed) still invalidates only the packages that read them.
+ *
+ * Scoping it to the dependency closure is what keeps the remaining case —
+ * adding, deleting or renaming a source file, ~20% of commits touching
+ * `packages/` — from invalidating all 13 packages including the ones that
+ * cannot resolve the changed package at all. `keyFor` is sync so a caller can
+ * key every package off one walk of the workspace.
  */
-export async function resolutionShapeKey(packagesDir: string): Promise<string> {
+export interface ResolutionShape {
+  /**
+   * Shape key for the package directory `dirName`. A directory the workspace
+   * graph doesn't know falls back to the workspace-global key: we can't bound
+   * what it resolves, so nothing may be assumed invariant.
+   */
+  keyFor(dirName: string): string;
+}
+
+export async function resolutionShape(packagesDir: string): Promise<ResolutionShape> {
   let dirs: string[];
   try {
     dirs = await fs.readdir(packagesDir);
   } catch {
-    return hashParts([]);
+    dirs = [];
   }
-  const perPackage = await Promise.all(
+  const names = new Map<string, string[]>();
+  await Promise.all(
     dirs.map(async (dir) => {
       const dist = path.join(packagesDir, dir, "dist");
       const files = await declarationsUnder(dist);
-      return files.map((file) => `${dir}/${path.relative(dist, file).replace(/\\/g, "/")}`);
+      names.set(
+        dir,
+        files.map((file) => `${dir}/${path.relative(dist, file).replace(/\\/g, "/")}`),
+      );
     }),
   );
-  return hashParts(perPackage.flat().sort());
+  const graph = await readWorkspaceGraph(packagesDir, dirs);
+  const globalKey = hashParts([...names.values()].flat().sort());
+  const keys = new Map<string, string>();
+  for (const dir of graph.keys()) {
+    const closure = transitiveDeps(graph, dir);
+    keys.set(dir, hashParts(closure.flatMap((dep) => names.get(dep) ?? []).sort()));
+  }
+  return { keyFor: (dirName) => keys.get(dirName) ?? globalKey };
+}
+
+/**
+ * Workspace dependency graph as package DIRECTORY → directories of its direct
+ * `@blazetrails/*` dependencies. Directories, not npm names, because that is
+ * what indexes `dist` — and several api-compare packages (actiondispatch,
+ * actioncontroller, …) share one directory. Unparseable or nameless
+ * `package.json`s are skipped; they simply don't appear in the graph and their
+ * callers fall back to the global key.
+ */
+async function readWorkspaceGraph(
+  packagesDir: string,
+  dirs: string[],
+): Promise<Map<string, string[]>> {
+  const manifests = await Promise.all(
+    dirs.map(async (dir) => {
+      try {
+        const body = await fs.readFile(path.join(packagesDir, dir, "package.json"), "utf-8");
+        const json = JSON.parse(body) as {
+          name?: string;
+          dependencies?: Record<string, string>;
+          peerDependencies?: Record<string, string>;
+        };
+        if (!json.name) return null;
+        return {
+          dir,
+          name: json.name,
+          deps: Object.keys({ ...json.dependencies, ...json.peerDependencies }),
+        };
+      } catch {
+        return null;
+      }
+    }),
+  );
+  const dirOfName = new Map<string, string>();
+  for (const manifest of manifests) {
+    if (manifest) dirOfName.set(manifest.name, manifest.dir);
+  }
+  const graph = new Map<string, string[]>();
+  for (const manifest of manifests) {
+    if (!manifest) continue;
+    const deps = manifest.deps
+      .map((dep) => dirOfName.get(dep))
+      .filter((dir): dir is string => dir !== undefined && dir !== manifest.dir);
+    graph.set(manifest.dir, [...new Set(deps)]);
+  }
+  return graph;
+}
+
+/** `dir` plus every directory reachable from it, cycle-safe (the graph may have any). */
+function transitiveDeps(graph: Map<string, string[]>, dir: string): string[] {
+  const seen = new Set<string>([dir]);
+  const queue = [dir];
+  while (queue.length > 0) {
+    for (const dep of graph.get(queue.pop() as string) ?? []) {
+      if (seen.has(dep)) continue;
+      seen.add(dep);
+      queue.push(dep);
+    }
+  }
+  return [...seen];
 }
 
 /**
@@ -151,7 +239,7 @@ export async function resolutionShapeKey(packagesDir: string): Promise<string> {
  * `pnpm-lock.yaml`.
  *
  * Neither of the other two keys can see `node_modules`: `normalizeReadSet`
- * drops every path under it and `resolutionShapeKey` only walks
+ * drops every path under it and `resolutionShape` only walks
  * `packages/*\/dist`. Yet most of what the compiler reads is third-party — on
  * actionview, 197 of 241 resolved files (`@types/node`, `typescript`'s
  * `lib.*.d.ts`, `undici-types`, `@types/pg`) — so a dependency bump changes the
