@@ -20,8 +20,24 @@ import type {
   ParamInfo,
   LiteralValue,
 } from "./types.js";
-import { ROOT_DIR, OUTPUT_DIR, PACKAGES, PACKAGE_DIR_OVERRIDES, packageSrcDir } from "./config.js";
-import { sharedCacheDir, contentFingerprint, readShared, writeShared } from "./shared-cache.js";
+import {
+  ROOT_DIR,
+  OUTPUT_DIR,
+  PACKAGES,
+  PACKAGE_DIR_OVERRIDES,
+  PACKAGE_SRC_SUBDIR,
+  packageSrcDir,
+} from "./config.js";
+import {
+  sharedCacheDir,
+  contentFingerprint,
+  widenKeyWithDeps,
+  dependencyInputFiles,
+  readShared,
+  writeShared,
+  readWorkspaceGraph,
+  transitiveDeps,
+} from "./shared-cache.js";
 import { extractorSchemaToken } from "./extractor-schema.js";
 
 // Per-package cache: extracting all packages with the TS Compiler API
@@ -31,8 +47,11 @@ import { extractorSchemaToken } from "./extractor-schema.js";
 // (SHA-1 over sorted (relPath, mtimeMs, size) triples) plus the
 // extractor SCHEMA_VERSION token (see extractor-schema.ts), which changes
 // whenever a new per-method output field is added so stale entries missing
-// the field are evicted automatically. Set `API_COMPARE_FORCE=1` to skip the
-// cache entirely. The token is computed async (it hashes the extractor
+// the field are evicted automatically. Both keys are widened with the
+// TRANSITIVE workspace dependencies' fingerprints — a package's extraction
+// resolves imports into sibling packages, so its surface changes when they do.
+// Set `API_COMPARE_FORCE=1` to skip the cache entirely. The token is computed
+// async (it hashes the extractor
 // sources), so it lives on `main()` rather than as a module const.
 const CACHE_DIR = path.join(OUTPUT_DIR, "ts-api-cache");
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -164,6 +183,59 @@ export async function main() {
   const sharedTag = path.basename(ROOT_DIR);
   const sharedHits = new Set<string>();
 
+  // Cross-package inputs. `extractPackage` compiles with the real module
+  // resolver, so a package's extracted surface also depends on the workspace
+  // packages it imports from (see readWorkspaceGraph). Fingerprint every
+  // package DIRECTORY once, then fold each package's transitive dependency
+  // fingerprints into its cache keys — otherwise an activesupport edit leaves
+  // actionview's entry cached and stale, and a cached run disagrees with an
+  // `API_COMPARE_FORCE=1` one on an unchanged tree.
+  const PACKAGES_DIR = path.join(ROOT_DIR, "packages");
+  const graph = await readWorkspaceGraph(PACKAGES_DIR);
+  const dirInputs = new Map<string, Promise<{ root: string; files: string[] }>>();
+  function dependencyInputs(dir: string): Promise<{ root: string; files: string[] }> {
+    let pending = dirInputs.get(dir);
+    if (!pending) {
+      const root = path.join(PACKAGES_DIR, dir);
+      pending = dependencyInputFiles(root).then((files) => ({ root, files }));
+      dirInputs.set(dir, pending);
+    }
+    return pending;
+  }
+  const dirMtimeFingerprints = new Map<string, Promise<string>>();
+  function dirMtimeFingerprint(dir: string): Promise<string> {
+    let pending = dirMtimeFingerprints.get(dir);
+    if (!pending) {
+      pending = dependencyInputs(dir).then(({ root, files }) => packageFingerprint(files, root));
+      dirMtimeFingerprints.set(dir, pending);
+    }
+    return pending;
+  }
+  // Content hashing reads every byte of the dependency, so it stays lazy: only
+  // a LOCAL cache miss (which then consults the shared cache) ever needs it.
+  const dirContentFingerprints = new Map<string, Promise<string>>();
+  function dirContentFingerprint(dir: string): Promise<string> {
+    let pending = dirContentFingerprints.get(dir);
+    if (!pending) {
+      pending = dependencyInputs(dir).then(({ root, files }) => contentFingerprint(files, root));
+      dirContentFingerprints.set(dir, pending);
+    }
+    return pending;
+  }
+  /** `own` key widened with the fingerprints of `deps` (package DIRECTORIES). */
+  async function withDeps(own: string, deps: string[], kind: "mtime" | "content"): Promise<string> {
+    const pairs = await Promise.all(
+      deps.map(
+        async (dep) =>
+          [
+            dep,
+            kind === "mtime" ? await dirMtimeFingerprint(dep) : await dirContentFingerprint(dep),
+          ] as [string, string],
+      ),
+    );
+    return widenKeyWithDeps(own, pairs);
+  }
+
   // Pass 1: serve every cache hit synchronously and record the
   // metadata needed to extract the misses below.
   interface PendingExtract {
@@ -186,7 +258,17 @@ export async function main() {
     // Anchor relative paths at the package root so tsconfig.json
     // doesn't show up as `../tsconfig.json` (which it would if we
     // anchored at the src dir).
-    const fingerprint = packageFingerprint(fingerprintInputs, pkgRoot);
+    // Packages that share a directory (actionpack hosts abstractcontroller,
+    // actioncontroller, actiondispatch) import across the sibling src subdirs
+    // that their own fingerprint — scoped to one subdir — doesn't cover, so the
+    // whole directory joins their dependency set.
+    const inputDirs = transitiveDeps(graph, dirName);
+    if (PACKAGE_SRC_SUBDIR[pkg]) inputDirs.push(dirName);
+    const fingerprint = await withDeps(
+      packageFingerprint(fingerprintInputs, pkgRoot),
+      inputDirs,
+      "mtime",
+    );
     const cachePath = path.join(CACHE_DIR, `${pkg}.json`);
 
     if (!force && fs.existsSync(cachePath)) {
@@ -208,7 +290,8 @@ export async function main() {
     // mtime-keyed cache so the next same-worktree run takes the fast path.
     let sharedKey: string | null = null;
     if (sharedDir) {
-      const contentKey = `${SCHEMA_VERSION}-${await contentFingerprint(fingerprintInputs, pkgRoot)}`;
+      const ownContent = await contentFingerprint(fingerprintInputs, pkgRoot);
+      const contentKey = `${SCHEMA_VERSION}-${await withDeps(ownContent, inputDirs, "content")}`;
       const body = await readShared(sharedDir, `ts-${pkg}`, contentKey);
       if (body) {
         try {

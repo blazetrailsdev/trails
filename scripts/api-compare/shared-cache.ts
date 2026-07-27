@@ -94,6 +94,138 @@ export async function fileHash(file: string): Promise<string | null> {
   }
 }
 
+/**
+ * Workspace dependency graph over `packages/`, keyed by DIRECTORY name.
+ *
+ * The TS extractor compiles a package with the real module resolver, so an
+ * `import { htmlEscapeOnce } from "@blazetrails/activesupport"` pulls the
+ * DECLARING file out of a sibling package and the extracted surface for the
+ * importer (e.g. actionview's `h` / `htmlEscapeOnce`) depends on that sibling's
+ * sources. A cache key built from the package's OWN files alone therefore
+ * survives an edit that changes its extraction — which is exactly how a cached
+ * run and an `API_COMPARE_FORCE=1` run came to disagree. Callers fold the
+ * dependencies' fingerprints into the key so they can't.
+ */
+export interface WorkspaceGraph {
+  /** npm package name (`@blazetrails/actionview`) → directory name (`actionview`). */
+  dirOfName: Record<string, string>;
+  /** directory name → directly-depended-on workspace directory names. */
+  depsOfDir: Record<string, string[]>;
+}
+
+/** Read every `packages/<dir>/package.json` and build the workspace graph. */
+export async function readWorkspaceGraph(packagesDir: string): Promise<WorkspaceGraph> {
+  const graph: WorkspaceGraph = { dirOfName: {}, depsOfDir: {} };
+  let dirs: string[];
+  try {
+    dirs = await fs.readdir(packagesDir);
+  } catch {
+    return graph;
+  }
+  const manifests = await Promise.all(
+    dirs.map(async (dir) => {
+      try {
+        const raw = await fs.readFile(path.join(packagesDir, dir, "package.json"), "utf-8");
+        return { dir, json: JSON.parse(raw) as { name?: string; dependencies?: object } };
+      } catch {
+        return null;
+      }
+    }),
+  );
+  for (const entry of manifests) {
+    if (!entry) continue;
+    if (entry.json.name) graph.dirOfName[entry.json.name] = entry.dir;
+  }
+  for (const entry of manifests) {
+    if (!entry) continue;
+    graph.depsOfDir[entry.dir] = Object.keys(entry.json.dependencies ?? {});
+  }
+  // Second pass: names resolve to dirs only once every manifest has been read.
+  for (const dir of Object.keys(graph.depsOfDir)) {
+    graph.depsOfDir[dir] = graph.depsOfDir[dir]
+      .map((name) => graph.dirOfName[name])
+      .filter((d): d is string => Boolean(d) && d !== dir);
+  }
+  return graph;
+}
+
+/**
+ * Transitive workspace dependencies of `dirName`, sorted and excluding itself.
+ * Cycles are tolerated (the visited set stops the walk).
+ */
+export function transitiveDeps(graph: WorkspaceGraph, dirName: string): string[] {
+  const seen = new Set<string>();
+  const stack = [...(graph.depsOfDir[dirName] ?? [])];
+  while (stack.length > 0) {
+    const dir = stack.pop() as string;
+    if (dir === dirName || seen.has(dir)) continue;
+    seen.add(dir);
+    stack.push(...(graph.depsOfDir[dir] ?? []));
+  }
+  return [...seen].sort();
+}
+
+async function filesUnder(dir: string, keep: (name: string) => boolean): Promise<string[]> {
+  let entries;
+  try {
+    entries = await fs.readdir(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const nested = await Promise.all(
+    entries.map(async (entry) => {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) return filesUnder(full, keep);
+      return keep(entry.name) ? [full] : [];
+    }),
+  );
+  return nested.flat();
+}
+
+/**
+ * Every file of `packageRoot` that can feed a DEPENDENT package's extraction.
+ *
+ * With no `paths` mapping in the root tsconfig, `@blazetrails/<dep>` resolves
+ * through the dep's `exports` to its BUILT `dist/*.d.ts` — those declarations,
+ * not the dep's `src`, are what the compiler actually reads. Both are included:
+ * `dist` because it's the real input (a rebuild with unchanged `src` still
+ * changes the dependent's extraction), `src` because an edit that hasn't been
+ * built yet still changes what a later run will see. A missing `src` or `dist`
+ * simply contributes nothing.
+ */
+export async function dependencyInputFiles(packageRoot: string): Promise<string[]> {
+  const [src, dist] = await Promise.all([
+    filesUnder(
+      path.join(packageRoot, "src"),
+      (name) => name.endsWith(".ts") && !name.endsWith(".test.ts") && !name.endsWith(".d.ts"),
+    ),
+    filesUnder(path.join(packageRoot, "dist"), (name) => name.endsWith(".d.ts")),
+  ]);
+  const files = [...src, ...dist];
+  const tsConfig = path.join(packageRoot, "tsconfig.json");
+  try {
+    await fs.stat(tsConfig);
+    files.push(tsConfig);
+  } catch {
+    // no tsconfig — nothing to fold in
+  }
+  return files;
+}
+
+/**
+ * Widen a package's own cache key with its dependencies' fingerprints, as
+ * `[dirName, fingerprint]` pairs. Empty deps return `own` unchanged so
+ * dependency-free packages keep their historical keys (and cache entries).
+ */
+export function widenKeyWithDeps(own: string, depFingerprints: [string, string][]): string {
+  if (depFingerprints.length === 0) return own;
+  const parts = [own];
+  for (const [dir, fingerprint] of [...depFingerprints].sort(([a], [b]) => (a < b ? -1 : 1))) {
+    parts.push(`${dir}\t${fingerprint}`);
+  }
+  return hashParts(parts);
+}
+
 function entryPath(dir: string, name: string, key: string): string {
   return path.join(dir, `${name}-${key}.json`);
 }
