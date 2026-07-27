@@ -9,8 +9,11 @@
  * from the globs below: rename a scoped-out file, edit exactly this file.
  */
 
+/** Root the rule and its scope globs are anchored to (repo-relative). */
+export const noRawSqlRoot = "packages/activerecord/src";
+
 /** Files the rule applies to (repo-relative glob). */
-export const noRawSqlFiles = ["packages/activerecord/src/**/*.ts"];
+export const noRawSqlFiles = [`${noRawSqlRoot}/**/*.ts`];
 
 /**
  * Paths that legitimately render SQL → out of scope (repo-relative globs).
@@ -20,24 +23,24 @@ export const noRawSqlFiles = ["packages/activerecord/src/**/*.ts"];
  * burndown worklist reflects only real arel migration targets.
  */
 export const noRawSqlIgnores = [
-  "packages/activerecord/src/**/*.test.ts",
-  "packages/activerecord/src/connection-adapters/**",
-  "packages/activerecord/src/adapters/**",
-  "packages/activerecord/src/tasks/**",
-  "packages/activerecord/src/**/schema-*.ts",
-  "packages/activerecord/src/test-helpers/**",
+  "**/*.test.ts",
+  "connection-adapters/**",
+  "adapters/**",
+  "tasks/**",
+  "**/schema-*.ts",
+  "test-helpers/**",
   // The fixture machinery is `lib/active_record/fixtures.rb:595` /
   // `test_fixtures.rb:113` code (RFC 0064 bucket D); it renders DDL/DML
   // directly for the same reason the rest of the test-infra does. Anchored to
   // the exact ported files — matching `fixtures.ts` by basename would also
   // exempt any future same-named module elsewhere under activerecord/src.
-  "packages/activerecord/src/fixtures.ts",
-  "packages/activerecord/src/test-fixtures.ts",
-  "packages/activerecord/src/test-fixtures/**",
-  "packages/activerecord/src/support/**",
-  "packages/activerecord/src/test-setup-*.ts",
-  "packages/activerecord/src/cases/helper.ts",
-];
+  "fixtures.ts",
+  "test-fixtures.ts",
+  "test-fixtures/**",
+  "support/**",
+  "test-setup-*.ts",
+  "cases/helper.ts",
+].map((glob) => `${noRawSqlRoot}/${glob}`);
 
 /** Minimal glob → RegExp for the subset used above: `**`, `*`, literals. */
 function globToRegExp(glob) {
@@ -66,6 +69,13 @@ function globToRegExp(glob) {
 }
 
 const ignoreRes = noRawSqlIgnores.map(globToRegExp);
+
+/** Repo-relative path under the rule's root; null when the file is outside it. */
+export function repoRel(filename) {
+  const norm = filename.replace(/\\/g, "/");
+  const m = norm.match(new RegExp(`(?:^|/)(${noRawSqlRoot}/.+\\.ts)$`));
+  return m ? m[1] : null;
+}
 
 /** True when `rel` (a repo-relative path) is out of the rule's scope. */
 export function isExcludedPath(rel) {

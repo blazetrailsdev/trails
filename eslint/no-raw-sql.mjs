@@ -1,4 +1,4 @@
-import { isExcludedPath } from "./no-raw-sql-scope.mjs";
+import { isExcludedPath, repoRel } from "./no-raw-sql-scope.mjs";
 
 /**
  * ESLint rule: no-raw-sql
@@ -21,13 +21,6 @@ import { isExcludedPath } from "./no-raw-sql-scope.mjs";
  * eslint.config.mjs — and is re-checked here so the rule is testable by
  * filename.
  */
-
-/** Repo-relative path under packages/activerecord/src; null if outside it. */
-function repoRel(filename) {
-  const norm = filename.replace(/\\/g, "/");
-  const m = norm.match(/(?:^|\/)(packages\/activerecord\/src\/.+\.ts)$/);
-  return m ? m[1] : null;
-}
 
 const SQL_RE = /^\s*(SELECT|INSERT|UPDATE|DELETE|ALTER|CREATE|DROP|TRUNCATE)\b/i;
 
