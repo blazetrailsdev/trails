@@ -14,7 +14,7 @@ import { generatesTokenFor, setTokenForSecret } from "./token-for.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 // Zeitwerk analog: Cpk::Book's counter-cached/association targets (Cpk::Order)
 // are resolved by name, as Rails resolves them from the autoloaded models tree.
-import "./test-helpers/canonical-model-index.js";
+import "./support/canonical-model-index.js";
 
 // Rails: class User < ::User { generates_token_for :lookup; … }
 class TokenUser extends User {
