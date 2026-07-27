@@ -198,12 +198,24 @@ export type Extended<M extends object> = CallableMethods<M>;
  *   // Now Base.connectedTo(...) works
  */
 export function extend(klass: AnyClass | object, mod: Module): void {
-  for (const key of Object.keys(mod)) {
-    const value = mod[key];
+  for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(mod))) {
+    if (!descriptor.enumerable || /^[A-Z]/.test(key)) continue;
+    // A Ruby `attr_accessor` on the module ports to a getter/setter pair; copy
+    // it as an accessor rather than reading `mod[key]`, which would invoke the
+    // getter with the module as receiver instead of the extending class.
+    if (descriptor.get || descriptor.set) {
+      Object.defineProperty(klass, key, {
+        get: descriptor.get,
+        set: descriptor.set,
+        configurable: true,
+        enumerable: false,
+      });
+      continue;
+    }
     // Ruby's extend copies only methods — skip non-functions and constants.
-    if (typeof value !== "function" || /^[A-Z]/.test(key)) continue;
+    if (typeof descriptor.value !== "function") continue;
     Object.defineProperty(klass, key, {
-      value,
+      value: descriptor.value,
       writable: true,
       configurable: true,
       enumerable: false,

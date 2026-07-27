@@ -46,39 +46,47 @@ export function setSignedIdVerifierSecret(
 }
 
 /**
- * Get or create the MessageVerifier instance for signed IDs.
- * Uses SHA256 digest, JSON serializer, URL-safe encoding.
+ * Class-level accessors mixed onto `Base` via `extend()` in base.ts.
  *
- * Mirrors: ActiveRecord::SignedId::ClassMethods#signed_id_verifier
- */
-export function signedIdVerifier(modelClass: typeof Base): MessageVerifier {
-  if ((modelClass as any)._signedIdVerifier) {
-    return (modelClass as any)._signedIdVerifier;
-  }
-
-  const secret = _signedIdVerifierSecret;
-  const resolvedSecret = typeof secret === "function" ? secret() : secret;
-  if (!resolvedSecret) {
-    throw new Error("You must set ActiveRecord::Base.signed_id_verifier_secret to use signed ids");
-  }
-
-  const verifier = new MessageVerifier(resolvedSecret, {
-    digest: "sha256",
-    url_safe: true,
-  });
-  (modelClass as any)._signedIdVerifier = verifier;
-  _cachedVerifierClasses.add(modelClass);
-  return verifier;
-}
-
-/**
- * Set a custom verifier for signed IDs on a model class.
+ * Rails' `signed_id_verifier` / `signed_id_verifier=` share one name, so the
+ * pair is ported as a getter/setter rather than a `set`-prefixed sibling.
  *
- * Mirrors: ActiveRecord::SignedId::ClassMethods#signed_id_verifier=
+ * Mirrors: ActiveRecord::SignedId::ClassMethods
  */
-export function setSignedIdVerifier(modelClass: typeof Base, verifier: MessageVerifier): void {
-  (modelClass as any)._signedIdVerifier = verifier;
-}
+export const ClassMethods = {
+  /**
+   * Get or create the MessageVerifier instance for signed IDs.
+   * Uses SHA256 digest, JSON serializer, URL-safe encoding.
+   *
+   * Mirrors: ActiveRecord::SignedId::ClassMethods#signed_id_verifier
+   */
+  get signedIdVerifier(): MessageVerifier {
+    if ((this as any)._signedIdVerifier) {
+      return (this as any)._signedIdVerifier;
+    }
+
+    const secret = _signedIdVerifierSecret;
+    const resolvedSecret = typeof secret === "function" ? secret() : secret;
+    if (!resolvedSecret) {
+      throw new Error(
+        "You must set ActiveRecord::Base.signed_id_verifier_secret to use signed ids",
+      );
+    }
+
+    const verifier = new MessageVerifier(resolvedSecret, {
+      digest: "sha256",
+      url_safe: true,
+    });
+    (this as any)._signedIdVerifier = verifier;
+    _cachedVerifierClasses.add(this);
+    return verifier;
+  },
+
+  /** Mirrors: ActiveRecord::SignedId::ClassMethods#signed_id_verifier= */
+  set signedIdVerifier(verifier: MessageVerifier) {
+    (this as any)._signedIdVerifier = verifier;
+  },
+};
 
 function _hasPrimaryKey(pk: unknown): boolean {
   if (pk == null) return false;
@@ -106,7 +114,7 @@ export function signedId(
     throw new Error("Cannot get a signed_id for a new record");
   }
   const ctor = instance.constructor as typeof Base;
-  const verifier = signedIdVerifier(ctor);
+  const verifier = ctor.signedIdVerifier;
   // BigInt is not JSON-serializable; coerce to a plain number so the signed
   // payload round-trips (Rails signs an integer id).
   const coerce = (v: unknown): unknown => (typeof v === "bigint" ? Number(v) : v);
@@ -135,7 +143,7 @@ export async function findSigned<T extends typeof Base>(
   if (!_hasPrimaryKey(pk)) {
     throw new UnknownPrimaryKey(modelClass);
   }
-  const verifier = signedIdVerifier(modelClass);
+  const verifier = modelClass.signedIdVerifier;
   const id = verifier.verified(token, {
     purpose: combinePurposes(modelClass, options?.purpose),
   });
@@ -161,7 +169,7 @@ export async function findSignedBang<T extends typeof Base>(
   token: string,
   options?: { purpose?: string },
 ): Promise<InstanceType<T>> {
-  const verifier = signedIdVerifier(modelClass);
+  const verifier = modelClass.signedIdVerifier;
   const id = verifier.verify(token, {
     purpose: combinePurposes(modelClass, options?.purpose),
   });
