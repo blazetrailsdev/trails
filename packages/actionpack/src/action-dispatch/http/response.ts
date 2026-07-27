@@ -14,8 +14,7 @@ import {
   cacheControlSegments as _cacheControlSegments,
   generateStrongEtag as _generateStrongEtag,
   generateWeakEtag as _generateWeakEtag,
-  getDate as _getDate,
-  getLastModified as _getLastModified,
+  Response as CacheResponse,
   handleConditionalGetBang as _handleConditionalGetBang,
   hasDate as _hasDate,
   hasEtag as _hasEtag,
@@ -24,8 +23,6 @@ import {
   mergeAndNormalizeCacheControlBang as _mergeAndNormalizeCacheControlBang,
   isWeakEtag as _isWeakEtag,
   prepareCacheControlBang as _prepareCacheControlBang,
-  setDate as _setDate,
-  setLastModified as _setLastModified,
   strongEtag as _strongEtag,
   weakEtag as _weakEtag,
 } from "./cache.js";
@@ -341,30 +338,10 @@ export class Response {
     }
   }
 
-  // --- ETag ---
-
-  /** Mirrors Rails' `Cache::Response#etag` reader — returns the `ETag` header. */
-  get etag(): string | undefined {
-    return this._headers["etag"] ?? this._headers["ETag"];
-  }
-
-  /**
-   * Mirrors Rails' `Cache::Response#etag=` — delegates to
-   * {@link weakEtag}, which hashes `validators` into a weak validator
-   * (`W/"<md5>"`). Pass `undefined` to delete the header.
-   */
-  set etag(value: unknown) {
-    if (value === undefined) {
-      delete this._headers["etag"];
-      delete this._headers["ETag"];
-      return;
-    }
-    this.weakEtag(value);
-  }
-
   // --- Cache::Response wiring (declared here for typing; bound below) ---
   declare lastModified: Date | undefined;
   declare date: Date | undefined;
+  declare etag: string | undefined;
   declare readonly hasLastModified: boolean;
   declare readonly hasDate: boolean;
   declare readonly hasEtag: boolean;
@@ -665,29 +642,17 @@ export class Response {
 // arguments are wired as prototype methods. The raw `Cache-Control` header
 // string is exposed via `_cacheControl` (Rails: aliased `_cache_control`),
 // and `cacheControl` (this wiring) is the parsed directive hash.
-Object.defineProperty(Response.prototype, "lastModified", {
-  get(this: Response) {
-    return _getLastModified.call(this);
-  },
-  set(this: Response, t: Date | undefined) {
-    if (t === undefined) this.deleteHeader("Last-Modified");
-    else _setLastModified.call(this, t);
-  },
-  configurable: true,
-});
+// `last_modified` / `date` / `etag` are reader+writer pairs in Ruby, so they
+// live as accessors on Cache::Response and are copied over descriptor-intact.
+for (const name of ["lastModified", "date", "etag"] as const) {
+  Object.defineProperty(Response.prototype, name, {
+    ...Object.getOwnPropertyDescriptor(CacheResponse.prototype, name)!,
+    configurable: true,
+  });
+}
 Object.defineProperty(Response.prototype, "hasLastModified", {
   get(this: Response) {
     return _hasLastModified.call(this);
-  },
-  configurable: true,
-});
-Object.defineProperty(Response.prototype, "date", {
-  get(this: Response) {
-    return _getDate.call(this);
-  },
-  set(this: Response, t: Date | undefined) {
-    if (t === undefined) this.deleteHeader("Date");
-    else _setDate.call(this, t);
   },
   configurable: true,
 });
