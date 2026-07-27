@@ -255,7 +255,79 @@ On every run, for every **existing** matched method, `api:build`:
   register it as a suppressed block tag in the TypeDoc config (and in
   `jsdoc/check-tag-names` if that lint is ever enabled) so it never renders
   on the docs site, the same way `@internal` is excluded via
-  `excludeInternal`.
+  `excludeInternal`. This is done for the whole tag family at once — see
+  "Tag configuration" below.
+
+## Sibling tag: `@noRailsEquivalent`
+
+`@missingRailsCall` is one of two api-compare JSDoc tags. Its sibling,
+`@noRailsEquivalent`, is designed in RFC 0080 (`api-compare JSDoc metadata`,
+in the `tasks` repo) and is already honored by `api:extra` as of trails
+PR 5358. This section records the shared conventions so the two tags stay
+one family; RFC 0080 remains the authority on `@noRailsEquivalent` semantics and
+its migration, and nothing here changes `@missingRailsCall` or the `api:build`
+design.
+
+```text
+@noRailsEquivalent <reason prose, may wrap onto following lines>
+```
+
+The two tags answer the same question — "this method diverges from Rails; is
+that known, and why?" — for two different gates (`api:calls` /
+`api:calls:wide` missing-call ratchets vs the `api:extra` extra-surface
+report). They therefore share:
+
+- **Placement** — leading JSDoc on the declaration (class/module member,
+  getter, or top-level function).
+- **Grammar** — free prose after the tag; where a key token precedes the
+  reason it is em-dash-separated (`@missingRailsCall` takes a Ruby call name
+  as that token, `@noRailsEquivalent` takes none); continuation lines with no
+  `@` attach to the preceding tag, so long curated reasons survive verbatim.
+  An empty reason is an error in both.
+- **Parser toolchain** — `ts.getJSDocTags` in `extract-ts-api.ts`, the same
+  pass that already reads `@internal`.
+- **Structural advantage over the JSON baselines** — the justification
+  travels with the declaration across renames and file moves; there is no
+  `package + tsFile + name` key to go stale for path reasons.
+- **Only-shrink gating** — a tag whose condition no longer holds (the call is
+  now made; the extra is no longer extra) fails the run exactly as a stale
+  JSON row does today, and the fix is deleting the tag next to the code.
+
+### `@noRailsEquivalent` vs `@internal`
+
+Different claims, deliberately kept distinct:
+
+- **`@internal`** — "this is not API surface at all" (a Rails-private helper
+  or a trails wiring seam). The extractor removes the member from the
+  compared TS surface entirely, and TypeDoc drops it via `excludeInternal`.
+- **`@noRailsEquivalent`** — "this IS public API surface, deliberately, and
+  Rails has no counterpart." The member stays counted and visible in
+  `api:extra`, reported in the `Allowed` column rather than hidden, with the
+  inline reason carrying the justification.
+
+Reaching for `@internal` to silence an extra that is public by design is a
+lie rather than a fix; that is what the sibling tag exists for.
+
+### Scope rule: novel extras only
+
+`@noRailsEquivalent` applies to justified **novel** extras — surface with no
+Ruby counterpart anywhere in Rails-land. A **moved** extra (a real Rails
+method ported into the wrong file) is a misplaced port: relocate it to its
+Rails-layout file, do not tag it. Tagging a moved extra asserts something
+false, and the stale-tag gate enforces the boundary mechanically where it
+can.
+
+### Tag configuration
+
+Both tags are machinery, not user documentation, so the docs-site
+registration is one change covering the family —
+`packages/website/typedoc.json` lists both in `blockTags` (so TypeDoc
+recognizes them instead of warning on an unknown tag) and in `excludeTags`
+(so neither renders on the site), the
+same suppression role `excludeInternal` plays for `@internal`. Both arrays
+restate TypeDoc's defaults because setting either option replaces the default
+list rather than extending it. If `jsdoc/check-tag-names` is ever enabled,
+both tags go in its `definedTags` together for the same reason.
 
 ## Relationship to the lints — recommendation
 
