@@ -25,12 +25,6 @@ import { adapterType, ambientPoolConfiguration } from "../test-adapter.js";
 import { Base } from "../base.js";
 import { getEnv } from "@blazetrails/activesupport";
 
-/**
- * The `ActiveRecord::ConnectionAdapters` constant names `current_adapter?` is
- * called with in the AR suite. `TrilogyAdapter` is accepted so ported call
- * sites can stay verbatim; trails has no Trilogy adapter (Ruby-only driver),
- * so it never matches.
- */
 export type AdapterClassName =
   | "SQLite3Adapter"
   | "PostgreSQLAdapter"
@@ -41,48 +35,21 @@ const ADAPTER_CLASS: Record<AdapterClassName, string> = {
   SQLite3Adapter: "sqlite",
   PostgreSQLAdapter: "postgres",
   Mysql2Adapter: "mysql",
-  // No trails backend ever answers to this, so `current_adapter?(:TrilogyAdapter)`
-  // is permanently false.
   TrilogyAdapter: "trilogy",
 };
 
-/**
- * `current_adapter?(*types)` (adapter_helper.rb:4) — is the active connection
- * an instance of any of the named adapter classes?
- */
 export function currentAdapter(...types: AdapterClassName[]): boolean {
   return types.some((type) => ADAPTER_CLASS[type] === adapterType);
 }
 
-/**
- * `in_memory_db?` (adapter_helper.rb:12): `current_adapter?(:SQLite3Adapter)
- * && db_config.database == ":memory:"`.
- *
- * The `db_config.database` analog here is the `database` field of the
- * `DatabaseConfigurations` entry built in `support/test-database-config.ts`,
- * which is `AR_TEST_WORKER_DB ?? ":memory:"` — i.e. literally `":memory:"` on
- * the default lane and a real on-disk clone path when a per-worker template
- * exists. So `!AR_TEST_WORKER_DB` is exactly `db_config.database == ":memory:"`.
- */
 export function inMemoryDb(): boolean {
   return currentAdapter("SQLite3Adapter") && !getEnv("AR_TEST_WORKER_DB");
 }
 
-/**
- * `sqlite3_adapter_strict_strings_disabled?` (adapter_helper.rb:16):
- * `current_adapter?(:SQLite3Adapter) && !configuration_hash[:strict]`.
- *
- * {@link ambientPoolConfiguration} is trails' `configuration_hash` for the
- * active lane's primary connection.
- */
 export function sqlite3AdapterStrictStringsDisabled(): boolean {
   return currentAdapter("SQLite3Adapter") && !ambientPoolConfiguration().strict;
 }
 
-/**
- * `mysql_enforcing_gtid_consistency?` (adapter_helper.rb:20). Async because
- * `show_variable` issues a query.
- */
 export async function mysqlEnforcingGtidConsistency(): Promise<boolean> {
   if (!currentAdapter("Mysql2Adapter", "TrilogyAdapter")) return false;
   const connection = (await Base.leaseConnection()) as unknown as {
@@ -91,7 +58,6 @@ export async function mysqlEnforcingGtidConsistency(): Promise<boolean> {
   return (await connection.showVariable("enforce_gtid_consistency")) === "ON";
 }
 
-/** The connection surface `enable_extension!` / `disable_extension!` drive. */
 type ExtensionConnection = {
   supportsExtensions(): boolean;
   extensionEnabled(name: string): Promise<boolean>;
@@ -102,10 +68,6 @@ type ExtensionConnection = {
   isTransactionOpen(): boolean;
 };
 
-/**
- * `enable_extension!(extension, connection)` (adapter_helper.rb:87). Returns
- * `false` when the adapter has no extension support, mirroring Rails' guard.
- */
 export async function enableExtensionBang(
   extension: string,
   connection: ExtensionConnection,
@@ -122,9 +84,6 @@ export async function enableExtensionBang(
   return true;
 }
 
-/**
- * `disable_extension!(extension, connection)` (adapter_helper.rb:96).
- */
 export async function disableExtensionBang(
   extension: string,
   connection: ExtensionConnection,
