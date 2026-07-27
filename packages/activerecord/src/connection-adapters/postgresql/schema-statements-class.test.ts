@@ -79,7 +79,10 @@ function makeSchemaAdapter() {
     execute: vi.fn(async (sql: string) => {
       execed.push(sql);
     }),
-    schemaQuery: vi.fn(async () => [{ search_path: '"$user", public' }]),
+    internalExecute: vi.fn(async (sql: string) => {
+      execed.push(sql);
+    }),
+    queryValue: vi.fn(async () => '"$user", public'),
   } as unknown as DatabaseAdapter;
   return { adapter, execed };
 }
@@ -107,7 +110,7 @@ describe("PostgreSQLSchemaStatements#schemaSearchPath", () => {
     expect(await ss.schemaSearchPath()).toBe('"$user", public');
     expect(await ss.schemaSearchPath()).toBe('"$user", public');
     expect(
-      (adapter as unknown as { schemaQuery: ReturnType<typeof vi.fn> }).schemaQuery,
+      (adapter as unknown as { queryValue: ReturnType<typeof vi.fn> }).queryValue,
     ).toHaveBeenCalledTimes(1);
   });
 
@@ -118,7 +121,7 @@ describe("PostgreSQLSchemaStatements#schemaSearchPath", () => {
     expect(execed).toEqual([`SET search_path TO my_schema, public`]);
     expect(await ss.schemaSearchPath()).toBe("my_schema, public");
     expect(
-      (adapter as unknown as { schemaQuery: ReturnType<typeof vi.fn> }).schemaQuery,
+      (adapter as unknown as { queryValue: ReturnType<typeof vi.fn> }).queryValue,
     ).not.toHaveBeenCalled();
   });
 

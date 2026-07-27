@@ -46,6 +46,7 @@ interface PgSchemaAdapter {
   queryValues(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[]>;
   exec(sql: string): Promise<void>;
   execute(sql: string): Promise<unknown>;
+  internalExecute(sql: string, name?: string): Promise<unknown>;
   clearCacheBang(): void;
   quote(value: unknown): string;
   quoteIdentifier(name: string): string;
@@ -529,30 +530,27 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       );
     }
     if (options.force) {
-      await this.pg.exec(`DROP SCHEMA IF EXISTS ${this.quoteSchemaName(name)} CASCADE`);
+      await this.dropSchema(name, { ifExists: true });
     }
     const ifNotExists = options.ifNotExists ? " IF NOT EXISTS" : "";
-    await this.pg.exec(`CREATE SCHEMA${ifNotExists} ${this.quoteSchemaName(name)}`);
+    await this.adapter.execute(`CREATE SCHEMA${ifNotExists} ${this.quoteSchemaName(name)}`);
   }
 
   async dropSchema(name: string, options: { ifExists?: boolean } = {}): Promise<void> {
-    // Rails' drop_schema unconditionally appends CASCADE — it is not gated on
-    // an option (PostgreSQL::SchemaStatements#drop_schema).
     const ifExists = options.ifExists ? " IF EXISTS" : "";
-    await this.pg.exec(`DROP SCHEMA${ifExists} ${this.quoteSchemaName(name)} CASCADE`);
+    await this.adapter.execute(`DROP SCHEMA${ifExists} ${this.quoteSchemaName(name)} CASCADE`);
   }
 
   async schemaExists(name: string): Promise<boolean> {
-    const rows = await this.pg.schemaQuery(
-      `SELECT COUNT(*) AS count FROM pg_namespace WHERE nspname = $1`,
-      [name],
+    const count = await this.pg.queryValue(
+      `SELECT COUNT(*) FROM pg_namespace WHERE nspname = ${this.pg.quote(name)}`,
+      "SCHEMA",
     );
-    return Number(rows[0].count) > 0;
+    return Number(count) > 0;
   }
 
   async currentSchema(): Promise<string> {
-    const rows = await this.pg.schemaQuery("SELECT current_schema() AS schema");
-    return rows[0].schema as string;
+    return (await this.pg.queryValue("SELECT current_schema", "SCHEMA")) as string;
   }
 
   // ---------------------------------------------------------------------------
@@ -587,11 +585,11 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       }
       optionString += ` CONNECTION LIMIT = ${limit}`;
     }
-    await this.pg.exec(`CREATE DATABASE ${this.pg.quoteIdentifier(name)}${optionString}`);
+    await this.adapter.execute(`CREATE DATABASE ${this.pg.quoteIdentifier(name)}${optionString}`);
   }
 
   async dropDatabase(name: string): Promise<void> {
-    await this.pg.exec(`DROP DATABASE IF EXISTS ${this.pg.quoteIdentifier(name)}`);
+    await this.adapter.execute(`DROP DATABASE IF EXISTS ${this.pg.quoteIdentifier(name)}`);
   }
 
   async recreateDatabase(name: string, options: CreateDatabaseOptions = {}): Promise<void> {
@@ -600,29 +598,28 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   }
 
   async currentDatabase(): Promise<string> {
-    const rows = await this.pg.schemaQuery("SELECT current_database() AS name");
-    return rows[0].name as string;
+    return (await this.pg.queryValue("SELECT current_database()", "SCHEMA")) as string;
   }
 
   async encoding(): Promise<string> {
-    const rows = await this.pg.schemaQuery(
-      "SELECT pg_encoding_to_char(encoding) AS enc FROM pg_database WHERE datname = current_database()",
-    );
-    return rows[0].enc as string;
+    return (await this.pg.queryValue(
+      "SELECT pg_encoding_to_char(encoding) FROM pg_database WHERE datname = current_database()",
+      "SCHEMA",
+    )) as string;
   }
 
   async collation(): Promise<string> {
-    const rows = await this.pg.schemaQuery(
-      "SELECT datcollate AS col FROM pg_database WHERE datname = current_database()",
-    );
-    return rows[0].col as string;
+    return (await this.pg.queryValue(
+      "SELECT datcollate FROM pg_database WHERE datname = current_database()",
+      "SCHEMA",
+    )) as string;
   }
 
   async ctype(): Promise<string> {
-    const rows = await this.pg.schemaQuery(
-      "SELECT datctype AS ct FROM pg_database WHERE datname = current_database()",
-    );
-    return rows[0].ct as string;
+    return (await this.pg.queryValue(
+      "SELECT datctype FROM pg_database WHERE datname = current_database()",
+      "SCHEMA",
+    )) as string;
   }
 
   // ---------------------------------------------------------------------------
@@ -630,34 +627,27 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   // ---------------------------------------------------------------------------
 
   async schemaSearchPath(): Promise<string> {
-    // Rails memoizes: @schema_search_path ||= query_value("SHOW search_path").
-    // The memo lives on the adapter (connection-scoped), since this statements
-    // object is reconstructed per call.
     if (this.pg._schemaSearchPathMemo == null) {
-      const rows = await this.pg.schemaQuery("SHOW search_path");
-      this.pg._schemaSearchPathMemo = rows[0].search_path as string;
+      this.pg._schemaSearchPathMemo = (await this.pg.queryValue(
+        "SHOW search_path",
+        "SCHEMA",
+      )) as string;
     }
     return this.pg._schemaSearchPathMemo;
   }
 
   async setSchemaSearchPath(searchPath: string | null): Promise<void> {
-    // Rails guards with `if schema_csv` (truthy), so "" is also a no-op.
     if (!searchPath) return;
-    // Mirrors Rails' schema_search_path= which uses direct interpolation:
-    //   internal_execute("SET search_path TO #{schema_csv}"); @schema_search_path = schema_csv
-    // This means unquoted $user causes a PG parse error (dollar-quoted string),
-    // matching Rails' behavior. Use '$user' (with single quotes) for the special token.
-    await this.pg.execute(`SET search_path TO ${searchPath}`);
+    await this.pg.internalExecute(`SET search_path TO ${searchPath}`);
     this.pg._schemaSearchPathMemo = searchPath;
   }
 
   async clientMinMessages(): Promise<string> {
-    const rows = await this.pg.schemaQuery("SHOW client_min_messages");
-    return rows[0].client_min_messages as string;
+    return (await this.pg.queryValue("SHOW client_min_messages", "SCHEMA")) as string;
   }
 
   async setClientMinMessages(level: string): Promise<void> {
-    await this.pg.exec(`SET client_min_messages TO ${this.pg.quoteLiteral(level)}`);
+    await this.pg.internalExecute(`SET client_min_messages TO '${level}'`, "SCHEMA");
   }
 
   private quoteSchemaName(name: string): string {
@@ -1897,11 +1887,10 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   }
 
   async serialSequence(tableName: string, column: string): Promise<string | null> {
-    const rows = await this.pg.schemaQuery(`SELECT pg_get_serial_sequence($1, $2) AS seq`, [
-      tableName,
-      column,
-    ]);
-    return (rows[0]?.seq as string | null) ?? null;
+    return ((await this.pg.queryValue(
+      `SELECT pg_get_serial_sequence(${this.pg.quote(tableName)}, ${this.pg.quote(column)})`,
+      "SCHEMA",
+    )) ?? null) as string | null;
   }
 
   async defaultSequenceName(
