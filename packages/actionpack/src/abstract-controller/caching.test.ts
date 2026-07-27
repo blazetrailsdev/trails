@@ -1,14 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { MemoryStore } from "@blazetrails/activesupport";
+import { include, MemoryStore } from "@blazetrails/activesupport";
 
 import {
   cache,
   cacheConfigured,
-  cacheStore,
+  ConfigMethods,
   CACHING_DEFAULTS,
   CACHING_SLOTS,
   readFragment,
-  setCacheStore,
   viewCacheDependencies,
   viewCacheDependency,
   writeFragment,
@@ -25,11 +24,15 @@ class HostClass {
   greeting = "hello";
 }
 
-function makeHost(store?: MemoryStore | null): HostClass & CachingHost {
+// Rails: `include ConfigMethods` / `extend ConfigMethods` in Caching's
+// `included` block — installs the `cacheStore` accessor pair on the host.
+include(HostClass, ConfigMethods);
+
+function makeHost(store?: MemoryStore | null): HostClass & CachingHost & ConfigMethods {
   HostClass.cacheStore = store ?? null;
   HostClass.performCaching = true;
   HostClass._viewCacheDependencies = undefined;
-  return new HostClass() as unknown as HostClass & CachingHost;
+  return new HostClass() as unknown as HostClass & CachingHost & ConfigMethods;
 }
 
 describe("AbstractController::Caching", () => {
@@ -52,17 +55,17 @@ describe("AbstractController::Caching", () => {
     it("reads the class-level slot", () => {
       const store = new MemoryStore();
       const host = makeHost(store);
-      expect(cacheStore.call(host)).toBe(store);
+      expect(host.cacheStore).toBe(store);
     });
     it("returns null when no store is wired up", () => {
-      expect(cacheStore.call(makeHost())).toBeNull();
+      expect(makeHost().cacheStore).toBeNull();
     });
-    it("setCacheStore assigns onto the class slot", () => {
+    it("cacheStore= assigns onto the class slot", () => {
       const host = makeHost();
       const store = new MemoryStore();
-      setCacheStore.call(host, store);
+      host.cacheStore = store;
       expect(HostClass.cacheStore).toBe(store);
-      expect(cacheStore.call(host)).toBe(store);
+      expect(host.cacheStore).toBe(store);
     });
   });
 

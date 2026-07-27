@@ -73,12 +73,6 @@
   },
   {
     "package": "abstractcontroller",
-    "tsFile": "caching.ts",
-    "name": "setCacheStore",
-    "reason": "Writer half of Rails' `ConfigMethods#cache_store` / `cache_store=` accessor pair. `cache_store=` camelizes to `cacheStore`, which the reader in the same file already declares — two exported functions cannot share a name, so the writer takes the `set` prefix."
-  },
-  {
-    "package": "abstractcontroller",
     "tsFile": "trailties/routes-helpers.ts",
     "name": "withRoutesHelpers",
     "reason": "Rails `AbstractController::Railties::RoutesHelpers.with`. `with` is a reserved word in ES strict mode, so the declaration cannot be named `with`; it is declared as `withRoutesHelpers` and re-exported as `with` at the bottom of the file."
