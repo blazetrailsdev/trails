@@ -163,10 +163,8 @@ function descendsFromActiveRecordByHierarchy(modelClass: typeof Base): boolean {
  */
 export function isDescendsFromActiveRecord(modelClass: typeof Base): boolean {
   if (descendsFromActiveRecordByHierarchy(modelClass)) return true;
-  return (
-    inheritanceColumnDisabled(modelClass) ||
-    !classHasAttribute(modelClass, getInheritanceColumn(modelClass))
-  );
+  const inheritCol = modelClass.inheritanceColumn;
+  return inheritCol === null || !classHasAttribute(modelClass, inheritCol);
 }
 
 /**
@@ -380,19 +378,6 @@ export function registerSubclass(klass: typeof Base): void {
 }
 
 /**
- * Get the inheritance column for a model.
- *
- * Mirrors Rails, where `inheritance_column` defaults to `"type"` for every
- * model (`class_attribute :inheritance_column, default: "type"`) regardless of
- * whether the model actually participates in STI. The column merely names where
- * STI *would* read/write the type; whether dispatch happens is gated separately
- * on `_has_attribute?(inheritance_column)` — see {@link classHasAttribute}.
- */
-export function getInheritanceColumn(modelClass: typeof Base): string {
-  return (modelClass as any)._inheritanceColumn ?? "type";
-}
-
-/**
  * Class-level column-aware `_has_attribute?`.
  *
  * Rails' `_has_attribute?(name)` is `attribute_types.key?(name)`, true for any
@@ -417,27 +402,11 @@ export function classHasAttribute(modelClass: typeof Base, name: string): boolea
 }
 
 /**
- * True when STI is explicitly disabled for this model — Rails'
- * `self.inheritance_column = nil`. trails stores an explicit `null` in
- * `_inheritanceColumn` (distinct from the `undefined` "unset" state, which still
- * defaults to "type"). A disabled model never dispatches STI even when its table
- * carries a real `type` column used for non-inheritance data, so every dispatch
- * gate short-circuits on this. {@link getInheritanceColumn} still resolves to the
- * column *name* "type" — disabling is about *whether* dispatch happens, not where
- * the column lives.
- *
- * @internal
- */
-export function inheritanceColumnDisabled(modelClass: object): boolean {
-  return (modelClass as any)._inheritanceColumn === null;
-}
-
-/**
  * True when STI was explicitly enabled on this class or an ancestor (the
- * inherited `_inheritanceColumn` sentinel). Distinct from {@link getInheritanceColumn},
- * which now always resolves to a name (default "type"): the column merely names
- * where STI *would* read the type; this reports whether the model actually
- * participates in STI.
+ * inherited `_inheritanceColumn` sentinel). Distinct from `inheritanceColumn`,
+ * which resolves to a name (default "type") for any model that hasn't disabled
+ * STI: the column merely names where STI *would* read the type; this reports
+ * whether the model actually participates in STI.
  *
  * Used to gate the database-row dispatch paths (instantiate, association build),
  * which resolve through the ambiguous global registry and so must stay scoped to
@@ -798,7 +767,7 @@ export function isFinderNeedsTypeCondition(modelClass: typeof Base): boolean {
   // `descends` is true. Memoize only the stable reasons (a hierarchy root, or STI
   // explicitly disabled); a non-root model that descends only because its `type`
   // column hasn't reflected yet must recompute once schema warms.
-  if (descendsFromActiveRecordByHierarchy(modelClass) || inheritanceColumnDisabled(modelClass)) {
+  if (descendsFromActiveRecordByHierarchy(modelClass) || modelClass.inheritanceColumn === null) {
     (modelClass as any)._finderNeedsTypeCondition = false;
   }
   return false;
@@ -885,7 +854,7 @@ export function stiClassFor(modelClass: typeof Base, typeName: string): typeof B
     if (!(cause instanceof NameError)) throw cause;
     throw new SubclassNotFound(
       `The single-table inheritance mechanism failed to locate the subclass: '${typeName}'. ` +
-        `This error is raised because the column '${getInheritanceColumn(modelClass)}' is reserved for storing the class in case of inheritance.`,
+        `This error is raised because the column '${modelClass.inheritanceColumn}' is reserved for storing the class in case of inheritance.`,
       { cause },
     );
   }
@@ -939,9 +908,9 @@ export function initializeInternalsCallback(this: Base): void {
  */
 export function ensureProperType(this: Base): void {
   const klass = this.constructor as typeof Base;
-  if (inheritanceColumnDisabled(klass)) return;
+  const inheritCol = klass.inheritanceColumn;
+  if (inheritCol === null) return;
   if (!isFinderNeedsTypeCondition(klass)) return;
-  const inheritCol = getInheritanceColumn(klass);
   // Only write when the column is a declared attribute — otherwise the value
   // wouldn't persist or serialize correctly. Mirrors usingSingleTableInheritance.
   if (!(klass as any)._attributeDefinitions?.has(inheritCol)) return;
@@ -960,8 +929,8 @@ export function discriminateClassForRecord(
   modelClass: typeof Base,
   record: Record<string, unknown>,
 ): typeof Base {
-  if (usingSingleTableInheritance(modelClass, record)) {
-    const inheritCol = getInheritanceColumn(modelClass);
+  const inheritCol = modelClass.inheritanceColumn;
+  if (inheritCol !== null && usingSingleTableInheritance(modelClass, record)) {
     // Rails: subclass = base_class.type_for_attribute(inheritCol).cast(record[inheritCol])
     const castValue = castInheritanceColumnValue(modelClass, inheritCol, record[inheritCol]);
     // A present-but-unmapped enum value casts to null; Rails keeps such values
@@ -990,8 +959,8 @@ function usingSingleTableInheritance(
   // itself in {@link findStiClassForRow} because its subtree tracks no subclass
   // and STI was never explicitly enabled, so dispatch is a no-op there.
   // `inheritance_column = nil` opts out entirely, even with a real `type` column.
-  if (inheritanceColumnDisabled(modelClass)) return false;
-  const inheritCol = getInheritanceColumn(modelClass);
+  const inheritCol = modelClass.inheritanceColumn;
+  if (inheritCol === null) return false;
   if (!isPresent(record[inheritCol])) return false;
   return stiColumnIsAttribute(modelClass, inheritCol, record);
 }
@@ -1031,7 +1000,12 @@ function stiColumnIsAttribute(
  * @internal Private method, used internally for STI type filtering in queries.
  */
 export function typeCondition(modelClass: typeof Base, arelTable?: any): any {
-  const inheritCol = getInheritanceColumn(modelClass);
+  const inheritCol = modelClass.inheritanceColumn;
+  // Unreachable with STI disabled: finderNeedsTypeCondition? is false there, and
+  // every caller gates on it.
+  if (inheritCol === null) {
+    throw new ActiveRecordError("Cannot build type condition without an inheritance column");
+  }
   const table = arelTable || (modelClass as any).arelTable;
   if (!table) throw new ActiveRecordError("Cannot build type condition without arel table");
 
@@ -1075,8 +1049,8 @@ export function subclassFromAttributes(
   if (!attrsHash || typeof attrsHash !== "object") return null;
 
   // `inheritance_column = nil` disables STI even when a real `type` column exists.
-  if (inheritanceColumnDisabled(modelClass)) return null;
-  const inheritCol = getInheritanceColumn(modelClass);
+  const inheritCol = modelClass.inheritanceColumn;
+  if (inheritCol === null) return null;
   // Rails gates STI dispatch on `_has_attribute?(inheritance_column)` — only
   // models that actually carry the column dispatch.
   if (!classHasAttribute(modelClass, inheritCol)) return null;
@@ -1240,8 +1214,8 @@ export function subclassFromAttributesForNew(
   // dispatch (it has no in-subtree match), so short-circuit the source probing —
   // including the non-memoized columnDefaults build — on the hot path.
   // `inheritance_column = nil` disables STI even when a real `type` column exists.
-  if (inheritanceColumnDisabled(modelClass)) return null;
-  const col = getInheritanceColumn(modelClass);
+  const col = modelClass.inheritanceColumn;
+  if (col === null) return null;
   if (!classHasAttribute(modelClass, col) && descendants(modelClass).length === 0) return null;
 
   const resolve = (source: unknown, fromScope = false): typeof Base | null => {

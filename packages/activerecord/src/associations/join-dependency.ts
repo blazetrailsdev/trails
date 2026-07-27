@@ -20,7 +20,7 @@ import {
 import { Table, Nodes, tableSqlName, type TableRef } from "@blazetrails/arel";
 import { modelRegistry, isAssociationCached } from "../associations.js";
 import { _reflectOnAssociation } from "../reflection.js";
-import { getInheritanceColumn, isStiSubclass } from "../inheritance.js";
+import { isStiSubclass } from "../inheritance.js";
 import { JoinBase } from "./join-dependency/join-base.js";
 import { JoinAssociation } from "./join-dependency/join-association.js";
 import { JoinPart } from "./join-dependency/join-part.js";
@@ -1170,7 +1170,7 @@ export class JoinDependency {
     model: typeof Base,
     arelTable: TableRef,
   ): Nodes.Node {
-    const inheritanceCol = getInheritanceColumn(model);
+    const inheritanceCol = model.inheritanceColumn;
     if (inheritanceCol && isStiSubclass(model)) {
       const stiNames = [model.name, ...((model as any).descendants ?? []).map((d: any) => d.name)];
       const quotedNames = stiNames.map((n: string) => new Nodes.Quoted(n));

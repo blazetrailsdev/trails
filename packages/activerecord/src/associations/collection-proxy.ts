@@ -59,7 +59,7 @@ import {
 } from "./errors.js";
 import { routeThroughCheckValidity } from "./validate-through-reflection.js";
 import { rebaseNewOwnerSeed } from "./new-owner-seed-rebase.js";
-import { getInheritanceColumn, findStiClass, stiEnabled, polymorphicName } from "../inheritance.js";
+import { findStiClass, stiEnabled, polymorphicName } from "../inheritance.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
@@ -1260,8 +1260,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // the subclass after scope-merge, so peek at scope here before
     // instantiation; the full scope_for_create filter still runs below.
     const sfcForSti = this._scopeForCreateRaw();
-    const inheritanceCol = getInheritanceColumn(targetModel);
-    if (stiEnabled(targetModel)) {
+    const inheritanceCol = targetModel.inheritanceColumn;
+    if (inheritanceCol !== null && stiEnabled(targetModel)) {
       const typeName = (buildAttrs[inheritanceCol] ?? sfcForSti[inheritanceCol]) as
         | string
         | undefined;
@@ -1280,8 +1280,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     let targetModel = this.model;
 
     const sfcForSti = this._scopeForCreateRaw();
-    const inheritanceCol = getInheritanceColumn(targetModel);
-    if (stiEnabled(targetModel)) {
+    const inheritanceCol = targetModel.inheritanceColumn;
+    if (inheritanceCol !== null && stiEnabled(targetModel)) {
       const typeName = (attrs[inheritanceCol] ?? sfcForSti[inheritanceCol]) as string | undefined;
       if (typeName) targetModel = findStiClass(targetModel, typeName);
     }
