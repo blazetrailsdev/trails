@@ -1,5 +1,9 @@
 import type { Base } from "../base.js";
-import type { AssociationDefinition } from "../associations.js";
+import type { AssociationDefinition, AssociationOptions } from "../associations.js";
+import { findTarget as findSingularTarget } from "./singular-association.js";
+import { findTarget as findHasManyTarget } from "./has-many-association.js";
+import { camelize, underscore } from "@blazetrails/activesupport";
+import { resolveAssocClass, loadHasOne, _hmtNotFound } from "../associations.js";
 import { HasOneAssociation, sameRecord } from "./has-one-association.js";
 import {
   HasOneThroughCantAssociateThroughHasOneOrManyReflection,
@@ -682,4 +686,55 @@ function ensureNotNested(assoc: HasOneThroughAssociation): void {
       assoc.reflection.name,
     );
   }
+}
+
+/**
+ * Mirrors: SingularAssociation#find_target as inherited by
+ * HasOneThroughAssociation (has_one_through_association.rb).
+ */
+export async function findTarget(
+  record: Base,
+  assocName: string,
+  options: AssociationOptions,
+): Promise<Base | null> {
+  const ctor = record.constructor as typeof Base;
+  const associations: AssociationDefinition[] = ctor._associations ?? [];
+  const throughAssoc = associations.find((a) => a.name === options.through);
+  if (!throughAssoc) {
+    throw _hmtNotFound(ctor, assocName, options.through!);
+  }
+
+  let throughRecord: Base | null;
+  if (throughAssoc.type === "hasOne") {
+    throughRecord = await loadHasOne(record, throughAssoc.name, throughAssoc.options);
+  } else if (throughAssoc.type === "belongsTo") {
+    throughRecord = await findSingularTarget(record, throughAssoc.name, throughAssoc.options);
+  } else if (throughAssoc.type === "hasMany") {
+    const throughRecords = await findHasManyTarget(record, throughAssoc.name, throughAssoc.options);
+    throughRecord = throughRecords[0] ?? null;
+  } else {
+    throughRecord = null;
+  }
+
+  if (!throughRecord) return null;
+
+  const sourceName = options.source ?? assocName;
+  const throughCtor = throughRecord.constructor as typeof Base;
+  const throughAssociations: AssociationDefinition[] = throughCtor._associations ?? [];
+  const sourceAssoc = throughAssociations.find((a) => a.name === sourceName);
+
+  if (sourceAssoc) {
+    if (sourceAssoc.type === "belongsTo") {
+      return findSingularTarget(throughRecord, sourceName, sourceAssoc.options);
+    } else if (sourceAssoc.type === "hasOne") {
+      return loadHasOne(throughRecord, sourceName, sourceAssoc.options);
+    }
+  }
+
+  const className = options.className ?? camelize(sourceName);
+  const targetFk = `${underscore(sourceName)}_id`;
+  const fkValue = throughRecord._readAttribute(targetFk);
+  if (fkValue === null || fkValue === undefined) return null;
+  const targetModel = resolveAssocClass(throughRecord, sourceName, className);
+  return targetModel.findBy({ [targetModel.primaryKey as string]: fkValue });
 }

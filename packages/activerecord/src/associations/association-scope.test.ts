@@ -276,8 +276,9 @@ describe("AssociationScope", () => {
   });
 
   it("loadHasMany applies caller-supplied options.scope when it differs from reflection.scope", async () => {
-    // Regression for the loadHasManyThrough path that wraps options.scope
-    // with sourceType filtering before calling findTarget. The migrated
+    // Regression for the `HasManyThroughAssociation#findTarget` path that wraps
+    // options.scope with sourceType filtering before calling
+    // `HasManyAssociation#findTarget`. The migrated
     // path skips re-applying when options.scope === reflection.scope
     // (avoid double-application), but augmented scopes must still run.
     // Canonical Author has_many :posts carries no macro scope, so the
