@@ -3416,8 +3416,6 @@ export class Base extends Model {
 
   declare writeAttribute: typeof ReadonlyAttributes.writeAttribute;
 
-  // `id` / `id=` are the PrimaryKey module's accessor pair; wired onto the
-  // prototype via include() below so they keep their Rails name.
   declare id: PrimaryKeyValue;
 
   // increment/decrement/toggle + bang variants wired via include() below;

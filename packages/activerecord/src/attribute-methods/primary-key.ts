@@ -149,26 +149,13 @@ function writeId(this: PrimaryKeyInstance, value: unknown): void {
 }
 
 /**
- * Home for the module's `id` accessor pair. Ruby names a writer after its
- * reader (`id` / `id=`); TypeScript can only spell that pair as a `get`/`set`
- * on a prototype, and two exported functions in one module can't share a name —
- * so a `setId`-style export would be surface Rails does not have. Hosts pick
- * the pair up with `include()` from `@blazetrails/activesupport`, which copies
- * accessor descriptors intact.
- *
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey
  */
 export class PrimaryKey {
-  // The host surface is asserted at the call, not declared as class fields:
-  // a `declare writeAttribute` here would register as TS surface this Rails
-  // module does not have (api:extra flags it as moved from write.rb).
-
-  /** Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id */
   get id(): unknown {
     return readId.call(this as unknown as PrimaryKeyInstance);
   }
 
-  /** Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id= */
   set id(value: unknown) {
     writeId.call(this as unknown as PrimaryKeyInstance, value);
   }
