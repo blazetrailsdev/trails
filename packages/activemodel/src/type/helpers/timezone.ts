@@ -1,5 +1,4 @@
 import { getZoneDefault } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/activesupport/temporal";
 
 export function isUtc(): boolean {
   const zoneDefault = getZoneDefault();
@@ -9,8 +8,4 @@ export function isUtc(): boolean {
 
 export function defaultTimezone(): "utc" | "local" {
   return isUtc() ? "utc" : "local";
-}
-
-export function configuredTimezone(utc: boolean = isUtc()): string {
-  return utc ? "UTC" : Temporal.Now.timeZoneId();
 }

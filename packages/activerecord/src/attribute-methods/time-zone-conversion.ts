@@ -2,7 +2,7 @@
  * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion
  */
 import type { Type } from "@blazetrails/activemodel";
-import { ValueType, configuredTimezone } from "@blazetrails/activemodel";
+import { ValueType, isUtcTimezone } from "@blazetrails/activemodel";
 import { TimeWithZone, TimeZone, getZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 type ValueTypeInstance = InstanceType<typeof ValueType>;
@@ -63,7 +63,7 @@ export class TimeZoneConverter extends ValueType<unknown> {
     // PlainDateTime: wall-clock components from multiparameter assembly (no timezone).
     // Mirrors Rails' Hash branch: set_time_zone_without_conversion(super).
     if (value instanceof Temporal.PlainDateTime) {
-      const instant = value.toZonedDateTime(configuredTimezone(this._subtypeIsUtc)).toInstant();
+      const instant = value.toZonedDateTime(zoneForIsUtc(this._subtypeIsUtc)).toInstant();
       return setTimeZoneWithoutConversion(instant, this._subtypeIsUtc);
     }
     // Strings: Rails gives String an in_time_zone method via CoreExt, so strings
@@ -207,6 +207,17 @@ export class TimeZoneConverter extends ValueType<unknown> {
 }
 
 /**
+ * Rails' time types branch on `is_utc?` between `::Time.utc` and `::Time.local`
+ * (time_value.rb:51-60). Temporal has no `Time.local`, so the local arm has to
+ * name the host zone explicitly.
+ *
+ * @internal
+ */
+function zoneForIsUtc(subtypeIsUtc?: boolean): string {
+  return (subtypeIsUtc ?? isUtcTimezone()) ? "UTC" : Temporal.Now.timeZoneId();
+}
+
+/**
  * Walks the `subtype` chain the way Rails' OID::Range / OID::Array delegate to
  * their subtype (range.rb:8-10, array.rb:12-13), so a wrapped
  * ActiveRecord::Type::DateTime still supplies the `is_utc?` that
@@ -249,11 +260,11 @@ function setTimeZoneWithoutConversion(value: unknown, subtypeIsUtc?: boolean): u
   if (!zone) return value;
   if (value instanceof Temporal.Instant) {
     // AcceptsMultiparameterTime builds the instant by interpreting components
-    // in configuredTimezone() (UTC when default_timezone is :utc, host-local
+    // in the is_utc? zone (UTC when default_timezone is :utc, host-local
     // when :local). Extract wall-clock components using the SAME timezone so
     // we get the original component values, then re-interpret them as local
     // time in the current zone (mirrors Time.zone.local_to_utc(t).in_time_zone).
-    const zoned = value.toZonedDateTimeISO(configuredTimezone(subtypeIsUtc));
+    const zoned = value.toZonedDateTimeISO(zoneForIsUtc(subtypeIsUtc));
     const pdt = zoned.toPlainDateTime();
     // zone.local() takes milliseconds; get the ms-level result with correct DST
     // disambiguation, then add back sub-millisecond precision from the original.
@@ -350,7 +361,7 @@ function castBoundInZone(value: unknown, subtypeIsUtc?: boolean): unknown {
   if (value instanceof Temporal.Instant) return convertTimeToTimeZone(value);
   if (value instanceof Temporal.ZonedDateTime) return convertTimeToTimeZone(value.toInstant());
   if (value instanceof Temporal.PlainDateTime) {
-    const instant = value.toZonedDateTime(configuredTimezone(subtypeIsUtc)).toInstant();
+    const instant = value.toZonedDateTime(zoneForIsUtc(subtypeIsUtc)).toInstant();
     return setTimeZoneWithoutConversion(instant, subtypeIsUtc);
   }
   if (typeof value === "string") {

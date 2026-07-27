@@ -7,7 +7,7 @@ import {
 } from "./internal/sentinels.js";
 import { ArgumentError } from "../attribute-assignment.js";
 import { AcceptsMultiparameterTime, isHash } from "./helpers/accepts-multiparameter-time.js";
-import { configuredTimezone, isUtc } from "./helpers/timezone.js";
+import { isUtc } from "./helpers/timezone.js";
 import { ValueType } from "./value.js";
 
 export type DateTimeCastResult = Temporal.Instant | DateInfinityType | DateNegativeInfinityType;
@@ -166,9 +166,13 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
       }
     }
     try {
-      return Temporal.PlainDateTime.from(datetimeString, { overflow: "reject" })
-        .toZonedDateTime(configuredTimezone(this.isUtc))
-        .toInstant();
+      return (
+        Temporal.PlainDateTime.from(datetimeString, { overflow: "reject" })
+          // Rails branches on `is_utc?` between `::Time.utc` and `::Time.local`;
+          // Temporal has no `Time.local`, so the local arm names the host zone.
+          .toZonedDateTime(this.isUtc ? "UTC" : Temporal.Now.timeZoneId())
+          .toInstant()
+      );
     } catch {
       return null;
     }

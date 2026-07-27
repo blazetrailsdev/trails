@@ -112,7 +112,6 @@ export { TimeType } from "./type/time.js";
 export {
   isUtc as isUtcTimezone,
   defaultTimezone as getDefaultTimezone,
-  configuredTimezone,
 } from "./type/helpers/timezone.js";
 
 import { StringType } from "./type/string.js";
