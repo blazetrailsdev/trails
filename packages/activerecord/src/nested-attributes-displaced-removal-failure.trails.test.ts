@@ -116,6 +116,66 @@ describe("nested-attributes displacement removal failure", () => {
     ).rejects.toThrow("removal exploded");
   });
 
+  it("announces the failure through Base.logger with no drain and no save", async () => {
+    const pirate = await pirateWithFailingRemoval();
+    const errors: string[] = [];
+    const previous = Pirate.logger;
+    Pirate.logger = { error: (message: string) => errors.push(message) };
+
+    try {
+      (pirate as unknown as { shipAttributes: unknown }).shipAttributes = {
+        name: "Davy Jones Gold Dagger",
+      };
+      await (pirate as unknown as RemovalHost)._pendingDisplacedRemovals?.[0];
+    } finally {
+      Pirate.logger = previous;
+    }
+
+    // Rails' `RecordNotSaved` message verbatim (has_one_association.rb:110-111).
+    expect(errors).toEqual([
+      "Failed to remove the existing associated ship. " +
+        "The record failed to save after its foreign key was set to nil.",
+    ]);
+  });
+
+  it("announces nothing when the displacement removal succeeds", async () => {
+    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
+    await Ship.create({
+      name: "Nights Dirty Lightning",
+      pirate_id: (pirate as unknown as { id: number }).id,
+    });
+    await (pirate as unknown as { ship: Promise<Base | null> }).ship;
+
+    const errors: string[] = [];
+    const previous = Pirate.logger;
+    Pirate.logger = { error: (message: string) => errors.push(message) };
+
+    try {
+      await (
+        pirate as unknown as { setShipAttributes: (a: unknown) => Promise<void> }
+      ).setShipAttributes({ name: "Davy Jones Gold Dagger" });
+    } finally {
+      Pirate.logger = previous;
+    }
+
+    expect(errors).toEqual([]);
+  });
+
+  it("still parks the failure when no logger is configured", async () => {
+    // `ActiveRecord::Base.logger` is nil until a Railtie assigns one, so the
+    // emit is best-effort; the sticky failure is the guarantee.
+    const pirate = await pirateWithFailingRemoval();
+    expect(Pirate.logger).toBe(null);
+
+    (pirate as unknown as { shipAttributes: unknown }).shipAttributes = {
+      name: "Davy Jones Gold Dagger",
+    };
+    await (pirate as unknown as RemovalHost)._pendingDisplacedRemovals?.[0];
+
+    expect((pirate as unknown as RemovalHost)._displacedRemovalFailure).toBeInstanceOf(Error);
+    await expect(pirate.save()).rejects.toThrow("removal exploded");
+  });
+
   it("does not leave a floating rejection when the removal is never drained", async () => {
     const pirate = await pirateWithFailingRemoval();
 

@@ -717,7 +717,9 @@ interface OneToOneAssociation {
  *   parks the first error on the owner, and **every** subsequent drain
  *   (`save()`, an awaitable writer, another assignment's drain) rethrows it. An
  *   owner that is never saved therefore still carries the failure; nothing
- *   silently discards it.
+ *   silently discards it. The failure is also emitted through `Base.logger` the
+ *   moment it is parked, so an owner that is never drained at all still
+ *   announces it — the analogue of Rails raising inline from `remove_target!`.
  *
  * The sticky failure is deliberately terminal for that instance: the in-memory
  * replacement landed while the displaced row did not detach, so persisting the
@@ -730,14 +732,19 @@ function detachDisplacedAtAssignment(
   record: Base,
   assoc: OneToOneAssociation,
   displaced: Base | null,
+  associationName: string,
 ): void {
   if (!displaced) return;
   if (typeof assoc.detachDisplacedTarget !== "function") return;
+  const host = record as unknown as DisplacedRemovalHost;
   const settled = assoc.detachDisplacedTarget(displaced).then(
     () => null,
-    (error: unknown) => error ?? new Error("displaced record removal failed"),
+    (rejection: unknown) => {
+      const error = rejection ?? new Error("displaced record removal failed");
+      recordDisplacedRemovalFailure(host, error, record, associationName);
+      return error;
+    },
   );
-  const host = record as unknown as DisplacedRemovalHost;
   (host._pendingDisplacedRemovals ??= []).push(settled);
 }
 
@@ -752,20 +759,59 @@ interface DisplacedRemovalHost {
 }
 
 /**
- * Park a displacement-removal failure on the owner permanently. Draining
- * consumes the *promise*, never the error — see the contract on
+ * Park a displacement-removal failure on the owner permanently, and announce it
+ * once. Called the moment the removal rejects — the drain consumes the
+ * *promise*, never the error — see the contract on
  * {@link detachDisplacedAtAssignment}.
+ *
+ * Rails raises `RecordNotSaved` inline from `remove_target!`
+ * (has_one_association.rb:105-112), so the failure is always announced even if
+ * nobody ever saves the owner. A synchronous JS setter cannot raise on an async
+ * write, so the announcement goes through `Base.logger` instead; the sticky
+ * rethrow is the backstop, not the only signal.
  * @internal
  */
-function recordDisplacedRemovalFailure(host: DisplacedRemovalHost, error: unknown): void {
-  host._displacedRemovalFailure ??= error;
+function recordDisplacedRemovalFailure(
+  host: DisplacedRemovalHost,
+  error: unknown,
+  owner: Base,
+  associationName: string,
+): void {
+  if (host._displacedRemovalFailure !== undefined) return;
+  host._displacedRemovalFailure = error;
+  logDisplacedRemovalFailure(owner, associationName);
+}
+
+/**
+ * The `Base.logger` analogue of Rails' inline `RecordNotSaved`, message and all
+ * (has_one_association.rb:110-111) — the string is Rails' verbatim, with no
+ * detail of the underlying error appended; the parked error itself carries that,
+ * and every drain rethrows it. Reaches the logger through the owner's own class
+ * so nested-attributes keeps its type-only import of `Base`.
+ *
+ * A missing logger is a silent no-op, matching Rails: `ActiveRecord::Base.logger`
+ * is `nil` until a Railtie assigns one, and Rails' own logging paths guard on it
+ * the same way (`ActiveSupport::Benchmarkable#benchmark`). Announcement is
+ * best-effort; the sticky rethrow, not the log line, is what guarantees nothing
+ * silently discards the failure.
+ * @internal
+ */
+function logDisplacedRemovalFailure(owner: Base, associationName: string): void {
+  const logger = (owner.constructor as unknown as { logger?: { error?: (m: string) => void } })
+    .logger;
+  if (typeof logger?.error !== "function") return;
+  logger.error(
+    `Failed to remove the existing associated ${associationName}. ` +
+      `The record failed to save after its foreign key was set to nil.`,
+  );
 }
 
 /**
  * Await the removals started by `detachDisplacedAtAssignment`, rethrowing the
- * first failure — the deferred half of Rails' inline `remove_target!`. A failure
- * already parked by an earlier drain is rethrown before anything is awaited, so
- * it cannot be observed once and then forgotten.
+ * first failure — the deferred half of Rails' inline `remove_target!`. Each
+ * removal parks its own failure as it settles, so awaiting the list is enough;
+ * a failure parked earlier is rethrown too, and cannot be observed once and then
+ * forgotten.
  * @internal
  */
 async function awaitPendingDisplacedRemovals(record: Base): Promise<void> {
@@ -773,10 +819,7 @@ async function awaitPendingDisplacedRemovals(record: Base): Promise<void> {
   const pending = host._pendingDisplacedRemovals;
   if (pending?.length) {
     host._pendingDisplacedRemovals = [];
-    for (const settled of pending) {
-      const error = await settled;
-      if (error) recordDisplacedRemovalFailure(host, error);
-    }
+    for (const settled of pending) await settled;
   }
   if (host._displacedRemovalFailure !== undefined) throw host._displacedRemovalFailure;
 }
@@ -916,7 +959,7 @@ export function assignNestedAttributesForOneToOneAssociation(
         } finally {
           assoc.buildDisplacementOwnedByCaller = false;
         }
-        detachDisplacedAtAssignment(record, assoc, displaced);
+        detachDisplacedAtAssignment(record, assoc, displaced, associationName);
       }
     }
   }
