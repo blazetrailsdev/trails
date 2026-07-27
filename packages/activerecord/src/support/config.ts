@@ -26,7 +26,7 @@
  *     `PGPASSWORD` / `PGDATABASE` for the postgresql lane (Rails' `postgresql:`
  *     entries carry no host at all, deferring to libpq's own env).
  *
- * ## Deviations from `config.example.yml` (deliberate, not parity)
+ * ## Deviations from `config.example.yml` — ACCEPTED PERMANENTLY
  *
  * Rails interpolates ONLY `MYSQL_HOST` / `MYSQL_PORT` / `MYSQL_SOCK` from the
  * environment and hard-codes the rest — notably `username: rails` on both
@@ -36,12 +36,37 @@
  * trails makes the credential and database name env-driven too
  * (`MYSQL_USER` / `MYSQL_PASSWORD` / `MYSQL_DATABASE`, and the `PG*` set), and
  * defaults them to `root` / `postgres` / `rails_js_test` — the users and
- * database the containers in `.github/workflows/ci.yml` actually provision.
- * Hard-coding Rails' `rails` user would not authenticate against them.
+ * database the containers in `.github/workflows/ci.yml` and `docker-compose.yml`
+ * actually provision. Hard-coding Rails' `rails` user would not authenticate
+ * against them.
+ *
+ * This was weighed against the alternative — provision a `rails` user in the
+ * containers so the harness could adopt Rails' literal credential and shrink to
+ * Rails' three interpolated keys — and deliberately kept. The reasoning, so it
+ * is not re-derived:
+ *
+ *   - The `PG*` half is not a deviation in substance. Rails' `postgresql:`
+ *     entries carry no connection fields precisely so libpq resolves them from
+ *     `PGHOST` / `PGPORT` / `PGUSER` / `PGPASSWORD` / `PGDATABASE`
+ *     (`config.example.yml:74-81`). trails reads the same variables because it
+ *     must *materialize* concrete values — it renders a URL for `pg` and for the
+ *     CLI's `--database-url` rather than handing libpq an empty config. Only the
+ *     explicit fallbacks (`postgres` / `rails_js_test`) are a trails addition,
+ *     and they are what libpq would otherwise resolve from the local role.
+ *   - Rails' `rails` user is an artifact of Rails' own CI images, not a
+ *     behaviour the port reproduces: no adapter, task, or assertion observes the
+ *     credential's *value*. Adopting it would mean provisioning a user in three
+ *     places (CI service containers, `docker-compose.yml`, and every
+ *     contributor's local server) to buy no fidelity in anything under test.
+ *   - Configurability is already depended on: CI sets `MYSQL_USER` / `PGUSER` /
+ *     `PGPASSWORD` / `*_DATABASE` explicitly, `AR_DB_SLOT` rewrites the database
+ *     name per worker, and local servers (Homebrew postgres, socket MySQL) have
+ *     no common credential to hard-code.
  *
  * So: the ARCONN-selects / sub-settings-describe *split* is Rails parity; the
- * particular set of interpolated keys and their defaults is a trails choice.
- * Anything relying on Rails' literal credential must set `MYSQL_USER` itself.
+ * particular set of interpolated keys and their defaults is a settled trails
+ * choice. Anything relying on Rails' literal credential must set `MYSQL_USER`
+ * itself. Revisit only if a test ever needs to assert the credential itself.
  *
  * trails previously collapsed both into a single `PG_TEST_URL` /
  * `MYSQL_TEST_URL` URL string, which made backend selection a side effect of
@@ -139,9 +164,10 @@ function applySlot(database: string, read: EnvReader): string {
 
 /**
  * PostgreSQL connection details from libpq's standard env vars — the ones
- * Rails' `postgresql:` entries rely on by carrying no host of their own. The
- * defaults (`postgres` / `rails_js_test`) are a trails choice matching what CI
- * provisions; see the deviations note in the module doc.
+ * Rails' `postgresql:` entries rely on by carrying no host of their own. Reading
+ * them is the parity path; only the explicit defaults (`postgres` /
+ * `rails_js_test`) are a trails choice, matching what CI provisions. Accepted
+ * permanently — see the deviations note in the module doc.
  */
 export function postgresSettings(read: EnvReader = getEnv): ServerSettings {
   return {
@@ -159,7 +185,8 @@ export function postgresSettings(read: EnvReader = getEnv): ServerSettings {
  * `MYSQL_HOST` / `MYSQL_PORT` / `MYSQL_SOCK` mirror the keys Rails interpolates
  * (`config.example.yml:12-19`). The credential and database name are a trails
  * extension defaulting to what CI provisions — Rails hard-codes
- * `username: rails` instead. See the deviations note in the module doc.
+ * `username: rails` instead. Accepted permanently (no test observes the
+ * credential's value); see the deviations note in the module doc.
  */
 export function mysqlSettings(read: EnvReader = getEnv): ServerSettings {
   return {

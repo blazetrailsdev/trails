@@ -269,6 +269,14 @@ Rails hard-codes `username: rails` and interpolates only host/port/socket
 (`vendor/rails/activerecord/test/config.example.yml`). `ARCONN` selecting the
 backend is the part that mirrors Rails.
 
+That divergence is **accepted permanently** rather than closed by provisioning a
+`rails` user: nothing under test observes the credential's value, adopting
+Rails' literal would need a user provisioned in CI, `docker-compose.yml`, and
+every contributor's local server, and the credential already has to stay
+configurable (CI sets it, and `AR_DB_SLOT` rewrites the database per worker).
+The full reasoning lives in the deviations note atop
+`packages/activerecord/src/support/config.ts`.
+
 The `SchemaAdapter` wrapper auto-creates tables from model attribute definitions, so tests don't need manual DDL.
 
 ## Project Structure
