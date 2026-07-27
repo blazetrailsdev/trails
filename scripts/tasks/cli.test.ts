@@ -97,6 +97,9 @@ import {
   formatStaleClaims,
   DEFAULT_STALE_HOURS,
   RfcEntry,
+  comparePriority,
+  priorityContext,
+  remainingStoryCounts,
   applyRfcPriorities,
   effectivePriority,
   parseRfcPriority,
@@ -3702,7 +3705,113 @@ describe("RFC-level priority", () => {
     });
   });
 
+  describe("equal-priority RFC tie-break (fewer stories remaining wins)", () => {
+    it("counts only stories that are neither done nor closed as remaining", () => {
+      const idx = idxWith([
+        story({ id: "a", rfc: "0001-r", status: "ready" }),
+        story({ id: "b", rfc: "0001-r", status: "in-progress" }),
+        story({ id: "c", rfc: "0001-r", status: "done" }),
+        story({ id: "d", rfc: "0001-r", status: "closed" }),
+        story({ id: "e", rfc: "0003-r", status: "blocked" }),
+      ]);
+      expect([...remainingStoryCounts(idx)]).toEqual([
+        ["0001-r", 2],
+        ["0003-r", 1],
+      ]);
+    });
+
+    it("orders the RFC with fewer stories left first when priorities are equal", () => {
+      const idx = idxWith(
+        [
+          story({ id: "big1", rfc: "0001-r" }),
+          story({ id: "big2", rfc: "0001-r" }),
+          story({ id: "big3", rfc: "0001-r" }),
+          story({ id: "small1", rfc: "0003-r" }),
+        ],
+        { "0001-r": 2, "0003-r": 2 },
+      );
+      expect(ready(idx)[0].id).toBe("small1");
+    });
+
+    it("ignores shipped work: an RFC with many done stories still counts as near-empty", () => {
+      const idx = idxWith(
+        [
+          story({ id: "lean1", rfc: "0001-r", status: "done" }),
+          story({ id: "lean2", rfc: "0001-r", status: "done" }),
+          story({ id: "lean3", rfc: "0001-r", status: "ready" }),
+          story({ id: "fat1", rfc: "0003-r" }),
+          story({ id: "fat2", rfc: "0003-r" }),
+        ],
+        { "0001-r": 1, "0003-r": 1 },
+      );
+      expect(ready(idx)[0].id).toBe("lean3");
+    });
+
+    it("breaks a tie between two stories that set the same priority themselves", () => {
+      const idx = idxWith(
+        [
+          story({ id: "fromBig", rfc: "0001-r", priority: 4 }),
+          story({ id: "fromBigB", rfc: "0001-r" }),
+          story({ id: "fromSmall", rfc: "0003-r", priority: 4 }),
+        ],
+        { "0001-r": 7, "0003-r": 7 },
+      );
+      expect(ready(idx)[0].id).toBe("fromSmall");
+    });
+
+    it("does not apply when the two RFC priorities differ", () => {
+      const idx = idxWith(
+        [
+          story({ id: "bigRfcFirst", rfc: "0001-r", priority: 4 }),
+          story({ id: "bigRfcSecond", rfc: "0001-r", priority: 4 }),
+          story({ id: "smallRfc", rfc: "0003-r", priority: 4 }),
+        ],
+        { "0001-r": 1, "0003-r": 2 },
+      );
+      expect(ready(idx).map((s) => s.id)).toEqual(["bigRfcFirst", "bigRfcSecond", "smallRfc"]);
+    });
+
+    it("does not reshuffle unprioritized RFCs by size", () => {
+      const idx = idxWith([
+        story({ id: "big1", rfc: "0001-r" }),
+        story({ id: "big2", rfc: "0001-r" }),
+        story({ id: "small1", rfc: "0003-r" }),
+      ]);
+      expect(ready(idx).map((s) => s.id)).toEqual(["big1", "big2", "small1"]);
+    });
+
+    it("leaves stories of one RFC in index order", () => {
+      const idx = idxWith(
+        [
+          story({ id: "s1", rfc: "0001-r" }),
+          story({ id: "s2", rfc: "0001-r" }),
+          story({ id: "s3", rfc: "0001-r" }),
+        ],
+        { "0001-r": 1 },
+      );
+      expect(ready(idx).map((s) => s.id)).toEqual(["s1", "s2", "s3"]);
+    });
+
+    it("returns 0 for two unprioritized stories rather than NaN", () => {
+      const idx = idxWith([story({ id: "a" }), story({ id: "b", rfc: "0003-r" })]);
+      const ctx = priorityContext(idx);
+      expect(comparePriority(idx.stories[0], idx.stories[1], ctx)).toBe(0);
+    });
+  });
+
   describe("nextBundle", () => {
+    it("leads the bundle with the nearer-to-done of two equal-priority RFCs", () => {
+      const idx = idxWith(
+        [
+          story({ id: "big1", rfc: "0001-r", cluster: "c1", est_loc: 100 }),
+          story({ id: "big2", rfc: "0001-r", cluster: "c1", est_loc: 100 }),
+          story({ id: "small1", rfc: "0003-r", cluster: "c2", est_loc: 100 }),
+        ],
+        { "0001-r": 3, "0003-r": 3 },
+      );
+      expect(nextBundle(idx, { maxLoc: 250 })[0].id).toBe("small1");
+    });
+
     it("leads with a story that inherits its RFC's priority, overriding LOC packing", () => {
       const idx = idxWith(
         [

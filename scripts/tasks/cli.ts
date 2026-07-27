@@ -343,8 +343,38 @@ export function effectivePriority(s: StoryEntry, rfcPriority: ReadonlyMap<string
   return s.priority ?? rfcPriority.get(s.rfc) ?? Infinity;
 }
 
+export interface PriorityContext {
+  rfcPriority: ReadonlyMap<string, number>;
+  remaining: ReadonlyMap<string, number>;
+}
+
+export function remainingStoryCounts(index: Index): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const s of index.stories) {
+    if (isDepResolved(s.status)) continue;
+    m.set(s.rfc, (m.get(s.rfc) ?? 0) + 1);
+  }
+  return m;
+}
+
+export function priorityContext(index: Index): PriorityContext {
+  return { rfcPriority: rfcPriorityMap(index), remaining: remainingStoryCounts(index) };
+}
+
+export function comparePriority(a: StoryEntry, b: StoryEntry, ctx: PriorityContext): number {
+  const ea = effectivePriority(a, ctx.rfcPriority);
+  const eb = effectivePriority(b, ctx.rfcPriority);
+  if (ea !== eb) return ea < eb ? -1 : 1;
+  const pa = ctx.rfcPriority.get(a.rfc);
+  const pb = ctx.rfcPriority.get(b.rfc);
+  if (pa === undefined || pa !== pb) return 0;
+  const ra = ctx.remaining.get(a.rfc) ?? 0;
+  const rb = ctx.remaining.get(b.rfc) ?? 0;
+  return ra === rb ? 0 : ra - rb;
+}
+
 export function ready(index: Index, opts: { rfc?: string } = {}): StoryEntry[] {
-  const rfcPriority = rfcPriorityMap(index);
+  const ctx = priorityContext(index);
   const rfcStatus = new Map(index.rfcs.map((r) => [r.id, r.status]));
   const storyStatus = new Map(index.stories.map((s) => [s.id, s.status]));
   return (
@@ -375,7 +405,7 @@ export function ready(index: Index, opts: { rfc?: string } = {}): StoryEntry[] {
       // leaving callers that don't set priority (and their tests) unaffected.
       // `next-bundle` re-derives its own ordering on top of this; the gain here
       // is that the `ready` command's output reflects priority too.
-      .sort((a, b) => effectivePriority(a, rfcPriority) - effectivePriority(b, rfcPriority))
+      .sort((a, b) => comparePriority(a, b, ctx))
   );
 }
 
@@ -427,17 +457,15 @@ export function nextBundle(
   // `.filter()` preserves order, so `prioritized[0]` is the highest-priority
   // candidate without re-sorting here — the ordering source of truth stays in
   // `ready()`.
-  const rfcPriority = rfcPriorityMap(index);
-  const prioritized = inScope.filter((s) => effectivePriority(s, rfcPriority) !== Infinity);
+  const ctx = priorityContext(index);
+  const prioritized = inScope.filter((s) => effectivePriority(s, ctx.rfcPriority) !== Infinity);
   if (prioritized.length > 0) {
     const lead = prioritized[0];
     const leadLoc = lead.est_loc ?? 0;
     const rest = inScope.filter(
       (s) => s.id !== lead.id && s.cluster === lead.cluster && s.est_loc !== null,
     );
-    const fill = bestBundle(rest, opts.maxLoc - leadLoc).sort(
-      (a, b) => effectivePriority(a, rfcPriority) - effectivePriority(b, rfcPriority),
-    );
+    const fill = bestBundle(rest, opts.maxLoc - leadLoc).sort((a, b) => comparePriority(a, b, ctx));
     return [lead, ...fill];
   }
   // Unprioritized path: knapsack same-cluster stories by est_loc, so stories
@@ -2879,10 +2907,11 @@ export function prLocDelta(pr: number, estLoc: number | null): string | null {
 
 // One-line legend printed above every story table so the priority column's
 // direction is documented wherever the ordering is shown (`ready`, `list`,
-// `next-bundle`). Ties at the same priority have no defined order.
+// `next-bundle`). Ties break toward the equal-priority RFC with fewer stories
+// left; anything still tied after that has no defined order.
 export const PRIORITY_LEGEND =
-  "priority: lower N = higher priority; absent = unprioritized; ties have undefined order; " +
-  "N* = inherited from the story's RFC";
+  "priority: lower N = higher priority; absent = unprioritized; N* = inherited from the " +
+  "story's RFC; equal-priority RFCs: fewer stories remaining first";
 
 // Default age (hours) past which a `claimed` story with no PR is flagged stale.
 // Overridable via `--stale-hours N`. Read once per command so `status` and
