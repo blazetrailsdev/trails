@@ -11,6 +11,7 @@ import {
   dedupeRubyMethodInto,
   selectMisplacedFile,
   MISPLACED_MIN_HITS,
+  blazetrailsDepKeys,
   buildEntitiesByName,
   significantMissingCalls,
   jsEnumerableAliases,
@@ -1232,5 +1233,26 @@ describe("buildEntitiesByName", () => {
     const candidates = map.get("Model") ?? [];
     // Local should be first (added first due to current-package priority)
     expect(candidates[0]).toBe(localModel);
+  });
+});
+
+describe("blazetrailsDepKeys", () => {
+  it("keeps a package that shares its dir with a test-support package", () => {
+    // `@blazetrails/activerecord` maps to both `activerecord` and
+    // `activerecord-test-support`; the lib package must survive the split.
+    expect(blazetrailsDepKeys("trailties")).toContain("activerecord");
+  });
+
+  it("never exposes a test-support package to its siblings", () => {
+    for (const pkg of ["trailties", "activerecord", "actioncontroller"]) {
+      expect(blazetrailsDepKeys(pkg)).not.toContain("activerecord-test-support");
+    }
+  });
+
+  it("gives a test-support package its container as a dep", () => {
+    // The helpers live in the container's npm package, so it is never listed
+    // in package.json — without this, FakeAdapter's superclass resolves to
+    // nothing.
+    expect(blazetrailsDepKeys("activerecord-test-support")).toContain("activerecord");
   });
 });

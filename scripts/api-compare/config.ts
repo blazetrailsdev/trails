@@ -44,6 +44,15 @@ export const DIR_TO_PACKAGES: Record<string, string[]> = Object.entries(
   ),
 );
 
+/**
+ * Packages that pair against a framework's *test* helpers rather than its lib.
+ * They live inside another package's src dir and are not part of anyone's
+ * dependency surface, so `blazetrailsDepKeys` filters them out of sibling
+ * packages' entity index — a Rails lib method must never satisfy its
+ * inheritance/arity lookup against a test helper.
+ */
+export const TEST_SUPPORT_PACKAGES = new Set(["activerecord-test-support"]);
+
 /** Override package → src subdirectory when package shares a dir */
 export const PACKAGE_SRC_SUBDIR: Record<string, string> = {
   actiondispatch: "action-dispatch",
@@ -54,10 +63,10 @@ export const PACKAGE_SRC_SUBDIR: Record<string, string> = {
 };
 
 /**
- * Src dirs of packages that live *inside* another package's src dir, keyed by
- * the containing package. The container's extraction walk skips them so each
- * file lands in exactly one package manifest (`activerecord` must not also
- * extract `src/support/`, which belongs to `activerecord-test-support`).
+ * Src dirs of the packages nested inside `pkg`'s own src dir. The container's
+ * extraction walk skips them so each file lands in exactly one package manifest
+ * (`activerecord` must not also extract `src/support/`, which belongs to
+ * `activerecord-test-support`).
  *
  * Actionpack's four packages are siblings under `src/`, with no package rooted
  * at `src/` itself, so nothing is excluded there.
