@@ -57,7 +57,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, PACKAGES, ROOT_DIR, SCRIPT_DIR } from "./config.js";
-import { serializeBaseline } from "./lint-call-mismatches.js";
+import { serializeBaseline } from "./baseline-json.js";
 
 export const ARTIFACT_PATH = path.join(OUTPUT_DIR, "body-hashes.json");
 export const MANIFEST_PATH = path.join(SCRIPT_DIR, "body-pins.json");

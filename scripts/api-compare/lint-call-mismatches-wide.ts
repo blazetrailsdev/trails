@@ -62,10 +62,9 @@ import {
   findDuplicateKeys,
   flattenArtifact,
   missingScope,
-  reportNonCanonicalBaselines,
   reseed,
-  serializeBaseline,
 } from "./lint-call-mismatches.js";
+import { reportNonCanonicalBaselines, serializeBaseline } from "./baseline-json.js";
 
 // The baseline is a directory of per-source-file JSON arrays (see header),
 // not a single file. Each entry lives at <BASELINE_DIR>/<package>/<tsFile

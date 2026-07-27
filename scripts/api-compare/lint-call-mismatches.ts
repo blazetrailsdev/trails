@@ -64,6 +64,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, PACKAGES, ROOT_DIR } from "./config.js";
+import { reportNonCanonicalBaselines, serializeBaseline } from "./baseline-json.js";
 
 const BASELINE_PATH = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -95,52 +96,6 @@ export interface CallMismatchKey {
 
 export interface ExcludeEntry extends CallMismatchKey {
   reason: string;
-}
-
-/**
- * The one canonical on-disk form for the JSON baselines these gates own:
- * 2-space `JSON.stringify` plus a trailing newline, with non-ASCII written
- * LITERALLY as UTF-8 — never as `\uXXXX` escapes.
- *
- * `JSON.stringify` already emits non-ASCII literally, so this is what the
- * writers have always produced; the rule is written down (and enforced by
- * assertCanonicalBaselines below) because the two encodings round-trip to the
- * same data but not the same bytes. Three files had landed with escaped
- * em-dashes in their `reason` prose, so EVERY `--write` reseed re-encoded them
- * — a reseeding agent's diff touched unrelated packages' baselines and buried
- * the real signal (the removed entries) in line noise.
- */
-export function serializeBaseline(value: unknown): string {
-  return JSON.stringify(value, null, 2) + "\n";
-}
-
-// Baseline files whose bytes are not the canonical serialization of their own
-// contents — i.e. files a no-op `--write` would silently rewrite.
-export async function findNonCanonicalBaselines(files: string[]): Promise<string[]> {
-  const out: string[] = [];
-  for (const f of files) {
-    const text = await fs.readFile(f, "utf-8");
-    if (serializeBaseline(JSON.parse(text)) !== text) out.push(f);
-  }
-  return out;
-}
-
-// Shared gate arm: fails when any baseline file is non-canonical, so escaped
-// non-ASCII (or stray indentation) cannot re-enter and re-arm the churn trap.
-export async function reportNonCanonicalBaselines(
-  files: string[],
-  label: string,
-): Promise<boolean> {
-  const bad = await findNonCanonicalBaselines(files);
-  if (bad.length === 0) return false;
-  console.error(
-    `\n${label}: ${bad.length} baseline file(s) not in canonical JSON form ` +
-      "(2-space indent, trailing newline, non-ASCII written literally rather " +
-      "than as \\uXXXX escapes). Left as-is, every reseed would rewrite them " +
-      "and bury the real diff. Run `--write` to normalize:\n",
-  );
-  for (const f of bad.sort()) console.error(`  ! ${path.relative(ROOT_DIR, f)}`);
-  return true;
 }
 
 interface ArtifactMismatch {
