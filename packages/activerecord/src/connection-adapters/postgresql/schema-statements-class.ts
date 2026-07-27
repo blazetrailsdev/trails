@@ -18,7 +18,6 @@ import { HashLookupTypeMap } from "../../type/hash-lookup-type-map.js";
 import { Column } from "./column.js";
 import { quoteColumnName as pgQuoteColumnName } from "./quoting.js";
 import { unquoteIdentifier, splitQuotedIdentifier, Name, Utils } from "./utils.js";
-import { splitPgDefault } from "../postgresql-adapter.js";
 import type { CreateDatabaseOptions, PgIndexDefinition } from "./schema-statements.js";
 import {
   type AlterTable as PgAlterTable,
@@ -74,6 +73,8 @@ interface PgSchemaAdapter {
     columnName: string,
     defaultFunction: string | null,
   ): boolean;
+  extractValueFromDefault(defaultExpr: string | null): unknown;
+  extractDefaultFunction(defaultValue: unknown, defaultExpr: string | null): string | null;
   nativeDatabaseTypes(): Record<string, string | { name?: string; limit?: number }>;
   createTableDefinition(name: string, options?: Record<string, unknown>): AbstractTableDefinition;
   createAlterTable(name: string): AlterTable;
@@ -729,9 +730,10 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       // The raw literal is stored verbatim (Rails' extract_value_from_default);
       // deserialization is deferred to Attribute.from_database, so
       // *_before_type_cast for a column default returns the raw String.
-      const splitDefault = attgenerated ? null : splitPgDefault(rawDefault);
-      const defaultFunction = attgenerated ? rawDefault : (splitDefault?.fn ?? null);
-      const rawLiteral = attgenerated ? null : (splitDefault?.literal ?? null);
+      const defaultValue = this.pg.extractValueFromDefault(rawDefault);
+      const defaultFunction = attgenerated
+        ? rawDefault
+        : this.pg.extractDefaultFunction(defaultValue, rawDefault);
       const isSerial = this.pg.serialFromDefaultFunction(
         tableName,
         r.name as string,
@@ -740,7 +742,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
 
       return new Column(
         r.name as string,
-        rawLiteral,
+        defaultValue,
         {
           sqlType,
           type: castType.type(),

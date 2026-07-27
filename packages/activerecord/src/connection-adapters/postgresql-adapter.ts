@@ -13,7 +13,7 @@ import { Result } from "../result.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
 import { TypeMap } from "../type/type-map.js";
 import { getDefaultTimezone } from "../type/internal/timezone.js";
-import { Utils } from "./postgresql/utils.js";
+import { Name, Utils } from "./postgresql/utils.js";
 import {
   checkAllForeignKeysValidBang,
   disableReferentialIntegrity,
@@ -75,12 +75,7 @@ import { deprecator } from "../deprecator.js";
 import { captureUnwrappedExecute, dirtiesQueryCache } from "./abstract/query-cache.js";
 import { PostgreSQLSchemaStatements } from "./postgresql/schema-statements-class.js";
 import type { JoinTableOptions } from "./abstract/schema-statements.js";
-import {
-  SchemaStatements,
-  indexNameForRemoveFrom,
-  indexExistsForRemoveFrom,
-  canRemoveIndexByName,
-} from "./abstract/schema-statements.js";
+import { SchemaStatements } from "./abstract/schema-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
   transactionIsolationLevels,
@@ -4205,49 +4200,44 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       throw new Error("DROP INDEX CONCURRENTLY cannot run inside a transaction");
     }
 
-    // Rails strips the schema from the table (PG `index_name` resolves against
-    // the unqualified table) and, when a name is given, splits its schema off:
-    // the bare identifier becomes the name to match, the index is dropped in the
-    // table's schema (or the name's schema when the table is unqualified), and a
-    // conflicting schema pair raises.
-    const [tableSchema, bareTable] = this.extractSchemaQualifiedName(tableName);
-    let dropSchema = tableSchema;
+    // Rails: `table = Utils.extract_schema_qualified_name(table_name.to_s)`, and
+    // when a name is given its schema is split off: the bare identifier becomes
+    // the name to match, the index is dropped in the table's schema (or the
+    // name's schema when the table is unqualified), and a conflicting pair raises.
+    let table = Utils.extractSchemaQualifiedName(tableName);
     let resolveOpts = opts;
     if (opts.name != null) {
-      const [nameSchema, nameIdent] = this.extractSchemaQualifiedName(opts.name);
-      resolveOpts = { ...opts, name: nameIdent };
-      if (!tableSchema) dropSchema = nameSchema;
-      if (nameSchema && tableSchema && nameSchema !== tableSchema) {
+      const providedIndex = Utils.extractSchemaQualifiedName(opts.name);
+      resolveOpts = { ...opts, name: providedIndex.identifier };
+      const tableSchema = table.schema;
+      if (!tableSchema) table = new Name(providedIndex.schema, table.identifier);
+      if (providedIndex.schema && tableSchema && tableSchema !== providedIndex.schema) {
         throw new ArgumentError(
-          `Index schema '${nameSchema}' does not match table schema '${tableSchema}'`,
+          `Index schema '${providedIndex.schema}' does not match table schema '${tableSchema}'`,
         );
       }
     }
 
-    // A bare `{ name }` resolves without introspection (Rails
-    // `can_remove_index_by_name?`); otherwise (or for `ifExists`) fetch indexes.
-    const canRemoveByName = canRemoveIndexByName(columnName, resolveOpts);
-    const all =
-      opts.ifExists || !canRemoveByName
-        ? ((await this.indexes(tableName)) as Array<{ name: string; columns: string[] }>)
-        : [];
-    // Rails: `return if options[:if_exists] && !index_exists?(...)`.
-    const genName = (t: string, c: string | string[]) => this.generateIndexName(t, c);
-    if (
-      opts.ifExists &&
-      !indexExistsForRemoveFrom(genName, all, bareTable, columnName, resolveOpts)
-    ) {
+    // Rails: `return if options[:if_exists] && !index_exists?(table_name, column_name, **options)`.
+    if (opts.ifExists && !(await this.indexExists(tableName, columnName, resolveOpts))) {
       return;
     }
-    const indexName = indexNameForRemoveFrom(genName, all, bareTable, columnName, resolveOpts);
 
-    // Rails quotes a PostgreSQL::Name, which quotes the schema and the bare
-    // identifier separately — the index name itself can contain a dot (an index
-    // on a schema-qualified table), so it must not be re-split here.
-    const prefix = dropSchema ? `${this.quoteTableName(dropSchema)}.` : "";
+    // Rails: `index_name_for_remove(table.to_s, column_name, options)` — the
+    // schema-qualified name, so a generated index name matches the one addIndex
+    // would have produced for the same argument.
+    const positional = typeof columnName === "string" ? columnName : null;
+    const nameOpts = Array.isArray(columnName)
+      ? { ...resolveOpts, column: columnName }
+      : resolveOpts;
+    const indexToRemove = new Name(
+      table.schema,
+      await this.indexNameForRemove(table.toString(), positional, nameOpts),
+    );
+
     const algorithm = this.indexAlgorithm(opts.algorithm);
     await this.execute(
-      `DROP INDEX${algorithm ? ` ${algorithm}` : ""} ${prefix}${this.quoteColumnName(indexName)}`,
+      `DROP INDEX${algorithm ? ` ${algorithm}` : ""} ${this.quoteTableName(indexToRemove.toString())}`,
     );
   }
 
@@ -4813,40 +4803,61 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     field: unknown[],
     _definitions: unknown,
   ): Promise<Column> {
-    const [col, type, raw, notnull, oid, fmod, , , identity, gen] = field as [
-      string,
-      string,
-      string | null,
-      boolean,
-      number,
-      number,
-      unknown,
-      unknown,
-      string | null,
-      string | null,
-    ];
-    const meta = await this.fetchTypeMetadata(col, type, Number(oid), Number(fmod));
-    const split = gen ? null : splitPgDefault(raw);
+    const [columnName, type, default_, notnull, oid, fmod, collation, comment, identity, gen] =
+      field as [
+        string,
+        string,
+        string | null,
+        boolean,
+        number,
+        number,
+        string | null,
+        string | null,
+        string | null,
+        string | null,
+      ];
+    const typeMetadata = await this.fetchTypeMetadata(columnName, type, Number(oid), Number(fmod));
     // Store the raw default literal verbatim (Rails' extract_value_from_default);
     // deserialization is deferred to Attribute.from_database so
     // *_before_type_cast for a column default returns the raw String.
-    const rawLiteral = gen ? null : (split?.literal ?? null);
+    const defaultValue = this.extractValueFromDefault(default_);
+
+    let defaultFunction: string | null;
+    if (gen) {
+      defaultFunction = default_;
+    } else {
+      defaultFunction = this.extractDefaultFunction(defaultValue, default_);
+    }
+
+    // Rails: a column is serial only when its `nextval()` default names the very
+    // sequence `sequence_name_from_parts` would generate for this table+column.
+    let serial: boolean | undefined;
+    const match = defaultFunction?.match(
+      /^nextval\('"?(?<sequenceName>.+_(?<suffix>seq\d*))"?'::regclass\)$/,
+    );
+    if (match) {
+      const { sequenceName, suffix } = match.groups!;
+      serial = this.sequenceNameFromParts(tableName, columnName, suffix) === sequenceName;
+    }
+
     return new Column(
-      col,
-      rawLiteral,
+      columnName,
+      defaultValue,
       {
-        sqlType: meta.sqlType,
-        type: meta.type,
+        sqlType: typeMetadata.sqlType,
+        type: typeMetadata.type,
         oid: Number(oid),
         fmod: Number(fmod),
-        limit: meta.limit,
-        precision: meta.precision,
-        scale: meta.scale,
+        limit: typeMetadata.limit,
+        precision: typeMetadata.precision,
+        scale: typeMetadata.scale,
       },
       !notnull,
       {
-        defaultFunction: (gen ? raw : split?.fn) ?? undefined,
-        serial: this.serialFromDefaultFunction(tableName, col, (gen ? raw : split?.fn) ?? null),
+        defaultFunction: defaultFunction ?? undefined,
+        collation: collation ?? undefined,
+        comment: comment || null,
+        serial,
         array: type.endsWith("[]"),
         identity: identity || null,
         generated: gen || null,
@@ -5026,6 +5037,18 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (num) return num[1];
     // Object identifier (bare integer)
     if (/^-?\d+$/.test(defaultExpr)) return defaultExpr;
+    // Deviation from Rails, which only allows an optional `::bigint` suffix on
+    // the numeric branch above and therefore reflects these as *function*
+    // defaults. PG emits `(150.55)::numeric::money` for `DEFAULT 150.55` on a
+    // money column and `(3.14...)::numeric` for a decimal domain column, and
+    // both money_test.rb ("default") and the domain-default schema tests assert
+    // a literal default there, so the multi-cast numeric forms are parsed here.
+    const parenNum = /^\((-?\d+(?:\.\d+)?)\)(?:::[\w"\s.]+)+$/.exec(defaultExpr);
+    if (parenNum) return parenNum[1];
+    // N::type[::type2...] — PG normalizes multi-cast numerics to the parens form
+    // above; this branch is defensive.
+    const castNum = /^(-?\d+(?:\.\d+)?)(?:::[\w"\s.]+)+$/.exec(defaultExpr);
+    if (castNum) return castNum[1];
     return null;
   }
 
@@ -5381,57 +5404,6 @@ function _pgAdvisoryLockSql(
   if (typeof lockId === "bigint") return [`SELECT ${fn}($1::bigint) AS ${col}`, lockId.toString()];
   if (typeof lockId === "number") return [`SELECT ${fn}($1) AS ${col}`, lockId];
   return [`SELECT ${fn}(hashtext($1)) AS ${col}`, lockId];
-}
-
-/**
- * Parse a raw `pg_attrdef` default expression into a literal value or a
- * SQL function expression. Mirrors Rails' PG `extract_value_from_default`
- * / `extract_default_function` split — so schema reflection can carry
- * expression defaults as `defaultFunction` rather than applying them as
- * literal bind values.
- */
-export function splitPgDefault(raw: string | null): { literal: unknown; fn: string | null } {
-  if (raw == null) return { literal: null, fn: null };
-  // 'value'::type[] — array literal with a cast; {} is the PG empty-array literal.
-  // Return the raw PG array string so the call site can deserialize via the
-  // correct cast type (e.g. OID::Array<Integer> returns [4,4,2] not ["4","4","2"]).
-  const arrayLiteral = /^'((?:[^']|'')*)'::[\w"\s.(,)]+\[\]$/.exec(raw);
-  if (arrayLiteral) {
-    const content = arrayLiteral[1].replace(/''/g, "'");
-    return { literal: content, fn: null };
-  }
-  // 'value'::type — quoted literal with a single cast (intentionally single-cast;
-  // multi-cast quoted forms like 'x'::text::domain fall to DEFAULT_FUNCTION_RE
-  // and are treated as function defaults, consistent with the domain-cast policy).
-  const quoted = /^'((?:[^']|'')*)'::[\w"\s.]+$/.exec(raw);
-  if (quoted) return { literal: quoted[1].replace(/''/g, "'"), fn: null };
-  // (N)::type[::type2...] — numeric wrapped in parens with one or more casts.
-  // PG emits `(150.55)::numeric::money` for `DEFAULT 150.55::numeric::money`.
-  // Rails' extract_value_from_default (postgresql_adapter.rb:769) only allows
-  // an optional ::bigint suffix and would misclassify this as a function default;
-  // we go beyond Rails' implementation to match what money_test.rb:98 asserts.
-  const parenNum = /^\((-?\d+(?:\.\d+)?)\)(?:::[\w"\s.]+)+$/.exec(raw);
-  if (parenNum) return { literal: parenNum[1], fn: null };
-  // N::type[::type2...] — bare numeric with one or more casts. PG normalizes
-  // multi-cast numerics to the parens form above; this branch is defensive.
-  const castNum = /^(-?\d+(?:\.\d+)?)(?:::[\w"\s.]+)+$/.exec(raw);
-  if (castNum) return { literal: castNum[1], fn: null };
-  // Bare numeric / boolean / NULL literal.
-  if (/^-?\d+(?:\.\d+)?$/.test(raw)) return { literal: raw, fn: null };
-  // Rails' extract_value_from_default keeps the raw "true"/"false" string;
-  // deserialization to a JS boolean happens later in Attribute.from_database.
-  if (raw === "true" || raw === "false") return { literal: raw, fn: null };
-  if (raw === "NULL") return { literal: null, fn: null };
-  // Everything else: only treat as a SQL function expression if it matches
-  // Rails' has_default_function? regex — a function call, a parenthesized
-  // expression with a cast, or CURRENT_DATE/CURRENT_TIMESTAMP. Arithmetic-
-  // expression defaults like `(((4 + 4) * 2) / 4)` match none of these and
-  // Rails reflects them with both `default` and `default_function` as nil
-  // (the DB still applies the default on INSERT).
-  if (DEFAULT_FUNCTION_RE.test(raw)) {
-    return { literal: null, fn: raw };
-  }
-  return { literal: null, fn: null };
 }
 
 /**

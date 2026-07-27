@@ -5,6 +5,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } 
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { itIfSupports } from "../../support/supports.js";
 import { StatementInvalid } from "../../errors.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { makeThingModels, makeThing5Model, makeSongAlbumModels } from "./schema-ar-models.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
 import { dumpAllTableSchema } from "../../support/schema-dumping-helper.js";
@@ -531,11 +532,32 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("remove index when schema specified", async () => {
-      await adapter.setSchemaSearchPath(SCHEMA_NAME);
-      await adapter.addIndex(TABLE_NAME, ["email"], { name: "removable_idx" });
-      expect(await adapter.indexNameExists(TABLE_NAME, "removable_idx")).toBe(true);
-      await adapter.removeIndex(`${SCHEMA_NAME}.${TABLE_NAME}`, { name: "removable_idx" });
-      expect(await adapter.indexNameExists(TABLE_NAME, "removable_idx")).toBe(false);
+      const createIndex = () =>
+        adapter.exec(
+          `CREATE INDEX "things_Index" ON ${SCHEMA_NAME}.${TABLE_NAME} (${INDEX_A_COLUMN})`,
+        );
+
+      // Rails: assert_nothing_raised { @connection.remove_index "things", name: "test_schema.things_Index" }
+      await createIndex();
+      await adapter.removeIndex(TABLE_NAME, { name: `${SCHEMA_NAME}.things_Index` });
+
+      await createIndex();
+      await adapter.removeIndex(`${SCHEMA_NAME}.${TABLE_NAME}`, { name: "things_Index" });
+
+      await createIndex();
+      await adapter.removeIndex(`${SCHEMA_NAME}.${TABLE_NAME}`, {
+        name: `${SCHEMA_NAME}.things_Index`,
+      });
+
+      // Rails: assert_raises(ArgumentError) — the index schema does not match the
+      // table schema.
+      await createIndex();
+      await expect(
+        adapter.removeIndex(`${SCHEMA2_NAME}.${TABLE_NAME}`, {
+          name: `${SCHEMA_NAME}.things_Index`,
+        }),
+      ).rejects.toThrow(ArgumentError);
+      await adapter.exec(`DROP INDEX ${SCHEMA_NAME}."things_Index"`);
     });
 
     it("primary key with schema specified", async () => {

@@ -41,7 +41,7 @@ export class Interval extends ValueType<Duration> {
         // and SELECT interval results arrive in ISO 8601 form that
         // Duration.parse accepts directly. For schema reflection,
         // pg_get_expr returns a casted form like `'P3Y'::interval`; the
-        // adapter's splitPgDefault strips the cast before this method
+        // adapter's extractValueFromDefault strips the cast before this method
         // sees `"P3Y"`.
         return null;
       }
