@@ -30,30 +30,9 @@
   {
     "package": "actiondispatch",
     "tsFile": "http/content-security-policy.ts",
-    "rubyName": "content_security_policy=",
-    "call": "set_header",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/content-security-policy.ts",
-    "rubyName": "content_security_policy_nonce_directives=",
-    "call": "set_header",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/content-security-policy.ts",
-    "rubyName": "content_security_policy_nonce_generator=",
-    "call": "set_header",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/content-security-policy.ts",
-    "rubyName": "content_security_policy_report_only=",
-    "call": "set_header",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "rubyName": "generate_content_security_policy_nonce",
+    "call": "call",
+    "reason": "Ruby Proc#call has no JS counterpart: the generator is invoked as a plain call, `generator(this)`, since JS `Function#call` would bind the argument as the receiver instead of passing it."
   },
   {
     "package": "actiondispatch",

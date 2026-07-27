@@ -402,81 +402,59 @@ export interface CspRequestHost {
 /** @internal Per-request nonce generator: `(request) => string`. */
 export type NonceGenerator = (request: unknown) => string;
 
-export function contentSecurityPolicy(
-  this: CspRequestHost,
-): ContentSecurityPolicy | null | undefined {
-  return this.getHeader(POLICY) as ContentSecurityPolicy | null | undefined;
-}
+export class ContentSecurityPolicyRequest {
+  declare getHeader: CspRequestHost["getHeader"];
+  declare setHeader: CspRequestHost["setHeader"];
 
-export function setContentSecurityPolicy(
-  this: CspRequestHost,
-  policy: ContentSecurityPolicy | null,
-): void {
-  this.setHeader(POLICY, policy);
-}
-
-export function contentSecurityPolicyReportOnly(this: CspRequestHost): boolean | undefined {
-  return this.getHeader(POLICY_REPORT_ONLY) as boolean | undefined;
-}
-
-export function setContentSecurityPolicyReportOnly(this: CspRequestHost, value: boolean): void {
-  this.setHeader(POLICY_REPORT_ONLY, value);
-}
-
-export function contentSecurityPolicyNonceGenerator(
-  this: CspRequestHost,
-): NonceGenerator | null | undefined {
-  return this.getHeader(NONCE_GENERATOR) as NonceGenerator | null | undefined;
-}
-
-export function setContentSecurityPolicyNonceGenerator(
-  this: CspRequestHost,
-  generator: NonceGenerator | null,
-): void {
-  this.setHeader(NONCE_GENERATOR, generator);
-}
-
-export function contentSecurityPolicyNonceDirectives(
-  this: CspRequestHost,
-): readonly string[] | null | undefined {
-  return this.getHeader(NONCE_DIRECTIVES) as readonly string[] | null | undefined;
-}
-
-export function setContentSecurityPolicyNonceDirectives(
-  this: CspRequestHost,
-  directives: readonly string[] | null,
-): void {
-  this.setHeader(NONCE_DIRECTIVES, directives);
-}
-
-/**
- * Per-request CSP nonce. Returns `undefined` unless a nonce generator is
- * configured; otherwise lazily memoizes the generated nonce in the env so
- * repeated reads return the same value (one nonce per request).
- *
- * Mirrors Rails `Request#content_security_policy_nonce`
- * (actionpack/lib/action_dispatch/http/content_security_policy.rb:112-120).
- */
-export function contentSecurityPolicyNonce(this: CspRequestHost): string | undefined {
-  const generator = contentSecurityPolicyNonceGenerator.call(this);
-  if (!generator) return undefined;
-  const existing = this.getHeader(NONCE) as string | undefined;
-  if (existing !== undefined) return existing;
-  const generated = generateContentSecurityPolicyNonce.call(this);
-  this.setHeader(NONCE, generated);
-  return generated;
-}
-
-/**
- * @internal
- * Mirrors Rails `Request#generate_content_security_policy_nonce` (private):
- * invokes the configured nonce generator with the request as its argument.
- * Throws if no generator is configured.
- */
-export function generateContentSecurityPolicyNonce(this: CspRequestHost): string {
-  const generator = contentSecurityPolicyNonceGenerator.call(this);
-  if (!generator) {
-    throw new Error("No content_security_policy_nonce_generator configured for this request");
+  get contentSecurityPolicy(): ContentSecurityPolicy | null | undefined {
+    return this.getHeader(POLICY) as ContentSecurityPolicy | null | undefined;
   }
-  return generator(this);
+
+  set contentSecurityPolicy(policy: ContentSecurityPolicy | null) {
+    this.setHeader(POLICY, policy);
+  }
+
+  get contentSecurityPolicyReportOnly(): boolean | undefined {
+    return this.getHeader(POLICY_REPORT_ONLY) as boolean | undefined;
+  }
+
+  set contentSecurityPolicyReportOnly(value: boolean) {
+    this.setHeader(POLICY_REPORT_ONLY, value);
+  }
+
+  get contentSecurityPolicyNonceGenerator(): NonceGenerator | null | undefined {
+    return this.getHeader(NONCE_GENERATOR) as NonceGenerator | null | undefined;
+  }
+
+  set contentSecurityPolicyNonceGenerator(generator: NonceGenerator | null) {
+    this.setHeader(NONCE_GENERATOR, generator);
+  }
+
+  get contentSecurityPolicyNonceDirectives(): readonly string[] | null | undefined {
+    return this.getHeader(NONCE_DIRECTIVES) as readonly string[] | null | undefined;
+  }
+
+  set contentSecurityPolicyNonceDirectives(directives: readonly string[] | null) {
+    this.setHeader(NONCE_DIRECTIVES, directives);
+  }
+
+  get contentSecurityPolicyNonce(): string | undefined {
+    if (!this.contentSecurityPolicyNonceGenerator) return undefined;
+    const existing = this.getHeader(NONCE);
+    if (existing !== null && existing !== undefined && existing !== false) {
+      return existing as string;
+    }
+    const generated = this.generateContentSecurityPolicyNonce();
+    this.setHeader(NONCE, generated);
+    return generated;
+  }
+
+  /** @internal */
+  generateContentSecurityPolicyNonce(): string {
+    const generator = this.contentSecurityPolicyNonceGenerator;
+    if (!generator) {
+      throw new Error("No content_security_policy_nonce_generator configured for this request");
+    }
+    return generator(this);
+  }
 }

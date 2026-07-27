@@ -34,7 +34,7 @@ import {
   type MimeNegotiationHost,
   type NullType,
 } from "./mime-negotiation.js";
-import type { ArrayInquirer } from "@blazetrails/activesupport";
+import { include, type ArrayInquirer } from "@blazetrails/activesupport";
 import type { MimeType } from "./mime-type.js";
 import { URL as HttpURL } from "./url.js";
 import {
@@ -46,20 +46,7 @@ import {
   parameterFilter as _parameterFilter,
   parameterFilterFor as _parameterFilterFor,
 } from "./filter-parameters.js";
-import {
-  contentSecurityPolicy as _contentSecurityPolicy,
-  contentSecurityPolicyNonce as _contentSecurityPolicyNonce,
-  contentSecurityPolicyNonceDirectives as _contentSecurityPolicyNonceDirectives,
-  contentSecurityPolicyNonceGenerator as _contentSecurityPolicyNonceGenerator,
-  contentSecurityPolicyReportOnly as _contentSecurityPolicyReportOnly,
-  generateContentSecurityPolicyNonce as _generateContentSecurityPolicyNonce,
-  setContentSecurityPolicy as _setContentSecurityPolicy,
-  setContentSecurityPolicyNonceDirectives as _setContentSecurityPolicyNonceDirectives,
-  setContentSecurityPolicyNonceGenerator as _setContentSecurityPolicyNonceGenerator,
-  setContentSecurityPolicyReportOnly as _setContentSecurityPolicyReportOnly,
-  type ContentSecurityPolicy,
-  type NonceGenerator,
-} from "./content-security-policy.js";
+import { ContentSecurityPolicyRequest as CspRequest } from "./content-security-policy.js";
 import { QueryParser } from "./query-parser.js";
 import { X_CASCADE } from "../constants.js";
 import type { PermissionsPolicy } from "../permissions-policy.js";
@@ -154,6 +141,7 @@ function envName(key: string): string {
   return key;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Request {
   readonly env: RackEnv;
 
@@ -418,45 +406,6 @@ export class Request {
   declare filteredQueryString: () => string;
   /** @internal */
   declare parameterFilterFor: (filters: Array<string | RegExp>) => ParameterFilter;
-
-  // --- Content Security Policy (ActionDispatch::ContentSecurityPolicy::Request) ---
-
-  get contentSecurityPolicy(): ContentSecurityPolicy | null | undefined {
-    return _contentSecurityPolicy.call(this);
-  }
-  set contentSecurityPolicy(policy: ContentSecurityPolicy | null) {
-    _setContentSecurityPolicy.call(this, policy);
-  }
-
-  get contentSecurityPolicyReportOnly(): boolean | undefined {
-    return _contentSecurityPolicyReportOnly.call(this);
-  }
-  set contentSecurityPolicyReportOnly(value: boolean) {
-    _setContentSecurityPolicyReportOnly.call(this, value);
-  }
-
-  get contentSecurityPolicyNonceGenerator(): NonceGenerator | null | undefined {
-    return _contentSecurityPolicyNonceGenerator.call(this);
-  }
-  set contentSecurityPolicyNonceGenerator(generator: NonceGenerator | null) {
-    _setContentSecurityPolicyNonceGenerator.call(this, generator);
-  }
-
-  get contentSecurityPolicyNonceDirectives(): readonly string[] | null | undefined {
-    return _contentSecurityPolicyNonceDirectives.call(this);
-  }
-  set contentSecurityPolicyNonceDirectives(directives: readonly string[] | null) {
-    _setContentSecurityPolicyNonceDirectives.call(this, directives);
-  }
-
-  get contentSecurityPolicyNonce(): string | undefined {
-    return _contentSecurityPolicyNonce.call(this);
-  }
-
-  /** @internal */
-  generateContentSecurityPolicyNonce(): string {
-    return _generateContentSecurityPolicyNonce.call(this);
-  }
 
   // --- Permissions Policy (ActionDispatch::PermissionsPolicy::Request) ---
 
@@ -1098,6 +1047,10 @@ Object.defineProperty(Request.prototype, "ifNoneMatchEtags", {
 Request.prototype.notModified = _notModified;
 Request.prototype.etagMatches = _etagMatches;
 Request.prototype.fresh = _fresh;
+
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging */
+export interface Request extends CspRequest {}
+include(Request, CspRequest);
 
 // --- ActionDispatch::Http::MimeNegotiation wiring ---
 // The mixin's host shape (getHeader/setHeader) reads env keys directly,

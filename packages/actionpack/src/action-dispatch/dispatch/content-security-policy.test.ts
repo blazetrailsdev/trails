@@ -3,13 +3,6 @@ import { ContentSecurityPolicy, MAPPINGS } from "../content-security-policy.js";
 import { IntegrationTest } from "../testing/integration.js";
 import { Base } from "../../action-controller/base.js";
 import type { AbstractController } from "../../abstract-controller/base.js";
-import {
-  type CspRequestHost,
-  contentSecurityPolicy as cspFromRequest,
-  contentSecurityPolicyNonce as cspNonceFromRequest,
-  contentSecurityPolicyNonceDirectives as cspNonceDirectivesFromRequest,
-  contentSecurityPolicyReportOnly as cspReportOnlyFromRequest,
-} from "../http/content-security-policy.js";
 
 describe("ContentSecurityPolicyTest", () => {
   it("build", () => {
@@ -378,17 +371,17 @@ describe("ContentSecurityPolicyTest", () => {
 
 function resolvedCspHeader(app: IntegrationTest): string | null {
   if (app.response.status === 304) return null;
-  const req = app.request as unknown as CspRequestHost;
-  const policy = cspFromRequest.call(req);
+  const req = app.request;
+  const policy = req.contentSecurityPolicy;
   if (!policy) return null;
-  const nonce = cspNonceFromRequest.call(req) ?? undefined;
-  const dirs = cspNonceDirectivesFromRequest.call(req) ?? undefined;
+  const nonce = req.contentSecurityPolicyNonce ?? undefined;
+  const dirs = req.contentSecurityPolicyNonceDirectives ?? undefined;
   const context = app.controller ?? app.request;
   return policy.build(context, nonce, dirs);
 }
 
 function resolvedCspReportOnly(app: IntegrationTest): boolean {
-  return !!cspReportOnlyFromRequest.call(app.request as unknown as CspRequestHost);
+  return !!app.request.contentSecurityPolicyReportOnly;
 }
 
 const NONCE_GENERATOR = () => "iyhD0Yc0W+c=";
