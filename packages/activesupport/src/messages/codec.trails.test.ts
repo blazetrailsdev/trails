@@ -24,6 +24,19 @@ const FORMATS: Format[] = [
   "message_pack_allow_marshal",
 ];
 
+// Rails' munge (message_encryptor_test.rb:191-195): base64-decode a segment,
+// reverse the bytes, re-encode. Poking a single character instead cannot be
+// trusted — the message's trailing segment is hex, so rewriting its last
+// character to "0" reproduces the original 1/16 of the time.
+function munge(base64String: string): string {
+  return Buffer.from(Buffer.from(base64String, "base64").reverse()).toString("base64");
+}
+
+function tamper(message: string): string {
+  const [payload, ...rest] = message.split("--");
+  return [munge(payload), ...rest].join("--");
+}
+
 describe("Messages::Codec (trails)", () => {
   it("subclasses default to the json serializer", () => {
     expect(MessageEncryptor.defaultSerializer).toBe("json");
@@ -75,9 +88,9 @@ describe("Messages::Codec (trails)", () => {
     const verifier = new MessageVerifier(SECRET);
     const message = verifier.generate("hello");
 
-    expect(() => verifier.verify(message.slice(0, -1) + "0")).toThrow(InvalidSignature);
-    expect(verifier.verified(message.slice(0, -1) + "0")).toBeNull();
-    expect(verifier.validMessage(message.slice(0, -1) + "0")).toBe(false);
+    expect(() => verifier.verify(tamper(message))).toThrow(InvalidSignature);
+    expect(verifier.verified(tamper(message))).toBeNull();
+    expect(verifier.validMessage(tamper(message))).toBe(false);
     expect(verifier.validMessage(message)).toBe(true);
   });
 
@@ -85,7 +98,7 @@ describe("Messages::Codec (trails)", () => {
     const encryptor = new MessageEncryptor(SECRET);
     const message = encryptor.encryptAndSign("hello");
 
-    expect(() => encryptor.decryptAndVerify(message.slice(0, -1) + "0")).toThrow(InvalidMessage);
+    expect(() => encryptor.decryptAndVerify(tamper(message))).toThrow(InvalidMessage);
     expect(() => encryptor.decryptAndVerify("not-a-message")).toThrow(InvalidMessage);
   });
 });
