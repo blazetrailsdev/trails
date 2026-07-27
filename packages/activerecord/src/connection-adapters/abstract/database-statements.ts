@@ -115,7 +115,7 @@ export interface DatabaseStatementsHost {
   internalExecute?(
     sql: string,
     name?: string,
-    opts?: { materializeTransactions?: boolean; binds?: unknown[] },
+    opts?: { materializeTransactions?: boolean; allowRetry?: boolean; binds?: unknown[] },
   ): Promise<unknown>;
   /** @internal */
   internalExecQuery?(
@@ -1426,10 +1426,15 @@ export async function internalExecQuery(
     const tm = (this as any)._transactionManager as TransactionManager | undefined;
     if (tm && (options?.materializeTransactions ?? true)) await tm.materializeTransactions();
     if (this?.internalExecute) {
-      // Thread binds through so a bound INSERT ... RETURNING reaches the driver
-      // (Rails internal_exec_query(sql, name, binds) → internal_execute). trails
-      // carries binds in the opts object rather than positionally.
-      const rawResult = await this.internalExecute(sql, sqlName, { binds });
+      // Thread binds and exec options through so a bound INSERT ... RETURNING
+      // reaches the driver and allow_retry / materialize_transactions survive
+      // (Rails internal_exec_query(...) → internal_execute(...) → raw_execute).
+      // trails carries all of them in the opts object rather than positionally.
+      const rawResult = await this.internalExecute(sql, sqlName, {
+        binds,
+        allowRetry: options?.allowRetry,
+        materializeTransactions: options?.materializeTransactions,
+      });
       return this.castResult ? this.castResult(rawResult) : normalizeResult(rawResult);
     }
     if (binds && binds.length > 0) {

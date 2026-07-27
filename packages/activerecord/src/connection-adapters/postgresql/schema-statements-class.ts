@@ -1275,6 +1275,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
          AND t.relname = ${scope.name!}
          AND n.nspname = ${scope.schema}`,
       "SCHEMA",
+      [],
+      { allowRetry: true, materializeTransactions: false },
     );
     return checkInfo.toArray().map((row) => {
       const expression = (row.constraintdef as string).match(/CHECK \((.+)\)/s)?.[1] ?? "";
