@@ -25,36 +25,6 @@ const TOOLING_ROOTS = ["scripts", "eslint", "vendor"];
 // Suites that deliberately do not run in CI yet. Every entry needs a reason
 // and the story that removes it — this list must shrink, never grow.
 const KNOWN_UNRUN: Record<string, string> = {
-  // ESLint RuleTester drives itself through global describe/it that vitest
-  // does not supply, so every one of these collects as "No test suite found".
-  // Story: run-eslint-rule-tests-in-ci.
-  ...Object.fromEntries(
-    [
-      "expected-fixtures",
-      "manifest-complete",
-      "nie-requires-annotation",
-      "no-explicit-any-disable",
-      "no-getter-called-as-method",
-      "no-internal-canonical-loaders",
-      "no-native-date",
-      "no-node-builtins",
-      "no-process-bypass",
-      "no-raw-sql",
-      "no-standalone-associations",
-      "prefer-await-relation",
-      "rails-arel-tosql",
-      "rails-callback-invocations",
-      "rails-deprecated-jsdoc",
-      "rails-error-parity",
-      "rails-error-parity-unported",
-      "rails-file-structure-method-order",
-      "rails-private-jsdoc",
-      "require-canonical-rebuild",
-      "require-table-teardown",
-      "sqlite-driver-await",
-      "test-fixture-parity",
-    ].map((n) => [`eslint/${n}.test.mjs`, "run-eslint-rule-tests-in-ci"]),
-  ),
   // vendor/fetch.test.ts fails outside a freshly fetched vendor/ tree.
   // Story: run-vendor-fetch-tests-in-ci.
   "vendor/fetch.test.ts": "run-vendor-fetch-tests-in-ci",

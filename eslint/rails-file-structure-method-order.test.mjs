@@ -91,9 +91,9 @@ function restoreManifest() {
 }
 fs.writeFileSync(MANIFEST_PATH, JSON.stringify(fixture, null, 2));
 // Fallback restore — covers process crash mid-test. The primary
-// restoration lives in the try/finally around `tester.run(...)` below
-// so we don't leak the fixture manifest into sibling test files when
-// Vitest reuses a worker process across files.
+// restoration lives in the afterAll below so we don't leak the fixture
+// manifest into sibling test files when Vitest reuses a worker process
+// across files.
 process.on("exit", restoreManifest);
 
 const classFile = path.join(REPO_ROOT, "packages/arel/src/fixture-class.ts");
@@ -525,7 +525,11 @@ try {
     ],
   });
 } finally {
-  restoreManifest();
+  // RuleTester registers its cases through describe/it, whose bodies run only
+  // AFTER this module has finished evaluating. Restoring the manifest here
+  // would pull the fixture out from under every case before the first one
+  // runs, and the rule would then read the real manifest and report nothing.
+  afterAll(restoreManifest);
 }
 
 console.log("rails-file-structure-method-order tests passed");
