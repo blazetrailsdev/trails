@@ -188,20 +188,7 @@ export function parseHttpDate(s: string | undefined): Date | undefined {
 
 type R = ResponseCacheHost;
 
-/**
- * Home for `Cache::Response`'s reader/writer pairs. Ruby names a writer after
- * its reader (`last_modified` / `last_modified=`); TypeScript can only spell
- * that pair as a `get`/`set` on a prototype, so a `setLastModified`-style
- * export would be surface Rails does not have. The pairs therefore live here
- * as accessors under the Rails name, and hosts pick them up by copying the
- * descriptors off `Response.prototype` (see `../dispatch/response.ts`).
- *
- * The predicates (`last_modified?` → {@link hasLastModified}) and the
- * argument-taking writers (`weak_etag=` → {@link weakEtag}) stay as
- * `this`-typed module functions per the mixin convention in CLAUDE.md.
- */
 export class Response {
-  /** Host surface the accessors read; sourced from {@link ResponseCacheHost}. */
   declare getHeader: ResponseCacheHost["getHeader"];
   declare setHeader: ResponseCacheHost["setHeader"];
   declare deleteHeader: ResponseCacheHost["deleteHeader"];
@@ -210,12 +197,6 @@ export class Response {
     return parseHttpDate(this.getHeader(LAST_MODIFIED));
   }
 
-  /**
-   * Rails: `set_header LAST_MODIFIED, utc_time.httpdate`. Ruby raises on a nil
-   * `utc_time`; here `undefined` deletes the header instead, which is the only
-   * way to unset it now that the writer is an accessor (Rails' callers reach
-   * for `delete_header` on the response directly).
-   */
   set lastModified(t: Date | undefined) {
     if (t === undefined) this.deleteHeader(LAST_MODIFIED);
     else this.setHeader(LAST_MODIFIED, t.toUTCString());
@@ -225,7 +206,6 @@ export class Response {
     return parseHttpDate(this.getHeader(DATE));
   }
 
-  /** See {@link lastModified} for the `undefined` handling. */
   set date(t: Date | undefined) {
     if (t === undefined) this.deleteHeader(DATE);
     else this.setHeader(DATE, t.toUTCString());
@@ -235,10 +215,6 @@ export class Response {
     return this.getHeader(ETAG);
   }
 
-  /**
-   * Rails: `etag=` delegates to `weak_etag=`, hashing the validators into a
-   * weak validator (`W/"<md5>"`). See {@link lastModified} for `undefined`.
-   */
   set etag(v: unknown) {
     if (v === undefined) this.deleteHeader(ETAG);
     else weakEtag.call(this, v);

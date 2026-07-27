@@ -642,8 +642,6 @@ export class Response {
 // arguments are wired as prototype methods. The raw `Cache-Control` header
 // string is exposed via `_cacheControl` (Rails: aliased `_cache_control`),
 // and `cacheControl` (this wiring) is the parsed directive hash.
-// `last_modified` / `date` / `etag` are reader+writer pairs in Ruby, so they
-// live as accessors on Cache::Response and are copied over descriptor-intact.
 for (const name of ["lastModified", "date", "etag"] as const) {
   Object.defineProperty(Response.prototype, name, {
     ...Object.getOwnPropertyDescriptor(CacheResponse.prototype, name)!,
