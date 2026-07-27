@@ -8,7 +8,7 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { travel, travelBack } from "@blazetrails/activesupport";
 import { Base, RecordNotFound, registerModel } from "./index.js";
 import { UnknownPrimaryKey } from "./errors.js";
-import { setSignedIdVerifierSecret, setSignedIdVerifier, signedIdVerifier } from "./signed-id.js";
+import { setSignedIdVerifierSecret } from "./signed-id.js";
 import { Account } from "./test-helpers/models/account.js";
 import { Toy } from "./test-helpers/models/toy.js";
 import { Company } from "./test-helpers/models/company.js";
@@ -228,13 +228,13 @@ describe("SignedIdTest", () => {
   });
 
   it("use a custom verifier", async () => {
-    const oldVerifier = signedIdVerifier(Account);
-    setSignedIdVerifier(Account, new MessageVerifier("sekret"));
+    const oldVerifier = Account.signedIdVerifier;
+    Account.signedIdVerifier = new MessageVerifier("sekret");
     try {
-      expect(signedIdVerifier(Base)).not.toBe(signedIdVerifier(Account));
+      expect(Base.signedIdVerifier).not.toBe(Account.signedIdVerifier);
       expect((await Account.findSigned((account as any).signedId()))?.id).toBe(account.id);
     } finally {
-      setSignedIdVerifier(Account, oldVerifier);
+      Account.signedIdVerifier = oldVerifier;
     }
   });
 

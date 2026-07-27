@@ -6,9 +6,8 @@ export class AbstractDoubloon extends Base {
   declare pirate: Pirate | null;
   declare loadBelongsTo: (name: "pirate") => Promise<Pirate | null>;
 
-  static abstractClass = true;
-
   static {
+    this.abstractClass = true;
     this.belongsTo("pirate");
   }
 }

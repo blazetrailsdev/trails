@@ -42,6 +42,8 @@ export const extended = Symbol.for("@blazetrails/activesupport:extended");
  */
 const includedKeys = Symbol.for("@blazetrails/activesupport:includedKeys");
 
+const STATIC_CLASS_KEYS = new Set(["prototype", "length", "name"]);
+
 function trackedKeys(proto: object): Set<string> {
   let set = (proto as any)[includedKeys] as Set<string> | undefined;
   if (!Object.prototype.hasOwnProperty.call(proto, includedKeys)) {
@@ -197,13 +199,33 @@ export type Extended<M extends object> = CallableMethods<M>;
  *   extend(Base, ConnectionHandlingMethods);
  *   // Now Base.connectedTo(...) works
  */
-export function extend(klass: AnyClass | object, mod: Module): void {
-  for (const key of Object.keys(mod)) {
-    const value = mod[key];
+export function extend(klass: AnyClass | object, mod: Module | AnyClass): void {
+  // A class module carries its members as non-enumerable own statics, so read
+  // its property names directly; a plain-object module keeps the Object.keys
+  // (enumerable-only) semantics.
+  const isClassModule = typeof mod === "function" && (mod as AnyClass).prototype;
+  const keys = isClassModule
+    ? Object.getOwnPropertyNames(mod).filter((k) => !STATIC_CLASS_KEYS.has(k))
+    : Object.keys(mod);
+
+  for (const key of keys) {
+    const descriptor = Object.getOwnPropertyDescriptor(mod, key);
+    if (!descriptor || /^[A-Z]/.test(key)) continue;
+    // Copy accessors as accessors: reading `mod[key]` would invoke the getter
+    // with the module as receiver instead of the extending class.
+    if (descriptor.get || descriptor.set) {
+      Object.defineProperty(klass, key, {
+        get: descriptor.get,
+        set: descriptor.set,
+        configurable: true,
+        enumerable: false,
+      });
+      continue;
+    }
     // Ruby's extend copies only methods — skip non-functions and constants.
-    if (typeof value !== "function" || /^[A-Z]/.test(key)) continue;
+    if (typeof descriptor.value !== "function") continue;
     Object.defineProperty(klass, key, {
-      value,
+      value: descriptor.value,
       writable: true,
       configurable: true,
       enumerable: false,

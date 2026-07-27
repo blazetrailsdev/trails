@@ -53,8 +53,6 @@ import {
   polymorphicClassFor,
   initializeInternalsCallback as inheritanceInitializeInternalsCallback,
   baseClass as _inheritanceBaseClass,
-  getAbstractClass as _getAbstractClass,
-  setAbstractClass as _setAbstractClass,
   isBaseClass as _isBaseClass,
   ensureProperType as _ensureProperType,
   narrowToProjectedColumns,
@@ -114,9 +112,10 @@ import {
   isMassAssignmentEmpty,
 } from "@blazetrails/activemodel";
 import { SignedGlobalID as _SignedGlobalIDCtor } from "@blazetrails/globalid/signed-global-id";
+import * as Inheritance from "./inheritance.js";
+import * as SignedId from "./signed-id.js";
 import {
   signedId as _signedId,
-  signedIdVerifier as _signedIdVerifier,
   signedIdVerifierSecret as _signedIdVerifierSecret,
   setSignedIdVerifierSecret as _setSignedIdVerifierSecret,
   findSigned as _findSigned,
@@ -1036,13 +1035,11 @@ export class Base extends Model {
     ModelSchema.protectedEnvironments.call(this, envs);
   }
 
-  static get abstractClass(): boolean {
-    return _getAbstractClass.call(this);
-  }
+  /** Mirrors: ActiveRecord::Inheritance::ClassMethods#abstract_class */
+  declare static abstractClass: boolean;
 
-  static set abstractClass(value: boolean) {
-    _setAbstractClass.call(this, value);
-  }
+  /** Mirrors: ActiveRecord::SignedId::ClassMethods#signed_id_verifier */
+  declare static signedIdVerifier: _MessageVerifier;
 
   static _requireConcreteClass(): void {
     // Rails: `abstract_class? || self == Base` (inheritance.rb:57) — Base
@@ -1163,13 +1160,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Locking::Optimistic.locking_column
    */
-  static get lockingColumn(): string {
-    return LockingOptimistic.lockingColumn(this);
-  }
-
-  static set lockingColumn(col: string) {
-    LockingOptimistic.setLockingColumn(this, col);
-  }
+  declare static lockingColumn: string;
 
   /**
    * Whether optimistic locking is enabled for this model (default true). Set to
@@ -1177,17 +1168,10 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.lock_optimistically
    */
-  static get lockOptimistically(): boolean {
-    return LockingOptimistic.lockOptimistically(this);
-  }
+  declare static lockOptimistically: boolean;
 
-  static set lockOptimistically(value: boolean) {
-    LockingOptimistic.setLockOptimistically(this, value);
-  }
-
-  static get lockingEnabled(): boolean {
-    return LockingOptimistic.lockingEnabled(this);
-  }
+  /** Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#locking_enabled? */
+  declare static lockingEnabled: boolean;
 
   static get compositePrimaryKey(): boolean {
     return _isCompositePrimaryKey.call(this);
@@ -4105,7 +4089,7 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base#to_sgid
    */
   toSgid(options?: ToSgidOptions): SignedGlobalIDType {
-    const verifier = _signedIdVerifier(this.constructor as typeof Base);
+    const verifier = (this.constructor as typeof Base).signedIdVerifier;
     return _SignedGlobalIDCtor.create(this as GlobalIDModel, { ...options, verifier });
   }
 
@@ -4165,7 +4149,7 @@ export class Base extends Model {
     input: string | _SignedGlobalIDType,
     options?: Omit<import("@blazetrails/globalid").LocateSignedOptions, "verifier">,
   ): Promise<unknown | null> {
-    const verifier = _signedIdVerifier(this);
+    const verifier = this.signedIdVerifier;
     return _Locator.locateSigned(input, { ...options, verifier });
   }
 
@@ -4786,6 +4770,9 @@ function _castEnumDirtyOpts(
 // ---------------------------------------------------------------------------
 
 extend(Base, ConnectionHandling.ClassMethods);
+extend(Base, Inheritance.ClassMethods);
+extend(Base, LockingOptimistic.ClassMethods);
+extend(Base, SignedId.ClassMethods);
 extend(Base, QueryCacheClassMethods.ClassMethods);
 
 // Re-define `connection` as a getter (accessor) after extend() overwrites it

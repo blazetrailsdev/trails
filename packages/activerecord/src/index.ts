@@ -146,7 +146,7 @@ export { registerSubclass, findStiClass } from "./inheritance.js";
 // subclass (statics) or a Base instance (instance methods).
 // establishConnection requires node:fs — use subpath: @blazetrails/activerecord/connection-handling
 // signedId requires MessageVerifier (node:crypto) — use subpath: @blazetrails/activerecord/signed-id
-export { lockingColumn, lockingEnabled, LockingType } from "./locking/optimistic.js";
+export { LockingType } from "./locking/optimistic.js";
 // ModelSchema is consumed via the Base mixins — `User.columnNames()`,
 // `User.columnsHash()`, `User.contentColumns()`, `User.createTable()`, etc.
 // (mixed in via activesupport `extend()`). The underlying functions are

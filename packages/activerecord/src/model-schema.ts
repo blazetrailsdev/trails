@@ -14,7 +14,6 @@ import {
 import {
   isBaseClass,
   baseClass,
-  getAbstractClass,
   lookupModuleTableNamePrefix,
   lookupModuleTableNameSuffix,
 } from "./inheritance.js";
@@ -162,7 +161,7 @@ function containedTableNamePrefix(this: typeof Base): string {
   const moduleName = (this as any).moduleName as string | undefined;
   if (!moduleName) return "";
   const parent = modelRegistry.get(moduleName);
-  if (!parent || getAbstractClass.call(parent as any)) return "";
+  if (!parent || (parent as any).abstractClass) return "";
   const contained =
     ((parent as any).pluralizeTableNames ?? true)
       ? singularize(parent.tableName)
@@ -663,7 +662,7 @@ export function resetTableName(this: SchemaHost): string {
   if (this.name === "Base") {
     return "";
   }
-  if (getAbstractClass.call(this as any)) {
+  if ((this as any).abstractClass) {
     const parent = Object.getPrototypeOf(this) as SchemaHost | null;
     if (parent?.tableName != null) {
       this._tableName = parent.tableName;
@@ -941,7 +940,7 @@ export function loadSchema(this: SchemaHost): void {
   // name even for abstract classes, so mirror the Rails effect by treating an
   // abstract class (or an explicitly cleared `table_name`) as table-less.
   const klass = this as unknown as typeof Base;
-  if (getAbstractClass.call(this as any) || !klass.tableName) {
+  if ((this as any).abstractClass || !klass.tableName) {
     throw new TableNotSpecified(
       `${klass.name} has no table configured. Set one with ${klass.name}.table_name=`,
     );
@@ -1225,7 +1224,7 @@ function applyColumnsHash(
  * @internal
  */
 export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
-  if (getAbstractClass.call(this as any)) return;
+  if ((this as any).abstractClass) return;
   let startingAdapter: SchemaHost["connection"] | undefined;
   try {
     startingAdapter = reflectionAdapter(this);
@@ -1415,7 +1414,7 @@ export async function reconcileVirtualAttributes(this: SchemaHost, reflect = fal
  * (caller may fall back to attribute-defs-derived metadata).
  */
 function loadSchemaFromCacheSync(host: SchemaHost): boolean {
-  if (getAbstractClass.call(host as any)) return false;
+  if ((host as any).abstractClass) return false;
   // Access can throw when no pool is configured; treat as "no adapter".
   let adapter: SchemaHost["connection"] | undefined;
   try {

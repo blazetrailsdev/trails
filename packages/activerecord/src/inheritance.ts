@@ -141,7 +141,7 @@ function descendsFromActiveRecordByHierarchy(modelClass: typeof Base): boolean {
   const parent = Object.getPrototypeOf(modelClass) as typeof Base | null;
   if (!parent || parent === Function.prototype || typeof parent.name !== "string") return true;
   // Rails: `elsif superclass.abstract_class?` → recurse through the abstract chain.
-  if (getAbstractClass.call(parent)) return descendsFromActiveRecordByHierarchy(parent);
+  if (parent.abstractClass) return descendsFromActiveRecordByHierarchy(parent);
   // Rails else branch begins with `superclass == Base`.
   return Object.prototype.hasOwnProperty.call(parent, "_isActiveRecordBase");
 }
@@ -203,7 +203,7 @@ export function setBaseClass(modelClass: typeof Base): void {
   // Rails: if superclass == Base || superclass.abstract_class? → self is root.
   // Use _isActiveRecordBase (existing sentinel) to identify the AR root class.
   const parentIsARBase = Object.prototype.hasOwnProperty.call(parent, "_isActiveRecordBase");
-  const parentIsAbstract = getAbstractClass.call(parent);
+  const parentIsAbstract = parent.abstractClass;
   if (parentIsARBase || parentIsAbstract) {
     (modelClass as any)._computedBaseClass = modelClass;
   } else {
@@ -444,34 +444,19 @@ export function baseClass(this: typeof Base): typeof Base {
   return (this as any)._computedBaseClass as typeof Base;
 }
 
-/**
- * Mirrors: ActiveRecord::Inheritance::ClassMethods#abstract_class
- * @internal
- */
-export function getAbstractClass(this: typeof Base): boolean {
-  return Object.prototype.hasOwnProperty.call(this, "_abstractClass")
-    ? (this as any)._abstractClass
-    : false;
-}
-
-/**
- * Mirrors: ActiveRecord::Inheritance::ClassMethods#abstract_class=
- * @internal
- */
-export function setAbstractClass(this: typeof Base, value: boolean): void {
-  (this as any)._abstractClass = value;
-}
-
-/**
- * Mirrors: ActiveRecord::Inheritance::ClassMethods#abstract_class,
- * abstract_class=, abstract_class?
- */
-export function abstractClass(this: typeof Base, value?: boolean): boolean {
-  if (value !== undefined) {
-    setAbstractClass.call(this, value);
-    return value;
+/** Mirrors: ActiveRecord::Inheritance::ClassMethods */
+export class ClassMethods {
+  /** Mirrors: ActiveRecord::Inheritance::ClassMethods#abstract_class */
+  static get abstractClass(): boolean {
+    return Object.prototype.hasOwnProperty.call(this, "_abstractClass")
+      ? (this as any)._abstractClass
+      : false;
   }
-  return getAbstractClass.call(this);
+
+  /** Mirrors: ActiveRecord::Inheritance::ClassMethods#abstract_class= */
+  static set abstractClass(value: boolean) {
+    (this as any)._abstractClass = value;
+  }
 }
 
 /**

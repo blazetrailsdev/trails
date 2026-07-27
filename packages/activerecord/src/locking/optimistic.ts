@@ -15,60 +15,6 @@ import { reloadSchemaFromCache } from "../model-schema.js";
  */
 
 /**
- * Return the column name used for optimistic locking.
- *
- * Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#locking_column
- */
-export function lockingColumn(modelClass: typeof Base): string {
-  return (modelClass as any)._lockingColumn ?? "lock_version";
-}
-
-/**
- * Set the column name used for optimistic locking.
- *
- * Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#locking_column=
- * @internal
- */
-export function setLockingColumn(modelClass: typeof Base, column: string): void {
-  reloadSchemaFromCache.call(modelClass as any);
-  (modelClass as any)._lockingColumn = column;
-}
-
-/**
- * Whether optimistic locking is enabled for the model — the `lock_optimistically`
- * config is on AND a lock_version column exists.
- *
- * Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#locking_enabled?
- * (`lock_optimistically && columns_hash.include?(locking_column)`).
- */
-export function lockingEnabled(modelClass: typeof Base): boolean {
-  return (
-    lockOptimistically(modelClass) &&
-    modelClass._attributeDefinitions.has(lockingColumn(modelClass))
-  );
-}
-
-/**
- * Rails: `class_attribute :lock_optimistically, instance_writer: false,
- * default: true` — lets a model disable optimistic locking even when a
- * lock_version column is present. Stored in the `_lockOptimistically` class
- * field (inherited via the prototype chain), defaulting to true.
- *
- * Mirrors: ActiveRecord::Locking::Optimistic#lock_optimistically
- */
-export function lockOptimistically(modelClass: typeof Base): boolean {
-  return (modelClass as any)._lockOptimistically !== false;
-}
-
-/**
- * Mirrors: ActiveRecord::Locking::Optimistic#lock_optimistically=
- * @internal
- */
-export function setLockOptimistically(modelClass: typeof Base, value: boolean): void {
-  (modelClass as any)._lockOptimistically = value;
-}
-
-/**
  * Type wrapper for the lock_version column that ensures nil → 0 on
  * serialize/deserialize so passing nil doesn't trigger StaleObjectError.
  * cast() coerces null → 0; deserialize() and serialize() also coerce null → 0.
@@ -163,7 +109,37 @@ export async function incrementBang(
  * Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#reset_locking_column
  */
 export function resetLockingColumn(this: LockingHost): void {
-  setLockingColumn(this as unknown as typeof Base, DEFAULT_LOCKING_COLUMN);
+  (this as unknown as typeof Base).lockingColumn = DEFAULT_LOCKING_COLUMN;
+}
+
+/** Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods */
+export class ClassMethods {
+  /** Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#locking_column */
+  static get lockingColumn(): string {
+    return (this as any)._lockingColumn ?? DEFAULT_LOCKING_COLUMN;
+  }
+
+  static set lockingColumn(column: string) {
+    reloadSchemaFromCache.call(this as any);
+    // Rails stores `value.to_s`, and every call site assigns a Symbol
+    // (`self.locking_column = :version`). `nil.to_s` is "", not "null".
+    (this as any)._lockingColumn = column == null ? "" : String(column);
+  }
+
+  /** Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#locking_enabled? */
+  static get lockingEnabled(): boolean {
+    const self = this as unknown as typeof Base;
+    return self.lockOptimistically && self._attributeDefinitions.has(self.lockingColumn);
+  }
+
+  /** Mirrors: ActiveRecord::Locking::Optimistic#lock_optimistically */
+  static get lockOptimistically(): boolean {
+    return (this as any)._lockOptimistically !== false;
+  }
+
+  static set lockOptimistically(value: boolean) {
+    (this as any)._lockOptimistically = value;
+  }
 }
 
 /**
@@ -189,8 +165,8 @@ export async function updateCounters(
   counters: Record<string, number>,
   options?: { touch?: boolean | string | string[] },
 ): Promise<number> {
-  if (lockingEnabled(this)) {
-    counters = { ...counters, [lockingColumn(this)]: 1 };
+  if (this.lockingEnabled) {
+    counters = { ...counters, [this.lockingColumn]: 1 };
   }
   return superFn.call(this, id, counters, options);
 }

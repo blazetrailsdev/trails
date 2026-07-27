@@ -92,6 +92,11 @@ export function registry(): AdapterSpecificRegistry {
 /**
  * Mirrors Rails' `ActiveRecord::Type.registry=` (attr_accessor setter).
  *
+ * Not converged onto a getter/setter pair under the Rails name: Rails hangs
+ * `attr_accessor :registry` off the `ActiveRecord::Type` module object, whose
+ * trails analogue is this ES module — and an ES module namespace is read-only
+ * from the importer's side, so there is no object to define an accessor on.
+ *
  * Replaces the active registry wholesale. Callers are responsible for
  * re-registering any types they need — this is intentional: Rails' own
  * TypeTest swaps in a blank AdapterSpecificRegistry per test and restores

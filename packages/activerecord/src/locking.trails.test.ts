@@ -23,4 +23,22 @@ describe("OptimisticLockingTrailsTest", () => {
     const record = new LockCust();
     expect(record.readAttribute("custom_lock_version")).toBe(0);
   });
+
+  it("locking_column= stores value.to_s", () => {
+    class LockCoerce extends Base {
+      static {
+        this._tableName = "lock_without_defaults";
+      }
+    }
+
+    const untyped = LockCoerce as unknown as { lockingColumn: unknown };
+
+    untyped.lockingColumn = 123;
+    expect(LockCoerce.lockingColumn).toBe("123");
+
+    // Ruby's nil.to_s is "", so the reader yields "" rather than falling back
+    // to the "lock_version" default.
+    untyped.lockingColumn = null;
+    expect(LockCoerce.lockingColumn).toBe("");
+  });
 });
