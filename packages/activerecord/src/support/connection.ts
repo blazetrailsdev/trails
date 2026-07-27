@@ -36,7 +36,6 @@ import {
   driverConfig,
   mysqlSettings,
   postgresSettings,
-  present,
   type ConnectionName,
   type EnvReader,
   type ServerSettings,
@@ -49,6 +48,12 @@ export type { TestAdapterName };
  * The connection name selected by `ARCONN`, falling back to
  * `config["default_connection"]`. Mirrors `connection.rb:9-11`.
  *
+ * `??`, not an empty-string check: Ruby's `ENV["ARCONN"] || ...` falls back on
+ * nil alone, so `ARCONN=""` selects the connection named `""` and fails in
+ * {@link testConfigurationHashes} with `Connection "" not found` rather than
+ * quietly running sqlite. Sub-settings do treat `""` as absent (`config.ts`);
+ * the selector must not.
+ *
  * Returns a bare `string`, not a `ConnectionName`: `ARCONN` is arbitrary user
  * input, and asserting it into the union here would be a type lie that makes
  * the unknown-name branch look unreachable to every caller.
@@ -56,7 +61,7 @@ export type { TestAdapterName };
  * so the error surfaces once, at config-build time.
  */
 export function connectionName(read: EnvReader = getEnv): string {
-  return present(read, "ARCONN") ?? DEFAULT_CONNECTION;
+  return read("ARCONN") ?? DEFAULT_CONNECTION;
 }
 
 /**
@@ -249,6 +254,10 @@ async function sqliteHash(): Promise<Record<string, unknown>> {
  * Assign the test `DatabaseConfigurations` and establish `Base`'s connection,
  * mirroring `ARTest.connect` (`connection.rb:22-38`).
  *
+ * `Base.configurations` is assigned as Rails does (`connection.rb:31`) so
+ * no-arg `Base.establishConnection()` and later configuration lookups resolve
+ * against the same test configuration the pool was opened from.
+ *
  * Beyond Rails it registers the adapter's `DatabaseTasks` handler, because
  * trails loads the schema through `DatabaseTasks` rather than by evaluating
  * `schema.rb` in-process. The registration runs on every call so callers that
@@ -261,6 +270,7 @@ async function sqliteHash(): Promise<Record<string, unknown>> {
 export async function connect(): Promise<TestDatabaseConfig> {
   const { adapter, envConfig } = await testConfigurationHashes();
   const configs = new DatabaseConfigurations([envConfig]);
+  Base.configurations(configs);
   DatabaseTasks.databaseConfiguration = configs;
 
   switch (adapter) {

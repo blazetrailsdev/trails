@@ -85,7 +85,7 @@ export type EnvReader = (key: string) => string | undefined;
  * `Access denied for user ''`. This matches the convention already used by
  * `MySQLDatabaseTasks#resolvedField`, which likewise rejects `""`.
  */
-export function present(read: EnvReader, key: string): string | undefined {
+function present(read: EnvReader, key: string): string | undefined {
   const value = read(key);
   return value === undefined || value === "" ? undefined : value;
 }

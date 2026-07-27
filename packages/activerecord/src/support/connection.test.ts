@@ -27,7 +27,7 @@ describe("connect", () => {
   });
 
   it("falls back to the default_connection (sqlite3) when ARCONN is unset", async () => {
-    vi.stubEnv("ARCONN", "");
+    vi.stubEnv("ARCONN", undefined);
     const { adapter } = await connect();
     expect(adapter).toBe("sqlite");
   });

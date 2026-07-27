@@ -904,8 +904,18 @@ describe("establish_connection accepts a DatabaseConfig", () => {
 describe("loadConfigFile resolves config/database.* against Trails.root", () => {
   let tmpRoot: string;
 
+  // See establish-connection.test.ts: the worker's setup file assigns
+  // `Base.configurations`, which short-circuits the config-file lookup this
+  // seam exists to exercise.
+  const originalConfigurations = Base.configurations();
+
+  beforeEach(() => {
+    Base.configurations({});
+  });
+
   afterEach(async () => {
     setTrailsRoot(null);
+    Base.configurations(originalConfigurations);
     await Base.connectionHandler.clearAllConnectionsBang();
     if (tmpRoot) nodeFs.rmSync(tmpRoot, { recursive: true, force: true });
   });
