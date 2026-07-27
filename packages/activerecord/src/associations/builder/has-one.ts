@@ -260,10 +260,10 @@ export class HasOne extends SingularAssociation {
  * @internal
  */
 function buildOwningDisplacement(assoc: any, args: unknown[]): any {
-  assoc.buildSkipsDisplacementRemoval = true;
+  assoc.buildDisplacementOwnedByCaller = true;
   try {
     return assoc.build(...args);
   } finally {
-    assoc.buildSkipsDisplacementRemoval = false;
+    assoc.buildDisplacementOwnedByCaller = false;
   }
 }

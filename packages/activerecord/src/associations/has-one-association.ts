@@ -263,13 +263,14 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   /**
-   * Set by the callers that own the displaced record's removal themselves — the
-   * `build#{name}` accessor (builder/has-one.ts, which awaits
+   * Set by the callers that own Rails' leading `load_target` and the
+   * `remove_target!` that follows it themselves — the `build#{name}` accessor
+   * (builder/has-one.ts, which runs `loadTargetForBuild` and awaits
    * `detachDisplacedTarget`) and the nested-attributes writer
-   * (nested-attributes.ts, which starts `detachDisplacedRecord` at assignment
-   * and drains it in its `save` wrapper). Both call `build` on their way through,
-   * and without this flag `build` would start a *second*, concurrent removal of
-   * the same row.
+   * (nested-attributes.ts, a synchronous property setter that starts
+   * `detachDisplacedRecord` at assignment and drains it in its `save` wrapper).
+   * Both call `build` on their way through, and without this flag `build` would
+   * re-run the load and start a *second*, concurrent removal of the same row.
    *
    * `protected` because it is association-internal bookkeeping, not API surface;
    * the two callers reach it through their existing duck-typed handles on the
@@ -277,7 +278,25 @@ export class HasOneAssociation extends SingularAssociation {
    *
    * @internal
    */
-  protected buildSkipsDisplacementRemoval = false;
+  protected buildDisplacementOwnedByCaller = false;
+
+  /**
+   * Rails' `set_new_record` → `replace(record, false)` opens with `load_target`
+   * (has_one_association.rb:59-62): the guard is `return target unless
+   * load_target || record`, and Ruby always evaluates the left operand, so
+   * EVERY build queries for an existing target before deciding whether to
+   * displace it — a never-loaded association included. `needsTargetLoadForBuild`
+   * is Rails' `find_target?`, so the query runs exactly when Rails' would (a
+   * persisted / FK-present owner whose target isn't loaded), and returning it
+   * here is what makes `association(name).build(...)` awaitable on that path.
+   *
+   * @internal
+   */
+  protected override loadDisplacedForBuild(): Promise<unknown> | null {
+    if (this.buildDisplacementOwnedByCaller) return null;
+    if (!this.needsTargetLoadForBuild()) return null;
+    return this.loadTargetForBuild();
+  }
 
   /**
    * `build_#{name}` and `association(:name).build` are the same Rails method,
@@ -299,7 +318,7 @@ export class HasOneAssociation extends SingularAssociation {
     displaced: Base | null,
     record: Base | null,
   ): Promise<void> | null {
-    if (this.buildSkipsDisplacementRemoval) return null;
+    if (this.buildDisplacementOwnedByCaller) return null;
     if (!displaced || sameRecord(displaced, record)) return null;
     // A displaced record that was never persisted keys no row: `remove_target!`'s
     // in-memory half already ran in `setNewRecord`, and its `target.save` is

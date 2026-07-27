@@ -59,19 +59,31 @@ export class SingularAssociation extends Association {
     this.replace(record);
   }
 
-  // has_one widens the return to a Promise when the freshly built record
-  // displaces a loaded, persisted target: Rails' `set_new_record` →
-  // `replace(record, false)` removes that row inline (`remove_target!`), and a
-  // synchronous JS return has no other way to expose the write for `await`.
+  // has_one widens the return to a Promise: Rails' `set_new_record` →
+  // `replace(record, false)` opens with `load_target` (the `unless load_target
+  // || record` guard, has_one_association.rb:62, always evaluates its left
+  // operand) and then removes the displaced row inline (`remove_target!`), and a
+  // synchronous JS return has no other way to expose either query for `await`.
   // belongs_to keeps the plain synchronous return — its `set_new_record` only
   // writes the owner's foreign key in memory.
   build(
     attributes?: Record<string, unknown>,
     block?: (record: Base) => void,
   ): Base | null | Promise<Base | null> {
-    // Rails' `set_new_record` → `replace(record, false)` opens with
-    // `load_target`, so only an ALREADY-loaded target can be displaced here (the
-    // `build#{name}` accessor, which can await, runs the load itself).
+    // Rails' `load_target` runs on EVERY build, so a persisted owner whose
+    // target has never been loaded still discovers (and displaces) the row in
+    // the DB. That query has to precede the in-memory build, which overwrites
+    // the target — hence the load-first branch rather than a load inside
+    // `detachDisplacedOnBuild`.
+    const load = this.loadDisplacedForBuild();
+    if (load) return load.then(() => this.buildAfterDisplacementLoad(attributes, block));
+    return this.buildAfterDisplacementLoad(attributes, block);
+  }
+
+  private buildAfterDisplacementLoad(
+    attributes?: Record<string, unknown>,
+    block?: (record: Base) => void,
+  ): Base | null | Promise<Base | null> {
     const displaced = this.loaded ? this.target : null;
     const record = this.buildRecord(attributes);
     if (record) {
@@ -83,6 +95,19 @@ export class SingularAssociation extends Association {
     }
     const removal = this.detachDisplacedOnBuild(displaced, record);
     return removal ? removal.then(() => record) : record;
+  }
+
+  /**
+   * Rails' leading `load_target` (has_one_association.rb:59-62), when it would
+   * actually query — null otherwise, which is always the case for belongs_to
+   * (`BelongsToAssociation#replace` neither loads nor removes anything).
+   * Overridden by has_one; the promise returned here is what makes `build`
+   * awaitable for the direct `record.association(name).build(...)` caller.
+   *
+   * @internal
+   */
+  protected loadDisplacedForBuild(): Promise<unknown> | null {
+    return null;
   }
 
   /**

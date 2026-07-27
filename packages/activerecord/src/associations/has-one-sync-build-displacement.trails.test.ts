@@ -73,8 +73,31 @@ describe("has_one displacement via the synchronous build path", () => {
     expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(null);
   });
 
-  it("returns the built record synchronously when nothing is displaced", async () => {
+  it("nullifies the displaced row when association(name).build replaces an unloaded child", async () => {
     const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
+    const displaced = (await Ship.create({
+      name: "Nights Dirty Lightning",
+      pirate_id: (pirate as unknown as { id: number }).id,
+    })) as Base;
+
+    // Never load the association: Rails' `replace` guard is `return target
+    // unless load_target || record`, whose left operand always runs, so the
+    // build discovers the row itself.
+    const refetched = (await Pirate.find((pirate as unknown as { id: number }).id)) as Base;
+    const assoc = (
+      refetched as unknown as { association(n: string): { build(a: object): unknown } }
+    ).association("ship");
+    const built = (await assoc.build({ name: "Davy Jones Gold Dagger" })) as Base;
+
+    expect((built as unknown as { name: string }).name).toBe("Davy Jones Gold Dagger");
+    const reloaded = (await Ship.find((displaced as unknown as { id: number }).id)) as Base;
+    expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(null);
+  });
+
+  it("returns the built record synchronously when no query would run", async () => {
+    // A new-record owner keys no row, so Rails' `find_target?` is false and
+    // `load_target` queries nothing — the build stays fully in memory.
+    const pirate = new (Pirate as unknown as new () => Base)();
     const assoc = (
       pirate as unknown as { association(n: string): { build(a: object): unknown } }
     ).association("ship");

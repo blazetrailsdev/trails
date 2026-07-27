@@ -79,7 +79,7 @@ describe("STI owner has_one — declaring-class owner FK", () => {
         association: (n: string) => { build: (a: Record<string, unknown>) => VerySpecialComment };
       }
     ).association("verySpecialComment");
-    const built = assoc.build({ body: "built sti has_one" });
+    const built = await assoc.build({ body: "built sti has_one" });
 
     expect(Number(built._readAttribute("post_id"))).toBe(Number(post.id));
   });

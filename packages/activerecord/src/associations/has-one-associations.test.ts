@@ -924,10 +924,10 @@ describe("HasOneAssociationsTest", () => {
   it("association keys bypass attribute protection", async () => {
     const car = (await Car.create({ name: "honda" })) as any;
 
-    let bulb = car.association("bulb").build();
+    let bulb = await car.association("bulb").build();
     expect(bulb.car_id).toBe(Number(car.id));
 
-    bulb = car.association("bulb").build({ car_id: Number(car.id) + 1 });
+    bulb = await car.association("bulb").build({ car_id: Number(car.id) + 1 });
     expect(bulb.car_id).toBe(Number(car.id));
 
     bulb = await car.association("bulb").create();
@@ -939,9 +939,9 @@ describe("HasOneAssociationsTest", () => {
 
   it("association protect foreign key", async () => {
     const pirate = await Pirate.create({ catchphrase: "Don' botharrr talkin' like one, savvy?" });
-    let ship = (pirate.association("ship") as any).build();
+    let ship = await (pirate.association("ship") as any).build();
     expect(ship.pirate_id).toBe(Number(pirate.id));
-    ship = (pirate.association("ship") as any).build({ pirate_id: Number(pirate.id) + 1 });
+    ship = await (pirate.association("ship") as any).build({ pirate_id: Number(pirate.id) + 1 });
     expect(ship.pirate_id).toBe(Number(pirate.id));
     ship = await (pirate.association("ship") as any).create({ name: "s1" });
     expect(ship.pirate_id).toBe(Number(pirate.id));
@@ -1017,7 +1017,7 @@ describe("HasOneAssociationsTest", () => {
 
   it("has one assignment dont trigger save on change of same object", async () => {
     const pirate = await Pirate.create({ catchphrase: "Don' botharrr talkin' like one, savvy?" });
-    const ship = (pirate.association("ship") as any).build({ name: "old name" });
+    const ship = await (pirate.association("ship") as any).build({ name: "old name" });
     await ship.save();
 
     ship.name = "new name";
@@ -1031,7 +1031,7 @@ describe("HasOneAssociationsTest", () => {
 
   it("has one assignment triggers save on change on replacing object", async () => {
     const pirate = await Pirate.create({ catchphrase: "Don' botharrr talkin' like one, savvy?" });
-    const ship = (pirate.association("ship") as any).build({ name: "old name" });
+    const ship = await (pirate.association("ship") as any).build({ name: "old name" });
     await ship.save();
 
     const newShip = await Ship.create({ name: "new name" });
