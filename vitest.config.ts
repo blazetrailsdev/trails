@@ -343,7 +343,7 @@ export default defineConfig({
     },
     projects: [
       {
-        // All activerecord tests. Each fork gets its own database (rails_js_test_N
+        // All activerecord tests. Each fork gets its own database (activerecord_unittest_N
         // for PG/MySQL, provisioned via AR_DB_FORKS) so files can run in parallel.
         // SQLite is file-backed too: globalSetup builds one on-disk template and
         // each fork restores it into its own private `.sqlite` clone stamped into

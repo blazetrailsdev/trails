@@ -913,7 +913,7 @@ async function establishWithConfig(
   // Mirror Rails' db_config_handler (database_configurations.rb:65-70):
   // `url ? UrlConfig.new(env, name, url, config) : HashConfig.new(...)`.
   // A UrlConfig parses the URL into its hash and surfaces the database name
-  // living in the path — e.g. the per-worker slot DB `rails_js_test_2` that
+  // living in the path — e.g. the per-worker slot DB `activerecord_unittest_2` that
   // test-setup-worker-db.ts suffixes on — natively via the URL fallback
   // (url-config.ts), so `connectionDbConfig().database` is no longer undefined.
   //

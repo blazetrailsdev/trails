@@ -7,7 +7,7 @@
  *   pnpm vitest run packages/activerecord/src/test-fixtures/use-transactional-tests.test.ts
  *
  * With PG:
- *   ARCONN=postgresql PGHOST=localhost PGPORT=5432 PGDATABASE=rails_test \
+ *   ARCONN=postgresql PGHOST=localhost PGPORT=5432 PGUSER=rails \
  *     pnpm vitest run packages/activerecord/src/test-fixtures/use-transactional-tests.test.ts
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
