@@ -18,7 +18,7 @@
     "test:watch": "vitest",
     "test:types": "vitest run --config vitest.dx-tests.config.ts",
     "test:types:virtualized": "tsc -b packages/activerecord-cli && node packages/activerecord-cli/dist/tsc-wrapper/cli.js -p packages/activerecord/virtualized-dx-tests/tsconfig.json",
-    "test:db": "ARCONN=postgresql PGHOST=localhost PGPORT=25432 PGUSER=postgres PGPASSWORD=postgres PGDATABASE=rails_js_test MYSQL_HOST=localhost MYSQL_PORT=13306 MYSQL_USER=root MYSQL_DATABASE=rails_js_test vitest run",
+    "test:db": "ARCONN=postgresql PGHOST=localhost PGPORT=25432 PGUSER=rails MYSQL_HOST=127.0.0.1 MYSQL_PORT=13306 vitest run",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
     "api:compare": "bash scripts/api-compare/run.sh",
