@@ -112,55 +112,33 @@ export function resetLockingColumn(this: LockingHost): void {
   (this as unknown as typeof Base).lockingColumn = DEFAULT_LOCKING_COLUMN;
 }
 
-/**
- * Class-level accessors mixed onto `Base` via `extend()` in base.ts.
- *
- * Rails declares these as `class_attribute :lock_optimistically` plus an
- * `attr_accessor`-shaped `locking_column` / `locking_column=` pair on
- * `ClassMethods`; the reader and writer share one Ruby name, so they are
- * ported as a getter/setter pair rather than a `set`-prefixed sibling.
- *
- * Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods
- */
-export const ClassMethods = {
+/** Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods */
+export class ClassMethods {
   /** Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#locking_column */
-  get lockingColumn(): string {
+  static get lockingColumn(): string {
     return (this as any)._lockingColumn ?? DEFAULT_LOCKING_COLUMN;
-  },
+  }
 
-  set lockingColumn(column: string) {
+  static set lockingColumn(column: string) {
     reloadSchemaFromCache.call(this as any);
     (this as any)._lockingColumn = column;
-  },
+  }
 
-  /**
-   * Whether optimistic locking is enabled for the model — the
-   * `lock_optimistically` config is on AND a lock_version column exists.
-   *
-   * Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#locking_enabled?
-   * (`lock_optimistically && columns_hash.include?(locking_column)`).
-   */
-  get lockingEnabled(): boolean {
+  /** Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#locking_enabled? */
+  static get lockingEnabled(): boolean {
     const self = this as unknown as typeof Base;
     return self.lockOptimistically && self._attributeDefinitions.has(self.lockingColumn);
-  },
+  }
 
-  /**
-   * Rails: `class_attribute :lock_optimistically, instance_writer: false,
-   * default: true` — lets a model disable optimistic locking even when a
-   * lock_version column is present. Stored in the `_lockOptimistically` class
-   * field (inherited via the prototype chain), defaulting to true.
-   *
-   * Mirrors: ActiveRecord::Locking::Optimistic#lock_optimistically
-   */
-  get lockOptimistically(): boolean {
+  /** Mirrors: ActiveRecord::Locking::Optimistic#lock_optimistically */
+  static get lockOptimistically(): boolean {
     return (this as any)._lockOptimistically !== false;
-  },
+  }
 
-  set lockOptimistically(value: boolean) {
+  static set lockOptimistically(value: boolean) {
     (this as any)._lockOptimistically = value;
-  },
-};
+  }
+}
 
 /**
  * Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#update_counters

@@ -444,27 +444,20 @@ export function baseClass(this: typeof Base): typeof Base {
   return (this as any)._computedBaseClass as typeof Base;
 }
 
-/**
- * Class-level accessors mixed onto `Base` via `extend()` in base.ts.
- *
- * Rails' `abstract_class` / `abstract_class=` share one name, so the pair is
- * ported as a getter/setter rather than a `set`-prefixed sibling.
- *
- * Mirrors: ActiveRecord::Inheritance::ClassMethods
- */
-export const ClassMethods = {
+/** Mirrors: ActiveRecord::Inheritance::ClassMethods */
+export class ClassMethods {
   /** Mirrors: ActiveRecord::Inheritance::ClassMethods#abstract_class */
-  get abstractClass(): boolean {
+  static get abstractClass(): boolean {
     return Object.prototype.hasOwnProperty.call(this, "_abstractClass")
       ? (this as any)._abstractClass
       : false;
-  },
+  }
 
   /** Mirrors: ActiveRecord::Inheritance::ClassMethods#abstract_class= */
-  set abstractClass(value: boolean) {
+  static set abstractClass(value: boolean) {
     (this as any)._abstractClass = value;
-  },
-};
+  }
+}
 
 /**
  * Get the STI base class for a model.

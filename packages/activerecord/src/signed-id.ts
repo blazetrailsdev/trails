@@ -45,22 +45,10 @@ export function setSignedIdVerifierSecret(
   _cachedVerifierClasses.clear();
 }
 
-/**
- * Class-level accessors mixed onto `Base` via `extend()` in base.ts.
- *
- * Rails' `signed_id_verifier` / `signed_id_verifier=` share one name, so the
- * pair is ported as a getter/setter rather than a `set`-prefixed sibling.
- *
- * Mirrors: ActiveRecord::SignedId::ClassMethods
- */
-export const ClassMethods = {
-  /**
-   * Get or create the MessageVerifier instance for signed IDs.
-   * Uses SHA256 digest, JSON serializer, URL-safe encoding.
-   *
-   * Mirrors: ActiveRecord::SignedId::ClassMethods#signed_id_verifier
-   */
-  get signedIdVerifier(): MessageVerifier {
+/** Mirrors: ActiveRecord::SignedId::ClassMethods */
+export class ClassMethods {
+  /** Mirrors: ActiveRecord::SignedId::ClassMethods#signed_id_verifier */
+  static get signedIdVerifier(): MessageVerifier {
     if ((this as any)._signedIdVerifier) {
       return (this as any)._signedIdVerifier;
     }
@@ -80,13 +68,13 @@ export const ClassMethods = {
     (this as any)._signedIdVerifier = verifier;
     _cachedVerifierClasses.add(this);
     return verifier;
-  },
+  }
 
   /** Mirrors: ActiveRecord::SignedId::ClassMethods#signed_id_verifier= */
-  set signedIdVerifier(verifier: MessageVerifier) {
+  static set signedIdVerifier(verifier: MessageVerifier) {
     (this as any)._signedIdVerifier = verifier;
-  },
-};
+  }
+}
 
 function _hasPrimaryKey(pk: unknown): boolean {
   if (pk == null) return false;

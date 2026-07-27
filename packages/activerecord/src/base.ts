@@ -1035,16 +1035,10 @@ export class Base extends Model {
     ModelSchema.protectedEnvironments.call(this, envs);
   }
 
-  /**
-   * Mirrors: ActiveRecord::Inheritance::ClassMethods#abstract_class.
-   * Installed as a static accessor by `extend()` after the class body.
-   */
+  /** Mirrors: ActiveRecord::Inheritance::ClassMethods#abstract_class */
   declare static abstractClass: boolean;
 
-  /**
-   * Mirrors: ActiveRecord::SignedId::ClassMethods#signed_id_verifier.
-   * Installed as a static accessor by `extend()` after the class body.
-   */
+  /** Mirrors: ActiveRecord::SignedId::ClassMethods#signed_id_verifier */
   declare static signedIdVerifier: _MessageVerifier;
 
   static _requireConcreteClass(): void {
