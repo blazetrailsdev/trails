@@ -6,6 +6,7 @@
  * Provides helpers to check if the default timezone is UTC and
  * to retrieve the current default timezone setting.
  */
+import { getZoneDefault } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
 export interface Timezone {
@@ -13,28 +14,14 @@ export interface Timezone {
   defaultTimezone(): "utc" | "local";
 }
 
-let _defaultTimezone: "utc" | "local" = "utc";
-
 export function isUtc(): boolean {
-  return _defaultTimezone === "utc";
+  const zoneDefault = getZoneDefault();
+  if (zoneDefault) return zoneDefault.name === "UTC";
+  return true;
 }
 
 export function defaultTimezone(): "utc" | "local" {
-  return _defaultTimezone;
-}
-
-/**
- * Trails-only seam with no Rails counterpart. Rails' helper derives the zone
- * from `Time.zone_default` (timezone.rb:11) and exposes no setter at all;
- * trails has no `Time.zone_default` yet, so the value is held here and pushed
- * in by `activerecord`'s `setDefaultTimezone`. Converging this onto a real
- * `Time.zone_default` is tracked by RFC 0081's
- * `converge-activemodel-timezone-onto-time-zone-default` story.
- *
- * @internal
- */
-export function setDefaultTimezone(tz: "utc" | "local"): void {
-  _defaultTimezone = tz;
+  return isUtc() ? "utc" : "local";
 }
 
 /** Resolves to "UTC" when the default timezone is UTC, else the host system zone. */
