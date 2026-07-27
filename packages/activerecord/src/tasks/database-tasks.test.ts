@@ -807,9 +807,6 @@ function databaseTasksMigrationTestCase(): MigrationTestCase {
     } catch {
       /* no pool */
     }
-    // This suite deliberately removes the pool above, so it re-establishes
-    // the worker's one by name — `connect`'s own line (connection.rb:32),
-    // against the configurations the worker setup file already installed.
     if (!skipMigrationTestCase) await Base.establishConnection("arunit");
   });
 

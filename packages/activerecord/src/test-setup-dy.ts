@@ -3,15 +3,9 @@
  * port (`support/connection.ts`) and loads the canonical fixture schema once
  * per worker via `DatabaseTasks`.
  *
- * The pool it opens then lives for the whole worker, as Rails' does for the
- * whole process (`cases/helper.rb` calls `ARTest.connect` at load and never
+ * The pool it opens lives for the whole worker, as Rails' does for the whole
+ * process (`cases/helper.rb` calls `ARTest.connect` at load and never
  * disconnects — `vendor/rails/activerecord/test/support/connection.rb:22-38`).
- * This file used to call `Base.removeConnection()` here so that test files
- * which never call `setupHandlerSuite` would not inherit a globally-installed
- * handler pool, which forced every handler-path suite to re-open the pool
- * through a `establishFromTestConfig` helper with no Rails counterpart. That
- * teardown was unnecessary: those files either build their own adapter or
- * connect themselves, and none of them observes the ambient pool.
  *
  * Must run AFTER cases/helper.ts so better-sqlite3 is registered and
  * Base.establishConnection can open the pool.

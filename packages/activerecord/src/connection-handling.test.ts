@@ -22,11 +22,6 @@ import * as nodeFs from "node:fs";
 import * as nodeOs from "node:os";
 import * as nodePath from "node:path";
 
-// The worker's pool lives for the whole run now — Rails' connect-once model,
-// where `cases/helper.rb` establishes once and nothing tears it down. The
-// bespoke describes below hand `Base` a foreign pool or clear it outright, so
-// each puts the worker's own pool back afterwards. `establish_connection
-// :arunit` is `ARTest.connect`'s own line (`support/connection.rb:32`).
 async function restoreWorkerConnection(): Promise<void> {
   await Base.establishConnection("arunit");
 }
@@ -50,16 +45,10 @@ describe("ConnectionHandlingTest", () => {
     connectedToStack().length = 0;
     await Base.connectionHandler.clearAllConnectionsBang();
     setPermanentConnectionCheckout(true);
-    // Cases here swap `Base`'s pool to a foreign config (`connected_to`,
-    // `connects_to`, `establish_connection` with another hash). The worker's
-    // pool lives for the whole run now, as Rails' does from `cases/helper.rb`,
-    // so put it back rather than leaving the next suite on the foreign one.
     await setupConnection();
   });
 
   it("#with_connection lease the connection for the duration of the block", async () => {
-    // Rails: `ActiveRecord::Base.release_connection` opens this case — the
-    // worker pool may hold a lease from an earlier suite.
     Base.releaseConnection();
     const pool = Base.connectionPool();
     expect(pool.activeConnection).toBeNull();
@@ -777,9 +766,6 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
 
   it("connectsTo plants _connectionSpecificationName (primary class normalizes to 'Base')", async () => {
     const { __resetPrimaryAbstractClass, primaryAbstractClass } = await import("./inheritance.js");
-    // The worker's pool lives for the whole file (Rails' connect-once model),
-    // so the bespoke `configurations` this case installs must be put back —
-    // otherwise every later suite resolves "primary" to db/primary.sqlite3.
     let priorConfigs: ReturnType<typeof Base.configurations> | undefined;
     class AppRecord extends Base {}
     class SecondaryAbstract extends Base {
