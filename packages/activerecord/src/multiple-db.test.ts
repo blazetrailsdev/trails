@@ -11,9 +11,9 @@ import { College } from "./test-helpers/models/college.js";
 import { Entrant } from "./test-helpers/models/entrant.js";
 import { Bird } from "./test-helpers/models/bird.js";
 
-// Rails runs MultipleDbTest against two real databases (arunit / arunit2). We
-// reproduce the split with a second in-memory SQLite pool on ARUnit2Model. The
-// PG/MySQL suites don't provision a second named database, so gate to SQLite.
+// Rails runs MultipleDbTest against two real databases (arunit / arunit2), as
+// does trails now that `connect` establishes ARUnit2Model on a provisioned
+// arunit2. Un-gating this suite for PG/MySQL is its own story.
 describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
   // Rails sets `self.use_transactional_tests = false`; fixtures() pins
   // the schema/fixtures across the file (skips the global per-test reset).

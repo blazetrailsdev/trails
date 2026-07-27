@@ -1,10 +1,9 @@
-import { beforeAll, describe, it, expect } from "vitest";
+import { describe, it, expect } from "vitest";
 
 import { Base } from "./index.js";
 import { ReadOnlyError } from "./errors.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { isSqliteRun } from "./support/sqlite-template.js";
-import { resolveSecondDatabaseConfig } from "./support/arunit2-config.js";
 import { rebuildCanonicalTables } from "./support/canonical-schema.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 import { Professor } from "./test-helpers/models/professor.js";
@@ -72,16 +71,6 @@ describe("BasePreventWritesTest", () => {
     await Base.whilePreventingWrites(async () => {
       await Bird.transaction(async () => {});
     });
-  });
-
-  // Rails runs this against two real databases (arunit / arunit2). Like
-  // MultipleDbTest, we reproduce the split with a second in-memory SQLite pool
-  // on ARUnit2Model; the PG/MySQL suites don't provision a second named
-  // database, so gate to SQLite.
-  beforeAll(async () => {
-    if (isSqliteRun() && !ARUnit2Model.connectionClassQ()) {
-      await ARUnit2Model.establishConnection(resolveSecondDatabaseConfig().config);
-    }
   });
 
   it.skipIf(!isSqliteRun())("preventing writes applies to all connections in block", async () => {

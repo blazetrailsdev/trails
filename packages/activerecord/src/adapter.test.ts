@@ -1296,8 +1296,7 @@ describe.runIf(adapterType === "mysql")("AdapterTest", () => {
         await connection.execute(`DROP DATABASE IF EXISTS ${database}`);
       }
       // ARUNIT2_DATABASE is this worker's real second database, which
-      // `ARUnit2Model` holds a pool on for the whole run — put it back rather
-      // than leaving later suites in the worker with colleges/courses gone.
+      // `ARUnit2Model` holds a pool on for the whole run.
       await provisionSecondDatabase();
     }
   });

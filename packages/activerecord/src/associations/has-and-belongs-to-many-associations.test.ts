@@ -1182,11 +1182,8 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     }).not.toThrow();
   });
 
-  // `Professor`/`Course` live in the `arunit2` second database. Rails runs the
-  // suite against two real databases; trails mirrors the split with a second
-  // in-memory SQLite pool on `ARUnit2Model`. The PG/MySQL suites don't yet
-  // provision a second named database, so gate the cross-pool habtm to SQLite —
-  // same gating as `MultipleDbTest`.
+  // `Professor`/`Course` live in the `arunit2` second database. Gated to SQLite
+  // like `MultipleDbTest`; un-gating both is its own story.
   it.skipIf(!isSqliteRun())("alternate database", async () => {
     await setupSecondPool();
     const professor = await Professor.create({ name: "Plum" });

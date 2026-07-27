@@ -772,11 +772,10 @@ describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
         } else {
           if ("addOn" in entry) await entry.addOn?.();
           const ModelClass = await resolvePrimaryModel(entry);
-          // Rails' `FixtureSet` seeds through `model_class.connection`. This
-          // loop passes `Base.adapter` instead because it runs under
-          // transactional fixtures pinned to that connection — but the arunit2
-          // models (colleges/courses) hold a pool of their own, and seeding
-          // them on the primary writes rows their own reload can't see.
+          // Rails' `FixtureSet` seeds through `model_class.connection`; this
+          // loop uses `Base.adapter` because it runs under transactional
+          // fixtures pinned to that connection. arunit2 models hold their own
+          // pool, so seeding them on the primary is invisible to their reload.
           const seedAdapter =
             ModelClass.prototype instanceof ARUnit2Model
               ? await ModelClass.leaseConnection()

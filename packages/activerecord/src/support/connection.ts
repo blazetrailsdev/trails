@@ -26,6 +26,7 @@ import { getEnv, getOsAsync } from "@blazetrails/activesupport";
 import { getPathAsync } from "@blazetrails/activesupport/fs-adapter";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../base.js";
+import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
@@ -379,14 +380,10 @@ async function sqliteHash(): Promise<Record<string, unknown>> {
  * `schema.rb` in-process. The registration runs on every call so callers that
  * clear `_registeredTasks` (e.g. `database-tasks.test.ts`) can re-register.
  *
- * `ARUnit2Model.establish_connection :arunit2` (`connection.rb:33`) follows, so
- * the second base owns its pool for the whole worker the way Rails' does,
- * rather than having it opened per suite. The pool is lazy: the arunit2
- * database and its tables are laid down by `provisionSecondDatabase`
- * (`support/setup-second-pool.ts`, run from `test-setup-dy.ts`) before any
- * suite runs — trails' stand-in for `schema.rb:1444-1460`, where
- * `Course.lease_connection.create_table` puts colleges/courses/professors in
- * arunit2.
+ * `ARUnit2Model.establish_connection :arunit2` (`connection.rb:33`) follows it.
+ * The pool is lazy; `provisionSecondDatabase` (`support/setup-second-pool.ts`,
+ * run from `test-setup-dy.ts`) creates the arunit2 database and its tables
+ * before any suite runs.
  */
 export async function connect(): Promise<TestDatabaseConfig> {
   const { adapter, envConfig, configurationHashes } = await testConfigurationHashes();
@@ -415,10 +412,6 @@ export async function connect(): Promise<TestDatabaseConfig> {
   // `connection.rb:32` — established by name, not from a raw hash, so the pool
   // comes from the entry `Base.configurations` publishes.
   await Base.establishConnection("arunit");
-  // `connection.rb:33`. Imported lazily: the model modules pull in the
-  // association machinery, and a static import here would run that at
-  // config-build time, before the primary pool exists.
-  const { ARUnit2Model } = await import("../test-helpers/models/arunit2-model.js");
   await ARUnit2Model.establishConnection("arunit2");
 
   return { configs, adapter, envConfig };
