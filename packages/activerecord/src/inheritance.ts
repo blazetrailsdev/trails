@@ -222,6 +222,14 @@ export function setBaseClass(modelClass: typeof Base): void {
  * bare component is the model's `_demodulizedName` (`"User"`) when present,
  * falling back to the JS `name`. Rails' `self.name` for such a model is
  * `"ClothingItem::Used"` — the value STI/polymorphic `type` columns store.
+ *
+ * @noRailsEquivalent Ruby resolves a model's namespace through the constant path (`Module#name`,
+ *   `Module#module_parents`) and reads a module-level `table_name_prefix`/`table_name_suffix` off the
+ *   enclosing module object — see `full_table_name_prefix` in model_schema.rb:302-307. JS classes
+ *   carry no module path and there are no module objects to respond to those readers, so trails
+ *   substitutes an explicit registry: namespaced models declare `static moduleName` and their
+ *   wrapping module registers its decoration here. There is no Ruby `def` to match because Ruby gets
+ *   this from the object model.
  */
 export function qualifiedName(modelClass: typeof Base): string {
   const klass = modelClass as typeof Base & { moduleName?: string; _demodulizedName?: string };
@@ -264,12 +272,32 @@ export function moduleParentChain(moduleName: string | undefined): string[] {
 const moduleTableNamePrefixes = new Map<string, string>();
 const moduleTableNameSuffixes = new Map<string, string>();
 
-/** Register a module-level `table_name_prefix` (Ruby `def self.table_name_prefix`). */
+/**
+ * Register a module-level `table_name_prefix` (Ruby `def self.table_name_prefix`).
+ *
+ * @noRailsEquivalent Ruby resolves a model's namespace through the constant path (`Module#name`,
+ *   `Module#module_parents`) and reads a module-level `table_name_prefix`/`table_name_suffix` off the
+ *   enclosing module object — see `full_table_name_prefix` in model_schema.rb:302-307. JS classes
+ *   carry no module path and there are no module objects to respond to those readers, so trails
+ *   substitutes an explicit registry: namespaced models declare `static moduleName` and their
+ *   wrapping module registers its decoration here. There is no Ruby `def` to match because Ruby gets
+ *   this from the object model.
+ */
 export function registerModuleTableNamePrefix(moduleName: string, prefix: string): void {
   moduleTableNamePrefixes.set(moduleName, prefix);
 }
 
-/** Register a module-level `table_name_suffix` (Ruby `def self.table_name_suffix`). */
+/**
+ * Register a module-level `table_name_suffix` (Ruby `def self.table_name_suffix`).
+ *
+ * @noRailsEquivalent Ruby resolves a model's namespace through the constant path (`Module#name`,
+ *   `Module#module_parents`) and reads a module-level `table_name_prefix`/`table_name_suffix` off the
+ *   enclosing module object — see `full_table_name_prefix` in model_schema.rb:302-307. JS classes
+ *   carry no module path and there are no module objects to respond to those readers, so trails
+ *   substitutes an explicit registry: namespaced models declare `static moduleName` and their
+ *   wrapping module registers its decoration here. There is no Ruby `def` to match because Ruby gets
+ *   this from the object model.
+ */
 export function registerModuleTableNameSuffix(moduleName: string, suffix: string): void {
   moduleTableNameSuffixes.set(moduleName, suffix);
 }
@@ -361,6 +389,12 @@ export function demodulize(name: string): string {
  *
  * Mirrors the implicit subclass registration Rails does via Ruby's
  * inherited hook.
+ *
+ * @noRailsEquivalent Stands in for Ruby's `inherited` hook (inheritance.rb:287), which Rails uses
+ *   to register each subclass with the DescendantsTracker. TypeScript has no class-definition hook, so subclasses call
+ *   `registerSubclass(Klass)` from a static initializer block instead. CLAUDE.md already routes Ruby
+ *   lifecycle hooks to a no-TS-equivalent skip; SKIP_GROUPS is keyed by *Ruby* name and only
+ *   suppresses the missing-method direction, so the extra TS surface it creates is recorded here.
  */
 export function registerSubclass(klass: typeof Base): void {
   const parent = Object.getPrototypeOf(klass) as typeof Base;

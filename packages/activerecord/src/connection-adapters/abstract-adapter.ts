@@ -162,6 +162,14 @@ export class Version {
    * (abstract_adapter.rb:243-259). `gte`/`lt` are the TS spelling of those two
    * Comparable operators — the only ones any caller uses — over the same
    * dotted-part comparison `<=>` performs.
+   *
+   * @noRailsEquivalent Rails' `AbstractAdapter::Version` does `include Comparable` and defines only
+   *   `<=>`
+   *   (abstract_adapter.rb:243-259); `>=` and `<` come from Comparable, so there is no `def gte` for
+   *   the extractor to match. `gte`/`lt` are the TS spelling of those two Comparable operators over
+   *   the same dotted-part comparison `<=>` performs. Justified at the declaration. The non-Rails
+   *   part-readers on the same class (`major`/`minor`/`patch`) were deleted rather than allowlisted —
+   *   they had no callers.
    */
   gte(other: Version | string): boolean {
     const otherVersion = typeof other === "string" ? new Version(other) : other;
@@ -663,6 +671,16 @@ export const ABSTRACT_COLUMN_METHOD_NAMES: readonly string[] = [
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AbstractAdapter implements Quoting {
+  /**
+   * @noRailsEquivalent `AbstractAdapter::Version` is a real Rails nested class
+   *   (abstract_adapter.rb:243); `static
+   *   readonly Version = Version` is the TS spelling of that nested Ruby constant, so this is public
+   *   Rails API parity, not drift. It reads as extra surface only because extra-surface skips nested
+   *   Ruby classes when building a file's allow-set (the `primaryClassPerFile` filter) while still
+   *   counting the TS nested class. Nothing to converge. AbstractMysqlAdapter's redundant re-pin of
+   *   the same constant was deleted rather than allowlisted — JS statics are inherited, so it
+   *   shadowed nothing and had no readers.
+   */
   static readonly Version = Version;
 
   /**
@@ -744,6 +762,14 @@ export class AbstractAdapter implements Quoting {
    * Returns true when `error` is a raw driver error indicating the database
    * does not exist. Concrete adapters override this with driver-specific checks.
    * The base implementation always returns false (safe default for custom adapters).
+   *
+   * @noRailsEquivalent Rails recognizes the no-such-database condition inline at the connect site
+   *   and raises
+   *   `ActiveRecord::NoDatabaseError` there (postgresql_adapter.rb:63, sqlite3_adapter.rb:38,120) —
+   *   there is no named predicate to mirror. trails needs the predicate separated from raising
+   *   because `DatabaseTasks._isMissingDatabaseError` (tasks/database-tasks.ts) classifies an
+   *   already-raised raw driver error, after the adapter failed to construct. Identical shape on all
+   *   three: the base returns false, each concrete adapter overrides with its driver check.
    */
   isNoDatabaseError(_error: unknown): boolean {
     return false;
@@ -1365,6 +1391,13 @@ export class AbstractAdapter implements Quoting {
    * is only an approximation (it surfaces `primary_key` and omits `virtual`).
    * Adapters whose `ColumnMethods` list adds more (MySQL, PostgreSQL) override
    * this and append their own names to `super.columnMethodNames()`.
+   *
+   * @noRailsEquivalent Rails spells this list as the `ColumnMethods` modules'
+   *   `define_column_methods` metaprogramming
+   *   (abstract/schema_definitions.rb:324 plus the per-adapter ColumnMethods modules), not as a
+   *   `def`, so the Ruby extractor records no counterpart. TypeScript has no `define_method`, so
+   *   trails reifies the list; each adapter appends to `super.columnMethodNames()` exactly where
+   *   Rails' adapter-specific ColumnMethods module extends the abstract one.
    */
   columnMethodNames(): string[] {
     return [...ABSTRACT_COLUMN_METHOD_NAMES];
@@ -1428,6 +1461,15 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
+  /**
+   * @noRailsEquivalent Rails gains these bodies with `include SchemaStatements` on the adapter, so
+   *   there is no
+   *   accessor to mirror. The schema-statement surface is far too large for the repo's `this`-typed
+   *   module-mixin pattern to stay readable, so trails keeps it in a companion class;
+   *   `schemaStatements(host?)` is the accessor that returns it bound to a host adapter. It is the TS
+   *   stand-in for the `include`, not new capability — mysql2-adapter.ts overrides it to return the
+   *   MySQL companion the same way Rails includes `MySQL::SchemaStatements`.
+   */
   schemaStatements(host?: AbstractAdapter): SchemaStatements {
     return new SchemaStatements((host ?? this) as unknown as AbstractAdapter);
   }
@@ -1459,6 +1501,14 @@ export class AbstractAdapter implements Quoting {
    * methods that need a pool handle can still call back into this adapter.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#schema_cache
+   *
+   * @noRailsEquivalent Rails' `AbstractAdapter#schema_cache` returns the pool's bound reflection
+   *   handle
+   *   (abstract_adapter.rb:298 → connection_pool.rb:285). trails' `schemaCache` getter returns the
+   *   raw `SchemaCache` the adapter memoizes incidental introspection into, so the Rails-shaped bound
+   *   handle needs a second name. The divergence is `schemaCache`'s return type, not this accessor;
+   *   until that is converged, `schemaCacheBound` is what `insertAll` and the uniqueness validator
+   *   read to get Rails' actual `schema_cache` semantics.
    */
   get schemaCacheBound(): BoundSchemaReflection {
     const pool = this.pool as { schemaCache?: BoundSchemaReflection } | null;

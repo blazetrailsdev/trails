@@ -199,7 +199,18 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return new SQLite3TableDefinition(name, { ...rest, adapter: this });
   }
 
-  /** Returns true for raw SQLite driver errors that indicate a missing or unopenable database file (SQLITE_CANTOPEN). */
+  /**
+   * Returns true for raw SQLite driver errors that indicate a missing or unopenable database
+   * file (SQLITE_CANTOPEN).
+   *
+   * @noRailsEquivalent Rails recognizes the no-such-database condition inline at the connect site
+   *   and raises
+   *   `ActiveRecord::NoDatabaseError` there (postgresql_adapter.rb:63, sqlite3_adapter.rb:38,120) —
+   *   there is no named predicate to mirror. trails needs the predicate separated from raising
+   *   because `DatabaseTasks._isMissingDatabaseError` (tasks/database-tasks.ts) classifies an
+   *   already-raised raw driver error, after the adapter failed to construct. Identical shape on all
+   *   three: the base returns false, each concrete adapter overrides with its driver check.
+   */
   isNoDatabaseError(error: unknown): boolean {
     return _isSqliteMissingDbError(error);
   }
@@ -326,6 +337,13 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    *
    * Mirrors: `database.yml`'s `statement_limit` — read by Rails as
    * `config[:statement_limit]` in `SQLite3Adapter#initialize`.
+   *
+   * @noRailsEquivalent `statement_limit` is a `database.yml` config key Rails reads as
+   *   `config[:statement_limit]` in
+   *   each adapter's `initialize` (abstract_mysql_adapter.rb, postgresql_adapter.rb,
+   *   sqlite3_adapter.rb) — a config option, never a Ruby `def`, so there is nothing for the
+   *   extractor to match. trails exposes the same setting as a validated accessor on the adapter,
+   *   identically on all three.
    */
   get statementLimit(): number {
     return this._statementLimit;

@@ -1345,9 +1345,9 @@ export function hasInternalJsDocTag(node: ts.Node): boolean {
  * compared surface), this tag keeps the method counted and justifies it as
  * deliberate trails-only surface — extra-surface.ts reports it as allowlisted.
  * Continuation lines belong to the tag and are joined into one line; the prose
- * is otherwise preserved verbatim. An empty reason is a hard error: an
- * unjustified tag is exactly what the allowlist's empty-reason rejection
- * refuses (RFC 0080).
+ * is otherwise preserved verbatim. An empty reason is a hard error: the tag is
+ * the only thing standing between a name and the extra-surface count, so an
+ * unjustified one would suppress drift with no argument for it (RFC 0080).
  */
 export function noRailsEquivalentReason(node: ts.Node): string | undefined {
   for (const tag of ts.getJSDocTags(node)) {

@@ -29,6 +29,11 @@
  *      should not count toward extra surface.
  *   4. Extra = TS names \ allowed names. Emit per-file, per-package, and
  *      top-N reports.
+ *   5. Subtract the reasoned exceptions: a declaration carrying a
+ *      `@noRailsEquivalent <reason>` JSDoc tag counts as `Allowed` rather
+ *      than extra. Since RFC 0080 the tag is the ONLY such source — the
+ *      former extra-surface-allow.json sidecar is gone — and a tag on a name
+ *      that no longer flags is STALE and fails the run.
  *
  * Manifests are produced by `pnpm api:compare`; if they're missing the
  * script bails with a hint (same convention as `api:moves`).
@@ -58,9 +63,7 @@
  */
 
 import * as fs from "fs";
-import * as fsp from "fs/promises";
 import * as path from "path";
-import { fileURLToPath } from "url";
 import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
 import { OUTPUT_DIR } from "./config.js";
 import {
@@ -259,34 +262,29 @@ function pushTo<K, V>(map: Map<K, V[]>, key: K, value: V): void {
  */
 export type ExtraKind = "novel" | "moved";
 
-export interface AllowEntry {
+/** One `@noRailsEquivalent`-tagged declaration, keyed by package + TS file + name. */
+export interface TaggedEntry {
   package: string;
   tsFile: string;
   name: string;
   reason: string;
 }
 
-export const ALLOWLIST_PATH = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "extra-surface-allow.json",
-);
-
 export function allowKeyOf(e: { package: string; tsFile: string; name: string }): string {
   return `${e.package} ${e.tsFile} ${e.name}`;
 }
 
 /**
- * Every `@noRailsEquivalent`-tagged declaration in the TS manifest, as
- * allowlist entries (RFC 0080). The tag is the inline successor of
- * extra-surface-allow.json: both sources are honored during the migration
- * window and both feed the same `Allowed` totals. Keyed by the CONTAINER's
- * file, matching how `collectTsFileNames` gathers the names it compares.
+ * Every `@noRailsEquivalent`-tagged declaration in the TS manifest — the sole
+ * source of allowed extra surface since RFC 0080 retired
+ * extra-surface-allow.json. Keyed by the CONTAINER's file, matching how
+ * `collectTsFileNames` gathers the names it compares.
  * Keys are deduped: one declaration reaches many hosts (the mixin object, the
  * install site, the auto-synthesized file module), so the same key arrives
  * repeatedly and would otherwise inflate the tag total.
  */
-export function collectTaggedEntries(ts: ApiManifest): AllowEntry[] {
-  const out: AllowEntry[] = [];
+export function collectTaggedEntries(ts: ApiManifest): TaggedEntry[] {
+  const out: TaggedEntry[] = [];
   const seen = new Set<string>();
   const push = (pkg: string, tsFile: string, m: MethodInfo): void => {
     if (m.noRailsEquivalent === undefined) return;
@@ -309,40 +307,6 @@ export function collectTaggedEntries(ts: ApiManifest): AllowEntry[] {
     }
   }
   return out;
-}
-
-export function findInvalidAllowEntries(entries: AllowEntry[]): string[] {
-  const problems: string[] = [];
-  const seen = new Set<string>();
-  for (const e of entries) {
-    const key = allowKeyOf(e);
-    if (!e.package || !e.tsFile || !e.name) {
-      problems.push(`incomplete key: ${JSON.stringify(e)}`);
-      continue;
-    }
-    if (typeof e.reason !== "string" || e.reason.trim() === "") {
-      problems.push(`empty reason: ${key}`);
-    }
-    if (seen.has(key)) problems.push(`duplicate key: ${key}`);
-    seen.add(key);
-  }
-  return problems;
-}
-
-export async function loadAllowlist(file: string = ALLOWLIST_PATH): Promise<AllowEntry[]> {
-  let raw: string;
-  try {
-    raw = await fsp.readFile(file, "utf-8");
-  } catch {
-    throw new Error(
-      `Missing ${path.basename(file)} — the allowlist file must exist (\`[]\` when empty).`,
-    );
-  }
-  const parsed: unknown = JSON.parse(raw);
-  if (!Array.isArray(parsed)) {
-    throw new Error(`${path.basename(file)} must be a JSON array of allowlist entries.`);
-  }
-  return parsed as AllowEntry[];
 }
 
 export interface ExtraName {
@@ -374,19 +338,20 @@ interface PackageTotals {
 interface AllowlistSummary {
   total: number;
   matched: number;
-  stale: AllowEntry[];
+  stale: TaggedEntry[];
 }
 
 interface Report {
   generatedAt: string;
   packages: PackageTotals[];
   topN: ExtraFile[];
-  allowlist: AllowlistSummary;
   /**
-   * `@noRailsEquivalent` tags found in the TS manifest. Additive to the
-   * existing shape — the `allowlist` summary and every count above keep
-   * their meaning for the stats-DB consumer.
+   * Retained key name for the stats-DB consumer. Since RFC 0080 retired
+   * extra-surface-allow.json it is fed solely by `@noRailsEquivalent` tags,
+   * and is identical to `tagged`.
    */
+  allowlist: AllowlistSummary;
+  /** `@noRailsEquivalent` tags found in the TS manifest. */
   tagged: AllowlistSummary;
 }
 
@@ -407,10 +372,10 @@ Options:
                        0 = unlimited)
   --help               This message
 
-Reasoned allowlist: extra-surface-allow.json lists justified extras keyed by
-package + tsFile + name (each with a non-empty reason). Allowed extras are
-subtracted from the novel/moved counts and reported as an "Allowed" total;
-an entry that no longer flags is STALE and fails the run.
+Reasoned exceptions: an extra is allowed by tagging its TS declaration
+\`@noRailsEquivalent <reason>\` in JSDoc. Allowed extras are subtracted from the
+novel/moved counts and reported as an "Allowed" total; a tag on a name that no
+longer flags is STALE and fails the run.
 
 Requires: pnpm api:compare must have run first to produce
   scripts/api-compare/output/{rails-api.json,ts-api.json}.
@@ -744,8 +709,6 @@ function buildPackageReport(
   crossPackageModules: Record<string, ClassInfo>,
   crossPackagePkgByFqn: Record<string, string>,
   novelOnly: boolean,
-  allowKeys: Set<string>,
-  matchedAllowKeys: Set<string>,
   tagKeys: Set<string>,
   matchedTagKeys: Set<string>,
 ): PackageTotals {
@@ -844,14 +807,8 @@ function buildPackageReport(
     for (const name of tsNames) {
       if (allowed.has(name)) continue;
       const allowKey = allowKeyOf({ package: pkg, tsFile: expectedTs, name });
-      // Both sources are consulted during the migration window: record the
-      // match on each that has it, so a doubly-justified name leaves neither
-      // the JSON entry nor the tag looking stale.
-      const jsonAllowed = allowKeys.has(allowKey);
-      const tagAllowed = tagKeys.has(allowKey);
-      if (jsonAllowed) matchedAllowKeys.add(allowKey);
-      if (tagAllowed) matchedTagKeys.add(allowKey);
-      if (jsonAllowed || tagAllowed) {
+      if (tagKeys.has(allowKey)) {
+        matchedTagKeys.add(allowKey);
         allowlistedCount++;
         continue;
       }
@@ -970,12 +927,8 @@ function printHumanReport(report: Report, topN: number, maxDetail: number): void
     );
   }
   console.log(
-    `\n${p.dim}Allowlist (extra-surface-allow.json): ${report.allowlist.total} entr(ies), ` +
-      `${report.allowlist.matched} matched — allowed extras are subtracted from the counts above.${p.reset}`,
-  );
-  console.log(
-    `${p.dim}@noRailsEquivalent tags: ${report.tagged.total} tag(s), ` +
-      `${report.tagged.matched} matched — counted in Allowed alongside the allowlist.${p.reset}`,
+    `\n${p.dim}@noRailsEquivalent tags: ${report.tagged.total} tag(s), ` +
+      `${report.tagged.matched} matched — allowed extras are subtracted from the counts above.${p.reset}`,
   );
 
   console.log(
@@ -1027,12 +980,8 @@ export function buildReport(
     excludeGlobs: string[];
     novelOnly: boolean;
     topN: number;
-    allow?: AllowEntry[];
   },
 ): Report {
-  const allow = opts.allow ?? [];
-  const allowKeys = new Set(allow.map(allowKeyOf));
-  const matchedAllowKeys = new Set<string>();
   const tagged = collectTaggedEntries(ts);
   const tagKeys = new Set(tagged.map(allowKeyOf));
   const matchedTagKeys = new Set<string>();
@@ -1056,8 +1005,6 @@ export function buildReport(
         crossPackageModules,
         crossPackagePkgByFqn,
         opts.novelOnly,
-        allowKeys,
-        matchedAllowKeys,
         tagKeys,
         matchedTagKeys,
       ),
@@ -1073,33 +1020,22 @@ export function buildReport(
       a.tsFile.localeCompare(b.tsFile),
   );
 
-  const stale = allow.filter(
-    (e) => scannedPkgs.has(e.package) && !matchedAllowKeys.has(allowKeyOf(e)),
-  );
   const staleTagged = tagged.filter(
     (e) => scannedPkgs.has(e.package) && !matchedTagKeys.has(allowKeyOf(e)),
   );
 
+  const taggedSummary: AllowlistSummary = {
+    total: tagged.length,
+    matched: matchedTagKeys.size,
+    stale: staleTagged,
+  };
   return {
     generatedAt: new Date().toISOString(),
     packages,
     topN: allExtras.slice(0, opts.topN),
-    allowlist: { total: allow.length, matched: matchedAllowKeys.size, stale },
-    tagged: { total: tagged.length, matched: matchedTagKeys.size, stale: staleTagged },
+    allowlist: taggedSummary,
+    tagged: taggedSummary,
   };
-}
-
-export async function resolveAllowlist(
-  file: string = ALLOWLIST_PATH,
-): Promise<{ allow: AllowEntry[]; problems: string[] }> {
-  let allow: AllowEntry[];
-  try {
-    allow = await loadAllowlist(file);
-  } catch (e) {
-    return { allow: [], problems: [e instanceof Error ? e.message : String(e)] };
-  }
-  const problems = findInvalidAllowEntries(allow);
-  return problems.length > 0 ? { allow: [], problems } : { allow, problems };
 }
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {
@@ -1116,17 +1052,11 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const ruby: ApiManifest = JSON.parse(fs.readFileSync(rubyPath, "utf-8"));
   const ts: ApiManifest = JSON.parse(fs.readFileSync(tsPath, "utf-8"));
 
-  // An unreadable or malformed allowlist must NOT stop the report: these
-  // outputs feed the stats pipeline. Degrade to no suppressions, print
-  // everything, and only then set the exit code.
-  const { allow, problems } = await resolveAllowlist();
-
   const report = buildReport(ruby, ts, {
     filterPkg: args.filterPkg,
     excludeGlobs: args.excludeGlobs,
     novelOnly: args.novelOnly,
     topN: args.topN,
-    allow,
   });
 
   if (args.json) {
@@ -1135,20 +1065,8 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     printHumanReport(report, args.topN, args.maxDetail);
   }
 
-  if (problems.length > 0) {
-    console.error(
-      `\nextra-surface allowlist: ${problems.length} problem(s) with ` +
-        `${path.basename(ALLOWLIST_PATH)} — the report above was produced with NO ` +
-        "suppressions:\n" +
-        problems.map((m) => `  ${m}`).join("\n") +
-        "\nEvery entry needs a unique package+tsFile+name and a non-empty reason.\n",
-    );
-    process.exit(1);
-  }
-
-  // Stale entries can't be judged when --exclude-glob hides whole TS files.
+  // Stale tags can't be judged when --exclude-glob hides whole TS files.
   if (args.excludeGlobs.length > 0) return;
-  const { stale } = report.allowlist;
   const staleTagged = report.tagged.stale;
   if (staleTagged.length > 0) {
     console.error(
@@ -1162,19 +1080,8 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
         staleTagged.map((e) => `  - ${e.package}  ${e.tsFile}  ${e.name}`).join("\n") +
         "\n",
     );
+    process.exit(1);
   }
-  if (stale.length === 0) {
-    if (staleTagged.length > 0) process.exit(1);
-    return;
-  }
-  console.error(
-    `\nextra-surface allowlist: ${stale.length} STALE entr(ies) that no longer ` +
-      "flag as extra surface. The allowlist only shrinks — remove them from " +
-      `${path.basename(ALLOWLIST_PATH)}:\n` +
-      stale.map((e) => `  - ${e.package}  ${e.tsFile}  ${e.name}`).join("\n") +
-      "\n",
-  );
-  process.exit(1);
 }
 
 const invokedAsScript =
