@@ -5,9 +5,11 @@
  * the content-type / accept-header negotiation helpers that Rails mixes into
  * `ActionDispatch::Request` via `extend ActiveSupport::Concern`.
  *
- * Exposed as `this`-typed functions per the mixin convention in CLAUDE.md so
- * the same code lives in the file matching Rails' layout while being assigned
- * directly onto the host class.
+ * Readers are exposed as `this`-typed functions per the mixin convention in
+ * CLAUDE.md so the same code lives in the file matching Rails' layout while
+ * being assigned directly onto the host class. Writers live on the
+ * {@link MimeNegotiation} class module, which is the only shape that can carry
+ * them under their Rails name (`variant=` → `set variant`).
  */
 
 import { ArrayInquirer } from "@blazetrails/activesupport";
@@ -71,18 +73,78 @@ export interface MimeNegotiationHost {
 }
 
 /**
- * Class-level "ignore Accept header" flag. Mirrors Rails'
- * `mattr_accessor :ignore_accept_header, default: false` declared inside
- * `included do … end` and exposed via `Request.ignore_accept_header`.
+ * Home for the module's *writers*. Ruby names a writer after its reader
+ * (`variant` / `variant=`); TypeScript can only spell that pair as a
+ * `get`/`set` on a prototype, and two exported functions in one module can't
+ * share a name — so a `setVariant`-style export would be surface Rails does
+ * not have. The writers therefore live here as `set` accessors under the
+ * Rails name, and hosts pick them up by deriving their mixin host from
+ * `MimeNegotiation.prototype`.
+ *
+ * The matching readers stay as `this`-typed module functions: `format` takes
+ * Rails' optional `_view_path` argument, which a getter cannot express, and
+ * the rest are called internally as plain functions.
  */
-let _ignoreAcceptHeader = false;
+export class MimeNegotiation {
+  /**
+   * Host surface the writers read; supplied by whoever mixes them in. Sourced
+   * from {@link MimeNegotiationHost} so the two can't drift.
+   */
+  declare setHeader: MimeNegotiationHost["setHeader"];
+  declare parameters: MimeNegotiationHost["parameters"];
+  /** @internal Backing slot for {@link variant} — Rails' `@variant`. */
+  declare _variant?: ArrayInquirer<string> & Record<string, () => boolean>;
 
-export function ignoreAcceptHeader(): boolean {
-  return _ignoreAcceptHeader;
-}
+  /**
+   * Class-level "ignore Accept header" flag. Mirrors Rails'
+   * `mattr_accessor :ignore_accept_header, default: false` declared inside
+   * `included do … end` and exposed via `Request.ignore_accept_header`.
+   * A plain assignable property covers both halves of the accessor.
+   */
+  static ignoreAcceptHeader = false;
 
-export function setIgnoreAcceptHeader(value: boolean): void {
-  _ignoreAcceptHeader = value;
+  /**
+   * Sets the variant for template. Mirrors Rails' `variant=`:
+   *
+   *     def variant=(variant)
+   *       variant = Array(variant)
+   *       if variant.all?(Symbol)
+   *         @variant = ActiveSupport::ArrayInquirer.new(variant)
+   *       else
+   *         raise ArgumentError, "request.variant must be set to a Symbol or an Array of Symbols."
+   *       end
+   *     end
+   *
+   * Ruby Symbols are represented as plain strings in this codebase (the same
+   * convention used elsewhere for symbol-keyed Rails APIs). `ArrayInquirer`'s
+   * predicate access (`variant.phone?`) is keyed by string property names, so
+   * narrowing to strings keeps `variant.phone()` and `variant.any("phone")`
+   * consistent — accepting raw JS `symbol` values here would store an entry
+   * that the proxy cannot match by property name.
+   */
+  set variant(value: string | string[] | null | undefined) {
+    const arr = Array.isArray(value) ? value : value == null ? [] : [value];
+    if (!arr.every((v) => typeof v === "string")) {
+      throw new Error("request.variant must be set to a Symbol or an Array of Symbols.");
+    }
+    this._variant = new ArrayInquirer<string>(...arr) as ArrayInquirer<string> &
+      Record<string, () => boolean>;
+  }
+
+  /** Sets the format by string extension (`request.format = :iphone`). */
+  set format(extension: unknown) {
+    this.parameters["format"] = extension == null ? "" : String(extension);
+    this.setHeader(FORMATS_KEY, [MimeType.lookupByExtension(this.parameters["format"] as string)]);
+  }
+
+  /** Sets the formats by string extensions (multiple, ordered, with fallback). */
+  set formats(extensions: unknown[]) {
+    this.parameters["format"] = extensions[0] == null ? "" : String(extensions[0]);
+    this.setHeader(
+      FORMATS_KEY,
+      extensions.map((ext) => MimeType.lookupByExtension(String(ext))),
+    );
+  }
 }
 
 // We use normal content negotiation unless you include `*/*` in your list, in
@@ -167,41 +229,6 @@ export function formats(this: MimeNegotiationHost): MimeType[] {
   return v;
 }
 
-/**
- * Sets the variant for template. Mirrors Rails' `variant=`:
- *
- *     def variant=(variant)
- *       variant = Array(variant)
- *       if variant.all?(Symbol)
- *         @variant = ActiveSupport::ArrayInquirer.new(variant)
- *       else
- *         raise ArgumentError, "request.variant must be set to a Symbol or an Array of Symbols."
- *       end
- *     end
- *
- * Ruby Symbols are represented as plain strings in this codebase (the same
- * convention used elsewhere for symbol-keyed Rails APIs). `ArrayInquirer`'s
- * predicate access (`variant.phone?`) is keyed by string property names, so
- * narrowing to strings keeps `variant.phone()` and `variant.any("phone")`
- * consistent — accepting raw JS `symbol` values here would store an entry
- * that the proxy cannot match by property name.
- */
-export function setVariant(
-  this: MimeNegotiationHost,
-  variant: string | string[] | null | undefined,
-): void {
-  const arr = Array.isArray(variant) ? variant : variant == null ? [] : [variant];
-  if (!arr.every((v) => typeof v === "string")) {
-    throw new Error("request.variant must be set to a Symbol or an Array of Symbols.");
-  }
-  (
-    this as MimeNegotiationHost & {
-      _variant?: ArrayInquirer<string> & Record<string, () => boolean>;
-    }
-  )._variant = new ArrayInquirer<string>(...arr) as ArrayInquirer<string> &
-    Record<string, () => boolean>;
-}
-
 export function variant(
   this: MimeNegotiationHost,
 ): ArrayInquirer<string> & Record<string, () => boolean> {
@@ -210,21 +237,6 @@ export function variant(
   };
   return (host._variant ??= new ArrayInquirer<string>() as ArrayInquirer<string> &
     Record<string, () => boolean>);
-}
-
-/** Sets the format by string extension (`request.format = :iphone`). */
-export function setFormat(this: MimeNegotiationHost, extension: unknown): void {
-  this.parameters["format"] = extension == null ? "" : String(extension);
-  this.setHeader(FORMATS_KEY, [MimeType.lookupByExtension(this.parameters["format"] as string)]);
-}
-
-/** Sets the formats by string extensions (multiple, ordered, with fallback). */
-export function setFormats(this: MimeNegotiationHost, extensions: unknown[]): void {
-  this.parameters["format"] = extensions[0] == null ? "" : String(extensions[0]);
-  this.setHeader(
-    FORMATS_KEY,
-    extensions.map((ext) => MimeType.lookupByExtension(String(ext))),
-  );
 }
 
 /** Returns the first MIME type that matches the provided array of MIME types. */
@@ -272,7 +284,7 @@ export function validAcceptHeader(this: MimeNegotiationHost): boolean {
 
 /** @internal */
 export function useAcceptHeader(this: MimeNegotiationHost): boolean {
-  return !ignoreAcceptHeader();
+  return !MimeNegotiation.ignoreAcceptHeader;
 }
 
 /** @internal */
