@@ -679,7 +679,7 @@ interface OneToOneAssociation {
   buildDisplacementOwnedByCaller?: boolean;
   initializeAttributes(record: Base): void;
   isLoaded?(): boolean;
-  detachDisplacedRecord?(displaced: Base | null): Promise<void>;
+  detachDisplacedTarget?(displaced: Base | null): Promise<void>;
 }
 
 /**
@@ -689,7 +689,7 @@ interface OneToOneAssociation {
  * Rails runs the removal inline inside `HasOneAssociation#replace`
  * (has_one_association.rb:69) — the nested-attributes writer is a synchronous
  * property setter (`pirate.shipAttributes = {...}`), so it cannot `await` the
- * nullify save. It CAN issue it: `detachDisplacedRecord` is kicked off here,
+ * nullify save. It CAN issue it: `detachDisplacedTarget` is kicked off here,
  * inline at assignment exactly as in Rails, and only its *completion* is
  * deferred — to the nested-attributes `save` wrapper, which drains this list
  * before the parent (and its autosaved new target) is persisted. That keeps
@@ -732,8 +732,8 @@ function detachDisplacedAtAssignment(
   displaced: Base | null,
 ): void {
   if (!displaced) return;
-  if (typeof assoc.detachDisplacedRecord !== "function") return;
-  const settled = assoc.detachDisplacedRecord(displaced).then(
+  if (typeof assoc.detachDisplacedTarget !== "function") return;
+  const settled = assoc.detachDisplacedTarget(displaced).then(
     () => null,
     (error: unknown) => error ?? new Error("displaced record removal failed"),
   );
@@ -902,7 +902,7 @@ export function assignNestedAttributesForOneToOneAssociation(
         // Capture it before the build overwrites `assoc.target`, then start that
         // removal here — see `detachDisplacedAtAssignment`. Rails only removes
         // what `load_target` surfaced, so an unloaded association displaces
-        // nothing; `detachDisplacedRecord` owns the remaining guards.
+        // nothing; `detachDisplacedTarget` owns the remaining guards.
         const displaced = assoc.isLoaded?.() === false ? null : existing;
         // `HasOneAssociation#build` runs the removal itself for direct callers
         // (returning a promise they can await). This writer is synchronous and

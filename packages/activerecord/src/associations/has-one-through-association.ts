@@ -182,17 +182,6 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   }
 
   /**
-   * No-op for the same reason as `detachDisplacedTarget` above: the
-   * nested-attributes displacement path must not nullify/destroy a displaced
-   * *end* record of a through association.
-   *
-   * @internal
-   */
-  override async detachDisplacedRecord(): Promise<void> {
-    // no-op — see JSDoc
-  }
-
-  /**
    * Mirrors Rails `HasOneThroughAssociation#replace` immediate persist to a
    * saved owner. The base `writer` saves the target's foreign key directly,
    * which is wrong for a through (persistence routes through the join model), so
