@@ -103,10 +103,6 @@ export interface RfcEntry {
   owner: string | null;
   packages: string[];
   clusters: string[];
-  // RFC-level ready-queue priority: the default for this RFC's stories that
-  // set no `priority` of their own (see effectivePriority). Optional because
-  // build-index.mjs doesn't emit it — applyRfcPriorities fills it in from the
-  // README on load, so `undefined` is "not read yet", `null` is "none set".
   priority?: number | null;
   file_path: string;
 }
@@ -162,9 +158,6 @@ export function loadIndex(): Index {
 
 const READ_INDEX_CACHE_DIRNAME = "trails-tasks-read-index";
 
-// Bumped whenever the cached shape gains a field the CLI derives itself: the
-// cache is keyed by tree sha alone, so an entry written by an older CLI would
-// otherwise be served forever. `v2` adds rfcs[].priority.
 const READ_INDEX_CACHE_VERSION = "v2";
 
 export interface ReadIndex {
@@ -244,9 +237,6 @@ export function buildIndexFromOriginMain(cwd?: string): { index: Index; sha: str
     execFileSync("tar", ["-xf", tarPath, "-C", treeDir], { stdio: "ignore" });
     linkNodeModules(treeDir, cwd ?? TASKS_DIR);
     execFileSync(process.execPath, ["scripts/build-index.mjs"], { cwd: treeDir, stdio: "ignore" });
-    // build-index.mjs doesn't carry RFC priority into index.json, so read it
-    // from the exported tree's READMEs while they're still on disk — the cached
-    // entry then serves priorities on every later hit for this sha.
     const index = applyRfcPriorities(
       JSON.parse(readFileSync(join(treeDir, "index.json"), "utf8")) as Index,
       treeDir,
@@ -343,21 +333,12 @@ export function isDepResolved(status: string | null | undefined): boolean {
   return status === "done" || status === "closed";
 }
 
-// RFC slug → RFC-level priority, for the RFCs that declare one. Built once per
-// query and threaded into effectivePriority so the scheduler never re-reads
-// files per story.
 export function rfcPriorityMap(index: Index): Map<string, number> {
   const m = new Map<string, number>();
   for (const r of index.rfcs) if (typeof r.priority === "number") m.set(r.id, r.priority);
   return m;
 }
 
-// The ready-queue sort key: a story's own `priority` if it sets one, else its
-// RFC's, else unprioritized (Infinity, sorts last). A story-set priority is
-// ABSOLUTE and global — never clamped into its RFC's band, so an explicit
-// `priority: 1` in an unprioritized RFC still leads every story that merely
-// inherits `priority: 5` from a prioritized one. RFC priority is a default for
-// that RFC's un-prioritized stories, nothing more.
 export function effectivePriority(s: StoryEntry, rfcPriority: ReadonlyMap<string, number>): number {
   return s.priority ?? rfcPriority.get(s.rfc) ?? Infinity;
 }
@@ -387,12 +368,11 @@ export function ready(index: Index, opts: { rfc?: string } = {}): StoryEntry[] {
         if (s.deps_rfc.some((d) => rfcStatus.get(d) !== "closed")) return false;
         return true;
       })
-      // Order the ready queue by EFFECTIVE priority (lower N first): the
-      // story's own `priority` frontmatter, falling back to its RFC's. Both
-      // honor the documented "ready-queue priority" contract. Unprioritized
-      // stories sort last. Array.sort is stable, so ties — including the
-      // all-unprioritized common case — keep index order, leaving callers whose
-      // stories and RFCs set no priority (and their tests) unaffected.
+      // Order the ready queue by effective priority (lower N first), honoring
+      // the `priority` frontmatter's documented contract ("ready-queue
+      // priority"). Unprioritized stories sort last. Array.sort is stable, so
+      // ties — including the all-unprioritized common case — keep index order,
+      // leaving callers that don't set priority (and their tests) unaffected.
       // `next-bundle` re-derives its own ordering on top of this; the gain here
       // is that the `ready` command's output reflects priority too.
       .sort((a, b) => effectivePriority(a, rfcPriority) - effectivePriority(b, rfcPriority))
@@ -435,8 +415,6 @@ export function nextBundle(
   // Priority overrides cluster-LOC packing. The legend says "lower N = higher
   // priority"; honor it literally — any prioritized story outranks every
   // unprioritized one, regardless of cluster or how well it fills the budget.
-  // "Prioritized" here means EFFECTIVE priority, so a story inheriting its
-  // RFC's priority leads the same way an explicitly prioritized one does.
   // The loop takes stories[0], so the head must be the globally-highest
   // priority candidate; we then fill the rest of the budget from that story's
   // cluster (so a prioritized cluster still bundles together). A prioritized
@@ -1750,7 +1728,6 @@ function rfc(
     relate?: string;
     clusters?: string;
     packages?: string;
-    // undefined = untouched, null = clear, number = set.
     priority?: number | null;
   },
 ): void {
@@ -1788,10 +1765,6 @@ function rfc(
     usage();
   }
 
-  // Same no-op guard as setPriority: re-setting the value already in the
-  // frontmatter would leave nothing to commit and make `git commit` error.
-  // loadIndex() populates rfcs[].priority from the README, so the indexed value
-  // is authoritative here.
   let priority = opts.priority;
   if (priority !== undefined) {
     const current = index.rfcs.find((r) => r.id === slug)?.priority ?? null;
@@ -1803,8 +1776,6 @@ function rfc(
       );
       priority = undefined;
       if (!otherEdits) {
-        // Nothing left to write; loadIndex() may have dirtied the generated
-        // index files, so restore them before this early return.
         restoreGeneratedFiles(TASKS_DIR);
         return;
       }
@@ -2210,10 +2181,6 @@ export function readRfcStatus(tasksDir: string, rfcSlug: string): RfcStatus | nu
   }
 }
 
-// Reads the `priority:` scalar out of a README's raw text, with the same
-// yaml.load semantics as readRfcStatus. Returns null when there is no
-// frontmatter, it doesn't parse, or the value isn't a non-negative integer —
-// the shape validate.mjs already enforces for story priority.
 export function parseRfcPriority(text: string): number | null {
   const fmMatch = text.match(/^---\n([\s\S]*?)\n---/);
   if (!fmMatch) return null;
@@ -2226,8 +2193,6 @@ export function parseRfcPriority(text: string): number | null {
   }
 }
 
-// The RFC-level counterpart to readRfcStatus: the RFC's default ready-queue
-// priority, or null when the README is missing or sets none.
 export function readRfcPriority(tasksDir: string, rfcSlug: string): number | null {
   try {
     return parseRfcPriority(readFileSync(join(tasksDir, "rfcs", rfcSlug, "README.md"), "utf8"));
@@ -2236,12 +2201,6 @@ export function readRfcPriority(tasksDir: string, rfcSlug: string): number | nul
   }
 }
 
-// Fills in rfcs[].priority for every RFC that hasn't got one yet, reading each
-// README under `rootDir`. The tasks repo's build-index.mjs knows nothing about
-// RFC priority, so this is where the scheduler's RFC model acquires it. Mutates
-// and returns `index`, so callers get a fully-populated index from
-// loadIndex/buildIndexFromOriginMain and never touch the filesystem again. An
-// unreadable README leaves the RFC unprioritized ("absent = unprioritized").
 export function applyRfcPriorities(index: Index, rootDir: string): Index {
   for (const r of index.rfcs) {
     if (r.priority !== undefined) continue;
@@ -2985,9 +2944,6 @@ export function formatRows(
   if (!rows.length) return "(none)";
   const cols = ["id", "rfc", "status", "priority", "est_loc", "cluster"] as const;
   const cell = (r: StoryEntry, c: (typeof cols)[number]) => {
-    // The priority column shows the EFFECTIVE priority the scheduler sorts by,
-    // marking an inherited one with `*` so it stays distinguishable from a
-    // priority the story sets itself. Column set is unchanged.
     if (c === "priority" && r.priority === null) {
       const inherited = rfcPriority.get(r.rfc);
       return inherited === undefined ? "—" : `${inherited}*`;
@@ -3069,10 +3025,6 @@ export function numberFlag(flags: Record<string, string | boolean>, name: string
   return Number(v);
 }
 
-// Resolves the `rfc <slug> --priority` argument: `--priority <N>` sets N,
-// `--priority --clear` clears, absence leaves the RFC untouched. Returns
-// "invalid" (a usage error for the caller) for a non-integer, a negative, or
-// the ambiguous `--priority <N> --clear`. Pure, so it's unit-testable.
 export function rfcPriorityFlag(
   flags: Record<string, string | boolean>,
 ): number | null | undefined | "invalid" {
@@ -3151,11 +3103,9 @@ function main(): void {
     "packages",
     "stale-hours",
   ];
-  // `--priority --clear` is the documented clear form (`rfc <slug> --priority
-  // --clear`), so a valueless `--priority` is legal exactly when `--clear`
-  // accompanies it; every other bare value-flag is still a usage error.
+  const rfcPriorityClear = cmd === "rfc" && flags.priority === true && flags.clear === true;
   for (const k of valueFlags) {
-    if (flags[k] === true && !(k === "priority" && flags.clear === true)) usage();
+    if (flags[k] === true && !(k === "priority" && rfcPriorityClear)) usage();
   }
 
   switch (cmd) {

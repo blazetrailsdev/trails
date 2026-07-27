@@ -3464,10 +3464,6 @@ describe("buildIndexFromOriginMain (read path serves the origin/main tree)", () 
   });
 
   it("ignores a pre-v2 entry for the same sha (it carries no RFC priorities)", () => {
-    // The cache is keyed by tree sha alone, so an entry an older CLI wrote
-    // would otherwise be served forever — missing rfcs[].priority and silently
-    // reverting the scheduler to story-only ordering. The version suffix is
-    // what forces the rebuild.
     const { gitDir, seen } = setup();
     const cacheDir = join(gitDir, "trails-tasks-read-index");
     mkdirSync(cacheDir, { recursive: true });
@@ -3623,8 +3619,6 @@ describe("syncWorktreeToOrigin (pre-read sync)", () => {
 });
 
 describe("RFC-level priority", () => {
-  // `index()` ships 0001-r (active) and 0002-r (closed); add an active third so
-  // cross-RFC ordering can be exercised.
   function idxWith(stories: StoryEntry[], priorities: Record<string, number> = {}): Index {
     const idx = index(stories);
     idx.rfcs.push({
@@ -3656,7 +3650,6 @@ describe("RFC-level priority", () => {
     });
 
     it("takes a story priority of 0 literally rather than inheriting", () => {
-      // `0 ?? x` is 0 — the guard against a truthiness-based fallback.
       const m = new Map([["0001-r", 5]]);
       expect(effectivePriority(story({ priority: 0 }), m)).toBe(0);
     });
@@ -3679,9 +3672,6 @@ describe("RFC-level priority", () => {
     });
 
     it("treats a story-set priority as absolute, never clamped to its RFC's band", () => {
-      // `low` sets priority 2 under an RFC prioritized 9; `high` merely inherits
-      // 3 from a better-prioritized RFC. Story priority is global, so 2 < 3 wins
-      // even though its RFC sorts after the other one.
       const idx = idxWith(
         [
           story({ id: "high", rfc: "0001-r", priority: null }),
@@ -3714,8 +3704,6 @@ describe("RFC-level priority", () => {
 
   describe("nextBundle", () => {
     it("leads with a story that inherits its RFC's priority, overriding LOC packing", () => {
-      // c2 packs more LOC (240 > 200), but a1's RFC is prioritized and a1 sets
-      // no priority of its own — it must still lead.
       const idx = idxWith(
         [
           story({ id: "a1", rfc: "0001-r", cluster: "c1", est_loc: 100 }),
@@ -3771,7 +3759,6 @@ describe("RFC-level priority", () => {
       expect(readRfcPriority(rfcDir(), "0005-gaps")).toBeNull();
     });
 
-    // Minimal RFC index rows for the applyRfcPriorities cases below.
     function idxOf(...rfcs: Partial<RfcEntry>[]): Index {
       return {
         generated_at: "now",
@@ -3798,20 +3785,44 @@ describe("RFC-level priority", () => {
 
     it("does not re-read an RFC whose priority is already populated", () => {
       const idx = idxOf({ id: "0005-gaps", priority: 2 });
-      // Points at a dir with no READMEs at all: an unconditional read would
-      // clobber the 2 with null.
       applyRfcPriorities(idx, mkdtempSync(join(tmpdir(), "tasks-test-")));
       expect(idx.rfcs[0].priority).toBe(2);
     });
 
-    it("round-trips a set then a clear through the frontmatter helpers", () => {
-      const dir = rfcDir(`---\nstatus: active\n---\nbody\n`);
+    const REAL_README = [
+      "---",
+      'rfc: "0005-gaps"',
+      'title: "Gaps"',
+      "status: active",
+      "created: 2026-07-04",
+      "updated: 2026-07-25",
+      'owner: "@your-handle"',
+      "packages: []",
+      "clusters: []",
+      "---",
+      "",
+      "# RFC 0005 — Gaps",
+      "",
+    ].join("\n");
+
+    it("round-trips a set then a clear on a real-shaped RFC README", () => {
+      const dir = rfcDir(REAL_README);
       const readme = join(dir, "rfcs", "0005-gaps", "README.md");
       editFrontmatter(readme, { priority: "4" });
       expect(readRfcPriority(dir, "0005-gaps")).toBe(4);
       removeFrontmatterKey(readme, "priority");
       expect(readRfcPriority(dir, "0005-gaps")).toBeNull();
-      expect(readFileSync(readme, "utf8")).toContain("status: active");
+      expect(readFileSync(readme, "utf8")).toBe(REAL_README);
+    });
+
+    it("leaves the RFC\'s other frontmatter keys untouched by a priority set", () => {
+      const dir = rfcDir(REAL_README);
+      const readme = join(dir, "rfcs", "0005-gaps", "README.md");
+      editFrontmatter(readme, { priority: "0" });
+      const out = readFileSync(readme, "utf8");
+      for (const line of REAL_README.split("\n")) expect(out).toContain(line);
+      expect(out).toContain("priority: 0");
+      expect(out).toContain("# RFC 0005 — Gaps");
     });
   });
 
