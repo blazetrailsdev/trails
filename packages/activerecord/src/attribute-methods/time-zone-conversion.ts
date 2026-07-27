@@ -41,12 +41,17 @@ export class TimeZoneConverter extends ValueType<unknown> {
     return this._subtype.type();
   }
 
+  private get _subtypeIsUtc(): boolean | undefined {
+    const subtype = this._subtype as { isUtc?: boolean };
+    return typeof subtype.isUtc === "boolean" ? subtype.isUtc : undefined;
+  }
+
   override cast(value: unknown): unknown {
     if (value == null) return null;
     // Hash (multiparameter attributes): cast via subtype, then treat wall-clock
     // components as local time in the current zone (set_time_zone_without_conversion).
     if (isPlainObject(value)) {
-      return setTimeZoneWithoutConversion(this._subtype.cast(value));
+      return setTimeZoneWithoutConversion(this._subtype.cast(value), this._subtypeIsUtc);
     }
     // TimeWithZone: move to current zone.
     if (value instanceof TimeWithZone) {
@@ -58,10 +63,9 @@ export class TimeZoneConverter extends ValueType<unknown> {
     }
     // PlainDateTime: wall-clock components from multiparameter assembly (no timezone).
     // Mirrors Rails' Hash branch: set_time_zone_without_conversion(super).
-    // Convert to instant via configuredTimezone() then re-interpret in current zone.
     if (value instanceof Temporal.PlainDateTime) {
-      const instant = value.toZonedDateTime(configuredTimezone()).toInstant();
-      return setTimeZoneWithoutConversion(instant);
+      const instant = value.toZonedDateTime(configuredTimezone(this._subtypeIsUtc)).toInstant();
+      return setTimeZoneWithoutConversion(instant, this._subtypeIsUtc);
     }
     // Strings: Rails gives String an in_time_zone method via CoreExt, so strings
     // take the respond_to?(:in_time_zone) branch and are parsed as local to
@@ -93,14 +97,16 @@ export class TimeZoneConverter extends ValueType<unknown> {
       // after ArrayType pre-casts them through the DateTime subtype; this.cast(v)
       // reaches convertTimeToTimeZone via the fallback path rather than through
       // ArrayType.cast again (which would be a no-op second pass).
-      return casted.map((v) => (isRangeLike(v) ? mapRange(v, castBoundInZone) : this.cast(v)));
+      return casted.map((v) =>
+        isRangeLike(v) ? mapRange(v, (b) => castBoundInZone(b, this._subtypeIsUtc)) : this.cast(v),
+      );
     }
     if (isRangeLike(casted)) {
       // Range-typed columns (tsrange/tstzrange): cast each bound through the
       // dedicated bound helper so string bounds are parsed in the current zone
       // and Instants are zone-wrapped — without routing through _subtype.cast
       // (which is RangeType and would misparse a timestamp string as a range literal).
-      return mapRange(casted, castBoundInZone);
+      return mapRange(casted, (b) => castBoundInZone(b, this._subtypeIsUtc));
     }
     return convertTimeToTimeZone(casted);
   }
@@ -219,7 +225,7 @@ function convertTimeToTimeZone(value: unknown): unknown {
 }
 
 /** @internal */
-function setTimeZoneWithoutConversion(value: unknown): unknown {
+function setTimeZoneWithoutConversion(value: unknown, subtypeIsUtc?: boolean): unknown {
   if (value == null) return null;
   const zone = getZone();
   if (!zone) return value;
@@ -229,7 +235,7 @@ function setTimeZoneWithoutConversion(value: unknown): unknown {
     // when :local). Extract wall-clock components using the SAME timezone so
     // we get the original component values, then re-interpret them as local
     // time in the current zone (mirrors Time.zone.local_to_utc(t).in_time_zone).
-    const zoned = value.toZonedDateTimeISO(configuredTimezone());
+    const zoned = value.toZonedDateTimeISO(configuredTimezone(subtypeIsUtc));
     const pdt = zoned.toPlainDateTime();
     // zone.local() takes milliseconds; get the ms-level result with correct DST
     // disambiguation, then add back sub-millisecond precision from the original.
@@ -320,14 +326,14 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 }
 
 /** @internal */
-function castBoundInZone(value: unknown): unknown {
+function castBoundInZone(value: unknown, subtypeIsUtc?: boolean): unknown {
   if (value == null) return null;
   if (value instanceof TimeWithZone) return convertTimeToTimeZone(value);
   if (value instanceof Temporal.Instant) return convertTimeToTimeZone(value);
   if (value instanceof Temporal.ZonedDateTime) return convertTimeToTimeZone(value.toInstant());
   if (value instanceof Temporal.PlainDateTime) {
-    const instant = value.toZonedDateTime(configuredTimezone()).toInstant();
-    return setTimeZoneWithoutConversion(instant);
+    const instant = value.toZonedDateTime(configuredTimezone(subtypeIsUtc)).toInstant();
+    return setTimeZoneWithoutConversion(instant, subtypeIsUtc);
   }
   if (typeof value === "string") {
     const zone = getZone();
