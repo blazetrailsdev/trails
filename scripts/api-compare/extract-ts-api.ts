@@ -26,6 +26,7 @@ import {
   PACKAGES,
   PACKAGE_DIR_OVERRIDES,
   packageSrcDir,
+  overlappingSubDirs,
   apiComparePackageRoots,
 } from "./config.js";
 import {
@@ -234,7 +235,7 @@ export async function main() {
 
   for (const pkg of PACKAGES) {
     const pkgDir = packageSrcDir(pkg);
-    const files = getAllTsFiles(pkgDir);
+    const files = getAllTsFiles(pkgDir, overlappingSubDirs(pkg));
     const dirName = PACKAGE_DIR_OVERRIDES[pkg] ?? pkg;
     const pkgRoot = path.join(ROOT_DIR, "packages", dirName);
     const tsConfigPath = path.join(pkgRoot, "tsconfig.json");
@@ -383,7 +384,8 @@ interface PendingReExport {
 }
 
 function extractPackage(pkgName: string, srcDir: string): WorkerOutput {
-  const files = getAllTsFiles(srcDir);
+  const subPackageDirs = overlappingSubDirs(pkgName);
+  const files = getAllTsFiles(srcDir, subPackageDirs);
 
   // Create a TypeScript program
   const dirName = PACKAGE_DIR_OVERRIDES[pkgName] ?? pkgName;
@@ -412,7 +414,7 @@ function extractPackage(pkgName: string, srcDir: string): WorkerOutput {
 
   const program = ts.createProgram(files, compilerOptions);
   return {
-    package: extractFromProgram(program, srcDir),
+    package: extractFromProgram(program, srcDir, subPackageDirs),
     inputs: program.getSourceFiles().map((sourceFile) => sourceFile.fileName),
   };
 }
@@ -422,7 +424,15 @@ function extractPackage(pkgName: string, srcDir: string): WorkerOutput {
  * from `extractPackage` so tests can drive it with synthetic in-memory
  * programs without needing a real package directory + tsconfig.
  */
-export function extractFromProgram(program: ts.Program, srcDir: string): PackageInfo {
+export function extractFromProgram(
+  program: ts.Program,
+  srcDir: string,
+  excludeDirs: readonly string[] = [],
+): PackageInfo {
+  // The program pulls in every file its entry points import, so a sub-package's
+  // files reach it through the container's own imports even though the entry
+  // list already skipped them — filter here too or the de-overlap is a no-op.
+  const excludePrefixes = excludeDirs.map((dir) => dir.replace(/\\/g, "/") + "/");
   const info: PackageInfo = { classes: {}, modules: {}, fileFunctions: {}, fileConstants: {} };
   const pendingReExports: PendingReExport[] = [];
   const checker = program.getTypeChecker();
@@ -431,6 +441,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
     const filePath = sourceFile.fileName;
     // Only process our source files (not node_modules or test files)
     if (!filePath.startsWith(srcDir)) continue;
+    if (excludePrefixes.some((prefix) => filePath.startsWith(prefix))) continue;
     if (filePath.endsWith(".test.ts")) continue;
     if (filePath.endsWith(".d.ts")) continue;
 
@@ -2348,14 +2359,15 @@ function isExported(node: ts.Node): boolean {
   return hasModifier(node, ts.SyntaxKind.ExportKeyword);
 }
 
-function getAllTsFiles(dir: string): string[] {
+export function getAllTsFiles(dir: string, excludeDirs: readonly string[] = []): string[] {
   const results: string[] = [];
   if (!fs.existsSync(dir)) return results;
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      results.push(...getAllTsFiles(fullPath));
+      if (excludeDirs.includes(fullPath)) continue;
+      results.push(...getAllTsFiles(fullPath, excludeDirs));
     } else if (
       entry.name.endsWith(".ts") &&
       !entry.name.endsWith(".test.ts") &&
