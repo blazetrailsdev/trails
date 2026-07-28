@@ -273,11 +273,11 @@ function writeMigrationMessage(verbose: boolean, text = ""): void {
   }
 }
 
-/** @internal The body of `Migration#announce` (`migration.rb:1005`). */
-function announceMigrationMessage(verbose: boolean, header: string, message: string): void {
+/** @internal The banner `Migration#announce` (`migration.rb:1005`) hands to `write`. */
+function announceMigrationText(header: string, message: string): string {
   const text = `${header}: ${message}`;
   const pad = Math.max(0, 75 - text.length);
-  writeMigrationMessage(verbose, `== ${text} ${"=".repeat(pad)}`);
+  return `== ${text} ${"=".repeat(pad)}`;
 }
 
 /**
@@ -1279,7 +1279,7 @@ export abstract class Migration {
   }
 
   announce(message: string): void {
-    announceMigrationMessage(this.verbose, `${this.version} ${this.name}`, message);
+    this.write(announceMigrationText(`${this.version} ${this.name}`, message));
   }
 
   say(message: string, subitem = false): void {
@@ -2839,7 +2839,10 @@ export class Migrator {
 
   /** @internal Rails: `MigrationProxy` delegates `announce`/`write` to the migration. */
   private _announce(proxy: MigrationProxy, message: string): void {
-    announceMigrationMessage(this.verbose, `${proxy.version} ${proxy.name}`, message);
+    writeMigrationMessage(
+      this.verbose,
+      announceMigrationText(`${proxy.version} ${proxy.name}`, message),
+    );
   }
 
   /**
