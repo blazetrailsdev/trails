@@ -2539,13 +2539,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     } else {
       await this.beginTransaction();
     }
-    const execTranslated = async (sql: string): Promise<void> => {
-      try {
-        await this.driver.exec(sql);
-      } catch (e) {
-        throw this._translateException(e, sql, []);
-      }
-    };
     try {
       await this.disableReferentialIntegrity(async () => {
         // Rails' alter_table is two move_table calls, each copy_table + drop_table
@@ -2558,10 +2551,10 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         // by the caller above (fks/checks/`modify`) instead of re-derived from the
         // buffer — that is where alter_table's whole point lives, and the buffer's
         // reflection would have lost the pending changes.
-        await execTranslated(createTableSql);
+        await this.execCopyTable(createTableSql);
         await this.copyTableIndexes(alteredTableName, tableName);
         await this.copyTableContents(alteredTableName, tableName, originalColNames);
-        await execTranslated(`DROP TABLE ${quoteTableName(alteredTableName)}`);
+        await this.execCopyTable(`DROP TABLE ${quoteTableName(alteredTableName)}`);
       });
 
       if (alreadyInTransaction) {
