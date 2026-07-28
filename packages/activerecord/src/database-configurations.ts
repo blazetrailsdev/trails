@@ -36,6 +36,18 @@ type DbConfigHandler = (
   config: DatabaseConfigOptions,
 ) => DatabaseConfig | null | undefined;
 
+/**
+ * The stand-in for Ruby's `config.is_a?(Symbol)`: TS collapses Ruby's Symbol
+ * and String onto `string`, so a scheme-less string is the connection name
+ * Ruby spells as a Symbol and anything with a scheme is a URL config.
+ *
+ * @internal
+ */
+export function symbolConnectionName(config: unknown): string | undefined {
+  if (typeof config !== "string") return undefined;
+  return /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(config) ? undefined : config;
+}
+
 export class DatabaseConfigurations {
   private static _defaultEnv: string | null = null;
 
@@ -254,8 +266,7 @@ export class DatabaseConfigurations {
       // Mirrors Rails: resolve(symbol) → resolve_symbol_connection → find_db_config
       // Strings with a URI scheme (e.g. "postgres://", "sqlite3:") are treated as URLs.
       // Strings without a scheme are treated as env names (mirrors Ruby symbol lookup).
-      const hasScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(config);
-      if (!hasScheme) {
+      if (symbolConnectionName(config) != null) {
         return this.resolveSymbolConnection(config);
       }
       return new UrlConfig(DatabaseConfigurations.defaultEnv, "primary", config);

@@ -11,7 +11,7 @@ import {
   _setAdapterClassResolver,
 } from "../../database-configurations/database-config.js";
 import { HashConfig } from "../../database-configurations/hash-config.js";
-import { DatabaseConfigurations } from "../../database-configurations.js";
+import { DatabaseConfigurations, symbolConnectionName } from "../../database-configurations.js";
 import { configurations as baseConfigurations } from "../../core.js";
 import { PoolConfig } from "../pool-config.js";
 import { PoolManager } from "../pool-manager.js";
@@ -38,15 +38,6 @@ _setAdapterClassResolver(
 
 export { ConnectionDescriptor };
 export type { ConnectionOwner };
-
-// The stand-in for Ruby's `config.is_a?(Symbol)`: a scheme-less string is a
-// connection name, anything with a scheme is a URL config.
-function symbolConnectionName(
-  config: DatabaseConfig | string | Record<string, unknown> | undefined,
-): string | undefined {
-  if (typeof config !== "string") return undefined;
-  return /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(config) ? undefined : config;
-}
 
 export class ConnectionHandler {
   private _connectionNameToPoolManager: Map<string, PoolManager>;
@@ -82,10 +73,6 @@ export class ConnectionHandler {
     if (typeof owner === "string") {
       return new ConnectionDescriptor(owner);
     }
-    // Rails' third branch is `elsif config.is_a?(Symbol)` — the bare-name
-    // shorthand `establish_connection :primary`. TS collapses Ruby's Symbol and
-    // String onto `string`, so we key on the same scheme test
-    // DatabaseConfigurations#resolve uses to tell a connection name from a URL.
     const symbolName = symbolConnectionName(config);
     if (symbolName != null) {
       return new ConnectionDescriptor(symbolName);
@@ -366,9 +353,7 @@ export class ConnectionHandler {
       config instanceof DatabaseConfig
         ? config
         : typeof config === "string"
-          ? // Mirrors resolve_pool_config's `Base.configurations.resolve(config)`:
-            // a bare name goes through find_db_config.
-            baseConfigurations().resolve(config)
+          ? baseConfigurations().resolve(config)
           : new HashConfig(DatabaseConfigurations.defaultEnv, connectionName, config as any);
     if (!dbConfig.adapter) {
       throw new AdapterNotSpecified("database configuration does not specify adapter");
