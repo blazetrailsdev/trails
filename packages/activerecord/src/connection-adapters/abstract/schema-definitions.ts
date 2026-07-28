@@ -510,7 +510,7 @@ export interface AddIndexOptions {
 }
 
 export interface AddReferenceOptions extends Omit<ColumnOptions, "index"> {
-  polymorphic?: boolean;
+  polymorphic?: boolean | Record<string, unknown>;
   foreignKey?: boolean | ReferenceForeignKeyOptions;
   type?: ColumnType;
   index?: boolean | AddIndexOptions;
