@@ -114,6 +114,32 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
 
   // --- alterTable ---
 
+  it("alterTable re-points a foreign key across a column rename", async () => {
+    await (db as any).alterTable("fk_test_has_fk", undefined, undefined, undefined, {
+      rename: { fk_id: "renamed_fk_id" },
+    });
+    const fks = await db.foreignKeys("fk_test_has_fk");
+    expect(fks).toHaveLength(1);
+    expect(fks[0].column).toBe("renamed_fk_id");
+    expect(fks[0].toTable).toBe("fk_test_has_pk");
+  });
+
+  it("removeColumn keeps a multi-column index on the surviving columns", async () => {
+    await db.addIndex("customers", ["name", "gps_location"], { unique: true });
+    await db.removeColumn("customers", "gps_location");
+    const indexes = (await db.indexes("customers")) as Array<{ name: string; columns: string[] }>;
+    expect(indexes.map((i) => i.name)).toEqual(["index_customers_on_name_and_gps_location"]);
+    expect(indexes[0].columns).toEqual(["name"]);
+  });
+
+  it("renameColumn renames the index whose name embeds the column", async () => {
+    await db.addIndex("customers", ["name"]);
+    await db.renameColumn("customers", "name", "nickname");
+    const names = ((await db.indexes("customers")) as Array<{ name: string }>).map((i) => i.name);
+    expect(names).toContain("index_customers_on_nickname");
+    expect(names).not.toContain("index_customers_on_name");
+  });
+
   it("alterTable keeps the primary key of a lowercase integer-like declared type", async () => {
     // PRAGMA table_info normalizes a declared `integer` to `INTEGER` but leaves
     // `bigint` verbatim, so hand-written DDL is the one way the rebuild sees an

@@ -7,6 +7,7 @@
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-fixtures.js";
 import { ambientConnection, withRocketTables } from "../support/rocket-tables.js";
+import { Base } from "../base.js";
 
 describe("removeForeignKey option narrowing", () => {
   fixtures([], { useTransactionalTests: false });
@@ -46,5 +47,29 @@ describe("removeForeignKey option narrowing", () => {
       expect(remaining.map((fk) => fk.column)).toEqual(["favorite_rocket_id"]);
       expect(remaining[0].onDelete).toBe("nullify");
     });
+  });
+});
+
+describe("renameColumn under a table_name_prefix", () => {
+  fixtures([], { useTransactionalTests: false });
+
+  it("keeps the foreign key pointing at the prefixed table", async () => {
+    const conn = await ambientConnection();
+    Base.tableNamePrefix = "p_";
+    await conn.createTable("p_rockets", { force: true }, () => {});
+    await conn.createTable("p_astronauts", { force: true }, (t) => {
+      t.references("rocket", { foreignKey: true });
+    });
+    try {
+      await conn.renameColumn("p_astronauts", "rocket_id", "new_rocket_id");
+
+      const foreignKeys = await conn.foreignKeys("p_astronauts");
+      expect(foreignKeys.length).toBe(1);
+      expect(foreignKeys[0].toTable).toBe("p_rockets");
+      expect(foreignKeys[0].column).toBe("new_rocket_id");
+    } finally {
+      await conn.dropTable("p_astronauts", "p_rockets", { ifExists: true });
+      Base.tableNamePrefix = "";
+    }
   });
 });
