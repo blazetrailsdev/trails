@@ -1,4 +1,4 @@
-import { camelize, NameError } from "@blazetrails/activesupport";
+import { camelize, demodulize, NameError } from "@blazetrails/activesupport";
 
 /**
  * `AbstractController::Helpers` — class-level registry that exposes
@@ -326,8 +326,11 @@ export function modulesForHelpers(
       const name = `${/^[A-Z]/.test(raw) ? raw : camelizeHelperPrefix(raw)}Helper`;
       const mod = options.resolve(name);
       // Rails' resolution raises NameError carrying the missing constant, which
-      // default_helper_module!'s `missing_name?` rescue reads.
-      if (!mod) throw new NameError(`uninitialized constant ${name}`, name);
+      // default_helper_module!'s `missing_name?` rescue reads. Ruby's `name` is
+      // the failing *segment*, not the path; the resolver is a flat host lookup
+      // with no intermediate modules, so the leaf is the only segment that can
+      // be said to be missing.
+      if (!mod) throw new NameError(`uninitialized constant ${name}`, demodulize(name));
       return mod;
     }
     throw new TypeError("helper must be a String, Symbol, or Module");

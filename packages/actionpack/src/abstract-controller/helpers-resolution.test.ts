@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { NameError } from "@blazetrails/activesupport";
 
 import {
   allHelpersFromPath,
@@ -177,8 +178,11 @@ describe("defaultHelperModuleBang", () => {
     const cls: HelpersClassMethods = { name: "FooController" };
     const surprising = (name: string): HelperMethodsModule | undefined => {
       if (name === "FooHelper") {
-        // simulate: FooHelper file exists but references some other missing const
-        throw new Error("uninitialized constant SomeOtherThing");
+        // simulate: FooHelper file exists but references some other missing
+        // const. Rails' scenario (helpers.rb:241) is a real NameError whose
+        // missing_name differs, so the rescue must reject on the NAME, not on
+        // the error type — throw a NameError to exercise that branch.
+        throw new NameError("uninitialized constant SomeOtherThing", "SomeOtherThing");
       }
       return undefined;
     };
