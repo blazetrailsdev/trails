@@ -259,9 +259,6 @@ describeIfSupports("foreign_keys", "ActiveRecord::Migration::ForeignKeyTest", ()
     });
   });
 
-  // Rails: `skip if current_adapter?(:SQLite3Adapter)` — spelled as a direct
-  // adapter exclusion (not `!unlessSqlite3Adapter`) so the test-compare gate
-  // extractor reads the adapter set instead of an opaque guard.
   it.skipIf(adapterType === "sqlite")("remove foreign key by name", async () => {
     const conn = await ambientConnection();
     await withRocketTables(conn, async () => {
@@ -312,11 +309,10 @@ describeIfSupports("foreign_keys", "ActiveRecord::Migration::ForeignKeyTest", ()
   // so the reflected fk stores `on_delete` as nil — the same fact Rails asserts in
   // test_add_on_delete_restrict_foreign_key. `defined_for?` then compares
   // `Array(nil)` against `["restrict"]` and never matches, so the removal raises.
-  // Rails leaves the case ungated because its own suite does not run it here.
-  // Held in a named boolean rather than an inline `adapterType === "mysql"`:
-  // this is a deviation from Rails' (absent) gate, not a ported one, so it is
-  // recorded as an incomparable guard instead of masquerading as an adapter
-  // restriction the Rails side never had.
+  // Rails leaves the case ungated because its own suite does not run it here,
+  // so the skip is ours, not a ported gate — held in a named boolean so
+  // test-compare records it as an incomparable guard rather than as an adapter
+  // restriction Rails never had.
   it.skipIf(mysqlRestrictActionReflectsNil)("remove foreign key with restrict action", async () => {
     const conn = await ambientConnection();
     await withRocketTables(conn, async () => {
