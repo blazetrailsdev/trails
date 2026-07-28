@@ -58,6 +58,7 @@ interface PgSchemaAdapter {
   supportsIdentityColumns(): boolean;
   supportsVirtualColumns(): boolean;
   extractSchemaQualifiedName(string: string): [string | null, string];
+  maxIdentifierLength(): number;
   getDatabaseVersion(): Promise<number>;
   supportsIndexInclude(): boolean;
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
@@ -1909,7 +1910,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
 
   /** @internal */
   sequenceNameFromParts(tableName: string, columnName: string, suffix: string): string {
-    const maxLen = 63;
+    const maxLen = this.pg.maxIdentifierLength();
     const [, unqualifiedTable] = this.pg.extractSchemaQualifiedName(tableName);
     let overLength = unqualifiedTable.length + columnName.length + suffix.length + 2 - maxLen;
     let col = columnName;
