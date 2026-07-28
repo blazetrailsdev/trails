@@ -24,6 +24,7 @@ import {
   TableBuilder,
 } from "./canonical-schema.js";
 import { COLUMN_TYPE_MAP_SQLITE } from "./schema-types.js";
+
 /** Minimal slice of the schema-statement surface {@link fkSafeDropPlan} needs. */
 export interface FkSafeDropPlanHost {
   tables(): Promise<string[]>;

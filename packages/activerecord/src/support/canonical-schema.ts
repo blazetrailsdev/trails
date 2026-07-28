@@ -68,9 +68,10 @@ interface IndexOpts {
  * declared offset, composite-PK NOT NULL, and the MySQL `DATETIME(6)` upgrade —
  * so the resulting DDL is identical. Indexes are collected and applied after the
  * table is created (with the same expression-index / MySQL-length gating).
+ *
+ * @internal Also consumed by `canonical-table-rebuild.ts`, which replays a
+ * table's block against a probe TableDefinition to read its declared FK edges.
  */
-/** @internal Consumed by `canonical-table-rebuild.ts` to replay a table's block
- *  against a probe TableDefinition. */
 export class TableBuilder {
   readonly indexes: { columns: string | string[]; opts: IndexOpts }[] = [];
 
@@ -223,7 +224,8 @@ export async function emitTableIndexes(
 
 /** One canonical table's definition: its name, table-level metadata, and the
  *  column/index builder block. Pure data (no adapter, no DDL), so a named subset
- *  can be dropped and recreated on demand (see `rebuildCanonicalTables` in `canonical-table-rebuild.ts`). */
+ *  can be dropped and recreated on demand (see `rebuildCanonicalTables` in
+ *  `canonical-table-rebuild.ts`). */
 export interface CanonicalTableDef {
   name: string;
   meta: TableMeta;
@@ -233,8 +235,11 @@ export interface CanonicalTableDef {
 /** Memoized ordered registry, built once per module instance. */
 let _registry: CanonicalTableDef[] | null = null;
 
-/** Resolve the adapter's schema-statement helper and per-adapter column type map. */
-/** @internal */
+/**
+ * Resolve the adapter's schema-statement helper and per-adapter column type map.
+ *
+ * @internal Shared with `canonical-table-rebuild.ts`.
+ */
 export async function prepareSchema(
   adapter: DatabaseAdapter,
 ): Promise<{ ss: SchemaStatements; typeMap: Record<string, string | undefined> }> {
@@ -253,9 +258,12 @@ export async function prepareSchema(
   return { ss, typeMap };
 }
 
-/** Create one canonical table (and its indexes) from its definition, emitting
- *  the same DDL `defineSchema` did. */
-/** @internal */
+/**
+ * Create one canonical table (and its indexes) from its definition, emitting the
+ * same DDL `defineSchema` did.
+ *
+ * @internal Shared with `canonical-table-rebuild.ts`.
+ */
 export async function runTable(
   adapter: DatabaseAdapter,
   ss: SchemaStatements,
@@ -290,6 +298,9 @@ export async function runTable(
  * each table, so the same data drives both the full boot-time lay
  * ({@link loadCanonicalSchema}) and a named-subset rebuild
  * (`rebuildCanonicalTables`, `canonical-table-rebuild.ts`).
+ *
+ * @internal The registry is the one declaration site for every canonical table;
+ * `canonical-table-rebuild.ts` reads it rather than restating any of them.
  */
 export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   if (_registry) return _registry;
