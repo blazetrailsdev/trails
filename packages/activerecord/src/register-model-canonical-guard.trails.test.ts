@@ -45,6 +45,20 @@ describe("registerModel canonical-name shadow guard", () => {
     expect(safeConstantize("Author")).toBe(Author);
   });
 
+  it("throws when a bespoke class reaches the registry through a bare set", () => {
+    class RfBareSetXyz extends Base {}
+    expect(() => modelRegistry.set("Author", RfBareSetXyz)).toThrow(/shadow the canonical model/);
+    expect(modelRegistry.get("Author")).toBe(Author);
+  });
+
+  it("registers an STI subclass as a constant without widening the registry", () => {
+    class RfStiHostXyz extends Base {}
+    const sub = subclassNamed(RfStiHostXyz, "RfStiSubXyz");
+    registerSubclass(sub);
+    expect(safeConstantize("RfStiSubXyz")).toBe(sub);
+    expect(modelRegistry.has("RfStiSubXyz")).toBe(false);
+  });
+
   it("unregisters the constant when the registry entry is dropped", () => {
     class RfDroppedXyz extends Base {}
     registerModel(RfDroppedXyz);
@@ -59,7 +73,7 @@ describe("registerModel canonical-name shadow guard", () => {
       modelRegistry.clear();
       for (const [name] of saved) expect(safeConstantize(name)).toBeUndefined();
     } finally {
-      for (const [name, model] of saved) modelRegistry.set(name, model);
+      for (const [name, model] of saved) registerModel(name, model);
     }
   });
 });

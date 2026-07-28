@@ -1352,10 +1352,14 @@ export class Base extends Model {
     if (this._adapter === adapter) {
       return;
     }
-    this._adapter = adapter;
+    // Registers (and shadow-guards) the name before any mutation: the guard
+    // throws, and a half-applied swap would leave `_adapter` pointing at the new
+    // adapter with the schema reset below never run.
     if (this !== Base && this.name) {
       registerModelConstant(this.name, this);
+      Base._modelsByName.set(this.name, this);
     }
+    this._adapter = adapter;
 
     // Full schema reset on adapter swap: drops schema-sourced defs and
     // their prototype accessors (preserves user-declared defs), and
