@@ -1309,21 +1309,10 @@ jobs:
         env:
           MYSQL_TEST_URL: mysql://rails@localhost:3306/activerecord_unittest
 
-  # Prepared-statement lane. Rails runs a `mysql2_prepared` CI leg so the
-  # `prepared_statements: true` branch of the mysql2 adapter is exercised by a
-  # real suite run, not just unit tests; ours are `mysql2-adapter.ts` (the
-  # execute/exec_query split) and `abstract-adapter.ts` (the statement cache).
-  # `MYSQL_PREPARED_STATEMENTS` flips the arunit/arunit2 entries
-  # (support/config.ts `mysqlPreparedStatements`), matching
-  # vendor/rails/activerecord/test/config.example.yml:7-11,27-31.
-  #
-  # ADVISORY, not required-to-merge: it is deliberately absent from the `ci`
-  # aggregator's `needs` list, so a red leg reports on the PR without blocking.
-  # Runner budget is the reason — the required MariaDB lane already burns two
-  # runners per PR, and mirroring its 2-way shard here would double that. This
-  # lane therefore runs unsharded (hence the wider timeout) on one runner, and
-  # skips the CLI E2E step, which does not touch the prepared path. Promote it
-  # to required once the prepared path is green and the budget allows.
+  # ADVISORY: deliberately absent from the `ci` aggregator's `needs` list, so a
+  # red leg reports without blocking merge. Runner budget is why it is also
+  # unsharded (hence the wider timeout) — the required maria-tests lane already
+  # burns two runners per PR.
   maria-prepared-tests:
     name: Active Record MariaDB Tests (prepared statements)
     needs: changes
@@ -1365,8 +1354,6 @@ jobs:
           ARCONN: mysql2
           MYSQL_HOST: localhost
           MYSQL_PORT: "3306"
-          # Presence is what counts, not the value (config.example.yml uses
-          # `<%= ENV["MYSQL_PREPARED_STATEMENTS"] ? true : false %>`).
           MYSQL_PREPARED_STATEMENTS: "1"
 
   website:
