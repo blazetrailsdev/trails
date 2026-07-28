@@ -4553,13 +4553,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
-   * @noRailsEquivalent Rails gains these bodies with `include SchemaStatements` on the adapter, so
-   *   there is no
-   *   accessor to mirror. The schema-statement surface is far too large for the repo's `this`-typed
-   *   module-mixin pattern to stay readable, so trails keeps it in a companion class;
-   *   `schemaStatements(host?)` is the accessor that returns it bound to a host adapter. It is the TS
-   *   stand-in for the `include`, not new capability — mysql2-adapter.ts overrides it to return the
-   *   MySQL companion the same way Rails includes `MySQL::SchemaStatements`.
+   * @noRailsEquivalent PERMANENT. Rails gains these bodies with `include SchemaStatements` on the
+   *   adapter, so there is no accessor to mirror. Permanent because TypeScript has no `include`:
+   *   the repo's substitute is a `this`-typed function assigned per method, and
+   *   abstract/schema_statements.rb defines 76 of them — that many hand-assigned statics is not a
+   *   readable class, and no future port removes the limitation. trails therefore keeps the module
+   *   as a companion class and `schemaStatements(host?)` returns it bound to a host adapter. It is
+   *   the TS stand-in for the `include`, not new capability — mysql2-adapter.ts overrides it to
+   *   return the MySQL companion the same way Rails includes `MySQL::SchemaStatements`.
    */
   override schemaStatements(host?: DatabaseAdapter): SchemaStatements {
     return new PostgreSQLSchemaStatements((host ?? this) as unknown as DatabaseAdapter);
