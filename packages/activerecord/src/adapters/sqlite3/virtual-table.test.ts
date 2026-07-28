@@ -24,11 +24,7 @@ describeIfSqlite("SQLite3VirtualTableTest", () => {
   });
 
   afterEach(async () => {
-    await adapter.dropTable("searchables", { ifExists: true }).catch(() => undefined);
-    // Deviation: Rails' teardown drops only :searchables, leaking the :emails
-    // table "schema load" creates. Harmless there, not here — the ambient
-    // database is reused by every later suite on this worker.
-    await adapter.dropTable("emails", { ifExists: true }).catch(() => undefined);
+    await adapter.dropTable("searchables", "emails", { ifExists: true });
   });
 
   it("schema dump", async () => {
