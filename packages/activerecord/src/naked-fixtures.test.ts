@@ -2,7 +2,7 @@
 // vendor/rails/activerecord/test/cases/fixtures_test.rb (FixturesTest)
 import { describe, it, expect } from "vitest";
 import { defineJoinTableFixtures } from "./fixtures.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { setupHandlerSuite } from "./support/setup-handler-suite.js";
 import { Tree } from "./test-helpers/models/tree.js";
 import { Base } from "./base.js";

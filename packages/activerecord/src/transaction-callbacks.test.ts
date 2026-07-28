@@ -24,7 +24,7 @@ import {
 import { skipCallbackOnProto } from "@blazetrails/activemodel";
 import { Owner } from "./test-helpers/models/owner.js";
 import { Pet } from "./test-helpers/models/pet.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 function defineBehaviourTopic() {
   return class extends Base {

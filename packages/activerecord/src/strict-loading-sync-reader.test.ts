@@ -2,7 +2,7 @@
 
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel, StrictLoadingViolationError } from "./index.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { seedAssociationCache } from "./support/seed-association-cache.js";

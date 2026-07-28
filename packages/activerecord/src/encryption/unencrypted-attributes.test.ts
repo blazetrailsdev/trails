@@ -7,7 +7,7 @@ import {
   assertNotEncryptedAttribute,
   withoutEncryption,
 } from "./test-helpers.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import type { EncryptedPost as EncryptedPostType } from "../test-helpers/models/post-encrypted.js";
 import { Configurable } from "./configurable.js";
 import { Decryption as DecryptionError } from "./errors.js";

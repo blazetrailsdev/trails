@@ -19,7 +19,7 @@ import {
   TooManyRecords,
 } from "./index.js";
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { Human } from "./test-helpers/models/human.js";
 import { Interest } from "./test-helpers/models/interest.js";

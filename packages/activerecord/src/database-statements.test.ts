@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 // Mirrors Rails' DatabaseStatementsTest, whose `setup` is
 // `@connection = ActiveRecord::Base.lease_connection` — the ambient

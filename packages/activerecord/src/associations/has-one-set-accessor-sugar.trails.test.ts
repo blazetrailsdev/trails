@@ -18,7 +18,7 @@ import {
   RecordNotFound,
   type Base,
 } from "../index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import {
   Company,
   Firm,

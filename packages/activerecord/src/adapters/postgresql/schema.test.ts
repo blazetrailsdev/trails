@@ -7,7 +7,7 @@ import { itIfSupports } from "../../support/supports.js";
 import { StatementInvalid } from "../../errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { makeThingModels, makeThing5Model, makeSongAlbumModels } from "./schema-ar-models.js";
-import { fixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-fixtures.js";
 import { dumpAllTableSchema } from "../../support/schema-dumping-helper.js";
 import type { SchemaSource } from "../../schema-dumper.js";
 import { Base } from "../../index.js";

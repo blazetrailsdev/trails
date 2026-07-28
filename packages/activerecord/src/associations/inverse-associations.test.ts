@@ -12,7 +12,7 @@ import {
   InverseOfAssociationRecursiveError,
 } from "../index.js";
 import { findTarget as findHasManyTarget } from "./has-many-association.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Branch, BrokenBranch } from "../test-helpers/models/branch.js";
 import { Human } from "../test-helpers/models/human.js";
 import { Face } from "../test-helpers/models/face.js";

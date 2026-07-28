@@ -12,7 +12,7 @@ import { Base, ReadonlyAttributeError, registerModel } from "./index.js";
 import { formatForInspect } from "./attribute-inspection.js";
 import { registerSubclass } from "./inheritance.js";
 
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
 
 registerModel(Minivan);

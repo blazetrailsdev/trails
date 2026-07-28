@@ -4,7 +4,7 @@
 // Rails test names and assertions as closely as TypeScript allows.
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { registerModel } from "./index.js"; // also eager-loads CollectionProxy for association()
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { itIfSupports } from "./support/supports.js";
 import { Base } from "./base.js";
 import { Task } from "./test-helpers/models/task.js";

@@ -5,7 +5,7 @@ import {
   restoreEncryptionConfig,
   makeKeyProvider,
 } from "./test-helpers.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Configurable } from "./configurable.js";
 import { installExtendedQueriesIfConfigured } from "./install.js";
 import { ExtendedDeterministicUniquenessValidator } from "./extended-deterministic-uniqueness-validator.js";

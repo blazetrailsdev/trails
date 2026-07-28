@@ -19,7 +19,7 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { Base, registerModel, Range } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Book } from "./test-helpers/models/book.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 describe("EnumTest", () => {
   const { books } = fixtures(["books"]);

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base, Range, RecordNotFound, registerModel } from "../index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import {
   Developer,
   DeveloperFilteredOnJoins,

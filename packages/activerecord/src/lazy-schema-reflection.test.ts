@@ -7,7 +7,7 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 describe("lazy async schema reflection", () => {
   fixtures([]);

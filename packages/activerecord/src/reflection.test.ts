@@ -43,7 +43,7 @@ import { ShardedComment } from "./test-helpers/models/sharded.js";
 
 import { UnknownPrimaryKey, NameError } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 fixtures(["topics"]);
 

@@ -16,7 +16,7 @@ import { ForbiddenAttributesError } from "@blazetrails/activemodel";
 // Side-effect: registers the Relation constructor on Base.
 import "./index.js";
 import { Person } from "./test-helpers/models/person.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { ProtectedParams } from "./support/stubs/strong-parameters.js";
 
 describe("ForbiddenAttributesProtectionUpdateTest", () => {

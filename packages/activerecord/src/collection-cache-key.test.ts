@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { Base, StatementInvalid, Relation } from "./index.js";
 import { hexdigest } from "@blazetrails/activesupport";
 import { assertQueriesCount, assertNoQueries } from "./testing/query-assertions.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { registerModel } from "./associations.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { Comment } from "./test-helpers/models/comment.js";

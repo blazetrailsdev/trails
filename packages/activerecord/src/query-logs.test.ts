@@ -7,7 +7,7 @@ import { LegacyFormatter, SQLCommenter } from "./query-logs-formatter.js";
 import { queryLogs } from "./query-logs-instance.js";
 import { queryTransformers, type QueryTransformer } from "./query-transformers.js";
 import { assertQueriesMatch } from "./testing/query-assertions.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { Dashboard } from "./test-helpers/models/dashboard.js";
 import { adapterType } from "./test-adapter.js";
 

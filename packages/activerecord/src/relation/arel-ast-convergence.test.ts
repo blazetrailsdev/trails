@@ -27,7 +27,7 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
 import { adapterType } from "../test-adapter.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Post as CanonicalPost } from "../test-helpers/models/post.js";
 
 // Establish the primary (boot-laid canonical-schema) pool so the bespoke

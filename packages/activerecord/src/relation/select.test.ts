@@ -8,7 +8,7 @@ import "../index.js";
 import { StatementInvalid } from "../index.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Post, PostWithDefaultSelect } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { registerModel } from "../associations.js";

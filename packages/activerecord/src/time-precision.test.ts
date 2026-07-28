@@ -6,7 +6,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./schema-dumper.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { itIfSupports } from "./support/supports.js";
 
 function nsecTime(v: Temporal.PlainTime): number {

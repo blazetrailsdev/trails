@@ -13,7 +13,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, pgServerVersion } from "./test-helper.js";
 import { captureSql } from "../../testing/sql-capture.js";
-import { fixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-fixtures.js";
 
 // Rails PostgreSQLAdapter#supports_nulls_not_distinct? — PG 15+ (150000).
 const supportsNullsNotDistinct = pgServerVersion >= 150000;

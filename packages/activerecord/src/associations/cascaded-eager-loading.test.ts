@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { registerModel, registerSubclass, resetCallbacks } from "../index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Base } from "../base.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Person } from "../test-helpers/models/person.js";

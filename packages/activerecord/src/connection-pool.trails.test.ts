@@ -25,7 +25,7 @@ import { SchemaReflection, BoundSchemaReflection } from "./connection-adapters/s
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { newRawTestAdapter, ambientPoolConfiguration, adapterType } from "./test-adapter.js";
 import type { LeasedTestAdapter } from "./test-adapter.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { adapterNameFromConfig } from "./connection-adapters/abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";

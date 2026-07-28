@@ -15,7 +15,7 @@
  * with no Ruby counterpart.
  */
 import { describe, it, expect } from "vitest";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 // Opt into the canonical-model autoload index so the belongsTo("author") target
 // (`Author`) resolves by name during JoinDependency construction — no manual
 // `registerModel`.

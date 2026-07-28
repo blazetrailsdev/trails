@@ -7,7 +7,7 @@ import { describe, it, expect } from "vitest";
 import "../index.js";
 import { Range } from "../index.js";
 import { registerModel } from "../associations.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Author } from "../test-helpers/models/author.js";

@@ -13,7 +13,7 @@ import { Account } from "./test-helpers/models/account.js";
 import { Toy } from "./test-helpers/models/toy.js";
 import { Company } from "./test-helpers/models/company.js";
 import { Matey } from "./test-helpers/models/matey.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 const SIGNED_ID_VERIFIER_TEST_SECRET = () =>
   "This is normally set by the railtie initializer when used with Rails!";

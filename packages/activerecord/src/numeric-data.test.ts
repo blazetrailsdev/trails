@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { adapterType } from "./test-adapter.js";
 
 fixtures([]);

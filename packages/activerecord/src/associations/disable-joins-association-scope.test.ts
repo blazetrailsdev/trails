@@ -5,7 +5,7 @@ import { Associations } from "../associations.js";
 import { findTarget } from "./has-many-association.js";
 import { DisableJoinsAssociationScope } from "./disable-joins-association-scope.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 function migrationCtx() {
   return new MigrationContext(Base.connection);

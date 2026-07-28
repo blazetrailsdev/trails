@@ -13,7 +13,7 @@ import {
 } from "./test-helper.js";
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
 import { DateTime as OidDateTime } from "../../connection-adapters/postgresql/oid/date-time.js";
-import { fixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-fixtures.js";
 import { Topic } from "../../test-helpers/models/topic.js";
 import { withTimezoneConfig } from "../../test-helper.js";
 import { Base } from "../../index.js";

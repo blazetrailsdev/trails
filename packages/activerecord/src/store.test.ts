@@ -3,7 +3,7 @@ import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { Base, storedAttributes, ConfigurationError } from "./index.js";
 import { storeAccessor } from "./store.js";
 import { AdminUser } from "./test-helpers/models/admin/user.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 // Rails: fixtures :'admin/users'
 const { "admin/users": adminUsers } = fixtures(["admin/accounts", "admin/users"]);

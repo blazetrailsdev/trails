@@ -12,7 +12,7 @@ import {
 import { Notifications } from "@blazetrails/activesupport";
 import { HasManyThroughAssociation } from "./has-many-through-association.js";
 import { assertNotCalledOnInstanceOf } from "../testing/method-call-assertions.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import {
   Post,

@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Human } from "../test-helpers/models/human.js";
 import { Face } from "../test-helpers/models/face.js";
 import { seedAssociationCache } from "../support/seed-association-cache.js";

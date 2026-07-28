@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from "vitest";
 import "../index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 
 fixtures([]);

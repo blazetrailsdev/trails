@@ -6,7 +6,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Base, composedOf, reflectOnAggregation } from "./index.js";
 import { reload as persistenceReload } from "./persistence.js";
 
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import {
   Customer as CustomerModel,
   Money as MoneyClass,

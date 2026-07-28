@@ -12,7 +12,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, registerModel, AssociationNotFoundError } from "../index.js";
 import { MigrationContext } from "../migration.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 describe("Base#loadBelongsTo / Base#loadHasOne", () => {
   // Ride `Base.connection` (single-pool test model) rather than a sidecar

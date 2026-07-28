@@ -16,7 +16,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import "../index.js";
 import { registerModel, RecordNotFound } from "../index.js";
 import { captureSql } from "../testing/sql-capture.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import {
   Developer,
   DeveloperOrderedBySalary,

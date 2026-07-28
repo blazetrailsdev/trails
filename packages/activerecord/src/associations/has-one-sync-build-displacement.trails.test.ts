@@ -22,7 +22,7 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel, RecordNotSaved, type Base } from "../index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Pirate } from "../test-helpers/models/pirate.js";
 import { Ship } from "../test-helpers/models/ship.js";
 

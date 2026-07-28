@@ -6,7 +6,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { TimeWithZone } from "@blazetrails/activesupport";
 import { Base, composedOf, MultiparameterAssignmentErrors } from "./index.js";
 import { withTimezoneConfig } from "./test-helper.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
 const utc = (v: Temporal.Instant) => v.toZonedDateTimeISO("UTC");

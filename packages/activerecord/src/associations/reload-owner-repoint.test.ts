@@ -8,7 +8,7 @@
 
 import { describe, it, expect, beforeAll } from "vitest";
 import { association, registerModel } from "../index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 

@@ -4,7 +4,7 @@ import { Topic } from "./test-helpers/models/topic.js";
 import { Rollback } from "./errors.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationSubscriber } from "@blazetrails/activesupport";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { topicFixtureData } from "./test-helpers/fixtures/topics.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 

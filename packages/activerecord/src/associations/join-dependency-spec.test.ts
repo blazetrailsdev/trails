@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { clearReflectionsCache } from "../reflection.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 
 describe("JoinDependency#addAssociationSpec", () => {

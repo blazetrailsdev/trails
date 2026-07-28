@@ -6,7 +6,7 @@ import { FixtureSet } from "./fixtures.js";
 import { Base } from "./base.js";
 import "./relation.js"; // registers the Relation ctor so Model.findBy/.all/.count work
 import { fixtureId, defineFixtures, defineJoinTableFixtures, isFixtureRef } from "./fixtures.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { setupHandlerSuite } from "./support/setup-handler-suite.js";
 import { withTransactionalFixtures } from "./test-fixtures/with-transactional-fixtures.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";

@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, registerModel, AssociationTypeMismatch, ReadOnlyRecord } from "../index.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Project, SpecialProject } from "../test-helpers/models/project.js";
 import {
   Developer,

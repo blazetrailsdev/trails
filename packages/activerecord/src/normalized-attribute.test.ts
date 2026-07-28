@@ -11,7 +11,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { presence, titleize } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 // Rails `Time#noon` — the same instant moved to 12:00:00 (midday) UTC.
 function noon(time: Temporal.Instant): Temporal.Instant {

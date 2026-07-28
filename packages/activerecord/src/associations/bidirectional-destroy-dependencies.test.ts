@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { registerModel } from "../index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import {
   Content,
   ContentPosition,

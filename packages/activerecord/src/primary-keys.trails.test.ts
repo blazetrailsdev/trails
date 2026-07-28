@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { CpkBook } from "./test-helpers/models/cpk.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 // Rails' `CompositePrimaryKey#id=` guards on `value.is_a?(Enumerable)` and then
 // `@primary_key.zip(value)`. A JS Set is the codebase's Enumerable analogue

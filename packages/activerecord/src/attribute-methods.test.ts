@@ -10,7 +10,7 @@ import { Base } from "./index.js";
 
 import { GeneratedAttributeMethods } from "./attribute-methods.js";
 import { inTimeZone } from "./cases/helper.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { adapterType } from "./test-adapter.js";
 import { registerModel } from "./associations.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";

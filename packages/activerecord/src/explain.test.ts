@@ -12,7 +12,7 @@ import { Base, ExplainRegistry, registerModel } from "./index.js";
 import { buildExplainClause } from "./explain.js";
 import { itIfSupports } from "./support/supports.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { Car } from "./test-helpers/models/car.js";
 import { Bulb } from "./test-helpers/models/bulb.js";
 

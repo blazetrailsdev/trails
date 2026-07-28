@@ -9,7 +9,7 @@ import { ValueType, MissingAttributeError } from "@blazetrails/activemodel";
 import { Base, serialize, SerializationTypeMismatch } from "./index.js";
 import { HashObject } from "./serialize.js";
 
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { SerializedPerson } from "./test-helpers/models/person.js";
 import { TrafficLight } from "./test-helpers/models/traffic-light.js";

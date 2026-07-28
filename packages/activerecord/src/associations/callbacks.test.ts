@@ -6,7 +6,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Base, association, registerModel, registerSubclass } from "../index.js";
 import { throwAbort } from "@blazetrails/activesupport";
 
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Project } from "../test-helpers/models/project.js";
 import { Developer, AuditLog } from "../test-helpers/models/developer.js";
 import { Author } from "../test-helpers/models/author.js";

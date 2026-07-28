@@ -9,7 +9,7 @@
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base, registerModel, registerSubclass, RecordInvalid } from "../index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { assertQueriesMatch, assertQueriesCount } from "../testing/query-assertions.js";
 import {
   HasOneThroughCantAssociateThroughCollection,

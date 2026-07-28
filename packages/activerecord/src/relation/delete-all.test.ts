@@ -4,7 +4,7 @@
  * Mirrors: activerecord/test/cases/relation/delete_all_test.rb
  */
 import { describe, it, expect } from "vitest";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Post } from "../test-helpers/models/post.js";

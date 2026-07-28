@@ -7,7 +7,7 @@ import { Base } from "./index.js";
 import { formatForInspect } from "./attribute-inspection.js";
 
 import { pp } from "./pretty-print.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { Topic, TitlePrimaryKeyTopic } from "./test-helpers/models/topic.js";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 

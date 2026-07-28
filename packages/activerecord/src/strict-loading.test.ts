@@ -14,7 +14,7 @@ import {
   setActionOnStrictLoadingViolation,
 } from "./index.js";
 import { association } from "./associations.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { Developer, AuditLog, AuditLogRequired } from "./test-helpers/models/developer.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { ShipPart } from "./test-helpers/models/ship-part.js";

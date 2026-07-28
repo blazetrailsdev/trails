@@ -20,7 +20,7 @@ import {
   Rollback,
 } from "./index.js";
 import { Result } from "./result.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { adapterType } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import { itIfSupports } from "./support/supports.js";

@@ -5,7 +5,7 @@ import { describe, it, beforeAll, afterAll, expect } from "vitest";
 import { describeIfMysql, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../base.js";
 import { Topic } from "../../test-helpers/models/topic.js";
-import { fixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-fixtures.js";
 
 describeIfMysql("Mysql2Adapter", () => {
   describe("StoredProcedureTest", () => {

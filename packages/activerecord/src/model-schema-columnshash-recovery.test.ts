@@ -13,7 +13,7 @@
  */
 import { describe, it, expect } from "vitest";
 import "./index.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { Developer, SpecialDeveloper } from "./test-helpers/models/developer.js";
 
 describe("columnsHash warm-cache same-table read", () => {

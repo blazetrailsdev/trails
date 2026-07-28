@@ -8,7 +8,7 @@ import { SchemaDumper } from "../../schema-dumper.js";
 import { SchemaStatements } from "../../connection-adapters/abstract/schema-statements.js";
 import { RecordNotFound } from "../../errors.js";
 import { itIfSupports } from "../../support/supports.js";
-import { fixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-fixtures.js";
 import { Base, registerModel } from "../../index.js";
 
 beforeAll(() => {

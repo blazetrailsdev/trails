@@ -19,7 +19,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../index.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 interface AssociationLike {
   isNullScope(): boolean;

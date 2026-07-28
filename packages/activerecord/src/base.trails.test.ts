@@ -12,7 +12,7 @@ import { quoteSqlValue } from "./base.js";
 import { registerSubclass } from "./inheritance.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Type } from "@blazetrails/activemodel";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { reconcileVirtualAttributes, loadSchema } from "./model-schema.js";
 

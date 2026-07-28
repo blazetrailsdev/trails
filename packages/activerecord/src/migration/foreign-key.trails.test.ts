@@ -5,7 +5,7 @@
  * lives outside the ported foreign-key.test.ts.
  */
 import { describe, it, expect } from "vitest";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { ambientConnection, withRocketTables } from "../support/rocket-tables.js";
 
 describe("removeForeignKey option narrowing", () => {

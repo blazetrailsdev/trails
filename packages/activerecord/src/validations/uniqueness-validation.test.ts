@@ -17,7 +17,7 @@ import { registerSubclass } from "../inheritance.js";
 import { adapterType } from "../test-adapter.js";
 import { itIfSupports } from "../support/supports.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Reply, UniqueReply, SillyUniqueReply } from "../test-helpers/models/reply.js";
 import { WarehouseThing } from "../test-helpers/models/warehouse-thing.js";

@@ -14,7 +14,7 @@ import { Company as CanonicalCompany, Firm, Client } from "./test-helpers/models
 import { Pirate as CanonicalPirate } from "./test-helpers/models/pirate.js";
 import { Bird as CanonicalBird } from "./test-helpers/models/bird.js";
 import { Eye, Iris, IrisWithReadOnlyForeignKey } from "./test-helpers/models/eye.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 function cacheAssoc(record: Base, name: string, value: unknown) {
   record.association(name).setTarget(value as any);

@@ -23,7 +23,7 @@ import { ShipPart } from "./test-helpers/models/ship-part.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { Treasure } from "./test-helpers/models/treasure.js";
 import { registerModel } from "./associations.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { ProtectedParams } from "./support/stubs/strong-parameters.js";
 
 // ShipPart's nested associations resolve `Ship` / `Treasure` from the model

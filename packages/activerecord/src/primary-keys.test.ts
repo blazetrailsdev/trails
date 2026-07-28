@@ -6,7 +6,7 @@ import { Base, registerModel } from "./index.js";
 import { SchemaDumper } from "./schema-dumper.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { adapterType } from "./test-adapter.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { rebuildCanonicalTables } from "./support/canonical-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Reply, SillyReply } from "./test-helpers/models/reply.js";

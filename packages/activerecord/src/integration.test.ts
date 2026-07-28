@@ -7,7 +7,7 @@ import { Owner } from "./test-helpers/models/owner.js";
 import { Pet } from "./test-helpers/models/pet.js";
 import { CpkBook, CpkOrder } from "./test-helpers/models/cpk.js";
 import { registerModel } from "./associations.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { withTimezoneConfig } from "./test-helper.js";
 
 // Pet `belongs_to :owner, touch: true` resolves Owner through the association

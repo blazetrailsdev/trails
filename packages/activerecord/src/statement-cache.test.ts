@@ -8,7 +8,7 @@ import { Electron } from "./test-helpers/models/electron.js";
 import { NumericData } from "./test-helpers/models/numeric-data.js";
 import { ClothingItem } from "./test-helpers/models/clothing-item.js";
 import { RecordNotFound } from "./errors.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 // Opt into the canonical-model autoload index so association targets
 // (`Molecule`/`Electron` via `Liquid`) resolve by name — no manual
 // `registerModel`.

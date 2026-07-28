@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { User } from "./test-helpers/models/user.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 // Mirrors Rails' `retry_flaky_test` (secure_password_test.rb): retry the timing
 // assertion a few times before failing, so a single unlucky preemption spike

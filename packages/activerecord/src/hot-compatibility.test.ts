@@ -6,7 +6,7 @@ import { adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import { PreparedStatementCacheExpired } from "./errors.js";
 import type { StatementPool } from "./connection-adapters/postgresql-adapter.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 // Rails' `get_prepared_statement_cache(connection)` reaches into
 // `@statements.@cache[Process.pid]`. The trails PG adapter owns a single

@@ -42,7 +42,7 @@ import { findTarget as findHasManyThroughTarget } from "./has-many-through-assoc
 import { DeleteRestrictionError } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import "../support/canonical-model-index.js";
 // Imported under HM-prefixed local aliases so the top-level bindings don't
 // collide with the bespoke `class Author` / `class Post` declarations in the

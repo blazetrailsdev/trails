@@ -18,7 +18,7 @@ import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions
 import { captureSql } from "../testing/sql-capture.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { throwAbort } from "@blazetrails/activesupport";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
 import { Essay } from "../test-helpers/models/essay.js";
 import { Account } from "../test-helpers/models/account.js";

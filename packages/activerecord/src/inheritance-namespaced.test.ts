@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { stiName, polymorphicName, qualifiedName, namespaceSegments } from "./inheritance.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import {
   ClothingItem,
   ClothingItemUsed,

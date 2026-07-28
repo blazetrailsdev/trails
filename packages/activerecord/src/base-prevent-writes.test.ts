@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { Base } from "./index.js";
 import { ReadOnlyError } from "./errors.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { isSqliteRun } from "./support/sqlite-template.js";
 import { rebuildCanonicalTables } from "./support/canonical-schema.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";

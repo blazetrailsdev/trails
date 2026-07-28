@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "./index.js";
 import { I18n } from "@blazetrails/activemodel";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 fixtures([]);
 beforeEach(() => {

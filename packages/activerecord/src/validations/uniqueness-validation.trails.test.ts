@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { StrictValidationFailed } from "@blazetrails/activemodel";
 import { registerModel } from "../associations.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { newRawTestAdapter } from "../test-adapter.js";
 import type { TestDatabaseAdapter } from "../test-adapter.js";

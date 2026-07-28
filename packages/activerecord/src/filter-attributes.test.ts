@@ -3,7 +3,7 @@ import { Base } from "./index.js";
 import { AdminUser } from "./test-helpers/models/admin/user.js";
 import { AdminAccount } from "./test-helpers/models/admin/account.js";
 import { User } from "./test-helpers/models/user.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 // Rails: `fixtures :"admin/users", :"admin/accounts"` + `Admin::User`, `Admin::Account`,
 // `User`. With the YAML store coder implemented, `Admin::User` (which declares

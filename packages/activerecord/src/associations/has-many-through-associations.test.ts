@@ -4,7 +4,7 @@
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Base, registerModel, RecordInvalid } from "../index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { association } from "../associations.js";
 import { quoteTableName } from "../support/quote-regex.js";
 

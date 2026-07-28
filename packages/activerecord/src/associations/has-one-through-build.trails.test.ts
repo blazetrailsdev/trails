@@ -14,7 +14,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Notifications, NotificationEvent } from "@blazetrails/activesupport";
 import { SQLCounter, type SqlPayload } from "../testing/query-assertions.js";
 import { Member } from "../test-helpers/models/member.js";

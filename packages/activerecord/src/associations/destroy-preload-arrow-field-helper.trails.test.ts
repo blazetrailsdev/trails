@@ -22,7 +22,7 @@ import {
   RestrictedWithErrorFirm,
   Client,
 } from "../test-helpers/models/company.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 // Rides the canonical `accounts` table (no bespoke schema). The arrow-field
 // helper `recordFirm` reads `this.firm` synchronously and captures whether the

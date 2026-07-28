@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "./index.js";
 import { MigrationContext } from "./migration.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 const BIG = 2n ** 62n; // 4611686018427387904 — above Number.MAX_SAFE_INTEGER
 fixtures([]);

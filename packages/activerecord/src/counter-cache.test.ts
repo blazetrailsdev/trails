@@ -26,7 +26,7 @@ import { Book } from "./test-helpers/models/book.js";
 import { Category } from "./test-helpers/models/category.js";
 import { Categorization } from "./test-helpers/models/categorization.js";
 import { CpkOrder, CpkBook } from "./test-helpers/models/cpk.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { assertQueriesCount } from "./testing/query-assertions.js";
 
 // Register the canonical models used directly and via through/dependent

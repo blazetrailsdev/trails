@@ -11,7 +11,7 @@ import { describe, it, expect } from "vitest";
 import { findTarget } from "./associations/singular-association.js";
 import { StrictLoadingViolationError, registerModel } from "./index.js";
 import { findTarget as findHasManyTarget } from "./associations/has-many-association.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { Developer, AuditLog } from "./test-helpers/models/developer.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { Project } from "./test-helpers/models/project.js";

@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Base } from "./index.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
