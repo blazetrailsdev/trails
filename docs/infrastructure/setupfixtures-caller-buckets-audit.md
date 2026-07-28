@@ -20,7 +20,7 @@ set is exactly the intersection).
 
 ## Wiring identity
 
-`fixtures({...})` (`test-helpers/fixtures.ts:64`) composes exactly:
+`fixtures({...})` (`test-fixtures.ts:604`) composes exactly:
 
 ```text
 setupHandlerSuite()                              # via setupFixtures()
