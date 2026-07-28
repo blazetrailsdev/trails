@@ -4,6 +4,7 @@ import {
   pluralize,
   camelize,
   demodulize,
+  privateConstant,
 } from "@blazetrails/activesupport";
 import * as Reflection from "../../reflection.js";
 import { habtmTargetFk, joinHabtmTableNames } from "../../associations.js";
@@ -203,6 +204,12 @@ export class HasAndBelongsToMany {
     // registry⇒constant invariant is what makes teardown symmetric, and the key
     // is synthetic — nothing but the habtm reflection names it.
     deps.modelRegistry.set(registryKey, JoinModel);
+    // Rails `const_set`s the join model and immediately marks it
+    // `private_constant` (associations.rb:1877-1878), so
+    // `Object.const_get("Country::HABTM_Treaties")` raises NameError. The join
+    // model stays reachable through the registry/reflection path, which is how
+    // both Rails and trails resolve it.
+    privateConstant(registryKey);
 
     const middleName = [pluralize(model.name.toLowerCase()), name].sort().join("_");
     const middleOptions: Record<string, unknown> = {

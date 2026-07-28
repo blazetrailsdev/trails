@@ -166,6 +166,7 @@ export function deconstantize(path: string): string {
 }
 
 const _constants = new Map<string, unknown>();
+const _privateConstants = new Set<string>();
 
 /**
  * @noRailsEquivalent The registration half of Ruby's constant table. `class Foo`
@@ -192,9 +193,22 @@ export function unregisterConstant(name: string, expected: unknown): void {
   _constants.delete(name);
 }
 
+/**
+ * @noRailsEquivalent The visibility half of Ruby's constant table, mirroring
+ * `Module#private_constant` (a language feature Rails calls, not one it
+ * defines). Ruby's constant table carries per-constant visibility;
+ * trails' invented table (see {@link registerConstant}) is flat, so the private
+ * set lives alongside it. The mark is independent of registration order, so a
+ * caller can declare a name private before whatever writes it does so.
+ */
+export function privateConstant(name: string): void {
+  _privateConstants.add(name);
+}
+
 /** @internal — test use only: clear the registered constant table. */
 export function _resetConstants(): void {
   _constants.clear();
+  _privateConstants.clear();
 }
 
 function isValidConstantPath(path: string): boolean {
@@ -207,6 +221,9 @@ export function constantize(camelCasedWord: string): unknown {
   const path = camelCasedWord.startsWith("::") ? camelCasedWord.slice(2) : camelCasedWord;
   if (!isValidConstantPath(path)) {
     throw new ReferenceError(`wrong constant name ${camelCasedWord}`);
+  }
+  if (_privateConstants.has(path)) {
+    throw new ReferenceError(`private constant ${path}`);
   }
   if (!_constants.has(path)) {
     throw new ReferenceError(`uninitialized constant ${path}`);
