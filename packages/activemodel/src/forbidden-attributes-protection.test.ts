@@ -8,9 +8,6 @@ class Account extends Model {
   }
 }
 
-// Mirrors Rails' ProtectedParams stub (forbidden_attributes_protection_test.rb):
-// a params-like wrapper exposing `permitted?` and `to_h`. Trails dispatches on
-// the camelCase `permitted` / `toH` members.
 class ProtectedParams {
   private parameters: Record<string, unknown>;
   private _permitted = false;
@@ -23,7 +20,7 @@ class ProtectedParams {
     return this._permitted;
   }
 
-  permit(): this {
+  permitBang(): this {
     this._permitted = true;
     return this;
   }
@@ -42,7 +39,7 @@ describe("ActiveModelMassUpdateProtectionTest", () => {
   });
 
   it("permitted attributes can be used for mass updating", () => {
-    const params = new ProtectedParams({ a: "b" }).permit();
+    const params = new ProtectedParams({ a: "b" }).permitBang();
     expect(
       new Account().sanitizeForbiddenAttributes(params as unknown as Record<string, unknown>),
     ).toEqual({ a: "b" });
