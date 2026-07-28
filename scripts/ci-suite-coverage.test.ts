@@ -174,6 +174,37 @@ describe("CI runs every tooling test suite", () => {
     expect(unmatched).toEqual([]);
   });
 
+  // guides-typecheck runs a full `pnpm build` plus `pnpm guides:typecheck`,
+  // so it is one of the most expensive gated jobs. The guides only ever
+  // compile against the PUBLIC type surface of the packages they import, so
+  // the changes job strips test-only paths (GUIDES_EXCL_RE) out of the
+  // changed-file list before matching GUIDES_PKGS_RE. Trace both directions:
+  // a source change must still run it, a test-only change must not.
+  it("fires guides_affected only for paths that can reach the public type surface", async () => {
+    const yml = await readFile(CI_YML, "utf8");
+    const gate = gateRegex(yml, "GUIDES_PKGS_RE");
+    const excl = gateRegex(yml, "GUIDES_EXCL_RE");
+    const fires = (file: string): boolean => !excl.test(file) && gate.test(file);
+
+    const runs = [
+      "packages/activerecord/src/relation.ts",
+      "packages/activemodel/src/validations.ts",
+      "packages/website/docs/guides/active-record-basics.md",
+      "scripts/guides-typecheck/check.ts",
+    ];
+    const skips = [
+      "packages/activerecord/src/relation.test.ts",
+      "packages/activerecord/src/test-helpers/models/topic.ts",
+      "packages/activerecord/src/test-helpers/fixtures/topics.yml",
+      "packages/arel/src/__snapshots__/visitors.test.ts.snap",
+    ];
+    expect(runs.filter((f) => !fires(f))).toEqual([]);
+    expect(skips.filter(fires)).toEqual([]);
+    // The exclusion, not the package regex, is what drops them: every skipped
+    // path still lives under a guides-dep package.
+    expect(skips.filter((f) => !gate.test(f))).toEqual([]);
+  });
+
   it("keeps KNOWN_UNRUN free of entries CI already runs", async () => {
     const yml = await readFile(CI_YML, "utf8");
     const filters = ciVitestFilters(yml);

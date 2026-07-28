@@ -217,7 +217,10 @@ jobs:
           # scripts/guides-typecheck/ is the job's own implementation and is
           # carved out of the infra sweep (INFRA_CARVEOUT_RE), so it must be
           # named here or a checker-only change would stop running the checker.
+          # GUIDES_EXCL_RE drops test-only paths before the match: guides
+          # compile against exported types, which no suite or fixture reaches.
           GUIDES_PKGS_RE='^(packages/(activerecord|activemodel|activesupport|arel|globalid|did-you-mean|trails-tsc)/|packages/website/docs/guides/|scripts/guides-typecheck/)'
+          GUIDES_EXCL_RE='(/src/test-helpers/|/test-fixtures?/|/__fixtures__/|/__snapshots__/|\.test\.ts$)'
           # website_affected gates the Website build (SvelteKit + typedoc +
           # VitePress). Scoped narrowly to packages/website/ — package-source
           # changes alone don't trigger it. To run the site build on a PR
@@ -234,8 +237,8 @@ jobs:
           # change can't move any comparison output, so it skips.
           # packages/website/ is EXCLUDED: it's the SvelteKit docs site, never
           # one of apiComparePackages() (vendor/sources.ts), so the comparison
-          # never scans it — it is filtered out of comparison_files below
-          # before the COMPARISON_RE `^packages/` clause is applied.
+          # never scans it — set_gate's exclusion argument drops it before
+          # the COMPARISON_RE `^packages/` clause is applied.
           # NOTE: scripts/api-compare/conventions.ts regenerates
           # docs/ruby-ts-conventions.md (checked by api:conventions --check in
           # the job); the scripts/api-compare/ clause keeps that drift check
@@ -363,9 +366,12 @@ jobs:
                   # each carved subtree still flips its own consuming job's gate
                   # via that gate's regex.
                   infra_files=$(echo "$files" | grep -vE "$INFRA_CARVEOUT_RE" || true)
+                  # $3 is an optional exclusion applied to $files before the
+                  # gate regex: paths that cannot reach what the job checks.
                   set_gate() {
-                    local name="$1" re="$2"
-                    if echo "$infra_files" | grep -qE "$INFRA_RE" || echo "$files" | grep -qE "$re"; then
+                    local name="$1" re="$2" gate_files="$files"
+                    if [ -n "$3" ]; then gate_files=$(echo "$files" | grep -vE "$3" || true); fi
+                    if echo "$infra_files" | grep -qE "$INFRA_RE" || echo "$gate_files" | grep -qE "$re"; then
                       echo "${name}=true"  >> "$GITHUB_OUTPUT"
                     else
                       echo "${name}=false" >> "$GITHUB_OUTPUT"
@@ -379,18 +385,9 @@ jobs:
                   set_gate trails_tsc_affected   "$TRAILS_TSC_PKGS_RE"
                   set_gate tse_compiler_affected "$TSE_COMPILER_PKGS_RE"
                   set_gate unit_tests_affected   "$UNIT_TESTS_PKGS_RE"
-                  set_gate guides_affected       "$GUIDES_PKGS_RE"
+                  set_gate guides_affected       "$GUIDES_PKGS_RE" "$GUIDES_EXCL_RE"
                   set_gate website_affected      "$WEBSITE_PKGS_RE"
-                  # comparison_affected can't reuse set_gate: it must first
-                  # drop packages/website/ (which the comparison never scans)
-                  # so a website-only PR skips the job. INFRA_RE still applies
-                  # via infra_files (website doesn't match INFRA_RE anyway).
-                  comparison_files=$(echo "$files" | grep -vE '^packages/website/' || true)
-                  if echo "$infra_files" | grep -qE "$INFRA_RE" || echo "$comparison_files" | grep -qE "$COMPARISON_RE"; then
-                    echo "comparison_affected=true"  >> "$GITHUB_OUTPUT"
-                  else
-                    echo "comparison_affected=false" >> "$GITHUB_OUTPUT"
-                  fi
+                  set_gate comparison_affected   "$COMPARISON_RE" '^packages/website/'
                 fi
                 ;;
             esac
