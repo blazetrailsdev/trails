@@ -165,6 +165,80 @@ export function deconstantize(path: string): string {
   return "";
 }
 
+/**
+ * Ruby's constant table, which `Object.const_get` reads and every `class Foo`
+ * populates implicitly. ESM has no such table, so hosts register explicitly.
+ */
+const _constants = new Map<string, unknown>();
+
+/**
+ * @noRailsEquivalent The registration half of Ruby's constant table. Ruby's
+ * `Object.const_get` — which {@link constantize} is — reads a global constant
+ * namespace that `class Foo` writes to as a side effect of definition; ESM
+ * classes are module-local bindings with no such namespace, so a JS host has
+ * to name its classes explicitly. Only registration is invented: lookup goes
+ * through `constantize`, which Rails does have.
+ */
+export function registerConstant(name: string, value: unknown): void {
+  _constants.set(name, value);
+}
+
+/** @internal — test use only: clear the registered constant table. */
+export function _resetConstants(): void {
+  _constants.clear();
+}
+
+/**
+ * Ruby constant paths are `::`-joined segments, each starting with an
+ * uppercase letter — `Ace::Base::Case`. `Object.const_get` raises NameError
+ * ("wrong constant name") for anything else, including the empty string,
+ * `"::"`, `"Ace::gas"`, and `"An invalid string"`.
+ */
+function isValidConstantPath(path: string): boolean {
+  if (path.length === 0) return false;
+  return path.split("::").every((segment) => /^[A-Z]\w*$/.test(segment));
+}
+
+/**
+ * Mirrors: Inflector.constantize — `Object.const_get(camel_cased_word)`.
+ *
+ * The name is assumed to be a top-level constant, whether or not it starts
+ * with `::`; no lexical context is taken into account. Raises when the name is
+ * not in CamelCase or the constant is unknown. Ruby raises `NameError` there;
+ * JS's nearest analogue for a reference to an undeclared name is
+ * `ReferenceError`, so that is what we throw.
+ */
+export function constantize(camelCasedWord: string): unknown {
+  const path = camelCasedWord.startsWith("::") ? camelCasedWord.slice(2) : camelCasedWord;
+  if (!isValidConstantPath(path)) {
+    throw new ReferenceError(`wrong constant name ${camelCasedWord}`);
+  }
+  if (!_constants.has(path)) {
+    throw new ReferenceError(`uninitialized constant ${path}`);
+  }
+  return _constants.get(path);
+}
+
+/**
+ * Mirrors: Inflector.safe_constantize. Returns undefined (Ruby: `nil`) when
+ * the name is not in CamelCase or the constant is unknown, and re-raises
+ * anything else.
+ *
+ * Rails narrows the rescue to a NameError naming a constant that is part of
+ * the requested path, so an unrelated NameError thrown by loading the constant
+ * still propagates. Our registry never runs host code during lookup, so the
+ * only errors `constantize` raises are its own two — both about the requested
+ * path — and an error from anywhere else is by construction not one of them.
+ */
+export function safeConstantize(camelCasedWord: string): unknown {
+  try {
+    return constantize(camelCasedWord);
+  } catch (e) {
+    if (e instanceof ReferenceError) return undefined;
+    throw e;
+  }
+}
+
 export function foreignKey(className: string, separateWithUnderscore: boolean = true): string {
   return underscore(demodulize(className)) + (separateWithUnderscore ? "_id" : "id");
 }

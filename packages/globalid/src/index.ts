@@ -14,14 +14,13 @@ export type {
 } from "./signed-global-id.js";
 export { validateApp, GID, MissingModelIdError, InvalidModelIdError } from "./uri/gid.js";
 export type { GidComponents } from "./uri/gid.js";
-export { Locator, BaseLocator, UnscopedLocator, BlockLocator, setModelFinder } from "./locator.js";
+export { Locator, BaseLocator, UnscopedLocator, BlockLocator } from "./locator.js";
 /** @internal */
-export { _resetModelFinder, _resetLocators } from "./locator.js";
+export { _resetLocators } from "./locator.js";
 export type {
   LocatorModel,
   LocateOptions,
   LocateSignedOptions,
-  ModelFinder,
   LocatorBlock,
   LocatorLike,
 } from "./locator.js";

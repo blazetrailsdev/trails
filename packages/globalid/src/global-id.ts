@@ -1,6 +1,7 @@
 import { getApp } from "./config.js";
 import { GID, validateApp, type GidComponents } from "./uri/gid.js";
-import { Locator, lookupClass, type LocateOptions, type LocatorModel } from "./locator.js";
+import { Locator, type LocateOptions, type LocatorModel } from "./locator.js";
+import { constantize } from "@blazetrails/activesupport";
 // LAZY-IMPORT CYCLE: global-id ↔ signed-global-id ↔ locator. Safe because
 // every cross-module reference below happens inside a method body (runtime),
 // not at class-body init time. Do NOT add module-level `const X = SignedGlobalID.foo`
@@ -128,25 +129,20 @@ export class GlobalID {
   }
 
   /**
-   * Resolve the model class via the registered ModelFinder.
-   *
    * Mirrors: GlobalID#model_class — `model_name.constantize`. Raises if the
    * resolved class is GlobalID / SignedGlobalID (Rails has the same guard
    * against recursive `model_class` lookup).
    */
   get modelClass(): LocatorModel {
-    const klass = lookupClass(this.modelName);
-    if (!klass) {
-      throw new Error(
-        `Cannot resolve model class for ${this.modelName}. Register the class via setModelFinder.`,
-      );
-    }
+    // Rails: `model = model_name.constantize` — raises when the constant is
+    // unknown rather than answering nil.
+    const klass = constantize(this.modelName) as LocatorModel;
     // Rails: `if model <= GlobalID then raise ArgumentError` — rejects
     // GlobalID itself and any subclass. In Ruby SGID < GID so the
     // single `<=` check covers both. In TS they're peers, and we also
     // need to catch subclasses via prototype-chain checks. Guard the
-    // prototype access since the finder is structurally typed and a
-    // non-constructor value technically satisfies LocatorModel.
+    // prototype access since a registered constant is structurally typed and
+    // a non-constructor value technically satisfies LocatorModel.
     if (isOrExtends(klass, GlobalID) || isOrExtends(klass, SignedGlobalID)) {
       throw new Error("GlobalID and SignedGlobalID cannot be used as model_class.");
     }

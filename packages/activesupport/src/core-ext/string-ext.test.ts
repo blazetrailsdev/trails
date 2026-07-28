@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { at, from, to, first, last, indent, exclude } from "../string-utils.js";
+import {
+  registerConstantizeFixtures,
+  runConstantizeTestsOn,
+  runSafeConstantizeTestsOn,
+} from "../constantize-test-cases.js";
 
 import {
   htmlSafe,
@@ -19,6 +24,9 @@ import {
   dasherize,
   demodulize,
   deconstantize,
+  constantize,
+  safeConstantize,
+  _resetConstants,
   foreignKey,
   humanize,
   parameterize,
@@ -500,9 +508,17 @@ describe("StringInflectionsTest", () => {
     expect(result).toBe("World");
   });
 
-  it.skip("constantize");
+  it("constantize", () => {
+    _resetConstants();
+    registerConstantizeFixtures();
+    runConstantizeTestsOn((string) => constantize(string));
+  });
 
-  it.skip("safe constantize");
+  it("safe constantize", () => {
+    _resetConstants();
+    registerConstantizeFixtures();
+    runSafeConstantizeTestsOn((string) => safeConstantize(string));
+  });
 });
 
 describe("OutputSafetyTest", () => {

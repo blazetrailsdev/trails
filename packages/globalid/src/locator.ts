@@ -7,6 +7,7 @@
 import { GlobalID } from "./global-id.js";
 import { SignedGlobalID } from "./signed-global-id.js";
 import { validateApp } from "./uri/gid.js";
+import { safeConstantize } from "@blazetrails/activesupport";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 
 /** Duck-typed model interface; globalid stays AR-agnostic. */
@@ -60,25 +61,6 @@ export interface LocateSignedOptions extends LocateOptions {
   verifier: MessageVerifier;
 }
 
-export type ModelFinder = (name: string) => LocatorModel | undefined;
-
-let _modelFinder: ModelFinder | undefined;
-
-/**
- * @noRailsEquivalent Stands in for Ruby's `model_name.constantize`, which
- * GlobalID#model_class uses to turn a model name into a class. JS has no global
- * constant table, so the host app registers a resolver instead. It lives next
- * to the per-app locator registry it serves.
- */
-export function setModelFinder(finder: ModelFinder): void {
-  _modelFinder = finder;
-}
-
-/** @internal — test use only */
-export function _resetModelFinder(): void {
-  _modelFinder = undefined;
-}
-
 // ─── BaseLocator / UnscopedLocator / BlockLocator ──────────────────────────
 
 /** Block-form locator function — accepts a parsed GlobalID + options. */
@@ -97,8 +79,8 @@ export interface LocatorLike {
 }
 
 /**
- * Mirrors: GlobalID::Locator::BaseLocator. Resolves GlobalIDs by looking up
- * the model class via the registered ModelFinder and delegating to
+ * Mirrors: GlobalID::Locator::BaseLocator. Resolves GlobalIDs by constantizing
+ * the model name and delegating to
  * `klass.find(id)` (or `klass.where({pk: ids})` for the batch + ignoreMissing
  * path).
  */
@@ -106,7 +88,7 @@ export class BaseLocator {
   /** Mirrors: BaseLocator#locate */
   async locate(gid: GlobalID, _options: LocateOptions = {}): Promise<unknown | null> {
     if (!this.modelIdIsValid(gid)) return null;
-    const klass = lookupClass(gid.modelName);
+    const klass = safeConstantize(gid.modelName) as LocatorModel | undefined;
     if (!klass) return null;
     const record = await klass.find(gid.modelId);
     return record ?? null;
@@ -118,7 +100,7 @@ export class BaseLocator {
     const allowed: Array<{ gid: GlobalID; klass: LocatorModel }> = [];
     for (const gid of gids) {
       if (!this.modelIdIsValid(gid)) continue;
-      const klass = lookupClass(gid.modelName)!;
+      const klass = safeConstantize(gid.modelName) as LocatorModel;
       allowed.push({ gid, klass });
       const ids = idsByClass.get(klass) ?? [];
       ids.push(gid.modelId);
@@ -177,7 +159,7 @@ export class BaseLocator {
 
   /** @internal Mirrors: BaseLocator#model_id_is_valid? — modelId arity matches PK arity. */
   protected modelIdIsValid(gid: GlobalID): boolean {
-    const klass = lookupClass(gid.modelName);
+    const klass = safeConstantize(gid.modelName) as LocatorModel | undefined;
     if (!klass) return false;
     return modelIdArityMatches(klass, gid.modelId, this.primaryKey(klass));
   }
@@ -195,7 +177,7 @@ export class BaseLocator {
  */
 export class UnscopedLocator extends BaseLocator {
   async locate(gid: GlobalID, options: LocateOptions = {}): Promise<unknown | null> {
-    const klass = lookupClass(gid.modelName);
+    const klass = safeConstantize(gid.modelName) as LocatorModel | undefined;
     return this.unscoped(klass, () => super.locate(gid, options));
   }
 
@@ -269,7 +251,7 @@ export class Locator {
   ): Promise<unknown | null> {
     const parsed = GlobalID.parse(gid);
     if (!parsed) return null;
-    const klass = lookupClass(parsed.modelName);
+    const klass = safeConstantize(parsed.modelName) as LocatorModel | undefined;
     if (!klass) return null;
     if (!Locator.findAllowed(klass, options.only)) return null;
     // Arity-check at the facade so BlockLocator / custom LocatorLike dispatch
@@ -388,7 +370,7 @@ export class Locator {
     for (const g of gids) {
       const parsed = GlobalID.parse(g);
       if (!parsed) continue;
-      const klass = lookupClass(parsed.modelName);
+      const klass = safeConstantize(parsed.modelName) as LocatorModel | undefined;
       if (!klass) continue;
       if (!Locator.findAllowed(klass, only)) continue;
       if (!modelIdArityMatches(klass, parsed.modelId)) continue;
@@ -409,12 +391,7 @@ export function _resetLocators(): void {
   _defaultLocator = new UnscopedLocator();
 }
 
-// ─── Helpers (mostly module-private; lookupClass is @internal-shared) ─────
-
-/** @internal — shared by `GlobalID#model_class` / `SignedGlobalID#modelClass`. */
-export function lookupClass(name: string): LocatorModel | undefined {
-  return _modelFinder?.(name);
-}
+// ─── Helpers (module-private) ─────────────────────────────────────────────
 
 type Ctor = new (...args: never[]) => unknown;
 
