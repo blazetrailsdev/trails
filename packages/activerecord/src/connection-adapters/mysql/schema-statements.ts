@@ -554,6 +554,7 @@ export function parseMysqlName(name: string): { schema?: string; table: string }
 interface ForeignKeysHost {
   schemaQuery(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]>;
   quote(value: unknown): string;
+  /** @internal */
   extractForeignKeyAction(specifier: string): "cascade" | "nullify" | undefined;
 }
 
