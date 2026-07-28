@@ -711,18 +711,18 @@ export function extractFromProgram(
           path.relative(srcDir, ctorDecl.getSourceFile().fileName).replace(/\\/g, "/") === relPath
             ? ctorDecl
             : undefined;
-        const ctorInternal = ownCtor !== undefined && hasInternalJsDocTag(ownCtor);
+        const ctorVisibility = ownCtor !== undefined ? memberVisibility(ownCtor) : "public";
         const ctorReason = ownCtor !== undefined ? noRailsEquivalentReason(ownCtor) : undefined;
         const ctorNode = ownCtor ?? node;
         mixinMethods.push({
           name: "constructor",
-          visibility: "public",
+          visibility: ctorVisibility,
           params: [],
           isStatic: false,
           line:
             ctorNode.getSourceFile().getLineAndCharacterOfPosition(ctorNode.getStart()).line + 1,
           file: relPath,
-          ...(ctorInternal ? { internal: true } : {}),
+          ...(ctorVisibility !== "public" ? { internal: true } : {}),
           ...(ctorReason !== undefined ? { noRailsEquivalent: ctorReason } : {}),
         });
       }

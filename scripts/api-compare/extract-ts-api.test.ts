@@ -1527,6 +1527,48 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     ).toBe("JS-only lifecycle hook");
   });
 
+  it("records the reason on a synthesized __mixin constructor", () => {
+    const info = extractFromFiles("/p", {
+      "attributes.ts": `
+        export function Attributes(Base: new () => object) {
+          class M extends Base {
+            /** @noRailsEquivalent JS constructors take no Ruby-style block */
+            constructor() { super(); }
+          }
+          return M;
+        }
+      `,
+    });
+    const ctor = info.modules["attributes.ts:Attributes__mixin"].instanceMethods.find(
+      (m) => m.name === "constructor",
+    )!;
+    expect(ctor.noRailsEquivalent).toBe("JS constructors take no Ruby-style block");
+    expect(ctor.line).toBe(5);
+  });
+
+  it("leaves a synthesized __mixin constructor bare when the inner class declares none", () => {
+    const info = extractFromFiles("/p", {
+      "base.ts": `
+        export class Base {
+          /** @noRailsEquivalent JS-only wiring */
+          constructor() {}
+        }
+      `,
+      "attributes.ts": `
+        import { Base } from "./base.js";
+        export function Attributes(B: typeof Base) {
+          class M extends B {}
+          return M;
+        }
+      `,
+    });
+    const ctor = info.modules["attributes.ts:Attributes__mixin"].instanceMethods.find(
+      (m) => m.name === "constructor",
+    )!;
+    expect(ctor.noRailsEquivalent).toBeUndefined();
+    expect(ctor.internal).toBeUndefined();
+  });
+
   it("records the reason on tagged namespace members", () => {
     const info = extractFromFiles("/p", {
       "locator.ts": `
