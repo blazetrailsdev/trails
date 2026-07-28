@@ -12,13 +12,10 @@ import { Base } from "../../base.js";
 // here so MySQL adapter tests can keep importing it from this module.
 export { withDbWarningsAction } from "../../support/with-db-warnings-action.js";
 
-// A *serialization* of the MySQL sub-settings (MYSQL_HOST/MYSQL_PORT/
-// MYSQL_USER/...), not an env var of its own. Its only callers are the tests
-// that deliberately build a *second*, differently configured adapter (a
-// non-strict sql_mode, ANSI_QUOTES, a statementLimit, a socket the retry loop
-// may tear down) — cases where the config itself is under test and must not
-// leak onto the shared leased connection. Everything else rides the ambient
-// `Base.connection` via leaseMysqlAdapter below.
+// A *serialization* of the MySQL sub-settings, not an env var of its own. Only
+// for tests that build a *second*, differently configured adapter, where the
+// config is itself under test and must not leak onto the shared leased
+// connection. Everything else rides leaseMysqlAdapter below.
 export const MYSQL_TEST_URL = mysqlUrl();
 
 /**
@@ -39,12 +36,11 @@ export const { arunit: ARUNIT_DATABASE, arunit2: ARUNIT2_DATABASE } = arunitData
 let mariaDb = false;
 let mysqlVersionStr = "";
 
-// Probes the server once at module load purely to read VERSION(): the
-// supports* gates below mirror Rails' version-keyed `supports_*?` predicates,
-// which have no static answer (the mysql lane may be MySQL 8 or the MariaDB CI
-// stand-in). An unreachable server yields an empty version, which makes every
-// gate false rather than skipping any suite — suite selection is
-// describeIfMysqlAdapter's job.
+// Reads VERSION() once at load: the supports* gates below mirror Rails'
+// version-keyed `supports_*?` predicates, which have no static answer (the
+// mysql lane may be MySQL 8 or the MariaDB CI stand-in). An unreachable server
+// yields an empty version, so every gate reads false — it never skips a suite,
+// which is describeIfMysqlAdapter's job alone.
 async function checkMysql(): Promise<{ isMariaDb: boolean; version: string }> {
   let conn: Awaited<ReturnType<typeof mysql.createConnection>> | undefined;
   try {
