@@ -16,7 +16,6 @@ import { modelRegistry } from "./associations.js";
 import { safeConstantize } from "@blazetrails/activesupport";
 import { Author } from "./test-helpers/models/author.js";
 
-/** A subclass whose `.name` is `name`, without shadowing an imported binding. */
 function subclassNamed(parent: typeof Base, name: string): typeof Base {
   const klass = class extends parent {};
   Object.defineProperty(klass, "name", { value: name });
