@@ -37,7 +37,7 @@ type DbConfigHandler = (
 ) => DatabaseConfig | null | undefined;
 
 export class DatabaseConfigurations {
-  private static _defaultEnv: string = "development";
+  private static _defaultEnv: string | null = null;
 
   /**
    * Mirrors: DatabaseConfigurations.db_config_handlers
@@ -60,20 +60,35 @@ export class DatabaseConfigurations {
 
   /** @internal */
   static get defaultEnv(): string {
+    if (this._defaultEnv === null) return "development";
     return this._defaultEnv || "default";
   }
 
-  /** @internal */
-  static set defaultEnv(value: string) {
+  /** @internal Assign null to clear the override and fall back to the process env. */
+  static set defaultEnv(value: string | null) {
     this._defaultEnv = value;
   }
 
   /**
-   * The active environment resolved from the process, mirroring Rails'
-   * `ConnectionHandling::DEFAULT_ENV` / `RAILS_ENV` lambdas:
-   * `RAILS_ENV` → `RACK_ENV` → the configured default. Here `TRAILS_ENV` is
-   * the canonical runtime env (BC-2), `NODE_ENV` is the one-release fallback,
-   * and `defaultEnv` (the app-bootstrap / test override) is the terminal value.
+   * The active environment. Rails' counterpart is
+   * `ConnectionHandling::DEFAULT_ENV` / `RAILS_ENV`, which resolves
+   * `Rails.env` → `RAILS_ENV` → `RACK_ENV` → the literal default.
+   * Ours resolves `TRAILS_ENV` → `defaultEnv` → `NODE_ENV` → the literal
+   * default.
+   *
+   * DELIBERATE DEVIATION — `TRAILS_ENV` outranks `defaultEnv`, Rails is the
+   * other way round. Per BC-2 (`docs/infrastructure/browser-compat-plan.md:88`)
+   * `TRAILS_ENV` is the rename of the old `process.env.NODE_ENV` reads, so it
+   * maps to Rails' `ENV["RAILS_ENV"]` / `ENV["RACK_ENV"]`, and `defaultEnv` is
+   * the `Rails.env` analogue — by `connection_handling.rb:6` `defaultEnv` would
+   * therefore win. trails inverts that on purpose: `TRAILS_ENV` is how a deploy
+   * declares which environment the process is, and no in-process bootstrap may
+   * override it. Consequence to know: with `TRAILS_ENV` set, assigning
+   * `defaultEnv` has no effect on the resolved env.
+   *
+   * `NODE_ENV` sits last, ahead of only the literal default: it is a
+   * one-release bridge with no Rails counterpart, and test runners set it
+   * unconditionally, so it must not mask a deliberate `defaultEnv`.
    *
    * Single source of truth for "what env are we building/connecting for" —
    * `fromEnv` (which builds the configs) and the runtime config selectors in
@@ -83,7 +98,12 @@ export class DatabaseConfigurations {
    * @internal
    */
   static currentEnv(): string {
-    return getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? DatabaseConfigurations.defaultEnv;
+    return (
+      getEnv("TRAILS_ENV") ||
+      this._defaultEnv ||
+      getEnv("NODE_ENV") ||
+      DatabaseConfigurations.defaultEnv
+    );
   }
 
   /**
@@ -113,7 +133,7 @@ export class DatabaseConfigurations {
       // merges DATABASE_URL via environment_url_config + merge_db_environment_variables.
       // Uses DatabaseConfigurations.defaultEnv (set by app bootstrap from RAILS_ENV/RACK_ENV),
       // not NODE_ENV — matching Rails' env resolution semantics.
-      this._configurations = this._buildConfigs(configurations, DatabaseConfigurations._defaultEnv);
+      this._configurations = this._buildConfigs(configurations, DatabaseConfigurations.defaultEnv);
     }
     // Register this instance as the current one for HashConfig.isPrimary lookup
     _currentConfigurations = this;
@@ -488,7 +508,8 @@ DatabaseConfigurations.registerDbConfigHandler((envName, name, url, config) => {
 // forCurrentEnv must use the same resolver as fromEnv() so that findDbConfig by
 // DB name locates the config built for the active env. Mirrors Rails:
 // DatabaseConfig#for_current_env? and DatabaseConfigurations#build_configs both
-// call ConnectionHandling::DEFAULT_ENV.call (RAILS_ENV → RACK_ENV → "development").
+// call ConnectionHandling::DEFAULT_ENV.call
+// (Rails.env → RAILS_ENV → RACK_ENV → the literal default).
 _setDefaultEnvGetter(() => DatabaseConfigurations.currentEnv());
 
 // Register the primary checker so HashConfig.isPrimary can consult the
