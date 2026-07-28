@@ -42,6 +42,8 @@
  *      that no longer flags is STALE and fails the run. The tag is read on
  *      members AND on class / interface / namespace declarations, so an extra
  *      that is a declaration rather than a member still has an inline form.
+ *      On an `interface` the declaration tag additionally covers every member
+ *      — see `collectTaggedEntries`.
  *
  * Manifests are produced by `pnpm api:compare`; if they're missing the
  * script bails with a hint (same convention as `api:moves`).
@@ -279,6 +281,15 @@ export interface TaggedEntry {
   tsFile: string;
   name: string;
   reason: string;
+  /**
+   * True when the entry derives from a tagged `interface` DECLARATION rather
+   * than from a tag written on this name — its members, and the interface's own
+   * name. Such entries allow extra surface like any other, but they are
+   * excluded from the tag total and from the stale check: the interface tag is
+   * written once for the whole shape, so a member of it that happens not to
+   * flag as extra is not a stale tag anyone can delete.
+   */
+  inherited?: boolean;
 }
 
 export function allowKeyOf(e: { package: string; tsFile: string; name: string }): string {
@@ -306,9 +317,21 @@ export function allowKeyOf(e: { package: string; tsFile: string; name: string })
 export function collectTaggedEntries(ts: ApiManifest): TaggedEntry[] {
   const out: TaggedEntry[] = [];
   const seen = new Set<string>();
-  const push = (pkg: string, tsFile: string, name: string, reason: string | undefined): void => {
+  const push = (
+    pkg: string,
+    tsFile: string,
+    name: string,
+    reason: string | undefined,
+    inherited = false,
+  ): void => {
     if (reason === undefined) return;
-    const entry = { package: pkg, tsFile, name, reason };
+    const entry: TaggedEntry = {
+      package: pkg,
+      tsFile,
+      name,
+      reason,
+      ...(inherited ? { inherited } : {}),
+    };
     const key = allowKeyOf(entry);
     if (seen.has(key)) return;
     seen.add(key);
@@ -329,7 +352,26 @@ export function collectTaggedEntries(ts: ApiManifest): TaggedEntry[] {
         // LAST on purpose: a member sharing the container's name occupies the
         // same key (see the dedup note above — one key is all the extra set
         // has), so the more specific member reason wins the tie.
-        push(pkg, c.file, c.name, c.noRailsEquivalent);
+        // An interface's own name is not member surface, so it never appears in
+        // the extra set `collectTsFileNames` builds and its entry can never
+        // match — flagged inherited so the stale check doesn't demand its
+        // deletion. The tag is still doing work: it covers the members below.
+        push(pkg, c.file, c.name, c.noRailsEquivalent, c.isInterface === true);
+        // A tagged `interface` covers its MEMBERS as well as its own name. An
+        // interface is type-only: the ones that need the tag exist solely to
+        // declare the shape of a duck-typed collaborator (e.g. globalid's
+        // `LocatorModel`, which types the Active Record surface Rails calls as
+        // `model_class.find gid.model_id`), and Ruby writes no such
+        // declaration at all. So no member of one can have a Ruby counterpart
+        // either, and tagging them one by one would repeat the same reason on
+        // every member of every such interface. Classes are deliberately
+        // excluded: a tagged class name is usually an extractor-shape artifact
+        // (a nested Ruby class TS must export as a sibling) whose members DO
+        // have Ruby counterparts, so inheriting there would mask real drift.
+        // A member's own tag still wins — members are pushed first.
+        if (c.isInterface === true && c.noRailsEquivalent !== undefined) {
+          for (const m of c.instanceMethods) push(pkg, c.file, m.name, c.noRailsEquivalent, true);
+        }
       }
     }
     for (const [file, fns] of Object.entries(tsPkg.fileFunctions ?? {})) {
@@ -379,8 +421,16 @@ interface PackageTotals {
 }
 
 interface TaggedSummary {
+  /** Tags actually WRITTEN in the source — inherited entries excluded. */
   total: number;
+  /** Written tags that matched an extra. */
   matched: number;
+  /**
+   * Extras allowed by an entry inherited from a tagged `interface` declaration
+   * rather than by a tag of their own. Counted apart from `matched` so the two
+   * numbers stay comparable with `total`, which counts written tags only.
+   */
+  inheritedMatched: number;
   stale: TaggedEntry[];
 }
 
@@ -1098,7 +1148,11 @@ function printHumanReport(report: Report, topN: number, maxDetail: number): void
   );
   console.log(
     `\n${p.dim}@noRailsEquivalent tags: ${report.tagged.total} tag(s), ` +
-      `${report.tagged.matched} matched — allowed extras are subtracted from the counts above.${p.reset}`,
+      `${report.tagged.matched} matched` +
+      (report.tagged.inheritedMatched > 0
+        ? ` (+${report.tagged.inheritedMatched} allowed by a tagged interface declaration)`
+        : "") +
+      ` — allowed extras are subtracted from the counts above.${p.reset}`,
   );
 
   console.log(
@@ -1194,12 +1248,16 @@ export function buildReport(
   );
 
   const staleTagged = tagged.filter(
-    (e) => scannedPkgs.has(e.package) && !matchedTagKeys.has(allowKeyOf(e)),
+    (e) => !e.inherited && scannedPkgs.has(e.package) && !matchedTagKeys.has(allowKeyOf(e)),
   );
 
+  const inheritedKeys = new Set(tagged.filter((e) => e.inherited).map(allowKeyOf));
+  const inheritedMatched = [...matchedTagKeys].filter((k) => inheritedKeys.has(k)).length;
+
   const taggedSummary: TaggedSummary = {
-    total: tagged.length,
-    matched: matchedTagKeys.size,
+    total: tagged.filter((e) => !e.inherited).length,
+    matched: matchedTagKeys.size - inheritedMatched,
+    inheritedMatched,
     stale: staleTagged,
   };
   return {

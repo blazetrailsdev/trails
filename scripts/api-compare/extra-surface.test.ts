@@ -1501,7 +1501,7 @@ describe("buildReport — @noRailsEquivalent tags", () => {
     expect(pkg.totalNovel).toBe(0);
     expect(pkg.totalAllowlisted).toBe(1);
     expect(pkg.extraFiles).toEqual([]);
-    expect(report.tagged).toEqual({ total: 1, matched: 1, stale: [] });
+    expect(report.tagged).toEqual({ total: 1, matched: 1, inheritedMatched: 0, stale: [] });
     expect(report).not.toHaveProperty("allowlist");
   });
 
@@ -1540,6 +1540,27 @@ describe("buildReport — @noRailsEquivalent tags", () => {
     const report = run(m);
     expect(report.tagged.stale.map((e) => e.name)).toEqual(["Foo"]);
     expect(report.tagged.matched).toBe(1);
+  });
+
+  it("allows a tagged interface's members without counting or staling the inherited entries", () => {
+    const m = makeManifests();
+    m.ts.packages.activemodel.modules.Shape = {
+      name: "Shape",
+      file: "foo.ts",
+      includes: [],
+      extends: [],
+      // `bar` has a Rails counterpart and never flags as extra; only
+      // `tsOnlyHelper` does. Neither may be reported stale — the one tag is
+      // written on the declaration, so there is nothing per-member to delete.
+      instanceMethods: [method("bar"), method("tsOnlyHelper")],
+      classMethods: [],
+      isInterface: true,
+      noRailsEquivalent: "duck-typed collaborator shape",
+    };
+    const report = run(m);
+    expect(report.packages[0].totalNovel).toBe(0);
+    expect(report.packages[0].totalAllowlisted).toBe(1);
+    expect(report.tagged).toEqual({ total: 0, matched: 0, inheritedMatched: 1, stale: [] });
   });
 
   it("does not judge tags of packages this run never scanned", () => {
@@ -1658,6 +1679,72 @@ describe("collectTaggedEntries", () => {
       },
     ]);
   });
+
+  it("spreads a tagged interface's declaration reason onto its members", () => {
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        globalid: {
+          classes: {},
+          modules: {
+            LocatorModel: {
+              name: "LocatorModel",
+              file: "locator.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("find"), { ...method("where"), noRailsEquivalent: "own" }],
+              classMethods: [],
+              isInterface: true,
+              noRailsEquivalent: "duck-typed collaborator shape",
+            },
+          },
+        },
+      },
+    };
+    expect(collectTaggedEntries(ts)).toEqual([
+      // The member's own tag still wins over the inherited one.
+      { package: "globalid", tsFile: "locator.ts", name: "where", reason: "own" },
+      {
+        package: "globalid",
+        tsFile: "locator.ts",
+        name: "LocatorModel",
+        reason: "duck-typed collaborator shape",
+        inherited: true,
+      },
+      {
+        package: "globalid",
+        tsFile: "locator.ts",
+        name: "find",
+        reason: "duck-typed collaborator shape",
+        inherited: true,
+      },
+    ]);
+  });
+
+  it("does not spread a tagged CLASS declaration's reason onto its members", () => {
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activerecord: {
+          classes: {
+            NullConfig: {
+              name: "NullConfig",
+              file: "connection-pool.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("schemaCache")],
+              classMethods: [],
+              noRailsEquivalent: "Rails nests this class inside NullPool",
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    expect(collectTaggedEntries(ts).map((e) => e.name)).toEqual(["NullConfig"]);
+  });
 });
 
 describe("@noRailsEquivalent — extractor to report", () => {
@@ -1728,6 +1815,7 @@ describe("@noRailsEquivalent — extractor to report", () => {
     expect(report.tagged).toEqual({
       total: 1,
       matched: 1,
+      inheritedMatched: 0,
       stale: [],
     });
     expect(report.packages[0].totalAllowlisted).toBe(1);
@@ -1772,7 +1860,7 @@ describe("@noRailsEquivalent — extractor to report", () => {
       { source: "typescript", generatedAt: "", packages: { activerecord: tsPkg } },
       { filterPkg: null, excludeGlobs: [], novelOnly: false, topN: 50 },
     );
-    expect(report.tagged).toEqual({ total: 1, matched: 1, stale: [] });
+    expect(report.tagged).toEqual({ total: 1, matched: 1, inheritedMatched: 0, stale: [] });
     expect(report.packages[0].totalAllowlisted).toBe(1);
     expect(report.packages[0].totalNovel).toBe(0);
   });

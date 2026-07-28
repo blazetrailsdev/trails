@@ -9,24 +9,20 @@ import { SignedGlobalID } from "./signed-global-id.js";
 import { validateApp } from "./uri/gid.js";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 
-/** Duck-typed model interface; globalid stays AR-agnostic. */
+/**
+ * Duck-typed model interface; globalid stays AR-agnostic.
+ *
+ * @noRailsEquivalent Declares the Active Record surface Rails' BaseLocator
+ * calls duck-typed — `model_class.find gid.model_id` and
+ * `model_class.where(primary_key => ids)` on the ignore_missing path. Ruby
+ * needs no such declaration, so neither the interface nor any member of it has
+ * a Ruby counterpart.
+ */
 export interface LocatorModel {
   name: string;
   primaryKey?: string | string[];
-  /**
-   * Single-id form returns a record; array form returns an ordered array.
-   *
-   * @noRailsEquivalent Member of the duck-typed `LocatorModel` interface, not a
-   * locator method: it declares the Active Record finder Rails' BaseLocator
-   * calls as `model_class.find gid.model_id`. Ruby needs no such declaration.
-   */
+  /** Single-id form returns a record; array form returns an ordered array. */
   find(id: unknown): Promise<unknown> | unknown;
-  /**
-   * @noRailsEquivalent Member of the duck-typed `LocatorModel` interface, not a
-   * locator method: it declares the Active Record relation Rails' BaseLocator
-   * calls as `model_class.where(primary_key => ids)` on the ignore_missing
-   * path. Ruby needs no such declaration.
-   */
   where?(conditions: Record<string, unknown>): {
     toArray?(): Promise<unknown[]> | unknown[];
   };
