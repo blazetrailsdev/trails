@@ -28,7 +28,7 @@ const rule = {
     type: "problem",
     docs: {
       description:
-        "Require a test file that drops a canonical table to restore it in the same file, via rebuildCanonicalTables() or loadCanonicalSchema(). Three drop forms are detected: the dropTable() helper, a raw DROP TABLE naming the table in an execution sink, and a drop loop driven by a catalogue sweep. The third form names no table in the DROP itself (`DROP TABLE ${row.tablename}`, or dropTable(row.name)); its victims appear only in the catalogue SELECT that feeds the loop. For the dropTable() spelling the argument must trace back to a for-of/for-in binding or an inline callback parameter, so dropTable(SOME_MODULE_CONST) — a fixed name, not a sweep — does not arm the check. Once a file contains such an unnameable drop, a canonical name counts as dropped when it is quoted inside a SQL string that also references a catalogue source (pg_tables, pg_class, sqlite_master, sqlite_schema, pragma_table_list, information_schema.tables, SHOW TABLES), or when it is an element of an array literal anywhere in a file that queries a catalogue at all — the latter because the filter list is commonly built in JS (`IN (${names.map((n) => `'${n}'`).join(\",\")})`), which puts the name in an array and never in the SQL. Catalogue strings are scanned wherever they appear, not only as direct arguments to a sink call, so hoisting the query to a `const SWEEP_SQL` does not hide it. Two deliberate narrowings, both to stop this becoming a ratchet that fires on unrelated edits: (a) only quoted names, never bare words, because `columns`, `values`, `select` and `distinct` are canonical table names as well as SQL keywords, and bare-word matching measured 24 false positives across 5 files; (b) only strings that touch a catalogue, because a sweep can only choose its victims by reading one, so ordinary DML quoting a table name for an unrelated reason stays quiet. Both are over-approximations within the catalogue-query population: a canonical name quoted in a catalogue probe that does NOT feed the drop loop still reports. Scoping the scan to the exact SELECT the loop iterates would need dataflow from the loop variable back to its iterable's initializer, which is more machinery than the one shape this guards. KNOWN GAPS, all of which let a real sweep through undetected: a filter list built from values that are neither string literals nor array-literal elements (a map lookup, a function return, a name read off another query's rows); a catalogue name spelled in a way CATALOGUE_SOURCE does not list; and a drop whose loop variable reaches the dropTable() helper through a wrapper function rather than directly, since arming requires the argument to trace back to a for-of/for-in binding or an inline callback parameter. Restores are rebuildCanonicalTables(adapter, [names]), loadCanonicalSchema(adapter), or a rebuildCanonicalTables() whose name list is not a literal array, which is treated as restoring everything rather than guessed at. Permanent exemptions live in eslint/require-canonical-rebuild-exclude.json: `privateAdapter` files own a :memory: or tmpdir database that cannot drift the shared per-worker one, and `nonExecuting` files record DDL against a fake adapter instead of running it.",
+        "Require a test file that drops a canonical table to restore it in the same file, via rebuildCanonicalTables() or loadCanonicalSchema(). Three drop forms are detected: the dropTable() helper, a raw DROP TABLE naming the table in an execution sink, and a drop loop driven by a catalogue sweep. The third form names no table in the DROP itself (`DROP TABLE ${row.tablename}`, or dropTable(row.name)); its victims appear only in the catalogue SELECT that feeds the loop. BOTH spellings arm only on a loop-bound name: the dropTable() argument, and the substitution expression of a `DROP TABLE ${…}` template, must each trace back to a for-of/for-in binding or an inline callback parameter. So dropTable(SOME_MODULE_CONST) and exec(`DROP TABLE \"${TABLE_NAME}\"`) — fixed names, not sweeps — do not arm the check, and an identifier that resolves to no declaration at all (an import, a global) counts as fixed rather than loop-bound. Once a file contains such an unnameable drop, a canonical name counts as dropped when it is quoted inside a SQL string that also references a catalogue source (pg_tables, pg_class, sqlite_master, sqlite_schema, pragma_table_list, information_schema.tables, SHOW TABLES), or when it is an element of an array literal in a file that executes such a query — the latter because the filter list is commonly built in JS (`IN (${names.map((n) => `'${n}'`).join(\",\")})`), which puts the name in an array and never in the SQL. Catalogue strings count only where they reach an execution sink, either directly or through an identifier whose initializer is the string, so hoisting the query to a `const SWEEP_SQL` does not hide it while an expected-SQL assertion or an error-message literal mentioning a catalogue does not arm anything. Two deliberate narrowings, both to stop this becoming a ratchet that fires on unrelated edits: (a) only quoted names, never bare words, because `columns`, `values`, `select` and `distinct` are canonical table names as well as SQL keywords, and bare-word matching measured 24 false positives across 5 files; (b) only strings that touch a catalogue, because a sweep can only choose its victims by reading one, so ordinary DML quoting a table name for an unrelated reason stays quiet. Both are over-approximations within the catalogue-query population: a canonical name quoted in a catalogue probe that does NOT feed the drop loop still reports. Scoping the scan to the exact SELECT the loop iterates would need dataflow from the loop variable back to its iterable's initializer, which is more machinery than the one shape this guards. KNOWN GAPS, all of which let a real sweep through undetected: a filter list built from values that are neither string literals nor array-literal elements (a map lookup, a function return, a name read off another query's rows); a catalogue name spelled in a way CATALOGUE_SOURCE does not list; a drop whose loop variable reaches either drop spelling through a wrapper function rather than directly; and a catalogue query built by string concatenation or returned from a helper, since only a literal, a template, or an identifier initialized to one is followed to a sink. The array-literal path also keeps one over-approximation of its own: the array need not be the filter list, so a canonical name in an unrelated array literal reports if the file both executes a catalogue query and drops by loop-bound name. Restores are rebuildCanonicalTables(adapter, [names]), loadCanonicalSchema(adapter), or a rebuildCanonicalTables() whose name list is not a literal array, which is treated as restoring everything rather than guessed at. Permanent exemptions live in eslint/require-canonical-rebuild-exclude.json: `privateAdapter` files own a :memory: or tmpdir database that cannot drift the shared per-worker one, and `nonExecuting` files record DDL against a fake adapter instead of running it.",
     },
     schema: [
       {
@@ -64,21 +64,38 @@ const rule = {
       if (canonical.has(table) && !dropped.has(table)) dropped.set(table, node);
     }
 
+    function sqlText(node) {
+      if (node?.type === "Literal") return typeof node.value === "string" ? node.value : null;
+      if (node?.type === "TemplateLiteral")
+        return node.quasis.map((q) => q.value.cooked ?? "").join(" ");
+      if (node?.type !== "Identifier") return null;
+      const scope = context.sourceCode.getScope(node);
+      let variable = null;
+      for (let s = scope; s && !variable; s = s.upper) {
+        variable = s.variables.find((v) => v.name === node.name) ?? null;
+      }
+      const init = variable?.defs?.[0]?.node?.init;
+      return init && init !== node ? sqlText(init) : null;
+    }
+
     function recordSinkSql(call) {
       for (const arg of call.arguments) {
         if (arg.type === "Literal") {
           if (typeof arg.value === "string") {
             for (const table of rawDropNames(arg.value)) recordDrop(table, arg);
-            recordCatalogueFilterNames(arg.value);
           }
         } else if (arg.type === "TemplateLiteral") {
           const last = arg.quasis.length - 1;
           arg.quasis.forEach((quasi, i) => {
             if (!quasi.value.cooked) return;
             for (const table of rawDropNames(quasi.value.cooked, i < last)) recordDrop(table, arg);
-            if (i < last && DROP_TABLE_DYNAMIC_TAIL.test(quasi.value.cooked)) dynamicDrop ??= arg;
+            if (i < last && DROP_TABLE_DYNAMIC_TAIL.test(quasi.value.cooked)) {
+              if (isLoopBound(arg.expressions[i])) dynamicDrop ??= arg;
+            }
           });
         }
+        const text = sqlText(arg);
+        if (text !== null) recordCatalogueFilterNames(text);
       }
     }
 
@@ -104,7 +121,7 @@ const rule = {
       for (let s = scope; s && !variable; s = s.upper) {
         variable = s.variables.find((v) => v.name === root) ?? null;
       }
-      if (variable === null) return true;
+      if (variable === null) return false;
       return variable.defs.some((def) => {
         for (let n = def.node; n; n = n.parent) {
           if (n.type === "ForOfStatement" || n.type === "ForInStatement") return true;
@@ -119,7 +136,6 @@ const rule = {
 
     return {
       Literal(node) {
-        if (typeof node.value === "string") recordCatalogueFilterNames(node.value);
         if (
           typeof node.value === "string" &&
           canonical.has(node.value) &&
@@ -127,10 +143,6 @@ const rule = {
         ) {
           arrayLiteralNames.add(node.value);
         }
-      },
-
-      TemplateLiteral(node) {
-        recordCatalogueFilterNames(node.quasis.map((q) => q.value.cooked ?? "").join(" "));
       },
 
       CallExpression(node) {

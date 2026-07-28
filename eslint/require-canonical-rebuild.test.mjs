@@ -112,6 +112,28 @@ tester.run("require-canonical-rebuild", rule, {
 
     {
       code:
+        'const names = ["posts", "people"];\n' +
+        "expect(sql).toContain(\"SELECT tablename FROM pg_tables WHERE schemaname = 'public'\");\n" +
+        'for (const t of rows) { await adapter.exec(`DROP TABLE IF EXISTS "${t.name}"`); }',
+      options,
+    },
+
+    {
+      code:
+        "await adapter.execute(\"SELECT tablename FROM pg_tables WHERE tablename = 'people'\");\n" +
+        "await ctx.dropTable(tableNameFromHelpers);",
+      options,
+    },
+
+    {
+      code:
+        "await adapter.execute(\"SELECT tablename FROM pg_tables WHERE tablename = 'people'\");\n" +
+        'await adapter.exec(`DROP TABLE IF EXISTS "${TABLE_NAME}"`);',
+      options,
+    },
+
+    {
+      code:
         'const names = ["ex_long", "foos"];\n' +
         "const SWEEP_SQL = `SELECT name FROM pragma_table_list WHERE schema <> 'temp'`;\n" +
         "const tables = await adapter.execute(SWEEP_SQL);\n" +
@@ -221,6 +243,22 @@ tester.run("require-canonical-rebuild", rule, {
         'for (const t of tables) { await adapter.exec(`DROP TABLE IF EXISTS "${t.name}"`); }',
       options,
       errors: [{ messageId: "sweepReachesCanonical", data: { table: "subscribers" } }],
+    },
+
+    {
+      code:
+        "const tables = await adapter.execute(`SELECT name FROM pragma_table_list WHERE name IN ('subscribers')`);\n" +
+        "await Promise.all(tables.map((t) => ctx.dropTable(t.name)));",
+      options,
+      errors: [{ messageId: "sweepReachesCanonical", data: { table: "subscribers" } }],
+    },
+
+    {
+      code:
+        "const tables = await adapter.execute(`SELECT name FROM pragma_table_list WHERE name IN ('people')`);\n" +
+        "tables.forEach(function (t) { ctx.dropTable(t.name); });",
+      options,
+      errors: [{ messageId: "sweepReachesCanonical", data: { table: "people" } }],
     },
 
     {
