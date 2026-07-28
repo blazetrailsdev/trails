@@ -3131,10 +3131,11 @@ function deleteForeignKeysForColumns(
 ): void {
   for (let i = definition.foreignKeys.length - 1; i >= 0; i--) {
     const fkColumn = definition.foreignKeys[i].column;
-    // A composite FK arrives either as an array or as the comma-joined string
-    // PRAGMA foreign_key_list reflects back; Rails only ever sees the former.
-    const cols = Array.isArray(fkColumn) ? fkColumn : fkColumn.split(",").map((c) => c.trim());
-    if (cols.some((c) => columnNames.includes(c))) definition.foreignKeys.splice(i, 1);
+    // Whole-value match, so a composite (array-valued) column never matches —
+    // Rails compares `fk.column` itself, never its members.
+    if (!Array.isArray(fkColumn) && columnNames.includes(fkColumn)) {
+      definition.foreignKeys.splice(i, 1);
+    }
   }
 }
 
