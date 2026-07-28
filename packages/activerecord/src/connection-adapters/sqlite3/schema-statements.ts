@@ -17,15 +17,6 @@ import { SchemaDumper } from "./schema-dumper.js";
 import { Column } from "./column.js";
 import { quoteColumnName, quoteString as quoteStringLiteral } from "./quoting.js";
 
-export interface SchemaStatements {
-  dataSources(): Promise<string[]>;
-  tables(): Promise<string[]>;
-  views(): Promise<string[]>;
-  indexes(tableName: string): Promise<unknown[]>;
-  primaryKeys(tableName: string): Promise<string[]>;
-  foreignKeys(tableName: string): Promise<unknown[]>;
-}
-
 interface SQLite3SchemaAdapter extends DatabaseAdapter {
   addForeignKey(
     fromTable: string,
