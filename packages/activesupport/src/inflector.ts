@@ -231,8 +231,8 @@ export function constantize(camelCasedWord: string): unknown {
   // `private_constant` on an undefined name is itself a NameError, so a name is
   // never private-and-absent. trails allows it because the habtm join key is
   // marked at declaration time while the constant itself is written by a
-  // separate path (`modelRegistry.set` today, plus the constant table once
-  // #5511 lands) — the mark must not depend on which writer runs first.
+  // separate path (`modelRegistry.set`, which binds the constant via
+  // `registerModelConstant`) — the mark must not depend on which writer runs first.
   if (_privateConstants.has(path)) {
     throw new ReferenceError(`private constant ${path} referenced`);
   }
