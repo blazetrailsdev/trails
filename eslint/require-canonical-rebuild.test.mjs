@@ -172,6 +172,15 @@ tester.run("require-canonical-rebuild", rule, {
     },
 
     {
+      code:
+        "await adapter.execute(\"SELECT tablename FROM pg_tables WHERE tablename = 'people'\");\n" +
+        "await withConnection(async (conn) => {\n" +
+        '  await conn.exec(`DROP TABLE "${conn.scratch}"`);\n' +
+        "});",
+      options,
+    },
+
+    {
       code: 'expect(sql).toContain("DROP TABLE subscribers");',
       options,
     },
@@ -396,6 +405,27 @@ tester.run("require-canonical-rebuild", rule, {
         'for (const t of tables) { await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`); }',
       options,
       errors: [{ messageId: "sweepReachesCanonical", data: { table: "subscribers" } }],
+    },
+
+    {
+      code:
+        "const rows = await adapter.execute(`SELECT tablename FROM pg_tables WHERE tablename IN ('subscribers')`);\n" +
+        "for (const row of rows) {\n" +
+        "  let name;\n" +
+        "  name = row.tablename;\n" +
+        '  await adapter.exec(`DROP TABLE "${name}"`);\n' +
+        "}",
+      options,
+      errors: [{ messageId: "sweepReachesCanonical", data: { table: "subscribers" } }],
+    },
+
+    {
+      code:
+        "let rows;\n" +
+        "rows = await adapter.execute(`SELECT tablename FROM pg_tables WHERE tablename IN ('people')`);\n" +
+        'for (let i = 0; i < rows.length; i++) { await adapter.exec(`DROP TABLE "${rows[i].tablename}"`); }',
+      options,
+      errors: [{ messageId: "sweepReachesCanonical", data: { table: "people" } }],
     },
 
     {
