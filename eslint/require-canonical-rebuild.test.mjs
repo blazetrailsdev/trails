@@ -77,6 +77,33 @@ tester.run("require-canonical-rebuild", rule, {
 
     {
       code:
+        "await adapter.execute(\"SELECT * FROM pg_class WHERE relname = 'people'\");\n" +
+        "await adapter.executeMutation(\"INSERT INTO logs (name) VALUES ('posts')\");",
+      options,
+    },
+
+    {
+      code:
+        "await adapter.executeMutation(\"INSERT INTO logs (name) VALUES ('posts')\");\n" +
+        'for (const t of names) { await adapter.exec(`DROP TABLE IF EXISTS "${t}"`); }',
+      options,
+    },
+
+    {
+      code:
+        "const tables = await adapter.execute(`SELECT tablename FROM pg_tables WHERE tablename IN ('subscribers')`);\n" +
+        'for (const t of tables) { await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`); }\n' +
+        "await loadCanonicalSchema(adapter);",
+      options,
+    },
+
+    {
+      code: 'await ctx.dropTable("ex_long", { ifExists: true });',
+      options,
+    },
+
+    {
+      code:
         "const tables = await adapter.execute(`SELECT tablename FROM pg_tables WHERE tablename IN ('subscribers')`);\n" +
         'for (const t of tables) { await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`); }\n' +
         'await rebuildCanonicalTables(adapter, ["subscribers"]);',
@@ -145,6 +172,30 @@ tester.run("require-canonical-rebuild", rule, {
         'for (const t of tables) { await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}" CASCADE`); }',
       options,
       errors: [{ messageId: "sweepReachesCanonical", data: { table: "subscribers" } }],
+    },
+
+    {
+      code:
+        "const tables = await adapter.execute(`SELECT tablename FROM pg_tables WHERE tablename IN ('subscribers')`);\n" +
+        'for (const t of tables) { await adapter.exec(`DROP TABLE IF EXISTS public."${t.tablename}" CASCADE`); }',
+      options,
+      errors: [{ messageId: "sweepReachesCanonical", data: { table: "subscribers" } }],
+    },
+
+    {
+      code:
+        "const tables = await adapter.execute(`SELECT tablename FROM pg_tables WHERE tablename IN ('subscribers')`);\n" +
+        'for (const t of tables) { await adapter.exec(`DROP TABLE IF EXISTS "public"."${t.tablename}" CASCADE`); }',
+      options,
+      errors: [{ messageId: "sweepReachesCanonical", data: { table: "subscribers" } }],
+    },
+
+    {
+      code:
+        "const tables = await adapter.execute(`SELECT table_name FROM information_schema.tables WHERE table_name IN ('people')`);\n" +
+        "for (const t of tables) { await ctx.dropTable(t.table_name); }",
+      options,
+      errors: [{ messageId: "sweepReachesCanonical", data: { table: "people" } }],
     },
 
     {

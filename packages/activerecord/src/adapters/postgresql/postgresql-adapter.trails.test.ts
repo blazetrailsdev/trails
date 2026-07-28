@@ -66,7 +66,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   afterEach(async () => {
     try {
       await adapter.exec(
-        `DROP TABLE IF EXISTS abba, ex_partial, ex_expr, ex_idx_opts, ex_opclass, ex_serial, ex_bigserial, ex_custom_seqt, ex_class, ex_uniq, ex_notnull, ex_parent, ex_child, ex_long, ex_lock, ex_dl, ex_num, ex_cast, ex_ser, ex_bool, ex_float, ex_int, ex_bigint, ex_numeric, ex_json, ex_jsonb, ex_backslash, ex_hs, ex_arr, ex_uuid, ex_xml, ex_cidr, ex_inet, ex_mac, ex_point, ex_bit, ex_rng, ex_custom_pk, ex_insert_ret, ex_insert_ret2, ex_insert_ret3, ex_insert_ret5, ex_serial_seq, ex_def_seq, ex_ns_pk, ex_no_seq, ex_no_pk, ex_keyword, ex_include, ex_include2, ex_incl_kw, ex_incl_esc, ex_invalid_idx, ex_nulls_nd, ex_unparsed_defaults, ex_dates, ex_insert_ret4, ex_pk_seq, ex_txn, ex_txn_rb, ex_txn_sp, ex_ret, ex_upd, ex_del, ex_ret2, ex_multi, ex_null, test_no_returning CASCADE`,
+        `DROP TABLE IF EXISTS abba, ex_arr, ex_backslash, ex_bigint, ex_bigserial, ex_bit, ex_bool, ex_cast, ex_child, ex_cidr, ex_class, ex_custom_seqt, ex_del, ex_dl, ex_float, ex_hs, ex_idx_opts, ex_inet, ex_insert_pkfalse, ex_insert_ret5, ex_int, ex_json, ex_jsonb, ex_lock, ex_long, ex_mac, ex_multi, ex_notnull, ex_null, ex_num, ex_numeric, ex_parent, ex_point, ex_ret, ex_ret2, ex_rng, ex_ser, ex_serial, ex_txn, ex_txn_rb, ex_txn_sp, ex_uniq, ex_upd, ex_uuid, ex_xml, test_no_returning CASCADE`,
       );
 
       const tables = await adapter.execute(
@@ -271,20 +271,18 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`CREATE TABLE "ex_ser" ("id" SERIAL PRIMARY KEY, "val" INTEGER)`);
       await adapter.executeMutation(`INSERT INTO "ex_ser" (val) VALUES (0)`);
       await withSecondAdapter(PG_TEST_URL, async (adapter2) => {
-        // Both transactions get their snapshots before either commits.
         await adapter.beginIsolatedDbTransaction("serializable");
         await adapter2.beginIsolatedDbTransaction("serializable");
         try {
-          // Both read the same row (establishes the SSI read-set).
           await adapter.execute(`SELECT * FROM "ex_ser"`);
           await adapter2.execute(`SELECT * FROM "ex_ser"`);
-          // Both write to that row.
+
           await adapter.execute(`UPDATE "ex_ser" SET val = 1`);
-          // adapter commits first.
+
           await adapter.commit();
-          // adapter2's write waits for adapter's lock, then writes.
+
           await adapter2.execute(`UPDATE "ex_ser" SET val = 2`);
-          // PG SSI detects the rw-anti-dependency cycle; one transaction must abort.
+
           await expect(adapter2.commit()).rejects.toBeInstanceOf(SerializationFailure);
         } catch (e) {
           await adapter.rollback().catch(() => {});
@@ -362,10 +360,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    // ── Bind parameter rewriting + type round-trip ──────────────────────
-    // Our adapter rewrites ? → $1, $2. These tests verify that bind params
-    // work correctly with various PG types through INSERT and SELECT.
-
     it("boolean decoding", async () => {
       await adapter.exec(`CREATE TABLE "ex_bool" ("id" SERIAL PRIMARY KEY, "flag" BOOLEAN)`);
       await adapter.executeMutation(`INSERT INTO "ex_bool" ("flag") VALUES (?)`, [true]);
@@ -390,7 +384,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("integer decoding", async () => {
       await adapter.exec(`CREATE TABLE "ex_int" ("id" SERIAL PRIMARY KEY, "val" INTEGER)`);
-      // executeMutation with auto-RETURNING returns the inserted id
+
       const id = await adapter.executeMutation(`INSERT INTO "ex_int" ("val") VALUES (?)`, [42]);
       expect(id).toBeGreaterThan(0);
       const rows = await adapter.execute(`SELECT "val" FROM "ex_int" WHERE "id" = ?`, [id]);
@@ -424,7 +418,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         JSON.stringify(obj),
       ]);
       const rows = await adapter.execute(`SELECT "val" FROM "ex_json"`);
-      // adapter.execute returns raw strings for json/jsonb; Json#deserialize owns parsing
+
       expect(JSON.parse(rows[0].val as string)).toEqual(obj);
     });
 
@@ -433,7 +427,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.executeMutation(`INSERT INTO "ex_jsonb" ("val") VALUES (?)`, [
         JSON.stringify({ b: 2 }),
       ]);
-      // JSONB supports containment queries via bind params
+
       const rows = await adapter.execute(`SELECT "val" FROM "ex_jsonb" WHERE "val" @> ?::jsonb`, [
         '{"b":2}',
       ]);
@@ -461,7 +455,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("array decoding", async () => {
       await adapter.exec(`CREATE TABLE "ex_arr" ("id" SERIAL PRIMARY KEY, "val" INTEGER[])`);
       await adapter.executeMutation(`INSERT INTO "ex_arr" ("val") VALUES ('{1,2,3}')`);
-      // Test bind param in ANY() array query
+
       const rows = await adapter.execute(`SELECT "val" FROM "ex_arr" WHERE ? = ANY("val")`, [2]);
       expect(rows).toHaveLength(1);
       expect(rows[0].val).toEqual([1, 2, 3]);
@@ -476,9 +470,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(typeof rows[0].id).toBe("string");
       expect(String(rows[0].id)).toMatch(/^[0-9a-f-]{36}$/);
     });
-
-    // ── Transaction tests ─────────────────────────────────────────────
-    // Our adapter manages transactions, savepoints, and rollbacks.
 
     it("xml decoding", async () => {
       await adapter.exec(`CREATE TABLE "ex_xml" ("id" SERIAL PRIMARY KEY, "val" XML)`);
@@ -595,11 +586,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("exec insert with pk=false opt-out skips RETURNING and currval fallback", async () => {
-      // Mirrors Rails: `if use_insert_returning? || pk == false`. With
-      // pk === false PG must NOT auto-append `RETURNING id` (the path
-      // executeMutation would otherwise take). Advance the SERIAL sequence
-      // so the inserted id (101) can't be confused with a row-count of 1
-      // — if the opt-out leaked, the result would be the id 101.
       await adapter.exec(`CREATE TABLE "ex_insert_pkfalse" ("id" SERIAL PRIMARY KEY, "n" INT)`);
       await adapter.exec(`SELECT setval(pg_get_serial_sequence('ex_insert_pkfalse', 'id'), 100)`);
       try {
@@ -609,9 +595,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           [],
           false,
         );
-        // execQuery returns a Result whose toArray() is empty when no
-        // RETURNING is present (no rows projected back). If RETURNING
-        // had leaked, the Result's first row first column would be 101.
+
         expect((result as { toArray(): unknown[] }).toArray?.()).toEqual([]);
         const rows = await adapter.execute(`SELECT id, n FROM "ex_insert_pkfalse"`);
         expect(rows[0].id).toBe(101);
@@ -621,8 +605,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    // db_warnings_action tests — flat under PostgreSQLAdapterTest to mirror
-    // Rails (no sub-context). Hooks save/restore the static warnings config.
     let savedWarningsAction: typeof PostgreSQLAdapter.dbWarningsAction;
     let savedWarningsIgnore: typeof PostgreSQLAdapter.dbWarningsIgnore;
     beforeEach(() => {
@@ -636,7 +618,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
   });
 
-  // ── Transaction lifecycle tests ───────────────────────────────────
   describe("Transactions", () => {
     it("commit persists data", async () => {
       await adapter.exec(`CREATE TABLE "ex_txn" ("id" SERIAL PRIMARY KEY, "val" TEXT)`);
@@ -673,7 +654,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
   });
 
-  // ── executeMutation auto-RETURNING tests ──────────────────────────
   describe("executeMutation RETURNING", () => {
     it("returns inserted id for serial pk", async () => {
       await adapter.exec(`CREATE TABLE "ex_ret" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
@@ -718,7 +698,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
   });
 
-  // ── Multiple bind parameter tests ─────────────────────────────────
   describe("Bind parameters", () => {
     it("rewrites multiple ? to $1 $2 $3", async () => {
       await adapter.exec(
@@ -748,7 +727,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
   });
 
-  // ── Column reflection ──────────────────────────────────────────────
   describe("Column reflection", () => {
     afterEach(async () => {
       await adapter.execute(`DROP TABLE IF EXISTS col_reflection_test CASCADE`);
@@ -805,7 +783,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           mood col_reflection_mood
         )
       `);
-      // Reload the OID type map so the newly created enum type is registered.
+
       await adapter.loadAdditionalTypes();
       const cols = await adapter.columns("col_reflection_test");
       const mood = cols.find((c) => c.name === "mood")!;
@@ -813,7 +791,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
   });
 
-  // ── DatabaseStatements ────────────────────────────────────────────
   describe("DatabaseStatements", () => {
     it("isWriteQuery returns false for read-like statements", () => {
       expect(adapter.isWriteQuery("SELECT 1")).toBe(false);
@@ -823,8 +800,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("highPrecisionCurrentTimestamp returns CURRENT_TIMESTAMP literal", () => {
       const ts = adapter.highPrecisionCurrentTimestamp();
-      // `to_sql` compiles through an engine's connection (arel/nodes/node.rb:148-153);
-      // this suite builds its adapter directly rather than through Base's pool.
+
       expect(ts.toSql({ connection: adapter })).toBe("CURRENT_TIMESTAMP");
     });
 
@@ -854,7 +830,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
   });
 
-  // ── Top-level adapter methods (PR C) ──────────────────────────────
   describe("PostgreSQLAdapter top-level methods", () => {
     it("nativeDatabaseTypes includes expected pg types", () => {
       const types = PostgreSQLAdapter.nativeDatabaseTypes();
@@ -910,8 +885,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("maxIdentifierLength returns a positive integer", async () => {
-      // warmMaxIdentifierLength runs the lazy SHOW query and populates the memo
-      // that the synchronous accessor (read by the DatabaseLimits mixin) returns.
       const len = await adapter.warmMaxIdentifierLength();
       expect(len).toBeGreaterThan(0);
       expect(Number.isInteger(len)).toBe(true);
@@ -974,21 +947,13 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("in-flight acquire adoption race", () => {
-    // A disconnectBang()/close() that races an in-flight _doAcquire() (suspended
-    // at `await newClient(...)`) must not let that stale acquire adopt/publish
-    // its pre-disconnect client after a checkout verify → reconnect clears
-    // _closed. disconnectBang/close bump _acquireGeneration; the resolving
-    // connect sees a stale generation and end()s its socket instead of adopting
-    // it. The disconnect/close analogue of the discard fix in PR #4303.
     type Deferred = { promise: Promise<pg.Client>; resolve: (c: pg.Client) => void };
     const defer = (): Deferred => {
       let resolve!: (c: pg.Client) => void;
       const promise = new Promise<pg.Client>((r) => (resolve = r));
       return { promise, resolve };
     };
-    // Wait until `newClient` has been called at least `n` times — the acquire
-    // reaches the connect only after the _inFlightReset / _maintenanceTail
-    // awaits, so poll on the call count rather than a fixed microtask count.
+
     const waitForNewClientCalls = async (
       spy: { mock: { calls: unknown[] } },
       n: number,
@@ -1009,30 +974,20 @@ describeIfPg("PostgreSQLAdapter", () => {
         .mockImplementationOnce(() => first.promise)
         .mockImplementationOnce(() => second.promise);
       try {
-        // First acquire suspends at `await newClient(...)` (generation 0).
         const firstAcquire = a.connect();
         await waitForNewClientCalls(spy, 1);
 
-        // disconnect while the connect is in flight: bumps the generation.
         a.disconnectBang();
 
-        // A checkout reconnect clears _closed and _rawConnection, then opens a
-        // fresh connect (generation 1) which also suspends.
         const reconnect = a.reconnect();
         await waitForNewClientCalls(spy, 2);
 
-        // The pre-disconnect connect resolves NOW, while _rawConnection is null
-        // and _closed is false — the exact window the adoption race exploits.
         first.resolve(orphan);
         await expect(firstAcquire).rejects.toBeTruthy();
 
-        // The stale acquire tore its client down instead of adopting it: it
-        // did NOT publish onto _rawConnection (still null — the reconnect's own
-        // connect has not resolved yet) and end()ed the socket.
         expect(endSpy).toHaveBeenCalled();
         expect(a._rawConnectionForTest()).toBeNull();
 
-        // The fresh reconnect publishes its own client and works.
         second.resolve(reconnected);
         await reconnect;
         expect(a._rawConnectionForTest()).toBe(reconnected);
@@ -1044,12 +999,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("orphaned acquire still fails when the racing reconnect publishes first", async () => {
-      // The reconnect wins the open race and publishes _rawConnection BEFORE the
-      // orphaned pre-disconnect connect resolves. A stale-generation acquire
-      // must fail uniformly here too — it must NOT fall through to adopt the
-      // now-valid post-disconnect connection (the pre-#4842 _rawConnection != null
-      // fallback would have). Locks in the deliberate "orphaned acquire never
-      // succeeds" semantics rather than a race-timing-dependent outcome.
       const a = new PostgreSQLAdapter(PG_TEST_URL);
       const orphan = await PostgreSQLAdapter.newClient({ connectionString: PG_TEST_URL });
       const reconnected = await PostgreSQLAdapter.newClient({ connectionString: PG_TEST_URL });
@@ -1065,16 +1014,12 @@ describeIfPg("PostgreSQLAdapter", () => {
 
         a.disconnectBang();
 
-        // Reconnect resolves fully first: _rawConnection is now `reconnected`.
         await a.reconnect();
         expect(a._rawConnectionForTest()).toBe(reconnected);
 
-        // Only now does the orphaned pre-disconnect connect resolve.
         first.resolve(orphan);
         await expect(firstAcquire).rejects.toBeTruthy();
 
-        // It tore down its own client and left the valid reconnect untouched —
-        // it did NOT overwrite or adopt `reconnected`.
         expect(endSpy).toHaveBeenCalled();
         expect(a._rawConnectionForTest()).toBe(reconnected);
       } finally {
@@ -1086,23 +1031,16 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("lock sharing", () => {
-    // Regression: withRawConnection and the transaction manager must share one
-    // reentrant lock (Rails' single @lock). With separate locks a transaction
-    // (holds the tx lock, then its write wants the raw lock) racing a bare write
-    // (holds the raw lock, then materializeTransactions wants the tx lock)
-    // deadlocks (ABBA) — the hang that routing writes through withRawConnection
-    // surfaced. See abstract-adapter.ts withRawConnection.
     it("concurrent transaction and bare write do not deadlock", async () => {
       await adapter.exec('DROP TABLE IF EXISTS "abba" CASCADE');
       await adapter.exec('CREATE TABLE "abba" ("id" SERIAL PRIMARY KEY, "n" INT)');
       const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-      // Transaction holds the lock, then (after a gap) writes — needs the raw lock.
+
       const inTx = adapter.transaction(async () => {
         await delay(150);
         await adapter.executeMutation(`INSERT INTO "abba" ("n") VALUES (1)`);
       });
-      // Bare write races into the gap: grabs the raw lock, then materialize wants
-      // the tx lock. Separate locks → ABBA deadlock; one shared lock → serializes.
+
       const bare = (async () => {
         await delay(50);
         await adapter.executeMutation(`INSERT INTO "abba" ("n") VALUES (2)`);
@@ -1115,12 +1053,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("connected?", () => {
-    // Mirrors Rails' `connected?`
-    // (`!(@raw_connection.nil? || @raw_connection.finished?)`): once the
-    // underlying socket is gone, `connected?`/`isConnected()` reports false even
-    // though the adapter has not nulled its handle (no `disconnect!`). Closing
-    // the live pg.Client underneath the adapter is the node-pg analog of a
-    // server-side `pg_terminate_backend` / `PQfinish`.
     it("connected? is false after the raw connection is finished", async () => {
       await adapter.exec("SELECT 1");
       const rawConnection = (adapter as unknown as { _rawConnection: pg.Client | null })
@@ -1128,8 +1060,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rawConnection).not.toBeNull();
       expect(adapter.isConnected()).toBe(true);
 
-      // Finish the socket without going through disconnectBang, so _connection
-      // is still set but the client is `finished?`.
       await rawConnection!.end();
 
       expect(adapter.isConnected()).toBe(false);
@@ -1141,8 +1071,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const def = adapter.buildChangeColumnDefinition("users", "age", "integer");
       expect(def.name).toBe("age");
       expect(def.column.name).toBe("age");
-      // Like Rails, the builder leaves sqlType unset — the visitor computes it
-      // on accept, so the emitted DDL carries the resolved SQL type.
+
       expect(await adapter.schemaCreation.accept(def)).toContain("TYPE integer");
     });
 
@@ -1235,11 +1164,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("extracts :to from a {from:, to:} change hash", async () => {
-      // Rails' extract_new_default_value only unwraps a {from:, to:} change
-      // hash when BOTH keys are present (abstract/schema_statements.rb:1820);
-      // otherwise the argument is treated as a literal default. (This is an
-      // internal unit test, not a test:compare Rails mirror, so renaming it to
-      // match the Rails-faithful behavior is safe.)
       const def = await adapter.buildChangeColumnDefaultDefinition("bcd_test", "score", {
         from: 0,
         to: 99,
@@ -1310,7 +1234,7 @@ describe("PostgreSQLAdapter#columnMethodNames", () => {
     ]) {
       expect(names).toContain(name);
     }
-    // Abstract names still present; native-types `primary_key` is not surfaced.
+
     expect(names).toContain("virtual");
     expect(names).not.toContain("primary_key");
   });
@@ -1318,13 +1242,11 @@ describe("PostgreSQLAdapter#columnMethodNames", () => {
 
 describe("PostgreSQLAdapter supports_* predicates (unit)", () => {
   function makeAdapter(): PostgreSQLAdapter {
-    // Create adapter with a dummy config — we'll stub execute before any query runs
     const adapter = new PostgreSQLAdapter({ host: "stub", port: 0 });
     return adapter;
   }
 
   function stubVersion(adapter: PostgreSQLAdapter, version: number): void {
-    // Bypass _ensureInitialized by directly setting internal state
     (adapter as any)._initialized = true;
     (adapter as any)._databaseVersion = version;
     (adapter as any)._hasOptimizerHints = false;
@@ -1358,7 +1280,6 @@ describe("PostgreSQLAdapter supports_* predicates (unit)", () => {
   it("version-gated predicates respect version thresholds", () => {
     const adapter = makeAdapter();
 
-    // PG 9.3 — below most version gates
     stubVersion(adapter, 90300);
     expect(adapter.supportsInsertOnConflict()).toBe(false);
     expect(adapter.supportsPgcryptoUuid()).toBe(false);
@@ -1368,7 +1289,6 @@ describe("PostgreSQLAdapter supports_* predicates (unit)", () => {
     expect(adapter.supportsRestartDbTransaction()).toBe(false);
     expect(adapter.supportsNullsNotDistinct()).toBe(false);
 
-    // PG 9.5 — insert on conflict
     stubVersion(adapter, 90500);
     expect(adapter.supportsInsertOnConflict()).toBe(true);
     expect(adapter.supportsInsertOnDuplicateSkip()).toBe(true);
@@ -1376,22 +1296,18 @@ describe("PostgreSQLAdapter supports_* predicates (unit)", () => {
     expect(adapter.supportsInsertConflictTarget()).toBe(true);
     expect(adapter.supportsPgcryptoUuid()).toBe(true);
 
-    // PG 10 — identity columns, native partitioning
     stubVersion(adapter, 100000);
     expect(adapter.supportsIdentityColumns()).toBe(true);
     expect(adapter.supportsNativePartitioning()).toBe(true);
 
-    // PG 11 — partitioned indexes, index include
     stubVersion(adapter, 110000);
     expect(adapter.supportsPartitionedIndexes()).toBe(true);
     expect(adapter.supportsIndexInclude()).toBe(true);
 
-    // PG 12 — virtual columns, restart db transaction
     stubVersion(adapter, 120000);
     expect(adapter.supportsVirtualColumns()).toBe(true);
     expect(adapter.supportsRestartDbTransaction()).toBe(true);
 
-    // PG 15 — nulls not distinct
     stubVersion(adapter, 150000);
     expect(adapter.supportsNullsNotDistinct()).toBe(true);
   });
@@ -1411,7 +1327,7 @@ describe("PostgreSQLAdapter supports_* predicates (unit)", () => {
     expect(adapter.typeToSql("datetime", { precision: 6 })).toBe("timestamp(6)");
     expect(adapter.typeToSql("datetime", { precision: 0 })).toBe("timestamp(0)");
     expect(adapter.typeToSql("datetime", { precision: 3 })).toBe("timestamp(3)");
-    // typeToSql itself has no default — addColumn supplies the default
+
     expect(adapter.typeToSql("datetime")).toBe("timestamp");
   });
 });
