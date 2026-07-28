@@ -1,7 +1,6 @@
 {
   "privateAdapter": [
     "packages/activerecord/src/adapter-prevent-writes.test.ts",
-    "packages/activerecord/src/adapters/sqlite3-adapter.test.ts",
     "packages/activerecord/src/adapters/sqlite3/bind-parameter.test.ts",
     "packages/activerecord/src/adapters/sqlite3/sqlite3-adapter.test.ts",
     "packages/activerecord/src/adapters/sqlite3/transaction.test.ts",
