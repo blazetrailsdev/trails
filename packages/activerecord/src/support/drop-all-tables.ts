@@ -22,10 +22,23 @@ const CANONICAL_TABLE_NAMES: ReadonlySet<string> = new Set(Object.keys(TEST_SCHE
  * one `load_schema` in Rails, so both are truncated between tests rather than
  * dropped.
  */
+const _bootLaidByAdapter = new Map<string, ReadonlySet<string>>();
+
 function bootLaidTableNames(adapter: DatabaseAdapter): ReadonlySet<string> {
-  const specific = adapterSpecificTableNames(adapter.adapterName);
-  if (specific.length === 0) return CANONICAL_TABLE_NAMES;
-  return new Set([...CANONICAL_TABLE_NAMES, ...specific]);
+  const name = adapter.adapterName;
+  // Memoized: this runs in the between-test reset, and both inputs are
+  // module-level constants, so the ~330-name Set is built at most once per
+  // adapter per worker.
+  let cached = _bootLaidByAdapter.get(name);
+  if (!cached) {
+    const specific = adapterSpecificTableNames(name);
+    cached =
+      specific.length === 0
+        ? CANONICAL_TABLE_NAMES
+        : new Set([...CANONICAL_TABLE_NAMES, ...specific]);
+    _bootLaidByAdapter.set(name, cached);
+  }
+  return cached;
 }
 
 /**

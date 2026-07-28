@@ -18,8 +18,13 @@ import { loadCanonicalSchema } from "./canonical-schema.js";
  * by story `port-postgresql-specific-schema-remainder`.
  */
 async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise<void> {
+  // `supportsPgcryptoUuid()` / `supportsVirtualColumns()` read the cached
+  // `databaseVersion`, whose sync getter throws until the version has been
+  // fetched once.
+  await adapter.getDatabaseVersion();
+
   await adapter.enableExtension("uuid-ossp");
-  await adapter.enableExtension("pgcrypto");
+  if (adapter.supportsPgcryptoUuid()) await adapter.enableExtension("pgcrypto");
 
   await adapter.createTable("chat_messages", { id: "uuid", force: true }, (t) => {
     (t as PgTableDefinition).text("content");
@@ -133,27 +138,26 @@ async function loadMysql2SpecificSchema(adapter: AbstractMysqlAdapter): Promise<
  */
 async function loadSqliteSpecificSchema(adapter: DatabaseAdapter): Promise<void> {
   await adapter.createTable("defaults", { force: true }, (t) => {
-    const table = t;
-    table.integer("random_number", { default: () => "ABS(RANDOM())" });
-    table.string("ruby_on_rails", { default: () => "('Ruby ' || 'on ' || 'Rails')" });
-    table.date("modified_date", { default: () => "CURRENT_DATE" });
-    table.date("modified_date_function", { default: () => "DATE('now')" });
-    table.date("fixed_date", { default: "2004-01-01" });
-    table.datetime("modified_time", { default: () => "CURRENT_TIMESTAMP" });
-    table.datetime("modified_time_without_precision", {
+    t.integer("random_number", { default: () => "ABS(RANDOM())" });
+    t.string("ruby_on_rails", { default: () => "('Ruby ' || 'on ' || 'Rails')" });
+    t.date("modified_date", { default: () => "CURRENT_DATE" });
+    t.date("modified_date_function", { default: () => "DATE('now')" });
+    t.date("fixed_date", { default: "2004-01-01" });
+    t.datetime("modified_time", { default: () => "CURRENT_TIMESTAMP" });
+    t.datetime("modified_time_without_precision", {
       precision: null,
       default: () => "CURRENT_TIMESTAMP",
     });
-    table.datetime("modified_time_with_precision_0", {
+    t.datetime("modified_time_with_precision_0", {
       precision: 0,
       default: () => "CURRENT_TIMESTAMP",
     });
-    table.datetime("modified_time_function", { default: () => "DATETIME('now')" });
-    table.datetime("fixed_time", { default: "2004-01-01 00:00:00.000000-00" });
-    table.column("char1", "char(1)", { default: "Y" });
-    table.string("char2", { limit: 50, default: "a varchar field" });
-    table.text("char3", { default: "a text field" });
-    table.text("multiline_default", { default: "--- []\n\n" });
+    t.datetime("modified_time_function", { default: () => "DATETIME('now')" });
+    t.datetime("fixed_time", { default: "2004-01-01 00:00:00.000000-00" });
+    t.column("char1", "char(1)", { default: "Y" });
+    t.string("char2", { limit: 50, default: "a varchar field" });
+    t.text("char3", { default: "a text field" });
+    t.text("multiline_default", { default: "--- []\n\n" });
   });
 }
 
