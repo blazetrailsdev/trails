@@ -1501,7 +1501,7 @@ describe("buildReport — @noRailsEquivalent tags", () => {
     expect(pkg.totalNovel).toBe(0);
     expect(pkg.totalAllowlisted).toBe(1);
     expect(pkg.extraFiles).toEqual([]);
-    expect(report.tagged).toEqual({ total: 1, matched: 1, stale: [] });
+    expect(report.tagged).toEqual({ total: 1, matched: 1, inheritedMatched: 0, stale: [] });
     expect(report).not.toHaveProperty("allowlist");
   });
 
@@ -1560,7 +1560,7 @@ describe("buildReport — @noRailsEquivalent tags", () => {
     const report = run(m);
     expect(report.packages[0].totalNovel).toBe(0);
     expect(report.packages[0].totalAllowlisted).toBe(1);
-    expect(report.tagged).toEqual({ total: 0, matched: 1, stale: [] });
+    expect(report.tagged).toEqual({ total: 0, matched: 0, inheritedMatched: 1, stale: [] });
   });
 
   it("does not judge tags of packages this run never scanned", () => {
@@ -1815,6 +1815,7 @@ describe("@noRailsEquivalent — extractor to report", () => {
     expect(report.tagged).toEqual({
       total: 1,
       matched: 1,
+      inheritedMatched: 0,
       stale: [],
     });
     expect(report.packages[0].totalAllowlisted).toBe(1);
@@ -1859,7 +1860,7 @@ describe("@noRailsEquivalent — extractor to report", () => {
       { source: "typescript", generatedAt: "", packages: { activerecord: tsPkg } },
       { filterPkg: null, excludeGlobs: [], novelOnly: false, topN: 50 },
     );
-    expect(report.tagged).toEqual({ total: 1, matched: 1, stale: [] });
+    expect(report.tagged).toEqual({ total: 1, matched: 1, inheritedMatched: 0, stale: [] });
     expect(report.packages[0].totalAllowlisted).toBe(1);
     expect(report.packages[0].totalNovel).toBe(0);
   });

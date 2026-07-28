@@ -1409,7 +1409,8 @@ export function hasInternalJsDocTag(node: ts.Node): boolean {
  * Read on members, statements and properties, and on class / interface /
  * namespace declarations (where it lands on `ClassInfo.noRailsEquivalent`) —
  * the latter is the only inline form available to an extra whose declaration
- * is the extra name itself.
+ * is the extra name itself, and on an `interface` it covers the members too
+ * (see `collectTaggedEntries` in extra-surface.ts).
  * Continuation lines belong to the tag and are joined into one line; the prose
  * is otherwise preserved verbatim. An empty reason is a hard error: the tag is
  * the only thing standing between a name and the extra-surface count, so an

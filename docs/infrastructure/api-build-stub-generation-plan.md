@@ -286,7 +286,12 @@ report). They therefore share:
   a class, interface, or namespace DECLARATION, where it justifies the
   declared name itself — the only inline form available to an extra that is a
   declaration rather than a member (e.g. a class Rails nests but TS must
-  export as a sibling).
+  export as a sibling). On an `interface` the declaration tag additionally
+  covers every MEMBER: an interface that types a duck-typed collaborator has no
+  Ruby counterpart by construction, so neither can its members, and Ruby writes
+  no such declaration to compare against. Classes are excluded from that spread
+  — a tagged class name is an extractor-shape artifact whose members do have
+  Ruby counterparts.
 - **Grammar** — free prose after the tag; where a key token precedes the
   reason it is em-dash-separated (`@missingRailsCall` takes a Ruby call name
   as that token, `@noRailsEquivalent` takes none); continuation lines with no

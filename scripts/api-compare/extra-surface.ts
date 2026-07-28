@@ -421,8 +421,16 @@ interface PackageTotals {
 }
 
 interface TaggedSummary {
+  /** Tags actually WRITTEN in the source — inherited entries excluded. */
   total: number;
+  /** Written tags that matched an extra. */
   matched: number;
+  /**
+   * Extras allowed by an entry inherited from a tagged `interface` declaration
+   * rather than by a tag of their own. Counted apart from `matched` so the two
+   * numbers stay comparable with `total`, which counts written tags only.
+   */
+  inheritedMatched: number;
   stale: TaggedEntry[];
 }
 
@@ -1140,7 +1148,11 @@ function printHumanReport(report: Report, topN: number, maxDetail: number): void
   );
   console.log(
     `\n${p.dim}@noRailsEquivalent tags: ${report.tagged.total} tag(s), ` +
-      `${report.tagged.matched} matched — allowed extras are subtracted from the counts above.${p.reset}`,
+      `${report.tagged.matched} matched` +
+      (report.tagged.inheritedMatched > 0
+        ? ` (+${report.tagged.inheritedMatched} allowed by a tagged interface declaration)`
+        : "") +
+      ` — allowed extras are subtracted from the counts above.${p.reset}`,
   );
 
   console.log(
@@ -1239,9 +1251,13 @@ export function buildReport(
     (e) => !e.inherited && scannedPkgs.has(e.package) && !matchedTagKeys.has(allowKeyOf(e)),
   );
 
+  const inheritedKeys = new Set(tagged.filter((e) => e.inherited).map(allowKeyOf));
+  const inheritedMatched = [...matchedTagKeys].filter((k) => inheritedKeys.has(k)).length;
+
   const taggedSummary: TaggedSummary = {
     total: tagged.filter((e) => !e.inherited).length,
-    matched: matchedTagKeys.size,
+    matched: matchedTagKeys.size - inheritedMatched,
+    inheritedMatched,
     stale: staleTagged,
   };
   return {
