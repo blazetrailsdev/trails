@@ -115,6 +115,24 @@ describe("SchemaMigration#assumeMigratedUptoVersion (trails)", () => {
     expect(await schemaMigration.versions()).toEqual([]);
   });
 
+  // Rails' `detect { |v| inserting.count(v) > 1 }` (schema_statements.rb:1377)
+  // reports the first element that repeats, not the first repeat encountered:
+  // for [B, A, A, B] it cites B, reached at index 0, even though A's second
+  // occurrence comes first.
+  it("cites the first repeating version when two versions repeat", async () => {
+    await expect(
+      schemaMigration.assumeMigratedUptoVersion(
+        20200103000000,
+        [20200102000000, 20200101000000, 20200101000000, 20200102000000],
+      ),
+    ).rejects.toThrow(
+      "Duplicate migration 20200102000000. Please renumber your migrations to resolve the conflict.",
+    );
+
+    expect(insertStatements()).toEqual([]);
+    expect(await schemaMigration.versions()).toEqual([]);
+  });
+
   // Rails builds the duplicate check from `inserting`, not from every supplied
   // version (schema_statements.rb:1375-1379), so an already-migrated repeat is
   // subtracted out before the check ever sees it.

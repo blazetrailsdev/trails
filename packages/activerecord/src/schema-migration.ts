@@ -193,14 +193,20 @@ export class SchemaMigration {
       ({ normalized: n, num }) => num < versionNum && !migrated.has(n),
     );
 
-    const seen = new Set<string>();
-    for (const { normalized: n, original } of inserting) {
-      if (seen.has(n)) {
-        throw new Error(
-          `Duplicate migration ${original}. Please renumber your migrations to resolve the conflict.`,
-        );
-      }
-      seen.add(n);
+    // Rails: inserting.detect { |v| inserting.count(v) > 1 }
+    // (schema_statements.rb:1377) — the FIRST element that occurs more than
+    // once, not the first repeat encountered. With two distinct duplicated
+    // values the two differ: for [B, A, A, B] `detect` reports B, while a
+    // seen-set walk would reach A's second occurrence first and report A.
+    const counts = new Map<string, number>();
+    for (const { normalized: n } of inserting) {
+      counts.set(n, (counts.get(n) ?? 0) + 1);
+    }
+    const duplicate = inserting.find(({ normalized: n }) => (counts.get(n) ?? 0) > 1);
+    if (duplicate) {
+      throw new Error(
+        `Duplicate migration ${duplicate.original}. Please renumber your migrations to resolve the conflict.`,
+      );
     }
 
     // All validation passed — now write.
