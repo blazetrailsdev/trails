@@ -9,6 +9,12 @@ on:
     #   run-parity-sqlite   — schema + query parity (SQLite fixtures)
     #   run-parity-postgres — Postgres-specific parity (future)
     #   run-parity-mysql    — MySQL/MariaDB-specific parity (future)
+    #   run-sqlite-mem      — the ARCONN=sqlite3_mem AR suite (otherwise only
+    #                         main / the weekly sweep / workflow_dispatch).
+    #                         Runs the lane for a look; does NOT gate the merge
+    #                         — `sqlite-mem-tests` is deliberately absent from
+    #                         the `ci` aggregator's `needs:`, so a failure here
+    #                         is red on its own job and nothing else.
     #   website             — force the Website build on a PR that doesn't
     #                         touch packages/website/
     #   release             — implies `website` (release PRs need the site
@@ -871,6 +877,37 @@ jobs:
       # / perturb fork scheduling — see trails-models-dump tests).
       - run: pnpm vitest run packages/activerecord/
       - run: pnpm vitest run packages/activerecord-cli
+
+  # `ARCONN=sqlite3_mem` is the only lane where `in_memory_db?` is true, so
+  # without it every `skipIf(inMemoryDb())` guard is dead code (RFC 0029).
+  #
+  # A second full pass over the AR suite, so deliberately not in the `ci`
+  # aggregator's `needs:` and not on every PR: it runs on `main`, on the Monday
+  # sweep (where `changes` forces every gate true), on `workflow_dispatch`, and
+  # on a PR labelled `run-sqlite-mem`. Not `continue-on-error` — a failure is a
+  # red job.
+  sqlite-mem-tests:
+    name: "Active Record SQLite :memory: Tests"
+    needs: changes
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.activerecord_affected == 'true' &&
+      (github.event_name != 'pull_request' ||
+       contains(github.event.pull_request.labels.*.name, 'run-sqlite-mem'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - uses: ./.github/actions/cache-build
+      - run: pnpm build
+      # Trailing slash for the reason given on `sqlite-tests`. The CLI package
+      # is excluded: it owns no `inMemoryDb()` guards, so it has nothing this
+      # lane can check.
+      - run: pnpm vitest run packages/activerecord/
+        env:
+          ARCONN: sqlite3_mem
 
   # Reporting-only AR coverage (story ar-sqlite-lane-coverage-reporting, RFC
   # 0028). Runs the sqlite AR suite (the cheapest backend) with v8 coverage and

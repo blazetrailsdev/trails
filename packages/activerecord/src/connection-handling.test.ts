@@ -18,6 +18,7 @@ import {
 import { setTrailsRoot } from "@blazetrails/activesupport";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
 import { adapterType } from "./test-adapter.js";
+import { inMemoryDb } from "./support/adapter-helper.js";
 import * as nodeFs from "node:fs";
 import * as nodeOs from "node:os";
 import * as nodePath from "node:path";
@@ -41,6 +42,12 @@ describe("ConnectionHandlingTest", () => {
     await setupConnection();
   });
 
+  // Under ARCONN=sqlite3_mem this teardown discards the database along with the
+  // connections and re-establishes an EMPTY one, so no case in this describe
+  // may depend on the canonical schema — including the ones left unguarded
+  // below. Today none does. A ported case that touches a table has to either
+  // take `it.skipIf(inMemoryDb())` like its neighbours or live in the
+  // fixture-bearing describe at the bottom of this file.
   afterEach(async () => {
     connectedToStack().length = 0;
     await Base.connectionHandler.clearAllConnectionsBang();
@@ -48,46 +55,64 @@ describe("ConnectionHandlingTest", () => {
     await setupConnection();
   });
 
-  it("#with_connection lease the connection for the duration of the block", async () => {
-    Base.releaseConnection();
-    const pool = Base.connectionPool();
-    expect(pool.activeConnection).toBeNull();
-    await Base.withConnection((conn) => {
-      expect(conn).toBeTruthy();
-      expect(pool.activeConnection).toBeTruthy();
-    });
-  });
+  // Rails puts every one of its `ConnectionHandlingTest` cases inside
+  // `unless in_memory_db?` (connection_handling_test.rb:18-185): they release
+  // and re-lease `Base`'s connection, and on `:memory:` the released connection
+  // takes the database with it. Per-`it` rather than a wrapping `describe`
+  // because this file also holds cases with no Rails counterpart, and the
+  // test:compare gate extractor only resolves inline `it.skipIf(...)`.
+  it.skipIf(inMemoryDb())(
+    "#with_connection lease the connection for the duration of the block",
+    async () => {
+      Base.releaseConnection();
+      const pool = Base.connectionPool();
+      expect(pool.activeConnection).toBeNull();
+      await Base.withConnection((conn) => {
+        expect(conn).toBeTruthy();
+        expect(pool.activeConnection).toBeTruthy();
+      });
+    },
+  );
 
-  it("#lease_connection makes the lease permanent even inside #with_connection", async () => {
-    await Base.withConnection(async () => {
+  it.skipIf(inMemoryDb())(
+    "#lease_connection makes the lease permanent even inside #with_connection",
+    async () => {
+      await Base.withConnection(async () => {
+        const leased = await Base.leaseConnection();
+        expect(leased).toBeTruthy();
+      });
+      // leaseConnection makes sticky=true, so connection persists
+      expect(Base.connectionPool().activeConnection).toBeTruthy();
+      Base.releaseConnection();
+    },
+  );
+
+  it.skipIf(inMemoryDb())(
+    "#lease_connection makes the lease permanent even inside #with_connection(prevent_permanent_checkout: true)",
+    async () => {
+      Base.releaseConnection();
+      await Base.withConnection(
+        async (connection) => {
+          expect(await Base.leaseConnection()).toBe(connection);
+        },
+        { preventPermanentCheckout: true },
+      );
+      expect(Base.connectionPool().activeConnection).toBeNull();
+    },
+  );
+
+  it.skipIf(inMemoryDb())(
+    "#with_connection use the already leased connection if available",
+    async () => {
       const leased = await Base.leaseConnection();
-      expect(leased).toBeTruthy();
-    });
-    // leaseConnection makes sticky=true, so connection persists
-    expect(Base.connectionPool().activeConnection).toBeTruthy();
-    Base.releaseConnection();
-  });
+      await Base.withConnection((conn) => {
+        expect(conn).toBe(leased);
+      });
+      Base.releaseConnection();
+    },
+  );
 
-  it("#lease_connection makes the lease permanent even inside #with_connection(prevent_permanent_checkout: true)", async () => {
-    Base.releaseConnection();
-    await Base.withConnection(
-      async (connection) => {
-        expect(await Base.leaseConnection()).toBe(connection);
-      },
-      { preventPermanentCheckout: true },
-    );
-    expect(Base.connectionPool().activeConnection).toBeNull();
-  });
-
-  it("#with_connection use the already leased connection if available", async () => {
-    const leased = await Base.leaseConnection();
-    await Base.withConnection((conn) => {
-      expect(conn).toBe(leased);
-    });
-    Base.releaseConnection();
-  });
-
-  it("#with_connection is reentrant", async () => {
+  it.skipIf(inMemoryDb())("#with_connection is reentrant", async () => {
     await Base.withConnection(async (outer) => {
       await Base.withConnection((inner) => {
         expect(inner).toBe(outer);
@@ -95,81 +120,93 @@ describe("ConnectionHandlingTest", () => {
     });
   });
 
-  it("#connection is a soft-deprecated alias to #lease_connection", async () => {
-    setPermanentConnectionCheckout(true);
-    Base.releaseConnection();
-    expect(Base.connectionPool().activeConnection).toBeNull();
+  it.skipIf(inMemoryDb())(
+    "#connection is a soft-deprecated alias to #lease_connection",
+    async () => {
+      setPermanentConnectionCheckout(true);
+      Base.releaseConnection();
+      expect(Base.connectionPool().activeConnection).toBeNull();
 
-    let conn: unknown;
-    await Base.withConnection(async (connection) => {
-      conn = connection;
+      let conn: unknown;
+      await Base.withConnection(async (connection) => {
+        conn = connection;
+        expect(Base.connectionPool().activeConnection).toBeTruthy();
+        expect(Base.connection).toBe(connection);
+        expect(Base.connection).toBe(connection);
+      });
+
       expect(Base.connectionPool().activeConnection).toBeTruthy();
-      expect(Base.connection).toBe(connection);
-      expect(Base.connection).toBe(connection);
-    });
-
-    expect(Base.connectionPool().activeConnection).toBeTruthy();
-    expect(Base.connection).toBe(conn);
-    Base.releaseConnection();
-  });
-
-  it("#connection emits a deprecation warning if ActiveRecord.permanent_connection_checkout == :deprecated", async () => {
-    setPermanentConnectionCheckout("deprecated");
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    try {
+      expect(Base.connection).toBe(conn);
       Base.releaseConnection();
+    },
+  );
 
-      void Base.connection;
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      warnSpy.mockClear();
+  it.skipIf(inMemoryDb())(
+    "#connection emits a deprecation warning if ActiveRecord.permanent_connection_checkout == :deprecated",
+    async () => {
+      setPermanentConnectionCheckout("deprecated");
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        Base.releaseConnection();
 
-      void Base.connection;
-      expect(warnSpy).not.toHaveBeenCalled();
-
-      Base.releaseConnection();
-
-      void Base.connection;
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      warnSpy.mockClear();
-      Base.releaseConnection();
-
-      await Base.withConnection(async () => {
         void Base.connection;
         expect(warnSpy).toHaveBeenCalledTimes(1);
-      });
-    } finally {
-      warnSpy.mockRestore();
-    }
-  });
+        warnSpy.mockClear();
 
-  it("#connection raises an error if ActiveRecord.permanent_connection_checkout == :disallowed", async () => {
-    setPermanentConnectionCheckout("disallowed");
-    Base.releaseConnection();
+        void Base.connection;
+        expect(warnSpy).not.toHaveBeenCalled();
 
-    expect(() => Base.connection).toThrow(ActiveRecordError);
+        Base.releaseConnection();
 
-    await Base.withConnection(async () => {
+        void Base.connection;
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        warnSpy.mockClear();
+        Base.releaseConnection();
+
+        await Base.withConnection(async () => {
+          void Base.connection;
+          expect(warnSpy).toHaveBeenCalledTimes(1);
+        });
+      } finally {
+        warnSpy.mockRestore();
+      }
+    },
+  );
+
+  it.skipIf(inMemoryDb())(
+    "#connection raises an error if ActiveRecord.permanent_connection_checkout == :disallowed",
+    async () => {
+      setPermanentConnectionCheckout("disallowed");
+      Base.releaseConnection();
+
       expect(() => Base.connection).toThrow(ActiveRecordError);
-    });
 
-    await Base.leaseConnection();
-    expect(() => Base.connection).not.toThrow();
-    Base.releaseConnection();
-  });
+      await Base.withConnection(async () => {
+        expect(() => Base.connection).toThrow(ActiveRecordError);
+      });
 
-  it("#connection doesn't make the lease permanent if inside #with_connection(prevent_permanent_checkout: true)", async () => {
-    setPermanentConnectionCheckout("disallowed");
-    Base.releaseConnection();
+      await Base.leaseConnection();
+      expect(() => Base.connection).not.toThrow();
+      Base.releaseConnection();
+    },
+  );
 
-    await Base.withConnection(
-      async (connection) => {
-        expect(Base.connection).toBe(connection);
-      },
-      { preventPermanentCheckout: true },
-    );
+  it.skipIf(inMemoryDb())(
+    "#connection doesn't make the lease permanent if inside #with_connection(prevent_permanent_checkout: true)",
+    async () => {
+      setPermanentConnectionCheckout("disallowed");
+      Base.releaseConnection();
 
-    expect(Base.connectionPool().activeConnection).toBeNull();
-  });
+      await Base.withConnection(
+        async (connection) => {
+          expect(Base.connection).toBe(connection);
+        },
+        { preventPermanentCheckout: true },
+      );
+
+      expect(Base.connectionPool().activeConnection).toBeNull();
+    },
+  );
 
   it("connected_to switches role for block", async () => {
     expect(currentRole.call(Base)).toBe("writing");
@@ -808,20 +845,23 @@ describe("ConnectionHandlingTest", () => {
     await Post.where({ title: "foo" }).deleteAll();
   });
 
-  it("common APIs don't permanently hold a connection when permanent checkout is deprecated or disallowed", async () => {
-    setPermanentConnectionCheckout("deprecated");
-    Base.releaseConnection();
-    expect(Base.connectionPool().activeConnection).toBeNull();
+  it.skipIf(inMemoryDb())(
+    "common APIs don't permanently hold a connection when permanent checkout is deprecated or disallowed",
+    async () => {
+      setPermanentConnectionCheckout("deprecated");
+      Base.releaseConnection();
+      expect(Base.connectionPool().activeConnection).toBeNull();
 
-    await Post.createBang({ title: "foo", body: "bar" });
-    expect(Post.connectionPool().activeConnection).toBeNull();
+      await Post.createBang({ title: "foo", body: "bar" });
+      expect(Post.connectionPool().activeConnection).toBeNull();
 
-    await Post.first();
-    expect(Post.connectionPool().activeConnection).toBeNull();
+      await Post.first();
+      expect(Post.connectionPool().activeConnection).toBeNull();
 
-    await Post.count();
-    expect(Post.connectionPool().activeConnection).toBeNull();
-  });
+      await Post.count();
+      expect(Post.connectionPool().activeConnection).toBeNull();
+    },
+  );
 });
 
 // trails-internal mechanism (no Rails counterpart): the connection threaded by
