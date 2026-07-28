@@ -2,11 +2,15 @@ import { afterAll, afterEach, describe, it, expect, beforeAll, vi } from "vitest
 import { Base } from "../base.js";
 import { setupHandlerSuite } from "./setup-handler-suite.js";
 import { dropAllTables, resetTestTables } from "./drop-all-tables.js";
-import { rebuildCanonicalTables } from "./canonical-table-rebuild.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
+import { openIsolatedDatabase, type IsolatedDatabase } from "./isolated-database.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
 let adapter: DatabaseAdapter;
+// The `dropAllTables` suite asserts a zero-table database, so it cannot ride
+// the per-worker adapter every other AR file shares: `test-setup-dy.ts` loads
+// the canonical schema once per worker, not once per file, and nothing would
+// lay it back down for the next file. It gets its own database instead.
+let isolated: IsolatedDatabase | undefined;
 
 async function listTables(a: DatabaseAdapter): Promise<string[]> {
   if (a.adapterName === "sqlite") {
@@ -38,17 +42,6 @@ setupHandlerSuite();
 
 beforeAll(() => {
   adapter = Base.adapter;
-});
-
-// The `dropAllTables` suite below asserts a zero-table database, so it wipes the
-// canonical schema out of the per-worker DB this file shares with every other
-// AR test file. Nothing lays it back down on its own — `test-setup-dy.ts` loads
-// the schema once per worker, not once per file — so restore it here or the next
-// file in this worker opens on an empty database. `schema_migrations` and
-// `ar_internal_metadata` are bookkeeping, not canonical, and are deliberately
-// left dropped (the Migrator tests want a clean `schema_migrations`).
-afterAll(async () => {
-  await rebuildCanonicalTables(adapter, Object.keys(TEST_SCHEMA));
 });
 
 describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
@@ -163,30 +156,54 @@ describe("resetTestTables", () => {
 });
 
 describe("dropAllTables", () => {
+  let dropAdapter: DatabaseAdapter;
+
+  beforeAll(async () => {
+    isolated = await openIsolatedDatabase("drop-all-tables");
+    dropAdapter = isolated.adapter;
+  });
+
+  afterAll(async () => {
+    await isolated?.close();
+    isolated = undefined;
+  });
+
   it("drops all tables", async () => {
-    await adapter.executeMutation(`CREATE TABLE drop_t1 (id INTEGER PRIMARY KEY)`);
-    await adapter.executeMutation(`CREATE TABLE drop_t2 (id INTEGER PRIMARY KEY)`);
-    await adapter.executeMutation(`CREATE TABLE drop_t3 (id INTEGER PRIMARY KEY)`);
-    await dropAllTables(adapter);
-    expect(await tableCount(adapter)).toBe(0);
+    await dropAdapter.executeMutation(`CREATE TABLE drop_t1 (id INTEGER PRIMARY KEY)`);
+    await dropAdapter.executeMutation(`CREATE TABLE drop_t2 (id INTEGER PRIMARY KEY)`);
+    await dropAdapter.executeMutation(`CREATE TABLE drop_t3 (id INTEGER PRIMARY KEY)`);
+    await dropAllTables(dropAdapter);
+    expect(await tableCount(dropAdapter)).toBe(0);
   });
 
   it("is idempotent — second call is a no-op", async () => {
-    await dropAllTables(adapter);
-    await dropAllTables(adapter);
-    expect(await tableCount(adapter)).toBe(0);
+    await dropAllTables(dropAdapter);
+    await dropAllTables(dropAdapter);
+    expect(await tableCount(dropAdapter)).toBe(0);
   });
 
   it("drops 3-table FK chain without error", async () => {
-    const int = adapter.adapterName === "mysql" ? "INT" : "INTEGER";
-    await adapter.executeMutation(`CREATE TABLE fk_parent (id ${int} PRIMARY KEY)`);
-    await adapter.executeMutation(
+    const int = dropAdapter.adapterName === "mysql" ? "INT" : "INTEGER";
+    await dropAdapter.executeMutation(`CREATE TABLE fk_parent (id ${int} PRIMARY KEY)`);
+    await dropAdapter.executeMutation(
       `CREATE TABLE fk_child (id ${int} PRIMARY KEY, parent_id ${int})`,
     );
-    await adapter.executeMutation(
+    await dropAdapter.executeMutation(
       `CREATE TABLE fk_grandchild (id ${int} PRIMARY KEY, child_id ${int})`,
     );
-    await dropAllTables(adapter);
-    expect(await tableCount(adapter)).toBe(0);
+    await dropAllTables(dropAdapter);
+    expect(await tableCount(dropAdapter)).toBe(0);
+  });
+});
+
+// Guards the isolation above: the per-worker database this file shares with
+// every other AR test file must still carry the canonical schema after the
+// zero-table suite has run. Before the isolation it was empty here.
+describe("dropAllTables (shared worker database)", () => {
+  it("leaves the shared canonical schema intact", async () => {
+    const tables = await listTables(adapter);
+    expect(tables.length).toBeGreaterThan(0);
+    expect(tables).toContain("items");
+    expect(tables).toContain("posts");
   });
 });
