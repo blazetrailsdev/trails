@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } fr
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { stdout } from "@blazetrails/activesupport";
 import { DatabaseTasks } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
@@ -776,11 +777,8 @@ function databaseTasksMigrationTestCase(): MigrationTestCase {
   beforeEach(async () => {
     if (skipMigrationTestCase) return;
     stdoutChunks = [];
-    // `Migration.logger` writes straight to `process.stdout` (activesupport
-    // logger.ts:64), so the capture has to sit there rather than on the
-    // activesupport `stdout` shim — both funnel through this write.
-    stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
-      stdoutChunks.push(typeof chunk === "string" ? chunk : chunk.toString());
+    stdoutSpy = vi.spyOn(stdout, "write").mockImplementation((chunk) => {
+      stdoutChunks.push(chunk);
       return true;
     });
     const ambient = ambientPoolConfiguration();
