@@ -89,5 +89,19 @@
     "rubyName": "uncacheable_methods",
     "call": "flat_map",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/delegation.ts",
+    "rubyName": "generated_relation_methods",
+    "call": "private_constant",
+    "reason": "Rails hides the GeneratedRelationMethods module constant; trails has no such constant to hide."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/delegation.ts",
+    "rubyName": "initialize_relation_delegate_cache",
+    "call": "private_constant",
+    "reason": "Rails hides each generated relation delegate class constant; trails' delegate cache holds classes directly, with no constant binding."
   }
 ]

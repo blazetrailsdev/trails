@@ -14,7 +14,7 @@ import { describe, it, expect } from "vitest";
 import { Base, registerModel, registerSubclass } from "./index.js";
 import { subclasses } from "./inheritance.js";
 import { modelRegistry } from "./associations.js";
-import { safeConstantize } from "@blazetrails/activesupport";
+import { constantize, safeConstantize } from "@blazetrails/activesupport";
 import { Author } from "./test-helpers/models/author.js";
 import "./test-helpers/models/country.js";
 
@@ -74,13 +74,10 @@ describe("registerModel canonical-name shadow guard", () => {
     expect(modelRegistry.has("RfStiSubXyz")).toBe(false);
   });
 
-  it("binds the habtm join model as a constant, wider than Rails' private_constant", () => {
-    // Rails const_sets the join model then marks it `private_constant`
-    // (associations.rb:1877-1878), so Ruby's const_get raises NameError here.
-    // trails has no private-constant concept — see the deviation note at
-    // associations/builder/has-and-belongs-to-many.ts.
-    expect(safeConstantize("Country::HABTM_Treaties")).toBe(
-      modelRegistry.get("Country::HABTM_Treaties"),
+  it("binds the habtm join model as a private constant", () => {
+    expect(safeConstantize("Country::HABTM_Treaties")).toBeUndefined();
+    expect(() => constantize("Country::HABTM_Treaties")).toThrow(
+      "private constant Country::HABTM_Treaties referenced",
     );
     expect(modelRegistry.get("Country::HABTM_Treaties")).toBeDefined();
   });
