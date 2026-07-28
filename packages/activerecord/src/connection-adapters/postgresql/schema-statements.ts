@@ -1,7 +1,7 @@
 /**
- * Option/result shapes for PostgreSQL-specific DDL operations. The statements
- * themselves live on PostgreSQLSchemaStatements (./schema-statements-class.ts),
- * mirroring ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements.
+ * PostgreSQL schema statements — PostgreSQL-specific DDL operations.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements
  */
 
 export interface PgIndexDefinition {
