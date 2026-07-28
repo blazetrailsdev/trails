@@ -3,7 +3,8 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { ambientConnection } from "../support/rocket-tables.js";
-import { describeIfSupports } from "../support/supports.js";
+import { describeIfSupports, itIfSupports } from "../support/supports.js";
+import { assertQueriesCount } from "../testing/query-assertions.js";
 
 async function withTestingTables(conn: AbstractAdapter, body: () => Promise<void>): Promise<void> {
   await conn.createTable("testing_parents", { force: true });
@@ -142,5 +143,154 @@ describeIfSupports("foreign_keys", "Migration", () => {
         ]);
       });
     });
+  });
+
+  describe("ReferencesForeignKeyInCreateTest", () => {
+    fixtures([], { useTransactionalTests: false });
+
+    it("foreign keys can be created with the table", async () => {
+      const conn = await ambientConnection();
+      await withTestingTables(conn, async () => {
+        await conn.createTable("testings", (t) => {
+          t.references("testing_parent", { foreignKey: true });
+        });
+
+        const fk = (await conn.foreignKeys("testings"))[0];
+        expect(fk.fromTable).toBe("testings");
+        expect(fk.toTable).toBe("testing_parents");
+      });
+    });
+
+    it("no foreign key is created by default", async () => {
+      const conn = await ambientConnection();
+      await withTestingTables(conn, async () => {
+        await conn.createTable("testings", (t) => {
+          t.references("testing_parent");
+        });
+
+        expect(await conn.foreignKeys("testings")).toEqual([]);
+      });
+    });
+
+    it("foreign keys can be created in one query when index is not added", async () => {
+      const conn = await ambientConnection();
+      await withTestingTables(conn, async () => {
+        await assertQueriesCount(1, false, async () => {
+          await conn.createTable("testings", (t) => {
+            t.references("testing_parent", { foreignKey: true, index: false });
+          });
+        });
+      });
+    });
+
+    it("options hash can be passed", async () => {
+      const conn = await ambientConnection();
+      await withTestingTables(conn, async () => {
+        await conn.changeTable("testing_parents", async (t) => {
+          await t.references("other", { index: { unique: true } });
+        });
+        await conn.createTable("testings", (t) => {
+          t.references("testing_parent", { foreignKey: { primaryKey: "other_id" } });
+        });
+
+        const fk = (await conn.foreignKeys("testings")).find(
+          (k) => k.toTable === "testing_parents",
+        );
+        expect(fk!.primaryKey).toBe("other_id");
+      });
+    });
+
+    it("to_table option can be passed", async () => {
+      const conn = await ambientConnection();
+      await withTestingTables(conn, async () => {
+        await conn.createTable("testings", (t) => {
+          t.references("parent", { foreignKey: { toTable: "testing_parents" } });
+        });
+
+        const fks = await conn.foreignKeys("testings");
+        expect(fks.map((fk) => [fk.fromTable, fk.toTable, fk.column])).toEqual([
+          ["testings", "testing_parents", "parent_id"],
+        ]);
+      });
+    });
+
+    itIfSupports("deferrable_constraints", "deferrable: false option can be passed", async () => {
+      const conn = await ambientConnection();
+      await withTestingTables(conn, async () => {
+        await conn.createTable("testings", (t) => {
+          t.references("testing_parent", { foreignKey: { deferrable: false } });
+        });
+
+        const fks = await conn.foreignKeys("testings");
+        expect(fks.map((fk) => [fk.fromTable, fk.toTable, fk.column, fk.deferrable])).toEqual([
+          ["testings", "testing_parents", "testing_parent_id", false],
+        ]);
+      });
+    });
+
+    itIfSupports(
+      "deferrable_constraints",
+      "deferrable: :immediate option can be passed",
+      async () => {
+        const conn = await ambientConnection();
+        await withTestingTables(conn, async () => {
+          await conn.createTable("testings", (t) => {
+            t.references("testing_parent", { foreignKey: { deferrable: "immediate" } });
+          });
+
+          const fks = await conn.foreignKeys("testings");
+          expect(fks.map((fk) => [fk.fromTable, fk.toTable, fk.column, fk.deferrable])).toEqual([
+            ["testings", "testing_parents", "testing_parent_id", "immediate"],
+          ]);
+        });
+      },
+    );
+
+    itIfSupports(
+      "deferrable_constraints",
+      "deferrable: :deferred option can be passed",
+      async () => {
+        const conn = await ambientConnection();
+        await withTestingTables(conn, async () => {
+          await conn.createTable("testings", (t) => {
+            t.references("testing_parent", { foreignKey: { deferrable: "deferred" } });
+          });
+
+          const fks = await conn.foreignKeys("testings");
+          expect(fks.map((fk) => [fk.fromTable, fk.toTable, fk.column, fk.deferrable])).toEqual([
+            ["testings", "testing_parents", "testing_parent_id", "deferred"],
+          ]);
+        });
+      },
+    );
+
+    itIfSupports(
+      "deferrable_constraints",
+      "deferrable and on_(delete|update) option can be passed",
+      async () => {
+        const conn = await ambientConnection();
+        await withTestingTables(conn, async () => {
+          await conn.createTable("testings", (t) => {
+            t.references("testing_parent", {
+              foreignKey: { onUpdate: "cascade", onDelete: "cascade", deferrable: "immediate" },
+            });
+          });
+
+          const fks = await conn.foreignKeys("testings");
+          expect(
+            fks.map((fk) => [
+              fk.fromTable,
+              fk.toTable,
+              fk.column,
+              fk.onDelete,
+              fk.onUpdate,
+              fk.deferrable,
+            ]),
+          ).toEqual([
+            ["testings", "testing_parents", "testing_parent_id", "cascade", "cascade", "immediate"],
+          ]);
+        });
+      },
+    );
   });
 });

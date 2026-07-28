@@ -1893,12 +1893,16 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   // from CREATE TABLE SQL since PRAGMA foreign_key_list doesn't expose it.
   private async _parseFkDeferrable(
     tableName: string,
-  ): Promise<Map<string, "immediate" | "deferred">> {
+  ): Promise<Map<string, "immediate" | "deferred" | false>> {
     const createSql = await this._getCreateTableSql(tableName);
-    const result = new Map<string, "immediate" | "deferred">();
+    const result = new Map<string, "immediate" | "deferred" | false>();
     if (!createSql) return result;
+    // Rails builds fk_defs from every `CONSTRAINT ... FOREIGN KEY` clause and
+    // records `mode || false` (sqlite3_adapter.rb:422-431), so a constraint
+    // without a DEFERRABLE clause reflects as `false`, not nil — the DEFERRABLE
+    // suffix is optional here for that reason.
     const fkRegex =
-      /FOREIGN KEY\s*\(([^)]+)\)\s*REFERENCES\s*"?([^"(,\s]+)"?\s*\(([^)]+)\)[^,)]*DEFERRABLE\s+INITIALLY\s+(\w+)/gi;
+      /CONSTRAINT\s+[^(]*?FOREIGN KEY\s*\(([^)]+)\)\s*REFERENCES\s*"?([^"(,\s]+)"?\s*\(([^)]+)\)(?:[^,)]*DEFERRABLE\s+INITIALLY\s+(\w+))?/gi;
     let match;
     while ((match = fkRegex.exec(createSql)) !== null) {
       const [, fromCols, toTbl, toCols, mode] = match;
@@ -1911,7 +1915,10 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         .map((c) => c.trim().replace(/^"|"$/g, ""))
         .join(",");
       const key = `${toTbl},${fromKey},${toKey}`;
-      result.set(key, mode.toLowerCase() === "deferred" ? "deferred" : "immediate");
+      result.set(
+        key,
+        mode === undefined ? false : mode.toLowerCase() === "deferred" ? "deferred" : "immediate",
+      );
     }
     return result;
   }
