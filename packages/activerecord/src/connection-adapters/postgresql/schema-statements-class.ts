@@ -58,6 +58,7 @@ interface PgSchemaAdapter {
   supportsIdentityColumns(): boolean;
   supportsVirtualColumns(): boolean;
   extractSchemaQualifiedName(string: string): [string | null, string];
+  maxIdentifierLength(): number;
   getDatabaseVersion(): Promise<number>;
   supportsIndexInclude(): boolean;
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
@@ -1909,13 +1910,14 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
 
   /** @internal */
   sequenceNameFromParts(tableName: string, columnName: string, suffix: string): string {
-    const maxLen = 63;
+    const maxIdentifierLength = this.pg.maxIdentifierLength();
     const [, unqualifiedTable] = this.pg.extractSchemaQualifiedName(tableName);
-    let overLength = unqualifiedTable.length + columnName.length + suffix.length + 2 - maxLen;
+    let overLength =
+      unqualifiedTable.length + columnName.length + suffix.length + 2 - maxIdentifierLength;
     let col = columnName;
     let tbl = unqualifiedTable;
     if (overLength > 0) {
-      const colMaxLen = Math.floor((maxLen - suffix.length - 2) / 2);
+      const colMaxLen = Math.floor((maxIdentifierLength - suffix.length - 2) / 2);
       const newColLen = Math.min(colMaxLen, col.length);
       overLength -= col.length - newColLen;
       // Mirrors Ruby's `column_name[0, column_name_length - [over_length, 0].min]`:

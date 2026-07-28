@@ -6,6 +6,7 @@ interface FakeOptions {
   logger?: { warn: (msg: string) => void };
   schemaQuery?: (sql: string) => Promise<Record<string, unknown>[]>;
   queryValue?: (sql: string) => Promise<unknown>;
+  maxIdentifierLength?: number;
 }
 
 function makeAdapter(options: FakeOptions = {}) {
@@ -44,6 +45,7 @@ function makeAdapter(options: FakeOptions = {}) {
       return options.queryValue ? await options.queryValue(text) : null;
     }),
     getDatabaseVersion: vi.fn(async () => 160000),
+    maxIdentifierLength: () => options.maxIdentifierLength ?? 63,
   };
   return { adapter: adapter as unknown as DatabaseAdapter, sql };
 }
@@ -188,5 +190,29 @@ describe("PostgreSQLSchemaStatements#resetPkSequenceBang", () => {
     const ss = new PostgreSQLSchemaStatements(adapter);
     await ss.resetPkSequenceBang("things", "id", "public.things_id_seq");
     expect(sql.at(-1)).toContain(`SELECT setval('"public"."things_id_seq"', 1, false)`);
+  });
+});
+
+describe("PostgreSQLSchemaStatements sequenceNameFromParts identifier budget", () => {
+  it("truncates against the server's maxIdentifierLength, not a hardcoded 63", () => {
+    const { adapter } = makeAdapter({ maxIdentifierLength: 31 });
+    const ss = new PostgreSQLSchemaStatements(adapter);
+    const name = ss.sequenceNameFromParts("a".repeat(40), "b".repeat(10), "seq");
+    expect(name).toBe(`${"a".repeat(16)}_${"b".repeat(10)}_seq`);
+    expect(name.length).toBe(31);
+  });
+
+  it("splits the overage across column and table under a short limit", () => {
+    const { adapter } = makeAdapter({ maxIdentifierLength: 31 });
+    const ss = new PostgreSQLSchemaStatements(adapter);
+    const name = ss.sequenceNameFromParts("a".repeat(40), "b".repeat(30), "seq");
+    expect(name).toBe(`${"a".repeat(13)}_${"b".repeat(13)}_seq`);
+    expect(name.length).toBe(31);
+  });
+
+  it("leaves names within the limit untouched", () => {
+    const { adapter } = makeAdapter({ maxIdentifierLength: 31 });
+    const ss = new PostgreSQLSchemaStatements(adapter);
+    expect(ss.sequenceNameFromParts("things", "id", "seq")).toBe("things_id_seq");
   });
 });
