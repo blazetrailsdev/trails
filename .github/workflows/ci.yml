@@ -1390,6 +1390,14 @@ jobs:
         # for the advisory arity check, applied by the API comparison step
         # above). Excludes only shrink — delete a converged entry by hand.
         run: pnpm exec tsx scripts/api-compare/lint-arity-excludes.ts
+      - name: Missing-call reasons gate
+        # Enforces the `@missingRailsCall` empty-reason contract (the same
+        # `parseJsdoc` check `api:build` uses) over every JSDoc block under
+        # packages/*/src. Read-only and artifact-free: `api:build` itself is
+        # opt-in and rewrites files, so without this step a hand-authored bare
+        # tag would sit undetected. See the empty-reason bullet in
+        # docs/infrastructure/api-build-stub-generation-plan.md.
+        run: pnpm exec tsx scripts/api-compare/lint-missing-rails-call-reasons.ts
       - name: Body-pins gate
         # Source-hash pinning (RFC 0025). Fails when a pinned pair's normalized
         # Rails body digest drifts from the current vendored source

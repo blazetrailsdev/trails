@@ -314,6 +314,17 @@ report). They therefore share:
     allowlist entry into a blessed one, which is exactly the failure mode the
     sibling tag rejects.
 
+  Where each is **enforced in CI** — the parser-level rule only bites if
+  something in CI runs it:
+  - `@noRailsEquivalent`: `noRailsEquivalentReason` runs inside the TS
+    extractor, so every `api:extra` / `api:compare` invocation gates it.
+  - `@missingRailsCall`: `parseJsdoc`'s sole caller is `api:build`, an opt-in
+    developer command with no CI job. `pnpm api:reasons`
+    (`lint-missing-rails-call-reasons.ts`) closes that gap and runs in the
+    Rails API/Test Comparison job: it feeds every JSDoc block under
+    `packages/*/src` through the same `parseJsdoc` check — read-only, no
+    second parser, and with no dependency on the wide call-mismatch artifact.
+
   The placeholder path is unaffected: a generator-authored placeholder is a
   non-empty reason, so it parses, round-trips byte-for-byte via `rawLines`,
   and still drops without a harvest report when the call converges. Reason
