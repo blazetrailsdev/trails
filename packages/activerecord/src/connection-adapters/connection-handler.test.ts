@@ -52,13 +52,16 @@ describe("ConnectionHandlerTest", () => {
       common: { adapter: "sqlite3", database: "test/db/common.sqlite3" },
     });
     DatabaseConfigurations.defaultEnv = "default_env";
+    const prevConfigs = Base.configurations();
+    Base.configurations(configs);
 
-    for (const name of ["primary", "readonly"]) {
-      handler.establishConnection(configs.configsFor({ envName: "default_env", name })[0], {
-        owner: name,
-      });
+    try {
+      handler.establishConnection("common");
+      handler.establishConnection("primary");
+      handler.establishConnection("readonly");
+    } finally {
+      Base.configurations(prevConfigs);
     }
-    handler.establishConnection(configs.configsFor({ envName: "common" })[0], { owner: "common" });
 
     const readonlyPool = handler.retrieveConnectionPool("readonly");
     expect(readonlyPool).toBeTruthy();

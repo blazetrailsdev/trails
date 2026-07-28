@@ -12,6 +12,7 @@ import {
 } from "../../database-configurations/database-config.js";
 import { HashConfig } from "../../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../../database-configurations.js";
+import { configurations as baseConfigurations } from "../../core.js";
 import { PoolConfig } from "../pool-config.js";
 import { PoolManager } from "../pool-manager.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
@@ -37,6 +38,15 @@ _setAdapterClassResolver(
 
 export { ConnectionDescriptor };
 export type { ConnectionOwner };
+
+// The stand-in for Ruby's `config.is_a?(Symbol)`: a scheme-less string is a
+// connection name, anything with a scheme is a URL config.
+function symbolConnectionName(
+  config: DatabaseConfig | string | Record<string, unknown> | undefined,
+): string | undefined {
+  if (typeof config !== "string") return undefined;
+  return /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(config) ? undefined : config;
+}
 
 export class ConnectionHandler {
   private _connectionNameToPoolManager: Map<string, PoolManager>;
@@ -66,18 +76,19 @@ export class ConnectionHandler {
    * @internal
    */
   determineOwnerName(
-    owner: string | ConnectionOwner,
-    // Rails' third branch is `elsif config.is_a?(Symbol)` — the bare-name
-    // shorthand `establish_connection :primary`. It is deliberately NOT ported:
-    // Ruby distinguishes that Symbol from a String config (a connection URL),
-    // which falls through to `owner_name` unchanged, and TS collapses both onto
-    // `string`. Porting it as `typeof config === "string"` would misread a URL
-    // as a connection name. The parameter stays so the signature matches Rails
-    // and the branch can land once a Symbol-shaped config exists to key on.
-    _config?: DatabaseConfig | Record<string, unknown>,
-  ): ConnectionDescriptor | ConnectionOwner {
+    owner: string | ConnectionOwner | undefined,
+    config?: DatabaseConfig | string | Record<string, unknown>,
+  ): ConnectionDescriptor | ConnectionOwner | undefined {
     if (typeof owner === "string") {
       return new ConnectionDescriptor(owner);
+    }
+    // Rails' third branch is `elsif config.is_a?(Symbol)` — the bare-name
+    // shorthand `establish_connection :primary`. TS collapses Ruby's Symbol and
+    // String onto `string`, so we key on the same scheme test
+    // DatabaseConfigurations#resolve uses to tell a connection name from a URL.
+    const symbolName = symbolConnectionName(config);
+    if (symbolName != null) {
+      return new ConnectionDescriptor(symbolName);
     }
     return owner;
   }
@@ -115,7 +126,7 @@ export class ConnectionHandler {
   }
 
   establishConnection(
-    config: DatabaseConfig | Record<string, unknown>,
+    config: DatabaseConfig | string | Record<string, unknown>,
     options: {
       owner?: string | ConnectionOwner;
       role?: string;
@@ -125,11 +136,10 @@ export class ConnectionHandler {
     } = {},
   ): ConnectionPool {
     const ownerName =
-      options.owner != null
-        ? this.determineOwnerName(options.owner, config)
-        : config instanceof DatabaseConfig
-          ? new ConnectionDescriptor(config.name)
-          : new ConnectionDescriptor(typeof options.owner === "string" ? options.owner : "primary");
+      this.determineOwnerName(options.owner, config) ??
+      (config instanceof DatabaseConfig
+        ? new ConnectionDescriptor(config.name)
+        : new ConnectionDescriptor("primary"));
 
     const role = options.role ?? "writing";
     const shard = options.shard ?? "default";
@@ -345,7 +355,7 @@ export class ConnectionHandler {
 
   /** @internal */
   private resolvePoolConfig(
-    config: DatabaseConfig | Record<string, unknown>,
+    config: DatabaseConfig | string | Record<string, unknown>,
     ownerName: ConnectionDescriptor | ConnectionOwner,
     role: string,
     shard: string,
@@ -355,7 +365,11 @@ export class ConnectionHandler {
     const dbConfig =
       config instanceof DatabaseConfig
         ? config
-        : new HashConfig(DatabaseConfigurations.defaultEnv, connectionName, config as any);
+        : typeof config === "string"
+          ? // Mirrors resolve_pool_config's `Base.configurations.resolve(config)`:
+            // a bare name goes through find_db_config.
+            baseConfigurations().resolve(config)
+          : new HashConfig(DatabaseConfigurations.defaultEnv, connectionName, config as any);
     if (!dbConfig.adapter) {
       throw new AdapterNotSpecified("database configuration does not specify adapter");
     }
