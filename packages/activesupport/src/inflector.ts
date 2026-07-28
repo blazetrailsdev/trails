@@ -187,10 +187,14 @@ export function registerConstant(name: string, value: unknown): void {
  * {@link constantize}. The removal is conditional on `expected`: the name is
  * dropped only when it currently resolves to that value, so a caller tearing
  * down its own binding cannot clobber a later rebinding by someone else.
+ * Dropping the entry also drops its visibility, the way `remove_const` takes the
+ * private mark with the constant — otherwise the name would keep raising
+ * `private constant` where Ruby raises `uninitialized constant`.
  */
 export function unregisterConstant(name: string, expected: unknown): void {
   if (_constants.get(name) !== expected) return;
   _constants.delete(name);
+  _privateConstants.delete(name);
 }
 
 /**
@@ -229,10 +233,9 @@ export function constantize(camelCasedWord: string): unknown {
   }
   // Privacy is checked before existence, which Ruby cannot reach: there
   // `private_constant` on an undefined name is itself a NameError, so a name is
-  // never private-and-absent. trails allows it because the habtm join key is
-  // marked at declaration time while the constant itself is written by a
-  // separate path (`modelRegistry.set`, which binds the constant via
-  // `registerModelConstant`) — the mark must not depend on which writer runs first.
+  // never private-and-absent. trails allows it because marking and binding are
+  // two calls made by independent writers, and the mark must hold whichever runs
+  // first.
   if (_privateConstants.has(path)) {
     throw new ReferenceError(`private constant ${path} referenced`);
   }
