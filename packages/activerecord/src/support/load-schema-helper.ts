@@ -9,9 +9,7 @@ import { loadCanonicalSchema } from "./canonical-schema.js";
  * The ported slice of
  * `vendor/rails/activerecord/test/schema/postgresql_specific_schema.rb:4-48` —
  * the `uuid-ossp` / `pgcrypto` extension header, the four uuid-primary-key
- * tables and the `defaults` table. `uuid_default` there is `{}` whenever
- * `supports_pgcrypto_uuid?` (PG >= 9.4, always true on our postgres lane), which
- * leaves the uuid PK on the adapter's `gen_random_uuid()` default.
+ * tables and the `defaults` table.
  *
  * The remainder of that file (`postgresql_times`, `postgresql_oids`, the
  * identity, sequence, partition and constraint tables — lines 50-225) is carried
@@ -26,21 +24,31 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
   await adapter.enableExtension("uuid-ossp");
   if (adapter.supportsPgcryptoUuid()) await adapter.enableExtension("pgcrypto");
 
-  await adapter.createTable("chat_messages", { id: "uuid", force: true }, (t) => {
+  // `uuid_default = supports_pgcrypto_uuid? ? {} : { default: "uuid_generate_v4()" }`
+  // (line 7), splatted into the three `id: :uuid` tables below. With pgcrypto the
+  // adapter's own `gen_random_uuid()` PK default stands; without it that function
+  // does not exist, so the PK falls back to uuid-ossp's `uuid_generate_v4()`.
+  // The bare string (not a thunk) is Rails verbatim: quoteDefaultExpression emits
+  // a `()`-bearing string unquoted on a uuid column.
+  const uuidDefault: { default?: string } = adapter.supportsPgcryptoUuid()
+    ? {}
+    : { default: "uuid_generate_v4()" };
+
+  await adapter.createTable("chat_messages", { id: "uuid", force: true, ...uuidDefault }, (t) => {
     (t as PgTableDefinition).text("content");
   });
 
   await adapter.createTable("chat_messages_custom_pk", { id: false, force: true }, (t) => {
     const pg = t as PgTableDefinition;
-    pg.uuid("message_id", { primaryKey: true, default: () => "uuid_generate_v4()" });
+    pg.uuid("message_id", { primaryKey: true, default: "uuid_generate_v4()" });
     pg.text("content");
   });
 
-  await adapter.createTable("uuid_parents", { id: "uuid", force: true }, (t) => {
+  await adapter.createTable("uuid_parents", { id: "uuid", force: true, ...uuidDefault }, (t) => {
     (t as PgTableDefinition).string("name");
   });
 
-  await adapter.createTable("uuid_children", { id: "uuid", force: true }, (t) => {
+  await adapter.createTable("uuid_children", { id: "uuid", force: true, ...uuidDefault }, (t) => {
     const pg = t as PgTableDefinition;
     pg.string("name");
     pg.uuid("uuid_parent_id");
