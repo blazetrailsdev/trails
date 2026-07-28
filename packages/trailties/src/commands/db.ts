@@ -15,13 +15,7 @@ import {
   type DatabaseConfig as RawConfig,
 } from "../database.js";
 import { discoverMigrations } from "../migration-loader.js";
-import {
-  DatabaseTasks,
-  HashConfig,
-  Migrator,
-  DatabaseAlreadyExists,
-  NoDatabaseError,
-} from "@blazetrails/activerecord";
+import { DatabaseTasks, HashConfig, Migrator } from "@blazetrails/activerecord";
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
 
 async function closeAdapter(adapter: DatabaseAdapter): Promise<void> {
@@ -523,35 +517,18 @@ function displayNameFor(config: HashConfig, raw: RawConfig): string {
 }
 
 async function runCreate(opts: DatabaseOpts = {}): Promise<void> {
-  await forEachDatabaseConfig(opts, async ({ raw, config, prefix }) => {
-    const displayName = displayNameFor(config, raw);
-    try {
-      await DatabaseTasks.create(config);
-      console.log(`${prefix}Created database '${displayName}'`);
-    } catch (error) {
-      if (error instanceof DatabaseAlreadyExists) {
-        console.error(`${prefix}Database '${displayName}' already exists`);
-        return;
-      }
-      throw error;
-    }
+  // The `Created database` / `already exists` banners are emitted by
+  // DatabaseTasks.create itself (database_tasks.rb:118-120).
+  await forEachDatabaseConfig(opts, async ({ config }) => {
+    await DatabaseTasks.create(config);
   });
 }
 
 async function runDrop(opts: DatabaseOpts = {}): Promise<void> {
-  await forEachDatabaseConfig(opts, async ({ raw, config, prefix }) => {
-    const displayName = displayNameFor(config, raw);
+  // Banners come from DatabaseTasks.drop itself (database_tasks.rb:213-215).
+  await forEachDatabaseConfig(opts, async ({ config }) => {
     await runProtectedEnvCheck(config, config.envName);
-    try {
-      await DatabaseTasks.drop(config);
-      console.log(`${prefix}Dropped database '${displayName}'`);
-    } catch (error) {
-      if (error instanceof NoDatabaseError) {
-        console.error(`${prefix}Database '${displayName}' does not exist`);
-        return;
-      }
-      throw error;
-    }
+    await DatabaseTasks.drop(config);
   });
 }
 
@@ -865,14 +842,8 @@ export function dbCommand(): Command {
       // the pool before creation would fail for pg/mysql when the DB doesn't exist.
       const raw = normalizeRawConfig(await loadDatabaseConfig());
       const config = toDbConfig(raw);
-      const { DatabaseAlreadyExists } = await import("@blazetrails/activerecord");
 
-      try {
-        await DatabaseTasks.create(config);
-        console.log(`Created database '${displayNameFor(config, raw)}'`);
-      } catch (error) {
-        if (!(error instanceof DatabaseAlreadyExists)) throw error;
-      }
+      await DatabaseTasks.create(config);
 
       await DatabaseTasks.withTemporaryPool(config, async (pool) => {
         // Rails measures "fresh" via `!schema_migration.table_exists?`,

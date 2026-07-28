@@ -8,7 +8,15 @@ import { DatabaseConfig } from "../database-configurations/database-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { ProtectedEnvironmentError } from "../migration.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
-import { getFs, getPath, getCryptoAsync, getOs, getEnv, stdout } from "@blazetrails/activesupport";
+import {
+  getFs,
+  getPath,
+  getCryptoAsync,
+  getOs,
+  getEnv,
+  stdout,
+  stderr,
+} from "@blazetrails/activesupport";
 import { ConnectionNotDefined } from "../errors.js";
 import { Base } from "../base.js";
 
@@ -176,9 +184,23 @@ export class DatabaseTasks {
   }
 
   static async create(config: DatabaseConfig): Promise<void> {
-    const handler = this._resolveTaskOrThrow(this._adapterFor(config));
-    if (handler.create) {
-      await handler.create(config);
+    const { DatabaseAlreadyExists } = await import("../errors.js");
+    try {
+      const handler = this._resolveTaskOrThrow(this._adapterFor(config));
+      if (handler.create) {
+        await handler.create(config);
+      }
+      if (isVerbose()) stdout.write(`Created database '${config.database}'\n`);
+    } catch (error) {
+      if (error instanceof DatabaseAlreadyExists) {
+        if (isVerbose()) stderr.write(`Database '${config.database}' already exists\n`);
+        return;
+      }
+      stderr.write(_errorToS(error) + "\n");
+      stderr.write(
+        `Couldn't create '${config.database}' database. Please check your configuration.\n`,
+      );
+      throw error;
     }
   }
 
@@ -228,9 +250,23 @@ export class DatabaseTasks {
   }
 
   static async drop(config: DatabaseConfig): Promise<void> {
-    const handler = this._resolveTaskOrThrow(this._adapterFor(config));
-    if (handler.drop) {
-      await handler.drop(config);
+    const { NoDatabaseError } = await import("../errors.js");
+    try {
+      const handler = this._resolveTaskOrThrow(this._adapterFor(config));
+      if (handler.drop) {
+        await handler.drop(config);
+      }
+      if (isVerbose()) stdout.write(`Dropped database '${config.database}'\n`);
+    } catch (error) {
+      // Rails' NoDatabaseError arm is deliberately ungated — no `if verbose?`
+      // (database_tasks.rb:214-215), unlike the create/DatabaseAlreadyExists arm.
+      if (error instanceof NoDatabaseError) {
+        stderr.write(`Database '${config.database}' does not exist\n`);
+        return;
+      }
+      stderr.write(_errorToS(error) + "\n");
+      stderr.write(`Couldn't drop database '${config.database}'\n`);
+      throw error;
     }
   }
 
@@ -1365,6 +1401,16 @@ export function resolveConfiguration(configuration: unknown): DatabaseConfig {
   const configs = DatabaseTasks.databaseConfiguration;
   if (!configs) throw new Error("DatabaseTasks.databaseConfiguration is not set");
   return configs.resolve(configuration);
+}
+
+/**
+ * Ruby's `$stderr.puts error` prints `error.to_s`, which for an exception is
+ * its message alone — not the `Error: ` -prefixed form `String(err)` yields.
+ *
+ * @internal
+ */
+function _errorToS(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 /** @internal */

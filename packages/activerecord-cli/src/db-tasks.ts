@@ -1,28 +1,17 @@
 import { join, resolve } from "path";
 import { getEnv, getFsAsync, setEnv } from "@blazetrails/activesupport";
-import {
-  DatabaseTasks,
-  DatabaseConfigurations,
-  NoDatabaseError,
-  DatabaseAlreadyExists,
-} from "@blazetrails/activerecord";
+import { DatabaseTasks, DatabaseConfigurations } from "@blazetrails/activerecord";
 import { loadDatabaseConfig, loadMigrations, tryLoadModels } from "./db-helpers.js";
 
 async function runCreate(
   config: import("@blazetrails/activerecord").DatabaseConfig,
 ): Promise<boolean> {
-  const dbName = config.database ?? "(unknown)";
+  // Banners (success, already-exists, and the failure pair) are emitted by
+  // DatabaseTasks.create itself (database_tasks.rb:118-124).
   try {
     await DatabaseTasks.create(config);
-    console.log(`Created database '${dbName}'`);
     return true;
-  } catch (err) {
-    if (err instanceof DatabaseAlreadyExists) {
-      console.error(`Database '${dbName}' already exists`);
-      return true;
-    }
-    console.error(`Couldn't create '${dbName}' database. Please check your configuration.`);
-    console.error(String(err));
+  } catch {
     return false;
   }
 }
@@ -30,18 +19,11 @@ async function runCreate(
 async function runDrop(
   config: import("@blazetrails/activerecord").DatabaseConfig,
 ): Promise<boolean> {
-  const dbName = config.database ?? "(unknown)";
+  // Banners are emitted by DatabaseTasks.drop itself (database_tasks.rb:213-219).
   try {
     await DatabaseTasks.drop(config);
-    console.log(`Dropped database '${dbName}'`);
     return true;
-  } catch (err) {
-    if (err instanceof NoDatabaseError) {
-      console.error(`Database '${dbName}' does not exist`);
-      return true;
-    }
-    console.error(`Couldn't drop database '${dbName}'`);
-    console.error(String(err));
+  } catch {
     return false;
   }
 }
