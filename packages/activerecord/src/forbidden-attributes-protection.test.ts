@@ -42,7 +42,7 @@ describe("ForbiddenAttributesProtectionTest", () => {
 
   it("permitted attributes can be used for mass assignment", () => {
     const params = new ProtectedParams({ first_name: "Guille", gender: "m" });
-    params.permit();
+    params.permitBang();
     const person = new Person(params);
 
     expect(person.readAttribute("first_name")).toBe("Guille");
@@ -56,7 +56,7 @@ describe("ForbiddenAttributesProtectionTest", () => {
 
   it("permitted attributes can be used for sti inheritance column", () => {
     const params = new ProtectedParams({ type: "Client" });
-    params.permit();
+    params.permitBang();
     const person = new Company(params);
 
     expect(person.constructor).toBe(Client);
@@ -81,7 +81,7 @@ describe("ForbiddenAttributesProtectionTest", () => {
   });
 
   it("create with works with permitted params", async () => {
-    const params = new ProtectedParams({ first_name: "Guille" }).permit();
+    const params = new ProtectedParams({ first_name: "Guille" }).permitBang();
 
     const person = await Person.createWith(params).createBang();
     expect(person.readAttribute("first_name")).toBe("Guille");
@@ -101,7 +101,7 @@ describe("ForbiddenAttributesProtectionTest", () => {
   });
 
   it("where works with permitted params", async () => {
-    const params = new ProtectedParams({ first_name: "Guille" }).permit();
+    const params = new ProtectedParams({ first_name: "Guille" }).permitBang();
 
     const person = await Person.where(params).createBang();
     expect(person.readAttribute("first_name")).toBe("Guille");
@@ -121,7 +121,7 @@ describe("ForbiddenAttributesProtectionTest", () => {
   });
 
   it("where not works with permitted params", async () => {
-    const params = new ProtectedParams({ first_name: "Guille" }).permit();
+    const params = new ProtectedParams({ first_name: "Guille" }).permitBang();
     await Person.createBang(params);
 
     const remaining = (await Person.whereNot(params)).filter(
@@ -133,8 +133,8 @@ describe("ForbiddenAttributesProtectionTest", () => {
   it("strong params style objects work with singular associations", () => {
     const params = new ProtectedParams({
       name: "Stern",
-      shipAttributes: new ProtectedParams({ name: "The Black Rock" }).permit(),
-    }).permit();
+      shipAttributes: new ProtectedParams({ name: "The Black Rock" }).permitBang(),
+    }).permitBang();
     const part = new ShipPart(params);
 
     expect(part.readAttribute("name")).toBe("Stern");
@@ -144,10 +144,10 @@ describe("ForbiddenAttributesProtectionTest", () => {
   it("strong params style objects work with collection associations", () => {
     const params = new ProtectedParams({
       trinketsAttributes: new ProtectedParams({
-        "0": new ProtectedParams({ name: "Necklace" }).permit(),
-        "1": new ProtectedParams({ name: "Spoon" }).permit(),
-      }).permit(),
-    }).permit();
+        "0": new ProtectedParams({ name: "Necklace" }).permitBang(),
+        "1": new ProtectedParams({ name: "Spoon" }).permitBang(),
+      }).permitBang(),
+    }).permitBang();
     const part = new ShipPart(params);
 
     expect((part as any).trinkets[0].readAttribute("name")).toBe("Necklace");

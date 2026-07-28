@@ -327,6 +327,52 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
     names: ["perform_calculation"],
     rubyFiles: ["relation.rb"],
   },
+  {
+    reason:
+      "AdapterHelper's four hand-written capability predicates are rendered by " +
+      "packages/activerecord/src/support/supports.ts as entries in one " +
+      "feature-keyed table (`default_expression`, `non_unique_constraint_name`, " +
+      "`text_column_with_default`, `sql_standard_drop_constraint`) rather than " +
+      "as four exports on adapter-helper.ts, exactly as the ~15 predicates " +
+      "adapter_helper.rb itself generates with `define_method` are. The table " +
+      "keys are the `supports_<key>?` names, so the pairing is checkable; " +
+      "duplicating them as free functions here would give two sources of truth " +
+      "for the same capability. Scoped to adapter_helper.rb, the only Ruby file " +
+      "in the tree that defines these names.",
+    names: [
+      "supports_default_expression?",
+      "supports_non_unique_constraint_name?",
+      "supports_text_column_with_default?",
+      "supports_sql_standard_drop_constraint?",
+    ],
+    rubyFiles: ["adapter_helper.rb"],
+  },
+  {
+    reason:
+      "`module ARTest` opens in config.rb and is reopened in connection.rb, so " +
+      "the Ruby extractor records one ARTest entity filed under config.rb and " +
+      "every ARTest method buckets there. Two populations end up in that " +
+      "bucket, neither of which is a gap. (1) `connection_name` / " +
+      "`test_configuration_hashes` / `connect` / `expand_config` are defined in " +
+      "connection.rb and ARE ported, in the matching Rails-layout file " +
+      "packages/activerecord/src/support/connection.ts. (2) `config` / " +
+      "`config_file` / `read_config` are the memoized read of test/config.yml; " +
+      "trails ships no config.yml — the `connections:` hash is expressed " +
+      "directly as the CONNECTIONS table in connection.ts and the sub-setting " +
+      "readers in config.ts — so there is no file to locate, copy from " +
+      "config.example.yml, or parse. Scoped to config.rb, the only Ruby file in " +
+      "the tree that defines these names.",
+    names: [
+      "config",
+      "config_file",
+      "read_config",
+      "expand_config",
+      "connection_name",
+      "test_configuration_hashes",
+      "connect",
+    ],
+    rubyFiles: ["config.rb"],
+  },
 ];
 
 /** Map of scoped-skip Ruby method name → the set of Ruby files it's skipped in. */

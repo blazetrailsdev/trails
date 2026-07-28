@@ -26,10 +26,18 @@ interface MergeColumnOptions {
 export class FakeActiveRecordAdapter extends FakeAdapterBase {
   static readonly columns = new Map<string, Column[]>();
 
-  dataSources: string[] = [];
-  primaryKeys: Record<string, string> = {};
+  dataSources: string[];
+  primaryKeys: Record<string, string>;
 
-  private readonly _fakeColumns = FakeActiveRecordAdapter.columns;
+  private readonly _fakeColumns: Map<string, Column[]>;
+
+  /** Mirrors: FakeActiveRecordAdapter#initialize */
+  constructor() {
+    super();
+    this.dataSources = [];
+    this.primaryKeys = {};
+    this._fakeColumns = FakeActiveRecordAdapter.columns;
+  }
 
   /** Mirrors: FakeActiveRecordAdapter#primary_key */
   primaryKey(table: string): string {

@@ -40,3 +40,21 @@ export async function runWithoutConnection<T>(
     await Base.establishConnection(originalConnection);
   }
 }
+
+/**
+ * Mirrors: ConnectionHelper#reset_connection
+ *
+ *   # Used to drop all cache query plans in tests.
+ *   def reset_connection
+ *     original_connection = ActiveRecord::Base.remove_connection
+ *     ActiveRecord::Base.establish_connection(original_connection)
+ *   end
+ *
+ * Same remove/re-establish pair as {@link runWithoutConnection} without a block
+ * in between — the point is the round trip itself, which discards every cached
+ * query plan the old pool's connections held.
+ */
+export async function resetConnection(): Promise<void> {
+  const originalConnection = Base.removeConnection()!;
+  await Base.establishConnection(originalConnection);
+}

@@ -38,7 +38,7 @@ describe("ForbiddenAttributesProtectionUpdateTest", () => {
 
   it("permitted attributes can be used for update", async () => {
     const person = await Person.first();
-    await person!.update(new ProtectedParams({ first_name: "Guille" }).permit());
+    await person!.update(new ProtectedParams({ first_name: "Guille" }).permitBang());
 
     expect(person!.readAttribute("first_name")).toBe("Guille");
     await person!.reload();
