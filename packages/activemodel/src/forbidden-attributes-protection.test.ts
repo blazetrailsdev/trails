@@ -23,7 +23,7 @@ class ProtectedParams {
     return this._permitted;
   }
 
-  permit(): this {
+  permitBang(): this {
     this._permitted = true;
     return this;
   }
@@ -42,7 +42,7 @@ describe("ActiveModelMassUpdateProtectionTest", () => {
   });
 
   it("permitted attributes can be used for mass updating", () => {
-    const params = new ProtectedParams({ a: "b" }).permit();
+    const params = new ProtectedParams({ a: "b" }).permitBang();
     expect(
       new Account().sanitizeForbiddenAttributes(params as unknown as Record<string, unknown>),
     ).toEqual({ a: "b" });
