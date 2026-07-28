@@ -103,6 +103,7 @@ import {
   CheckConstraintDefinition,
   ForeignKeyDefinition,
   type AddForeignKeyOptions,
+  type ColumnType,
   type RemoveForeignKeyOptions,
   type ForeignKeyLookupOptions,
 } from "./abstract/schema-definitions.js";
@@ -2385,7 +2386,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     modify: (columns: Record<string, Record<string, unknown>>) => void,
     overrideForeignKeys?: ForeignKeyDefinition[],
     overrideCheckConstraints?: CheckConstraintDefinition[],
-    extraDefinition?: (def: import("./abstract/schema-definitions.js").TableDefinition) => void,
+    extraDefinition?: (definition: SQLite3TableDefinition) => void,
   ): Promise<void> {
     await this.ensureConnected();
     const { schema, bare: bareTable } = this._splitTableName(tableName);
@@ -2460,34 +2461,46 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       .map((c) => c.name);
     const compositePk = pkColumns.length > 1;
 
-    const existingCollations = await this._parseCollationsFromTableSql(tableName);
-    const colDefs = colNames.map((name) => {
-      const col = columns[name];
-      let def = `${quoteColumnName(name)} ${col.type ?? "TEXT"}`;
-      const collation = col.collation === undefined ? existingCollations.get(name) : col.collation;
-      if (collation) def += ` COLLATE ${quoteColumnName(String(collation))}`;
-      if (col.generatedAs) {
-        def += ` GENERATED ALWAYS AS (${col.generatedAs})${col.generatedStored ? " STORED" : " VIRTUAL"}`;
-      }
-      if (!compositePk && col.pk) def += " PRIMARY KEY";
-      if (col.notnull) def += " NOT NULL";
-      if (col.dflt_value !== null && col.dflt_value !== undefined) {
-        def += ` DEFAULT ${col.dflt_value}`;
-      }
-      return def;
+    const definition = new SQLite3TableDefinition(tableName, {
+      id: false,
+      adapter: this,
+      ...(compositePk ? { primaryKey: pkColumns } : {}),
     });
-    if (compositePk) {
-      colDefs.push(`PRIMARY KEY(${pkColumns.map((n) => quoteColumnName(n)).join(", ")})`);
+
+    const existingCollations = await this._parseCollationsFromTableSql(tableName);
+    for (const name of colNames) {
+      const col = columns[name];
+      const options: Record<string, unknown> = {};
+      const collation = col.collation === undefined ? existingCollations.get(name) : col.collation;
+      if (collation) options.collation = String(collation);
+      if (col.generatedAs) {
+        options.as = col.generatedAs;
+        options.stored = Boolean(col.generatedStored);
+      }
+      if (!compositePk && col.pk) options.primaryKey = true;
+      if (col.notnull) options.null = false;
+      if (col.dflt_value !== null && col.dflt_value !== undefined) {
+        const literal = String(col.dflt_value);
+        options.default = () => literal;
+      }
+      const sqlType = String(col.type ?? "TEXT");
+      const columnDefinition = definition.newColumnDefinition(name, sqlType as ColumnType, options);
+      // PRAGMA reports the declared SQL type, not an AR type name, so pin it here
+      // rather than let the visitor resolve it through typeToSql — that is what
+      // round-trips storage affinity exactly. Not when newColumnDefinition flipped
+      // the type to :primary_key though (an integer/bigint PK with no default):
+      // visit_ColumnDefinition then skips add_column_options! entirely and the
+      // whole constraint rides on type_to_sql(:primary_key), so pinning the
+      // declared text over it would silently drop the PRIMARY KEY. Rails' `||=`
+      // has the same effect (abstract/schema_creation.rb:34).
+      if (columnDefinition.type !== "primary_key") columnDefinition.sqlType = sqlType;
+      definition.columns.push(columnDefinition);
     }
 
     // Preserve foreign keys and check constraints across the rebuild.
     // Rails: alter_table(table_name, foreign_keys(...), check_constraints(...))
     const fks = overrideForeignKeys ?? (await this.foreignKeys(tableName));
     const checks = overrideCheckConstraints ?? (await this.checkConstraints(tableName));
-
-    // PRAGMA foreign_key_list doesn't expose constraint names, but the
-    // CREATE TABLE DDL does. Parse names so they survive the rebuild.
-    const fkNames = await this._parseForeignKeyNames(tableName);
 
     for (const fk of fks) {
       const cols = Array.isArray(fk.column)
@@ -2496,21 +2509,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
           ? fk.column.split(",").map((c) => c.trim())
           : [fk.column];
       if (!cols.every((c) => colNames.includes(c))) continue;
-      const pks = Array.isArray(fk.primaryKey)
-        ? fk.primaryKey
-        : fk.primaryKey.includes(",")
-          ? fk.primaryKey.split(",").map((c) => c.trim())
-          : [fk.primaryKey];
-      const colList = cols.map((c) => quoteColumnName(c)).join(", ");
-      const pkList = pks.map((c) => quoteColumnName(c)).join(", ");
-      let fkSql = "";
-      const fkKey = cols.join(",");
-      const fkName = fkNames.get(fkKey) ?? `fk_${bareTable}_${cols.join("_")}`;
-      fkSql += `CONSTRAINT ${quoteColumnName(fkName)} `;
-      fkSql += `FOREIGN KEY(${colList}) REFERENCES ${quoteTableName(fk.toTable)}(${pkList})`;
-      if (fk.onDelete) fkSql += ` ON DELETE ${normalizeReferentialAction(fk.onDelete)}`;
-      if (fk.onUpdate) fkSql += ` ON UPDATE ${normalizeReferentialAction(fk.onUpdate)}`;
-      colDefs.push(fkSql);
+      definition.foreignKeys.push(fk);
     }
 
     const removedColumns = tableInfo
@@ -2523,32 +2522,12 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         new RegExp(`\\b${col.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(chk.expression),
       );
       if (referencesRemovedCol) continue;
-      colDefs.push(`CONSTRAINT ${quoteColumnName(chk.name)} CHECK (${chk.expression})`);
+      definition.checkConstraints.push(chk);
     }
 
-    // Apply any extra definitions (e.g. new FK/check from add operations)
-    if (extraDefinition) {
-      const { TableDefinition } = await import("./abstract/schema-definitions.js");
-      const tmpDef = new TableDefinition(bareTable);
-      extraDefinition(tmpDef);
-      for (const fkDef of tmpDef.foreignKeys) {
-        let fkSql = "";
-        if (fkDef.name) fkSql += `CONSTRAINT ${quoteColumnName(fkDef.name)} `;
-        const fkDefCols = (Array.isArray(fkDef.column) ? fkDef.column : [fkDef.column])
-          .map((c) => quoteColumnName(c))
-          .join(", ");
-        const fkDefPks = (Array.isArray(fkDef.primaryKey) ? fkDef.primaryKey : [fkDef.primaryKey])
-          .map((c) => quoteColumnName(c))
-          .join(", ");
-        fkSql += `FOREIGN KEY(${fkDefCols}) REFERENCES ${quoteTableName(fkDef.toTable)}(${fkDefPks})`;
-        if (fkDef.onDelete) fkSql += ` ON DELETE ${normalizeReferentialAction(fkDef.onDelete)}`;
-        if (fkDef.onUpdate) fkSql += ` ON UPDATE ${normalizeReferentialAction(fkDef.onUpdate)}`;
-        colDefs.push(fkSql);
-      }
-      for (const chkDef of tmpDef.checkConstraints) {
-        colDefs.push(`CONSTRAINT ${quoteColumnName(chkDef.name)} CHECK (${chkDef.expression})`);
-      }
-    }
+    extraDefinition?.(definition);
+
+    const createTableSql = await this.schemaCreation.accept(definition);
 
     // Generated columns can't be inserted into — exclude them from the copy
     // (Rails: columns_to_copy rejects columns with an :as option,
@@ -2599,7 +2578,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
           );
         }
         await execTranslated(`DROP TABLE ${qTable}`);
-        await execTranslated(`CREATE TABLE ${qTable} (${colDefs.join(", ")})`);
+        await execTranslated(createTableSql);
         if (tmpColDefs.length > 0) {
           await execTranslated(
             `INSERT INTO ${qTable} (${selectCols}) SELECT ${selectCols} FROM ${qTmp}`,
@@ -3214,23 +3193,6 @@ export class SQLite3Integer {
     const v = BigInt(value);
     return v >= SQLite3Integer.MIN && v <= SQLite3Integer.MAX;
   }
-}
-
-const REFERENTIAL_ACTION_MAP: Record<string, string> = {
-  nullify: "SET NULL",
-  cascade: "CASCADE",
-  restrict: "RESTRICT",
-};
-
-function normalizeReferentialAction(action: string): string {
-  const sql = REFERENTIAL_ACTION_MAP[action];
-  if (sql === undefined) {
-    throw new ArgumentError(
-      `'${action}' is not supported for :on_update or :on_delete.\n` +
-        `Supported values are: :nullify, :cascade, :restrict\n`,
-    );
-  }
-  return sql;
 }
 
 /** @internal */
