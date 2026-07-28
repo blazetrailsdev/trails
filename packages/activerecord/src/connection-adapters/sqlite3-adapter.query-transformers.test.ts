@@ -1,20 +1,24 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { it, expect, beforeEach, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
+import { Base } from "../base.js";
+import { fixtures } from "../test-helpers/fixtures.js";
+import { describeIfSqlite } from "../adapters/sqlite3/test-helper.js";
+import type { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
 import { queryTransformers, type QueryTransformer } from "../query-transformers.js";
+
+fixtures([], { useTransactionalTests: false });
 
 // Integration proof for QL PR 3: a registered query transformer is applied in
 // preprocessQuery and the post-transform (commented) SQL flows all the way into
 // both the executed statement and the `sql.active_record` instrumentation
 // payload — the Rails-faithful ordering where preprocess_query runs before
 // raw_execute's log block.
-describe("SQLite3Adapter queryTransformers wiring", () => {
+describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
   let adapter: AbstractSQLite3Adapter;
   let savedTransformers: QueryTransformer[];
 
   beforeEach(() => {
-    adapter = new BetterSQLite3Adapter(":memory:");
+    adapter = Base.connection as AbstractSQLite3Adapter;
     savedTransformers = queryTransformers.slice();
     queryTransformers.length = 0;
   });
@@ -22,12 +26,12 @@ describe("SQLite3Adapter queryTransformers wiring", () => {
   afterEach(async () => {
     queryTransformers.length = 0;
     queryTransformers.push(...savedTransformers);
-    // Throwaway :memory: tables; per-name IF EXISTS drops balance
-    // require-table-teardown (SQLite has no multi-table DROP).
-    await adapter
-      .exec("DROP TABLE IF EXISTS widgets; DROP TABLE IF EXISTS t")
-      .catch(() => undefined);
-    await adapter.close().catch(() => undefined);
+    // Scratch tables on the ambient test connection: drop them by name so the
+    // shared worker DB is left exactly as it was found (SQLite has no
+    // multi-table DROP, hence one IF EXISTS per name).
+    await adapter.exec(
+      "DROP TABLE IF EXISTS widgets; DROP TABLE IF EXISTS t; DROP TABLE IF EXISTS a; DROP TABLE IF EXISTS b",
+    );
   });
 
   function captureSql<T>(fn: () => Promise<T>): Promise<{ result: T; sqls: string[] }> {

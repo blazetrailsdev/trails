@@ -1,28 +1,32 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
+import { it, expect, beforeEach, afterEach } from "vitest";
+import { Base } from "../base.js";
+import { fixtures } from "../test-helpers/fixtures.js";
+import { describeIfSqlite } from "../adapters/sqlite3/test-helper.js";
+import type { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
 
-describe("SQLite3Adapter table-rebuild cluster", () => {
+fixtures([], { useTransactionalTests: false });
+
+describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   let db: AbstractSQLite3Adapter;
 
   beforeEach(() => {
-    db = new BetterSQLite3Adapter(":memory:");
+    db = Base.connection as AbstractSQLite3Adapter;
   });
 
   afterEach(async () => {
-    // Throwaway :memory: tables; per-name IF EXISTS drops balance
-    // require-table-teardown (SQLite has no multi-table DROP).
+    // Scratch tables on the ambient test connection: drop them by name so the
+    // shared worker DB is left exactly as it was found (SQLite has no
+    // multi-table DROP, hence one IF EXISTS per name).
     await db.exec(
-      `DROP TABLE IF EXISTS users; DROP TABLE IF EXISTS orders; DROP TABLE IF EXISTS src; DROP TABLE IF EXISTS dst`,
+      `DROP TABLE IF EXISTS rebuild_users; DROP TABLE IF EXISTS rebuild_orders; DROP TABLE IF EXISTS src; DROP TABLE IF EXISTS dst`,
     );
-    await db.close();
   });
 
   // --- tableStructureSql ---
 
   it("tableStructureSql returns column definition strings from CREATE TABLE SQL", async () => {
-    await db.exec('CREATE TABLE "users" ("id" INTEGER PRIMARY KEY, "name" TEXT NOT NULL)');
-    const strings = await (db as any).tableStructureSql("users", ["id", "name"]);
+    await db.exec('CREATE TABLE "rebuild_users" ("id" INTEGER PRIMARY KEY, "name" TEXT NOT NULL)');
+    const strings = await (db as any).tableStructureSql("rebuild_users", ["id", "name"]);
     expect(strings).toHaveLength(2);
     expect(strings[0]).toMatch(/"id"/);
     expect(strings[1]).toMatch(/"name"/);
@@ -35,32 +39,36 @@ describe("SQLite3Adapter table-rebuild cluster", () => {
 
   it("tableStructureSql includes CONSTRAINT strings", async () => {
     await db.exec(
-      'CREATE TABLE "orders" ("id" INTEGER PRIMARY KEY, "user_id" INTEGER, CONSTRAINT "fk_user" FOREIGN KEY("user_id") REFERENCES "users"("id"))',
+      'CREATE TABLE "rebuild_orders" ("id" INTEGER PRIMARY KEY, "user_id" INTEGER, CONSTRAINT "fk_user" FOREIGN KEY("user_id") REFERENCES "rebuild_users"("id"))',
     );
-    const strings = await (db as any).tableStructureSql("orders", ["id", "user_id"]);
+    const strings = await (db as any).tableStructureSql("rebuild_orders", ["id", "user_id"]);
     expect(strings.some((s: string) => s.includes("CONSTRAINT"))).toBe(true);
   });
 
   // --- tableStructureWithCollation ---
 
   it("tableStructureWithCollation extracts collation from CREATE TABLE SQL", async () => {
-    await db.exec('CREATE TABLE "users" ("id" INTEGER PRIMARY KEY, "name" TEXT COLLATE "NOCASE")');
+    await db.exec(
+      'CREATE TABLE "rebuild_users" ("id" INTEGER PRIMARY KEY, "name" TEXT COLLATE "NOCASE")',
+    );
     const basic = [
       { name: "id", type: "INTEGER", notnull: 0, dflt_value: null, pk: 1 },
       { name: "name", type: "TEXT", notnull: 0, dflt_value: null, pk: 0 },
     ];
-    const enriched = await (db as any).tableStructureWithCollation("users", basic);
+    const enriched = await (db as any).tableStructureWithCollation("rebuild_users", basic);
     const nameCol = enriched.find((c: any) => c.name === "name");
     expect(nameCol.collation).toBe("NOCASE");
   });
 
   it("tableStructureWithCollation extracts auto_increment flag", async () => {
-    await db.exec('CREATE TABLE "users" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "name" TEXT)');
+    await db.exec(
+      'CREATE TABLE "rebuild_users" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "name" TEXT)',
+    );
     const basic = [
       { name: "id", type: "INTEGER", notnull: 0, dflt_value: null, pk: 1 },
       { name: "name", type: "TEXT", notnull: 0, dflt_value: null, pk: 0 },
     ];
-    const enriched = await (db as any).tableStructureWithCollation("users", basic);
+    const enriched = await (db as any).tableStructureWithCollation("rebuild_users", basic);
     const idCol = enriched.find((c: any) => c.name === "id");
     expect(idCol.auto_increment).toBe(true);
   });
@@ -68,8 +76,8 @@ describe("SQLite3Adapter table-rebuild cluster", () => {
   // --- tableInfo ---
 
   it("tableInfo returns PRAGMA table_info rows", async () => {
-    await db.exec("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)");
-    const info = await (db as any).tableInfo("users");
+    await db.exec("CREATE TABLE rebuild_users (id INTEGER PRIMARY KEY, name TEXT)");
+    const info = await (db as any).tableInfo("rebuild_users");
     expect(info).toHaveLength(2);
     expect(info[0].name).toBe("id");
   });
@@ -77,8 +85,10 @@ describe("SQLite3Adapter table-rebuild cluster", () => {
   // --- tableStructure ---
 
   it("tableStructure returns enriched column info", async () => {
-    await db.exec('CREATE TABLE "users" ("id" INTEGER PRIMARY KEY, "name" TEXT COLLATE "NOCASE")');
-    const structure = await (db as any).tableStructure("users");
+    await db.exec(
+      'CREATE TABLE "rebuild_users" ("id" INTEGER PRIMARY KEY, "name" TEXT COLLATE "NOCASE")',
+    );
+    const structure = await (db as any).tableStructure("rebuild_users");
     expect(structure).toHaveLength(2);
     const nameCol = structure.find((c: any) => c.name === "name");
     expect(nameCol.collation).toBe("NOCASE");
@@ -184,9 +194,9 @@ describe("SQLite3Adapter table-rebuild cluster", () => {
     // AR-spelled integer-like type — the shape that makes newColumnDefinition
     // flip the column to :primary_key, where the constraint rides entirely on
     // type_to_sql(:primary_key).
-    await db.exec('CREATE TABLE "users" ("id" bigint PRIMARY KEY, "name" TEXT)');
-    await db.removeColumn("users", "name");
-    const pk = (await (db as any).tableInfo("users")).filter((c: any) => Number(c.pk) > 0);
+    await db.exec('CREATE TABLE "rebuild_users" ("id" bigint PRIMARY KEY, "name" TEXT)');
+    await db.removeColumn("rebuild_users", "name");
+    const pk = (await (db as any).tableInfo("rebuild_users")).filter((c: any) => Number(c.pk) > 0);
     expect(pk.map((c: any) => c.name)).toEqual(["id"]);
   });
 });
