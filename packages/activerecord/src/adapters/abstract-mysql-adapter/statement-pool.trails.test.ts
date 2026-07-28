@@ -1,8 +1,9 @@
 /**
- * Trails-only: Rails has no mysql2/abstract_mysql_adapter statement pool suite
- * (only postgresql/ and sqlite3/ ship a statement_pool_test.rb), so these test
- * names are trails prose covering Mysql2StatementPool
- * (activerecord/lib/active_record/connection_adapters/mysql2/…).
+ * Trails-only. Rails ships a statement_pool_test.rb for postgresql/ and
+ * sqlite3/ but none for mysql, so every test name below is trails prose, not a
+ * Rails name. Subject under test is `Mysql2StatementPool`, our subclass of the
+ * port of `AbstractMysqlAdapter::StatementPool`
+ * (activerecord/lib/active_record/connection_adapters/abstract_mysql_adapter.rb).
  */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import {

@@ -178,9 +178,9 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
     });
   });
 
-  // Rails has no mysql translate_exception test file; these cover
-  // AbstractMysqlAdapter#translate_exception
-  // (activerecord/lib/active_record/connection_adapters/abstract_mysql_adapter.rb:815).
+  // Rails has no mysql translate_exception test file, so these names are trails
+  // prose covering `AbstractMysqlAdapter#translate_exception`
+  // (activerecord/lib/active_record/connection_adapters/abstract_mysql_adapter.rb).
   // Matches the PG adapter's equivalent suite.
   describe("translate_exception", () => {
     beforeEach(async () => {
