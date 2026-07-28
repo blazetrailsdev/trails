@@ -268,6 +268,49 @@ tester.run("require-canonical-rebuild", rule, {
 
     {
       code:
+        "const tables = await adapter.execute(`SELECT tablename FROM pg_tables WHERE tablename IN ('subscribers')`);\n" +
+        "for (const row of tables) {\n" +
+        "  const name = row.tablename;\n" +
+        '  await adapter.exec(`DROP TABLE "${name}"`);\n' +
+        "}",
+      options,
+      errors: [{ messageId: "sweepReachesCanonical", data: { table: "subscribers" } }],
+    },
+
+    {
+      code:
+        "const tables = await adapter.execute(`SELECT tablename FROM pg_tables WHERE tablename IN ('people')`);\n" +
+        "for (const row of tables) {\n" +
+        "  const name = row.tablename;\n" +
+        "  await ctx.dropTable(name);\n" +
+        "}",
+      options,
+      errors: [{ messageId: "sweepReachesCanonical", data: { table: "people" } }],
+    },
+
+    {
+      code:
+        "const res = await adapter.execute(`SELECT tablename FROM pg_tables WHERE tablename IN ('widgets')`);\n" +
+        "const rows = res.rows;\n" +
+        "for (let i = 0; i < rows.length; i++) {\n" +
+        '  await adapter.exec(`DROP TABLE "${rows[i].tablename}"`);\n' +
+        "}",
+      options,
+      errors: [{ messageId: "sweepReachesCanonical", data: { table: "widgets" } }],
+    },
+
+    {
+      code:
+        'let SQL = "SELECT 1";\n' +
+        "SQL = \"SELECT tablename FROM pg_tables WHERE tablename IN ('people')\";\n" +
+        "const tables = await adapter.execute(SQL);\n" +
+        'for (const t of tables) { await adapter.exec(`DROP TABLE "${t.tablename}"`); }',
+      options,
+      errors: [{ messageId: "sweepReachesCanonical", data: { table: "people" } }],
+    },
+
+    {
+      code:
         "const rows = await adapter.execute(`SELECT tablename FROM pg_tables WHERE tablename IN ('subscribers')`);\n" +
         "for (let i = 0; i < rows.length; i++) {\n" +
         '  await adapter.exec(`DROP TABLE "${rows[i].tablename}"`);\n' +
