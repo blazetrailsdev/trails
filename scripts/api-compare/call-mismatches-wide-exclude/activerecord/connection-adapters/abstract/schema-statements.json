@@ -702,13 +702,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/schema-statements.ts",
-    "rubyName": "table_exists?",
-    "call": "tables",
-    "reason": "Newly comparable (RFC 0072 arity sweep): Rails calls `tables` only from the `rescue NotImplementedError` fallback arm; trails' tableExists issues the data-source query per adapter and has no such fallback. Pre-existing gap — converge by porting the rescue arm."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-statements.ts",
     "rubyName": "tables",
     "call": "data_source_sql",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

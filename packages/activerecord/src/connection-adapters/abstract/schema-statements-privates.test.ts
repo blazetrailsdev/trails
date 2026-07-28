@@ -564,3 +564,30 @@ describe("distinctRelationForPrimaryKey", () => {
     expect(whereBang).not.toHaveBeenCalled();
   });
 });
+
+describe("tableExists NotImplementedError fallback", () => {
+  it("returns false for a blank table name without querying", async () => {
+    const execute = vi.fn().mockResolvedValue([]);
+    const ss = makeStatements({ quote: (v: string) => `'${v}'`, execute });
+
+    expect(await ss.tableExists("")).toBe(false);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("falls back to tables.include? when the data-source path is not implemented", async () => {
+    const ss = makeStatements({ adapterName: "fake" as any, quote: (v: string) => `'${v}'` });
+    vi.spyOn(ss, "tables").mockResolvedValue(["posts", "comments"]);
+
+    expect(await ss.tableExists("posts")).toBe(true);
+    expect(await ss.tableExists("widgets")).toBe(false);
+  });
+
+  it("propagates errors other than NotImplementedError", async () => {
+    const ss = makeStatements({
+      quote: (v: string) => `'${v}'`,
+      execute: vi.fn().mockRejectedValue(new Error("connection lost")),
+    });
+
+    await expect(ss.tableExists("posts")).rejects.toThrow("connection lost");
+  });
+});

@@ -588,32 +588,45 @@ export class SchemaStatements {
   }
 
   async tableExists(tableName: string): Promise<boolean> {
-    // Rails' data_source_exists? embeds the table name via quote() — an escaped
-    // SQL string literal, not raw interpolation (data_source_sql, schema_statements.rb).
-    // A value containing quotes/operators is escaped to a literal that matches
-    // nothing and returns false instead of producing broken SQL.
-    const quoted = this.adapter.quote(tableName);
-    let rows: Record<string, unknown>[];
-    switch (this.adapterName) {
-      case "sqlite":
-        rows = await this.adapter.execute(
-          `SELECT name FROM sqlite_master WHERE type='table' AND name=${quoted}`,
-        );
-        break;
-      case "postgres":
-        // Rails' PG data_source_sql scopes to ANY (current_schemas(false))
-        // (the active search_path), not a hardcoded 'public'.
-        rows = await this.adapter.execute(
-          `SELECT 1 FROM information_schema.tables WHERE table_schema = ANY (current_schemas(false)) AND table_name = ${quoted} LIMIT 1`,
-        );
-        break;
-      case "mysql":
-        rows = await this.adapter.execute(
-          `SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ${quoted} LIMIT 1`,
-        );
-        break;
+    // Rails guards on `table_name.present?` and returns nil otherwise; the
+    // boolean return type makes that false here.
+    if (!tableName) return false;
+    try {
+      // Rails' data_source_exists? embeds the table name via quote() — an escaped
+      // SQL string literal, not raw interpolation (data_source_sql, schema_statements.rb).
+      // A value containing quotes/operators is escaped to a literal that matches
+      // nothing and returns false instead of producing broken SQL.
+      const quoted = this.adapter.quote(tableName);
+      let rows: Record<string, unknown>[];
+      switch (this.adapterName) {
+        case "sqlite":
+          rows = await this.adapter.execute(
+            `SELECT name FROM sqlite_master WHERE type='table' AND name=${quoted}`,
+          );
+          break;
+        case "postgres":
+          // Rails' PG data_source_sql scopes to ANY (current_schemas(false))
+          // (the active search_path), not a hardcoded 'public'.
+          rows = await this.adapter.execute(
+            `SELECT 1 FROM information_schema.tables WHERE table_schema = ANY (current_schemas(false)) AND table_name = ${quoted} LIMIT 1`,
+          );
+          break;
+        case "mysql":
+          rows = await this.adapter.execute(
+            `SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ${quoted} LIMIT 1`,
+          );
+          break;
+        default:
+          // Rails' abstract data_source_sql raises NotImplementedError; the
+          // rescue arm below degrades to tables.include?.
+          // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1890
+          throw new NotImplementedError("#data_source_sql is not implemented");
+      }
+      return rows.length > 0;
+    } catch (error) {
+      if (!(error instanceof NotImplementedError)) throw error;
+      return (await this.tables()).includes(String(tableName));
     }
-    return rows.length > 0;
   }
 
   async columnExists(
@@ -1453,6 +1466,11 @@ export class SchemaStatements {
           `SELECT table_name AS name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE' ORDER BY table_name`,
         );
         return (rows as any[]).map((r: any) => r.name ?? r.TABLE_NAME);
+      default:
+        // Rails' abstract #tables goes through data_source_sql, which raises
+        // NotImplementedError for an adapter that does not define it.
+        // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1890
+        throw new NotImplementedError("#tables is not implemented");
     }
   }
 
