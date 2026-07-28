@@ -539,9 +539,16 @@ describe("Migrator drives migrations through Migration#migrate", () => {
   });
 
   it("honours the migration's verbose setting", async () => {
-    const migrator = new Migrator(adapter, [makeMigration("1", "M1")]);
-    migrator.verbose = false;
-    await migrator.up();
-    expect(chunks.join("")).toBe("");
+    // Rails' verbose is a cattr_accessor (migration.rb:797) — one shared
+    // setting, not per-Migrator state.
+    const was = Migration.verbose;
+    Migration.verbose = false;
+    try {
+      const migrator = new Migrator(adapter, [makeMigration("1", "M1")]);
+      await migrator.up();
+      expect(chunks.join("")).toBe("");
+    } finally {
+      Migration.verbose = was;
+    }
   });
 });
