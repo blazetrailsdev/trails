@@ -1,5 +1,5 @@
 import { join, resolve } from "path";
-import { getFsAsync } from "@blazetrails/activesupport";
+import { getEnv, getFsAsync, setEnv } from "@blazetrails/activesupport";
 import {
   DatabaseTasks,
   DatabaseConfigurations,
@@ -123,15 +123,29 @@ export async function dbMigrate(cwd: string, args: string[]): Promise<number> {
   await tryLoadModels(cwd);
   loadMigrations(cwd);
 
+  // Rails' `rake db:migrate` (railties/databases.rake:89) takes its target from
+  // `ENV["VERSION"]`, which `migrate_all` reads back through `target_version`;
+  // `--version` is the CLI spelling of that env var, not an extra argument.
   const version = flagValue(args, "--version");
+  const previousVersion = getEnv("TRAILS_MIGRATION_VERSION");
+  if (version !== undefined) setEnv("TRAILS_MIGRATION_VERSION", version);
+  // `db:migrate` depends on `load_config: :environment` (databases.rake:22, :89),
+  // so app boot has already established Base's connection by the time
+  // `migrate_all` reaches its single-primary fast path. The CLI has no boot
+  // step, so open that ambient connection here.
+  const dbConfig = DatabaseTasks.databaseConfiguration?.findDbConfig(DatabaseTasks.env);
   try {
-    await DatabaseTasks.withTemporaryPoolForEach(DatabaseTasks.env, async () => {
-      await DatabaseTasks.migrate(version);
-    });
+    if (dbConfig) {
+      await DatabaseTasks.withTemporaryPool(dbConfig, () => DatabaseTasks.migrateAll());
+    } else {
+      await DatabaseTasks.migrateAll();
+    }
     return 0;
   } catch (err) {
     console.error(`ar: db:migrate failed — ${String(err)}`);
     return 1;
+  } finally {
+    if (version !== undefined) setEnv("TRAILS_MIGRATION_VERSION", previousVersion);
   }
 }
 

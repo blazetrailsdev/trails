@@ -51,14 +51,21 @@ describe("DbMigrateTest", () => {
   it("db:migrate calls migrate with no args", async () => {
     DatabaseConfigurations.defaultEnv = "development";
     expect(await run(["db:migrate"], await makeFakeProject())).toBe(0);
-    expect(migrateSpy).toHaveBeenCalledWith(undefined);
+    expect(migrateSpy).toHaveBeenCalledWith(undefined, { skipInitialize: true });
   });
 
   it("db:migrate --version passes version string", async () => {
+    // `--version` is the CLI spelling of Rails' `VERSION=x rake db:migrate`, so
+    // it reaches `migrate` through `targetVersion()` rather than as an argument.
+    let seenTargetVersion: number | null = null;
+    migrateSpy.mockImplementation(async () => {
+      seenTargetVersion = DatabaseTasks.targetVersion();
+    });
     expect(await run(["db:migrate", "--version", "20240101000000"], await makeFakeProject())).toBe(
       0,
     );
-    expect(migrateSpy).toHaveBeenCalledWith("20240101000000");
+    expect(seenTargetVersion).toBe(20240101000000);
+    expect(DatabaseTasks.targetVersion()).toBeNull();
   });
 
   it("db:migrate calls Migrator.discoverMigrations before migrate", async () => {
