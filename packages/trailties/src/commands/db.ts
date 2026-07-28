@@ -835,25 +835,33 @@ export function dbCommand(): Command {
       "Create the database if it doesn't exist, run pending migrations, and seed when fresh",
     )
     .action(async () => {
-      // Create the DB first, then connect via withTemporaryPool — establishing
-      // the pool before creation would fail for pg/mysql when the DB doesn't exist.
       const raw = normalizeRawConfig(await loadDatabaseConfig());
       const config = toDbConfig(raw);
-
-      await DatabaseTasks.create(config);
+      const { NoDatabaseError } = await import("@blazetrails/activerecord");
 
       await DatabaseTasks.withTemporaryPool(config, async (pool) => {
-        // Rails measures "fresh" via `!schema_migration.table_exists?`,
-        // matching its `initialize_database` contract. A sqlite DB file
-        // may have been created by either our DatabaseTasks.create call
-        // above or by better-sqlite3 on connect; the meaningful signal
-        // is whether migrations have been applied.
-        const adapter = await pool.leaseConnection();
-        const migrator = createMigrator(adapter, [], raw);
-        const wasFresh = !(await migrator.schemaMigrationTableExists());
+        let adapter: DatabaseAdapter;
+        let databaseAlreadyInitialized: boolean;
+        try {
+          adapter = await pool.leaseConnection();
+          databaseAlreadyInitialized = await createMigrator(
+            adapter,
+            [],
+            raw,
+          ).schemaMigrationTableExists();
+        } catch (error) {
+          if (!(error instanceof NoDatabaseError)) throw error;
+          await DatabaseTasks.create(config);
+          adapter = await pool.leaseConnection();
+          databaseAlreadyInitialized = await createMigrator(
+            adapter,
+            [],
+            raw,
+          ).schemaMigrationTableExists();
+        }
 
         await runMigrate(adapter, raw);
-        if (wasFresh) {
+        if (!databaseAlreadyInitialized) {
           await withSeedAdapter(adapter, runSeed);
         }
       });
