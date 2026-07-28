@@ -595,47 +595,25 @@ describe("SchemaDumperTest", () => {
   });
 
   it.skipIf(adapterType !== "postgres")("schema dump includes limit on array type", async () => {
-    const adapter = Base.connection;
-    const testCtx = new MigrationContext(adapter);
-    await testCtx.createTable("bigint_array", { force: true }, (t) => {
-      (t as any).integer("big_int_data_points", { limit: 8, array: true });
-    });
-    const output = await SchemaDumper.dumpTableSchema(adapter, "bigint_array");
+    const output = await SchemaDumper.dumpTableSchema(Base.connection, "bigint_array");
     expect(output).toMatch(/t\.bigint\("big_int_data_points", \{ array: true \}\)/);
   });
   it.skipIf(adapterType !== "postgres")(
     "schema dump allows array of decimal defaults",
     async () => {
-      const testAdapter = Base.connection;
-      const testCtx = new MigrationContext(testAdapter);
-      await testCtx.createTable("bigint_array", { force: true }, (t) => {
-        t.integer("big_int_data_points", { limit: 8, array: true });
-        t.decimal("decimal_array_default", { array: true, default: [1.23, 3.45] });
-      });
-      const output = await SchemaDumper.dumpTableSchema(testAdapter, "bigint_array");
+      const output = await SchemaDumper.dumpTableSchema(Base.connection, "bigint_array");
       expect(output).toMatch(
         /t\.decimal\("decimal_array_default",\s*\{[^}]*default:\s*\["1\.23", "3\.45"\][^}]*array:\s*true/,
       );
     },
   );
   it.skipIf(adapterType !== "postgres")("schema dump interval type", async () => {
-    const adapter = Base.connection;
-    const testCtx = new MigrationContext(adapter);
-    await testCtx.createTable("postgresql_times", {}, (t) => {
-      (t as any).interval("time_interval");
-      (t as any).interval("scaled_time_interval", { precision: 6 });
-    });
-    const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_times");
+    const output = await SchemaDumper.dumpTableSchema(Base.connection, "postgresql_times");
     expect(output).toMatch(/t\.interval\("time_interval"\)/);
     expect(output).toMatch(/t\.interval\("scaled_time_interval", \{ precision: 6 \}\)/);
   });
   it.skipIf(adapterType !== "postgres")("schema dump oid type", async () => {
-    const adapter = Base.connection;
-    const testCtx = new MigrationContext(adapter);
-    await testCtx.createTable("postgresql_oids", {}, (t) => {
-      (t as any).oid("obj_id");
-    });
-    const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_oids");
+    const output = await SchemaDumper.dumpTableSchema(Base.connection, "postgresql_oids");
     expect(output).toMatch(/t\.oid\("obj_id"\)/);
   });
   it.skipIf(adapterType !== "postgres")("schema dump includes extensions", async () => {
@@ -1012,7 +990,6 @@ describe("SchemaDumperDefaultsTest", () => {
 afterAll(async () => {
   const ctx = new MigrationContext(Base.connection);
   const o = { ifExists: true } as const;
-  await ctx.dropTable("bigint_array", o);
   await ctx.dropTable("booleans", o);
   await ctx.dropTable("companies", o);
   await ctx.dropTable("dump_defaults", o);
@@ -1023,8 +1000,6 @@ afterAll(async () => {
   await ctx.dropTable("myapp_users", o);
   await ctx.dropTable("myapp_users_v1", o);
   await ctx.dropTable("numeric_data", o);
-  await ctx.dropTable("postgresql_oids", o);
-  await ctx.dropTable("postgresql_times", o);
   await ctx.dropTable("posts", o);
   await ctx.dropTable("schema_dump_probe", o);
   await ctx.dropTable("products", o);
