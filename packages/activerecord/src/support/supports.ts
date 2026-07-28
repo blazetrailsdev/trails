@@ -72,6 +72,9 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // PostgreSQL only (postgresql_adapter.rb:224/228; abstract default false).
   exclusion_constraints: ["postgres"],
   unique_constraints: ["postgres"],
+  // `supports_validate_constraints?`: PostgreSQL only (postgresql_adapter.rb:232;
+  // abstract default false).
+  validate_constraints: ["postgres"],
   // `supports_deferrable_constraints?`: PostgreSQL + SQLite true, abstract
   // default false. (postgresql_adapter.rb:236, sqlite3_adapter.rb:249)
   deferrable_constraints: ["postgres", "sqlite"],
