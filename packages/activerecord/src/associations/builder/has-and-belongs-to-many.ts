@@ -201,6 +201,13 @@ export class HasAndBelongsToMany {
     const middleName = [pluralize(model.name.toLowerCase()), name].sort().join("_");
     const middleOptions: Record<string, unknown> = {
       className: registryKey,
+      // Rails sets only `class_name` here (has_and_belongs_to_many.rb:73), but
+      // the constant it names was just marked private, and `const_get` on a
+      // private constant raises — Rails' association survives because it
+      // "resolves through the reflection, not the constant table". Hold the join
+      // model directly so `klass` short-circuits before any name lookup;
+      // `className` stays for fidelity and for anything reading the name.
+      anonymousClass: JoinModel,
       foreignKey: ownerFk,
       dependent: "delete",
     };
