@@ -1,20 +1,24 @@
 /**
  * Mirrors Rails activerecord/test/cases/connection_adapters/type_lookup_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
+import { describe, it, expect, beforeEach } from "vitest";
+import type { Type } from "@blazetrails/activemodel";
 import { IntegerType } from "@blazetrails/activemodel";
+import { Base } from "../base.js";
 import { adapterType } from "../test-adapter.js";
 
-let adapter: AbstractSQLite3Adapter;
+/** The only surface this suite touches, and not on AbstractAdapter itself. */
+interface TypeLookupConnection {
+  lookupCastType(sqlType: string): Type;
+}
 
-beforeEach(() => {
-  adapter = new BetterSQLite3Adapter(":memory:");
-});
+let adapter: TypeLookupConnection;
 
-afterEach(async () => {
-  await adapter.close();
+// Rails: `@connection = ActiveRecord::Base.lease_connection`
+// (type_lookup_test.rb:10) — the ambient lane connection, not a private
+// `:memory:` handle. Nothing here writes, so the lease is never closed.
+beforeEach(async () => {
+  adapter = (await Base.leaseConnection()) as unknown as TypeLookupConnection;
 });
 
 function assertLookupType(expected: string, sqlType: string) {

@@ -1,12 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ConnectionHandler } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
+import { ambientPoolConfiguration } from "../test-adapter.js";
+import { inMemoryDb } from "../support/adapter-helper.js";
 
-describe("ConnectionHandlersMultiPoolConfigTest", () => {
+// Rails wraps every test in this file in `unless in_memory_db?`
+// (connection_handlers_multi_pool_config_test.rb:21) because they open a real
+// connection against a file-backed database — its hardcoded
+// "test/db/primary.sqlite3" (`:27,:54,:78`) is the file-backed equivalent of
+// our ambient lane config, so the pools here ride that instead of `:memory:`.
+describe.skipIf(inMemoryDb())("ConnectionHandlersMultiPoolConfigTest", () => {
   let handler: ConnectionHandler;
 
-  const primaryConfig = () =>
-    new HashConfig("default_env", "primary", { adapter: "sqlite3", database: ":memory:" });
+  const primaryConfig = () => new HashConfig("default_env", "primary", ambientPoolConfiguration());
 
   beforeEach(() => {
     handler = new ConnectionHandler();

@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { StatementPool } from "./statement-pool.js";
+import { isSqliteRun } from "../support/sqlite-template.js";
+import { newRawTestAdapter } from "../test-adapter.js";
 
 describe("StatementPoolTest", () => {
   it("#delete doesn't call dealloc if the statement didn't exist", () => {
@@ -108,13 +110,16 @@ describe("StatementPoolTest", () => {
 });
 
 describe("SQLite3 StatementPool integration", () => {
-  it("caches prepared statements across execute calls", async () => {
-    const { BetterSQLite3Adapter } =
-      await import("../connection-adapters/better-sqlite3-adapter.js");
-    const adapter = new BetterSQLite3Adapter(":memory:");
+  // The Rails-mirrored StatementPoolTest above needs no adapter at all — Rails
+  // builds a bare `TestPool.new` (statement_pool_test.rb:16). This trails-only
+  // test does need one, so it rides the ambient sqlite lane connection rather
+  // than a private `:memory:` handle, and only runs where that lane is sqlite.
+  it.skipIf(!isSqliteRun())("caches prepared statements across execute calls", async () => {
+    const adapter = newRawTestAdapter();
     const prepareSpy = vi.spyOn((adapter as any).driver, "prepare");
 
     try {
+      await adapter.executeMutation('DROP TABLE IF EXISTS "test_pool"');
       await adapter.executeMutation(
         'CREATE TABLE "test_pool" ("id" INTEGER PRIMARY KEY, "name" TEXT)',
       );
@@ -133,9 +138,9 @@ describe("SQLite3 StatementPool integration", () => {
       // db.prepare should have been called once for the SELECT, not twice
       const selectCalls = prepareSpy.mock.calls.filter((c) => c[0] === selectSql);
       expect(selectCalls).toHaveLength(1);
-      await adapter.executeMutation('DROP TABLE IF EXISTS "test_pool"');
     } finally {
       prepareSpy.mockRestore();
+      await adapter.executeMutation('DROP TABLE IF EXISTS "test_pool"');
       adapter.disconnectBang();
     }
   });
