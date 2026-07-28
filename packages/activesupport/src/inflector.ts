@@ -4,6 +4,7 @@
  */
 
 import { Inflections } from "./inflector/inflections.js";
+import { NameError } from "./core-ext/name-error.js";
 
 /** @internal */
 function applyInflections(word: string, rules: { rule: RegExp; replacement: string }[]): string {
@@ -220,6 +221,27 @@ export function _resetConstants(): void {
   _privateConstants.clear();
 }
 
+/**
+ * The segment `Object.const_get` would fail on: it resolves `A::B::C` one step
+ * at a time, so the NameError names the first link that is missing, not the
+ * whole path. Our table is keyed by full path, so walking prefixes is the
+ * equivalent probe.
+ *
+ * This is exact only for paths whose enclosing modules are themselves
+ * registered. Ruby walks real modules, so `A::B` with `A` a live module names
+ * `:B`; here, if nothing registered `A`, the walk stops at `A` and names that
+ * instead. Registering the enclosing names (as a namespaced model registration
+ * does) makes the two agree.
+ * @internal
+ */
+function missingSegment(path: string): string {
+  const segments = path.split("::");
+  for (let i = 1; i <= segments.length; i++) {
+    if (!_constants.has(segments.slice(0, i).join("::"))) return segments[i - 1];
+  }
+  return segments[segments.length - 1];
+}
+
 function isValidConstantPath(path: string): boolean {
   if (path.length === 0) return false;
   return path.split("::").every((segment) => /^[A-Z]\w*$/.test(segment));
@@ -229,7 +251,7 @@ function isValidConstantPath(path: string): boolean {
 export function constantize(camelCasedWord: string): unknown {
   const path = camelCasedWord.startsWith("::") ? camelCasedWord.slice(2) : camelCasedWord;
   if (!isValidConstantPath(path)) {
-    throw new ReferenceError(`wrong constant name ${camelCasedWord}`);
+    throw new NameError(`wrong constant name ${camelCasedWord}`);
   }
   // Privacy is checked before existence, which Ruby cannot reach: there
   // `private_constant` on an undefined name is itself a NameError, so a name is
@@ -240,7 +262,7 @@ export function constantize(camelCasedWord: string): unknown {
     throw new ReferenceError(`private constant ${path} referenced`);
   }
   if (!_constants.has(path)) {
-    throw new ReferenceError(`uninitialized constant ${path}`);
+    throw new NameError(`uninitialized constant ${path}`, missingSegment(path));
   }
   return _constants.get(path);
 }
@@ -250,8 +272,15 @@ export function safeConstantize(camelCasedWord: string): unknown {
   try {
     return constantize(camelCasedWord);
   } catch (e) {
-    if (e instanceof ReferenceError) return undefined;
-    throw e;
+    if (!(e instanceof NameError)) throw e;
+    // Ruby: `raise if e.name && !(camel_cased_word.split("::").include?(e.name) ||
+    // e.name == camel_cased_word)` — swallow only a miss on this path's own
+    // segments, never one bubbling out of an unrelated constant.
+    const name = e.constantName;
+    if (name && !(camelCasedWord.split("::").includes(name) || name === camelCasedWord)) {
+      throw e;
+    }
+    return undefined;
   }
 }
 

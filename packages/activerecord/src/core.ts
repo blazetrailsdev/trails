@@ -5,7 +5,12 @@
  */
 
 import { getApplicationRecordClass } from "./inheritance.js";
-import { RecordNotFound, StatementInvalid, StrictLoadingViolationError } from "./errors.js";
+import {
+  NameError,
+  RecordNotFound,
+  StatementInvalid,
+  StrictLoadingViolationError,
+} from "./errors.js";
 import { actionOnStrictLoadingViolation } from "./ar-config.js";
 import { WRITING_ROLE } from "./roles.js";
 import {
@@ -20,6 +25,7 @@ import {
   IsolatedExecutionState,
   ParameterFilter,
   camelize,
+  constantize,
   pluralize,
 } from "@blazetrails/activesupport";
 import {
@@ -430,7 +436,20 @@ function parentClass(klass: CoreHost): CoreHost | null {
 
 export function destroyAssociationAsyncJob(this: CoreHost, value?: any): any {
   if (value !== undefined) {
+    // Rails aliases the writer straight to `_destroy_association_async_job=`
+    // (core.rb:36), a plain setter that never resolves the constant. Only the
+    // reader below constantizes, so assigning a not-yet-registered class name
+    // stays legal.
     this._destroyAssociationAsyncJob = value;
+    return this._destroyAssociationAsyncJob;
+  }
+  if (typeof this._destroyAssociationAsyncJob === "string") {
+    try {
+      this._destroyAssociationAsyncJob = constantize(this._destroyAssociationAsyncJob);
+    } catch (error) {
+      if (!(error instanceof NameError)) throw error;
+      throw new NameError(`Unable to load destroy_association_async_job: ${error.message}`);
+    }
   }
   return this._destroyAssociationAsyncJob ?? null;
 }

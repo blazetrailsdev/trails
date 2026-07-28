@@ -734,12 +734,11 @@ export class UnknownAttributeError extends ActiveRecordError {
   }
 }
 
-export class NameError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "NameError";
-  }
-}
+// Ruby's NameError is a core class, not an Active Record one: it is what
+// constant resolution (so Inflector.constantize) raises. Re-exported from
+// Active Support's core-ext port so `rescue NameError` sites catch the same
+// class whether the constant was resolved here or by the inflector.
+export { NameError } from "@blazetrails/activesupport";
 
 export class SQLWarning extends AdapterError {
   readonly code: string | null;

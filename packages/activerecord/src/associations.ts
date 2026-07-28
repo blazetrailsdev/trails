@@ -77,7 +77,7 @@ export async function initializeAssociations(): Promise<void> {
     import("./associations/disable-joins-association-scope.js"),
   ]);
 }
-import { ConfigurationError, NameError } from "./errors.js";
+import { ConfigurationError } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { strictLoadingViolationBang } from "./core.js";
 import { StatementCache } from "./statement-cache.js";
@@ -101,6 +101,7 @@ import {
   pluralize,
   camelize,
   foreignKey as deriveForeignKey,
+  constantize,
   registerConstant,
   unregisterConstant,
 } from "@blazetrails/activesupport";
@@ -242,12 +243,16 @@ class ModelRegistry extends Map<string, typeof Base> {
     return this.#generation;
   }
 
+  // Write-through lives here, not at each caller, so a direct
+  // `modelRegistry.set` (the HABTM join model) or `.delete` (the PG schema
+  // helper) cannot leave the registry and the constant table disagreeing.
   override set(name: string, model: typeof Base): this {
     // Guard (inside registerModelConstant) before any mutation: a rejected
     // registration must not bump the generation, which would invalidate every
     // reflection memo for a write that never happened.
     registerModelConstant(name, model);
     if (super.get(name) !== model) this.#generation++;
+    registerConstant(name, model);
     return super.set(name, model);
   }
 
@@ -408,7 +413,7 @@ export function registerModel(
 
 /**
  * Zeitwerk analog: a fallback name→class index populated by the canonical
- * test-models barrel. When {@link resolveModel} or reflection's `computeClass`
+ * test-models barrel. When {@link autoloadModel} or reflection's `computeClass`
  * miss {@link modelRegistry}, they consult this index to autoload a canonical
  * model by name — the trails equivalent of Rails autoloading a constant on
  * first reference from an already-indexed `test/models/` tree. It stays
@@ -427,45 +432,33 @@ export function _setCanonicalModelAutoloadIndex(index: ReadonlyMap<string, typeo
 }
 
 /**
- * Look up a model by name, falling back to the canonical autoload index on a
- * {@link modelRegistry} miss. A hit in the index is registered so subsequent
- * lookups resolve directly from the registry. Returns undefined on a genuine
- * miss (name in neither the registry nor the index).
+ * Fault a canonical model into the constant table by name — the registration
+ * half of constant resolution, and all that is left of trails' old registry
+ * lookup. Ruby's `const_get` (so `constantize`) runs the autoloader on a miss;
+ * trails' constant table has no such hook, so callers fault the name in here
+ * and then resolve it with {@link constantize} exactly the way Rails spells it.
+ * No-op when the name already resolves or the index has no entry, so a genuine
+ * miss still leaves `constantize` to raise.
  * @internal
  */
-export function lookupModelWithAutoload(name: string): typeof Base | undefined {
-  const model = modelRegistry.get(name);
-  if (model) return model;
-  const autoloaded = canonicalModelAutoloadIndex?.get(name);
-  if (autoloaded) {
-    registerModel(autoloaded);
-    return autoloaded;
-  }
-  return undefined;
-}
-
-/**
- * Resolve a model class by name.
- *
- * @internal Registry lookup, not a Rails method. Ruby resolves association
- * class names through constant lookup — `Reflection#compute_class`
- * (`reflection.rb:434` and `:490`) into `Object.const_get` — so `resolve_model`
- * is defined nowhere in the Rails source; trails needs an explicit registry
- * because ESM has no constant namespace to walk. Sits between the
- * already-`@internal` {@link lookupModelWithAutoload} and
- * {@link resolveAssocClass}, which are the same invention.
- */
-export function resolveModel(name: string): typeof Base {
-  const model = lookupModelWithAutoload(name);
-  if (!model) {
-    throw new NameError(`uninitialized constant ${name}`);
-  }
-  return model;
+export function autoloadModel(name: string): void {
+  // `constantize` strips a leading `::` itself; the registry and the index are
+  // keyed unprefixed, so strip here too or `compute_class("::#{class_name}")`
+  // (reflection.rb:427) can never fault one in.
+  const bare = name.replace(/^::/, "");
+  // Gate on the *registry*, not the constant table. `registerSubclass`
+  // (inheritance.ts) and the adapter setter write constants without going
+  // through `registerModel`, so an STI subclass can be constantize-able while
+  // still absent from `modelRegistry` — which the join planner reads directly.
+  // Gating on `safeConstantize` would skip the fault-in and leave it absent.
+  if (modelRegistry.has(bare)) return;
+  const autoloaded = canonicalModelAutoloadIndex?.get(bare);
+  if (autoloaded) registerModel(autoloaded);
 }
 
 /**
  * Resolve the target model for an association using the rich reflection's
- * namespace-aware klass when available, falling back to flat resolveModel.
+ * namespace-aware klass when available, falling back to a flat constant lookup.
  * Skips `.klass` for polymorphic associations (checked via `isPolymorphic()`)
  * because polymorphic reflections intentionally throw on `.klass` access.
  * Non-polymorphic errors (e.g. not-an-AR-subclass) propagate unchanged.
@@ -490,7 +483,8 @@ export function resolveAssocClass(
     const richKlass = refl.klass;
     if (richKlass) return richKlass;
   }
-  return resolveModel(className);
+  autoloadModel(className);
+  return constantize(className) as typeof Base;
 }
 
 /**

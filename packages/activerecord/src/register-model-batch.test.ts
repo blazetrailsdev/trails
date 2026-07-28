@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { registerModel, modelRegistry, resolveModel } from "./associations.js";
+import { registerModel, modelRegistry } from "./associations.js";
+import { constantize } from "@blazetrails/activesupport";
 import { Base } from "./base.js";
 import { Author } from "./test-helpers/models/author.js";
 import { Comment, SpecialComment, SubSpecialComment } from "./test-helpers/models/comment.js";
@@ -8,7 +9,7 @@ describe("registerModel array form", () => {
   it("registers every class in the array, resolvable by name", () => {
     registerModel([Author, Comment, SpecialComment, SubSpecialComment]);
 
-    expect(resolveModel("Author")).toBe(Author);
+    expect(constantize("Author")).toBe(Author);
     expect(modelRegistry.get("Comment")).toBe(Comment);
     expect(modelRegistry.get("SpecialComment")).toBe(SpecialComment);
     expect(modelRegistry.get("SubSpecialComment")).toBe(SubSpecialComment);
@@ -54,14 +55,14 @@ describe("registerModel array form", () => {
     expect((BatchBase as any)._subclasses ?? []).not.toContain(BatchBase);
     expect((BatchBase as any)._subclasses).toContain(BatchChild);
     expect((BatchChild as any)._subclasses).toContain(BatchGrandchild);
-    expect(resolveModel("BatchGrandchild")).toBe(BatchGrandchild);
+    expect(constantize("BatchGrandchild")).toBe(BatchGrandchild);
   });
 
   it("keeps the single-class and (name, model) forms working", () => {
     registerModel(Author);
-    expect(resolveModel("Author")).toBe(Author);
+    expect(constantize("Author")).toBe(Author);
 
     registerModel("AuthorAlias", Author);
-    expect(resolveModel("AuthorAlias")).toBe(Author);
+    expect(constantize("AuthorAlias")).toBe(Author);
   });
 });

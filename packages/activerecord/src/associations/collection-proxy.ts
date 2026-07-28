@@ -38,7 +38,7 @@ import {
   raiseNotFoundSingle,
 } from "../relation/finder-methods.js";
 import type { Nodes } from "@blazetrails/arel";
-import { underscore, singularize, camelize } from "@blazetrails/activesupport";
+import { underscore, singularize, camelize, constantize } from "@blazetrails/activesupport";
 import { filterScopeForCreate } from "./association.js";
 import {
   RecordNotSaved,
@@ -64,7 +64,7 @@ import { compositeQueryConstraintsList } from "../persistence.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
   association,
-  resolveModel,
+  autoloadModel,
   resolveAssocClass,
   buildHasManyRelation,
   buildThroughJoinScope,
@@ -543,7 +543,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       _reflectOnAssociation?: (n: string) => { klass?: typeof Base } | null;
     };
     const richKlass = ownerCtor._reflectOnAssociation?.(assocName)?.klass;
-    return richKlass ?? resolveModel(className);
+    if (richKlass) return richKlass;
+    autoloadModel(className);
+    return constantize(className) as typeof Base;
   }
 
   /**

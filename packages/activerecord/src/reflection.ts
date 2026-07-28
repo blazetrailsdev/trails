@@ -8,6 +8,8 @@ import {
   singularize,
   camelize,
   demodulize,
+  constantize,
+  safeConstantize,
   foreignKey as deriveForeignKey,
 } from "@blazetrails/activesupport";
 import { Table, type TableRef } from "@blazetrails/arel";
@@ -15,7 +17,7 @@ import { _correctNames } from "./associations.js";
 import { joinTableName } from "./migration/join-table.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
 
-import { modelRegistry, lookupModelWithAutoload } from "./associations.js";
+import { modelRegistry, autoloadModel } from "./associations.js";
 import {
   hasQueryConstraints,
   queryConstraintsList,
@@ -688,18 +690,8 @@ export class MacroReflection extends AbstractReflection {
   }
 
   computeClass(name: string): typeof Base {
-    const lookupName = name.startsWith("::") ? name.slice(2) : name;
-    const resolved = lookupModelWithAutoload(lookupName);
-    if (!resolved) {
-      // Rails resolves both association and aggregation reflection classes
-      // through compute_type, which raises NameError for a missing constant
-      // (reflection.rb:495-508). Match AssociationReflection#computeClass so
-      // callers rescuing only NameError treat both paths uniformly.
-      throw new NameError(
-        `Model '${lookupName}' not found in registry (for '${this.nameString}' on ${this.activeRecord.name})`,
-      );
-    }
-    return resolved;
+    autoloadModel(name);
+    return constantize(name) as typeof Base;
   }
 
   scopeFor(relation: any, owner?: any): any {
@@ -1023,13 +1015,10 @@ export class AssociationReflection extends MacroReflection {
         }
       }
     } catch (e: unknown) {
-      // Rails: rescue NameError => error; raise unless error.name.to_s == class_name
-      // Only swallow model-not-found errors from computeClass, re-raise anything else
-      if (
-        e instanceof Error &&
-        e.message.startsWith("Model ") &&
-        e.message.includes("not found in registry")
-      ) {
+      // Rails: `rescue NameError => error; raise unless error.name.to_s == class_name`
+      // (reflection.rb:769) — swallow only the miss for *this* reflection's own
+      // class name, re-raise anything else.
+      if (e instanceof NameError && e.constantName === this.className) {
         reflection = false;
       } else {
         throw e;
@@ -1305,7 +1294,8 @@ export class AssociationReflection extends MacroReflection {
         const segments = nestingSource.split("::");
         for (let i = segments.length; i > 0; i--) {
           const candidate = [...segments.slice(0, i), simpleName].join("::");
-          const resolved = lookupModelWithAutoload(candidate);
+          autoloadModel(candidate);
+          const resolved = safeConstantize(candidate) as typeof Base | undefined;
           if (resolved) {
             if (!(resolved as any)._isActiveRecordBase) {
               throw new ArgumentError(
@@ -1318,14 +1308,22 @@ export class AssociationReflection extends MacroReflection {
       }
     }
 
-    const resolved = lookupModelWithAutoload(simpleName);
-    if (!resolved) {
-      // Rails' compute_class raises NameError for a missing constant (the only
-      // error check_validity! callers rescue); the subclass guard below raises
-      // ArgumentError, which must propagate. reflection.rb:495-508.
-      throw new NameError(
-        `Model '${simpleName}' not found in registry (for '${this.nameString}' on ${this.activeRecord.name})`,
-      );
+    autoloadModel(simpleName);
+    let resolved: typeof Base;
+    try {
+      resolved = constantize(simpleName) as typeof Base;
+    } catch (error) {
+      // Rails re-raises compute_type's NameError as its own, carrying `name`
+      // (reflection.rb:494-503) — which is what lets automatic_inverse_of
+      // compare `error.name.to_s == class_name` at :769. A miss on an
+      // unrelated constant propagates untouched.
+      if (!(error instanceof NameError)) throw error;
+      if (!new RegExp(`(?:^|::)${simpleName}$`).test(error.constantName ?? "")) throw error;
+      let message = `Missing model class ${simpleName} for the ${this.activeRecord.name}#${this.nameString} association.`;
+      if (!this.options.className) {
+        message += " You can specify a different model class with the :class_name option.";
+      }
+      throw new NameError(message, simpleName);
     }
     if (!(resolved as any)._isActiveRecordBase) {
       throw new ArgumentError(

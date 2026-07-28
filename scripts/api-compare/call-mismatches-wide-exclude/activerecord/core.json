@@ -219,13 +219,6 @@
   {
     "package": "activerecord",
     "tsFile": "core.ts",
-    "rubyName": "destroy_association_async_job",
-    "call": "constantize",
-    "reason": "Equivalent (different path): trails resolves the constant through Active Record's own registry lookup (modelRegistry / resolveModel / resolveComputedType), which is the same table ActiveSupport::Inflector.constantize now reads — reached directly rather than through the inflector. Newly visible because #5471 ported constantize; converging these call sites onto it is its own story."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
     "rubyName": "generated_association_methods",
     "call": "private_constant",
     "reason": "Rails hides the GeneratedAssociationMethods module constant; trails has no such constant to hide."

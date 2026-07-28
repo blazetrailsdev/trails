@@ -26,12 +26,5 @@
     "rubyName": "touch_record",
     "call": "touch_later",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/builder/belongs-to.ts",
-    "rubyName": "add_counter_cache_callbacks",
-    "call": "safe_constantize",
-    "reason": "Equivalent (different path): trails resolves the constant through Active Record's own registry lookup (modelRegistry / resolveModel / resolveComputedType), which is the same table ActiveSupport::Inflector.constantize now reads — reached directly rather than through the inflector. Newly visible because #5471 ported constantize; converging these call sites onto it is its own story."
   }
 ]

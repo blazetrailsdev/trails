@@ -1,6 +1,13 @@
 import type { Base } from "./base.js";
-import { camelize, inquiry, singularize, tableize, underscore } from "@blazetrails/activesupport";
-import { resolveModel } from "./associations.js";
+import {
+  camelize,
+  constantize,
+  inquiry,
+  singularize,
+  tableize,
+  underscore,
+} from "@blazetrails/activesupport";
+import { autoloadModel } from "./associations.js";
 
 /**
  * Configuration for a delegated type.
@@ -102,7 +109,8 @@ export function delegatedType(
     get(this: Base) {
       const typeName = this.readAttribute(foreignType) as string | null;
       if (!typeName) return null;
-      return resolveModel(typeName);
+      autoloadModel(typeName);
+      return constantize(typeName) as typeof Base;
     },
     configurable: true,
   });
@@ -136,7 +144,8 @@ export function delegatedType(
       if (!typeName) {
         throw new Error(`Cannot build${camelize(role, true)}: ${foreignType} is not set`);
       }
-      const TargetClass = resolveModel(typeName);
+      autoloadModel(typeName);
+      const TargetClass = constantize(typeName) as typeof Base;
       const instance = new (TargetClass as unknown as new (a: Record<string, unknown>) => Base)(
         attrs,
       );

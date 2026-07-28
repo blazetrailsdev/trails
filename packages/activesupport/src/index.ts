@@ -1,3 +1,4 @@
+export { NameError } from "./core-ext/name-error.js";
 export {
   registerFsAdapter,
   getFs,
