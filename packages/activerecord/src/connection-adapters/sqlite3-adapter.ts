@@ -2412,20 +2412,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     const alteredTableName = `a${bareTable}`;
     const colNames = definition.columns.map((c) => c.name);
 
-    // Rails has no equivalent guard: its remove_column block deletes the FKs it
-    // orphans, but a check constraint naming a dropped column would survive and
-    // fail the rebuild. Keep dropping those here.
-    const removedColumns = sourceColumns.map((c) => c.name).filter((n) => !colNames.includes(n));
-    if (removedColumns.length > 0) {
-      for (let i = definition.checkConstraints.length - 1; i >= 0; i--) {
-        const chk = definition.checkConstraints[i];
-        const referencesRemovedCol = removedColumns.some((col) =>
-          new RegExp(`\\b${col.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(chk.expression),
-        );
-        if (referencesRemovedCol) definition.checkConstraints.splice(i, 1);
-      }
-    }
-
     const createTableSql = await this.schemaCreation.accept(definition);
 
     // Generated columns can't be inserted into — exclude them from the copy
