@@ -90,11 +90,8 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
 }
 
 /**
- * Port of `vendor/rails/activerecord/test/schema/mysql2_specific_schema.rb:4-26`
- * — the three default-expression tables. The rest of that file (`binary_fields`,
- * `key_tests`, `collation_tests`, the stored procedures and the trigger-backed
- * primary-key table — lines 28-95) is carried by story
- * `port-mysql2-specific-schema-remainder`.
+ * Port of `vendor/rails/activerecord/test/schema/mysql2_specific_schema.rb`,
+ * whole.
  *
  * `supports_default_expression?` is `adapter_helper.rb:23`, not an adapter
  * method: on the MySQL family it is MariaDB >= 10.2.1 or MySQL >= 8.0.13. It is
@@ -138,6 +135,76 @@ async function loadMysql2SpecificSchema(adapter: AbstractMysqlAdapter): Promise<
       my.string("char2_concatenated", { default: () => "(concat(`char2`, '-'))" });
     }
   });
+
+  await adapter.createTable("binary_fields", { force: true }, (t) => {
+    const my = t as MysqlTableDefinition;
+    my.binary("var_binary", { limit: 255 });
+    my.binary("var_binary_large", { limit: 4095 });
+
+    my.tinyblob("tiny_blob");
+    my.blob("normal_blob");
+    my.mediumblob("medium_blob");
+    my.longblob("long_blob");
+    my.tinytext("tiny_text");
+    my.text("normal_text");
+    my.mediumtext("medium_text");
+    my.longtext("long_text");
+
+    my.binary("tiny_blob_2", { size: "tiny" });
+    my.binary("medium_blob_2", { size: "medium" });
+    my.binary("long_blob_2", { size: "long" });
+    my.text("tiny_text_2", { size: "tiny" });
+    my.text("medium_text_2", { size: "medium" });
+    my.text("long_text_2", { size: "long" });
+
+    my.index(["var_binary"]);
+  });
+
+  await adapter.createTable(
+    "key_tests",
+    { force: true, options: "CHARSET=utf8 ENGINE=MyISAM" },
+    (t) => {
+      const my = t as MysqlTableDefinition;
+      my.string("awesome");
+      my.string("pizza");
+      my.string("snacks");
+      my.index(["awesome"], { type: "fulltext", name: "index_key_tests_on_awesome" });
+      my.index(["pizza"], { using: "btree", name: "index_key_tests_on_pizza" });
+      my.index(["snacks"], { name: "index_key_tests_on_snack" });
+    },
+  );
+
+  await adapter.createTable("collation_tests", { id: false, force: true }, (t) => {
+    const my = t as MysqlTableDefinition;
+    my.string("string_cs_column", { limit: 1, collation: "utf8mb4_bin" });
+    my.string("string_ci_column", { limit: 1, collation: "utf8mb4_general_ci" });
+    my.binary("binary_column", { limit: 1 });
+  });
+
+  await adapter.execute("DROP PROCEDURE IF EXISTS ten");
+  await adapter.execute("CREATE PROCEDURE ten() SQL SECURITY INVOKER\nBEGIN\n  SELECT 10;\nEND\n");
+
+  await adapter.execute("DROP PROCEDURE IF EXISTS topics");
+  await adapter.execute(
+    "CREATE PROCEDURE topics(IN num INT) SQL SECURITY INVOKER\nBEGIN\n  SELECT * FROM topics LIMIT num;\nEND\n",
+  );
+
+  if (adapter.supportsInsertReturning()) {
+    await adapter.createTable(
+      "pk_autopopulated_by_a_trigger_records",
+      { force: true, id: false },
+      (t) => {
+        (t as MysqlTableDefinition).integer("id", { null: false });
+      },
+    );
+
+    await adapter.execute(
+      "CREATE TRIGGER before_insert_trigger\n" +
+        "BEFORE INSERT ON pk_autopopulated_by_a_trigger_records\n" +
+        "FOR EACH ROW\n" +
+        "SET NEW.id = (SELECT COALESCE(MAX(id), 0) + 1 FROM pk_autopopulated_by_a_trigger_records);\n",
+    );
+  }
 }
 
 /**
@@ -175,11 +242,10 @@ async function loadSqliteSpecificSchema(adapter: DatabaseAdapter): Promise<void>
  * `<adapter>_specific_schema` loader when trails has one, and to nothing when it
  * does not.
  *
- * `sqlite_specific_schema.rb` is ported whole. The postgres and mysql arms are
- * still partial — the remaining tables of
- * `postgresql_specific_schema.rb:50-225` and `mysql2_specific_schema.rb:28-95`
- * are owned by stories `port-postgresql-specific-schema-remainder` and
- * `port-mysql2-specific-schema-remainder`, not a claim that the gap does not
+ * `sqlite_specific_schema.rb` and `mysql2_specific_schema.rb` are ported whole.
+ * The postgres arm is still partial — the remaining tables of
+ * `postgresql_specific_schema.rb:50-225` are owned by story
+ * `port-postgresql-specific-schema-remainder`, not a claim that the gap does not
  * exist. `trilogy_specific_schema.rb` is the one genuine no-op: trails has no
  * Trilogy adapter, so no adapter name ever selects it.
  */
@@ -206,7 +272,17 @@ const ADAPTER_SPECIFIC_TABLES: Record<string, readonly string[]> = {
     "uuid_children",
     "defaults",
   ],
-  mysql: ["datetime_defaults", "timestamp_defaults", "defaults"],
+  mysql: [
+    "datetime_defaults",
+    "timestamp_defaults",
+    "defaults",
+    "binary_fields",
+    "key_tests",
+    "collation_tests",
+    // Laid only behind `supportsInsertReturning()` (MariaDB), but listed
+    // unconditionally: this list only shields tables from the between-test drop.
+    "pk_autopopulated_by_a_trigger_records",
+  ],
   sqlite: ["defaults"],
 };
 

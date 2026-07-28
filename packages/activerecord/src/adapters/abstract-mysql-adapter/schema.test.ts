@@ -144,33 +144,17 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("dump indexes", async () => {
-      await adapter.dropTable("key_tests", { ifExists: true });
-      try {
-        await adapter.createTable("key_tests", { force: true }, (t: any) => {
-          t.string("awesome");
-          t.string("pizza");
-          t.string("snacks");
-        });
-        await adapter.addIndex("key_tests", ["snacks"], { name: "index_key_tests_on_snack" });
-        await adapter.addIndex("key_tests", ["pizza"], { name: "index_key_tests_on_pizza" });
-        await adapter.addIndex("key_tests", ["awesome"], {
-          name: "index_key_tests_on_awesome",
-          type: "fulltext",
-        });
-        const indexes = (await adapter.indexes("key_tests")).sort((a, b) =>
-          a.name.localeCompare(b.name),
-        );
-        expect(indexes).toHaveLength(3);
-        const byName = (n: string) => indexes.find((i) => i.name === n)!;
-        expect(byName("index_key_tests_on_snack").using).toBe("btree");
-        expect(byName("index_key_tests_on_snack").type).toBeUndefined();
-        expect(byName("index_key_tests_on_pizza").using).toBe("btree");
-        expect(byName("index_key_tests_on_pizza").type).toBeUndefined();
-        expect(byName("index_key_tests_on_awesome").using).toBeUndefined();
-        expect(byName("index_key_tests_on_awesome").type).toBe("fulltext");
-      } finally {
-        await adapter.dropTable("key_tests", { ifExists: true });
-      }
+      const indexes = (await adapter.indexes("key_tests")).sort((a, b) =>
+        a.name.localeCompare(b.name),
+      );
+      expect(indexes).toHaveLength(3);
+      const byName = (n: string) => indexes.find((i) => i.name === n)!;
+      expect(byName("index_key_tests_on_snack").using).toBe("btree");
+      expect(byName("index_key_tests_on_snack").type).toBeUndefined();
+      expect(byName("index_key_tests_on_pizza").using).toBe("btree");
+      expect(byName("index_key_tests_on_pizza").type).toBeUndefined();
+      expect(byName("index_key_tests_on_awesome").using).toBeUndefined();
+      expect(byName("index_key_tests_on_awesome").type).toBe("fulltext");
     });
 
     it("drop temporary table", async () => {

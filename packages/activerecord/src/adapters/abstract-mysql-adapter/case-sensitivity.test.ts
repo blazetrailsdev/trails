@@ -13,20 +13,14 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   });
 
   describe("CaseSensitivityTest", () => {
-    // Mirrors test/schema/mysql2_specific_schema.rb's collation_tests table.
-    beforeEach(async () => {
-      await adapter.createTable("collation_tests", { id: false, force: true }, (t: any) => {
-        t.string("string_cs_column", { limit: 1, collation: "utf8mb4_bin" });
-        t.string("string_ci_column", { limit: 1, collation: "utf8mb4_general_ci" });
-        t.binary("binary_column", { limit: 1 });
-      });
-      // No explicit schema-cache priming needed: `columnForAttribute` falls back
-      // to `this.columns()` when pool is null and the cache is cold (the cache
-      // is cleared by `resetColumnInformation` when each `it` block defines a
-      // new `CollationTest` subclass).
-    });
+    // `collation_tests` is laid at boot by the mysql arm of `loadSchema`,
+    // mirroring mysql2_specific_schema.rb:60-64. No explicit schema-cache
+    // priming needed: `columnForAttribute` falls back to `this.columns()` when
+    // pool is null and the cache is cold (the cache is cleared by
+    // `resetColumnInformation` when each `it` block defines a new
+    // `CollationTest` subclass).
     afterEach(async () => {
-      await adapter.dropTable("collation_tests", { ifExists: true });
+      await adapter.execute("DELETE FROM collation_tests");
     });
 
     function collationTestModel(): typeof Base {
