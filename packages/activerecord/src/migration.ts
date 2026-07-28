@@ -2997,9 +2997,6 @@ export class Migrator {
     // MigrationContext#last_stored_environment short-circuits on
     // `internal_metadata.enabled?` before the table_exists? read.
     if (!this._internalMetadata.enabled) return null;
-    // Rails guards on current_version == 0 BEFORE the table_exists? read: an
-    // unmigrated database is unstamped even when ar_internal_metadata exists
-    // and carries an environment row.
     if ((await this.currentVersionReadOnly()) === 0) return null;
     const noEnvMsg =
       "Environment data not found in the schema. To resolve this issue, run: bin/rails db:environment:set";
