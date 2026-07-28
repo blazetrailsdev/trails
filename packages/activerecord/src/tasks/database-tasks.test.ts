@@ -1333,16 +1333,26 @@ describe("DatabaseTasksWithTemporaryPoolTest", () => {
     });
     await Base.establishConnection(config);
     const ambientPool = Base.connectionPool();
-    DatabaseTasks.registerTask("sqlite", { create: async () => {} });
+    // Rails stubs `create` rather than registering a task
+    // (database_tasks_test.rb:587). Registering one here would mean clearing the
+    // registry afterwards, and clearRegisteredTasks() wipes the SQLiteDatabaseTasks
+    // registration the test bootstrap installs (support/connection.ts:396).
+    const createSpy = vi.spyOn(DatabaseTasks, "create").mockResolvedValue(undefined);
+    const previousConfiguration = DatabaseTasks.databaseConfiguration;
+    // The DatabaseConfigurations constructor installs itself as the module-level
+    // current-configurations singleton, so that needs restoring too.
+    const previousCurrent = DatabaseConfigurations.current;
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       [DatabaseTasks.env]: { adapter: "sqlite3", database: "db/other.sqlite3" },
     });
     try {
       await DatabaseTasks.createAll();
+      expect(createSpy).toHaveBeenCalled();
       expect(Base.connectionPool()).toBe(ambientPool);
     } finally {
-      DatabaseTasks.clearRegisteredTasks();
-      DatabaseTasks.databaseConfiguration = null;
+      createSpy.mockRestore();
+      DatabaseTasks.databaseConfiguration = previousConfiguration;
+      DatabaseConfigurations.current = previousCurrent;
     }
   });
 });

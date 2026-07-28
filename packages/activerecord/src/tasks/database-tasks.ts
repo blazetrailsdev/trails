@@ -211,9 +211,14 @@ export class DatabaseTasks {
         await this.create(config);
       }
     }
-    // Rails: establish_connection(environment.to_sym) calls configurations.resolve(:env)
-    // → find_db_config(env) which returns forCurrentEnv configs first, then falls back
-    // to the first config for that env_name. findDbConfig mirrors that exact lookup.
+    // Rails is `establish_connection(environment.to_sym)` (database_tasks.rb:653),
+    // which resolves through `Base.configurations`. trails cannot pass the bare env:
+    // `DatabaseTasks.databaseConfiguration` is a SEPARATE registry from
+    // `Base.configurations` (support/connection.ts:390-392 happens to set both, but
+    // callers reassign `databaseConfiguration` alone), so the env string would
+    // resolve against the wrong set of configs. findDbConfig mirrors what
+    // configurations.resolve(:env) does: forCurrentEnv configs first, then the first
+    // config for that env_name.
     const envName = this._normalizeEnv(environment);
     const primaryConfig = this.databaseConfiguration?.findDbConfig(envName);
     if (primaryConfig) {
@@ -1063,7 +1068,7 @@ export class DatabaseTasks {
       if (!(error instanceof ConnectionNotDefined)) throw error;
     }
     // Rails passes the `DatabaseConfig` object itself
-    // (tasks/database_tasks.rb:652), which is what lets
+    // (tasks/database_tasks.rb:542,544), which is what lets
     // `ConnectionHandler#establish_connection` recognise an already-established
     // pool for the same config and reuse it instead of opening a second one
     // (connection_adapters/abstract/connection_handler.rb:139). Handing over a
