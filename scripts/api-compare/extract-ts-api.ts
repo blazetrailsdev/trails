@@ -696,15 +696,34 @@ export function extractFromProgram(
         });
       }
 
-      // Add constructor
+      // Add constructor. The inner class is invisible to the top-level walker,
+      // so its `constructor` reaches this entry only through the construct
+      // signature's declaration. When the inner class declares one in THIS
+      // file, that declaration IS the entry's member declaration and carries
+      // its JSDoc; otherwise (implicit constructor, or one inherited from a
+      // base in another file) there is no declaration here to read, and the
+      // entry stays bare — same reason foreign members above skip their tag.
       if (constructSigs.length > 0) {
+        const ctorDecl = constructSigs[0].getDeclaration();
+        const ownCtor =
+          ctorDecl !== undefined &&
+          ts.isConstructorDeclaration(ctorDecl) &&
+          path.relative(srcDir, ctorDecl.getSourceFile().fileName).replace(/\\/g, "/") === relPath
+            ? ctorDecl
+            : undefined;
+        const ctorInternal = ownCtor !== undefined && hasInternalJsDocTag(ownCtor);
+        const ctorReason = ownCtor !== undefined ? noRailsEquivalentReason(ownCtor) : undefined;
+        const ctorNode = ownCtor ?? node;
         mixinMethods.push({
           name: "constructor",
           visibility: "public",
           params: [],
           isStatic: false,
-          line: node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1,
+          line:
+            ctorNode.getSourceFile().getLineAndCharacterOfPosition(ctorNode.getStart()).line + 1,
           file: relPath,
+          ...(ctorInternal ? { internal: true } : {}),
+          ...(ctorReason !== undefined ? { noRailsEquivalent: ctorReason } : {}),
         });
       }
 
