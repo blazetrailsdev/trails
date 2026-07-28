@@ -16,18 +16,18 @@ describeIfSqlite("SQLite3CollationTest", () => {
 
   beforeEach(async () => {
     adapter = (await Base.leaseConnection()) as unknown as AbstractSQLite3Adapter;
-    await adapter.exec(`DROP TABLE IF EXISTS "collation_table_sqlite3"`);
+    await adapter.dropTable("collation_table_sqlite3", { ifExists: true });
     await adapter.exec(`CREATE TABLE "collation_table_sqlite3" (
-    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-    "string_nocase" VARCHAR(255) COLLATE "NOCASE",
-    "text_rtrim" TEXT COLLATE "RTRIM",
-    "decimal_col" DECIMAL(6, 2),
-    "string_after_decimal_nocase" VARCHAR(255) COLLATE "NOCASE"
-  )`);
+      "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+      "string_nocase" VARCHAR(255) COLLATE "NOCASE",
+      "text_rtrim" TEXT COLLATE "RTRIM",
+      "decimal_col" DECIMAL(6, 2),
+      "string_after_decimal_nocase" VARCHAR(255) COLLATE "NOCASE"
+    )`);
   });
 
   afterEach(async () => {
-    await adapter.exec(`DROP TABLE IF EXISTS "collation_table_sqlite3"`).catch(() => undefined);
+    await adapter.dropTable("collation_table_sqlite3", { ifExists: true });
   });
 
   it("string column with collation", async () => {

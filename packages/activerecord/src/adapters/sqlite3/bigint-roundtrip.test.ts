@@ -17,17 +17,17 @@ describeIfSqlite("SQLite3 bigint round-trip", () => {
   beforeEach(async () => {
     adapter = (await Base.leaseConnection()) as unknown as AbstractSQLite3Adapter;
     await adapter.exec(`
-    CREATE TABLE "big_items" (
-      "id"     INTEGER PRIMARY KEY AUTOINCREMENT,
-      "score"  BIGINT NOT NULL,
-      "count"  INTEGER NOT NULL DEFAULT 0,
-      "active" INTEGER NOT NULL DEFAULT 1
-    )
-  `);
+      CREATE TABLE "big_items" (
+        "id"     INTEGER PRIMARY KEY AUTOINCREMENT,
+        "score"  BIGINT NOT NULL,
+        "count"  INTEGER NOT NULL DEFAULT 0,
+        "active" INTEGER NOT NULL DEFAULT 1
+      )
+    `);
   });
 
   afterEach(async () => {
-    await adapter.exec(`DROP TABLE IF EXISTS "big_items"`).catch(() => undefined);
+    await adapter.dropTable("big_items", { ifExists: true });
   });
 
   const BIG = 2n ** 62n; // 4611686018427387904 — well above Number.MAX_SAFE_INTEGER

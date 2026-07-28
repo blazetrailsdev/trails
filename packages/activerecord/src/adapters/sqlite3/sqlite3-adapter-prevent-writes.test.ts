@@ -20,11 +20,7 @@ describeIfSqlite("SQLite3AdapterPreventWritesTest", () => {
   });
 
   afterEach(async () => {
-    await adapter
-      .exec(
-        `DROP TABLE IF EXISTS pw; DROP TABLE IF EXISTS pw2; DROP TABLE IF EXISTS pw3; DROP TABLE IF EXISTS pw4; DROP TABLE IF EXISTS pw5`,
-      )
-      .catch(() => undefined);
+    await adapter.dropTable("pw", "pw2", "pw3", "pw4", "pw5", { ifExists: true });
   });
 
   it("errors when an insert query is called while preventing writes", async () => {

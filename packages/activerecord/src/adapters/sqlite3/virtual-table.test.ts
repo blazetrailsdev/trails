@@ -24,6 +24,9 @@ describeIfSqlite("SQLite3VirtualTableTest", () => {
   });
 
   afterEach(async () => {
+    // Deviation: Rails drops only :searchables (virtual_table_test.rb:15-17),
+    // leaking the :emails table "schema load" creates. Harmless there, not
+    // here — the ambient database is reused by every later test in this file.
     await adapter.dropTable("searchables", "emails", { ifExists: true });
   });
 

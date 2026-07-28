@@ -19,11 +19,23 @@ describeIfSqlite("SQLite3QuotingTest", () => {
   });
 
   afterEach(async () => {
-    await adapter
-      .exec(
-        `DROP TABLE IF EXISTS quote_test; DROP TABLE IF EXISTS q; DROP TABLE IF EXISTS "my table"; DROP TABLE IF EXISTS bin_enc; DROP TABLE IF EXISTS bool_test; DROP TABLE IF EXISTS bool_test2; DROP TABLE IF EXISTS bd_test; DROP TABLE IF EXISTS bin_quote; DROP TABLE IF EXISTS time_test; DROP TABLE IF EXISTS time_norm; DROP TABLE IF EXISTS time_utc; DROP TABLE IF EXISTS time_local; DROP TABLE IF EXISTS inf_test; DROP TABLE IF EXISTS nan_test`,
-      )
-      .catch(() => undefined);
+    await adapter.dropTable(
+      "quote_test",
+      "q",
+      "my table",
+      "bin_enc",
+      "bool_test",
+      "bool_test2",
+      "bd_test",
+      "bin_quote",
+      "time_test",
+      "time_norm",
+      "time_utc",
+      "time_local",
+      "inf_test",
+      "nan_test",
+      { ifExists: true },
+    );
   });
 
   it("quote string", async () => {
@@ -43,6 +55,11 @@ describeIfSqlite("SQLite3QuotingTest", () => {
   });
 
   it("quote table name", async () => {
+    // The rule's raw-SQL name scanner stops at the space inside the quoted
+    // identifier and records this table as `my`, which no drop can match. The
+    // afterEach drops the real name; story `require-table-teardown-quoted-name`
+    // fixes the scanner.
+    // eslint-disable-next-line blazetrails/require-table-teardown
     await adapter.exec(`CREATE TABLE "my table" ("id" INTEGER PRIMARY KEY)`);
     const rows = await adapter.execute(`SELECT * FROM "my table"`);
     expect(rows).toHaveLength(0);

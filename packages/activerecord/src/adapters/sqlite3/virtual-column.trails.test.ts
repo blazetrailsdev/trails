@@ -17,7 +17,7 @@ describeIfSqlite("SQLite3VirtualColumnTest trails extras", () => {
 
   beforeEach(async () => {
     adapter = (await Base.leaseConnection()) as unknown as AbstractSQLite3Adapter;
-    await adapter.exec(`DROP TABLE IF EXISTS "virtual_columns"`);
+    await adapter.dropTable("virtual_columns", { ifExists: true });
     await adapter.exec(
       `CREATE TABLE "virtual_columns" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" varchar, "upper_name" varchar GENERATED ALWAYS AS (UPPER(name)) STORED, "lower_name" varchar GENERATED ALWAYS AS (LOWER(name)) VIRTUAL, "column1" integer)`,
     );
@@ -27,7 +27,7 @@ describeIfSqlite("SQLite3VirtualColumnTest trails extras", () => {
   });
 
   afterEach(async () => {
-    await adapter.exec(`DROP TABLE IF EXISTS "virtual_columns"`).catch(() => undefined);
+    await adapter.dropTable("virtual_columns", { ifExists: true });
   });
 
   it("alter-table rebuild preserves pre-existing generated columns", async () => {

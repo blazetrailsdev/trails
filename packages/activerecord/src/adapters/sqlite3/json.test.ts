@@ -29,7 +29,6 @@ describeIfSqlite("SQLite3JSONTest", () => {
       t.json("payload", { default: "{}" });
       t.json("settings");
     });
-    JsonDataType.resetColumnInformation();
   });
 
   afterEach(async () => {
