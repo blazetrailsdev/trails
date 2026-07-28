@@ -21,8 +21,9 @@ import {
   withRocketTables,
 } from "../support/rocket-tables.js";
 import { adapterType } from "../test-adapter.js";
-import { describeIfSupports, itIfSupports } from "../support/supports.js";
+import { adapterSupports, describeIfSupports, itIfSupports } from "../support/supports.js";
 import { assertQueriesMatch } from "../testing/query-assertions.js";
+import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";
 import type { SchemaSource } from "../schema-dumper.js";
 import { Base } from "../base.js";
@@ -33,6 +34,33 @@ import { SchemaDumper } from "../schema-dumper.js";
 // assertions: PRAGMA foreign_key_list exposes no constraint name, so SQLite
 // has no name to compare.
 const unlessSqlite3Adapter = adapterType !== "sqlite";
+
+// Rails' `else` arm of `if supports_validate_constraints?`. Held in a const so
+// the `it.skipIf(...)` call site carries no feature literal: the gate extractor
+// drops the negation, and an inline `adapterSupports("validate_constraints")`
+// would tag the else-arm case with the very feature it excludes — colliding
+// with the `if` arm, which shares the test name.
+const supportsValidateConstraints = adapterSupports("validate_constraints");
+
+/**
+ * `validate_foreign_key` / `validate_constraint` live on
+ * PostgreSQL::SchemaStatements only, so they are absent from the
+ * `AbstractAdapter` type the shared rocket-tables helper hands back. The cases
+ * that call them are gated on `validate_constraints` (PostgreSQL-only), so the
+ * narrowing is sound wherever it is used.
+ */
+interface ValidatingAdapter {
+  validateForeignKey(
+    fromTable: string,
+    toTable?: string,
+    options?: { column?: string; name?: string },
+  ): Promise<void>;
+  validateConstraint(tableName: string, constraintName: string): Promise<void>;
+}
+
+function validating(conn: AbstractAdapter): ValidatingAdapter {
+  return conn as unknown as ValidatingAdapter;
+}
 
 /** Rails' `silence_stream($stdout) { migration.migrate(...) }`. */
 class SilentMigration extends Migration {
@@ -355,6 +383,159 @@ describeIfSupports("foreign_keys", "Migration", () => {
         expect((await conn.foreignKeys("astronauts")).length).toBe(1);
         await conn.removeForeignKey("astronauts", "rockets", { onDelete: "restrict" });
         expect(await conn.foreignKeys("astronauts")).toEqual([]);
+      });
+    });
+
+    itIfSupports("validate_constraints", "add invalid foreign key", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.addForeignKey("astronauts", "rockets", {
+          column: "rocket_id",
+          validate: false,
+        });
+
+        const foreignKeys = await conn.foreignKeys("astronauts");
+        expect(foreignKeys.length).toBe(1);
+
+        const fk = foreignKeys[0];
+        expect(fk.isValidated).toBe(false);
+      });
+    });
+
+    itIfSupports("validate_constraints", "validate foreign key infers column", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.addForeignKey("astronauts", "rockets", { validate: false });
+        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBe(false);
+
+        await validating(conn).validateForeignKey("astronauts", "rockets");
+        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBe(true);
+      });
+    });
+
+    itIfSupports("validate_constraints", "validate foreign key by column", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.addForeignKey("astronauts", "rockets", {
+          column: "rocket_id",
+          validate: false,
+        });
+        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBe(false);
+
+        await validating(conn).validateForeignKey("astronauts", undefined, {
+          column: "rocket_id",
+        });
+        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBe(true);
+      });
+    });
+
+    // Ruby's `column: :rocket_id` symbol has no TS analogue; the string form of
+    // the previous case is the only spelling available here.
+    itIfSupports("validate_constraints", "validate foreign key by symbol column", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.addForeignKey("astronauts", "rockets", {
+          column: "rocket_id",
+          validate: false,
+        });
+        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBe(false);
+
+        await validating(conn).validateForeignKey("astronauts", undefined, {
+          column: "rocket_id",
+        });
+        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBe(true);
+      });
+    });
+
+    itIfSupports("validate_constraints", "validate foreign key by name", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.addForeignKey("astronauts", "rockets", {
+          column: "rocket_id",
+          name: "fancy_named_fk",
+          validate: false,
+        });
+        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBe(false);
+
+        await validating(conn).validateForeignKey("astronauts", undefined, {
+          name: "fancy_named_fk",
+        });
+        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBe(true);
+      });
+    });
+
+    itIfSupports(
+      "validate_constraints",
+      "validate foreign non existing foreign key raises",
+      async () => {
+        const conn = await ambientConnection();
+        await withRocketTables(conn, async () => {
+          await expect(
+            validating(conn).validateForeignKey("astronauts", "rockets"),
+          ).rejects.toThrow(ArgumentError);
+        });
+      },
+    );
+
+    itIfSupports("validate_constraints", "validate constraint by name", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.addForeignKey("astronauts", "rockets", {
+          column: "rocket_id",
+          name: "fancy_named_fk",
+          validate: false,
+        });
+
+        await validating(conn).validateConstraint("astronauts", "fancy_named_fk");
+        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBe(true);
+      });
+    });
+
+    itIfSupports("validate_constraints", "schema dumping with validate false", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.addForeignKey("astronauts", "rockets", {
+          column: "rocket_id",
+          validate: false,
+        });
+
+        const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+
+        expect(output).toMatch(
+          /\s+await ctx\.addForeignKey\("astronauts", "rockets", \{ validate: false \}\);$/m,
+        );
+      });
+    });
+
+    itIfSupports("validate_constraints", "schema dumping with validate true", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.addForeignKey("astronauts", "rockets", {
+          column: "rocket_id",
+          validate: true,
+        });
+
+        const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+
+        expect(output).toMatch(/\s+await ctx\.addForeignKey\("astronauts", "rockets"\);$/m);
+      });
+    });
+
+    // Rails' `else` arm: without `supports_validate_constraints?` the foreign
+    // key is still created, but is never reported as invalid.
+    it.skipIf(supportsValidateConstraints)("add invalid foreign key", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.addForeignKey("astronauts", "rockets", {
+          column: "rocket_id",
+          validate: false,
+        });
+
+        const foreignKeys = await conn.foreignKeys("astronauts");
+        expect(foreignKeys.length).toBe(1);
+
+        const fk = foreignKeys[0];
+        expect(fk.isValidated).toBe(true);
       });
     });
 
