@@ -1,13 +1,3 @@
-/**
- * trails-specific PostgreSQLAdapter invariants with no Rails counterpart.
- *
- * These guard behaviour that exists only in the trails port -- the bind-param
- * \`?\` -> \`$1\` rewriting, Temporal-based value decoding, PG-error -> ActiveRecord
- * exception translation, executeMutation auto-RETURNING, column reflection,
- * and the top-level adapter helpers. They were relocated verbatim out of
- * postgresql-adapter.test.ts (which mirrors postgresql_adapter_test.rb) so the
- * convention file tracks Rails 1:1.
- */
 import pg from "pg";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -27,9 +17,6 @@ import {
 import { withSecondAdapter } from "../../support/second-connection.js";
 import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 
-// Run `fn` with `ext` guaranteed disabled; restore the pre-state (enabled
-// or disabled) on exit even if `fn` throws before tearing down whatever it
-// created.
 async function withExtensionDisabled(
   adapter: PostgreSQLAdapter,
   ext: string,
@@ -48,9 +35,6 @@ async function withExtensionDisabled(
   }
 }
 
-// PG 15+ supports NULLS NOT DISTINCT on unique indexes. The helpers below
-// gate index creation + expected value on that version so the test body has
-// no version branching.
 const PG_NND_MIN_VERSION = 150000;
 
 async function maybeCreateNullsNotDistinctIndex(adapter: PostgreSQLAdapter): Promise<void> {
@@ -80,30 +64,18 @@ describeIfPg("PostgreSQLAdapter", () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
   });
   afterEach(async () => {
-    // Clean up test tables
     try {
-      // Explicit teardown for every table this file creates via raw CREATE TABLE
-      // (the dynamic `LIKE 'ex_%'` sweep below also drops them, but the static
-      // list is what require-table-teardown balances against). IF EXISTS keeps
-      // this idempotent and behavior-neutral.
       await adapter.exec(
         `DROP TABLE IF EXISTS abba, ex_partial, ex_expr, ex_idx_opts, ex_opclass, ex_serial, ex_bigserial, ex_custom_seqt, ex_class, ex_uniq, ex_notnull, ex_parent, ex_child, ex_long, ex_lock, ex_dl, ex_num, ex_cast, ex_ser, ex_bool, ex_float, ex_int, ex_bigint, ex_numeric, ex_json, ex_jsonb, ex_backslash, ex_hs, ex_arr, ex_uuid, ex_xml, ex_cidr, ex_inet, ex_mac, ex_point, ex_bit, ex_rng, ex_custom_pk, ex_insert_ret, ex_insert_ret2, ex_insert_ret3, ex_insert_ret5, ex_serial_seq, ex_def_seq, ex_ns_pk, ex_no_seq, ex_no_pk, ex_keyword, ex_include, ex_include2, ex_incl_kw, ex_incl_esc, ex_invalid_idx, ex_nulls_nd, ex_unparsed_defaults, ex_dates, ex_insert_ret4, ex_pk_seq, ex_txn, ex_txn_rb, ex_txn_sp, ex_ret, ex_upd, ex_del, ex_ret2, ex_multi, ex_null, test_no_returning CASCADE`,
       );
-      // Sweep only this file's own `ex_`-prefixed tables. It used to also name
-      // `items`, which is CANONICAL (`TEST_SCHEMA.items`, Rails schema.rb:685)
-      // and is never created here — the sweep dropped it off the shared
-      // per-worker PG database, which is how `items` went missing mid-run for
-      // whichever file ran next. The dynamic `"${t.tablename}"` drop is
-      // invisible to `require-canonical-rebuild`, so nothing caught it.
+
       const tables = await adapter.execute(
         `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'ex_%'`,
       );
       for (const t of tables) {
         await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}" CASCADE`);
       }
-    } catch {
-      // ignore cleanup errors
-    }
+    } catch {}
     await adapter.close();
   });
 
@@ -234,7 +206,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`CREATE TABLE "ex_dl" ("id" SERIAL PRIMARY KEY, "val" INTEGER)`);
       await adapter.executeMutation(`INSERT INTO "ex_dl" ("val") VALUES (1)`);
       await adapter.executeMutation(`INSERT INTO "ex_dl" ("val") VALUES (2)`);
-      // conn1 locks row 1, conn2 locks row 2, then each tries to lock the other's row
+
       await withSecondAdapter(PG_TEST_URL, async (adapter2) => {
         await adapter.beginTransaction();
         await adapter2.beginTransaction();
@@ -271,18 +243,14 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("translate exception query cancelled", async () => {
-      // Use a transaction so that pg_backend_pid() and pg_sleep() share the same
-      // pooled connection — otherwise two execute() calls get different PG backends.
       await adapter.beginTransaction();
       try {
         const pidRows = await adapter.execute(`SELECT pg_backend_pid() AS pid`);
         const pid = (pidRows[0] as { pid: number }).pid;
         const sleepPromise = adapter.execute(`SELECT pg_sleep(10)`);
-        // Attach a no-op handler synchronously so Node never flags this as an
-        // unhandled rejection during the gap before the expect() runs.
+
         sleepPromise.catch(() => {});
-        // Poll pg_stat_activity until the pg_sleep query is observed as active on
-        // this backend, so the cancel always arrives after execution has started.
+
         await withSecondAdapter(PG_TEST_URL, async (adapter2) => {
           const deadline = Date.now() + 2000;
           while (Date.now() < deadline) {
