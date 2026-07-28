@@ -20,10 +20,15 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
   // The ambient connection is a shared worker DB, so the scratch tables are
   // cleared on the way in as well as out: a hard-killed run must not wedge the
   // next one.
-  const dropScratchTables = (): Promise<void> =>
-    adapter.exec(
+  const dropScratchTables = async (): Promise<void> => {
+    // Guarded so a beforeEach that fails before the lease surfaces its own
+    // error rather than a TypeError on `undefined.exec` from this teardown.
+    const conn = adapter as AbstractSQLite3Adapter | undefined;
+    if (!conn) return;
+    await conn.exec(
       "DROP TABLE IF EXISTS widgets; DROP TABLE IF EXISTS t; DROP TABLE IF EXISTS a; DROP TABLE IF EXISTS b",
     );
+  };
 
   beforeEach(async () => {
     adapter = Base.connection as AbstractSQLite3Adapter;
@@ -33,9 +38,11 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
   });
 
   afterEach(async () => {
+    // Drop before restoring: on the shared ambient connection a globally
+    // registered transformer would otherwise rewrite the teardown DDL.
     queryTransformers.length = 0;
-    queryTransformers.push(...savedTransformers);
     await dropScratchTables();
+    queryTransformers.push(...savedTransformers);
   });
 
   function captureSql<T>(fn: () => Promise<T>): Promise<{ result: T; sqls: string[] }> {
