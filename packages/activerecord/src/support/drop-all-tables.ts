@@ -22,21 +22,20 @@ const CANONICAL_TABLE_NAMES: ReadonlySet<string> = new Set(Object.keys(TEST_SCHE
  * one `load_schema` in Rails, so both are truncated between tests rather than
  * dropped.
  */
-const _bootLaidByAdapter = new Map<string, ReadonlySet<string>>();
+const _bootLaidBySpecificTables = new Map<string, ReadonlySet<string>>();
 
 async function bootLaidTableNames(adapter: DatabaseAdapter): Promise<ReadonlySet<string>> {
-  const name = adapter.adapterName;
-  // Memoized: this runs in the between-test reset, and both inputs are
-  // module-level constants, so the ~330-name Set is built at most once per
-  // adapter per worker.
-  let cached = _bootLaidByAdapter.get(name);
+  const specific = await adapterSpecificTableNames(adapter);
+  if (specific.length === 0) return CANONICAL_TABLE_NAMES;
+
+  // Keyed on the resolved list, not on `adapterName`: the mysql arm is gated on
+  // `supportsInsertReturning()`, so a MySQL 8 and a MariaDB >= 10.5 connection
+  // share an adapter name but lay different tables.
+  const key = specific.join(",");
+  let cached = _bootLaidBySpecificTables.get(key);
   if (!cached) {
-    const specific = await adapterSpecificTableNames(adapter);
-    cached =
-      specific.length === 0
-        ? CANONICAL_TABLE_NAMES
-        : new Set([...CANONICAL_TABLE_NAMES, ...specific]);
-    _bootLaidByAdapter.set(name, cached);
+    cached = new Set([...CANONICAL_TABLE_NAMES, ...specific]);
+    _bootLaidBySpecificTables.set(key, cached);
   }
   return cached;
 }
