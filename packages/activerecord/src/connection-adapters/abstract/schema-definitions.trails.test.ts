@@ -3,6 +3,8 @@ import {
   ForeignKeyDefinition,
   CheckConstraintDefinition,
   TableDefinition,
+  ReferenceDefinition,
+  type ReferenceDefinitionConnection,
 } from "./schema-definitions.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 
@@ -67,5 +69,89 @@ describe("TableDefinition#remove_column", () => {
     const t = td();
     t.removeColumn("nonexistent");
     expect(t.columns.map((c) => c.name)).toEqual(["id", "name", "rocket_id"]);
+  });
+});
+
+describe("ReferenceDefinition#add", () => {
+  type Call = [string, ...unknown[]];
+
+  const recorder = (): { calls: Call[]; connection: ReferenceDefinitionConnection } => {
+    const calls: Call[] = [];
+    return {
+      calls,
+      connection: {
+        async addColumn(tableName, columnName, type, options) {
+          calls.push(["addColumn", tableName, columnName, type, options]);
+        },
+        async addIndex(tableName, columns, options) {
+          calls.push(["addIndex", tableName, columns, options]);
+        },
+        async addForeignKey(fromTable, toTable, options) {
+          calls.push(["addForeignKey", fromTable, toTable, options]);
+        },
+      },
+    };
+  };
+
+  it("adds the column, index and foreign key in Rails' order", async () => {
+    const { calls, connection } = recorder();
+    await new ReferenceDefinition("user", { foreignKey: true }).add("taggings", connection);
+
+    expect(calls.map((c) => c[0])).toEqual(["addColumn", "addIndex", "addForeignKey"]);
+    expect(calls[0].slice(1, 4)).toEqual(["taggings", "user_id", "bigint"]);
+    expect(calls[1][2]).toEqual(["user_id"]);
+    expect(calls[2][2]).toBe("users");
+    expect(calls[2][3]).toMatchObject({ column: "user_id" });
+  });
+
+  it("adds a polymorphic reference type-column first and names its index", async () => {
+    const { calls, connection } = recorder();
+    await new ReferenceDefinition("taggable", { polymorphic: true }).add("taggings", connection);
+
+    expect(calls.map((c) => c[2])).toEqual([
+      "taggable_type",
+      "taggable_id",
+      ["taggable_type", "taggable_id"],
+    ]);
+    expect(calls[2][3]).toMatchObject({ name: "index_taggings_on_taggable" });
+  });
+
+  it("merges an index options hash", async () => {
+    const { calls, connection } = recorder();
+    await new ReferenceDefinition("user", { index: { unique: true, name: "my_index" } }).add(
+      "taggings",
+      connection,
+    );
+
+    expect(calls[1][3]).toMatchObject({ unique: true, name: "my_index" });
+  });
+
+  it("passes ifNotExists through to the index and foreign key options", async () => {
+    const { calls, connection } = recorder();
+    await new ReferenceDefinition("user", { foreignKey: true, ifNotExists: true }).add(
+      "taggings",
+      connection,
+    );
+
+    expect(calls[1][3]).toMatchObject({ ifNotExists: true });
+    expect(calls[2][3]).toMatchObject({ ifNotExists: true });
+  });
+
+  it("merges a polymorphic options hash into the type column", async () => {
+    const { calls, connection } = recorder();
+    await new ReferenceDefinition("taggable", {
+      polymorphic: { null: false },
+      index: false,
+    }).add("taggings", connection);
+
+    expect(calls[0][2]).toBe("taggable_type");
+    expect(calls[0][4]).toMatchObject({ null: false });
+  });
+
+  it("skips the index when index is false", async () => {
+    const { calls, connection } = recorder();
+    await new ReferenceDefinition("user", { index: false }).add("taggings", connection);
+
+    expect(calls.map((c) => c[0])).toEqual(["addColumn"]);
   });
 });
