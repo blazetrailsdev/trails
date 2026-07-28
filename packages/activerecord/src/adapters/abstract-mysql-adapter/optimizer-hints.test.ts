@@ -2,7 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/optimizer_hints_test.rb
  */
 import { it, expect, beforeAll } from "vitest";
-import { describeIfMysql, Mysql2Adapter } from "./test-helper.js";
+import { describeIfMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { describeIfSupports } from "../../support/supports.js";
 import { captureSql } from "../../testing/sql-capture.js";
 import { Base } from "../../index.js";
@@ -12,7 +12,7 @@ import { Post } from "../../test-helpers/models/post.js";
 // Rails wraps the whole OptimizerHintsTest body in `if supports_optimizer_hints?`
 // (MySQL ≥ 5.7.7, never MariaDB), so the examples never run on a server that
 // reports no support. Mirror that with a conditional describe.
-describeIfMysql("Mysql2Adapter", () => {
+describeIfMysqlAdapter("Mysql2Adapter", () => {
   describeIfSupports("optimizer_hints", "OptimizerHintsTest", () => {
     // mirrors Rails: fixtures :posts
     fixtures(["posts"]);

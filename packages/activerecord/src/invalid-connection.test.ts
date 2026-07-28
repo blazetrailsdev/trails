@@ -1,13 +1,13 @@
 import { beforeEach, afterEach, it, expect } from "vitest";
 import { Base } from "./base.js";
-import { describeIfMysql } from "./adapters/abstract-mysql-adapter/test-helper.js";
+import { describeIfMysqlAdapter } from "./adapters/abstract-mysql-adapter/test-helper.js";
 
 // Mirrors: activerecord/test/cases/invalid_connection_test.rb
 //
 // Rails gates this on `current_adapter?(:Mysql2Adapter, :TrilogyAdapter)`
 // because sqlite3 would create a database file on the fly, so the connection
-// config would never be "invalid". We mirror that gate with describeIfMysql.
-describeIfMysql("TestAdapterWithInvalidConnection", () => {
+// config would never be "invalid". We mirror that gate with describeIfMysqlAdapter.
+describeIfMysqlAdapter("TestAdapterWithInvalidConnection", () => {
   class Bird extends Base {}
 
   beforeEach(async () => {

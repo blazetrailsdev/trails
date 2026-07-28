@@ -3,7 +3,7 @@
  */
 import { it, expect, beforeEach } from "vitest";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
-import { describeIfMysql } from "../adapters/abstract-mysql-adapter/test-helper.js";
+import { describeIfMysqlAdapter } from "../adapters/abstract-mysql-adapter/test-helper.js";
 
 // Minimal subclass of the *concrete* Mysql2Adapter — char/varchar/enum/set
 // string registrations live on the concrete adapter (mysql2_adapter.rb:40-49),
@@ -31,7 +31,7 @@ function assertLookupType(expected: string, lookup: string) {
   expect(castType.type()).toBe(expected);
 }
 
-describeIfMysql("MysqlTypeLookupTest", () => {
+describeIfMysqlAdapter("MysqlTypeLookupTest", () => {
   it("boolean types", () => {
     // emulate_booleans = true: tinyint(1) → boolean
     assertLookupType("boolean", "tinyint(1)");

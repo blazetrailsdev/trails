@@ -9,6 +9,6 @@ import { isSqliteRun } from "./sqlite-template.js";
  * must skip there rather than run against a backend Rails never points them at.
  * Reuses the canonical {@link isSqliteRun} predicate so the "what counts as a
  * SQLite run" rule has one source of truth. Counterpart to `describeIfPg` /
- * `describeIfMysql`.
+ * `describeIfMysqlAdapter`.
  */
 export const describeIfSqlite = isSqliteRun() ? describe : (describe.skip as typeof describe);

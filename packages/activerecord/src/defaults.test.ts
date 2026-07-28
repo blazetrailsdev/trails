@@ -13,7 +13,7 @@ import { adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import {
-  describeIfMysql,
+  describeIfMysqlAdapter,
   isMariaDb,
   Mysql2Adapter,
   MYSQL_TEST_URL,
@@ -287,7 +287,7 @@ describeIfPg("PostgresqlDefaultExpressionTest", () => {
 // Mirrors `MysqlDefaultExpressionTest` (defaults_test.rb), gated to the
 // Mysql2Adapter. The three tables come from mysql2_specific_schema.rb and are
 // laid at boot by the adapter-specific arm of loadSchema.
-describeIfMysql("MysqlDefaultExpressionTest", () => {
+describeIfMysqlAdapter("MysqlDefaultExpressionTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(() => {
@@ -395,7 +395,7 @@ describeIfMysql("MysqlDefaultExpressionTest", () => {
 // to the Mysql2Adapter. Rails toggles strict mode via
 // `establish_connection(..., strict:)`; our Mysql2Adapter accepts the same
 // `strict` config key, so `using_strict` becomes a fresh adapter per block.
-describeIfMysql("DefaultsTestWithoutTransactionalFixtures", () => {
+describeIfMysqlAdapter("DefaultsTestWithoutTransactionalFixtures", () => {
   // Mirrors `with_mysql_not_null_table`: build the NOT NULL table on a
   // strict/non-strict connection, yield the model, then drop it.
   async function withMysqlNotNullTable(
