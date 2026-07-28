@@ -12,6 +12,7 @@
 export interface TableNameOptionsSource {
   readonly tableNamePrefix: string;
   readonly tableNameSuffix: string;
+  readonly pluralizeTableNames: boolean;
 }
 
 let _source: TableNameOptionsSource | null = null;
@@ -29,4 +30,9 @@ export function globalTableNamePrefix(): string {
 /** @internal */
 export function globalTableNameSuffix(): string {
   return _source?.tableNameSuffix ?? "";
+}
+
+/** @internal */
+export function globalPluralizeTableNames(): boolean {
+  return _source?.pluralizeTableNames ?? true;
 }

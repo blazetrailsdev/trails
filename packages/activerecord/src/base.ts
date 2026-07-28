@@ -5188,6 +5188,9 @@ registerTableNameOptions({
   get tableNameSuffix() {
     return Base._tableNameSuffix;
   },
+  get pluralizeTableNames() {
+    return Base.pluralizeTableNames;
+  },
 });
 
 registerMigrationArConfig({

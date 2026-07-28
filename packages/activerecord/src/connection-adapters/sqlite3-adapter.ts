@@ -1714,6 +1714,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       });
       return;
     }
+    if (options?.ifNotExists === true && (await this.columnExists(tableName, columnName))) {
+      return;
+    }
     const sqlType = baseType;
     let sql = `ALTER TABLE ${quoteTableName(tableName)} ADD COLUMN ${quoteColumnName(columnName)} ${sqlType}`;
     if (options?.collation) sql += ` COLLATE ${quoteColumnName(String(options.collation))}`;
