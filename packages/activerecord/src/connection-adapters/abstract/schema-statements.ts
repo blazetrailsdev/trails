@@ -435,6 +435,7 @@ export class SchemaStatements {
     // adapter supplies its own removeColumn (mirrors renameColumn's gate).
     const adapter = this.adapter as any;
     if (
+      adapter !== (this as unknown) &&
       typeof adapter.removeColumn === "function" &&
       adapter.removeColumn !== SchemaStatements.prototype.removeColumn
     ) {

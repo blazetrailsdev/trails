@@ -63,6 +63,19 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
     await this.adapter.execute(await this.schemaCreation.accept(createDef));
   }
 
+  /** Mirrors: MySQL::SchemaStatements#remove_column */
+  override async removeColumn(
+    tableName: string,
+    columnName: string,
+    type?: string,
+    options: { ifExists?: boolean } = {},
+  ): Promise<void> {
+    if (await this.foreignKeyExists(tableName, { column: columnName })) {
+      await this.removeForeignKey(tableName, { column: columnName });
+    }
+    return super.removeColumn(tableName, columnName, type, options);
+  }
+
   override async dropTable(
     ...args:
       | [string, ...string[]]

@@ -87,7 +87,9 @@ import {
   newColumnFromField,
   quotedScope,
   tableAliasLength as mysqlTableAliasLength,
+  MysqlSchemaStatements,
 } from "./mysql/schema-statements.js";
+import { include } from "@blazetrails/activesupport";
 import type { Column as MysqlColumn } from "./mysql/column.js";
 import { TypeMap } from "../type/type-map.js";
 import {
@@ -2224,3 +2226,6 @@ export class StatementPool extends ConnectionStatementPool<MysqlPreparedStatemen
     return `a${++this._counter}`;
   }
 }
+
+// Rails: `include MySQL::SchemaStatements` (abstract_mysql_adapter.rb:19).
+include(AbstractMysqlAdapter, MysqlSchemaStatements);

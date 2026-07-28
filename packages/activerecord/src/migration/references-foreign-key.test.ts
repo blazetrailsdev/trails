@@ -99,6 +99,19 @@ describeIfSupports("foreign_keys", "Migration", () => {
       });
     });
 
+    it("removing column removes foreign key", async () => {
+      const conn = await ambientConnection();
+      await withTestingTables(conn, async () => {
+        await conn.createTable("testings", (t) => {
+          t.references("testing_parent", { index: true, foreignKey: true });
+        });
+
+        const before = (await conn.foreignKeys("testings")).length;
+        await conn.removeColumn("testings", "testing_parent_id");
+        expect((await conn.foreignKeys("testings")).length).toBe(before - 1);
+      });
+    });
+
     it("multiple foreign keys can be added to the same table", async () => {
       const conn = await ambientConnection();
       await withTestingTables(conn, async () => {
