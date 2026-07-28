@@ -197,7 +197,7 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
     // `expandConfig` synthesizes it from the defaults alone. Its
     // `preparedStatements: false` therefore does NOT come from the yml or from
     // `expand_config` (which fills in `database` / `adapter` only,
-    // `config.rb:26-37`): with no key on the entry, Rails falls back to
+    // `support/config.rb:26-41`): with no key on the entry, Rails falls back to
     // `Mysql2Adapter#default_prepared_statements` (`mysql2_adapter.rb:186-188`),
     // which is `false`. So the entry stays off whatever
     // `MYSQL_PREPARED_STATEMENTS` says, matching Rails.
@@ -256,7 +256,7 @@ export function configuredConnectionHash(): Record<string, unknown> {
 
 /**
  * Expand a connection's entries into the three named configs, mirroring
- * `expand_config` (`config.rb:26-37`): iterate `arunit`, `arunit2` and
+ * `expand_config` (`support/config.rb:26-41`): iterate `arunit`, `arunit2` and
  * `arunit_without_prepared_statements`, creating any the connection omits, then
  * fill in only a missing `database` or `adapter`. Options a connection does
  * declare are preserved per entry — mysql2's two collations, postgresql's

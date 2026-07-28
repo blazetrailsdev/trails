@@ -86,7 +86,7 @@ describe("config", () => {
   it("interpolates exactly the sub-setting key set config.example.yml interpolates", () => {
     // Rails interpolates only MYSQL_HOST/MYSQL_PORT/MYSQL_SOCK
     // (config.example.yml:12-20) plus MYSQL_PREPARED_STATEMENTS
-    // (config.example.yml:7-11,26-30) and hard-codes the credential and database;
+    // (config.example.yml:7-11,27-31) and hard-codes the credential and database;
     // its postgresql: entries carry no fields so libpq reads PG* itself
     // (config.example.yml:74-81). AR_DB_SLOT is the one trails addition — the
     // per-worker database copy Rails has no analogue for. Re-widening this set
@@ -117,7 +117,7 @@ describe("config", () => {
   });
 
   it("turns prepared statements on when MYSQL_PREPARED_STATEMENTS is present", () => {
-    // config.example.yml:7-11,26-30 tests the var with a bare `if`, so any
+    // config.example.yml:7-11,27-31 tests the var with a bare `if`, so any
     // value at all — including "" and "0" — turns prepared statements on.
     expect(mysqlPreparedStatements(reader({}))).toBe(false);
     expect(mysqlPreparedStatements(reader({ MYSQL_PREPARED_STATEMENTS: "1" }))).toBe(true);

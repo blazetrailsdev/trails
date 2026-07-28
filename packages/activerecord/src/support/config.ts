@@ -23,7 +23,7 @@
  *   - **How to reach it** comes from the connection entry itself, over which
  *     Rails interpolates exactly four env vars: `MYSQL_HOST` / `MYSQL_PORT` /
  *     `MYSQL_SOCK` (`config.example.yml:12-20`) and
- *     `MYSQL_PREPARED_STATEMENTS` (`config.example.yml:7-11,26-30`), the last
+ *     `MYSQL_PREPARED_STATEMENTS` (`config.example.yml:7-11,27-31`), the last
  *     of which selects a value rather than supplying one — see
  *     {@link mysqlPreparedStatements}. The postgresql entries carry
  *     no connection fields at all (`config.example.yml:74-81`), leaving libpq
@@ -213,7 +213,7 @@ export function mysqlSettings(read: EnvReader = getEnv): ServerSettings {
 /**
  * The mysql2 `prepared_statements` value for the `arunit` / `arunit2` entries:
  * `true` when `MYSQL_PREPARED_STATEMENTS` is set, `false` otherwise
- * (`config.example.yml:7-11,26-30`).
+ * (`config.example.yml:7-11,27-31`).
  *
  * Presence, not truthiness, and deliberately not routed through the
  * empty-string rejection the other sub-settings use: Rails tests the variable
