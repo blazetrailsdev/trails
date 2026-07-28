@@ -2386,7 +2386,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     modify: (columns: Record<string, Record<string, unknown>>) => void,
     overrideForeignKeys?: ForeignKeyDefinition[],
     overrideCheckConstraints?: CheckConstraintDefinition[],
-    extraDefinition?: (def: import("./abstract/schema-definitions.js").TableDefinition) => void,
+    extraDefinition?: (definition: SQLite3TableDefinition) => void,
   ): Promise<void> {
     await this.ensureConnected();
     const { schema, bare: bareTable } = this._splitTableName(tableName);
@@ -2461,11 +2461,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       .map((c) => c.name);
     const compositePk = pkColumns.length > 1;
 
-    // Rails' copy_table populates a real TableDefinition (`@definition.column`,
-    // `definition.foreign_key`, `definition.check_constraint`) and hands it to
-    // create_table, so the rebuild emits through schema_creation exactly like
-    // any other CREATE TABLE (sqlite3_adapter.rb:598-640). Build the same
-    // definition here instead of concatenating column/FK/CHECK SQL by hand.
     const definition = new SQLite3TableDefinition(tableName, {
       id: false,
       adapter: this,
@@ -2482,24 +2477,19 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         options.as = col.generatedAs;
         options.stored = Boolean(col.generatedStored);
       }
-      // Rails passes `primary_key: column_name == from_primary_key`, which is
-      // never true for a composite key (from_primary_key is an Array there).
       if (!compositePk && col.pk) options.primaryKey = true;
       if (col.notnull) options.null = false;
       if (col.dflt_value !== null && col.dflt_value !== undefined) {
-        // `dflt_value` is already a quoted SQL literal (PRAGMA hands it back
-        // verbatim, and the callers that rewrite it run it through
-        // quoteDefault first), so carry it as a callable default — the same
-        // vehicle Rails' copy_table uses for `-> { column.default_function }`,
-        // which quote_default_expression emits without re-quoting.
         const literal = String(col.dflt_value);
         options.default = () => literal;
       }
-      definition.column(name, String(col.type ?? "TEXT") as ColumnType, options);
-      // PRAGMA reports the declared SQL type, not an AR type name, so pin it
-      // rather than letting the visitor resolve it through typeToSql: that is
-      // how the rebuild round-trips storage affinity exactly.
-      definition.columns[definition.columns.length - 1].sqlType = String(col.type ?? "TEXT");
+      const sqlType = String(col.type ?? "TEXT");
+      const columnDefinition = definition.newColumnDefinition(name, sqlType as ColumnType, options);
+      // PRAGMA reports the declared SQL type, not an AR type name, so pin it here
+      // rather than let the visitor resolve it through typeToSql — that is what
+      // round-trips storage affinity exactly.
+      columnDefinition.sqlType = sqlType;
+      definition.columns.push(columnDefinition);
     }
 
     // Preserve foreign keys and check constraints across the rebuild.
@@ -2514,10 +2504,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
           ? fk.column.split(",").map((c) => c.trim())
           : [fk.column];
       if (!cols.every((c) => colNames.includes(c))) continue;
-      // Push the reflected definition rather than re-deriving one: foreignKeys()
-      // already resolved the constraint name out of the CREATE TABLE DDL (PRAGMA
-      // foreign_key_list doesn't expose it), and Rails' caller block likewise
-      // reuses the introspected fk's options.
       definition.foreignKeys.push(fk);
     }
 
@@ -2534,9 +2520,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       definition.checkConstraints.push(chk);
     }
 
-    // Rails: `yield definition if block_given?` at the tail of copy_table's
-    // create_table block — this is where add_foreign_key / add_check_constraint
-    // contribute their new constraint.
     extraDefinition?.(definition);
 
     const createTableSql = await this.schemaCreation.accept(definition);
