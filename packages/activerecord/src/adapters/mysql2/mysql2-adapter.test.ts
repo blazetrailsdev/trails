@@ -37,7 +37,7 @@ import {
 } from "../../errors.js";
 import { AbstractMysqlAdapter } from "../../connection-adapters/abstract-mysql-adapter.js";
 import { NullPool } from "../../connection-adapters/abstract/connection-pool.js";
-import { rebuildCanonicalTables } from "../../support/canonical-schema.js";
+import { rebuildCanonicalTables } from "../../support/canonical-table-rebuild.js";
 import { Result } from "../../result.js";
 import * as Arel from "@blazetrails/arel";
 

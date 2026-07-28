@@ -4,7 +4,7 @@ import { Base } from "./index.js";
 import { ReadOnlyError } from "./errors.js";
 import { fixtures } from "./test-fixtures.js";
 import { isSqliteRun } from "./support/sqlite-template.js";
-import { rebuildCanonicalTables } from "./support/canonical-schema.js";
+import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 import { Professor } from "./test-helpers/models/professor.js";
 

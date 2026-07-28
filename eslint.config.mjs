@@ -555,8 +555,9 @@ export default defineConfig(
   //    canonical-schema loaders (ensureCanonicalTables, loadCanonicalSchema)
   //    directly — wire the canonical schema + fixtures through `fixtures({ ... })`.
   //    rebuildCanonicalTables is intentionally allowed (documented shared shield).
-  //    Only canonical-schema.test.ts may import them, to test them directly
-  //    (allowlisted in the rule). See eslint/no-internal-canonical-loaders.mjs. ──
+  //    Only canonical-schema.test.ts / canonical-table-rebuild.test.ts may
+  //    import them, to test them directly (allowlisted in the rule).
+  //    See eslint/no-internal-canonical-loaders.mjs. ──
   {
     files: ["packages/activerecord/src/**/*.test.ts"],
     rules: {

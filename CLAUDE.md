@@ -109,8 +109,9 @@ package list, and the `declare` / associations / enums / schema reference, see
   schema + fixtures through `fixtures({ ... })` (the endgame surface: one call
   wires the handler, transactional fixtures, and the canonical schema); never
   re-declare a table inline or invent a free table name. For lower-level setup,
-  the canonical loader (`loadCanonicalSchema` / `rebuildCanonicalTables` in
-  `support/canonical-schema.ts`) lays the schema directly. Use the official
+  the canonical loader (`loadCanonicalSchema` in `support/canonical-schema.ts`,
+  `rebuildCanonicalTables` in `support/canonical-table-rebuild.ts`) lays the
+  schema directly. Use the official
   models in `packages/activerecord/src/test-helpers/models/`. Table, column, and
   model names must match Rails exactly. If a test needs something the canonical
   schema lacks, add it to the canonical schema — do not reach for a bespoke

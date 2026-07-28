@@ -16,7 +16,7 @@ import { quoteDefaultExpression } from "./connection-adapters/abstract/quoting.j
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Migration } from "./migration.js";
 import { fixtures } from "./test-fixtures.js";
-import { rebuildCanonicalTables } from "./support/canonical-schema.js";
+import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { SchemaCreation as PgSchemaCreation } from "./connection-adapters/postgresql/schema-creation.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./connection-adapters/mysql/schema-creation.js";

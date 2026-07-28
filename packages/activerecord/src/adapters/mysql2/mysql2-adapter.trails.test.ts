@@ -32,7 +32,7 @@ import {
   ValueTooLong,
 } from "../../errors.js";
 import { AbstractMysqlAdapter } from "../../connection-adapters/abstract-mysql-adapter.js";
-import { rebuildCanonicalTables } from "../../support/canonical-schema.js";
+import { rebuildCanonicalTables } from "../../support/canonical-table-rebuild.js";
 import { Result } from "../../result.js";
 
 // Fabricated-error translate_exception checks. These don't touch a live

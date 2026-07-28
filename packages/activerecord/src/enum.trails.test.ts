@@ -19,7 +19,7 @@ import { ArgumentError, DecimalType } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
 import { Map as MapCaster } from "./type-caster/map.js";
 import { fixtures } from "./test-fixtures.js";
-import { rebuildCanonicalTables } from "./support/canonical-schema.js";
+import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Lion } from "./test-helpers/models/cat.js";
 

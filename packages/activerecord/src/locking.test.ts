@@ -14,7 +14,7 @@ import {
 } from "./index.js";
 import { Associations, association } from "./associations.js";
 
-import { rebuildCanonicalTables } from "./support/canonical-schema.js";
+import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
 import { fixtures } from "./test-fixtures.js";
 import { Person, RichPerson } from "./test-helpers/models/person.js";
 import { Frog } from "./test-helpers/models/frog.js";

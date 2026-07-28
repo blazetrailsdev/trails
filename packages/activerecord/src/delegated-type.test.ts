@@ -6,7 +6,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vites
 import { registerModel } from "./index.js";
 import { adapterType } from "./test-adapter.js";
 import { StringInquirer, travel, travelBack } from "@blazetrails/activesupport";
-import { rebuildCanonicalTables } from "./support/canonical-schema.js";
+import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
 import { fixtures } from "./test-fixtures.js";
 import { Base } from "./base.js";
 import { delegatedType } from "./index.js";

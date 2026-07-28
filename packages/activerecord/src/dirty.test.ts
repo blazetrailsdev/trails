@@ -30,7 +30,7 @@ import { MigrationContext } from "./migration.js";
 import { describeIfSupports } from "./support/supports.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { fixtures } from "./test-fixtures.js";
-import { rebuildCanonicalTables } from "./support/canonical-schema.js";
+import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
 
 import { Pirate } from "./test-helpers/models/pirate.js";
 import { Parrot, LiveParrot } from "./test-helpers/models/parrot.js";
