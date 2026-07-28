@@ -26,7 +26,8 @@
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { TransactionManager } from "./connection-adapters/abstract/transaction.js";
-import type { SQLite3Config } from "./connection-adapters/pool-config.js";
+import type { SQLite3AdapterOptions } from "./connection-adapters/pool-config.js";
+import { buildAdapterArg } from "./connection-adapters/adapter-args.js";
 import { resetTestTables } from "./support/drop-all-tables.js";
 import { Base } from "./base.js";
 import { activeLane, testConfigurationHashes } from "./support/connection.js";
@@ -70,6 +71,13 @@ export type LeasedTestAdapter = DatabaseAdapter & {
 // It is the `arunit` entry `connect()` establishes the primary pool from, so
 // the two cannot drift; resolved with top-level await because the sqlite3
 // database is only known asynchronously (`fallbackDatabasePath()`).
+//
+// Order-dependent: this snapshot and `connect()` resolve the entry separately
+// and agree only because `test-setup-worker-db.ts` stamps AR_TEST_WORKER_DB /
+// AR_DB_SLOT before anything imports this module. A module in that setupFile's
+// graph reaching test-adapter.ts (or adapter-helper.ts, which imports it) would
+// snapshot the fallback database while Base rides the worker clone —
+// `test-adapter.trails.test.ts` asserts the two stay equal.
 const _primaryConfiguration: Record<string, unknown> = {
   ...(await testConfigurationHashes()).envConfig.configurationHash,
 };
@@ -98,26 +106,35 @@ export function ambientPoolConfiguration(): Record<string, unknown> {
  */
 export let newRawTestAdapter: () => DatabaseAdapter;
 
+// `buildAdapterArg` is the boundary `ConnectionPool#newConnection` builds its
+// adapters through, so going through it here means a raw adapter is constructed
+// from the ambient hash exactly as the primary pool's are — including the
+// per-adapter key whitelisting that keeps config-only keys out of the drivers.
+const adapterArgs = buildAdapterArg(_primaryConfiguration.adapter as string, _primaryConfiguration);
+
 if (adapterType === "postgres") {
   const { PostgreSQLAdapter } = await import("./connection-adapters/postgresql-adapter.js");
+  const [config] = adapterArgs as [Record<string, unknown>];
   // Constrain the driver pool to max: 1 so each pooled-adapter slot maps to
   // exactly one PG server connection (the outer ConnectionPool multiplexes).
   newRawTestAdapter = () =>
-    new PostgreSQLAdapter({ ..._primaryConfiguration, max: 1 }) as unknown as DatabaseAdapter;
+    new PostgreSQLAdapter({ ...config, max: 1 }) as unknown as DatabaseAdapter;
 } else if (adapterType === "mysql") {
   // Built from the config hash rather than a URL so a socket-configured run
   // (MYSQL_SOCK) reaches the driver — a URL cannot carry a socket path.
   const { Mysql2Adapter } = await import("./connection-adapters/mysql2-adapter.js");
+  const [config] = adapterArgs as [Record<string, unknown>];
   newRawTestAdapter = () =>
     new Mysql2Adapter({
-      ..._primaryConfiguration,
+      ...config,
       connectionLimit: 1,
       flags: ["FOUND_ROWS"],
     }) as unknown as DatabaseAdapter;
 } else {
   const { BetterSQLite3Adapter } = await import("./connection-adapters/better-sqlite3-adapter.js");
+  const [filename, options] = adapterArgs as [string, SQLite3AdapterOptions | undefined];
   newRawTestAdapter = () =>
-    new BetterSQLite3Adapter(_primaryConfiguration as SQLite3Config) as unknown as DatabaseAdapter;
+    new BetterSQLite3Adapter(filename, options) as unknown as DatabaseAdapter;
 }
 
 // --- In-test pool for pool-mechanics suites ---------------------------------
