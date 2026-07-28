@@ -356,7 +356,16 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "`test_configuration_hashes` / `connect` (connection.rb) and " +
       "`expand_config` (config.rb) ARE ported — all four in " +
       "packages/activerecord/src/support/connection.ts, next to the CONNECTIONS " +
-      "entries they name and expand. (2) `config` / " +
+      "entries they name and expand. They miss only because the bucket's " +
+      "expected TS file is config.ts; export status is not why — the TS " +
+      "extractor records file-local functions too, so the non-exported " +
+      "`expandConfig` (connection.ts:269) is exactly as visible to api:compare " +
+      "as the three exported ones, and exporting it would not match it. Moving " +
+      "it into config.ts would: it is typed on `NamedConnection` / " +
+      "`ARUNIT_ENTRY_NAMES` / `HashConfig`, all declared in connection.ts, which " +
+      "already imports from config.ts — so the move closes an import cycle, and " +
+      "dragging those declarations along would relocate the `connections:` " +
+      "vocabulary out of the file mirroring connection.rb. (2) `config` / " +
       "`config_file` / `read_config` are the memoized read of test/config.yml; " +
       "trails ships no config.yml — the `connections:` hash is expressed " +
       "directly as the CONNECTIONS table in connection.ts and the sub-setting " +
