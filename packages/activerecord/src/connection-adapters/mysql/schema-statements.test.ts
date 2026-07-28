@@ -374,7 +374,6 @@ describe("MySQL::SchemaStatements", () => {
     expect(fks[0].primaryKey).toBe("id");
     expect(fks[0].toTable).toBe("rockets");
     expect(fks[0].onDelete).toBe("cascade");
-    // RESTRICT is MySQL's default and reports as nil (foreign_key_test.rb:267).
     expect(fks[0].onUpdate).toBeUndefined();
   });
 
