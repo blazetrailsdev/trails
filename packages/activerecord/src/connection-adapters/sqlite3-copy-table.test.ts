@@ -4,26 +4,14 @@ import { fixtures } from "../test-helpers/fixtures.js";
 import { describeIfSqlite } from "../adapters/sqlite3/test-helper.js";
 import type { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
 
-// The rebuild helpers are DDL, so the suite cannot run inside the fixture
-// transaction. Sources are canonical tables read-only; every table this file
-// writes is a `<canonical>2`/`<canonical>3` copy target (the naming Rails'
-// copy_table_test.rb uses) that the drop below reclaims.
 fixtures([], { useTransactionalTests: false });
 
 describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   let db: AbstractSQLite3Adapter;
 
-  // The ambient connection is a shared worker DB, so the copy targets are
-  // cleared on the way in as well as out: a hard-killed run must not wedge the
-  // next one. `_alter_tmp_customers2` is alterTable's rebuild scratch table
-  // (sqlite3-adapter.ts `_alter_tmp_${bareTable}`), which it only drops on the
-  // success path — a mid-rebuild failure leaves it behind.
   const dropCopyTargets = async (): Promise<void> => {
-    // Guarded so a beforeEach that fails before the lease surfaces its own
-    // error rather than a TypeError on `undefined.exec` from this teardown.
-    const conn = db as AbstractSQLite3Adapter | undefined;
-    if (!conn) return;
-    await conn.exec(
+    if (db === undefined) return;
+    await db.exec(
       `DROP TABLE IF EXISTS customers2; DROP TABLE IF EXISTS customers3; DROP TABLE IF EXISTS books2; DROP TABLE IF EXISTS "_alter_tmp_customers2"`,
     );
   };
@@ -38,8 +26,6 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   // --- tableStructureSql ---
 
   it("tableStructureSql returns column definition strings from CREATE TABLE SQL", async () => {
-    // The splitter only breaks before the named columns, so `customers`' seven
-    // columns yield two strings: `id`, and `name` plus the trailing remainder.
     const strings = await (db as any).tableStructureSql("customers", ["id", "name"]);
     expect(strings).toHaveLength(2);
     expect(strings[0]).toMatch(/"id"/);
@@ -52,8 +38,6 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   });
 
   it("tableStructureSql includes CONSTRAINT strings", async () => {
-    // `fk_test_has_fk` is the canonical table whose CREATE TABLE carries a named
-    // FOREIGN KEY constraint (schema.rb: fk_name → fk_test_has_pk.pk_id).
     const strings = await (db as any).tableStructureSql("fk_test_has_fk", ["id", "fk_id"]);
     expect(strings.some((s: string) => s.includes("CONSTRAINT"))).toBe(true);
   });
@@ -61,9 +45,6 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   // --- tableStructureWithCollation ---
 
   it("tableStructureWithCollation extracts auto_increment flag", async () => {
-    // Rails' SQLite primary key is `integer PRIMARY KEY AUTOINCREMENT NOT NULL`,
-    // so any canonical table exercises the AUTOINCREMENT branch. (The COLLATE
-    // branch is covered by the Rails port at adapters/sqlite3/collation.test.ts.)
     const basic = await (db as any).tableInfo("customers");
     const enriched = await (db as any).tableStructureWithCollation("customers", basic);
     const idCol = enriched.find((c: any) => c.name === "id");
@@ -78,17 +59,23 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
 
   // --- copyTableIndexes ---
 
+  const copiedIndexSql = async (table: string, matching: string): Promise<string | undefined> => {
+    const rows = (await db.execute(
+      `SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='${table}'`,
+    )) as Array<{ sql: string | null }>;
+    return rows.find((row) => row.sql?.includes(matching))?.sql ?? undefined;
+  };
+
   it("copyTableIndexes preserves partial index WHERE clause", async () => {
-    // `books` carries schema.rb's unique partial index on `isbn`
-    // (`WHERE published_on IS NOT NULL`); its generated name embeds the source
-    // table, so the copy is renamed to index_books2_on_isbn — no collision.
     await (db as any).copyTable("books", "books2");
-    const idxSql = (
-      await db.execute("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='books2'")
-    ).find((row: any) => typeof row["sql"] === "string" && row["sql"].includes("isbn")) as
-      | { sql: string }
-      | undefined;
-    expect(idxSql?.sql).toMatch(/WHERE\s+published_on\s+IS\s+NOT\s+NULL/i);
+    expect(await copiedIndexSql("books2", "isbn")).toMatch(
+      /WHERE\s+published_on\s+IS\s+NOT\s+NULL/i,
+    );
+  });
+
+  it("copyTableIndexes copies an expression index verbatim", async () => {
+    await (db as any).copyTable("books", "books2");
+    expect(await copiedIndexSql("books2", "lower")).toMatch(/lower\(external_id\)/i);
   });
 
   // --- moveTable ---
@@ -110,11 +97,9 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
     // PRAGMA table_info normalizes a declared `integer` to `INTEGER` but leaves
     // `bigint` verbatim, so hand-written DDL is the one way the rebuild sees an
     // AR-spelled integer-like type — the shape that makes newColumnDefinition
-    // flip the column to :primary_key, where the constraint rides entirely on
-    // type_to_sql(:primary_key). No canonical table declares a `bigint` primary
-    // key, so this one table is laid down by hand; it reuses the `customers2`
-    // copy-target name rather than inventing a table.
-
+    // flip the column to :primary_key. No canonical table declares a `bigint`
+    // primary key, so this table alone is laid down by hand, under the
+    // `customers2` copy-target name the teardown above already reclaims.
     await db.exec('CREATE TABLE "customers2" ("id" bigint PRIMARY KEY, "name" TEXT)');
     await db.removeColumn("customers2", "name");
     const pk = (await (db as any).tableInfo("customers2")).filter((c: any) => Number(c.pk) > 0);

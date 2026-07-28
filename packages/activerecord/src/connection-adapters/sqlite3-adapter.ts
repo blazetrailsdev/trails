@@ -2796,16 +2796,13 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       // Rails gates the rename/filter on `columns.is_a?(Array)`: an expression
       // index carries its parenthesized expression as a bare string, which is
       // copied across verbatim (no column-name mapping applies).
-      const isColumnList = Array.isArray(idx.columns);
-      const cols = isColumnList
-        ? (idx.columns as string[]).map((c) => rename[c] ?? c).filter((c) => toCols.includes(c))
+      const cols = Array.isArray(idx.columns)
+        ? idx.columns.map((c) => rename[c] ?? c).filter((c) => toCols.includes(c))
         : idx.columns;
       if (!cols.length) continue;
       const escapedFrom = bareFrom.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const newName = name.replace(new RegExp(`(^|_)(${escapedFrom})_`), `$1${bareTo}_`);
-      const colSql = isColumnList
-        ? (cols as string[]).map((c) => quoteColumnName(c)).join(", ")
-        : (cols as string);
+      const colSql = Array.isArray(cols) ? cols.map((c) => quoteColumnName(c)).join(", ") : cols;
       let sql = `CREATE ${idx.unique ? "UNIQUE " : ""}INDEX ${quoteColumnName(newName)} ON ${quoteTableName(to)} (${colSql})`;
       if (idx.where) sql += ` WHERE ${idx.where}`;
       await this.driver.exec(sql);

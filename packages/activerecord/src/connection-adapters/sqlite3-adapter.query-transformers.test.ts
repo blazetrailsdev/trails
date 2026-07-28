@@ -6,9 +6,6 @@ import { describeIfSqlite } from "../adapters/sqlite3/test-helper.js";
 import type { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
 import { queryTransformers, type QueryTransformer } from "../query-transformers.js";
 
-// Every statement below is a read or a write against the canonical `customers`
-// table, so the fixture transaction rolls the suite's writes back and no
-// scratch DDL is needed.
 fixtures([]);
 
 // Integration proof for QL PR 3: a registered query transformer is applied in
@@ -26,7 +23,7 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
     queryTransformers.length = 0;
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     queryTransformers.length = 0;
     queryTransformers.push(...savedTransformers);
   });
