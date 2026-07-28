@@ -2,6 +2,10 @@ import { describe, it, expect } from "vitest";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 
 // Guard for the defect this file was added with: vitest.config.ts has always
 // collected the tooling test suites under scripts/ into the "other" project,
@@ -125,6 +129,38 @@ function gateRegex(yml: string, name: string): RegExp {
   return new RegExp(source);
 }
 
+/**
+ * Runs the `changes` job's own gate block — the `*_RE` definitions plus the
+ * `infra_files`/`set_gate` region lifted verbatim out of ci.yml — over a
+ * changed-file list, under the same `set -euo pipefail` the job uses. Modelling
+ * the regexes in JS instead would miss shell-level faults (an unbound `$3`
+ * under `set -u` took the whole job down once).
+ */
+async function gateRunner(yml: string): Promise<(file: string) => Promise<Record<string, string>>> {
+  const lines = yml.split("\n").map((l) => l.trim());
+  const defs = lines.filter((l) => /^[A-Z_]+_RE='/.test(l));
+  const start = lines.findIndex((l) => l.startsWith("infra_files=$("));
+  const end = lines.findIndex((l) => l.startsWith("set_gate comparison_affected"));
+  if (start === -1 || end === -1) throw new Error("no gate block in ci.yml");
+  const script = [
+    "set -euo pipefail",
+    ...defs,
+    'GITHUB_OUTPUT=$(mktemp)\nfiles="$1"',
+    ...lines.slice(start, end + 1),
+    'cat "$GITHUB_OUTPUT"; rm -f "$GITHUB_OUTPUT"',
+  ].join("\n");
+
+  return async (file) => {
+    const { stdout } = await execFileAsync("bash", ["-c", script, "gate", file]);
+    return Object.fromEntries(
+      stdout
+        .split("\n")
+        .filter(Boolean)
+        .map((l) => l.split("=") as [string, string]),
+    );
+  };
+}
+
 describe("CI runs every tooling test suite", () => {
   it("covers each scripts/eslint/vendor test file with a ci.yml vitest filter", async () => {
     const yml = await readFile(CI_YML, "utf8");
@@ -172,6 +208,42 @@ describe("CI runs every tooling test suite", () => {
       unmatched.push(...inputs.filter((input) => !gate.test(input)));
     }
     expect(unmatched).toEqual([]);
+  });
+
+  it("fires guides_affected only for paths that can reach the public type surface", async () => {
+    const yml = await readFile(CI_YML, "utf8");
+    const gate = gateRegex(yml, "GUIDES_PKGS_RE");
+    const runGate = await gateRunner(yml);
+
+    const runs = [
+      "packages/activerecord/src/relation.ts",
+      "packages/activemodel/src/validations.ts",
+      "packages/website/docs/guides/active-record-basics.md",
+      "scripts/guides-typecheck/check.ts",
+    ];
+    const skips = [
+      "packages/activerecord/src/relation.test.ts",
+      "packages/activerecord/src/test-helpers/models/topic.ts",
+      "packages/activerecord/src/test-helpers/fixtures/topics.yml",
+      "packages/arel/src/__snapshots__/visitors.test.ts.snap",
+      "packages/activerecord/src/test-fixtures.ts",
+      "packages/activerecord/src/test-fixtures/fixture-connection.ts",
+    ];
+    const fired = await Promise.all([...runs, ...skips].map(runGate));
+    const outcome = Object.fromEntries(
+      [...runs, ...skips].map((f, i) => [f, fired[i].guides_affected]),
+    );
+    expect(runs.filter((f) => outcome[f] !== "true")).toEqual([]);
+    expect(skips.filter((f) => outcome[f] !== "false")).toEqual([]);
+    expect(skips.filter((f) => !gate.test(f))).toEqual([]);
+  });
+
+  it("keeps comparison_affected off for website-only changes", async () => {
+    const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
+    expect((await runGate("packages/website/src/app.ts")).comparison_affected).toBe("false");
+    expect((await runGate("packages/activerecord/src/relation.ts")).comparison_affected).toBe(
+      "true",
+    );
   });
 
   it("keeps KNOWN_UNRUN free of entries CI already runs", async () => {
