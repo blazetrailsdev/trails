@@ -1871,24 +1871,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /** @internal */
   static override initializeTypeMap(this: typeof AbstractMysqlAdapter, m: TypeMap): void {
-    // Rails' `initialize_type_map` opens with `super`
-    // (abstract_mysql_adapter.rb:711-712), so every base registration and alias
-    // — char/binary/text/date/time/datetime/float/int, blob, clob, timestamp,
-    // numeric, number, double, json, decimal — is inherited rather than
-    // re-listed. The temporal registrations pick up the MySQL `(date)?time
-    // (stamp)?` precision rule through the `extractPrecision` override below.
-    // NOTE: char/varchar/enum/set string registrations do NOT belong here —
-    // they bind mysql2/trilogy-specific `"1"`/`"0"` boolean-string behavior to
-    // a concrete client, so Rails registers them in the concrete
-    // `Mysql2Adapter#initialize_type_map` (mysql2_adapter.rb:40-49), not in
-    // `AbstractMysqlAdapter#initialize_type_map`. See
-    // Mysql2Adapter.initializeTypeMap.
     super.initializeTypeMap(m);
 
-    // MySQL-specific overrides (mirrors MySQL's initialize_type_map additions).
-    // Rails registers each lob variant with a fixed byte-size limit (2**8-1 …
-    // 2**32-1) rather than extracting it from the sql_type, so column
-    // introspection and the schema dumper's :size mapping see the right limit.
     m.registerType(/tinytext/i, undefined, () => new TextType({ limit: 2 ** 8 - 1 }));
     m.registerType(/tinyblob/i, undefined, () => new BinaryType({ limit: 2 ** 8 - 1 }));
     m.registerType(/text/i, undefined, () => new TextType({ limit: 2 ** 16 - 1 }));
@@ -1908,19 +1892,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     m.aliasType(/bit/i, "binary");
   }
 
-  /**
-   * @internal Mirrors: AbstractMysqlAdapter.extract_precision
-   * (abstract_mysql_adapter.rb:751-757) — for the `(date)?time(stamp)?` family
-   * a missing `(N)` modifier resolves to 0 (TIME ≡ TIME(0) on MySQL/MariaDB),
-   * not nil. The base type map's temporal registrations read precision through
-   * this hook, which is how Rails' `super` gets MySQL semantics.
-   */
-  static override extractPrecision(sqlType: string): number | undefined {
-    const precision = AbstractAdapter.extractPrecision(sqlType);
-    if (/^(?:date)?time(?:stamp)?\b/i.test(sqlType)) return precision ?? 0;
-    return precision;
-  }
-
   /** @internal */
   protected static registerIntegerType(
     mapping: TypeMap,
@@ -1932,6 +1903,13 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       if (options.limit === 8) return new MysqlBigInteger(options);
       return new IntegerType(options);
     });
+  }
+
+  /** @internal */
+  static override extractPrecision(sqlType: string): number | undefined {
+    const precision = super.extractPrecision(sqlType);
+    if (/^(?:date)?time(?:stamp)?\b/i.test(sqlType)) return precision ?? 0;
+    return precision;
   }
 
   /** @internal */
