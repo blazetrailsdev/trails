@@ -1,7 +1,8 @@
 // trails-only Migrator cases with no counterpart in
 // vendor/rails/activerecord/test/cases/migrator_test.rb. See migrator.test.ts
 // for the faithful Rails mirror.
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from "vitest";
+import { stdout } from "@blazetrails/activesupport";
 import {
   Migrator,
   CheckPending,
@@ -453,5 +454,101 @@ describe("Migrator advisory lock wrapping", () => {
     } as unknown as DatabaseAdapter;
     const migrator = new Migrator(adapter, []);
     expect(migrator.isUseAdvisoryLock()).toBe(false);
+  });
+});
+
+describe("Migrator drives migrations through Migration#migrate", () => {
+  let adapter: DatabaseAdapter;
+  let chunks: string[];
+  let spy: MockInstance;
+
+  beforeEach(() => {
+    adapter = Base.connection;
+    chunks = [];
+    spy = vi.spyOn(stdout, "write").mockImplementation((chunk) => {
+      chunks.push(chunk);
+      return true;
+    });
+  });
+
+  afterEach(() => {
+    spy.mockRestore();
+  });
+
+  it("Migration#name and #version report the constructor arguments", () => {
+    class Chunky extends Migration {}
+    const migration = new Chunky("Bacon", "20240101000000");
+    expect(migration.name).toBe("Bacon");
+    expect(migration.version).toBe("20240101000000");
+  });
+
+  it("Migration#name defaults to the class and #version stays unset", () => {
+    // Rails: `initialize(name = self.class.name, version = nil)`
+    // (migration.rb:799) — only the name falls back to the class.
+    class Chunky extends Migration {}
+    const migration = new Chunky();
+    expect(migration.name).toBe("Chunky");
+    expect(migration.version).toBeUndefined();
+  });
+
+  it("announces the identity the proxy constructed the migration with", async () => {
+    // Rails' load_migration builds `name.constantize.new(name, version)`
+    // (migration.rb:1195), so the banner carries the proxy's identity even
+    // though the class is named something else.
+    class SomeOtherClassName extends Migration {
+      override async change(): Promise<void> {}
+    }
+    const migrator = new Migrator(adapter, [
+      {
+        version: "1",
+        name: "CreateWidgets",
+        migration: () => new SomeOtherClassName("CreateWidgets", "1"),
+      },
+    ]);
+    await migrator.up();
+    const banners = chunks.join("").split("\n").filter(Boolean);
+    expect(banners[0]).toMatch(/^== 1 CreateWidgets: migrating =+$/);
+    expect(banners[1]).toMatch(/^== 1 CreateWidgets: migrated \(\d+\.\d{4}s\) =+$/);
+  });
+
+  it("honours a Migration subclass override of announce", async () => {
+    // Rails' MigrationProxy delegates announce to the real migration
+    // (migration.rb:1187), so an override wins over the base banner.
+    class Shouty extends Migration {
+      override announce(message: string): void {
+        this.write(`!! ${message} !!`);
+      }
+      override async change(): Promise<void> {}
+    }
+    const migrator = new Migrator(adapter, [
+      { version: "1", name: "Shouty", migration: () => new Shouty("Shouty", "1") },
+    ]);
+    await migrator.up();
+    const output = chunks.join("");
+    expect(output).toContain("!! migrating !!");
+    expect(output).toContain("!! migrated (");
+    expect(output).not.toContain("== 1 Shouty: migrating");
+  });
+
+  it("announces each banner exactly once", async () => {
+    const migrator = new Migrator(adapter, [makeMigration("1", "M1")]);
+    await migrator.up();
+    const output = chunks.join("");
+    expect(output.match(/1 M1: migrating/g)).toHaveLength(1);
+    expect(output.match(/1 M1: migrated/g)).toHaveLength(1);
+  });
+
+  it("honours the migration's verbose setting", async () => {
+    // Rails' verbose is a cattr_accessor (migration.rb:797) — one shared
+    // setting, not per-Migrator state.
+    const was = Migration.verbose;
+    Migration.verbose = false;
+    try {
+      const migrator = new Migrator(adapter, [makeMigration("1", "M1")]);
+      await migrator.up();
+      expect(chunks.join("")).toBe("");
+    } finally {
+      Migration.verbose = was;
+    }
   });
 });

@@ -271,10 +271,6 @@ let migrationVerbose = true;
  * have no Migration instance. Rails puts migration output on `$stdout` via
  * `Kernel#puts`; `stdout` is the activesupport shim standing in for `$stdout`
  * — no logger is involved.
- *
- * The Migrator needs it: unlike Rails, where `Migration#migrate` announces its
- * own banners, trails' Migrator drives the execution strategy directly and its
- * migrations may be bare `{ up, down }` proxies with no `announce`.
  */
 function writeMigrationMessage(text = ""): void {
   if (migrationVerbose) {
@@ -1110,7 +1106,7 @@ export abstract class Migration {
    * Mirrors: ActiveRecord::Migration#name
    */
   get name(): string {
-    return this.constructor.name;
+    return this._name ?? this.constructor.name;
   }
 
   /**
@@ -1291,10 +1287,13 @@ export abstract class Migration {
   }
 
   /**
-   * Get the migration version from the class name or a static property.
+   * Get the migration version. Rails initializes `@version` to nil
+   * (`migration.rb:799`) — only `@name` defaults to the class name — so an
+   * unversioned migration has no version. The static hook is the trails path
+   * for compatibility classes that declare one.
    */
-  get version(): string {
-    return (this.constructor as any).version ?? this.constructor.name;
+  get version(): string | undefined {
+    return this._version ?? (this.constructor as any).version;
   }
 
   // --- Logging (Rails: Migration#write, #announce, #say, #say_with_time, #suppress_messages) ---
@@ -1306,7 +1305,8 @@ export abstract class Migration {
   }
 
   announce(message: string): void {
-    this.write(announceMigrationText(`${this.version} ${this.name}`, message));
+    // Ruby interpolates a nil version as "", not "undefined".
+    this.write(announceMigrationText(`${this.version ?? ""} ${this.name}`, message));
   }
 
   say(message: string, subitem = false): void {
@@ -1519,7 +1519,7 @@ export abstract class Migration {
           migration: async () => {
             const { pathToFileURL } = await import("node:url");
             const mod = (await import(pathToFileURL(newPath).href)) as Record<string, unknown>;
-            return (mod.default ?? mod[proxyName]) as MigrationLike;
+            return loadMigrationFrom(mod, proxyName, newVersion);
           },
         };
         last = copy;
@@ -2071,6 +2071,43 @@ export interface MigrationProxy {
   basename?(): string;
   /** @internal Mirrors: ActiveRecord::MigrationProxy#load_migration */
   loadMigration?(): Promise<MigrationLike>;
+}
+
+/**
+ * Mirrors: ActiveRecord::MigrationProxy#load_migration (`migration.rb:1195`) —
+ * `name.constantize.new(name, version)`. The module's named export is the
+ * migration class; the legacy `default` export is a pre-built instance that
+ * cannot carry the proxy's identity, so it is only the fallback.
+ */
+async function loadMigrationFrom(
+  mod: Record<string, unknown>,
+  name: string,
+  version: string,
+): Promise<MigrationLike> {
+  const exported = mod[name] ?? mod.default;
+  if (typeof exported === "function") {
+    return new (exported as new (name?: string, version?: string) => Migration)(name, version);
+  }
+  return exported as MigrationLike;
+}
+
+/** Mirrors: ActiveRecord::MigrationProxy (`migration.rb:1187`) */
+class MigrationProxyDelegate extends Migration {
+  constructor(
+    proxy: MigrationProxy,
+    private readonly _loaded: MigrationLike,
+    private readonly _execStrategy: ExecutionStrategy,
+  ) {
+    super(proxy.name, proxy.version);
+  }
+
+  override get disableDdlTransaction(): boolean {
+    return this._loaded.disableDdlTransaction ?? false;
+  }
+
+  override async execMigration(conn: DatabaseAdapter, direction: "up" | "down"): Promise<void> {
+    await this._execStrategy.exec(direction, this._loaded, conn);
+  }
 }
 
 /**
@@ -2659,7 +2696,7 @@ export class Migrator {
         migration: async () => {
           const { pathToFileURL } = await import("node:url");
           const mod = await import(pathToFileURL(file).href);
-          return (mod.default ?? mod[name]) as MigrationLike;
+          return loadMigrationFrom(mod, name, version);
         },
       });
     }
@@ -2694,7 +2731,7 @@ export class Migrator {
         migration: async () => {
           const { pathToFileURL } = await import("node:url");
           const mod = await import(pathToFileURL(file).href);
-          return (mod.default ?? mod[name]) as MigrationLike;
+          return loadMigrationFrom(mod, name, version);
         },
       });
     }
@@ -2878,25 +2915,23 @@ export class Migrator {
   }
 
   private async _runMigration(proxy: MigrationProxy, direction: "up" | "down"): Promise<void> {
-    const migration = await proxy.migration();
+    const loaded = await proxy.migration();
+    // Rails' MigrationProxy delegates migrate/announce/write to the real
+    // Migration (`migration.rb:1187`), so a subclass override is honoured. The
+    // wrapper is only for the trails-only bare `{ up, down }` proxy shape,
+    // which has no migrate/announce of its own.
+    const migration =
+      loaded instanceof Migration
+        ? loaded
+        : new MigrationProxyDelegate(proxy, loaded, this._strategy);
+    migration.connection = this._adapter;
     // Rails wraps both the migration execution AND the version
     // stamping inside the same ddl_transaction so they commit/rollback
     // atomically. Without this, a committed migration + failed stamp
     // would leave schema_migrations out of sync.
     try {
       await this._ddlTransaction(migration, async () => {
-        // Rails emits these banners from Migration#migrate (`migration.rb:964`),
-        // which this Migrator bypasses by driving the execution strategy
-        // directly. They belong inside the ddl_transaction because Rails calls
-        // migration.migrate from within it (`migration.rb:1534`).
-        this._announce(proxy, direction === "up" ? "migrating" : "reverting");
-        // Rails benchmarks exec_migration alone (`migration.rb:973`) and emits
-        // the completion banner before record_version_state_after_migrating.
-        const start = Date.now();
-        await this._strategy.exec(direction, migration, this._adapter);
-        const elapsed = ((Date.now() - start) / 1000).toFixed(4);
-        this._announce(proxy, `${direction === "up" ? "migrated" : "reverted"} (${elapsed}s)`);
-        writeMigrationMessage();
+        await migration.migrate(direction);
         if (direction === "up") {
           await this._schemaMigration.recordVersion(proxy.version);
           if (this._internalMetadata.enabled) {
@@ -2914,11 +2949,6 @@ export class Migrator {
       const msg = `An error has occurred, ${useTx ? "this and " : ""}all later migrations canceled:\n\n${e instanceof Error ? e.message : e}`;
       throw Object.assign(new Error(msg), { cause: e });
     }
-  }
-
-  /** @internal Rails: `MigrationProxy` delegates `announce`/`write` to the migration. */
-  private _announce(proxy: MigrationProxy, message: string): void {
-    writeMigrationMessage(announceMigrationText(`${proxy.version} ${proxy.name}`, message));
   }
 
   /**
