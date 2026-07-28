@@ -269,7 +269,7 @@ export class DatabaseTasks {
     const effectiveVersion = typeof raw === "string" ? raw.trim() || null : raw;
     this.checkTargetVersion(effectiveVersion ?? undefined);
 
-    const { Migrator, Migration } = await import("../migration.js");
+    const { Migrator } = await import("../migration.js");
     const scope = getEnv("SCOPE");
     const verbose = isVerbose();
 
@@ -294,7 +294,10 @@ export class DatabaseTasks {
       }
       const ran = await migrator.migrate(effectiveVersion ?? null, filter);
       if (scope && scope.trim() !== "" && ran.length === 0 && verbose) {
-        Migration.logger.info(`No migrations ran. (using ${scope} scope)`);
+        // Rails: `Migration.write("No migrations ran. ...")` — write puts to
+        // $stdout (`migration.rb:1001`); `verbose` here is the gate Migration
+        // #write applies. `stdout` is the activesupport $stdout shim.
+        stdout.write(`No migrations ran. (using ${scope} scope)\n`);
       }
       // Rails: `migration_connection_pool.schema_cache.clear!` — drop the
       // reflected schema so post-migration introspection re-reads the

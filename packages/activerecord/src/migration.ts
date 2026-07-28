@@ -1,11 +1,11 @@
 import {
   getFs,
   getPath,
-  Logger,
   getEnv,
   camelize,
   underscore,
   humanize,
+  stdout,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -258,6 +258,29 @@ export class EnvironmentStorageError extends MigrationError {
 }
 
 /**
+ * @internal The body of `Migration#write` (`migration.rb:1001`), lifted to a
+ * free function so the `verbose` gate exists in exactly one place. Rails puts
+ * migration output on `$stdout` via `Kernel#puts`; `stdout` is the
+ * activesupport shim standing in for `$stdout` — no logger is involved.
+ *
+ * The Migrator needs it too: unlike Rails, where `Migration#migrate` announces
+ * its own banners, trails' Migrator drives the execution strategy directly and
+ * its migrations may be bare `{ up, down }` proxies with no `announce`.
+ */
+function writeMigrationMessage(verbose: boolean, text = ""): void {
+  if (verbose) {
+    stdout.write(`${text}\n`);
+  }
+}
+
+/** @internal The banner `Migration#announce` (`migration.rb:1005`) hands to `write`. */
+function announceMigrationText(header: string, message: string): string {
+  const text = `${header}: ${message}`;
+  const pad = Math.max(0, 75 - text.length);
+  return `== ${text} ${"=".repeat(pad)}`;
+}
+
+/**
  * Migration — base class for database migrations.
  *
  * Mirrors: ActiveRecord::Migration
@@ -279,7 +302,6 @@ export abstract class Migration {
   static delegate: DatabaseAdapter | null = null;
   private _version?: string;
   verbose = true;
-  static logger: Logger = new Logger();
   private static _disableDdlTransaction = false;
 
   /** Return the normalized adapter name from the configured adapter. */
@@ -1253,15 +1275,11 @@ export abstract class Migration {
   // --- Logging (Rails: Migration#write, #announce, #say, #say_with_time, #suppress_messages) ---
 
   write(text = ""): void {
-    if (this.verbose) {
-      Migration.logger.info(text);
-    }
+    writeMigrationMessage(this.verbose, text);
   }
 
   announce(message: string): void {
-    const text = `${this.version} ${this.name}: ${message}`;
-    const pad = Math.max(0, 75 - text.length);
-    this.write(`== ${text} ${"=".repeat(pad)}`);
+    this.write(announceMigrationText(`${this.version} ${this.name}`, message));
   }
 
   say(message: string, subitem = false): void {
@@ -2837,11 +2855,6 @@ export class Migrator {
   }
 
   private async _runMigration(proxy: MigrationProxy, direction: "up" | "down"): Promise<void> {
-    if (this.verbose) {
-      const action = direction === "up" ? "migrating" : "reverting";
-      Migration.logger.info(`== ${proxy.version} ${proxy.name}: ${action} ==`);
-    }
-
     const migration = await proxy.migration();
     // Rails wraps both the migration execution AND the version
     // stamping inside the same ddl_transaction so they commit/rollback
@@ -2849,7 +2862,18 @@ export class Migrator {
     // would leave schema_migrations out of sync.
     try {
       await this._ddlTransaction(migration, async () => {
+        // Rails emits these banners from Migration#migrate (`migration.rb:964`),
+        // which this Migrator bypasses by driving the execution strategy
+        // directly. They belong inside the ddl_transaction because Rails calls
+        // migration.migrate from within it (`migration.rb:1534`).
+        this._announce(proxy, direction === "up" ? "migrating" : "reverting");
+        // Rails benchmarks exec_migration alone (`migration.rb:973`) and emits
+        // the completion banner before record_version_state_after_migrating.
+        const start = Date.now();
         await this._strategy.exec(direction, migration, this._adapter);
+        const elapsed = ((Date.now() - start) / 1000).toFixed(4);
+        this._announce(proxy, `${direction === "up" ? "migrated" : "reverted"} (${elapsed}s)`);
+        writeMigrationMessage(this.verbose);
         if (direction === "up") {
           await this._schemaMigration.recordVersion(proxy.version);
           if (this._internalMetadata.enabled) {
@@ -2867,11 +2891,14 @@ export class Migrator {
       const msg = `An error has occurred, ${useTx ? "this and " : ""}all later migrations canceled:\n\n${e instanceof Error ? e.message : e}`;
       throw Object.assign(new Error(msg), { cause: e });
     }
+  }
 
-    if (this.verbose) {
-      const action = direction === "up" ? "migrated" : "reverted";
-      Migration.logger.info(`== ${proxy.version} ${proxy.name}: ${action} ==`);
-    }
+  /** @internal Rails: `MigrationProxy` delegates `announce`/`write` to the migration. */
+  private _announce(proxy: MigrationProxy, message: string): void {
+    writeMigrationMessage(
+      this.verbose,
+      announceMigrationText(`${proxy.version} ${proxy.name}`, message),
+    );
   }
 
   /**

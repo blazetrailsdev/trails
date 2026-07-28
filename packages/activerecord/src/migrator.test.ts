@@ -1,9 +1,8 @@
 // Faithful port of vendor/rails/activerecord/test/cases/migrator_test.rb
-import { describe, it, expect, beforeEach } from "vitest";
-import { Logger } from "@blazetrails/activesupport";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { stdout } from "@blazetrails/activesupport";
 import {
   Migrator,
-  Migration,
   DuplicateMigrationVersionError,
   UnknownMigrationVersionError,
 } from "./migration.js";
@@ -427,8 +426,13 @@ describe("MigratorTest", () => {
 
   it("migrator verbosity", async () => {
     const lines: string[] = [];
-    const origLogger = Migration.logger;
-    Migration.logger = new Logger({ write: (s) => lines.push(s) });
+    // Rails counts messages via `Migration.message_count`, which its test
+    // helper increments from an overridden `write`. Here the equivalent seam
+    // is the stdout shim `write` puts to.
+    const spy = vi.spyOn(stdout, "write").mockImplementation((chunk) => {
+      lines.push(chunk);
+      return true;
+    });
     try {
       const { migrations } = sensors(3);
 
@@ -444,14 +448,16 @@ describe("MigratorTest", () => {
       await downMigrator.migrate(0);
       expect(lines.length).not.toBe(0);
     } finally {
-      Migration.logger = origLogger;
+      spy.mockRestore();
     }
   });
 
   it("migrator verbosity off", async () => {
     const lines: string[] = [];
-    const origLogger = Migration.logger;
-    Migration.logger = new Logger({ write: (s) => lines.push(s) });
+    const spy = vi.spyOn(stdout, "write").mockImplementation((chunk) => {
+      lines.push(chunk);
+      return true;
+    });
     try {
       const { migrations } = sensors(3);
 
@@ -465,7 +471,7 @@ describe("MigratorTest", () => {
       await downMigrator.migrate(0);
       expect(lines.length).toBe(0);
     } finally {
-      Migration.logger = origLogger;
+      spy.mockRestore();
     }
   });
 

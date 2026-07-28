@@ -1,6 +1,11 @@
 import { Command } from "commander";
-import { getFsAsync, getPathAsync, Logger } from "@blazetrails/activesupport";
-import { env, setExitCode, stdout } from "@blazetrails/activesupport/process-adapter";
+import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
+import {
+  env,
+  setExitCode,
+  getProcessAdapter,
+  registerProcessAdapter,
+} from "@blazetrails/activesupport/process-adapter";
 import {
   loadDatabaseConfig,
   loadAllDatabaseConfigs,
@@ -13,7 +18,6 @@ import { discoverMigrations } from "../migration-loader.js";
 import {
   DatabaseTasks,
   HashConfig,
-  Migration,
   Migrator,
   DatabaseAlreadyExists,
   NoDatabaseError,
@@ -583,17 +587,32 @@ async function withMigratorForDb(
     environment: ctx.config.envName,
     internalMetadataEnabled: ctx.config.useMetadataTable,
   });
-  const prevLogger = Migration.logger;
-  if (ctx.prefix) {
-    Migration.logger = new Logger({
-      write: (s) => stdout.write(`${ctx.prefix}${s}`),
+  // Migration output goes to stdout (Rails' Migration#write is `puts`), so the
+  // per-database prefix is applied by swapping in a stdout-wrapping process
+  // adapter for the duration of the run.
+  const prevAdapter = ctx.prefix ? getProcessAdapter() : null;
+  if (prevAdapter) {
+    registerProcessAdapter({
+      ...prevAdapter,
+      stdout: {
+        write: (chunk) => prevAdapter.stdout.write(`${ctx.prefix}${chunk}`),
+        get isTTY() {
+          return prevAdapter.stdout.isTTY;
+        },
+        get columns() {
+          return prevAdapter.stdout.columns;
+        },
+        get rows() {
+          return prevAdapter.stdout.rows;
+        },
+      },
     });
   }
   try {
     await operation(migrator);
     if (opts?.afterOutput) await opts.afterOutput(migrator);
   } finally {
-    Migration.logger = prevLogger;
+    if (prevAdapter) registerProcessAdapter(prevAdapter);
   }
   if (!opts?.skipDump) await dumpSchemaAfterMigrate(ctx.raw, ctx.config);
 }
