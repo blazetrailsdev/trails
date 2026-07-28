@@ -101,10 +101,11 @@ interface RubyEntity {
 
 /**
  * Mixins a host class gains at *runtime* via a gem's railtie
- * `ActiveSupport.on_load(:active_record)` block rather than a lexical `include`
- * in the host's own source. The static Ruby extractor only sees `include`s
- * written inside the class/module body, so a railtie-injected mixin never
- * lands in the host's `includes` array and its faithful TS ports look novel.
+ * `ActiveSupport.on_load(:active_record)` block rather than a lexical
+ * `include` in the host's own source. The static Ruby extractor only sees
+ * `include`s written inside the class/module body, so a railtie-injected mixin
+ * never lands in the host's `includes` array and its faithful TS ports look
+ * novel.
  *
  * `includes` are resolved against the *cross-package* module map (every
  * package's extracted modules), so a mixin defined in a different gem —
@@ -112,7 +113,7 @@ interface RubyEntity {
  * `ActiveRecord::Base` (activerecord package) by globalid's railtie — still
  * contributes its instance methods to the host's allowed set.
  */
-const AMBIENT_RAILTIE_MIXINS: Record<string, { includes?: string[] }> = {
+const AMBIENT_RAILTIE_MIXINS: Record<string, { includes: string[] }> = {
   "ActiveRecord::Base": {
     includes: ["GlobalID::Identification"],
   },
@@ -650,10 +651,7 @@ function collectAllowedNames(
     for (const inc of info.includes ?? []) walkMixin(inc, fqn);
     for (const ext of info.extends ?? []) walkMixin(ext, fqn);
 
-    const ambient = AMBIENT_RAILTIE_MIXINS[fqn];
-    if (ambient) {
-      for (const inc of ambient.includes ?? []) walkMixin(inc, fqn);
-    }
+    for (const inc of AMBIENT_RAILTIE_MIXINS[fqn]?.includes ?? []) walkMixin(inc, fqn);
 
     for (const name of PORTED_UNPORTED_MIXIN_METHODS[fqn] ?? []) addRubyName(name);
   }
