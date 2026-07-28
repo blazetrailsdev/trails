@@ -508,11 +508,11 @@ export interface AddIndexOptions {
   algorithm?: string;
 }
 
-export interface AddReferenceOptions extends ColumnOptions {
+export interface AddReferenceOptions extends Omit<ColumnOptions, "index"> {
   polymorphic?: boolean;
-  foreignKey?: boolean;
+  foreignKey?: boolean | ReferenceForeignKeyOptions;
   type?: ColumnType;
-  index?: boolean;
+  index?: boolean | AddIndexOptions;
   ifExists?: boolean;
   ifNotExists?: boolean;
 }
@@ -664,6 +664,18 @@ export interface ColumnMethods {
   ): unknown;
 }
 
+/** @internal */
+export interface ReferenceDefinitionConnection {
+  addColumn(
+    tableName: string,
+    columnName: string,
+    type: ColumnType,
+    options?: ColumnOptions,
+  ): Promise<void>;
+  addIndex(tableName: string, columnNames: string[], options?: AddIndexOptions): Promise<void>;
+  addForeignKey(fromTable: string, toTable: string, options?: AddForeignKeyOptions): Promise<void>;
+}
+
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::ReferenceDefinition
  */
@@ -686,7 +698,7 @@ export class ReferenceDefinition {
     } = {},
   ) {
     if (options.polymorphic && options.foreignKey) {
-      throw new Error("Cannot add a foreign key to a polymorphic relation");
+      throw new ArgumentError("Cannot add a foreign key to a polymorphic relation");
     }
     this.name = name;
     this.polymorphic = options.polymorphic ?? false;
@@ -699,6 +711,22 @@ export class ReferenceDefinition {
     this.type = options.type ?? "bigint";
     const { polymorphic: _, foreignKey: _fk, index: _idx, type: _t, ...rest } = options;
     this.options = rest;
+  }
+
+  async add(tableName: string, connection: ReferenceDefinitionConnection): Promise<void> {
+    for (const [colName, colType, colOpts] of this._columns()) {
+      await connection.addColumn(tableName, colName, colType, colOpts);
+    }
+    if (this.index) {
+      await connection.addIndex(tableName, this.columnNames(), this.indexOptions(tableName));
+    }
+    if (this.foreignKey) {
+      await connection.addForeignKey(
+        tableName,
+        this.foreignTableName(),
+        this.foreignKeyOptions() as AddForeignKeyOptions,
+      );
+    }
   }
 
   addTo(table: TableDefinition): void {

@@ -26,6 +26,8 @@ import {
   assertCompositeForeignKeyArity,
   type AddForeignKeyOptions,
   type AddIndexOptions,
+  type AddReferenceOptions,
+  ReferenceDefinition,
   type ColumnType,
   type ColumnOptions,
   type IdHashOptions,
@@ -698,55 +700,16 @@ export class SchemaStatements {
   async addReference(
     tableName: string,
     refName: string,
-    options: ColumnOptions & {
-      polymorphic?: boolean;
-      foreignKey?: boolean | { toTable?: string; column?: string };
-      type?: ColumnType;
-      index?: boolean;
-    } = {},
+    options: AddReferenceOptions = {},
   ): Promise<void> {
-    // Mirrors ReferenceDefinition#initialize (schema_definitions.rb:214-216):
-    // a foreign key can't target a polymorphic (type-tagged) reference.
-    if (options.polymorphic && options.foreignKey) {
-      throw new ArgumentError("Cannot add a foreign key to a polymorphic relation");
-    }
-    // Rails' ReferenceDefinition defaults `type: :bigint`
-    // (schema_definitions.rb:204), matching the default `bigint` primary key a
-    // referenced table gets — so a reference column lines up with the PK it
-    // points at.
-    const colType = options.type ?? "bigint";
-    await this.addColumn(tableName, `${refName}_id`, colType, options);
-    if (options.polymorphic) {
-      await this.addColumn(tableName, `${refName}_type`, "string", options);
-    }
-    if (options.index !== false) {
-      const cols = options.polymorphic ? [`${refName}_id`, `${refName}_type`] : [`${refName}_id`];
-      await this.addIndex(tableName, cols);
-    }
-    if (options.foreignKey) {
-      // Mirrors ReferenceDefinition#add: `connection.add_foreign_key(table_name,
-      // foreign_table_name, **foreign_key_options)`. foreign_table_name defaults
-      // to the pluralized reference name; foreign_key_options carries the
-      // `<ref>_id` column and, when `foreign_key:` is a hash, its `to_table`.
-      const fkOptions = typeof options.foreignKey === "object" ? options.foreignKey : {};
-      const toTable = (fkOptions as { toTable?: string }).toTable ?? pluralize(refName);
-      await this.addForeignKey(tableName, toTable, {
-        ...(fkOptions as Record<string, unknown>),
-        column: `${refName}_id`,
-      });
-    }
+    await new ReferenceDefinition(refName, options).add(tableName, this);
   }
 
   /** Alias of addReference (Rails: `alias :add_belongs_to :add_reference`). */
   async addBelongsTo(
     tableName: string,
     refName: string,
-    options: ColumnOptions & {
-      polymorphic?: boolean;
-      foreignKey?: boolean | { toTable?: string; column?: string };
-      type?: ColumnType;
-      index?: boolean;
-    } = {},
+    options: AddReferenceOptions = {},
   ): Promise<void> {
     return this.addReference(tableName, refName, options);
   }
