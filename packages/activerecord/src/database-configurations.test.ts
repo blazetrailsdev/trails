@@ -5,7 +5,7 @@ import { Base } from "./base.js";
 
 describe("DatabaseConfigurationsTest", () => {
   beforeEach(() => {
-    DatabaseConfigurations.defaultEnv = "development";
+    DatabaseConfigurations.defaultEnv = null;
   });
 
   // Rails' second assertion (`blank?`) is Object#blank?, an ActiveSupport
@@ -151,22 +151,50 @@ describe("DatabaseConfigurationsTest", () => {
   describe("currentEnv resolution", () => {
     afterEach(() => {
       vi.unstubAllEnvs();
+      DatabaseConfigurations.defaultEnv = null;
     });
 
     it("currentEnv prefers TRAILS_ENV over NODE_ENV", () => {
-      DatabaseConfigurations.defaultEnv = "development";
+      DatabaseConfigurations.defaultEnv = null;
       vi.stubEnv("TRAILS_ENV", "production");
       vi.stubEnv("NODE_ENV", "test");
       expect(DatabaseConfigurations.currentEnv()).toBe("production");
     });
 
     it("currentEnv falls back to NODE_ENV, then defaultEnv", () => {
-      DatabaseConfigurations.defaultEnv = "development";
+      DatabaseConfigurations.defaultEnv = null;
       vi.stubEnv("NODE_ENV", "staging");
       expect(DatabaseConfigurations.currentEnv()).toBe("staging");
 
       vi.stubEnv("NODE_ENV", undefined as unknown as string);
       expect(DatabaseConfigurations.currentEnv()).toBe("development");
+    });
+
+    it("forCurrentEnv follows an explicitly set defaultEnv over the process env", () => {
+      // Rails: DEFAULT_ENV.call is Rails.env → RAILS_ENV → RACK_ENV, so an
+      // app-supplied env outranks the process env. defaultEnv is our Rails.env
+      // analogue; before this it was the terminal fallback only, so setting it
+      // left forCurrentEnv reading NODE_ENV and findDbConfig's first pass —
+      // which is gated on forCurrentEnv — never matched a 3-level entry.
+      vi.stubEnv("NODE_ENV", "test");
+      DatabaseConfigurations.defaultEnv = "default_env";
+
+      const configs = DatabaseConfigurations.fromRaw({
+        default_env: {
+          readonly: { adapter: "sqlite3", database: "readonly.sqlite3" },
+          primary: { adapter: "sqlite3", database: "primary.sqlite3" },
+        },
+        another_env: {
+          readonly: { adapter: "sqlite3", database: "bad-readonly.sqlite3" },
+          primary: { adapter: "sqlite3", database: "bad-primary.sqlite3" },
+        },
+        common: { adapter: "sqlite3", database: "common.sqlite3" },
+      });
+
+      expect(DatabaseConfigurations.currentEnv()).toBe("default_env");
+      expect(configs.findDbConfig("primary")!.database).toBe("primary.sqlite3");
+      expect(configs.findDbConfig("readonly")!.database).toBe("readonly.sqlite3");
+      expect(configs.findDbConfig("common")!.database).toBe("common.sqlite3");
     });
 
     it("fromEnv builds the synthesized DATABASE_URL config under currentEnv", () => {
@@ -184,7 +212,7 @@ describe("DatabaseConfigurationsTest", () => {
     it("forCurrentEnv and fromEnv resolve the same env when TRAILS_ENV differs from defaultEnv", () => {
       // Regression: forCurrentEnv previously used defaultEnv while fromEnv() used
       // currentEnv(), so findDbConfig by DB name failed when TRAILS_ENV != defaultEnv.
-      DatabaseConfigurations.defaultEnv = "development";
+      DatabaseConfigurations.defaultEnv = null;
       vi.stubEnv("TRAILS_ENV", "production");
 
       const configs = DatabaseConfigurations.fromEnv({

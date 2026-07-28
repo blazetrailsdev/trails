@@ -38,6 +38,10 @@ type DbConfigHandler = (
 
 export class DatabaseConfigurations {
   private static _defaultEnv: string = "development";
+  // Analogue of `defined?(Rails.env)` in `ConnectionHandling::RAILS_ENV`: the
+  // initial "development" above is the built-in fallback, not an app-supplied
+  // env, so only an explicit assignment may outrank TRAILS_ENV / NODE_ENV.
+  private static _defaultEnvSet = false;
 
   /**
    * Mirrors: DatabaseConfigurations.db_config_handlers
@@ -64,16 +68,23 @@ export class DatabaseConfigurations {
   }
 
   /** @internal */
-  static set defaultEnv(value: string) {
+  static set defaultEnv(value: string | null) {
+    if (value === null) {
+      this._defaultEnv = "development";
+      this._defaultEnvSet = false;
+      return;
+    }
     this._defaultEnv = value;
+    this._defaultEnvSet = true;
   }
 
   /**
    * The active environment resolved from the process, mirroring Rails'
    * `ConnectionHandling::DEFAULT_ENV` / `RAILS_ENV` lambdas:
-   * `RAILS_ENV` → `RACK_ENV` → the configured default. Here `TRAILS_ENV` is
-   * the canonical runtime env (BC-2), `NODE_ENV` is the one-release fallback,
-   * and `defaultEnv` (the app-bootstrap / test override) is the terminal value.
+   * `Rails.env` → `RAILS_ENV` → `RACK_ENV` → the literal default. Here
+   * `defaultEnv` (the app-bootstrap / test override) is the `Rails.env`
+   * analogue and so wins when set, `TRAILS_ENV` is the canonical runtime env
+   * (BC-2), and `NODE_ENV` is the one-release fallback.
    *
    * Single source of truth for "what env are we building/connecting for" —
    * `fromEnv` (which builds the configs) and the runtime config selectors in
@@ -83,7 +94,12 @@ export class DatabaseConfigurations {
    * @internal
    */
   static currentEnv(): string {
-    return getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? DatabaseConfigurations.defaultEnv;
+    return (
+      (this._defaultEnvSet ? this._defaultEnv : "") ||
+      getEnv("TRAILS_ENV") ||
+      getEnv("NODE_ENV") ||
+      DatabaseConfigurations.defaultEnv
+    );
   }
 
   /**
@@ -488,7 +504,8 @@ DatabaseConfigurations.registerDbConfigHandler((envName, name, url, config) => {
 // forCurrentEnv must use the same resolver as fromEnv() so that findDbConfig by
 // DB name locates the config built for the active env. Mirrors Rails:
 // DatabaseConfig#for_current_env? and DatabaseConfigurations#build_configs both
-// call ConnectionHandling::DEFAULT_ENV.call (RAILS_ENV → RACK_ENV → "development").
+// call ConnectionHandling::DEFAULT_ENV.call
+// (Rails.env → RAILS_ENV → RACK_ENV → the literal default).
 _setDefaultEnvGetter(() => DatabaseConfigurations.currentEnv());
 
 // Register the primary checker so HashConfig.isPrimary can consult the
