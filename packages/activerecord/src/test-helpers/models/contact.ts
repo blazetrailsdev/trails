@@ -1,11 +1,6 @@
 // vendor/rails/activerecord/test/models/contact.rb
 import { Base } from "../../base.js";
-import type { FakeActiveRecordAdapter } from "../../support/fake-adapter.js";
-
-interface ColumnOptions {
-  default?: unknown;
-  null?: boolean;
-}
+import type { FakeActiveRecordAdapter, MergeColumnOptions } from "../../support/fake-adapter.js";
 
 type ContactFakeColumnsHost = typeof Base & { column: typeof column };
 
@@ -20,7 +15,7 @@ function column(
   this: typeof Base,
   name: string,
   sqlType: string | null = null,
-  options: ColumnOptions = {},
+  options: MergeColumnOptions = {},
 ): void {
   leaseConnection(this).mergeColumn(this.tableName, name, sqlType, options);
 }

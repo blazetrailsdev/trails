@@ -17,7 +17,7 @@ const FakeAdapterBase = AbstractAdapter as unknown as new () => Omit<
   "dataSources" | "primaryKey" | "columns" | "active"
 >;
 
-interface MergeColumnOptions {
+export interface MergeColumnOptions {
   default?: unknown;
   null?: boolean;
 }
