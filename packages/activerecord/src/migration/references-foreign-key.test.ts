@@ -5,6 +5,22 @@ import { fixtures } from "../test-helpers/fixtures.js";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { describeIfSupports, itIfSupports } from "../support/supports.js";
 import { assertQueriesCount } from "../testing/query-assertions.js";
+import { Base } from "../base.js";
+import { Migration } from "../migration.js";
+
+class CreateDogsMigration extends Migration {
+  write(): void {}
+
+  async change(): Promise<void> {
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await this.createTable("dog_owners");
+
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await this.createTable("dogs", (t) => {
+      t.references("dog_owner", { foreignKey: true });
+    });
+  }
+}
 
 async function withTestingTables(conn: AbstractAdapter, body: () => Promise<void>): Promise<void> {
   await conn.createTable("testing_parents", { force: true });
@@ -155,6 +171,81 @@ describeIfSupports("foreign_keys", "Migration", () => {
           ["testings", "testing_parents", "parent2_id"],
         ]);
       });
+    });
+
+    it("foreign key methods respect pluralize_table_names", async () => {
+      const conn = await ambientConnection();
+      const originalPluralizeTableNames = Base.pluralizeTableNames;
+      Base.pluralizeTableNames = false;
+      try {
+        await withTestingTables(conn, async () => {
+          await conn.createTable("testing");
+          await conn.changeTable("testing_parents", async (t) => {
+            await t.references("testing", { foreignKey: true });
+          });
+
+          const fk = (await conn.foreignKeys("testing_parents"))[0];
+          expect(fk.fromTable).toBe("testing_parents");
+          expect(fk.toTable).toBe("testing");
+
+          const before = (await conn.foreignKeys("testing_parents")).length;
+          await conn.removeReference("testing_parents", "testing", { foreignKey: true });
+          expect((await conn.foreignKeys("testing_parents")).length).toBe(before - 1);
+        });
+      } finally {
+        Base.pluralizeTableNames = originalPluralizeTableNames;
+        await conn.dropTable("testing", { ifExists: true });
+      }
+    });
+
+    it("remove_reference responds to if_exists option", async () => {
+      const conn = await ambientConnection();
+      await withTestingTables(conn, async () => {
+        await conn.createTable("testings");
+
+        await expect(
+          conn.removeReference("testings", "nonexistent", { foreignKey: true, ifExists: true }),
+        ).resolves.toBeUndefined();
+      });
+    });
+
+    it("add_reference responds to if_not_exists option", async () => {
+      const conn = await ambientConnection();
+      await withTestingTables(conn, async () => {
+        await conn.createTable("testings", (t) => {
+          t.references("testing", { foreignKey: true });
+        });
+
+        await expect(
+          conn.addReference("testings", "testing", { foreignKey: true, ifNotExists: true }),
+        ).resolves.toBeUndefined();
+      });
+    });
+
+    it("references foreign key with prefix", async () => {
+      const conn = await ambientConnection();
+      Base.tableNamePrefix = "p_";
+      const migration = new CreateDogsMigration();
+      try {
+        await migration.migrate("up");
+        expect((await conn.foreignKeys("p_dogs")).length).toBe(1);
+      } finally {
+        await migration.migrate("down");
+        Base.tableNamePrefix = "";
+      }
+    });
+
+    it("references foreign key with suffix", async () => {
+      const conn = await ambientConnection();
+      Base.tableNameSuffix = "_s";
+      const migration = new CreateDogsMigration();
+      try {
+        await migration.migrate("up");
+        expect((await conn.foreignKeys("dogs_s")).length).toBe(1);
+      } finally {
+        await migration.migrate("down");
+        Base.tableNameSuffix = "";
+      }
     });
   });
 

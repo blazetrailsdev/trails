@@ -4,8 +4,11 @@ import type { Column } from "../column.js";
 import { singularize, pluralize, getCrypto } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { SchemaDumper } from "../../schema-dumper.js";
-import { globalTableNamePrefix, globalTableNameSuffix } from "./table-name-options.js";
-import { Base } from "../../base.js";
+import {
+  globalPluralizeTableNames,
+  globalTableNamePrefix,
+  globalTableNameSuffix,
+} from "./table-name-options.js";
 
 /**
  * @internal Shared identifier guard for MySQL bare-identifier emission
@@ -806,7 +809,7 @@ export class ReferenceDefinition {
   /** @internal */
   private foreignTableName(): string {
     const fkOpts = this.foreignKeyOptions();
-    return fkOpts.toTable ?? (Base.pluralizeTableNames ? pluralize(this.name) : this.name);
+    return fkOpts.toTable ?? (globalPluralizeTableNames() ? pluralize(this.name) : this.name);
   }
 
   /** @internal */

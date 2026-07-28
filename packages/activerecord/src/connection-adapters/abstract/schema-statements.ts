@@ -45,7 +45,11 @@ import { singularize, pluralize, getCrypto, isPresent } from "@blazetrails/activ
 import { SchemaDumper } from "./schema-dumper.js";
 import { Utils as PgUtils } from "../postgresql/utils.js";
 import { indexes as sqliteIndexes } from "../sqlite3/schema-statements.js";
-import { globalTableNamePrefix, globalTableNameSuffix } from "./table-name-options.js";
+import {
+  globalPluralizeTableNames,
+  globalTableNamePrefix,
+  globalTableNameSuffix,
+} from "./table-name-options.js";
 
 export { assertSchemaAdapter } from "./assert-schema-adapter.js";
 
@@ -731,28 +735,30 @@ export class SchemaStatements {
     options: {
       polymorphic?: boolean;
       foreignKey?: boolean | { toTable?: string; column?: string };
+      ifExists?: boolean;
+      ifNotExists?: boolean;
     } = {},
   ): Promise<void> {
-    // Mirrors Rails remove_reference (schema_statements.rb): when `foreign_key`
-    // is given, drop the constraint BEFORE the column, otherwise MySQL/MariaDB
-    // refuses to drop the column's index while the FK still needs it. This is
-    // the inverse `add_reference ... foreign_key:` records (CommandRecorder
-    // passes the same args through), so it has to undo the FK the forward call
-    // created.
+    const conditionalOptions: { ifExists?: boolean; ifNotExists?: boolean } = {};
+    if (options.ifExists !== undefined) conditionalOptions.ifExists = options.ifExists;
+    if (options.ifNotExists !== undefined) conditionalOptions.ifNotExists = options.ifNotExists;
     if (options.foreignKey) {
       const fkOptions =
         typeof options.foreignKey === "object"
-          ? { ...options.foreignKey }
-          : { toTable: pluralize(refName) };
+          ? { ...options.foreignKey, ...conditionalOptions }
+          : {
+              toTable: globalPluralizeTableNames() ? pluralize(refName) : refName,
+              ...conditionalOptions,
+            };
       if ((fkOptions as { column?: string }).column == null) {
         (fkOptions as { column?: string }).column = `${refName}_id`;
       }
       await this.removeForeignKey(tableName, fkOptions);
     }
+    await this.removeColumn(tableName, `${refName}_id`, undefined, conditionalOptions);
     if (options.polymorphic) {
-      await this.removeColumn(tableName, `${refName}_type`);
+      await this.removeColumn(tableName, `${refName}_type`, undefined, conditionalOptions);
     }
-    await this.removeColumn(tableName, `${refName}_id`);
   }
 
   /** Alias of removeReference (Rails: `alias :remove_belongs_to :remove_reference`). */
@@ -762,6 +768,8 @@ export class SchemaStatements {
     options: {
       polymorphic?: boolean;
       foreignKey?: boolean | { toTable?: string; column?: string };
+      ifExists?: boolean;
+      ifNotExists?: boolean;
     } = {},
   ): Promise<void> {
     return this.removeReference(tableName, refName, options);
