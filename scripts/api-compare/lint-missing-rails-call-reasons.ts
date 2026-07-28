@@ -3,13 +3,12 @@
  * api:reasons — enforce the `@missingRailsCall` empty-reason contract in CI.
  *
  * `parseJsdoc` (build.ts) already rejects a bare or whitespace-only tag, but
- * its only caller is `api:build`, an opt-in developer command with no CI job:
- * a hand-authored bare tag can sit in the tree undetected until someone
- * happens to reconcile that file. This lint runs the SAME check over every
- * JSDoc block under `packages/<pkg>/src`, read-only and with no dependency on the
- * wide call-mismatch artifact, so the tag is gated like its sibling
- * `@noRailsEquivalent` (validated by `noRailsEquivalentReason` on every
- * `api:extra` / `api:compare` run).
+ * its only caller is `api:build`: an opt-in developer command with no CI job,
+ * which also needs the wide call-mismatch artifact and rewrites source files.
+ * This lint runs that same check over every JSDoc block under
+ * `packages/<pkg>/src` — read-only and artifact-free — so the tag is gated
+ * like its sibling `@noRailsEquivalent` (validated by `noRailsEquivalentReason`
+ * on every `api:extra` / `api:compare` run).
  *
  * Usage:
  *   pnpm api:reasons
@@ -27,39 +26,39 @@ const PACKAGES_DIR = path.join(ROOT_DIR, "packages");
 const SKIP_DIRS = new Set(["node_modules", "dist"]);
 const JSDOC_BLOCK = /\/\*\*[\s\S]*?\*\//g;
 
-/** Every `.ts` file under `<packages>/<pkg>/src`, sorted for stable output. */
+/** Every `.ts` file under `<packagesDir>/<pkg>/src`, sorted for stable output.
+ *  Includes `*.test.ts` (unlike the extractor's `getAllTsFiles`): the contract
+ *  is about what is committed, not about what api-compare measures. */
 export async function listSourceFiles(packagesDir: string): Promise<string[]> {
-  const walk = async (dir: string): Promise<string[]> => {
-    let entries;
-    try {
-      entries = await fs.readdir(dir, { withFileTypes: true });
-    } catch {
-      return [];
-    }
-    const found = await Promise.all(
-      entries.map(async (entry) => {
-        const abs = path.join(dir, entry.name);
-        if (entry.isDirectory()) return SKIP_DIRS.has(entry.name) ? [] : walk(abs);
-        return entry.name.endsWith(".ts") ? [abs] : [];
-      }),
-    );
-    return found.flat();
-  };
-  let pkgs;
+  let pkgs: string[];
   try {
-    pkgs = await fs.readdir(packagesDir, { withFileTypes: true });
+    pkgs = (await fs.readdir(packagesDir, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
   } catch {
     return [];
   }
   const perPackage = await Promise.all(
-    pkgs.filter((p) => p.isDirectory()).map((p) => walk(path.join(packagesDir, p.name, "src"))),
+    pkgs.map(async (pkg) => {
+      const srcDir = path.join(packagesDir, pkg, "src");
+      let names: string[];
+      try {
+        names = await fs.readdir(srcDir, { recursive: true });
+      } catch {
+        return [];
+      }
+      return names
+        .filter((name) => name.endsWith(".ts"))
+        .filter((name) => !name.split(path.sep).some((seg) => SKIP_DIRS.has(seg)))
+        .map((name) => path.join(srcDir, name));
+    }),
   );
   return perPackage.flat().sort();
 }
 
-/** Run `parseJsdoc`'s empty-reason check over one file's JSDoc blocks.
- *  Returns the (possibly empty) list of error messages — never throws, so one
- *  bad tag doesn't hide the rest. */
+/** Run `parseJsdoc`'s empty-reason check over one file's JSDoc blocks, and
+ *  return the resulting error messages. Each block is parsed independently so
+ *  one bare tag doesn't hide the rest of the file. */
 export function lintFileText(fileName: string, text: string): string[] {
   if (!text.includes(TAG)) return [];
   const errors: string[] = [];
@@ -78,13 +77,14 @@ export function lintFileText(fileName: string, text: string): string[] {
 
 export async function main(): Promise<number> {
   const files = await listSourceFiles(PACKAGES_DIR);
+  // Sequential: the tree is ~3k files, and fanning every read out at once
+  // risks EMFILE for no measurable win (the whole pass is ~1s).
   const errors: string[] = [];
   for (const abs of files) {
-    const text = await fs.readFile(abs, "utf-8");
-    errors.push(...lintFileText(path.relative(ROOT_DIR, abs), text));
+    errors.push(...lintFileText(path.relative(ROOT_DIR, abs), await fs.readFile(abs, "utf-8")));
   }
   if (errors.length > 0) {
-    for (const e of errors) console.error(`api:reasons: ${e}`);
+    for (const error of errors) console.error(`api:reasons: ${error}`);
     console.error(
       `api:reasons: ${errors.length} tag(s) without a reason — see the empty-reason ` +
         "contract in docs/infrastructure/api-build-stub-generation-plan.md.",
