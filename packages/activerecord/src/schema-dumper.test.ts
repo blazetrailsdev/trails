@@ -537,13 +537,7 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "mysql")(
     "schema dump includes length for mysql binary fields",
     async () => {
-      const adapter = Base.connection;
-      const testCtx = new MigrationContext(adapter);
-      await testCtx.createTable("binary_fields", { force: true }, (t) => {
-        t.binary("var_binary", { limit: 255 });
-        t.binary("var_binary_large", { limit: 4095 });
-      });
-      const output = await SchemaDumper.dumpTableSchema(adapter, "binary_fields");
+      const output = await SchemaDumper.dumpTableSchema(Base.connection, "binary_fields");
       expect(output).toMatch(/t\.binary\("var_binary", \{ limit: 255 \}\)/);
       expect(output).toMatch(/t\.binary\("var_binary_large", \{ limit: 4095 \}\)/);
     },
@@ -551,19 +545,7 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "mysql")(
     "schema dump includes length for mysql blob and text fields",
     async () => {
-      const bfAdapter = Base.connection;
-      const bfCtx = new MigrationContext(bfAdapter);
-      await bfCtx.createTable("binary_fields", { force: true }, (t) => {
-        t.binary("tiny_blob", { size: "tiny" });
-        t.binary("normal_blob");
-        t.binary("medium_blob", { size: "medium" });
-        t.binary("long_blob", { size: "long" });
-        t.text("tiny_text", { size: "tiny" });
-        t.text("normal_text");
-        t.text("medium_text", { size: "medium" });
-        t.text("long_text", { size: "long" });
-      });
-      const output = await SchemaDumper.dumpTableSchema(bfAdapter, "binary_fields");
+      const output = await SchemaDumper.dumpTableSchema(Base.connection, "binary_fields");
       expect(output).toMatch(/t\.binary\("tiny_blob", \{ size: "tiny" \}\)/);
       expect(output).toMatch(/t\.binary\("normal_blob"\)/);
       expect(output).toMatch(/t\.binary\("medium_blob", \{ size: "medium" \}\)/);
@@ -572,6 +554,12 @@ describe("SchemaDumperTest", () => {
       expect(output).toMatch(/t\.text\("normal_text"\)/);
       expect(output).toMatch(/t\.text\("medium_text", \{ size: "medium" \}\)/);
       expect(output).toMatch(/t\.text\("long_text", \{ size: "long" \}\)/);
+      expect(output).toMatch(/t\.binary\("tiny_blob_2", \{ size: "tiny" \}\)/);
+      expect(output).toMatch(/t\.binary\("medium_blob_2", \{ size: "medium" \}\)/);
+      expect(output).toMatch(/t\.binary\("long_blob_2", \{ size: "long" \}\)/);
+      expect(output).toMatch(/t\.text\("tiny_text_2", \{ size: "tiny" \}\)/);
+      expect(output).toMatch(/t\.text\("medium_text_2", \{ size: "medium" \}\)/);
+      expect(output).toMatch(/t\.text\("long_text_2", \{ size: "long" \}\)/);
     },
   );
   it.skipIf(adapterType !== "mysql")(
@@ -587,21 +575,7 @@ describe("SchemaDumperTest", () => {
     },
   );
   it.skipIf(adapterType !== "mysql")("schema dumps index type", async () => {
-    const ktAdapter = Base.connection;
-    const ktCtx = new MigrationContext(ktAdapter);
-    await ktCtx.createTable("key_tests", {}, (t) => {
-      t.string("awesome");
-      t.string("pizza");
-    });
-    await ktCtx.addIndex("key_tests", "awesome", {
-      type: "fulltext",
-      name: "index_key_tests_on_awesome",
-    });
-    await ktCtx.addIndex("key_tests", "pizza", {
-      using: "btree",
-      name: "index_key_tests_on_pizza",
-    });
-    const output = await SchemaDumper.dumpTableSchema(ktAdapter, "key_tests");
+    const output = await SchemaDumper.dumpTableSchema(Base.connection, "key_tests");
     expect(output).toContain(
       'addIndex("key_tests", "awesome", { name: "index_key_tests_on_awesome", type: "fulltext" })',
     );
@@ -1039,13 +1013,11 @@ afterAll(async () => {
   const ctx = new MigrationContext(Base.connection);
   const o = { ifExists: true } as const;
   await ctx.dropTable("bigint_array", o);
-  await ctx.dropTable("binary_fields", o);
   await ctx.dropTable("booleans", o);
   await ctx.dropTable("companies", o);
   await ctx.dropTable("dump_defaults", o);
   await ctx.dropTable("indexed", o);
   await ctx.dropTable("infinity_defaults", o);
-  await ctx.dropTable("key_tests", o);
   await ctx.dropTable("limits", o);
   await ctx.dropTable("myapp_posts", o);
   await ctx.dropTable("myapp_users", o);
