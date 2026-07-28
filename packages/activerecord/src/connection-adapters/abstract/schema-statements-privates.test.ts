@@ -571,6 +571,7 @@ describe("tableExists NotImplementedError fallback", () => {
     const ss = makeStatements({ quote: (v: string) => `'${v}'`, execute });
 
     expect(await ss.tableExists("")).toBe(false);
+    expect(await ss.tableExists("   ")).toBe(false);
     expect(execute).not.toHaveBeenCalled();
   });
 

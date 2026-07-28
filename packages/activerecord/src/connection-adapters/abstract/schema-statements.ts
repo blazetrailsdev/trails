@@ -39,7 +39,7 @@ import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { Column } from "../column.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { deduplicate } from "../deduplicable.js";
-import { singularize, pluralize, getCrypto } from "@blazetrails/activesupport";
+import { singularize, pluralize, getCrypto, isPresent } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
 import { Utils as PgUtils } from "../postgresql/utils.js";
 import { indexes as sqliteIndexes } from "../sqlite3/schema-statements.js";
@@ -588,9 +588,7 @@ export class SchemaStatements {
   }
 
   async tableExists(tableName: string): Promise<boolean> {
-    // Rails guards on `table_name.present?` and returns nil otherwise; the
-    // boolean return type makes that false here.
-    if (!tableName) return false;
+    if (!isPresent(tableName)) return false;
     try {
       // Rails' data_source_exists? embeds the table name via quote() — an escaped
       // SQL string literal, not raw interpolation (data_source_sql, schema_statements.rb).
@@ -617,8 +615,6 @@ export class SchemaStatements {
           );
           break;
         default:
-          // Rails' abstract data_source_sql raises NotImplementedError; the
-          // rescue arm below degrades to tables.include?.
           // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1890
           throw new NotImplementedError("#data_source_sql is not implemented");
       }
@@ -1467,8 +1463,6 @@ export class SchemaStatements {
         );
         return (rows as any[]).map((r: any) => r.name ?? r.TABLE_NAME);
       default:
-        // Rails' abstract #tables goes through data_source_sql, which raises
-        // NotImplementedError for an adapter that does not define it.
         // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1890
         throw new NotImplementedError("#tables is not implemented");
     }
