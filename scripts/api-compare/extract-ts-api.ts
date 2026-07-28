@@ -698,20 +698,21 @@ export function extractFromProgram(
 
       // Add constructor. The inner class is invisible to the top-level walker,
       // so its `constructor` reaches this entry only through the construct
-      // signature's declaration. When the inner class declares one in THIS
-      // file, that declaration IS the entry's member declaration and carries
-      // its JSDoc; otherwise (implicit constructor, or one inherited from a
-      // base in another file) there is no declaration here to read, and the
-      // entry stays bare — same reason foreign members above skip their tag.
+      // signature's declaration. Split the same way as the property loop
+      // above: visibility comes off whichever declaration the signature
+      // resolves to, near or foreign, while only the JSDoc reason is gated on
+      // the declaration living in THIS file. An implicit constructor resolves
+      // to no declaration at all, and that entry stays bare.
       if (constructSigs.length > 0) {
-        const ctorDecl = constructSigs[0].getDeclaration();
+        const sigDecl = constructSigs[0].getDeclaration();
+        const ctorDecl =
+          sigDecl !== undefined && ts.isConstructorDeclaration(sigDecl) ? sigDecl : undefined;
         const ownCtor =
           ctorDecl !== undefined &&
-          ts.isConstructorDeclaration(ctorDecl) &&
           path.relative(srcDir, ctorDecl.getSourceFile().fileName).replace(/\\/g, "/") === relPath
             ? ctorDecl
             : undefined;
-        const ctorVisibility = ownCtor !== undefined ? memberVisibility(ownCtor) : "public";
+        const ctorVisibility = ctorDecl !== undefined ? memberVisibility(ctorDecl) : "public";
         const ctorReason = ownCtor !== undefined ? noRailsEquivalentReason(ownCtor) : undefined;
         const ctorNode = ownCtor ?? node;
         mixinMethods.push({

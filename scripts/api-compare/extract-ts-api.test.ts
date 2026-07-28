@@ -1569,6 +1569,28 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     expect(ctor.internal).toBeUndefined();
   });
 
+  it("inherits a foreign base constructor's visibility onto the synthesized __mixin entry", () => {
+    const info = extractFromFiles("/p", {
+      "base.ts": `
+        export class Base {
+          protected constructor() {}
+        }
+      `,
+      "attributes.ts": `
+        import { Base } from "./base.js";
+        export function Attributes(B: typeof Base) {
+          class M extends B {}
+          return M;
+        }
+      `,
+    });
+    const ctor = info.modules["attributes.ts:Attributes__mixin"].instanceMethods.find(
+      (m) => m.name === "constructor",
+    )!;
+    expect(ctor.visibility).toBe("protected");
+    expect(ctor.internal).toBe(true);
+  });
+
   it("records the reason on tagged namespace members", () => {
     const info = extractFromFiles("/p", {
       "locator.ts": `
