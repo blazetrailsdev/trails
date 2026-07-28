@@ -190,15 +190,7 @@ export class SchemaCreation {
     return sql;
   }
 
-  /**
-   * @internal Mirrors Rails' `delegate :use_foreign_keys?, to: :@conn`
-   * (abstract/schema_creation.rb:17), whose connection-side definition is
-   * `supports_foreign_keys? && foreign_keys_enabled?` — the latter reading
-   * `@config.fetch(:foreign_keys, true)` (abstract/schema_statements.rb:1545,
-   * :1783). `this.adapter` is the real adapter here (schema-statements.ts
-   * builds the visitor with it), so read both halves off it. Duplicated by
-   * MySQL::SchemaCreation, which threads the adapter as `_hostAdapter`.
-   */
+  /** @internal */
   protected useForeignKeys(): boolean {
     const host = this.adapter as unknown as {
       supportsForeignKeys?: () => boolean;

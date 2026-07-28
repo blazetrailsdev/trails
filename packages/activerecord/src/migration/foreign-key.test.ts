@@ -645,8 +645,6 @@ describeIfSupports("foreign_keys", "Migration", () => {
     });
 
     it("does not create foreign keys when bypassed by config", async () => {
-      // Rails builds a `SQLite3Adapter` directly regardless of the adapter under
-      // test; trails' concrete SQLite adapter is BetterSQLite3Adapter.
       const connection = new BetterSQLite3Adapter(":memory:", { foreignKeys: false });
 
       try {
@@ -663,7 +661,6 @@ describeIfSupports("foreign_keys", "Migration", () => {
         const foreignKeys = await connection.foreignKeys("astronauts");
         expect(foreignKeys.length).toBe(0);
       } finally {
-        // Ruby GCs the adapter; a stray node handle would keep the suite alive.
         connection.disconnectBang();
       }
     });
@@ -698,10 +695,6 @@ describeIfSupports("foreign_keys", "Migration", () => {
             expect(message).toMatch(/Duplicate foreign key constraint name/);
           }
         } else {
-          // Rails matches `/PG::DuplicateObject: ERROR:.*for relation ... already
-          // exists/`; that prefix is the Ruby pg driver's exception class and
-          // severity tag, which node-postgres does not put in `message`, so only
-          // the server text is asserted.
           expect(message).toMatch(/for relation "astronauts" already exists/);
         }
       });
@@ -723,7 +716,6 @@ describeIfSupports("foreign_keys", "Migration", () => {
         const columnFor = async (tableName: string, columnName: string) =>
           (await conn.columns(tableName)).find((column) => column.name === columnName);
 
-        // Rails' `assert_no_changes -> { ... }, from: true`.
         expect((await columnFor("astronauts", "rocket_id"))?.isBigint()).toBe(true);
         await conn.addForeignKey("astronauts", "rockets");
         expect((await columnFor("astronauts", "rocket_id"))?.isBigint()).toBe(true);
