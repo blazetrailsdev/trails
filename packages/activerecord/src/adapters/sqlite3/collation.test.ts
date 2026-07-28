@@ -6,16 +6,14 @@ import "../../index.js";
 import { describeIfSqlite } from "./test-helper.js";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
-import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import type { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 
 let adapter: AbstractSQLite3Adapter;
 
 describeIfSqlite("SQLite3CollationTest", () => {
-  fixtures([], { useTransactionalTests: false });
+  fixtures([]);
 
-  // Rails `setup`: `@connection = ActiveRecord::Base.lease_connection`, then
-  // `create_table :collation_table_sqlite3, force: true`.
   beforeEach(async () => {
     adapter = (await Base.leaseConnection()) as unknown as AbstractSQLite3Adapter;
     await adapter.exec(`DROP TABLE IF EXISTS "collation_table_sqlite3"`);
@@ -28,8 +26,6 @@ describeIfSqlite("SQLite3CollationTest", () => {
   )`);
   });
 
-  // Rails `teardown`: drop_table :collation_table_sqlite3, if_exists: true.
-  // Required now that the ambient database outlives the test.
   afterEach(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS "collation_table_sqlite3"`).catch(() => undefined);
   });

@@ -6,19 +6,16 @@ import "../../index.js";
 import { describeIfSqlite } from "./test-helper.js";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
-import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import type { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 
 let adapter: AbstractSQLite3Adapter;
 
 describeIfSqlite("SQLite3VirtualTableTest", () => {
-  fixtures([], { useTransactionalTests: false });
+  fixtures([]);
 
-  // Rails `setup`: `@connection = ActiveRecord::Base.lease_connection`, then
-  // `create_virtual_table :searchables, :fts5, [...]`.
   beforeEach(async () => {
     adapter = (await Base.leaseConnection()) as unknown as AbstractSQLite3Adapter;
-    await adapter.dropTable("searchables", { ifExists: true });
     await adapter.createVirtualTable("searchables", "fts5", [
       "content",
       "meta UNINDEXED",
@@ -26,10 +23,11 @@ describeIfSqlite("SQLite3VirtualTableTest", () => {
     ]);
   });
 
-  // Rails `teardown`: drop_table :searchables, if_exists: true. Required now
-  // that the ambient database outlives the test.
   afterEach(async () => {
     await adapter.dropTable("searchables", { ifExists: true }).catch(() => undefined);
+    // Deviation: Rails' teardown drops only :searchables, leaking the :emails
+    // table "schema load" creates. Harmless there, not here — the ambient
+    // database is reused by every later suite on this worker.
     await adapter.dropTable("emails", { ifExists: true }).catch(() => undefined);
   });
 

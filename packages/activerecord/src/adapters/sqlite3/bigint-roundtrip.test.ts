@@ -4,7 +4,7 @@ import { describeIfSqlite } from "./test-helper.js";
 import { BigIntegerType, IntegerType, BooleanType } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
-import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import type { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 
 let adapter: AbstractSQLite3Adapter;
 const bigType = new BigIntegerType();
@@ -12,11 +12,10 @@ const intType = new IntegerType();
 const boolType = new BooleanType();
 
 describeIfSqlite("SQLite3 bigint round-trip", () => {
-  fixtures([], { useTransactionalTests: false });
+  fixtures([]);
 
   beforeEach(async () => {
     adapter = (await Base.leaseConnection()) as unknown as AbstractSQLite3Adapter;
-    await adapter.exec(`DROP TABLE IF EXISTS "big_items"`);
     await adapter.exec(`
     CREATE TABLE "big_items" (
       "id"     INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,7 +26,6 @@ describeIfSqlite("SQLite3 bigint round-trip", () => {
   `);
   });
 
-  // The ambient database outlives the test, so the ad-hoc table must be dropped.
   afterEach(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS "big_items"`).catch(() => undefined);
   });

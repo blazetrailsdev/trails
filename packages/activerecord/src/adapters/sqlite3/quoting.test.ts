@@ -6,21 +6,18 @@ import "../../index.js";
 import { describeIfSqlite } from "./test-helper.js";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
-import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import type { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 
 let adapter: AbstractSQLite3Adapter;
 
 // -- Rails test class: quoting_test.rb --
 describeIfSqlite("SQLite3QuotingTest", () => {
-  fixtures([], { useTransactionalTests: false });
+  fixtures([]);
 
-  // Rails `setup`: `@conn = ActiveRecord::Base.lease_connection`.
   beforeEach(async () => {
     adapter = (await Base.leaseConnection()) as unknown as AbstractSQLite3Adapter;
   });
 
-  // The ambient database outlives the test, so every ad-hoc table each case
-  // creates has to be dropped by name (SQLite has no multi-table DROP).
   afterEach(async () => {
     await adapter
       .exec(

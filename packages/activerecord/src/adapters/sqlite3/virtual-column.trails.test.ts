@@ -3,7 +3,7 @@ import "../../index.js";
 import { describeIfSqlite } from "./test-helper.js";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
-import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import type { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import type { Column } from "../../connection-adapters/sqlite3/column.js";
 
 let adapter: AbstractSQLite3Adapter;
@@ -13,7 +13,7 @@ let adapter: AbstractSQLite3Adapter;
 // but PRAGMA table_info hides them — a table_info-sourced rebuild silently
 // drops every pre-existing generated column.
 describeIfSqlite("SQLite3VirtualColumnTest trails extras", () => {
-  fixtures([], { useTransactionalTests: false });
+  fixtures([]);
 
   beforeEach(async () => {
     adapter = (await Base.leaseConnection()) as unknown as AbstractSQLite3Adapter;
@@ -26,7 +26,6 @@ describeIfSqlite("SQLite3VirtualColumnTest trails extras", () => {
     );
   });
 
-  // The ambient database outlives the test, so the ad-hoc table must be dropped.
   afterEach(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS "virtual_columns"`).catch(() => undefined);
   });
