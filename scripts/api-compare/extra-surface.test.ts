@@ -1042,12 +1042,12 @@ describe("buildReport — novel vs moved classification", () => {
     expect(f!.extras.map((e) => e.name)).toContain("unportedMethod");
   });
 
-  it("folds a ported mirror of an unported mixin method back into allowed (PORTED_UNPORTED_MIXIN_METHODS)", () => {
+  it("folds a ported mirror of an unported mixin method back into allowed (PORTED_METHODS_FROM_UNPORTED_MIXINS)", () => {
     // ActiveRecord::AssociationNotFoundError `include DidYouMean::Correctable`,
     // whose source (core_ext/name_error.rb) is unported — so walkMixin skips it
     // and `detailedMessage` would show as a "moved" extra. We ported
     // detailed_message inline (associations/errors.ts), so
-    // PORTED_UNPORTED_MIXIN_METHODS must fold it back into allowed while a
+    // PORTED_METHODS_FROM_UNPORTED_MIXINS must fold it back into allowed while a
     // genuinely-extra name stays flagged.
     const ruby: ApiManifest = {
       source: "ruby",
@@ -1111,7 +1111,7 @@ describe("buildReport — novel vs moved classification", () => {
     // on_load(:action_controller) { include … }); its source
     // controller_runtime.rb is unported, so the ported process_action /
     // cleanup_view_runtime / append_info_to_payload mirrors would show as moved
-    // extras without the PORTED_UNPORTED_MIXIN_METHODS["ActiveRecord::Railtie"]
+    // extras without the PORTED_METHODS_FROM_UNPORTED_MIXINS["ActiveRecord::Railtie"]
     // fold-back. Guards the exact host FQN + method names against a typo.
     const ruby: ApiManifest = {
       source: "ruby",

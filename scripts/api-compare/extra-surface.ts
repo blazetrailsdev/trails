@@ -143,7 +143,7 @@ const AMBIENT_RAILTIE_MIXINS: Record<string, { includes: string[] }> = {
  *     machinery with no JS analog). Keyed on one host class since `allowed` is
  *     unioned per-file across every entity in errors.rb.
  */
-const PORTED_UNPORTED_MIXIN_METHODS: Record<string, string[]> = {
+const PORTED_METHODS_FROM_UNPORTED_MIXINS: Record<string, string[]> = {
   "ActiveRecord::Railtie": ["process_action", "cleanup_view_runtime", "append_info_to_payload"],
   "ActiveRecord::AssociationNotFoundError": ["detailed_message"],
 };
@@ -653,7 +653,7 @@ function collectAllowedNames(
 
     for (const inc of AMBIENT_RAILTIE_MIXINS[fqn]?.includes ?? []) walkMixin(inc, fqn);
 
-    for (const name of PORTED_UNPORTED_MIXIN_METHODS[fqn] ?? []) addRubyName(name);
+    for (const name of PORTED_METHODS_FROM_UNPORTED_MIXINS[fqn] ?? []) addRubyName(name);
   }
   return allowed;
 }
