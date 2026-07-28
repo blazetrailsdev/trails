@@ -124,13 +124,8 @@ export async function dbMigrate(cwd: string, args: string[]): Promise<number> {
   loadMigrations(cwd);
 
   const version = flagValue(args, "--version");
-  const env = DatabaseTasks.env;
-  if (DatabaseTasks.configsFor(env).length === 0) {
-    console.error(`ar: no database configuration found for environment "${env}"`);
-    return 1;
-  }
   try {
-    await DatabaseTasks.withTemporaryPoolForEach(env, async () => {
+    await DatabaseTasks.withTemporaryPoolForEach(DatabaseTasks.env, async () => {
       await DatabaseTasks.migrate(version);
     });
     return 0;

@@ -304,8 +304,6 @@ export class DatabaseTasks {
     };
 
     const pool = await this.migrationConnectionPool();
-    if (!pool) throw new ConnectionNotDefined("No connection pool for the migration connection");
-
     if (!skipInitialize) await initializeDatabase(pool.dbConfig);
     await runMigration(await pool.leaseConnection());
   }
@@ -1154,11 +1152,8 @@ export class DatabaseTasks {
     }
   }
 
-  static async migrationConnectionPool(): Promise<ConnectionPool | null> {
-    const { Base } = await import("../base.js");
-    this._baseClass = Base;
-    const fn = (Base as unknown as { connectionPool?: () => ConnectionPool }).connectionPool;
-    return fn ? fn.call(Base) : null;
+  static async migrationConnectionPool(): Promise<ConnectionPool> {
+    return (await this.migrationClass()).connectionPool();
   }
 
   static async schemaUpToDate(
