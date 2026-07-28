@@ -2806,11 +2806,17 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       if (!cols.length) continue;
       const escapedFrom = bareFrom.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const newName = name.replace(new RegExp(`(^|_)(${escapedFrom})_`), `$1${bareTo}_`);
-      // Rails forwards `index.orders` to add_index, which keys the direction off
-      // the column name as it appears in the copied list.
+      // Rails forwards `index.orders` to add_index, whose add_index_sort_order
+      // appends any present direction upcased (`column << " #{orders[name].upcase}"`)
+      // keyed off the column name as it appears in the copied list. This
+      // hand-built CREATE INDEX stands in for add_index, so it must stay
+      // value-agnostic: `indexes()` only records "desc" today, but an "asc" or
+      // upper-cased entry must not be silently dropped.
       const orders = idx.orders ?? {};
       const colSql = Array.isArray(cols)
-        ? cols.map((c) => `${quoteColumnName(c)}${orders[c] === "desc" ? " DESC" : ""}`).join(", ")
+        ? cols
+            .map((c) => `${quoteColumnName(c)}${orders[c] ? ` ${orders[c].toUpperCase()}` : ""}`)
+            .join(", ")
         : cols;
       let sql = `CREATE ${idx.unique ? "UNIQUE " : ""}INDEX ${quoteColumnName(newName)} ON ${quoteTableName(to)} (${colSql})`;
       if (idx.where) sql += ` WHERE ${idx.where}`;

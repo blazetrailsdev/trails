@@ -12,7 +12,7 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   const dropCopyTargets = async (): Promise<void> => {
     if (db === undefined) return;
     await db.exec(
-      `DROP TABLE IF EXISTS customers2; DROP TABLE IF EXISTS customers3; DROP TABLE IF EXISTS books2; DROP TABLE IF EXISTS "_alter_tmp_customers2"; DROP INDEX IF EXISTS index_customers_on_name`,
+      `DROP TABLE IF EXISTS customers2; DROP TABLE IF EXISTS customers3; DROP TABLE IF EXISTS books2; DROP TABLE IF EXISTS "_alter_tmp_customers2"`,
     );
   };
 
@@ -79,6 +79,7 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   });
 
   it("copyTableIndexes carries the index column orders across", async () => {
+    // Rolled back with the fixture transaction; no teardown needed.
     await db.addIndex("customers", ["name"], { order: { name: "desc" } });
     await (db as any).copyTable("customers", "customers2");
     expect(await copiedIndexSql("customers2", "name")).toMatch(/"name"\s+DESC/i);
