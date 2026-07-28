@@ -498,7 +498,8 @@ export default defineConfig(
 
   // ── require-canonical-rebuild: a test file that drops a canonical table
   //    (a TEST_SCHEMA key) must restore it in the same file, via
-  //    rebuildCanonicalTables()/loadCanonicalSchema(). A canonical table left
+  //    rebuildCanonicalTables() (support/canonical-table-rebuild.ts) or
+  //    loadCanonicalSchema() (support/canonical-schema.ts). A canonical table left
   //    dropped drifts the shared per-worker database for the next file.
   //    test-helpers/** is exempt — the canonical loaders are its subject under
   //    test. See eslint/require-canonical-rebuild.mjs. ──
@@ -552,7 +553,8 @@ export default defineConfig(
   },
 
   // ── no-internal-canonical-loaders: a *.test.ts must not import the internal
-  //    canonical-schema loaders (ensureCanonicalTables, loadCanonicalSchema)
+  //    canonical loaders (loadCanonicalSchema in support/canonical-schema.ts,
+  //    ensureCanonicalTables in support/canonical-table-rebuild.ts)
   //    directly — wire the canonical schema + fixtures through `fixtures({ ... })`.
   //    rebuildCanonicalTables is intentionally allowed (documented shared shield).
   //    Only canonical-schema.test.ts / canonical-table-rebuild.test.ts may

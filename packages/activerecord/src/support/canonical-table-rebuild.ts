@@ -16,14 +16,12 @@
  */
 
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import type { TableDefinition } from "../connection-adapters/abstract/schema-definitions.js";
 import {
   buildCanonicalRegistry,
+  canonicalForeignKeyDependents,
   prepareSchema,
   runTable,
-  TableBuilder,
 } from "./canonical-schema.js";
-import { COLUMN_TYPE_MAP_SQLITE } from "./schema-types.js";
 
 /** Minimal slice of the schema-statement surface {@link fkSafeDropPlan} needs. */
 export interface FkSafeDropPlanHost {
@@ -262,32 +260,6 @@ export function bulkInboundFkHost(
 }
 
 /**
- * Map of referenced table -> tables whose definition declares a foreign key into
- * it. Built by replaying each table's block against a probe TableDefinition that
- * records `foreignKey` calls and discards columns, so the edges come from the
- * one declaration site rather than a hand-maintained second list.
- */
-let _dependents: Map<string, string[]> | null = null;
-
-async function foreignKeyDependents(): Promise<Map<string, string[]>> {
-  if (_dependents) return _dependents;
-  const dependents = new Map<string, string[]>();
-  for (const def of await buildCanonicalRegistry()) {
-    const probe = {
-      column: () => {},
-      foreignKey: (toTable: string) => {
-        const children = dependents.get(toTable) ?? [];
-        children.push(def.name);
-        dependents.set(toTable, children);
-      },
-    } as unknown as TableDefinition;
-    def.fn(new TableBuilder(probe, "sqlite", COLUMN_TYPE_MAP_SQLITE, null, null));
-  }
-  _dependents = dependents;
-  return dependents;
-}
-
-/**
  * Drop and recreate a named subset of canonical tables, restoring each to its
  * full canonical shape — the `create_table`-based equivalent of
  * `defineSchema({ …subset }, { dropExisting: true })`. Test files use it as an
@@ -312,7 +284,7 @@ export async function rebuildCanonicalTables(
   // A table nobody asked for still has to be rebuilt when it holds a foreign key
   // into one that was: MySQL refuses to drop a table a live FK points at, and PG
   // would cascade the constraint away silently.
-  const dependents = await foreignKeyDependents();
+  const dependents = await canonicalForeignKeyDependents();
   const queue = [...wanted];
   for (const name of queue) {
     for (const child of dependents.get(name) ?? []) {

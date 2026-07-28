@@ -74,7 +74,7 @@ const rule = {
     schema: [],
     messages: {
       banned:
-        "`{{name}}` is internal canonical-schema plumbing — do not import it into a test file. Wire the canonical schema + fixtures through the `fixtures({ ... })` helper instead. (Only `canonical-schema.test.ts` may import it, to test it directly.)",
+        "`{{name}}` is internal canonical-schema plumbing — do not import it into a test file. Wire the canonical schema + fixtures through the `fixtures({ ... })` helper instead. (Only the loaders' own unit tests — `canonical-schema.test.ts`, `canonical-table-rebuild.test.ts` — may import it, to test it directly.)",
     },
   },
 

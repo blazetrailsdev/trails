@@ -68,11 +68,8 @@ interface IndexOpts {
  * declared offset, composite-PK NOT NULL, and the MySQL `DATETIME(6)` upgrade —
  * so the resulting DDL is identical. Indexes are collected and applied after the
  * table is created (with the same expression-index / MySQL-length gating).
- *
- * @internal Also consumed by `canonical-table-rebuild.ts`, which replays a
- * table's block against a probe TableDefinition to read its declared FK edges.
  */
-export class TableBuilder {
+class TableBuilder {
   readonly indexes: { columns: string | string[]; opts: IndexOpts }[] = [];
 
   constructor(
@@ -226,7 +223,7 @@ export async function emitTableIndexes(
  *  column/index builder block. Pure data (no adapter, no DDL), so a named subset
  *  can be dropped and recreated on demand (see `rebuildCanonicalTables` in
  *  `canonical-table-rebuild.ts`). */
-export interface CanonicalTableDef {
+interface CanonicalTableDef {
   name: string;
   meta: TableMeta;
   fn: (t: TableBuilder) => void;
@@ -2109,4 +2106,35 @@ export async function loadCanonicalSchema(adapter: DatabaseAdapter): Promise<voi
   // create_table/drop_table clear the connection's prepared statements in Rails;
   // mirror that so PostgreSQL doesn't reuse a stale cached plan (0A000).
   (adapter as { clearCacheBang?: () => void }).clearCacheBang?.();
+}
+
+/**
+ * Map of referenced table -> tables whose definition declares a foreign key into
+ * it. Built by replaying each table's block against a probe TableDefinition that
+ * records `foreignKey` calls and discards columns, so the edges come from the
+ * one declaration site rather than a hand-maintained second list.
+ *
+ * @internal Read by `canonical-table-rebuild.ts` to widen a drop set. It lives
+ * here, next to the registry it replays, so `TableBuilder` stays file-local:
+ * exporting the class would publish all fifteen of its `t.<type>()` members as
+ * extra TS surface just to let a sibling module construct one throwaway probe.
+ */
+let _dependents: Map<string, string[]> | null = null;
+
+export async function canonicalForeignKeyDependents(): Promise<Map<string, string[]>> {
+  if (_dependents) return _dependents;
+  const dependents = new Map<string, string[]>();
+  for (const def of await buildCanonicalRegistry()) {
+    const probe = {
+      column: () => {},
+      foreignKey: (toTable: string) => {
+        const children = dependents.get(toTable) ?? [];
+        children.push(def.name);
+        dependents.set(toTable, children);
+      },
+    } as unknown as TableDefinition;
+    def.fn(new TableBuilder(probe, "sqlite", COLUMN_TYPE_MAP_SQLITE, null, null));
+  }
+  _dependents = dependents;
+  return dependents;
 }
