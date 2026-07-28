@@ -55,11 +55,6 @@ describeIfSqlite("SQLite3QuotingTest", () => {
   });
 
   it("quote table name", async () => {
-    // The rule's raw-SQL name scanner stops at the space inside the quoted
-    // identifier and records this table as `my`, which no drop can match. The
-    // afterEach drops the real name; story `require-table-teardown-quoted-name`
-    // fixes the scanner.
-    // eslint-disable-next-line blazetrails/require-table-teardown
     await adapter.exec(`CREATE TABLE "my table" ("id" INTEGER PRIMARY KEY)`);
     const rows = await adapter.execute(`SELECT * FROM "my table"`);
     expect(rows).toHaveLength(0);
