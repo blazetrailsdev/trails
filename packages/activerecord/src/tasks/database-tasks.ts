@@ -199,7 +199,7 @@ export class DatabaseTasks {
     }
     // Rails: re-establish connection to the original config after all creates.
     if (originalConfig !== null) {
-      await Base.establishConnection(originalConfig.configuration as Record<string, unknown>);
+      await Base.establishConnection(originalConfig);
     }
   }
 
@@ -1501,21 +1501,18 @@ function _isSQLiteMemoryDatabase(database: string): boolean {
 
 // Mirrors Rails' SQLiteDatabaseTasks#initialize: resolve relative `database`
 // paths against root so all withTemporaryPool callers behave consistently.
-// The rewrite is applied to the config OBJECT in place, through Rails'
-// `DatabaseConfig#_database=` (which exists so tasks can swap the database
-// without minting a new config). Returning a new config instead would break
-// `ConnectionHandler#establishConnection`'s reference-equality reuse check,
-// so a temporary pool over a relative sqlite path would replace — and
-// disconnect — the ambient pool.
-function _normalizeSQLitePath(config: DatabaseConfig, root: string): DatabaseConfig {
+// Rewrites the config OBJECT in place (Rails' `DatabaseConfig#_database=`):
+// returning a new config would break `ConnectionHandler#establishConnection`'s
+// reference-equality reuse check, so a temporary pool over a relative sqlite
+// path would replace — and disconnect — the ambient pool.
+function _normalizeSQLitePath(config: DatabaseConfig, root: string): void {
   const adapter = config.adapter;
-  if (typeof adapter !== "string" || !adapter.includes("sqlite")) return config;
+  if (typeof adapter !== "string" || !adapter.includes("sqlite")) return;
   const database = config.database;
-  if (typeof database !== "string" || _isSQLiteMemoryDatabase(database)) return config;
+  if (typeof database !== "string" || _isSQLiteMemoryDatabase(database)) return;
   const p = getPath();
-  if (!p.isAbsolute || p.isAbsolute(database)) return config;
+  if (!p.isAbsolute || p.isAbsolute(database)) return;
   config._database = p.resolve(root, database);
-  return config;
 }
 
 // Defensive fallback for SQL-level errors that slip through pool proxies or

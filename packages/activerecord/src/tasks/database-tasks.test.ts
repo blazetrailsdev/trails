@@ -9,6 +9,7 @@ import { DatabaseConfigurations } from "../database-configurations.js";
 import { NoEnvironmentInSchemaError, ProtectedEnvironmentError } from "../migration.js";
 import { SchemaMigration } from "../schema-migration.js";
 import { Base } from "../base.js";
+import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { adapterType, ambientPoolConfiguration } from "../test-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { fixtures } from "../test-helpers/fixtures.js";
@@ -557,8 +558,6 @@ describe("DatabaseTasksDropAllTest", () => {
       development: { adapter: "sqlite3", database: "dev.db", host: "127.0.0.1" },
     });
     await DatabaseTasks.dropAll();
-    // Resolved: checkProtectedEnvironmentsBang runs the config through
-    // withTemporaryConnection, which resolves relative sqlite paths in place.
     expect(dropped).toContain(path.resolve(DatabaseTasks.root, "dev.db"));
   });
 
@@ -567,8 +566,6 @@ describe("DatabaseTasksDropAllTest", () => {
       development: { adapter: "sqlite3", database: "dev.db", host: "localhost" },
     });
     await DatabaseTasks.dropAll();
-    // Resolved: checkProtectedEnvironmentsBang runs the config through
-    // withTemporaryConnection, which resolves relative sqlite paths in place.
     expect(dropped).toContain(path.resolve(DatabaseTasks.root, "dev.db"));
   });
 
@@ -577,8 +574,6 @@ describe("DatabaseTasksDropAllTest", () => {
       development: { adapter: "sqlite3", database: "dev.db", host: "" },
     });
     await DatabaseTasks.dropAll();
-    // Resolved: checkProtectedEnvironmentsBang runs the config through
-    // withTemporaryConnection, which resolves relative sqlite paths in place.
     expect(dropped).toContain(path.resolve(DatabaseTasks.root, "dev.db"));
   });
 });
@@ -1313,9 +1308,6 @@ describe("DatabaseTasksWithTemporaryPoolTest", () => {
   });
 
   it("reuses the ambient pool for a relative sqlite path", async () => {
-    // Path normalization must not cost config identity: the handler's reuse
-    // check is reference equality on the DatabaseConfig
-    // (connection-handler.ts, existingPoolConfig.dbConfig === poolConfig.dbConfig).
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-temp-pool-"));
     const previousRoot = DatabaseTasks.root;
     DatabaseTasks.root = tmp;
@@ -1327,7 +1319,7 @@ describe("DatabaseTasksWithTemporaryPoolTest", () => {
     try {
       await Base.establishConnection(config);
       const ambientPool = Base.connectionPool();
-      let temporaryPool: unknown = null;
+      let temporaryPool: ConnectionPool | null = null;
       await DatabaseTasks.withTemporaryPool(config, async (pool) => {
         temporaryPool = pool;
       });
