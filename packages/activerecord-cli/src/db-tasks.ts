@@ -124,8 +124,20 @@ export async function dbMigrate(cwd: string, args: string[]): Promise<number> {
   loadMigrations(cwd);
 
   const version = flagValue(args, "--version");
+  const configs = DatabaseTasks.configsFor(DatabaseTasks.env);
+  if (configs.length === 0) {
+    console.error(`ar: no database configuration found for environment "${DatabaseTasks.env}"`);
+    return 1;
+  }
+  const config = configs.find((c) => c.name === "primary") ?? configs[0];
   try {
-    await DatabaseTasks.migrate(version);
+    // `migrate` routes through the migration connection pool (Rails
+    // tasks/database_tasks.rb:262-283), so the caller picks the database —
+    // mirroring `with_temporary_connection(db_config) { migrate(...) }` in
+    // `migrate_all` (:254).
+    await DatabaseTasks.withTemporaryPool(config, async () => {
+      await DatabaseTasks.migrate(version);
+    });
     return 0;
   } catch (err) {
     console.error(`ar: db:migrate failed — ${String(err)}`);

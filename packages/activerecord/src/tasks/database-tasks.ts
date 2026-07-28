@@ -269,12 +269,6 @@ export class DatabaseTasks {
     const effectiveVersion = typeof raw === "string" ? raw.trim() || null : raw;
     this.checkTargetVersion(effectiveVersion ?? undefined);
 
-    if (!this.databaseConfiguration) return;
-    const configs = this.configsFor(this._normalizeEnv());
-    if (configs.length === 0) return;
-
-    const config = configs.find((c) => c.name === "primary") ?? configs[0];
-
     const { Migrator, Migration } = await import("../migration.js");
     const scope = getEnv("SCOPE");
     const verbose = isVerbose();
@@ -309,37 +303,19 @@ export class DatabaseTasks {
       adapter.schemaCache?.clear();
     };
 
-    // Pool path: check whether the Base pool is connected to this config's database.
-    // When pool and config point to different known databases (multi-db scenario),
-    // route through withTemporaryConnection so the owned adapter is properly closed.
-    // "database unknown on either side" means a URL-only config or no database
-    // restriction — treat as matching so the established pool is reused.
-    const { Base } = await import("../base.js");
-    this._baseClass = Base;
-    let pool: ConnectionPool | undefined;
-    try {
-      pool = Base.connectionPool();
-    } catch (error) {
-      if (!(error instanceof ConnectionNotDefined)) throw error;
-      // No pool — fall through to withTemporaryConnection.
-    }
-    // Use the pool when: pool is present AND databases are equal, or either side
-    // is unknown (URL-only config / pool established without an explicit database).
-    if (
-      pool &&
-      (!pool.dbConfig.database || !config.database || config.database === pool.dbConfig.database)
-    ) {
-      // Rails: `initialize_database(migration_connection_pool.db_config)`
-      // (tasks/database_tasks.rb:268) — the pool's OWN config object, so the
-      // temporary pool it opens resolves to the established pool rather than a
-      // second one.
-      if (!skipInitialize) await initializeDatabase(pool.dbConfig);
-      await runMigration(await pool.leaseConnection());
-    } else {
-      // Multi-db or no pool: withTemporaryConnection scopes the adapter lifecycle.
-      if (!skipInitialize) await initializeDatabase(config);
-      await this.withTemporaryConnection(config, runMigration);
-    }
+    // Rails routes solely through `migration_connection_pool`
+    // (tasks/database_tasks.rb:262-283): no configurations lookup, no early
+    // return, and no comparison of the config's database to the pool's. The
+    // caller (`with_temporary_connection`, `db_configs_with_versions`) is what
+    // selects which database gets migrated.
+    const pool = await this.migrationConnectionPool();
+    if (!pool) throw new ConnectionNotDefined("No connection pool for the migration connection");
+
+    // Rails: `initialize_database(migration_connection_pool.db_config)` — the
+    // pool's OWN config object, so the temporary pool it opens resolves to the
+    // established pool rather than a second one.
+    if (!skipInitialize) await initializeDatabase(pool.dbConfig);
+    await runMigration(await pool.leaseConnection());
   }
 
   /** Roll back the last N migrations (default 1). Mirrors `db:rollback`. */
