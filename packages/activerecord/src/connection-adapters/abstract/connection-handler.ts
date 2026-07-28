@@ -355,6 +355,9 @@ export class ConnectionHandler {
     options?: { adapterFactory?: () => DatabaseAdapter },
   ): PoolConfig {
     const dbConfig = baseConfigurations().resolve(config);
+    // Rails calls db_config.validate! here (connection_handler.rb:277). Ours is
+    // async (it awaits adapterClass()) and this path is sync, so the adapter
+    // guard below stands in until establishConnection can await.
     if (!dbConfig.adapter) {
       throw new AdapterNotSpecified("database configuration does not specify adapter");
     }

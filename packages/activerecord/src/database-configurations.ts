@@ -55,7 +55,10 @@ let _configurations: DatabaseConfigurations | undefined;
 
 /** @internal */
 export function configurationsStore(): DatabaseConfigurations {
-  return _configurations ?? DatabaseConfigurations.fromEnv({});
+  // Memoized on first read so `Base.configurations` holds one object, as Rails'
+  // @@configurations attribute does: save/restore round-trips must be no-ops.
+  _configurations ??= DatabaseConfigurations.fromEnv({});
+  return _configurations;
 }
 
 /** @internal */

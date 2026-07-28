@@ -51,6 +51,7 @@ describe("ConnectionHandlerTest", () => {
       },
       common: { adapter: "sqlite3", database: "test/db/common.sqlite3" },
     };
+    const prevEnv = DatabaseConfigurations.defaultEnv;
     DatabaseConfigurations.defaultEnv = "default_env";
     const prevConfigs = Base.configurations();
     Base.configurations(config);
@@ -73,6 +74,7 @@ describe("ConnectionHandlerTest", () => {
       expect(commonPool!.dbConfig.database).toBe("test/db/common.sqlite3");
     } finally {
       Base.configurations(prevConfigs);
+      DatabaseConfigurations.defaultEnv = prevEnv;
     }
   });
 
