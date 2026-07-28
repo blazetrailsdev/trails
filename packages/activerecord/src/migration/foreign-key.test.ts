@@ -2,7 +2,7 @@
  * Port of the `add_foreign_key`, `remove_foreign_key` and `SchemaDumpingHelper`
  * halves of `ActiveRecord::Migration::ForeignKeyTest`
  * (vendor/rails/activerecord/test/cases/migration/foreign_key_test.rb:209-330,
- * :393-451, :524-619, :643-747 and :749-773) plus all of its sibling
+ * :393-451, :536-619, :643-747 and :749-773) plus all of its sibling
  * `ActiveRecord::Migration::CompositeForeignKeyTest` (:824-912).
  *
  * Driven by the ambient connection, mirroring Rails'
@@ -504,7 +504,6 @@ describeIfSupports("foreign_keys", "Migration", () => {
     itIfSupports("deferrable_constraints", "deferrable foreign key", async () => {
       const conn = await ambientConnection();
       await withRocketTables(conn, async () => {
-        const deferrableClause = /\("id"\)\s+DEFERRABLE INITIALLY IMMEDIATE\W*$/i;
         const addTheKey = async (): Promise<void> => {
           await conn.addForeignKey("astronauts", "rockets", {
             column: "rocket_id",
@@ -513,18 +512,18 @@ describeIfSupports("foreign_keys", "Migration", () => {
         };
 
         if (adapterType === "sqlite") {
-          // SQLite adds a foreign key by rebuilding the table, and trails'
-          // rebuild issues its CREATE TABLE straight through the driver
-          // (sqlite3-adapter.ts alterTable), so no sql.active_record event
-          // carries the clause Rails' assert_queries_match inspects. Assert the
-          // same clause against the DDL that landed instead of dropping it.
           await addTheKey();
           const ddl = await conn.selectValue(
             "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'astronauts'",
           );
           expect(String(ddl)).toMatch(/\("id"\)\s+DEFERRABLE INITIALLY IMMEDIATE/i);
         } else {
-          await assertQueriesMatch(deferrableClause, undefined, true, addTheKey);
+          await assertQueriesMatch(
+            /\("id"\)\s+DEFERRABLE INITIALLY IMMEDIATE\W*$/i,
+            undefined,
+            true,
+            addTheKey,
+          );
         }
 
         const foreignKeys = await conn.foreignKeys("astronauts");
