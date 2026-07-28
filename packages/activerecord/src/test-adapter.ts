@@ -26,7 +26,7 @@
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { TransactionManager } from "./connection-adapters/abstract/transaction.js";
-import type { SQLite3AdapterOptions } from "./connection-adapters/pool-config.js";
+import type { SQLite3AdapterOptions, SQLite3Config } from "./connection-adapters/pool-config.js";
 import { buildAdapterArg } from "./connection-adapters/adapter-args.js";
 import { resetTestTables } from "./support/drop-all-tables.js";
 import { Base } from "./base.js";
@@ -132,9 +132,12 @@ if (adapterType === "postgres") {
     }) as unknown as DatabaseAdapter;
 } else {
   const { BetterSQLite3Adapter } = await import("./connection-adapters/better-sqlite3-adapter.js");
+  // Recombined into the Rails-shaped single-hash form the adapter constructor
+  // prefers; `buildAdapterArg` returns the positional pair only because the
+  // pool's resolver predates that overload.
   const [filename, options] = adapterArgs as [string, SQLite3AdapterOptions | undefined];
-  newRawTestAdapter = () =>
-    new BetterSQLite3Adapter(filename, options) as unknown as DatabaseAdapter;
+  const config: SQLite3Config = { ...options, database: filename };
+  newRawTestAdapter = () => new BetterSQLite3Adapter(config) as unknown as DatabaseAdapter;
 }
 
 // --- In-test pool for pool-mechanics suites ---------------------------------
