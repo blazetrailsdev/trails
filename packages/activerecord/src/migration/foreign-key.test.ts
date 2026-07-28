@@ -4,14 +4,16 @@
  * (vendor/rails/activerecord/test/cases/migration/foreign_key_test.rb:209-330,
  * :336-391, :393-451, :453-535, :536-619, :621-747, :749-773 and :775-823) plus
  * all of its sibling
- * `ActiveRecord::Migration::CompositeForeignKeyTest` (:824-912).
+ * `ActiveRecord::Migration::CompositeForeignKeyTest` (:824-912), plus
+ * `ForeignKeyInCreateTest` (:9-21) and `ForeignKeyChangeColumnTest` (:23-143)
+ * with its `WithPrefix`/`WithSuffix` subclasses (:145-163).
  *
  * Driven by the ambient connection, mirroring Rails'
  * `@connection = ActiveRecord::Base.lease_connection`. The rockets/astronauts
  * setup/teardown is shared with schema-statements-on-adapter.test.ts via
  * `withRocketTables`.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { StatementInvalid } from "../errors.js";
 import type { ReferentialAction } from "../connection-adapters/abstract/schema-definitions.js";
@@ -92,6 +94,24 @@ class CreateSchoolsAndClassesMigration extends SilentMigration {
 }
 
 describeIfSupports("foreign_keys", "Migration", () => {
+  describe("ForeignKeyInCreateTest", () => {
+    fixtures([]);
+
+    it("foreign keys", async () => {
+      const conn = await ambientConnection();
+      const foreignKeys = await conn.foreignKeys("fk_test_has_fk");
+      expect(foreignKeys.length).toBe(1);
+
+      const fk = foreignKeys[0];
+      expect(fk.fromTable).toBe("fk_test_has_fk");
+      expect(fk.toTable).toBe("fk_test_has_pk");
+      expect(fk.column).toBe("fk_id");
+      expect(fk.primaryKey).toBe("pk_id");
+      // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors Rails' inline `unless current_adapter?(:SQLite3Adapter)` guard on the name assertion
+      if (unlessSqlite3Adapter) expect(fk.name).toBe("fk_name");
+    });
+  });
+
   describe("ForeignKeyTest", () => {
     // DDL can't run inside the transactional-fixtures wrapper (PG aborts the
     // outer transaction on a failed statement), matching the schema-statements
@@ -1013,82 +1033,163 @@ describeIfSupports("foreign_keys", "Migration", () => {
     );
   });
 
-  describe("ForeignKeyChangeColumnTest", () => {
-    fixtures([], { useTransactionalTests: false });
+  /**
+   * Rails' `ForeignKeyChangeColumnTest` plus its two subclasses,
+   * `ForeignKeyChangeColumnWithPrefixTest` and
+   * `ForeignKeyChangeColumnWithSuffixTest`, which re-run the whole body under
+   * `ActiveRecord::Base.table_name_prefix = "p_"` / `table_name_suffix = "_s"`.
+   * TS has no test-class inheritance, so the body is a function called three
+   * times rather than copied.
+   *
+   * Rails' `CreateRocketsMigration` runs through `Migration#method_missing`,
+   * which routes the table name through `proper_table_name` — hence the
+   * prefixed/suffixed literals here. The `t.references(..., foreign_key: true)`
+   * target is prefixed by `TableDefinition#new_foreign_key_definition` itself,
+   * so `rocket` still resolves to the decorated rockets table.
+   */
+  function foreignKeyChangeColumnTest(name: string, prefix: string, suffix: string): void {
+    describe(name, () => {
+      fixtures([], { useTransactionalTests: false });
 
-    const withChangeColumnTables = async (
-      body: (conn: AbstractAdapter) => Promise<void>,
-    ): Promise<void> => {
-      const conn = await ambientConnection();
-      await conn.dropTable("astronauts", "rockets", { ifExists: true });
-      await conn.createTable("rockets", {}, (t) => {
-        t.string("name");
+      const rockets = `${prefix}rockets${suffix}`;
+      const astronauts = `${prefix}astronauts${suffix}`;
+
+      beforeEach(() => {
+        Base.tableNamePrefix = prefix;
+        Base.tableNameSuffix = suffix;
       });
-      await conn.createTable("astronauts", {}, (t) => {
-        t.string("name");
-        t.references("rocket", { foreignKey: true });
+
+      afterEach(() => {
+        Base.tableNamePrefix = "";
+        Base.tableNameSuffix = "";
       });
-      try {
-        await body(conn);
-      } finally {
-        await conn.dropTable("astronauts", "rockets", { ifExists: true });
-      }
-    };
 
-    const createRocketWithAstronaut = async (conn: AbstractAdapter): Promise<void> => {
-      await conn.executeMutation(
-        `INSERT INTO ${conn.quoteTableName("rockets")} (name) VALUES ('myrocket')`,
-      );
-      const rows = (await conn.execute(
-        `SELECT id FROM ${conn.quoteTableName("rockets")}`,
-      )) as Array<{
-        id: number;
-      }>;
-      await conn.executeMutation(
-        `INSERT INTO ${conn.quoteTableName("astronauts")} (rocket_id) VALUES (${rows[0].id})`,
-      );
-    };
+      const withChangeColumnTables = async (
+        body: (conn: AbstractAdapter) => Promise<void>,
+      ): Promise<void> => {
+        const conn = await ambientConnection();
+        await conn.dropTable(astronauts, rockets, { ifExists: true });
+        await conn.createTable(rockets, {}, (t) => {
+          t.string("name");
+        });
+        await conn.createTable(astronauts, {}, (t) => {
+          t.string("name");
+          t.references("rocket", { foreignKey: true });
+        });
+        try {
+          await body(conn);
+        } finally {
+          await conn.dropTable(astronauts, rockets, { ifExists: true });
+        }
+      };
 
-    const rocketName = async (conn: AbstractAdapter): Promise<string> => {
-      const rows = (await conn.execute(
-        `SELECT name FROM ${conn.quoteTableName("rockets")} ORDER BY id`,
-      )) as Array<{ name: string }>;
-      return rows[0].name;
-    };
+      const createRocketWithAstronaut = async (conn: AbstractAdapter): Promise<void> => {
+        await conn.executeMutation(
+          `INSERT INTO ${conn.quoteTableName(rockets)} (name) VALUES ('myrocket')`,
+        );
+        const rows = (await conn.execute(
+          `SELECT id FROM ${conn.quoteTableName(rockets)}`,
+        )) as Array<{
+          id: number;
+        }>;
+        await conn.executeMutation(
+          `INSERT INTO ${conn.quoteTableName(astronauts)} (rocket_id) VALUES (${rows[0].id})`,
+        );
+      };
 
-    it("rename column of child table", async () => {
-      await withChangeColumnTables(async (conn) => {
-        await createRocketWithAstronaut(conn);
+      const rocketName = async (conn: AbstractAdapter): Promise<string> => {
+        const rows = (await conn.execute(
+          `SELECT name FROM ${conn.quoteTableName(rockets)} ORDER BY id`,
+        )) as Array<{ name: string }>;
+        return rows[0].name;
+      };
 
-        await conn.renameColumn("astronauts", "name", "astronaut_name");
+      it("change column of parent table", async () => {
+        await withChangeColumnTables(async (conn) => {
+          await createRocketWithAstronaut(conn);
 
-        const foreignKeys = await conn.foreignKeys("astronauts");
-        expect(foreignKeys.length).toBe(1);
+          await conn.changeColumnNull(rockets, "name", false);
 
-        const fk = foreignKeys[0];
-        expect(await rocketName(conn)).toBe("myrocket");
-        expect(fk.fromTable).toBe("astronauts");
-        expect(fk.toTable).toBe("rockets");
+          const foreignKeys = await conn.foreignKeys(astronauts);
+          expect(foreignKeys.length).toBe(1);
+
+          const fk = foreignKeys[0];
+          expect(await rocketName(conn)).toBe("myrocket");
+          expect(fk.fromTable).toBe(astronauts);
+          expect(fk.toTable).toBe(rockets);
+        });
+      });
+
+      it("rename column of child table", async () => {
+        await withChangeColumnTables(async (conn) => {
+          await createRocketWithAstronaut(conn);
+
+          await conn.renameColumn(astronauts, "name", "astronaut_name");
+
+          const foreignKeys = await conn.foreignKeys(astronauts);
+          expect(foreignKeys.length).toBe(1);
+
+          const fk = foreignKeys[0];
+          expect(await rocketName(conn)).toBe("myrocket");
+          expect(fk.fromTable).toBe(astronauts);
+          expect(fk.toTable).toBe(rockets);
+        });
+      });
+
+      it.skipIf(adapterType === "mysql")("rename reference column of child table", async () => {
+        await withChangeColumnTables(async (conn) => {
+          await createRocketWithAstronaut(conn);
+
+          await conn.renameColumn(astronauts, "rocket_id", "new_rocket_id");
+
+          const foreignKeys = await conn.foreignKeys(astronauts);
+          expect(foreignKeys.length).toBe(1);
+
+          const fk = foreignKeys[0];
+          expect(await rocketName(conn)).toBe("myrocket");
+          expect(fk.fromTable).toBe(astronauts);
+          expect(fk.toTable).toBe(rockets);
+          expect(fk.column).toBe("new_rocket_id");
+        });
+      });
+
+      it("remove reference column of child table", async () => {
+        await withChangeColumnTables(async (conn) => {
+          await createRocketWithAstronaut(conn);
+
+          await conn.removeColumn(astronauts, "rocket_id");
+
+          expect(await conn.foreignKeys(astronauts)).toEqual([]);
+        });
+      });
+
+      it("remove foreign key by column", async () => {
+        await withChangeColumnTables(async (conn) => {
+          await createRocketWithAstronaut(conn);
+
+          await conn.removeForeignKey(astronauts, { column: "rocket_id" });
+
+          expect(await conn.foreignKeys(astronauts)).toEqual([]);
+        });
+      });
+
+      it("remove foreign key by column in change table", async () => {
+        await withChangeColumnTables(async (conn) => {
+          await createRocketWithAstronaut(conn);
+
+          await conn.changeTable(astronauts, async (t) => {
+            await t.removeForeignKey({ column: "rocket_id" });
+          });
+
+          expect(await conn.foreignKeys(astronauts)).toEqual([]);
+        });
       });
     });
+  }
 
-    it.skipIf(adapterType === "mysql")("rename reference column of child table", async () => {
-      await withChangeColumnTables(async (conn) => {
-        await createRocketWithAstronaut(conn);
-
-        await conn.renameColumn("astronauts", "rocket_id", "new_rocket_id");
-
-        const foreignKeys = await conn.foreignKeys("astronauts");
-        expect(foreignKeys.length).toBe(1);
-
-        const fk = foreignKeys[0];
-        expect(await rocketName(conn)).toBe("myrocket");
-        expect(fk.fromTable).toBe("astronauts");
-        expect(fk.toTable).toBe("rockets");
-        expect(fk.column).toBe("new_rocket_id");
-      });
-    });
-  });
+  foreignKeyChangeColumnTest("ForeignKeyChangeColumnTest", "", "");
+  foreignKeyChangeColumnTest("ForeignKeyChangeColumnWithPrefixTest", "p_", "");
+  foreignKeyChangeColumnTest("ForeignKeyChangeColumnWithSuffixTest", "", "_s");
 
   describe("CompositeForeignKeyTest", () => {
     fixtures([], { useTransactionalTests: false });
