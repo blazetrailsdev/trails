@@ -38,6 +38,13 @@
     "package": "activerecord",
     "tsFile": "base.ts",
     "rubyName": "define_delegated_type_methods",
+    "call": "constantize",
+    "reason": "Equivalent (different path): base.ts's static is a thin delegator to delegated-type.ts's `defineDelegatedTypeMethods` (Rails reaches it via `include DelegatedType`), so the constantize call cannot be lexically present here. See converge-delegated-type-method-split."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "base.ts",
+    "rubyName": "define_delegated_type_methods",
     "call": "define_method",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

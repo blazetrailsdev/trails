@@ -3,6 +3,13 @@
     "package": "activerecord",
     "tsFile": "delegated-type.ts",
     "rubyName": "define_delegated_type_methods",
+    "call": "constantize",
+    "reason": "Equivalent (different path): trails inverts Rails' split — `defineDelegatedTypeMethods` delegates to `delegatedType`, which owns the `#{role}_class` / `build_#{role}` definitions and makes the constantize call, whereas Rails has `delegated_type` call `define_delegated_type_methods`. Converging the inversion is tracked by converge-delegated-type-method-split."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "delegated-type.ts",
+    "rubyName": "define_delegated_type_methods",
     "call": "define_method",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

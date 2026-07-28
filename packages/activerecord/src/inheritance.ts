@@ -50,7 +50,15 @@ export function computeType(baseClass: typeof Base, typeName: string): typeof Ba
   // module nesting and imposes NO subclass relationship — a sibling in the same
   // namespace (e.g. Business::Client.compute_type("Firm")) resolves fine. The STI
   // subclass constraint lives in find_sti_class ({@link stiClassFor}), not here.
-  return resolveComputedType(baseClass, typeName);
+  if (typeName.startsWith("::")) {
+    return constantize(typeName) as typeof Base;
+  }
+  const candidates = computeTypeCandidates(baseClass, typeName);
+  for (const candidate of candidates) {
+    const klass = safeConstantize(candidate) as typeof Base | undefined;
+    if (klass && qualifiedName(klass) === candidate) return klass;
+  }
+  throw new NameError(`uninitialized constant ${candidates[0]}`, candidates[0]);
 }
 
 /**
@@ -71,33 +79,6 @@ function computeTypeCandidates(baseClass: typeof Base, typeName: string): string
   }
   candidates.push(typeName);
   return candidates;
-}
-
-/**
- * Ruby-style namespace-relative constant resolution, mirroring
- * ActiveRecord::Inheritance::ClassMethods#compute_type. Walks the model's module
- * nesting (see {@link computeTypeCandidates}) and returns the first candidate that
- * resolves to a registered class whose own qualified name equals the candidate —
- * Rails' `candidate == constant.to_s` guard, which rejects an outer-scope constant
- * leaking through (so a demodulized type stored under a namespaced model resolves
- * via the namespace prefix even when the bare name is unregistered). A leading
- * `::` is an absolute reference resolved directly. Throws NameError when nothing
- * resolves. Does NOT enforce a subclass relationship — that is {@link stiClassFor}'s
- * (Rails' find_sti_class's) job, leaving this usable for polymorphic and sibling
- * targets.
- *
- * @internal
- */
-function resolveComputedType(baseClass: typeof Base, typeName: string): typeof Base {
-  if (typeName.startsWith("::")) {
-    return constantize(typeName) as typeof Base;
-  }
-  const candidates = computeTypeCandidates(baseClass, typeName);
-  for (const candidate of candidates) {
-    const klass = safeConstantize(candidate) as typeof Base | undefined;
-    if (klass && qualifiedName(klass) === candidate) return klass;
-  }
-  throw new NameError(`uninitialized constant ${candidates[0]}`, candidates[0]);
 }
 
 /**
@@ -782,7 +763,7 @@ export function stiClassFor(modelClass: typeof Base, typeName: string): typeof B
     if (klass.storeFullStiClass && klass.storeFullClassName) {
       subclass = constantize(typeName) as typeof Base;
     } else {
-      subclass = resolveComputedType(modelClass, typeName);
+      subclass = computeType(modelClass, typeName);
     }
   } catch (cause) {
     if (!(cause instanceof NameError)) throw cause;
@@ -813,7 +794,7 @@ export function polymorphicClassFor(modelClass: typeof Base, name: string): type
   if (klass.storeFullClassName) {
     return constantize(name) as typeof Base;
   }
-  return resolveComputedType(modelClass, name);
+  return computeType(modelClass, name);
 }
 
 /**
