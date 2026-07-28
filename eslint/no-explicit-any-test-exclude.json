@@ -45,7 +45,6 @@
   "packages/activerecord/src/adapters/postgresql/uuid.test.ts",
   "packages/activerecord/src/adapters/postgresql/virtual-column.test.ts",
   "packages/activerecord/src/adapters/postgresql/xml.test.ts",
-  "packages/activerecord/src/adapters/sqlite3-adapter.test.ts",
   "packages/activerecord/src/adapters/sqlite3/copy-table.test.ts",
   "packages/activerecord/src/adapters/sqlite3/json.test.ts",
   "packages/activerecord/src/adapters/sqlite3/sqlite3-adapter.test.ts",
