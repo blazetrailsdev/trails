@@ -27,6 +27,12 @@ describe("FakeActiveRecordAdapter", () => {
     expect(columns[1].null).toBe(false);
     expect(columns[1].default).toBe(0);
     expect(columns[0].sqlTypeMetadata?.sqlType).toBe("string");
+    // `type` is the cast type's own `type`, not the sql_type string: the
+    // abstract TYPE_MAP keys strings under /char/i, so "string" falls through
+    // to Type::Value (nil type) exactly as it does in Rails, while "integer"
+    // matches /int/i.
+    expect(columns[0].sqlTypeMetadata?.type).toBeUndefined();
+    expect(columns[1].sqlTypeMetadata?.type).toBe("integer");
   });
 
   it("columns is empty for an unknown table", () => {

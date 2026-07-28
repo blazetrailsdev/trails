@@ -331,7 +331,18 @@ describe("SchemaStatements privates (PR 8)", () => {
   });
 
   it("fetchTypeMetadata returns SqlTypeMetadata with sqlType", () => {
-    expect(makeStatements().fetchTypeMetadata("varchar(255)").sqlType).toBe("varchar(255)");
+    const meta = makeStatements().fetchTypeMetadata("varchar(255)");
+    expect(meta.sqlType).toBe("varchar(255)");
+    // `Type#type` is a method, so the metadata must carry its result, not the
+    // function object (schema_statements.rb:1721 `cast_type.type`).
+    expect(meta.type).toBe("string");
+    expect(meta.limit).toBe(255);
+  });
+
+  it("fetchTypeMetadata keeps a nil sql_type nil", () => {
+    const meta = makeStatements().fetchTypeMetadata(null);
+    expect(meta.sqlType).toBeNull();
+    expect(meta.type).toBeUndefined();
   });
 
   it("foreignKeyFor returns undefined when not found", async () => {
