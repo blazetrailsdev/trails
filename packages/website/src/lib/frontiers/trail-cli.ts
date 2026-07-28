@@ -2,8 +2,8 @@ import type { VirtualFS } from "./virtual-fs.js";
 import type { SqlJsAdapter } from "./sql-js-adapter.js";
 import { VfsModelGenerator, VfsMigrationGenerator, VfsAppGenerator } from "./vfs-generator.js";
 import type { MigrationProxy, MigrationLike } from "@blazetrails/activerecord/migration";
-import { Migration, Migrator } from "@blazetrails/activerecord/migration";
-import { camelize, Logger } from "@blazetrails/activesupport";
+import { Migrator } from "@blazetrails/activerecord/migration";
+import { camelize, registerProcessAdapter, type ProcessAdapter } from "@blazetrails/activesupport";
 
 export interface CliResult {
   success: boolean;
@@ -128,6 +128,38 @@ export function dropUserTables(adapter: SqlJsAdapter, getTables: () => string[])
   return tables.length;
 }
 
+let stdoutSink: (chunk: string) => void = () => {};
+
+/** Minimal ProcessAdapter so the activesupport `stdout` shim works in the browser. */
+const browserProcessAdapter: ProcessAdapter = {
+  envSnapshot: () => ({}),
+  argvSnapshot: () => [],
+  cwd: () => "/",
+  chdir: () => {},
+  platform: () => "browser",
+  setEnv: () => {},
+  exit: () => {
+    throw new Error("exit() is not supported in the browser CLI");
+  },
+  setExitCode: () => {},
+  onSignal: () => () => {},
+  stdout: {
+    write: (chunk) => {
+      stdoutSink(chunk);
+      return true;
+    },
+    isTTY: false,
+  },
+  stderr: {
+    write: (chunk) => {
+      stdoutSink(chunk);
+      return true;
+    },
+    isTTY: false,
+  },
+  stdin: { isTTY: false, read: async () => null },
+};
+
 export function createTrailCLI(deps: TrailCliDeps) {
   const { vfs, adapter } = deps;
   const output: string[] = [];
@@ -142,12 +174,15 @@ export function createTrailCLI(deps: TrailCliDeps) {
       return;
     }
     const migrator = new Migrator(adapter, proxies);
-    const prevLogger = Migration.logger;
-    Migration.logger = new Logger({ write: (s) => log(s.replace(/\n$/, "")) });
+    // Migration output goes to stdout (Rails' Migration#write is `puts`), and
+    // the browser has no process — so the shim's stdout is pointed at this
+    // CLI's output buffer for the duration of the run.
+    registerProcessAdapter(browserProcessAdapter);
+    stdoutSink = (chunk) => log(chunk.replace(/\n$/, ""));
     try {
       await fn(migrator);
     } finally {
-      Migration.logger = prevLogger;
+      stdoutSink = () => {};
     }
   }
 
