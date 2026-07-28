@@ -2719,8 +2719,16 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       } else {
         if (!compositePk && pkCols.includes(col.name)) def += " PRIMARY KEY";
         if (!col.null) def += " NOT NULL";
-        if (!sqlite3Col.autoIncrement && col.default !== null && col.default !== undefined) {
-          def += ` DEFAULT ${this.quoteDefault(col.default)}`;
+        if (!sqlite3Col.autoIncrement) {
+          if (col.default !== null && col.default !== undefined) {
+            def += ` DEFAULT ${this.quoteDefault(col.default)}`;
+          } else if (col.defaultFunction) {
+            // Rails swaps in `-> { column.default_function }` when the
+            // deserialized default is nil (sqlite3_adapter.rb:630), and a proc
+            // default is emitted raw by quote_default_expression. Without this
+            // a `DEFAULT CURRENT_TIMESTAMP` column loses its default in the copy.
+            def += ` DEFAULT ${col.defaultFunction}`;
+          }
         }
         // Generated columns are computed, never copied as content (Rails rejects
         // columns whose options carry `:as`).
