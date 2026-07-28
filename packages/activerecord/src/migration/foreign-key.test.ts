@@ -2,7 +2,7 @@
  * Port of the `add_foreign_key`, `remove_foreign_key` and `SchemaDumpingHelper`
  * halves of `ActiveRecord::Migration::ForeignKeyTest`
  * (vendor/rails/activerecord/test/cases/migration/foreign_key_test.rb:209-330,
- * :393-451, :643-747 and :749-773) plus all of its sibling
+ * :393-451, :524-619, :643-747 and :749-773) plus all of its sibling
  * `ActiveRecord::Migration::CompositeForeignKeyTest` (:824-912).
  *
  * Driven by the ambient connection, mirroring Rails'
@@ -21,7 +21,8 @@ import {
   withRocketTables,
 } from "../support/rocket-tables.js";
 import { adapterType } from "../test-adapter.js";
-import { describeIfSupports } from "../support/supports.js";
+import { describeIfSupports, itIfSupports } from "../support/supports.js";
+import { assertQueriesMatch } from "../testing/query-assertions.js";
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";
 import type { SchemaSource } from "../schema-dumper.js";
 import { Base } from "../base.js";
@@ -499,6 +500,180 @@ describeIfSupports("foreign_keys", "Migration", () => {
         Base.tableNameSuffix = "";
       }
     });
+
+    itIfSupports("deferrable_constraints", "deferrable foreign key", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        const deferrableClause = /\("id"\)\s+DEFERRABLE INITIALLY IMMEDIATE\W*$/i;
+        const addTheKey = async (): Promise<void> => {
+          await conn.addForeignKey("astronauts", "rockets", {
+            column: "rocket_id",
+            deferrable: "immediate",
+          });
+        };
+
+        if (adapterType === "sqlite") {
+          // SQLite adds a foreign key by rebuilding the table, and trails'
+          // rebuild issues its CREATE TABLE straight through the driver
+          // (sqlite3-adapter.ts alterTable), so no sql.active_record event
+          // carries the clause Rails' assert_queries_match inspects. Assert the
+          // same clause against the DDL that landed instead of dropping it.
+          await addTheKey();
+          const ddl = await conn.selectValue(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'astronauts'",
+          );
+          expect(String(ddl)).toMatch(/\("id"\)\s+DEFERRABLE INITIALLY IMMEDIATE/i);
+        } else {
+          await assertQueriesMatch(deferrableClause, undefined, true, addTheKey);
+        }
+
+        const foreignKeys = await conn.foreignKeys("astronauts");
+        expect(foreignKeys.length).toBe(1);
+
+        const fk = foreignKeys[0];
+        expect(fk.deferrable).toBe("immediate");
+      });
+    });
+
+    itIfSupports("deferrable_constraints", "not deferrable foreign key", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.addForeignKey("astronauts", "rockets", {
+          column: "rocket_id",
+          deferrable: false,
+        });
+
+        const foreignKeys = await conn.foreignKeys("astronauts");
+        expect(foreignKeys.length).toBe(1);
+
+        const fk = foreignKeys[0];
+        expect(fk.deferrable).toBe(false);
+      });
+    });
+
+    itIfSupports(
+      "deferrable_constraints",
+      "deferrable initially deferred foreign key",
+      async () => {
+        const conn = await ambientConnection();
+        await withRocketTables(conn, async () => {
+          await conn.addForeignKey("astronauts", "rockets", {
+            column: "rocket_id",
+            deferrable: "deferred",
+          });
+
+          const foreignKeys = await conn.foreignKeys("astronauts");
+          expect(foreignKeys.length).toBe(1);
+
+          const fk = foreignKeys[0];
+          expect(fk.deferrable).toBe("deferred");
+        });
+      },
+    );
+
+    itIfSupports(
+      "deferrable_constraints",
+      "deferrable initially immediate foreign key",
+      async () => {
+        const conn = await ambientConnection();
+        await withRocketTables(conn, async () => {
+          await conn.addForeignKey("astronauts", "rockets", {
+            column: "rocket_id",
+            deferrable: "immediate",
+          });
+
+          const foreignKeys = await conn.foreignKeys("astronauts");
+          expect(foreignKeys.length).toBe(1);
+
+          const fk = foreignKeys[0];
+          expect(fk.deferrable).toBe("immediate");
+        });
+      },
+    );
+
+    itIfSupports("deferrable_constraints", "schema dumping with defferable", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.addForeignKey("astronauts", "rockets", {
+          column: "rocket_id",
+          deferrable: "immediate",
+        });
+
+        const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+        expect(output).toMatch(
+          /\s+await ctx\.addForeignKey\("astronauts", "rockets", \{ deferrable: "immediate" \}\);$/m,
+        );
+      });
+    });
+
+    itIfSupports("deferrable_constraints", "schema dumping with disabled defferable", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.addForeignKey("astronauts", "rockets", {
+          column: "rocket_id",
+          deferrable: false,
+        });
+
+        const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+        expect(output).toMatch(/\s+await ctx\.addForeignKey\("astronauts", "rockets"\);$/m);
+      });
+    });
+
+    itIfSupports(
+      "deferrable_constraints",
+      "schema dumping with defferable initially deferred",
+      async () => {
+        const conn = await ambientConnection();
+        await withRocketTables(conn, async () => {
+          await conn.addForeignKey("astronauts", "rockets", {
+            column: "rocket_id",
+            deferrable: "deferred",
+          });
+
+          const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+          expect(output).toMatch(
+            /\s+await ctx\.addForeignKey\("astronauts", "rockets", \{ deferrable: "deferred" \}\);$/m,
+          );
+        });
+      },
+    );
+
+    itIfSupports(
+      "deferrable_constraints",
+      "schema dumping with defferable initially immediate",
+      async () => {
+        const conn = await ambientConnection();
+        await withRocketTables(conn, async () => {
+          await conn.addForeignKey("astronauts", "rockets", {
+            column: "rocket_id",
+            deferrable: "immediate",
+          });
+
+          const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+          expect(output).toMatch(
+            /\s+await ctx\.addForeignKey\("astronauts", "rockets", \{ deferrable: "immediate" \}\);$/m,
+          );
+        });
+      },
+    );
+
+    itIfSupports(
+      "deferrable_constraints",
+      "schema dumping with special chars deferrable",
+      async () => {
+        const conn = await ambientConnection();
+        await withRocketTables(conn, async () => {
+          await conn.addReference("astronauts", "røcket", {
+            foreignKey: { toTable: "rockets", deferrable: "deferred" },
+          });
+
+          const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+          expect(output).toMatch(
+            /\s+await ctx\.addForeignKey\("astronauts", "rockets", \{ column: "røcket_id", deferrable: "deferred" \}\);$/m,
+          );
+        });
+      },
+    );
   });
 
   describe("CompositeForeignKeyTest", () => {
