@@ -156,17 +156,14 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
     adapter: "sqlite3",
     lane: "sqlite",
     // `config.example.yml:91-97` — both entries are their own `:memory:` database.
+    // Exercised by ci.yml's `sqlite-mem-tests` job — the only lane where
+    // `inMemoryDb()` is true, and so the only thing keeping the
+    // `skipIf(inMemoryDb())` guards from rotting.
     //
-    // A supported, CI-exercised lane: the `sqlite-mem-tests` job in ci.yml runs
-    // the AR suite under `ARCONN=sqlite3_mem` on main, on the weekly sweep, and
-    // on any PR labelled `run-sqlite-mem`. It is the only lane where
-    // `inMemoryDb()` is true, so it is what keeps the `skipIf(inMemoryDb())`
-    // guards honest.
-    //
-    // `pool: 1` has no counterpart in the yml. A `:memory:` database belongs to
+    // `pool: 1` has no counterpart in the yml: a `:memory:` database belongs to
     // its connection, so a second pool member would silently be a second, empty
-    // database; Rails never notices because its suite checks out one connection
-    // at a time, but our pool leases concurrently.
+    // database. Rails never notices — its suite checks out one connection at a
+    // time; our pool leases concurrently.
     build: async () => ({
       arunit: { adapter: "sqlite3", database: ":memory:", pool: 1 },
       arunit2: { adapter: "sqlite3", database: ":memory:", pool: 1 },

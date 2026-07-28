@@ -52,10 +52,9 @@ describe("ConnectionHandlingTest", () => {
   // Rails puts every one of its `ConnectionHandlingTest` cases inside
   // `unless in_memory_db?` (connection_handling_test.rb:18-185): they release
   // and re-lease `Base`'s connection, and on `:memory:` the released connection
-  // takes the database with it. The guard is per-`it` rather than a wrapping
-  // `describe` because this file also holds cases with no Rails counterpart,
-  // and because the test:compare gate extractor only resolves inline
-  // `it.skipIf(...)`.
+  // takes the database with it. Per-`it` rather than a wrapping `describe`
+  // because this file also holds cases with no Rails counterpart, and the
+  // test:compare gate extractor only resolves inline `it.skipIf(...)`.
   it.skipIf(inMemoryDb())(
     "#with_connection lease the connection for the duration of the block",
     async () => {

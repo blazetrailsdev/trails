@@ -874,21 +874,20 @@ jobs:
       - run: pnpm vitest run packages/activerecord/
       - run: pnpm vitest run packages/activerecord-cli
 
-  # `ARCONN=sqlite3_mem` — Rails' `config.example.yml` `sqlite3_mem` connection
-  # (`:memory:`, one connection). It is the ONLY lane that makes `in_memory_db?`
-  # true, so without it every `skipIf(inMemoryDb())` guard is dead code that can
-  # rot unnoticed (story sqlite3-mem-lane-status, RFC 0029).
+  # `ARCONN=sqlite3_mem` is the only lane where `in_memory_db?` is true, so
+  # without it every `skipIf(inMemoryDb())` guard is dead code (RFC 0029).
   #
-  # Deliberately NOT in the `ci` aggregator's `needs:` and NOT run on every PR:
-  # it is a second full pass over the AR suite, and runner minutes are scarce.
-  # It runs where regressions still surface within a week — on `main` after a
-  # merge, on the Monday sweep, on demand, and on any PR labelled
-  # `run-sqlite-mem`. It is not `continue-on-error`: a failure is a red job.
+  # A second full pass over the AR suite, so deliberately not in the `ci`
+  # aggregator's `needs:` and not on every PR: it runs on `main`, on the Monday
+  # sweep (where `changes` forces every gate true), on `workflow_dispatch`, and
+  # on a PR labelled `run-sqlite-mem`. Not `continue-on-error` — a failure is a
+  # red job.
   sqlite-mem-tests:
     name: "Active Record SQLite :memory: Tests"
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.activerecord_affected == 'true' &&
       (github.event_name != 'pull_request' ||
        contains(github.event.pull_request.labels.*.name, 'run-sqlite-mem'))
     runs-on: ubuntu-latest
@@ -899,9 +898,9 @@ jobs:
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
       - run: pnpm build
-      # Trailing slash as in `sqlite-tests` above. The CLI package is not run
-      # here: it shells out to its own subprocesses, which do not inherit this
-      # lane's meaning.
+      # Trailing slash for the reason given on `sqlite-tests`. The CLI package
+      # is excluded: it owns no `inMemoryDb()` guards, so it has nothing this
+      # lane can check.
       - run: pnpm vitest run packages/activerecord/
         env:
           ARCONN: sqlite3_mem

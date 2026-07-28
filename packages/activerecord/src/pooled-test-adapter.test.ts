@@ -46,9 +46,8 @@ describe("createPooledTestAdapter (Phase B smoke)", () => {
     }
   });
 
-  // The duplicate pool inherits the primary's size, and the `sqlite3_mem`
-  // connection pins that to 1 (`:memory:` is only shared within one connection).
-  // This test needs a second connection — the setup lease plus the pinned one —
+  // The duplicate pool inherits the primary's size, which `sqlite3_mem` pins to
+  // 1. This test needs two connections — the setup lease plus the pinned one —
   // so on that lane it can only ever time out.
   it.skipIf(inMemoryDb())(
     "pinConnectionBang + write + unpinConnectionBang rolls back",
