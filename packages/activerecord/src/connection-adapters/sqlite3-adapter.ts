@@ -1751,9 +1751,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     await this.alterTable(tableName, (definition) => {
       // The raw value, not a literal: schemaCreation re-emits it through
       // quoteDefaultExpression, which serializes it through the column's cast
-      // type, so `default: {}` on a json column quotes to `{}`.
-      const column = definition.get(columnName);
-      if (column) column.options.default = newDefault;
+      // type, so `default: {}` on a json column quotes to `{}`. Unguarded, as
+      // in Rails — an unknown column raises rather than rebuilding unchanged.
+      definition.get(columnName)!.options.default = newDefault;
     });
   }
 
@@ -1774,8 +1774,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       );
     }
     await this.alterTable(tableName, (definition) => {
-      const column = definition.get(columnName);
-      if (column) column.options.null = allowNull;
+      definition.get(columnName)!.options.null = allowNull;
     });
   }
 
