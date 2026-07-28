@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "./base.js";
 import { ShardSelector } from "./middleware/shard-selector.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
+import { ambientPoolConfiguration } from "./test-adapter.js";
 
 describe("ShardSelectorTest", () => {
   afterEach(async () => {
@@ -9,7 +10,10 @@ describe("ShardSelectorTest", () => {
   });
 
   function setupShards() {
-    const dbConfig = new HashConfig("test", "Base", { adapter: "sqlite3", database: ":memory:" });
+    // Rails' ShardSelectorTest resolves shards from the ambient `arunit`
+    // configuration; the shard pool clones that config rather than naming a
+    // database of its own.
+    const dbConfig = new HashConfig("test", "Base", ambientPoolConfiguration());
     Base.connectionHandler.establishConnection(dbConfig, {
       owner: "Base",
       role: "writing",

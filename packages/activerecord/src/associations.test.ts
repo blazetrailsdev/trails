@@ -44,6 +44,7 @@ import { markForDestruction, isMarkedForDestruction } from "./autosave-associati
 import { Preloader } from "./associations/preloader.js";
 import { Batch } from "./associations/preloader/batch.js";
 import { LoaderQuery } from "./associations/preloader/association.js";
+import { scratchDatabasePath } from "./support/scratch-database.js";
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -1022,8 +1023,17 @@ describe("PreloaderTest", () => {
     }
     registerModel("OtherDog", OtherDog);
 
+    // Rails' arunit2 is a file, not `:memory:` — the loaders must be
+    // distinguished by connection identity, and a real second database on disk
+    // is what makes that distinction observable.
     const [secondaryPool] = AnimalsBase.connectsTo({
-      database: { writing: { adapter: "sqlite3", database: ":memory:", pool: 1 } },
+      database: {
+        writing: {
+          adapter: "sqlite3",
+          database: await scratchDatabasePath("associations-animals"),
+          pool: 1,
+        },
+      },
     });
     try {
       await secondaryPool.adapterReady;
