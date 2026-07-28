@@ -214,6 +214,15 @@ export class SchemaMigration {
       // visitor quotes it (to_sql.rb:112). A Quoted wrap would fall to `quote()`,
       // which raises TypeError on a node (abstract/quoting.ts:151), matching
       // Rails (quoting.rb:86).
+      //
+      // Rails' `assume_migrated_upto_version` uses no Arel at all — it is raw
+      // `execute insert_versions_sql(inserting)`
+      // (abstract/schema_statements.rb:1364-1383). The InsertManager stays here
+      // deliberately: this wrapper hangs off a SchemaMigration instance (no
+      // pool/migration_context), and every other write on this class
+      // (`createVersion`, `deleteVersion`) already goes through Arel, so the
+      // adapter's own visitor does the identifier quoting. The emitted SQL is
+      // pinned by schema-migration.trails.test.ts.
       const rows = toInsert.map((v) => [v]);
       im.ast.columns = [col];
       im.values = im.createValuesList(rows);
