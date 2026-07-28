@@ -148,16 +148,27 @@ function droppedTableNames(call) {
 /**
  * The leading `CREATE [GLOBAL|LOCAL] [TEMP[ORARY]|UNLOGGED] TABLE [IF NOT
  * EXISTS]` clause, up to and including the table name. The optional opening
- * quote (`` ` ``, `"`, `'`) is matched and stripped via a backreference so a
- * quoted name balances an unquoted helper name (`CREATE TABLE "items"` ↔
- * `dropTable("items")`); `\1?` tolerates an unmatched (no-quote) group.
+ * quote (`` ` ``, `"`, `'`) is matched and stripped so a quoted name balances an
+ * unquoted helper name (`CREATE TABLE "items"` ↔ `dropTable("items")`).
+ *
+ * A quoted name runs to its closing quote rather than to the first
+ * non-identifier character, so an embedded space stays part of the name
+ * (`CREATE TABLE "my table"` is the table `my table`, not `my`). Truncating it
+ * used to make a create unmatchable by any drop of the real name.
  */
-const CREATE_TABLE_RE =
-  /\bcreate\s+(?:(?:global|local)\s+)?(?:temp(?:orary)?\s+|unlogged\s+)?table\s+(?:if\s+not\s+exists\s+)?(`|"|')?([\w.]+)\1?/gi;
+const NAME_SRC = "(?:`([^`]+)`|\"([^\"]+)\"|'([^']+)'|([\\w.]+))";
+/** The first defined name capture of `m`, whose name groups start at `base`. */
+function capturedName(m, base) {
+  return m[base] ?? m[base + 1] ?? m[base + 2] ?? m[base + 3];
+}
+const CREATE_TABLE_RE = new RegExp(
+  `\\bcreate\\s+(?:(?:global|local)\\s+)?(?:temp(?:orary)?\\s+|unlogged\\s+)?table\\s+(?:if\\s+not\\s+exists\\s+)?${NAME_SRC}`,
+  "gi",
+);
 /** The `DROP TABLE [IF EXISTS]` keyword prefix; the name list follows. */
 const DROP_TABLE_RE = /\bdrop\s+table\s+(?:if\s+exists\s+)?/gi;
 /** A single (optionally quoted) table name at the start of `rest`. */
-const NAME_RE = /^\s*(`|"|')?([\w.]+)\1?/;
+const NAME_RE = new RegExp(`^\\s*${NAME_SRC}`);
 
 /**
  * Call names that execute a raw SQL string against the database. A `CREATE
@@ -187,7 +198,7 @@ function rawCreateNames(text, endIsDynamic) {
   let m;
   while ((m = CREATE_TABLE_RE.exec(text)) !== null) {
     if (endIsDynamic && m.index + m[0].length === text.length) continue;
-    names.push(m[2]);
+    names.push(capturedName(m, 1));
   }
   return names;
 }
@@ -209,9 +220,10 @@ export function rawDropNames(text, endIsDynamic = false) {
     let rest = text.slice(m.index + m[0].length);
     let nm;
     while ((nm = NAME_RE.exec(rest)) !== null) {
-      if (/^(?:cascade|restrict)$/i.test(nm[2])) break;
+      const name = capturedName(nm, 1);
+      if (nm[4] !== undefined && /^(?:cascade|restrict)$/i.test(name)) break;
       rest = rest.slice(nm[0].length);
-      if (!(endIsDynamic && rest.length === 0)) names.push(nm[2]);
+      if (!(endIsDynamic && rest.length === 0)) names.push(name);
       rest = rest.replace(/^\s+/, "");
       if (rest[0] !== ",") break;
       rest = rest.slice(1);

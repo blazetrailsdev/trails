@@ -47,6 +47,14 @@ tester.run("require-table-teardown", rule, {
     'await ctx.createTable("widgets", () => {});\nawait adapter.exec("DROP TABLE widgets");',
     // IF NOT EXISTS / IF EXISTS and trailing clauses don't defeat matching.
     'await c.exec("CREATE TABLE IF NOT EXISTS tmp_x (id int)");\nawait c.exec("DROP TABLE IF EXISTS tmp_x CASCADE");',
+    // A quoted name with an embedded space is one name on both sides — the
+    // identifier pattern must not stop at the space (`"my table"` → `my`),
+    // which would leave the create unmatchable by any drop of the real table.
+    'await adapter.exec(`CREATE TABLE "my table" (id int)`);\nawait adapter.exec(`DROP TABLE "my table"`);',
+    "await adapter.exec('CREATE TABLE `my table` (id int)');\nawait adapter.exec('DROP TABLE `my table`');",
+    // A spaced quoted name in a multi-table drop list.
+    'await adapter.exec(`CREATE TABLE "my table" (id int)`);\nawait adapter.exec(`CREATE TABLE b (id int)`);\n' +
+      'await adapter.exec(`DROP TABLE "my table", b`);',
     // Interpolated raw-SQL table name is unknowable — neither create nor drop.
     "await adapter.exec(`CREATE TABLE ${name} (id int)`);",
     // Static prefix flush against an interpolation is a dynamic-name prefix,
@@ -80,6 +88,14 @@ tester.run("require-table-teardown", rule, {
     'await ctx.dropTable(name);\nawait ctx.dropTable("b");',
   ],
   invalid: [
+    // Dropping the truncated prefix of a spaced quoted name is not a teardown
+    // of the real table — the create is still reported by its full name.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "my table" (id int)`);\n' +
+        'await adapter.exec(`DROP TABLE "my"`);',
+      errors: [{ messageId: "missingTeardown", data: { table: "my table" } }],
+    },
     // Symmetrically, a DROP name flush against an interpolation is a prefix,
     // not a table: the phantom `tmp_` must not be credited as the teardown of
     // the real `tmp_a`.
