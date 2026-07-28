@@ -106,6 +106,18 @@ describe("Migrator trails extensions", () => {
     await expect(migrator.checkProtectedEnvironments()).rejects.toThrow(ProtectedEnvironmentError);
   });
 
+  it("lastStoredEnvironment returns null at version 0 even when metadata is stamped", async () => {
+    const metadata = new InternalMetadata(adapter);
+    await metadata.createTable();
+    await metadata.set("environment", "production");
+
+    const migrator = new Migrator(adapter, [makeMigration("1", "M1")], {
+      environment: "production",
+    });
+    await expect(migrator.lastStoredEnvironment()).resolves.toBeNull();
+    await expect(migrator.checkProtectedEnvironments()).resolves.toBeUndefined();
+  });
+
   it("checkProtectedEnvironments passes for development", async () => {
     const migrator = new Migrator(adapter, [makeMigration("1", "M1")], {
       environment: "development",
