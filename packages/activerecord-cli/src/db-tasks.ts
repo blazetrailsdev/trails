@@ -6,8 +6,6 @@ import { loadDatabaseConfig, loadMigrations, tryLoadModels } from "./db-helpers.
 async function runCreate(
   config: import("@blazetrails/activerecord").DatabaseConfig,
 ): Promise<boolean> {
-  // Banners (success, already-exists, and the failure pair) are emitted by
-  // DatabaseTasks.create itself (database_tasks.rb:118-124).
   try {
     await DatabaseTasks.create(config);
     return true;
@@ -19,7 +17,6 @@ async function runCreate(
 async function runDrop(
   config: import("@blazetrails/activerecord").DatabaseConfig,
 ): Promise<boolean> {
-  // Banners are emitted by DatabaseTasks.drop itself (database_tasks.rb:213-219).
   try {
     await DatabaseTasks.drop(config);
     return true;

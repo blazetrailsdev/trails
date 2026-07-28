@@ -517,15 +517,12 @@ function displayNameFor(config: HashConfig, raw: RawConfig): string {
 }
 
 async function runCreate(opts: DatabaseOpts = {}): Promise<void> {
-  // The `Created database` / `already exists` banners are emitted by
-  // DatabaseTasks.create itself (database_tasks.rb:118-120).
   await forEachDatabaseConfig(opts, async ({ config }) => {
     await DatabaseTasks.create(config);
   });
 }
 
 async function runDrop(opts: DatabaseOpts = {}): Promise<void> {
-  // Banners come from DatabaseTasks.drop itself (database_tasks.rb:213-215).
   await forEachDatabaseConfig(opts, async ({ config }) => {
     await runProtectedEnvCheck(config, config.envName);
     await DatabaseTasks.drop(config);

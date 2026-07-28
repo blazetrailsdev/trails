@@ -1,7 +1,3 @@
-// trails-only: Rails' database_tasks_test.rb has no test for the create/drop
-// banners themselves — they're covered indirectly by railties' rake tests,
-// which trails has no analogue for. These pin the shapes at
-// database_tasks.rb:116-124 and :210-220 directly.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { stdout, stderr } from "@blazetrails/activesupport";
 import { DatabaseTasks } from "./database-tasks.js";

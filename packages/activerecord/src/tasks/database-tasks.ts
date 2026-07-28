@@ -258,8 +258,6 @@ export class DatabaseTasks {
       }
       if (isVerbose()) stdout.write(`Dropped database '${config.database}'\n`);
     } catch (error) {
-      // Rails' NoDatabaseError arm is deliberately ungated — no `if verbose?`
-      // (database_tasks.rb:214-215), unlike the create/DatabaseAlreadyExists arm.
       if (error instanceof NoDatabaseError) {
         stderr.write(`Database '${config.database}' does not exist\n`);
         return;
@@ -1403,12 +1401,6 @@ export function resolveConfiguration(configuration: unknown): DatabaseConfig {
   return configs.resolve(configuration);
 }
 
-/**
- * Ruby's `$stderr.puts error` prints `error.to_s`, which for an exception is
- * its message alone — not the `Error: ` -prefixed form `String(err)` yields.
- *
- * @internal
- */
 function _errorToS(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
