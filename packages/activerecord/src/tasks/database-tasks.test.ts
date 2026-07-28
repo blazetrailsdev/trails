@@ -9,6 +9,7 @@ import { DatabaseConfigurations } from "../database-configurations.js";
 import { NoEnvironmentInSchemaError, ProtectedEnvironmentError } from "../migration.js";
 import { SchemaMigration } from "../schema-migration.js";
 import { Base } from "../base.js";
+import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { adapterType, ambientPoolConfiguration } from "../test-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { fixtures } from "../test-helpers/fixtures.js";
@@ -428,7 +429,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
     expect(establishSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         adapter: "sqlite3",
-        database: path.resolve(DatabaseTasks.root, "dev.db"),
+        database: "dev.db",
       }),
     );
   });
@@ -499,7 +500,7 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
     expect(establishSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         adapter: "sqlite3",
-        database: path.resolve(DatabaseTasks.root, "dev_primary.db"),
+        database: "dev_primary.db",
       }),
     );
   });
@@ -1294,5 +1295,64 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
     process.env.SCHEMA = "override.rb";
     const config = new HashConfig("test", "animals", { adapter: "sqlite3" });
     expect(DatabaseTasks.dumpSchemaFilename(config)).toBe("override.rb");
+  });
+});
+
+describe("DatabaseTasksWithTemporaryPoolTest", () => {
+  afterEach(async () => {
+    await Base.establishConnection(ambientPoolConfiguration());
+  });
+
+  it.skipIf(adapterType !== "sqlite")(
+    "reuses the ambient pool for a relative sqlite path",
+    async () => {
+      const config = new HashConfig(DatabaseTasks.env, "primary", {
+        adapter: "sqlite3",
+        database: "db/relative.sqlite3",
+        pool: 1,
+      });
+      await Base.establishConnection(config);
+      const ambientPool = Base.connectionPool();
+      let temporaryPool: ConnectionPool | null = null;
+      await DatabaseTasks.withTemporaryPool(config, async (pool) => {
+        temporaryPool = pool;
+      });
+      expect(temporaryPool).toBe(ambientPool);
+      expect(Base.connectionPool()).toBe(ambientPool);
+      // The relative path survives: nothing may rewrite the registry config
+      // (Rails' with_temporary_pool does no path work — database_tasks.rb:542).
+      expect(config.database).toBe("db/relative.sqlite3");
+    },
+  );
+
+  it.skipIf(adapterType !== "sqlite")("createAll restores the original pool", async () => {
+    const config = new HashConfig(DatabaseTasks.env, "primary", {
+      adapter: "sqlite3",
+      database: "db/ambient.sqlite3",
+      pool: 1,
+    });
+    await Base.establishConnection(config);
+    const ambientPool = Base.connectionPool();
+    // Rails stubs `create` rather than registering a task
+    // (database_tasks_test.rb:587). Registering one here would mean clearing the
+    // registry afterwards, and clearRegisteredTasks() wipes the SQLiteDatabaseTasks
+    // registration the test bootstrap installs (support/connection.ts:396).
+    const createSpy = vi.spyOn(DatabaseTasks, "create").mockResolvedValue(undefined);
+    const previousConfiguration = DatabaseTasks.databaseConfiguration;
+    // The DatabaseConfigurations constructor installs itself as the module-level
+    // current-configurations singleton, so that needs restoring too.
+    const previousCurrent = DatabaseConfigurations.current;
+    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+      [DatabaseTasks.env]: { adapter: "sqlite3", database: "db/other.sqlite3" },
+    });
+    try {
+      await DatabaseTasks.createAll();
+      expect(createSpy).toHaveBeenCalled();
+      expect(Base.connectionPool()).toBe(ambientPool);
+    } finally {
+      createSpy.mockRestore();
+      DatabaseTasks.databaseConfiguration = previousConfiguration;
+      DatabaseConfigurations.current = previousCurrent;
+    }
   });
 });

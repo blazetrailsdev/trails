@@ -199,7 +199,7 @@ export class DatabaseTasks {
     }
     // Rails: re-establish connection to the original config after all creates.
     if (originalConfig !== null) {
-      await Base.establishConnection(originalConfig.configuration as Record<string, unknown>);
+      await Base.establishConnection(originalConfig);
     }
   }
 
@@ -211,18 +211,19 @@ export class DatabaseTasks {
         await this.create(config);
       }
     }
-    // Rails: establish_connection(environment.to_sym) calls configurations.resolve(:env)
-    // → find_db_config(env) which returns forCurrentEnv configs first, then falls back
-    // to the first config for that env_name. findDbConfig mirrors that exact lookup.
+    // Rails is `establish_connection(environment.to_sym)` (database_tasks.rb:653),
+    // which resolves through `Base.configurations`. trails cannot pass the bare env:
+    // `DatabaseTasks.databaseConfiguration` is a SEPARATE registry from
+    // `Base.configurations` (support/connection.ts:390-392 happens to set both, but
+    // callers reassign `databaseConfiguration` alone), so the env string would
+    // resolve against the wrong set of configs. findDbConfig mirrors what
+    // configurations.resolve(:env) does: forCurrentEnv configs first, then the first
+    // config for that env_name.
     const envName = this._normalizeEnv(environment);
     const primaryConfig = this.databaseConfiguration?.findDbConfig(envName);
     if (primaryConfig) {
       const { Base } = await import("../base.js");
-      const configuration = _normalizeSQLitePath(
-        primaryConfig.configuration as Record<string, unknown>,
-        this.root,
-      );
-      await Base.establishConnection(configuration);
+      await Base.establishConnection(primaryConfig);
     }
   }
 
@@ -1047,9 +1048,10 @@ export class DatabaseTasks {
   }
 
   /**
-   * Mirrors Rails' `DatabaseTasks.with_temporary_pool`: establishes a fresh
-   * pool for `config` (clobber: true), yields it, then restores the prior
-   * pool (or removes the pool if none existed before).
+   * Mirrors Rails' `DatabaseTasks.with_temporary_pool`: establishes a pool for
+   * `config` (clobber defaults to false, so an existing pool for the same
+   * config object is reused), yields it, then restores the prior pool (or
+   * removes the pool if none existed before).
    *
    * @internal
    */
@@ -1065,21 +1067,16 @@ export class DatabaseTasks {
     } catch (error) {
       if (!(error instanceof ConnectionNotDefined)) throw error;
     }
-    const rawConfiguration = config.configuration as Record<string, unknown>;
-    const configuration = _normalizeSQLitePath(rawConfiguration, this.root);
     // Rails passes the `DatabaseConfig` object itself
-    // (tasks/database_tasks.rb:652), which is what lets
+    // (tasks/database_tasks.rb:542,544), which is what lets
     // `ConnectionHandler#establish_connection` recognise an already-established
     // pool for the same config and reuse it instead of opening a second one
     // (connection_adapters/abstract/connection_handler.rb:139). Handing over a
     // plain hash would mint a fresh `HashConfig` that can never match, and a
     // second pool on a `:memory:` database discards the first one's data.
-    // The normalized hash is only used when path resolution actually rewrote
-    // something, since that rewrite has no config-object form.
-    const target = configuration === rawConfiguration ? config : configuration;
     // Mirrors Rails' `ensure` which restores even if establish_connection raises.
     try {
-      await Base.establishConnection(target);
+      await Base.establishConnection(config);
       const pool = Base.connectionPool();
       return await fn(pool);
     } finally {
@@ -1493,32 +1490,6 @@ export async function initializeDatabase(dbConfig: DatabaseConfig): Promise<bool
     }
     return !alreadyInitialized;
   });
-}
-
-// Mirrors SQLite3Adapter._isMemoryFilename: `:memory:`, `file::memory:`, and
-// `file:...?mode=memory` are all in-memory and must not be path-resolved.
-function _isSQLiteMemoryDatabase(database: string): boolean {
-  if (database === ":memory:") return true;
-  if (!database.startsWith("file:")) return false;
-  if (database.startsWith("file::memory:")) return true;
-  const q = database.indexOf("?");
-  if (q === -1) return false;
-  return new URLSearchParams(database.slice(q + 1)).get("mode") === "memory";
-}
-
-// Mirrors Rails' SQLiteDatabaseTasks#initialize: resolve relative `database`
-// paths against root so all withTemporaryPool callers behave consistently.
-function _normalizeSQLitePath(
-  configuration: Record<string, unknown>,
-  root: string,
-): Record<string, unknown> {
-  const adapter = configuration["adapter"];
-  if (typeof adapter !== "string" || !adapter.includes("sqlite")) return configuration;
-  const database = configuration["database"];
-  if (typeof database !== "string" || _isSQLiteMemoryDatabase(database)) return configuration;
-  const p = getPath();
-  if (!p.isAbsolute || p.isAbsolute(database)) return configuration;
-  return { ...configuration, database: p.resolve(root, database) };
 }
 
 // Defensive fallback for SQL-level errors that slip through pool proxies or
