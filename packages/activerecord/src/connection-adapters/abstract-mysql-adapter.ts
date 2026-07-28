@@ -1418,6 +1418,15 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return this._typeMap;
   }
 
+  /**
+   * A divergent override, NOT a port: Rails defines `lookup_cast_type` only at
+   * `abstract/quoting.rb:234-236` and `postgresql/quoting.rb:195` — never on a
+   * MySQL adapter — so the inherited one is what Rails runs here. This
+   * override and the `_nativeTypeMap` / `_buildTypeMap` slots behind it are a
+   * trails invention, as is `lookupCastTypeFromColumn`'s null return for an
+   * empty sql_type. Deliberately left flagged rather than tagged: converging
+   * them is `mysql-native-type-map-converges-onto-type-map`.
+   */
   lookupCastType(sqlType: string | null): import("@blazetrails/activemodel").Type {
     return this._nativeTypeMap.lookup(sqlType?.toLowerCase().trim() ?? null);
   }
