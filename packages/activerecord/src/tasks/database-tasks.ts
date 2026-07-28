@@ -218,11 +218,8 @@ export class DatabaseTasks {
     const primaryConfig = this.databaseConfiguration?.findDbConfig(envName);
     if (primaryConfig) {
       const { Base } = await import("../base.js");
-      const configuration = _normalizeSQLitePath(
-        primaryConfig.configuration as Record<string, unknown>,
-        this.root,
-      );
-      await Base.establishConnection(configuration);
+      _normalizeSQLitePath(primaryConfig, this.root);
+      await Base.establishConnection(primaryConfig);
     }
   }
 
@@ -1065,8 +1062,7 @@ export class DatabaseTasks {
     } catch (error) {
       if (!(error instanceof ConnectionNotDefined)) throw error;
     }
-    const rawConfiguration = config.configuration as Record<string, unknown>;
-    const configuration = _normalizeSQLitePath(rawConfiguration, this.root);
+    _normalizeSQLitePath(config, this.root);
     // Rails passes the `DatabaseConfig` object itself
     // (tasks/database_tasks.rb:652), which is what lets
     // `ConnectionHandler#establish_connection` recognise an already-established
@@ -1074,12 +1070,9 @@ export class DatabaseTasks {
     // (connection_adapters/abstract/connection_handler.rb:139). Handing over a
     // plain hash would mint a fresh `HashConfig` that can never match, and a
     // second pool on a `:memory:` database discards the first one's data.
-    // The normalized hash is only used when path resolution actually rewrote
-    // something, since that rewrite has no config-object form.
-    const target = configuration === rawConfiguration ? config : configuration;
     // Mirrors Rails' `ensure` which restores even if establish_connection raises.
     try {
-      await Base.establishConnection(target);
+      await Base.establishConnection(config);
       const pool = Base.connectionPool();
       return await fn(pool);
     } finally {
@@ -1508,17 +1501,21 @@ function _isSQLiteMemoryDatabase(database: string): boolean {
 
 // Mirrors Rails' SQLiteDatabaseTasks#initialize: resolve relative `database`
 // paths against root so all withTemporaryPool callers behave consistently.
-function _normalizeSQLitePath(
-  configuration: Record<string, unknown>,
-  root: string,
-): Record<string, unknown> {
-  const adapter = configuration["adapter"];
-  if (typeof adapter !== "string" || !adapter.includes("sqlite")) return configuration;
-  const database = configuration["database"];
-  if (typeof database !== "string" || _isSQLiteMemoryDatabase(database)) return configuration;
+// The rewrite is applied to the config OBJECT in place, through Rails'
+// `DatabaseConfig#_database=` (which exists so tasks can swap the database
+// without minting a new config). Returning a new config instead would break
+// `ConnectionHandler#establishConnection`'s reference-equality reuse check,
+// so a temporary pool over a relative sqlite path would replace — and
+// disconnect — the ambient pool.
+function _normalizeSQLitePath(config: DatabaseConfig, root: string): DatabaseConfig {
+  const adapter = config.adapter;
+  if (typeof adapter !== "string" || !adapter.includes("sqlite")) return config;
+  const database = config.database;
+  if (typeof database !== "string" || _isSQLiteMemoryDatabase(database)) return config;
   const p = getPath();
-  if (!p.isAbsolute || p.isAbsolute(database)) return configuration;
-  return { ...configuration, database: p.resolve(root, database) };
+  if (!p.isAbsolute || p.isAbsolute(database)) return config;
+  config._database = p.resolve(root, database);
+  return config;
 }
 
 // Defensive fallback for SQL-level errors that slip through pool proxies or

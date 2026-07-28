@@ -557,7 +557,9 @@ describe("DatabaseTasksDropAllTest", () => {
       development: { adapter: "sqlite3", database: "dev.db", host: "127.0.0.1" },
     });
     await DatabaseTasks.dropAll();
-    expect(dropped).toContain("dev.db");
+    // Resolved: checkProtectedEnvironmentsBang runs the config through
+    // withTemporaryConnection, which resolves relative sqlite paths in place.
+    expect(dropped).toContain(path.resolve(DatabaseTasks.root, "dev.db"));
   });
 
   it("drops configurations with local host", async () => {
@@ -565,7 +567,9 @@ describe("DatabaseTasksDropAllTest", () => {
       development: { adapter: "sqlite3", database: "dev.db", host: "localhost" },
     });
     await DatabaseTasks.dropAll();
-    expect(dropped).toContain("dev.db");
+    // Resolved: checkProtectedEnvironmentsBang runs the config through
+    // withTemporaryConnection, which resolves relative sqlite paths in place.
+    expect(dropped).toContain(path.resolve(DatabaseTasks.root, "dev.db"));
   });
 
   it("drops configurations with blank hosts", async () => {
@@ -573,7 +577,9 @@ describe("DatabaseTasksDropAllTest", () => {
       development: { adapter: "sqlite3", database: "dev.db", host: "" },
     });
     await DatabaseTasks.dropAll();
-    expect(dropped).toContain("dev.db");
+    // Resolved: checkProtectedEnvironmentsBang runs the config through
+    // withTemporaryConnection, which resolves relative sqlite paths in place.
+    expect(dropped).toContain(path.resolve(DatabaseTasks.root, "dev.db"));
   });
 });
 
@@ -601,7 +607,7 @@ describe("DatabaseTasksDropCurrentTest", () => {
   it("drops current environment database", async () => {
     DatabaseTasks.env = "test";
     await DatabaseTasks.dropCurrent("test");
-    expect(dropped).toContain("test:test.db");
+    expect(dropped).toContain(`test:${path.resolve(DatabaseTasks.root, "test.db")}`);
   });
 
   it("drops current environment database with url", async () => {
@@ -1294,5 +1300,42 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
     process.env.SCHEMA = "override.rb";
     const config = new HashConfig("test", "animals", { adapter: "sqlite3" });
     expect(DatabaseTasks.dumpSchemaFilename(config)).toBe("override.rb");
+  });
+});
+
+describe("DatabaseTasksWithTemporaryPoolTest", () => {
+  afterEach(() => {
+    try {
+      Base.removeConnection();
+    } catch {
+      /* no pool */
+    }
+  });
+
+  it("reuses the ambient pool for a relative sqlite path", async () => {
+    // Path normalization must not cost config identity: the handler's reuse
+    // check is reference equality on the DatabaseConfig
+    // (connection-handler.ts, existingPoolConfig.dbConfig === poolConfig.dbConfig).
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-temp-pool-"));
+    const previousRoot = DatabaseTasks.root;
+    DatabaseTasks.root = tmp;
+    const config = new HashConfig(DatabaseTasks.env, "primary", {
+      adapter: "sqlite3",
+      database: "relative.sqlite3",
+      pool: 1,
+    });
+    try {
+      await Base.establishConnection(config);
+      const ambientPool = Base.connectionPool();
+      let temporaryPool: unknown = null;
+      await DatabaseTasks.withTemporaryPool(config, async (pool) => {
+        temporaryPool = pool;
+      });
+      expect(temporaryPool).toBe(ambientPool);
+      expect(Base.connectionPool()).toBe(ambientPool);
+      expect(config.database).toBe(path.join(tmp, "relative.sqlite3"));
+    } finally {
+      DatabaseTasks.root = previousRoot;
+    }
   });
 });
