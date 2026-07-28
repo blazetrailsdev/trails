@@ -16,6 +16,7 @@ import { subclasses } from "./inheritance.js";
 import { modelRegistry } from "./associations.js";
 import { safeConstantize } from "@blazetrails/activesupport";
 import { Author } from "./test-helpers/models/author.js";
+import "./test-helpers/models/country.js";
 
 function subclassNamed(parent: typeof Base, name: string): typeof Base {
   const klass = class extends parent {};
@@ -71,6 +72,14 @@ describe("registerModel canonical-name shadow guard", () => {
     registerSubclass(sub);
     expect(safeConstantize("RfStiSubXyz")).toBe(sub);
     expect(modelRegistry.has("RfStiSubXyz")).toBe(false);
+  });
+
+  it("binds the habtm join model as a constant, as Rails' const_set does", () => {
+    // Rails: `const_set join_model.name, join_model` (associations.rb:1877).
+    expect(safeConstantize("Country::HABTM_Treaties")).toBe(
+      modelRegistry.get("Country::HABTM_Treaties"),
+    );
+    expect(modelRegistry.get("Country::HABTM_Treaties")).toBeDefined();
   });
 
   it("unregisters the constant when the registry entry is dropped", () => {

@@ -194,6 +194,8 @@ export class HasAndBelongsToMany {
       sourceName,
     );
 
+    // Registering the key also binds it in the constant table, matching Rails'
+    // `const_set join_model.name, join_model` on the owner (associations.rb:1877).
     deps.modelRegistry.set(registryKey, JoinModel);
 
     const middleName = [pluralize(model.name.toLowerCase()), name].sort().join("_");
