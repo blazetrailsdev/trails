@@ -2,8 +2,10 @@
  * Port of the `add_foreign_key` and `remove_foreign_key` halves of
  * `ActiveRecord::Migration::ForeignKeyTest`
  * (vendor/rails/activerecord/test/cases/migration/foreign_key_test.rb:209-330
- * and :393-451, :749-773). The `SchemaDumpingHelper`-driven dumper cases in the
- * same Rails class are still unported.
+ * and :393-451, :749-773) plus all of its sibling
+ * `ActiveRecord::Migration::CompositeForeignKeyTest` (:824-912). The
+ * `SchemaDumpingHelper`-driven dumper cases in `ForeignKeyTest` are still
+ * unported.
  *
  * Driven by the ambient connection, mirroring Rails'
  * `@connection = ActiveRecord::Base.lease_connection`. The rockets/astronauts
@@ -384,7 +386,6 @@ describeIfSupports("foreign_keys", "Migration", () => {
         } else if (adapterType === "sqlite") {
           expect(message).toMatch(/foreign key mismatch - "astronauts" referencing "rockets"/);
         } else {
-          // MariaDB and different versions of MySQL generate different error messages.
           expect(
             [
               /Foreign key constraint is incorrectly formed/i,
@@ -488,10 +489,9 @@ describeIfSupports("foreign_keys", "Migration", () => {
 
         const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
 
-        // Rails asserts the Ruby DSL line
-        // `add_foreign_key "astronauts", "rockets", column: [...], primary_key: [...]`;
-        // the TS dumper emits the equivalent `ctx.addForeignKey(...)` call with
-        // JSON-formatted arrays.
+        // Deviation: Rails asserts the Ruby DSL line `add_foreign_key "astronauts",
+        // "rockets", column: [...], primary_key: [...]`. The TS dumper emits the
+        // equivalent `ctx.addForeignKey(...)` call with JSON-formatted arrays.
         expect(output).toMatch(
           /\s+await ctx\.addForeignKey\("astronauts", "rockets", \{ column: \["rocket_tenant_id","rocket_id"\], primaryKey: \["tenant_id","id"\] \}\);$/m,
         );
