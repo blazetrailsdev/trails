@@ -178,6 +178,20 @@ export function registerConstant(name: string, value: unknown): void {
   _constants.set(name, value);
 }
 
+/**
+ * @noRailsEquivalent The removal half of the invented constant table (see
+ * {@link registerConstant}). Ruby constants are removed with
+ * `Object.send(:remove_const, …)`, which has no ESM analogue; trails needs it so
+ * a registry teardown cannot leave a name resolvable through
+ * {@link constantize}. The removal is conditional on `expected`: the name is
+ * dropped only when it currently resolves to that value, so a caller tearing
+ * down its own binding cannot clobber a later rebinding by someone else.
+ */
+export function unregisterConstant(name: string, expected: unknown): void {
+  if (_constants.get(name) !== expected) return;
+  _constants.delete(name);
+}
+
 /** @internal — test use only: clear the registered constant table. */
 export function _resetConstants(): void {
   _constants.clear();

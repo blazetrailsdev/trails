@@ -102,6 +102,7 @@ import {
   camelize,
   foreignKey as deriveForeignKey,
   registerConstant,
+  unregisterConstant,
 } from "@blazetrails/activesupport";
 import { registerSubclass, polymorphicName } from "./inheritance.js";
 import { flushPendingCounterCacheColumns } from "./counter-cache.js";
@@ -242,18 +243,30 @@ class ModelRegistry extends Map<string, typeof Base> {
   }
 
   override set(name: string, model: typeof Base): this {
+    // Guard (inside registerModelConstant) before any mutation: a rejected
+    // registration must not bump the generation, which would invalidate every
+    // reflection memo for a write that never happened.
+    registerModelConstant(name, model);
     if (super.get(name) !== model) this.#generation++;
     return super.set(name, model);
   }
 
   override delete(name: string): boolean {
+    // The constant table is wider than the registry, so the name may since have
+    // been rebound (e.g. by registerSubclass) to a class this registry entry
+    // knows nothing about — only drop the constant when it is still ours.
+    const model = super.get(name);
     const deleted = super.delete(name);
-    if (deleted) this.#generation++;
+    if (deleted) {
+      this.#generation++;
+      unregisterConstant(name, model);
+    }
     return deleted;
   }
 
   override clear(): void {
     if (this.size > 0) this.#generation++;
+    for (const [name, model] of this) unregisterConstant(name, model);
     super.clear();
   }
 }
@@ -294,11 +307,30 @@ function guardCanonicalNameShadow(name: string, model: typeof Base): void {
   const canonical = canonicalModelAutoloadIndex?.get(name);
   if (canonical && canonical !== model) {
     throw new Error(
-      `registerModel(${JSON.stringify(name)}, …) would shadow the canonical model of the ` +
+      `Registering a class under ${JSON.stringify(name)} would shadow the canonical model of the ` +
         `same name in the global registry, poisoning every later test that resolves it as an ` +
         `association target. Use the canonical model, or a distinct non-canonical name.`,
     );
   }
+}
+
+/**
+ * The single path that binds a model class to a name in Active Support's
+ * constant table. Every constant write for a model class goes through here —
+ * {@link registerModel} and every other `modelRegistry.set` caller reach it via
+ * `ModelRegistry.set`, `registerSubclass` and `Base.adapter=` call it directly —
+ * so the shadow guard covers every writer, and a name in the registry is always
+ * a registered constant (`delete`/`clear` unregister the matching constant).
+ *
+ * Deliberately narrow: it does NOT write `modelRegistry` (the constant table is
+ * the wider, fallback-only namespace — `registerSubclass` and `Base.adapter=`
+ * must not promote a throwaway subclass into association resolution) and it does
+ * NOT write `_modelsByName`, which its own callers still own.
+ * @internal
+ */
+export function registerModelConstant(name: string, model: typeof Base): void {
+  guardCanonicalNameShadow(name, model);
+  registerConstant(name, model);
 }
 
 /**
@@ -350,20 +382,16 @@ export function registerModel(
   }
   if (typeof nameOrModel === "string") {
     if (!model) throw new Error("registerModel(name, model) requires a model class");
-    guardCanonicalNameShadow(nameOrModel, model);
     modelRegistry.set(nameOrModel, model);
     model._modelsByName.set(nameOrModel, model);
-    registerConstant(nameOrModel, model);
     // Attach registry key so counter-cache pending-map lookup can match it.
     const keys: string[] = model._registryKeys ?? [];
     if (!keys.includes(nameOrModel)) keys.push(nameOrModel);
     model._registryKeys = keys;
     flushPendingCounterCacheColumns(model);
   } else {
-    guardCanonicalNameShadow(nameOrModel.name, nameOrModel);
     modelRegistry.set(nameOrModel.name, nameOrModel);
     nameOrModel._modelsByName.set(nameOrModel.name, nameOrModel);
-    registerConstant(nameOrModel.name, nameOrModel);
     // A namespaced model carries its Ruby module path via `static moduleName`;
     // derive the `::`-qualified registry key from it (e.g.
     // "MyApplication::Billing::Firm") so cross-namespace `className` resolution

@@ -194,6 +194,14 @@ export class HasAndBelongsToMany {
       sourceName,
     );
 
+    // Registering the key also binds it in the constant table. Rails does
+    // `const_set join_model.name, join_model` here — but then
+    // `private_constant join_model.name` (associations.rb:1877-1878), so Ruby
+    // raises NameError on `const_get("Country::HABTM_Treaties")`. trails' flat
+    // constant table has no private-constant concept, so the binding is wider
+    // than Rails': the join model is constantize-able. Accepted because the
+    // registry⇒constant invariant is what makes teardown symmetric, and the key
+    // is synthetic — nothing but the habtm reflection names it.
     deps.modelRegistry.set(registryKey, JoinModel);
 
     const middleName = [pluralize(model.name.toLowerCase()), name].sort().join("_");
