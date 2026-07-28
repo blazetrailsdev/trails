@@ -2,10 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 
-// Trails-only coverage with no Rails counterpart: the type resolver, the
-// in-memory filename predicate, and validation of the trails `pragmas`
-// constructor option. Everything Rails names lives in sqlite3-adapter.test.ts.
-
 describe("SqliteAdapter", () => {
   let adapter: AbstractSQLite3Adapter;
 
@@ -56,10 +52,11 @@ describe("SqliteAdapter", () => {
 });
 
 describe("SQLite3Adapter._isMemoryFilename", () => {
-  // Access the private static via `as any` — avoids opening any real DB connection.
-  const isMemoryFilename = (AbstractSQLite3Adapter as any)._isMemoryFilename.bind(
-    AbstractSQLite3Adapter,
-  ) as (filename: string) => boolean;
+  const isMemoryFilename = (
+    AbstractSQLite3Adapter as unknown as {
+      _isMemoryFilename(filename: string): boolean;
+    }
+  )._isMemoryFilename.bind(AbstractSQLite3Adapter);
 
   it("treats :memory: as in-memory", () => {
     expect(isMemoryFilename(":memory:")).toBe(true);
@@ -74,7 +71,6 @@ describe("SQLite3Adapter._isMemoryFilename", () => {
   });
 
   it("does NOT treat a path containing mode=memory text as in-memory", () => {
-    // file:/tmp/mode=memory.db has the text but not as a query param
     expect(isMemoryFilename("file:/tmp/mode=memory.db")).toBe(false);
   });
 

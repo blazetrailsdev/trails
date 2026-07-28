@@ -48,7 +48,6 @@
   "packages/activerecord/src/adapters/sqlite3/copy-table.test.ts",
   "packages/activerecord/src/adapters/sqlite3/json.test.ts",
   "packages/activerecord/src/adapters/sqlite3/sqlite3-adapter.test.ts",
-  "packages/activerecord/src/adapters/sqlite3/sqlite3-adapter.trails.test.ts",
   "packages/activerecord/src/adapters/sqlite3/transaction.test.ts",
   "packages/activerecord/src/aggregations.test.ts",
   "packages/activerecord/src/associations.test.ts",
