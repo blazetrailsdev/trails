@@ -171,11 +171,6 @@ describe("DatabaseConfigurationsTest", () => {
     });
 
     it("forCurrentEnv follows an explicitly set defaultEnv over the process env", () => {
-      // Rails: DEFAULT_ENV.call is Rails.env → RAILS_ENV → RACK_ENV, so an
-      // app-supplied env outranks the process env. defaultEnv is our Rails.env
-      // analogue; before this it was the terminal fallback only, so setting it
-      // left forCurrentEnv reading NODE_ENV and findDbConfig's first pass —
-      // which is gated on forCurrentEnv — never matched a 3-level entry.
       vi.stubEnv("NODE_ENV", "test");
       DatabaseConfigurations.defaultEnv = "default_env";
 
@@ -192,6 +187,12 @@ describe("DatabaseConfigurationsTest", () => {
       });
 
       expect(DatabaseConfigurations.currentEnv()).toBe("default_env");
+      expect(configs.configsFor({ envName: "default_env" }).every((c) => c.forCurrentEnv)).toBe(
+        true,
+      );
+      expect(configs.configsFor({ envName: "another_env" }).some((c) => c.forCurrentEnv)).toBe(
+        false,
+      );
       expect(configs.findDbConfig("primary")!.database).toBe("primary.sqlite3");
       expect(configs.findDbConfig("readonly")!.database).toBe("readonly.sqlite3");
       expect(configs.findDbConfig("common")!.database).toBe("common.sqlite3");

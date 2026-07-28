@@ -37,11 +37,7 @@ type DbConfigHandler = (
 ) => DatabaseConfig | null | undefined;
 
 export class DatabaseConfigurations {
-  private static _defaultEnv: string = "development";
-  // Analogue of `defined?(Rails.env)` in `ConnectionHandling::RAILS_ENV`: the
-  // initial "development" above is the built-in fallback, not an app-supplied
-  // env, so only an explicit assignment may outrank TRAILS_ENV / NODE_ENV.
-  private static _defaultEnvSet = false;
+  private static _defaultEnv: string | null = null;
 
   /**
    * Mirrors: DatabaseConfigurations.db_config_handlers
@@ -64,18 +60,13 @@ export class DatabaseConfigurations {
 
   /** @internal */
   static get defaultEnv(): string {
+    if (this._defaultEnv === null) return "development";
     return this._defaultEnv || "default";
   }
 
-  /** @internal */
+  /** @internal Assign null to clear the override and fall back to the process env. */
   static set defaultEnv(value: string | null) {
-    if (value === null) {
-      this._defaultEnv = "development";
-      this._defaultEnvSet = false;
-      return;
-    }
     this._defaultEnv = value;
-    this._defaultEnvSet = true;
   }
 
   /**
@@ -95,7 +86,7 @@ export class DatabaseConfigurations {
    */
   static currentEnv(): string {
     return (
-      (this._defaultEnvSet ? this._defaultEnv : "") ||
+      this._defaultEnv ||
       getEnv("TRAILS_ENV") ||
       getEnv("NODE_ENV") ||
       DatabaseConfigurations.defaultEnv
@@ -129,7 +120,7 @@ export class DatabaseConfigurations {
       // merges DATABASE_URL via environment_url_config + merge_db_environment_variables.
       // Uses DatabaseConfigurations.defaultEnv (set by app bootstrap from RAILS_ENV/RACK_ENV),
       // not NODE_ENV — matching Rails' env resolution semantics.
-      this._configurations = this._buildConfigs(configurations, DatabaseConfigurations._defaultEnv);
+      this._configurations = this._buildConfigs(configurations, DatabaseConfigurations.defaultEnv);
     }
     // Register this instance as the current one for HashConfig.isPrimary lookup
     _currentConfigurations = this;
