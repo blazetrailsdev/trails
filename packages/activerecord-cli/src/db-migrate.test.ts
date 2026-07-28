@@ -10,10 +10,27 @@ const config = { development: { adapter: "sqlite3", database: ":memory:", pool: 
 export default config;
 `;
 
+const FAKE_MULTI_DB_CONFIG = `
+const config = {
+  development: {
+    primary: { adapter: "sqlite3", database: ":memory:", pool: 1 },
+    animals: { adapter: "sqlite3", database: ":memory:", pool: 1 },
+  },
+};
+export default config;
+`;
+
 async function makeFakeProject(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "ar-db-migrate-"));
   await mkdir(join(dir, "config"), { recursive: true });
   await writeFile(join(dir, "config", "database.ts"), FAKE_CONFIG, "utf8");
+  return dir;
+}
+
+async function makeMultiDbFakeProject(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "ar-db-migrate-multi-"));
+  await mkdir(join(dir, "config"), { recursive: true });
+  await writeFile(join(dir, "config", "database.ts"), FAKE_MULTI_DB_CONFIG, "utf8");
   return dir;
 }
 
@@ -72,6 +89,16 @@ describe("DbMigrateTest", () => {
     const discoverSpy = vi.spyOn(Migrator, "discoverMigrations").mockReturnValue([]);
     expect(await run(["db:migrate"], await makeFakeProject())).toBe(0);
     expect(discoverSpy).toHaveBeenCalled();
+  });
+
+  it("db:migrate takes the multi-database path when the env has several configs", async () => {
+    // `migrateAll`'s multi-db branch never touches the ambient pool `dbMigrate`
+    // opens — it drives each config through its own `withTemporaryConnection`,
+    // so the single-primary fast path (and with it `migrate`) is never reached.
+    DatabaseConfigurations.defaultEnv = "development";
+    expect(await run(["db:migrate"], await makeMultiDbFakeProject())).toBe(0);
+    expect(DatabaseTasks.configsFor("development")).toHaveLength(2);
+    expect(migrateSpy).not.toHaveBeenCalled();
   });
 
   it("db:migrate exits 1 on missing config", async () => {
