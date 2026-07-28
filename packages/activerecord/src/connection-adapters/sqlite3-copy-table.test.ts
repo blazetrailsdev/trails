@@ -15,7 +15,7 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
 
   const dropCopyTargets = async (): Promise<void> => {
     await leased?.exec(
-      `DROP TABLE IF EXISTS customers2; DROP TABLE IF EXISTS customers3; DROP TABLE IF EXISTS books2; DROP TABLE IF EXISTS "_alter_tmp_customers2"`,
+      `DROP TABLE IF EXISTS customers2; DROP TABLE IF EXISTS customers3; DROP TABLE IF EXISTS books2; DROP TABLE IF EXISTS auto_id_tests2; DROP TABLE IF EXISTS "acustomers2"`,
     );
   };
 
@@ -86,6 +86,16 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
     await db.addIndex("customers", ["name"], { order: { name: "desc" } });
     await (db as any).copyTable("customers", "customers2");
     expect(await copiedIndexSql("customers2", "name")).toMatch(/"name"\s+DESC/i);
+  });
+
+  it("copyTable keeps a column's SQL function default", async () => {
+    // Rails deserializes column.default and, when that is nil, substitutes
+    // `-> { column.default_function }` before handing it to create_table
+    // (sqlite3_adapter.rb:627-634). `auto_id_tests.published_at` is the
+    // canonical `default: -> { "CURRENT_TIMESTAMP" }` column.
+    await (db as any).copyTable("auto_id_tests", "auto_id_tests2");
+    const copied = (await db.columns("auto_id_tests2")).find((c) => c.name === "published_at");
+    expect(copied?.defaultFunction).toBe("CURRENT_TIMESTAMP");
   });
 
   // --- moveTable ---

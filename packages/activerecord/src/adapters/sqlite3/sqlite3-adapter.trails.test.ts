@@ -13,6 +13,28 @@ describe("SqliteAdapter", () => {
     await adapter.close();
   });
 
+  // TS-only coverage for the alter_table rebuild: a typeless column has BLOB
+  // affinity, and both the throwaway "a"-prefixed buffer and the rebuilt table
+  // have to keep the declared type empty or the affinity silently becomes TEXT.
+  describe("alterTable", () => {
+    it("round-trips a typeless (BLOB affinity) column", async () => {
+      await adapter.exec(
+        `CREATE TABLE "affinities" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "untyped", "doomed" varchar)`,
+      );
+      await adapter.executeMutation(`INSERT INTO "affinities" ("untyped") VALUES (42)`);
+
+      await adapter.removeColumn("affinities", "doomed");
+
+      const columns = await adapter.columns("affinities");
+      expect(columns.map((c) => c.name)).toEqual(["id", "untyped"]);
+      expect(columns.find((c) => c.name === "untyped")?.sqlType).toBe("");
+      const rows = await adapter.selectAll(`SELECT typeof("untyped") AS t FROM "affinities"`);
+      expect(rows.rows[0]?.[0]).toBe("integer");
+
+      await adapter.dropTable("affinities");
+    });
+  });
+
   describe("lookupCastType", () => {
     it("resolves base SQL types", () => {
       expect(adapter.lookupCastType("string").name).toBe("string");
