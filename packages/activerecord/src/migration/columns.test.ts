@@ -46,8 +46,6 @@ describe("Migration", () => {
 
       await connection.renameColumn("test_models", "first_name", "nick_name");
       TestModel.resetColumnInformation();
-      // `reset_column_information` is lazy in Rails; trails' schema load is
-      // async, so the reflection is pulled explicitly before reading it.
       await TestModel.loadSchema();
       expect(TestModel.columnNames()).toContain("nick_name");
       expect((await TestModel.all()).map((m) => m.nick_name)).toEqual(["foo"]);
@@ -69,8 +67,6 @@ describe("Migration", () => {
       expect(newColumns.find((c) => c.name === "age" && c.type === "integer")).toBeFalsy();
       expect(newColumns.find((c) => c.name === "age" && c.type === "string")).toBeTruthy();
 
-      // Rails deserializes `c.default` inline in each block; `lookupCastTypeFromColumn`
-      // is async here, so the boolean `approved` default is resolved up front.
       const approvedDefault = async (columns: readonly Column[]): Promise<unknown> => {
         const column = columns.find((c) => c.name === "approved" && c.type === "boolean");
         if (!column) return undefined;

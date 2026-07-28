@@ -30,9 +30,6 @@ describeIfSupports("exclusion_constraints", "Migration", () => {
 
   afterEach(async () => {
     await connection.dropTable("invoices", { ifExists: true });
-    // Rails' setup replaces `invoices` with a start_date/end_date table and its
-    // teardown drops it; restore the canonical shape so the shared per-worker
-    // database does not drift for the files that run next.
     await rebuildCanonicalTables(connection, ["invoices"]);
     await connection.close();
   });

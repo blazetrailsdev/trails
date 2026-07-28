@@ -22,9 +22,6 @@ describeIfSupports("unique_constraints", "Migration", () => {
 
   afterEach(async () => {
     await connection.dropTable("sections", { ifExists: true });
-    // Rails' setup replaces `sections` with a single-column table and its
-    // teardown drops it; restore the canonical shape so the shared per-worker
-    // database does not drift for the files that run next.
     await rebuildCanonicalTables(connection, ["sections"]);
     await connection.close();
   });
