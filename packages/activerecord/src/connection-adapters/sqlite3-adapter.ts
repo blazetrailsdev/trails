@@ -1694,8 +1694,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     type: string,
     options?: Record<string, unknown>,
   ): Promise<void> {
-    const baseType = this._baseColumnType(type, options);
-    const generatedAs = typeof options?.as === "string" ? options.as : null;
     if (isInvalidAlterTableType(type, options ?? {})) {
       await this.alterTable(tableName, (definition) => {
         definition.column(columnName, type as ColumnType, (options ?? {}) as ColumnOptions);
@@ -1705,7 +1703,8 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     if (options?.ifNotExists === true && (await this.columnExists(tableName, columnName))) {
       return;
     }
-    const sqlType = baseType;
+    const generatedAs = typeof options?.as === "string" ? options.as : null;
+    const sqlType = this._baseColumnType(type, options);
     let sql = `ALTER TABLE ${quoteTableName(tableName)} ADD COLUMN ${quoteColumnName(columnName)} ${sqlType}`;
     if (options?.collation) sql += ` COLLATE ${quoteColumnName(String(options.collation))}`;
     if (generatedAs !== null) {
@@ -1750,10 +1749,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     const newDefault = this.schemaStatements().extractNewDefaultValue(defaultOrChanges);
     this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
     await this.alterTable(tableName, (definition) => {
-      // Rails: `definition[column_name].default = default` — the raw value, not
-      // a literal. schemaCreation re-emits it through quoteDefaultExpression,
-      // which serializes through the column's cast type, so a `default: {}` on a
-      // json column quotes to `{}` and not `[object Object]`.
+      // The raw value, not a literal: schemaCreation re-emits it through
+      // quoteDefaultExpression, which serializes it through the column's cast
+      // type, so `default: {}` on a json column quotes to `{}`.
       const column = definition.get(columnName);
       if (column) column.options.default = newDefault;
     });
@@ -2351,10 +2349,8 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     await this.ensureConnected();
     const { bare: bareTable } = this._splitTableName(tableName);
 
-    // Rails' copy_table reflects the source with `primary_key(from)` +
-    // `columns(from)` and feeds real Column objects into the definition
-    // (sqlite3_adapter.rb:597-640). `columns` reaches table_structure, which
-    // raises StatementInvalid naming a missing table (foreign_key_test.rb:322).
+    // No explicit missing-table guard: `columns` reaches table_structure, which
+    // already raises StatementInvalid naming the table (foreign_key_test.rb:322).
     const fromPrimaryKey = await this.primaryKey(tableName);
     const sourceColumns = (await this.columns(tableName)) as Sqlite3Column[];
     const compositePk = Array.isArray(fromPrimaryKey);
@@ -2379,19 +2375,16 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         options.as = column.defaultFunction;
         options.stored = column.isVirtualStored();
         options.type = column.type;
-      } else if (column.hasDefault) {
-        const castType = this.lookupCastTypeFromColumn(column);
-        let deserialized = castType.deserialize(column.default);
-        // Rails: `default = -> { column.default_function } if default.nil?`
-        // — a default the cast type can't represent (CURRENT_TIMESTAMP and
-        // friends) rides through as a raw SQL literal.
-        if (deserialized == null) {
-          const defaultFunction = column.defaultFunction;
-          deserialized = (() => defaultFunction) as unknown as typeof deserialized;
-        }
-        if (!column.autoIncrement) {
-          options.default = deserialized;
-        }
+      } else if (column.hasDefault && !column.autoIncrement) {
+        const defaultFunction = column.defaultFunction;
+        const deserialized: unknown = this.lookupCastTypeFromColumn(column).deserialize(
+          column.default,
+        );
+        // Rails: `default = -> { column.default_function } if default.nil?`. The
+        // extra `defaultFunction` guard is trails-only: quoteDefaultExpression
+        // rejects a callable returning null, where Ruby's `quote(nil)` yields NULL.
+        options.default =
+          deserialized == null && defaultFunction != null ? () => defaultFunction : deserialized;
       }
 
       const columnType = column.isVirtual()
@@ -2402,10 +2395,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       definition.column(column.name, columnType as ColumnType, options);
     }
 
-    // Preserve foreign keys and check constraints across the rebuild, before
-    // the block runs — Rails' alter_table lambda adds them first and only then
-    // yields, which is what lets remove_column delete the FKs it orphans
-    // (sqlite3_adapter.rb:566-583).
+    // Attached before the block runs, as in Rails' alter_table lambda
+    // (sqlite3_adapter.rb:566-583) — that ordering is what lets remove_column
+    // delete the FKs it orphans.
     const fks = overrideForeignKeys ?? (await this.foreignKeys(tableName));
     const checks = overrideCheckConstraints ?? (await this.checkConstraints(tableName));
     definition.foreignKeys.push(...fks);
@@ -3153,7 +3145,9 @@ function deleteForeignKeysForColumns(
 ): void {
   for (let i = definition.foreignKeys.length - 1; i >= 0; i--) {
     const fkColumn = definition.foreignKeys[i].column;
-    const cols = Array.isArray(fkColumn) ? fkColumn : [fkColumn];
+    // A composite FK arrives either as an array or as the comma-joined string
+    // PRAGMA foreign_key_list reflects back; Rails only ever sees the former.
+    const cols = Array.isArray(fkColumn) ? fkColumn : fkColumn.split(",").map((c) => c.trim());
     if (cols.some((c) => columnNames.includes(c))) definition.foreignKeys.splice(i, 1);
   }
 }
