@@ -65,6 +65,19 @@ describe("connect", () => {
     expect(withoutPrepared.adapter).toBe("mysql2");
   });
 
+  it("turns prepared statements on for mysql2 when MYSQL_PREPARED_STATEMENTS is set", async () => {
+    // config.example.yml:7-11,26-30 — the var flips arunit and arunit2 only;
+    // the third entry exists to be the one with them off (config.rb:27-28).
+    vi.stubEnv("ARCONN", "mysql2");
+    vi.stubEnv("MYSQL_PREPARED_STATEMENTS", undefined);
+    const off = (await testConfigurationHashes()).configurationHashes;
+    expect(off.map((c) => c.configurationHash.preparedStatements)).toEqual([false, false, false]);
+
+    vi.stubEnv("MYSQL_PREPARED_STATEMENTS", "1");
+    const on = (await testConfigurationHashes()).configurationHashes;
+    expect(on.map((c) => c.configurationHash.preparedStatements)).toEqual([true, true, false]);
+  });
+
   it("carries min_messages on every postgresql entry", async () => {
     vi.stubEnv("ARCONN", "postgresql");
     const { configurationHashes } = await testConfigurationHashes();
