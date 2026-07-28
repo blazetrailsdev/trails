@@ -1,70 +1,14 @@
-/**
- * ESLint rule: require-canonical-rebuild
- *
- * The inverse of `require-table-teardown`. That rule balances DDL **per table
- * name** — a bespoke `CREATE TABLE foo` must be matched by a `DROP TABLE foo`
- * — which catches a table that outlives its test. It cannot catch the opposite
- * drift: a test file that **drops a canonical table and leaves it dropped**.
- *
- * That is what happened to `subscribers` (PR #5256): the mysql2 adapter test
- * hand-rolled `CREATE TABLE subscribers` and dropped it again in a `finally`,
- * perfectly balanced by the teardown rule's accounting, and still left the
- * shared per-worker database missing the canonical `subscribers` for whichever
- * file ran next — shape drift `repairWorkerSchema` then had to repair.
- *
- * The invariant: a **canonical** table (a key of `TEST_SCHEMA` in
- * `test-helpers/test-schema.ts`, supplied to the rule via the
- * `canonicalTables` option) may be dropped by a test file only if that same
- * file restores it, via `rebuildCanonicalTables(adapter, ["…"])` or
- * `loadCanonicalSchema(adapter)`.
- *
- *   ✗  await adapter.executeMutation("DROP TABLE IF EXISTS `subscribers`");
- *      // …no rebuild anywhere in the file
- *
- *   ✓  await adapter.executeMutation("DROP TABLE IF EXISTS `subscribers`");
- *      await rebuildCanonicalTables(adapter, ["subscribers"]);
- *
- * Drops are seen in both forms `require-table-teardown` understands: the
- * `dropTable("foo")` helper (receiver-agnostic, multiple names per call) and a
- * raw `DROP TABLE foo` inside an execution sink's string/template argument
- * (`SQL_SINKS`). Only statically-known names participate in either direction;
- * a name behind an interpolation (`` `DROP TABLE ${t}` ``) is invisible, so it
- * is never flagged.
- *
- * Restores are recognised as:
- *   - `rebuildCanonicalTables(adapter, ["a", "b"])` — each static element of
- *     the array literal is restored;
- *   - `loadCanonicalSchema(adapter)` — restores everything, so the file is
- *     clean by construction;
- *   - `rebuildCanonicalTables(adapter, NAMES)` with a non-literal name list —
- *     the set can't be read statically, so the file is treated as restoring
- *     everything rather than guessed at (no false positives).
- *
- * Exemptions live in `eslint/require-canonical-rebuild-exclude.json`, on the
- * same pattern `require-table-teardown-raw-sql-exclude.json` uses, split into
- * two permanently-exempt groups: `privateAdapter` files own their own adapter
- * (a `:memory:` database, or a throwaway file under a per-test tmpdir), so a
- * canonical table they drop cannot drift the shared per-worker database;
- * `nonExecuting` files have no database at all — a hand-rolled fake adapter
- * records the DDL instead of running it. Neither is backlog: a file that
- * really leaves a canonical table dropped is fixed, not listed, and a file
- * that only sometimes skips execution (captureSql's stub mode) takes a
- * line-scoped disable at the drop rather than a whole-file exemption.
- */
-
 import { calledName, staticString, rawDropNames, SQL_SINKS } from "./require-table-teardown.mjs";
 
-/** Call names that restore the canonical schema for every table at once. */
+const DROP_TABLE = /\bdrop\s+table\b/i;
+
+const CATALOGUE_SOURCE =
+  /\b(?:pg_tables|pg_class|sqlite_master|sqlite_schema|pragma_table_list|information_schema\.tables)\b|\bshow\s+tables\b/i;
+
 const FULL_RESTORE_CALLS = new Set(["loadCanonicalSchema"]);
-/** Call name that restores a named subset of the canonical schema. */
+
 const REBUILD_CALL = "rebuildCanonicalTables";
 
-/**
- * The statically-known table names a `rebuildCanonicalTables(adapter, names)`
- * call restores, or null when the name list isn't a literal array of static
- * strings — a spread, a variable, or a computed element makes the set unknown,
- * which the caller treats as a full restore.
- */
 function rebuiltTableNames(call) {
   const names = call.arguments[1];
   if (!names || names.type !== "ArrayExpression") return null;
@@ -83,14 +27,12 @@ const rule = {
     type: "problem",
     docs: {
       description:
-        "Require a test file that drops a canonical table to restore it in the same file, via rebuildCanonicalTables() or loadCanonicalSchema().",
+        "Require a test file that drops a canonical table to restore it in the same file, via rebuildCanonicalTables() or loadCanonicalSchema(). Three drop forms are detected: the dropTable() helper, a raw DROP TABLE naming the table in an execution sink, and a drop loop driven by a catalogue sweep. The third form names no table in the DROP itself (`DROP TABLE ${row.tablename}`, or dropTable(row.name)); its victims appear only in the catalogue SELECT that feeds the loop. BOTH spellings arm only on a swept name: the dropTable() argument, and at least one substitution of a template containing DROP TABLE, must trace back to a for-of/for-in binding, an inline callback parameter, or a variable initialized OR ASSIGNED from an execution sink (let rows; rows = await execute(sql) binds as surely as the const form). A variable counts as sweep-bound only when it IS the for-of/for-in binding, or the parameter of a callback whose call also carries the row set — either as the callee's object (tables.map(cb)) or as another argument (eachRow(rows, cb), pMap(rows, cb), Array.from(rows, cb)). That is a shape test, not a method-name list: a list covers no non-member spelling, while requiring the row set to be sink-derived keeps a resource callback such as withConnection((conn) => …) quiet, since it carries no sink-derived value. Arming is per-CALL, not per-parameter: every parameter of every callback in a qualifying call arms, whatever its role — a reduce accumulator, and equally the resource parameter of withRows(rows, (conn) => …), where a fixed per-connection name reports because the same call also carries the row set. Over-report direction, accepted. A variable is never sweep-bound merely by being declared inside one of these — otherwise every fixed name declared in a describe/it callback or a loop body arms. That last clause is what covers index and while loops (an index loop over rows[i].name, or while (rows.length) { const t = rows.pop(); … }), whose loop variable has no binding form to detect — the rows came from a query, which is the actual sweep signal. Note it is ANY sink-derived value, rows or not: a scratch name read back from the database (const scratch = await execute('SELECT gen_scratch_name()')) arms too, though nothing is swept. Arming looks at every substitution rather than only the one following a `DROP TABLE ` prefix, so a dynamic schema qualifier (DROP TABLE ${SCHEMA}.<quoted ${t}>) cannot hide the swept name. The swept substitution need NOT be the table name, and need not be related to the DROP at all: a template that contains DROP TABLE anywhere and any swept substitution anywhere arms, so a fixed-name drop carrying a swept value in a trailing comment or a second statement arms too. That is deliberate — pairing a substitution to the name position costs the schema-qualifier and multi-statement cases for no measured benefit. So dropTable(SOME_MODULE_CONST) and exec(`DROP TABLE \"${TABLE_NAME}\"`) — fixed names, not sweeps — do not arm the check, and an identifier that resolves to no declaration at all (an import, a global) counts as fixed rather than loop-bound. Once a file contains such an unnameable drop, a canonical name counts as dropped when it is quoted inside a SQL string that also references a catalogue source (pg_tables, pg_class, sqlite_master, sqlite_schema, pragma_table_list, information_schema.tables, SHOW TABLES), or when it is an element of an array literal in a file that executes such a query — the latter because the filter list is commonly built in JS (`IN (${names.map((n) => `'${n}'`).join(\",\")})`), which puts the name in an array and never in the SQL. Catalogue strings count only where they reach an execution sink, either directly or through an identifier holding the string. For such an identifier EVERY string it can hold counts — initializer and all assignments, regardless of position relative to the call — deliberately, because which write reaches the sink is not decidable here and guessing wrong is a miss rather than a noisy report, so hoisting the query to a `const SWEEP_SQL` does not hide it while an expected-SQL assertion or an error-message literal mentioning a catalogue does not arm anything. Two deliberate narrowings, both to stop this becoming a ratchet that fires on unrelated edits: (a) only quoted names, never bare words, because `columns`, `values`, `select` and `distinct` are canonical table names as well as SQL keywords, and bare-word matching measured 24 false positives across 5 files; (b) only strings that touch a catalogue, because a sweep can only choose its victims by reading one, so ordinary DML quoting a table name for an unrelated reason stays quiet. Both are over-approximations within the catalogue-query population: a canonical name quoted in a catalogue probe that does NOT feed the drop loop still reports. The name scan is deliberately NOT scoped to the exact SELECT the loop iterates, even though arming now resolves a swept name back to its row source: a sweep's filter and its DROP are often written against different variables, and pairing them would trade a tolerable over-report for real misses. KNOWN GAPS, all of which let a real sweep through undetected: a filter list built from values that are neither string literals nor array-literal elements (a map lookup, a function return, a name read off another query's rows); a catalogue name spelled in a way CATALOGUE_SOURCE does not list; a drop whose swept name reaches either spelling through a call the rule does not see through, such as dropTable(String(t)) or a wrapper function. Both walkers share one unwrapStep, so member, optional-chain, non-null, await, logical and single-expression-template wrappings are unwrapped identically at the drop site and when resolving a row source; they differ only in that a call is unwrapped to its callee when resolving a row source (to reach a member chain's object, as in res.rows.filter(cb)) and not at the drop site. A call resolving to a plain function binding is an accepted dead end; a catalogue query built by string concatenation or returned from a helper, since only a literal, a template, or an identifier holding one is followed to a sink; and a row name aliased through a form unwrapStep cannot follow, which the next paragraph states exactly. UNWRAPPING BOUNDARY: unwrapStep is single-successor by construction, so it follows exactly one operand per node. A value aliased through a CONDITIONAL (r.tablename ? r.tablename : 'x') is not followed at all, and a template is followed only when it has exactly ONE substitution — `public.${r.tablename}` resolves, `${PRE}${r.tablename}` does not, because two substitutions would need a fan-out the single-successor shape cannot express. LogicalExpression follows the LEFT operand only, chosen for the default-value shape people actually write (res.rows ?? [], res.rows || []); the mirrored FALLBACK || res.rows is therefore quiet. The array-literal path also keeps one over-approximation of its own: the array need not be the filter list, so a canonical name in an unrelated array literal reports if the file both executes a catalogue query and drops by loop-bound name. Restores are rebuildCanonicalTables(adapter, [names]), loadCanonicalSchema(adapter), or a rebuildCanonicalTables() whose name list is not a literal array, which is treated as restoring everything rather than guessed at. Permanent exemptions live in eslint/require-canonical-rebuild-exclude.json: `privateAdapter` files own a :memory: or tmpdir database that cannot drift the shared per-worker one, and `nonExecuting` files record DDL against a fake adapter instead of running it.",
     },
     schema: [
       {
         type: "object",
         properties: {
-          // The canonical table names (keys of TEST_SCHEMA), supplied by
-          // eslint.config.mjs so the rule stays free of filesystem access.
           canonicalTables: { type: "array", items: { type: "string" } },
         },
         additionalProperties: false,
@@ -99,6 +41,8 @@ const rule = {
     messages: {
       missingRebuild:
         'Canonical table `{{table}}` is dropped but never restored in this file. Add `await rebuildCanonicalTables(adapter, ["{{table}}"])` after the drop. A canonical table left dropped drifts the shared per-worker database for every file that runs next. If this file owns a private adapter (`:memory:` or a tmpdir file) it cannot drift the shared database — add it to the `privateAdapter` group in eslint/require-canonical-rebuild-exclude.json.',
+      sweepReachesCanonical:
+        'This file drops tables by a name it computes at runtime, and a catalogue query in it names the canonical table `{{table}}`, so the sweep can drop `{{table}}` off the shared per-worker database and leave it dropped for every file that runs next. Narrow the catalogue filter so it cannot select `{{table}}` (a prefix filter matching only this file\'s own tables), or restore it with `await rebuildCanonicalTables(adapter, ["{{table}}"])`.',
     },
   },
 
@@ -106,13 +50,50 @@ const rule = {
     const canonical = new Set(context.options[0]?.canonicalTables ?? []);
     if (canonical.size === 0) return {};
 
-    // canonical table name → first drop node seen (for the report location).
     const dropped = new Map();
+
+    let dynamicDrop = null;
+    let catalogueSeen = false;
+    const namesInScope = new Set();
+    const arrayLiteralNames = new Set();
     const rebuilt = new Set();
     let restoresEverything = false;
 
     function recordDrop(table, node) {
       if (canonical.has(table) && !dropped.has(table)) dropped.set(table, node);
+    }
+
+    function resolve(node) {
+      if (node?.type !== "Identifier") return null;
+      const scope = context.sourceCode.getScope(node);
+      for (let s = scope; s; s = s.upper) {
+        const found = s.variables.find((v) => v.name === node.name);
+        if (found) return found;
+      }
+      return null;
+    }
+
+    /**
+     * Every string a sink argument could carry: the initializer AND all later
+     * assignments, since a `let` reassigned to the catalogue query before the
+     * call is as real as one initialized to it, and which write reaches the
+     * sink is not decidable here.
+     */
+    function sqlTexts(node, seen = new Set()) {
+      if (node?.type === "Literal") return typeof node.value === "string" ? [node.value] : [];
+      if (node?.type === "TemplateLiteral")
+        return [node.quasis.map((q) => q.value.cooked ?? "").join(" ")];
+      if (node?.type !== "Identifier") return [];
+      const variable = resolve(node);
+      if (variable === null || seen.has(variable)) return [];
+      seen.add(variable);
+      const out = [];
+      const init = variable.defs?.[0]?.node?.init;
+      if (init) out.push(...sqlTexts(init, seen));
+      for (const ref of variable.references) {
+        if (ref.writeExpr) out.push(...sqlTexts(ref.writeExpr, seen));
+      }
+      return out;
     }
 
     function recordSinkSql(call) {
@@ -122,19 +103,151 @@ const rule = {
             for (const table of rawDropNames(arg.value)) recordDrop(table, arg);
           }
         } else if (arg.type === "TemplateLiteral") {
-          // A quasi followed by an interpolation has a dynamic end: a name that
-          // runs to it is a prefix of a dynamic name, not a table (see
-          // rawDropNames).
           const last = arg.quasis.length - 1;
           arg.quasis.forEach((quasi, i) => {
             if (!quasi.value.cooked) return;
             for (const table of rawDropNames(quasi.value.cooked, i < last)) recordDrop(table, arg);
           });
+          const isDropStatement = arg.quasis.some((q) => DROP_TABLE.test(q.value.cooked ?? ""));
+          if (isDropStatement && arg.expressions.some(isLoopBound)) dynamicDrop ??= arg;
         }
+        for (const text of sqlTexts(arg)) recordCatalogueFilterNames(text);
       }
     }
 
+    function recordCatalogueFilterNames(text) {
+      if (!CATALOGUE_SOURCE.test(text)) return;
+      catalogueSeen = true;
+      for (const [, name] of text.matchAll(/'([A-Za-z_][A-Za-z0-9_]*)'/g)) {
+        if (canonical.has(name)) namesInScope.add(name);
+      }
+    }
+
+    /**
+     * One unwrapping step shared by both walkers, so they cannot drift apart:
+     * they differ only in that isSinkDerived also descends a CallExpression.
+     * Returns undefined when the node is not a wrapper, null at a dead end.
+     */
+    function unwrapStep(node) {
+      switch (node?.type) {
+        case "AwaitExpression":
+          return node.argument;
+        case "ChainExpression":
+        case "TSNonNullExpression":
+          return node.expression;
+        case "LogicalExpression":
+          return node.left;
+        case "MemberExpression":
+          return node.object;
+        case "TemplateLiteral":
+          return node.expressions.length === 1 ? node.expressions[0] : null;
+        default:
+          return undefined;
+      }
+    }
+
+    function rootIdentifier(expr) {
+      let cur = expr;
+      for (;;) {
+        if (!cur) return null;
+        const next = unwrapStep(cur);
+        if (next === undefined) return cur.type === "Identifier" ? cur : null;
+        cur = next;
+      }
+    }
+
+    /**
+     * A value read out of a query's result rows — the row source of a sweep.
+     * The sink call can sit at ANY level of the chain, not just the top:
+     * `(await execute(sql)).rows` and `(await execute(sql)).rows.forEach` both
+     * bottom out in a call rather than an identifier, so stopping at the first
+     * non-call would miss the collapsed one-liner form while reporting the
+     * two-step `const res = …; const rows = res.rows;` spelling.
+     */
+    function isSinkDerived(node, seen) {
+      let cur = node;
+      for (;;) {
+        if (!cur) return false;
+        if (cur.type === "CallExpression") {
+          if (SQL_SINKS.has(calledName(cur.callee))) return true;
+          // Toward the function, never the arguments: this exists only to reach
+          // a member chain's object (`res.rows.filter(cb)`). Landing on a plain
+          // function binding is an accepted dead end, not an error.
+          cur = cur.callee;
+          continue;
+        }
+        const next = unwrapStep(cur);
+        if (next === undefined) break;
+        cur = next;
+      }
+      return cur?.type === "Identifier" ? varIsSweepBound(resolve(cur), seen) : false;
+    }
+
+    /**
+     * The variable must BE the sweep binding, never merely be enclosed by one:
+     * walking up to an enclosing construct arms every fixed name declared
+     * inside a describe/it callback or a loop body.
+     */
+    function varIsSweepBound(variable, seen = new Set()) {
+      if (variable === null || seen.has(variable)) return false;
+      seen.add(variable);
+      const boundByDef = variable.defs.some((def) => {
+        if (def.type === "Parameter") return isRowCallbackParam(def.node, seen);
+        const declarator = def.node;
+        if (declarator?.type !== "VariableDeclarator") return false;
+        const declaration = declarator.parent;
+        const loop = declaration?.parent;
+        if (
+          (loop?.type === "ForOfStatement" || loop?.type === "ForInStatement") &&
+          loop.left === declaration
+        ) {
+          return true;
+        }
+        return declarator.init ? isSinkDerived(declarator.init, seen) : false;
+      });
+      if (boundByDef) return true;
+      // `let name; name = row.tablename;` binds by assignment, not initializer —
+      // the same spelling sqlTexts already follows on the SQL side.
+      return variable.references.some((ref) => ref.writeExpr && isSinkDerived(ref.writeExpr, seen));
+    }
+
+    /**
+     * A parameter of a callback whose call also carries the row set — as the
+     * callee's object (`tables.map(cb)`) or as a sibling argument
+     * (`eachRow(rows, cb)`, `pMap(rows, cb)`). Shape, not method name: a name
+     * list misses every non-member spelling, and `withConnection((conn) => …)`
+     * stays quiet here because it carries no sink-derived value at all.
+     *
+     * Arming is per-CALL, not per-parameter: every parameter of every callback
+     * in a qualifying call counts, whatever its role. A `reduce` accumulator
+     * arms, and so does the resource parameter of
+     * `withRows(rows, (conn) => …)`. Over-report direction, accepted.
+     */
+    function isRowCallbackParam(fn, seen) {
+      if (fn?.type !== "ArrowFunctionExpression" && fn?.type !== "FunctionExpression") return false;
+      const call = fn.parent;
+      if (call?.type !== "CallExpression" || !call.arguments.includes(fn)) return false;
+      const callee = call.callee;
+      if (callee?.type === "MemberExpression" && isSinkDerived(callee.object, seen)) return true;
+      return call.arguments.some((arg) => arg !== fn && isSinkDerived(arg, seen));
+    }
+
+    function isLoopBound(expr) {
+      const root = rootIdentifier(expr);
+      return root === null ? false : varIsSweepBound(resolve(root));
+    }
+
     return {
+      Literal(node) {
+        if (
+          typeof node.value === "string" &&
+          canonical.has(node.value) &&
+          node.parent?.type === "ArrayExpression"
+        ) {
+          arrayLiteralNames.add(node.value);
+        }
+      },
+
       CallExpression(node) {
         const name = calledName(node.callee);
         if (name === null) return;
@@ -142,6 +255,7 @@ const rule = {
           for (const arg of node.arguments) {
             const table = staticString(arg);
             if (table !== null) recordDrop(table, node);
+            else if (isLoopBound(arg)) dynamicDrop ??= node;
           }
         } else if (name === REBUILD_CALL) {
           const names = rebuiltTableNames(node);
@@ -154,13 +268,21 @@ const rule = {
         }
       },
 
-      // Deferred so a rebuild anywhere in the file — including a hook declared
-      // after the test that drops — counts as the restore.
       "Program:exit"() {
         if (restoresEverything) return;
         for (const [table, node] of dropped) {
           if (rebuilt.has(table)) continue;
           context.report({ node, messageId: "missingRebuild", data: { table } });
+        }
+        if (dynamicDrop === null) return;
+        if (catalogueSeen) for (const table of arrayLiteralNames) namesInScope.add(table);
+        for (const table of namesInScope) {
+          if (rebuilt.has(table) || dropped.has(table)) continue;
+          context.report({
+            node: dynamicDrop,
+            messageId: "sweepReachesCanonical",
+            data: { table },
+          });
         }
       },
     };
