@@ -259,7 +259,10 @@ export function constantize(camelCasedWord: string): unknown {
   // two calls made by independent writers, and the mark must hold whichever runs
   // first.
   if (_privateConstants.has(path)) {
-    throw new ReferenceError(`private constant ${path} referenced`);
+    // Ruby raises NameError here too, with `name` set to the constant itself —
+    // which is why `safe_constantize` returns nil for a private constant rather
+    // than propagating. Carrying the leaf keeps that guard satisfied.
+    throw new NameError(`private constant ${path} referenced`, demodulize(path));
   }
   if (!_constants.has(path)) {
     throw new NameError(`uninitialized constant ${path}`, missingSegment(path));
