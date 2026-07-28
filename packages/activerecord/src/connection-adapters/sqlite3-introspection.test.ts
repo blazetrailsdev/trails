@@ -195,7 +195,9 @@ describe("SQLite3Adapter schema introspection", () => {
     );
     await adapter.executeMutation(`CREATE INDEX widgets_on_name_desc ON widgets ("name" DESC)`);
 
-    const before = await adapter.indexes("widgets");
+    const byNameSorted = (list: readonly unknown[]): Array<{ name: string }> =>
+      [...(list as Array<{ name: string }>)].sort((a, b) => a.name.localeCompare(b.name));
+    const before = byNameSorted(await adapter.indexes("widgets"));
     await adapter.removeColumn("widgets", "doomed");
 
     const indexes = (await adapter.indexes("widgets")) as Array<{
@@ -205,7 +207,8 @@ describe("SQLite3Adapter schema introspection", () => {
       where?: string;
       orders?: Record<string, string>;
     }>;
-    expect(indexes).toEqual(before);
+    // Sorted by name: index creation order is not part of the contract.
+    expect(byNameSorted(indexes)).toEqual(before);
     const byName = Object.fromEntries(indexes.map((i) => [i.name, i]));
     expect(byName["widgets_on_lower_name"]?.columns).toBe("lower(name)");
     expect(byName["widgets_on_code"]?.unique).toBe(true);
