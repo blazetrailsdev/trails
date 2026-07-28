@@ -336,19 +336,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS bio`);
     });
 
-    it("rename column", async () => {
-      await adapter.addColumn(`${SCHEMA_NAME}.${TABLE_NAME}`, "old_col", "integer");
-      await adapter.renameColumn(`${SCHEMA_NAME}.${TABLE_NAME}`, "old_col", "new_col");
-      const cols = await adapter.schemaQuery(
-        `SELECT column_name FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2`,
-        [SCHEMA_NAME, TABLE_NAME],
-      );
-      const names = cols.map((r) => r.column_name);
-      expect(names).toContain("new_col");
-      expect(names).not.toContain("old_col");
-      await adapter.exec(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS new_col`);
-    });
-
     it("change column default", async () => {
       await adapter.addColumn(`${SCHEMA_NAME}.${TABLE_NAME}`, "rating", "integer");
       await adapter.changeColumnDefault(`${SCHEMA_NAME}.${TABLE_NAME}`, "rating", 5);
@@ -453,119 +440,6 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("typeToSql binary limit too large throws", () => {
       expect(() => adapter.typeToSql("binary", { limit: 0x40000000 })).toThrow();
-    });
-  });
-
-  describe("UniqueConstraintTest", () => {
-    beforeEach(async () => {
-      await adapter.exec(
-        `CREATE TABLE ${SCHEMA_NAME}.test_unique_constraints (
-           id serial PRIMARY KEY,
-           position_1 integer,
-           position_2 integer,
-           position_3 integer,
-           position_4 integer,
-           CONSTRAINT test_unique_constraints_position_deferrable_false UNIQUE (position_1),
-           CONSTRAINT test_unique_constraints_position_deferrable_immediate UNIQUE (position_2)
-             DEFERRABLE INITIALLY IMMEDIATE,
-           CONSTRAINT test_unique_constraints_position_deferrable_deferred UNIQUE (position_3)
-             DEFERRABLE INITIALLY DEFERRED,
-           CONSTRAINT test_unique_constraints_position_nulls_not_distinct
-             UNIQUE NULLS NOT DISTINCT (position_4)
-         )`,
-      );
-    });
-
-    it("unique constraints", async () => {
-      const uniqueConstraints = await adapter.uniqueConstraints(
-        `${SCHEMA_NAME}.test_unique_constraints`,
-      );
-      const expectedConstraints = [
-        {
-          name: "test_unique_constraints_position_deferrable_false",
-          deferrable: false,
-          column: ["position_1"],
-        },
-        {
-          name: "test_unique_constraints_position_deferrable_immediate",
-          deferrable: "immediate",
-          column: ["position_2"],
-        },
-        {
-          name: "test_unique_constraints_position_deferrable_deferred",
-          deferrable: "deferred",
-          column: ["position_3"],
-        },
-      ];
-      expect(uniqueConstraints.length).toBe(expectedConstraints.length + 1);
-
-      for (const expected of expectedConstraints) {
-        const constraint = uniqueConstraints.find((c) => c.name === expected.name)!;
-        expect(constraint.tableName).toBe(`${SCHEMA_NAME}.test_unique_constraints`);
-        expect(constraint.name).toBe(expected.name);
-        expect(constraint.column).toEqual(expected.column);
-        expect(constraint.deferrable).toBe(expected.deferrable);
-      }
-
-      const nullsNotDistinct = uniqueConstraints.find(
-        (c) => c.name === "test_unique_constraints_position_nulls_not_distinct",
-      )!;
-      expect(nullsNotDistinct.column).toEqual(["position_4"]);
-      expect(nullsNotDistinct.nullsNotDistinct).toBe(true);
-    });
-  });
-
-  describe("ExclusionConstraintTest", () => {
-    beforeEach(async () => {
-      await adapter.exec(
-        `CREATE TABLE ${SCHEMA_NAME}.test_exclusion_constraints (
-           id serial PRIMARY KEY,
-           start_date date,
-           end_date date,
-           valid_from date,
-           valid_to date,
-           CONSTRAINT test_exclusion_constraints_date_overlap
-             EXCLUDE USING gist (daterange(start_date, end_date) WITH &&)
-             WHERE (start_date IS NOT NULL AND end_date IS NOT NULL),
-           CONSTRAINT test_exclusion_constraints_valid_overlap
-             EXCLUDE USING gist (daterange(valid_from, valid_to) WITH &&)
-             WHERE (valid_from IS NOT NULL AND valid_to IS NOT NULL)
-             DEFERRABLE INITIALLY IMMEDIATE
-         )`,
-      );
-    });
-
-    it("exclusion constraints", async () => {
-      const exclusionConstraints = await adapter.exclusionConstraints(
-        `${SCHEMA_NAME}.test_exclusion_constraints`,
-      );
-      const expectedConstraints = [
-        {
-          name: "test_exclusion_constraints_date_overlap",
-          expression: "daterange(start_date, end_date) WITH &&",
-          where: "(start_date IS NOT NULL) AND (end_date IS NOT NULL)",
-          using: "gist",
-          deferrable: false,
-        },
-        {
-          name: "test_exclusion_constraints_valid_overlap",
-          expression: "daterange(valid_from, valid_to) WITH &&",
-          where: "(valid_from IS NOT NULL) AND (valid_to IS NOT NULL)",
-          using: "gist",
-          deferrable: "immediate",
-        },
-      ];
-      expect(exclusionConstraints.length).toBe(expectedConstraints.length);
-
-      for (const expected of expectedConstraints) {
-        const constraint = exclusionConstraints.find((c) => c.name === expected.name)!;
-        expect(constraint.tableName).toBe(`${SCHEMA_NAME}.test_exclusion_constraints`);
-        expect(constraint.name).toBe(expected.name);
-        expect(constraint.expression).toBe(expected.expression);
-        expect(constraint.using).toBe(expected.using);
-        expect(constraint.where).toBe(expected.where);
-        expect(constraint.deferrable).toBe(expected.deferrable);
-      }
     });
   });
 

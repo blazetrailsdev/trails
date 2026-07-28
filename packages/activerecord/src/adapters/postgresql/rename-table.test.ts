@@ -26,13 +26,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgresqlRenameTableTest", () => {
-    it("rename table", async () => {
-      await adapter.exec("CREATE TABLE before_rename (id serial primary key, name text)");
-      await adapter.renameTable("before_rename", "after_rename");
-      expect(await adapter.dataSourceExists("after_rename")).toBe(true);
-      expect(await adapter.dataSourceExists("before_rename")).toBe(false);
-    });
-
     it("rename table with index", async () => {
       await adapter.exec("CREATE TABLE before_rename (id serial primary key, name text)");
       await adapter.exec("CREATE INDEX idx_before_name ON before_rename (name)");

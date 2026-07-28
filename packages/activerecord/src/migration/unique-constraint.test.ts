@@ -2,8 +2,7 @@
  * Mirrors Rails activerecord/test/cases/migration/unique_constraint_test.rb
  * (PostgreSQL-only — `supports_unique_constraints?`).
  *
- * The model-backed and schema-scoped arms, and the arms that need Rails'
- * `test_unique_constraints` fixture table, are not ported here.
+ * The model-backed and schema-scoped arms are not ported here.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -31,6 +30,53 @@ describeIfSupports("unique_constraints", "Migration", () => {
   });
 
   describe("UniqueConstraintTest", () => {
+    it("unique constraints", async () => {
+      const uniqueConstraints = await connection.uniqueConstraints("test_unique_constraints");
+
+      const expectedConstraints = [
+        {
+          name: "test_unique_constraints_position_deferrable_false",
+          deferrable: false,
+          column: ["position_1"],
+        },
+        {
+          name: "test_unique_constraints_position_deferrable_immediate",
+          deferrable: "immediate",
+          column: ["position_2"],
+        },
+        {
+          name: "test_unique_constraints_position_deferrable_deferred",
+          deferrable: "deferred",
+          column: ["position_3"],
+        },
+        {
+          name: "test_unique_constraints_position_nulls_not_distinct",
+          nullsNotDistinct: true,
+          column: ["position_4"],
+        },
+      ];
+
+      expect(uniqueConstraints.length).toBe(expectedConstraints.length);
+
+      const expectedNullsNotDistinct = expectedConstraints.pop()!;
+
+      for (const expected of expectedConstraints) {
+        const constraint = uniqueConstraints.find((c) => c.name === expected.name)!;
+        expect(constraint.tableName).toBe("test_unique_constraints");
+        expect(constraint.name).toBe(expected.name);
+        expect(constraint.column).toEqual(expected.column);
+        expect(constraint.deferrable).toBe(expected.deferrable);
+      }
+
+      const nullsNotDistinct = uniqueConstraints.find(
+        (c) => c.name === expectedNullsNotDistinct.name,
+      )!;
+      expect(nullsNotDistinct.tableName).toBe("test_unique_constraints");
+      expect(nullsNotDistinct.name).toBe(expectedNullsNotDistinct.name);
+      expect(nullsNotDistinct.column).toEqual(expectedNullsNotDistinct.column);
+      expect(nullsNotDistinct.nullsNotDistinct).toBe(expectedNullsNotDistinct.nullsNotDistinct);
+    });
+
     it("add unique constraint without deferrable", async () => {
       await connection.addUniqueConstraint("sections", ["position"]);
 

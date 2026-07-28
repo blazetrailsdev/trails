@@ -3,9 +3,8 @@
  * (PostgreSQL-only — `supports_exclusion_constraints?`).
  *
  * The model-backed arms (test_added_exclusion_constraint_ensures_valid_values,
- * test_added_deferrable_initially_immediate_exclusion_constraint) and the
- * introspection arms that need Rails' `test_exclusion_constraints` fixture
- * table are not ported here; this file covers the add/remove paths that
+ * test_added_deferrable_initially_immediate_exclusion_constraint) are not
+ * ported here; this file covers the add/remove paths that
  * PostgreSQL::SchemaStatements#add_exclusion_constraint and
  * #remove_exclusion_constraint route through create_alter_table +
  * schema_creation.accept.
@@ -39,6 +38,50 @@ describeIfSupports("exclusion_constraints", "Migration", () => {
   });
 
   describe("ExclusionConstraintTest", () => {
+    it("exclusion constraints", async () => {
+      const expectedExclusionConstraints = [
+        {
+          tableName: "test_exclusion_constraints",
+          name: "test_exclusion_constraints_date_overlap",
+          expression: "daterange(start_date, end_date) WITH &&",
+          where: "(start_date IS NOT NULL) AND (end_date IS NOT NULL)",
+          using: "gist",
+          deferrable: false,
+        },
+        {
+          tableName: "test_exclusion_constraints",
+          name: "test_exclusion_constraints_valid_overlap",
+          expression: "daterange(valid_from, valid_to) WITH &&",
+          where: "(valid_from IS NOT NULL) AND (valid_to IS NOT NULL)",
+          using: "gist",
+          deferrable: "immediate",
+        },
+        {
+          tableName: "test_exclusion_constraints",
+          name: "test_exclusion_constraints_transaction_overlap",
+          expression: "daterange(transaction_from, transaction_to) WITH &&",
+          where: "(transaction_from IS NOT NULL) AND (transaction_to IS NOT NULL)",
+          using: "gist",
+          deferrable: "deferred",
+        },
+      ];
+
+      const exclusionConstraints = await connection.exclusionConstraints(
+        "test_exclusion_constraints",
+      );
+      expect(exclusionConstraints.length).toBe(expectedExclusionConstraints.length);
+
+      for (const expected of expectedExclusionConstraints) {
+        const constraint = exclusionConstraints.find((c) => c.name === expected.name)!;
+        expect(constraint.tableName).toBe(expected.tableName);
+        expect(constraint.name).toBe(expected.name);
+        expect(constraint.expression).toBe(expected.expression);
+        expect(constraint.using).toBe(expected.using);
+        expect(constraint.where).toBe(expected.where);
+        expect(constraint.deferrable).toBe(expected.deferrable);
+      }
+    });
+
     it("add exclusion constraint", async () => {
       await connection.addExclusionConstraint("invoices", EXPRESSION, { using: "gist" });
 

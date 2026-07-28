@@ -659,7 +659,13 @@ export abstract class Migration {
       return;
     }
     tableName = this._pt(tableName);
-    await this.schema.changeColumnNull(tableName, columnName, allowNull, defaultValue);
+    // Rails' `method_missing` forwards to the connection, so the adapter's own
+    // override runs. Going through `this.schema` instead reached the abstract
+    // `ALTER COLUMN ... SET NOT NULL`, which SQLite has no syntax for — its
+    // table-rebuild override on the adapter was unreachable from a migration.
+    const conn = this.connection;
+    assertSchemaAdapter(conn);
+    await conn.changeColumnNull(tableName, columnName, allowNull, defaultValue);
   }
 
   async addReference(
