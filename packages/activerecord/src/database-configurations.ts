@@ -72,10 +72,16 @@ export class DatabaseConfigurations {
   /**
    * The active environment resolved from the process, mirroring Rails'
    * `ConnectionHandling::DEFAULT_ENV` / `RAILS_ENV` lambdas:
-   * `Rails.env` → `RAILS_ENV` → `RACK_ENV` → the literal default. Here
+   * `Rails.env` → `RAILS_ENV` → `RACK_ENV` → the literal default.
+   *
+   * `TRAILS_ENV` is the canonical runtime env (BC-2) and outranks everything,
+   * including an explicit `defaultEnv` — deploys set it to say which
+   * environment this process IS, so no bootstrap may override it. Below it,
    * `defaultEnv` (the app-bootstrap / test override) is the `Rails.env`
-   * analogue and so wins when set, `TRAILS_ENV` is the canonical runtime env
-   * (BC-2), and `NODE_ENV` is the one-release fallback.
+   * analogue and wins when set. `NODE_ENV` is last, ahead of only the literal
+   * default: it is a one-release bridge with no Rails counterpart, and test
+   * runners set it unconditionally, so it must not mask a deliberate
+   * `defaultEnv`.
    *
    * Single source of truth for "what env are we building/connecting for" —
    * `fromEnv` (which builds the configs) and the runtime config selectors in
@@ -86,8 +92,8 @@ export class DatabaseConfigurations {
    */
   static currentEnv(): string {
     return (
-      this._defaultEnv ||
       getEnv("TRAILS_ENV") ||
+      this._defaultEnv ||
       getEnv("NODE_ENV") ||
       DatabaseConfigurations.defaultEnv
     );

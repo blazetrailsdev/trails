@@ -155,7 +155,7 @@ describe("DatabaseConfigurationsTest", () => {
     });
 
     it("currentEnv prefers TRAILS_ENV over NODE_ENV", () => {
-      DatabaseConfigurations.defaultEnv = null;
+      DatabaseConfigurations.defaultEnv = "development";
       vi.stubEnv("TRAILS_ENV", "production");
       vi.stubEnv("NODE_ENV", "test");
       expect(DatabaseConfigurations.currentEnv()).toBe("production");
@@ -213,7 +213,7 @@ describe("DatabaseConfigurationsTest", () => {
     it("forCurrentEnv and fromEnv resolve the same env when TRAILS_ENV differs from defaultEnv", () => {
       // Regression: forCurrentEnv previously used defaultEnv while fromEnv() used
       // currentEnv(), so findDbConfig by DB name failed when TRAILS_ENV != defaultEnv.
-      DatabaseConfigurations.defaultEnv = null;
+      DatabaseConfigurations.defaultEnv = "development";
       vi.stubEnv("TRAILS_ENV", "production");
 
       const configs = DatabaseConfigurations.fromEnv({
