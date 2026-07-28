@@ -162,10 +162,14 @@ function droppedTableNames(call) {
  * phantom `my`. `(?!\1)` keeps the `+` bounded — it can never cross an
  * undoubled quote, so a name cannot run past its close or across statements.
  *
- * A name whose opening quote is never closed matches neither branch and is
- * skipped entirely, so the create goes unreported. That is malformed SQL in a
- * plain string literal; in a template it means the closing quote lives past an
- * interpolation, where the name was already unknowable.
+ * A name whose opening quote is never closed is skipped rather than truncated,
+ * so the create goes unreported. Usually it matches neither branch. The
+ * exception is an unclosed name containing a doubled quote
+ * (`CREATE TABLE "my""table${x}`): the `+` can backtrack off the `""` unit and
+ * let its first quote serve as the close, matching the phantom `"my"`. See
+ * `quotedNameTruncated`, which rejects that parse. Either way the input is
+ * malformed SQL in a plain string literal, or — in a template — a name whose
+ * closing quote lives past an interpolation, so it was already unknowable.
  */
 const NAME_SRC = "(?:([\"'`])((?:(?!\\1)[\\s\\S]|\\1\\1)+)\\1|([\\w.]+))";
 /**
@@ -178,6 +182,17 @@ function capturedName(m) {
   const quote = m[OPEN_QUOTE];
   if (quote === undefined) return m[BARE_NAME];
   return m[QUOTED_NAME].replaceAll(quote + quote, quote);
+}
+
+/**
+ * Whether `m` closed a quoted name early by backtracking off a doubled quote,
+ * leaving a phantom short name. `charAfter` is the character following the
+ * match. A real closing quote is never immediately followed by its own quote —
+ * that pair would have been consumed as escaped content — so this signature is
+ * exactly the truncated parse, and the name is dropped rather than recorded.
+ */
+function quotedNameTruncated(m, charAfter) {
+  return m[OPEN_QUOTE] !== undefined && charAfter === m[OPEN_QUOTE];
 }
 
 /**
@@ -220,7 +235,9 @@ function rawCreateNames(text, endIsDynamic) {
   CREATE_TABLE_RE.lastIndex = 0;
   let m;
   while ((m = CREATE_TABLE_RE.exec(text)) !== null) {
-    if (endIsDynamic && m.index + m[0].length === text.length) continue;
+    const end = m.index + m[0].length;
+    if (endIsDynamic && end === text.length) continue;
+    if (quotedNameTruncated(m, text[end])) continue;
     names.push(capturedName(m));
   }
   return names;
@@ -243,6 +260,9 @@ export function rawDropNames(text, endIsDynamic = false) {
     let rest = text.slice(m.index + m[0].length);
     let nm;
     while ((nm = NAME_RE.exec(rest)) !== null) {
+      // A truncated name would credit a teardown that drops nothing, and the
+      // rest of the list can't be trusted either — stop reading.
+      if (quotedNameTruncated(nm, rest[nm[0].length])) break;
       const name = capturedName(nm);
       // Only a bare word can be the trailing clause; quoting it makes it a name.
       if (nm[OPEN_QUOTE] === undefined && /^(?:cascade|restrict)$/i.test(name)) break;

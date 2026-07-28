@@ -62,6 +62,9 @@ tester.run("require-table-teardown", rule, {
     // The doubled-quote branch must not overreach: a later `""` elsewhere in
     // the statement is not part of the name, which closes at its own quote.
     'await adapter.exec(`CREATE TABLE "t" (c TEXT DEFAULT "")`);\nawait adapter.exec(`DROP TABLE "t"`);',
+    // An unclosed name containing a doubled quote must not be truncated into a
+    // phantom `my` create by backtracking off the `""` — it is unknowable.
+    'await adapter.exec(`CREATE TABLE "my""table${x} (id int)`);',
     // Quoting turns a would-be trailing clause into a table name, so the drop
     // list keeps reading past it.
     'await adapter.exec(`CREATE TABLE "cascade" (id int)`);\nawait adapter.exec(`CREATE TABLE b (id int)`);\n' +
@@ -109,6 +112,14 @@ tester.run("require-table-teardown", rule, {
         'await adapter.exec(`CREATE TABLE "my table" (id int)`);\n' +
         'await adapter.exec(`DROP TABLE "my"`);',
       errors: [{ messageId: "missingTeardown", data: { table: "my table" } }],
+    },
+    // A truncated drop is not credited as the teardown of the phantom name it
+    // would otherwise spell — `my` is still reported.
+    {
+      code:
+        'await adapter.exec("CREATE TABLE my (id int)");\n' +
+        'await adapter.exec(`DROP TABLE "my""table${x}`);',
+      errors: [{ messageId: "missingTeardown", data: { table: "my" } }],
     },
     // Dropping the prefix before an escaped (doubled) quote is not a teardown
     // of the real table either.
