@@ -268,7 +268,9 @@ export class HasOneAssociation extends SingularAssociation {
    * (builder/has-one.ts, which runs `loadTargetForBuild` and awaits
    * `detachDisplacedTarget`) and the nested-attributes writer
    * (nested-attributes.ts, a synchronous property setter that starts
-   * `detachDisplacedTarget` at assignment and drains it in its `save` wrapper).
+   * `detachDisplacedTarget` — for a loaded target — or
+   * `detachDisplacedForSyncBuild` — for an unloaded one, which runs the leading
+   * `load_target` itself — at assignment, and drains it in its `save` wrapper).
    * Both call `build` on their way through, and without this flag `build` would
    * re-run the load and start a *second*, concurrent removal of the same row.
    *
@@ -499,6 +501,43 @@ export class HasOneAssociation extends SingularAssociation {
       this.target = displaced;
       throw error;
     }
+  }
+
+  /**
+   * The unloaded half of the nested-attributes writer's `remove_target!`.
+   *
+   * Rails' `set_new_record` -> `replace(record, false)` opens with `load_target`
+   * (has_one_association.rb:59-62) on EVERY build, so a build over a *never
+   * loaded* has_one on a persisted owner still discovers the existing row and
+   * removes it. `detachDisplacedTarget` only covers what the caller already had
+   * in memory; this covers the row that only ever existed in the DB.
+   *
+   * The synchronous writer (`pirate.shipAttributes = {...}`) cannot await the
+   * SELECT, so it calls this at assignment — Rails' timing for *issuing* the
+   * query — and parks the returned promise on the owner, draining it in the
+   * `save` wrapper exactly like `detachDisplacedTarget`'s. Null when Rails would
+   * issue no query at all (`find_target?`) or when the target is already loaded,
+   * which keeps the writer synchronous on those paths.
+   *
+   * `protected` for the same reason as `buildDisplacementOwnedByCaller`: this is
+   * association-internal bookkeeping, not API surface. The writer lives outside
+   * the class hierarchy and reaches it through its duck-typed handle.
+   *
+   * The find deliberately goes through `doAsyncFindTarget` rather than
+   * `loadTargetForBuild`: by the time it resolves, the build has already
+   * installed the replacement as `this.target`, and `load_target`'s writeback
+   * would clobber it. We need only the displaced record, never the cache.
+   *
+   * @internal
+   */
+  protected detachDisplacedForSyncBuild(): Promise<void> | null {
+    if (this.loaded) return null;
+    if (!this.needsTargetLoadForBuild()) return null;
+    return this.findThenDetachDisplaced();
+  }
+
+  private async findThenDetachDisplaced(): Promise<void> {
+    await this.detachDisplacedTarget(await this.doAsyncFindTarget());
   }
 
   protected override async doAsyncFindTarget(): Promise<Base | null> {
