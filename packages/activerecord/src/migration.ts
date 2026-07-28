@@ -271,10 +271,6 @@ let migrationVerbose = true;
  * have no Migration instance. Rails puts migration output on `$stdout` via
  * `Kernel#puts`; `stdout` is the activesupport shim standing in for `$stdout`
  * — no logger is involved.
- *
- * The Migrator needs it: unlike Rails, where `Migration#migrate` announces its
- * own banners, trails' Migrator drives the execution strategy directly and its
- * migrations may be bare `{ up, down }` proxies with no `announce`.
  */
 function writeMigrationMessage(text = ""): void {
   if (migrationVerbose) {
@@ -1110,7 +1106,9 @@ export abstract class Migration {
    * Mirrors: ActiveRecord::Migration#name
    */
   get name(): string {
-    return this.constructor.name;
+    // Rails: `attr_reader :name`, defaulting to `self.class.name` when the
+    // migration was built without one (`migration.rb:889`).
+    return this._name ?? this.constructor.name;
   }
 
   /**
@@ -1292,9 +1290,14 @@ export abstract class Migration {
 
   /**
    * Get the migration version from the class name or a static property.
+   *
+   * Rails' `#version` is the `attr_reader` for the `@version` set in
+   * `initialize` (`migration.rb:889`), which `MigrationProxy#load_migration`
+   * supplies; the class-level fallbacks are the trails path for migrations
+   * constructed without one.
    */
   get version(): string {
-    return (this.constructor as any).version ?? this.constructor.name;
+    return this._version ?? (this.constructor as any).version ?? this.constructor.name;
   }
 
   // --- Logging (Rails: Migration#write, #announce, #say, #say_with_time, #suppress_messages) ---
@@ -2071,6 +2074,40 @@ export interface MigrationProxy {
   basename?(): string;
   /** @internal Mirrors: ActiveRecord::MigrationProxy#load_migration */
   loadMigration?(): Promise<MigrationLike>;
+}
+
+/**
+ * Mirrors Rails' `MigrationProxy` delegation (`migration.rb:1187`):
+ * `delegate :migrate, :announce, :write, ... to: :migration`, where `migration`
+ * is a real `Migration` built as `name.constantize.new(name, version)`.
+ *
+ * A trails `MigrationProxy` is a plain record whose `migration()` may yield a
+ * bare `{ up, down }` object with no `migrate`/`announce`, so the Migrator
+ * wraps whatever was loaded in a `Migration` carrying the proxy's
+ * name/version. That wrapper is what supplies `migrate` — and therefore the
+ * announce/benchmark/announce/write banners — for every proxy shape.
+ */
+class MigrationProxyDelegate extends Migration {
+  constructor(
+    proxy: MigrationProxy,
+    private readonly _loaded: MigrationLike,
+    private readonly _execStrategy: ExecutionStrategy,
+  ) {
+    super(proxy.name, proxy.version);
+  }
+
+  override get disableDdlTransaction(): boolean {
+    return this._loaded.disableDdlTransaction ?? false;
+  }
+
+  /**
+   * Rails' `exec_migration` `public_send`s the direction on the migration
+   * itself; trails routes it through the Migrator's execution strategy, which
+   * is where a custom strategy gets to wrap the call.
+   */
+  override async execMigration(conn: DatabaseAdapter, direction: "up" | "down"): Promise<void> {
+    await this._execStrategy.exec(direction, this._loaded, conn);
+  }
 }
 
 /**
@@ -2878,25 +2915,18 @@ export class Migrator {
   }
 
   private async _runMigration(proxy: MigrationProxy, direction: "up" | "down"): Promise<void> {
-    const migration = await proxy.migration();
+    const migration = new MigrationProxyDelegate(proxy, await proxy.migration(), this._strategy);
+    migration.connection = this._adapter;
     // Rails wraps both the migration execution AND the version
     // stamping inside the same ddl_transaction so they commit/rollback
     // atomically. Without this, a committed migration + failed stamp
     // would leave schema_migrations out of sync.
     try {
       await this._ddlTransaction(migration, async () => {
-        // Rails emits these banners from Migration#migrate (`migration.rb:964`),
-        // which this Migrator bypasses by driving the execution strategy
-        // directly. They belong inside the ddl_transaction because Rails calls
-        // migration.migrate from within it (`migration.rb:1534`).
-        this._announce(proxy, direction === "up" ? "migrating" : "reverting");
-        // Rails benchmarks exec_migration alone (`migration.rb:973`) and emits
-        // the completion banner before record_version_state_after_migrating.
-        const start = Date.now();
-        await this._strategy.exec(direction, migration, this._adapter);
-        const elapsed = ((Date.now() - start) / 1000).toFixed(4);
-        this._announce(proxy, `${direction === "up" ? "migrated" : "reverted"} (${elapsed}s)`);
-        writeMigrationMessage();
+        // Rails: `migration.migrate(@direction)` (`migration.rb:1534`), which
+        // owns the announce/benchmark/announce/write sequence and runs before
+        // record_version_state_after_migrating.
+        await migration.migrate(direction);
         if (direction === "up") {
           await this._schemaMigration.recordVersion(proxy.version);
           if (this._internalMetadata.enabled) {
@@ -2914,11 +2944,6 @@ export class Migrator {
       const msg = `An error has occurred, ${useTx ? "this and " : ""}all later migrations canceled:\n\n${e instanceof Error ? e.message : e}`;
       throw Object.assign(new Error(msg), { cause: e });
     }
-  }
-
-  /** @internal Rails: `MigrationProxy` delegates `announce`/`write` to the migration. */
-  private _announce(proxy: MigrationProxy, message: string): void {
-    writeMigrationMessage(announceMigrationText(`${proxy.version} ${proxy.name}`, message));
   }
 
   /**
