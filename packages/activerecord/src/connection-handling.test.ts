@@ -561,11 +561,18 @@ describe("ConnectionHandlingTest", () => {
     expect(dbConfig.adapter).toBeUndefined();
 
     class BackfillModel extends Base {}
-    await BackfillModel.establishConnection(dbConfig as any);
+    try {
+      await BackfillModel.establishConnection(dbConfig as any);
 
-    expect(dbConfig.adapter).toBe("sqlite");
-    expect(Object.isFrozen(dbConfig.configurationHash)).toBe(true);
-    expect(BackfillModel.connectionPool().dbConfig).toBe(dbConfig);
+      expect(dbConfig.adapter).toBe("sqlite");
+      expect(Object.isFrozen(dbConfig.configurationHash)).toBe(true);
+      const pool = BackfillModel.connectionPool();
+      expect(pool.dbConfig).toBe(dbConfig);
+      // Never checked out — db/foo.sqlite3 must not be created by this test.
+      expect(pool.activeConnection).toBeNull();
+    } finally {
+      BackfillModel.removeConnection();
+    }
   });
 });
 
