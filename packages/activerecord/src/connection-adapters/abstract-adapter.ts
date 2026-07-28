@@ -2158,6 +2158,27 @@ export class AbstractAdapter implements Quoting {
 
   // --- Type registration (Rails: class << self private) ---
 
+  /**
+   * @internal Mirrors: AbstractAdapter::TYPE_MAP
+   *
+   * Rails builds this constant at class-definition time (abstract_adapter.rb:942).
+   * Built on first read here instead: the type classes `initializeTypeMap`
+   * registers sit on a circular import edge and are still in their temporal
+   * dead zone while this module evaluates.
+   */
+  static get TYPE_MAP(): TypeMap {
+    return (abstractTypeMap ??= (() => {
+      const m = new TypeMap();
+      AbstractAdapter.initializeTypeMap(m);
+      return m;
+    })());
+  }
+
+  /** @internal Mirrors: AbstractAdapter#lookup_cast_type */
+  lookupCastType(sqlType: string): unknown {
+    return (this.typeMap as TypeMap).lookup(sqlType);
+  }
+
   /** @internal */
   static initializeTypeMap(this: typeof AbstractAdapter, m: TypeMap): void {
     this.registerClassWithLimit(m, /boolean/i, BooleanType);
@@ -2637,6 +2658,9 @@ export class AbstractAdapter implements Quoting {
 // evaluating. Instance methods only matter on instances, so first-construction
 // is early enough.
 let abstractAdapterMixinsApplied = false;
+
+/** Backing slot for the lazily built {@link AbstractAdapter.TYPE_MAP}. */
+let abstractTypeMap: TypeMap | undefined;
 
 /** @internal Applies the abstract-adapter mixin/callback/query-cache wiring once. */
 function ensureAbstractAdapterMixinsApplied(): void {

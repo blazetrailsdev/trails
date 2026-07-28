@@ -221,6 +221,9 @@ describe("AbstractAdapter query/logging infrastructure (PR 25b)", () => {
 
     it("returns the sqlType string when lookupCastType is absent", () => {
       const a = new AbstractAdapter();
+      // AbstractAdapter now carries Rails' own `lookup_cast_type` (TYPE_MAP
+      // lookup), so drop it to reach the no-cast-type fallback.
+      (a as any).lookupCastType = undefined;
       expect(a.lookupCastTypeFromColumn({ sqlType: "integer" })).toBe("integer");
     });
   });
