@@ -230,12 +230,12 @@ describe("DatabaseConfigurations", () => {
       expect(config.lazySchemaCachePath()).toBe("db/alternate_schema_cache.json");
     });
 
-    it("validate checks the adapter exists", async () => {
+    it("validate checks the adapter exists", () => {
       const ok = new HashConfig("default_env", "primary", { adapter: "abstract" });
-      await expect(ok.validateBang()).resolves.toBe(true);
+      expect(ok.validateBang()).toBe(true);
 
       const bad = new HashConfig("default_env", "primary", { adapter: "potato" });
-      await expect(bad.validateBang()).rejects.toBeInstanceOf(AdapterNotFound);
+      expect(() => bad.validateBang()).toThrow(AdapterNotFound);
     });
 
     it("inspect does not show secrets", () => {

@@ -51,8 +51,10 @@ type AdapterClassResolver = (adapterName: string) => Promise<new (...args: any[]
 type AdapterClassResolverSync = (adapterName: string) => (new (...args: any[]) => unknown) | null;
 type AdapterArgBuilder = (adapterName: string, configuration: Record<string, unknown>) => unknown[];
 type LoadErrorLookup = (adapterName: string) => unknown | null;
+type AdapterNameValidator = (adapterName: string) => void;
 let _adapterClassResolver: AdapterClassResolver | null = null;
 let _adapterClassResolverSync: AdapterClassResolverSync | null = null;
+let _validateAdapterName: AdapterNameValidator | null = null;
 let _buildAdapterArg: AdapterArgBuilder = (_n, c) => [c];
 let _loadAdapterError: LoadErrorLookup | null = null;
 
@@ -62,11 +64,13 @@ export function _setAdapterClassResolver(
   syncFn: AdapterClassResolverSync,
   argBuilder: AdapterArgBuilder,
   errorLookup: LoadErrorLookup,
+  nameValidator: AdapterNameValidator,
 ): void {
   _adapterClassResolver = fn;
   _adapterClassResolverSync = syncFn;
   _buildAdapterArg = argBuilder;
   _loadAdapterError = errorLookup;
+  _validateAdapterName = nameValidator;
 }
 
 let writeConfigurationHash!: (config: DatabaseConfig, hash: DatabaseConfigOptions) => void;
@@ -328,9 +332,24 @@ export class DatabaseConfig {
    *
    * Validates the configuration by resolving the adapter class.
    * Returns true on success or throws.
+   *
+   * Deviation: Rails resolves the adapter class here; trails checks the
+   * adapter name against the registry instead, because {@link adapterClass}
+   * is async (ESM imports are) and `validate!`'s callers are sync. A
+   * registered adapter whose module fails to import surfaces at first
+   * checkout rather than here.
    */
-  async validateBang(): Promise<true> {
-    if (this.adapter) await this.adapterClass();
+  validateBang(): true {
+    // `!= null`, not truthiness: `adapter: ""` is truthy in Ruby, so Rails
+    // validates it and raises AdapterNotFound rather than AdapterNotSpecified.
+    if (this.adapter != null) {
+      if (!_validateAdapterName) {
+        throw new Error(
+          "Adapter class resolver not registered — import ConnectionHandler (or connection-handling) first",
+        );
+      }
+      _validateAdapterName(this.adapter);
+    }
     return true;
   }
 }

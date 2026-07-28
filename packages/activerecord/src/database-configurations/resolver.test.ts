@@ -2,10 +2,9 @@ import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import type { RawConfigurations } from "../database-configurations.js";
 import { AdapterNotFound } from "../errors.js";
-// connection-handling registers the adapter class resolver that validateBang()
-// relies on (same import hash-config.test.ts uses) so the "url invalid adapter"
-// case resolves the adapter rather than throwing "resolver not registered".
+// connection-handling registers the adapter class resolver validateBang() needs.
 import "../connection-handling.js";
+import { ConnectionHandler } from "../connection-adapters/abstract/connection-handler.js";
 
 function resolveDbConfig(poolConfig: string, config: RawConfigurations = {}) {
   const configs = new DatabaseConfigurations(config);
@@ -22,15 +21,18 @@ describe("PoolConfig", () => {
       DatabaseConfigurations.defaultEnv = "development";
     });
 
-    it("url invalid adapter", async () => {
-      // Rails drives this through Base.connection_handler.establish_connection; the
-      // trails resolver suite tests the resolver level (configs.resolve), so we
-      // resolve + validate the config directly. An unknown adapter in the URL
-      // (scheme "ridiculous" → adapter "ridiculous") fails adapter resolution.
-      const promise = resolveDbConfig("ridiculous://foo?encoding=utf8").validateBang();
-      await expect(promise).rejects.toBeInstanceOf(AdapterNotFound);
+    it("url invalid adapter", () => {
+      // Rails passes the URL string straight to establish_connection; trails'
+      // establishConnection takes an already-resolved config.
+      const dbConfig = resolveDbConfig("ridiculous://foo?encoding=utf8");
+      const handler = new ConnectionHandler();
+      expect(() => handler.establishConnection(dbConfig)).toThrow(AdapterNotFound);
       // Mirrors Rails' assert_match on the nonexistent-adapter message.
-      await expect(promise).rejects.toThrow(/nonexistent 'ridiculous' adapter/);
+      // The available-adapters list varies with what the running suite has
+      // registered, so the two fixed clauses are matched around it.
+      expect(() => handler.establishConnection(dbConfig)).toThrow(
+        /^Database configuration specifies nonexistent 'ridiculous' adapter\. Available adapters are: .+\. Ensure that the adapter is spelled correctly in config\/database\.yml and that you've added the necessary adapter package to your package\.json if it's not in the list of available adapters\.$/,
+      );
     });
 
     it("url from environment", () => {

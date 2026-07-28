@@ -24,6 +24,7 @@ import {
   resolve as resolveConnectionAdapter,
   resolveSync as resolveConnectionAdapterSync,
   resolveSyncError as resolveConnectionAdapterSyncError,
+  validateAdapterName,
 } from "../../connection-adapters.js";
 import { buildAdapterArg } from "../adapter-args.js";
 
@@ -35,6 +36,7 @@ _setAdapterClassResolver(
   (adapterName) => resolveConnectionAdapterSync(adapterName),
   (adapterName, configuration) => buildAdapterArg(adapterName, configuration),
   (adapterName) => resolveConnectionAdapterSyncError(adapterName),
+  (adapterName) => validateAdapterName(adapterName),
 );
 
 export { ConnectionDescriptor };
@@ -355,9 +357,7 @@ export class ConnectionHandler {
     options?: { adapterFactory?: () => DatabaseAdapter },
   ): PoolConfig {
     const dbConfig = configurations().resolve(config);
-    // Rails calls db_config.validate! here (connection_handler.rb:277). Ours is
-    // async (it awaits adapterClass()) and this path is sync, so the adapter
-    // guard below stands in until establishConnection can await.
+    dbConfig.validateBang();
     if (!dbConfig.adapter) {
       throw new AdapterNotSpecified("database configuration does not specify adapter");
     }

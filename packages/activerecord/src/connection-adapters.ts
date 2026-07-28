@@ -69,6 +69,29 @@ export function register(name: string, loader: AdapterLoader): void {
   resolveErrors.delete(name);
 }
 
+// Builds the AdapterNotFound raised for an unregistered name. Rails' wording,
+// with its gem/Gemfile pair rendered as the JS package/package.json one.
+function adapterNotFoundError(adapterName: string): AdapterNotFound {
+  const available = [...adapters.keys()].sort().join(", ");
+  return new AdapterNotFound(
+    `Database configuration specifies nonexistent '${adapterName}' adapter. ` +
+      `Available adapters are: ${available}. ` +
+      `Ensure that the adapter is spelled correctly in config/database.yml and that you've added the necessary ` +
+      `adapter package to your package.json if it's not in the list of available adapters.`,
+  );
+}
+
+/**
+ * Synchronous half of `resolve(name)` — Rails does this check inline, but
+ * trails' sync callers can't await the dynamic import.
+ *
+ * @internal
+ */
+export function validateAdapterName(adapterName: string): void {
+  if (adapters.has(adapterName)) return;
+  throw adapterNotFoundError(adapterName);
+}
+
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters.resolve
  *
@@ -80,11 +103,7 @@ export async function resolve(adapterName: string): Promise<AdapterClass> {
 
   const loader = adapters.get(adapterName);
   if (!loader) {
-    const available = [...adapters.keys()].sort().join(", ");
-    const err = new AdapterNotFound(
-      `Database configuration specifies nonexistent '${adapterName}' adapter. ` +
-        `Available adapters are: ${available}.`,
-    );
+    const err = adapterNotFoundError(adapterName);
     resolveErrors.set(adapterName, err);
     throw err;
   }
