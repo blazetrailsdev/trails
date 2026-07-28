@@ -334,7 +334,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "feature-keyed table (`default_expression`, `non_unique_constraint_name`, " +
       "`text_column_with_default`, `sql_standard_drop_constraint`) rather than " +
       "as four exports on adapter-helper.ts, exactly as the ~15 predicates " +
-      "adapter_helper.rb itself generates with `define_method` are. The table " +
+      "`adapter_helper.rb` itself generates with `define_method` are. The table " +
       "keys are the `supports_<key>?` names, so the pairing is checkable; " +
       "duplicating them as free functions here would give two sources of truth " +
       "for the same capability. Scoped to adapter_helper.rb, the only Ruby file " +

@@ -31,7 +31,14 @@ export class FakeActiveRecordAdapter extends FakeAdapterBase {
 
   private readonly _fakeColumns: Map<string, Column[]>;
 
-  /** Mirrors: FakeActiveRecordAdapter#initialize */
+  /**
+   * Mirrors: FakeActiveRecordAdapter#initialize, minus the forwarding. Rails is
+   * `def initialize(...)` + bare `super`, passing the adapter's whole argument
+   * list up; trails' AbstractAdapter constructor takes none
+   * (abstract-adapter.ts:706), so there is nothing to forward and the signature
+   * is zero-arg. Behaviourally identical to the field initializers this
+   * replaced — it exists to put the three assignments in Rails' order.
+   */
   constructor() {
     super();
     this.dataSources = [];

@@ -65,6 +65,9 @@ export class ProtectedParams {
     return this.toH();
   }
 
+  // Ruby's `@parameters.each_pair(&block)` returns `@parameters`, not `self`.
+  // Here `this` IS the parameters hash, so returning it is that same value —
+  // read the `this` as the hash, not as Ruby's `self`.
   eachPair(block: (key: string, value: unknown) => void): this {
     for (const [key, value] of Object.entries(this)) block(key, value);
     return this;

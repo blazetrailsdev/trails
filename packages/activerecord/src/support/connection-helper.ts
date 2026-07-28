@@ -44,8 +44,22 @@ export async function runWithoutConnection<T>(
 /**
  * Mirrors: ConnectionHelper#reset_connection — the same remove/re-establish
  * pair as {@link runWithoutConnection} with no block in between. The round trip
- * itself is the point: Rails uses it "to drop all cache query plans in tests",
- * which the new pool's fresh connections guarantee.
+ * itself is the point: Rails uses it "to drop all cache query plans in tests".
+ *
+ * That holds here because the prepared-statement cache is per-adapter private
+ * state (`_statementPool`, postgresql-adapter.ts:476; the MySQL and SQLite
+ * adapters carry their own), so a new pool hands out new adapter instances with
+ * empty caches. What does NOT carry over from Rails is the teardown half:
+ * `removeConnectionPool` drops the old pool from the manager and then leaves
+ * `disconnect()` unawaited (connection-handler.ts:340), so this resolving means
+ * the *next* query gets a fresh connection — not that the old sockets are
+ * already closed. Tests that assert on server-side connection counts need to
+ * account for that; tests that only want a cold statement cache do not.
+ *
+ * No trails caller yet: every Rails caller is in an unported adapter suite
+ * (postgresql/enum_test.rb:33,36, referential_integrity_test.rb:39,
+ * postgresql_adapter_test.rb:528+, abstract_mysql_adapter/active_schema_test.rb:26,
+ * mysql_type_lookup_test.rb:17).
  */
 export async function resetConnection(): Promise<void> {
   const originalConnection = Base.removeConnection()!;
