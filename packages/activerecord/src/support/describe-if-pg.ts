@@ -47,6 +47,6 @@ export const pgHasHintPlan = probe.hasHintPlan;
  * Scope a suite to a reachable PostgreSQL server. Lives in `support/` rather
  * than the `adapters/postgresql/` test-helper because suites outside that tree
  * gate on it too — a test file should never have to import glue from another
- * adapter's tree. Counterpart to `describeIfSqlite` / `describeIfMysql`.
+ * adapter's tree. Counterpart to `describeIfSqlite` / `describeIfMysqlAdapter`.
  */
 export const describeIfPg = pgAvailable ? describe : (describe.skip as typeof describe);
