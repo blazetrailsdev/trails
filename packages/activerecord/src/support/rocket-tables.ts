@@ -38,3 +38,29 @@ export async function withRocketTables(
     await conn.dropTable("astronauts", "rockets", { ifExists: true });
   }
 }
+
+/**
+ * `ActiveRecord::Migration::CompositeForeignKeyTest`'s setup/teardown,
+ * foreign_key_test.rb:827-842. Same table names as `withRocketTables` but a
+ * composite primary key on `rockets` and the matching pair of integer FK
+ * columns on `astronauts`.
+ */
+export async function withCompositeRocketTables(
+  conn: AbstractAdapter,
+  body: () => Promise<void>,
+): Promise<void> {
+  await conn.createTable("rockets", { primaryKey: ["tenant_id", "id"], force: true }, (t) => {
+    t.integer("tenant_id");
+    t.integer("id");
+  });
+  await conn.createTable("astronauts", { force: true }, (t) => {
+    t.integer("rocket_id");
+    t.integer("rocket_tenant_id");
+  });
+  try {
+    await body();
+  } finally {
+    await conn.dropTable("astronauts", { ifExists: true });
+    await conn.dropTable("rockets", { ifExists: true });
+  }
+}

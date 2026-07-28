@@ -2568,17 +2568,44 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     } else {
       await this.beginTransaction();
     }
+    const execTranslated = async (sql: string): Promise<void> => {
+      try {
+        await this.driver.exec(sql);
+      } catch (e) {
+        throw this._translateException(e, sql, []);
+      }
+    };
     try {
       await this.disableReferentialIntegrity(async () => {
-        await this.driver.exec(`CREATE TABLE ${qTmp} (${colDefs.join(", ")})`);
-        if (originalColNames.length > 0) {
-          const selectCols = originalColNames.map((n) => quoteColumnName(n)).join(", ");
-          await this.driver.exec(
+        const selectCols = originalColNames.map((n) => quoteColumnName(n)).join(", ");
+        // Rails' copy_table builds even the throwaway "a"-prefixed table through
+        // the full create_table machinery. This buffer carries the declared type
+        // verbatim (so storage affinity round-trips exactly, including the
+        // typeless/BLOB-affinity case) but drops NOT NULL/DEFAULT/CHECK/PK: rows
+        // come straight from a table that already satisfied those, so omitting
+        // them can only ever be more permissive, and no INSERT here relies on a
+        // default — both name every column explicitly.
+        const originalTypes = new Map(
+          tableInfo.map((c) => [c.name as string, (c.type as string | null) ?? ""]),
+        );
+        const tmpColDefs = originalColNames.map((n) => {
+          const declaredType = originalTypes.get(n) ?? "";
+          return declaredType === "" ? quoteColumnName(n) : `${quoteColumnName(n)} ${declaredType}`;
+        });
+        if (tmpColDefs.length > 0) {
+          await execTranslated(`CREATE TABLE ${qTmp} (${tmpColDefs.join(", ")})`);
+          await execTranslated(
             `INSERT INTO ${qTmp} (${selectCols}) SELECT ${selectCols} FROM ${qTable}`,
           );
         }
-        await this.driver.exec(`DROP TABLE ${qTable}`);
-        await this.driver.exec(`ALTER TABLE ${qTmp} RENAME TO ${quoteColumnName(bareTable)}`);
+        await execTranslated(`DROP TABLE ${qTable}`);
+        await execTranslated(`CREATE TABLE ${qTable} (${colDefs.join(", ")})`);
+        if (tmpColDefs.length > 0) {
+          await execTranslated(
+            `INSERT INTO ${qTable} (${selectCols}) SELECT ${selectCols} FROM ${qTmp}`,
+          );
+          await execTranslated(`DROP TABLE ${qTmp}`);
+        }
       });
 
       // Recreate indexes inside the transaction so failures roll back
