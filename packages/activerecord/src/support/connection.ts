@@ -194,9 +194,13 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
     // `config.example.yml:3-40`: `arunit` and `arunit2` differ — unicode vs
     // general collation, and only `arunit` carries the `time_zone` variable.
     // Rails leaves `arunit_without_prepared_statements` out for mysql2, so
-    // `expandConfig` synthesizes it from the defaults alone — and pins its
-    // `preparedStatements: false` regardless of `MYSQL_PREPARED_STATEMENTS`,
-    // which is the whole point of that entry (`config.rb:27-28`).
+    // `expandConfig` synthesizes it from the defaults alone. Its
+    // `preparedStatements: false` therefore does NOT come from the yml or from
+    // `expand_config` (which fills in `database` / `adapter` only,
+    // `config.rb:26-37`): with no key on the entry, Rails falls back to
+    // `Mysql2Adapter#default_prepared_statements` (`mysql2_adapter.rb:186-188`),
+    // which is `false`. So the entry stays off whatever
+    // `MYSQL_PREPARED_STATEMENTS` says, matching Rails.
     //
     // `buildAdapterArg` forwards the whole hash to mysql2, which logs
     // "Ignoring invalid configuration option" for the keys it does not know
@@ -287,8 +291,11 @@ function expandConfig(
     const entry = { ...(entries[name] ?? {}) };
     entry.database ??= defaultDatabase[name];
     entry.adapter ??= connection.adapter;
-    // Rails' third entry exists to turn prepared statements off, so a
-    // connection that does not spell the entry out still gets the flag.
+    // Rails' third entry exists to turn prepared statements off. Spelling the
+    // flag out here is what the postgresql yml does
+    // (`config.example.yml:77-79`); on mysql2, where no entry is spelled out at
+    // all, it stands in for `Mysql2Adapter#default_prepared_statements`
+    // (`mysql2_adapter.rb:186-188`) — same `false`, reached a different way.
     if (name === "arunit_without_prepared_statements") entry.preparedStatements ??= false;
     return new HashConfig(name, "primary", entry);
   });

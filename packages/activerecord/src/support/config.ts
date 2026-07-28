@@ -219,8 +219,11 @@ export function mysqlSettings(read: EnvReader = getEnv): ServerSettings {
  * empty-string rejection the other sub-settings use: Rails tests the variable
  * with a bare `if`, under which `""` and `"0"` are both truthy, so
  * `MYSQL_PREPARED_STATEMENTS=` turns prepared statements ON there and must here
- * too. `arunit_without_prepared_statements` is unaffected — that entry exists
- * to be the one with them off (`config.rb:27-28`).
+ * too. `arunit_without_prepared_statements` is unaffected: the yml carries no
+ * `prepared_statements` key on the mysql2 entry (it does not spell that entry
+ * out at all), so Rails falls back to
+ * `Mysql2Adapter#default_prepared_statements` (`mysql2_adapter.rb:186-188`),
+ * which is `false` whatever the env var says.
  */
 export function mysqlPreparedStatements(read: EnvReader = getEnv): boolean {
   return read("MYSQL_PREPARED_STATEMENTS") !== undefined;

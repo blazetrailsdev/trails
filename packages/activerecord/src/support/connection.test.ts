@@ -67,7 +67,9 @@ describe("connect", () => {
 
   it("turns prepared statements on for mysql2 when MYSQL_PREPARED_STATEMENTS is set", async () => {
     // config.example.yml:7-11,26-30 — the var flips arunit and arunit2 only;
-    // the third entry exists to be the one with them off (config.rb:27-28).
+    // the third entry carries no prepared_statements key on mysql2, so it
+    // falls back to Mysql2Adapter#default_prepared_statements
+    // (mysql2_adapter.rb:186-188), which is false.
     vi.stubEnv("ARCONN", "mysql2");
     vi.stubEnv("MYSQL_PREPARED_STATEMENTS", undefined);
     const off = (await testConfigurationHashes()).configurationHashes;
