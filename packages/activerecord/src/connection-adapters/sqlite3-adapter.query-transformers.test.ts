@@ -16,22 +16,22 @@ fixtures([], { useTransactionalTests: false });
 describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
   let adapter: AbstractSQLite3Adapter;
   let savedTransformers: QueryTransformer[];
+  // Teardown-only handle. `adapter` stays non-optional for the test bodies, but
+  // the teardown has to tolerate a beforeEach that failed before the lease, so
+  // it reads a genuinely optional binding rather than casting `adapter`.
+  let leased: AbstractSQLite3Adapter | undefined;
 
   // The ambient connection is a shared worker DB, so the scratch tables are
   // cleared on the way in as well as out: a hard-killed run must not wedge the
   // next one.
   const dropScratchTables = async (): Promise<void> => {
-    // Guarded so a beforeEach that fails before the lease surfaces its own
-    // error rather than a TypeError on `undefined.exec` from this teardown.
-    const conn = adapter as AbstractSQLite3Adapter | undefined;
-    if (!conn) return;
-    await conn.exec(
+    await leased?.exec(
       "DROP TABLE IF EXISTS widgets; DROP TABLE IF EXISTS t; DROP TABLE IF EXISTS a; DROP TABLE IF EXISTS b",
     );
   };
 
   beforeEach(async () => {
-    adapter = Base.connection as AbstractSQLite3Adapter;
+    adapter = leased = Base.connection as AbstractSQLite3Adapter;
     savedTransformers = queryTransformers.slice();
     queryTransformers.length = 0;
     await dropScratchTables();

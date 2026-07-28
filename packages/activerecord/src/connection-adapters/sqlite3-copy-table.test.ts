@@ -8,6 +8,10 @@ fixtures([], { useTransactionalTests: false });
 
 describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   let db: AbstractSQLite3Adapter;
+  // Teardown-only handle. `db` stays non-optional for the test bodies, but the
+  // teardown has to tolerate a beforeEach that failed before the lease, so it
+  // reads a genuinely optional binding rather than casting `db`.
+  let leased: AbstractSQLite3Adapter | undefined;
 
   // The ambient connection is a shared worker DB, so the scratch tables are
   // cleared on the way in as well as out: a hard-killed run must not wedge the
@@ -15,17 +19,13 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   // (sqlite3-adapter.ts `_alter_tmp_${bareTable}`), which it only drops on the
   // success path — a mid-rebuild failure leaves it behind.
   const dropScratchTables = async (): Promise<void> => {
-    // Guarded so a beforeEach that fails before the lease surfaces its own
-    // error rather than a TypeError on `undefined.exec` from this teardown.
-    const conn = db as AbstractSQLite3Adapter | undefined;
-    if (!conn) return;
-    await conn.exec(
+    await leased?.exec(
       `DROP TABLE IF EXISTS rebuild_users; DROP TABLE IF EXISTS rebuild_orders; DROP TABLE IF EXISTS src; DROP TABLE IF EXISTS dst; DROP TABLE IF EXISTS "_alter_tmp_rebuild_users"`,
     );
   };
 
   beforeEach(async () => {
-    db = Base.connection as AbstractSQLite3Adapter;
+    db = leased = Base.connection as AbstractSQLite3Adapter;
     await dropScratchTables();
   });
 
