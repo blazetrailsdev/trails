@@ -1144,6 +1144,10 @@ export class CreatePosts extends Migration {
     const adapter = new BetterSQLite3Adapter(dbFile);
     try {
       const migrator = new Migrator(adapter, []);
+      // Rails' last_stored_environment returns nil at current_version == 0, so
+      // record a version (as database_tasks_test.rb does) to make the DB stamped.
+      await migrator.schemaMigration.createTable();
+      await migrator.schemaMigration.createVersion("1");
       await migrator.internalMetadata.createTable();
       await migrator.internalMetadata.set("environment", "production");
     } finally {
@@ -1184,6 +1188,10 @@ export class CreatePosts extends Migration {
     const adapter = new BetterSQLite3Adapter(dbFile);
     try {
       const migrator = new Migrator(adapter, []);
+      // Rails' last_stored_environment returns nil at current_version == 0, so
+      // record a version (as database_tasks_test.rb does) to make the DB stamped.
+      await migrator.schemaMigration.createTable();
+      await migrator.schemaMigration.createVersion("1");
       await migrator.internalMetadata.createTable();
       await migrator.internalMetadata.set("environment", "staging");
     } finally {
@@ -1216,6 +1224,10 @@ export class CreatePosts extends Migration {
     const adapter = new BetterSQLite3Adapter(dbFile);
     try {
       const migrator = new Migrator(adapter, []);
+      // Rails' last_stored_environment returns nil at current_version == 0, so
+      // record a version (as database_tasks_test.rb does) to make the DB stamped.
+      await migrator.schemaMigration.createTable();
+      await migrator.schemaMigration.createVersion("1");
       await migrator.internalMetadata.createTable();
       await migrator.internalMetadata.set("environment", "production");
     } finally {
@@ -1263,6 +1275,8 @@ export class CreatePosts extends Migration {
       expect(await migrator.internalMetadata.tableExists()).toBe(false);
 
       // After stamping as production, both calls reflect the protected state.
+      await migrator.schemaMigration.createTable();
+      await migrator.schemaMigration.createVersion("1");
       await migrator.internalMetadata.createTable();
       await migrator.internalMetadata.set("environment", "production");
       expect(await migrator.protectedEnvironment()).toBe(true);
