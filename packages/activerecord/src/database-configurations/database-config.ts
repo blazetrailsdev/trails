@@ -75,7 +75,9 @@ export function _setAdapterClassResolver(
 export class DatabaseConfig {
   readonly envName: string;
   readonly name: string;
-  readonly configuration: DatabaseConfigOptions;
+  // Not readonly: `_database=` replaces the hash wholesale (Rails reassigns
+  // @configuration_hash) rather than writing through to the caller's literal.
+  configuration: DatabaseConfigOptions;
 
   constructor(envName: string, name: string, configuration: DatabaseConfigOptions = {}) {
     this.envName = envName;
@@ -123,9 +125,13 @@ export class DatabaseConfig {
    *
    * Internal setter for the database name. Rails exposes this so things like
    * db:create can swap the database without creating a new config.
+   *
+   * Rails: `@configuration_hash = configuration_hash.merge(database:).freeze`
+   * — the hash the caller passed in is never mutated, and the config object's
+   * own identity is preserved (ConnectionHandler's reuse check depends on it).
    */
   set _database(database: string) {
-    (this.configuration as Record<string, unknown>).database = database;
+    this.configuration = Object.freeze({ ...this.configuration, database });
   }
 
   /**

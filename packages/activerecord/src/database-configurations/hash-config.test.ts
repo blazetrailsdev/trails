@@ -271,5 +271,18 @@ describe("DatabaseConfigurations", () => {
       vi.spyOn(config, "isPrimary").mockReturnValue(false);
       expect(config.seeds).toBe(true);
     });
+
+    // trails-only: Rails' _database= replaces @configuration_hash with a frozen
+    // merge, so the hash the caller passed in can never be written through.
+    it("_database= does not mutate the hash passed to the constructor", () => {
+      const original = { adapter: "abstract", database: "original_db" };
+      const config = new HashConfig("default_env", "primary", original);
+
+      config._database = "swapped_db";
+
+      expect(original.database).toBe("original_db");
+      expect(config.database).toBe("swapped_db");
+      expect(config.configurationHash.adapter).toBe("abstract");
+    });
   });
 });
