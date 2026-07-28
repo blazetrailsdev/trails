@@ -10,9 +10,10 @@ import {
   DatabaseConfig,
   _setAdapterClassResolver,
 } from "../../database-configurations/database-config.js";
-import { HashConfig } from "../../database-configurations/hash-config.js";
-import { DatabaseConfigurations, symbolConnectionName } from "../../database-configurations.js";
-import { configurations as baseConfigurations } from "../../core.js";
+import {
+  configurationsStore as baseConfigurations,
+  symbolConnectionName,
+} from "../../database-configurations.js";
 import { PoolConfig } from "../pool-config.js";
 import { PoolManager } from "../pool-manager.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
@@ -63,6 +64,11 @@ export class ConnectionHandler {
    * PoolConfig.connectionDescriptor= can call primaryClassQ() on them.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionHandler#determine_owner_name
+   *
+   * Returns undefined where Rails returns `owner_name`'s default, `Base`:
+   * trails has no Base-as-default-owner (Base is a model class here, and
+   * importing it would close a cycle), so establishConnection supplies the
+   * fallback descriptor instead.
    *
    * @internal
    */
@@ -348,13 +354,7 @@ export class ConnectionHandler {
     shard: string,
     options?: { adapterFactory?: () => DatabaseAdapter },
   ): PoolConfig {
-    const connectionName = ownerName.name;
-    const dbConfig =
-      config instanceof DatabaseConfig
-        ? config
-        : typeof config === "string"
-          ? baseConfigurations().resolve(config)
-          : new HashConfig(DatabaseConfigurations.defaultEnv, connectionName, config as any);
+    const dbConfig = baseConfigurations().resolve(config);
     if (!dbConfig.adapter) {
       throw new AdapterNotSpecified("database configuration does not specify adapter");
     }

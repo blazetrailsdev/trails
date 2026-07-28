@@ -38,14 +38,29 @@ type DbConfigHandler = (
 
 /**
  * The stand-in for Ruby's `config.is_a?(Symbol)`: TS collapses Ruby's Symbol
- * and String onto `string`, so a scheme-less string is the connection name
- * Ruby spells as a Symbol and anything with a scheme is a URL config.
+ * and String onto `string`, so a non-empty scheme-less string is the connection
+ * name Ruby spells as a Symbol; anything with a scheme — and `""`, which Ruby
+ * can only mean as a String — is a URL config.
  *
  * @internal
  */
 export function symbolConnectionName(config: unknown): string | undefined {
-  if (typeof config !== "string") return undefined;
+  if (typeof config !== "string" || config === "") return undefined;
   return /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(config) ? undefined : config;
+}
+
+// Backing store for ActiveRecord::Base.configurations (core.ts). It lives here,
+// not in core.ts, so leaf modules can read it without importing core.ts.
+let _configurations: DatabaseConfigurations | undefined;
+
+/** @internal */
+export function configurationsStore(): DatabaseConfigurations {
+  return _configurations ?? DatabaseConfigurations.fromEnv({});
+}
+
+/** @internal */
+export function setConfigurationsStore(configs: DatabaseConfigurations): void {
+  _configurations = configs;
 }
 
 export class DatabaseConfigurations {

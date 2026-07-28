@@ -8,7 +8,12 @@ import { getApplicationRecordClass } from "./inheritance.js";
 import { RecordNotFound, StatementInvalid, StrictLoadingViolationError } from "./errors.js";
 import { actionOnStrictLoadingViolation } from "./ar-config.js";
 import { WRITING_ROLE } from "./roles.js";
-import { DatabaseConfigurations, type RawConfigurations } from "./database-configurations.js";
+import {
+  DatabaseConfigurations,
+  configurationsStore,
+  setConfigurationsStore,
+  type RawConfigurations,
+} from "./database-configurations.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
 import {
   Notifications,
@@ -434,7 +439,9 @@ export function destroyAssociationAsyncJob(this: CoreHost, value?: any): any {
 // (core.rb:71-79), so there is exactly one registry for the whole process:
 // assigning through any model class replaces `ActiveRecord::Base`'s value.
 // A per-class static would instead shadow through the JS prototype chain.
-let _configurations: DatabaseConfigurations | undefined;
+// The store itself lives in database-configurations.ts so that leaf modules
+// (ConnectionHandler) can read it without importing core.ts, which would close
+// an import cycle through base.ts and break its static initializers.
 
 /**
  * Mirrors: ActiveRecord::Base.configurations / .configurations=
@@ -448,14 +455,15 @@ export function configurations(
   config?: RawConfigurations | DatabaseConfigurations | DatabaseConfig[],
 ): DatabaseConfigurations {
   if (config !== undefined) {
-    _configurations =
+    setConfigurationsStore(
       config instanceof DatabaseConfigurations
         ? config
         : Array.isArray(config)
           ? new DatabaseConfigurations(config)
-          : DatabaseConfigurations.fromEnv(config);
+          : DatabaseConfigurations.fromEnv(config),
+    );
   }
-  return _configurations ?? DatabaseConfigurations.fromEnv({});
+  return configurationsStore();
 }
 
 export function isApplicationRecordClass(this: CoreHost): boolean {

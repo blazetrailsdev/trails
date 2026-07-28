@@ -40,7 +40,7 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it("establish connection using 3 levels config", async () => {
-    const configs = new DatabaseConfigurations({
+    const config = {
       default_env: {
         readonly: { adapter: "sqlite3", database: "test/db/readonly.sqlite3" },
         primary: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
@@ -50,30 +50,30 @@ describe("ConnectionHandlerTest", () => {
         primary: { adapter: "sqlite3", database: "test/db/bad-primary.sqlite3" },
       },
       common: { adapter: "sqlite3", database: "test/db/common.sqlite3" },
-    });
+    };
     DatabaseConfigurations.defaultEnv = "default_env";
     const prevConfigs = Base.configurations();
-    Base.configurations(configs);
+    Base.configurations(config);
 
     try {
       handler.establishConnection("common");
       handler.establishConnection("primary");
       handler.establishConnection("readonly");
+
+      const readonlyPool = handler.retrieveConnectionPool("readonly");
+      expect(readonlyPool).toBeTruthy();
+      expect(readonlyPool!.dbConfig.database).toBe("test/db/readonly.sqlite3");
+
+      const primaryPool = handler.retrieveConnectionPool("primary");
+      expect(primaryPool).toBeTruthy();
+      expect(primaryPool!.dbConfig.database).toBe("test/db/primary.sqlite3");
+
+      const commonPool = handler.retrieveConnectionPool("common");
+      expect(commonPool).toBeTruthy();
+      expect(commonPool!.dbConfig.database).toBe("test/db/common.sqlite3");
     } finally {
       Base.configurations(prevConfigs);
     }
-
-    const readonlyPool = handler.retrieveConnectionPool("readonly");
-    expect(readonlyPool).toBeTruthy();
-    expect(readonlyPool!.dbConfig.database).toBe("test/db/readonly.sqlite3");
-
-    const primaryPool = handler.retrieveConnectionPool("primary");
-    expect(primaryPool).toBeTruthy();
-    expect(primaryPool!.dbConfig.database).toBe("test/db/primary.sqlite3");
-
-    const commonPool = handler.retrieveConnectionPool("common");
-    expect(commonPool).toBeTruthy();
-    expect(commonPool!.dbConfig.database).toBe("test/db/common.sqlite3");
   });
 
   it("validates db configuration and raises on invalid adapter", async () => {
