@@ -13,6 +13,28 @@ describe("SqliteAdapter", () => {
     await adapter.close();
   });
 
+  // TS-only coverage for the alter_table rebuild: a typeless column has BLOB
+  // affinity, and both the throwaway "a"-prefixed buffer and the rebuilt table
+  // have to keep the declared type empty or the affinity silently becomes TEXT.
+  describe("alterTable", () => {
+    it("round-trips a typeless (BLOB affinity) column", async () => {
+      await adapter.exec(
+        `CREATE TABLE "affinities" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "untyped", "doomed" varchar)`,
+      );
+      await adapter.executeMutation(`INSERT INTO "affinities" ("untyped") VALUES (42)`);
+
+      await adapter.removeColumn("affinities", "doomed");
+
+      const columns = await adapter.columns("affinities");
+      expect(columns.map((c) => c.name)).toEqual(["id", "untyped"]);
+      expect(columns.find((c) => c.name === "untyped")?.sqlType).toBe("");
+      const rows = await adapter.selectAll(`SELECT typeof("untyped") AS t FROM "affinities"`);
+      expect(rows.rows[0]?.[0]).toBe("integer");
+
+      await adapter.dropTable("affinities");
+    });
+  });
+
   describe("lookupCastType", () => {
     it("resolves base SQL types", () => {
       expect(adapter.lookupCastType("string").name).toBe("string");
@@ -49,91 +71,91 @@ describe("SqliteAdapter", () => {
       expect(adapter.lookupCastType("tinyint").name).toBe("integer");
     });
   });
-});
 
-describe("SQLite3Adapter._isMemoryFilename", () => {
-  const isMemoryFilename = (
-    AbstractSQLite3Adapter as unknown as {
-      _isMemoryFilename(filename: string): boolean;
-    }
-  )._isMemoryFilename.bind(AbstractSQLite3Adapter);
+  describe("SQLite3Adapter._isMemoryFilename", () => {
+    const isMemoryFilename = (
+      AbstractSQLite3Adapter as unknown as {
+        _isMemoryFilename(filename: string): boolean;
+      }
+    )._isMemoryFilename.bind(AbstractSQLite3Adapter);
 
-  it("treats :memory: as in-memory", () => {
-    expect(isMemoryFilename(":memory:")).toBe(true);
-  });
-
-  it("treats file::memory: URI as in-memory", () => {
-    expect(isMemoryFilename("file::memory:?cache=shared")).toBe(true);
-  });
-
-  it("treats file:?mode=memory URI as in-memory", () => {
-    expect(isMemoryFilename("file:memdb1?mode=memory&cache=shared")).toBe(true);
-  });
-
-  it("does NOT treat a path containing mode=memory text as in-memory", () => {
-    expect(isMemoryFilename("file:/tmp/mode=memory.db")).toBe(false);
-  });
-
-  it("treats a regular file path as on-disk", () => {
-    expect(isMemoryFilename("/tmp/test.db")).toBe(false);
-  });
-});
-
-describe("SQLite3Adapter pragmas option", () => {
-  let adapter: AbstractSQLite3Adapter | undefined;
-
-  afterEach(async () => {
-    await adapter?.close();
-    vi.restoreAllMocks();
-  });
-
-  it("applies a valid numeric pragma on construction", () => {
-    adapter = new BetterSQLite3Adapter(":memory:", { pragmas: { cache_size: 500 } });
-    const result = (adapter.raw as import("better-sqlite3").Database).pragma(
-      "cache_size",
-    ) as Array<{ cache_size: number }>;
-    expect(result[0]?.cache_size).toBe(500);
-  });
-
-  it("applies a valid string enum pragma", () => {
-    adapter = new BetterSQLite3Adapter(":memory:", { pragmas: { synchronous: "FULL" } });
-    const result = (adapter.raw as import("better-sqlite3").Database).pragma(
-      "synchronous",
-    ) as Array<{ synchronous: number }>;
-    expect(result[0]?.synchronous).toBe(2);
-  });
-
-  it("converts boolean true to 1 for pragma", () => {
-    adapter = new BetterSQLite3Adapter(":memory:", { pragmas: { foreign_keys: true } });
-    const result = (adapter.raw as import("better-sqlite3").Database).pragma(
-      "foreign_keys",
-    ) as Array<{ foreign_keys: number }>;
-    expect(result[0]?.foreign_keys).toBe(1);
-  });
-
-  it("converts boolean false to 0 for pragma", () => {
-    adapter = new BetterSQLite3Adapter(":memory:", { pragmas: { foreign_keys: false } });
-    const result = (adapter.raw as import("better-sqlite3").Database).pragma(
-      "foreign_keys",
-    ) as Array<{ foreign_keys: number }>;
-    expect(result[0]?.foreign_keys).toBe(0);
-  });
-
-  it("warns and skips an invalid pragma name", () => {
-    vi.spyOn(console, "warn").mockImplementation(() => {});
-    adapter = new BetterSQLite3Adapter(":memory:", {
-      pragmas: { "bad-name!": 1 } as Record<string, number>,
+    it("treats :memory: as in-memory", () => {
+      expect(isMemoryFilename(":memory:")).toBe(true);
     });
-    expect(console.warn).toHaveBeenCalledWith(
-      expect.stringContaining("invalid SQLite pragma name"),
-    );
+
+    it("treats file::memory: URI as in-memory", () => {
+      expect(isMemoryFilename("file::memory:?cache=shared")).toBe(true);
+    });
+
+    it("treats file:?mode=memory URI as in-memory", () => {
+      expect(isMemoryFilename("file:memdb1?mode=memory&cache=shared")).toBe(true);
+    });
+
+    it("does NOT treat a path containing mode=memory text as in-memory", () => {
+      expect(isMemoryFilename("file:/tmp/mode=memory.db")).toBe(false);
+    });
+
+    it("treats a regular file path as on-disk", () => {
+      expect(isMemoryFilename("/tmp/test.db")).toBe(false);
+    });
   });
 
-  it("warns and skips a string value with unsafe characters", () => {
-    vi.spyOn(console, "warn").mockImplementation(() => {});
-    adapter = new BetterSQLite3Adapter(":memory:", {
-      pragmas: { synchronous: "FULL; DROP TABLE users" },
+  describe("SQLite3Adapter pragmas option", () => {
+    let adapter: AbstractSQLite3Adapter | undefined;
+
+    afterEach(async () => {
+      await adapter?.close();
+      vi.restoreAllMocks();
     });
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("unsafe characters"));
+
+    it("applies a valid numeric pragma on construction", () => {
+      adapter = new BetterSQLite3Adapter(":memory:", { pragmas: { cache_size: 500 } });
+      const result = (adapter.raw as import("better-sqlite3").Database).pragma(
+        "cache_size",
+      ) as Array<{ cache_size: number }>;
+      expect(result[0]?.cache_size).toBe(500);
+    });
+
+    it("applies a valid string enum pragma", () => {
+      adapter = new BetterSQLite3Adapter(":memory:", { pragmas: { synchronous: "FULL" } });
+      const result = (adapter.raw as import("better-sqlite3").Database).pragma(
+        "synchronous",
+      ) as Array<{ synchronous: number }>;
+      expect(result[0]?.synchronous).toBe(2);
+    });
+
+    it("converts boolean true to 1 for pragma", () => {
+      adapter = new BetterSQLite3Adapter(":memory:", { pragmas: { foreign_keys: true } });
+      const result = (adapter.raw as import("better-sqlite3").Database).pragma(
+        "foreign_keys",
+      ) as Array<{ foreign_keys: number }>;
+      expect(result[0]?.foreign_keys).toBe(1);
+    });
+
+    it("converts boolean false to 0 for pragma", () => {
+      adapter = new BetterSQLite3Adapter(":memory:", { pragmas: { foreign_keys: false } });
+      const result = (adapter.raw as import("better-sqlite3").Database).pragma(
+        "foreign_keys",
+      ) as Array<{ foreign_keys: number }>;
+      expect(result[0]?.foreign_keys).toBe(0);
+    });
+
+    it("warns and skips an invalid pragma name", () => {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      adapter = new BetterSQLite3Adapter(":memory:", {
+        pragmas: { "bad-name!": 1 } as Record<string, number>,
+      });
+      expect(console.warn).toHaveBeenCalledWith(
+        expect.stringContaining("invalid SQLite pragma name"),
+      );
+    });
+
+    it("warns and skips a string value with unsafe characters", () => {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      adapter = new BetterSQLite3Adapter(":memory:", {
+        pragmas: { synchronous: "FULL; DROP TABLE users" },
+      });
+      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("unsafe characters"));
+    });
   });
 });

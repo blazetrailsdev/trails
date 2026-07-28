@@ -2401,7 +2401,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     await this.ensureConnected();
     const { schema, bare: bareTable } = this._splitTableName(tableName);
     const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
-    const qTable = quoteTableName(tableName);
     // table_info hides GENERATED columns; table_xinfo exposes them with
     // hidden 2 (virtual) / 3 (stored) so the rebuild preserves them (Rails
     // rebuilds from columns(from) and re-adds them with as:/stored:,
@@ -2458,9 +2457,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       }
     }
 
-    const prefix = schema ? `${schema}.` : "";
-    const tmpTable = `${prefix}_alter_tmp_${bareTable}`;
-    const qTmp = quoteTableName(tmpTable);
+    // Rails: altered_table_name = "a#{table_name}" (sqlite3_adapter.rb:566).
+    // Kept bare even for a schema-qualified table: the buffer is a TEMPORARY
+    // table, which always lives in the `temp` schema, so a qualifier would be
+    // rejected.
+    const alteredTableName = `a${bareTable}`;
     const colNames = Object.keys(columns);
 
     // Detect composite primary keys
@@ -2566,35 +2567,19 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     };
     try {
       await this.disableReferentialIntegrity(async () => {
-        const selectCols = originalColNames.map((n) => quoteColumnName(n)).join(", ");
-        // Rails' copy_table builds even the throwaway "a"-prefixed table through
-        // the full create_table machinery. This buffer carries the declared type
-        // verbatim (so storage affinity round-trips exactly, including the
-        // typeless/BLOB-affinity case) but drops NOT NULL/DEFAULT/CHECK/PK: rows
-        // come straight from a table that already satisfied those, so omitting
-        // them can only ever be more permissive, and no INSERT here relies on a
-        // default — both name every column explicitly.
-        const originalTypes = new Map(
-          tableInfo.map((c) => [c.name as string, (c.type as string | null) ?? ""]),
-        );
-        const tmpColDefs = originalColNames.map((n) => {
-          const declaredType = originalTypes.get(n) ?? "";
-          return declaredType === "" ? quoteColumnName(n) : `${quoteColumnName(n)} ${declaredType}`;
-        });
-        if (tmpColDefs.length > 0) {
-          await execTranslated(`CREATE TABLE ${qTmp} (${tmpColDefs.join(", ")})`);
-          await execTranslated(
-            `INSERT INTO ${qTmp} (${selectCols}) SELECT ${selectCols} FROM ${qTable}`,
-          );
-        }
-        await execTranslated(`DROP TABLE ${qTable}`);
+        // Rails' alter_table is two move_table calls, each copy_table + drop_table
+        // (sqlite3_adapter.rb:585-596). The first move is Rails' verbatim: the
+        // throwaway "a"-prefixed buffer is built by copy_table off the source
+        // table's own reflection, so it carries the full column definitions
+        // rather than a hand-concatenated CREATE TABLE.
+        await this.moveTable(tableName, alteredTableName, { temporary: true });
+        // The second move is copy_table + drop_table with the definition supplied
+        // by the caller above (fks/checks/`modify`) instead of re-derived from the
+        // buffer — that is where alter_table's whole point lives, and the buffer's
+        // reflection would have lost the pending changes.
         await execTranslated(createTableSql);
-        if (tmpColDefs.length > 0) {
-          await execTranslated(
-            `INSERT INTO ${qTable} (${selectCols}) SELECT ${selectCols} FROM ${qTmp}`,
-          );
-          await execTranslated(`DROP TABLE ${qTmp}`);
-        }
+        await this.copyTableContents(alteredTableName, tableName, originalColNames);
+        await execTranslated(`DROP TABLE ${quoteTableName(alteredTableName)}`);
       });
 
       // Recreate indexes inside the transaction so failures roll back
@@ -2718,6 +2703,21 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return this.tableStructure(tableName);
   }
 
+  /**
+   * Rails runs the copy-table family's DDL through `execute` and its INSERT
+   * through `internal_exec_query`, both of which translate driver errors
+   * (sqlite3_adapter.rb:593-648). These helpers go straight to the driver to
+   * stay inert w.r.t. savepoint nesting, so translate here instead.
+   * @internal
+   */
+  private async execCopyTable(sql: string): Promise<void> {
+    try {
+      await this.driver.exec(sql);
+    } catch (e) {
+      throw this._translateException(e, sql, []);
+    }
+  }
+
   /** @internal */
   private async moveTable(
     from: string,
@@ -2726,7 +2726,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     block?: (colDefs: string[]) => void,
   ): Promise<void> {
     await this.copyTable(from, to, options, block);
-    await this.driver.exec(`DROP TABLE ${quoteTableName(from)}`);
+    await this.execCopyTable(`DROP TABLE ${quoteTableName(from)}`);
   }
 
   /** @internal */
@@ -2772,7 +2772,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     }
     if (block) block(colDefs);
     const prefix = options.temporary ? "CREATE TEMPORARY TABLE" : "CREATE TABLE";
-    await this.driver.exec(`${prefix} ${quoteTableName(to)} (${colDefs.join(", ")})`);
+    await this.execCopyTable(`${prefix} ${quoteTableName(to)} (${colDefs.join(", ")})`);
     await this.copyTableIndexes(from, to, rename);
     await this.copyTableContents(from, to, contentCols, rename);
   }
@@ -2823,7 +2823,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         : cols;
       let sql = `CREATE ${idx.unique ? "UNIQUE " : ""}INDEX ${quoteColumnName(newName)} ON ${quoteTableName(to)} (${colSql})`;
       if (idx.where) sql += ` WHERE ${idx.where}`;
-      await this.driver.exec(sql);
+      await this.execCopyTable(sql);
     }
   }
 
@@ -2843,7 +2843,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     const fromColsToCopy = validCols.map((col) => destToSrc[col]);
     const quotedDest = validCols.map((c) => quoteColumnName(c)).join(", ");
     const quotedSrc = fromColsToCopy.map((c) => quoteColumnName(c)).join(", ");
-    await this.driver.exec(
+    await this.execCopyTable(
       `INSERT INTO ${quoteTableName(to)} (${quotedDest}) SELECT ${quotedSrc} FROM ${quoteTableName(from)}`,
     );
   }

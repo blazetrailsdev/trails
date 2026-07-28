@@ -15,7 +15,7 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
 
   const dropCopyTargets = async (): Promise<void> => {
     await leased?.exec(
-      `DROP TABLE IF EXISTS customers2; DROP TABLE IF EXISTS customers3; DROP TABLE IF EXISTS books2; DROP TABLE IF EXISTS "_alter_tmp_customers2"`,
+      `DROP TABLE IF EXISTS customers2; DROP TABLE IF EXISTS customers3; DROP TABLE IF EXISTS books2; DROP TABLE IF EXISTS "acustomers2"`,
     );
   };
 
