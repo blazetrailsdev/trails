@@ -1095,6 +1095,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   declare foreignKeys: typeof mysqlForeignKeys;
 
+  /** @internal */
   declare extractForeignKeyAction: typeof mysqlExtractForeignKeyAction;
 
   async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
