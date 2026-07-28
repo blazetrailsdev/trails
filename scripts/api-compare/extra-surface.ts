@@ -100,7 +100,7 @@ interface RubyEntity {
 }
 
 /**
- * Mixins (and methods) a host class gains at *runtime* via a gem's railtie
+ * Mixins a host class gains at *runtime* via a gem's railtie
  * `ActiveSupport.on_load(:active_record)` block rather than a lexical `include`
  * in the host's own source. The static Ruby extractor only sees `include`s
  * written inside the class/module body, so a railtie-injected mixin never
@@ -111,28 +111,8 @@ interface RubyEntity {
  * e.g. `GlobalID::Identification` (globalid package) included into
  * `ActiveRecord::Base` (activerecord package) by globalid's railtie — still
  * contributes its instance methods to the host's allowed set.
- *
- * `methods` are raw Ruby method names the railtie surface implies but which
- * have no static `def` anywhere (so they can't be reached via a module). It is
- * only for that Ruby-extractor blind spot: Rails really does gain the method,
- * the extractor just can't see it. A trails-only method with no Rails
- * counterpart is NOT that case and does not belong here — either it is
- * permanently unportable, which a `@noRailsEquivalent` tag on its own
- * declaration records (RFC 0080), or it is unconverged work, which stays
- * unsuppressed so this report keeps flagging it.
- *
- * `ActiveRecord::Base` previously listed `find_global_id` /
- * `find_signed_global_id[!]` here. It was the wrong bucket both ways: globalid's
- * railtie includes only `GlobalID::Identification`
- * (globalid/lib/global_id/railtie.rb:35), and Rails callers reach the finders
- * through `GlobalID::Locator.locate` / `locate_signed`
- * (globalid/lib/global_id/locator.rb:23,:84), so there is no ambient Ruby
- * method to be blind to — trails' model-side class methods are an invention with
- * no callers. They are deliberately untagged so `api:extra` reports them until
- * they are removed. No entry needs `methods` today; the field stays because the
- * blind spot it covers is a property of the Ruby extractor, not of any one gem.
  */
-const AMBIENT_RAILTIE_MIXINS: Record<string, { includes?: string[]; methods?: string[] }> = {
+const AMBIENT_RAILTIE_MIXINS: Record<string, { includes?: string[] }> = {
   "ActiveRecord::Base": {
     includes: ["GlobalID::Identification"],
   },
@@ -145,10 +125,9 @@ const AMBIENT_RAILTIE_MIXINS: Record<string, { includes?: string[]; methods?: st
  * compare.ts:507) and the faithful TS ports look like unexplained "moved"
  * extras. We DID port these methods, just as standalone mirrors that don't go
  * through the unported module, so list them here keyed by the Ruby host FQN to
- * fold the ported names back into the host's allowed set. Applied like
- * `AMBIENT_RAILTIE_MIXINS.methods` (raw Ruby names → `addRubyName`), but the
- * justification is a source-unported *lexical* include rather than a railtie
- * `on_load` injection.
+ * fold the ported names back into the host's allowed set (raw Ruby names →
+ * `addRubyName`). The justification is a source-unported *lexical* include
+ * rather than a railtie `on_load` injection.
  *
  *   - `ActiveRecord::Railtie` re-exports `Railties::ControllerRuntime`
  *     (railtie.rb:267 — `on_load(:action_controller) { include … }`); the port
@@ -674,7 +653,6 @@ function collectAllowedNames(
     const ambient = AMBIENT_RAILTIE_MIXINS[fqn];
     if (ambient) {
       for (const inc of ambient.includes ?? []) walkMixin(inc, fqn);
-      for (const name of ambient.methods ?? []) addRubyName(name);
     }
 
     for (const name of PORTED_UNPORTED_MIXIN_METHODS[fqn] ?? []) addRubyName(name);
