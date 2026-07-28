@@ -2438,25 +2438,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
 
     modify(columns);
 
-    // Collect existing indexes to recreate after table rebuild
-    const indexListStmt = await this.driver.prepare(
-      `PRAGMA ${pragmaPrefix}index_list(${quoteColumnName(bareTable)})`,
-    );
-    const indexList = (await indexListStmt.all()) as Array<Record<string, unknown>>;
-    const indexDefs: string[] = [];
-    for (const idx of indexList) {
-      const idxName = idx.name as string;
-      // Skip auto-created indexes (sqlite_autoindex_*)
-      if (idxName.startsWith("sqlite_autoindex_")) continue;
-      const idxSqlStmt = await this.driver.prepare(
-        `SELECT sql FROM ${pragmaPrefix}sqlite_master WHERE type='index' AND name=${sqliteQuoteStringLiteral(idxName)}`,
-      );
-      const createSql = (await idxSqlStmt.get()) as { sql: string } | undefined;
-      if (createSql?.sql) {
-        indexDefs.push(createSql.sql);
-      }
-    }
-
     // Rails: altered_table_name = "a#{table_name}" (sqlite3_adapter.rb:566).
     // Kept bare even for a schema-qualified table: the buffer is a TEMPORARY
     // table, which always lives in the `temp` schema, so a qualifier would be
@@ -2578,22 +2559,10 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         // buffer — that is where alter_table's whole point lives, and the buffer's
         // reflection would have lost the pending changes.
         await execTranslated(createTableSql);
+        await this.copyTableIndexes(alteredTableName, tableName);
         await this.copyTableContents(alteredTableName, tableName, originalColNames);
         await execTranslated(`DROP TABLE ${quoteTableName(alteredTableName)}`);
       });
-
-      // Recreate indexes inside the transaction so failures roll back
-      // the entire rebuild rather than leaving a partially-migrated table.
-      for (const sql of indexDefs) {
-        try {
-          await this.driver.exec(sql);
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : "";
-          if (!msg.includes("no such column") && !msg.includes("already exists")) {
-            throw err;
-          }
-        }
-      }
 
       if (alreadyInTransaction) {
         await this.releaseSavepoint(savepointName);
@@ -2794,8 +2763,13 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     const { bare: bareTo } = this._splitTableName(to);
     for (const idx of idxRows) {
       let name = idx.name;
-      if (to === `a${from}`) name = `t${name}`;
-      else if (from === `a${to}`) name = name.slice(1);
+      // Compared on the bare names: alter_table's buffer is a TEMPORARY table,
+      // so it is unqualified even when the source is `aux.posts`, and comparing
+      // the qualified names would miss the "a"-prefix relationship — leaving an
+      // index whose name doesn't embed the table name (a custom `name:`) unrenamed
+      // and colliding with the still-live original.
+      if (bareTo === `a${bareFrom}`) name = `t${name}`;
+      else if (bareFrom === `a${bareTo}`) name = name.slice(1);
       // Rails gates the rename/filter on `columns.is_a?(Array)` — and with it
       // the `columns(to)` reflection: an expression index carries its
       // parenthesized expression as a bare string, copied across verbatim.
@@ -2821,7 +2795,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
             .map((c) => `${quoteColumnName(c)}${orders[c] ? ` ${orders[c].toUpperCase()}` : ""}`)
             .join(", ")
         : cols;
-      let sql = `CREATE ${idx.unique ? "UNIQUE " : ""}INDEX ${quoteColumnName(newName)} ON ${quoteTableName(to)} (${colSql})`;
+      // SQLite puts the schema on the INDEX name, not on the table it indexes
+      // (`CREATE INDEX aux.by_name ON widgets (...)`); qualifying the table
+      // instead is a syntax error. Rails has no ATTACHed-schema notion here.
+      const { schema: toSchema } = this._splitTableName(to);
+      const target = toSchema
+        ? `${quoteColumnName(toSchema)}.${quoteColumnName(newName)} ON ${quoteColumnName(bareTo)}`
+        : `${quoteColumnName(newName)} ON ${quoteTableName(to)}`;
+      let sql = `CREATE ${idx.unique ? "UNIQUE " : ""}INDEX ${target} (${colSql})`;
       if (idx.where) sql += ` WHERE ${idx.where}`;
       await this.execCopyTable(sql);
     }

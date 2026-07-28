@@ -182,6 +182,29 @@ describe("SQLite3Adapter schema introspection", () => {
     ]);
   });
 
+  it("alterTable rebuilds a schema-qualified table whose index has a custom name", async () => {
+    // The alter_table buffer is a TEMPORARY table, so it is unqualified even
+    // when the source is `aux.widgets`. copy_table_indexes has to spot the
+    // "a"-prefix relationship on the bare names to reach its `t`-prefix rename;
+    // otherwise an index name that doesn't embed the table name is copied onto
+    // the buffer under its original name and collides with the live original.
+    const auxPath = path.join(tmpDir, "aux-alter.sqlite3");
+    await adapter.executeMutation(`ATTACH DATABASE '${auxPath}' AS aux`);
+    await adapter.executeMutation(
+      "CREATE TABLE aux.widgets (id INTEGER PRIMARY KEY, name TEXT, doomed TEXT)",
+    );
+    await adapter.executeMutation("CREATE INDEX aux.by_name ON widgets (name)");
+    await adapter.executeMutation("INSERT INTO aux.widgets (name) VALUES ('gizmo')");
+
+    await adapter.removeColumn("aux.widgets", "doomed");
+
+    expect((await adapter.columns("aux.widgets")).map((c) => c.name)).toEqual(["id", "name"]);
+    const indexes = (await adapter.indexes("aux.widgets")) as Array<{ name: string }>;
+    expect(indexes.map((i) => i.name)).toEqual(["by_name"]);
+    const rows = await adapter.selectAll("SELECT name FROM aux.widgets");
+    expect(rows.rows).toEqual([["gizmo"]]);
+  });
+
   it("dataSourceExists matches both tables and views, hides sqlite_* internals", async () => {
     await adapter.executeMutation(
       "CREATE TABLE widgets (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)",
