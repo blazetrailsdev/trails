@@ -13,11 +13,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-  PG_TEST_URL,
-} from "../../adapters/postgresql/test-helper.js";
+import { PostgreSQLAdapter } from "../postgresql-adapter.js";
+import { describeIfPg, PG_TEST_URL } from "../../support/describe-if-pg.js";
 
 const SCHEMA_NAME = "test_schema_stmts";
 const TABLE_NAME = "things";

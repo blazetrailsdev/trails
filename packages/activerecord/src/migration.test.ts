@@ -37,7 +37,7 @@ function emitTableSql(td: TableDefinition): Promise<string> {
 import { Person } from "./test-helpers/models/person.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 import { itIfSupports, describeIfSupports } from "./support/supports.js";
-import { describeIfPg } from "./adapters/postgresql/test-helper.js";
+import { describeIfPg } from "./support/describe-if-pg.js";
 import {
   describeIfMysqlAdapter,
   leaseMysqlAdapter,
