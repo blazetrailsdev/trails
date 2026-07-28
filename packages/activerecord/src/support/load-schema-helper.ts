@@ -7,13 +7,17 @@ import { loadCanonicalSchema } from "./canonical-schema.js";
 
 /**
  * The ported slice of
- * `vendor/rails/activerecord/test/schema/postgresql_specific_schema.rb:4-48` —
- * the `uuid-ossp` / `pgcrypto` extension header, the four uuid-primary-key
- * tables and the `defaults` table.
+ * `vendor/rails/activerecord/test/schema/postgresql_specific_schema.rb` — the
+ * `uuid-ossp` / `pgcrypto` extension header, the four uuid-primary-key tables,
+ * `defaults` (lines 4-48), and the plain `create_table` remainder:
+ * `postgresql_times`, `postgresql_oids`, `limitless_fields`, `bigint_array`,
+ * the four `uuid_*` tables and the exclusion/unique constraint tables.
  *
- * The remainder of that file (`postgresql_times`, `postgresql_oids`, the
- * identity, sequence, partition and constraint tables — lines 50-225) is carried
- * by story `port-postgresql-specific-schema-remainder`.
+ * Still unported: the `supports_identity_columns?` tables (50-66), the
+ * `companies_nonstd_seq`/`setval` sequence pass and the partition +
+ * `timestamp_with_zones` raw-DDL block (77-128), the `measurements*`
+ * partitioned tables and `company_include_index` (187-201), and the
+ * `supports_insert_returning?` trigger table (203-225).
  */
 async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise<void> {
   // `supportsPgcryptoUuid()` / `supportsVirtualColumns()` read the cached
@@ -86,6 +90,107 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
     pg.bigint("bigint_default", { default: () => "0::bigint" });
     pg.binary("binary_default_function", { default: () => "convert_to('A', 'UTF8')" });
     pg.text("multiline_default", { default: "--- []\n\n" });
+  });
+
+  await adapter.createTable("postgresql_times", { force: true }, (t) => {
+    const pg = t as PgTableDefinition;
+    pg.interval("time_interval");
+    pg.interval("scaled_time_interval", { precision: 6 });
+  });
+
+  await adapter.createTable("postgresql_oids", { force: true }, (t) => {
+    (t as PgTableDefinition).oid("obj_id");
+  });
+
+  // "This table is to verify if the :limit option is being ignored for text and
+  // binary columns" (postgresql_specific_schema.rb:130).
+  await adapter.createTable("limitless_fields", { force: true }, (t) => {
+    const pg = t as PgTableDefinition;
+    pg.binary("binary", { limit: 100_000 });
+    pg.text("text", { limit: 100_000 });
+  });
+
+  await adapter.createTable("bigint_array", { force: true }, (t) => {
+    const pg = t as PgTableDefinition;
+    pg.integer("big_int_data_points", { limit: 8, array: true });
+    pg.decimal("decimal_array_default", { array: true, default: [1.23, 3.45] });
+  });
+
+  await adapter.createTable("uuid_comments", { force: true, id: false }, (t) => {
+    const pg = t as PgTableDefinition;
+    pg.uuid("uuid", { primaryKey: true, ...uuidDefault });
+    pg.string("content");
+  });
+
+  await adapter.createTable("uuid_entries", { force: true, id: false }, (t) => {
+    const pg = t as PgTableDefinition;
+    pg.uuid("uuid", { primaryKey: true, ...uuidDefault });
+    pg.string("entryable_type", { null: false });
+    pg.uuid("entryable_uuid", { null: false });
+  });
+
+  await adapter.createTable("uuid_items", { force: true, id: false }, (t) => {
+    const pg = t as PgTableDefinition;
+    pg.uuid("uuid", { primaryKey: true, ...uuidDefault });
+    pg.string("title");
+  });
+
+  await adapter.createTable("uuid_messages", { force: true, id: false }, (t) => {
+    const pg = t as PgTableDefinition;
+    pg.uuid("uuid", { primaryKey: true, ...uuidDefault });
+    pg.string("subject");
+  });
+
+  await adapter.createTable("test_exclusion_constraints", { force: true }, (t) => {
+    const pg = t as PgTableDefinition;
+    pg.date("start_date");
+    pg.date("end_date");
+    pg.date("valid_from");
+    pg.date("valid_to");
+    pg.date("transaction_from");
+    pg.date("transaction_to");
+
+    pg.exclusionConstraint("daterange(start_date, end_date) WITH &&", {
+      using: "gist",
+      where: "start_date IS NOT NULL AND end_date IS NOT NULL",
+      name: "test_exclusion_constraints_date_overlap",
+    });
+    pg.exclusionConstraint("daterange(valid_from, valid_to) WITH &&", {
+      using: "gist",
+      where: "valid_from IS NOT NULL AND valid_to IS NOT NULL",
+      name: "test_exclusion_constraints_valid_overlap",
+      deferrable: "immediate",
+    });
+    pg.exclusionConstraint("daterange(transaction_from, transaction_to) WITH &&", {
+      using: "gist",
+      where: "transaction_from IS NOT NULL AND transaction_to IS NOT NULL",
+      name: "test_exclusion_constraints_transaction_overlap",
+      deferrable: "deferred",
+    });
+  });
+
+  await adapter.createTable("test_unique_constraints", { force: true }, (t) => {
+    const pg = t as PgTableDefinition;
+    pg.integer("position_1");
+    pg.integer("position_2");
+    pg.integer("position_3");
+    pg.integer("position_4");
+
+    pg.uniqueConstraint("position_1", {
+      name: "test_unique_constraints_position_deferrable_false",
+    });
+    pg.uniqueConstraint("position_2", {
+      name: "test_unique_constraints_position_deferrable_immediate",
+      deferrable: "immediate",
+    });
+    pg.uniqueConstraint("position_3", {
+      name: "test_unique_constraints_position_deferrable_deferred",
+      deferrable: "deferred",
+    });
+    pg.uniqueConstraint("position_4", {
+      name: "test_unique_constraints_position_nulls_not_distinct",
+      nullsNotDistinct: true,
+    });
   });
 }
 
@@ -271,6 +376,16 @@ const ADAPTER_SPECIFIC_TABLES: Record<string, readonly string[]> = {
     "uuid_parents",
     "uuid_children",
     "defaults",
+    "postgresql_times",
+    "postgresql_oids",
+    "limitless_fields",
+    "bigint_array",
+    "uuid_comments",
+    "uuid_entries",
+    "uuid_items",
+    "uuid_messages",
+    "test_exclusion_constraints",
+    "test_unique_constraints",
   ],
   mysql: [
     "datetime_defaults",
