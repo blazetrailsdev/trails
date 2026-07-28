@@ -5,7 +5,7 @@ import { it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { describeIfSqlite } from "./test-helper.js";
+import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 
 // -- Rails test class: sqlite3_create_folder_test.rb --

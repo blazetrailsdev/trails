@@ -3,7 +3,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { BinaryData } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-fixtures.js";
-import { describeIfSqlite } from "../../adapters/sqlite3/test-helper.js";
+import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { type AbstractSQLite3Adapter, SQLiteDateTimeType } from "../sqlite3-adapter.js";
 import { Date as DateType } from "../../type/date.js";
 import { Time as TimeType } from "../../type/time.js";

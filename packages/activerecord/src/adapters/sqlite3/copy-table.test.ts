@@ -3,7 +3,7 @@
  */
 import { it, expect } from "vitest";
 import "../../index.js";
-import { describeIfSqlite } from "./test-helper.js";
+import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-fixtures.js";
 

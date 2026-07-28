@@ -1,5 +1,5 @@
 import { it } from "vitest";
-import { describeIfSqlite } from "./test-helper.js";
+import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 
 describeIfSqlite("SQLite3DbConsoleTest", () => {
   it.skip("sqlite3", () => {

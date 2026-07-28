@@ -1,5 +1,5 @@
 import { it } from "vitest";
-import { describeIfSqlite } from "./test-helper.js";
+import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 
 describeIfSqlite("SqliteDBCreateTest", () => {
   it.skip("db checks database exists", () => {

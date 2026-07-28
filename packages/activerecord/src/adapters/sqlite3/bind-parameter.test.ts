@@ -2,7 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/sqlite3/bind_parameter_test.rb
  */
 import { describe, it, expect } from "vitest";
-import { describeIfSqlite } from "./test-helper.js";
+import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { fixtures } from "../../test-fixtures.js";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Post } from "../../test-helpers/models/post.js";
