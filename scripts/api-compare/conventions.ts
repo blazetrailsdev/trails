@@ -353,9 +353,10 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "the Ruby extractor records one ARTest entity filed under config.rb and " +
       "every ARTest method buckets there. Two populations end up in that " +
       "bucket, neither of which is a gap. (1) `connection_name` / " +
-      "`test_configuration_hashes` / `connect` / `expand_config` are defined in " +
-      "connection.rb and ARE ported, in the matching Rails-layout file " +
-      "packages/activerecord/src/support/connection.ts. (2) `config` / " +
+      "`test_configuration_hashes` / `connect` (connection.rb) and " +
+      "`expand_config` (config.rb) ARE ported — all four in " +
+      "packages/activerecord/src/support/connection.ts, next to the CONNECTIONS " +
+      "entries they name and expand. (2) `config` / " +
       "`config_file` / `read_config` are the memoized read of test/config.yml; " +
       "trails ships no config.yml — the `connections:` hash is expressed " +
       "directly as the CONNECTIONS table in connection.ts and the sub-setting " +
