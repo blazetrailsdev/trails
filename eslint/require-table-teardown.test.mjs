@@ -52,6 +52,10 @@ tester.run("require-table-teardown", rule, {
     // which would leave the create unmatchable by any drop of the real table.
     'await adapter.exec(`CREATE TABLE "my table" (id int)`);\nawait adapter.exec(`DROP TABLE "my table"`);',
     "await adapter.exec('CREATE TABLE `my table` (id int)');\nawait adapter.exec('DROP TABLE `my table`');",
+    // Quoting turns a would-be trailing clause into a table name, so the drop
+    // list keeps reading past it.
+    'await adapter.exec(`CREATE TABLE "cascade" (id int)`);\nawait adapter.exec(`CREATE TABLE b (id int)`);\n' +
+      'await adapter.exec(`DROP TABLE "cascade", b`);',
     // A spaced quoted name in a multi-table drop list.
     'await adapter.exec(`CREATE TABLE "my table" (id int)`);\nawait adapter.exec(`CREATE TABLE b (id int)`);\n' +
       'await adapter.exec(`DROP TABLE "my table", b`);',

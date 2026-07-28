@@ -156,11 +156,16 @@ function droppedTableNames(call) {
  * (`CREATE TABLE "my table"` is the table `my table`, not `my`). Truncating it
  * used to make a create unmatchable by any drop of the real name.
  */
-const NAME_SRC = "(?:`([^`]+)`|\"([^\"]+)\"|'([^']+)'|([\\w.]+))";
-/** The first defined name capture of `m`, whose name groups start at `base`. */
-function capturedName(m, base) {
-  return m[base] ?? m[base + 1] ?? m[base + 2] ?? m[base + 3];
+const NAME_SRC = "(?:([\"'`])((?:(?!\\1)[\\s\\S])+)\\1|([\\w.]+))";
+/** The name `m` captured, quoted or bare. */
+function capturedName(m) {
+  return m[QUOTED_NAME] ?? m[BARE_NAME];
 }
+/**
+ * `NAME_SRC` capture indices. The `\1` backreference pins the fragment to the
+ * first capture group, so it must be the only group in any regex built from it.
+ */
+const [OPEN_QUOTE, QUOTED_NAME, BARE_NAME] = [1, 2, 3];
 const CREATE_TABLE_RE = new RegExp(
   `\\bcreate\\s+(?:(?:global|local)\\s+)?(?:temp(?:orary)?\\s+|unlogged\\s+)?table\\s+(?:if\\s+not\\s+exists\\s+)?${NAME_SRC}`,
   "gi",
@@ -198,7 +203,7 @@ function rawCreateNames(text, endIsDynamic) {
   let m;
   while ((m = CREATE_TABLE_RE.exec(text)) !== null) {
     if (endIsDynamic && m.index + m[0].length === text.length) continue;
-    names.push(capturedName(m, 1));
+    names.push(capturedName(m));
   }
   return names;
 }
@@ -220,8 +225,9 @@ export function rawDropNames(text, endIsDynamic = false) {
     let rest = text.slice(m.index + m[0].length);
     let nm;
     while ((nm = NAME_RE.exec(rest)) !== null) {
-      const name = capturedName(nm, 1);
-      if (nm[4] !== undefined && /^(?:cascade|restrict)$/i.test(name)) break;
+      const name = capturedName(nm);
+      // Only a bare word can be the trailing clause; quoting it makes it a name.
+      if (nm[OPEN_QUOTE] === undefined && /^(?:cascade|restrict)$/i.test(name)) break;
       rest = rest.slice(nm[0].length);
       if (!(endIsDynamic && rest.length === 0)) names.push(name);
       rest = rest.replace(/^\s+/, "");
