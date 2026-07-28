@@ -13,10 +13,6 @@ describe("ConnectionHandlersMultiDbTest", () => {
   let roPool: any;
   const connectionName = "Base";
 
-  // Rails names distinct on-disk databases (test/db/primary.sqlite3,
-  // test/db/readonly.sqlite3, test/db/animals.sqlite3) so that two pools
-  // genuinely address two databases; `:memory:` on both sides would make the
-  // discrimination vacuous. Per-run temp dir keeps parallel workers isolated.
   const DB_NAMES = ["primary", "readonly", "animals"] as const;
   type DbName = (typeof DB_NAMES)[number];
 
@@ -60,15 +56,17 @@ describe("ConnectionHandlersMultiDbTest", () => {
   });
 
   afterEach(async () => {
-    await handler.clearAllConnectionsBang();
-    await Base.connectionHandler.clearAllConnectionsBang();
-
-    const fs = await asyncFs();
-    const path = await getPathAsync();
-    for (const entry of await fs.readdir(dbDir)) {
-      await fs.unlink(path.join(dbDir, entry));
+    try {
+      await handler.clearAllConnectionsBang();
+      await Base.connectionHandler.clearAllConnectionsBang();
+    } finally {
+      const fs = await asyncFs();
+      const path = await getPathAsync();
+      for (const entry of await fs.readdir(dbDir)) {
+        await fs.unlink(path.join(dbDir, entry));
+      }
+      await fs.rmdir(dbDir);
     }
-    await fs.rmdir(dbDir);
   });
 
   function withBaseConfigs(
@@ -89,9 +87,6 @@ describe("ConnectionHandlersMultiDbTest", () => {
       Base.configurations(prevConfigs);
       DatabaseConfigurations.defaultEnv = prevDefaultEnv;
       if (opts.defaultEnv) vi.unstubAllEnvs();
-      // Sync helper (fn: () => void); the async clearAllConnectionsBang tears
-      // down synchronously here, so catch (rather than await) its drain promise
-      // to keep this best-effort without cascading async through ~15 callers.
       void Base.connectionHandler.clearAllConnectionsBang().catch(() => {});
     }
   }
@@ -126,10 +121,6 @@ describe("ConnectionHandlersMultiDbTest", () => {
       },
     });
 
-    // Load the relation within the :secondary scope so the query runs against
-    // the connection where the `:memory:` table exists. `load()` returns the
-    // relation itself (then-stripped) so it escapes the block as a loaded
-    // Relation rather than auto-unwrapping to an array.
     const relation = await Base.connectedTo({ role: "secondary" }, async () => {
       await (
         await MultiConnectionTestModel.leaseConnection()
@@ -138,16 +129,12 @@ describe("ConnectionHandlersMultiDbTest", () => {
       );
       await MultiConnectionTestModel.createBang({ connection_role: "reading" });
       const loaded = await MultiConnectionTestModel.where({ connection_role: "reading" }).load();
-      // Relation is already loaded (cached); dropping here is behavior-neutral
-      // and balances require-table-teardown for the raw-created table.
       await (
         await MultiConnectionTestModel.leaseConnection()
       ).executeMutation("DROP TABLE IF EXISTS `multi_connection_test_models`");
       return loaded;
     });
 
-    // The relation is already loaded, so `.first` returns the cached record
-    // without re-querying in the default (writing) pool — mirroring Rails.
     expect((await relation.first())!.readAttribute("connection_role")).toBe("reading");
   });
 
@@ -246,9 +233,6 @@ describe("ConnectionHandlersMultiDbTest", () => {
   });
 
   it("switching connections with database hash uses passed role and database", () => {
-    // Distinct database paths (as in Rails: test/db/primary.sqlite3 vs
-    // …/animals.sqlite3) so the configuration_hash assertion below actually
-    // discriminates that `primary` — not `animals` — was selected.
     const config = {
       default_env: {
         animals: sqliteDb("animals"),
@@ -280,7 +264,6 @@ describe("ConnectionHandlersMultiDbTest", () => {
       expect(Base.connectionHandler).toBe(Base.connectionHandler);
       expect(currentRole.call(Base as any)).toBe("writing");
       expect(Base.connectedToQ({ role: "writing" })).toBe(true);
-      // database: arg → @shard_keys = [] (shards.keys before default injection)
       expect(Base.shardKeys()).toEqual([]);
       expect(Base.isSharded()).toBe(false);
     });
