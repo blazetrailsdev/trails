@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   driverConfig,
   settingsUrl,
+  mysqlPreparedStatements,
   mysqlSettings,
   mysqlUrl,
   postgresSettings,
@@ -84,7 +85,8 @@ describe("config", () => {
 
   it("interpolates exactly the sub-setting key set config.example.yml interpolates", () => {
     // Rails interpolates only MYSQL_HOST/MYSQL_PORT/MYSQL_SOCK
-    // (config.example.yml:12-20) and hard-codes the credential and database;
+    // (config.example.yml:12-20) plus MYSQL_PREPARED_STATEMENTS
+    // (config.example.yml:7-11,27-31) and hard-codes the credential and database;
     // its postgresql: entries carry no fields so libpq reads PG* itself
     // (config.example.yml:74-81). AR_DB_SLOT is the one trails addition — the
     // per-worker database copy Rails has no analogue for. Re-widening this set
@@ -96,8 +98,15 @@ describe("config", () => {
     };
 
     mysqlSettings(recording({}));
+    mysqlPreparedStatements(recording({}));
     expect(new Set(seen)).toEqual(
-      new Set(["MYSQL_HOST", "MYSQL_PORT", "MYSQL_SOCK", "AR_DB_SLOT"]),
+      new Set([
+        "MYSQL_HOST",
+        "MYSQL_PORT",
+        "MYSQL_SOCK",
+        "MYSQL_PREPARED_STATEMENTS",
+        "AR_DB_SLOT",
+      ]),
     );
 
     seen.length = 0;
@@ -105,6 +114,15 @@ describe("config", () => {
     expect(new Set(seen)).toEqual(
       new Set(["PGHOST", "PGPORT", "PGUSER", "PGPASSWORD", "AR_DB_SLOT"]),
     );
+  });
+
+  it("turns prepared statements on when MYSQL_PREPARED_STATEMENTS is present", () => {
+    // config.example.yml:7-11,27-31 tests the var with a bare `if`, so any
+    // value at all — including "" and "0" — turns prepared statements on.
+    expect(mysqlPreparedStatements(reader({}))).toBe(false);
+    expect(mysqlPreparedStatements(reader({ MYSQL_PREPARED_STATEMENTS: "1" }))).toBe(true);
+    expect(mysqlPreparedStatements(reader({ MYSQL_PREPARED_STATEMENTS: "0" }))).toBe(true);
+    expect(mysqlPreparedStatements(reader({ MYSQL_PREPARED_STATEMENTS: "" }))).toBe(true);
   });
 
   it("suffixes the database with the worker isolation slot above slot 1", () => {
