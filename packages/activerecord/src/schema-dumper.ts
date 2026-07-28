@@ -1092,12 +1092,29 @@ export class SchemaDumper {
       validate?: boolean;
     };
     const fkIgnorePattern = (this.constructor as typeof SchemaDumper).fkIgnorePattern;
+    // Rails' `@connection.foreign_key_column_for(to_table, "id")` — the column
+    // whose match makes the dump omit `column:`. A bare SchemaSource lacks the
+    // schema-statement mixin, and with no inference to compare against the
+    // option is emitted rather than guessed at.
+    const columnFor = (host as { foreignKeyColumnFor?: (t: string, c: string) => string })
+      .foreignKeyColumnFor;
+    // Rails sorts the emitted statements (`add_foreign_key_statements.sort`),
+    // so the dump order does not follow introspection order.
+    const statements: string[] = [];
     for (const fk of fks as Fk[]) {
       const fromExpr = JSON.stringify(this.removePrefixAndSuffix(fk.fromTable ?? tableName));
       const toExpr = JSON.stringify(this.removePrefixAndSuffix(fk.toTable));
       const opts: string[] = [];
-      if (fk.column) opts.push(`column: ${JSON.stringify(fk.column)}`);
-      if (fk.primaryKey) opts.push(`primaryKey: ${JSON.stringify(fk.primaryKey)}`);
+      const inferredColumn = columnFor ? columnFor.call(host, fk.toTable, "id") : undefined;
+      if (fk.column && fk.column !== inferredColumn) {
+        opts.push(`column: ${JSON.stringify(fk.column)}`);
+      }
+      const isCustomPrimaryKey =
+        "isCustomPrimaryKey" in (fk as object)
+          ? (fk as unknown as { isCustomPrimaryKey: boolean }).isCustomPrimaryKey
+          : fk.primaryKey != null && fk.primaryKey !== "id";
+      if (isCustomPrimaryKey && fk.primaryKey)
+        opts.push(`primaryKey: ${JSON.stringify(fk.primaryKey)}`);
       // Mirrors Rails' export_name_on_schema_dump? — delegate to FK object when available
       // (ForeignKeyDefinition incorporates the fk_rails_ ignore-pattern check), else fall back.
       const exportName =
@@ -1111,8 +1128,10 @@ export class SchemaDumper {
         opts.push(`deferrable: ${JSON.stringify(fk.deferrable)}`);
       if (fk.validate === false) opts.push("validate: false");
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
-      lines.push(`  await ctx.addForeignKey(${fromExpr}, ${toExpr}${optStr});`);
+      statements.push(`  await ctx.addForeignKey(${fromExpr}, ${toExpr}${optStr});`);
     }
+    statements.sort();
+    lines.push(...statements);
   }
 
   /**

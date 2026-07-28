@@ -45,6 +45,7 @@ import { singularize, pluralize, getCrypto, isPresent } from "@blazetrails/activ
 import { SchemaDumper } from "./schema-dumper.js";
 import { Utils as PgUtils } from "../postgresql/utils.js";
 import { indexes as sqliteIndexes } from "../sqlite3/schema-statements.js";
+import { globalTableNamePrefix, globalTableNameSuffix } from "./table-name-options.js";
 
 export { assertSchemaAdapter } from "./assert-schema-adapter.js";
 
@@ -2401,16 +2402,16 @@ export class SchemaStatements {
 
   /**
    * @internal
-   * Diverges from Rails: Rails reads `Base.table_name_prefix` / `Base.table_name_suffix`
-   * (model-class globals). Importing Base here creates a circular dependency
-   * (base.ts → connection-adapters/abstract/connection-handler.ts). Instead, we read from
-   * the adapter, which callers can populate from `Base.tableNamePrefix` at the connection
-   * layer if needed.
+   * Rails reads `Base.table_name_prefix` / `Base.table_name_suffix` (model-class
+   * globals). Importing Base here creates a circular dependency
+   * (base.ts → connection-adapters/abstract/connection-handler.ts), so the globals
+   * arrive through the `table-name-options` registry Base populates at load; an
+   * adapter-level override still wins.
    */
   stripTableNamePrefixAndSuffix(tableName: string): string {
     const adapter = this.adapter as any;
-    const prefix: string = adapter.tableNamePrefix ?? "";
-    const suffix: string = adapter.tableNameSuffix ?? "";
+    const prefix: string = adapter.tableNamePrefix ?? globalTableNamePrefix();
+    const suffix: string = adapter.tableNameSuffix ?? globalTableNameSuffix();
     const str = String(tableName);
     if (prefix || suffix) {
       const re = new RegExp(`^${prefix}(.+)${suffix}$`);

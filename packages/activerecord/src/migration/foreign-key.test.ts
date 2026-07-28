@@ -1,11 +1,9 @@
 /**
- * Port of the `add_foreign_key` and `remove_foreign_key` halves of
- * `ActiveRecord::Migration::ForeignKeyTest`
- * (vendor/rails/activerecord/test/cases/migration/foreign_key_test.rb:209-330
- * and :393-451, :749-773) plus all of its sibling
- * `ActiveRecord::Migration::CompositeForeignKeyTest` (:824-912). The
- * `SchemaDumpingHelper`-driven dumper cases in `ForeignKeyTest` are still
- * unported.
+ * Port of the `add_foreign_key`, `remove_foreign_key` and `SchemaDumpingHelper`
+ * halves of `ActiveRecord::Migration::ForeignKeyTest`
+ * (vendor/rails/activerecord/test/cases/migration/foreign_key_test.rb:209-330,
+ * :393-451, :643-747 and :749-773) plus all of its sibling
+ * `ActiveRecord::Migration::CompositeForeignKeyTest` (:824-912).
  *
  * Driven by the ambient connection, mirroring Rails'
  * `@connection = ActiveRecord::Base.lease_connection`. The rockets/astronauts
@@ -26,11 +24,49 @@ import { adapterType } from "../test-adapter.js";
 import { describeIfSupports } from "../support/supports.js";
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";
 import type { SchemaSource } from "../schema-dumper.js";
+import { Base } from "../base.js";
+import { Migration } from "../migration.js";
+import { SchemaDumper } from "../schema-dumper.js";
 
 // Rails' `unless current_adapter?(:SQLite3Adapter)` guard on the `fk.name`
 // assertions: PRAGMA foreign_key_list exposes no constraint name, so SQLite
 // has no name to compare.
 const unlessSqlite3Adapter = adapterType !== "sqlite";
+
+/** Rails' `silence_stream($stdout) { migration.migrate(...) }`. */
+class SilentMigration extends Migration {
+  write(): void {}
+}
+
+class CreateCitiesAndHousesMigration extends SilentMigration {
+  async change(): Promise<void> {
+    await this.createTable("cities", () => {});
+
+    await this.createTable("houses", (t) => {
+      t.references("city");
+    });
+    await this.addForeignKey("houses", "cities", { column: "city_id" });
+
+    // remove and re-add to test that schema is updated and not accidentally cached
+    await this.removeForeignKey("houses", "cities");
+    await this.addForeignKey("houses", "cities", { column: "city_id", onDelete: "cascade" });
+  }
+}
+
+class CreateSchoolsAndClassesMigration extends SilentMigration {
+  async change(): Promise<void> {
+    // Both tables are dropped by the migration's own `migrate("down")` in each
+    // case's ensure block, which the rule can't see from here.
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await this.createTable("schools");
+
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await this.createTable("classes", (t) => {
+      t.references("school");
+    });
+    await this.addForeignKey("classes", "schools", { validate: true });
+  }
+}
 
 describeIfSupports("foreign_keys", "Migration", () => {
   describe("ForeignKeyTest", () => {
@@ -349,6 +385,119 @@ describeIfSupports("foreign_keys", "Migration", () => {
 
         await conn.removeForeignKey("astronauts", "rockets", { ifExists: true });
       });
+    });
+
+    it("schema dumping", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.addForeignKey("astronauts", "rockets");
+        const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+        expect(output).toMatch(/\s+await ctx\.addForeignKey\("astronauts", "rockets"\);$/m);
+      });
+    });
+
+    it("schema dumping with options", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        // Rails' SQLite3 branch expects no `name:` because its `foreign_keys`
+        // reads PRAGMA foreign_key_list, which drops the CONSTRAINT name
+        // (sqlite3_adapter.rb:417-451). trails' SQLite `foreignKeys` additionally
+        // parses the CREATE TABLE DDL and recovers the real name, so the dump
+        // carries `name: "fk_name"` on every adapter and the branch collapses.
+        const output = await dumpTableSchema(conn as unknown as SchemaSource, "fk_test_has_fk");
+        expect(output).toMatch(
+          /\s+await ctx\.addForeignKey\("fk_test_has_fk", "fk_test_has_pk", \{ column: "fk_id", primaryKey: "pk_id", name: "fk_name" \}\);$/m,
+        );
+      });
+    });
+
+    it("schema dumping with custom fk ignore pattern", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        const originalPattern = SchemaDumper.fkIgnorePattern;
+        SchemaDumper.fkIgnorePattern = /^ignored_/;
+        await conn.addForeignKey("astronauts", "rockets", {
+          name: "ignored_fk_astronauts_rockets",
+        });
+
+        const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+        expect(output).toMatch(/\s+await ctx\.addForeignKey\("astronauts", "rockets"\);$/m);
+
+        SchemaDumper.fkIgnorePattern = originalPattern;
+      });
+    });
+
+    it("schema dumping on delete and on update options", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.addForeignKey("astronauts", "rockets", {
+          column: "rocket_id",
+          onDelete: "nullify",
+          onUpdate: "cascade",
+        });
+
+        const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+        expect(output).toMatch(
+          /\s+await ctx\.addForeignKey\("astronauts",.+onUpdate: "cascade",.+onDelete: "nullify" \}\);$/m,
+        );
+      });
+    });
+
+    it("add foreign key is reversible", async () => {
+      const conn = await ambientConnection();
+      await conn.dropTable("cities", "houses", { ifExists: true });
+
+      try {
+        const migration = new CreateCitiesAndHousesMigration();
+        await migration.migrate("up");
+        expect((await conn.foreignKeys("houses")).length).toBe(1);
+        await migration.migrate("down");
+      } finally {
+        await conn.dropTable("cities", "houses", { ifExists: true });
+      }
+    });
+
+    it("foreign key constraint is not cached incorrectly", async () => {
+      const conn = await ambientConnection();
+      await conn.dropTable("cities", "houses", { ifExists: true });
+
+      try {
+        const migration = new CreateCitiesAndHousesMigration();
+        await migration.migrate("up");
+        const output = await dumpTableSchema(conn as unknown as SchemaSource, "houses");
+        expect(output).toMatch(
+          /\s+await ctx\.addForeignKey\("houses",.+onDelete: "cascade" \}\);$/m,
+        );
+        await migration.migrate("down");
+      } finally {
+        await conn.dropTable("cities", "houses", { ifExists: true });
+      }
+    });
+
+    it("add foreign key with prefix", async () => {
+      Base.tableNamePrefix = "p_";
+      const migration = new CreateSchoolsAndClassesMigration();
+      try {
+        await migration.migrate("up");
+        const conn = await ambientConnection();
+        expect((await conn.foreignKeys("p_classes")).length).toBe(1);
+      } finally {
+        await migration.migrate("down");
+        Base.tableNamePrefix = "";
+      }
+    });
+
+    it("add foreign key with suffix", async () => {
+      Base.tableNameSuffix = "_s";
+      const migration = new CreateSchoolsAndClassesMigration();
+      try {
+        await migration.migrate("up");
+        const conn = await ambientConnection();
+        expect((await conn.foreignKeys("classes_s")).length).toBe(1);
+      } finally {
+        await migration.migrate("down");
+        Base.tableNameSuffix = "";
+      }
     });
   });
 

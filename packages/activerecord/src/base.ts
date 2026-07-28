@@ -134,6 +134,7 @@ import {
   setVerboseQueryLogs as _setVerboseQueryLogs,
 } from "./log-subscriber.js";
 import { registerMigrationArConfig } from "./migration.js";
+import { registerTableNameOptions } from "./connection-adapters/abstract/table-name-options.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 import * as LockingOptimistic from "./locking/optimistic.js";
 import * as LockingPessimistic from "./locking/pessimistic.js";
@@ -5179,6 +5180,15 @@ _setSuperValidates(Model.validates);
     });
   }
 }
+
+registerTableNameOptions({
+  get tableNamePrefix() {
+    return Base._tableNamePrefix;
+  },
+  get tableNameSuffix() {
+    return Base._tableNameSuffix;
+  },
+});
 
 registerMigrationArConfig({
   get tableNamePrefix() {
