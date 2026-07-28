@@ -333,10 +333,11 @@ export class DatabaseConfig {
    * Validates the configuration by resolving the adapter class.
    * Returns true on success or throws.
    *
-   * Deviation: sync, because Rails' callers (`resolve_pool_config`,
-   * `establish_connection`) are sync while {@link adapterClass} is async. It
-   * validates the adapter name against the registry; a registered adapter
-   * whose module fails to import still surfaces at first checkout.
+   * Deviation: Rails resolves the adapter class here; trails checks the
+   * adapter name against the registry instead, because {@link adapterClass}
+   * is async (ESM imports are) and `validate!`'s callers are sync. A
+   * registered adapter whose module fails to import surfaces at first
+   * checkout rather than here.
    */
   validateBang(): true {
     if (this.adapter) {

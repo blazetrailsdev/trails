@@ -28,8 +28,10 @@ describe("PoolConfig", () => {
       const handler = new ConnectionHandler();
       expect(() => handler.establishConnection(dbConfig)).toThrow(AdapterNotFound);
       // Mirrors Rails' assert_match on the nonexistent-adapter message.
+      // The available-adapters list varies with what the running suite has
+      // registered, so the two fixed clauses are matched around it.
       expect(() => handler.establishConnection(dbConfig)).toThrow(
-        /nonexistent 'ridiculous' adapter/,
+        /^Database configuration specifies nonexistent 'ridiculous' adapter\. Available adapters are: .+\. Ensure that the adapter is spelled correctly in config\/database\.yml and that you've added the necessary adapter package to your package\.json if it's not in the list of available adapters\.$/,
       );
     });
 

@@ -69,6 +69,17 @@ export function register(name: string, loader: AdapterLoader): void {
   resolveErrors.delete(name);
 }
 
+// Rails' Gemfile sentence, with the JS equivalent of the gem/Gemfile pair.
+function adapterNotFoundError(adapterName: string): AdapterNotFound {
+  const available = [...adapters.keys()].sort().join(", ");
+  return new AdapterNotFound(
+    `Database configuration specifies nonexistent '${adapterName}' adapter. ` +
+      `Available adapters are: ${available}. ` +
+      `Ensure that the adapter is spelled correctly in config/database.yml and that you've added the necessary ` +
+      `adapter package to your package.json if it's not in the list of available adapters.`,
+  );
+}
+
 /**
  * Synchronous half of `resolve(name)` — Rails does this check inline, but
  * trails' sync callers can't await the dynamic import.
@@ -77,13 +88,7 @@ export function register(name: string, loader: AdapterLoader): void {
  */
 export function validateAdapterName(adapterName: string): void {
   if (adapters.has(adapterName)) return;
-  const available = [...adapters.keys()].sort().join(", ");
-  const err = new AdapterNotFound(
-    `Database configuration specifies nonexistent '${adapterName}' adapter. ` +
-      `Available adapters are: ${available}.`,
-  );
-  resolveErrors.set(adapterName, err);
-  throw err;
+  throw adapterNotFoundError(adapterName);
 }
 
 /**
@@ -95,8 +100,12 @@ export async function resolve(adapterName: string): Promise<AdapterClass> {
   const cached = resolved.get(adapterName);
   if (cached) return cached;
 
-  validateAdapterName(adapterName);
-  const loader = adapters.get(adapterName)!;
+  const loader = adapters.get(adapterName);
+  if (!loader) {
+    const err = adapterNotFoundError(adapterName);
+    resolveErrors.set(adapterName, err);
+    throw err;
+  }
   const promise = loader()
     .then((klass) => {
       resolvedSyncCache.set(adapterName, klass);
