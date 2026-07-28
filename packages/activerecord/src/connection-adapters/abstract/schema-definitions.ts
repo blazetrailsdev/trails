@@ -508,11 +508,11 @@ export interface AddIndexOptions {
   algorithm?: string;
 }
 
-export interface AddReferenceOptions extends ColumnOptions {
+export interface AddReferenceOptions extends Omit<ColumnOptions, "index"> {
   polymorphic?: boolean;
-  foreignKey?: boolean;
+  foreignKey?: boolean | ReferenceForeignKeyOptions;
   type?: ColumnType;
-  index?: boolean;
+  index?: boolean | AddIndexOptions;
   ifExists?: boolean;
   ifNotExists?: boolean;
 }
@@ -686,7 +686,7 @@ export class ReferenceDefinition {
     } = {},
   ) {
     if (options.polymorphic && options.foreignKey) {
-      throw new Error("Cannot add a foreign key to a polymorphic relation");
+      throw new ArgumentError("Cannot add a foreign key to a polymorphic relation");
     }
     this.name = name;
     this.polymorphic = options.polymorphic ?? false;

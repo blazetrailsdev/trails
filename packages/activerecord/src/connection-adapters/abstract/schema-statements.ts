@@ -702,7 +702,7 @@ export class SchemaStatements {
       polymorphic?: boolean;
       foreignKey?: boolean | { toTable?: string; column?: string };
       type?: ColumnType;
-      index?: boolean;
+      index?: boolean | AddIndexOptions;
     } = {},
   ): Promise<void> {
     // Mirrors ReferenceDefinition#initialize (schema_definitions.rb:214-216):
@@ -721,7 +721,11 @@ export class SchemaStatements {
     }
     if (options.index !== false) {
       const cols = options.polymorphic ? [`${refName}_id`, `${refName}_type`] : [`${refName}_id`];
-      await this.addIndex(tableName, cols);
+      // ReferenceDefinition#index_options (schema_definitions.rb:266-274):
+      // `index:` given as a hash carries real index options (`unique:`, `name:`,
+      // …), not just an on/off flag.
+      const indexOptions = typeof options.index === "object" ? options.index : {};
+      await this.addIndex(tableName, cols, indexOptions);
     }
     if (options.foreignKey) {
       // Mirrors ReferenceDefinition#add: `connection.add_foreign_key(table_name,
