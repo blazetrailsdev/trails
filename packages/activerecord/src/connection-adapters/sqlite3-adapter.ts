@@ -2782,7 +2782,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   ): Promise<void> {
     const idxRows = (await this.indexes(from)) as Array<{
       name: string;
-      columns: string[];
+      columns: string[] | string;
       unique: boolean;
       where?: string;
     }>;
@@ -2793,11 +2793,20 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       let name = idx.name;
       if (to === `a${from}`) name = `t${name}`;
       else if (from === `a${to}`) name = name.slice(1);
-      const cols = idx.columns.map((c) => rename[c] ?? c).filter((c) => toCols.includes(c));
+      // Rails gates the rename/filter on `columns.is_a?(Array)`: an expression
+      // index carries its parenthesized expression as a bare string, which is
+      // copied across verbatim (no column-name mapping applies).
+      const isColumnList = Array.isArray(idx.columns);
+      const cols = isColumnList
+        ? (idx.columns as string[]).map((c) => rename[c] ?? c).filter((c) => toCols.includes(c))
+        : idx.columns;
       if (!cols.length) continue;
       const escapedFrom = bareFrom.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const newName = name.replace(new RegExp(`(^|_)(${escapedFrom})_`), `$1${bareTo}_`);
-      let sql = `CREATE ${idx.unique ? "UNIQUE " : ""}INDEX ${quoteColumnName(newName)} ON ${quoteTableName(to)} (${cols.map((c) => quoteColumnName(c)).join(", ")})`;
+      const colSql = isColumnList
+        ? (cols as string[]).map((c) => quoteColumnName(c)).join(", ")
+        : (cols as string);
+      let sql = `CREATE ${idx.unique ? "UNIQUE " : ""}INDEX ${quoteColumnName(newName)} ON ${quoteTableName(to)} (${colSql})`;
       if (idx.where) sql += ` WHERE ${idx.where}`;
       await this.driver.exec(sql);
     }
