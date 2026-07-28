@@ -178,8 +178,10 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
     });
   });
 
-  // Rails: activerecord/test/cases/adapters/abstract_mysql_adapter/mysql_adapter_test.rb
-  // translate_exception tests. Matches the PG adapter's equivalent suite.
+  // Rails has no mysql translate_exception test file, so these names are trails
+  // prose covering `AbstractMysqlAdapter#translate_exception`
+  // (activerecord/lib/active_record/connection_adapters/abstract_mysql_adapter.rb).
+  // Matches the PG adapter's equivalent suite.
   describe("translate_exception", () => {
     beforeEach(async () => {
       await adapter.executeMutation(`DROP TABLE IF EXISTS ex_child`);
