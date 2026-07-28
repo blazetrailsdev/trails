@@ -156,19 +156,28 @@ function droppedTableNames(call) {
  * used to make a create unmatchable by any drop of the real name — and the
  * phantom short name matchable by a drop that tears down nothing.
  *
- * A name whose opening quote is never closed (the closing quote lives in a
- * later template quasi) matches neither branch and is skipped; such a name is
- * interpolated, so it was already unknowable.
+ * SQLite and PostgreSQL escape a quote inside an identifier by doubling it, so
+ * `\1\1` is consumed as content rather than read as the closing quote:
+ * `"my""table"` is one name, `my"table` (undoubled by `capturedName`), not the
+ * phantom `my`. `(?!\1)` keeps the `+` bounded — it can never cross an
+ * undoubled quote, so a name cannot run past its close or across statements.
+ *
+ * A name whose opening quote is never closed matches neither branch and is
+ * skipped entirely, so the create goes unreported. That is malformed SQL in a
+ * plain string literal; in a template it means the closing quote lives past an
+ * interpolation, where the name was already unknowable.
  */
-const NAME_SRC = "(?:([\"'`])((?:(?!\\1)[\\s\\S])+)\\1|([\\w.]+))";
+const NAME_SRC = "(?:([\"'`])((?:(?!\\1)[\\s\\S]|\\1\\1)+)\\1|([\\w.]+))";
 /**
  * `NAME_SRC` capture indices. Its `\1` backreference pins the fragment to the
  * first capture group, so it must be the only group in any regex built from it.
  */
 const [OPEN_QUOTE, QUOTED_NAME, BARE_NAME] = [1, 2, 3];
-/** The name `m` captured, quoted or bare. */
+/** The name `m` captured, with a quoted name's doubled quotes undoubled. */
 function capturedName(m) {
-  return m[QUOTED_NAME] ?? m[BARE_NAME];
+  const quote = m[OPEN_QUOTE];
+  if (quote === undefined) return m[BARE_NAME];
+  return m[QUOTED_NAME].replaceAll(quote + quote, quote);
 }
 
 /**
