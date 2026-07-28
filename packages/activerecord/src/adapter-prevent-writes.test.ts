@@ -1,84 +1,65 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapter_prevent_writes_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
+import { describe, it, expect, beforeEach } from "vitest";
+import { Base } from "./index.js";
+import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { ReadOnlyError, StatementInvalid } from "./errors.js";
 import { itIfSupports } from "./support/supports.js";
 import { adapterType } from "./test-adapter.js";
-import { scratchDatabasePath } from "./support/scratch-database.js";
-import { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
-import { PG_TEST_URL } from "./support/describe-if-pg.js";
+import { fixtures } from "./test-fixtures.js";
 
-// Rails' `setup` is `@connection = ActiveRecord::Base.lease_connection` — the
-// ambient file-backed `arunit` connection, with `subscribers` coming from
-// schema.rb. trails cannot ride that connection here because write prevention
-// (`while_preventing_writes`) is only implemented on the sqlite3 adapter, so
-// this suite stays sqlite-pinned on every lane. What it does drop is the
-// `:memory:` database: the connection is file-backed like `arunit`, on its own
-// path because the suite creates and drops `subscribers` itself and must not
-// touch the worker's canonical copy.
-let adapter: AbstractSQLite3Adapter;
-
-beforeEach(async () => {
-  adapter = new BetterSQLite3Adapter(await scratchDatabasePath("adapter-prevent-writes"));
-  await adapter.exec(`DROP TABLE IF EXISTS "subscribers"`);
-  await adapter.exec(
-    `CREATE TABLE "subscribers" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "nick" TEXT)`,
-  );
-});
-
-afterEach(async () => {
-  await adapter.exec(`DROP TABLE IF EXISTS "subscribers"`).catch(() => undefined);
-  await adapter.close();
-});
+let connection: AbstractAdapter;
 
 describe("AdapterPreventWritesTest", () => {
-  it("preventing writes predicate", async () => {
-    expect(adapter.preventingWrites).toBe(false);
+  fixtures([]);
 
-    await adapter.withPreventedWrites(async () => {
-      expect(adapter.preventingWrites).toBe(true);
+  beforeEach(async () => {
+    connection = await Base.leaseConnection();
+  });
+
+  it("preventing writes predicate", async () => {
+    expect(connection.isPreventingWrites()).toBe(false);
+
+    await Base.whilePreventingWrites(async () => {
+      expect(connection.isPreventingWrites()).toBe(true);
     });
 
-    expect(adapter.preventingWrites).toBe(false);
+    expect(connection.isPreventingWrites()).toBe(false);
   });
 
   it("errors when an insert query is called while preventing writes", async () => {
-    await expect(
-      adapter.withPreventedWrites(() =>
-        adapter.executeMutation(`INSERT INTO "subscribers" ("nick") VALUES ('test')`),
-      ),
-    ).rejects.toThrow(ReadOnlyError);
+    await Base.whilePreventingWrites(async () => {
+      await expect(
+        connection.insert("INSERT INTO subscribers(nick) VALUES ('138853948594')"),
+      ).rejects.toThrow(ReadOnlyError);
+    });
   });
 
   it("errors when an update query is called while preventing writes", async () => {
-    await adapter.executeMutation(`INSERT INTO "subscribers" ("nick") VALUES ('test')`);
+    await connection.insert("INSERT INTO subscribers(nick) VALUES ('138853948594')");
 
-    await expect(
-      adapter.withPreventedWrites(() =>
-        adapter.executeMutation(
-          `UPDATE "subscribers" SET "nick" = 'updated' WHERE "nick" = 'test'`,
-        ),
-      ),
-    ).rejects.toThrow(ReadOnlyError);
+    await Base.whilePreventingWrites(async () => {
+      await expect(
+        connection.update("UPDATE subscribers SET nick = '9989' WHERE nick = '138853948594'"),
+      ).rejects.toThrow(ReadOnlyError);
+    });
   });
 
   it("errors when a delete query is called while preventing writes", async () => {
-    await adapter.executeMutation(`INSERT INTO "subscribers" ("nick") VALUES ('test')`);
+    await connection.insert("INSERT INTO subscribers(nick) VALUES ('138853948594')");
 
-    await expect(
-      adapter.withPreventedWrites(() =>
-        adapter.executeMutation(`DELETE FROM "subscribers" WHERE "nick" = 'test'`),
-      ),
-    ).rejects.toThrow(ReadOnlyError);
+    await Base.whilePreventingWrites(async () => {
+      await expect(
+        connection.delete("DELETE FROM subscribers WHERE nick = '138853948594'"),
+      ).rejects.toThrow(ReadOnlyError);
+    });
   });
 
   // Rails defines two variants of this test in the same class: one for PostgreSQL
   // (raises StatementInvalid on encoding errors before the write-prevention check) and
   // one for all other adapters (assert_nothing_raised). This first occurrence is the
-  // PostgreSQL variant; it requires a live PG connection to exercise.
+  // PostgreSQL variant.
   it.skipIf(adapterType !== "postgres")(
     "doesnt error when a select query has encoding errors",
     async () => {
@@ -87,35 +68,30 @@ describe("AdapterPreventWritesTest", () => {
       // a raw 0xC8 byte — node-pg always emits valid UTF-8 — so we provoke the same
       // UTF8 encoding error server-side via a bytea literal. The key assertion holds:
       // the write-prevention check (a read) doesn't pre-empt the encoding failure.
-      const pg = new PostgreSQLAdapter(PG_TEST_URL);
-      (pg as PostgreSQLAdapter & { pool: { preventWrites?: boolean } }).pool = {
-        preventWrites: true,
-      };
-      try {
-        await expect(pg.selectAll(`SELECT convert_from('\\xc8'::bytea, 'UTF8')`)).rejects.toThrow(
-          StatementInvalid,
-        );
-      } finally {
-        await pg.close();
-      }
+      await Base.whilePreventingWrites(async () => {
+        await expect(
+          connection.selectAll(`SELECT convert_from('\\xc8'::bytea, 'UTF8')`),
+        ).rejects.toThrow(StatementInvalid);
+      });
     },
   );
 
   // Non-PostgreSQL variant (Rails' `else` branch): the extractor records it as
   // unconditional, so this stays ungated to pair with that variant.
   it("doesnt error when a select query has encoding errors", async () => {
-    await adapter.withPreventedWrites(async () => {
-      // SQLite returns invalid bytes as-is rather than failing
-      await expect(adapter.execute(`SELECT '\xC8'`)).resolves.toBeDefined();
+    await Base.whilePreventingWrites(async () => {
+      await expect(connection.selectAll(`SELECT '\xC8'`)).resolves.toBeDefined();
     });
   });
 
   it("doesnt error when a select query is called while preventing writes", async () => {
-    await adapter.executeMutation(`INSERT INTO "subscribers" ("nick") VALUES ('test')`);
+    await connection.insert("INSERT INTO subscribers(nick) VALUES ('138853948594')");
 
-    await adapter.withPreventedWrites(async () => {
-      const result = await adapter.execute(`SELECT * FROM "subscribers" WHERE "nick" = 'test'`);
-      expect(result).toHaveLength(1);
+    await Base.whilePreventingWrites(async () => {
+      const result = await connection.selectAll(
+        "SELECT subscribers.* FROM subscribers WHERE nick = '138853948594'",
+      );
+      expect(result.length).toBe(1);
     });
   });
 
@@ -123,84 +99,80 @@ describe("AdapterPreventWritesTest", () => {
     "common_table_expressions",
     "doesnt error when a read query with a cte is called while preventing writes",
     async () => {
-      await adapter.executeMutation(`INSERT INTO "subscribers" ("nick") VALUES ('test')`);
+      await connection.insert("INSERT INTO subscribers(nick) VALUES ('138853948594')");
 
-      await adapter.withPreventedWrites(async () => {
-        const result = await adapter.execute(`
-        WITH matching AS (SELECT * FROM "subscribers" WHERE "nick" = 'test')
-        SELECT * FROM matching
-      `);
-        expect(result).toHaveLength(1);
+      await Base.whilePreventingWrites(async () => {
+        const result = await connection.selectAll(`
+          WITH matching_subscribers AS (SELECT subscribers.* FROM subscribers WHERE nick = '138853948594')
+          SELECT * FROM matching_subscribers
+        `);
+        expect(result.length).toBe(1);
       });
     },
   );
 
   it("doesnt error when a select query starting with a slash star comment is called while preventing writes", async () => {
-    await adapter.executeMutation(`INSERT INTO "subscribers" ("nick") VALUES ('test')`);
+    await connection.insert("INSERT INTO subscribers(nick) VALUES ('138853948594')");
 
-    await adapter.withPreventedWrites(async () => {
-      const result = await adapter.execute(
-        `/* some comment */ SELECT * FROM "subscribers" WHERE "nick" = 'test'`,
+    await Base.whilePreventingWrites(async () => {
+      const result = await connection.selectAll(
+        "/* some comment */ SELECT subscribers.* FROM subscribers WHERE nick = '138853948594'",
       );
-      expect(result).toHaveLength(1);
+      expect(result.length).toBe(1);
     });
   });
 
   it("errors when an insert query prefixed by a slash star comment is called while preventing writes", async () => {
-    await expect(
-      adapter.withPreventedWrites(() =>
-        adapter.executeMutation(
-          `/* some comment */ INSERT INTO "subscribers" ("nick") VALUES ('test')`,
+    await Base.whilePreventingWrites(async () => {
+      await expect(
+        connection.insert(
+          "/* some comment */ INSERT INTO subscribers(nick) VALUES ('138853948594')",
         ),
-      ),
-    ).rejects.toThrow(ReadOnlyError);
+      ).rejects.toThrow(ReadOnlyError);
+    });
   });
 
   it("doesnt error when a select query starting with double dash comments is called while preventing writes", async () => {
-    await adapter.executeMutation(`INSERT INTO "subscribers" ("nick") VALUES ('test')`);
+    await connection.insert("INSERT INTO subscribers(nick) VALUES ('138853948594')");
 
-    await adapter.withPreventedWrites(async () => {
-      const result = await adapter.execute(
-        `-- some comment\n-- comment about INSERT\nSELECT * FROM "subscribers" WHERE "nick" = 'test'`,
+    await Base.whilePreventingWrites(async () => {
+      const result = await connection.selectAll(
+        "-- some comment\n-- comment about INSERT\nSELECT subscribers.* FROM subscribers WHERE nick = '138853948594'",
       );
-      expect(result).toHaveLength(1);
+      expect(result.length).toBe(1);
     });
   });
 
   it("errors when an insert query prefixed by a double dash comment is called while preventing writes", async () => {
-    await expect(
-      adapter.withPreventedWrites(() =>
-        adapter.executeMutation(
-          `-- some comment\nINSERT INTO "subscribers" ("nick") VALUES ('test')`,
-        ),
-      ),
-    ).rejects.toThrow(ReadOnlyError);
+    await Base.whilePreventingWrites(async () => {
+      await expect(
+        connection.insert("-- some comment\nINSERT INTO subscribers(nick) VALUES ('138853948594')"),
+      ).rejects.toThrow(ReadOnlyError);
+    });
   });
 
   it("errors when an insert query prefixed by a multiline double dash comment is called while preventing writes", async () => {
     const manyComments = "-- comment\n".repeat(50);
-    await expect(
-      adapter.withPreventedWrites(() =>
-        adapter.executeMutation(
-          `${manyComments}INSERT INTO "subscribers" ("nick") VALUES ('test')`,
-        ),
-      ),
-    ).rejects.toThrow(ReadOnlyError);
+    await Base.whilePreventingWrites(async () => {
+      await expect(
+        connection.insert(`${manyComments}INSERT INTO subscribers(nick) VALUES ('138853948594')`),
+      ).rejects.toThrow(ReadOnlyError);
+    });
   });
 
   it("errors when an insert query prefixed by a slash star comment containing read command is called while preventing writes", async () => {
-    await expect(
-      adapter.withPreventedWrites(() =>
-        adapter.executeMutation(`/* SELECT */ INSERT INTO "subscribers" ("nick") VALUES ('test')`),
-      ),
-    ).rejects.toThrow(ReadOnlyError);
+    await Base.whilePreventingWrites(async () => {
+      await expect(
+        connection.insert("/* SELECT */ INSERT INTO subscribers(nick) VALUES ('138853948594')"),
+      ).rejects.toThrow(ReadOnlyError);
+    });
   });
 
   it("errors when an insert query prefixed by a double dash comment containing read command is called while preventing writes", async () => {
-    await expect(
-      adapter.withPreventedWrites(() =>
-        adapter.executeMutation(`-- SELECT\nINSERT INTO "subscribers" ("nick") VALUES ('test')`),
-      ),
-    ).rejects.toThrow(ReadOnlyError);
+    await Base.whilePreventingWrites(async () => {
+      await expect(
+        connection.insert("-- SELECT\nINSERT INTO subscribers(nick) VALUES ('138853948594')"),
+      ).rejects.toThrow(ReadOnlyError);
+    });
   });
 });

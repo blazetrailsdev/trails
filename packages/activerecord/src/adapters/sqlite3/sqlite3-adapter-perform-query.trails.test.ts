@@ -9,6 +9,7 @@
  */
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
+import { Base } from "../../base.js";
 import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { ReadOnlyError } from "../../errors.js";
@@ -105,12 +106,12 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     // The guard lives in preprocess_query's check_if_write_query, so it covers
     // execute and executeMutation alike.
     await expect(
-      adapter.withPreventedWrites(() => adapter.execute(`INSERT INTO "pq" ("nick") VALUES ('a')`)),
+      Base.whilePreventingWrites(() => adapter.execute(`INSERT INTO "pq" ("nick") VALUES ('a')`)),
     ).rejects.toThrow(ReadOnlyError);
   });
 
   it("does not prevent a read routed through execute while preventing writes", async () => {
-    await adapter.withPreventedWrites(async () => {
+    await Base.whilePreventingWrites(async () => {
       await expect(adapter.execute(`SELECT * FROM "pq"`)).resolves.toEqual([]);
     });
   });

@@ -305,7 +305,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   private _sqlite3SchemaCreation?: SQLite3SchemaCreation;
   private _readonly: boolean;
   private _strict: boolean;
-  private _preventWrites = false;
   /** @internal Rails' `@last_affected_rows`; read by the affected_rows port. */
   _lastAffectedRows = 0;
   _lastInsertRowid: number | bigint = 0;
@@ -602,38 +601,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   async pragma(name: string): Promise<unknown> {
     await this.ensureConnected();
     return await this.driver.pragma(name);
-  }
-
-  /**
-   * Prevent or allow write operations. Delegates to the predicate so this and
-   * `isPreventingWrites()` — both Rails `preventing_writes?` — cannot disagree:
-   * the getter would otherwise miss the pool/replica component.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#preventing_writes?
-   */
-  get preventingWrites(): boolean {
-    return this.isPreventingWrites();
-  }
-
-  /**
-   * Folds `withPreventedWrites`' local flag into the inherited pool/replica
-   * check so the guard reaches every statement through preprocess_query's
-   * check_if_write_query, rather than only the executeMutation entry point.
-   */
-  override isPreventingWrites(): boolean {
-    return this._preventWrites || super.isPreventingWrites();
-  }
-
-  /**
-   * Execute a block with writes prevented.
-   */
-  async withPreventedWrites<R>(fn: () => R | Promise<R>): Promise<R> {
-    this._preventWrites = true;
-    try {
-      return await fn();
-    } finally {
-      this._preventWrites = false;
-    }
   }
 
   /**
