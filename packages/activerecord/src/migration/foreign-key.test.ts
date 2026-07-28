@@ -24,6 +24,8 @@ import { describeIfSupports } from "../support/supports.js";
 // has no name to compare.
 const unlessSqlite3Adapter = adapterType !== "sqlite";
 
+const mysqlRestrictActionReflectsNil = adapterType === "mysql";
+
 describeIfSupports("foreign_keys", "ActiveRecord::Migration::ForeignKeyTest", () => {
   // DDL can't run inside the transactional-fixtures wrapper (PG aborts the
   // outer transaction on a failed statement), matching the schema-statements
@@ -257,7 +259,10 @@ describeIfSupports("foreign_keys", "ActiveRecord::Migration::ForeignKeyTest", ()
     });
   });
 
-  it.skipIf(!unlessSqlite3Adapter)("remove foreign key by name", async () => {
+  // Rails: `skip if current_adapter?(:SQLite3Adapter)` — spelled as a direct
+  // adapter exclusion (not `!unlessSqlite3Adapter`) so the test-compare gate
+  // extractor reads the adapter set instead of an opaque guard.
+  it.skipIf(adapterType === "sqlite")("remove foreign key by name", async () => {
     const conn = await ambientConnection();
     await withRocketTables(conn, async () => {
       await conn.addForeignKey("astronauts", "rockets", {
@@ -308,7 +313,11 @@ describeIfSupports("foreign_keys", "ActiveRecord::Migration::ForeignKeyTest", ()
   // test_add_on_delete_restrict_foreign_key. `defined_for?` then compares
   // `Array(nil)` against `["restrict"]` and never matches, so the removal raises.
   // Rails leaves the case ungated because its own suite does not run it here.
-  it.skipIf(adapterType === "mysql")("remove foreign key with restrict action", async () => {
+  // Held in a named boolean rather than an inline `adapterType === "mysql"`:
+  // this is a deviation from Rails' (absent) gate, not a ported one, so it is
+  // recorded as an incomparable guard instead of masquerading as an adapter
+  // restriction the Rails side never had.
+  it.skipIf(mysqlRestrictActionReflectsNil)("remove foreign key with restrict action", async () => {
     const conn = await ambientConnection();
     await withRocketTables(conn, async () => {
       await conn.addForeignKey("astronauts", "rockets", { onDelete: "restrict" });
