@@ -6,7 +6,10 @@ import { getFsAsync, getPathAsync, trailsRoot } from "@blazetrails/activesupport
 import { DatabaseConfigurations, type RawConfigurations } from "./database-configurations.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { UrlConfig } from "./database-configurations/url-config.js";
-import { DatabaseConfig } from "./database-configurations/database-config.js";
+import {
+  DatabaseConfig,
+  _setConfigurationHash,
+} from "./database-configurations/database-config.js";
 import {
   resolve as resolveConnectionAdapter,
   resolveSync as resolveConnectionAdapterSync,
@@ -845,11 +848,19 @@ async function establishWithDbConfig(
   // config already names its adapter — matching Rails, whose URL configs always
   // parse a scheme. Defensively backfill should a non-UrlConfig path ever hand
   // us an adapter-less hash with a derivable URL.
+  // Replaces the hash rather than writing into it: configuration hashes are
+  // frozen (Rails freezes them in HashConfig#initialize), and the object
+  // identity the handler's pool-reuse check keys on is the DatabaseConfig, not
+  // its hash.
+  let configForConnect = config;
   if (!dbConfig.adapter) {
-    (config as { adapter?: string }).adapter = adapterName;
+    configForConnect = _setConfigurationHash(dbConfig, {
+      ...config,
+      adapter: adapterName,
+    }) as Record<string, unknown>;
   }
 
-  await establishWithConfig(modelClass, adapterName, connectUrl, config, dbConfig);
+  await establishWithConfig(modelClass, adapterName, connectUrl, configForConnect, dbConfig);
   if (tz) setDefaultTimezone(tz);
 }
 

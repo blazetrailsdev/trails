@@ -583,6 +583,34 @@ describe("ConnectionHandlingTest", () => {
       (DatabaseConfigurations as any).current = priorCurrent;
     }
   });
+
+  // The adapter backfill in establishWithDbConfig is only reached by an
+  // adapter-less config carrying a derivable URL — a UrlConfig pre-infers the
+  // adapter in buildUrlHash, so only a HashConfig gets here. Configuration
+  // hashes are frozen, so the backfill has to replace the hash rather than
+  // write into it.
+  it("establishConnection backfills the adapter on an adapter-less HashConfig", async () => {
+    const { DatabaseConfigurations } = await import("./database-configurations.js");
+    const { HashConfig } = await import("./database-configurations/hash-config.js");
+    const env = DatabaseConfigurations.currentEnv();
+
+    const dbConfig = new HashConfig(env, "primary", { url: "sqlite3:db/foo.sqlite3" });
+    expect(dbConfig.adapter).toBeUndefined();
+
+    class BackfillModel extends Base {}
+    try {
+      await BackfillModel.establishConnection(dbConfig as any);
+
+      expect(dbConfig.adapter).toBe("sqlite");
+      expect(Object.isFrozen(dbConfig.configurationHash)).toBe(true);
+      const pool = BackfillModel.connectionPool();
+      expect(pool.dbConfig).toBe(dbConfig);
+      // Never checked out — db/foo.sqlite3 must not be created by this test.
+      expect(pool.activeConnection).toBeNull();
+    } finally {
+      BackfillModel.removeConnection();
+    }
+  });
 });
 
 describe("withRoleAndShard loads Relation return values within scope (Story K gap 5)", () => {

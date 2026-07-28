@@ -271,5 +271,33 @@ describe("DatabaseConfigurations", () => {
       vi.spyOn(config, "isPrimary").mockReturnValue(false);
       expect(config.seeds).toBe(true);
     });
+
+    it("_database= does not mutate the hash passed to the constructor", () => {
+      const original = { adapter: "abstract", database: "original_db" };
+      const config = new HashConfig("default_env", "primary", original);
+
+      const hashBefore = config.configurationHash;
+      config._database = "swapped_db";
+
+      expect(original.database).toBe("original_db");
+      expect(config.database).toBe("swapped_db");
+      expect(config.configurationHash.adapter).toBe("abstract");
+      expect(config.configurationHash).not.toBe(hashBefore);
+      expect(Object.isFrozen(config.configurationHash)).toBe(true);
+
+      config._database = "swapped_again";
+      expect(config.database).toBe("swapped_again");
+    });
+
+    it("the configuration hash is a frozen copy of the hash passed to the constructor", () => {
+      const original: Record<string, unknown> = { adapter: "abstract", database: "original_db" };
+      const config = new HashConfig("default_env", "primary", original);
+
+      expect(config.configurationHash).not.toBe(original);
+      expect(Object.isFrozen(config.configurationHash)).toBe(true);
+
+      original.database = "mutated_after_construction";
+      expect(config.database).toBe("original_db");
+    });
   });
 });
