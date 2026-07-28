@@ -73,6 +73,23 @@ tester.run("require-canonical-rebuild", rule, {
       code: 'await ctx.dropTable("ex_long");\nawait ctx.dropTable("foos");',
       options,
     },
+    // A sweep-driven drop loop whose filter cannot select a canonical table —
+    // the postgresql-adapter.trails.test.ts shape after PR-fix. No canonical
+    // name is in scope, so the interpolated drop is unreportable.
+    {
+      code:
+        "const tables = await adapter.execute(`SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`);\n" +
+        'for (const t of tables) { await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}" CASCADE`); }',
+      options,
+    },
+    // A rebuild of the swept table clears the sweep report too.
+    {
+      code:
+        "const tables = await adapter.execute(`SELECT tablename FROM pg_tables WHERE tablename IN ('subscribers')`);\n" +
+        'for (const t of tables) { await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`); }\n' +
+        'await rebuildCanonicalTables(adapter, ["subscribers"]);',
+      options,
+    },
     // A DDL string that is an assertion target, not a sink argument, is ignored.
     {
       code: 'expect(sql).toContain("DROP TABLE subscribers");',
@@ -130,6 +147,17 @@ tester.run("require-canonical-rebuild", rule, {
         { messageId: "missingRebuild", data: { table: "posts" } },
         { messageId: "missingRebuild", data: { table: "people" } },
       ],
+    },
+    // The regression: a drop loop fed by a pg_tables sweep whose filter list
+    // names a canonical table. The DROP itself carries no static name, so
+    // `rawDropNames` sees nothing — the SELECT's filter list is the only
+    // evidence that the sweep can reach `subscribers`.
+    {
+      code:
+        "const tables = await adapter.execute(`SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%' OR tablename IN ('subscribers')`);\n" +
+        'for (const t of tables) { await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}" CASCADE`); }',
+      options,
+      errors: [{ messageId: "sweepReachesCanonical", data: { table: "subscribers" } }],
     },
     // Repeated drops of the same table report once, at the first drop.
     {

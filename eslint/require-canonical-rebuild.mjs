@@ -27,9 +27,18 @@
  * Drops are seen in both forms `require-table-teardown` understands: the
  * `dropTable("foo")` helper (receiver-agnostic, multiple names per call) and a
  * raw `DROP TABLE foo` inside an execution sink's string/template argument
- * (`SQL_SINKS`). Only statically-known names participate in either direction;
- * a name behind an interpolation (`` `DROP TABLE ${t}` ``) is invisible, so it
- * is never flagged.
+ * (`SQL_SINKS`). Only statically-known names participate in either direction.
+ *
+ * A third, indirect form: a drop loop driven by a catalogue sweep, where the
+ * DROP carries no static name at all and its victims are named only in the
+ * SELECT that feeds it. `items` went missing off the shared PostgreSQL worker
+ * database exactly this way — `postgresql-adapter.trails.test.ts` swept
+ * `pg_tables … tablename IN ('…', 'items', …)` and dropped each row by
+ * interpolated name, which no per-name accounting could see. So when a file
+ * contains a `` `DROP TABLE ${…}` `` *and* quotes a canonical table name in
+ * some sink SQL, that name counts as dropped. Only *quoted* names count:
+ * `columns`, `values`, `select` and `distinct` are canonical table names as
+ * well as SQL keywords, so bare-word matching reports on ordinary query text.
  *
  * Restores are recognised as:
  *   - `rebuildCanonicalTables(adapter, ["a", "b"])` — each static element of
@@ -53,6 +62,13 @@
  */
 
 import { calledName, staticString, rawDropNames, SQL_SINKS } from "./require-table-teardown.mjs";
+
+/**
+ * A quasi whose text ends in `DROP TABLE [IF EXISTS] [quote]` hands the table
+ * name to the interpolation that follows: the drop is real but its target is
+ * invisible to `rawDropNames`. See `dynamicDrop` below.
+ */
+const DROP_TABLE_DYNAMIC_TAIL = /\bdrop\s+table\s+(?:if\s+exists\s+)?["'`[]?$/i;
 
 /** Call names that restore the canonical schema for every table at once. */
 const FULL_RESTORE_CALLS = new Set(["loadCanonicalSchema"]);
@@ -99,6 +115,8 @@ const rule = {
     messages: {
       missingRebuild:
         'Canonical table `{{table}}` is dropped but never restored in this file. Add `await rebuildCanonicalTables(adapter, ["{{table}}"])` after the drop. A canonical table left dropped drifts the shared per-worker database for every file that runs next. If this file owns a private adapter (`:memory:` or a tmpdir file) it cannot drift the shared database — add it to the `privateAdapter` group in eslint/require-canonical-rebuild-exclude.json.',
+      sweepReachesCanonical:
+        'This file drops tables by interpolated name (`DROP TABLE ${…}`) and mentions the canonical table `{{table}}`, so the sweep can drop it off the shared per-worker database and leave it dropped. Narrow the sweep so it cannot select `{{table}}` (a prefix filter on this file\'s own tables), or restore it with `await rebuildCanonicalTables(adapter, ["{{table}}"])`.',
     },
   },
 
@@ -108,6 +126,13 @@ const rule = {
 
     // canonical table name → first drop node seen (for the report location).
     const dropped = new Map();
+    // First `DROP TABLE ${…}` node in the file, if any, plus every canonical
+    // name quoted in a SQL sink string. A drop loop fed by a
+    // `pg_tables`/`sqlite_master` sweep names its victims in the SELECT's
+    // filter list, never in the DROP — that pair is the only static evidence
+    // that the sweep can reach a canonical table.
+    let dynamicDrop = null;
+    const namesInScope = new Set();
     const rebuilt = new Set();
     let restoresEverything = false;
 
@@ -120,6 +145,7 @@ const rule = {
         if (arg.type === "Literal") {
           if (typeof arg.value === "string") {
             for (const table of rawDropNames(arg.value)) recordDrop(table, arg);
+            recordQuotedNames(arg.value);
           }
         } else if (arg.type === "TemplateLiteral") {
           // A quasi followed by an interpolation has a dynamic end: a name that
@@ -129,8 +155,23 @@ const rule = {
           arg.quasis.forEach((quasi, i) => {
             if (!quasi.value.cooked) return;
             for (const table of rawDropNames(quasi.value.cooked, i < last)) recordDrop(table, arg);
+            recordQuotedNames(quasi.value.cooked);
+            if (i < last && DROP_TABLE_DYNAMIC_TAIL.test(quasi.value.cooked)) dynamicDrop ??= arg;
           });
         }
+      }
+    }
+
+    /**
+     * Canonical names appearing as a *quoted SQL string* in a sink argument —
+     * `IN ('items', …)` in the catalogue SELECT that feeds a drop loop. Bare
+     * words are deliberately not counted: several canonical tables are named
+     * after SQL keywords (`columns`, `values`, `select`, `distinct`), so any
+     * looser match reports on ordinary query text.
+     */
+    function recordQuotedNames(text) {
+      for (const [, name] of text.matchAll(/'([A-Za-z_][A-Za-z0-9_]*)'/g)) {
+        if (canonical.has(name)) namesInScope.add(name);
       }
     }
 
@@ -161,6 +202,15 @@ const rule = {
         for (const [table, node] of dropped) {
           if (rebuilt.has(table)) continue;
           context.report({ node, messageId: "missingRebuild", data: { table } });
+        }
+        if (dynamicDrop === null) return;
+        for (const table of namesInScope) {
+          if (rebuilt.has(table) || dropped.has(table)) continue;
+          context.report({
+            node: dynamicDrop,
+            messageId: "sweepReachesCanonical",
+            data: { table },
+          });
         }
       },
     };
