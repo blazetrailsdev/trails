@@ -132,16 +132,18 @@ export class HasOne extends SingularAssociation {
     if (existing && !existing.configurable) return;
     Object.defineProperty(mixin, name, {
       get: existing?.get,
-      // The `=` setter exists because Rails defines `#{name}=` and dropping it
-      // would report that method missing — but it is NOT the co-equal writer.
-      // It is faithful on exactly one branch: an *unpersisted* owner, where
-      // Rails' assignment is in-memory too, so `syncWrite` sets the FK/inverse
-      // and lets autosave persist at the owner's first `save()`. On a
-      // *persisted* owner it degrades to a deprecation shim: `syncWrite` throws
-      // `HasOnePersistedAssignmentError` — a deliberate DEVIATION, since Rails
-      // raises nothing there and simply persists the displacement inline, which
-      // needs `await`. Throwing steers the caller to the awaitable port rather
-      // than silently skipping the write. Callers use
+      // The synchronous path, supported alongside `set${cap}` — Rails defines
+      // `#{name}=`, so this stays. It is fully faithful on the branch where
+      // Rails does no I/O either: an *unpersisted* owner, where Rails'
+      // assignment is in-memory too, so `syncWrite` sets the FK/inverse and
+      // lets autosave persist at the owner's first `save()`.
+      //
+      // On a *persisted* owner Rails persists the displacement inline, which
+      // needs `await` — unreachable from a JS property setter. `syncWrite`
+      // therefore throws `HasOnePersistedAssignmentError`, a deliberate
+      // DEVIATION (Rails raises nothing there): the alternative is accepting
+      // the assignment and silently skipping the write, so the throw is a guard
+      // against data loss, not a deprecation. Persisted-owner callers use
       // `await owner.set#{Name}(value)` (the `set${cap}` port above) or
       // `await record.association(name).writer(value)` (RFC 0068).
       set(this: { association(n: string): { syncWrite(v: unknown): void } }, value: unknown) {

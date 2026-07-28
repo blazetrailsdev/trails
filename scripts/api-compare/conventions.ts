@@ -753,9 +753,10 @@ Setter-form details: a Ruby \`name=\` writer matches the bare camel accessor
 first, and \`set#{Name}\` second. The \`set*\` fallback covers writers whose Rails
 body blocks on I/O — \`has_one\`'s \`#{name}=\` removes and persists the displaced
 target inline — which a synchronous JS property setter cannot express. There the
-promise-returning \`setAccount\` **is** the port of \`account=\`, and the sync \`=\`
-setter remains only as the faithful in-memory path on an unpersisted owner plus a
-shim steering persisted-owner callers to the awaitable writer. Underscore-prefixed
+promise-returning \`setAccount\` **is** the port of \`account=\`. Both spellings are
+supported and both score as the port — the candidate list is a fallback chain, not
+a migration: a sync accessor alone still matches, as it always did.
+Underscore-prefixed
 writers (\`_reflections=\`) are \`class_attribute\` storage slots, never blocking
 writers, so they get no \`set*\` candidate.
 
