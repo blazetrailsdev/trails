@@ -58,15 +58,6 @@ export interface AbstractPool {
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::NullPool::NullConfig
- *
- * Rails nests this class inside `NullPool` (`class NullPool; class NullConfig` —
- * connection_pool.rb:14-22), and the Ruby extractor records only the outer
- * `NullPool`. TS cannot declare a nested class, so it is a sibling export
- * re-attached as `NullPool.NullConfig` (a static, matching Rails' constant
- * lookup path). Same class, same file, same semantics — an extractor-shape
- * artifact, not added surface. It carried a `@noRailsEquivalent` tag until that
- * tag went stale: `api:extra` builds its extra set from MEMBER names only, so
- * the static never flags and the tag could never match.
  */
 export class NullConfig {
   [key: string]: unknown;
