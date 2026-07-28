@@ -7,7 +7,7 @@ import {
   _resetSignedGlobalIDClassConfig,
 } from "./signed-global-id.js";
 import { setApp, _resetApp } from "./config.js";
-import { setModelFinder, _resetModelFinder, type LocatorModel } from "./locator.js";
+import { registerConstant, _resetConstants } from "@blazetrails/activesupport";
 
 function makeVerifier(secret = "test-secret"): MessageVerifier {
   return new MessageVerifier(secret, { digest: "sha256", url_safe: true });
@@ -30,11 +30,11 @@ class Person {
 describe("SignedGlobalIDTest", () => {
   beforeEach(() => {
     setApp(TEST_APP);
-    setModelFinder((name) => (name === "Person" ? (Person as unknown as LocatorModel) : undefined));
+    registerConstant("Person", Person);
   });
   afterEach(() => {
     _resetApp();
-    _resetModelFinder();
+    _resetConstants();
   });
 
   it("as string", () => {

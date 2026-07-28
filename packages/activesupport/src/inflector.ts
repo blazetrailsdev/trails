@@ -165,6 +165,51 @@ export function deconstantize(path: string): string {
   return "";
 }
 
+const _constants = new Map<string, unknown>();
+
+/**
+ * @noRailsEquivalent The registration half of Ruby's constant table. `class Foo`
+ * writes Ruby's global constant namespace as a side effect of definition; ESM
+ * classes are module-local bindings with no such namespace, so a JS host names
+ * its classes explicitly. Only registration is invented — lookup goes through
+ * {@link constantize}, which Rails has.
+ */
+export function registerConstant(name: string, value: unknown): void {
+  _constants.set(name, value);
+}
+
+/** @internal — test use only: clear the registered constant table. */
+export function _resetConstants(): void {
+  _constants.clear();
+}
+
+function isValidConstantPath(path: string): boolean {
+  if (path.length === 0) return false;
+  return path.split("::").every((segment) => /^[A-Z]\w*$/.test(segment));
+}
+
+/** Mirrors: Inflector.constantize — `Object.const_get(camel_cased_word)`. */
+export function constantize(camelCasedWord: string): unknown {
+  const path = camelCasedWord.startsWith("::") ? camelCasedWord.slice(2) : camelCasedWord;
+  if (!isValidConstantPath(path)) {
+    throw new ReferenceError(`wrong constant name ${camelCasedWord}`);
+  }
+  if (!_constants.has(path)) {
+    throw new ReferenceError(`uninitialized constant ${path}`);
+  }
+  return _constants.get(path);
+}
+
+/** Mirrors: Inflector.safe_constantize. */
+export function safeConstantize(camelCasedWord: string): unknown {
+  try {
+    return constantize(camelCasedWord);
+  } catch (e) {
+    if (e instanceof ReferenceError) return undefined;
+    throw e;
+  }
+}
+
 export function foreignKey(className: string, separateWithUnderscore: boolean = true): string {
   return underscore(demodulize(className)) + (separateWithUnderscore ? "_id" : "id");
 }

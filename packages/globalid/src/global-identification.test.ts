@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { setApp, _resetApp } from "./config.js";
+import { registerConstant, _resetConstants } from "@blazetrails/activesupport";
 import { GlobalID } from "./global-id.js";
 import { SignedGlobalID } from "./signed-global-id.js";
 import {
@@ -11,7 +12,7 @@ import {
   toSgid,
   toSgidParam,
 } from "./identification.js";
-import { Locator, setModelFinder, _resetModelFinder, type LocatorModel } from "./locator.js";
+import { Locator } from "./locator.js";
 
 function makeVerifier(): MessageVerifier {
   return new MessageVerifier("test-secret", { digest: "sha256", url_safe: true });
@@ -33,11 +34,11 @@ class Person {
 describe("GlobalIdentificationTest", () => {
   beforeEach(() => {
     setApp("bcx");
-    setModelFinder((name) => (name === "Person" ? (Person as unknown as LocatorModel) : undefined));
+    registerConstant("Person", Person);
   });
   afterEach(() => {
     _resetApp();
-    _resetModelFinder();
+    _resetConstants();
   });
 
   it("creates a Global ID from self", () => {
@@ -115,11 +116,11 @@ describe("GlobalIdentificationTest", () => {
 describe("Locator.locateSigned + locateManySigned", () => {
   beforeEach(() => {
     setApp("bcx");
-    setModelFinder((name) => (name === "Person" ? (Person as unknown as LocatorModel) : undefined));
+    registerConstant("Person", Person);
   });
   afterEach(() => {
     _resetApp();
-    _resetModelFinder();
+    _resetConstants();
   });
 
   it("locate_signed finds a record by valid SGID", async () => {

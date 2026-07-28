@@ -173,5 +173,12 @@
     "rubyName": "send_early_hints",
     "call": "call",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/request.ts",
+    "rubyName": "controller_class_for",
+    "call": "constantize",
+    "reason": "Not implemented: controllerClassFor throws by design — trails has no controller constant registry, so callers resolve controllers through the router instead (see the method's doc comment)."
   }
 ]

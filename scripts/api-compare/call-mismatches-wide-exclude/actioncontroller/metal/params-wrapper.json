@@ -75,5 +75,12 @@
     "rubyName": "wrap_parameters",
     "call": "slice",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/params-wrapper.ts",
+    "rubyName": "_default_wrap_model",
+    "call": "safe_constantize",
+    "reason": "Equivalent (different path): Rails safe_constantizes the derived name only to re-derive a wrapper key from the class; trails' _defaultWrapModel computes that key from the name string directly, so no constant is resolved at all."
   }
 ]

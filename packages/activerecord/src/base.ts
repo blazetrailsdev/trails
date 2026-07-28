@@ -153,6 +153,7 @@ import {
   type Included,
   type ParameterFilter,
   type BenchmarkLogger,
+  registerConstant,
 } from "@blazetrails/activesupport";
 import {
   hasAttribute as _hasAttribute,
@@ -1351,7 +1352,10 @@ export class Base extends Model {
       return;
     }
     this._adapter = adapter;
-    if (this !== Base && this.name) Base._modelsByName.set(this.name, this);
+    if (this !== Base && this.name) {
+      Base._modelsByName.set(this.name, this);
+      registerConstant(this.name, this);
+    }
 
     // Full schema reset on adapter swap: drops schema-sourced defs and
     // their prototype accessors (preserves user-declared defs), and
@@ -5195,16 +5199,7 @@ registerMigrationArConfig({
 // register here without callers needing to re-add it.
 import "@blazetrails/globalid/wire";
 
-// Register globalid's model finder. Base._modelsByName is populated by the
-// adapter setter (every AR model receives an adapter), so any class that
-// behaves as an AR model is reachable here. modelRegistry from associations
-// covers the explicit registerModel(name, klass) form for models registered
-// under aliases.
-import {
-  setModelFinder as _setGlobalIdModelFinder,
-  type LocatorModel as _LocatorModel,
-} from "@blazetrails/globalid";
-import { modelRegistry as _gidModelRegistry } from "./associations.js";
+import { type LocatorModel as _LocatorModel } from "@blazetrails/globalid";
 // Compile-time wire: AR's static `Base.unscoped(block)` is the
 // `LocatorModel.unscoped` implementation that GlobalID's `UnscopedLocator`
 // invokes — wrapping lookups in `klass.unscoped { ... }` so default scopes
@@ -5215,25 +5210,6 @@ type _ARBaseUnscopedWire =
   typeof Base extends Pick<Required<_LocatorModel>, "unscoped"> ? true : never;
 const _arBaseUnscopedWire: _ARBaseUnscopedWire = true;
 void _arBaseUnscopedWire;
-_setGlobalIdModelFinder((name: string) => {
-  const fromBase = Base._modelsByName.get(name);
-  if (fromBase) return fromBase as unknown as _LocatorModel;
-  const fromAssoc = _gidModelRegistry.get(name);
-  if (fromAssoc) return fromAssoc as unknown as _LocatorModel;
-  // STI subclasses inherit their parent's adapter, so they don't trigger the
-  // adapter setter. registerSubclass(klass) attaches them to their direct
-  // parent's _subclasses, not to Base — so we walk descendants of every
-  // model in _modelsByName, not just Base.descendants. Cache for O(1) repeat.
-  for (const root of Base._modelsByName.values()) {
-    for (const klass of root.descendants) {
-      if (klass.name === name) {
-        Base._modelsByName.set(name, klass);
-        return klass as unknown as _LocatorModel;
-      }
-    }
-  }
-  return undefined;
-});
 
 setCurrentAdapterResolver(() => Base);
 

@@ -5,5 +5,12 @@
     "rubyName": "initialize_sid",
     "call": "delete",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Same body as abstract_store.rb:35-38 (mem_cache_store.rb defines no initialize_sid of its own; the flag comes from the shared Compatibility body); trails mem-cache-store.ts inherits abstract-store.ts:124-127, which uses the JS `delete` operator."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "middleware/session/mem-cache-store.ts",
+    "rubyName": "stale_session_check!",
+    "call": "constantize",
+    "reason": "Equivalent (different path): shares staleSessionCheckBang with abstract-store.ts — see that file's entry."
   }
 ]

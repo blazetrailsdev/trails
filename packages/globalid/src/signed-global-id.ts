@@ -8,7 +8,8 @@ import { GID, type GidComponents } from "./uri/gid.js";
 // ReferenceError (TDZ) for an uninitialized imported binding accessed during
 // the initial circular evaluation.
 import { GlobalID, isOrExtends, type GlobalIDModel } from "./global-id.js";
-import { lookupClass, type LocatorModel } from "./locator.js";
+import { type LocatorModel } from "./locator.js";
+import { constantize } from "@blazetrails/activesupport";
 
 export type { GlobalIDModel };
 
@@ -323,12 +324,10 @@ export class SignedGlobalID {
   }
 
   /**
-   * Resolve the model class via the registered ModelFinder.
-   *
    * Mirrors: GlobalID#model_class
    *
    * In Ruby SGID inherits the `model <= GlobalID` guard from GID; in TS
-   * the peer class repeats it so a misconfigured ModelFinder can't slip
+   * the peer class repeats it so a misregistered constant can't slip
    * either identity through.
    *
    * @noRailsEquivalent Inherited from GlobalID in Ruby; re-declared because the
@@ -336,12 +335,7 @@ export class SignedGlobalID {
    * file.
    */
   get modelClass(): LocatorModel {
-    const klass = lookupClass(this.modelName);
-    if (!klass) {
-      throw new Error(
-        `Cannot resolve model class for ${this.modelName}. Register the class via setModelFinder.`,
-      );
-    }
+    const klass = constantize(this.modelName) as LocatorModel;
     if (isOrExtends(klass, GlobalID) || isOrExtends(klass, SignedGlobalID)) {
       throw new Error("GlobalID and SignedGlobalID cannot be used as model_class.");
     }

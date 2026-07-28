@@ -1,16 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { setApp, _resetApp } from "./config.js";
+import { registerConstant, _resetConstants } from "@blazetrails/activesupport";
 import { GlobalID } from "./global-id.js";
 import { SignedGlobalID } from "./signed-global-id.js";
-import {
-  Locator,
-  BlockLocator,
-  setModelFinder,
-  _resetModelFinder,
-  _resetLocators,
-  type LocatorModel,
-} from "./locator.js";
+import { Locator, BlockLocator, _resetLocators, type LocatorModel } from "./locator.js";
 
 const TEST_APP = "bcx";
 const UUID = "7ef9b614-353c-43a1-a203-ab2307851990";
@@ -69,6 +63,12 @@ class CompositePrimaryKeyModel {
   }
 }
 
+function registerConstants(registry: Record<string, LocatorModel>): void {
+  for (const [name, klass] of Object.entries(registry)) {
+    registerConstant(name, klass);
+  }
+}
+
 const REGISTRY: Record<string, LocatorModel> = {
   Person: Person as unknown as LocatorModel,
   PersonChild: PersonChild as unknown as LocatorModel,
@@ -88,7 +88,7 @@ describe("GlobalLocatorTest", () => {
 
   beforeEach(() => {
     setApp(TEST_APP);
-    setModelFinder((name) => REGISTRY[name]);
+    registerConstants(REGISTRY);
     verifier = makeVerifier();
     personGid = GlobalID.create(new Person("id"));
     cpkGid = GlobalID.create(new CompositePrimaryKeyModel(["tenant-key-value", "id-value"]));
@@ -103,7 +103,7 @@ describe("GlobalLocatorTest", () => {
   });
   afterEach(() => {
     _resetApp();
-    _resetModelFinder();
+    _resetConstants();
   });
 
   it("by GID", async () => {
@@ -498,9 +498,8 @@ describe("GlobalLocatorTest", () => {
         };
       }
     }
-    setModelFinder((name) =>
-      name === "PersonNoPk" ? (PersonNoPk as unknown as LocatorModel) : REGISTRY[name],
-    );
+    registerConstants(REGISTRY);
+    registerConstant("PersonNoPk", PersonNoPk);
 
     const gid = GlobalID.create(new PersonNoPk("id"));
     const found = (await Locator.locate(gid)) as PersonNoPk;
@@ -587,18 +586,13 @@ describe("ScopedRecordLocatingTest", () => {
 
   beforeEach(() => {
     setApp(TEST_APP);
-    setModelFinder((name) =>
-      name === "PersonScoped"
-        ? (PersonScoped as unknown as LocatorModel)
-        : name === "Person"
-          ? (Person as unknown as LocatorModel)
-          : undefined,
-    );
+    registerConstant("PersonScoped", PersonScoped);
+    registerConstant("Person", Person);
     gid = GlobalID.create(new PersonScoped("1"));
   });
   afterEach(() => {
     _resetApp();
-    _resetModelFinder();
+    _resetConstants();
     PersonScoped._findAllowed = false;
   });
 
@@ -631,11 +625,11 @@ describe("ScopedRecordLocatingTest", () => {
 describe("Locator (non-Rails coverage)", () => {
   beforeEach(() => {
     setApp(TEST_APP);
-    setModelFinder((name) => REGISTRY[name]);
+    registerConstants(REGISTRY);
   });
   afterEach(() => {
     _resetApp();
-    _resetModelFinder();
+    _resetConstants();
   });
 
   it("returns null when model class isn't registered", async () => {
@@ -663,9 +657,7 @@ describe("Locator (non-Rails coverage)", () => {
       }
     }
     Object.defineProperty(BadWhereModel, "name", { value: "BadWhereModel" });
-    setModelFinder((name) =>
-      name === "BadWhereModel" ? (BadWhereModel as unknown as LocatorModel) : undefined,
-    );
+    registerConstant("BadWhereModel", BadWhereModel);
     await expect(
       Locator.locateMany(["gid://bcx/BadWhereModel/1"], { ignoreMissing: true }),
     ).rejects.toThrow(/toArray/);
@@ -675,7 +667,7 @@ describe("Locator (non-Rails coverage)", () => {
 describe("Locator without model finder", () => {
   beforeEach(() => {
     setApp(TEST_APP);
-    _resetModelFinder();
+    _resetConstants();
   });
   afterEach(() => _resetApp());
 
@@ -687,11 +679,11 @@ describe("Locator without model finder", () => {
 describe("Locator non-Rails coverage — per-app dispatch helpers", () => {
   beforeEach(() => {
     setApp(TEST_APP);
-    setModelFinder((name) => REGISTRY[name]);
+    registerConstants(REGISTRY);
   });
   afterEach(() => {
     _resetApp();
-    _resetModelFinder();
+    _resetConstants();
     _resetLocators();
   });
 

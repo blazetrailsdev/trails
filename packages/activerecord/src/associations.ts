@@ -101,6 +101,7 @@ import {
   pluralize,
   camelize,
   foreignKey as deriveForeignKey,
+  registerConstant,
 } from "@blazetrails/activesupport";
 import { registerSubclass, polymorphicName } from "./inheritance.js";
 import { flushPendingCounterCacheColumns } from "./counter-cache.js";
@@ -352,6 +353,7 @@ export function registerModel(
     guardCanonicalNameShadow(nameOrModel, model);
     modelRegistry.set(nameOrModel, model);
     model._modelsByName.set(nameOrModel, model);
+    registerConstant(nameOrModel, model);
     // Attach registry key so counter-cache pending-map lookup can match it.
     const keys: string[] = model._registryKeys ?? [];
     if (!keys.includes(nameOrModel)) keys.push(nameOrModel);
@@ -361,6 +363,7 @@ export function registerModel(
     guardCanonicalNameShadow(nameOrModel.name, nameOrModel);
     modelRegistry.set(nameOrModel.name, nameOrModel);
     nameOrModel._modelsByName.set(nameOrModel.name, nameOrModel);
+    registerConstant(nameOrModel.name, nameOrModel);
     // A namespaced model carries its Ruby module path via `static moduleName`;
     // derive the `::`-qualified registry key from it (e.g.
     // "MyApplication::Billing::Firm") so cross-namespace `className` resolution

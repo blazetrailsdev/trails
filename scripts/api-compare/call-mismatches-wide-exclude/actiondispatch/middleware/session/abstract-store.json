@@ -5,5 +5,12 @@
     "rubyName": "initialize_sid",
     "call": "delete",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails abstract_store.rb:35-38 calls `@default_options.delete` twice; trails abstract-store.ts:124-127 uses the JS `delete this.defaultOptions.*` operator."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "middleware/session/abstract-store.ts",
+    "rubyName": "stale_session_check!",
+    "call": "constantize",
+    "reason": "Equivalent (different path): Rails constantizes the class named in the marshalling error to force an autoload retry; trails has no autoloader, so staleSessionCheckBang matches the `undefined class/module` message and raises SessionRestoreError directly."
   }
 ]

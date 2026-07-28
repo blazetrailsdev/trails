@@ -201,5 +201,12 @@
     "rubyName": "wrap_execution",
     "call": "wrap",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "test-case.ts",
+    "rubyName": "tests",
+    "call": "constantize",
+    "reason": "Equivalent (different path): `tests` resolves the camelized `<Name>Controller` off `globalThis` and raises the same `uninitialized constant <Name>` NameError shape — controllers are not registered in the Inflector constant table, so constantize would not find them."
   }
 ]

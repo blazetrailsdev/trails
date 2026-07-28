@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
 import {
   pluralize,
   singularize,
@@ -10,6 +10,9 @@ import {
   dasherize,
   demodulize,
   deconstantize,
+  constantize,
+  safeConstantize,
+  _resetConstants,
   foreignKey,
   humanize,
   parameterize,
@@ -17,6 +20,11 @@ import {
   ordinalize,
 } from "./index.js";
 import { Inflections } from "./inflector/inflections.js";
+import {
+  registerConstantizeFixtures,
+  runConstantizeTestsOn,
+  runSafeConstantizeTestsOn,
+} from "./constantize-test-cases.js";
 
 // Rails inflector_test_cases.rb — SingularToPlural
 const SingularToPlural: Record<string, string> = {
@@ -119,6 +127,19 @@ function withInflections(fn: (inflect: Inflections) => void): void {
 }
 
 describe("InflectorTest", () => {
+  beforeEach(() => {
+    _resetConstants();
+    registerConstantizeFixtures();
+  });
+
+  it("constantize", () => {
+    runConstantizeTestsOn((string) => constantize(string));
+  });
+
+  it("safe constantize", () => {
+    runSafeConstantizeTestsOn((string) => safeConstantize(string));
+  });
+
   it("pluralize plurals", () => {
     expect(pluralize("plurals")).toBe("plurals");
   });

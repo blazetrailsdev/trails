@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { setApp, _resetApp } from "./config.js";
+import { registerConstant, _resetConstants } from "@blazetrails/activesupport";
 import { GlobalID } from "./global-id.js";
-import { setModelFinder, _resetModelFinder, type LocatorModel } from "./locator.js";
+import { type LocatorModel } from "./locator.js";
 
 // Synthetic GlobalIDModel — overrides `constructor.name` without building
 // a real class. Both real instances and these literals satisfy
@@ -34,6 +35,12 @@ class CompositePrimaryKeyModel {
   }
 }
 
+function registerConstants(registry: Record<string, LocatorModel>): void {
+  for (const [name, klass] of Object.entries(registry)) {
+    registerConstant(name, klass);
+  }
+}
+
 const FIXTURE_REGISTRY: Record<string, LocatorModel> = {
   Person: Person as unknown as LocatorModel,
   PersonUuid: PersonUuid as unknown as LocatorModel,
@@ -62,11 +69,11 @@ describe("GlobalIDTest", () => {
 describe("GlobalIDParamEncodedTest", () => {
   beforeEach(() => {
     setApp("bcx");
-    setModelFinder((name) => FIXTURE_REGISTRY[name]);
+    registerConstants(FIXTURE_REGISTRY);
   });
   afterEach(() => {
     _resetApp();
-    _resetModelFinder();
+    _resetConstants();
   });
 
   it("parsing", () => {
@@ -93,11 +100,11 @@ describe("GlobalIDCreationTest", () => {
 
   beforeEach(() => {
     setApp("bcx");
-    setModelFinder((name) => FIXTURE_REGISTRY[name]);
+    registerConstants(FIXTURE_REGISTRY);
   });
   afterEach(() => {
     _resetApp();
-    _resetModelFinder();
+    _resetConstants();
   });
 
   it("as string", () => {
