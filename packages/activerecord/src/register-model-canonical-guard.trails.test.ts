@@ -74,8 +74,11 @@ describe("registerModel canonical-name shadow guard", () => {
     expect(modelRegistry.has("RfStiSubXyz")).toBe(false);
   });
 
-  it("binds the habtm join model as a constant, as Rails' const_set does", () => {
-    // Rails: `const_set join_model.name, join_model` (associations.rb:1877).
+  it("binds the habtm join model as a constant, wider than Rails' private_constant", () => {
+    // Rails const_sets the join model then marks it `private_constant`
+    // (associations.rb:1877-1878), so Ruby's const_get raises NameError here.
+    // trails has no private-constant concept — see the deviation note at
+    // associations/builder/has-and-belongs-to-many.ts.
     expect(safeConstantize("Country::HABTM_Treaties")).toBe(
       modelRegistry.get("Country::HABTM_Treaties"),
     );
