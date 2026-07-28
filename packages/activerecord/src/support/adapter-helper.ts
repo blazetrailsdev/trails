@@ -11,8 +11,8 @@
  *
  * `in_memory_db?` reads `Base.connection_pool.db_config.database` once Base is
  * connected, exactly as Rails does. Before that there is no pool to ask, so it
- * falls back to `configuredConnectionHash()` — the same `connections:` entry
- * `ARCONN` selects, so the two cannot drift. `sqlite3_mem` is the only entry
+ * falls back to `ambientPoolConfiguration()` — the very `arunit` entry the pool
+ * is established from, so the two cannot drift. `sqlite3_mem` is the only entry
  * whose database is `":memory:"` (config.example.yml:93); the default `sqlite3`
  * entry is file-backed (config.example.yml:83).
  * `sqlite3AdapterStrictStringsDisabled` reads `strict` off that same hash.
@@ -29,8 +29,7 @@
  * connection); they stay there for the same reason.
  */
 
-import { adapterType } from "../test-adapter.js";
-import { configuredConnectionHash } from "./connection.js";
+import { adapterType, ambientPoolConfiguration } from "../test-adapter.js";
 import { Base } from "../base.js";
 
 export type AdapterClassName =
@@ -53,7 +52,7 @@ export function currentAdapter(...types: AdapterClassName[]): boolean {
 function poolConfigurationHash(): Record<string, unknown> {
   return Base.isConnectedQ()
     ? (Base.connectionPool().dbConfig.configurationHash as Record<string, unknown>)
-    : configuredConnectionHash();
+    : ambientPoolConfiguration();
 }
 
 export function inMemoryDb(): boolean {

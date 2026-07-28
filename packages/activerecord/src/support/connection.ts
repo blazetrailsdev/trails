@@ -225,28 +225,6 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
 };
 
 /**
- * The connection-hash keys of the `ARCONN`-selected entry that are known
- * without doing async work — the pre-connection stand-in for
- * `ActiveRecord::Base.connection_pool.db_config.configuration_hash`. The
- * sqlite3 entry's `database` is resolved asynchronously
- * ({@link fallbackDatabasePath}) and is therefore absent here.
- */
-export function configuredConnectionHash(): Record<string, unknown> {
-  switch (connectionName()) {
-    case "sqlite3_mem":
-      return { adapter: "sqlite3", database: ":memory:", pool: 1 };
-    case "sqlite3":
-      return { adapter: "sqlite3", timeout: 5000, strict: true };
-    case "postgresql":
-      return serverHash("postgresql", postgresSettings());
-    case "mysql2":
-      return serverHash("mysql2", mysqlSettings());
-    default:
-      return {};
-  }
-}
-
-/**
  * Expand a connection's entries into the three named configs, mirroring
  * `expand_config` (`config.rb:26-37`): iterate `arunit`, `arunit2` and
  * `arunit_without_prepared_statements`, creating any the connection omits, then

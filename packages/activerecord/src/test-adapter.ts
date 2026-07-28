@@ -6,8 +6,8 @@
  * a connection detail (see `support/config.ts`):
  *   - ARCONN=postgresql → PostgreSQLAdapter
  *   - ARCONN=mysql2     → Mysql2Adapter
- *   - (default)         → SQLite3Adapter (the per-worker template clone, or
- *     `:memory:` when no clone was built)
+ *   - (default)         → SQLite3Adapter (the per-worker template clone, or the
+ *     run-scoped fallback file `support/connection.ts` resolves)
  *
  * RFC 0059 retired the standing sidecar `_pool`: Rails has no sidecar test
  * pool (`grep -r sidecar vendor/rails/activerecord/test` = 0 hits) — every
@@ -26,11 +26,10 @@
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { TransactionManager } from "./connection-adapters/abstract/transaction.js";
+import type { SQLite3Config } from "./connection-adapters/pool-config.js";
 import { resetTestTables } from "./support/drop-all-tables.js";
 import { Base } from "./base.js";
-import { getEnv } from "@blazetrails/activesupport";
-import { driverConfig, mysqlSettings, postgresSettings } from "./support/config.js";
-import { activeLane } from "./support/connection.js";
+import { activeLane, testConfigurationHashes } from "./support/connection.js";
 
 /**
  * Which adapter backend is active. Read once at module load — the worker's
@@ -67,12 +66,16 @@ export type LeasedTestAdapter = DatabaseAdapter & {
 // `ActiveRecord::Base.connection_pool.db_config.configuration_hash`, letting
 // pool-mechanics tests clone the ambient config (with per-test overrides)
 // instead of hardcoding `adapter: "sqlite3"`.
-const _primaryConfiguration: Record<string, unknown> =
-  adapterType === "postgres"
-    ? { adapter: "postgresql", ...driverConfig(postgresSettings()) }
-    : adapterType === "mysql"
-      ? { adapter: "mysql2", ...driverConfig(mysqlSettings()) }
-      : { adapter: "sqlite3", database: getEnv("AR_TEST_WORKER_DB") ?? ":memory:" };
+//
+// Read from the one source Rails has — the `connections:` entry `ARCONN`
+// selects (`support/connection.ts`, mirroring `config.example.yml`) — via the
+// same `arunit` entry `connect()` establishes the primary pool from, so this
+// hash and `Base.connectionPool().dbConfig.configurationHash` cannot drift.
+// The entry is resolved with top-level await because the sqlite3 database is
+// only known asynchronously (`fallbackDatabasePath()`).
+const _primaryConfiguration: Record<string, unknown> = {
+  ...(await testConfigurationHashes()).envConfig.configurationHash,
+};
 
 /**
  * A copy of the active lane's primary configuration hash. Mirrors Rails'
@@ -99,27 +102,25 @@ export function ambientPoolConfiguration(): Record<string, unknown> {
 export let newRawTestAdapter: () => DatabaseAdapter;
 
 if (adapterType === "postgres") {
-  const config = driverConfig(postgresSettings());
   const { PostgreSQLAdapter } = await import("./connection-adapters/postgresql-adapter.js");
   // Constrain the driver pool to max: 1 so each pooled-adapter slot maps to
   // exactly one PG server connection (the outer ConnectionPool multiplexes).
   newRawTestAdapter = () =>
-    new PostgreSQLAdapter({ ...config, max: 1 }) as unknown as DatabaseAdapter;
+    new PostgreSQLAdapter({ ..._primaryConfiguration, max: 1 }) as unknown as DatabaseAdapter;
 } else if (adapterType === "mysql") {
   // Built from the config hash rather than a URL so a socket-configured run
   // (MYSQL_SOCK) reaches the driver — a URL cannot carry a socket path.
-  const config = driverConfig(mysqlSettings());
   const { Mysql2Adapter } = await import("./connection-adapters/mysql2-adapter.js");
   newRawTestAdapter = () =>
     new Mysql2Adapter({
-      ...config,
+      ..._primaryConfiguration,
       connectionLimit: 1,
       flags: ["FOUND_ROWS"],
     }) as unknown as DatabaseAdapter;
 } else {
-  const database = getEnv("AR_TEST_WORKER_DB") ?? ":memory:";
   const { BetterSQLite3Adapter } = await import("./connection-adapters/better-sqlite3-adapter.js");
-  newRawTestAdapter = () => new BetterSQLite3Adapter(database) as unknown as DatabaseAdapter;
+  newRawTestAdapter = () =>
+    new BetterSQLite3Adapter(_primaryConfiguration as SQLite3Config) as unknown as DatabaseAdapter;
 }
 
 // --- In-test pool for pool-mechanics suites ---------------------------------
