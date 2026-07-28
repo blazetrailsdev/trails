@@ -362,7 +362,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "the non-exported `expandConfig` (connection.ts:269) is as visible to " +
       "api:compare as the three exported ones, and exporting it would not match " +
       "it. (Under --public-only the two sides drop it symmetrically: Ruby's " +
-      "`expand_config` is itself private, under config.rb's `private` at :12, " +
+      "`expand_config` is itself private, under config.rb's `private` at :13, " +
       "so neither side offers it.) Moving it into config.ts is the only thing " +
       "that would match it, and that is what cannot happen: it is typed on " +
       "`NamedConnection` and `ARUNIT_ENTRY_NAMES`, both declared in " +
