@@ -146,26 +146,35 @@ function droppedTableNames(call) {
 }
 
 /**
- * The leading `CREATE [GLOBAL|LOCAL] [TEMP[ORARY]|UNLOGGED] TABLE [IF NOT
- * EXISTS]` clause, up to and including the table name. The optional opening
- * quote (`` ` ``, `"`, `'`) is matched and stripped so a quoted name balances an
+ * A table name: either quoted (`` ` ``, `"`, `'`) or a bare identifier. The
+ * quotes are captured separately from the name so a quoted name balances an
  * unquoted helper name (`CREATE TABLE "items"` ↔ `dropTable("items")`).
  *
  * A quoted name runs to its closing quote rather than to the first
  * non-identifier character, so an embedded space stays part of the name
  * (`CREATE TABLE "my table"` is the table `my table`, not `my`). Truncating it
- * used to make a create unmatchable by any drop of the real name.
+ * used to make a create unmatchable by any drop of the real name — and the
+ * phantom short name matchable by a drop that tears down nothing.
+ *
+ * A name whose opening quote is never closed (the closing quote lives in a
+ * later template quasi) matches neither branch and is skipped; such a name is
+ * interpolated, so it was already unknowable.
  */
 const NAME_SRC = "(?:([\"'`])((?:(?!\\1)[\\s\\S])+)\\1|([\\w.]+))";
+/**
+ * `NAME_SRC` capture indices. Its `\1` backreference pins the fragment to the
+ * first capture group, so it must be the only group in any regex built from it.
+ */
+const [OPEN_QUOTE, QUOTED_NAME, BARE_NAME] = [1, 2, 3];
 /** The name `m` captured, quoted or bare. */
 function capturedName(m) {
   return m[QUOTED_NAME] ?? m[BARE_NAME];
 }
+
 /**
- * `NAME_SRC` capture indices. The `\1` backreference pins the fragment to the
- * first capture group, so it must be the only group in any regex built from it.
+ * The leading `CREATE [GLOBAL|LOCAL] [TEMP[ORARY]|UNLOGGED] TABLE [IF NOT
+ * EXISTS]` clause, up to and including the table name.
  */
-const [OPEN_QUOTE, QUOTED_NAME, BARE_NAME] = [1, 2, 3];
 const CREATE_TABLE_RE = new RegExp(
   `\\bcreate\\s+(?:(?:global|local)\\s+)?(?:temp(?:orary)?\\s+|unlogged\\s+)?table\\s+(?:if\\s+not\\s+exists\\s+)?${NAME_SRC}`,
   "gi",
