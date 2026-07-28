@@ -26,9 +26,6 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
   afterEach(async () => {
     queryTransformers.length = 0;
     queryTransformers.push(...savedTransformers);
-    // Scratch tables on the ambient test connection: drop them by name so the
-    // shared worker DB is left exactly as it was found (SQLite has no
-    // multi-table DROP, hence one IF EXISTS per name).
     await adapter.exec(
       "DROP TABLE IF EXISTS widgets; DROP TABLE IF EXISTS t; DROP TABLE IF EXISTS a; DROP TABLE IF EXISTS b",
     );

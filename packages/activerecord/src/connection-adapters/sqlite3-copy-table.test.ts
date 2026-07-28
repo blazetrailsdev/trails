@@ -14,9 +14,6 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   });
 
   afterEach(async () => {
-    // Scratch tables on the ambient test connection: drop them by name so the
-    // shared worker DB is left exactly as it was found (SQLite has no
-    // multi-table DROP, hence one IF EXISTS per name).
     await db.exec(
       `DROP TABLE IF EXISTS rebuild_users; DROP TABLE IF EXISTS rebuild_orders; DROP TABLE IF EXISTS src; DROP TABLE IF EXISTS dst`,
     );
