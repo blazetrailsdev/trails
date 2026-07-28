@@ -3636,7 +3636,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // `lookupCastTypeFromColumn` (sync, OID-keyed) and `quoteDefaultExpression`
   // (awaits this), so no sync duck-typed consumer sees the promise. Tracked by
   // `pg-lookup-cast-type-async-divergence`.
-  async lookupCastType(sqlType: string): Promise<Type> {
+  async lookupCastType(sqlType: string | null): Promise<Type> {
     const rows = await this.schemaQuery(`SELECT ${this.quote(sqlType)}::regtype::oid`);
     return this.typeMap.lookup(Number(rows[0]?.oid));
   }

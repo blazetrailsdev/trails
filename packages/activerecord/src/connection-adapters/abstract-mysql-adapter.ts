@@ -1418,8 +1418,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return this._typeMap;
   }
 
-  lookupCastType(sqlType: string): import("@blazetrails/activemodel").Type {
-    return this._nativeTypeMap.lookup(sqlType.toLowerCase().trim());
+  lookupCastType(sqlType: string | null): import("@blazetrails/activemodel").Type {
+    return this._nativeTypeMap.lookup(sqlType?.toLowerCase().trim() ?? null);
   }
 
   lookupCastTypeFromColumn(column: {
@@ -1434,7 +1434,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   static override readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
 
   /** @internal Mirrors: AbstractMysqlAdapter.extended_type_map */
-  static extendedTypeMap(
+  static override extendedTypeMap(
     this: typeof AbstractMysqlAdapter,
     options: { defaultTimezone?: string; emulateBooleans: boolean },
   ): TypeMap {

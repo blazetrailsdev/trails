@@ -2374,12 +2374,15 @@ export class SchemaStatements {
   }
 
   /** @internal */
-  fetchTypeMetadata(sqlType: string): SqlTypeMetadata {
+  fetchTypeMetadata(sqlType: string | null): SqlTypeMetadata {
     const adapter = this.adapter as any;
     const castType =
       typeof adapter.lookupCastType === "function" ? adapter.lookupCastType(sqlType) : null;
     return new SqlTypeMetadata({
-      sqlType,
+      // Rails keeps a nil sql_type as nil (fetch_type_metadata, schema_statements.rb);
+      // SqlTypeMetadata still coerces it to "" one level down — tracked by
+      // `sql-type-metadata-nullable-sql-type`.
+      sqlType: sqlType ?? undefined,
       type: castType?.type ?? "string",
       limit: castType?.limit ?? null,
       precision: castType?.precision ?? null,

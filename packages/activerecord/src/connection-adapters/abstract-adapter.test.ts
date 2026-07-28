@@ -187,7 +187,9 @@ describe("AbstractAdapter.initializeTypeMap", () => {
   });
 
   it("aliases timestamp to datetime", () => {
-    expect(m.lookup("timestamp")).toBeInstanceOf(DateTimeType);
+    // Pins abstract_adapter.rb:881 — the alias must resolve against this map's
+    // overlaid tz-aware datetime, not the parent map's untouched one.
+    expect(m.lookup("timestamp")).toMatchObject({ isUtc: true });
   });
 
   it("aliases double to float", () => {
@@ -201,7 +203,9 @@ describe("AbstractAdapter.extendedTypeMap", () => {
     expect(m.lookup("integer")).toBeInstanceOf(IntegerType);
     expect(m.lookup("datetime")).toMatchObject({ isUtc: true });
     expect(m.lookup("time")).toMatchObject({ isUtc: true });
-    expect(m.lookup("timestamp")).toBeInstanceOf(DateTimeType);
+    // Pins abstract_adapter.rb:881 — the alias must resolve against this map's
+    // overlaid tz-aware datetime, not the parent map's untouched one.
+    expect(m.lookup("timestamp")).toMatchObject({ isUtc: true });
   });
 
   it("backs the typeMap of an adapter configured with a default timezone", () => {

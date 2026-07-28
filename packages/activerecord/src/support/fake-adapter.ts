@@ -44,12 +44,7 @@ export class FakeActiveRecordAdapter extends FakeAdapterBase {
     options: MergeColumnOptions = {},
   ): void {
     this.columns(tableName).push(
-      new Column(
-        String(name),
-        options.default,
-        this.fetchTypeMetadata(sqlType ?? ""),
-        options.null,
-      ),
+      new Column(String(name), options.default, this.fetchTypeMetadata(sqlType), options.null),
     );
   }
 
@@ -72,7 +67,7 @@ export class FakeActiveRecordAdapter extends FakeAdapterBase {
     return true;
   }
 
-  private fetchTypeMetadata(sqlType: string): SqlTypeMetadata {
+  private fetchTypeMetadata(sqlType: string | null): SqlTypeMetadata {
     return (this as unknown as AbstractAdapter).schemaStatements().fetchTypeMetadata(sqlType);
   }
 }

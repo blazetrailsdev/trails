@@ -16,7 +16,8 @@
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { Attribute as ModelAttribute, BinaryData } from "@blazetrails/activemodel";
+import { Attribute as ModelAttribute, BinaryData, type Type } from "@blazetrails/activemodel";
+import type { TypeMap } from "../../type/type-map.js";
 import { NotImplementedError } from "../../errors.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import {
@@ -677,6 +678,18 @@ function typeCastedBinds(
     }
     return this.typeCast(value);
   });
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#lookup_cast_type
+ * (abstract/quoting.rb:234-236)
+ *
+ * Rails marks it private; TS has no equivalent for a mixed-in member adapters
+ * must still dispatch through `this`, so it is public and `@internal`.
+ * @internal
+ */
+export function lookupCastType(this: { typeMap: unknown }, sqlType: string | null): Type {
+  return (this.typeMap as TypeMap).lookup(sqlType);
 }
 
 /**

@@ -66,6 +66,7 @@ import {
   quotedBinary as abstractQuotedBinary,
   castBoundValue as abstractCastBoundValue,
   sanitizeAsSqlComment as abstractSanitizeAsSqlComment,
+  lookupCastType as abstractLookupCastType,
   Quoting as QuotingMixin,
 } from "./abstract/quoting.js";
 import type { Quoting } from "./abstract/quoting-interface.js";
@@ -104,6 +105,7 @@ import {
   BooleanType,
   BinaryType,
   DecimalType,
+  type Type,
 } from "@blazetrails/activemodel";
 import { connectedToStack } from "../core.js";
 import { Text as TextType } from "../type/text.js";
@@ -2203,11 +2205,6 @@ export class AbstractAdapter implements Quoting {
     return m;
   }
 
-  /** @internal Mirrors: AbstractAdapter#lookup_cast_type */
-  lookupCastType(sqlType: string | null): unknown {
-    return (this.typeMap as TypeMap).lookup(sqlType);
-  }
-
   /** @internal */
   static initializeTypeMap(this: typeof AbstractAdapter, m: TypeMap): void {
     this.registerClassWithLimit(m, /boolean/i, BooleanType);
@@ -2656,8 +2653,26 @@ export class AbstractAdapter implements Quoting {
     );
   }
 
+  /**
+   * Implemented in `abstract/quoting.ts`, the file Rails declares it in
+   * (abstract/quoting.rb:234-236); dispatched here like `quote` / `typeCast`
+   * above so adapter overrides of `typeMap` are honoured.
+   *
+   * The `Promise<Type>` arm is not Rails: `PostgreSQLAdapter#lookupCastType`
+   * resolves a sql_type with a live regtype query, so its override is async
+   * (tracked by `pg-lookup-cast-type-async-divergence`). The `null` arm is
+   * `AbstractMysqlAdapter`'s early return for an empty sql_type, which
+   * `mysql-native-type-map-converges-onto-type-map` deletes. Both are spelled
+   * out rather than erased behind `unknown`, so a caller cannot silently
+   * duck-type past them.
+   * @internal
+   */
+  lookupCastType(sqlType: string | null): Type | Promise<Type> | null {
+    return abstractLookupCastType.call(this, sqlType);
+  }
+
   /** @internal Mirrors: AbstractAdapter#lookup_cast_type_from_column */
-  lookupCastTypeFromColumn(column: { sqlType: string | null }): unknown {
+  lookupCastTypeFromColumn(column: { sqlType: string | null }): Type | Promise<Type> | null {
     return this.lookupCastType(column.sqlType);
   }
 }

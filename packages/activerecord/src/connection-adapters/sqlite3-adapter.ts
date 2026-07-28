@@ -1200,14 +1200,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#lookup_cast_type
    */
-  lookupCastType(sqlType: string): import("@blazetrails/activemodel").Type {
+  lookupCastType(sqlType: string | null): import("@blazetrails/activemodel").Type {
     // Pass the full sql type to the map so regex registrations (e.g. /decimal/i)
     // can inspect precision/scale. Fall back to the bare normalized key when
     // no full-string match is found.
-    const lower = sqlType.toLowerCase().trim();
+    const lower = sqlType?.toLowerCase().trim() ?? null;
     const full = this._nativeTypeMap.fetch(lower);
     if (full.type() != null) return full;
-    const normalized = lower.replace(/\(.*\)/, "").trim();
+    const normalized = lower?.replace(/\(.*\)/, "").trim() ?? null;
     return this._nativeTypeMap.lookup(normalized);
   }
 
