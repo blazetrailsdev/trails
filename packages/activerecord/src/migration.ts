@@ -2093,19 +2093,16 @@ export class Migrator {
   }
 
   /**
-   * Build the per-run Migrator Rails constructs for every `run` / `up` / `down`
-   * (`Migrator.new(direction, migrations, schema_migration, internal_metadata,
-   * target_version)`), carrying the direction and target version as
-   * construction state instead of threading them through each call.
+   * Options for the per-run Migrator `run` / `up` / `down` each construct
+   * (Rails' `Migrator.new(direction, migrations, schema_migration,
+   * internal_metadata, target_version)`). The `new Migrator(...)` call itself
+   * stays inline at all three sites, as Rails writes it.
    */
-  private _forRun(direction: "up" | "down", targetVersion: number | string | null): Migrator {
-    const migrator = new Migrator(this._adapter, this._migrations, {
-      ...this._options,
-      direction,
-      targetVersion,
-    });
-    migrator.verbose = this.verbose;
-    return migrator;
+  private _runOptions(
+    direction: "up" | "down",
+    targetVersion: number | string | null,
+  ): MigratorOptions {
+    return { ...this._options, direction, targetVersion };
   }
 
   // Rails: MIGRATOR_SALT = 2053462845 (Zlib.crc32("googol"))
@@ -2203,7 +2200,12 @@ export class Migrator {
    * @internal
    */
   async up(targetVersion?: number | string | null): Promise<MigrationProxy[]> {
-    const migrator = this._forRun("up", targetVersion ?? null);
+    const migrator = new Migrator(
+      this._adapter,
+      this._migrations,
+      this._runOptions("up", targetVersion ?? null),
+    );
+    migrator.verbose = this.verbose;
     return migrator._withAdvisoryLock(() => migrator.migrateWithoutLock());
   }
 
@@ -2215,7 +2217,12 @@ export class Migrator {
    * @internal
    */
   async down(targetVersion?: number | string | null): Promise<MigrationProxy[]> {
-    const migrator = this._forRun("down", targetVersion ?? null);
+    const migrator = new Migrator(
+      this._adapter,
+      this._migrations,
+      this._runOptions("down", targetVersion ?? null),
+    );
+    migrator.verbose = this.verbose;
     return migrator._withAdvisoryLock(() => migrator.migrateWithoutLock());
   }
 
@@ -2780,7 +2787,12 @@ export class Migrator {
    * scoped to `target_version` and calls `#run`).
    */
   async run(direction: "up" | "down", targetVersion: number | string): Promise<string | undefined> {
-    const migrator = this._forRun(direction, targetVersion);
+    const migrator = new Migrator(
+      this._adapter,
+      this._migrations,
+      this._runOptions(direction, targetVersion),
+    );
+    migrator.verbose = this.verbose;
     return migrator._withAdvisoryLock(() => migrator.runWithoutLock());
   }
 
