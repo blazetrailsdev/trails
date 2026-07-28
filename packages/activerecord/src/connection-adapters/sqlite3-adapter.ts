@@ -1198,7 +1198,16 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   /**
    * Resolve a SQL column type string to an ActiveRecord Type instance.
    *
-   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#lookup_cast_type
+   * NOT a Rails method: `sqlite3_adapter.rb` only *calls*
+   * `lookup_cast_type_from_column` (:628) and defines no
+   * `sqlite3/quoting.rb` counterpart, so this override — and the
+   * `_nativeTypeMap` fetch-full-then-lookup-normalized pair behind it — is a
+   * trails invention, like MySQL's. Converging it onto the inherited
+   * `Quoting#lookup_cast_type` is tracked by
+   * `sqlite3-native-type-map-converges-onto-type-map`.
+   *
+   * @noRailsEquivalent trails-only cast-type resolution over `_nativeTypeMap`;
+   * SQLite3Adapter declares no `lookup_cast_type` in Rails.
    */
   lookupCastType(sqlType: string | null): import("@blazetrails/activemodel").Type {
     // Pass the full sql type to the map so regex registrations (e.g. /decimal/i)

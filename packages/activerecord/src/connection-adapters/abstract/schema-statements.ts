@@ -2386,9 +2386,9 @@ export class SchemaStatements {
       // Rails' `cast_type.type` (schema_statements.rb:1721) — `Type#type` is a
       // method here, not a getter, so it must be invoked.
       type: castType?.type(),
-      limit: castType?.limit ?? null,
-      precision: castType?.precision ?? null,
-      scale: castType?.scale ?? null,
+      limit: castType?.limit,
+      precision: castType?.precision,
+      scale: castType?.scale,
     });
   }
 
