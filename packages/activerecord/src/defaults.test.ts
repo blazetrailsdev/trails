@@ -17,7 +17,6 @@ import {
   isMariaDb,
   Mysql2Adapter,
   MYSQL_TEST_URL,
-  supportsDefaultExpression,
 } from "./adapters/abstract-mysql-adapter/test-helper.js";
 import { describeIfPg } from "./adapters/postgresql/test-helper.js";
 import { describeIfSqlite } from "./adapters/sqlite3/test-helper.js";
@@ -78,24 +77,16 @@ describe("DefaultTest", () => {
 describe.skipIf(adapterType === "mysql")("DefaultTest", () => {
   it("multiline default text", async () => {
     const adapter = Base.connection;
-    const ctx = new MigrationContext(adapter);
-    await ctx.createTable("defaults", { force: true }, (t: any) => {
-      t.text("multiline_default", { default: "--- []\n\n" });
-    });
-    try {
-      class Default extends Base {
-        static override tableName = "defaults";
-      }
-      Default.adapter = adapter;
-      await Default.loadSchema();
-      // Rails: assert("--- []\n\n" == record.multiline_default ||
-      //               "--- []\\012\\012" == record.multiline_default)
-      // Older PostgreSQL versions reflect the default with escaped newlines.
-      const multiline = (new Default() as any).multiline_default;
-      expect(["--- []\n\n", "--- []\\012\\012"]).toContain(multiline);
-    } finally {
-      await ctx.dropTable("defaults", { ifExists: true });
+    class Default extends Base {
+      static override tableName = "defaults";
     }
+    Default.adapter = adapter;
+    await Default.loadSchema();
+    // Rails: assert("--- []\n\n" == record.multiline_default ||
+    //               "--- []\\012\\012" == record.multiline_default)
+    // Older PostgreSQL versions reflect the default with escaped newlines.
+    const multiline = (new Default() as any).multiline_default;
+    expect(["--- []\n\n", "--- []\\012\\012"]).toContain(multiline);
   });
 });
 
@@ -263,40 +254,12 @@ describeIfSupports("text_column_with_default", "DefaultTextTest", () => {
 
 // Mirrors `PostgresqlDefaultExpressionTest` (defaults_test.rb), gated to the
 // PostgreSQLAdapter. The `defaults` table comes from postgresql_specific_schema.rb
-// — built here with the migration DSL (expression defaults round-trip through the
-// catalog and reflect via column.defaultFunction) and dumped via dump_table_schema.
+// and is laid at boot by the adapter-specific arm of loadSchema.
 describeIfPg("PostgresqlDefaultExpressionTest", () => {
   let adapter: DatabaseAdapter;
-  let ctx: MigrationContext;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     adapter = Base.connection;
-    ctx = new MigrationContext(adapter);
-    await ctx.createTable("defaults", { force: true }, (t: any) => {
-      t.integer("random_number", { default: () => "random() * 100" });
-      t.string("ruby_on_rails", { default: () => "concat('Ruby ', 'on ', 'Rails')" });
-      t.date("modified_date", { default: () => "CURRENT_DATE" });
-      t.date("modified_date_function", { default: () => "now()" });
-      t.date("fixed_date", { default: "2004-01-01" });
-      t.datetime("modified_time", { default: () => "CURRENT_TIMESTAMP" });
-      t.datetime("modified_time_without_precision", {
-        precision: null,
-        default: () => "CURRENT_TIMESTAMP",
-      });
-      t.datetime("modified_time_with_precision_0", {
-        precision: 0,
-        default: () => "CURRENT_TIMESTAMP",
-      });
-      t.datetime("modified_time_function", { default: () => "now()" });
-      t.datetime("fixed_time", { default: "2004-01-01 00:00:00.000000-00" });
-      t.column("char1", "char(1)", { default: "Y" });
-      t.string("char2", { limit: 50, default: "a varchar field" });
-      t.text("char3", { default: "a text field" });
-    });
-  });
-
-  afterEach(async () => {
-    await ctx.dropTable("defaults", { ifExists: true });
   });
 
   it("schema dump includes default expression", async () => {
@@ -322,46 +285,13 @@ describeIfPg("PostgresqlDefaultExpressionTest", () => {
 });
 
 // Mirrors `MysqlDefaultExpressionTest` (defaults_test.rb), gated to the
-// Mysql2Adapter. The three tables come from mysql2_specific_schema.rb — built
-// here with the migration DSL (the expression defaults round-trip through
-// quoteDefaultExpression) and dumped via SchemaDumpingHelper#dump_table_schema.
+// Mysql2Adapter. The three tables come from mysql2_specific_schema.rb and are
+// laid at boot by the adapter-specific arm of loadSchema.
 describeIfMysql("MysqlDefaultExpressionTest", () => {
   let adapter: DatabaseAdapter;
-  let ctx: MigrationContext;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     adapter = Base.connection;
-    ctx = new MigrationContext(adapter);
-    await ctx.createTable("datetime_defaults", { force: true }, (t: any) => {
-      t.datetime("modified_datetime", { precision: null, default: () => "CURRENT_TIMESTAMP" });
-      t.datetime("precise_datetime", { default: () => "CURRENT_TIMESTAMP(6)" });
-      t.datetime("updated_datetime", {
-        default: () => "CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)",
-      });
-    });
-    await ctx.createTable("timestamp_defaults", { force: true }, (t: any) => {
-      t.timestamp("nullable_timestamp");
-      t.timestamp("modified_timestamp", { precision: null, default: () => "CURRENT_TIMESTAMP" });
-      t.timestamp("precise_timestamp", { precision: 6, default: () => "CURRENT_TIMESTAMP(6)" });
-      t.timestamp("updated_timestamp", {
-        precision: 6,
-        default: () => "CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)",
-      });
-    });
-    await ctx.createTable("defaults", { force: true }, (t: any) => {
-      t.date("fixed_date", { default: "2004-01-01" });
-      t.datetime("fixed_time", { default: "2004-01-01 00:00:00" });
-      t.column("char1", "char(1)", { default: "Y" });
-      t.string("char2", { limit: 50, default: "a varchar field" });
-      if (supportsDefaultExpression) {
-        t.binary("uuid", { limit: 36, default: () => "(uuid())" });
-        t.string("char2_concatenated", { default: () => "(concat(`char2`, '-'))" });
-      }
-    });
-  });
-
-  afterEach(async () => {
-    await ctx.dropTable("defaults", "timestamp_defaults", "datetime_defaults", { ifExists: true });
   });
 
   // The `uuid()`/`concat()` function defaults reflect on both MySQL 8 (via the
@@ -531,41 +461,14 @@ describeIfMysql("DefaultsTestWithoutTransactionalFixtures", () => {
 });
 
 // Mirrors `Sqlite3DefaultExpressionTest` (defaults_test.rb), gated to the
-// SQLite3Adapter. The `defaults` table comes from sqlite_specific_schema.rb —
-// built here with the migration DSL; expression defaults reflect via
-// column.defaultFunction (newColumnFromField/_extractDefaultFunction).
+// SQLite3Adapter. The `defaults` table comes from sqlite_specific_schema.rb and
+// is laid at boot by the adapter-specific arm of loadSchema; expression defaults
+// reflect via column.defaultFunction (newColumnFromField/_extractDefaultFunction).
 describeIfSqlite("Sqlite3DefaultExpressionTest", () => {
   let adapter: DatabaseAdapter;
-  let ctx: MigrationContext;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     adapter = Base.connection;
-    ctx = new MigrationContext(adapter);
-    await ctx.createTable("defaults", { force: true }, (t: any) => {
-      t.integer("random_number", { default: () => "ABS(RANDOM())" });
-      t.string("ruby_on_rails", { default: () => "('Ruby ' || 'on ' || 'Rails')" });
-      t.date("modified_date", { default: () => "CURRENT_DATE" });
-      t.date("modified_date_function", { default: () => "DATE('now')" });
-      t.date("fixed_date", { default: "2004-01-01" });
-      t.datetime("modified_time", { default: () => "CURRENT_TIMESTAMP" });
-      t.datetime("modified_time_without_precision", {
-        precision: null,
-        default: () => "CURRENT_TIMESTAMP",
-      });
-      t.datetime("modified_time_with_precision_0", {
-        precision: 0,
-        default: () => "CURRENT_TIMESTAMP",
-      });
-      t.datetime("modified_time_function", { default: () => "DATETIME('now')" });
-      t.datetime("fixed_time", { default: "2004-01-01 00:00:00.000000-00" });
-      t.column("char1", "char(1)", { default: "Y" });
-      t.string("char2", { limit: 50, default: "a varchar field" });
-      t.text("char3", { default: "a text field" });
-    });
-  });
-
-  afterEach(async () => {
-    await ctx.dropTable("defaults", { ifExists: true });
   });
 
   it("schema dump includes default expression", async () => {

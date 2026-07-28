@@ -1,5 +1,6 @@
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
+import { adapterSpecificTableNames } from "./load-schema-helper.js";
 
 /**
  * Table names the boot-time canonical schema
@@ -14,6 +15,18 @@ import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
  * state leaks across the reset.
  */
 const CANONICAL_TABLE_NAMES: ReadonlySet<string> = new Set(Object.keys(TEST_SCHEMA));
+
+/**
+ * The boot-laid schema for `adapter`: the canonical `schema.rb` mirror plus the
+ * active adapter's `<adapter>_specific_schema.rb` tables. Both halves come from
+ * one `load_schema` in Rails, so both are truncated between tests rather than
+ * dropped.
+ */
+function bootLaidTableNames(adapter: DatabaseAdapter): ReadonlySet<string> {
+  const specific = adapterSpecificTableNames(adapter.adapterName);
+  if (specific.length === 0) return CANONICAL_TABLE_NAMES;
+  return new Set([...CANONICAL_TABLE_NAMES, ...specific]);
+}
 
 /**
  * Drops every user table/view/matview in the database. Idempotent; per-DROP
@@ -45,15 +58,16 @@ export async function resetTestTables(adapter: DatabaseAdapter): Promise<void> {
 type ResetMode = "drop-all" | "reset";
 
 async function resetTables(adapter: DatabaseAdapter, mode: ResetMode): Promise<void> {
+  const bootLaid = bootLaidTableNames(adapter);
   switch (adapter.adapterName) {
     case "postgres":
-      await resetPgTables(adapter, mode);
+      await resetPgTables(adapter, mode, bootLaid);
       break;
     case "mysql":
-      await resetMysqlTables(adapter, mode);
+      await resetMysqlTables(adapter, mode, bootLaid);
       break;
     case "sqlite":
-      await resetSqliteTables(adapter, mode);
+      await resetSqliteTables(adapter, mode, bootLaid);
       break;
   }
 }
@@ -106,23 +120,31 @@ function _isPgConnectionError(e: unknown): boolean {
   );
 }
 
-async function resetPgTables(adapter: DatabaseAdapter, mode: ResetMode): Promise<void> {
+async function resetPgTables(
+  adapter: DatabaseAdapter,
+  mode: ResetMode,
+  bootLaid: ReadonlySet<string>,
+): Promise<void> {
   try {
-    await _resetPgTablesOnce(adapter, mode);
+    await _resetPgTablesOnce(adapter, mode, bootLaid);
   } catch (e) {
     // exec() routes through withRawConnection, whose retry loop calls
     // reconnectBang → the PG reconnect() override on a connection error, so
     // _rawConnection is now null and the next _acquireFreshClient() will open a
     // fresh pg.Client. Retry exactly once.
     if (_isPgConnectionError(e)) {
-      await _resetPgTablesOnce(adapter, mode);
+      await _resetPgTablesOnce(adapter, mode, bootLaid);
     } else {
       throw e;
     }
   }
 }
 
-async function _resetPgTablesOnce(adapter: DatabaseAdapter, mode: ResetMode): Promise<void> {
+async function _resetPgTablesOnce(
+  adapter: DatabaseAdapter,
+  mode: ResetMode,
+  bootLaid: ReadonlySet<string>,
+): Promise<void> {
   const schema = `ANY(current_schemas(false))`;
   // Views/matviews are never canonical — always drop them.
   for (const { schemaname: s, name: n } of (await adapter.execute(
@@ -152,7 +174,7 @@ async function _resetPgTablesOnce(adapter: DatabaseAdapter, mode: ResetMode): Pr
     // A table living outside the default (public) schema — e.g. schema.test.ts's
     // test_schema/test_schema2 — can never be a boot-laid canonical table; drop
     // it regardless of mode so it can't bleed state into the next file.
-    if (mode === "reset" && s === "public" && CANONICAL_TABLE_NAMES.has(t)) {
+    if (mode === "reset" && s === "public" && bootLaid.has(t)) {
       toTruncate.push(t);
       continue;
     }
@@ -165,7 +187,11 @@ async function _resetPgTablesOnce(adapter: DatabaseAdapter, mode: ResetMode): Pr
   await truncateNonEmpty(adapter, toTruncate);
 }
 
-async function resetMysqlTables(adapter: DatabaseAdapter, mode: ResetMode): Promise<void> {
+async function resetMysqlTables(
+  adapter: DatabaseAdapter,
+  mode: ResetMode,
+  bootLaid: ReadonlySet<string>,
+): Promise<void> {
   // Works with both the legacy pool model (_driverPool) and the current
   // single-connection model (_client). Falls back to adapter.execute /
   // adapter.executeMutation so both paths share one implementation.
@@ -188,7 +214,7 @@ async function resetMysqlTables(adapter: DatabaseAdapter, mode: ResetMode): Prom
     for (const r of tableRows as Array<{ table_name?: string; TABLE_NAME?: string }>) {
       const name = r.table_name ?? r.TABLE_NAME;
       if (!name) continue;
-      if (mode === "reset" && CANONICAL_TABLE_NAMES.has(name)) {
+      if (mode === "reset" && bootLaid.has(name)) {
         toTruncate.push(name);
         continue;
       }
@@ -204,7 +230,11 @@ async function resetMysqlTables(adapter: DatabaseAdapter, mode: ResetMode): Prom
   }
 }
 
-async function resetSqliteTables(adapter: DatabaseAdapter, mode: ResetMode): Promise<void> {
+async function resetSqliteTables(
+  adapter: DatabaseAdapter,
+  mode: ResetMode,
+  bootLaid: ReadonlySet<string>,
+): Promise<void> {
   const toTruncate: string[] = [];
   for (const { name } of (await adapter.execute(
     `SELECT name FROM sqlite_master WHERE type='view' AND name NOT LIKE 'sqlite_%'`,
@@ -216,7 +246,7 @@ async function resetSqliteTables(adapter: DatabaseAdapter, mode: ResetMode): Pro
   for (const { name } of (await adapter.execute(
     `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
   )) as { name: string }[]) {
-    if (mode === "reset" && CANONICAL_TABLE_NAMES.has(name)) {
+    if (mode === "reset" && bootLaid.has(name)) {
       toTruncate.push(name);
       continue;
     }

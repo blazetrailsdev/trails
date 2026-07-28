@@ -19,6 +19,9 @@ describe("LoadSchemaHelper", () => {
       expect(tables).toContain("topics");
       expect(tables).toContain("posts");
       expect(tables).not.toContain("chat_messages");
+      // The sqlite arm of ADAPTER_SPECIFIC_SCHEMAS: sqlite_specific_schema.rb's
+      // only table.
+      expect(tables).toContain("defaults");
     } finally {
       await (adapter as unknown as BetterSQLite3Adapter).close();
     }

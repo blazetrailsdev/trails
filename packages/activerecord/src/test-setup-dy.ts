@@ -73,6 +73,13 @@ if (missingTables.length > 0) {
   );
 }
 
+// `load_schema_helper.rb:15` — the adapter-specific arm. DatabaseTasks lays
+// only schema.rb's mirror, so the `<adapter>_specific_schema.rb` tables have to
+// be laid here, on the same per-worker DB (the reconstruct path purges whatever
+// the template carried).
+const { loadAdapterSpecificSchema } = await import("./support/load-schema-helper.js");
+await loadAdapterSpecificSchema(await Base.leaseConnection());
+
 // `schema.rb:1444-1462` — the arunit2 tables Rails creates through
 // `Course.lease_connection`. Imported lazily so the second-database models load
 // after the canonical schema is in place.

@@ -836,7 +836,14 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("DefaultsUsingMultipleSchemasAndDomainTest", () => {
     const DOMAIN_SCHEMA = "schema_1";
+    let oldSearchPath: string;
 
+    // Rails sets the search path to `schema_1, pg_catalog` BEFORE creating
+    // `defaults` and restores it in teardown, so the domain-typed table only
+    // ever lives in `schema_1` and is dropped with the schema (drop_schema is
+    // CASCADE). `public` must stay off the path and the table must never be
+    // dropped by name: `public.defaults` is the boot-laid
+    // postgresql_specific_schema.rb table on the shared per-worker DB.
     beforeEach(async () => {
       await adapter.dropSchema(DOMAIN_SCHEMA, { ifExists: true });
       await adapter.createSchema(DOMAIN_SCHEMA);
@@ -844,7 +851,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`CREATE DOMAIN ${DOMAIN_SCHEMA}.varchar AS varchar`);
       await adapter.exec(`CREATE DOMAIN ${DOMAIN_SCHEMA}.numeric AS numeric`);
       await adapter.exec(`CREATE DOMAIN ${DOMAIN_SCHEMA}.bpchar AS bpchar`);
-      await adapter.exec(`DROP TABLE IF EXISTS defaults`);
+      oldSearchPath = await adapter.schemaSearchPath();
+      await adapter.setSchemaSearchPath(`${DOMAIN_SCHEMA}, pg_catalog`);
+      // Torn down by the afterEach `dropSchema` (DROP SCHEMA … CASCADE), which
+      // is how Rails disposes of it — dropping it by name would hit the
+      // boot-laid `public.defaults` instead.
+      // eslint-disable-next-line blazetrails/require-table-teardown
       await adapter.exec(`
         CREATE TABLE defaults (
           id serial primary key,
@@ -853,10 +865,9 @@ describeIfPg("PostgreSQLAdapter", () => {
           decimal_col ${DOMAIN_SCHEMA}.numeric DEFAULT 3.14159265358979323846
         )
       `);
-      await adapter.setSchemaSearchPath(`${DOMAIN_SCHEMA},public,pg_catalog`);
     });
     afterEach(async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS defaults`);
+      await adapter.setSchemaSearchPath(oldSearchPath);
       await adapter.dropSchema(DOMAIN_SCHEMA, { ifExists: true });
     });
 
