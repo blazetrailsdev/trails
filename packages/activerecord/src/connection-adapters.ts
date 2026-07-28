@@ -69,7 +69,8 @@ export function register(name: string, loader: AdapterLoader): void {
   resolveErrors.delete(name);
 }
 
-// Rails' Gemfile sentence, with the JS equivalent of the gem/Gemfile pair.
+// Builds the AdapterNotFound raised for an unregistered name. Rails' wording,
+// with its gem/Gemfile pair rendered as the JS package/package.json one.
 function adapterNotFoundError(adapterName: string): AdapterNotFound {
   const available = [...adapters.keys()].sort().join(", ");
   return new AdapterNotFound(

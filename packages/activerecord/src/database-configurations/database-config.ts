@@ -340,7 +340,9 @@ export class DatabaseConfig {
    * checkout rather than here.
    */
   validateBang(): true {
-    if (this.adapter) {
+    // `!= null`, not truthiness: `adapter: ""` is truthy in Ruby, so Rails
+    // validates it and raises AdapterNotFound rather than AdapterNotSpecified.
+    if (this.adapter != null) {
       if (!_validateAdapterName) {
         throw new Error(
           "Adapter class resolver not registered — import ConnectionHandler (or connection-handling) first",
