@@ -268,11 +268,19 @@ export class EnvironmentStorageError extends MigrationError {
  * its own banners, trails' Migrator drives the execution strategy directly and
  * its migrations may be bare `{ up, down }` proxies with no `announce`.
  */
-function writeMigrationMessage(verbose: boolean, text = ""): void {
-  if (verbose) {
+function writeMigrationMessage(text = ""): void {
+  if (migrationVerbose) {
     stdout.write(`${text}\n`);
   }
 }
+
+/**
+ * @internal Backing store for `Migration.verbose` (`migration.rb:797`,
+ * defaulted at `:811`). Rails' `cattr_accessor` is one variable shared by the
+ * class and every instance, so it lives at module scope rather than as a class
+ * field, which subclasses would shadow.
+ */
+let migrationVerbose = true;
 
 /** @internal The banner `Migration#announce` (`migration.rb:1005`) hands to `write`. */
 function announceMigrationText(header: string, message: string): string {
@@ -302,7 +310,27 @@ export abstract class Migration {
    */
   static delegate: DatabaseAdapter | null = null;
   private _version?: string;
-  verbose = true;
+
+  /**
+   * Mirrors: ActiveRecord::Migration.verbose (`migration.rb:797`) — Rails'
+   * `cattr_accessor`, so the class and instance readers/writers share one
+   * variable.
+   */
+  static get verbose(): boolean {
+    return migrationVerbose;
+  }
+
+  static set verbose(value: boolean) {
+    migrationVerbose = value;
+  }
+
+  get verbose(): boolean {
+    return migrationVerbose;
+  }
+
+  set verbose(value: boolean) {
+    migrationVerbose = value;
+  }
   private static _disableDdlTransaction = false;
 
   /** Return the normalized adapter name from the configured adapter. */
@@ -1276,7 +1304,7 @@ export abstract class Migration {
   // --- Logging (Rails: Migration#write, #announce, #say, #say_with_time, #suppress_messages) ---
 
   write(text = ""): void {
-    writeMigrationMessage(this.verbose, text);
+    writeMigrationMessage(text);
   }
 
   announce(message: string): void {
@@ -1300,12 +1328,12 @@ export abstract class Migration {
   }
 
   async suppressMessages(fn: () => Promise<void>): Promise<void> {
-    const was = this.verbose;
-    this.verbose = false;
+    const was = Migration.verbose;
+    Migration.verbose = false;
     try {
       await fn();
     } finally {
-      this.verbose = was;
+      Migration.verbose = was;
     }
   }
 
@@ -2078,7 +2106,6 @@ export class Migrator {
   private readonly _options: MigratorOptions;
   private readonly _direction: "up" | "down";
   private readonly _targetVersion: number | string | null;
-  verbose = true;
 
   constructor(
     adapter: DatabaseAdapter,
@@ -2224,7 +2251,6 @@ export class Migrator {
       this._migrations,
       this._runOptions("up", targetVersion ?? null),
     );
-    migrator.verbose = this.verbose;
     return migrator._withAdvisoryLock(() => migrator.migrateWithoutLock());
   }
 
@@ -2241,7 +2267,6 @@ export class Migrator {
       this._migrations,
       this._runOptions("down", targetVersion ?? null),
     );
-    migrator.verbose = this.verbose;
     return migrator._withAdvisoryLock(() => migrator.migrateWithoutLock());
   }
 
@@ -2811,7 +2836,6 @@ export class Migrator {
       this._migrations,
       this._runOptions(direction, targetVersion),
     );
-    migrator.verbose = this.verbose;
     return migrator._withAdvisoryLock(() => migrator.runWithoutLock());
   }
 
@@ -2874,7 +2898,7 @@ export class Migrator {
         await this._strategy.exec(direction, migration, this._adapter);
         const elapsed = ((Date.now() - start) / 1000).toFixed(4);
         this._announce(proxy, `${direction === "up" ? "migrated" : "reverted"} (${elapsed}s)`);
-        writeMigrationMessage(this.verbose);
+        writeMigrationMessage();
         if (direction === "up") {
           await this._schemaMigration.recordVersion(proxy.version);
           if (this._internalMetadata.enabled) {
@@ -2896,10 +2920,7 @@ export class Migrator {
 
   /** @internal Rails: `MigrationProxy` delegates `announce`/`write` to the migration. */
   private _announce(proxy: MigrationProxy, message: string): void {
-    writeMigrationMessage(
-      this.verbose,
-      announceMigrationText(`${proxy.version} ${proxy.name}`, message),
-    );
+    writeMigrationMessage(announceMigrationText(`${proxy.version} ${proxy.name}`, message));
   }
 
   /**

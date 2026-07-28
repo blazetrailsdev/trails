@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { stdout } from "@blazetrails/activesupport";
 import {
+  Migration,
   Migrator,
   DuplicateMigrationVersionError,
   UnknownMigrationVersionError,
@@ -436,19 +437,19 @@ describe("MigratorTest", () => {
     try {
       const { migrations } = sensors(3);
 
+      Migration.verbose = true;
       const upMigrator = new Migrator(adapter, migrations);
-      upMigrator.verbose = true;
       await upMigrator.migrate(1);
       expect(lines.length).not.toBe(0);
 
       lines.length = 0;
 
       const downMigrator = new Migrator(adapter, migrations);
-      downMigrator.verbose = true;
       await downMigrator.migrate(0);
       expect(lines.length).not.toBe(0);
     } finally {
       spy.mockRestore();
+      Migration.verbose = true;
     }
   });
 
@@ -461,17 +462,17 @@ describe("MigratorTest", () => {
     try {
       const { migrations } = sensors(3);
 
+      Migration.verbose = false;
       const upMigrator = new Migrator(adapter, migrations);
-      upMigrator.verbose = false;
       await upMigrator.migrate(1);
       expect(lines.length).toBe(0);
 
       const downMigrator = new Migrator(adapter, migrations);
-      downMigrator.verbose = false;
       await downMigrator.migrate(0);
       expect(lines.length).toBe(0);
     } finally {
       spy.mockRestore();
+      Migration.verbose = true;
     }
   });
 

@@ -270,15 +270,17 @@ export class DatabaseTasks {
     const effectiveVersion = typeof raw === "string" ? raw.trim() || null : raw;
     this.checkTargetVersion(effectiveVersion ?? undefined);
 
-    const { Migrator } = await import("../migration.js");
+    const { Migration, Migrator } = await import("../migration.js");
     const scope = getEnv("SCOPE");
-    const verbose = isVerbose();
+    // Rails: `verbose_was, Migration.verbose = Migration.verbose, verbose?`
+    // (`database_tasks.rb:264`), restored in the ensure block at `:282`.
+    const verboseWas = Migration.verbose;
+    Migration.verbose = isVerbose();
 
     const runMigration = async (
       adapter: import("../connection-adapters/abstract-adapter.js").AbstractAdapter,
     ) => {
       const migrator = new Migrator(adapter, this._migrations);
-      migrator.verbose = verbose;
       // Rails block: `version.blank? ? (scope.blank? || scope == m.scope) : m.version == version`
       // `version` is the *method parameter* (explicit arg), NOT ENV["VERSION"].
       // The rake task always calls migrate() with no arg, so version is nil → scope filter only.
@@ -294,10 +296,10 @@ export class DatabaseTasks {
         filter = (m) => m.scope === scope;
       }
       const ran = await migrator.migrate(effectiveVersion ?? null, filter);
-      if (scope && scope.trim() !== "" && ran.length === 0 && verbose) {
+      if (scope && scope.trim() !== "" && ran.length === 0 && Migration.verbose) {
         // Rails: `Migration.write("No migrations ran. ...")` — write puts to
-        // $stdout (`migration.rb:1001`); `verbose` here is the gate Migration
-        // #write applies. `stdout` is the activesupport $stdout shim.
+        // $stdout (`migration.rb:1001`); `Migration.verbose` is the gate
+        // Migration#write applies. `stdout` is the activesupport $stdout shim.
         stdout.write(`No migrations ran. (using ${scope} scope)\n`);
       }
       // Rails: `migration_connection_pool.schema_cache.clear!` — drop the
@@ -307,9 +309,13 @@ export class DatabaseTasks {
       adapter.schemaCache?.clear();
     };
 
-    const pool = await this.migrationConnectionPool();
-    if (!skipInitialize) await initializeDatabase(pool.dbConfig);
-    await runMigration(await pool.leaseConnection());
+    try {
+      const pool = await this.migrationConnectionPool();
+      if (!skipInitialize) await initializeDatabase(pool.dbConfig);
+      await runMigration(await pool.leaseConnection());
+    } finally {
+      Migration.verbose = verboseWas;
+    }
   }
 
   /** Roll back the last N migrations (default 1). Mirrors `db:rollback`. */
