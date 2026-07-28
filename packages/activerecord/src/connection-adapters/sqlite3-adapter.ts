@@ -2785,22 +2785,43 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   ): Promise<void> {
     const idxRows = (await this.indexes(from)) as Array<{
       name: string;
-      columns: string[];
+      columns: string[] | string;
       unique: boolean;
       where?: string;
+      orders?: Record<string, string>;
     }>;
     const { bare: bareFrom } = this._splitTableName(from);
     const { bare: bareTo } = this._splitTableName(to);
-    const toCols = (await this.columns(to)).map((c) => c.name);
     for (const idx of idxRows) {
       let name = idx.name;
       if (to === `a${from}`) name = `t${name}`;
       else if (from === `a${to}`) name = name.slice(1);
-      const cols = idx.columns.map((c) => rename[c] ?? c).filter((c) => toCols.includes(c));
+      // Rails gates the rename/filter on `columns.is_a?(Array)` — and with it
+      // the `columns(to)` reflection: an expression index carries its
+      // parenthesized expression as a bare string, copied across verbatim.
+      let cols: string[] | string;
+      if (Array.isArray(idx.columns)) {
+        const toCols = (await this.columns(to)).map((c) => c.name);
+        cols = idx.columns.map((c) => rename[c] ?? c).filter((c) => toCols.includes(c));
+      } else {
+        cols = idx.columns;
+      }
       if (!cols.length) continue;
       const escapedFrom = bareFrom.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const newName = name.replace(new RegExp(`(^|_)(${escapedFrom})_`), `$1${bareTo}_`);
-      let sql = `CREATE ${idx.unique ? "UNIQUE " : ""}INDEX ${quoteColumnName(newName)} ON ${quoteTableName(to)} (${cols.map((c) => quoteColumnName(c)).join(", ")})`;
+      // Rails forwards `index.orders` to add_index, whose add_index_sort_order
+      // appends any present direction upcased (`column << " #{orders[name].upcase}"`)
+      // keyed off the column name as it appears in the copied list. This
+      // hand-built CREATE INDEX stands in for add_index, so it must stay
+      // value-agnostic: `indexes()` only records "desc" today, but an "asc" or
+      // upper-cased entry must not be silently dropped.
+      const orders = idx.orders ?? {};
+      const colSql = Array.isArray(cols)
+        ? cols
+            .map((c) => `${quoteColumnName(c)}${orders[c] ? ` ${orders[c].toUpperCase()}` : ""}`)
+            .join(", ")
+        : cols;
+      let sql = `CREATE ${idx.unique ? "UNIQUE " : ""}INDEX ${quoteColumnName(newName)} ON ${quoteTableName(to)} (${colSql})`;
       if (idx.where) sql += ` WHERE ${idx.where}`;
       await this.driver.exec(sql);
     }

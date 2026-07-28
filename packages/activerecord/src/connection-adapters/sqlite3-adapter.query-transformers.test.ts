@@ -6,7 +6,7 @@ import { describeIfSqlite } from "../adapters/sqlite3/test-helper.js";
 import type { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
 import { queryTransformers, type QueryTransformer } from "../query-transformers.js";
 
-fixtures([], { useTransactionalTests: false });
+fixtures([]);
 
 // Integration proof for QL PR 3: a registered query transformer is applied in
 // preprocessQuery and the post-transform (commented) SQL flows all the way into
@@ -16,32 +16,15 @@ fixtures([], { useTransactionalTests: false });
 describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
   let adapter: AbstractSQLite3Adapter;
   let savedTransformers: QueryTransformer[];
-  // Teardown-only handle. `adapter` stays non-optional for the test bodies, but
-  // the teardown has to tolerate a beforeEach that failed before the lease, so
-  // it reads a genuinely optional binding rather than casting `adapter`.
-  let leased: AbstractSQLite3Adapter | undefined;
 
-  // The ambient connection is a shared worker DB, so the scratch tables are
-  // cleared on the way in as well as out: a hard-killed run must not wedge the
-  // next one.
-  const dropScratchTables = async (): Promise<void> => {
-    await leased?.exec(
-      "DROP TABLE IF EXISTS widgets; DROP TABLE IF EXISTS t; DROP TABLE IF EXISTS a; DROP TABLE IF EXISTS b",
-    );
-  };
-
-  beforeEach(async () => {
-    adapter = leased = Base.connection as AbstractSQLite3Adapter;
+  beforeEach(() => {
+    adapter = Base.connection as AbstractSQLite3Adapter;
     savedTransformers = queryTransformers.slice();
     queryTransformers.length = 0;
-    await dropScratchTables();
   });
 
-  afterEach(async () => {
-    // Drop before restoring: on the shared ambient connection a globally
-    // registered transformer would otherwise rewrite the teardown DDL.
+  afterEach(() => {
     queryTransformers.length = 0;
-    await dropScratchTables();
     queryTransformers.push(...savedTransformers);
   });
 
@@ -65,12 +48,11 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
   });
 
   it("applies the comment on write queries too", async () => {
-    await adapter.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)");
     queryTransformers.push({ call: (sql) => `${sql} /*app:test*/` });
     const { sqls } = await captureSql(() =>
-      adapter.executeMutation("INSERT INTO widgets (name) VALUES ('x')"),
+      adapter.executeMutation("INSERT INTO customers (name) VALUES ('x')"),
     );
-    expect(sqls.some((s) => s === "INSERT INTO widgets (name) VALUES ('x') /*app:test*/")).toBe(
+    expect(sqls.some((s) => s === "INSERT INTO customers (name) VALUES ('x') /*app:test*/")).toBe(
       true,
     );
   });
@@ -85,8 +67,8 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
     queryTransformers.push({ call: (sql) => `${sql} /*app:test*/` });
     const { sqls } = await captureSql(() =>
       adapter.executeBatch([
-        "CREATE TABLE a (id INTEGER PRIMARY KEY)",
-        "CREATE TABLE b (id INTEGER PRIMARY KEY)",
+        "INSERT INTO customers (name) VALUES ('a')",
+        "INSERT INTO customers (name) VALUES ('b')",
       ]),
     );
     expect(sqls.length).toBeGreaterThan(0);
@@ -97,16 +79,18 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
     // The batch-suppression flag is consumed synchronously inside preprocessQuery
     // (before any await), so a query interleaved with an in-flight batch still
     // gets transformed. If the flag spanned the await, this comment would be lost.
-    await adapter.executeMutation("CREATE TABLE t (id INTEGER PRIMARY KEY)");
     queryTransformers.push({ call: (sql) => `${sql} /*app:test*/` });
     const { sqls } = await captureSql(() =>
       Promise.all([
-        adapter.executeBatch(["INSERT INTO t (id) VALUES (1)", "INSERT INTO t (id) VALUES (2)"]),
-        adapter.execute("SELECT id FROM t"),
+        adapter.executeBatch([
+          "INSERT INTO customers (name) VALUES ('c1')",
+          "INSERT INTO customers (name) VALUES ('c2')",
+        ]),
+        adapter.execute("SELECT id FROM customers"),
       ]),
     );
     // The batch statements stay uncommented; the concurrent SELECT keeps its comment.
-    expect(sqls.some((s) => s === "SELECT id FROM t /*app:test*/")).toBe(true);
+    expect(sqls.some((s) => s === "SELECT id FROM customers /*app:test*/")).toBe(true);
     expect(sqls.some((s) => s.startsWith("INSERT") && s.includes("/*app:test*/"))).toBe(false);
   });
 

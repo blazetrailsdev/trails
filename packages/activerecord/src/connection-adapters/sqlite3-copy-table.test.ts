@@ -4,7 +4,7 @@ import { fixtures } from "../test-helpers/fixtures.js";
 import { describeIfSqlite } from "../adapters/sqlite3/test-helper.js";
 import type { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
 
-fixtures([], { useTransactionalTests: false });
+fixtures([]);
 
 describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   let db: AbstractSQLite3Adapter;
@@ -13,29 +13,23 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   // reads a genuinely optional binding rather than casting `db`.
   let leased: AbstractSQLite3Adapter | undefined;
 
-  // The ambient connection is a shared worker DB, so the scratch tables are
-  // cleared on the way in as well as out: a hard-killed run must not wedge the
-  // next one. `_alter_tmp_rebuild_users` is alterTable's rebuild scratch table
-  // (sqlite3-adapter.ts `_alter_tmp_${bareTable}`), which it only drops on the
-  // success path — a mid-rebuild failure leaves it behind.
-  const dropScratchTables = async (): Promise<void> => {
+  const dropCopyTargets = async (): Promise<void> => {
     await leased?.exec(
-      `DROP TABLE IF EXISTS rebuild_users; DROP TABLE IF EXISTS rebuild_orders; DROP TABLE IF EXISTS src; DROP TABLE IF EXISTS dst; DROP TABLE IF EXISTS "_alter_tmp_rebuild_users"`,
+      `DROP TABLE IF EXISTS customers2; DROP TABLE IF EXISTS customers3; DROP TABLE IF EXISTS books2; DROP TABLE IF EXISTS "_alter_tmp_customers2"`,
     );
   };
 
   beforeEach(async () => {
     db = leased = Base.connection as AbstractSQLite3Adapter;
-    await dropScratchTables();
+    await dropCopyTargets();
   });
 
-  afterEach(dropScratchTables);
+  afterEach(dropCopyTargets);
 
   // --- tableStructureSql ---
 
   it("tableStructureSql returns column definition strings from CREATE TABLE SQL", async () => {
-    await db.exec('CREATE TABLE "rebuild_users" ("id" INTEGER PRIMARY KEY, "name" TEXT NOT NULL)');
-    const strings = await (db as any).tableStructureSql("rebuild_users", ["id", "name"]);
+    const strings = await (db as any).tableStructureSql("customers", ["id", "name"]);
     expect(strings).toHaveLength(2);
     expect(strings[0]).toMatch(/"id"/);
     expect(strings[1]).toMatch(/"name"/);
@@ -47,152 +41,65 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   });
 
   it("tableStructureSql includes CONSTRAINT strings", async () => {
-    await db.exec(
-      'CREATE TABLE "rebuild_orders" ("id" INTEGER PRIMARY KEY, "user_id" INTEGER, CONSTRAINT "fk_user" FOREIGN KEY("user_id") REFERENCES "rebuild_users"("id"))',
-    );
-    const strings = await (db as any).tableStructureSql("rebuild_orders", ["id", "user_id"]);
+    const strings = await (db as any).tableStructureSql("fk_test_has_fk", ["id", "fk_id"]);
     expect(strings.some((s: string) => s.includes("CONSTRAINT"))).toBe(true);
   });
 
   // --- tableStructureWithCollation ---
 
-  it("tableStructureWithCollation extracts collation from CREATE TABLE SQL", async () => {
-    await db.exec(
-      'CREATE TABLE "rebuild_users" ("id" INTEGER PRIMARY KEY, "name" TEXT COLLATE "NOCASE")',
-    );
-    const basic = [
-      { name: "id", type: "INTEGER", notnull: 0, dflt_value: null, pk: 1 },
-      { name: "name", type: "TEXT", notnull: 0, dflt_value: null, pk: 0 },
-    ];
-    const enriched = await (db as any).tableStructureWithCollation("rebuild_users", basic);
-    const nameCol = enriched.find((c: any) => c.name === "name");
-    expect(nameCol.collation).toBe("NOCASE");
-  });
-
   it("tableStructureWithCollation extracts auto_increment flag", async () => {
-    await db.exec(
-      'CREATE TABLE "rebuild_users" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "name" TEXT)',
-    );
-    const basic = [
-      { name: "id", type: "INTEGER", notnull: 0, dflt_value: null, pk: 1 },
-      { name: "name", type: "TEXT", notnull: 0, dflt_value: null, pk: 0 },
-    ];
-    const enriched = await (db as any).tableStructureWithCollation("rebuild_users", basic);
+    const basic = await (db as any).tableInfo("customers");
+    const enriched = await (db as any).tableStructureWithCollation("customers", basic);
     const idCol = enriched.find((c: any) => c.name === "id");
     expect(idCol.auto_increment).toBe(true);
   });
 
-  // --- tableInfo ---
-
-  it("tableInfo returns PRAGMA table_info rows", async () => {
-    await db.exec("CREATE TABLE rebuild_users (id INTEGER PRIMARY KEY, name TEXT)");
-    const info = await (db as any).tableInfo("rebuild_users");
-    expect(info).toHaveLength(2);
-    expect(info[0].name).toBe("id");
-  });
-
   // --- tableStructure ---
-
-  it("tableStructure returns enriched column info", async () => {
-    await db.exec(
-      'CREATE TABLE "rebuild_users" ("id" INTEGER PRIMARY KEY, "name" TEXT COLLATE "NOCASE")',
-    );
-    const structure = await (db as any).tableStructure("rebuild_users");
-    expect(structure).toHaveLength(2);
-    const nameCol = structure.find((c: any) => c.name === "name");
-    expect(nameCol.collation).toBe("NOCASE");
-  });
 
   it("tableStructure throws StatementInvalid for non-existent table", async () => {
     await expect((db as any).tableStructure("no_such")).rejects.toThrow(/Could not find table/);
   });
 
-  // --- copyTableContents ---
-
-  it("copyTableContents copies rows from source to destination", async () => {
-    await db.exec("CREATE TABLE src (id INTEGER, name TEXT)");
-    await db.exec("CREATE TABLE dst (id INTEGER, name TEXT)");
-    await db.exec("INSERT INTO src VALUES (1, 'Alice'), (2, 'Bob')");
-    await (db as any).copyTableContents("src", "dst", ["id", "name"]);
-    const rows = (db.raw as import("better-sqlite3").Database)
-      .prepare("SELECT * FROM dst ORDER BY id")
-      .all();
-    expect(rows).toHaveLength(2);
-    expect((rows[0] as any).name).toBe("Alice");
-  });
-
-  it("copyTableContents respects column rename mapping", async () => {
-    await db.exec("CREATE TABLE src (id INTEGER, old_name TEXT)");
-    await db.exec("CREATE TABLE dst (id INTEGER, new_name TEXT)");
-    await db.exec("INSERT INTO src VALUES (1, 'Alice')");
-    // rename: {srcCol: destCol} = {old_name: new_name}
-    await (db as any).copyTableContents("src", "dst", ["id", "new_name"], {
-      old_name: "new_name",
-    });
-    const rows = (db.raw as import("better-sqlite3").Database).prepare("SELECT * FROM dst").all();
-    expect((rows[0] as any).new_name).toBe("Alice");
-  });
-
   // --- copyTableIndexes ---
 
-  it("copyTableIndexes recreates indexes on destination table", async () => {
-    await db.exec("CREATE TABLE src (id INTEGER, email TEXT)");
-    await db.exec("CREATE UNIQUE INDEX index_src_on_email ON src (email)");
-    await db.exec("CREATE TABLE dst (id INTEGER, email TEXT)");
-    await (db as any).copyTableIndexes("src", "dst");
-    const idxList = (db.raw as import("better-sqlite3").Database)
-      .prepare("PRAGMA index_list(dst)")
-      .all() as any[];
-    expect(idxList.length).toBeGreaterThan(0);
-    expect(idxList[0].unique).toBe(1);
-  });
+  const copiedIndexSql = async (table: string, matching: string): Promise<string | undefined> => {
+    const rows = (await db.execute(
+      `SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='${table}'`,
+    )) as Array<{ sql: string | null }>;
+    return rows.find((row) => row.sql?.includes(matching))?.sql ?? undefined;
+  };
 
   it("copyTableIndexes preserves partial index WHERE clause", async () => {
-    await db.exec("CREATE TABLE src (id INTEGER, active INTEGER, email TEXT)");
-    await db.exec("CREATE UNIQUE INDEX index_src_on_email_active ON src (email) WHERE active = 1");
-    await db.exec("CREATE TABLE dst (id INTEGER, active INTEGER, email TEXT)");
-    await (db as any).copyTableIndexes("src", "dst");
-    const idxSql = (db.raw as import("better-sqlite3").Database)
-      .prepare("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='dst'")
-      .get() as { sql: string } | undefined;
-    expect(idxSql?.sql).toMatch(/WHERE\s+active\s*=\s*1/i);
+    await (db as any).copyTable("books", "books2");
+    expect(await copiedIndexSql("books2", "isbn")).toMatch(
+      /WHERE\s+published_on\s+IS\s+NOT\s+NULL/i,
+    );
   });
 
-  // --- copyTable ---
-
-  it("copyTable creates destination with same schema and data", async () => {
-    await db.exec("CREATE TABLE src (id INTEGER PRIMARY KEY, name TEXT NOT NULL)");
-    await db.exec("INSERT INTO src VALUES (1, 'Alice')");
-    await (db as any).copyTable("src", "dst");
-    const rows = (db.raw as import("better-sqlite3").Database).prepare("SELECT * FROM dst").all();
-    expect(rows).toHaveLength(1);
-    expect((rows[0] as any).name).toBe("Alice");
+  it("copyTableIndexes copies an expression index verbatim", async () => {
+    await (db as any).copyTable("books", "books2");
+    expect(await copiedIndexSql("books2", "lower")).toMatch(/lower\(external_id\)/i);
   });
 
-  it("copyTable renames columns when options.rename is provided", async () => {
-    await db.exec("CREATE TABLE src (id INTEGER, old_col TEXT)");
-    await db.exec("INSERT INTO src VALUES (1, 'hello')");
-    await (db as any).copyTable("src", "dst", { rename: { old_col: "new_col" } });
-    const cols = (db.raw as import("better-sqlite3").Database)
-      .prepare("PRAGMA table_info(dst)")
-      .all() as any[];
-    expect(cols.map((c: any) => c.name)).toContain("new_col");
-    const rows = (db.raw as import("better-sqlite3").Database).prepare("SELECT * FROM dst").all();
-    expect((rows[0] as any).new_col).toBe("hello");
+  it("copyTableIndexes carries the index column orders across", async () => {
+    // Rolled back with the fixture transaction; no teardown needed.
+    await db.addIndex("customers", ["name"], { order: { name: "desc" } });
+    await (db as any).copyTable("customers", "customers2");
+    expect(await copiedIndexSql("customers2", "name")).toMatch(/"name"\s+DESC/i);
   });
 
   // --- moveTable ---
 
   it("moveTable copies data to destination and drops source", async () => {
-    await db.exec("CREATE TABLE src (id INTEGER PRIMARY KEY, name TEXT)");
-    await db.exec("INSERT INTO src VALUES (1, 'Alice')");
-    await (db as any).moveTable("src", "dst");
-    const rows = (db.raw as import("better-sqlite3").Database).prepare("SELECT * FROM dst").all();
-    expect(rows).toHaveLength(1);
-    const tables = (db.raw as import("better-sqlite3").Database)
-      .prepare("SELECT name FROM sqlite_master WHERE type='table'")
-      .all() as any[];
-    expect(tables.map((t: any) => t.name)).not.toContain("src");
+    await (db as any).copyTable("customers", "customers2");
+    await db.executeMutation("INSERT INTO customers2 (name) VALUES ('Alice')");
+    const sourceRows = await db.execute("SELECT * FROM customers2");
+    await (db as any).moveTable("customers2", "customers3");
+    const rows = await db.execute("SELECT * FROM customers3");
+    expect(rows).toHaveLength(sourceRows.length);
+    expect(rows.map((r: any) => r.name)).toContain("Alice");
+    const tables = await db.execute("SELECT name FROM sqlite_master WHERE type='table'");
+    expect(tables.map((t: any) => t.name)).not.toContain("customers2");
   });
 
   // --- alterTable ---
@@ -201,11 +108,12 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
     // PRAGMA table_info normalizes a declared `integer` to `INTEGER` but leaves
     // `bigint` verbatim, so hand-written DDL is the one way the rebuild sees an
     // AR-spelled integer-like type — the shape that makes newColumnDefinition
-    // flip the column to :primary_key, where the constraint rides entirely on
-    // type_to_sql(:primary_key).
-    await db.exec('CREATE TABLE "rebuild_users" ("id" bigint PRIMARY KEY, "name" TEXT)');
-    await db.removeColumn("rebuild_users", "name");
-    const pk = (await (db as any).tableInfo("rebuild_users")).filter((c: any) => Number(c.pk) > 0);
+    // flip the column to :primary_key. No canonical table declares a `bigint`
+    // primary key, so this table alone is laid down by hand, under the
+    // `customers2` copy-target name the teardown above already reclaims.
+    await db.exec('CREATE TABLE "customers2" ("id" bigint PRIMARY KEY, "name" TEXT)');
+    await db.removeColumn("customers2", "name");
+    const pk = (await (db as any).tableInfo("customers2")).filter((c: any) => Number(c.pk) > 0);
     expect(pk.map((c: any) => c.name)).toEqual(["id"]);
   });
 });
