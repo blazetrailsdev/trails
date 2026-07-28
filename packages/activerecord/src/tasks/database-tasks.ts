@@ -303,17 +303,9 @@ export class DatabaseTasks {
       adapter.schemaCache?.clear();
     };
 
-    // Rails routes solely through `migration_connection_pool`
-    // (tasks/database_tasks.rb:262-283): no configurations lookup, no early
-    // return, and no comparison of the config's database to the pool's. The
-    // caller (`with_temporary_connection`, `db_configs_with_versions`) is what
-    // selects which database gets migrated.
     const pool = await this.migrationConnectionPool();
     if (!pool) throw new ConnectionNotDefined("No connection pool for the migration connection");
 
-    // Rails: `initialize_database(migration_connection_pool.db_config)` — the
-    // pool's OWN config object, so the temporary pool it opens resolves to the
-    // established pool rather than a second one.
     if (!skipInitialize) await initializeDatabase(pool.dbConfig);
     await runMigration(await pool.leaseConnection());
   }
