@@ -73,6 +73,9 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // encryption/properties.rb:20 `delegate :[], to: :data` / :50 `def []=(key, value)`
   // → encryption/properties.ts `get` / `set`.
   "ActiveRecord::Encryption::Properties": { "[]": ["get"], "[]=": ["set"] },
+  // abstract/schema_definitions.rb:421 `def [](name)` →
+  // connection-adapters/abstract/schema-definitions.ts `TableDefinition#get`.
+  "ActiveRecord::ConnectionAdapters::TableDefinition": { "[]": ["get"] },
   // result.rb:148 `def [](idx)` → result.ts `at` (Result declares no `at` in
   // Ruby, so the name is free).
   "ActiveRecord::Result": { "[]": ["at"] },
