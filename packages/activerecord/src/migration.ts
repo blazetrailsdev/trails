@@ -2802,9 +2802,11 @@ export class Migrator {
     // Rails emits these banners from Migration#migrate (`migration.rb:964`),
     // which this Migrator bypasses by driving the execution strategy directly.
     this._announce(proxy, direction === "up" ? "migrating" : "reverting");
-    const start = Date.now();
 
     const migration = await proxy.migration();
+    // Rails benchmarks exec_migration only (`migration.rb:973`), so the timer
+    // starts after the migration is loaded.
+    const start = Date.now();
     // Rails wraps both the migration execution AND the version
     // stamping inside the same ddl_transaction so they commit/rollback
     // atomically. Without this, a committed migration + failed stamp

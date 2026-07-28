@@ -3,7 +3,13 @@ import type { SqlJsAdapter } from "./sql-js-adapter.js";
 import { VfsModelGenerator, VfsMigrationGenerator, VfsAppGenerator } from "./vfs-generator.js";
 import type { MigrationProxy, MigrationLike } from "@blazetrails/activerecord/migration";
 import { Migrator } from "@blazetrails/activerecord/migration";
-import { camelize, registerProcessAdapter, type ProcessAdapter } from "@blazetrails/activesupport";
+import {
+  camelize,
+  getProcessAdapter,
+  processAdapterConfig,
+  registerProcessAdapter,
+  type ProcessAdapter,
+} from "@blazetrails/activesupport";
 
 export interface CliResult {
   success: boolean;
@@ -176,13 +182,16 @@ export function createTrailCLI(deps: TrailCliDeps) {
     const migrator = new Migrator(adapter, proxies);
     // Migration output goes to stdout (Rails' Migration#write is `puts`), and
     // the browser has no process — so the shim's stdout is pointed at this
-    // CLI's output buffer for the duration of the run.
+    // CLI's output buffer for the duration of the run. Any adapter the host
+    // already registered (e.g. the Node one under test) is restored after.
+    const prevAdapter = processAdapterConfig.adapter === null ? null : getProcessAdapter();
     registerProcessAdapter(browserProcessAdapter);
     stdoutSink = (chunk) => log(chunk.replace(/\n$/, ""));
     try {
       await fn(migrator);
     } finally {
       stdoutSink = () => {};
+      if (prevAdapter) registerProcessAdapter(prevAdapter);
     }
   }
 

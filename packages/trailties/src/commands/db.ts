@@ -590,8 +590,8 @@ async function withMigratorForDb(
   // Migration output goes to stdout (Rails' Migration#write is `puts`), so the
   // per-database prefix is applied by swapping in a stdout-wrapping process
   // adapter for the duration of the run.
-  const prevAdapter = getProcessAdapter();
-  if (ctx.prefix) {
+  const prevAdapter = ctx.prefix ? getProcessAdapter() : null;
+  if (prevAdapter) {
     registerProcessAdapter({
       ...prevAdapter,
       stdout: {
@@ -612,7 +612,7 @@ async function withMigratorForDb(
     await operation(migrator);
     if (opts?.afterOutput) await opts.afterOutput(migrator);
   } finally {
-    if (ctx.prefix) registerProcessAdapter(prevAdapter);
+    if (prevAdapter) registerProcessAdapter(prevAdapter);
   }
   if (!opts?.skipDump) await dumpSchemaAfterMigrate(ctx.raw, ctx.config);
 }
