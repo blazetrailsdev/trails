@@ -481,5 +481,19 @@
     "rubyName": "class_for_adapter",
     "call": "constantize",
     "reason": "Equivalent (different path): classForAdapter resolves the adapter class through trails' adapter registry, not a constant lookup."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/database-tasks.ts",
+    "rubyName": "create",
+    "call": "verbose?",
+    "reason": "trails' DatabaseTasks.create/drop emit no banner — the `Created/Dropped database` line is printed by the CLI layer instead (trailties commands/db.ts:530,547), so there is no verbose? gate to call here."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/database-tasks.ts",
+    "rubyName": "drop",
+    "call": "verbose?",
+    "reason": "trails' DatabaseTasks.create/drop emit no banner — the `Created/Dropped database` line is printed by the CLI layer instead (trailties commands/db.ts:530,547), so there is no verbose? gate to call here."
   }
 ]

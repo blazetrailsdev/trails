@@ -259,28 +259,28 @@ export class EnvironmentStorageError extends MigrationError {
 }
 
 /**
- * @internal The body of `Migration#write` (`migration.rb:1001`), lifted to a
- * free function so the `verbose` gate exists in exactly one place. Rails puts
- * migration output on `$stdout` via `Kernel#puts`; `stdout` is the
- * activesupport shim standing in for `$stdout` — no logger is involved.
+ * @internal Backing store for `Migration.verbose` (`migration.rb:797`,
+ * defaulted at `:811`). Rails' `cattr_accessor` is one variable shared by the
+ * class and every instance; a static class field would be shadowed by a
+ * subclass assigning to it, so the storage lives at module scope.
+ */
+let migrationVerbose = true;
+
+/**
+ * @internal `Migration#write`'s body (`migration.rb:1001`) for callers that
+ * have no Migration instance. Rails puts migration output on `$stdout` via
+ * `Kernel#puts`; `stdout` is the activesupport shim standing in for `$stdout`
+ * — no logger is involved.
  *
- * The Migrator needs it too: unlike Rails, where `Migration#migrate` announces
- * its own banners, trails' Migrator drives the execution strategy directly and
- * its migrations may be bare `{ up, down }` proxies with no `announce`.
+ * The Migrator needs it: unlike Rails, where `Migration#migrate` announces its
+ * own banners, trails' Migrator drives the execution strategy directly and its
+ * migrations may be bare `{ up, down }` proxies with no `announce`.
  */
 function writeMigrationMessage(text = ""): void {
   if (migrationVerbose) {
     stdout.write(`${text}\n`);
   }
 }
-
-/**
- * @internal Backing store for `Migration.verbose` (`migration.rb:797`,
- * defaulted at `:811`). Rails' `cattr_accessor` is one variable shared by the
- * class and every instance, so it lives at module scope rather than as a class
- * field, which subclasses would shadow.
- */
-let migrationVerbose = true;
 
 /** @internal The banner `Migration#announce` (`migration.rb:1005`) hands to `write`. */
 function announceMigrationText(header: string, message: string): string {
@@ -311,11 +311,7 @@ export abstract class Migration {
   static delegate: DatabaseAdapter | null = null;
   private _version?: string;
 
-  /**
-   * Mirrors: ActiveRecord::Migration.verbose (`migration.rb:797`) — Rails'
-   * `cattr_accessor`, so the class and instance readers/writers share one
-   * variable.
-   */
+  /** Mirrors: ActiveRecord::Migration.verbose (`cattr_accessor`, `migration.rb:797`). */
   static get verbose(): boolean {
     return migrationVerbose;
   }
@@ -1304,7 +1300,9 @@ export abstract class Migration {
   // --- Logging (Rails: Migration#write, #announce, #say, #say_with_time, #suppress_messages) ---
 
   write(text = ""): void {
-    writeMigrationMessage(text);
+    if (Migration.verbose) {
+      stdout.write(`${text}\n`);
+    }
   }
 
   announce(message: string): void {

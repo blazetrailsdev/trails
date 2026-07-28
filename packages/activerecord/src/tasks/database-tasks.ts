@@ -829,41 +829,53 @@ export class DatabaseTasks {
     // reach check_schema_file. Use == null (nullish) to match that.
     const filename = file ?? this.schemaDumpPath(config, format);
     if (filename == null) return;
-    this.checkSchemaFile(filename);
 
-    if (format === "sql") {
-      await this.structureLoad(config, filename);
-      await this._stampSchemaSha1(config, filename);
-      return;
-    }
+    // Rails: `verbose_was, Migration.verbose = Migration.verbose, verbose? && ENV["VERBOSE"]`
+    // (`database_tasks.rb:380`) — the extra ENV["VERBOSE"] term keeps a schema
+    // load quiet unless VERBOSE was set explicitly; restored at `:394`.
+    const { Migration } = await import("../migration.js");
+    const verboseWas = Migration.verbose;
+    Migration.verbose = isVerbose() && getEnv("VERBOSE") !== undefined;
+    try {
+      this.checkSchemaFile(filename);
 
-    const path = getPath();
-    if (!path.pathToFileURL) {
-      throw new Error(
-        "DatabaseTasks.loadSchema requires PathAdapter.pathToFileURL. " +
-          "The configured PathAdapter does not provide it.",
-      );
+      if (format === "sql") {
+        await this.structureLoad(config, filename);
+        await this._stampSchemaSha1(config, filename);
+        return;
+      }
+
+      const path = getPath();
+      if (!path.pathToFileURL) {
+        throw new Error(
+          "DatabaseTasks.loadSchema requires PathAdapter.pathToFileURL. " +
+            "The configured PathAdapter does not provide it.",
+        );
+      }
+      // Missing isAbsolute means the PathAdapter doesn't model relative vs.
+      // absolute (e.g. a VFS) — treat the incoming filename as already
+      // absolute in that case.
+      const absolute = this._resolveSchemaPath(filename);
+      const href = path.pathToFileURL(absolute).href;
+      const mod = (await import(href)) as {
+        default?: (ctx: unknown) => Promise<void> | void;
+      };
+      const defineSchema =
+        mod.default ?? (mod as unknown as (ctx: unknown) => Promise<void> | void);
+      if (typeof defineSchema !== "function") {
+        throw new Error(`Schema file must export a default function (got ${typeof defineSchema})`);
+      }
+      const adapter = await this._migrationAdapter();
+      const { MigrationContext } = await import("../migration.js");
+      const ctx = new MigrationContext(adapter);
+      await defineSchema(ctx);
+      // Stamp using the resolved absolute path — `filename` may be
+      // relative and `_schemaSha1` reads the file via getFs(), so the
+      // path must match what was actually imported.
+      await this._stampSchemaSha1(config, absolute);
+    } finally {
+      Migration.verbose = verboseWas;
     }
-    // Missing isAbsolute means the PathAdapter doesn't model relative vs.
-    // absolute (e.g. a VFS) — treat the incoming filename as already
-    // absolute in that case.
-    const absolute = this._resolveSchemaPath(filename);
-    const href = path.pathToFileURL(absolute).href;
-    const mod = (await import(href)) as {
-      default?: (ctx: unknown) => Promise<void> | void;
-    };
-    const defineSchema = mod.default ?? (mod as unknown as (ctx: unknown) => Promise<void> | void);
-    if (typeof defineSchema !== "function") {
-      throw new Error(`Schema file must export a default function (got ${typeof defineSchema})`);
-    }
-    const adapter = await this._migrationAdapter();
-    const { MigrationContext } = await import("../migration.js");
-    const ctx = new MigrationContext(adapter);
-    await defineSchema(ctx);
-    // Stamp using the resolved absolute path — `filename` may be
-    // relative and `_schemaSha1` reads the file via getFs(), so the
-    // path must match what was actually imported.
-    await this._stampSchemaSha1(config, absolute);
   }
 
   /**
