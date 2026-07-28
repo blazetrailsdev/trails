@@ -107,10 +107,11 @@ export class HasOne extends SingularAssociation {
     // blocking I/O a synchronous JS property setter cannot express but a
     // promise-returning method can. api:compare scores it as such —
     // `rubyMethodToTs` offers `set#{Name}` as a candidate for `name=`
-    // (scripts/api-compare/conventions.ts). Generated
-    // here — beside that setter, unconditionally (including polymorphic
-    // has_one) — rather than in `defineConstructors`, which Rails skips for
-    // polymorphic; the sugar must exist wherever the `=` setter does. A thin
+    // (scripts/api-compare/conventions.ts).
+    //
+    // Generated here — beside the `=` setter below, unconditionally (including
+    // polymorphic has_one) — rather than in `defineConstructors`, which Rails
+    // skips for polymorphic; the writer must exist wherever `=` does. A thin
     // delegation to the association-level `writer`, whose has_one /
     // has_one_through overrides run the Rails-faithful immediate replace/persist
     // and whose returned promise rejects (`RecordNotSaved`) at the call site.

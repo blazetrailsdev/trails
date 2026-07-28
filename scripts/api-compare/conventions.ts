@@ -638,16 +638,16 @@ export function rubyMethodToTsIgnoringSkip(name: string): string[] | null {
   if (name.endsWith("=")) {
     const base = name.slice(0, -1);
     const camel = snakeToCamel(base);
-    // `setX` is offered *after* the bare camel name so plain-value writers
-    // (`table_name=`, `_reflections=`) keep matching the accessor they always
-    // matched. It exists for writers whose Rails body blocks on I/O — has_one's
-    // `#{name}=` persists the displacement inline (has_one_association.rb:59-84)
-    // — which a synchronous JS property setter cannot express; the awaitable
-    // `set#{Name}` is the faithful rendering there (RFC 0068).
     // Underscore-prefixed writers are `class_attribute` storage slots
-    // (`_reflections=`), never blocking writers — offering `set_reflections`
-    // there would only be a nonsense candidate, so they keep the bare form.
+    // (`_reflections=`), never blocking writers — `set_reflections` would only
+    // be a nonsense candidate, so they keep the bare form alone.
     if (camel.startsWith("_")) return [camel];
+    // `setX` is offered *after* the bare camel name so plain-value writers
+    // (`table_name=`) keep matching the accessor they always matched. It exists
+    // for writers whose Rails body blocks on I/O — has_one's `#{name}=`
+    // persists the displacement inline (has_one_association.rb:59-84) — which a
+    // synchronous JS property setter cannot express; the awaitable `set#{Name}`
+    // is the faithful rendering there (RFC 0068).
     return [camel, "set" + camel.charAt(0).toUpperCase() + camel.slice(1)];
   }
 
