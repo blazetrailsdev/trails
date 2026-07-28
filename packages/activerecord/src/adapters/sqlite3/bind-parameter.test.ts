@@ -4,19 +4,13 @@
 import { describe, it, expect } from "vitest";
 import { describeIfSqlite } from "./test-helper.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
+import { BigDecimal } from "@blazetrails/activesupport";
 import { Post } from "../../test-helpers/models/post.js";
 
 describeIfSqlite("SQLite3Adapter", () => {
   describe("BindParameterTest", () => {
-    // Mirrors Rails' `fixtures :posts`. Authors are declared first so the posts
-    // fixture's author label-ref resolves to David's id (matching Rails posts.yml).
-    fixtures(["authors", "posts"]);
+    fixtures(["posts"]);
 
-    // Mirrors Rails' private `assert_quoted_as(expected, value, match: 0)`: the
-    // point of the suite is how each value type renders into the bind position
-    // of `Post.where("title = ?", value)`, so the assertion is on `toSql()`.
-    // Like Rails, the `match == 0` branch asserts `to_a` is empty and the
-    // matching branch asserts `count`.
     async function assertQuotedAs(expected: string, value: unknown, match = 0) {
       const relation = Post.where("title = ?", value);
       expect(relation.toSql()).toBe(`SELECT "posts".* FROM "posts" WHERE (title = ${expected})`);
@@ -47,9 +41,7 @@ describeIfSqlite("SQLite3Adapter", () => {
     });
 
     it("where with decimal for string column using bind parameters", async () => {
-      // Rails passes `BigDecimal(0)` and expects `0.0`. JS has no BigDecimal;
-      // the nearest value is a plain `Number`, which the adapter renders `0`.
-      await assertQuotedAs("0", 0);
+      await assertQuotedAs("0.0", new BigDecimal(0));
     });
 
     it("where with rational for string column using bind parameters", async () => {
@@ -57,5 +49,5 @@ describeIfSqlite("SQLite3Adapter", () => {
       // the nearest value is a plain `Number`, which the adapter renders `0`.
       await assertQuotedAs("0", 0);
     });
-  }); // BindParameterTest
+  });
 });
