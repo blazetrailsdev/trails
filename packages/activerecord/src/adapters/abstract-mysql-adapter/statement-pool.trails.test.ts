@@ -1,5 +1,8 @@
 /**
- * Mirrors Rails activerecord/test/cases/adapters/mysql2/statement_pool_test.rb
+ * Trails-only: Rails has no mysql2/abstract_mysql_adapter statement pool suite
+ * (only postgresql/ and sqlite3/ ship a statement_pool_test.rb), so these test
+ * names are trails prose covering Mysql2StatementPool
+ * (activerecord/lib/active_record/connection_adapters/mysql2/…).
  */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import {
