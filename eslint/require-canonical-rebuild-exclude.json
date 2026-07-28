@@ -8,7 +8,6 @@
     "packages/activerecord/src/connection-adapters/connection-handlers-sharding-db.test.ts",
     "packages/activerecord/src/connection-adapters/schema-cache.test.ts",
     "packages/activerecord/src/connection-adapters/sqlite3-adapter.transactions.test.ts",
-    "packages/activerecord/src/connection-adapters/sqlite3-copy-table.test.ts",
     "packages/activerecord/src/connection-adapters/sqlite3-introspection.test.ts",
     "packages/activerecord/src/connection-adapters/sqlite3/quoting.test.ts",
     "packages/activerecord/src/core.trails.test.ts",

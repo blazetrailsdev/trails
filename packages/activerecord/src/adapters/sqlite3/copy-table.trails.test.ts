@@ -1,8 +1,49 @@
+/**
+ * Trails-only sibling of copy-table.test.ts (Rails
+ * activerecord/test/cases/adapters/sqlite3/copy_table_test.rb).
+ *
+ * Everything here probes the SQLite table-rebuild helpers at a granularity no
+ * Rails test reaches. Per-test reasons:
+ *
+ * - `tableStructureWithCollation` / `tableStructure`: private helpers Rails only
+ *   drives through `copy_table`, so no Rails test asserts the AUTOINCREMENT flag
+ *   or the missing-table error directly.
+ * - `copyTableIndexes`: Rails' "copy table with index" only asserts the indexes
+ *   survive; the partial-index WHERE clause, expression indexes and column
+ *   orders are trails regressions with no Rails counterpart.
+ * - `moveTable`: reached in Rails only as an `alter_table` implementation
+ *   detail; no Rails test names it.
+ * - `alterTable`: the foreign-key re-point (#5529) and the integer-like primary
+ *   key shape are trails regressions. Rails' index-preserving column
+ *   rename/removal *is* tested — migration/columns_test.rb
+ *   `test_rename_column_with_an_index` / `test_remove_column_with_multi_column_index`
+ *   — but that file is not ported yet, so the coverage stays here until it is.
+ */
 import { it, expect, beforeEach, afterEach } from "vitest";
-import { Base } from "../base.js";
-import { fixtures } from "../test-fixtures.js";
-import { describeIfSqlite } from "../support/describe-if-sqlite.js";
-import type { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
+import "../../index.js";
+import { Base } from "../../base.js";
+import { fixtures } from "../../test-fixtures.js";
+import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
+import type { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+
+type Row = Record<string, unknown>;
+
+// The table-rebuild helpers are private on the adapter; name their shapes here
+// rather than reaching through `any`.
+interface TableRebuildInternals {
+  tableInfo(tableName: string): Promise<Row[]>;
+  tableStructureWithCollation(tableName: string, basicStructure: Row[]): Promise<Row[]>;
+  tableStructure(tableName: string): Promise<Row[]>;
+  copyTable(from: string, to: string): Promise<void>;
+  moveTable(from: string, to: string): Promise<void>;
+  alterTable(
+    tableName: string,
+    block: undefined,
+    foreignKeys: undefined,
+    checkConstraints: undefined,
+    options: { rename?: Record<string, string> },
+  ): Promise<void>;
+}
 
 fixtures([]);
 
@@ -12,6 +53,7 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   // teardown has to tolerate a beforeEach that failed before the lease, so it
   // reads a genuinely optional binding rather than casting `db`.
   let leased: AbstractSQLite3Adapter | undefined;
+  const internals = (): TableRebuildInternals => db as unknown as TableRebuildInternals;
 
   const dropCopyTargets = async (): Promise<void> => {
     await leased?.exec(
@@ -26,38 +68,19 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
 
   afterEach(dropCopyTargets);
 
-  // --- tableStructureSql ---
-
-  it("tableStructureSql returns column definition strings from CREATE TABLE SQL", async () => {
-    const strings = await (db as any).tableStructureSql("customers", ["id", "name"]);
-    expect(strings).toHaveLength(2);
-    expect(strings[0]).toMatch(/"id"/);
-    expect(strings[1]).toMatch(/"name"/);
-  });
-
-  it("tableStructureSql returns empty array for non-existent table", async () => {
-    const strings = await (db as any).tableStructureSql("no_such_table");
-    expect(strings).toEqual([]);
-  });
-
-  it("tableStructureSql includes CONSTRAINT strings", async () => {
-    const strings = await (db as any).tableStructureSql("fk_test_has_fk", ["id", "fk_id"]);
-    expect(strings.some((s: string) => s.includes("CONSTRAINT"))).toBe(true);
-  });
-
   // --- tableStructureWithCollation ---
 
   it("tableStructureWithCollation extracts auto_increment flag", async () => {
-    const basic = await (db as any).tableInfo("customers");
-    const enriched = await (db as any).tableStructureWithCollation("customers", basic);
-    const idCol = enriched.find((c: any) => c.name === "id");
-    expect(idCol.auto_increment).toBe(true);
+    const basic = await internals().tableInfo("customers");
+    const enriched = await internals().tableStructureWithCollation("customers", basic);
+    const idCol = enriched.find((c) => c["name"] === "id");
+    expect(idCol?.["auto_increment"]).toBe(true);
   });
 
   // --- tableStructure ---
 
   it("tableStructure throws StatementInvalid for non-existent table", async () => {
-    await expect((db as any).tableStructure("no_such")).rejects.toThrow(/Could not find table/);
+    await expect(internals().tableStructure("no_such")).rejects.toThrow(/Could not find table/);
   });
 
   // --- copyTableIndexes ---
@@ -70,21 +93,21 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   };
 
   it("copyTableIndexes preserves partial index WHERE clause", async () => {
-    await (db as any).copyTable("books", "books2");
+    await internals().copyTable("books", "books2");
     expect(await copiedIndexSql("books2", "isbn")).toMatch(
       /WHERE\s+published_on\s+IS\s+NOT\s+NULL/i,
     );
   });
 
   it("copyTableIndexes copies an expression index verbatim", async () => {
-    await (db as any).copyTable("books", "books2");
+    await internals().copyTable("books", "books2");
     expect(await copiedIndexSql("books2", "lower")).toMatch(/lower\(external_id\)/i);
   });
 
   it("copyTableIndexes carries the index column orders across", async () => {
     // Rolled back with the fixture transaction; no teardown needed.
     await db.addIndex("customers", ["name"], { order: { name: "desc" } });
-    await (db as any).copyTable("customers", "customers2");
+    await internals().copyTable("customers", "customers2");
     expect(await copiedIndexSql("customers2", "name")).toMatch(/"name"\s+DESC/i);
   });
 
@@ -93,7 +116,7 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
     // `-> { column.default_function }` before handing it to create_table
     // (sqlite3_adapter.rb:627-634). `auto_id_tests.published_at` is the
     // canonical `default: -> { "CURRENT_TIMESTAMP" }` column.
-    await (db as any).copyTable("auto_id_tests", "auto_id_tests2");
+    await internals().copyTable("auto_id_tests", "auto_id_tests2");
     const copied = (await db.columns("auto_id_tests2")).find((c) => c.name === "published_at");
     expect(copied?.defaultFunction).toBe("CURRENT_TIMESTAMP");
   });
@@ -101,21 +124,21 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   // --- moveTable ---
 
   it("moveTable copies data to destination and drops source", async () => {
-    await (db as any).copyTable("customers", "customers2");
+    await internals().copyTable("customers", "customers2");
     await db.executeMutation("INSERT INTO customers2 (name) VALUES ('Alice')");
     const sourceRows = await db.execute("SELECT * FROM customers2");
-    await (db as any).moveTable("customers2", "customers3");
-    const rows = await db.execute("SELECT * FROM customers3");
+    await internals().moveTable("customers2", "customers3");
+    const rows = (await db.execute("SELECT * FROM customers3")) as Row[];
     expect(rows).toHaveLength(sourceRows.length);
-    expect(rows.map((r: any) => r.name)).toContain("Alice");
-    const tables = await db.execute("SELECT name FROM sqlite_master WHERE type='table'");
-    expect(tables.map((t: any) => t.name)).not.toContain("customers2");
+    expect(rows.map((r) => r["name"])).toContain("Alice");
+    const tables = (await db.execute("SELECT name FROM sqlite_master WHERE type='table'")) as Row[];
+    expect(tables.map((t) => t["name"])).not.toContain("customers2");
   });
 
   // --- alterTable ---
 
   it("alterTable re-points a foreign key across a column rename", async () => {
-    await (db as any).alterTable("fk_test_has_fk", undefined, undefined, undefined, {
+    await internals().alterTable("fk_test_has_fk", undefined, undefined, undefined, {
       rename: { fk_id: "renamed_fk_id" },
     });
     const fks = await db.foreignKeys("fk_test_has_fk");
@@ -149,7 +172,7 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
     // `customers2` copy-target name the teardown above already reclaims.
     await db.exec('CREATE TABLE "customers2" ("id" bigint PRIMARY KEY, "name" TEXT)');
     await db.removeColumn("customers2", "name");
-    const pk = (await (db as any).tableInfo("customers2")).filter((c: any) => Number(c.pk) > 0);
-    expect(pk.map((c: any) => c.name)).toEqual(["id"]);
+    const pk = (await internals().tableInfo("customers2")).filter((c) => Number(c["pk"]) > 0);
+    expect(pk.map((c) => c["name"])).toEqual(["id"]);
   });
 });

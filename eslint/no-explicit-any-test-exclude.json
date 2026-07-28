@@ -138,7 +138,6 @@
   "packages/activerecord/src/connection-adapters/registration.test.ts",
   "packages/activerecord/src/connection-adapters/schema-cache.test.ts",
   "packages/activerecord/src/connection-adapters/sqlite3-adapter.transactions.test.ts",
-  "packages/activerecord/src/connection-adapters/sqlite3-copy-table.test.ts",
   "packages/activerecord/src/connection-adapters/sqlite3/schema-creation.test.ts",
   "packages/activerecord/src/connection-adapters/sqlite3/schema-definitions.test.ts",
   "packages/activerecord/src/connection-adapters/sqlite3/schema-dumper.test.ts",
