@@ -7,9 +7,6 @@ import {
   _resetConstants,
 } from "./inflector.js";
 
-// Ruby's constant table carries visibility; trails' invented constant table is
-// flat, so `private_constant` is modelled as a separate mark. No Rails test
-// covers it directly — Rails gets the behavior from the language.
 describe("PrivateConstantTest", () => {
   beforeEach(() => {
     _resetConstants();

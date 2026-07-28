@@ -1,11 +1,3 @@
-/**
- * Trails-only: Rails `const_set`s the habtm join model and then marks it
- * `private_constant` (`activerecord/lib/active_record/associations.rb:1877-1878`),
- * so `Object.const_get("Country::HABTM_Treaties")` raises NameError while the
- * association itself keeps working — it resolves through the reflection, not
- * through the constant table. Ruby gets that from the language; trails'
- * invented constant table needs the mark applied explicitly, so it needs a test.
- */
 import { describe, it, expect } from "vitest";
 import { constantize, safeConstantize } from "@blazetrails/activesupport";
 import { modelRegistry } from "../associations.js";
