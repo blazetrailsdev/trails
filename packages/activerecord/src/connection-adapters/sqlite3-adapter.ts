@@ -2487,8 +2487,13 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       const columnDefinition = definition.newColumnDefinition(name, sqlType as ColumnType, options);
       // PRAGMA reports the declared SQL type, not an AR type name, so pin it here
       // rather than let the visitor resolve it through typeToSql — that is what
-      // round-trips storage affinity exactly.
-      columnDefinition.sqlType = sqlType;
+      // round-trips storage affinity exactly. Not when newColumnDefinition flipped
+      // the type to :primary_key though (an integer/bigint PK with no default):
+      // visit_ColumnDefinition then skips add_column_options! entirely and the
+      // whole constraint rides on type_to_sql(:primary_key), so pinning the
+      // declared text over it would silently drop the PRIMARY KEY. Rails' `||=`
+      // has the same effect (abstract/schema_creation.rb:34).
+      if (columnDefinition.type !== "primary_key") columnDefinition.sqlType = sqlType;
       definition.columns.push(columnDefinition);
     }
 

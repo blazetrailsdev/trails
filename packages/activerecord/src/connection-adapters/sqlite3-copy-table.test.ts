@@ -175,4 +175,18 @@ describe("SQLite3Adapter table-rebuild cluster", () => {
       .all() as any[];
     expect(tables.map((t: any) => t.name)).not.toContain("src");
   });
+
+  // --- alterTable ---
+
+  it("alterTable keeps the primary key of a lowercase integer-like declared type", async () => {
+    // PRAGMA table_info normalizes a declared `integer` to `INTEGER` but leaves
+    // `bigint` verbatim, so hand-written DDL is the one way the rebuild sees an
+    // AR-spelled integer-like type — the shape that makes newColumnDefinition
+    // flip the column to :primary_key, where the constraint rides entirely on
+    // type_to_sql(:primary_key).
+    await db.exec('CREATE TABLE "users" ("id" bigint PRIMARY KEY, "name" TEXT)');
+    await db.removeColumn("users", "name");
+    const pk = (await (db as any).tableInfo("users")).filter((c: any) => Number(c.pk) > 0);
+    expect(pk.map((c: any) => c.name)).toEqual(["id"]);
+  });
 });
