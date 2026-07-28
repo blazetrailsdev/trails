@@ -2799,10 +2799,6 @@ export class Migrator {
   }
 
   private async _runMigration(proxy: MigrationProxy, direction: "up" | "down"): Promise<void> {
-    // Rails emits these banners from Migration#migrate (`migration.rb:964`),
-    // which this Migrator bypasses by driving the execution strategy directly.
-    this._announce(proxy, direction === "up" ? "migrating" : "reverting");
-
     const migration = await proxy.migration();
     // Rails wraps both the migration execution AND the version
     // stamping inside the same ddl_transaction so they commit/rollback
@@ -2810,9 +2806,13 @@ export class Migrator {
     // would leave schema_migrations out of sync.
     try {
       await this._ddlTransaction(migration, async () => {
+        // Rails emits these banners from Migration#migrate (`migration.rb:964`),
+        // which this Migrator bypasses by driving the execution strategy
+        // directly. They belong inside the ddl_transaction because Rails calls
+        // migration.migrate from within it (`migration.rb:1534`).
+        this._announce(proxy, direction === "up" ? "migrating" : "reverting");
         // Rails benchmarks exec_migration alone (`migration.rb:973`) and emits
-        // the completion banner from Migration#migrate — i.e. before
-        // record_version_state_after_migrating runs (`migration.rb:1534`).
+        // the completion banner before record_version_state_after_migrating.
         const start = Date.now();
         await this._strategy.exec(direction, migration, this._adapter);
         const elapsed = ((Date.now() - start) / 1000).toFixed(4);
