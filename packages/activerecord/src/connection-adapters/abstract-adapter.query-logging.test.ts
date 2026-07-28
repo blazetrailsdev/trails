@@ -208,20 +208,10 @@ describe("AbstractAdapter query/logging infrastructure (PR 25b)", () => {
   });
 
   describe("lookupCastTypeFromColumn", () => {
-    it("returns null for a column with null sqlType", () => {
-      const a = new AbstractAdapter();
-      expect(a.lookupCastTypeFromColumn({ sqlType: null })).toBeNull();
-    });
-
     it("delegates to lookupCastType when available", () => {
       const a = new AbstractAdapter();
       (a as any).lookupCastType = (t: string) => `cast:${t}`;
       expect(a.lookupCastTypeFromColumn({ sqlType: "varchar" })).toBe("cast:varchar");
-    });
-
-    it("returns the sqlType string when lookupCastType is absent", () => {
-      const a = new AbstractAdapter();
-      expect(a.lookupCastTypeFromColumn({ sqlType: "integer" })).toBe("integer");
     });
   });
 });

@@ -196,13 +196,6 @@ export const SKIP_GROUPS: SkipGroup[] = [
   },
   {
     reason:
-      "PostgreSQL::Quoting#lookup_cast_type issues an async DB query (SELECT oid) " +
-      "to resolve a sql_type string; our standalone-function quoting module has " +
-      "no adapter instance, so this can't be ported without a larger refactor.",
-    names: ["lookup_cast_type"],
-  },
-  {
-    reason:
       'CheckPending helpers — depend on Rails.root, system("bin/rails ..."), and ' +
       "the ActiveRecord::Tasks infrastructure that has no JS equivalent.",
     names: ["any_schema_needs_update?", "db_configs_in_current_env", "load_schema!"],
@@ -265,6 +258,18 @@ export interface ScopedSkipGroup {
 }
 
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
+  {
+    reason:
+      "PostgreSQL::Quoting#lookup_cast_type resolves a sql_type string with a " +
+      "live `SELECT '<type>'::regtype::oid` query, so trails' port is async and " +
+      "diverges from the sync abstract signature it overrides; it is tracked by " +
+      "the `pg-lookup-cast-type-async-divergence` story rather than counted as " +
+      "a gap. Scoped to postgresql/quoting.rb: the abstract " +
+      "`Quoting#lookup_cast_type` (abstract/quoting.rb:234-236) IS ported, so a " +
+      "flat skip would now hide a real surface.",
+    names: ["lookup_cast_type"],
+    rubyFiles: ["connection_adapters/postgresql/quoting.rb"],
+  },
   {
     reason:
       "ActiveSupport::Duration#+@ (`def +@; self; end`, duration.rb:326) is " +

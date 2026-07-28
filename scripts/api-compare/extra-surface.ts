@@ -16,7 +16,7 @@
  *      Rails-private method exists in Rails (a visibility divergence, not
  *      extra surface). Map each to its TS-candidate name set via
  *      `rubyMethodCandidates`, which also resolves `conventions.SKIP`
- *      mirrors (`freeze`, `to_a`, `lookup_cast_type`) so a TS override is
+ *      mirrors (`freeze`, `to_a`, `inspect`) so a TS override is
  *      allowed in the file where Ruby defines the method. Union = the
  *      "allowed" TS name set.
  *   3. Collect public TS names declared in the matching TS file — each
@@ -176,7 +176,7 @@ const MIRROR_CANDIDATE_OVERRIDES: Record<string, string[]> = {
  *
  * `conventions.SKIP` means api:compare never expects a TS counterpart, but the
  * Ruby method still EXISTS in the file — so a TS override of it (`freeze`,
- * `inspect`, `lookupCastType`) is Rails-faithful, not drift. Mapping those
+ * `inspect`, `to_a`) is Rails-faithful, not drift. Mapping those
  * names here keeps the allowance *file-scoped*: `freeze` is allowed in core.ts
  * because core.rb defines `freeze`, and stays flagged anywhere Ruby doesn't.
  * That's strictly tighter than the blanket in-file allow-set this replaced.

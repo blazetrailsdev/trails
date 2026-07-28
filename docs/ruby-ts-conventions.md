@@ -89,8 +89,6 @@ api:compare never expects a TS counterpart for these Ruby methods:
   - `singleton_method_added`
 - NoTouching: TS uses a Map-based depth counter (\_noTouchingDepth) instead of a thread-local array; klasses() is the Rails internal accessor for that array.
   - `klasses`
-- PostgreSQL::Quoting#lookup_cast_type issues an async DB query (SELECT oid) to resolve a sql_type string; our standalone-function quoting module has no adapter instance, so this can't be ported without a larger refactor.
-  - `lookup_cast_type`
 - CheckPending helpers — depend on Rails.root, system("bin/rails ..."), and the ActiveRecord::Tasks infrastructure that has no JS equivalent.
   - `any_schema_needs_update?`, `db_configs_in_current_env`, `load_schema!`
 - Migrator internal index helpers — Rails stores @target_version / @direction as instance variables; our TS Migrator passes them as method parameters instead, so these zero-arg helpers can't be faithfully ported.
@@ -104,6 +102,8 @@ api:compare skips these Ruby methods, but only within the listed files — they
 have a real TS surface elsewhere, so the skip is file-scoped to avoid silencing
 a genuine gap:
 
+- PostgreSQL::Quoting#lookup_cast_type resolves a sql_type string with a live `SELECT '<type>'::regtype::oid` query, so trails' port is async and diverges from the sync abstract signature it overrides; it is tracked by the `pg-lookup-cast-type-async-divergence` story rather than counted as a gap. Scoped to postgresql/quoting.rb: the abstract `Quoting#lookup_cast_type` (abstract/quoting.rb:234-236) IS ported, so a flat skip would now hide a real surface.
+  - `lookup_cast_type` (only in: `connection_adapters/postgresql/quoting.rb`)
 - ActiveSupport::Duration#+@ (`def +@; self; end`, duration.rb:326) is Ruby's unary-plus operator returning self. TS has no syntax that dispatches to a named method for `+duration` — the unary `+` coerces through `valueOf()` to a number — so a ported `identity()` method would be inert dead code no caller can reach (unlike `-@` → `negate`, which is called from `minus()` via `other.negate()`). Scoped to duration.rb so it can't silence a genuine `+@` gap elsewhere.
   - `+@` (only in: `duration.rb`)
 - Ruby `-@` deduplication operator (`alias :-@ :deduplicate` in ConnectionAdapters::Deduplicable). TS has no unary-minus method; trails realizes dedup via the `deduplicate` free function plus the DeduplicableBase constructor, so the alias has no separate TS surface on these value objects. Scoped to the AR adapter value-object files so it can't silence ActiveSupport::Duration#-@ (ported as `Duration#negate`).

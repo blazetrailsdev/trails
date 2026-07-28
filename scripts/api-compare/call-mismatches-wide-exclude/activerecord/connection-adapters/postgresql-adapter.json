@@ -943,5 +943,12 @@
     "rubyName": "write_query?",
     "call": "match?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql-adapter.ts",
+    "rubyName": "lookup_cast_type",
+    "call": "query_value",
+    "reason": "PG resolves the regtype OID through `schemaQuery` rather than `query_value`; the async signature that forces it is tracked by the `pg-lookup-cast-type-async-divergence` story."
   }
 ]

@@ -1,51 +1,84 @@
 // vendor/rails/activerecord/test/models/contact.rb
 import { Base } from "../../base.js";
+import { ConnectionNotEstablished } from "../../errors.js";
+import { FakeActiveRecordAdapter } from "../../support/fake-adapter.js";
+import type { MergeColumnOptions } from "../../support/fake-adapter.js";
 
-// Contact uses a fake adapter with synthetic columns (ContactFakeColumns).
-// The fake adapter infrastructure is not ported; these classes declare the
-// association shape used by tests that exercise STI and serialization paths.
+type ContactFakeColumnsHost = typeof Base & { column: typeof column };
 
-// The fake adapter's synthetic column list (id, name, age, avatar, created_at,
-// awesome, preferences, alternative_id) is declared directly on the class so
-// in-memory `new Contact(...)` round-trips the same attribute set Rails exposes.
-function declareContactColumns(klass: typeof Base): void {
-  klass.attribute("id", "integer");
-  klass.attribute("name", "string");
-  klass.attribute("age", "integer");
-  klass.attribute("avatar", "binary");
-  klass.attribute("created_at", "datetime");
-  klass.attribute("awesome", "boolean");
-  klass.attribute("preferences", "string");
-  klass.attribute("alternative_id", "integer");
+// Stands in for Rails' `lease_connection` reads in contact.rb:6-8/29, with two
+// deviations that keep it from being named after it: trails' `leaseConnection`
+// is async so a class-body caller takes the sync escape hatch, and the adapter
+// kind is asserted rather than cast. The distinct name also matters to
+// api:compare — a `leaseConnection` taking an argument would make the calls
+// gate treat every `lease_connection` call in the package as significant.
+function fakeConnection(klass: typeof Base): FakeActiveRecordAdapter {
+  const connection = klass.connectionPool().leaseConnectionSync();
+  if (!(connection instanceof FakeActiveRecordAdapter)) {
+    throw new ConnectionNotEstablished(
+      `${klass.name} expected the "fake" adapter, got ${connection.constructor.name}`,
+    );
+  }
+  return connection;
+}
+
+/** Mirrors: ContactFakeColumns#column */
+function column(
+  this: typeof Base,
+  name: string,
+  sqlType: string | null = null,
+  options: MergeColumnOptions = {},
+): void {
+  fakeConnection(this).mergeColumn(this.tableName, name, sqlType, options);
+}
+
+/** Mirrors: ContactFakeColumns.extended */
+async function extended(base: ContactFakeColumnsHost): Promise<void> {
+  await base.establishConnection({ adapter: "fake" });
+
+  const connection = fakeConnection(base);
+  connection.dataSources = [base.tableName];
+  connection.primaryKeys = { [base.tableName]: "id" };
+
+  base.column("id", "integer");
+  base.column("name", "string");
+  base.column("age", "integer");
+  base.column("avatar", "binary");
+  base.column("created_at", "datetime");
+  base.column("awesome", "boolean");
+  base.column("preferences", "string");
+  base.column("alternative_id", "integer");
+
+  base.serialize("preferences");
+
+  base.belongsTo("alternative", { className: "Contact" });
 }
 
 export class Contact extends Base {
   declare alternative: Contact | null;
   declare loadBelongsTo: (name: "alternative") => Promise<Contact | null>;
 
-  static {
-    declareContactColumns(this);
-    this.serialize("preferences");
-    this.belongsTo("alternative", { className: "Contact" });
-  }
+  static column = column;
 }
 
+await extended(Contact);
+
 export class ContactSti extends Base {
-  declare alternative: ContactSti | null;
-  declare loadBelongsTo: (name: "alternative") => Promise<ContactSti | null>;
+  declare alternative: Contact | null;
+  declare loadBelongsTo: (name: "alternative") => Promise<Contact | null>;
 
-  static {
-    this._tableName = "contacts";
-    declareContactColumns(this);
-    this.attribute("type", "string");
-    this.serialize("preferences");
-    this.belongsTo("alternative", { className: "ContactSti" });
-  }
+  static column = column;
 
-  // Rails: `def type; "ContactSti" end` — ContactSti overrides the `type`
-  // reader to a constant so serialization still sees an inheritance-column
-  // value to exclude. Defined after the attribute reader so it wins.
   get type(): string {
     return "ContactSti";
   }
 }
+
+await extended(ContactSti);
+ContactSti.column("type", "string");
+
+// Rails reflects the fake adapter's columns lazily, on the first `columns`
+// read. trails' synchronous reflection sees only an already-warm schema cache,
+// so warm it here — after the last `column` call — while we can still await.
+await Contact.loadSchema();
+await ContactSti.loadSchema();

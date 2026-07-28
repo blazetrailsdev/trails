@@ -10,7 +10,7 @@
 
 import { NotImplementedError } from "../../errors.js";
 import { joinTableName as _joinTableName } from "../../migration/join-table.js";
-import { ArgumentError } from "@blazetrails/activemodel";
+import { ArgumentError, type Type } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter, AdapterName } from "../abstract-adapter.js";
 import {
   TableDefinition,
@@ -2373,17 +2373,22 @@ export class SchemaStatements {
     }
   }
 
-  /** @internal */
-  fetchTypeMetadata(sqlType: string): SqlTypeMetadata {
-    const adapter = this.adapter as any;
-    const castType =
-      typeof adapter.lookupCastType === "function" ? adapter.lookupCastType(sqlType) : null;
+  /**
+   * PostgreSQL never lands here — it defines its own async `fetchTypeMetadata`
+   * (postgresql-adapter.ts) keyed on OID — which is why the sync `Type` this
+   * reads is safe despite `PostgreSQLAdapter#lookupCastType` returning a promise.
+   * @internal
+   */
+  fetchTypeMetadata(sqlType: string | null): SqlTypeMetadata {
+    const castType = this.adapter.lookupCastType(sqlType) as Type;
     return new SqlTypeMetadata({
       sqlType,
-      type: castType?.type ?? "string",
-      limit: castType?.limit ?? null,
-      precision: castType?.precision ?? null,
-      scale: castType?.scale ?? null,
+      // Rails' `cast_type.type` (schema_statements.rb:1721) — `Type#type` is a
+      // method here, not a getter, so it must be invoked.
+      type: castType?.type(),
+      limit: castType?.limit,
+      precision: castType?.precision,
+      scale: castType?.scale,
     });
   }
 

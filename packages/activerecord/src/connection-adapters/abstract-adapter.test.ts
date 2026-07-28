@@ -7,6 +7,7 @@ import {
   IntegerType,
   FloatType,
   DecimalType,
+  ValueType,
 } from "@blazetrails/activemodel";
 import { Text as TextType } from "../type/text.js";
 import { Date as DateType } from "../type/date.js";
@@ -186,11 +187,71 @@ describe("AbstractAdapter.initializeTypeMap", () => {
   });
 
   it("aliases timestamp to datetime", () => {
-    expect(m.lookup("timestamp")).toBeInstanceOf(DateTimeType);
+    // Pins abstract_adapter.rb:881 — the alias must resolve against this map's
+    // overlaid tz-aware datetime, not the parent map's untouched one.
+    expect(m.lookup("timestamp")).toMatchObject({ isUtc: true });
   });
 
   it("aliases double to float", () => {
     expect(m.lookup("double")).toBeInstanceOf(FloatType);
+  });
+});
+
+describe("AbstractAdapter.extendedTypeMap", () => {
+  it("inherits TYPE_MAP entries and overlays timezone-aware time types", () => {
+    const m = AbstractAdapter.extendedTypeMap({ defaultTimezone: "utc" });
+    expect(m.lookup("integer")).toBeInstanceOf(IntegerType);
+    expect(m.lookup("datetime")).toMatchObject({ isUtc: true });
+    expect(m.lookup("time")).toMatchObject({ isUtc: true });
+    // Pins abstract_adapter.rb:881 — the alias must resolve against this map's
+    // overlaid tz-aware datetime, not the parent map's untouched one.
+    expect(m.lookup("timestamp")).toMatchObject({ isUtc: true });
+  });
+
+  it("backs the typeMap of an adapter configured with a default timezone", () => {
+    const adapter = new TestAdapter();
+    (adapter as any)._config = { defaultTimezone: "utc" };
+    expect(adapter.lookupCastType("datetime")).toMatchObject({ isUtc: true });
+  });
+
+  // TestAdapter declares no EXTENDED_TYPE_MAPS of its own, so — as in Ruby,
+  // where the constant lookup walks up to AbstractAdapter — the entry lands in
+  // the base class's shared map. Asserted on AbstractAdapter to keep that
+  // sharing visible rather than implying a per-class cache.
+  it("is memoized per key in EXTENDED_TYPE_MAPS rather than rebuilt per read", () => {
+    const adapter = new TestAdapter();
+    (adapter as any)._config = { defaultTimezone: "utc" };
+    expect(adapter.typeMap).toBe(adapter.typeMap);
+    expect(AbstractAdapter.EXTENDED_TYPE_MAPS.get(JSON.stringify({ defaultTimezone: "utc" }))).toBe(
+      adapter.typeMap,
+    );
+  });
+});
+
+describe("AbstractAdapter#lookupCastType", () => {
+  it("looks the sql type up in TYPE_MAP", () => {
+    const adapter = new TestAdapter();
+    expect(adapter.lookupCastType("integer")).toBeInstanceOf(IntegerType);
+    expect(adapter.lookupCastType("boolean")).toBeInstanceOf(BooleanType);
+  });
+
+  it("carries the sql type's limit through to the cast type", () => {
+    const adapter = new TestAdapter();
+    expect(adapter.lookupCastType("varchar(64)")).toMatchObject({ limit: 64 });
+  });
+
+  it("is the type source for lookupCastTypeFromColumn", () => {
+    const adapter = new TestAdapter();
+    expect(adapter.lookupCastTypeFromColumn({ sqlType: "datetime" })).toBeInstanceOf(DateTimeType);
+  });
+
+  it("falls back to the default value type for an unmapped sql type", () => {
+    const adapter = new TestAdapter();
+    expect(adapter.lookupCastTypeFromColumn({ sqlType: null })).toBeInstanceOf(ValueType);
+  });
+
+  it("TYPE_MAP is memoized across reads", () => {
+    expect(AbstractAdapter.TYPE_MAP).toBe(AbstractAdapter.TYPE_MAP);
   });
 });
 

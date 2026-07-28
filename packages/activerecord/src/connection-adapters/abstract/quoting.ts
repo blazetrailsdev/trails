@@ -16,7 +16,8 @@
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { Attribute as ModelAttribute, BinaryData } from "@blazetrails/activemodel";
+import { Attribute as ModelAttribute, BinaryData, type Type } from "@blazetrails/activemodel";
+import type { TypeMap } from "../../type/type-map.js";
 import { NotImplementedError } from "../../errors.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import {
@@ -237,12 +238,19 @@ export function castBoundValue(value: unknown): unknown {
  */
 export interface QuotingHost {
   /** @internal */
-  lookupCastType?(sqlType: string): unknown;
+  lookupCastType?(sqlType: string | null): unknown;
 }
 
 /**
  * Look up the cast type from a column. Delegates to lookupCastType(column.sql_type)
  * on the adapter, matching Rails' internal delegation chain.
+ *
+ * Rails can call `lookup_cast_type` unconditionally because every host of this
+ * module is an adapter. This standalone version is also bound to adapter-less
+ * hosts (`ABSTRACT_SCHEMA_QUOTER`, the MySQL schema quoter) that have no type
+ * map, so it keeps the guard and hands back the raw sql_type for them; the
+ * adapter method (`AbstractAdapter#lookupCastTypeFromColumn`) is the
+ * unconditional one-liner.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#lookup_cast_type_from_column
  */
@@ -309,15 +317,15 @@ export function quoteDefaultExpression(
   }
   if (isSqlLiteral(value)) return value.value;
   // Rails: `value = lookup_cast_type(column.sql_type).serialize(value)`
-  // (abstract/quoting.rb:161). Serialize only when the host exposes a cast type
-  // with a `serialize` — the adapter-free fallback (ABSTRACT_SCHEMA_QUOTER) and
-  // the mysql schema-quoter have no `lookupCastType`, so `lookupCastTypeFromColumn`
-  // returns the raw sqlType string and the value passes through unserialized.
+  // (abstract/quoting.rb:161). Rails dispatches `lookup_cast_type`
+  // unconditionally; the optional call is for the adapter-free hosts this
+  // standalone version also serves (ABSTRACT_SCHEMA_QUOTER, the mysql schema
+  // quoter), which have no type map, so their values pass through unserialized.
   let serialized: unknown = value;
   if (column != null) {
-    const castType = lookupCastTypeFromColumn.call(this, {
-      sqlType: column.sqlType ?? null,
-    }) as { serialize?(v: unknown): unknown } | null;
+    const castType = this.lookupCastType?.(column.sqlType ?? null) as {
+      serialize?(v: unknown): unknown;
+    } | null;
     if (castType && typeof castType.serialize === "function") {
       serialized = castType.serialize(value);
     }
@@ -670,6 +678,18 @@ function typeCastedBinds(
     }
     return this.typeCast(value);
   });
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#lookup_cast_type
+ * (abstract/quoting.rb:234-236)
+ *
+ * Rails marks it private; TS has no equivalent for a mixed-in member adapters
+ * must still dispatch through `this`, so it is public and `@internal`.
+ * @internal
+ */
+export function lookupCastType(this: { typeMap: TypeMap }, sqlType: string | null): Type {
+  return this.typeMap.lookup(sqlType);
 }
 
 /**

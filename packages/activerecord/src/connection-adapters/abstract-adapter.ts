@@ -66,6 +66,7 @@ import {
   quotedBinary as abstractQuotedBinary,
   castBoundValue as abstractCastBoundValue,
   sanitizeAsSqlComment as abstractSanitizeAsSqlComment,
+  lookupCastType as abstractLookupCastType,
   Quoting as QuotingMixin,
 } from "./abstract/quoting.js";
 import type { Quoting } from "./abstract/quoting-interface.js";
@@ -104,6 +105,7 @@ import {
   BooleanType,
   BinaryType,
   DecimalType,
+  type Type,
 } from "@blazetrails/activemodel";
 import { connectedToStack } from "../core.js";
 import { Text as TextType } from "../type/text.js";
@@ -919,9 +921,7 @@ export class AbstractAdapter implements Quoting {
     let serialized: unknown = value;
     const sqlType = (column as { sqlType?: string | null } | undefined)?.sqlType;
     if (sqlType) {
-      const castType = this.lookupCastTypeFromColumn({ sqlType }) as {
-        serialize?(v: unknown): unknown;
-      };
+      const castType = this.lookupCastType(sqlType) as { serialize?(v: unknown): unknown };
       if (typeof castType?.serialize === "function") serialized = castType.serialize(value);
     }
     return this.quote(serialized);
@@ -2158,6 +2158,51 @@ export class AbstractAdapter implements Quoting {
 
   // --- Type registration (Rails: class << self private) ---
 
+  /**
+   * @internal Mirrors: AbstractAdapter::TYPE_MAP (abstract_adapter.rb:942)
+   *
+   * Declared only here, as in Rails: `PostgreSQLAdapter` and
+   * `AbstractMysqlAdapter` define no `TYPE_MAP` constant, so `self::TYPE_MAP`
+   * resolves to this one for them and their `initialize_type_map` never
+   * re-runs.
+   *
+   * Rails additionally declares `TYPE_MAP` on `Mysql2Adapter`
+   * (mysql2_adapter.rb:53) and `SQLite3Adapter` (sqlite3_adapter.rb:505), plus
+   * `EXTENDED_TYPE_MAPS` on `SQLite3Adapter` (506). trails has neither, so
+   * those two seed their extended maps from this base map and share this
+   * `EXTENDED_TYPE_MAPS` — inert only because both resolve casts through the
+   * invented `_buildTypeMap` path, which is exactly what
+   * `mysql-native-type-map-converges-onto-type-map` deletes. That story must
+   * add the missing declarations in the same change.
+   *
+   * Built on first read rather than at class-definition time because the type
+   * classes `initializeTypeMap` registers sit on a circular import edge and are
+   * still in their temporal dead zone while this module evaluates.
+   */
+  static get TYPE_MAP(): TypeMap {
+    return (abstractTypeMap ??= (() => {
+      const m = new TypeMap();
+      AbstractAdapter.initializeTypeMap(m);
+      return m;
+    })());
+  }
+
+  /** @internal Mirrors: AbstractAdapter::EXTENDED_TYPE_MAPS (abstract_adapter.rb:943) */
+  static readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
+
+  /** @internal Mirrors: AbstractAdapter.extended_type_map */
+  static extendedTypeMap(
+    this: typeof AbstractAdapter,
+    options: { defaultTimezone?: string },
+  ): TypeMap {
+    const m = new TypeMap(this.TYPE_MAP);
+    const timezone = options.defaultTimezone;
+    this.registerClassWithPrecision(m, /^[^(]*time/i, TimeType, { timezone });
+    this.registerClassWithPrecision(m, /^[^(]*datetime/i, DateTimeType, { timezone });
+    m.aliasType(/^[^(]*timestamp/i, "datetime");
+    return m;
+  }
+
   /** @internal */
   static initializeTypeMap(this: typeof AbstractAdapter, m: TypeMap): void {
     this.registerClassWithLimit(m, /boolean/i, BooleanType);
@@ -2238,11 +2283,6 @@ export class AbstractAdapter implements Quoting {
     if (!match) return undefined;
     const n = Number.parseInt(match[1], 10);
     return Number.isNaN(n) ? 0 : n;
-  }
-
-  private _extendedTypeMap?: Map<string, unknown>;
-  get extendedTypeMap(): Map<string, unknown> {
-    return (this._extendedTypeMap ??= new Map());
   }
 
   // --- Connection lifecycle privates (Rails abstract_adapter.rb 946–1234) ---
@@ -2418,19 +2458,14 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal Mirrors: AbstractAdapter#type_map */
   get typeMap(): unknown {
-    const ctor = this.constructor as {
-      EXTENDED_TYPE_MAPS?: Map<string, unknown>;
-      TYPE_MAP?: unknown;
-      extendedTypeMap?: (key: Record<string, unknown>) => unknown;
-    };
+    const ctor = this.constructor as typeof AbstractAdapter;
     const key = this.extendedTypeMapKey();
-    if (!key) return ctor.TYPE_MAP ?? this.extendedTypeMap;
-    const build = () => ctor.extendedTypeMap?.(key) ?? this.extendedTypeMap;
-    const cache = ctor.EXTENDED_TYPE_MAPS;
-    if (!cache) return build();
-    const ck = JSON.stringify(key);
-    let m = cache.get(ck);
-    if (!m) cache.set(ck, (m = build()));
+    if (!key) return ctor.TYPE_MAP;
+    // Rails keys `EXTENDED_TYPE_MAPS` on the option hash itself; JS Maps use
+    // reference identity, so the serialized hash stands in for it.
+    const cacheKey = JSON.stringify(key);
+    let m = ctor.EXTENDED_TYPE_MAPS.get(cacheKey);
+    if (!m) ctor.EXTENDED_TYPE_MAPS.set(cacheKey, (m = ctor.extendedTypeMap(key)));
     return m;
   }
 
@@ -2616,14 +2651,31 @@ export class AbstractAdapter implements Quoting {
     );
   }
 
+  /**
+   * Implemented in `abstract/quoting.ts`, the file Rails declares it in
+   * (abstract/quoting.rb:234-236); dispatched here like `quote` / `typeCast`
+   * above so adapter overrides of `typeMap` are honoured.
+   *
+   * The `Promise<Type>` arm is not Rails: `PostgreSQLAdapter#lookupCastType`
+   * resolves a sql_type with a live regtype query, so its override is async
+   * (tracked by `pg-lookup-cast-type-async-divergence`). The `null` arm is
+   * `AbstractMysqlAdapter`'s early return for an empty sql_type, which
+   * `mysql-native-type-map-converges-onto-type-map` deletes. Both are spelled
+   * out rather than erased behind `unknown`, so a caller cannot silently
+   * duck-type past them.
+   * @internal
+   */
+  lookupCastType(sqlType: string | null): Type | Promise<Type> | null {
+    // The quoting helper constrains its receiver to a `TypeMap`-bearing host;
+    // the base `typeMap` getter is `unknown` because PostgreSQL's override
+    // returns a `HashLookupTypeMap`, which is a separate class in Rails too
+    // (type/hash_lookup_type_map.rb) — and PG overrides this method anyway.
+    return abstractLookupCastType.call(this as unknown as { typeMap: TypeMap }, sqlType);
+  }
+
   /** @internal Mirrors: AbstractAdapter#lookup_cast_type_from_column */
-  lookupCastTypeFromColumn(column: { sqlType: string | null }): unknown {
-    const sqlType = column.sqlType;
-    if (!sqlType) return null;
-    if (typeof (this as any).lookupCastType === "function") {
-      return (this as any).lookupCastType(sqlType);
-    }
-    return sqlType;
+  lookupCastTypeFromColumn(column: { sqlType: string | null }): Type | Promise<Type> | null {
+    return this.lookupCastType(column.sqlType);
   }
 }
 
@@ -2637,6 +2689,8 @@ export class AbstractAdapter implements Quoting {
 // evaluating. Instance methods only matter on instances, so first-construction
 // is early enough.
 let abstractAdapterMixinsApplied = false;
+
+let abstractTypeMap: TypeMap | undefined;
 
 /** @internal Applies the abstract-adapter mixin/callback/query-cache wiring once. */
 function ensureAbstractAdapterMixinsApplied(): void {

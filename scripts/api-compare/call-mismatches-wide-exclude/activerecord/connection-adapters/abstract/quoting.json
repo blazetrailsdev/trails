@@ -75,5 +75,12 @@
     "rubyName": "type_cast",
     "call": "quoted_time",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/quoting.ts",
+    "rubyName": "quote_default_expression",
+    "call": "call",
+    "reason": "Rails' `value.call` (abstract/quoting.rb:159) invokes a Proc default; the TS branch invokes the function directly (`value()`), which the extractor cannot see as a `call` call."
   }
 ]
