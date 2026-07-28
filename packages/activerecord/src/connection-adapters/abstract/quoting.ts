@@ -238,7 +238,7 @@ export function castBoundValue(value: unknown): unknown {
  */
 export interface QuotingHost {
   /** @internal */
-  lookupCastType?(sqlType: string): unknown;
+  lookupCastType?(sqlType: string | null): unknown;
 }
 
 /**
@@ -317,15 +317,15 @@ export function quoteDefaultExpression(
   }
   if (isSqlLiteral(value)) return value.value;
   // Rails: `value = lookup_cast_type(column.sql_type).serialize(value)`
-  // (abstract/quoting.rb:161). Serialize only when the host exposes a cast type
-  // with a `serialize` — the adapter-free fallback (ABSTRACT_SCHEMA_QUOTER) and
-  // the mysql schema-quoter have no `lookupCastType`, so `lookupCastTypeFromColumn`
-  // returns the raw sqlType string and the value passes through unserialized.
+  // (abstract/quoting.rb:161). Rails dispatches `lookup_cast_type`
+  // unconditionally; the optional call is for the adapter-free hosts this
+  // standalone version also serves (ABSTRACT_SCHEMA_QUOTER, the mysql schema
+  // quoter), which have no type map, so their values pass through unserialized.
   let serialized: unknown = value;
   if (column != null) {
-    const castType = lookupCastTypeFromColumn.call(this, {
-      sqlType: column.sqlType ?? null,
-    }) as { serialize?(v: unknown): unknown } | null;
+    const castType = this.lookupCastType?.(column.sqlType ?? null) as {
+      serialize?(v: unknown): unknown;
+    } | null;
     if (castType && typeof castType.serialize === "function") {
       serialized = castType.serialize(value);
     }
@@ -688,8 +688,8 @@ function typeCastedBinds(
  * must still dispatch through `this`, so it is public and `@internal`.
  * @internal
  */
-export function lookupCastType(this: { typeMap: unknown }, sqlType: string | null): Type {
-  return (this.typeMap as TypeMap).lookup(sqlType);
+export function lookupCastType(this: { typeMap: TypeMap }, sqlType: string | null): Type {
+  return this.typeMap.lookup(sqlType);
 }
 
 /**

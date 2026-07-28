@@ -921,9 +921,7 @@ export class AbstractAdapter implements Quoting {
     let serialized: unknown = value;
     const sqlType = (column as { sqlType?: string | null } | undefined)?.sqlType;
     if (sqlType) {
-      const castType = this.lookupCastTypeFromColumn({ sqlType }) as {
-        serialize?(v: unknown): unknown;
-      };
+      const castType = this.lookupCastType(sqlType) as { serialize?(v: unknown): unknown };
       if (typeof castType?.serialize === "function") serialized = castType.serialize(value);
     }
     return this.quote(serialized);
@@ -2668,7 +2666,11 @@ export class AbstractAdapter implements Quoting {
    * @internal
    */
   lookupCastType(sqlType: string | null): Type | Promise<Type> | null {
-    return abstractLookupCastType.call(this, sqlType);
+    // The quoting helper constrains its receiver to a `TypeMap`-bearing host;
+    // the base `typeMap` getter is `unknown` because PostgreSQL's override
+    // returns a `HashLookupTypeMap`, which is a separate class in Rails too
+    // (type/hash_lookup_type_map.rb) — and PG overrides this method anyway.
+    return abstractLookupCastType.call(this as unknown as { typeMap: TypeMap }, sqlType);
   }
 
   /** @internal Mirrors: AbstractAdapter#lookup_cast_type_from_column */

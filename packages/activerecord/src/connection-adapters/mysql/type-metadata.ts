@@ -9,7 +9,7 @@
  */
 
 export class TypeMetadata {
-  readonly sqlType: string;
+  readonly sqlType: string | null;
   readonly type: string | undefined;
   readonly limit: number | null;
   readonly precision: number | null;
@@ -18,7 +18,7 @@ export class TypeMetadata {
 
   constructor(
     typeMetadata: {
-      sqlType: string;
+      sqlType: string | null;
       type?: string;
       limit?: number | null;
       precision?: number | null;

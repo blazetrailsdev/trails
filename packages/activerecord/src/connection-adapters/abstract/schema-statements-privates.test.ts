@@ -5,6 +5,7 @@ import {
   indexNameForRemoveFrom,
 } from "./schema-statements.js";
 import { ForeignKeyDefinition } from "./schema-definitions.js";
+import { AbstractAdapter } from "../abstract-adapter.js";
 
 function makeStatements(adapterOverrides: Record<string, unknown> = {}) {
   return new SchemaStatements({
@@ -14,6 +15,10 @@ function makeStatements(adapterOverrides: Record<string, unknown> = {}) {
     quoteDefaultExpression: (v: unknown) => `${v}`,
     execute: vi.fn().mockResolvedValue([]),
     executeMutation: vi.fn().mockResolvedValue(undefined),
+    // Every real host is an AbstractAdapter, which mixes in Quoting's
+    // lookup_cast_type; the stub carries the base implementation so
+    // fetchTypeMetadata dispatches through it as schema_statements.rb:1718 does.
+    lookupCastType: (sqlType: string | null) => AbstractAdapter.TYPE_MAP.lookup(sqlType),
     config: {},
     ...adapterOverrides,
   } as any);
