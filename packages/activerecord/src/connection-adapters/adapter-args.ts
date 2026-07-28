@@ -156,6 +156,7 @@ export function buildAdapterArg(
       driver,
       pragmas,
       strict,
+      timeout,
       statementLimit,
       preparedStatements,
       driverOptions,
@@ -167,6 +168,10 @@ export function buildAdapterArg(
     if (driver !== undefined) options.driver = driver;
     if (pragmas !== undefined) options.pragmas = pragmas;
     if (strict !== undefined) options.strict = strict;
+    // Rails' SQLite3Adapter reads `@config[:timeout]` and applies it as the
+    // driver's busy timeout (sqlite3_adapter.rb:821-826); `config.example.yml:84`
+    // sets it on both arunit entries.
+    if (timeout !== undefined) options.timeout = timeout;
     if (statementLimit !== undefined) options.statementLimit = statementLimit;
     if (preparedStatements !== undefined) options.preparedStatements = preparedStatements;
     if (driverOptions !== undefined) options.driverOptions = driverOptions;

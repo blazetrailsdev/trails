@@ -29,6 +29,16 @@ describe("buildAdapterArg", () => {
       ]);
     });
 
+    it("preserves the SQLite timeout option", () => {
+      const args = buildAdapterArg("sqlite3", {
+        adapter: "sqlite3",
+        database: "x.db",
+        timeout: 5000,
+        strict: true,
+      });
+      expect(args).toEqual(["x.db", { strict: true, timeout: 5000 }]);
+    });
+
     it("ignores unrelated database.yml keys (pool, host, etc.)", () => {
       const args = buildAdapterArg("sqlite3", {
         adapter: "sqlite3",

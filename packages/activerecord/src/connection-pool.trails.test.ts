@@ -24,6 +24,7 @@ import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { SchemaReflection, BoundSchemaReflection } from "./connection-adapters/schema-cache.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { newRawTestAdapter, ambientPoolConfiguration, adapterType } from "./test-adapter.js";
+import { inMemoryDb } from "./support/adapter-helper.js";
 import type { LeasedTestAdapter } from "./test-adapter.js";
 import { fixtures } from "./test-fixtures.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -610,60 +611,68 @@ describe("ConnectionPool schema cache", () => {
     });
   });
 
-  it("eagerly warms the schema cache by introspection on first connection when enabled", async () => {
-    // Production analogue of Rails' schema_cache.addAll(pool) at boot: with
-    // no schema_cache.json on disk, eager warming introspects the live DB so
-    // a synchronous read sees real columns. Await pool._eagerWarmPromise so
-    // we're not timing-dependent. Introspects the ambient lane DB's canonical
-    // `posts` table (Rails' scratch-table name) instead of an invented one.
+  // The pool under test opens its own handle, and on the sqlite3_mem lane that
+  // is its own empty database — there is no canonical `posts` to introspect.
+  it.skipIf(inMemoryDb())(
+    "eagerly warms the schema cache by introspection on first connection when enabled",
+    async () => {
+      // Production analogue of Rails' schema_cache.addAll(pool) at boot: with
+      // no schema_cache.json on disk, eager warming introspects the live DB so
+      // a synchronous read sees real columns. Await pool._eagerWarmPromise so
+      // we're not timing-dependent. Introspects the ambient lane DB's canonical
+      // `posts` table (Rails' scratch-table name) instead of an invented one.
 
-    const prevEager = SchemaReflection.eagerLoadSchemaCache;
-    SchemaReflection.eagerLoadSchemaCache = true;
+      const prevEager = SchemaReflection.eagerLoadSchemaCache;
+      SchemaReflection.eagerLoadSchemaCache = true;
 
-    // No schemaCachePath: there is no dump file, so only DB introspection
-    // can populate the cache.
-    const pool = makeAmbientPool({ schemaCachePath: "" });
-    try {
-      await pool.leaseConnection();
-      pool.releaseConnection();
-      expect(pool._eagerWarmPromise).not.toBeNull();
-      await pool._eagerWarmPromise;
-      expect(pool.schemaCache.isCached("posts")).toBe(true);
-      // Adapter-visible raw cache is propagated so synchronous consumers
-      // (Model.columnNames) see the introspected columns without a DB hit.
-      expect(pool.poolConfig.schemaCache).not.toBeNull();
-      expect(pool.poolConfig.schemaCache!.isColumnsHash(null, "posts")).toBe(true);
-    } finally {
-      SchemaReflection.eagerLoadSchemaCache = prevEager;
-      await closePoolConnections(pool);
-    }
-  });
+      // No schemaCachePath: there is no dump file, so only DB introspection
+      // can populate the cache.
+      const pool = makeAmbientPool({ schemaCachePath: "" });
+      try {
+        await pool.leaseConnection();
+        pool.releaseConnection();
+        expect(pool._eagerWarmPromise).not.toBeNull();
+        await pool._eagerWarmPromise;
+        expect(pool.schemaCache.isCached("posts")).toBe(true);
+        // Adapter-visible raw cache is propagated so synchronous consumers
+        // (Model.columnNames) see the introspected columns without a DB hit.
+        expect(pool.poolConfig.schemaCache).not.toBeNull();
+        expect(pool.poolConfig.schemaCache!.isColumnsHash(null, "posts")).toBe(true);
+      } finally {
+        SchemaReflection.eagerLoadSchemaCache = prevEager;
+        await closePoolConnections(pool);
+      }
+    },
+  );
 
-  it("lets eager warming win when both lazy and eager flags are on", async () => {
-    // Eager subsumes lazy (loadAllBang consults the dump first, then
-    // introspects). With both flags on and NO dump file, the lazy path must
-    // not suppress the eager introspection — otherwise the cache stays empty.
+  it.skipIf(inMemoryDb())(
+    "lets eager warming win when both lazy and eager flags are on",
+    async () => {
+      // Eager subsumes lazy (loadAllBang consults the dump first, then
+      // introspects). With both flags on and NO dump file, the lazy path must
+      // not suppress the eager introspection — otherwise the cache stays empty.
 
-    const prevLazy = SchemaReflection.lazilyLoadSchemaCache;
-    const prevEager = SchemaReflection.eagerLoadSchemaCache;
-    SchemaReflection.lazilyLoadSchemaCache = true;
-    SchemaReflection.eagerLoadSchemaCache = true;
+      const prevLazy = SchemaReflection.lazilyLoadSchemaCache;
+      const prevEager = SchemaReflection.eagerLoadSchemaCache;
+      SchemaReflection.lazilyLoadSchemaCache = true;
+      SchemaReflection.eagerLoadSchemaCache = true;
 
-    const pool = makeAmbientPool({ schemaCachePath: "" });
-    try {
-      await pool.leaseConnection();
-      pool.releaseConnection();
-      // Lazy path suppressed; eager path drove the warm.
-      expect(pool._lazyLoadPromise).toBeNull();
-      expect(pool._eagerWarmPromise).not.toBeNull();
-      await pool._eagerWarmPromise;
-      expect(pool.schemaCache.isCached("posts")).toBe(true);
-    } finally {
-      SchemaReflection.lazilyLoadSchemaCache = prevLazy;
-      SchemaReflection.eagerLoadSchemaCache = prevEager;
-      await closePoolConnections(pool);
-    }
-  });
+      const pool = makeAmbientPool({ schemaCachePath: "" });
+      try {
+        await pool.leaseConnection();
+        pool.releaseConnection();
+        // Lazy path suppressed; eager path drove the warm.
+        expect(pool._lazyLoadPromise).toBeNull();
+        expect(pool._eagerWarmPromise).not.toBeNull();
+        await pool._eagerWarmPromise;
+        expect(pool.schemaCache.isCached("posts")).toBe(true);
+      } finally {
+        SchemaReflection.lazilyLoadSchemaCache = prevLazy;
+        SchemaReflection.eagerLoadSchemaCache = prevEager;
+        await closePoolConnections(pool);
+      }
+    },
+  );
 
   it("does not eagerly warm when the flag is off (default)", async () => {
     // Canonical `posts` exists in the ambient lane DB (via the describe's
@@ -682,26 +691,29 @@ describe("ConnectionPool schema cache", () => {
     }
   });
 
-  it("BoundSchemaReflection.dumpTo(filename) round-trips through the pool", async () => {
-    // End-to-end Rails path: pool.schema_cache.dump_to(filename)
-    // allocates a fresh SchemaCache, addAll(pool) populates it via
-    // the pool's withConnection, dumpTo writes the JSON. Covers the
-    // full chain Rails uses for db:schema:cache:dump. Dumps the ambient lane
-    // DB's canonical `posts` table (provided by the describe's fixtures).
-    await withCacheDir(async (dir) => {
-      const pool = makeAmbientPool();
-      try {
-        const filename = join(dir, "schema_cache.json");
-        await pool.schemaCache.dumpTo(filename);
-        const parsed = JSON.parse(await readFile(filename, "utf8")) as {
-          columns: Record<string, unknown[]>;
-        };
-        expect(Object.keys(parsed.columns)).toContain("posts");
-      } finally {
-        await closePoolConnections(pool);
-      }
-    });
-  });
+  it.skipIf(inMemoryDb())(
+    "BoundSchemaReflection.dumpTo(filename) round-trips through the pool",
+    async () => {
+      // End-to-end Rails path: pool.schema_cache.dump_to(filename)
+      // allocates a fresh SchemaCache, addAll(pool) populates it via
+      // the pool's withConnection, dumpTo writes the JSON. Covers the
+      // full chain Rails uses for db:schema:cache:dump. Dumps the ambient lane
+      // DB's canonical `posts` table (provided by the describe's fixtures).
+      await withCacheDir(async (dir) => {
+        const pool = makeAmbientPool();
+        try {
+          const filename = join(dir, "schema_cache.json");
+          await pool.schemaCache.dumpTo(filename);
+          const parsed = JSON.parse(await readFile(filename, "utf8")) as {
+            columns: Record<string, unknown[]>;
+          };
+          expect(Object.keys(parsed.columns)).toContain("posts");
+        } finally {
+          await closePoolConnections(pool);
+        }
+      });
+    },
+  );
 
   it("PoolConfig treats blank/empty schemaCachePath as presence-based 'no cache'", async () => {
     // User explicitly setting schemaCachePath — even to '' or '   ' —
