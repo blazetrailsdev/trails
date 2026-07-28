@@ -2164,9 +2164,16 @@ export class AbstractAdapter implements Quoting {
    * Declared only here, as in Rails: `PostgreSQLAdapter` and
    * `AbstractMysqlAdapter` define no `TYPE_MAP` constant, so `self::TYPE_MAP`
    * resolves to this one for them and their `initialize_type_map` never
-   * re-runs. (Rails also declares the constant on `Mysql2Adapter` and
-   * `SQLite3Adapter`; trails resolves both through `_buildTypeMap` instead —
-   * tracked by `mysql-native-type-map-converges-onto-type-map`.)
+   * re-runs.
+   *
+   * Rails additionally declares `TYPE_MAP` on `Mysql2Adapter`
+   * (mysql2_adapter.rb:53) and `SQLite3Adapter` (sqlite3_adapter.rb:505), plus
+   * `EXTENDED_TYPE_MAPS` on `SQLite3Adapter` (506). trails has neither, so
+   * those two seed their extended maps from this base map and share this
+   * `EXTENDED_TYPE_MAPS` — inert only because both resolve casts through the
+   * invented `_buildTypeMap` path, which is exactly what
+   * `mysql-native-type-map-converges-onto-type-map` deletes. That story must
+   * add the missing declarations in the same change.
    *
    * Built on first read rather than at class-definition time because the type
    * classes `initializeTypeMap` registers sit on a circular import edge and are

@@ -13,9 +13,8 @@ export class TypeMap {
   }
 
   // `lookupKey` is nullable because Rails reaches here with a nil `sql_type`
-  // (`lookup_cast_type(column.sql_type)`, abstract/quoting.rb:125-127) and
-  // `Regexp#===(nil)` simply does not match. Nothing registers a key matching
-  // the coerced "null", so a nil key falls through to the default value type.
+  // (`lookup_cast_type(column.sql_type)`, abstract/quoting.rb:125-127); as with
+  // `Regexp#===(nil)`, a nil key matches nothing and falls to the default type.
   lookup(lookupKey: string | null): Type {
     return this.fetch(lookupKey, () => new ValueType());
   }
@@ -51,7 +50,7 @@ export class TypeMap {
       const matches =
         typeof key === "string"
           ? key === lookupKey
-          : ((key.lastIndex = 0), key.test(String(lookupKey)));
+          : lookupKey !== null && ((key.lastIndex = 0), key.test(lookupKey));
       if (matches) return factory(lookupKey as string);
     }
     if (this._parent) {

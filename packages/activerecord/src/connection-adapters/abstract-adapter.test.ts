@@ -210,11 +210,15 @@ describe("AbstractAdapter.extendedTypeMap", () => {
     expect(adapter.lookupCastType("datetime")).toMatchObject({ isUtc: true });
   });
 
+  // TestAdapter declares no EXTENDED_TYPE_MAPS of its own, so — as in Ruby,
+  // where the constant lookup walks up to AbstractAdapter — the entry lands in
+  // the base class's shared map. Asserted on AbstractAdapter to keep that
+  // sharing visible rather than implying a per-class cache.
   it("is memoized per key in EXTENDED_TYPE_MAPS rather than rebuilt per read", () => {
     const adapter = new TestAdapter();
     (adapter as any)._config = { defaultTimezone: "utc" };
     expect(adapter.typeMap).toBe(adapter.typeMap);
-    expect(TestAdapter.EXTENDED_TYPE_MAPS.get(JSON.stringify({ defaultTimezone: "utc" }))).toBe(
+    expect(AbstractAdapter.EXTENDED_TYPE_MAPS.get(JSON.stringify({ defaultTimezone: "utc" }))).toBe(
       adapter.typeMap,
     );
   });
