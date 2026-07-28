@@ -62,6 +62,10 @@ tester.run("require-table-teardown", rule, {
     // The doubled-quote branch must not overreach: a later `""` elsewhere in
     // the statement is not part of the name, which closes at its own quote.
     'await adapter.exec(`CREATE TABLE "t" (c TEXT DEFAULT "")`);\nawait adapter.exec(`DROP TABLE "t"`);',
+    // An escaped quote as the *last* content character puts a real closing
+    // quote right after a doubled pair — the boundary `quotedNameTruncated`
+    // must not fire on, since `charAfter` is the space, not a quote.
+    'await adapter.exec(`CREATE TABLE "my""" (id int)`);\nawait ctx.dropTable(\'my"\');',
     // An unclosed name containing a doubled quote must not be truncated into a
     // phantom `my` create by backtracking off the `""` — it is unknowable.
     'await adapter.exec(`CREATE TABLE "my""table${x} (id int)`);',
