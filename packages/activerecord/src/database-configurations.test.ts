@@ -198,6 +198,23 @@ describe("DatabaseConfigurationsTest", () => {
       expect(configs.findDbConfig("common")!.database).toBe("common.sqlite3");
     });
 
+    it("currentEnv prefers TRAILS_ENV over an explicitly set defaultEnv", () => {
+      // Deliberate deviation from Rails, where Rails.env (our defaultEnv)
+      // outranks ENV["RAILS_ENV"] (our TRAILS_ENV, per BC-2). TRAILS_ENV is how
+      // a deploy declares the process env, so no bootstrap may override it.
+      vi.stubEnv("TRAILS_ENV", "production");
+      vi.stubEnv("NODE_ENV", "test");
+      DatabaseConfigurations.defaultEnv = "default_env";
+
+      expect(DatabaseConfigurations.currentEnv()).toBe("production");
+
+      const configs = DatabaseConfigurations.fromRaw({
+        production: { primary: { adapter: "sqlite3", database: "prod.db" } },
+        default_env: { primary: { adapter: "sqlite3", database: "bad.db" } },
+      });
+      expect(configs.findDbConfig("primary")!.database).toBe("prod.db");
+    });
+
     it("fromEnv builds the synthesized DATABASE_URL config under currentEnv", () => {
       // The build env must equal currentEnv() so the runtime selectors in
       // connection-handling find the synthesized config under the same env.

@@ -70,18 +70,25 @@ export class DatabaseConfigurations {
   }
 
   /**
-   * The active environment resolved from the process, mirroring Rails'
-   * `ConnectionHandling::DEFAULT_ENV` / `RAILS_ENV` lambdas:
+   * The active environment. Rails' counterpart is
+   * `ConnectionHandling::DEFAULT_ENV` / `RAILS_ENV`, which resolves
    * `Rails.env` → `RAILS_ENV` → `RACK_ENV` → the literal default.
+   * Ours resolves `TRAILS_ENV` → `defaultEnv` → `NODE_ENV` → the literal
+   * default.
    *
-   * `TRAILS_ENV` is the canonical runtime env (BC-2) and outranks everything,
-   * including an explicit `defaultEnv` — deploys set it to say which
-   * environment this process IS, so no bootstrap may override it. Below it,
-   * `defaultEnv` (the app-bootstrap / test override) is the `Rails.env`
-   * analogue and wins when set. `NODE_ENV` is last, ahead of only the literal
-   * default: it is a one-release bridge with no Rails counterpart, and test
-   * runners set it unconditionally, so it must not mask a deliberate
-   * `defaultEnv`.
+   * DELIBERATE DEVIATION — `TRAILS_ENV` outranks `defaultEnv`, Rails is the
+   * other way round. Per BC-2 (`docs/infrastructure/browser-compat-plan.md:88`)
+   * `TRAILS_ENV` is the rename of the old `process.env.NODE_ENV` reads, so it
+   * maps to Rails' `ENV["RAILS_ENV"]` / `ENV["RACK_ENV"]`, and `defaultEnv` is
+   * the `Rails.env` analogue — by `connection_handling.rb:6` `defaultEnv` would
+   * therefore win. trails inverts that on purpose: `TRAILS_ENV` is how a deploy
+   * declares which environment the process is, and no in-process bootstrap may
+   * override it. Consequence to know: with `TRAILS_ENV` set, assigning
+   * `defaultEnv` has no effect on the resolved env.
+   *
+   * `NODE_ENV` sits last, ahead of only the literal default: it is a
+   * one-release bridge with no Rails counterpart, and test runners set it
+   * unconditionally, so it must not mask a deliberate `defaultEnv`.
    *
    * Single source of truth for "what env are we building/connecting for" —
    * `fromEnv` (which builds the configs) and the runtime config selectors in
