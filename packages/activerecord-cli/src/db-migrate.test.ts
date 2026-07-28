@@ -10,10 +10,27 @@ const config = { development: { adapter: "sqlite3", database: ":memory:", pool: 
 export default config;
 `;
 
+const FAKE_MULTI_DB_CONFIG = `
+const config = {
+  development: {
+    primary: { adapter: "sqlite3", database: ":memory:", pool: 1 },
+    animals: { adapter: "sqlite3", database: ":memory:", pool: 1 },
+  },
+};
+export default config;
+`;
+
 async function makeFakeProject(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "ar-db-migrate-"));
   await mkdir(join(dir, "config"), { recursive: true });
   await writeFile(join(dir, "config", "database.ts"), FAKE_CONFIG, "utf8");
+  return dir;
+}
+
+async function makeMultiDbFakeProject(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "ar-db-migrate-multi-"));
+  await mkdir(join(dir, "config"), { recursive: true });
+  await writeFile(join(dir, "config", "database.ts"), FAKE_MULTI_DB_CONFIG, "utf8");
   return dir;
 }
 
@@ -51,20 +68,37 @@ describe("DbMigrateTest", () => {
   it("db:migrate calls migrate with no args", async () => {
     DatabaseConfigurations.defaultEnv = "development";
     expect(await run(["db:migrate"], await makeFakeProject())).toBe(0);
-    expect(migrateSpy).toHaveBeenCalledWith(undefined);
+    expect(migrateSpy).toHaveBeenCalledWith(undefined, { skipInitialize: true });
   });
 
   it("db:migrate --version passes version string", async () => {
+    // `--version` is the CLI spelling of Rails' `VERSION=x rake db:migrate`, so
+    // it reaches `migrate` through `targetVersion()` rather than as an argument.
+    let seenTargetVersion: number | null = null;
+    migrateSpy.mockImplementation(async () => {
+      seenTargetVersion = DatabaseTasks.targetVersion();
+    });
     expect(await run(["db:migrate", "--version", "20240101000000"], await makeFakeProject())).toBe(
       0,
     );
-    expect(migrateSpy).toHaveBeenCalledWith("20240101000000");
+    expect(seenTargetVersion).toBe(20240101000000);
+    expect(DatabaseTasks.targetVersion()).toBeNull();
   });
 
   it("db:migrate calls Migrator.discoverMigrations before migrate", async () => {
     const discoverSpy = vi.spyOn(Migrator, "discoverMigrations").mockReturnValue([]);
     expect(await run(["db:migrate"], await makeFakeProject())).toBe(0);
     expect(discoverSpy).toHaveBeenCalled();
+  });
+
+  it("db:migrate takes the multi-database path when the env has several configs", async () => {
+    // `migrateAll`'s multi-db branch never touches the ambient pool `dbMigrate`
+    // opens — it drives each config through its own `withTemporaryConnection`,
+    // so the single-primary fast path (and with it `migrate`) is never reached.
+    DatabaseConfigurations.defaultEnv = "development";
+    expect(await run(["db:migrate"], await makeMultiDbFakeProject())).toBe(0);
+    expect(DatabaseTasks.configsFor("development")).toHaveLength(2);
+    expect(migrateSpy).not.toHaveBeenCalled();
   });
 
   it("db:migrate exits 1 on missing config", async () => {

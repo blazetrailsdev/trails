@@ -786,13 +786,6 @@ function databaseTasksMigrationTestCase(): MigrationTestCase {
     const ambient = ambientPoolConfiguration();
     const sourceFile = String(ambient.database);
     await Base.establishConnection({ ...ambient, database: ":memory:", pool: 1 });
-    // Rails leaves the ambient `arunit` configurations in place while the
-    // connection is `:memory:`; trails' `migrate` picks its pool by comparing
-    // the config's database to the pool's, so the ambient shape is carried
-    // over with the connected database substituted in.
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      [DatabaseTasks.env]: { ...ambient, database: ":memory:" },
-    });
     await backupIntoConnection(sourceFile);
   });
 
