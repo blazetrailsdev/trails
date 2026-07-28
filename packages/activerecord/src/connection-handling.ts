@@ -845,11 +845,17 @@ async function establishWithDbConfig(
   // config already names its adapter — matching Rails, whose URL configs always
   // parse a scheme. Defensively backfill should a non-UrlConfig path ever hand
   // us an adapter-less hash with a derivable URL.
+  // Replaces the hash rather than writing into it: configuration hashes are
+  // frozen (Rails freezes them in HashConfig#initialize), and the object
+  // identity the handler's pool-reuse check keys on is the DatabaseConfig, not
+  // its hash.
+  let configForConnect = config;
   if (!dbConfig.adapter) {
-    (config as { adapter?: string }).adapter = adapterName;
+    dbConfig.configuration = Object.freeze({ ...config, adapter: adapterName });
+    configForConnect = dbConfig.configuration as Record<string, unknown>;
   }
 
-  await establishWithConfig(modelClass, adapterName, connectUrl, config, dbConfig);
+  await establishWithConfig(modelClass, adapterName, connectUrl, configForConnect, dbConfig);
   if (tz) setDefaultTimezone(tz);
 }
 

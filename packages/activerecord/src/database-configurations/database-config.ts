@@ -80,7 +80,10 @@ export class DatabaseConfig {
   constructor(envName: string, name: string, configuration: DatabaseConfigOptions = {}) {
     this.envName = envName;
     this.name = name;
-    this.configuration = configuration;
+    // Rails: `@configuration_hash = configuration_hash.symbolize_keys.freeze`
+    // (hash_config.rb:40) — a new frozen hash, so the caller's literal is
+    // never aliased and no later write can reach it.
+    this.configuration = Object.freeze({ ...configuration });
   }
 
   /**
