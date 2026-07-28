@@ -182,4 +182,32 @@ describe("MigrationTest", () => {
     );
     expect(new IllegalMigrationNameError().message).toBe("Illegal name for migration.");
   });
+
+  // Rails' `verbose` is a cattr_accessor (`migration.rb:797`), so the class and
+  // instance readers share one variable and `suppress_messages` toggling it on
+  // an instance is visible class-wide. No Rails test asserts that coupling
+  // directly, so it lives in the trails-only sibling.
+  it("verbose is shared between the class and its instances", async () => {
+    const verboseWas = Migration.verbose;
+    try {
+      class Quiet extends Migration {}
+      const instance = new (class extends Migration {})();
+
+      Migration.verbose = false;
+      expect(instance.verbose).toBe(false);
+      expect(Quiet.verbose).toBe(false);
+
+      instance.verbose = true;
+      expect(Migration.verbose).toBe(true);
+
+      let seen: boolean | undefined;
+      await instance.suppressMessages(async () => {
+        seen = Migration.verbose;
+      });
+      expect(seen).toBe(false);
+      expect(Migration.verbose).toBe(true);
+    } finally {
+      Migration.verbose = verboseWas;
+    }
+  });
 });

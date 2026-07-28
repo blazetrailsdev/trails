@@ -270,15 +270,17 @@ export class DatabaseTasks {
     const effectiveVersion = typeof raw === "string" ? raw.trim() || null : raw;
     this.checkTargetVersion(effectiveVersion ?? undefined);
 
-    const { Migrator } = await import("../migration.js");
+    const { Migration, Migrator } = await import("../migration.js");
     const scope = getEnv("SCOPE");
-    const verbose = isVerbose();
+    // Rails: `verbose_was, Migration.verbose = Migration.verbose, verbose?`
+    // (`database_tasks.rb:264`), restored in the ensure block at `:282`.
+    const verboseWas = Migration.verbose;
+    Migration.verbose = isVerbose();
 
     const runMigration = async (
       adapter: import("../connection-adapters/abstract-adapter.js").AbstractAdapter,
     ) => {
       const migrator = new Migrator(adapter, this._migrations);
-      migrator.verbose = verbose;
       // Rails block: `version.blank? ? (scope.blank? || scope == m.scope) : m.version == version`
       // `version` is the *method parameter* (explicit arg), NOT ENV["VERSION"].
       // The rake task always calls migrate() with no arg, so version is nil → scope filter only.
@@ -294,10 +296,10 @@ export class DatabaseTasks {
         filter = (m) => m.scope === scope;
       }
       const ran = await migrator.migrate(effectiveVersion ?? null, filter);
-      if (scope && scope.trim() !== "" && ran.length === 0 && verbose) {
+      if (scope && scope.trim() !== "" && ran.length === 0 && Migration.verbose) {
         // Rails: `Migration.write("No migrations ran. ...")` — write puts to
-        // $stdout (`migration.rb:1001`); `verbose` here is the gate Migration
-        // #write applies. `stdout` is the activesupport $stdout shim.
+        // $stdout (`migration.rb:1001`); `Migration.verbose` is the gate
+        // Migration#write applies. `stdout` is the activesupport $stdout shim.
         stdout.write(`No migrations ran. (using ${scope} scope)\n`);
       }
       // Rails: `migration_connection_pool.schema_cache.clear!` — drop the
@@ -307,9 +309,13 @@ export class DatabaseTasks {
       adapter.schemaCache?.clear();
     };
 
-    const pool = await this.migrationConnectionPool();
-    if (!skipInitialize) await initializeDatabase(pool.dbConfig);
-    await runMigration(await pool.leaseConnection());
+    try {
+      const pool = await this.migrationConnectionPool();
+      if (!skipInitialize) await initializeDatabase(pool.dbConfig);
+      await runMigration(await pool.leaseConnection());
+    } finally {
+      Migration.verbose = verboseWas;
+    }
   }
 
   /** Roll back the last N migrations (default 1). Mirrors `db:rollback`. */
@@ -823,41 +829,53 @@ export class DatabaseTasks {
     // reach check_schema_file. Use == null (nullish) to match that.
     const filename = file ?? this.schemaDumpPath(config, format);
     if (filename == null) return;
-    this.checkSchemaFile(filename);
 
-    if (format === "sql") {
-      await this.structureLoad(config, filename);
-      await this._stampSchemaSha1(config, filename);
-      return;
-    }
+    // Rails: `verbose_was, Migration.verbose = Migration.verbose, verbose? && ENV["VERBOSE"]`
+    // (`database_tasks.rb:380`) — the extra ENV["VERBOSE"] term keeps a schema
+    // load quiet unless VERBOSE was set explicitly; restored at `:394`.
+    const { Migration } = await import("../migration.js");
+    const verboseWas = Migration.verbose;
+    Migration.verbose = isVerbose() && getEnv("VERBOSE") !== undefined;
+    try {
+      this.checkSchemaFile(filename);
 
-    const path = getPath();
-    if (!path.pathToFileURL) {
-      throw new Error(
-        "DatabaseTasks.loadSchema requires PathAdapter.pathToFileURL. " +
-          "The configured PathAdapter does not provide it.",
-      );
+      if (format === "sql") {
+        await this.structureLoad(config, filename);
+        await this._stampSchemaSha1(config, filename);
+        return;
+      }
+
+      const path = getPath();
+      if (!path.pathToFileURL) {
+        throw new Error(
+          "DatabaseTasks.loadSchema requires PathAdapter.pathToFileURL. " +
+            "The configured PathAdapter does not provide it.",
+        );
+      }
+      // Missing isAbsolute means the PathAdapter doesn't model relative vs.
+      // absolute (e.g. a VFS) — treat the incoming filename as already
+      // absolute in that case.
+      const absolute = this._resolveSchemaPath(filename);
+      const href = path.pathToFileURL(absolute).href;
+      const mod = (await import(href)) as {
+        default?: (ctx: unknown) => Promise<void> | void;
+      };
+      const defineSchema =
+        mod.default ?? (mod as unknown as (ctx: unknown) => Promise<void> | void);
+      if (typeof defineSchema !== "function") {
+        throw new Error(`Schema file must export a default function (got ${typeof defineSchema})`);
+      }
+      const adapter = await this._migrationAdapter();
+      const { MigrationContext } = await import("../migration.js");
+      const ctx = new MigrationContext(adapter);
+      await defineSchema(ctx);
+      // Stamp using the resolved absolute path — `filename` may be
+      // relative and `_schemaSha1` reads the file via getFs(), so the
+      // path must match what was actually imported.
+      await this._stampSchemaSha1(config, absolute);
+    } finally {
+      Migration.verbose = verboseWas;
     }
-    // Missing isAbsolute means the PathAdapter doesn't model relative vs.
-    // absolute (e.g. a VFS) — treat the incoming filename as already
-    // absolute in that case.
-    const absolute = this._resolveSchemaPath(filename);
-    const href = path.pathToFileURL(absolute).href;
-    const mod = (await import(href)) as {
-      default?: (ctx: unknown) => Promise<void> | void;
-    };
-    const defineSchema = mod.default ?? (mod as unknown as (ctx: unknown) => Promise<void> | void);
-    if (typeof defineSchema !== "function") {
-      throw new Error(`Schema file must export a default function (got ${typeof defineSchema})`);
-    }
-    const adapter = await this._migrationAdapter();
-    const { MigrationContext } = await import("../migration.js");
-    const ctx = new MigrationContext(adapter);
-    await defineSchema(ctx);
-    // Stamp using the resolved absolute path — `filename` may be
-    // relative and `_schemaSha1` reads the file via getFs(), so the
-    // path must match what was actually imported.
-    await this._stampSchemaSha1(config, absolute);
   }
 
   /**

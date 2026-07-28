@@ -1,7 +1,8 @@
 // Faithful port of vendor/rails/activerecord/test/cases/migrator_test.rb
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { stdout } from "@blazetrails/activesupport";
 import {
+  Migration,
   Migrator,
   DuplicateMigrationVersionError,
   UnknownMigrationVersionError,
@@ -76,15 +77,23 @@ describe("MigratorTest", () => {
     return sm;
   }
 
+  let verboseWas: boolean;
+
   // Rails' setup/teardown do `@schema_migration.create_table` +
   // `delete_all_versions rescue nil` around each test; on the shared
   // `Base.connection` pool the schema_migrations rows persist between tests, so
-  // clear them here to match Rails' fresh-per-test version state.
+  // clear them here to match Rails' fresh-per-test version state. Rails' setup
+  // also stashes `@verbose_was` and its teardown restores it.
   beforeEach(async () => {
     adapter = Base.connection;
     const sm = new SchemaMigration(adapter);
     await sm.createTable();
     await sm.deleteAllVersions();
+    verboseWas = Migration.verbose;
+  });
+
+  afterEach(() => {
+    Migration.verbose = verboseWas;
   });
 
   it("migrator with duplicate names", () => {
@@ -436,15 +445,14 @@ describe("MigratorTest", () => {
     try {
       const { migrations } = sensors(3);
 
+      Migration.verbose = true;
       const upMigrator = new Migrator(adapter, migrations);
-      upMigrator.verbose = true;
       await upMigrator.migrate(1);
       expect(lines.length).not.toBe(0);
 
       lines.length = 0;
 
       const downMigrator = new Migrator(adapter, migrations);
-      downMigrator.verbose = true;
       await downMigrator.migrate(0);
       expect(lines.length).not.toBe(0);
     } finally {
@@ -461,13 +469,12 @@ describe("MigratorTest", () => {
     try {
       const { migrations } = sensors(3);
 
+      Migration.verbose = false;
       const upMigrator = new Migrator(adapter, migrations);
-      upMigrator.verbose = false;
       await upMigrator.migrate(1);
       expect(lines.length).toBe(0);
 
       const downMigrator = new Migrator(adapter, migrations);
-      downMigrator.verbose = false;
       await downMigrator.migrate(0);
       expect(lines.length).toBe(0);
     } finally {
