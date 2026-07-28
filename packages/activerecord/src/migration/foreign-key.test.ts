@@ -2,7 +2,7 @@
  * Port of the `add_foreign_key`, `remove_foreign_key` and `SchemaDumpingHelper`
  * halves of `ActiveRecord::Migration::ForeignKeyTest`
  * (vendor/rails/activerecord/test/cases/migration/foreign_key_test.rb:209-330,
- * :393-451, :536-619, :643-747 and :749-773) plus all of its sibling
+ * :393-451, :453-535, :536-619, :643-747 and :749-773) plus all of its sibling
  * `ActiveRecord::Migration::CompositeForeignKeyTest` (:824-912).
  *
  * Driven by the ambient connection, mirroring Rails'
