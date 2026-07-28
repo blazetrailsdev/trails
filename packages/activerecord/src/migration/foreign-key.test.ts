@@ -24,6 +24,8 @@ import { describeIfSupports } from "../support/supports.js";
 // has no name to compare.
 const unlessSqlite3Adapter = adapterType !== "sqlite";
 
+const mysqlRestrictActionReflectsNil = adapterType === "mysql";
+
 describeIfSupports("foreign_keys", "ActiveRecord::Migration::ForeignKeyTest", () => {
   // DDL can't run inside the transactional-fixtures wrapper (PG aborts the
   // outer transaction on a failed statement), matching the schema-statements
@@ -257,7 +259,7 @@ describeIfSupports("foreign_keys", "ActiveRecord::Migration::ForeignKeyTest", ()
     });
   });
 
-  it.skipIf(!unlessSqlite3Adapter)("remove foreign key by name", async () => {
+  it.skipIf(adapterType === "sqlite")("remove foreign key by name", async () => {
     const conn = await ambientConnection();
     await withRocketTables(conn, async () => {
       await conn.addForeignKey("astronauts", "rockets", {
@@ -307,8 +309,11 @@ describeIfSupports("foreign_keys", "ActiveRecord::Migration::ForeignKeyTest", ()
   // so the reflected fk stores `on_delete` as nil — the same fact Rails asserts in
   // test_add_on_delete_restrict_foreign_key. `defined_for?` then compares
   // `Array(nil)` against `["restrict"]` and never matches, so the removal raises.
-  // Rails leaves the case ungated because its own suite does not run it here.
-  it.skipIf(adapterType === "mysql")("remove foreign key with restrict action", async () => {
+  // Rails leaves the case ungated because its own suite does not run it here,
+  // so the skip is ours, not a ported gate — held in a named boolean so
+  // test-compare records it as an incomparable guard rather than as an adapter
+  // restriction Rails never had.
+  it.skipIf(mysqlRestrictActionReflectsNil)("remove foreign key with restrict action", async () => {
     const conn = await ambientConnection();
     await withRocketTables(conn, async () => {
       await conn.addForeignKey("astronauts", "rockets", { onDelete: "restrict" });
