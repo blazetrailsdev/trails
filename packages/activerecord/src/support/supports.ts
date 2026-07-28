@@ -72,6 +72,9 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // PostgreSQL only (postgresql_adapter.rb:224/228; abstract default false).
   exclusion_constraints: ["postgres"],
   unique_constraints: ["postgres"],
+  // `supports_deferrable_constraints?`: PostgreSQL + SQLite true, abstract
+  // default false. (postgresql_adapter.rb:236, sqlite3_adapter.rb:249)
+  deferrable_constraints: ["postgres", "sqlite"],
   // `supports_expression_index?`: PG + SQLite always; MySQL family per the
   // live-server probe above (MySQL ≥ 8.0.13, never MariaDB).
   // (postgresql_adapter.rb:208, sqlite3_adapter.rb:155, abstract_mysql_adapter.rb:104)
