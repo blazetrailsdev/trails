@@ -2,6 +2,7 @@
  * Logger and TaggedLogging — mirroring ActiveSupport's logging API.
  */
 
+import { stdout } from "./process-adapter.js";
 import { Temporal } from "./temporal.js";
 
 export type LogLevel = "debug" | "info" | "warn" | "error" | "fatal" | "unknown";
@@ -27,6 +28,12 @@ const LEVEL_NAMES: Record<number, LogLevel> = {
 export interface LoggerOutput {
   write(s: string): void;
 }
+
+const defaultOutput: LoggerOutput = {
+  write: (s) => {
+    stdout.write(s);
+  },
+};
 
 /**
  * ActiveSupport::Logger — a structured logger with level filtering, silence blocks,
@@ -61,7 +68,7 @@ export class Logger {
   static readonly FATAL = 4;
   static readonly UNKNOWN = 5;
 
-  constructor(output: LoggerOutput | null = { write: (s) => process.stdout.write(s) }) {
+  constructor(output: LoggerOutput | null = defaultOutput) {
     this.output = output;
   }
 
