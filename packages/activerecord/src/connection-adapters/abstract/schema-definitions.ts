@@ -1089,6 +1089,15 @@ export class TableDefinition {
   }
 
   /**
+   * Returns the ColumnDefinition for the column named +name+.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::TableDefinition#[]
+   */
+  get(name: string): ColumnDefinition | undefined {
+    return this.columns.find((c) => c.name === String(name));
+  }
+
+  /**
    * Remove the column +name+ from the table.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::TableDefinition#remove_column

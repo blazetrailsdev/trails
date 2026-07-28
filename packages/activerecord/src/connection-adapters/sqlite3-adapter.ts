@@ -104,6 +104,7 @@ import {
   ForeignKeyDefinition,
   type AddForeignKeyOptions,
   type ColumnType,
+  type ColumnOptions,
   type RemoveForeignKeyOptions,
   type ForeignKeyLookupOptions,
 } from "./abstract/schema-definitions.js";
@@ -1693,31 +1694,17 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     type: string,
     options?: Record<string, unknown>,
   ): Promise<void> {
-    const baseType = this._baseColumnType(type, options);
-    const generatedAs = typeof options?.as === "string" ? options.as : null;
     if (isInvalidAlterTableType(type, options ?? {})) {
-      const isPk = Boolean(options?.primaryKey) || type === "primary_key";
-      await this.alterTable(tableName, (columns) => {
-        columns[columnName] = {
-          name: columnName,
-          type: baseType,
-          collation: options?.collation ?? null,
-          generatedAs,
-          generatedStored: Boolean(options?.stored),
-          notnull: options?.null === false || isPk ? 1 : 0,
-          dflt_value:
-            options?.default !== undefined && generatedAs === null
-              ? this.quoteDefault(this.serializeDefaultForColumn(options.default, baseType))
-              : null,
-          pk: isPk ? 1 : 0,
-        };
+      await this.alterTable(tableName, (definition) => {
+        definition.column(columnName, type as ColumnType, (options ?? {}) as ColumnOptions);
       });
       return;
     }
     if (options?.ifNotExists === true && (await this.columnExists(tableName, columnName))) {
       return;
     }
-    const sqlType = baseType;
+    const generatedAs = typeof options?.as === "string" ? options.as : null;
+    const sqlType = this._baseColumnType(type, options);
     let sql = `ALTER TABLE ${quoteTableName(tableName)} ADD COLUMN ${quoteColumnName(columnName)} ${sqlType}`;
     if (options?.collation) sql += ` COLLATE ${quoteColumnName(String(options.collation))}`;
     if (generatedAs !== null) {
@@ -1736,16 +1723,18 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   async removeColumn(tableName: string, columnName: string, _type?: string): Promise<void> {
-    await this.alterTable(tableName, (columns) => {
-      delete columns[columnName];
+    await this.alterTable(tableName, (definition) => {
+      definition.removeColumn(columnName);
+      deleteForeignKeysForColumns(definition, [columnName]);
     });
   }
 
   async removeColumns(tableName: string, ...columnNames: string[]): Promise<void> {
-    await this.alterTable(tableName, (columns) => {
+    await this.alterTable(tableName, (definition) => {
       for (const col of columnNames) {
-        delete columns[col];
+        definition.removeColumn(col);
       }
+      deleteForeignKeysForColumns(definition, columnNames);
     });
   }
 
@@ -1759,16 +1748,12 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // `{}` is the literal default, not a changes hash.
     const newDefault = this.schemaStatements().extractNewDefaultValue(defaultOrChanges);
     this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
-    await this.alterTable(tableName, (columns) => {
-      if (columns[columnName]) {
-        // Rails recreates the table and re-emits DEFAULT through
-        // quote_default_expression, which serializes structured values through
-        // the column's cast type (sqlite3_adapter.rb:366). Mirror that so a
-        // `default: {}` on a json column quotes to `{}` and not `[object Object]`.
-        const columnType = columns[columnName].type as string | null | undefined;
-        const serialized = this.serializeDefaultForColumn(newDefault, columnType);
-        columns[columnName].dflt_value = serialized === null ? null : this.quoteDefault(serialized);
-      }
+    await this.alterTable(tableName, (definition) => {
+      // The raw value, not a literal: schemaCreation re-emits it through
+      // quoteDefaultExpression, which serializes it through the column's cast
+      // type, so `default: {}` on a json column quotes to `{}`. Unguarded, as
+      // in Rails — an unknown column raises rather than rebuilding unchanged.
+      definition.get(columnName)!.options.default = newDefault;
     });
   }
 
@@ -1788,10 +1773,8 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         `UPDATE ${quoteTableName(tableName)} SET ${quoteColumnName(columnName)} = ${quotedDefault} WHERE ${quoteColumnName(columnName)} IS NULL`,
       );
     }
-    await this.alterTable(tableName, (columns) => {
-      if (columns[columnName]) {
-        columns[columnName].notnull = allowNull ? 0 : 1;
-      }
+    await this.alterTable(tableName, (definition) => {
+      definition.get(columnName)!.options.null = allowNull;
     });
   }
 
@@ -1801,18 +1784,8 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     type: string,
     options?: Record<string, unknown>,
   ): Promise<void> {
-    const sqlType = this.typeToSql(type, options);
-    await this.alterTable(tableName, (columns) => {
-      if (columns[columnName]) {
-        columns[columnName].type = sqlType;
-        if (options?.null !== undefined) columns[columnName].notnull = options.null ? 0 : 1;
-        if (options?.default !== undefined) {
-          const serialized = this.serializeDefaultForColumn(options.default, sqlType);
-          columns[columnName].dflt_value =
-            serialized === null ? null : this.quoteDefault(serialized);
-        }
-        if (options?.collation !== undefined) columns[columnName].collation = options.collation;
-      }
+    await this.alterTable(tableName, (definition) => {
+      definition.changeColumn(columnName, type as ColumnType, (options ?? {}) as ColumnOptions);
     });
   }
 
@@ -2209,19 +2182,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return fields.map((field) => newColumnFromField(this, tableName, field, fields));
   }
 
-  // Mirrors: SQLite3Adapter#table_structure_with_collation
-  private async _parseCollationsFromTableSql(tableName: string): Promise<Map<string, string>> {
-    const result = new Map<string, string>();
-    const enriched = await this.tableStructureWithCollation(
-      tableName,
-      await this.tableInfo(tableName),
-    );
-    for (const e of enriched) {
-      if (e["collation"] != null) result.set(String(e["name"]), String(e["collation"]));
-    }
-    return result;
-  }
-
   async indexes(tableName: string): Promise<unknown[]> {
     return sqliteIndexes(this, tableName);
   }
@@ -2264,15 +2224,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         return;
       }
     }
-    await this.alterTable(
-      fromTable,
-      () => {},
-      undefined,
-      undefined,
-      (definition) => {
-        definition.foreignKey(toTable, options);
-      },
-    );
+    await this.alterTable(fromTable, (definition) => {
+      definition.foreignKey(toTable, options);
+    });
   }
 
   /**
@@ -2325,7 +2279,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     }
 
     const remainingFks = existingFks.filter((fk) => fk !== fkToRemove);
-    await this.alterTable(fromTable, () => {}, remainingFks);
+    await this.alterTable(fromTable, undefined, remainingFks);
   }
 
   /**
@@ -2340,15 +2294,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       throw new Error("validate: false is only supported on PostgreSQL");
     }
     const { name } = options;
-    await this.alterTable(
-      tableName,
-      () => {},
-      undefined,
-      undefined,
-      (definition) => {
-        definition.checkConstraint(expression, { name });
-      },
-    );
+    await this.alterTable(tableName, (definition) => {
+      definition.checkConstraint(expression, { name });
+    });
   }
 
   /**
@@ -2386,147 +2334,94 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     }
 
     const remainingChecks = existingChecks.filter((c) => c.name !== nameToRemove);
-    await this.alterTable(tableName, () => {}, undefined, remainingChecks);
+    await this.alterTable(tableName, undefined, undefined, remainingChecks);
   }
 
   // --- Private: alter_table copy strategy (Rails: SQLite3Adapter#alter_table) ---
 
   private async alterTable(
     tableName: string,
-    modify: (columns: Record<string, Record<string, unknown>>) => void,
+    block?: (definition: SQLite3TableDefinition) => void,
     overrideForeignKeys?: ForeignKeyDefinition[],
     overrideCheckConstraints?: CheckConstraintDefinition[],
-    extraDefinition?: (definition: SQLite3TableDefinition) => void,
   ): Promise<void> {
     await this.ensureConnected();
-    const { schema, bare: bareTable } = this._splitTableName(tableName);
-    const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
-    // table_info hides GENERATED columns; table_xinfo exposes them with
-    // hidden 2 (virtual) / 3 (stored) so the rebuild preserves them (Rails
-    // rebuilds from columns(from) and re-adds them with as:/stored:,
-    // sqlite3_adapter.rb:623).
-    const infoPragma = this.supportsVirtualColumns() ? "table_xinfo" : "table_info";
-    const tableInfoStmt = await this.driver.prepare(
-      `PRAGMA ${pragmaPrefix}${infoPragma}(${quoteColumnName(bareTable)})`,
-    );
-    const tableInfo = ((await tableInfoStmt.all()) as Array<Record<string, unknown>>).filter(
-      (col) => Number(col.hidden ?? 0) !== 1,
-    );
+    const { bare: bareTable } = this._splitTableName(tableName);
 
-    // Rails' alter_table -> copy_table -> primary_key(from) reaches
-    // table_structure, which raises StatementInvalid naming the table when it
-    // doesn't exist (sqlite3_adapter.rb:598, foreign_key_test.rb:322). Our
-    // rebuild reads PRAGMA directly, so raise the same error here rather than
-    // emitting a column-less CREATE TABLE that fails with a syntax error.
-    if (!tableInfo.length) {
-      throw new StatementInvalid(`Could not find table '${tableName}'`, { sql: "", binds: [] });
-    }
+    // No explicit missing-table guard: `columns` reaches table_structure, which
+    // already raises StatementInvalid naming the table (foreign_key_test.rb:322).
+    const fromPrimaryKey = await this.primaryKey(tableName);
+    const sourceColumns = (await this.columns(tableName)) as Sqlite3Column[];
+    const compositePk = Array.isArray(fromPrimaryKey);
 
-    const hasGenerated = tableInfo.some((col) => Number(col.hidden ?? 0) >= 2);
-    const reflected = hasGenerated ? await this.columns(tableName) : [];
-    const columns: Record<string, Record<string, unknown>> = {};
-    for (const col of tableInfo) {
-      const entry: Record<string, unknown> = { ...col };
-      if (Number(col.hidden ?? 0) >= 2) {
-        const meta = reflected.find((r) => r.name === col.name);
-        entry.generatedAs = meta?.defaultFunction ?? null;
-        entry.generatedStored = Number(col.hidden) === 3;
-        entry.dflt_value = null;
+    const definition = new SQLite3TableDefinition(tableName, {
+      id: false,
+      adapter: this,
+      ...(compositePk ? { primaryKey: fromPrimaryKey } : {}),
+    });
+
+    for (const column of sourceColumns) {
+      const options: Record<string, unknown> = {
+        limit: column.limit,
+        precision: column.precision,
+        scale: column.scale,
+        null: column.null,
+        collation: column.collation,
+        primaryKey: !compositePk && column.name === fromPrimaryKey,
+      };
+
+      if (column.isVirtual()) {
+        options.as = column.defaultFunction;
+        options.stored = column.isVirtualStored();
+        options.type = column.type;
+      } else if (column.hasDefault && !column.autoIncrement) {
+        const defaultFunction = column.defaultFunction;
+        const deserialized: unknown = this.lookupCastTypeFromColumn(column).deserialize(
+          column.default,
+        );
+        // Rails: `default = -> { column.default_function } if default.nil?`. The
+        // extra `defaultFunction` guard is trails-only: quoteDefaultExpression
+        // rejects a callable returning null, where Ruby's `quote(nil)` yields NULL.
+        options.default =
+          deserialized == null && defaultFunction != null ? () => defaultFunction : deserialized;
       }
-      columns[col.name as string] = entry;
+
+      // Left null rather than coerced to "" for a typeless (BLOB affinity)
+      // column: typeToSql renders a null type as the empty string, matching
+      // Rails' `type_to_sql(nil)` -> `nil.to_s`, but rejects a blank string.
+      const columnType = column.isVirtual()
+        ? "virtual"
+        : column.isBigint()
+          ? "bigint"
+          : column.type;
+      definition.column(column.name, columnType as ColumnType, options);
     }
 
-    modify(columns);
+    // Attached before the block runs, as in Rails' alter_table lambda
+    // (sqlite3_adapter.rb:566-583) — that ordering is what lets remove_column
+    // delete the FKs it orphans.
+    const fks = overrideForeignKeys ?? (await this.foreignKeys(tableName));
+    const checks = overrideCheckConstraints ?? (await this.checkConstraints(tableName));
+    definition.foreignKeys.push(...fks);
+    definition.checkConstraints.push(...checks);
+
+    block?.(definition);
 
     // Rails: altered_table_name = "a#{table_name}" (sqlite3_adapter.rb:566).
     // Kept bare even for a schema-qualified table: the buffer is a TEMPORARY
     // table, which always lives in the `temp` schema, so a qualifier would be
     // rejected.
     const alteredTableName = `a${bareTable}`;
-    const colNames = Object.keys(columns);
-
-    // Detect composite primary keys
-    const pkColumns = colNames
-      .map((name) => ({ name, pk: Number(columns[name].pk) || 0 }))
-      .filter((c) => c.pk > 0)
-      .sort((a, b) => a.pk - b.pk)
-      .map((c) => c.name);
-    const compositePk = pkColumns.length > 1;
-
-    const definition = new SQLite3TableDefinition(tableName, {
-      id: false,
-      adapter: this,
-      ...(compositePk ? { primaryKey: pkColumns } : {}),
-    });
-
-    const existingCollations = await this._parseCollationsFromTableSql(tableName);
-    for (const name of colNames) {
-      const col = columns[name];
-      const options: Record<string, unknown> = {};
-      const collation = col.collation === undefined ? existingCollations.get(name) : col.collation;
-      if (collation) options.collation = String(collation);
-      if (col.generatedAs) {
-        options.as = col.generatedAs;
-        options.stored = Boolean(col.generatedStored);
-      }
-      if (!compositePk && col.pk) options.primaryKey = true;
-      if (col.notnull) options.null = false;
-      if (col.dflt_value !== null && col.dflt_value !== undefined) {
-        const literal = String(col.dflt_value);
-        options.default = () => literal;
-      }
-      const sqlType = String(col.type ?? "TEXT");
-      const columnDefinition = definition.newColumnDefinition(name, sqlType as ColumnType, options);
-      // PRAGMA reports the declared SQL type, not an AR type name, so pin it here
-      // rather than let the visitor resolve it through typeToSql — that is what
-      // round-trips storage affinity exactly. Not when newColumnDefinition flipped
-      // the type to :primary_key though (an integer/bigint PK with no default):
-      // visit_ColumnDefinition then skips add_column_options! entirely and the
-      // whole constraint rides on type_to_sql(:primary_key), so pinning the
-      // declared text over it would silently drop the PRIMARY KEY. Rails' `||=`
-      // has the same effect (abstract/schema_creation.rb:34).
-      if (columnDefinition.type !== "primary_key") columnDefinition.sqlType = sqlType;
-      definition.columns.push(columnDefinition);
-    }
-
-    // Preserve foreign keys and check constraints across the rebuild.
-    // Rails: alter_table(table_name, foreign_keys(...), check_constraints(...))
-    const fks = overrideForeignKeys ?? (await this.foreignKeys(tableName));
-    const checks = overrideCheckConstraints ?? (await this.checkConstraints(tableName));
-
-    for (const fk of fks) {
-      const cols = Array.isArray(fk.column)
-        ? fk.column
-        : fk.column.includes(",")
-          ? fk.column.split(",").map((c) => c.trim())
-          : [fk.column];
-      if (!cols.every((c) => colNames.includes(c))) continue;
-      definition.foreignKeys.push(fk);
-    }
-
-    const removedColumns = tableInfo
-      .map((c) => c.name as string)
-      .filter((n) => !colNames.includes(n));
-    for (const chk of checks) {
-      // Skip check constraints that reference columns no longer in the table
-      // (mirrors the FK handling above which skips FKs for removed columns)
-      const referencesRemovedCol = removedColumns.some((col) =>
-        new RegExp(`\\b${col.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(chk.expression),
-      );
-      if (referencesRemovedCol) continue;
-      definition.checkConstraints.push(chk);
-    }
-
-    extraDefinition?.(definition);
+    const colNames = definition.columns.map((c) => c.name);
 
     const createTableSql = await this.schemaCreation.accept(definition);
 
     // Generated columns can't be inserted into — exclude them from the copy
     // (Rails: columns_to_copy rejects columns with an :as option,
     // sqlite3_adapter.rb:645).
-    const originalColNames = tableInfo
-      .filter((c) => Number(c.hidden ?? 0) < 2)
-      .map((c) => c.name as string)
+    const originalColNames = sourceColumns
+      .filter((c) => !c.isVirtual())
+      .map((c) => c.name)
       .filter((n) => colNames.includes(n));
 
     // Rails: transaction { disable_referential_integrity { move_table(...) } }
@@ -3225,6 +3120,25 @@ function hasDefaultFunction(defaultValue: unknown, default_: string): boolean {
     defaultValue == null &&
     /\w+\(.*\)|CURRENT_TIME|CURRENT_DATE|CURRENT_TIMESTAMP|\|\|/.test(default_)
   );
+}
+
+/**
+ * Mirrors the `definition.foreign_keys.delete_if { |fk| ... }` line shared by
+ * SQLite3Adapter#remove_column / #remove_columns (sqlite3_adapter.rb:352, 362).
+ * @internal
+ */
+function deleteForeignKeysForColumns(
+  definition: SQLite3TableDefinition,
+  columnNames: string[],
+): void {
+  for (let i = definition.foreignKeys.length - 1; i >= 0; i--) {
+    const fkColumn = definition.foreignKeys[i].column;
+    // Whole-value match, so a composite (array-valued) column never matches —
+    // Rails compares `fk.column` itself, never its members.
+    if (!Array.isArray(fkColumn) && columnNames.includes(fkColumn)) {
+      definition.foreignKeys.splice(i, 1);
+    }
+  }
 }
 
 /** @internal */
