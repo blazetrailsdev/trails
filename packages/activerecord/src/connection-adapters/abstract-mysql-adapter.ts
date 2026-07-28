@@ -87,7 +87,9 @@ import {
   newColumnFromField,
   quotedScope,
   tableAliasLength as mysqlTableAliasLength,
+  MysqlSchemaStatements,
 } from "./mysql/schema-statements.js";
+import { include } from "@blazetrails/activesupport";
 import type { Column as MysqlColumn } from "./mysql/column.js";
 import { TypeMap } from "../type/type-map.js";
 import {
@@ -2224,3 +2226,12 @@ export class StatementPool extends ConnectionStatementPool<MysqlPreparedStatemen
     return `a${++this._counter}`;
   }
 }
+
+// Rails: `include MySQL::SchemaStatements` in the AbstractMysqlAdapter class
+// body (abstract_mysql_adapter.rb:19), so the MySQL overrides win over the base
+// SchemaStatements on the adapter itself — not just on the companion returned by
+// `schemaStatements()`. Applied here at module scope rather than inside the class
+// because trails keeps the module in a companion class; `include()` copies its
+// own prototype descriptors and leaves class-body methods (which sit above every
+// mixin in Ruby's ancestry) untouched.
+include(AbstractMysqlAdapter, MysqlSchemaStatements);
