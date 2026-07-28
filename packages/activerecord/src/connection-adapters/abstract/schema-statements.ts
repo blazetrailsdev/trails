@@ -1070,8 +1070,16 @@ export class SchemaStatements {
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
+    this.validateIndexLengthBang(tableName, newName);
+
+    const oldIndexDef = (await this.indexes(tableName)).find((i) => i.name === oldName);
+    if (!oldIndexDef) return;
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
-    await this.adapter.execute(`ALTER INDEX ${this._qi(oldName)} RENAME TO ${this._qi(newName)}`);
+    await this.addIndex(tableName, oldIndexDef.columns, {
+      name: newName,
+      unique: oldIndexDef.unique,
+    });
+    await this.removeIndex(tableName, { name: oldName });
   }
 
   indexName(

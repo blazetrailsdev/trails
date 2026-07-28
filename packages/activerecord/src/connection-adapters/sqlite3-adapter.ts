@@ -1790,10 +1790,12 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   async renameColumn(tableName: string, columnName: string, newColumnName: string): Promise<void> {
+    const column = await this.columnFor(tableName, columnName);
     this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
-    await this.execute(
-      `ALTER TABLE ${quoteTableName(tableName)} RENAME COLUMN ${quoteColumnName(columnName)} TO ${quoteColumnName(newColumnName)}`,
-    );
+    await this.alterTable(tableName, undefined, undefined, undefined, {
+      rename: { [column.name]: newColumnName },
+    });
+    await this.schemaStatements().renameColumnIndexes(tableName, column.name, newColumnName);
   }
 
   async addTimestamps(tableName: string, options?: Record<string, unknown>): Promise<void> {
@@ -2344,8 +2346,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     block?: (definition: SQLite3TableDefinition) => void,
     overrideForeignKeys?: ForeignKeyDefinition[],
     overrideCheckConstraints?: CheckConstraintDefinition[],
+    options: { rename?: Record<string, string> } = {},
   ): Promise<void> {
     await this.ensureConnected();
+    const rename = options.rename ?? {};
+    const renamed = (name: string): string => rename[name] ?? name;
     const { bare: bareTable } = this._splitTableName(tableName);
 
     // No explicit missing-table guard: `columns` reaches table_structure, which
@@ -2357,11 +2362,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     const definition = new SQLite3TableDefinition(tableName, {
       id: false,
       adapter: this,
-      ...(compositePk ? { primaryKey: fromPrimaryKey } : {}),
+      ...(compositePk ? { primaryKey: fromPrimaryKey.map(renamed) } : {}),
     });
 
     for (const column of sourceColumns) {
-      const options: Record<string, unknown> = {
+      const columnOptions: Record<string, unknown> = {
         limit: column.limit,
         precision: column.precision,
         scale: column.scale,
@@ -2371,9 +2376,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       };
 
       if (column.isVirtual()) {
-        options.as = column.defaultFunction;
-        options.stored = column.isVirtualStored();
-        options.type = column.type;
+        columnOptions.as = column.defaultFunction;
+        columnOptions.stored = column.isVirtualStored();
+        columnOptions.type = column.type;
       } else if (column.hasDefault && !column.autoIncrement) {
         const defaultFunction = column.defaultFunction;
         const deserialized: unknown = this.lookupCastTypeFromColumn(column).deserialize(
@@ -2382,7 +2387,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         // Rails: `default = -> { column.default_function } if default.nil?`. The
         // extra `defaultFunction` guard is trails-only: quoteDefaultExpression
         // rejects a callable returning null, where Ruby's `quote(nil)` yields NULL.
-        options.default =
+        columnOptions.default =
           deserialized == null && defaultFunction != null ? () => defaultFunction : deserialized;
       }
 
@@ -2394,7 +2399,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         : column.isBigint()
           ? "bigint"
           : column.type;
-      definition.column(column.name, columnType as ColumnType, options);
+      definition.column(renamed(column.name), columnType as ColumnType, columnOptions);
     }
 
     // Attached before the block runs, as in Rails' alter_table lambda
@@ -2402,7 +2407,25 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // delete the FKs it orphans.
     const fks = overrideForeignKeys ?? (await this.foreignKeys(tableName));
     const checks = overrideCheckConstraints ?? (await this.checkConstraints(tableName));
-    definition.foreignKeys.push(...fks);
+    definition.foreignKeys.push(
+      ...fks.map((fk) => {
+        const column = typeof fk.column === "string" ? (rename[fk.column] ?? fk.column) : fk.column;
+        return column === fk.column
+          ? fk
+          : new ForeignKeyDefinition(
+              fk.fromTable,
+              fk.toTable,
+              column,
+              fk.primaryKey,
+              fk.name,
+              fk.onDelete,
+              fk.onUpdate,
+              fk.deferrable,
+              fk.storesValidate ? fk.validate : undefined,
+              fk.storedOptionKeys,
+            );
+      }),
+    );
     definition.checkConstraints.push(...checks);
 
     block?.(definition);
@@ -2422,7 +2445,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     const originalColNames = sourceColumns
       .filter((c) => !c.isVirtual())
       .map((c) => c.name)
-      .filter((n) => colNames.includes(n));
+      .filter((n) => colNames.includes(renamed(n)));
 
     // Rails: transaction { disable_referential_integrity { move_table(...) } }
     // Use savepoint if already inside a transaction (e.g. migration),
@@ -2441,14 +2464,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         // throwaway "a"-prefixed buffer is built by copy_table off the source
         // table's own reflection, so it carries the full column definitions
         // rather than a hand-concatenated CREATE TABLE.
-        await this.moveTable(tableName, alteredTableName, { temporary: true });
+        await this.moveTable(tableName, alteredTableName, { temporary: true, rename });
         // The second move is copy_table + drop_table with the definition supplied
         // by the caller above (fks/checks/`modify`) instead of re-derived from the
         // buffer — that is where alter_table's whole point lives, and the buffer's
         // reflection would have lost the pending changes.
         await this.execCopyTable(createTableSql);
         await this.copyTableIndexes(alteredTableName, tableName);
-        await this.copyTableContents(alteredTableName, tableName, originalColNames);
+        await this.copyTableContents(alteredTableName, tableName, originalColNames.map(renamed));
         await this.execCopyTable(`DROP TABLE ${quoteTableName(alteredTableName)}`);
       });
 

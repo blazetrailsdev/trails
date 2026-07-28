@@ -898,10 +898,14 @@ describe("DDL cache-invalidation safety-net", () => {
     });
 
     const ss = new SchemaStatements(adapter as any);
+    vi.spyOn(ss, "indexes").mockResolvedValue([
+      { table: "posts", name: "index_posts_on_title", columns: ["title"], unique: false } as any,
+    ]);
     await ss.renameIndex("posts", "index_posts_on_title", "index_posts_on_headline");
 
     expect(cache.isCached("posts")).toBe(false);
-    expect(order).toEqual(["clear:posts", "sql"]);
+    expect(order[0]).toBe("clear:posts");
+    expect(order).toContain("sql");
   });
 });
 

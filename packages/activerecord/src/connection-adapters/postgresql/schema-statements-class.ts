@@ -978,6 +978,16 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     await this.renameColumnIndexes(tableName, columnName, newColumnName);
   }
 
+  override async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
+    this.validateIndexLengthBang(tableName, newName);
+
+    const [schema] = this.pg.extractSchemaQualifiedName(tableName);
+    this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
+    await this.adapter.execute(
+      `ALTER INDEX ${schema ? `${this._qt(schema)}.` : ""}${this._qi(oldName)} RENAME TO ${this._qt(newName)}`,
+    );
+  }
+
   override async changeColumnDefault(
     tableName: string,
     columnName: string,
