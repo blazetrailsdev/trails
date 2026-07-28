@@ -1430,12 +1430,16 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return this.lookupCastType(sqlType);
   }
 
-  static extendedTypeMap(options: {
-    defaultTimezone?: string;
-    emulateBooleans: boolean;
-  }): Map<string, string> {
-    void options;
-    return new Map();
+  /** @internal Mirrors: AbstractMysqlAdapter.extended_type_map */
+  static extendedTypeMap(
+    this: typeof AbstractMysqlAdapter,
+    options: { defaultTimezone?: string; emulateBooleans: boolean },
+  ): TypeMap {
+    const m = AbstractAdapter.extendedTypeMap.call(this, options);
+    if (options.emulateBooleans) {
+      m.registerType(/^tinyint\(1\)/i, new BooleanType());
+    }
+    return m;
   }
 
   /**

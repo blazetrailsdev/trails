@@ -1,13 +1,21 @@
 // vendor/rails/activerecord/test/models/contact.rb
 import { Base } from "../../base.js";
-import type { FakeActiveRecordAdapter, MergeColumnOptions } from "../../support/fake-adapter.js";
+import { ConnectionNotEstablished } from "../../errors.js";
+import { FakeActiveRecordAdapter } from "../../support/fake-adapter.js";
+import type { MergeColumnOptions } from "../../support/fake-adapter.js";
 
 type ContactFakeColumnsHost = typeof Base & { column: typeof column };
 
 // Rails' `lease_connection` is synchronous; trails' is async, so a class-body
 // caller takes the sync escape hatch.
 function leaseConnection(klass: typeof Base): FakeActiveRecordAdapter {
-  return klass.connectionPool().leaseConnectionSync() as unknown as FakeActiveRecordAdapter;
+  const connection = klass.connectionPool().leaseConnectionSync();
+  if (!(connection instanceof FakeActiveRecordAdapter)) {
+    throw new ConnectionNotEstablished(
+      `${klass.name} expected the "fake" adapter, got ${connection.constructor.name}`,
+    );
+  }
+  return connection;
 }
 
 /** Mirrors: ContactFakeColumns#column */

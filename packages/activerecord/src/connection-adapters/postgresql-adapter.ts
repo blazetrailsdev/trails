@@ -3630,6 +3630,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * also handles typmods (`(255)`), `[]` array suffixes, enums, and domains.
    * @internal
    */
+  // Async where Rails (and the inherited `AbstractAdapter#lookup_cast_type`) is
+  // sync, and public where Rails keeps it private — TS cannot narrow an
+  // inherited member's visibility. Contained today: PG overrides both
+  // `lookupCastTypeFromColumn` (sync, OID-keyed) and `quoteDefaultExpression`
+  // (awaits this), so no sync duck-typed consumer sees the promise. Tracked by
+  // `pg-lookup-cast-type-async-divergence`.
   async lookupCastType(sqlType: string): Promise<Type> {
     const rows = await this.schemaQuery(`SELECT ${this.quote(sqlType)}::regtype::oid`);
     return this.typeMap.lookup(Number(rows[0]?.oid));

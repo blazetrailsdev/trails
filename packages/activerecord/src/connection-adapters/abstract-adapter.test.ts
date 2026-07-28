@@ -7,6 +7,7 @@ import {
   IntegerType,
   FloatType,
   DecimalType,
+  ValueType,
 } from "@blazetrails/activemodel";
 import { Text as TextType } from "../type/text.js";
 import { Date as DateType } from "../type/date.js";
@@ -194,6 +195,22 @@ describe("AbstractAdapter.initializeTypeMap", () => {
   });
 });
 
+describe("AbstractAdapter.extendedTypeMap", () => {
+  it("inherits TYPE_MAP entries and overlays timezone-aware time types", () => {
+    const m = AbstractAdapter.extendedTypeMap({ defaultTimezone: "utc" });
+    expect(m.lookup("integer")).toBeInstanceOf(IntegerType);
+    expect(m.lookup("datetime")).toMatchObject({ isUtc: true });
+    expect(m.lookup("time")).toMatchObject({ isUtc: true });
+    expect(m.lookup("timestamp")).toBeInstanceOf(DateTimeType);
+  });
+
+  it("backs the typeMap of an adapter configured with a default timezone", () => {
+    const adapter = new TestAdapter();
+    (adapter as any)._config = { defaultTimezone: "utc" };
+    expect(adapter.lookupCastType("datetime")).toMatchObject({ isUtc: true });
+  });
+});
+
 describe("AbstractAdapter#lookupCastType", () => {
   it("looks the sql type up in TYPE_MAP", () => {
     const adapter = new TestAdapter();
@@ -209,6 +226,11 @@ describe("AbstractAdapter#lookupCastType", () => {
   it("is the type source for lookupCastTypeFromColumn", () => {
     const adapter = new TestAdapter();
     expect(adapter.lookupCastTypeFromColumn({ sqlType: "datetime" })).toBeInstanceOf(DateTimeType);
+  });
+
+  it("falls back to the default value type for an unmapped sql type", () => {
+    const adapter = new TestAdapter();
+    expect(adapter.lookupCastTypeFromColumn({ sqlType: null })).toBeInstanceOf(ValueType);
   });
 
   it("TYPE_MAP is memoized across reads", () => {

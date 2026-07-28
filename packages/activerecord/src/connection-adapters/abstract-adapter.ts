@@ -2161,16 +2161,35 @@ export class AbstractAdapter implements Quoting {
   /**
    * @internal Mirrors: AbstractAdapter::TYPE_MAP
    *
-   * Built on first read rather than at class-definition time: the type classes
-   * `initializeTypeMap` registers sit on a circular import edge and are still
-   * in their temporal dead zone while this module evaluates.
+   * Rails gives each adapter class its own `TYPE_MAP` constant seeded from that
+   * class's `initialize_type_map`, so `self::TYPE_MAP` resolves per class; the
+   * WeakMap keyed on the class reproduces that. Built on first read rather than
+   * at class-definition time because the type classes `initializeTypeMap`
+   * registers sit on a circular import edge and are still in their temporal
+   * dead zone while this module evaluates.
    */
   static get TYPE_MAP(): TypeMap {
-    return (abstractTypeMap ??= (() => {
-      const m = new TypeMap();
-      AbstractAdapter.initializeTypeMap(m);
-      return m;
-    })());
+    const klass = this as unknown as typeof AbstractAdapter;
+    let m = typeMaps.get(klass);
+    if (!m) {
+      m = new TypeMap();
+      klass.initializeTypeMap(m);
+      typeMaps.set(klass, m);
+    }
+    return m;
+  }
+
+  /** @internal Mirrors: AbstractAdapter.extended_type_map */
+  static extendedTypeMap(
+    this: typeof AbstractAdapter,
+    options: { defaultTimezone?: string },
+  ): TypeMap {
+    const m = new TypeMap(this.TYPE_MAP);
+    const timezone = options.defaultTimezone;
+    this.registerClassWithPrecision(m, /^[^(]*time/i, TimeType, { timezone });
+    this.registerClassWithPrecision(m, /^[^(]*datetime/i, DateTimeType, { timezone });
+    m.aliasType(/^[^(]*timestamp/i, "datetime");
+    return m;
   }
 
   /** @internal Mirrors: AbstractAdapter#lookup_cast_type */
@@ -2258,11 +2277,6 @@ export class AbstractAdapter implements Quoting {
     if (!match) return undefined;
     const n = Number.parseInt(match[1], 10);
     return Number.isNaN(n) ? 0 : n;
-  }
-
-  private _extendedTypeMap?: Map<string, unknown>;
-  get extendedTypeMap(): Map<string, unknown> {
-    return (this._extendedTypeMap ??= new Map());
   }
 
   // --- Connection lifecycle privates (Rails abstract_adapter.rb 946–1234) ---
@@ -2438,14 +2452,12 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal Mirrors: AbstractAdapter#type_map */
   get typeMap(): unknown {
-    const ctor = this.constructor as {
+    const ctor = this.constructor as typeof AbstractAdapter & {
       EXTENDED_TYPE_MAPS?: Map<string, unknown>;
-      TYPE_MAP?: unknown;
-      extendedTypeMap?: (key: Record<string, unknown>) => unknown;
     };
     const key = this.extendedTypeMapKey();
-    if (!key) return ctor.TYPE_MAP ?? this.extendedTypeMap;
-    const build = () => ctor.extendedTypeMap?.(key) ?? this.extendedTypeMap;
+    if (!key) return ctor.TYPE_MAP;
+    const build = () => ctor.extendedTypeMap(key);
     const cache = ctor.EXTENDED_TYPE_MAPS;
     if (!cache) return build();
     const ck = JSON.stringify(key);
@@ -2638,12 +2650,7 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal Mirrors: AbstractAdapter#lookup_cast_type_from_column */
   lookupCastTypeFromColumn(column: { sqlType: string | null }): unknown {
-    const sqlType = column.sqlType;
-    if (!sqlType) return null;
-    if (typeof (this as any).lookupCastType === "function") {
-      return (this as any).lookupCastType(sqlType);
-    }
-    return sqlType;
+    return this.lookupCastType(column.sqlType as string);
   }
 }
 
@@ -2658,7 +2665,7 @@ export class AbstractAdapter implements Quoting {
 // is early enough.
 let abstractAdapterMixinsApplied = false;
 
-let abstractTypeMap: TypeMap | undefined;
+const typeMaps = new WeakMap<typeof AbstractAdapter, TypeMap>();
 
 /** @internal Applies the abstract-adapter mixin/callback/query-cache wiring once. */
 function ensureAbstractAdapterMixinsApplied(): void {

@@ -244,6 +244,13 @@ export interface QuotingHost {
  * Look up the cast type from a column. Delegates to lookupCastType(column.sql_type)
  * on the adapter, matching Rails' internal delegation chain.
  *
+ * Rails can call `lookup_cast_type` unconditionally because every host of this
+ * module is an adapter. This standalone version is also bound to adapter-less
+ * hosts (`ABSTRACT_SCHEMA_QUOTER`, the MySQL schema quoter) that have no type
+ * map, so it keeps the guard and hands back the raw sql_type for them; the
+ * adapter method (`AbstractAdapter#lookupCastTypeFromColumn`) is the
+ * unconditional one-liner.
+ *
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#lookup_cast_type_from_column
  */
 export function lookupCastTypeFromColumn(

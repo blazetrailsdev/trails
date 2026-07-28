@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { AbstractAdapter } from "./abstract-adapter.js";
+import { TypeMap } from "../type/type-map.js";
 import {
   ConnectionNotEstablished,
   ConnectionNotDefined,
@@ -46,7 +47,7 @@ describe("AbstractAdapter connection lifecycle privates", () => {
     expect(a.extendedTypeMapKey()).toBeNull();
     (a as any)._config.defaultTimezone = "utc";
     expect(a.extendedTypeMapKey()).toEqual({ defaultTimezone: "utc" });
-    expect(a.typeMap).toBeInstanceOf(Map);
+    expect(a.typeMap).toBeInstanceOf(TypeMap);
   });
 
   it("withRawConnection serializes concurrent calls and yields the connection", async () => {
