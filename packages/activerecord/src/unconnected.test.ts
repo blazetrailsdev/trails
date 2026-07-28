@@ -17,6 +17,9 @@ describe("TestUnconnectedAdapter", () => {
     connectionName = Base.removeConnection();
   });
 
+  // Rails pairs the re-establish with `load_schema if in_memory_db?` — removing
+  // the connection destroys an in-memory database along with it. The ambient
+  // connection is a file, so the schema survives and there is nothing to reload.
   afterEach(async () => {
     await Base.establishConnection(connectionName);
   });

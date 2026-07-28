@@ -21,7 +21,7 @@ import { PostgreSQLAdapter, PG_TEST_URL } from "./adapters/postgresql/test-helpe
 let adapter: AbstractSQLite3Adapter;
 
 beforeEach(async () => {
-  adapter = new BetterSQLite3Adapter(await scratchDatabasePath("prevent-writes"));
+  adapter = new BetterSQLite3Adapter(await scratchDatabasePath("adapter-prevent-writes"));
   await adapter.exec(`DROP TABLE IF EXISTS "subscribers"`);
   await adapter.exec(
     `CREATE TABLE "subscribers" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "nick" TEXT)`,

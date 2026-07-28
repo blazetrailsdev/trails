@@ -38,7 +38,8 @@ const paths = new Map<string, Promise<string>>();
  * The name carries the run token and the worker's isolation slot (the same two
  * discriminators `sqlite-template.ts` uses for the worker clone) so parallel
  * vitest workers — and parallel worktrees sharing one tmpdir — cannot land on
- * the same file.
+ * the same file. `label` discriminates *within* a worker, so name it after the
+ * test file that owns it: two files sharing a label would share a database.
  */
 export function scratchDatabasePath(label: string): Promise<string> {
   let resolved = paths.get(label);

@@ -1030,7 +1030,7 @@ describe("PreloaderTest", () => {
       database: {
         writing: {
           adapter: "sqlite3",
-          database: await scratchDatabasePath("animals"),
+          database: await scratchDatabasePath("associations-animals"),
           pool: 1,
         },
       },
