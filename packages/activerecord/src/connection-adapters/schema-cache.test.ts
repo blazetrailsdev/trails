@@ -913,9 +913,6 @@ describe("SchemaCache DDL invalidation", () => {
   }
 
   beforeEach(async () => {
-    // Rails' schema_cache_test.rb:12 rides a real lane connection
-    // (ARUnit2Model.lease_connection); newRawTestAdapter is the trails
-    // equivalent — a fresh adapter object on the ambient lane database.
     adapter = newRawTestAdapter();
     await adapter.dropTable("things", "stuff", { ifExists: true });
     await adapter.createTable("things", (t) => {

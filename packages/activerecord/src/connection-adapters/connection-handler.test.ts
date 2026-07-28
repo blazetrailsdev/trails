@@ -40,9 +40,6 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it("establish connection using 3 levels config", async () => {
-    // Rails (connection_handler_test.rb:34-63) establishes all three named
-    // configs out of a 3-level hash and asserts each pool's db_config.database
-    // is the file path that config named.
     const configs = new DatabaseConfigurations({
       default_env: {
         readonly: { adapter: "sqlite3", database: "test/db/readonly.sqlite3" },
@@ -56,11 +53,6 @@ describe("ConnectionHandlerTest", () => {
     });
     DatabaseConfigurations.defaultEnv = "default_env";
 
-    // Rails passes the bare symbol and lets establish_connection resolve it via
-    // find_db_config. Resolved explicitly here: trails' DatabaseConfig
-    // `forCurrentEnv` does not see `DatabaseConfigurations.defaultEnv`, so
-    // findDbConfig misses the 3-level entries — a wiring divergence of its own,
-    // not something this test should encode.
     for (const name of ["primary", "readonly"]) {
       handler.establishConnection(configs.configsFor({ envName: "default_env", name })[0], {
         owner: name,
@@ -284,9 +276,6 @@ describe("ConnectionHandlerTest", () => {
     try {
       class Klass2 extends Base {}
 
-      // Rails: klass2.establish_connection(
-      //   ActiveRecord::Base.connection_pool.db_config.configuration_hash)
-      // — the ambient lane config, not a private `:memory:` database.
       const baseConfig = new HashConfig("development", "primary", ambientPoolConfiguration());
       const ownConfig = new HashConfig("development", "Klass2", ambientPoolConfiguration());
 

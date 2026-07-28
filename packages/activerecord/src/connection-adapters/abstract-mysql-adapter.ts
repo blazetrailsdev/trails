@@ -1913,6 +1913,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     };
     m.registerType(/decimal/i, undefined, registerDecimal);
     m.registerType(/numeric/i, undefined, registerDecimal);
+    m.registerType(/clob/i, undefined, (sqlType: string) => {
+      const meta = /\(.*\)/.exec(sqlType)?.[0] ?? "";
+      return m.lookup(`text${meta}`);
+    });
+    m.registerType(/number/i, undefined, registerDecimal);
     m.registerType("json", new JsonType());
 
     // MySQL-specific overrides (mirrors MySQL's initialize_type_map additions).

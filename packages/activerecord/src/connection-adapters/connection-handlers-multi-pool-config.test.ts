@@ -4,11 +4,6 @@ import { HashConfig } from "../database-configurations/hash-config.js";
 import { ambientPoolConfiguration } from "../test-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 
-// Rails wraps every test in this file in `unless in_memory_db?`
-// (connection_handlers_multi_pool_config_test.rb:21) because they open a real
-// connection against a file-backed database — its hardcoded
-// "test/db/primary.sqlite3" (`:27,:54,:78`) is the file-backed equivalent of
-// our ambient lane config, so the pools here ride that instead of `:memory:`.
 describe.skipIf(inMemoryDb())("ConnectionHandlersMultiPoolConfigTest", () => {
   let handler: ConnectionHandler;
 
@@ -54,7 +49,7 @@ describe.skipIf(inMemoryDb())("ConnectionHandlersMultiPoolConfigTest", () => {
     handler.establishConnection(primaryConfig(), { owner: "primary", shard: "pool_config_two" });
 
     // connect to default
-    await handler.connectionPoolList("writing")[0].leaseConnection();
+    await (await handler.connectionPoolList("writing")[0].checkout()).connectBang();
 
     expect(handler.isConnected("primary")).toBe(true);
     expect(handler.isConnected("primary", { shard: "default" })).toBe(true);

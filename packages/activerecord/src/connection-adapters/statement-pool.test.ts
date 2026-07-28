@@ -110,10 +110,6 @@ describe("StatementPoolTest", () => {
 });
 
 describe("SQLite3 StatementPool integration", () => {
-  // The Rails-mirrored StatementPoolTest above needs no adapter at all — Rails
-  // builds a bare `TestPool.new` (statement_pool_test.rb:16). This trails-only
-  // test does need one, so it rides the ambient sqlite lane connection rather
-  // than a private `:memory:` handle, and only runs where that lane is sqlite.
   it.skipIf(!isSqliteRun())("caches prepared statements across execute calls", async () => {
     const adapter = newRawTestAdapter();
     const prepareSpy = vi.spyOn((adapter as any).driver, "prepare");

@@ -7,16 +7,12 @@ import { IntegerType } from "@blazetrails/activemodel";
 import { Base } from "../base.js";
 import { adapterType } from "../test-adapter.js";
 
-/** The only surface this suite touches, and not on AbstractAdapter itself. */
 interface TypeLookupConnection {
   lookupCastType(sqlType: string): Type;
 }
 
 let adapter: TypeLookupConnection;
 
-// Rails: `@connection = ActiveRecord::Base.lease_connection`
-// (type_lookup_test.rb:10) — the ambient lane connection, not a private
-// `:memory:` handle. Nothing here writes, so the lease is never closed.
 beforeEach(async () => {
   adapter = (await Base.leaseConnection()) as unknown as TypeLookupConnection;
 });
