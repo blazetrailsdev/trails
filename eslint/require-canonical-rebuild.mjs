@@ -24,7 +24,7 @@ const rule = {
     type: "problem",
     docs: {
       description:
-        "Require a test file that drops a canonical table to restore it in the same file, via rebuildCanonicalTables() or loadCanonicalSchema().",
+        "Require a test file that drops a canonical table to restore it in the same file, via rebuildCanonicalTables() or loadCanonicalSchema(). Three drop forms are detected: the dropTable() helper, a raw DROP TABLE naming the table in an execution sink, and a drop loop driven by a catalogue sweep. The third form names no table in the DROP itself (`DROP TABLE ${row.tablename}`); its victims appear only in the SELECT that feeds the loop, so a canonical name QUOTED in any sink SQL counts as dropped once the file contains an interpolated DROP. Quoted only, never bare words: `columns`, `values`, `select` and `distinct` are canonical table names as well as SQL keywords, so bare-word matching reports on ordinary query text (measured: 24 false positives across 5 files). Restores are rebuildCanonicalTables(adapter, [names]), loadCanonicalSchema(adapter), or a rebuildCanonicalTables() whose name list is not a literal array, which is treated as restoring everything rather than guessed at. Permanent exemptions live in eslint/require-canonical-rebuild-exclude.json: `privateAdapter` files own a :memory: or tmpdir database that cannot drift the shared per-worker one, and `nonExecuting` files record DDL against a fake adapter instead of running it.",
     },
     schema: [
       {
