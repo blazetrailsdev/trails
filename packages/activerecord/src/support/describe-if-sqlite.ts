@@ -10,9 +10,5 @@ import { isSqliteRun } from "./sqlite-template.js";
  * Reuses the canonical {@link isSqliteRun} predicate so the "what counts as a
  * SQLite run" rule has one source of truth. Counterpart to `describeIfPg` /
  * `describeIfMysql`.
- *
- * Lives here rather than in `adapters/sqlite3/test-helper.ts` because both the
- * `adapters/sqlite3/` and the pre-RFC-0026 `connection-adapters/` test trees
- * need the same gate, and neither tree should import test glue from the other.
  */
 export const describeIfSqlite = isSqliteRun() ? describe : (describe.skip as typeof describe);
