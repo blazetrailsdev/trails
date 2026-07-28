@@ -30,9 +30,11 @@ describeIfSqlite("SQLite3Adapter", () => {
     });
 
     it("where with float for string column using bind parameters", async () => {
-      // Rails passes `0.0` and expects the literal `0.0`. JS has a single
-      // `Number` type, so `0.0 === 0` and the adapter renders `0` — there is no
-      // distinct float literal to reproduce Ruby's `0.0`.
+      // Tracked deviation pending convergence, RFC 0082
+      // `rational-value-quoting-analogue`: Rails passes `0.0` and expects the
+      // literal `0.0`, but JS has a single `Number` type, so `0.0 === 0` and the
+      // adapter renders `0`. That story decides whether a Float analogue is
+      // warranted or the limitation is terminal.
       await assertQuotedAs("0", 0.0);
     });
 
@@ -45,8 +47,11 @@ describeIfSqlite("SQLite3Adapter", () => {
     });
 
     it("where with rational for string column using bind parameters", async () => {
-      // Rails passes `Rational(0)` and expects `0/1`. JS has no Rational type;
-      // the nearest value is a plain `Number`, which the adapter renders `0`.
+      // Tracked deviation pending convergence, RFC 0082
+      // `rational-value-quoting-analogue`: Rails passes `Rational(0)` and
+      // expects `0/1`, but trails has no `Rational` analogue yet, so the nearest
+      // value is a plain `Number` — which makes this case duplicate the integer
+      // one above until that story ports the class (as `BigDecimal` already is).
       await assertQuotedAs("0", 0);
     });
   });
