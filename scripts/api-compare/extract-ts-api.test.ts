@@ -1544,6 +1544,7 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     )!;
     expect(ctor.noRailsEquivalent).toBe("JS constructors take no Ruby-style block");
     expect(ctor.line).toBe(5);
+    expect(ctor.declaredIn).toBeUndefined();
   });
 
   it("leaves a synthesized __mixin constructor bare when the inner class declares none", () => {
@@ -1567,6 +1568,7 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     )!;
     expect(ctor.noRailsEquivalent).toBeUndefined();
     expect(ctor.internal).toBeUndefined();
+    expect(ctor.declaredIn).toBe("base.ts");
   });
 
   it("inherits a foreign base constructor's visibility onto the synthesized __mixin entry", () => {
@@ -1589,6 +1591,7 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     )!;
     expect(ctor.visibility).toBe("protected");
     expect(ctor.internal).toBe(true);
+    expect(ctor.declaredIn).toBe("base.ts");
   });
 
   it("records the reason on tagged namespace members", () => {

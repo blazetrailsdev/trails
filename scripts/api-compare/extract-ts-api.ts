@@ -700,18 +700,19 @@ export function extractFromProgram(
       // so its `constructor` reaches this entry only through the construct
       // signature's declaration. Split the same way as the property loop
       // above: visibility comes off whichever declaration the signature
-      // resolves to, near or foreign, while only the JSDoc reason is gated on
-      // the declaration living in THIS file. An implicit constructor resolves
-      // to no declaration at all, and that entry stays bare.
+      // resolves to, a foreign one is marked `declaredIn` so `collectTsFileNames`
+      // skips it as another file's surface, and only the JSDoc reason is gated
+      // on the declaration living in THIS file. An implicit constructor
+      // resolves to no declaration at all, and that entry stays bare.
       if (constructSigs.length > 0) {
         const sigDecl = constructSigs[0].getDeclaration();
         const ctorDecl =
           sigDecl !== undefined && ts.isConstructorDeclaration(sigDecl) ? sigDecl : undefined;
-        const ownCtor =
-          ctorDecl !== undefined &&
-          path.relative(srcDir, ctorDecl.getSourceFile().fileName).replace(/\\/g, "/") === relPath
-            ? ctorDecl
+        const ctorDeclFile =
+          ctorDecl !== undefined
+            ? path.relative(srcDir, ctorDecl.getSourceFile().fileName).replace(/\\/g, "/")
             : undefined;
+        const ownCtor = ctorDeclFile === relPath ? ctorDecl : undefined;
         const ctorVisibility = ctorDecl !== undefined ? memberVisibility(ctorDecl) : "public";
         const ctorReason = ownCtor !== undefined ? noRailsEquivalentReason(ownCtor) : undefined;
         const ctorNode = ownCtor ?? node;
@@ -723,6 +724,9 @@ export function extractFromProgram(
           line:
             ctorNode.getSourceFile().getLineAndCharacterOfPosition(ctorNode.getStart()).line + 1,
           file: relPath,
+          ...(ctorDeclFile !== undefined && ctorDeclFile !== relPath
+            ? { declaredIn: ctorDeclFile }
+            : {}),
           ...(ctorVisibility !== "public" ? { internal: true } : {}),
           ...(ctorReason !== undefined ? { noRailsEquivalent: ctorReason } : {}),
         });
