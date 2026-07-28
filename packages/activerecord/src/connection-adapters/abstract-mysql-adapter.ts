@@ -1093,13 +1093,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return mysqlQuoteTableName(name);
   }
 
-  // Rails: `include MySQL::SchemaStatements` makes `foreign_keys` and its
-  // protected helper `extract_foreign_key_action` real instance methods on
-  // every MySQL adapter (mysql/schema_statements.rb:225).
-  foreignKeys = mysqlForeignKeys;
+  declare foreignKeys: typeof mysqlForeignKeys;
 
-  /** @internal */
-  extractForeignKeyAction = mysqlExtractForeignKeyAction;
+  declare extractForeignKeyAction: typeof mysqlExtractForeignKeyAction;
 
   async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
     // supportsCheckConstraints() reads the cached databaseVersion, which throws
@@ -2235,3 +2231,5 @@ export class StatementPool extends ConnectionStatementPool<MysqlPreparedStatemen
 
 // Rails: `include MySQL::SchemaStatements` (abstract_mysql_adapter.rb:19).
 include(AbstractMysqlAdapter, MysqlSchemaStatements);
+AbstractMysqlAdapter.prototype.foreignKeys = mysqlForeignKeys;
+AbstractMysqlAdapter.prototype.extractForeignKeyAction = mysqlExtractForeignKeyAction;
