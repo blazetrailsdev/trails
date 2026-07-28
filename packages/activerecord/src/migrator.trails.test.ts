@@ -1,7 +1,8 @@
 // trails-only Migrator cases with no counterpart in
 // vendor/rails/activerecord/test/cases/migrator_test.rb. See migrator.test.ts
 // for the faithful Rails mirror.
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from "vitest";
+import { stdout } from "@blazetrails/activesupport";
 import {
   Migrator,
   CheckPending,
@@ -453,5 +454,66 @@ describe("Migrator advisory lock wrapping", () => {
     } as unknown as DatabaseAdapter;
     const migrator = new Migrator(adapter, []);
     expect(migrator.isUseAdvisoryLock()).toBe(false);
+  });
+});
+
+describe("Migrator drives migrations through Migration#migrate", () => {
+  let adapter: DatabaseAdapter;
+  let chunks: string[];
+  let spy: MockInstance;
+
+  beforeEach(() => {
+    adapter = Base.connection;
+    chunks = [];
+    spy = vi.spyOn(stdout, "write").mockImplementation((chunk) => {
+      chunks.push(chunk);
+      return true;
+    });
+  });
+
+  afterEach(() => {
+    spy.mockRestore();
+  });
+
+  it("Migration#name and #version report the constructor arguments", () => {
+    class Chunky extends Migration {}
+    const migration = new Chunky("Bacon", "20240101000000");
+    expect(migration.name).toBe("Bacon");
+    expect(migration.version).toBe("20240101000000");
+  });
+
+  it("Migration#name and #version fall back to the class when none were passed", () => {
+    class Chunky extends Migration {}
+    const migration = new Chunky();
+    expect(migration.name).toBe("Chunky");
+    expect(migration.version).toBe("Chunky");
+  });
+
+  it("announces the proxy version and name, not the loaded migration class name", async () => {
+    class SomeOtherClassName extends Migration {
+      override async change(): Promise<void> {}
+    }
+    const migrator = new Migrator(adapter, [
+      { version: "1", name: "CreateWidgets", migration: () => new SomeOtherClassName() },
+    ]);
+    await migrator.up();
+    const banners = chunks.join("").split("\n").filter(Boolean);
+    expect(banners[0]).toMatch(/^== 1 CreateWidgets: migrating =+$/);
+    expect(banners[1]).toMatch(/^== 1 CreateWidgets: migrated \(\d+\.\d{4}s\) =+$/);
+  });
+
+  it("announces each banner exactly once", async () => {
+    const migrator = new Migrator(adapter, [makeMigration("1", "M1")]);
+    await migrator.up();
+    const output = chunks.join("");
+    expect(output.match(/1 M1: migrating/g)).toHaveLength(1);
+    expect(output.match(/1 M1: migrated/g)).toHaveLength(1);
+  });
+
+  it("honours the migration's verbose setting", async () => {
+    const migrator = new Migrator(adapter, [makeMigration("1", "M1")]);
+    migrator.verbose = false;
+    await migrator.up();
+    expect(chunks.join("")).toBe("");
   });
 });

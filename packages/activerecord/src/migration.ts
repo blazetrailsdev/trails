@@ -1106,8 +1106,6 @@ export abstract class Migration {
    * Mirrors: ActiveRecord::Migration#name
    */
   get name(): string {
-    // Rails: `attr_reader :name`, defaulting to `self.class.name` when the
-    // migration was built without one (`migration.rb:889`).
     return this._name ?? this.constructor.name;
   }
 
@@ -1290,11 +1288,6 @@ export abstract class Migration {
 
   /**
    * Get the migration version from the class name or a static property.
-   *
-   * Rails' `#version` is the `attr_reader` for the `@version` set in
-   * `initialize` (`migration.rb:889`), which `MigrationProxy#load_migration`
-   * supplies; the class-level fallbacks are the trails path for migrations
-   * constructed without one.
    */
   get version(): string {
     return this._version ?? (this.constructor as any).version ?? this.constructor.name;
@@ -2076,17 +2069,7 @@ export interface MigrationProxy {
   loadMigration?(): Promise<MigrationLike>;
 }
 
-/**
- * Mirrors Rails' `MigrationProxy` delegation (`migration.rb:1187`):
- * `delegate :migrate, :announce, :write, ... to: :migration`, where `migration`
- * is a real `Migration` built as `name.constantize.new(name, version)`.
- *
- * A trails `MigrationProxy` is a plain record whose `migration()` may yield a
- * bare `{ up, down }` object with no `migrate`/`announce`, so the Migrator
- * wraps whatever was loaded in a `Migration` carrying the proxy's
- * name/version. That wrapper is what supplies `migrate` — and therefore the
- * announce/benchmark/announce/write banners — for every proxy shape.
- */
+/** Mirrors: ActiveRecord::MigrationProxy (`migration.rb:1187`) */
 class MigrationProxyDelegate extends Migration {
   constructor(
     proxy: MigrationProxy,
@@ -2100,11 +2083,6 @@ class MigrationProxyDelegate extends Migration {
     return this._loaded.disableDdlTransaction ?? false;
   }
 
-  /**
-   * Rails' `exec_migration` `public_send`s the direction on the migration
-   * itself; trails routes it through the Migrator's execution strategy, which
-   * is where a custom strategy gets to wrap the call.
-   */
   override async execMigration(conn: DatabaseAdapter, direction: "up" | "down"): Promise<void> {
     await this._execStrategy.exec(direction, this._loaded, conn);
   }
@@ -2923,9 +2901,6 @@ export class Migrator {
     // would leave schema_migrations out of sync.
     try {
       await this._ddlTransaction(migration, async () => {
-        // Rails: `migration.migrate(@direction)` (`migration.rb:1534`), which
-        // owns the announce/benchmark/announce/write sequence and runs before
-        // record_version_state_after_migrating.
         await migration.migrate(direction);
         if (direction === "up") {
           await this._schemaMigration.recordVersion(proxy.version);
