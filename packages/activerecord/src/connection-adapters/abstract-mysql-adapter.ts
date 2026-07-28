@@ -1430,12 +1430,15 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return this.lookupCastType(sqlType);
   }
 
+  /** @internal Mirrors: AbstractMysqlAdapter::EXTENDED_TYPE_MAPS (abstract_mysql_adapter.rb:754) */
+  static override readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
+
   /** @internal Mirrors: AbstractMysqlAdapter.extended_type_map */
   static extendedTypeMap(
     this: typeof AbstractMysqlAdapter,
     options: { defaultTimezone?: string; emulateBooleans: boolean },
   ): TypeMap {
-    const m = AbstractAdapter.extendedTypeMap.call(this, options);
+    const m = super.extendedTypeMap(options);
     if (options.emulateBooleans) {
       m.registerType(/^tinyint\(1\)/i, new BooleanType());
     }

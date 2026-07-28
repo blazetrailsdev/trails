@@ -2159,25 +2159,29 @@ export class AbstractAdapter implements Quoting {
   // --- Type registration (Rails: class << self private) ---
 
   /**
-   * @internal Mirrors: AbstractAdapter::TYPE_MAP
+   * @internal Mirrors: AbstractAdapter::TYPE_MAP (abstract_adapter.rb:942)
    *
-   * Rails gives each adapter class its own `TYPE_MAP` constant seeded from that
-   * class's `initialize_type_map`, so `self::TYPE_MAP` resolves per class; the
-   * WeakMap keyed on the class reproduces that. Built on first read rather than
-   * at class-definition time because the type classes `initializeTypeMap`
-   * registers sit on a circular import edge and are still in their temporal
-   * dead zone while this module evaluates.
+   * Declared only here, as in Rails: `PostgreSQLAdapter` and
+   * `AbstractMysqlAdapter` define no `TYPE_MAP` constant, so `self::TYPE_MAP`
+   * resolves to this one for them and their `initialize_type_map` never
+   * re-runs. (Rails also declares the constant on `Mysql2Adapter` and
+   * `SQLite3Adapter`; trails resolves both through `_buildTypeMap` instead —
+   * tracked by `mysql-native-type-map-converges-onto-type-map`.)
+   *
+   * Built on first read rather than at class-definition time because the type
+   * classes `initializeTypeMap` registers sit on a circular import edge and are
+   * still in their temporal dead zone while this module evaluates.
    */
   static get TYPE_MAP(): TypeMap {
-    const klass = this as unknown as typeof AbstractAdapter;
-    let m = typeMaps.get(klass);
-    if (!m) {
-      m = new TypeMap();
-      klass.initializeTypeMap(m);
-      typeMaps.set(klass, m);
-    }
-    return m;
+    return (abstractTypeMap ??= (() => {
+      const m = new TypeMap();
+      AbstractAdapter.initializeTypeMap(m);
+      return m;
+    })());
   }
+
+  /** @internal Mirrors: AbstractAdapter::EXTENDED_TYPE_MAPS (abstract_adapter.rb:943) */
+  static readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
 
   /** @internal Mirrors: AbstractAdapter.extended_type_map */
   static extendedTypeMap(
@@ -2193,7 +2197,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   /** @internal Mirrors: AbstractAdapter#lookup_cast_type */
-  lookupCastType(sqlType: string): unknown {
+  lookupCastType(sqlType: string | null): unknown {
     return (this.typeMap as TypeMap).lookup(sqlType);
   }
 
@@ -2452,17 +2456,14 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal Mirrors: AbstractAdapter#type_map */
   get typeMap(): unknown {
-    const ctor = this.constructor as typeof AbstractAdapter & {
-      EXTENDED_TYPE_MAPS?: Map<string, unknown>;
-    };
+    const ctor = this.constructor as typeof AbstractAdapter;
     const key = this.extendedTypeMapKey();
     if (!key) return ctor.TYPE_MAP;
-    const build = () => ctor.extendedTypeMap(key);
-    const cache = ctor.EXTENDED_TYPE_MAPS;
-    if (!cache) return build();
-    const ck = JSON.stringify(key);
-    let m = cache.get(ck);
-    if (!m) cache.set(ck, (m = build()));
+    // Rails keys `EXTENDED_TYPE_MAPS` on the option hash itself; JS Maps use
+    // reference identity, so the serialized hash stands in for it.
+    const cacheKey = JSON.stringify(key);
+    let m = ctor.EXTENDED_TYPE_MAPS.get(cacheKey);
+    if (!m) ctor.EXTENDED_TYPE_MAPS.set(cacheKey, (m = ctor.extendedTypeMap(key)));
     return m;
   }
 
@@ -2650,7 +2651,7 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal Mirrors: AbstractAdapter#lookup_cast_type_from_column */
   lookupCastTypeFromColumn(column: { sqlType: string | null }): unknown {
-    return this.lookupCastType(column.sqlType as string);
+    return this.lookupCastType(column.sqlType);
   }
 }
 
@@ -2665,7 +2666,7 @@ export class AbstractAdapter implements Quoting {
 // is early enough.
 let abstractAdapterMixinsApplied = false;
 
-const typeMaps = new WeakMap<typeof AbstractAdapter, TypeMap>();
+let abstractTypeMap: TypeMap | undefined;
 
 /** @internal Applies the abstract-adapter mixin/callback/query-cache wiring once. */
 function ensureAbstractAdapterMixinsApplied(): void {

@@ -209,6 +209,15 @@ describe("AbstractAdapter.extendedTypeMap", () => {
     (adapter as any)._config = { defaultTimezone: "utc" };
     expect(adapter.lookupCastType("datetime")).toMatchObject({ isUtc: true });
   });
+
+  it("is memoized per key in EXTENDED_TYPE_MAPS rather than rebuilt per read", () => {
+    const adapter = new TestAdapter();
+    (adapter as any)._config = { defaultTimezone: "utc" };
+    expect(adapter.typeMap).toBe(adapter.typeMap);
+    expect(TestAdapter.EXTENDED_TYPE_MAPS.get(JSON.stringify({ defaultTimezone: "utc" }))).toBe(
+      adapter.typeMap,
+    );
+  });
 });
 
 describe("AbstractAdapter#lookupCastType", () => {

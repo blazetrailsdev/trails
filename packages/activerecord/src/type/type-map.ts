@@ -6,17 +6,21 @@ import { ArgumentError, Type, ValueType } from "@blazetrails/activemodel";
 export class TypeMap {
   private _mapping: Map<string | RegExp, (lookupKey: string) => Type> = new Map();
   private _parent?: TypeMap;
-  private _cache: Map<string, Type> = new Map();
+  private _cache: Map<string | null, Type> = new Map();
 
   constructor(parent?: TypeMap) {
     this._parent = parent;
   }
 
-  lookup(lookupKey: string): Type {
+  // `lookupKey` is nullable because Rails reaches here with a nil `sql_type`
+  // (`lookup_cast_type(column.sql_type)`, abstract/quoting.rb:125-127) and
+  // `Regexp#===(nil)` simply does not match. Nothing registers a key matching
+  // the coerced "null", so a nil key falls through to the default value type.
+  lookup(lookupKey: string | null): Type {
     return this.fetch(lookupKey, () => new ValueType());
   }
 
-  fetch(lookupKey: string, fallback?: (key: string) => Type): Type {
+  fetch(lookupKey: string | null, fallback?: (key: string) => Type): Type {
     const cached = this._cache.get(lookupKey);
     if (cached) return cached;
     const result = this._performFetch(lookupKey, fallback);
@@ -41,17 +45,19 @@ export class TypeMap {
     });
   }
 
-  protected _performFetch(lookupKey: string, fallback?: (key: string) => Type): Type {
+  protected _performFetch(lookupKey: string | null, fallback?: (key: string) => Type): Type {
     const entries = [...this._mapping.entries()].reverse();
     for (const [key, factory] of entries) {
       const matches =
-        typeof key === "string" ? key === lookupKey : ((key.lastIndex = 0), key.test(lookupKey));
-      if (matches) return factory(lookupKey);
+        typeof key === "string"
+          ? key === lookupKey
+          : ((key.lastIndex = 0), key.test(String(lookupKey)));
+      if (matches) return factory(lookupKey as string);
     }
     if (this._parent) {
       return this._parent._performFetch(lookupKey, fallback);
     }
-    if (fallback) return fallback(lookupKey);
+    if (fallback) return fallback(lookupKey as string);
     return new ValueType();
   }
 }
@@ -66,7 +72,7 @@ export class TypeMap {
  */
 export function performFetch(
   typeMap: TypeMap,
-  lookupKey: string,
+  lookupKey: string | null,
   fallback?: (key: string) => Type,
 ): Type {
   return (typeMap as any)._performFetch(lookupKey, fallback);
