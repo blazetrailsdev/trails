@@ -1,45 +1,171 @@
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
+import type { TableDefinition as MysqlTableDefinition } from "../connection-adapters/mysql/schema-definitions.js";
 import type { TableDefinition as PgTableDefinition } from "../connection-adapters/postgresql/schema-definitions.js";
+import type { AbstractMysqlAdapter } from "../connection-adapters/abstract-mysql-adapter.js";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { loadCanonicalSchema } from "./canonical-schema.js";
 
 /**
  * The ported slice of
- * `vendor/rails/activerecord/test/schema/postgresql_specific_schema.rb:4-25` —
- * the `uuid-ossp` / `pgcrypto` extension header and the four uuid-primary-key
- * tables. `uuid_default` there is `{}` whenever `supports_pgcrypto_uuid?`
- * (PG >= 9.4, always true on our postgres lane), which leaves the uuid PK on the
- * adapter's `gen_random_uuid()` default.
+ * `vendor/rails/activerecord/test/schema/postgresql_specific_schema.rb:4-48` —
+ * the `uuid-ossp` / `pgcrypto` extension header, the four uuid-primary-key
+ * tables and the `defaults` table.
  *
- * The remainder of that file (`defaults`, `postgresql_times`, the identity,
- * sequence, partition and constraint tables — lines 27-225) and the `mysql2_` /
- * `sqlite_` schemas are carried by story `port-adapter-specific-schemas`: the
- * `defaults` table in particular is contended (`adapters/postgresql/schema.test.ts`
- * and `schema-dumper.test.ts` create and DROP their own on the shared per-worker
- * DB), so laying it at boot needs those files repointed in the same change.
+ * The remainder of that file (`postgresql_times`, `postgresql_oids`, the
+ * identity, sequence, partition and constraint tables — lines 50-225) is carried
+ * by story `port-postgresql-specific-schema-remainder`.
  */
 async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise<void> {
-  await adapter.enableExtension("uuid-ossp");
-  await adapter.enableExtension("pgcrypto");
+  // `supportsPgcryptoUuid()` / `supportsVirtualColumns()` read the cached
+  // `databaseVersion`, whose sync getter throws until the version has been
+  // fetched once.
+  await adapter.getDatabaseVersion();
 
-  await adapter.createTable("chat_messages", { id: "uuid", force: true }, (t) => {
+  await adapter.enableExtension("uuid-ossp");
+  if (adapter.supportsPgcryptoUuid()) await adapter.enableExtension("pgcrypto");
+
+  // `uuid_default = supports_pgcrypto_uuid? ? {} : { default: "uuid_generate_v4()" }`
+  // (line 7), splatted into the three `id: :uuid` tables below. With pgcrypto the
+  // adapter's own `gen_random_uuid()` PK default stands; without it that function
+  // does not exist, so the PK falls back to uuid-ossp's `uuid_generate_v4()`.
+  // The bare string (not a thunk) is Rails verbatim: quoteDefaultExpression emits
+  // a `()`-bearing string unquoted on a uuid column.
+  const uuidDefault: { default?: string } = adapter.supportsPgcryptoUuid()
+    ? {}
+    : { default: "uuid_generate_v4()" };
+
+  await adapter.createTable("chat_messages", { id: "uuid", force: true, ...uuidDefault }, (t) => {
     (t as PgTableDefinition).text("content");
   });
 
   await adapter.createTable("chat_messages_custom_pk", { id: false, force: true }, (t) => {
     const pg = t as PgTableDefinition;
-    pg.uuid("message_id", { primaryKey: true, default: () => "uuid_generate_v4()" });
+    pg.uuid("message_id", { primaryKey: true, default: "uuid_generate_v4()" });
     pg.text("content");
   });
 
-  await adapter.createTable("uuid_parents", { id: "uuid", force: true }, (t) => {
+  await adapter.createTable("uuid_parents", { id: "uuid", force: true, ...uuidDefault }, (t) => {
     (t as PgTableDefinition).string("name");
   });
 
-  await adapter.createTable("uuid_children", { id: "uuid", force: true }, (t) => {
+  await adapter.createTable("uuid_children", { id: "uuid", force: true, ...uuidDefault }, (t) => {
     const pg = t as PgTableDefinition;
     pg.string("name");
     pg.uuid("uuid_parent_id");
+  });
+
+  await adapter.createTable("defaults", { force: true }, (t) => {
+    const pg = t as PgTableDefinition;
+    if (adapter.supportsVirtualColumns()) {
+      pg.virtual("virtual_stored_number", {
+        type: "integer",
+        as: "random_number * 10",
+        stored: true,
+      });
+    }
+    pg.integer("random_number", { default: () => "random() * 100" });
+    pg.string("ruby_on_rails", { default: () => "concat('Ruby ', 'on ', 'Rails')" });
+    pg.date("modified_date", { default: () => "CURRENT_DATE" });
+    pg.date("modified_date_function", { default: () => "now()" });
+    pg.date("fixed_date", { default: "2004-01-01" });
+    pg.datetime("modified_time", { default: () => "CURRENT_TIMESTAMP" });
+    pg.datetime("modified_time_without_precision", {
+      precision: null,
+      default: () => "CURRENT_TIMESTAMP",
+    });
+    pg.datetime("modified_time_with_precision_0", {
+      precision: 0,
+      default: () => "CURRENT_TIMESTAMP",
+    });
+    pg.datetime("modified_time_function", { default: () => "now()" });
+    pg.datetime("fixed_time", { default: "2004-01-01 00:00:00.000000-00" });
+    pg.timestamptz("fixed_time_with_time_zone", { default: "2004-01-01 01:00:00+1" });
+    pg.column("char1", "char(1)", { default: "Y" });
+    pg.string("char2", { limit: 50, default: "a varchar field" });
+    pg.text("char3", { default: "a text field" });
+    pg.bigint("bigint_default", { default: () => "0::bigint" });
+    pg.binary("binary_default_function", { default: () => "convert_to('A', 'UTF8')" });
+    pg.text("multiline_default", { default: "--- []\n\n" });
+  });
+}
+
+/**
+ * Port of `vendor/rails/activerecord/test/schema/mysql2_specific_schema.rb:4-26`
+ * — the three default-expression tables. The rest of that file (`binary_fields`,
+ * `key_tests`, `collation_tests`, the stored procedures and the trigger-backed
+ * primary-key table — lines 28-95) is carried by story
+ * `port-mysql2-specific-schema-remainder`.
+ *
+ * `supports_default_expression?` is `adapter_helper.rb:23`, not an adapter
+ * method: on the MySQL family it is MariaDB >= 10.2.1 or MySQL >= 8.0.13. It is
+ * resolved here off the live connection rather than through
+ * `support/supports.ts` because this module is also imported by the vitest
+ * `globalSetup` entry point (template-global-setup.ts), which runs outside the
+ * worker and so cannot pull in `supports.ts`'s `vitest` import.
+ */
+async function loadMysql2SpecificSchema(adapter: AbstractMysqlAdapter): Promise<void> {
+  await adapter.getDatabaseVersion();
+  const supportsDefaultExpression = adapter.isMariadb()
+    ? adapter.databaseVersion.gte("10.2.1")
+    : adapter.databaseVersion.gte("8.0.13");
+
+  await adapter.createTable("datetime_defaults", { force: true }, (t) => {
+    t.datetime("modified_datetime", { precision: null, default: () => "CURRENT_TIMESTAMP" });
+    t.datetime("precise_datetime", { default: () => "CURRENT_TIMESTAMP(6)" });
+    t.datetime("updated_datetime", {
+      default: () => "CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)",
+    });
+  });
+
+  await adapter.createTable("timestamp_defaults", { force: true }, (t) => {
+    t.timestamp("nullable_timestamp");
+    t.timestamp("modified_timestamp", { precision: null, default: () => "CURRENT_TIMESTAMP" });
+    t.timestamp("precise_timestamp", { precision: 6, default: () => "CURRENT_TIMESTAMP(6)" });
+    t.timestamp("updated_timestamp", {
+      precision: 6,
+      default: () => "CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)",
+    });
+  });
+
+  await adapter.createTable("defaults", { force: true }, (t) => {
+    const my = t as MysqlTableDefinition;
+    my.date("fixed_date", { default: "2004-01-01" });
+    my.datetime("fixed_time", { default: "2004-01-01 00:00:00" });
+    my.column("char1", "char(1)", { default: "Y" });
+    my.string("char2", { limit: 50, default: "a varchar field" });
+    if (supportsDefaultExpression) {
+      my.binary("uuid", { limit: 36, default: () => "(uuid())" });
+      my.string("char2_concatenated", { default: () => "(concat(`char2`, '-'))" });
+    }
+  });
+}
+
+/**
+ * Port of `vendor/rails/activerecord/test/schema/sqlite_specific_schema.rb:3-22`
+ * — the SQLite `defaults` table, the file's only content.
+ */
+async function loadSqliteSpecificSchema(adapter: DatabaseAdapter): Promise<void> {
+  await adapter.createTable("defaults", { force: true }, (t) => {
+    t.integer("random_number", { default: () => "ABS(RANDOM())" });
+    t.string("ruby_on_rails", { default: () => "('Ruby ' || 'on ' || 'Rails')" });
+    t.date("modified_date", { default: () => "CURRENT_DATE" });
+    t.date("modified_date_function", { default: () => "DATE('now')" });
+    t.date("fixed_date", { default: "2004-01-01" });
+    t.datetime("modified_time", { default: () => "CURRENT_TIMESTAMP" });
+    t.datetime("modified_time_without_precision", {
+      precision: null,
+      default: () => "CURRENT_TIMESTAMP",
+    });
+    t.datetime("modified_time_with_precision_0", {
+      precision: 0,
+      default: () => "CURRENT_TIMESTAMP",
+    });
+    t.datetime("modified_time_function", { default: () => "DATETIME('now')" });
+    t.datetime("fixed_time", { default: "2004-01-01 00:00:00.000000-00" });
+    t.column("char1", "char(1)", { default: "Y" });
+    t.string("char2", { limit: 50, default: "a varchar field" });
+    t.text("char3", { default: "a text field" });
+    t.text("multiline_default", { default: "--- []\n\n" });
   });
 }
 
@@ -49,18 +175,45 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
  * `<adapter>_specific_schema` loader when trails has one, and to nothing when it
  * does not.
  *
- * INCOMPLETE, deliberately. Rails has four such files and every one of them has
- * real content; trails has ported part of one. `sqlite_specific_schema.rb:3-21`
- * and `mysql2_specific_schema.rb:3-95` have no entry here at all, so the sqlite
- * and mysql lanes currently boot without the schema Rails gives them. That is a
- * known gap owned by story `port-adapter-specific-schemas` (RFC 0064), not a
- * claim that the gap does not exist. `trilogy_specific_schema.rb` is the one
- * genuine no-op: trails has no Trilogy adapter, so no adapter name ever selects
- * it.
+ * `sqlite_specific_schema.rb` is ported whole. The postgres and mysql arms are
+ * still partial — the remaining tables of
+ * `postgresql_specific_schema.rb:50-225` and `mysql2_specific_schema.rb:28-95`
+ * are owned by stories `port-postgresql-specific-schema-remainder` and
+ * `port-mysql2-specific-schema-remainder`, not a claim that the gap does not
+ * exist. `trilogy_specific_schema.rb` is the one genuine no-op: trails has no
+ * Trilogy adapter, so no adapter name ever selects it.
  */
 const ADAPTER_SPECIFIC_SCHEMAS: Record<string, (adapter: DatabaseAdapter) => Promise<void>> = {
   postgres: (adapter) => loadPostgresqlSpecificSchema(adapter as unknown as PostgreSQLAdapter),
+  mysql: (adapter) => loadMysql2SpecificSchema(adapter as unknown as AbstractMysqlAdapter),
+  sqlite: loadSqliteSpecificSchema,
 };
+
+/**
+ * The tables each {@link ADAPTER_SPECIFIC_SCHEMAS} arm lays, by adapter name.
+ * Must be kept in step with the loaders above.
+ *
+ * `support/drop-all-tables.ts` reads this: its between-test `reset` mode drops
+ * every table that is not part of the loaded schema, and these are as much part
+ * of the schema Rails boots with as `schema.rb`'s. Without them here the arm
+ * would be undone before the first test in every file.
+ */
+const ADAPTER_SPECIFIC_TABLES: Record<string, readonly string[]> = {
+  postgres: [
+    "chat_messages",
+    "chat_messages_custom_pk",
+    "uuid_parents",
+    "uuid_children",
+    "defaults",
+  ],
+  mysql: ["datetime_defaults", "timestamp_defaults", "defaults"],
+  sqlite: ["defaults"],
+};
+
+/** The adapter-specific schema tables for `adapterName`; empty when it has no arm. */
+export function adapterSpecificTableNames(adapterName: string): readonly string[] {
+  return ADAPTER_SPECIFIC_TABLES[adapterName] ?? [];
+}
 
 /**
  * Port of `LoadSchemaHelper#load_schema`
@@ -89,7 +242,24 @@ const ADAPTER_SPECIFIC_SCHEMAS: Record<string, (adapter: DatabaseAdapter) => Pro
  */
 export async function loadSchema(adapter: DatabaseAdapter): Promise<void> {
   await loadCanonicalSchema(adapter);
+  await loadAdapterSpecificSchema(adapter);
+}
 
+/**
+ * The `load adapter_specific_schema_file if File.exist?(...)` arm of
+ * `load_schema_helper.rb:15`, on its own.
+ *
+ * Exported because trails lays the canonical half through two different
+ * mechanisms depending on the lane: {@link loadSchema} (the sqlite/PG template
+ * build) and `DatabaseTasks.reconstructFromSchema`/`loadSchema` on the
+ * generated schema file (`test-setup-dy.ts`, the per-worker DB every AR test
+ * actually rides). The latter knows only about schema.rb's mirror and purges
+ * whatever the template carried, so it has to call this arm itself — otherwise
+ * the `<adapter>_specific_schema.rb` tables exist only in the template.
+ *
+ * @internal Boot/template setup paths only.
+ */
+export async function loadAdapterSpecificSchema(adapter: DatabaseAdapter): Promise<void> {
   const adapterSpecificSchema = ADAPTER_SPECIFIC_SCHEMAS[adapter.adapterName];
   if (adapterSpecificSchema) await adapterSpecificSchema(adapter);
 }

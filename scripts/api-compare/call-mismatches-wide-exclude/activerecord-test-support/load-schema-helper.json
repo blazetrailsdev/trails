@@ -19,5 +19,12 @@
     "rubyName": "load_schema",
     "call": "new",
     "reason": "`StringIO.new` backs the `$stdout` silencing around Ruby's `load`, which prints a migration line per statement. Laying the schema through the adapter prints nothing, so there is no output to silence."
+  },
+  {
+    "package": "activerecord-test-support",
+    "tsFile": "load-schema-helper.ts",
+    "rubyName": "load_schema",
+    "call": "adapter_name",
+    "reason": "The `adapter_name` read that selects the adapter-specific schema still happens, one frame down: loadSchema delegates that arm to loadAdapterSpecificSchema, which trails must also call on its own from test-setup-dy.ts (the per-worker schema load runs through DatabaseTasks, not through loadSchema). The wide ratchet is lexical per method, so the extraction reads as an omitted call."
   }
 ]

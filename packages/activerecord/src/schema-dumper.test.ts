@@ -614,9 +614,8 @@ describe("SchemaDumperTest", () => {
     // Mirrors Rails: test_schema_dump_includes_bigint_default
     // (activerecord/test/cases/schema_dumper_test.rb:366)
     // assert_match %r{t\.bigint\s+"bigint_default",\s+default: 0}, output
-    await ctx.createTable("defaults", {}, (t) => {
-      t.bigint("bigint_default", { default: 0 });
-    });
+    // `defaults` (with its `0::bigint` default) is laid at boot by the
+    // postgres arm of loadSchema, mirroring postgresql_specific_schema.rb:43.
     const output = await SchemaDumper.dumpTableSchema(Base.connection, "defaults");
     expect(output).toMatch(/t\.bigint\("bigint_default",\s*\{[^}]*default:\s*0[^}]*\}/);
   });
@@ -1043,7 +1042,6 @@ afterAll(async () => {
   await ctx.dropTable("binary_fields", o);
   await ctx.dropTable("booleans", o);
   await ctx.dropTable("companies", o);
-  await ctx.dropTable("defaults", o);
   await ctx.dropTable("dump_defaults", o);
   await ctx.dropTable("indexed", o);
   await ctx.dropTable("infinity_defaults", o);
