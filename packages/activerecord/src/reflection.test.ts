@@ -30,6 +30,7 @@ import { Post as CanonicalPost } from "./test-helpers/models/post.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { create as createReflection } from "./reflection.js";
 import { Customer } from "./test-helpers/models/customer.js";
+import { UserWithInvalidRelation } from "./test-helpers/models/user-with-invalid-relation.js";
 import { Organization } from "./test-helpers/models/organization.js";
 import { Author } from "./test-helpers/models/author.js";
 import { Hotel as CanonicalHotel } from "./test-helpers/models/hotel.js";
@@ -897,8 +898,22 @@ describe("ReflectionTest", () => {
   it.skip("name error from incidental code is not converted to name error for association", () => {
     // UNPORTED: relies on Ruby const_missing mechanism — no JS equivalent.
   });
-  it.skip("automatic inverse suppresses name error for association", () => {
-    // UNPORTED: relies on Ruby const_missing mechanism — no JS equivalent.
+  it("automatic inverse suppresses name error for association", () => {
+    // automatic_inverse_of rescues the NameError compute_class raises for the
+    // association's own missing class (reflection.rb:769,
+    // `raise unless error.name.to_s == class_name`) and gives up on the
+    // inverse rather than propagating. `notAClass` names no registered model.
+    const reflection = reflectOnAssociation(UserWithInvalidRelation, "notAClass");
+    expect(reflection).not.toBeNull();
+    // Rails: `reflection.dup.has_inverse?` — "dup to prevent global
+    // memoization" (reflection_test.rb:651). UserWithInvalidRelation is
+    // module-scoped, so memoizing the failed inverse onto the shared reflection
+    // would leak into every later test. Object#dup is a shallow copy.
+    const dup = Object.create(
+      Object.getPrototypeOf(reflection),
+      Object.getOwnPropertyDescriptors(reflection),
+    ) as typeof reflection;
+    expect(dup!.hasInverse()).toBe(false);
   });
   it.skip("automatic inverse does not suppress name error from incidental code", () => {
     // UNPORTED: relies on Ruby const_missing mechanism — no JS equivalent.
@@ -1139,8 +1154,13 @@ describe("ReflectionTest", () => {
     }
     const ref = reflectOnAssociation(Orphan, "ghosts");
     expect(ref).not.toBeNull();
-    // "Ghost" is not registered, so accessing klass should throw
-    expect(() => ref!.klass).toThrow(/not found in registry/);
+    // "Ghost" is not registered, so accessing klass should throw. compute_class
+    // wraps the miss in its own NameError (reflection.rb:494-503), and appends
+    // the :class_name hint because no class_name option was given.
+    expect(() => ref!.klass).toThrow(
+      "Missing model class Ghost for the Orphan#ghosts association." +
+        " You can specify a different model class with the :class_name option.",
+    );
   });
 
   it("reflection klass not found with pointer to non existent class name", () => {
@@ -1155,7 +1175,11 @@ describe("ReflectionTest", () => {
     }
     const ref = reflectOnAssociation(Orphan2, "items");
     expect(ref).not.toBeNull();
-    expect(() => ref!.klass).toThrow(/not found in registry/);
+    // class_name *was* given, so Rails omits the hint suffix.
+    expect(() => ref!.klass).toThrow(
+      "Missing model class NonExistentModel for the Orphan2#items association.",
+    );
+    expect(() => ref!.klass).not.toThrow(/:class_name option/);
   });
 
   it("reflection klass requires ar subclass", () => {
@@ -1255,11 +1279,12 @@ describe("ReflectionTest", () => {
       }
     }
     // AggregateReflection backs composed_of; a string class_name pointing at a
-    // constant that isn't registered must raise NameError (Rails compute_type),
-    // matching AssociationReflection#computeClass so NameError-only rescues apply.
+    // constant that isn't registered must raise NameError. Rails'
+    // MacroReflection#compute_class is `name.constantize` (reflection.rb:434),
+    // so the message is constantize's, not a registry-specific one.
     const ref = new AggregateReflection("balance", null, { className: "NoSuchMoney" }, Buyer);
     expect(() => ref.klass).toThrow(NameError);
-    expect(() => ref.klass).toThrow(/not found in registry/);
+    expect(() => ref.klass).toThrow(/uninitialized constant NoSuchMoney/);
   });
 
   it("association reflection in modules", async () => {

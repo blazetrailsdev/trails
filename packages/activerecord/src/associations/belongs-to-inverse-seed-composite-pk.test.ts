@@ -15,7 +15,7 @@
  * requires the target class in the registry before `association()` is called.
  * This weakens the original guard: a future regression where `staleState()`
  * falls back to a registry lookup instead of reading from the held instance
- * would go undetected. Catching that would require a spy on `resolveModel`.
+ * would go undetected. Catching that would require a spy on `autoloadModel`.
  */
 import { describe, it, expect, vi } from "vitest";
 
@@ -83,7 +83,7 @@ describe("belongs_to inverse seeding with a composite-PK target", () => {
     // the spy only guards the setTarget → staleState → foreignKeyNames path.
     const holder = child.association("compositePkParent");
 
-    const spy = vi.spyOn(associationsModule, "resolveModel");
+    const spy = vi.spyOn(associationsModule, "autoloadModel");
     try {
       holder.setTarget(parent);
       expect(spy).not.toHaveBeenCalled();

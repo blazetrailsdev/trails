@@ -141,8 +141,10 @@ const AMBIENT_RAILTIE_MIXINS: Record<string, { includes: string[] }> = {
  *   - The association error classes `include DidYouMean::Correctable`
  *     (associations/errors.rb:18,47,88); `Correctable#detailed_message` is
  *     ported inline as `detailedMessage` in `associations/errors.ts`.
- *     Correctable's source `core_ext/name_error.rb` is unported (Ruby NameError
- *     machinery with no JS analog). Keyed on one host class since `allowed` is
+ *     Correctable's source is did-you-mean's `core_ext/name_error.rb`, which is
+ *     unported (Ruby NameError machinery with no JS analog) — not the
+ *     same-named Active Support file, which is ported as `core-ext/name-error.ts`.
+ *     Keyed on one host class since `allowed` is
  *     unioned per-file across every entity in errors.rb.
  */
 const PORTED_METHODS_FROM_UNPORTED_MIXINS: Record<string, string[]> = {

@@ -645,6 +645,10 @@ const TS_ROOT_INTERMEDIATE = new Map<string, string>([
   // ActionDispatch `Collector` (re-aliased as `DispatchCollector`) to share
   // the negotiation pipeline.
   ["Collector", "DispatchCollector"],
+  // `core_ext/name_error.rb` reopens Ruby's core `NameError`, so the Ruby
+  // side records no superclass. TS has no NameError, and trails uses
+  // `ReferenceError` as the analogue throughout, so the port declares it.
+  ["NameError", "ReferenceError"],
 ]);
 
 // Per-class TS renames that don't fit the systematic alias patterns

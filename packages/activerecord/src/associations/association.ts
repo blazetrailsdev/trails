@@ -1,12 +1,18 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
-import { resolveModel, _preloadedHolderTarget } from "../associations.js";
+import { autoloadModel, _preloadedHolderTarget } from "../associations.js";
 import { AssociationScope } from "./association-scope.js";
 import { associationKeysEqual } from "./key-normalization.js";
 import { ScopeRegistry } from "../scoping.js";
 import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slots.js";
 import { validateReflectionValidity } from "./validate-through-reflection.js";
-import { camelize, singularize, underscore } from "@blazetrails/activesupport";
+import {
+  camelize,
+  constantize,
+  safeConstantize,
+  singularize,
+  underscore,
+} from "@blazetrails/activesupport";
 import {
   AssociationTargetReplacedDuringLoad,
   AssociationTypeMismatch,
@@ -172,14 +178,15 @@ export class Association {
       // Rails rescues only the missing-constant NameError from compute_class and
       // re-raises anything else — notably the ArgumentError "resolved constant is
       // not an ActiveRecord::Base subclass" guard (reflection.rb:495-508). Mirror
-      // that: a missing-class NameError falls through to the resolveModel lookup
+      // that: a missing-class NameError falls through to the constant lookup
       // below (which re-raises the same faithful NameError); every other error
       // — config/reflection failures — propagates unchanged.
       if (!(e instanceof NameError)) throw e;
     }
     const className =
       opts.className ?? camelize(this.reflection.type === "hasMany" ? singularize(name) : name);
-    resolveModel(className);
+    autoloadModel(className);
+    constantize(className);
   }
 
   get name(): string {
@@ -463,6 +470,16 @@ export class Association {
    * Returns the class of the target. belongs_to polymorphic overrides
    * this to look at the polymorphic_type field on the owner.
    */
+  /**
+   * Mirrors: AssociationReflection#derive_class_name (reflection.rb:821-825) —
+   * `class_name.singularize if collection?`, then camelize.
+   * @internal
+   */
+  private deriveClassName(): string {
+    const name = this.reflection.name;
+    return camelize(this.isCollection() ? singularize(name) : name);
+  }
+
   get klass(): typeof Base {
     // Use the rich reflection's klass getter when available — it does
     // namespace-relative resolution, matching Rails' compute_type walk.
@@ -471,9 +488,9 @@ export class Association {
     };
     const richKlass = ctor._reflectOnAssociation?.(this.reflection.name)?.klass;
     if (richKlass) return richKlass;
-    const className =
-      this.reflection.options.className ?? camelize(singularize(this.reflection.name));
-    return resolveModel(className);
+    const className = this.reflection.options.className ?? this.deriveClassName();
+    autoloadModel(className);
+    return constantize(className) as typeof Base;
   }
 
   get extensions(): any[] {
@@ -893,10 +910,6 @@ export class Association {
 
   protected raiseOnTypeMismatchBang(record: Base): void {
     const klass = this.klass;
-    // Rails (association.rb:340-347) does a two-step check: `record.is_a?(reflection.klass)`
-    // and, on failure, `record.is_a?(reflection.class_name.safe_constantize)`. The second
-    // step exists only to tolerate constant reloading in development mode, which has no
-    // JS analogue, so a single `instanceof` is faithful here.
     if (klass && !(record instanceof (klass as any))) {
       // Rails names the expected side with `reflection.class_name` — the
       // demodulized convention name (`belongs_to :region` → "Region"), NOT the
@@ -905,11 +918,19 @@ export class Association {
       const ctor = this.owner.constructor as typeof Base & {
         _reflectOnAssociation?: (n: string) => { className?: string } | null;
       };
+      // Rails' `reflection.class_name` — the only string it constantizes
+      // (association.rb:341), and always defined. Never `klass.name` (a
+      // flattened namespaced ctor) or the bare association name, either of
+      // which could resolve to an unrelated class and swallow a genuine
+      // mismatch. `derive_class_name` singularizes only for a collection
+      // (reflection.rb:821-825), so a belongs_to named `status` or `series`
+      // must not be singularized into the wrong constant.
       const expectedType =
         ctor._reflectOnAssociation?.(this.reflection.name)?.className ??
         this.reflection.options.className ??
-        (klass as any).name ??
-        this.reflection.name;
+        this.deriveClassName();
+      const freshClass = safeConstantize(expectedType) as typeof Base | undefined;
+      if (freshClass && record instanceof (freshClass as any)) return;
       const actualType =
         record == null
           ? String(record)

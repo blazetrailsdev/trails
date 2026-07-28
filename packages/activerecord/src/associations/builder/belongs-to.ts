@@ -1,8 +1,13 @@
-import { underscore, pluralize, camelize, isBlank } from "@blazetrails/activesupport";
+import {
+  underscore,
+  pluralize,
+  camelize,
+  isBlank,
+  safeConstantize,
+} from "@blazetrails/activesupport";
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
 import { beforeValidation, afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
-import { modelRegistry } from "../../associations.js";
 import {
   flushPendingCounterCacheColumns,
   registerCounterCachedAssociation,
@@ -93,14 +98,11 @@ export class BelongsTo extends SingularAssociation {
     const pending = pendingCounterCacheColumns.get(targetClassName) ?? new Set<() => string>();
     pending.add(cacheColumn);
     pendingCounterCacheColumns.set(targetClassName, pending);
-    if (modelRegistry.has(targetClassName)) {
-      // Target already registered — flush right now (eager path).
-      // Use modelRegistry.get directly (not resolveAssocClass) to avoid
-      // prematurely caching the reflection's klass via a stale registry
-      // entry when the target class is re-defined (e.g. between tests).
-      const targetClass = modelRegistry.get(targetClassName) as any;
-      if (targetClass) flushPendingCounterCacheColumns(targetClass);
-    }
+    // Resolved through the constant table rather than the reflection so a
+    // target class re-defined between tests does not get its `klass` memo
+    // prematurely seeded.
+    const klass = safeConstantize(targetClassName) as any;
+    if (klass) flushPendingCounterCacheColumns(klass);
 
     // Mirrors Rails: `model.counter_cached_association_names |= [reflection.name]`
     registerCounterCachedAssociation(model, name);

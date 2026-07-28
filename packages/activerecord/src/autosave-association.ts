@@ -40,7 +40,7 @@ function _guardKey(association: unknown): string {
  * methods (`isUpdated`, `isStaleTarget`, `setInverseInstance`,
  * `loadedBang`, etc.) are reachable.
  *
- * Configuration errors (`validateThroughReflection`, `resolveModel` for an
+ * Configuration errors (`validateThroughReflection`, `constantize` for an
  * unregistered target class, inverse-of validity, etc.) intentionally
  * propagate to surface misconfiguration loudly, matching Rails'
  * `Reflection#check_validity!` semantics. Only `AssociationNotFoundError`

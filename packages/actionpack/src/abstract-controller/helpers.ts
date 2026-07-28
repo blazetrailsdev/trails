@@ -1,4 +1,4 @@
-import { camelize } from "@blazetrails/activesupport";
+import { camelize, demodulize, NameError } from "@blazetrails/activesupport";
 
 /**
  * `AbstractController::Helpers` — class-level registry that exposes
@@ -325,7 +325,12 @@ export function modulesForHelpers(
       const raw = typeof arg === "symbol" ? (arg.description ?? "") : arg;
       const name = `${/^[A-Z]/.test(raw) ? raw : camelizeHelperPrefix(raw)}Helper`;
       const mod = options.resolve(name);
-      if (!mod) throw new Error(`uninitialized constant ${name}`);
+      // Rails' resolution raises NameError carrying the missing constant, which
+      // default_helper_module!'s `missing_name?` rescue reads. Ruby's `name` is
+      // the failing *segment*, not the path; the resolver is a flat host lookup
+      // with no intermediate modules, so the leaf is the only segment that can
+      // be said to be missing.
+      if (!mod) throw new NameError(`uninitialized constant ${name}`, demodulize(name));
       return mod;
     }
     throw new TypeError("helper must be a String, Symbol, or Module");
@@ -397,10 +402,10 @@ export function defaultHelperModuleBang(
     helper(cls, mod);
   } catch (err) {
     // Rails: `rescue NameError => e; raise unless e.missing_name?("#{helper_prefix}Helper")`.
-    // Only swallow the missing-constant error for *this* specific helper
-    // name. Errors from elsewhere (e.g. the helper module's own body
-    // referencing some other missing constant) must propagate.
-    if (err instanceof Error && err.message === `uninitialized constant ${expectedName}`) return;
+    // Only swallow the missing-constant error for *this* specific helper name.
+    // Errors from elsewhere (e.g. the helper module's own body referencing some
+    // other missing constant) must propagate.
+    if (err instanceof NameError && err.isMissingName(expectedName)) return;
     throw err;
   }
 }
