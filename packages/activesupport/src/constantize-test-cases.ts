@@ -1,19 +1,11 @@
 /**
- * Mirrors: activesupport/test/constantize_test_cases.rb — the shared assertion
- * bodies `InflectorTest#test_constantize` and `StringInflectionsTest#test_constantize`
- * both run.
+ * Mirrors: activesupport/test/constantize_test_cases.rb
  *
- * Rails builds its fixtures by *defining* `module Ace; module Base; class Case`,
- * because in Ruby defining a constant is what registers it. We define the same
- * shape as classes and register the same names.
- *
- * Arms of the Ruby file that a flat constant table cannot express are omitted
- * rather than faked:
- *   - `Ace::Base::Fase::Dice` (inherited-constant lookup — `Fase < Case`, so
- *     Ruby's `const_get` walks ancestors to find `Case::Dice`),
- *   - the `Object::…` / `AddtlGlobalConstants` arms (Ruby's implicit `Object`
- *     namespace prefix, and `include`-ing a module into `Object`),
- *   - the `with_autoloading_fixtures` arms (no autoloader).
+ * Arms that a flat constant table cannot express are omitted rather than
+ * faked: inherited-constant lookup (`Ace::Base::Fase::Dice` resolving through
+ * `Fase < Case`), the `Object::…` / `AddtlGlobalConstants` arms that depend on
+ * Ruby's implicit `Object` namespace and `include`-into-`Object`, and the
+ * `with_autoloading_fixtures` arms.
  */
 import { expect } from "vitest";
 import { registerConstant } from "./inflector.js";
@@ -22,12 +14,9 @@ class AceBaseCase {}
 class AceBaseCaseDice {}
 class ConstantizeTestCases {}
 
-/** Registers the fixture constants; call from a `beforeEach`. */
 export function registerConstantizeFixtures(): void {
   registerConstant("Ace::Base::Case", AceBaseCase);
   registerConstant("Ace::Base::Case::Dice", AceBaseCaseDice);
-  // Ruby: `class Gas; include Base; end`, so `Ace::Gas::Case` resolves to the
-  // very same class object as `Ace::Base::Case`.
   registerConstant("Ace::Gas::Case", AceBaseCase);
   registerConstant("Ace::Gas::Case::Dice", AceBaseCaseDice);
   registerConstant("ConstantizeTestCases", ConstantizeTestCases);
@@ -68,7 +57,6 @@ export function runSafeConstantizeTestsOn(yieldFn: (name: string) => unknown): v
   expect(yieldFn("ConstantizeTestCases")).toBe(ConstantizeTestCases);
   expect(yieldFn("::ConstantizeTestCases")).toBe(ConstantizeTestCases);
 
-  // Ruby's `nil`.
   expect(yieldFn("")).toBeUndefined();
   expect(yieldFn("::")).toBeUndefined();
   expect(yieldFn("UnknownClass")).toBeUndefined();

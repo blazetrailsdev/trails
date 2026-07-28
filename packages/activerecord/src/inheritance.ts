@@ -409,8 +409,6 @@ export function registerSubclass(klass: typeof Base): void {
   if (!(parent as any)._subclasses.includes(klass)) {
     (parent as any)._subclasses.push(klass);
   }
-  // STI subclasses inherit their parent's adapter, so they never trip the
-  // adapter setter that otherwise feeds the constant table GlobalID reads.
   if (klass.name) registerConstant(klass.name, klass);
 }
 

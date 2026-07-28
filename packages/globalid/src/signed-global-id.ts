@@ -335,8 +335,6 @@ export class SignedGlobalID {
    * file.
    */
   get modelClass(): LocatorModel {
-    // Rails: `model = model_name.constantize` — raises when the constant is
-    // unknown rather than answering nil.
     const klass = constantize(this.modelName) as LocatorModel;
     if (isOrExtends(klass, GlobalID) || isOrExtends(klass, SignedGlobalID)) {
       throw new Error("GlobalID and SignedGlobalID cannot be used as model_class.");

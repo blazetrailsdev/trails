@@ -134,15 +134,11 @@ export class GlobalID {
    * against recursive `model_class` lookup).
    */
   get modelClass(): LocatorModel {
-    // Rails: `model = model_name.constantize` — raises when the constant is
-    // unknown rather than answering nil.
     const klass = constantize(this.modelName) as LocatorModel;
     // Rails: `if model <= GlobalID then raise ArgumentError` — rejects
     // GlobalID itself and any subclass. In Ruby SGID < GID so the
     // single `<=` check covers both. In TS they're peers, and we also
     // need to catch subclasses via prototype-chain checks. Guard the
-    // prototype access since a registered constant is structurally typed and
-    // a non-constructor value technically satisfies LocatorModel.
     if (isOrExtends(klass, GlobalID) || isOrExtends(klass, SignedGlobalID)) {
       throw new Error("GlobalID and SignedGlobalID cannot be used as model_class.");
     }

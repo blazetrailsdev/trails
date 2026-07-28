@@ -1354,9 +1354,6 @@ export class Base extends Model {
     this._adapter = adapter;
     if (this !== Base && this.name) {
       Base._modelsByName.set(this.name, this);
-      // Ruby gets this for free: `class Topic < ActiveRecord::Base` writes the
-      // constant table itself. See the GlobalID wiring note at the foot of
-      // this file.
       registerConstant(this.name, this);
     }
 
@@ -5202,10 +5199,6 @@ registerMigrationArConfig({
 // register here without callers needing to re-add it.
 import "@blazetrails/globalid/wire";
 
-// GlobalID resolves model names through `ActiveSupport::Inflector.constantize`.
-// AR feeds that constant table from the same three points that populate
-// `_modelsByName` / `modelRegistry` / `_subclasses`: the adapter setter
-// (`Base.adapter=`), `registerModel`, and `registerSubclass`.
 import { type LocatorModel as _LocatorModel } from "@blazetrails/globalid";
 // Compile-time wire: AR's static `Base.unscoped(block)` is the
 // `LocatorModel.unscoped` implementation that GlobalID's `UnscopedLocator`

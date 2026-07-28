@@ -35,9 +35,6 @@ class CompositePrimaryKeyModel {
   }
 }
 
-// Ruby's fixture models are plain `class Person` definitions, which register
-// themselves in the constant table `model_name.constantize` reads. Our fixture
-// classes are module-local, so the suite names them explicitly.
 function registerConstants(registry: Record<string, LocatorModel>): void {
   for (const [name, klass] of Object.entries(registry)) {
     registerConstant(name, klass);
