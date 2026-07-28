@@ -182,6 +182,37 @@ describe("SQLite3Adapter schema introspection", () => {
     ]);
   });
 
+  it("alterTable preserves expression, partial and unique indexes across the rebuild", async () => {
+    // The rebuild used to replay each index's sqlite_master CREATE SQL
+    // verbatim; it now round-trips them through copy_table_indexes, which
+    // reconstructs from reflection. Pin the option-carrying shapes.
+    await adapter.executeMutation(
+      "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT, code TEXT, doomed TEXT)",
+    );
+    await adapter.executeMutation("CREATE INDEX widgets_on_lower_name ON widgets (lower(name))");
+    await adapter.executeMutation(
+      "CREATE UNIQUE INDEX widgets_on_code ON widgets (code) WHERE code IS NOT NULL",
+    );
+    await adapter.executeMutation(`CREATE INDEX widgets_on_name_desc ON widgets ("name" DESC)`);
+
+    const before = await adapter.indexes("widgets");
+    await adapter.removeColumn("widgets", "doomed");
+
+    const indexes = (await adapter.indexes("widgets")) as Array<{
+      name: string;
+      columns: string[] | string;
+      unique: boolean;
+      where?: string;
+      orders?: Record<string, string>;
+    }>;
+    expect(indexes).toEqual(before);
+    const byName = Object.fromEntries(indexes.map((i) => [i.name, i]));
+    expect(byName["widgets_on_lower_name"]?.columns).toBe("lower(name)");
+    expect(byName["widgets_on_code"]?.unique).toBe(true);
+    expect(byName["widgets_on_code"]?.where).toBe("code IS NOT NULL");
+    expect(byName["widgets_on_name_desc"]?.orders).toEqual({ name: "desc" });
+  });
+
   it("alterTable rebuilds a schema-qualified table whose index has a custom name", async () => {
     // The alter_table buffer is a TEMPORARY table, so it is unqualified even
     // when the source is `aux.widgets`. copy_table_indexes has to spot the
