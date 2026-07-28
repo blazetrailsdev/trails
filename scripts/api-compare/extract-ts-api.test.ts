@@ -1569,12 +1569,15 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     expect(ctor.noRailsEquivalent).toBeUndefined();
     expect(ctor.internal).toBeUndefined();
     expect(ctor.declaredIn).toBe("base.ts");
+    expect(ctor.line).toBe(4);
   });
 
   it("inherits a foreign base constructor's visibility onto the synthesized __mixin entry", () => {
     const info = extractFromFiles("/p", {
       "base.ts": `
         export class Base {
+          readonly tag = "base";
+
           protected constructor() {}
         }
       `,
@@ -1592,6 +1595,8 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     expect(ctor.visibility).toBe("protected");
     expect(ctor.internal).toBe(true);
     expect(ctor.declaredIn).toBe("base.ts");
+    // Line 5 of base.ts, not line 3 — the factory's line in attributes.ts.
+    expect(ctor.line).toBe(5);
   });
 
   it("records the reason on tagged namespace members", () => {

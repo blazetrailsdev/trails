@@ -700,8 +700,9 @@ export function extractFromProgram(
       // so its `constructor` reaches this entry only through the construct
       // signature's declaration. Split the same way as the property loop
       // above: visibility comes off whichever declaration the signature
-      // resolves to, a foreign one is marked `declaredIn` so `collectTsFileNames`
-      // skips it as another file's surface, and only the JSDoc reason is gated
+      // resolves to — its line points into that file too — a foreign one is
+      // marked `declaredIn` so `collectTsFileNames` skips it as another file's
+      // surface, and only the JSDoc reason is gated
       // on the declaration living in THIS file. An implicit constructor
       // resolves to no declaration at all, and that entry stays bare.
       if (constructSigs.length > 0) {
@@ -715,7 +716,7 @@ export function extractFromProgram(
         const ownCtor = ctorDeclFile === relPath ? ctorDecl : undefined;
         const ctorVisibility = ctorDecl !== undefined ? memberVisibility(ctorDecl) : "public";
         const ctorReason = ownCtor !== undefined ? noRailsEquivalentReason(ownCtor) : undefined;
-        const ctorNode = ownCtor ?? node;
+        const ctorNode = ctorDecl ?? node;
         mixinMethods.push({
           name: "constructor",
           visibility: ctorVisibility,
