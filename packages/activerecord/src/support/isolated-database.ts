@@ -97,9 +97,6 @@ async function openMysqlDatabase(label: string): Promise<IsolatedDatabase> {
   const database = databaseNameFor(settings.database, label);
   const root = new Mysql2Adapter(settingsUrl("mysql", settings));
   try {
-    // Spelled with an explicit charset because MySQL's `createDatabase` only
-    // infers one from a database version it has already probed, and this root
-    // adapter is cold.
     await root.recreateDatabase(database, { charset: "utf8mb4" });
   } finally {
     await root.close();

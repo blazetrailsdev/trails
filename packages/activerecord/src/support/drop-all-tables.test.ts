@@ -6,10 +6,6 @@ import { openIsolatedDatabase, type IsolatedDatabase } from "./isolated-database
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
 let adapter: DatabaseAdapter;
-// The `dropAllTables` suite asserts a zero-table database, so it cannot ride
-// the per-worker adapter every other AR file shares: `test-setup-dy.ts` loads
-// the canonical schema once per worker, not once per file, and nothing would
-// lay it back down for the next file. It gets its own database instead.
 let isolated: IsolatedDatabase | undefined;
 
 async function listTables(a: DatabaseAdapter): Promise<string[]> {
@@ -196,9 +192,6 @@ describe("dropAllTables", () => {
   });
 });
 
-// Guards the isolation above: the per-worker database this file shares with
-// every other AR test file must still carry the canonical schema after the
-// zero-table suite has run. Before the isolation it was empty here.
 describe("dropAllTables (shared worker database)", () => {
   it("leaves the shared canonical schema intact", async () => {
     const tables = await listTables(adapter);
