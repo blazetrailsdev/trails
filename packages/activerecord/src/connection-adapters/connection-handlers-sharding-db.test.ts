@@ -1,8 +1,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import * as os from "node:os";
 import * as path from "node:path";
-import * as fs from "node:fs";
-import { randomUUID } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
 import { Base } from "../base.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations, type RawConfigurations } from "../database-configurations.js";
@@ -33,6 +32,21 @@ async function withBaseConfigs(
   }
 }
 
+// Rails names on-disk databases (`test/db/primary.sqlite3`,
+// `test/db/primary_shard_one.sqlite3`, and the `arunit` test database) in every
+// config hash here; only the tests that pass inline database hashes to
+// `connects_to` use `":memory:"` (rb:354,355,362,363,379,380). We can't write
+// into the repo, so each test gets a private directory holding files with
+// Rails' basenames.
+async function withDbFiles(fn: (dbPath: (basename: string) => string) => Promise<void>) {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "trails-sharding-db-"));
+  try {
+    await fn((basename) => path.join(dir, basename));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
 describe("ConnectionHandlersShardingDbTest", () => {
   afterEach(async () => {
     await Base.connectionHandler.clearAllConnectionsBang();
@@ -42,11 +56,11 @@ describe("ConnectionHandlersShardingDbTest", () => {
   });
 
   it("establishing a connection in connected to block uses current role and shard", async () => {
-    const tmpfile = path.join(os.tmpdir(), `trails-connectsto-${randomUUID()}.sqlite3`);
-    try {
+    await withDbFiles(async (dbPath) => {
+      const primary = dbPath("primary.sqlite3");
       await withBaseConfigs(
         {
-          default_env: { primary: { adapter: "sqlite3", database: tmpfile } },
+          default_env: { primary: { adapter: "sqlite3", database: primary } },
         },
         async () => {
           const pools = Base.connectsTo({
@@ -55,7 +69,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
           await Promise.all(pools.map((p) => p.adapterReady));
 
           await Base.connectedTo({ role: "writing", shard: "shard_one" }, async () => {
-            await Base.establishConnection({ adapter: "sqlite3", database: tmpfile });
+            await Base.establishConnection({ adapter: "sqlite3", database: primary });
             const conn = await Base.leaseConnection();
             await conn.executeMutation(
               `CREATE TABLE IF NOT EXISTS "people" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "name" TEXT)`,
@@ -70,188 +84,222 @@ describe("ConnectionHandlersShardingDbTest", () => {
         },
         { defaultEnv: "default_env" },
       );
-    } finally {
-      if (fs.existsSync(tmpfile)) fs.unlinkSync(tmpfile);
-    }
+    });
   });
   it("establish connection using 3 levels config", async () => {
-    await withBaseConfigs(
-      {
-        default_env: {
-          primary: { adapter: "sqlite3", database: ":memory:" },
-          primary_shard_one: { adapter: "sqlite3", database: ":memory:" },
-        },
-      },
-      async () => {
-        Base.connectsTo({
-          shards: {
-            default: { writing: "primary", reading: "primary" },
-            shard_one: { writing: "primary_shard_one", reading: "primary_shard_one" },
+    await withDbFiles(async (dbPath) => {
+      const primary = dbPath("primary.sqlite3");
+      const primaryShardOne = dbPath("primary_shard_one.sqlite3");
+      await withBaseConfigs(
+        {
+          default_env: {
+            primary: { adapter: "sqlite3", database: primary },
+            primary_shard_one: { adapter: "sqlite3", database: primaryShardOne },
           },
-        });
+        },
+        async () => {
+          Base.connectsTo({
+            shards: {
+              default: { writing: "primary", reading: "primary" },
+              shard_one: { writing: "primary_shard_one", reading: "primary_shard_one" },
+            },
+          });
 
-        const basePool = Base.connectionHandler.retrieveConnectionPool("Base");
-        const defaultPool = Base.connectionHandler.retrieveConnectionPool("Base", {
-          shard: "default",
-        });
+          const basePool = Base.connectionHandler.retrieveConnectionPool("Base");
+          const defaultPool = Base.connectionHandler.retrieveConnectionPool("Base", {
+            shard: "default",
+          });
 
-        expect((Base.connectionHandler as any).getPoolManager("Base")!.shardNames).toEqual([
-          "default",
-          "shard_one",
-        ]);
-        expect(basePool).toBe(defaultPool);
-        expect(defaultPool!.dbConfig.name).toBe("primary");
+          expect((Base.connectionHandler as any).getPoolManager("Base")!.shardNames).toEqual([
+            "default",
+            "shard_one",
+          ]);
+          expect(basePool).toBe(defaultPool);
+          expect(defaultPool!.dbConfig.database).toBe(primary);
+          expect(defaultPool!.dbConfig.name).toBe("primary");
 
-        const shardOnePool = Base.connectionHandler.retrieveConnectionPool("Base", {
-          shard: "shard_one",
-        });
-        expect(shardOnePool).not.toBeUndefined();
-        expect(shardOnePool!.dbConfig.name).toBe("primary_shard_one");
-      },
-      { defaultEnv: "default_env" },
-    );
+          const shardOnePool = Base.connectionHandler.retrieveConnectionPool("Base", {
+            shard: "shard_one",
+          });
+          expect(shardOnePool).not.toBeUndefined();
+          expect(shardOnePool!.dbConfig.database).toBe(primaryShardOne);
+          expect(shardOnePool!.dbConfig.name).toBe("primary_shard_one");
+        },
+        { defaultEnv: "default_env" },
+      );
+    });
   });
   it("establish connection using 3 levels config with shards and replica", async () => {
-    await withBaseConfigs(
-      {
-        default_env: {
-          primary: { adapter: "sqlite3", database: ":memory:" },
-          primary_replica: { adapter: "sqlite3", database: ":memory:", replica: true },
-          primary_shard_one: { adapter: "sqlite3", database: ":memory:" },
-          primary_shard_one_replica: { adapter: "sqlite3", database: ":memory:", replica: true },
-        },
-      },
-      async () => {
-        Base.connectsTo({
-          shards: {
-            default: { writing: "primary", reading: "primary_replica" },
-            shard_one: { writing: "primary_shard_one", reading: "primary_shard_one_replica" },
+    await withDbFiles(async (dbPath) => {
+      const primary = dbPath("primary.sqlite3");
+      const primaryShardOne = dbPath("primary_shard_one.sqlite3");
+      await withBaseConfigs(
+        {
+          default_env: {
+            primary: { adapter: "sqlite3", database: primary },
+            primary_replica: { adapter: "sqlite3", database: primary, replica: true },
+            primary_shard_one: { adapter: "sqlite3", database: primaryShardOne },
+            primary_shard_one_replica: {
+              adapter: "sqlite3",
+              database: primaryShardOne,
+              replica: true,
+            },
           },
-        });
+        },
+        async () => {
+          Base.connectsTo({
+            shards: {
+              default: { writing: "primary", reading: "primary_replica" },
+              shard_one: { writing: "primary_shard_one", reading: "primary_shard_one_replica" },
+            },
+          });
 
-        const defaultWritingPool = Base.connectionHandler.retrieveConnectionPool("Base", {
-          shard: "default",
-        });
-        const baseWritingPool = Base.connectionHandler.retrieveConnectionPool("Base");
-        expect(baseWritingPool).toBe(defaultWritingPool);
-        expect(defaultWritingPool!.dbConfig.name).toBe("primary");
+          const defaultWritingPool = Base.connectionHandler.retrieveConnectionPool("Base", {
+            shard: "default",
+          });
+          const baseWritingPool = Base.connectionHandler.retrieveConnectionPool("Base");
+          expect(baseWritingPool).toBe(defaultWritingPool);
+          expect(defaultWritingPool!.dbConfig.database).toBe(primary);
+          expect(defaultWritingPool!.dbConfig.name).toBe("primary");
 
-        const defaultReadingPool = Base.connectionHandler.retrieveConnectionPool("Base", {
-          role: "reading",
-          shard: "default",
-        });
-        const baseReadingPool = Base.connectionHandler.retrieveConnectionPool("Base", {
-          role: "reading",
-        });
-        expect(baseReadingPool).toBe(defaultReadingPool);
-        expect(defaultReadingPool!.dbConfig.name).toBe("primary_replica");
+          const defaultReadingPool = Base.connectionHandler.retrieveConnectionPool("Base", {
+            role: "reading",
+            shard: "default",
+          });
+          const baseReadingPool = Base.connectionHandler.retrieveConnectionPool("Base", {
+            role: "reading",
+          });
+          expect(baseReadingPool).toBe(defaultReadingPool);
+          expect(defaultReadingPool!.dbConfig.database).toBe(primary);
+          expect(defaultReadingPool!.dbConfig.name).toBe("primary_replica");
 
-        const shardOneWritingPool = Base.connectionHandler.retrieveConnectionPool("Base", {
-          shard: "shard_one",
-        });
-        expect(shardOneWritingPool).not.toBeUndefined();
-        expect(shardOneWritingPool!.dbConfig.name).toBe("primary_shard_one");
+          const shardOneWritingPool = Base.connectionHandler.retrieveConnectionPool("Base", {
+            shard: "shard_one",
+          });
+          expect(shardOneWritingPool).not.toBeUndefined();
+          expect(shardOneWritingPool!.dbConfig.database).toBe(primaryShardOne);
+          expect(shardOneWritingPool!.dbConfig.name).toBe("primary_shard_one");
 
-        const shardOneReadingPool = Base.connectionHandler.retrieveConnectionPool("Base", {
-          role: "reading",
-          shard: "shard_one",
-        });
-        expect(shardOneReadingPool).not.toBeUndefined();
-        expect(shardOneReadingPool!.dbConfig.name).toBe("primary_shard_one_replica");
-      },
-      { defaultEnv: "default_env" },
-    );
+          const shardOneReadingPool = Base.connectionHandler.retrieveConnectionPool("Base", {
+            role: "reading",
+            shard: "shard_one",
+          });
+          expect(shardOneReadingPool).not.toBeUndefined();
+          expect(shardOneReadingPool!.dbConfig.database).toBe(primaryShardOne);
+          expect(shardOneReadingPool!.dbConfig.name).toBe("primary_shard_one_replica");
+        },
+        { defaultEnv: "default_env" },
+      );
+    });
   });
 
   it("switching connections via handler", async () => {
-    const makePool = (name: string, role: string, shard: string, replica = false) =>
-      Base.connectionHandler.establishConnection(
-        new HashConfig("test", name, {
-          adapter: "sqlite3",
-          database: ":memory:",
-          ...(replica ? { replica: true } : {}),
-        }),
-        { owner: "Base", role, shard, adapterFactory: () => new BetterSQLite3Adapter() },
-      );
+    await withDbFiles(async (dbPath) => {
+      const primary = dbPath("primary.sqlite3");
+      const primaryShardOne = dbPath("primary_shard_one.sqlite3");
+      const makePool = (
+        name: string,
+        database: string,
+        role: string,
+        shard: string,
+        replica = false,
+      ) =>
+        Base.connectionHandler.establishConnection(
+          new HashConfig("test", name, {
+            adapter: "sqlite3",
+            database,
+            ...(replica ? { replica: true } : {}),
+          }),
+          { owner: "Base", role, shard, adapterFactory: () => new BetterSQLite3Adapter() },
+        );
 
-    try {
-      makePool("primary", "writing", "default");
-      makePool("primary_replica", "reading", "default", true);
-      makePool("primary_shard_one", "writing", "shard_one");
-      makePool("primary_shard_one_replica", "reading", "shard_one", true);
-      (Base as any)._shardKeys = ["default", "shard_one"];
+      try {
+        makePool("primary", primary, "writing", "default");
+        makePool("primary_replica", primary, "reading", "default", true);
+        makePool("primary_shard_one", primaryShardOne, "writing", "shard_one");
+        makePool("primary_shard_one_replica", primaryShardOne, "reading", "shard_one", true);
+        (Base as any)._shardKeys = ["default", "shard_one"];
 
-      await Base.connectedTo({ role: "reading", shard: "default" }, async () => {
-        expect(currentRole.call(Base as any)).toBe("reading");
-        expect(Base.connectedToQ({ role: "reading", shard: "default" })).toBe(true);
-        expect(Base.connectedToQ({ role: "writing", shard: "default" })).toBe(false);
-        expect(Base.connectedToQ({ role: "reading", shard: "shard_one" })).toBe(false);
-        expect((await Base.leaseConnection()).isPreventingWrites()).toBe(true);
-      });
+        await Base.connectedTo({ role: "reading", shard: "default" }, async () => {
+          expect(currentRole.call(Base as any)).toBe("reading");
+          expect(Base.connectedToQ({ role: "reading", shard: "default" })).toBe(true);
+          expect(Base.connectedToQ({ role: "writing", shard: "default" })).toBe(false);
+          expect(Base.connectedToQ({ role: "reading", shard: "shard_one" })).toBe(false);
+          expect((await Base.leaseConnection()).isPreventingWrites()).toBe(true);
+        });
 
-      await Base.connectedTo({ role: "writing", shard: "default" }, async () => {
-        expect(currentRole.call(Base as any)).toBe("writing");
-        expect(Base.connectedToQ({ role: "writing", shard: "default" })).toBe(true);
-        expect(Base.connectedToQ({ role: "reading", shard: "default" })).toBe(false);
-        expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBe(false);
-        expect((await Base.leaseConnection()).isPreventingWrites()).toBe(false);
-      });
-
-      await Base.connectedTo({ role: "reading", shard: "shard_one" }, async () => {
-        expect(currentRole.call(Base as any)).toBe("reading");
-        expect(Base.connectedToQ({ role: "reading", shard: "shard_one" })).toBe(true);
-        expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBe(false);
-        expect(Base.connectedToQ({ role: "reading", shard: "default" })).toBe(false);
-        expect((await Base.leaseConnection()).isPreventingWrites()).toBe(true);
-      });
-
-      await Base.connectedTo({ role: "writing", shard: "shard_one" }, async () => {
-        expect(currentRole.call(Base as any)).toBe("writing");
-        expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBe(true);
-        expect(Base.connectedToQ({ role: "reading", shard: "shard_one" })).toBe(false);
-        expect(Base.connectedToQ({ role: "writing", shard: "default" })).toBe(false);
-        expect((await Base.leaseConnection()).isPreventingWrites()).toBe(false);
-      });
-    } finally {
-      await Base.connectionHandler.clearAllConnectionsBang();
-      (Base as any)._shardKeys = undefined;
-    }
-  });
-
-  it("retrieves proper connection with nested connected to", async () => {
-    await withBaseConfigs(
-      {
-        default_env: {
-          primary: { adapter: "sqlite3", database: ":memory:" },
-          primary_replica: { adapter: "sqlite3", database: ":memory:", replica: true },
-          primary_shard_one: { adapter: "sqlite3", database: ":memory:" },
-          primary_shard_one_replica: { adapter: "sqlite3", database: ":memory:", replica: true },
-        },
-      },
-      async () => {
-        Base.connectsTo({
-          shards: {
-            default: { writing: "primary", reading: "primary_replica" },
-            shard_one: { writing: "primary_shard_one", reading: "primary_shard_one_replica" },
-          },
+        await Base.connectedTo({ role: "writing", shard: "default" }, async () => {
+          expect(currentRole.call(Base as any)).toBe("writing");
+          expect(Base.connectedToQ({ role: "writing", shard: "default" })).toBe(true);
+          expect(Base.connectedToQ({ role: "reading", shard: "default" })).toBe(false);
+          expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBe(false);
+          expect((await Base.leaseConnection()).isPreventingWrites()).toBe(false);
         });
 
         await Base.connectedTo({ role: "reading", shard: "shard_one" }, async () => {
-          expect(Base.connectionPool().dbConfig.name).toBe("primary_shard_one_replica");
-
-          await Base.connectedTo({ role: "writing" }, async () => {
-            expect(Base.connectionPool().dbConfig.name).toBe("primary_shard_one");
-          });
-
-          await Base.connectedTo({ role: "reading", shard: "default" }, async () => {
-            expect(Base.connectionPool().dbConfig.name).toBe("primary_replica");
-          });
-
-          expect(Base.connectionPool().dbConfig.name).toBe("primary_shard_one_replica");
+          expect(currentRole.call(Base as any)).toBe("reading");
+          expect(Base.connectedToQ({ role: "reading", shard: "shard_one" })).toBe(true);
+          expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBe(false);
+          expect(Base.connectedToQ({ role: "reading", shard: "default" })).toBe(false);
+          expect((await Base.leaseConnection()).isPreventingWrites()).toBe(true);
         });
-      },
-      { defaultEnv: "default_env" },
-    );
+
+        await Base.connectedTo({ role: "writing", shard: "shard_one" }, async () => {
+          expect(currentRole.call(Base as any)).toBe("writing");
+          expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBe(true);
+          expect(Base.connectedToQ({ role: "reading", shard: "shard_one" })).toBe(false);
+          expect(Base.connectedToQ({ role: "writing", shard: "default" })).toBe(false);
+          expect((await Base.leaseConnection()).isPreventingWrites()).toBe(false);
+        });
+      } finally {
+        await Base.connectionHandler.clearAllConnectionsBang();
+        (Base as any)._shardKeys = undefined;
+      }
+    });
+  });
+
+  it("retrieves proper connection with nested connected to", async () => {
+    await withDbFiles(async (dbPath) => {
+      const primary = dbPath("primary.sqlite3");
+      const primaryShardOne = dbPath("primary_shard_one.sqlite3");
+      await withBaseConfigs(
+        {
+          default_env: {
+            primary: { adapter: "sqlite3", database: primary },
+            primary_replica: { adapter: "sqlite3", database: primary, replica: true },
+            primary_shard_one: { adapter: "sqlite3", database: primaryShardOne },
+            primary_shard_one_replica: {
+              adapter: "sqlite3",
+              database: primaryShardOne,
+              replica: true,
+            },
+          },
+        },
+        async () => {
+          Base.connectsTo({
+            shards: {
+              default: { writing: "primary", reading: "primary_replica" },
+              shard_one: { writing: "primary_shard_one", reading: "primary_shard_one_replica" },
+            },
+          });
+
+          await Base.connectedTo({ role: "reading", shard: "shard_one" }, async () => {
+            expect(Base.connectionPool().dbConfig.name).toBe("primary_shard_one_replica");
+
+            await Base.connectedTo({ role: "writing" }, async () => {
+              expect(Base.connectionPool().dbConfig.name).toBe("primary_shard_one");
+            });
+
+            await Base.connectedTo({ role: "reading", shard: "default" }, async () => {
+              expect(Base.connectionPool().dbConfig.name).toBe("primary_replica");
+            });
+
+            expect(Base.connectionPool().dbConfig.name).toBe("primary_shard_one_replica");
+          });
+        },
+        { defaultEnv: "default_env" },
+      );
+    });
   });
 
   it("connected to raises without a shard or role", async () => {
@@ -270,119 +318,143 @@ describe("ConnectionHandlersShardingDbTest", () => {
   });
 
   it("retrieve connection pool with invalid shard", async () => {
-    Base.connectionHandler.establishConnection(
-      new HashConfig("test", "Base", { adapter: "sqlite3", database: ":memory:" }),
-      { owner: "Base" },
-    );
-    expect(Base.connectionHandler.retrieveConnectionPool("Base")).not.toBeUndefined();
-    expect(Base.connectionHandler.retrieveConnectionPool("Base", { shard: "foo" })).toBeUndefined();
+    await withDbFiles(async (dbPath) => {
+      Base.connectionHandler.establishConnection(
+        new HashConfig("test", "Base", {
+          adapter: "sqlite3",
+          database: dbPath("arunit.sqlite3"),
+        }),
+        { owner: "Base" },
+      );
+      expect(Base.connectionHandler.retrieveConnectionPool("Base")).not.toBeUndefined();
+      expect(
+        Base.connectionHandler.retrieveConnectionPool("Base", { shard: "foo" }),
+      ).toBeUndefined();
+    });
   });
 
   it("calling connected to on a non existent shard raises", async () => {
-    await withBaseConfigs(
-      { default_env: { arunit: { adapter: "sqlite3", database: ":memory:" } } },
-      async () => {
-        Base.connectsTo({ shards: { default: { writing: "arunit", reading: "arunit" } } });
-        let error: any;
-        try {
-          await Base.connectedTo({ role: "reading", shard: "foo" }, async () => {
-            Base.connectionPool();
-          });
-        } catch (e) {
-          error = e;
-        }
-        expect(error).toBeDefined();
-        expect(error.message).toBe(
-          "No database connection defined for 'foo' shard and 'reading' role.",
-        );
-        expect(error.connectionName).toBe("Base");
-        expect(error.shard).toBe("foo");
-        expect(error.role).toBe("reading");
-      },
-      { defaultEnv: "default_env" },
-    );
+    await withDbFiles(async (dbPath) => {
+      await withBaseConfigs(
+        { default_env: { arunit: { adapter: "sqlite3", database: dbPath("arunit.sqlite3") } } },
+        async () => {
+          Base.connectsTo({ shards: { default: { writing: "arunit", reading: "arunit" } } });
+          let error: any;
+          try {
+            await Base.connectedTo({ role: "reading", shard: "foo" }, async () => {
+              Base.connectionPool();
+            });
+          } catch (e) {
+            error = e;
+          }
+          expect(error).toBeDefined();
+          expect(error.message).toBe(
+            "No database connection defined for 'foo' shard and 'reading' role.",
+          );
+          expect(error.connectionName).toBe("Base");
+          expect(error.shard).toBe("foo");
+          expect(error.role).toBe("reading");
+        },
+        { defaultEnv: "default_env" },
+      );
+    });
   });
   it("calling connected to on a non existent role for shard raises", async () => {
-    await withBaseConfigs(
-      { default_env: { arunit: { adapter: "sqlite3", database: ":memory:" } } },
-      async () => {
-        Base.connectsTo({
-          shards: {
-            default: { writing: "arunit", reading: "arunit" },
-            shard_one: { writing: "arunit", reading: "arunit" },
-          },
-        });
-        let error: any;
-        try {
-          await Base.connectedTo({ role: "non_existent", shard: "shard_one" }, async () => {
-            Base.connectionPool();
+    await withDbFiles(async (dbPath) => {
+      await withBaseConfigs(
+        { default_env: { arunit: { adapter: "sqlite3", database: dbPath("arunit.sqlite3") } } },
+        async () => {
+          Base.connectsTo({
+            shards: {
+              default: { writing: "arunit", reading: "arunit" },
+              shard_one: { writing: "arunit", reading: "arunit" },
+            },
           });
-        } catch (e) {
-          error = e;
-        }
-        expect(error).toBeDefined();
-        expect(error.message).toBe(
-          "No database connection defined for 'shard_one' shard and 'non_existent' role.",
-        );
-        expect(error.connectionName).toBe("Base");
-        expect(error.shard).toBe("shard_one");
-        expect(error.role).toBe("non_existent");
-      },
-      { defaultEnv: "default_env" },
-    );
+          let error: any;
+          try {
+            await Base.connectedTo({ role: "non_existent", shard: "shard_one" }, async () => {
+              Base.connectionPool();
+            });
+          } catch (e) {
+            error = e;
+          }
+          expect(error).toBeDefined();
+          expect(error.message).toBe(
+            "No database connection defined for 'shard_one' shard and 'non_existent' role.",
+          );
+          expect(error.connectionName).toBe("Base");
+          expect(error.shard).toBe("shard_one");
+          expect(error.role).toBe("non_existent");
+        },
+        { defaultEnv: "default_env" },
+      );
+    });
   });
   it("calling connected to on a default role for non existent shard raises", async () => {
-    await withBaseConfigs(
-      { default_env: { arunit: { adapter: "sqlite3", database: ":memory:" } } },
-      async () => {
-        Base.connectsTo({ shards: { default: { writing: "arunit", reading: "arunit" } } });
-        let error: any;
-        try {
-          await Base.connectedTo({ shard: "foo" }, async () => {
-            Base.connectionPool();
-          });
-        } catch (e) {
-          error = e;
-        }
-        expect(error).toBeDefined();
-        expect(error.message).toBe("No database connection defined for 'foo' shard.");
-        expect(error.connectionName).toBe("Base");
-        expect(error.shard).toBe("foo");
-        expect(error.role).toBe("writing");
-      },
-      { defaultEnv: "default_env" },
-    );
+    await withDbFiles(async (dbPath) => {
+      await withBaseConfigs(
+        { default_env: { arunit: { adapter: "sqlite3", database: dbPath("arunit.sqlite3") } } },
+        async () => {
+          Base.connectsTo({ shards: { default: { writing: "arunit", reading: "arunit" } } });
+          let error: any;
+          try {
+            await Base.connectedTo({ shard: "foo" }, async () => {
+              Base.connectionPool();
+            });
+          } catch (e) {
+            error = e;
+          }
+          expect(error).toBeDefined();
+          expect(error.message).toBe("No database connection defined for 'foo' shard.");
+          expect(error.connectionName).toBe("Base");
+          expect(error.shard).toBe("foo");
+          expect(error.role).toBe("writing");
+        },
+        { defaultEnv: "default_env" },
+      );
+    });
   });
 
   it("cannot swap shards while prohibited", async () => {
-    const makePool = (shard: string) =>
-      Base.connectionHandler.establishConnection(
-        new HashConfig("test", shard, { adapter: "sqlite3", database: ":memory:" }),
-        { owner: "Base", role: "writing", shard },
-      );
-    try {
-      makePool("default");
-      makePool("shard_one");
-      expect(() => {
-        Base.prohibitShardSwapping(() => {
-          Base.connectedTo({ role: "reading", shard: "default" }, () => {});
-        });
-      }).toThrow(/cannot swap `shard` while shard swapping is prohibited/);
-    } finally {
-      await Base.connectionHandler.clearAllConnectionsBang();
-    }
+    await withDbFiles(async (dbPath) => {
+      const databases: Record<string, string> = {
+        default: dbPath("primary.sqlite3"),
+        shard_one: dbPath("primary_shard_one.sqlite3"),
+      };
+      const makePool = (shard: string) =>
+        Base.connectionHandler.establishConnection(
+          new HashConfig("test", shard, { adapter: "sqlite3", database: databases[shard] }),
+          { owner: "Base", role: "writing", shard },
+        );
+      try {
+        makePool("default");
+        makePool("shard_one");
+        expect(() => {
+          Base.prohibitShardSwapping(() => {
+            Base.connectedTo({ role: "reading", shard: "default" }, () => {});
+          });
+        }).toThrow(/cannot swap `shard` while shard swapping is prohibited/);
+      } finally {
+        await Base.connectionHandler.clearAllConnectionsBang();
+      }
+    });
   });
 
   it("can swap roles while shard swapping is prohibited", async () => {
-    Base.connectionHandler.establishConnection(
-      new HashConfig("test", "Base", { adapter: "sqlite3", database: ":memory:" }),
-      { owner: "Base", role: "reading", shard: "default" },
-    );
-    expect(() => {
-      Base.prohibitShardSwapping(() => {
-        Base.connectedTo({ role: "reading" }, () => {});
-      });
-    }).not.toThrow();
+    await withDbFiles(async (dbPath) => {
+      Base.connectionHandler.establishConnection(
+        new HashConfig("test", "Base", {
+          adapter: "sqlite3",
+          database: dbPath("primary.sqlite3"),
+        }),
+        { owner: "Base", role: "reading", shard: "default" },
+      );
+      expect(() => {
+        Base.prohibitShardSwapping(() => {
+          Base.connectedTo({ role: "reading" }, () => {});
+        });
+      }).not.toThrow();
+    });
   });
 
   it("default shard is chosen by first key or default", async () => {
