@@ -2161,10 +2161,9 @@ export class AbstractAdapter implements Quoting {
   /**
    * @internal Mirrors: AbstractAdapter::TYPE_MAP
    *
-   * Rails builds this constant at class-definition time (abstract_adapter.rb:942).
-   * Built on first read here instead: the type classes `initializeTypeMap`
-   * registers sit on a circular import edge and are still in their temporal
-   * dead zone while this module evaluates.
+   * Built on first read rather than at class-definition time: the type classes
+   * `initializeTypeMap` registers sit on a circular import edge and are still
+   * in their temporal dead zone while this module evaluates.
    */
   static get TYPE_MAP(): TypeMap {
     return (abstractTypeMap ??= (() => {
@@ -2659,7 +2658,6 @@ export class AbstractAdapter implements Quoting {
 // is early enough.
 let abstractAdapterMixinsApplied = false;
 
-/** Backing slot for the lazily built {@link AbstractAdapter.TYPE_MAP}. */
 let abstractTypeMap: TypeMap | undefined;
 
 /** @internal Applies the abstract-adapter mixin/callback/query-cache wiring once. */

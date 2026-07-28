@@ -194,6 +194,28 @@ describe("AbstractAdapter.initializeTypeMap", () => {
   });
 });
 
+describe("AbstractAdapter#lookupCastType", () => {
+  it("looks the sql type up in TYPE_MAP", () => {
+    const adapter = new TestAdapter();
+    expect(adapter.lookupCastType("integer")).toBeInstanceOf(IntegerType);
+    expect(adapter.lookupCastType("boolean")).toBeInstanceOf(BooleanType);
+  });
+
+  it("carries the sql type's limit through to the cast type", () => {
+    const adapter = new TestAdapter();
+    expect(adapter.lookupCastType("varchar(64)")).toMatchObject({ limit: 64 });
+  });
+
+  it("is the type source for lookupCastTypeFromColumn", () => {
+    const adapter = new TestAdapter();
+    expect(adapter.lookupCastTypeFromColumn({ sqlType: "datetime" })).toBeInstanceOf(DateTimeType);
+  });
+
+  it("TYPE_MAP is memoized across reads", () => {
+    expect(AbstractAdapter.TYPE_MAP).toBe(AbstractAdapter.TYPE_MAP);
+  });
+});
+
 describe("DatabaseStatements#insert id extraction", () => {
   // execInsert/execute are include()-mixed methods, not class declarations,
   // so we assign them via any rather than using class override syntax.

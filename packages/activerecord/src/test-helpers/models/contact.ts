@@ -9,9 +9,9 @@ interface ColumnOptions {
 
 type ContactFakeColumnsHost = typeof Base & { column: typeof column };
 
-function fakeConnection(klass: typeof Base): FakeActiveRecordAdapter {
-  // Rails' `lease_connection` is synchronous; trails' is async, so a class-body
-  // caller uses the sync escape hatch.
+// Rails' `lease_connection` is synchronous; trails' is async, so a class-body
+// caller takes the sync escape hatch.
+function leaseConnection(klass: typeof Base): FakeActiveRecordAdapter {
   return klass.connectionPool().leaseConnectionSync() as unknown as FakeActiveRecordAdapter;
 }
 
@@ -22,14 +22,14 @@ function column(
   sqlType: string | null = null,
   options: ColumnOptions = {},
 ): void {
-  fakeConnection(this).mergeColumn(this.tableName, name, sqlType, options);
+  leaseConnection(this).mergeColumn(this.tableName, name, sqlType, options);
 }
 
 /** Mirrors: ContactFakeColumns.extended */
 async function extended(base: ContactFakeColumnsHost): Promise<void> {
   await base.establishConnection({ adapter: "fake" });
 
-  const connection = fakeConnection(base);
+  const connection = leaseConnection(base);
   connection.dataSources = [base.tableName];
   connection.primaryKeys = { [base.tableName]: "id" };
 
@@ -62,9 +62,6 @@ export class ContactSti extends Base {
 
   static column = column;
 
-  // Rails: `def type; "ContactSti" end` — ContactSti overrides the `type`
-  // reader to a constant so serialization still sees an inheritance-column
-  // value to exclude.
   get type(): string {
     return "ContactSti";
   }
@@ -74,7 +71,7 @@ await extended(ContactSti);
 ContactSti.column("type", "string");
 
 // Rails reflects the fake adapter's columns lazily, on the first `columns`
-// read. trails' sync reflection path only sees an already-warm schema cache,
+// read. trails' synchronous reflection sees only an already-warm schema cache,
 // so warm it here — after the last `column` call — while we can still await.
 await Contact.loadSchema();
 await ContactSti.loadSchema();

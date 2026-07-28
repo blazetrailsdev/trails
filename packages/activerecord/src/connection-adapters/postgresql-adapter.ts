@@ -3630,8 +3630,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * also handles typmods (`(255)`), `[]` array suffixes, enums, and domains.
    * @internal
    */
-  // Rails keeps this private (postgresql/quoting.rb:195); TS can't narrow the
-  // now-inherited `AbstractAdapter#lookup_cast_type` to private in a subclass.
   async lookupCastType(sqlType: string): Promise<Type> {
     const rows = await this.schemaQuery(`SELECT ${this.quote(sqlType)}::regtype::oid`);
     return this.typeMap.lookup(Number(rows[0]?.oid));
