@@ -2,11 +2,12 @@ import { describe, it, expect, afterEach } from "vitest";
 import {
   ForeignKeyDefinition,
   CheckConstraintDefinition,
-  TableDefinition,
   ReferenceDefinition,
+  TableDefinition,
   type ReferenceDefinitionConnection,
 } from "./schema-definitions.js";
 import { SchemaDumper } from "../../schema-dumper.js";
+import { Base } from "../../base.js";
 
 const originalFkPattern = SchemaDumper.fkIgnorePattern;
 const originalChkPattern = SchemaDumper.chkIgnorePattern;
@@ -153,5 +154,32 @@ describe("ReferenceDefinition#add", () => {
     await new ReferenceDefinition("user", { index: false }).add("taggings", connection);
 
     expect(calls.map((c) => c[0])).toEqual(["addColumn"]);
+  });
+});
+
+describe("ReferenceDefinition#foreign_table_name", () => {
+  const originalPluralize = Base.pluralizeTableNames;
+
+  afterEach(() => {
+    Base.pluralizeTableNames = originalPluralize;
+  });
+
+  it("targets the singular table when Base.pluralizeTableNames is false", () => {
+    Base.pluralizeTableNames = false;
+    const ref = new ReferenceDefinition("user", { foreignKey: true, index: false });
+    const td = new TableDefinition("posts", { id: false });
+    ref.addTo(td);
+    expect(td.foreignKeys[0].toTable).toBe("user");
+  });
+
+  it("still honors an explicit toTable when pluralizeTableNames is false", () => {
+    Base.pluralizeTableNames = false;
+    const ref = new ReferenceDefinition("author", {
+      foreignKey: { toTable: "accounts" },
+      index: false,
+    });
+    const td = new TableDefinition("posts", { id: false });
+    ref.addTo(td);
+    expect(td.foreignKeys[0].toTable).toBe("accounts");
   });
 });
