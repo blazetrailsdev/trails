@@ -7,12 +7,22 @@ import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapt
 import { ReadOnlyError, StatementInvalid } from "./errors.js";
 import { itIfSupports } from "./support/supports.js";
 import { adapterType } from "./test-adapter.js";
+import { scratchDatabasePath } from "./support/scratch-database.js";
 import { PostgreSQLAdapter, PG_TEST_URL } from "./adapters/postgresql/test-helper.js";
 
+// Rails' `setup` is `@connection = ActiveRecord::Base.lease_connection` — the
+// ambient file-backed `arunit` connection, with `subscribers` coming from
+// schema.rb. trails cannot ride that connection here because write prevention
+// (`while_preventing_writes`) is only implemented on the sqlite3 adapter, so
+// this suite stays sqlite-pinned on every lane. What it does drop is the
+// `:memory:` database: the connection is file-backed like `arunit`, on its own
+// path because the suite creates and drops `subscribers` itself and must not
+// touch the worker's canonical copy.
 let adapter: AbstractSQLite3Adapter;
 
 beforeEach(async () => {
-  adapter = new BetterSQLite3Adapter(":memory:");
+  adapter = new BetterSQLite3Adapter(await scratchDatabasePath("prevent-writes"));
+  await adapter.exec(`DROP TABLE IF EXISTS "subscribers"`);
   await adapter.exec(
     `CREATE TABLE "subscribers" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "nick" TEXT)`,
   );

@@ -1,20 +1,24 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "./base.js";
-import { HashConfig } from "./database-configurations/hash-config.js";
+import type { DatabaseConfig } from "./database-configurations/database-config.js";
 import { ConnectionNotDefined } from "./errors.js";
 
 class TestRecord extends Base {}
 
 describe("TestUnconnectedAdapter", () => {
   let underlying: { active: boolean };
+  // Rails' `remove_connection` hands back the db_config the pool was opened
+  // from, and teardown re-establishes it — the ambient `arunit` connection is
+  // never named or rebuilt by hand here.
+  let connectionName: DatabaseConfig | undefined;
 
   beforeEach(async () => {
-    Base.connectionHandler.establishConnection(
-      new HashConfig("test", "primary", { adapter: "sqlite3", database: ":memory:", pool: 1 }),
-      { owner: "Base" },
-    );
     underlying = (await Base.leaseConnection()) as unknown as { active: boolean };
-    Base.removeConnection();
+    connectionName = Base.removeConnection();
+  });
+
+  afterEach(async () => {
+    await Base.establishConnection(connectionName);
   });
 
   it("connection no longer established", async () => {

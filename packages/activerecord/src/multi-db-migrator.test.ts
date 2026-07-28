@@ -2,15 +2,21 @@
  * Multi-DB migrator tests: two separate database connections run migrations independently.
  * Mirrors: activerecord/test/cases/multi_db_migrator_test.rb
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Migrator } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import { scratchDatabasePath } from "./support/scratch-database.js";
 
-async function makeSqliteAdapter(): Promise<DatabaseAdapter> {
+// Rails takes `ActiveRecord::Base.connection_pool` and
+// `ARUnit2Model.connection_pool` — two *different* databases, both file-backed
+// (`arunit` / `arunit2`). The point of the test is that the two schema_migration
+// tables are independent, so each adapter gets its own on-disk database rather
+// than a private `:memory:` one.
+async function makeSqliteAdapter(label: string): Promise<DatabaseAdapter> {
   const { BetterSQLite3Adapter } = await import("./connection-adapters/better-sqlite3-adapter.js");
-  return new BetterSQLite3Adapter(":memory:");
+  return new BetterSQLite3Adapter(await scratchDatabasePath(label));
 }
 
 function sensor(
@@ -43,8 +49,8 @@ describe("MultiDbMigratorTest", () => {
   let migrationsB: MigrationProxy[];
 
   beforeEach(async () => {
-    adapterA = await makeSqliteAdapter();
-    adapterB = await makeSqliteAdapter();
+    adapterA = await makeSqliteAdapter("multi-db-migrator-a");
+    adapterB = await makeSqliteAdapter("multi-db-migrator-b");
     smA = new SchemaMigration(adapterA);
     smB = new SchemaMigration(adapterB);
     await smA.createTable();
@@ -81,6 +87,13 @@ describe("MultiDbMigratorTest", () => {
         migration: () => ({ up: async () => {}, down: async () => {} }),
       },
     ];
+  });
+
+  // The databases are files now, so the handles have to be released — a leaked
+  // one keeps the WAL sidecars alive past the run.
+  afterEach(async () => {
+    await adapterA.close();
+    await adapterB.close();
   });
 
   it("schema migration is different for different connections", async () => {
