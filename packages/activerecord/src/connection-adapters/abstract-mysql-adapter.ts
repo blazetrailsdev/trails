@@ -2227,11 +2227,5 @@ export class StatementPool extends ConnectionStatementPool<MysqlPreparedStatemen
   }
 }
 
-// Rails: `include MySQL::SchemaStatements` in the AbstractMysqlAdapter class
-// body (abstract_mysql_adapter.rb:19), so the MySQL overrides win over the base
-// SchemaStatements on the adapter itself — not just on the companion returned by
-// `schemaStatements()`. Applied here at module scope rather than inside the class
-// because trails keeps the module in a companion class; `include()` copies its
-// own prototype descriptors and leaves class-body methods (which sit above every
-// mixin in Ruby's ancestry) untouched.
+// Rails: `include MySQL::SchemaStatements` (abstract_mysql_adapter.rb:19).
 include(AbstractMysqlAdapter, MysqlSchemaStatements);

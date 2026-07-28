@@ -433,10 +433,6 @@ export class SchemaStatements {
     // reference it are dropped instead of left dangling; delegate when the
     // adapter supplies its own removeColumn (mirrors renameColumn's gate).
     const adapter = this.adapter as any;
-    // `adapter !== this` keeps the dispatch one-way: when these methods run
-    // mixed into an adapter (MySQL's `include MySQL::SchemaStatements`),
-    // `this.adapter` is the adapter itself, so an override reaching this body
-    // through `super` would otherwise be dispatched straight back to itself.
     if (
       adapter !== (this as unknown) &&
       typeof adapter.removeColumn === "function" &&

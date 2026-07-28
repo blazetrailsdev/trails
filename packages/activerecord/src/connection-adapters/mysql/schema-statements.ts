@@ -63,12 +63,7 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
     await this.adapter.execute(await this.schemaCreation.accept(createDef));
   }
 
-  /**
-   * MySQL refuses to drop a column that a foreign key references
-   * (ER_FK_COLUMN_CANNOT_DROP), so drop the key first.
-   *
-   * Mirrors: MySQL::SchemaStatements#remove_column
-   */
+  /** Mirrors: MySQL::SchemaStatements#remove_column */
   override async removeColumn(
     tableName: string,
     columnName: string,
@@ -89,9 +84,7 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
     const last = args[args.length - 1];
     const hasOpts = last !== null && last !== undefined && typeof last === "object";
     const opts = (hasOpts ? last : {}) as { temporary?: boolean };
-    // `this.adapter !== this` keeps the delegation one-way once this body is
-    // mixed onto the adapter itself (see removeColumn).
-    if (opts.temporary && (this.adapter as unknown) !== (this as unknown)) {
+    if (opts.temporary) {
       return (
         this.adapter as unknown as { dropTable(...args: unknown[]): Promise<void> }
       ).dropTable(...(args as unknown[]));
