@@ -47,6 +47,35 @@ tester.run("require-table-teardown", rule, {
     'await ctx.createTable("widgets", () => {});\nawait adapter.exec("DROP TABLE widgets");',
     // IF NOT EXISTS / IF EXISTS and trailing clauses don't defeat matching.
     'await c.exec("CREATE TABLE IF NOT EXISTS tmp_x (id int)");\nawait c.exec("DROP TABLE IF EXISTS tmp_x CASCADE");',
+    // A quoted name with an embedded space is one name on both sides — the
+    // identifier pattern must not stop at the space (`"my table"` → `my`),
+    // which would leave the create unmatchable by any drop of the real table.
+    'await adapter.exec(`CREATE TABLE "my table" (id int)`);\nawait adapter.exec(`DROP TABLE "my table"`);',
+    "await adapter.exec('CREATE TABLE `my table` (id int)');\nawait adapter.exec('DROP TABLE `my table`');",
+    // A quoted raw create balanced by the helper form — the cross-form
+    // equivalence the separate quote capture exists for, in both directions.
+    'await adapter.exec(`CREATE TABLE "my table" (id int)`);\nawait ctx.dropTable("my table");',
+    'await ctx.createTable("my table", () => {});\nawait adapter.exec(`DROP TABLE "my table"`);',
+    // A doubled quote escapes a quote inside the identifier: one name,
+    // `my"table` — not the phantom `my` a truncating parse would record.
+    'await adapter.exec(`CREATE TABLE "my""table" (id int)`);\nawait ctx.dropTable(\'my"table\');',
+    // The doubled-quote branch must not overreach: a later `""` elsewhere in
+    // the statement is not part of the name, which closes at its own quote.
+    'await adapter.exec(`CREATE TABLE "t" (c TEXT DEFAULT "")`);\nawait adapter.exec(`DROP TABLE "t"`);',
+    // An escaped quote as the *last* content character puts a real closing
+    // quote right after a doubled pair — the boundary `quotedNameTruncated`
+    // must not fire on, since `charAfter` is the space, not a quote.
+    'await adapter.exec(`CREATE TABLE "my""" (id int)`);\nawait ctx.dropTable(\'my"\');',
+    // An unclosed name containing a doubled quote must not be truncated into a
+    // phantom `my` create by backtracking off the `""` — it is unknowable.
+    'await adapter.exec(`CREATE TABLE "my""table${x} (id int)`);',
+    // Quoting turns a would-be trailing clause into a table name, so the drop
+    // list keeps reading past it.
+    'await adapter.exec(`CREATE TABLE "cascade" (id int)`);\nawait adapter.exec(`CREATE TABLE b (id int)`);\n' +
+      'await adapter.exec(`DROP TABLE "cascade", b`);',
+    // A spaced quoted name in a multi-table drop list.
+    'await adapter.exec(`CREATE TABLE "my table" (id int)`);\nawait adapter.exec(`CREATE TABLE b (id int)`);\n' +
+      'await adapter.exec(`DROP TABLE "my table", b`);',
     // Interpolated raw-SQL table name is unknowable — neither create nor drop.
     "await adapter.exec(`CREATE TABLE ${name} (id int)`);",
     // Static prefix flush against an interpolation is a dynamic-name prefix,
@@ -80,6 +109,30 @@ tester.run("require-table-teardown", rule, {
     'await ctx.dropTable(name);\nawait ctx.dropTable("b");',
   ],
   invalid: [
+    // Dropping the truncated prefix of a spaced quoted name is not a teardown
+    // of the real table — the create is still reported by its full name.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "my table" (id int)`);\n' +
+        'await adapter.exec(`DROP TABLE "my"`);',
+      errors: [{ messageId: "missingTeardown", data: { table: "my table" } }],
+    },
+    // A truncated drop is not credited as the teardown of the phantom name it
+    // would otherwise spell — `my` is still reported.
+    {
+      code:
+        'await adapter.exec("CREATE TABLE my (id int)");\n' +
+        'await adapter.exec(`DROP TABLE "my""table${x}`);',
+      errors: [{ messageId: "missingTeardown", data: { table: "my" } }],
+    },
+    // Dropping the prefix before an escaped (doubled) quote is not a teardown
+    // of the real table either.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "my""table" (id int)`);\n' +
+        'await adapter.exec(`DROP TABLE "my"`);',
+      errors: [{ messageId: "missingTeardown", data: { table: 'my"table' } }],
+    },
     // Symmetrically, a DROP name flush against an interpolation is a prefix,
     // not a table: the phantom `tmp_` must not be credited as the teardown of
     // the real `tmp_a`.

@@ -146,18 +146,67 @@ function droppedTableNames(call) {
 }
 
 /**
- * The leading `CREATE [GLOBAL|LOCAL] [TEMP[ORARY]|UNLOGGED] TABLE [IF NOT
- * EXISTS]` clause, up to and including the table name. The optional opening
- * quote (`` ` ``, `"`, `'`) is matched and stripped via a backreference so a
- * quoted name balances an unquoted helper name (`CREATE TABLE "items"` ↔
- * `dropTable("items")`); `\1?` tolerates an unmatched (no-quote) group.
+ * A table name: either quoted (`` ` ``, `"`, `'`) or a bare identifier. The
+ * quotes are captured separately from the name so a quoted name balances an
+ * unquoted helper name (`CREATE TABLE "items"` ↔ `dropTable("items")`).
+ *
+ * A quoted name runs to its closing quote rather than to the first
+ * non-identifier character, so an embedded space stays part of the name
+ * (`CREATE TABLE "my table"` is the table `my table`, not `my`). Truncating it
+ * used to make a create unmatchable by any drop of the real name — and the
+ * phantom short name matchable by a drop that tears down nothing.
+ *
+ * SQLite and PostgreSQL escape a quote inside an identifier by doubling it, so
+ * `\1\1` is consumed as content rather than read as the closing quote:
+ * `"my""table"` is one name, `my"table` (undoubled by `capturedName`), not the
+ * phantom `my`. `(?!\1)` keeps the `+` bounded — it can never cross an
+ * undoubled quote, so a name cannot run past its close or across statements.
+ *
+ * A name whose opening quote is never closed is skipped rather than truncated,
+ * so the create goes unreported. Usually it matches neither branch. The
+ * exception is an unclosed name containing a doubled quote
+ * (`CREATE TABLE "my""table${x}`): the `+` can backtrack off the `""` unit and
+ * let its first quote serve as the close, matching the phantom `"my"`. See
+ * `quotedNameTruncated`, which rejects that parse. Either way the input is
+ * malformed SQL in a plain string literal, or — in a template — a name whose
+ * closing quote lives past an interpolation, so it was already unknowable.
  */
-const CREATE_TABLE_RE =
-  /\bcreate\s+(?:(?:global|local)\s+)?(?:temp(?:orary)?\s+|unlogged\s+)?table\s+(?:if\s+not\s+exists\s+)?(`|"|')?([\w.]+)\1?/gi;
+const NAME_SRC = "(?:([\"'`])((?:(?!\\1)[\\s\\S]|\\1\\1)+)\\1|([\\w.]+))";
+/**
+ * `NAME_SRC` capture indices. Its `\1` backreference pins the fragment to the
+ * first capture group, so it must be the only group in any regex built from it.
+ */
+const [OPEN_QUOTE, QUOTED_NAME, BARE_NAME] = [1, 2, 3];
+/** The name `m` captured, with a quoted name's doubled quotes undoubled. */
+function capturedName(m) {
+  const quote = m[OPEN_QUOTE];
+  if (quote === undefined) return m[BARE_NAME];
+  return m[QUOTED_NAME].replaceAll(quote + quote, quote);
+}
+
+/**
+ * Whether `m` closed a quoted name early by backtracking off a doubled quote,
+ * leaving a phantom short name. `charAfter` is the character following the
+ * match. A real closing quote is never immediately followed by its own quote —
+ * that pair would have been consumed as escaped content — so this signature is
+ * exactly the truncated parse, and the name is dropped rather than recorded.
+ */
+function quotedNameTruncated(m, charAfter) {
+  return m[OPEN_QUOTE] !== undefined && charAfter === m[OPEN_QUOTE];
+}
+
+/**
+ * The leading `CREATE [GLOBAL|LOCAL] [TEMP[ORARY]|UNLOGGED] TABLE [IF NOT
+ * EXISTS]` clause, up to and including the table name.
+ */
+const CREATE_TABLE_RE = new RegExp(
+  `\\bcreate\\s+(?:(?:global|local)\\s+)?(?:temp(?:orary)?\\s+|unlogged\\s+)?table\\s+(?:if\\s+not\\s+exists\\s+)?${NAME_SRC}`,
+  "gi",
+);
 /** The `DROP TABLE [IF EXISTS]` keyword prefix; the name list follows. */
 const DROP_TABLE_RE = /\bdrop\s+table\s+(?:if\s+exists\s+)?/gi;
 /** A single (optionally quoted) table name at the start of `rest`. */
-const NAME_RE = /^\s*(`|"|')?([\w.]+)\1?/;
+const NAME_RE = new RegExp(`^\\s*${NAME_SRC}`);
 
 /**
  * Call names that execute a raw SQL string against the database. A `CREATE
@@ -186,8 +235,10 @@ function rawCreateNames(text, endIsDynamic) {
   CREATE_TABLE_RE.lastIndex = 0;
   let m;
   while ((m = CREATE_TABLE_RE.exec(text)) !== null) {
-    if (endIsDynamic && m.index + m[0].length === text.length) continue;
-    names.push(m[2]);
+    const end = m.index + m[0].length;
+    if (endIsDynamic && end === text.length) continue;
+    if (quotedNameTruncated(m, text[end])) continue;
+    names.push(capturedName(m));
   }
   return names;
 }
@@ -209,9 +260,14 @@ export function rawDropNames(text, endIsDynamic = false) {
     let rest = text.slice(m.index + m[0].length);
     let nm;
     while ((nm = NAME_RE.exec(rest)) !== null) {
-      if (/^(?:cascade|restrict)$/i.test(nm[2])) break;
+      // A truncated name would credit a teardown that drops nothing, and the
+      // rest of the list can't be trusted either — stop reading.
+      if (quotedNameTruncated(nm, rest[nm[0].length])) break;
+      const name = capturedName(nm);
+      // Only a bare word can be the trailing clause; quoting it makes it a name.
+      if (nm[OPEN_QUOTE] === undefined && /^(?:cascade|restrict)$/i.test(name)) break;
       rest = rest.slice(nm[0].length);
-      if (!(endIsDynamic && rest.length === 0)) names.push(nm[2]);
+      if (!(endIsDynamic && rest.length === 0)) names.push(name);
       rest = rest.replace(/^\s+/, "");
       if (rest[0] !== ",") break;
       rest = rest.slice(1);
