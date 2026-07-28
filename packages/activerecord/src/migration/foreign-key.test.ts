@@ -29,6 +29,7 @@ import { adapterSupports, describeIfSupports, itIfSupports } from "../support/su
 import { assertQueriesMatch } from "../testing/query-assertions.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
+import { supportsRenameIndex } from "../adapters/abstract-mysql-adapter/test-helper.js";
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";
 import type { SchemaSource } from "../schema-dumper.js";
 import { Base } from "../base.js";
@@ -1122,22 +1123,25 @@ describeIfSupports("foreign_keys", "Migration", () => {
         });
       });
 
-      it.skipIf(adapterType === "mysql")("rename reference column of child table", async () => {
-        await withChangeColumnTables(async (conn) => {
-          await createRocketWithAstronaut(conn);
+      it.skipIf(adapterType === "mysql" && !supportsRenameIndex)(
+        "rename reference column of child table",
+        async () => {
+          await withChangeColumnTables(async (conn) => {
+            await createRocketWithAstronaut(conn);
 
-          await conn.renameColumn(astronauts, "rocket_id", "new_rocket_id");
+            await conn.renameColumn(astronauts, "rocket_id", "new_rocket_id");
 
-          const foreignKeys = await conn.foreignKeys(astronauts);
-          expect(foreignKeys.length).toBe(1);
+            const foreignKeys = await conn.foreignKeys(astronauts);
+            expect(foreignKeys.length).toBe(1);
 
-          const fk = foreignKeys[0];
-          expect(await rocketName(conn)).toBe("myrocket");
-          expect(fk.fromTable).toBe(astronauts);
-          expect(fk.toTable).toBe(rockets);
-          expect(fk.column).toBe("new_rocket_id");
-        });
-      });
+            const fk = foreignKeys[0];
+            expect(await rocketName(conn)).toBe("myrocket");
+            expect(fk.fromTable).toBe(astronauts);
+            expect(fk.toTable).toBe(rockets);
+            expect(fk.column).toBe("new_rocket_id");
+          });
+        },
+      );
 
       it("remove reference column of child table", async () => {
         await withChangeColumnTables(async (conn) => {

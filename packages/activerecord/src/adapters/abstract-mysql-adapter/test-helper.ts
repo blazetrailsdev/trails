@@ -96,6 +96,17 @@ export const supportsDefaultExpression = mariaDb
  */
 export const supportsExpressionIndex = !mariaDb && _serverVersion?.gte("8.0.13") === true;
 
+/**
+ * Mirrors AbstractMysqlAdapter#supports_rename_index?
+ * (abstract_mysql_adapter.rb:896-901): MariaDB ≥ 10.5.2, MySQL ≥ 5.7.6. Lets a
+ * test reproduce Rails' `skip "Cannot drop index, needed in a foreign key
+ * constraint" if current_adapter?(:Mysql2Adapter) && !supports_rename_index?`
+ * without hiding the supported MySQL path behind a blanket adapter skip.
+ */
+export const supportsRenameIndex =
+  mysqlAvailable &&
+  (mariaDb ? _serverVersion?.gte("10.5.2") === true : _serverVersion?.gte("5.7.6") === true);
+
 export { Mysql2Adapter };
 
 /**
