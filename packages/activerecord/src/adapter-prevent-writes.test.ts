@@ -56,18 +56,9 @@ describe("AdapterPreventWritesTest", () => {
     });
   });
 
-  // Rails defines two variants of this test in the same class: one for PostgreSQL
-  // (raises StatementInvalid on encoding errors before the write-prevention check) and
-  // one for all other adapters (assert_nothing_raised). This first occurrence is the
-  // PostgreSQL variant.
   it.skipIf(adapterType !== "postgres")(
     "doesnt error when a select query has encoding errors",
     async () => {
-      // Rails sends Ruby's `'\xC8'` literal as a raw 0xC8 byte, which PG's client
-      // eagerly rejects as invalid UTF-8 (StatementInvalid). JS strings can't carry
-      // a raw 0xC8 byte — node-pg always emits valid UTF-8 — so we provoke the same
-      // UTF8 encoding error server-side via a bytea literal. The key assertion holds:
-      // the write-prevention check (a read) doesn't pre-empt the encoding failure.
       await Base.whilePreventingWrites(async () => {
         await expect(
           connection.selectAll(`SELECT convert_from('\\xc8'::bytea, 'UTF8')`),
@@ -76,8 +67,6 @@ describe("AdapterPreventWritesTest", () => {
     },
   );
 
-  // Non-PostgreSQL variant (Rails' `else` branch): the extractor records it as
-  // unconditional, so this stays ungated to pair with that variant.
   it("doesnt error when a select query has encoding errors", async () => {
     await Base.whilePreventingWrites(async () => {
       await expect(connection.selectAll(`SELECT '\xC8'`)).resolves.toBeDefined();
