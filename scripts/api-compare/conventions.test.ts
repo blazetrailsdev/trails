@@ -113,7 +113,13 @@ describe("rubyMethodToTs", () => {
   });
 
   it("strips the trailing `=` from setter methods", () => {
-    expect(rubyMethodToTs("name=")).toEqual(["name"]);
+    expect(rubyMethodToTs("name=")).toEqual(["name", "setName"]);
+  });
+
+  it("orders the setX candidate after the bare accessor for setter methods", () => {
+    expect(rubyMethodToTs("table_name=")).toEqual(["tableName", "setTableName"]);
+    // Underscore-prefixed storage slots get no `setX` candidate at all.
+    expect(rubyMethodToTs("_load_from=")).toEqual(["_loadFrom"]);
   });
 
   it("camelCases capitalized snake-case visit method names", () => {

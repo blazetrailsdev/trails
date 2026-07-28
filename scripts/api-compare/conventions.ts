@@ -637,7 +637,18 @@ export function rubyMethodToTsIgnoringSkip(name: string): string[] | null {
 
   if (name.endsWith("=")) {
     const base = name.slice(0, -1);
-    return [snakeToCamel(base)];
+    const camel = snakeToCamel(base);
+    // Underscore-prefixed writers are `class_attribute` storage slots
+    // (`_reflections=`), never blocking writers — `set_reflections` would only
+    // be a nonsense candidate, so they keep the bare form alone.
+    if (camel.startsWith("_")) return [camel];
+    // `setX` is offered *after* the bare camel name so plain-value writers
+    // (`table_name=`) keep matching the accessor they always matched. It exists
+    // for writers whose Rails body blocks on I/O — has_one's `#{name}=`
+    // persists the displacement inline (has_one_association.rb:59-84) — which a
+    // synchronous JS property setter cannot express; the awaitable `set#{Name}`
+    // is the faithful rendering there (RFC 0068).
+    return [camel, "set" + camel.charAt(0).toUpperCase() + camel.slice(1)];
   }
 
   return [snakeToCamel(name)];
@@ -722,7 +733,7 @@ matches the first candidate present in the target file), not a call expression.
 | ${predicatePrefixes} | camel form + \`is*\` fallback | \`has_attribute?\` → ${example("has_attribute?")} |
 | ${containmentPredicates} | \`is*\` / camel / native JS spelling | \`include?\` → ${example("include?")} |
 | \`name!\` (bang) | \`*Bang\` suffix | \`save!\` → ${example("save!")} |
-| \`name=\` (setter) | bare camel name | \`table_name=\` → ${example("table_name=")} |
+| \`name=\` (setter) | bare camel name, \`set*\` fallback | \`table_name=\` → ${example("table_name=")} |
 | \`initialize\` / \`new\` | \`constructor\` | \`initialize\` → ${example("initialize")} |
 | \`to_s\` / \`to_str\` | \`toString\` | \`to_s\` → ${example("to_s")} |
 | \`to_json\` | \`toJSON\` | \`to_json\` → ${example("to_json")} |
@@ -737,6 +748,17 @@ name collides with a macro (e.g. \`isHasOne()\` alongside the \`Model.hasOne\`
 declaration). Leading underscores and runs of underscores collapse like a single
 underscore (\`visit__regexp\` → \`visitRegexp\`), and underscore-before-capital
 collapses too (\`visit_Arel_Nodes_X\` → \`visitArelNodesX\`).
+
+Setter-form details: a Ruby \`name=\` writer matches the bare camel accessor
+first, and \`set#{Name}\` second. The \`set*\` fallback covers writers whose Rails
+body blocks on I/O — \`has_one\`'s \`#{name}=\` removes and persists the displaced
+target inline — which a synchronous JS property setter cannot express. There the
+promise-returning \`setAccount\` **is** the port of \`account=\`. Both spellings are
+supported and both score as the port — the candidate list is a fallback chain, not
+a migration: a sync accessor alone still matches, as it always did.
+Underscore-prefixed
+writers (\`_reflections=\`) are \`class_attribute\` storage slots, never blocking
+writers, so they get no \`set*\` candidate.
 
 ## Operators
 

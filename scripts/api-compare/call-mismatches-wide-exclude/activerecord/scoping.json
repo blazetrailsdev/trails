@@ -16,13 +16,6 @@
   {
     "package": "activerecord",
     "tsFile": "scoping.ts",
-    "rubyName": "ignore_default_scope=",
-    "call": "set_ignore_default_scope",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "scoping.ts",
     "rubyName": "populate_with_current_scope_attributes",
     "call": "any?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
