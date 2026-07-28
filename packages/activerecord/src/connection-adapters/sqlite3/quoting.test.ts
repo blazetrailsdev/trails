@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { BinaryData } from "@blazetrails/activemodel";
-import { AbstractSQLite3Adapter, SQLiteDateTimeType } from "../sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "../better-sqlite3-adapter.js";
+import { Base } from "../../base.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
+import { describeIfSqlite } from "../../adapters/sqlite3/test-helper.js";
+import { type AbstractSQLite3Adapter, SQLiteDateTimeType } from "../sqlite3-adapter.js";
 import { Date as DateType } from "../../type/date.js";
 import { Time as TimeType } from "../../type/time.js";
 import {
@@ -37,6 +39,8 @@ const HOST = {
 };
 const quote = (value: unknown): string => quoteFn.call(HOST, value);
 const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
+
+fixtures([], { useTransactionalTests: false });
 
 describe("SQLite3::Quoting", () => {
   describe("columnNameMatcher", () => {
@@ -341,12 +345,13 @@ describe("SQLite3::Quoting", () => {
     });
   });
 
-  describe("SQLite microsecond round-trip — integration", () => {
+  describeIfSqlite("SQLite microsecond round-trip — integration", () => {
     let adapter: AbstractSQLite3Adapter;
 
     beforeEach(async () => {
-      adapter = new BetterSQLite3Adapter(":memory:");
-      await adapter.exec(`CREATE TABLE "events" (
+      adapter = Base.connection as AbstractSQLite3Adapter;
+      await adapter.exec(`DROP TABLE IF EXISTS "quoting_events"`);
+      await adapter.exec(`CREATE TABLE "quoting_events" (
         "id" INTEGER PRIMARY KEY AUTOINCREMENT,
         "ts"  DATETIME,
         "dt"  DATETIME,
@@ -356,14 +361,15 @@ describe("SQLite3::Quoting", () => {
     });
 
     afterEach(async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS "events"`).catch(() => undefined);
-      await adapter.close();
+      await adapter.exec(`DROP TABLE IF EXISTS "quoting_events"`);
     });
 
     it("Temporal.Instant with microsecond precision survives INSERT → SELECT as Instant", async () => {
       const instant = Temporal.Instant.from("2026-04-18T12:34:56.123456Z");
-      await adapter.executeMutation(`INSERT INTO "events" ("ts") VALUES (${quote(instant)})`);
-      const rows = await adapter.execute(`SELECT "ts" FROM "events" LIMIT 1`);
+      await adapter.executeMutation(
+        `INSERT INTO "quoting_events" ("ts") VALUES (${quote(instant)})`,
+      );
+      const rows = await adapter.execute(`SELECT "ts" FROM "quoting_events" LIMIT 1`);
       const raw = rows[0].ts as string;
       // SQLiteDateTimeType converts the offset-less UTC string → Temporal.Instant.
       const cast = new SQLiteDateTimeType().cast(raw);
@@ -374,8 +380,8 @@ describe("SQLite3::Quoting", () => {
 
     it("Temporal.PlainDateTime with microseconds survives INSERT → SELECT as Instant", async () => {
       const dt = Temporal.PlainDateTime.from("2026-04-18T12:34:56.654321");
-      await adapter.executeMutation(`INSERT INTO "events" ("dt") VALUES (${quote(dt)})`);
-      const rows = await adapter.execute(`SELECT "dt" FROM "events" LIMIT 1`);
+      await adapter.executeMutation(`INSERT INTO "quoting_events" ("dt") VALUES (${quote(dt)})`);
+      const rows = await adapter.execute(`SELECT "dt" FROM "quoting_events" LIMIT 1`);
       const raw = rows[0].dt as string;
       const cast = new SQLiteDateTimeType().cast(raw) as Temporal.Instant;
       expect(cast).toBeInstanceOf(Temporal.Instant);
@@ -386,8 +392,8 @@ describe("SQLite3::Quoting", () => {
 
     it("Temporal.PlainDate survives INSERT → SELECT", async () => {
       const date = Temporal.PlainDate.from("2026-04-18");
-      await adapter.executeMutation(`INSERT INTO "events" ("d") VALUES (${quote(date)})`);
-      const rows = await adapter.execute(`SELECT "d" FROM "events" LIMIT 1`);
+      await adapter.executeMutation(`INSERT INTO "quoting_events" ("d") VALUES (${quote(date)})`);
+      const rows = await adapter.execute(`SELECT "d" FROM "quoting_events" LIMIT 1`);
       const raw = rows[0].d as string;
       const cast = new DateType().cast(raw);
       expect(cast).toBeInstanceOf(Temporal.PlainDate);
@@ -402,8 +408,8 @@ describe("SQLite3::Quoting", () => {
       // TimeType#cast handles the full '2000-01-01 HH:MM:SS.ffffff' string via
       // extractTimePortion(), so no manual stripping is needed.
       const time = Temporal.PlainTime.from("14:23:55.654321");
-      await adapter.executeMutation(`INSERT INTO "events" ("t") VALUES (${quote(time)})`);
-      const rows = await adapter.execute(`SELECT "t" FROM "events" LIMIT 1`);
+      await adapter.executeMutation(`INSERT INTO "quoting_events" ("t") VALUES (${quote(time)})`);
+      const rows = await adapter.execute(`SELECT "t" FROM "quoting_events" LIMIT 1`);
       const raw = rows[0].t as string;
       const cast = new TimeType().cast(raw) as Temporal.PlainTime;
       expect(cast).toBeInstanceOf(Temporal.PlainTime);
