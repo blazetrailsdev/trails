@@ -102,8 +102,6 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
     (t as PgTableDefinition).oid("obj_id");
   });
 
-  // "This table is to verify if the :limit option is being ignored for text and
-  // binary columns" (postgresql_specific_schema.rb:130).
   await adapter.createTable("limitless_fields", { force: true }, (t) => {
     const pg = t as PgTableDefinition;
     pg.binary("binary", { limit: 100_000 });
