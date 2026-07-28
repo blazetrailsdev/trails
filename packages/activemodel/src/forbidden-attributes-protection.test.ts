@@ -8,9 +8,6 @@ class Account extends Model {
   }
 }
 
-// Mirrors Rails' ProtectedParams stub (forbidden_attributes_protection_test.rb):
-// a params-like wrapper exposing `permitted?` and `to_h`. Trails dispatches on
-// the camelCase `permitted` / `toH` members.
 class ProtectedParams {
   private parameters: Record<string, unknown>;
   private _permitted = false;
