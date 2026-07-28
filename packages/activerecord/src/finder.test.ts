@@ -2418,11 +2418,11 @@ describe("FinderTest", () => {
   });
 
   it("exists with strong parameters", async () => {
-    expect(await Subscriber.exists(new ProtectedParams({ nick: "foo" }).permit())).toBe(false);
+    expect(await Subscriber.exists(new ProtectedParams({ nick: "foo" }).permitBang())).toBe(false);
 
     await Subscriber.createBang({ nick: "foo" });
 
-    expect(await Subscriber.exists(new ProtectedParams({ nick: "foo" }).permit())).toBe(true);
+    expect(await Subscriber.exists(new ProtectedParams({ nick: "foo" }).permitBang())).toBe(true);
 
     await expect(Subscriber.exists(new ProtectedParams({ nick: "foo" }))).rejects.toThrow(
       ForbiddenAttributesError,
