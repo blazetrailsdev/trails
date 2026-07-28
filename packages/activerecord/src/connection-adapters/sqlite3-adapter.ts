@@ -2568,17 +2568,44 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     } else {
       await this.beginTransaction();
     }
+    // Rails' copy_table/move_table run their DDL through `execute`, so a
+    // rebuild failure (e.g. SQLite's "foreign key mismatch" when a new FK
+    // doesn't match a unique key on the referenced table) surfaces as
+    // StatementInvalid. The rebuild below uses driver.exec directly to manage
+    // savepoint nesting, so translate the raw driver error here to match.
+    const execTranslated = async (sql: string): Promise<void> => {
+      try {
+        await this.driver.exec(sql);
+      } catch (e) {
+        throw this._translateException(e, sql, []);
+      }
+    };
     try {
       await this.disableReferentialIntegrity(async () => {
-        await this.driver.exec(`CREATE TABLE ${qTmp} (${colDefs.join(", ")})`);
-        if (originalColNames.length > 0) {
-          const selectCols = originalColNames.map((n) => quoteColumnName(n)).join(", ");
-          await this.driver.exec(
+        // Rails: move_table(table, atable, temporary: true); move_table(atable, table, &block)
+        // — two copy_table + drop_table pairs, so the *rebuilt* table is created
+        // under its real name. Creating the new definition under a temp name and
+        // renaming it afterwards would make SQLite's DDL errors (e.g. "foreign
+        // key mismatch") name the temp table instead of the real one.
+        const selectCols = originalColNames.map((n) => quoteColumnName(n)).join(", ");
+        const tmpColDefs = originalColNames.map((n) => {
+          const info = tableInfo.find((c) => c.name === n);
+          return `${quoteColumnName(n)} ${info?.type ?? "TEXT"}`;
+        });
+        if (tmpColDefs.length > 0) {
+          await execTranslated(`CREATE TABLE ${qTmp} (${tmpColDefs.join(", ")})`);
+          await execTranslated(
             `INSERT INTO ${qTmp} (${selectCols}) SELECT ${selectCols} FROM ${qTable}`,
           );
         }
-        await this.driver.exec(`DROP TABLE ${qTable}`);
-        await this.driver.exec(`ALTER TABLE ${qTmp} RENAME TO ${quoteColumnName(bareTable)}`);
+        await execTranslated(`DROP TABLE ${qTable}`);
+        await execTranslated(`CREATE TABLE ${qTable} (${colDefs.join(", ")})`);
+        if (tmpColDefs.length > 0) {
+          await execTranslated(
+            `INSERT INTO ${qTable} (${selectCols}) SELECT ${selectCols} FROM ${qTmp}`,
+          );
+          await execTranslated(`DROP TABLE ${qTmp}`);
+        }
       });
 
       // Recreate indexes inside the transaction so failures roll back
