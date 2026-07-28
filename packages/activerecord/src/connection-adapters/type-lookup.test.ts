@@ -1,20 +1,20 @@
 /**
  * Mirrors Rails activerecord/test/cases/connection_adapters/type_lookup_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
+import { describe, it, expect, beforeEach } from "vitest";
+import type { Type } from "@blazetrails/activemodel";
 import { IntegerType } from "@blazetrails/activemodel";
+import { Base } from "../base.js";
 import { adapterType } from "../test-adapter.js";
 
-let adapter: AbstractSQLite3Adapter;
+interface TypeLookupConnection {
+  lookupCastType(sqlType: string): Type;
+}
 
-beforeEach(() => {
-  adapter = new BetterSQLite3Adapter(":memory:");
-});
+let adapter: TypeLookupConnection;
 
-afterEach(async () => {
-  await adapter.close();
+beforeEach(async () => {
+  adapter = (await Base.leaseConnection()) as unknown as TypeLookupConnection;
 });
 
 function assertLookupType(expected: string, sqlType: string) {
@@ -76,6 +76,9 @@ describe.skipIf(adapterType === "postgres")("TypeLookupTest", () => {
     assertLookupType("decimal", "numeric");
     assertLookupType("decimal", "numeric(2,8)");
     assertLookupType("decimal", "NUMERIC");
+    assertLookupType("decimal", "number");
+    assertLookupType("decimal", "number(2,8)");
+    assertLookupType("decimal", "NUMBER");
   });
 
   it("float types", () => {
@@ -104,7 +107,14 @@ describe.skipIf(adapterType === "postgres")("TypeLookupTest", () => {
   });
 
   it("decimal without scale", () => {
-    for (const sqlType of ["decimal(2)", "decimal(2,0)", "numeric(2)", "numeric(2,0)"]) {
+    for (const sqlType of [
+      "decimal(2)",
+      "decimal(2,0)",
+      "numeric(2)",
+      "numeric(2,0)",
+      "number(2)",
+      "number(2,0)",
+    ]) {
       const castType = adapter.lookupCastType(sqlType);
       expect(castType.type()).toBe("decimal");
       expect(castType.cast(2.1)).toBe(2);

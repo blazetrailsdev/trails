@@ -1915,6 +1915,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     };
     m.registerType(/decimal/i, undefined, registerDecimal);
     m.registerType(/numeric/i, undefined, registerDecimal);
+    m.aliasType(/clob/i, "text");
+    m.aliasType(/number/i, "decimal");
     m.registerType("json", new JsonType());
 
     // MySQL-specific overrides (mirrors MySQL's initialize_type_map additions).

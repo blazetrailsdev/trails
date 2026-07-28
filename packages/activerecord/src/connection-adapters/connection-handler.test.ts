@@ -3,6 +3,7 @@ import { ConnectionHandler } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { Base } from "../base.js";
+import { ambientPoolConfiguration } from "../test-adapter.js";
 
 // Mirrors ActiveRecord::TestFixtures#setup_shared_connection_pool (test_fixtures.rb:220).
 // For each shard in each pool manager, replaces every non-writing role's pool
@@ -39,13 +40,37 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it("establish connection using 3 levels config", async () => {
-    const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: "dev.db",
+    const configs = new DatabaseConfigurations({
+      default_env: {
+        readonly: { adapter: "sqlite3", database: "test/db/readonly.sqlite3" },
+        primary: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
+      },
+      another_env: {
+        readonly: { adapter: "sqlite3", database: "test/db/bad-readonly.sqlite3" },
+        primary: { adapter: "sqlite3", database: "test/db/bad-primary.sqlite3" },
+      },
+      common: { adapter: "sqlite3", database: "test/db/common.sqlite3" },
     });
-    const pool = handler.establishConnection(config);
-    expect(pool).toBeTruthy();
-    expect(pool.dbConfig.adapter).toBe("sqlite3");
+    DatabaseConfigurations.defaultEnv = "default_env";
+
+    for (const name of ["primary", "readonly"]) {
+      handler.establishConnection(configs.configsFor({ envName: "default_env", name })[0], {
+        owner: name,
+      });
+    }
+    handler.establishConnection(configs.configsFor({ envName: "common" })[0], { owner: "common" });
+
+    const readonlyPool = handler.retrieveConnectionPool("readonly");
+    expect(readonlyPool).toBeTruthy();
+    expect(readonlyPool!.dbConfig.database).toBe("test/db/readonly.sqlite3");
+
+    const primaryPool = handler.retrieveConnectionPool("primary");
+    expect(primaryPool).toBeTruthy();
+    expect(primaryPool!.dbConfig.database).toBe("test/db/primary.sqlite3");
+
+    const commonPool = handler.retrieveConnectionPool("common");
+    expect(commonPool).toBeTruthy();
+    expect(commonPool!.dbConfig.database).toBe("test/db/common.sqlite3");
   });
 
   it("validates db configuration and raises on invalid adapter", async () => {
@@ -251,14 +276,8 @@ describe("ConnectionHandlerTest", () => {
     try {
       class Klass2 extends Base {}
 
-      const baseConfig = new HashConfig("development", "primary", {
-        adapter: "sqlite3",
-        database: ":memory:",
-      });
-      const ownConfig = new HashConfig("development", "Klass2", {
-        adapter: "sqlite3",
-        database: ":memory:",
-      });
+      const baseConfig = new HashConfig("development", "primary", ambientPoolConfiguration());
+      const ownConfig = new HashConfig("development", "Klass2", ambientPoolConfiguration());
 
       const basePool = freshHandler.establishConnection(baseConfig, {
         owner: "Base",

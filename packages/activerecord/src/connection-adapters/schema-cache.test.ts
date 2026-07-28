@@ -6,8 +6,8 @@ import { setSchemaCacheIgnoredTables } from "../ar-config.js";
 import { StatementInvalid } from "../errors.js";
 import { SchemaStatements } from "./abstract/schema-statements.js";
 import { TableDefinition } from "./abstract/schema-definitions.js";
-import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
+import type { AbstractAdapter } from "./abstract-adapter.js";
+import { newRawTestAdapter } from "../test-adapter.js";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -906,14 +906,15 @@ describe("DDL cache-invalidation safety-net", () => {
 });
 
 describe("SchemaCache DDL invalidation", () => {
-  let adapter: AbstractSQLite3Adapter;
+  let adapter: AbstractAdapter;
 
   function warmCache(tableName: string) {
     adapter.schemaCache.setColumns(tableName, [makeColumn("id", "integer")]);
   }
 
   beforeEach(async () => {
-    adapter = new BetterSQLite3Adapter(":memory:");
+    adapter = newRawTestAdapter();
+    await adapter.dropTable("things", "stuff", { ifExists: true });
     await adapter.createTable("things", (t) => {
       t.string("name");
       t.integer("count");
@@ -923,6 +924,7 @@ describe("SchemaCache DDL invalidation", () => {
   });
 
   afterEach(async () => {
+    await adapter.dropTable("things", "stuff", { ifExists: true });
     await adapter.close();
   });
 

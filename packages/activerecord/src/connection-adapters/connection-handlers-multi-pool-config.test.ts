@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ConnectionHandler } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
+import { ambientPoolConfiguration } from "../test-adapter.js";
+import { inMemoryDb } from "../support/adapter-helper.js";
 
-describe("ConnectionHandlersMultiPoolConfigTest", () => {
+describe.skipIf(inMemoryDb())("ConnectionHandlersMultiPoolConfigTest", () => {
   let handler: ConnectionHandler;
 
-  const primaryConfig = () =>
-    new HashConfig("default_env", "primary", { adapter: "sqlite3", database: ":memory:" });
+  const primaryConfig = () => new HashConfig("default_env", "primary", ambientPoolConfiguration());
 
   beforeEach(() => {
     handler = new ConnectionHandler();
@@ -48,7 +49,7 @@ describe("ConnectionHandlersMultiPoolConfigTest", () => {
     handler.establishConnection(primaryConfig(), { owner: "primary", shard: "pool_config_two" });
 
     // connect to default
-    await handler.connectionPoolList("writing")[0].leaseConnection();
+    await (await handler.connectionPoolList("writing")[0].checkout()).connectBang();
 
     expect(handler.isConnected("primary")).toBe(true);
     expect(handler.isConnected("primary", { shard: "default" })).toBe(true);
