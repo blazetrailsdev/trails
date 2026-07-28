@@ -2578,10 +2578,20 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     try {
       await this.disableReferentialIntegrity(async () => {
         const selectCols = originalColNames.map((n) => quoteColumnName(n)).join(", ");
-        const originalTypes = new Map(tableInfo.map((c) => [c.name as string, c.type]));
-        const tmpColDefs = originalColNames.map(
-          (n) => `${quoteColumnName(n)} ${originalTypes.get(n) ?? "TEXT"}`,
+        // Rails' copy_table builds even the throwaway "a"-prefixed table through
+        // the full create_table machinery. This buffer carries the declared type
+        // verbatim (so storage affinity round-trips exactly, including the
+        // typeless/BLOB-affinity case) but drops NOT NULL/DEFAULT/CHECK/PK: rows
+        // come straight from a table that already satisfied those, so omitting
+        // them can only ever be more permissive, and no INSERT here relies on a
+        // default — both name every column explicitly.
+        const originalTypes = new Map(
+          tableInfo.map((c) => [c.name as string, (c.type as string | null) ?? ""]),
         );
+        const tmpColDefs = originalColNames.map((n) => {
+          const declaredType = originalTypes.get(n) ?? "";
+          return declaredType === "" ? quoteColumnName(n) : `${quoteColumnName(n)} ${declaredType}`;
+        });
         if (tmpColDefs.length > 0) {
           await execTranslated(`CREATE TABLE ${qTmp} (${tmpColDefs.join(", ")})`);
           await execTranslated(

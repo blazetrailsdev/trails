@@ -385,15 +385,14 @@ describeIfSupports("foreign_keys", "Migration", () => {
           );
         } else if (adapterType === "sqlite") {
           expect(message).toMatch(/foreign key mismatch - "astronauts" referencing "rockets"/);
-        } else {
-          expect(
-            [
-              /Foreign key constraint is incorrectly formed/i,
-              /Failed to add the foreign key constraint/i,
-              /Cannot add foreign key constraint/i,
-            ].some((pattern) => pattern.test(message)),
-          ).toBe(true);
         }
+        // Rails' MySQL/MariaDB branch builds an `.any?` over three message
+        // patterns and then discards the result — it is passed to no assertion
+        // (foreign_key_test.rb:850-856), deliberately, because "MariaDB and
+        // different versions of MySQL generate different error messages". Only
+        // the raise itself is asserted there, so there is nothing to port: an
+        // `expect` here would be a stronger pass condition than Rails', failing
+        // on any MySQL/MariaDB build whose wording is not one of the three.
       });
     });
 
