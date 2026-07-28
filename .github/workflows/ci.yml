@@ -218,7 +218,7 @@ jobs:
           # carved out of the infra sweep (INFRA_CARVEOUT_RE), so it must be
           # named here or a checker-only change would stop running the checker.
           GUIDES_PKGS_RE='^(packages/(activerecord|activemodel|activesupport|arel|globalid|did-you-mean|trails-tsc)/|packages/website/docs/guides/|scripts/guides-typecheck/)'
-          GUIDES_EXCL_RE='(/src/test-helpers/|/test-fixtures?/|/__fixtures__/|/__snapshots__/|\.test\.ts$)'
+          GUIDES_EXCL_RE='(/src/test-helpers(/|\.ts$)|/test-fixtures?(/|\.ts$)|/__fixtures__/|/__snapshots__/|\.test\.ts$)'
           # website_affected gates the Website build (SvelteKit + typedoc +
           # VitePress). Scoped narrowly to packages/website/ — package-source
           # changes alone don't trigger it. To run the site build on a PR

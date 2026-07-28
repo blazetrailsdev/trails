@@ -226,6 +226,8 @@ describe("CI runs every tooling test suite", () => {
       "packages/activerecord/src/test-helpers/models/topic.ts",
       "packages/activerecord/src/test-helpers/fixtures/topics.yml",
       "packages/arel/src/__snapshots__/visitors.test.ts.snap",
+      "packages/activerecord/src/test-fixtures.ts",
+      "packages/activerecord/src/test-fixtures/fixture-connection.ts",
     ];
     const fired = await Promise.all([...runs, ...skips].map(runGate));
     const outcome = Object.fromEntries(
