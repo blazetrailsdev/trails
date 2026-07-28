@@ -8,16 +8,19 @@ fixtures([]);
 
 describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   let db: AbstractSQLite3Adapter;
+  // Teardown-only handle. `db` stays non-optional for the test bodies, but the
+  // teardown has to tolerate a beforeEach that failed before the lease, so it
+  // reads a genuinely optional binding rather than casting `db`.
+  let leased: AbstractSQLite3Adapter | undefined;
 
   const dropCopyTargets = async (): Promise<void> => {
-    if (db === undefined) return;
-    await db.exec(
+    await leased?.exec(
       `DROP TABLE IF EXISTS customers2; DROP TABLE IF EXISTS customers3; DROP TABLE IF EXISTS books2; DROP TABLE IF EXISTS "_alter_tmp_customers2"`,
     );
   };
 
   beforeEach(async () => {
-    db = Base.connection as AbstractSQLite3Adapter;
+    db = leased = Base.connection as AbstractSQLite3Adapter;
     await dropCopyTargets();
   });
 
