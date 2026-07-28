@@ -669,9 +669,13 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const connection = new BetterSQLite3Adapter(":memory:", { foreignKeys: false });
 
       try {
+        // These live in this test's own `:memory:` connection, disconnected in
+        // the finally below — nothing to collide with a sibling fork.
+        // eslint-disable-next-line blazetrails/require-table-teardown
         await connection.createTable("rockets", { force: true }, (t) => {
           t.string("name");
         });
+        // eslint-disable-next-line blazetrails/require-table-teardown
         await connection.createTable("astronauts", { force: true }, (t) => {
           t.string("name");
           t.references("rocket");
