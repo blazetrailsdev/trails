@@ -41,7 +41,7 @@ import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { Column } from "../column.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { deduplicate } from "../deduplicable.js";
-import { singularize, pluralize, getCrypto } from "@blazetrails/activesupport";
+import { singularize, pluralize, getCrypto, isPresent } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
 import { Utils as PgUtils } from "../postgresql/utils.js";
 import { indexes as sqliteIndexes } from "../sqlite3/schema-statements.js";
@@ -590,32 +590,41 @@ export class SchemaStatements {
   }
 
   async tableExists(tableName: string): Promise<boolean> {
-    // Rails' data_source_exists? embeds the table name via quote() — an escaped
-    // SQL string literal, not raw interpolation (data_source_sql, schema_statements.rb).
-    // A value containing quotes/operators is escaped to a literal that matches
-    // nothing and returns false instead of producing broken SQL.
-    const quoted = this.adapter.quote(tableName);
-    let rows: Record<string, unknown>[];
-    switch (this.adapterName) {
-      case "sqlite":
-        rows = await this.adapter.execute(
-          `SELECT name FROM sqlite_master WHERE type='table' AND name=${quoted}`,
-        );
-        break;
-      case "postgres":
-        // Rails' PG data_source_sql scopes to ANY (current_schemas(false))
-        // (the active search_path), not a hardcoded 'public'.
-        rows = await this.adapter.execute(
-          `SELECT 1 FROM information_schema.tables WHERE table_schema = ANY (current_schemas(false)) AND table_name = ${quoted} LIMIT 1`,
-        );
-        break;
-      case "mysql":
-        rows = await this.adapter.execute(
-          `SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ${quoted} LIMIT 1`,
-        );
-        break;
+    if (!isPresent(tableName)) return false;
+    try {
+      // Rails' data_source_exists? embeds the table name via quote() — an escaped
+      // SQL string literal, not raw interpolation (data_source_sql, schema_statements.rb).
+      // A value containing quotes/operators is escaped to a literal that matches
+      // nothing and returns false instead of producing broken SQL.
+      const quoted = this.adapter.quote(tableName);
+      let rows: Record<string, unknown>[];
+      switch (this.adapterName) {
+        case "sqlite":
+          rows = await this.adapter.execute(
+            `SELECT name FROM sqlite_master WHERE type='table' AND name=${quoted}`,
+          );
+          break;
+        case "postgres":
+          // Rails' PG data_source_sql scopes to ANY (current_schemas(false))
+          // (the active search_path), not a hardcoded 'public'.
+          rows = await this.adapter.execute(
+            `SELECT 1 FROM information_schema.tables WHERE table_schema = ANY (current_schemas(false)) AND table_name = ${quoted} LIMIT 1`,
+          );
+          break;
+        case "mysql":
+          rows = await this.adapter.execute(
+            `SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ${quoted} LIMIT 1`,
+          );
+          break;
+        default:
+          // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1890
+          throw new NotImplementedError("#data_source_sql is not implemented");
+      }
+      return rows.length > 0;
+    } catch (error) {
+      if (!(error instanceof NotImplementedError)) throw error;
+      return (await this.tables()).includes(String(tableName));
     }
-    return rows.length > 0;
   }
 
   async columnExists(
@@ -1416,6 +1425,9 @@ export class SchemaStatements {
           `SELECT table_name AS name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE' ORDER BY table_name`,
         );
         return (rows as any[]).map((r: any) => r.name ?? r.TABLE_NAME);
+      default:
+        // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1890
+        throw new NotImplementedError("#tables is not implemented");
     }
   }
 
