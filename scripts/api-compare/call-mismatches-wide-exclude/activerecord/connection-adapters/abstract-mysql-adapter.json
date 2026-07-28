@@ -261,13 +261,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "initialize_type_map",
-    "call": "alias_type",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "mariadb?",
     "call": "match?",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails abstract_mysql_adapter.rb:92-94 runs `/mariadb/i.match?(full_version)` live; trails isMariadb (abstract-mysql-adapter.ts:422-424) returns the `_mariadb` flag computed once at connect by the same regex (mysql2-adapter.ts:1864)."
