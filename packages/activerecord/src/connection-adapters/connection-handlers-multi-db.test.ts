@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
+import { getOsAsync } from "@blazetrails/activesupport";
 import { ConnectionHandler } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations, type RawConfigurations } from "../database-configurations.js";
@@ -11,12 +13,41 @@ describe("ConnectionHandlersMultiDbTest", () => {
   let roPool: any;
   const connectionName = "Base";
 
-  beforeEach(() => {
+  const DB_NAMES = ["primary", "readonly", "animals"] as const;
+  type DbName = (typeof DB_NAMES)[number];
+
+  let dbDir: string;
+  let dbPaths: Record<DbName, string>;
+
+  const sqliteDb = (name: DbName, extra: { replica?: boolean } = {}) => ({
+    adapter: "sqlite3",
+    database: dbPaths[name],
+    ...extra,
+  });
+
+  async function asyncFs() {
+    const fs = await getFsAsync();
+    const { mkdtemp, writeFile, readdir, unlink, rmdir } = fs;
+    if (!mkdtemp || !writeFile || !readdir || !unlink || !rmdir) {
+      throw new Error("fs adapter is missing the async APIs this test requires");
+    }
+    return { mkdtemp, writeFile, readdir, unlink, rmdir };
+  }
+
+  beforeEach(async () => {
+    const fs = await asyncFs();
+    const path = await getPathAsync();
+    const os = await getOsAsync();
+
+    dbDir = await fs.mkdtemp(path.join(os.tmpdir(), "trails-conn-multi-db-"));
+    dbPaths = {} as Record<DbName, string>;
+    for (const name of DB_NAMES) {
+      dbPaths[name] = path.join(dbDir, `${name}.sqlite3`);
+      await fs.writeFile(dbPaths[name], "");
+    }
+
     handler = new ConnectionHandler();
-    const dbConfig = new HashConfig("test", connectionName, {
-      adapter: "sqlite3",
-      database: ":memory:",
-    });
+    const dbConfig = new HashConfig("test", connectionName, sqliteDb("primary"));
     rwPool = handler.establishConnection(dbConfig, { owner: connectionName });
     roPool = handler.establishConnection(dbConfig, {
       owner: connectionName,
@@ -25,8 +56,17 @@ describe("ConnectionHandlersMultiDbTest", () => {
   });
 
   afterEach(async () => {
-    await handler.clearAllConnectionsBang();
-    await Base.connectionHandler.clearAllConnectionsBang();
+    try {
+      await handler.clearAllConnectionsBang();
+      await Base.connectionHandler.clearAllConnectionsBang();
+    } finally {
+      const fs = await asyncFs();
+      const path = await getPathAsync();
+      for (const entry of await fs.readdir(dbDir)) {
+        await fs.unlink(path.join(dbDir, entry));
+      }
+      await fs.rmdir(dbDir);
+    }
   });
 
   function withBaseConfigs(
@@ -47,9 +87,6 @@ describe("ConnectionHandlersMultiDbTest", () => {
       Base.configurations(prevConfigs);
       DatabaseConfigurations.defaultEnv = prevDefaultEnv;
       if (opts.defaultEnv) vi.unstubAllEnvs();
-      // Sync helper (fn: () => void); the async clearAllConnectionsBang tears
-      // down synchronously here, so catch (rather than await) its drain promise
-      // to keep this best-effort without cascading async through ~15 callers.
       void Base.connectionHandler.clearAllConnectionsBang().catch(() => {});
     }
   }
@@ -84,10 +121,6 @@ describe("ConnectionHandlersMultiDbTest", () => {
       },
     });
 
-    // Load the relation within the :secondary scope so the query runs against
-    // the connection where the `:memory:` table exists. `load()` returns the
-    // relation itself (then-stripped) so it escapes the block as a loaded
-    // Relation rather than auto-unwrapping to an array.
     const relation = await Base.connectedTo({ role: "secondary" }, async () => {
       await (
         await MultiConnectionTestModel.leaseConnection()
@@ -96,16 +129,12 @@ describe("ConnectionHandlersMultiDbTest", () => {
       );
       await MultiConnectionTestModel.createBang({ connection_role: "reading" });
       const loaded = await MultiConnectionTestModel.where({ connection_role: "reading" }).load();
-      // Relation is already loaded (cached); dropping here is behavior-neutral
-      // and balances require-table-teardown for the raw-created table.
       await (
         await MultiConnectionTestModel.leaseConnection()
       ).executeMutation("DROP TABLE IF EXISTS `multi_connection_test_models`");
       return loaded;
     });
 
-    // The relation is already loaded, so `.first` returns the cached record
-    // without re-querying in the default (writing) pool — mirroring Rails.
     expect((await relation.first())!.readAttribute("connection_role")).toBe("reading");
   });
 
@@ -113,8 +142,8 @@ describe("ConnectionHandlersMultiDbTest", () => {
     withBaseConfigs(
       {
         default_env: {
-          readonly: { adapter: "sqlite3", database: ":memory:", replica: true },
-          default: { adapter: "sqlite3", database: ":memory:" },
+          readonly: sqliteDb("readonly", { replica: true }),
+          default: sqliteDb("primary"),
         },
       },
       () => {
@@ -138,8 +167,8 @@ describe("ConnectionHandlersMultiDbTest", () => {
     withBaseConfigs(
       {
         default_env: {
-          readonly: { adapter: "sqlite3", database: ":memory:" },
-          primary: { adapter: "sqlite3", database: ":memory:" },
+          readonly: sqliteDb("readonly"),
+          primary: sqliteDb("primary"),
         },
       },
       () => {
@@ -174,7 +203,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
 
   it("switching connections with database config hash", () => {
     withBaseConfigs({}, () => {
-      Base.connectsTo({ database: { writing: { adapter: "sqlite3", database: ":memory:" } } });
+      Base.connectsTo({ database: { writing: sqliteDb("readonly") } });
       expect(currentRole.call(Base as any)).toBe("writing");
       expect(Base.connectedToQ({ role: "writing" })).toBe(true);
       expect(Base.connectionHandler.retrieveConnectionPool("Base")).not.toBeNull();
@@ -189,8 +218,8 @@ describe("ConnectionHandlersMultiDbTest", () => {
     withBaseConfigs(
       {
         default_env: {
-          animals: { adapter: "sqlite3", database: ":memory:" },
-          primary: { adapter: "sqlite3", database: ":memory:" },
+          animals: sqliteDb("animals"),
+          primary: sqliteDb("primary"),
         },
       },
       () => {
@@ -204,14 +233,10 @@ describe("ConnectionHandlersMultiDbTest", () => {
   });
 
   it("switching connections with database hash uses passed role and database", () => {
-    // Distinct database paths (as in Rails: test/db/primary.sqlite3 vs
-    // …/animals.sqlite3) so the configuration_hash assertion below actually
-    // discriminates that `primary` — not `animals` — was selected. The pools
-    // are never connected (connectsTo is lazy), so no sqlite files are created.
     const config = {
       default_env: {
-        animals: { adapter: "sqlite3", database: "animals.sqlite3" },
-        primary: { adapter: "sqlite3", database: "primary.sqlite3" },
+        animals: sqliteDb("animals"),
+        primary: sqliteDb("primary"),
       },
     };
     withBaseConfigs(
@@ -234,12 +259,11 @@ describe("ConnectionHandlersMultiDbTest", () => {
   });
 
   it("connects to with single configuration", () => {
-    withBaseConfigs({ development: { adapter: "sqlite3", database: ":memory:" } }, () => {
+    withBaseConfigs({ development: sqliteDb("primary") }, () => {
       Base.connectsTo({ database: { writing: "development" } });
       expect(Base.connectionHandler).toBe(Base.connectionHandler);
       expect(currentRole.call(Base as any)).toBe("writing");
       expect(Base.connectedToQ({ role: "writing" })).toBe(true);
-      // database: arg → @shard_keys = [] (shards.keys before default injection)
       expect(Base.shardKeys()).toEqual([]);
       expect(Base.isSharded()).toBe(false);
     });
@@ -248,8 +272,8 @@ describe("ConnectionHandlersMultiDbTest", () => {
   it("connects to using top level key in two level config", () => {
     withBaseConfigs(
       {
-        development: { adapter: "sqlite3", database: ":memory:" },
-        development_readonly: { adapter: "sqlite3", database: ":memory:" },
+        development: sqliteDb("primary"),
+        development_readonly: sqliteDb("readonly"),
       },
       () => {
         Base.connectsTo({ database: { writing: "development", reading: "development_readonly" } });
@@ -262,8 +286,8 @@ describe("ConnectionHandlersMultiDbTest", () => {
   it("connects to returns array of established connections", () => {
     withBaseConfigs(
       {
-        development: { adapter: "sqlite3", database: ":memory:" },
-        development_readonly: { adapter: "sqlite3", database: ":memory:" },
+        development: sqliteDb("primary"),
+        development_readonly: sqliteDb("readonly"),
       },
       () => {
         const result = Base.connectsTo({
