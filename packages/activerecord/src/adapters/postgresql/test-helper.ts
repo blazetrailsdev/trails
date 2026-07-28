@@ -4,9 +4,6 @@ import { Notifications, squish } from "@blazetrails/activesupport";
 import type { NotificationSubscriber, NotificationEvent } from "@blazetrails/activesupport";
 import { pgAvailable, pgHasHintPlan, pgServerVersion } from "../../support/describe-if-pg.js";
 
-// The PG server-reachability gate and the probe behind it are tree-neutral —
-// suites outside this tree gate on them — so they live in support/. Re-exported
-// so this tree's tests keep a single import.
 export { describeIfPg, pgServerVersion, PG_TEST_URL } from "../../support/describe-if-pg.js";
 
 /**
