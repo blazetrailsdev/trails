@@ -30,7 +30,10 @@ export class MigrationRunner {
   constructor(adapter: DatabaseAdapter, migrations: Migration[]) {
     this.adapter = adapter;
     this.migrations = migrations.map((m) => ({
-      version: m.version,
+      // Rails leaves an unversioned migration's #version nil, but a
+      // schema_migrations row needs a key, so this runner keeps its
+      // long-standing class-name fallback.
+      version: m.version ?? m.constructor.name,
       migration: m,
     }));
   }

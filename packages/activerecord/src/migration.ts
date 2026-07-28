@@ -1287,10 +1287,13 @@ export abstract class Migration {
   }
 
   /**
-   * Get the migration version from the class name or a static property.
+   * Get the migration version. Rails initializes `@version` to nil
+   * (`migration.rb:799`) — only `@name` defaults to the class name — so an
+   * unversioned migration has no version. The static hook is the trails path
+   * for compatibility classes that declare one.
    */
-  get version(): string {
-    return this._version ?? (this.constructor as any).version ?? this.constructor.name;
+  get version(): string | undefined {
+    return this._version ?? (this.constructor as any).version;
   }
 
   // --- Logging (Rails: Migration#write, #announce, #say, #say_with_time, #suppress_messages) ---
@@ -1302,7 +1305,8 @@ export abstract class Migration {
   }
 
   announce(message: string): void {
-    this.write(announceMigrationText(`${this.version} ${this.name}`, message));
+    // Ruby interpolates a nil version as "", not "undefined".
+    this.write(announceMigrationText(`${this.version ?? ""} ${this.name}`, message));
   }
 
   say(message: string, subitem = false): void {
@@ -1515,7 +1519,7 @@ export abstract class Migration {
           migration: async () => {
             const { pathToFileURL } = await import("node:url");
             const mod = (await import(pathToFileURL(newPath).href)) as Record<string, unknown>;
-            return (mod.default ?? mod[proxyName]) as MigrationLike;
+            return loadMigrationFrom(mod, proxyName, newVersion);
           },
         };
         last = copy;
@@ -2067,6 +2071,24 @@ export interface MigrationProxy {
   basename?(): string;
   /** @internal Mirrors: ActiveRecord::MigrationProxy#load_migration */
   loadMigration?(): Promise<MigrationLike>;
+}
+
+/**
+ * Mirrors: ActiveRecord::MigrationProxy#load_migration (`migration.rb:1195`) —
+ * `name.constantize.new(name, version)`. The module's named export is the
+ * migration class; the legacy `default` export is a pre-built instance that
+ * cannot carry the proxy's identity, so it is only the fallback.
+ */
+async function loadMigrationFrom(
+  mod: Record<string, unknown>,
+  name: string,
+  version: string,
+): Promise<MigrationLike> {
+  const exported = mod[name] ?? mod.default;
+  if (typeof exported === "function") {
+    return new (exported as new (name?: string, version?: string) => Migration)(name, version);
+  }
+  return exported as MigrationLike;
 }
 
 /** Mirrors: ActiveRecord::MigrationProxy (`migration.rb:1187`) */
@@ -2674,7 +2696,7 @@ export class Migrator {
         migration: async () => {
           const { pathToFileURL } = await import("node:url");
           const mod = await import(pathToFileURL(file).href);
-          return (mod.default ?? mod[name]) as MigrationLike;
+          return loadMigrationFrom(mod, name, version);
         },
       });
     }
@@ -2709,7 +2731,7 @@ export class Migrator {
         migration: async () => {
           const { pathToFileURL } = await import("node:url");
           const mod = await import(pathToFileURL(file).href);
-          return (mod.default ?? mod[name]) as MigrationLike;
+          return loadMigrationFrom(mod, name, version);
         },
       });
     }
@@ -2893,7 +2915,15 @@ export class Migrator {
   }
 
   private async _runMigration(proxy: MigrationProxy, direction: "up" | "down"): Promise<void> {
-    const migration = new MigrationProxyDelegate(proxy, await proxy.migration(), this._strategy);
+    const loaded = await proxy.migration();
+    // Rails' MigrationProxy delegates migrate/announce/write to the real
+    // Migration (`migration.rb:1187`), so a subclass override is honoured. The
+    // wrapper is only for the trails-only bare `{ up, down }` proxy shape,
+    // which has no migrate/announce of its own.
+    const migration =
+      loaded instanceof Migration
+        ? loaded
+        : new MigrationProxyDelegate(proxy, loaded, this._strategy);
     migration.connection = this._adapter;
     // Rails wraps both the migration execution AND the version
     // stamping inside the same ddl_transaction so they commit/rollback
