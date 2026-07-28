@@ -6,8 +6,10 @@
  * that wires the handler, transactional fixtures, and the canonical schema.
  *
  * The lower-level canonical loaders in
- * `packages/activerecord/src/support/canonical-schema.ts` —
- * `ensureCanonicalTables` and `loadCanonicalSchema` — are internal plumbing that
+ * `packages/activerecord/src/support/canonical-schema.ts`
+ * (`loadCanonicalSchema`) and
+ * `packages/activerecord/src/support/canonical-table-rebuild.ts`
+ * (`ensureCanonicalTables`) are internal plumbing that
  * `fixtures()` and a couple of internal setup paths (the boot/template global
  * setup, the adapter-suite setup, `encryption/test-helpers.ts`) call. They are
  * NOT for direct use in test files; reaching for them re-invents schema wiring
@@ -19,9 +21,10 @@
  * to restore a canonical table a sibling file left in a reduced shape on the
  * shared per-worker DB (see its JSDoc). It has no `fixtures({})` equivalent.
  *
- * Allowlist: the loaders' own unit test (`canonical-schema.test.ts`) imports
- * them to test them directly. Non-`*.test.ts` internal helpers are already out
- * of scope because this rule is wired to test files only.
+ * Allowlist: the loaders' own unit tests (`canonical-schema.test.ts`,
+ * `canonical-table-rebuild.test.ts`) import them to test them directly.
+ * Non-`*.test.ts` internal helpers are already out of scope because this rule
+ * is wired to test files only.
  */
 
 import path from "path";
@@ -42,16 +45,22 @@ export const BANNED = new Set(["ensureCanonicalTables", "loadCanonicalSchema", "
 // Test files permitted to import the banned loaders (they test them directly).
 export const ALLOW = new Set([
   "packages/activerecord/src/support/canonical-schema.test.ts",
+  "packages/activerecord/src/support/canonical-table-rebuild.test.ts",
   "packages/activerecord/src/support/load-schema-helper.test.ts",
 ]);
 
-/** True when `source` resolves to the canonical-schema test helper module. */
+/** True when `source` resolves to one of the canonical-schema test helper modules. */
 function isCanonicalSchemaModule(source) {
   // Match on the module basename regardless of directory depth so a
   // same-directory import from inside support/ (`./canonical-schema.js`)
   // is caught, not just the `../../support/canonical-schema.js` form. The
-  // repo has a single canonical-schema module, so basename matching is safe.
-  return /(?:^|\/)(?:canonical-schema|load-schema-helper)(?:\.js)?$/.test(source);
+  // basenames are unique in the repo, so basename matching is safe.
+  // `canonical-table-rebuild` is listed because `ensureCanonicalTables` moved
+  // there when the schema.rb transcription split from the drop/rebuild
+  // machinery; omitting it would leave the ban open under the new path.
+  return /(?:^|\/)(?:canonical-schema|canonical-table-rebuild|load-schema-helper)(?:\.js)?$/.test(
+    source,
+  );
 }
 
 /** @type {import("eslint").Rule.RuleModule} */
@@ -65,7 +74,7 @@ const rule = {
     schema: [],
     messages: {
       banned:
-        "`{{name}}` is internal canonical-schema plumbing — do not import it into a test file. Wire the canonical schema + fixtures through the `fixtures({ ... })` helper instead. (Only `canonical-schema.test.ts` may import it, to test it directly.)",
+        "`{{name}}` is internal canonical-schema plumbing — do not import it into a test file. Wire the canonical schema + fixtures through the `fixtures({ ... })` helper instead. (Only the loaders' own unit tests — `canonical-schema.test.ts`, `canonical-table-rebuild.test.ts` — may import it, to test it directly.)",
     },
   },
 

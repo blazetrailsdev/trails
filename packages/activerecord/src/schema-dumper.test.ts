@@ -7,7 +7,7 @@ import { adapterType } from "./test-adapter.js";
 import type { TestDatabaseAdapter } from "./test-adapter.js";
 import { itIfSupports, adapterSupports } from "./support/supports.js";
 import { fixtures } from "./test-fixtures.js";
-import { rebuildCanonicalTables } from "./support/canonical-schema.js";
+import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
 import {
   dumpAllTableSchema,
   dumpTableSchema,

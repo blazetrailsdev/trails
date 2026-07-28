@@ -3,6 +3,7 @@ import rule from "./no-internal-canonical-loaders.mjs";
 
 const FILENAME = "packages/activerecord/src/dirty.test.ts";
 const OWN_TEST = "packages/activerecord/src/support/canonical-schema.test.ts";
+const OWN_REBUILD_TEST = "packages/activerecord/src/support/canonical-table-rebuild.test.ts";
 
 const tester = new RuleTester({
   languageOptions: {
@@ -22,13 +23,19 @@ tester.run("no-internal-canonical-loaders", rule, {
     // rebuildCanonicalTables is the documented anti-contamination shield — allowed.
     {
       filename: FILENAME,
-      code: 'import { rebuildCanonicalTables } from "./support/canonical-schema.js";',
+      code: 'import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";',
     },
     // The loaders' own unit test may import them directly — via the real
     // same-directory specifier it actually uses.
     {
       filename: OWN_TEST,
-      code: 'import { ensureCanonicalTables, loadCanonicalSchema } from "./canonical-schema.js";',
+      code: 'import { loadCanonicalSchema } from "./canonical-schema.js";',
+    },
+    // Same for the drop/rebuild half's own unit test, which owns
+    // ensureCanonicalTables since the split.
+    {
+      filename: OWN_REBUILD_TEST,
+      code: 'import { ensureCanonicalTables } from "./canonical-table-rebuild.js";',
     },
     // load-schema-helper's own unit test may import loadSchema directly.
     {
@@ -44,7 +51,7 @@ tester.run("no-internal-canonical-loaders", rule, {
   invalid: [
     {
       filename: FILENAME,
-      code: 'import { ensureCanonicalTables } from "./support/canonical-schema.js";',
+      code: 'import { ensureCanonicalTables } from "./support/canonical-table-rebuild.js";',
       errors: [{ messageId: "banned", data: { name: "ensureCanonicalTables" } }],
     },
     {
@@ -62,7 +69,7 @@ tester.run("no-internal-canonical-loaders", rule, {
     // Deeper relative path (adapters/mysql2/*.test.ts reaching up two levels).
     {
       filename: "packages/activerecord/src/adapters/mysql2/mysql2-adapter.test.ts",
-      code: 'import { ensureCanonicalTables } from "../../support/canonical-schema.js";',
+      code: 'import { ensureCanonicalTables } from "../../support/canonical-table-rebuild.js";',
       errors: [{ messageId: "banned", data: { name: "ensureCanonicalTables" } }],
     },
     // Same-directory sibling test inside test-helpers/ (not the allowlisted own
@@ -76,7 +83,7 @@ tester.run("no-internal-canonical-loaders", rule, {
     // Both banned symbols in one import → one report each.
     {
       filename: FILENAME,
-      code: 'import { ensureCanonicalTables, loadCanonicalSchema } from "./support/canonical-schema.js";',
+      code: 'import { ensureCanonicalTables, loadCanonicalSchema } from "./support/canonical-table-rebuild.js";',
       errors: [
         { messageId: "banned", data: { name: "ensureCanonicalTables" } },
         { messageId: "banned", data: { name: "loadCanonicalSchema" } },

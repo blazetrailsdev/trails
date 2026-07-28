@@ -15,7 +15,7 @@ import { Base, RecordNotFound, registerModel } from "./index.js";
 import "./relation.js";
 import { Associations } from "./associations.js";
 import { fixtures } from "./test-fixtures.js";
-import { rebuildCanonicalTables } from "./support/canonical-schema.js";
+import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { defineFixtures, defineJoinTableFixtures } from "./fixtures.js";

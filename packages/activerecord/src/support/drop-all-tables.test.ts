@@ -2,7 +2,7 @@ import { afterAll, afterEach, describe, it, expect, beforeAll, vi } from "vitest
 import { Base } from "../base.js";
 import { setupHandlerSuite } from "./setup-handler-suite.js";
 import { dropAllTables, resetTestTables } from "./drop-all-tables.js";
-import { rebuildCanonicalTables } from "./canonical-schema.js";
+import { rebuildCanonicalTables } from "./canonical-table-rebuild.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 

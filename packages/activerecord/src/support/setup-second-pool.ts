@@ -2,7 +2,7 @@ import { afterAll, beforeAll } from "vitest";
 import { Base } from "../base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { registerModel } from "../associations.js";
-import { rebuildCanonicalTables } from "./canonical-schema.js";
+import { rebuildCanonicalTables } from "./canonical-table-rebuild.js";
 import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
 import { Course } from "../test-helpers/models/course.js";
 import { College } from "../test-helpers/models/college.js";
