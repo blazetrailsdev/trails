@@ -217,8 +217,6 @@ jobs:
           # scripts/guides-typecheck/ is the job's own implementation and is
           # carved out of the infra sweep (INFRA_CARVEOUT_RE), so it must be
           # named here or a checker-only change would stop running the checker.
-          # GUIDES_EXCL_RE drops test-only paths before the match: guides
-          # compile against exported types, which no suite or fixture reaches.
           GUIDES_PKGS_RE='^(packages/(activerecord|activemodel|activesupport|arel|globalid|did-you-mean|trails-tsc)/|packages/website/docs/guides/|scripts/guides-typecheck/)'
           GUIDES_EXCL_RE='(/src/test-helpers/|/test-fixtures?/|/__fixtures__/|/__snapshots__/|\.test\.ts$)'
           # website_affected gates the Website build (SvelteKit + typedoc +
@@ -366,11 +364,9 @@ jobs:
                   # each carved subtree still flips its own consuming job's gate
                   # via that gate's regex.
                   infra_files=$(echo "$files" | grep -vE "$INFRA_CARVEOUT_RE" || true)
-                  # $3 is an optional exclusion applied to $files before the
-                  # gate regex: paths that cannot reach what the job checks.
                   set_gate() {
-                    local name="$1" re="$2" gate_files="$files"
-                    if [ -n "$3" ]; then gate_files=$(echo "$files" | grep -vE "$3" || true); fi
+                    local name="$1" re="$2" excl="${3:-}" gate_files="$files"
+                    if [ -n "$excl" ]; then gate_files=$(echo "$files" | grep -vE "$excl" || true); fi
                     if echo "$infra_files" | grep -qE "$INFRA_RE" || echo "$gate_files" | grep -qE "$re"; then
                       echo "${name}=true"  >> "$GITHUB_OUTPUT"
                     else
