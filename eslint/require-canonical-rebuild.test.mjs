@@ -150,6 +150,28 @@ tester.run("require-canonical-rebuild", rule, {
     },
 
     {
+      code:
+        'describe("suite", () => {\n' +
+        '  const TABLE_NAME = "ex_foo";\n' +
+        "  beforeEach(async () => {\n" +
+        "    await adapter.execute(\"SELECT tablename FROM pg_tables WHERE tablename = 'people'\");\n" +
+        '    await adapter.exec(`DROP TABLE "${TABLE_NAME}"`);\n' +
+        "  });\n" +
+        "});",
+      options,
+    },
+
+    {
+      code:
+        "await adapter.execute(\"SELECT tablename FROM pg_tables WHERE tablename = 'people'\");\n" +
+        "for (const x of list) {\n" +
+        '  const NAME = "ex_1";\n' +
+        '  await adapter.exec(`DROP TABLE "${NAME}"`);\n' +
+        "}",
+      options,
+    },
+
+    {
       code: 'expect(sql).toContain("DROP TABLE subscribers");',
       options,
     },
