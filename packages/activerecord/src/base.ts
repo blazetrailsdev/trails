@@ -154,7 +154,6 @@ import {
   type Included,
   type ParameterFilter,
   type BenchmarkLogger,
-  registerConstant,
 } from "@blazetrails/activesupport";
 import {
   hasAttribute as _hasAttribute,
@@ -310,6 +309,7 @@ import {
   isAssociationCached as _isAssociationCached,
   associationInstanceGet as _associationInstanceGet,
   associationInstanceSet as _associationInstanceSet,
+  registerModelConstant,
   type AssociationDefinition,
 } from "./associations.js";
 import * as _AttributeAssignment from "./attribute-assignment.js";
@@ -1354,8 +1354,7 @@ export class Base extends Model {
     }
     this._adapter = adapter;
     if (this !== Base && this.name) {
-      Base._modelsByName.set(this.name, this);
-      registerConstant(this.name, this);
+      registerModelConstant(this.name, this);
     }
 
     // Full schema reset on adapter swap: drops schema-sourced defs and

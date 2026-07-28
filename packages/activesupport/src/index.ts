@@ -159,6 +159,7 @@ export {
   constantize,
   safeConstantize,
   registerConstant,
+  unregisterConstant,
   _resetConstants,
   foreignKey,
   humanize,

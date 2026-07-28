@@ -102,6 +102,7 @@ import {
   camelize,
   foreignKey as deriveForeignKey,
   registerConstant,
+  unregisterConstant,
 } from "@blazetrails/activesupport";
 import { registerSubclass, polymorphicName } from "./inheritance.js";
 import { flushPendingCounterCacheColumns } from "./counter-cache.js";
@@ -243,17 +244,22 @@ class ModelRegistry extends Map<string, typeof Base> {
 
   override set(name: string, model: typeof Base): this {
     if (super.get(name) !== model) this.#generation++;
+    registerConstant(name, model);
     return super.set(name, model);
   }
 
   override delete(name: string): boolean {
     const deleted = super.delete(name);
-    if (deleted) this.#generation++;
+    if (deleted) {
+      this.#generation++;
+      unregisterConstant(name);
+    }
     return deleted;
   }
 
   override clear(): void {
     if (this.size > 0) this.#generation++;
+    for (const name of this.keys()) unregisterConstant(name);
     super.clear();
   }
 }
@@ -299,6 +305,21 @@ function guardCanonicalNameShadow(name: string, model: typeof Base): void {
         `association target. Use the canonical model, or a distinct non-canonical name.`,
     );
   }
+}
+
+/**
+ * The single path that binds a model class to a name in Active Support's
+ * constant table. Every writer — {@link registerModel}, `registerSubclass`, and
+ * `Base.adapter=` — goes through here, so the registry and the constant table
+ * can never disagree in either direction: {@link modelRegistry} owns the
+ * constant write (and the matching unregister on delete/clear), and the shadow
+ * guard covers every path rather than just `registerModel`.
+ * @internal
+ */
+export function registerModelConstant(name: string, model: typeof Base): void {
+  guardCanonicalNameShadow(name, model);
+  modelRegistry.set(name, model);
+  model._modelsByName.set(name, model);
 }
 
 /**
@@ -350,20 +371,14 @@ export function registerModel(
   }
   if (typeof nameOrModel === "string") {
     if (!model) throw new Error("registerModel(name, model) requires a model class");
-    guardCanonicalNameShadow(nameOrModel, model);
-    modelRegistry.set(nameOrModel, model);
-    model._modelsByName.set(nameOrModel, model);
-    registerConstant(nameOrModel, model);
+    registerModelConstant(nameOrModel, model);
     // Attach registry key so counter-cache pending-map lookup can match it.
     const keys: string[] = model._registryKeys ?? [];
     if (!keys.includes(nameOrModel)) keys.push(nameOrModel);
     model._registryKeys = keys;
     flushPendingCounterCacheColumns(model);
   } else {
-    guardCanonicalNameShadow(nameOrModel.name, nameOrModel);
-    modelRegistry.set(nameOrModel.name, nameOrModel);
-    nameOrModel._modelsByName.set(nameOrModel.name, nameOrModel);
-    registerConstant(nameOrModel.name, nameOrModel);
+    registerModelConstant(nameOrModel.name, nameOrModel);
     // A namespaced model carries its Ruby module path via `static moduleName`;
     // derive the `::`-qualified registry key from it (e.g.
     // "MyApplication::Billing::Firm") so cross-namespace `className` resolution

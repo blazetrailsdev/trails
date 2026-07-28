@@ -5,9 +5,9 @@
  */
 
 import type { Base } from "./base.js";
-import { modelRegistry } from "./associations.js";
+import { modelRegistry, registerModelConstant } from "./associations.js";
 import { ActiveRecordError, NameError, SubclassNotFound } from "./errors.js";
-import { camelize, isPresent, registerConstant, underscore } from "@blazetrails/activesupport";
+import { camelize, isPresent, underscore } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { applicationRecordClass, setApplicationRecordClass } from "./ar-config.js";
 
@@ -409,7 +409,7 @@ export function registerSubclass(klass: typeof Base): void {
   if (!(parent as any)._subclasses.includes(klass)) {
     (parent as any)._subclasses.push(klass);
   }
-  if (klass.name) registerConstant(klass.name, klass);
+  if (klass.name) registerModelConstant(klass.name, klass);
 }
 
 /**
