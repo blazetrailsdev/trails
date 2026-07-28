@@ -70,6 +70,26 @@ export function register(name: string, loader: AdapterLoader): void {
 }
 
 /**
+ * Synchronous half of `resolve(name)`: throws AdapterNotFound when the name
+ * isn't registered. Rails' `resolve` does this check inline (its autoload is
+ * sync); trails splits it out so sync callers — `DatabaseConfig#validateBang`,
+ * and through it `ConnectionHandler#resolvePoolConfig` — can surface an
+ * unknown adapter name without awaiting the dynamic import.
+ *
+ * @internal
+ */
+export function validateAdapterName(adapterName: string): void {
+  if (adapters.has(adapterName)) return;
+  const available = [...adapters.keys()].sort().join(", ");
+  const err = new AdapterNotFound(
+    `Database configuration specifies nonexistent '${adapterName}' adapter. ` +
+      `Available adapters are: ${available}.`,
+  );
+  resolveErrors.set(adapterName, err);
+  throw err;
+}
+
+/**
  * Mirrors: ActiveRecord::ConnectionAdapters.resolve
  *
  * Resolves an adapter name to its class.
@@ -78,16 +98,8 @@ export async function resolve(adapterName: string): Promise<AdapterClass> {
   const cached = resolved.get(adapterName);
   if (cached) return cached;
 
-  const loader = adapters.get(adapterName);
-  if (!loader) {
-    const available = [...adapters.keys()].sort().join(", ");
-    const err = new AdapterNotFound(
-      `Database configuration specifies nonexistent '${adapterName}' adapter. ` +
-        `Available adapters are: ${available}.`,
-    );
-    resolveErrors.set(adapterName, err);
-    throw err;
-  }
+  validateAdapterName(adapterName);
+  const loader = adapters.get(adapterName)!;
   const promise = loader()
     .then((klass) => {
       resolvedSyncCache.set(adapterName, klass);

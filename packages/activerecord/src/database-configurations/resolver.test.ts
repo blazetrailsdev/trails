@@ -6,6 +6,7 @@ import { AdapterNotFound } from "../errors.js";
 // relies on (same import hash-config.test.ts uses) so the "url invalid adapter"
 // case resolves the adapter rather than throwing "resolver not registered".
 import "../connection-handling.js";
+import { ConnectionHandler } from "../connection-adapters/abstract/connection-handler.js";
 
 function resolveDbConfig(poolConfig: string, config: RawConfigurations = {}) {
   const configs = new DatabaseConfigurations(config);
@@ -22,15 +23,19 @@ describe("PoolConfig", () => {
       DatabaseConfigurations.defaultEnv = "development";
     });
 
-    it("url invalid adapter", async () => {
-      // Rails drives this through Base.connection_handler.establish_connection; the
-      // trails resolver suite tests the resolver level (configs.resolve), so we
-      // resolve + validate the config directly. An unknown adapter in the URL
-      // (scheme "ridiculous" → adapter "ridiculous") fails adapter resolution.
-      const promise = resolveDbConfig("ridiculous://foo?encoding=utf8").validateBang();
-      await expect(promise).rejects.toBeInstanceOf(AdapterNotFound);
+    it("url invalid adapter", () => {
+      // Rails passes the URL string straight to establish_connection, which
+      // resolves it via Base.configurations; trails' establishConnection takes an
+      // already-resolved config, so we resolve first and hand it over. The
+      // AdapterNotFound must surface here, at establish time, not at first
+      // checkout — that's resolvePoolConfig's db_config.validate! call.
+      const dbConfig = resolveDbConfig("ridiculous://foo?encoding=utf8");
+      const handler = new ConnectionHandler();
+      expect(() => handler.establishConnection(dbConfig)).toThrow(AdapterNotFound);
       // Mirrors Rails' assert_match on the nonexistent-adapter message.
-      await expect(promise).rejects.toThrow(/nonexistent 'ridiculous' adapter/);
+      expect(() => handler.establishConnection(dbConfig)).toThrow(
+        /nonexistent 'ridiculous' adapter/,
+      );
     });
 
     it("url from environment", () => {

@@ -51,8 +51,10 @@ type AdapterClassResolver = (adapterName: string) => Promise<new (...args: any[]
 type AdapterClassResolverSync = (adapterName: string) => (new (...args: any[]) => unknown) | null;
 type AdapterArgBuilder = (adapterName: string, configuration: Record<string, unknown>) => unknown[];
 type LoadErrorLookup = (adapterName: string) => unknown | null;
+type AdapterNameValidator = (adapterName: string) => void;
 let _adapterClassResolver: AdapterClassResolver | null = null;
 let _adapterClassResolverSync: AdapterClassResolverSync | null = null;
+let _validateAdapterName: AdapterNameValidator | null = null;
 let _buildAdapterArg: AdapterArgBuilder = (_n, c) => [c];
 let _loadAdapterError: LoadErrorLookup | null = null;
 
@@ -62,11 +64,13 @@ export function _setAdapterClassResolver(
   syncFn: AdapterClassResolverSync,
   argBuilder: AdapterArgBuilder,
   errorLookup: LoadErrorLookup,
+  nameValidator: AdapterNameValidator,
 ): void {
   _adapterClassResolver = fn;
   _adapterClassResolverSync = syncFn;
   _buildAdapterArg = argBuilder;
   _loadAdapterError = errorLookup;
+  _validateAdapterName = nameValidator;
 }
 
 let writeConfigurationHash!: (config: DatabaseConfig, hash: DatabaseConfigOptions) => void;
@@ -328,9 +332,25 @@ export class DatabaseConfig {
    *
    * Validates the configuration by resolving the adapter class.
    * Returns true on success or throws.
+   *
+   * Rails resolves the class itself (`adapter_class if adapter`), which its
+   * sync autoload makes cheap. trails' {@link adapterClass} is async because
+   * ESM imports are, and `validate!`'s callers — `resolvePoolConfig` and
+   * `establishConnection` — are sync, so this checks the adapter *name*
+   * against the registry synchronously instead. That covers the case Rails'
+   * check exists for (a misspelled/unavailable adapter, raising
+   * AdapterNotFound at establish time); a registered adapter whose module
+   * fails to import still surfaces later, at first connection checkout.
    */
-  async validateBang(): Promise<true> {
-    if (this.adapter) await this.adapterClass();
+  validateBang(): true {
+    if (this.adapter) {
+      if (!_validateAdapterName) {
+        throw new Error(
+          "Adapter class resolver not registered — import ConnectionHandler (or connection-handling) first",
+        );
+      }
+      _validateAdapterName(this.adapter);
+    }
     return true;
   }
 }
