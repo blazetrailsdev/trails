@@ -2804,16 +2804,20 @@ export class Migrator {
     this._announce(proxy, direction === "up" ? "migrating" : "reverting");
 
     const migration = await proxy.migration();
-    // Rails benchmarks exec_migration only (`migration.rb:973`), so the timer
-    // starts after the migration is loaded.
-    const start = Date.now();
     // Rails wraps both the migration execution AND the version
     // stamping inside the same ddl_transaction so they commit/rollback
     // atomically. Without this, a committed migration + failed stamp
     // would leave schema_migrations out of sync.
     try {
       await this._ddlTransaction(migration, async () => {
+        // Rails benchmarks exec_migration alone (`migration.rb:973`) and emits
+        // the completion banner from Migration#migrate — i.e. before
+        // record_version_state_after_migrating runs (`migration.rb:1534`).
+        const start = Date.now();
         await this._strategy.exec(direction, migration, this._adapter);
+        const elapsed = ((Date.now() - start) / 1000).toFixed(4);
+        this._announce(proxy, `${direction === "up" ? "migrated" : "reverted"} (${elapsed}s)`);
+        writeMigrationMessage(this.verbose);
         if (direction === "up") {
           await this._schemaMigration.recordVersion(proxy.version);
           if (this._internalMetadata.enabled) {
@@ -2831,10 +2835,6 @@ export class Migrator {
       const msg = `An error has occurred, ${useTx ? "this and " : ""}all later migrations canceled:\n\n${e instanceof Error ? e.message : e}`;
       throw Object.assign(new Error(msg), { cause: e });
     }
-
-    const elapsed = ((Date.now() - start) / 1000).toFixed(4);
-    this._announce(proxy, `${direction === "up" ? "migrated" : "reverted"} (${elapsed}s)`);
-    writeMigrationMessage(this.verbose);
   }
 
   /** @internal Rails: `MigrationProxy` delegates `announce`/`write` to the migration. */
