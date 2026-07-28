@@ -1962,6 +1962,7 @@ function extractInterface(
     extends: extendsArr,
     instanceMethods,
     classMethods: [],
+    isInterface: true,
     ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
   };
 }

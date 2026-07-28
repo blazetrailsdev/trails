@@ -1625,6 +1625,10 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
       "trails-only locator namespace",
     );
     expect(info.modules["seams.ts:Plain"].noRailsEquivalent).toBeUndefined();
+    // extra-surface.ts spreads a declaration tag onto members for interfaces
+    // only, so the kind has to survive into the manifest.
+    expect(info.modules["seams.ts:Quoting"].isInterface).toBe(true);
+    expect(info.modules["seams.ts:Locator"].isInterface).toBeUndefined();
   });
 
   it("keeps a declaration-merged interface's tag when the untagged half is walked first", () => {

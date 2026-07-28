@@ -120,6 +120,13 @@ export interface ClassInfo {
    */
   synthesizedMixin?: boolean;
   /**
+   * TS-side only: this entry came from an `interface` declaration rather than a
+   * `class`, `namespace`, or synthesized module. Interfaces are type-only, so a
+   * container-level `@noRailsEquivalent` on one covers its members too — see
+   * `collectTaggedEntries` in extra-surface.ts.
+   */
+  isInterface?: boolean;
+  /**
    * Reason prose of an `@noRailsEquivalent` tag written on the class /
    * interface / namespace DECLARATION itself, justifying the declared name as
    * deliberate trails-only surface. Members carry their own tag on
