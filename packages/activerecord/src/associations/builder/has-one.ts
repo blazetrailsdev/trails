@@ -102,9 +102,12 @@ export class HasOne extends SingularAssociation {
   static override defineWriters(mixin: object, name: string): void {
     if (!mixin || typeof mixin !== "object") return;
     const cap = name.charAt(0).toUpperCase() + name.slice(1);
-    // Ergonomic awaitable setter (`await firm.setAccount(x)` /
-    // `await firm.setAccount(null)`), the RFC-sanctioned alternative to the
-    // racy native `firm.account = x` property setter defined below. Generated
+    // `set${cap}` IS the port of Rails' `#{name}=` writer: that writer removes
+    // and persists the displaced target inline (has_one_association.rb:59-84),
+    // blocking I/O a synchronous JS property setter cannot express but a
+    // promise-returning method can. api:compare scores it as such —
+    // `rubyMethodToTs` offers `set#{Name}` as a candidate for `name=`
+    // (scripts/api-compare/conventions.ts). Generated
     // here — beside that setter, unconditionally (including polymorphic
     // has_one) — rather than in `defineConstructors`, which Rails skips for
     // polymorphic; the sugar must exist wherever the `=` setter does. A thin
@@ -128,13 +131,18 @@ export class HasOne extends SingularAssociation {
     if (existing && !existing.configurable) return;
     Object.defineProperty(mixin, name, {
       get: existing?.get,
-      // A JS property setter cannot `await`. On an *unpersisted* owner Rails'
-      // assignment is in-memory too, so `syncWrite` sets the FK/inverse and
-      // lets autosave persist at the owner's first `save()`. On a *persisted*
-      // owner `syncWrite` throws (`HasOnePersistedAssignmentError`): Rails
-      // persists the displacement inline at assignment, which needs `await`.
-      // Callers use `await owner.set#{Name}(value)` (the `set${cap}` sugar
-      // above) or `await record.association(name).writer(value)` (RFC 0068).
+      // The `=` setter exists because Rails defines `#{name}=` and dropping it
+      // would report that method missing — but it is NOT the co-equal writer.
+      // It is faithful on exactly one branch: an *unpersisted* owner, where
+      // Rails' assignment is in-memory too, so `syncWrite` sets the FK/inverse
+      // and lets autosave persist at the owner's first `save()`. On a
+      // *persisted* owner it degrades to a deprecation shim: `syncWrite` throws
+      // `HasOnePersistedAssignmentError` — a deliberate DEVIATION, since Rails
+      // raises nothing there and simply persists the displacement inline, which
+      // needs `await`. Throwing steers the caller to the awaitable port rather
+      // than silently skipping the write. Callers use
+      // `await owner.set#{Name}(value)` (the `set${cap}` port above) or
+      // `await record.association(name).writer(value)` (RFC 0068).
       set(this: { association(n: string): { syncWrite(v: unknown): void } }, value: unknown) {
         this.association(name).syncWrite(value);
       },

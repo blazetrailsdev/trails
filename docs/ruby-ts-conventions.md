@@ -22,7 +22,7 @@ matches the first candidate present in the target file), not a call expression.
 | `has_*?` / `supports_*?` / `can_*?` / `should_*?` / `needs_*?` / `includes_*?` / `responds_*?` / `allows_*?` / `uses_*?` | camel form + `is*` fallback          | `has_attribute?` → `hasAttribute` or `isHasAttribute` |
 | `include?` / `member?` / `exclude?`                                                                                      | `is*` / camel / native JS spelling   | `include?` → `isInclude` or `include` or `includes`   |
 | `name!` (bang)                                                                                                           | `*Bang` suffix                       | `save!` → `saveBang`                                  |
-| `name=` (setter)                                                                                                         | bare camel name                      | `table_name=` → `tableName`                           |
+| `name=` (setter)                                                                                                         | bare camel name, `set*` fallback     | `table_name=` → `tableName` or `setTableName`         |
 | `initialize` / `new`                                                                                                     | `constructor`                        | `initialize` → `constructor`                          |
 | `to_s` / `to_str`                                                                                                        | `toString`                           | `to_s` → `toString`                                   |
 | `to_json`                                                                                                                | `toJSON`                             | `to_json` → `toJSON`                                  |
@@ -37,6 +37,16 @@ name collides with a macro (e.g. `isHasOne()` alongside the `Model.hasOne`
 declaration). Leading underscores and runs of underscores collapse like a single
 underscore (`visit__regexp` → `visitRegexp`), and underscore-before-capital
 collapses too (`visit_Arel_Nodes_X` → `visitArelNodesX`).
+
+Setter-form details: a Ruby `name=` writer matches the bare camel accessor
+first, and `set#{Name}` second. The `set*` fallback covers writers whose Rails
+body blocks on I/O — `has_one`'s `#{name}=` removes and persists the displaced
+target inline — which a synchronous JS property setter cannot express. There the
+promise-returning `setAccount` **is** the port of `account=`, and the sync `=`
+setter remains only as the faithful in-memory path on an unpersisted owner plus a
+shim steering persisted-owner callers to the awaitable writer. Underscore-prefixed
+writers (`_reflections=`) are `class_attribute` storage slots, never blocking
+writers, so they get no `set*` candidate.
 
 ## Operators
 

@@ -1919,12 +1919,13 @@ describe("buildReport — TS files with no Rails counterpart", () => {
     });
     const files = report.packages[0].extraFiles;
     expect(files.map((f) => f.tsFile)).toEqual(["ar-config.ts"]);
-    // `foo=` maps to `foo`, so the `setX` re-spelling is novel and the reader
-    // is moved (base.ts owns it) — the whole file is measured, not skipped.
+    // `foo=` maps to `foo` first and `setFoo` second, so both spellings are
+    // moved (base.rb's `foo=` owns them) — the whole file is measured, not
+    // skipped.
     expect(files[0].rubyFile).toBeNull();
     expect(files[0].extras.map((e) => [e.name, e.kind])).toEqual([
-      ["setFoo", "novel"],
       ["foo", "moved"],
+      ["setFoo", "moved"],
     ]);
   });
 
@@ -1940,7 +1941,7 @@ describe("buildReport — TS files with no Rails counterpart", () => {
     expect(pkg.totalExtras).toBe(2);
     expect(pkg.noCounterpartFiles).toBe(1);
     expect(pkg.noCounterpartExtras).toBe(2);
-    expect(pkg.noCounterpartNovel).toBe(1);
+    expect(pkg.noCounterpartNovel).toBe(0);
   });
 
   it("treats a Ruby file known only by its file-level constants as a counterpart", () => {

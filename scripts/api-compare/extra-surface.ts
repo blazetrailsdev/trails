@@ -850,11 +850,13 @@ export function isTestSupportFile(tsFile: string): boolean {
  *
  * These files are scored with an EMPTY allowed set — there is no Rails file to
  * take allowed names from — so every public name lands as an extra, classed
- * novel vs moved against the package-wide Rails candidates like any other. In
- * particular the umbrella-config attribution `compare.ts` applies (crediting
- * `setProtocolAdapters` to `ActiveRecord.protocol_adapters=` as a *move*) is
- * deliberately NOT mirrored here: `rubyMethodToTs` maps `foo=` to `foo`, so the
- * `setX` spelling is novel surface, which is the finding, not noise to absorb.
+ * novel vs moved against the package-wide Rails candidates like any other —
+ * including the `setX` spelling of a Ruby `foo=` writer, which `rubyMethodToTs`
+ * now offers as a candidate after the bare `foo` accessor, so
+ * `setProtocolAdapters` lands as a *move* against `ActiveRecord.protocol_adapters=`
+ * rather than as novel. The name is still reported; only its classification
+ * changed, and it changed because a promise-returning `setX` is the faithful
+ * rendering of a Rails writer that blocks on I/O (RFC 0068).
  */
 export function uncoveredTsFiles(
   coveredTsFiles: Set<string>,
