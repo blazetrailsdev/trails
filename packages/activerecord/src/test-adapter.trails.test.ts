@@ -9,29 +9,35 @@
 import { describe, expect, test } from "vitest";
 import { Base } from "./base.js";
 import { ambientPoolConfiguration, newRawTestAdapter } from "./test-adapter.js";
-import { inMemoryDb } from "./support/adapter-helper.js";
+import { currentAdapter, inMemoryDb } from "./support/adapter-helper.js";
 
 describe("ambientPoolConfiguration", () => {
   test("matches the primary pool's configuration hash key-for-key", () => {
     expect(ambientPoolConfiguration()).toEqual(Base.connectionPool().dbConfig.configurationHash);
   });
 
-  // A `:memory:` database belongs to its own connection, so on the sqlite3_mem
-  // lane a second handle is a second, empty database by design.
+  // A `:memory:` database belongs to its own connection: on the sqlite3_mem lane
+  // a second handle is a second, empty database by design.
   test.skipIf(inMemoryDb())("newRawTestAdapter opens the database Base rides", async () => {
     const adapter = newRawTestAdapter();
     try {
-      const ambient = ambientPoolConfiguration();
-      // The canonical schema is laid on the primary database at worker boot, so
-      // seeing it here means this handle opened that same database.
       expect(await adapter.tableExists("posts")).toBe(true);
-      if (ambient.adapter === "sqlite3") {
-        expect((adapter as unknown as { strictStrings: boolean }).strictStrings).toBe(
-          ambient.strict,
-        );
-      }
     } finally {
       await adapter.disconnectBang();
     }
   });
+
+  test.skipIf(!currentAdapter("SQLite3Adapter"))(
+    "newRawTestAdapter opens sqlite with the ambient strict setting",
+    async () => {
+      const adapter = newRawTestAdapter() as unknown as { strictStrings: boolean } & {
+        disconnectBang(): Promise<void>;
+      };
+      try {
+        expect(adapter.strictStrings).toBe(Boolean(ambientPoolConfiguration().strict));
+      } finally {
+        await adapter.disconnectBang();
+      }
+    },
+  );
 });

@@ -67,12 +67,9 @@ export type LeasedTestAdapter = DatabaseAdapter & {
 // pool-mechanics tests clone the ambient config (with per-test overrides)
 // instead of hardcoding `adapter: "sqlite3"`.
 //
-// Read from the one source Rails has — the `connections:` entry `ARCONN`
-// selects (`support/connection.ts`, mirroring `config.example.yml`) — via the
-// same `arunit` entry `connect()` establishes the primary pool from, so this
-// hash and `Base.connectionPool().dbConfig.configurationHash` cannot drift.
-// The entry is resolved with top-level await because the sqlite3 database is
-// only known asynchronously (`fallbackDatabasePath()`).
+// It is the `arunit` entry `connect()` establishes the primary pool from, so
+// the two cannot drift; resolved with top-level await because the sqlite3
+// database is only known asynchronously (`fallbackDatabasePath()`).
 const _primaryConfiguration: Record<string, unknown> = {
   ...(await testConfigurationHashes()).envConfig.configurationHash,
 };
