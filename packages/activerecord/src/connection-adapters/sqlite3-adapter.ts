@@ -3038,6 +3038,17 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
 
   /** @internal */
   static override initializeTypeMap(m: TypeMap): void {
+    // Rails' `initialize_type_map` opens with `super` (sqlite3_adapter.rb:499-502)
+    // and adds only the `%r(int)i → SQLite3Integer` override, so every base
+    // registration and alias — char/binary/text/date/time/datetime/float/int,
+    // blob, clob, timestamp, numeric, number, double, json, decimal — is
+    // inherited. The registrations below re-declare a subset with SQLite
+    // affinity semantics; because lookup scans in reverse-registration order
+    // they shadow the inherited entries they replace, and everything they do
+    // not replace now resolves from the base map instead of falling through to
+    // the default Value type.
+    super.initializeTypeMap(m);
+
     const sqlite3Int = (limit?: number) => new SQLite3IntegerType({ limit });
     m.registerType("string", new StringType());
     m.registerType("text", new TextType());
@@ -3089,9 +3100,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     this.registerClassWithLimit(m, /char/i, StringType);
     this.registerClassWithLimit(m, /text/i, TextType);
     this.registerClassWithLimit(m, /binary/i, BinaryType);
-    m.aliasType(/clob/i, "text");
-    m.aliasType(/blob/i, "binary");
-    m.aliasType(/number/i, "decimal");
     this.registerClassWithLimit(m, /real|floa|doub/i, FloatType);
   }
 }

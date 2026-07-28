@@ -2215,16 +2215,12 @@ export class AbstractAdapter implements Quoting {
     this.registerClassWithLimit(m, /float/i, FloatType);
     this.registerClassWithLimit(m, /int/i, IntegerType);
 
-    const aliasTo = (targetKey: string) => (sqlType: string) => {
-      const meta = /\(.*\)/.exec(sqlType)?.[0] ?? "";
-      return m.lookup(`${targetKey}${meta}`);
-    };
-    m.registerType(/blob/i, undefined, aliasTo("binary"));
-    m.registerType(/clob/i, undefined, aliasTo("text"));
-    m.registerType(/timestamp/i, undefined, aliasTo("datetime"));
-    m.registerType(/numeric/i, undefined, aliasTo("decimal"));
-    m.registerType(/number/i, undefined, aliasTo("decimal"));
-    m.registerType(/double/i, undefined, aliasTo("float"));
+    m.aliasType(/blob/i, "binary");
+    m.aliasType(/clob/i, "text");
+    m.aliasType(/timestamp/i, "datetime");
+    m.aliasType(/numeric/i, "decimal");
+    m.aliasType(/number/i, "decimal");
+    m.aliasType(/double/i, "float");
 
     m.registerType(/^json/i, new JsonType());
 
