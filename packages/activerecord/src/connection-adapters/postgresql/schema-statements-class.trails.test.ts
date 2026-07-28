@@ -193,11 +193,6 @@ describe("PostgreSQLSchemaStatements#resetPkSequenceBang", () => {
   });
 });
 
-// PostgreSQL's identifier limit is NAMEDATALEN - 1, and NAMEDATALEN is a
-// compile-time constant: `max_identifier_length` is the real server value, not
-// necessarily 63. sequenceNameFromParts is what newColumnFromField compares a
-// column's nextval() default against to decide `serial:`, so a budget that
-// ignores the server value mis-detects serial columns and changes the dump.
 describe("PostgreSQLSchemaStatements sequenceNameFromParts identifier budget", () => {
   it("truncates against the server's maxIdentifierLength, not a hardcoded 63", () => {
     const { adapter } = makeAdapter({ maxIdentifierLength: 31 });
