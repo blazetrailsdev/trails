@@ -107,7 +107,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
       expect(fk.toTable).toBe("fk_test_has_pk");
       expect(fk.column).toBe("fk_id");
       expect(fk.primaryKey).toBe("pk_id");
-      // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors Rails' inline `unless current_adapter?(:SQLite3Adapter)` guard on the name assertion
+      // eslint-disable-next-line vitest/no-conditional-in-test
       if (unlessSqlite3Adapter) expect(fk.name).toBe("fk_name");
     });
   });
@@ -1033,20 +1033,6 @@ describeIfSupports("foreign_keys", "Migration", () => {
     );
   });
 
-  /**
-   * Rails' `ForeignKeyChangeColumnTest` plus its two subclasses,
-   * `ForeignKeyChangeColumnWithPrefixTest` and
-   * `ForeignKeyChangeColumnWithSuffixTest`, which re-run the whole body under
-   * `ActiveRecord::Base.table_name_prefix = "p_"` / `table_name_suffix = "_s"`.
-   * TS has no test-class inheritance, so the body is a function called three
-   * times rather than copied.
-   *
-   * Rails' `CreateRocketsMigration` runs through `Migration#method_missing`,
-   * which routes the table name through `proper_table_name` — hence the
-   * prefixed/suffixed literals here. The `t.references(..., foreign_key: true)`
-   * target is prefixed by `TableDefinition#new_foreign_key_definition` itself,
-   * so `rocket` still resolves to the decorated rockets table.
-   */
   function foreignKeyChangeColumnTest(name: string, prefix: string, suffix: string): void {
     describe(name, () => {
       fixtures([], { useTransactionalTests: false });
