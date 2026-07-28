@@ -360,15 +360,20 @@ const ADAPTER_SPECIFIC_SCHEMAS: Record<string, (adapter: DatabaseAdapter) => Pro
 
 /**
  * The tables each {@link ADAPTER_SPECIFIC_SCHEMAS} arm lays, by adapter name.
- * Must be kept in step with the loaders above.
+ * Must be kept in step with the loaders above — including their support gates,
+ * which is why each arm resolves against the live adapter rather than being a
+ * flat list.
  *
  * `support/drop-all-tables.ts` reads this: its between-test `reset` mode drops
  * every table that is not part of the loaded schema, and these are as much part
  * of the schema Rails boots with as `schema.rb`'s. Without them here the arm
  * would be undone before the first test in every file.
  */
-const ADAPTER_SPECIFIC_TABLES: Record<string, readonly string[]> = {
-  postgres: [
+const ADAPTER_SPECIFIC_TABLES: Record<
+  string,
+  (adapter: DatabaseAdapter) => Promise<readonly string[]>
+> = {
+  postgres: async () => [
     "chat_messages",
     "chat_messages_custom_pk",
     "uuid_parents",
@@ -385,21 +390,30 @@ const ADAPTER_SPECIFIC_TABLES: Record<string, readonly string[]> = {
     "test_exclusion_constraints",
     "test_unique_constraints",
   ],
-  mysql: [
-    "datetime_defaults",
-    "timestamp_defaults",
-    "defaults",
-    "binary_fields",
-    "key_tests",
-    "collation_tests",
-    "pk_autopopulated_by_a_trigger_records",
-  ],
-  sqlite: ["defaults"],
+  mysql: async (adapter) => {
+    // Same `supports_insert_returning?` gate the loader applies to
+    // `pk_autopopulated_by_a_trigger_records` (mysql2_specific_schema.rb:84).
+    // The version fetch mirrors the loader's, so a cold pool lease cannot
+    // answer `false` on MariaDB and leave the table unshielded.
+    await adapter.getDatabaseVersion();
+    return [
+      "datetime_defaults",
+      "timestamp_defaults",
+      "defaults",
+      "binary_fields",
+      "key_tests",
+      "collation_tests",
+      ...(adapter.supportsInsertReturning() ? ["pk_autopopulated_by_a_trigger_records"] : []),
+    ];
+  },
+  sqlite: async () => ["defaults"],
 };
 
-/** The adapter-specific schema tables for `adapterName`; empty when it has no arm. */
-export function adapterSpecificTableNames(adapterName: string): readonly string[] {
-  return ADAPTER_SPECIFIC_TABLES[adapterName] ?? [];
+/** The adapter-specific schema tables for `adapter`; empty when it has no arm. */
+export async function adapterSpecificTableNames(
+  adapter: DatabaseAdapter,
+): Promise<readonly string[]> {
+  return (await ADAPTER_SPECIFIC_TABLES[adapter.adapterName]?.(adapter)) ?? [];
 }
 
 /**

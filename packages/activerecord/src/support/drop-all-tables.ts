@@ -24,14 +24,14 @@ const CANONICAL_TABLE_NAMES: ReadonlySet<string> = new Set(Object.keys(TEST_SCHE
  */
 const _bootLaidByAdapter = new Map<string, ReadonlySet<string>>();
 
-function bootLaidTableNames(adapter: DatabaseAdapter): ReadonlySet<string> {
+async function bootLaidTableNames(adapter: DatabaseAdapter): Promise<ReadonlySet<string>> {
   const name = adapter.adapterName;
   // Memoized: this runs in the between-test reset, and both inputs are
   // module-level constants, so the ~330-name Set is built at most once per
   // adapter per worker.
   let cached = _bootLaidByAdapter.get(name);
   if (!cached) {
-    const specific = adapterSpecificTableNames(name);
+    const specific = await adapterSpecificTableNames(adapter);
     cached =
       specific.length === 0
         ? CANONICAL_TABLE_NAMES
@@ -71,7 +71,7 @@ export async function resetTestTables(adapter: DatabaseAdapter): Promise<void> {
 type ResetMode = "drop-all" | "reset";
 
 async function resetTables(adapter: DatabaseAdapter, mode: ResetMode): Promise<void> {
-  const bootLaid = bootLaidTableNames(adapter);
+  const bootLaid = await bootLaidTableNames(adapter);
   switch (adapter.adapterName) {
     case "postgres":
       await resetPgTables(adapter, mode, bootLaid);
