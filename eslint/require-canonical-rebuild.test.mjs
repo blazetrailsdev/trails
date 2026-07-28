@@ -154,6 +154,11 @@ tester.run("require-canonical-rebuild", rule, {
       options,
     },
 
+    {
+      code: "const a = b;\nconst b = a;\nawait adapter.execute(a);\nawait ctx.dropTable(b);",
+      options,
+    },
+
     { code: 'await ctx.dropTable("posts");', options: [{}] },
   ],
 
@@ -257,6 +262,53 @@ tester.run("require-canonical-rebuild", rule, {
       code:
         "const tables = await adapter.execute(`SELECT name FROM pragma_table_list WHERE name IN ('people')`);\n" +
         "tables.forEach(function (t) { ctx.dropTable(t.name); });",
+      options,
+      errors: [{ messageId: "sweepReachesCanonical", data: { table: "people" } }],
+    },
+
+    {
+      code:
+        "const rows = await adapter.execute(`SELECT tablename FROM pg_tables WHERE tablename IN ('subscribers')`);\n" +
+        "for (let i = 0; i < rows.length; i++) {\n" +
+        '  await adapter.exec(`DROP TABLE "${rows[i].tablename}"`);\n' +
+        "}",
+      options,
+      errors: [{ messageId: "sweepReachesCanonical", data: { table: "subscribers" } }],
+    },
+
+    {
+      code:
+        "const rows = await adapter.execute(`SELECT tablename FROM pg_tables WHERE tablename IN ('people')`);\n" +
+        "while (rows.length) {\n" +
+        "  const t = rows.pop();\n" +
+        '  await adapter.exec(`DROP TABLE "${t.tablename}"`);\n' +
+        "}",
+      options,
+      errors: [{ messageId: "sweepReachesCanonical", data: { table: "people" } }],
+    },
+
+    {
+      code:
+        "const tables = await adapter.execute(`SELECT tablename FROM pg_tables WHERE tablename IN ('subscribers')`);\n" +
+        'for (const t of tables) { await adapter.exec(`DROP TABLE ${SCHEMA}."${t.tablename}"`); }',
+      options,
+      errors: [{ messageId: "sweepReachesCanonical", data: { table: "subscribers" } }],
+    },
+
+    {
+      code:
+        "const tables = await adapter.execute(`SELECT name FROM pragma_table_list WHERE name IN ('widgets')`);\n" +
+        'for (const t of tables) { await adapter.exec(`DROP TABLE "${t.name ?? ""}"`); }',
+      options,
+      errors: [{ messageId: "sweepReachesCanonical", data: { table: "widgets" } }],
+    },
+
+    {
+      code:
+        "let SWEEP_SQL;\n" +
+        "SWEEP_SQL = \"SELECT tablename FROM pg_tables WHERE tablename IN ('people')\";\n" +
+        "const tables = await adapter.execute(SWEEP_SQL);\n" +
+        'for (const t of tables) { await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`); }',
       options,
       errors: [{ messageId: "sweepReachesCanonical", data: { table: "people" } }],
     },
