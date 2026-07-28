@@ -243,16 +243,17 @@ class ModelRegistry extends Map<string, typeof Base> {
     return this.#generation;
   }
 
-  // Write-through lives here, not at each caller, so a direct
+  // Write-through runs here, not at each caller, so a direct
   // `modelRegistry.set` (the HABTM join model) or `.delete` (the PG schema
   // helper) cannot leave the registry and the constant table disagreeing.
+  // `registerModelConstant` is the single path that binds a model class to a
+  // name; this must not write the constant table itself.
   override set(name: string, model: typeof Base): this {
     // Guard (inside registerModelConstant) before any mutation: a rejected
     // registration must not bump the generation, which would invalidate every
     // reflection memo for a write that never happened.
     registerModelConstant(name, model);
     if (super.get(name) !== model) this.#generation++;
-    registerConstant(name, model);
     return super.set(name, model);
   }
 
