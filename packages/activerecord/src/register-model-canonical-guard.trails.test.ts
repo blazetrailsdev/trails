@@ -97,7 +97,11 @@ describe("registerModel canonical-name shadow guard", () => {
     const saved = [...modelRegistry.entries()];
     try {
       modelRegistry.clear();
-      for (const [name] of saved) expect(safeConstantize(name)).toBeUndefined();
+      // The invariant is that clear() drops every constant the registry owns,
+      // not that the name becomes unresolvable: a name rebound elsewhere (see
+      // the rebind case above) keeps the other writer's binding, since
+      // unregisterConstant only removes a constant that is still the registry's.
+      for (const [name, model] of saved) expect(safeConstantize(name)).not.toBe(model);
     } finally {
       // Replay each key the way it was installed: a bare `set` key (e.g. the
       // habtm join key) must not come back with the `_registryKeys` entry and
