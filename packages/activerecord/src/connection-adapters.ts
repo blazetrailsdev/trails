@@ -70,11 +70,8 @@ export function register(name: string, loader: AdapterLoader): void {
 }
 
 /**
- * Synchronous half of `resolve(name)`: throws AdapterNotFound when the name
- * isn't registered. Rails' `resolve` does this check inline (its autoload is
- * sync); trails splits it out so sync callers — `DatabaseConfig#validateBang`,
- * and through it `ConnectionHandler#resolvePoolConfig` — can surface an
- * unknown adapter name without awaiting the dynamic import.
+ * Synchronous half of `resolve(name)` — Rails does this check inline, but
+ * trails' sync callers can't await the dynamic import.
  *
  * @internal
  */

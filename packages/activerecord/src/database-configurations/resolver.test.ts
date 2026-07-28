@@ -2,9 +2,7 @@ import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import type { RawConfigurations } from "../database-configurations.js";
 import { AdapterNotFound } from "../errors.js";
-// connection-handling registers the adapter class resolver that validateBang()
-// relies on (same import hash-config.test.ts uses) so the "url invalid adapter"
-// case resolves the adapter rather than throwing "resolver not registered".
+// connection-handling registers the adapter class resolver validateBang() needs.
 import "../connection-handling.js";
 import { ConnectionHandler } from "../connection-adapters/abstract/connection-handler.js";
 
@@ -24,11 +22,8 @@ describe("PoolConfig", () => {
     });
 
     it("url invalid adapter", () => {
-      // Rails passes the URL string straight to establish_connection, which
-      // resolves it via Base.configurations; trails' establishConnection takes an
-      // already-resolved config, so we resolve first and hand it over. The
-      // AdapterNotFound must surface here, at establish time, not at first
-      // checkout — that's resolvePoolConfig's db_config.validate! call.
+      // Rails passes the URL string straight to establish_connection; trails'
+      // establishConnection takes an already-resolved config.
       const dbConfig = resolveDbConfig("ridiculous://foo?encoding=utf8");
       const handler = new ConnectionHandler();
       expect(() => handler.establishConnection(dbConfig)).toThrow(AdapterNotFound);

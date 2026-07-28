@@ -333,14 +333,10 @@ export class DatabaseConfig {
    * Validates the configuration by resolving the adapter class.
    * Returns true on success or throws.
    *
-   * Rails resolves the class itself (`adapter_class if adapter`), which its
-   * sync autoload makes cheap. trails' {@link adapterClass} is async because
-   * ESM imports are, and `validate!`'s callers — `resolvePoolConfig` and
-   * `establishConnection` — are sync, so this checks the adapter *name*
-   * against the registry synchronously instead. That covers the case Rails'
-   * check exists for (a misspelled/unavailable adapter, raising
-   * AdapterNotFound at establish time); a registered adapter whose module
-   * fails to import still surfaces later, at first connection checkout.
+   * Deviation: sync, because Rails' callers (`resolve_pool_config`,
+   * `establish_connection`) are sync while {@link adapterClass} is async. It
+   * validates the adapter name against the registry; a registered adapter
+   * whose module fails to import still surfaces at first checkout.
    */
   validateBang(): true {
     if (this.adapter) {
