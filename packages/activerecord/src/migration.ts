@@ -2056,9 +2056,9 @@ export class Migrator {
   private _internalMetadata: InternalMetadata;
   private _environment: string;
   private _strategy: ExecutionStrategy;
-  private _options: MigratorOptions;
-  private _direction: "up" | "down";
-  private _targetVersion: number | string | null;
+  private readonly _options: MigratorOptions;
+  private readonly _direction: "up" | "down";
+  private readonly _targetVersion: number | string | null;
   verbose = true;
 
   constructor(
@@ -2202,9 +2202,9 @@ export class Migrator {
    *
    * @internal
    */
-  async up(targetVersion?: number | string | null): Promise<void> {
+  async up(targetVersion?: number | string | null): Promise<MigrationProxy[]> {
     const migrator = this._forRun("up", targetVersion ?? null);
-    await migrator._withAdvisoryLock(() => migrator.migrateWithoutLock());
+    return migrator._withAdvisoryLock(() => migrator.migrateWithoutLock());
   }
 
   /**
@@ -2214,9 +2214,9 @@ export class Migrator {
    *
    * @internal
    */
-  async down(targetVersion?: number | string | null): Promise<void> {
+  async down(targetVersion?: number | string | null): Promise<MigrationProxy[]> {
     const migrator = this._forRun("down", targetVersion ?? null);
-    await migrator._withAdvisoryLock(() => migrator.migrateWithoutLock());
+    return migrator._withAdvisoryLock(() => migrator.migrateWithoutLock());
   }
 
   /**
