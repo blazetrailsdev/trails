@@ -7,6 +7,7 @@ import {
   CheckPending,
   PendingMigrationError,
   ConcurrentMigrationError,
+  UnknownMigrationVersionError,
   EnvironmentMismatchError,
   NoEnvironmentInSchemaError,
   ProtectedEnvironmentError,
@@ -71,6 +72,25 @@ describe("Migrator trails extensions", () => {
     await migrator.up();
     const env = await migrator.internalMetadata.get("environment");
     expect(env).toBe("test");
+  });
+
+  it("up and down raise UnknownMigrationVersionError for an unknown target", async () => {
+    // Rails routes both through a per-run Migrator whose migrate_without_lock
+    // starts with `raise UnknownMigrationVersionError if invalid_target?`
+    // (migration.rb:1503-1505); target 0 stays valid.
+    const list = (): MigrationProxy[] => [makeMigration("1", "M1"), makeMigration("2", "M2")];
+    await expect(new Migrator(adapter, list()).up(3)).rejects.toThrow(UnknownMigrationVersionError);
+    await expect(new Migrator(adapter, list()).down(3)).rejects.toThrow(
+      UnknownMigrationVersionError,
+    );
+    await expect(new Migrator(adapter, list()).down(0)).resolves.toEqual([]);
+  });
+
+  it("down does not stamp the environment", async () => {
+    // Rails' record_environment returns early when down? (migration.rb:1511).
+    const migrator = new Migrator(adapter, [makeMigration("1", "M1")], { environment: "test" });
+    await migrator.down();
+    expect(await migrator.internalMetadata.get("environment")).toBeNull();
   });
 
   it("checkEnvironment raises NoEnvironmentInSchemaError when no environment stored", async () => {

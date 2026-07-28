@@ -22,11 +22,5 @@
     "rubyFile": "database_configurations/url_config.rb",
     "rubyName": "build_url_hash",
     "reason": "Ruby reads `@url`, but the TS port must run BEFORE `super(...)` in the UrlConfig constructor — its result is merged into the configuration hash passed up to HashConfig, and `this` is unavailable before `super`. The url therefore has to be threaded in as a parameter."
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "migration.rb",
-    "rubyName": "run_without_lock",
-    "reason": "Rails' Migrator holds `@direction` / `@target_version` as construction-time ivars; trails' MigrationContext keeps one long-lived instance and passes both per call. Converging means splitting a per-run Migrator out of MigrationContext, which is a structural port well beyond an arity fix."
   }
 ]

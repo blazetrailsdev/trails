@@ -2028,6 +2028,25 @@ export interface MigrationProxy {
   loadMigration?(): Promise<MigrationLike>;
 }
 
+/**
+ * Construction-time options. `direction` / `targetVersion` are the per-run
+ * state Rails' `Migrator` holds as `@direction` / `@target_version`; a Migrator
+ * built without them is the long-lived, MigrationContext-shaped instance
+ * (Rails' `MigrationContext#open`).
+ */
+type MigratorOptions = {
+  environment?: string;
+  strategy?: ExecutionStrategy;
+  /**
+   * Set to false when the db_config opts out of metadata storage
+   * (Rails' `use_metadata_table: false`). environment stamping is a
+   * no-op / raises in `environment:set` when this is false.
+   */
+  internalMetadataEnabled?: boolean;
+  direction?: "up" | "down";
+  targetVersion?: number | string | null;
+};
+
 export class Migrator {
   static validateMigrationTimestamps = false;
 
@@ -2037,22 +2056,19 @@ export class Migrator {
   private _internalMetadata: InternalMetadata;
   private _environment: string;
   private _strategy: ExecutionStrategy;
+  private readonly _options: MigratorOptions;
+  private readonly _direction: "up" | "down";
+  private readonly _targetVersion: number | string | null;
   verbose = true;
 
   constructor(
     adapter: DatabaseAdapter,
     migrations: MigrationProxy[],
-    options: {
-      environment?: string;
-      strategy?: ExecutionStrategy;
-      /**
-       * Set to false when the db_config opts out of metadata storage
-       * (Rails' `use_metadata_table: false`). environment stamping is a
-       * no-op / raises in `environment:set` when this is false.
-       */
-      internalMetadataEnabled?: boolean;
-    } = {},
+    options: MigratorOptions = {},
   ) {
+    this._options = options;
+    this._direction = options.direction ?? "up";
+    this._targetVersion = options.targetVersion ?? null;
     this._adapter = adapter;
     this._schemaMigration = new SchemaMigration(adapter);
     this._internalMetadata = new InternalMetadata(adapter, {
@@ -2074,6 +2090,19 @@ export class Migrator {
 
   get migrations(): MigrationProxy[] {
     return [...this._migrations];
+  }
+
+  /**
+   * Options for the per-run Migrator `run` / `up` / `down` each construct
+   * (Rails' `Migrator.new(direction, migrations, schema_migration,
+   * internal_metadata, target_version)`). The `new Migrator(...)` call itself
+   * stays inline at all three sites, as Rails writes it.
+   */
+  private _runOptions(
+    direction: "up" | "down",
+    targetVersion: number | string | null,
+  ): MigratorOptions {
+    return { ...this._options, direction, targetVersion };
   }
 
   // Rails: MIGRATOR_SALT = 2053462845 (Zlib.crc32("googol"))
@@ -2170,11 +2199,14 @@ export class Migrator {
    *
    * @internal
    */
-  async up(targetVersion?: number | string | null): Promise<void> {
-    await this._withAdvisoryLock(async () => {
-      await this._ensureSchemaTable();
-      await this._migrateUp(targetVersion ?? null);
-    });
+  async up(targetVersion?: number | string | null): Promise<MigrationProxy[]> {
+    const migrator = new Migrator(
+      this._adapter,
+      this._migrations,
+      this._runOptions("up", targetVersion ?? null),
+    );
+    migrator.verbose = this.verbose;
+    return migrator._withAdvisoryLock(() => migrator.migrateWithoutLock());
   }
 
   /**
@@ -2184,11 +2216,14 @@ export class Migrator {
    *
    * @internal
    */
-  async down(targetVersion?: number | string | null): Promise<void> {
-    await this._withAdvisoryLock(async () => {
-      await this._ensureSchemaTable();
-      await this._migrateDown(targetVersion ?? null);
-    });
+  async down(targetVersion?: number | string | null): Promise<MigrationProxy[]> {
+    const migrator = new Migrator(
+      this._adapter,
+      this._migrations,
+      this._runOptions("down", targetVersion ?? null),
+    );
+    migrator.verbose = this.verbose;
+    return migrator._withAdvisoryLock(() => migrator.migrateWithoutLock());
   }
 
   /**
@@ -2238,18 +2273,19 @@ export class Migrator {
   /**
    * @internal Mirrors: ActiveRecord::Migrator#run_without_lock
    *
-   * Signature differs from Rails: Rails reads `@direction`/`@target_version` from
-   * per-invocation instance state; TS takes them as explicit params.
+   * Reads the direction and target version this Migrator was constructed with,
+   * as Rails does with `@direction` / `@target_version`.
    *
    * The already-applied guards replicate the skip logic in Rails'
    * `execute_migration_in_transaction` (migration.rb:1528-1530), which checks
    * `migrated.include?(migration.version)` before running. Our `_runMigration`
    * doesn't carry that check, so the guard lives here instead.
    */
-  async runWithoutLock(
-    direction: "up" | "down",
-    targetVersion: string | number,
-  ): Promise<string | undefined> {
+  async runWithoutLock(): Promise<string | undefined> {
+    // Rails' `Migrator#run` is only ever built with a target version; a nil one
+    // finds no migration and raises, so mirror that rather than treating it as
+    // "run everything".
+    const targetVersion = this._targetVersion ?? "";
     await this._ensureSchemaTable();
     let key: string;
     try {
@@ -2259,21 +2295,40 @@ export class Migrator {
     }
     const proxy = this._migrations.find((m) => m.version === key);
     if (!proxy) throw new UnknownMigrationVersionError(targetVersion);
+    await this.recordEnvironment();
     const applied = await this._appliedVersions();
-    if (direction === "up" && applied.has(key)) return undefined;
-    if (direction === "down" && !applied.has(key)) return undefined;
-    await this._runMigration(proxy, direction);
+    if (this.isUp() && applied.has(key)) return undefined;
+    if (this.isDown() && !applied.has(key)) return undefined;
+    await this._runMigration(proxy, this._direction);
     return proxy.version;
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#migrate_without_lock */
-  async migrateWithoutLock(targetVersion?: number | string | null): Promise<void> {
+  async migrateWithoutLock(): Promise<MigrationProxy[]> {
+    // isInvalidTarget() is only ever true for a non-null target version.
+    if (this.isInvalidTarget()) {
+      throw new UnknownMigrationVersionError(this._targetVersion ?? "");
+    }
     await this._ensureSchemaTable();
-    await this._migrateUp(targetVersion ?? null);
+    await this.recordEnvironment();
+    return this.isDown()
+      ? this._migrateDown(this._targetVersion)
+      : this._migrateUp(this._targetVersion);
+  }
+
+  /** @internal Mirrors: ActiveRecord::Migrator#up? */
+  isUp(): boolean {
+    return this._direction === "up";
+  }
+
+  /** @internal Mirrors: ActiveRecord::Migrator#down? */
+  isDown(): boolean {
+    return this._direction === "down";
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#record_environment */
   async recordEnvironment(): Promise<void> {
+    if (this.isDown()) return;
     if (this._internalMetadata.enabled) {
       await this._ensureSchemaTable();
       await this._internalMetadata.set("environment", this._environment);
@@ -2287,14 +2342,9 @@ export class Migrator {
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#invalid_target? */
-  isInvalidTarget(targetVersion?: string | number | null): boolean {
-    if (targetVersion === null || targetVersion === undefined) return false;
-    try {
-      const key = String(BigInt(targetVersion));
-      return !this._migrations.some((m) => m.version === key);
-    } catch {
-      return true;
-    }
+  isInvalidTarget(): boolean {
+    if (this._targetVersion === null) return false;
+    return this._invalidTarget(this._targetVersion);
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#execute_migration_in_transaction */
@@ -2737,7 +2787,13 @@ export class Migrator {
    * scoped to `target_version` and calls `#run`).
    */
   async run(direction: "up" | "down", targetVersion: number | string): Promise<string | undefined> {
-    return this._withAdvisoryLock(() => this.runWithoutLock(direction, targetVersion));
+    const migrator = new Migrator(
+      this._adapter,
+      this._migrations,
+      this._runOptions(direction, targetVersion),
+    );
+    migrator.verbose = this.verbose;
+    return migrator._withAdvisoryLock(() => migrator.runWithoutLock());
   }
 
   private async _migrateUp(
