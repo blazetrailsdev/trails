@@ -2785,24 +2785,33 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       columns: string[] | string;
       unique: boolean;
       where?: string;
+      orders?: Record<string, string>;
     }>;
     const { bare: bareFrom } = this._splitTableName(from);
     const { bare: bareTo } = this._splitTableName(to);
-    const toCols = (await this.columns(to)).map((c) => c.name);
     for (const idx of idxRows) {
       let name = idx.name;
       if (to === `a${from}`) name = `t${name}`;
       else if (from === `a${to}`) name = name.slice(1);
-      // Rails gates the rename/filter on `columns.is_a?(Array)`: an expression
-      // index carries its parenthesized expression as a bare string, which is
-      // copied across verbatim (no column-name mapping applies).
-      const cols = Array.isArray(idx.columns)
-        ? idx.columns.map((c) => rename[c] ?? c).filter((c) => toCols.includes(c))
-        : idx.columns;
+      // Rails gates the rename/filter on `columns.is_a?(Array)` — and with it
+      // the `columns(to)` reflection: an expression index carries its
+      // parenthesized expression as a bare string, copied across verbatim.
+      let cols: string[] | string;
+      if (Array.isArray(idx.columns)) {
+        const toCols = (await this.columns(to)).map((c) => c.name);
+        cols = idx.columns.map((c) => rename[c] ?? c).filter((c) => toCols.includes(c));
+      } else {
+        cols = idx.columns;
+      }
       if (!cols.length) continue;
       const escapedFrom = bareFrom.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const newName = name.replace(new RegExp(`(^|_)(${escapedFrom})_`), `$1${bareTo}_`);
-      const colSql = Array.isArray(cols) ? cols.map((c) => quoteColumnName(c)).join(", ") : cols;
+      // Rails forwards `index.orders` to add_index, which keys the direction off
+      // the column name as it appears in the copied list.
+      const orders = idx.orders ?? {};
+      const colSql = Array.isArray(cols)
+        ? cols.map((c) => `${quoteColumnName(c)}${orders[c] === "desc" ? " DESC" : ""}`).join(", ")
+        : cols;
       let sql = `CREATE ${idx.unique ? "UNIQUE " : ""}INDEX ${quoteColumnName(newName)} ON ${quoteTableName(to)} (${colSql})`;
       if (idx.where) sql += ` WHERE ${idx.where}`;
       await this.driver.exec(sql);

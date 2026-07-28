@@ -4,7 +4,7 @@ import { fixtures } from "../test-helpers/fixtures.js";
 import { describeIfSqlite } from "../adapters/sqlite3/test-helper.js";
 import type { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
 
-fixtures([], { useTransactionalTests: false });
+fixtures([]);
 
 describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   let db: AbstractSQLite3Adapter;
@@ -12,7 +12,7 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   const dropCopyTargets = async (): Promise<void> => {
     if (db === undefined) return;
     await db.exec(
-      `DROP TABLE IF EXISTS customers2; DROP TABLE IF EXISTS customers3; DROP TABLE IF EXISTS books2; DROP TABLE IF EXISTS "_alter_tmp_customers2"`,
+      `DROP TABLE IF EXISTS customers2; DROP TABLE IF EXISTS customers3; DROP TABLE IF EXISTS books2; DROP TABLE IF EXISTS "_alter_tmp_customers2"; DROP INDEX IF EXISTS index_customers_on_name`,
     );
   };
 
@@ -78,15 +78,22 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
     expect(await copiedIndexSql("books2", "lower")).toMatch(/lower\(external_id\)/i);
   });
 
+  it("copyTableIndexes carries the index column orders across", async () => {
+    await db.addIndex("customers", ["name"], { order: { name: "desc" } });
+    await (db as any).copyTable("customers", "customers2");
+    expect(await copiedIndexSql("customers2", "name")).toMatch(/"name"\s+DESC/i);
+  });
+
   // --- moveTable ---
 
   it("moveTable copies data to destination and drops source", async () => {
     await (db as any).copyTable("customers", "customers2");
     await db.executeMutation("INSERT INTO customers2 (name) VALUES ('Alice')");
+    const sourceRows = await db.execute("SELECT * FROM customers2");
     await (db as any).moveTable("customers2", "customers3");
     const rows = await db.execute("SELECT * FROM customers3");
-    expect(rows).toHaveLength(1);
-    expect((rows[0] as any).name).toBe("Alice");
+    expect(rows).toHaveLength(sourceRows.length);
+    expect(rows.map((r: any) => r.name)).toContain("Alice");
     const tables = await db.execute("SELECT name FROM sqlite_master WHERE type='table'");
     expect(tables.map((t: any) => t.name)).not.toContain("customers2");
   });
