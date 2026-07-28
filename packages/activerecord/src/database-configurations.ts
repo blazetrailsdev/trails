@@ -64,6 +64,10 @@ export function configurationsStore(): DatabaseConfigurations {
 /** @internal */
 export function setConfigurationsStore(configs: DatabaseConfigurations): void {
   _configurations = configs;
+  // Rails has one @@configurations, so `primary?` always answers from whatever
+  // Base.configurations= last stored (core.rb:71-79). Assigning an existing
+  // instance must re-register it, not just the constructor/fromRaw paths.
+  _currentConfigurations = configs;
 }
 
 export class DatabaseConfigurations {
