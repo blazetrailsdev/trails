@@ -6,7 +6,10 @@ import { getFsAsync, getPathAsync, trailsRoot } from "@blazetrails/activesupport
 import { DatabaseConfigurations, type RawConfigurations } from "./database-configurations.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { UrlConfig } from "./database-configurations/url-config.js";
-import { DatabaseConfig } from "./database-configurations/database-config.js";
+import {
+  DatabaseConfig,
+  _setConfigurationHash,
+} from "./database-configurations/database-config.js";
 import {
   resolve as resolveConnectionAdapter,
   resolveSync as resolveConnectionAdapterSync,
@@ -851,8 +854,10 @@ async function establishWithDbConfig(
   // its hash.
   let configForConnect = config;
   if (!dbConfig.adapter) {
-    dbConfig.configuration = Object.freeze({ ...config, adapter: adapterName });
-    configForConnect = dbConfig.configuration as Record<string, unknown>;
+    configForConnect = _setConfigurationHash(dbConfig, {
+      ...config,
+      adapter: adapterName,
+    }) as Record<string, unknown>;
   }
 
   await establishWithConfig(modelClass, adapterName, connectUrl, configForConnect, dbConfig);

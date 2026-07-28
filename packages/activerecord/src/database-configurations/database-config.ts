@@ -69,13 +69,40 @@ export function _setAdapterClassResolver(
   _loadAdapterError = errorLookup;
 }
 
+let writeConfigurationHash!: (config: DatabaseConfig, hash: DatabaseConfigOptions) => void;
+
+/**
+ * Replace a config's hash with a frozen copy of `hash`, preserving the
+ * `DatabaseConfig` object's identity (the pool-reuse check keys on it).
+ *
+ * @internal
+ */
+export function _setConfigurationHash(
+  config: DatabaseConfig,
+  hash: DatabaseConfigOptions,
+): DatabaseConfigOptions {
+  const frozen = Object.freeze({ ...hash });
+  writeConfigurationHash(config, frozen);
+  return frozen;
+}
+
 /**
  * Mirrors: ActiveRecord::DatabaseConfigurations::DatabaseConfig
  */
 export class DatabaseConfig {
   readonly envName: string;
   readonly name: string;
-  configuration: DatabaseConfigOptions;
+  #configuration: DatabaseConfigOptions;
+
+  // Rails is `attr_reader :configuration_hash` — no writer. The one trails-only
+  // path that must replace the hash (connection-handling's adapter backfill)
+  // goes through _setConfigurationHash, which reaches the private field via
+  // this static-block closure rather than a Rails-visible public writer.
+  static {
+    writeConfigurationHash = (config, hash) => {
+      config.#configuration = hash;
+    };
+  }
 
   constructor(envName: string, name: string, configuration: DatabaseConfigOptions = {}) {
     this.envName = envName;
@@ -83,7 +110,11 @@ export class DatabaseConfig {
     // Rails: `@configuration_hash = configuration_hash.symbolize_keys.freeze`
     // (hash_config.rb:40) — a new frozen hash, so the caller's literal is
     // never aliased and no later write can reach it.
-    this.configuration = Object.freeze({ ...configuration });
+    this.#configuration = Object.freeze({ ...configuration });
+  }
+
+  get configuration(): DatabaseConfigOptions {
+    return this.#configuration;
   }
 
   /**
@@ -128,7 +159,7 @@ export class DatabaseConfig {
    * db:create can swap the database without creating a new config.
    */
   set _database(database: string) {
-    this.configuration = Object.freeze({ ...this.configuration, database });
+    this.#configuration = Object.freeze({ ...this.#configuration, database });
   }
 
   /**
