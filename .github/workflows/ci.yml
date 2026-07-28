@@ -10,7 +10,11 @@ on:
     #   run-parity-postgres — Postgres-specific parity (future)
     #   run-parity-mysql    — MySQL/MariaDB-specific parity (future)
     #   run-sqlite-mem      — the ARCONN=sqlite3_mem AR suite (otherwise only
-    #                         main / the weekly sweep / workflow_dispatch)
+    #                         main / the weekly sweep / workflow_dispatch).
+    #                         Runs the lane for a look; does NOT gate the merge
+    #                         — `sqlite-mem-tests` is deliberately absent from
+    #                         the `ci` aggregator's `needs:`, so a failure here
+    #                         is red on its own job and nothing else.
     #   website             — force the Website build on a PR that doesn't
     #                         touch packages/website/
     #   release             — implies `website` (release PRs need the site

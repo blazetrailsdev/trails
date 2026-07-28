@@ -47,8 +47,13 @@ describe("createPooledTestAdapter (Phase B smoke)", () => {
   });
 
   // The duplicate pool inherits the primary's size, which `sqlite3_mem` pins to
-  // 1. This test needs two connections — the setup lease plus the pinned one —
-  // so on that lane it can only ever time out.
+  // 1. This test needs two: the setup lease above plus the pinned one. So
+  // `pinConnectionBang` raises ConnectionTimeoutError ("All 1 connections are
+  // in use") before it issues any SQL.
+  //
+  // Checkout starvation, NOT the duplicate pool landing on its own empty
+  // `:memory:` database — the setup CREATE TABLE on the preceding line
+  // succeeds, as does the CREATE-then-read in the schemaCache case above.
   it.skipIf(inMemoryDb())(
     "pinConnectionBang + write + unpinConnectionBang rolls back",
     async () => {

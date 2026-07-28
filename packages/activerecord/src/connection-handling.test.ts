@@ -42,6 +42,12 @@ describe("ConnectionHandlingTest", () => {
     await setupConnection();
   });
 
+  // Under ARCONN=sqlite3_mem this teardown discards the database along with the
+  // connections and re-establishes an EMPTY one, so no case in this describe
+  // may depend on the canonical schema — including the ones left unguarded
+  // below. Today none does. A ported case that touches a table has to either
+  // take `it.skipIf(inMemoryDb())` like its neighbours or live in the
+  // fixture-bearing describe at the bottom of this file.
   afterEach(async () => {
     connectedToStack().length = 0;
     await Base.connectionHandler.clearAllConnectionsBang();
