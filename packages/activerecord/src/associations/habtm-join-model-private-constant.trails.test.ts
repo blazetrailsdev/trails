@@ -6,7 +6,7 @@ import { Country } from "../test-helpers/models/country.js";
 describe("HabtmJoinModelPrivateConstantTest", () => {
   it("the habtm join model is a private constant", () => {
     expect(() => constantize("Country::HABTM_Treaties")).toThrow(
-      "private constant Country::HABTM_Treaties",
+      "private constant Country::HABTM_Treaties referenced",
     );
     expect(safeConstantize("Country::HABTM_Treaties")).toBeUndefined();
   });

@@ -19,7 +19,7 @@ describe("PrivateConstantTest", () => {
 
     privateConstant("Country::HABTM_Treaties");
     expect(() => constantize("Country::HABTM_Treaties")).toThrow(
-      "private constant Country::HABTM_Treaties",
+      "private constant Country::HABTM_Treaties referenced",
     );
   });
 
@@ -36,7 +36,7 @@ describe("PrivateConstantTest", () => {
     registerConstant("Country::HABTM_Treaties", class Treaties {});
 
     expect(() => constantize("Country::HABTM_Treaties")).toThrow(
-      "private constant Country::HABTM_Treaties",
+      "private constant Country::HABTM_Treaties referenced",
     );
   });
 

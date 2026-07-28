@@ -198,8 +198,13 @@ export function unregisterConstant(name: string, expected: unknown): void {
  * `Module#private_constant` (a language feature Rails calls, not one it
  * defines). Ruby's constant table carries per-constant visibility;
  * trails' invented table (see {@link registerConstant}) is flat, so the private
- * set lives alongside it. The mark is independent of registration order, so a
- * caller can declare a name private before whatever writes it does so.
+ * set lives alongside it and is global rather than per-owner: Ruby's visibility
+ * is a property of the constant within its owning module, so `Country` still
+ * resolves `HABTM_Treaties` lexically while `Object.const_get` raises. Here the
+ * name is unresolvable from everywhere — wider than Ruby, and sufficient for
+ * the only consumer (the habtm join key), which nothing resolves lexically.
+ * The mark is also independent of registration order, so a caller can declare a
+ * name private before whatever writes it does so.
  */
 export function privateConstant(name: string): void {
   _privateConstants.add(name);
@@ -222,8 +227,14 @@ export function constantize(camelCasedWord: string): unknown {
   if (!isValidConstantPath(path)) {
     throw new ReferenceError(`wrong constant name ${camelCasedWord}`);
   }
+  // Privacy is checked before existence, which Ruby cannot reach: there
+  // `private_constant` on an undefined name is itself a NameError, so a name is
+  // never private-and-absent. trails allows it because the habtm join key is
+  // marked at declaration time while the constant itself is written by a
+  // separate path (`modelRegistry.set` today, plus the constant table once
+  // #5511 lands) — the mark must not depend on which writer runs first.
   if (_privateConstants.has(path)) {
-    throw new ReferenceError(`private constant ${path}`);
+    throw new ReferenceError(`private constant ${path} referenced`);
   }
   if (!_constants.has(path)) {
     throw new ReferenceError(`uninitialized constant ${path}`);
