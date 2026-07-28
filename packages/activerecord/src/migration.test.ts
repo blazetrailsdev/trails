@@ -1066,8 +1066,10 @@ describe("MigrationTest", () => {
     const migrator = new Migrator(adapter, [proxy], { environment: "test" });
     await migrator.up().catch(() => {});
     const env = await im.get("environment");
-    // Environment should NOT be stored when migration fails
-    expect(env).toBeNull();
+    // Rails stamps the environment in `record_environment` BEFORE running the
+    // migrations, so a failing migration still leaves it recorded
+    // (migration_test.rb:697-711).
+    expect(env).toBe("test");
   });
 
   it("internal metadata stores environment when other data exists", async () => {
