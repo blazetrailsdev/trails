@@ -24,6 +24,7 @@ import {
 
 import { adapterType } from "./test-adapter.js";
 import { itIfSupports } from "./support/supports.js";
+import { inMemoryDb } from "./support/adapter-helper.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { Reply, SillyReply, UniqueReply, SillyUniqueReply } from "./test-helpers/models/reply.js";
@@ -1310,8 +1311,13 @@ describe("TransactionTest", () => {
 // still-incomplete transaction. These run OUTSIDE the shared fixture
 // transaction (`usesTransaction`) because evicting the connection mid-test would
 // poison transactional-fixtures teardown.
+//
+// Rails wraps this whole group in `if !in_memory_db?`
+// (transactions_test.rb:232-368): evicting the sole connection of a `:memory:`
+// database throws the database away with it, leaving every later test with an
+// empty schema.
 // ==========================================================================
-describe("TransactionTest", () => {
+describe.skipIf(inMemoryDb())("TransactionTest", () => {
   const { topics } = fixtures(["topics"], {
     usesTransaction: [
       "rollback dirty changes even with raise during rollback removes from pool",

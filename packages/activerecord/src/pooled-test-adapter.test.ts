@@ -10,6 +10,7 @@ import { describe, it, expect, afterAll } from "vitest";
 
 import { createPooledTestAdapter, _resetPooledTestAdapterForTests } from "./test-adapter.js";
 import { withExecutionContext } from "./connection-adapters/abstract/connection-pool/execution-context.js";
+import { inMemoryDb } from "./support/adapter-helper.js";
 
 type Execable = { exec(sql: string): Promise<void> };
 const asExec = (a: unknown) => a as Execable;
@@ -45,34 +46,41 @@ describe("createPooledTestAdapter (Phase B smoke)", () => {
     }
   });
 
-  it("pinConnectionBang + write + unpinConnectionBang rolls back", async () => {
-    const { adapter: setupAdapter, pool } = await createPooledTestAdapter();
-    const tableName = "pooled_smoke_pin_rollback";
-    await asExec(setupAdapter).exec(`DROP TABLE IF EXISTS ${tableName}`);
-    await asExec(setupAdapter).exec(`CREATE TABLE ${tableName} (id INTEGER PRIMARY KEY)`);
-    try {
-      await withExecutionContext(async () => {
-        // Pin first, THEN check out so the pinned connection is the one we
-        // write through. Leases are keyed by executionContextId, so a lease
-        // taken outside this context would resolve to a different connection.
-        await pool.pinConnectionBang(false);
-        try {
-          const pinned = await pool.checkout();
-          await asExec(pinned).exec(`INSERT INTO ${tableName} (id) VALUES (1)`);
-          const inside = await pinned.execute(`SELECT count(*) AS c FROM ${tableName}`);
-          expect(Number((inside[0] as { c: number }).c)).toBe(1);
-        } finally {
-          const clean = await pool.unpinConnectionBang();
-          expect(clean).toBe(true);
-        }
-      });
-
-      const after = await setupAdapter.execute(`SELECT count(*) AS c FROM ${tableName}`);
-      expect(Number((after[0] as { c: number }).c)).toBe(0);
-    } finally {
+  // The duplicate pool inherits the primary's size, and the `sqlite3_mem`
+  // connection pins that to 1 (`:memory:` is only shared within one connection).
+  // This test needs a second connection — the setup lease plus the pinned one —
+  // so on that lane it can only ever time out.
+  it.skipIf(inMemoryDb())(
+    "pinConnectionBang + write + unpinConnectionBang rolls back",
+    async () => {
+      const { adapter: setupAdapter, pool } = await createPooledTestAdapter();
+      const tableName = "pooled_smoke_pin_rollback";
       await asExec(setupAdapter).exec(`DROP TABLE IF EXISTS ${tableName}`);
-    }
-  });
+      await asExec(setupAdapter).exec(`CREATE TABLE ${tableName} (id INTEGER PRIMARY KEY)`);
+      try {
+        await withExecutionContext(async () => {
+          // Pin first, THEN check out so the pinned connection is the one we
+          // write through. Leases are keyed by executionContextId, so a lease
+          // taken outside this context would resolve to a different connection.
+          await pool.pinConnectionBang(false);
+          try {
+            const pinned = await pool.checkout();
+            await asExec(pinned).exec(`INSERT INTO ${tableName} (id) VALUES (1)`);
+            const inside = await pinned.execute(`SELECT count(*) AS c FROM ${tableName}`);
+            expect(Number((inside[0] as { c: number }).c)).toBe(1);
+          } finally {
+            const clean = await pool.unpinConnectionBang();
+            expect(clean).toBe(true);
+          }
+        });
+
+        const after = await setupAdapter.execute(`SELECT count(*) AS c FROM ${tableName}`);
+        expect(Number((after[0] as { c: number }).c)).toBe(0);
+      } finally {
+        await asExec(setupAdapter).exec(`DROP TABLE IF EXISTS ${tableName}`);
+      }
+    },
+  );
 
   it("two pooled-adapter handles share the same pool", async () => {
     const a = await createPooledTestAdapter();
