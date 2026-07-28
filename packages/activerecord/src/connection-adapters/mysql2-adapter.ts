@@ -56,6 +56,7 @@ import { SchemaDumper as MysqlSchemaDumper } from "./mysql/schema-dumper.js";
 import { abandonRawSocket } from "./abandon-raw-socket.js";
 import {
   foreignKeys as mysqlForeignKeys,
+  extractForeignKeyAction as mysqlExtractForeignKeyAction,
   indexes as mysqlIndexes,
   parseMysqlName as mysqlParseName,
   MysqlSchemaStatements,
@@ -1836,13 +1837,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /** Delegates to {@link mysqlForeignKeys} in `mysql/schema-statements.ts`. */
   override async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
-    // `_mysqlFkAction` is protected on AbstractMysqlAdapter, so bind a public
-    // host surface rather than handing `this` straight to the standalone helper.
     return mysqlForeignKeys.call(
       {
         schemaQuery: this.schemaQuery.bind(this),
         quote: this.quote.bind(this),
-        _mysqlFkAction: this._mysqlFkAction.bind(this),
+        extractForeignKeyAction: mysqlExtractForeignKeyAction,
       },
       tableName,
     );

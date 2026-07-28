@@ -31,14 +31,7 @@ function fkHost(rows: Record<string, unknown>[]) {
   return {
     schemaQuery: async () => rows,
     quote,
-    _mysqlFkAction: (action: string) =>
-      action === "CASCADE"
-        ? "cascade"
-        : action === "SET NULL"
-          ? "nullify"
-          : action === "RESTRICT"
-            ? "restrict"
-            : undefined,
+    extractForeignKeyAction,
   };
 }
 
@@ -381,6 +374,7 @@ describe("MySQL::SchemaStatements", () => {
     expect(fks[0].primaryKey).toBe("id");
     expect(fks[0].toTable).toBe("rockets");
     expect(fks[0].onDelete).toBe("cascade");
+    expect(fks[0].onUpdate).toBeUndefined();
   });
 
   it("test_add_composite_foreign_key_infers_column", async () => {

@@ -87,7 +87,6 @@ import {
   newColumnFromField,
   quotedScope,
   tableAliasLength as mysqlTableAliasLength,
-  extractForeignKeyAction as mysqlExtractForeignKeyAction,
 } from "./mysql/schema-statements.js";
 import type { Column as MysqlColumn } from "./mysql/column.js";
 import { TypeMap } from "../type/type-map.js";
@@ -1094,15 +1093,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
     void tableName;
     return [];
-  }
-
-  protected _mysqlFkAction(
-    rule: string | null | undefined,
-  ): "cascade" | "nullify" | "restrict" | undefined {
-    // MySQL::SchemaStatements#extract_foreign_key_action overrides the abstract
-    // one with `super unless specifier == "RESTRICT"` (mysql/schema_statements.rb:225)
-    // — RESTRICT is MySQL's default, so it reports as nil (foreign_key_test.rb:267).
-    return mysqlExtractForeignKeyAction((rule ?? "").toUpperCase());
   }
 
   async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
