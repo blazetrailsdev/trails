@@ -1,16 +1,3 @@
-/**
- * Port of `ActiveRecord::Migration::ReferencesForeignKeyTest`
- * (vendor/rails/activerecord/test/cases/migration/references_foreign_key_test.rb:110-269).
- *
- * The sibling `ReferencesForeignKeyInCreateTest` class in the same Rails file,
- * plus the `pluralize_table_names` / `if_exists` / `if_not_exists` /
- * `table_name_prefix` / `table_name_suffix` cases of this class, are still
- * unported — they need `ReferenceDefinition` to thread `Base.pluralize_table_names`
- * and the conditional options through, which is separate work.
- *
- * Driven by the ambient connection, mirroring Rails'
- * `@connection = ActiveRecord::Base.lease_connection`.
- */
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
@@ -18,11 +5,6 @@ import { fixtures } from "../test-helpers/fixtures.js";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { describeIfSupports } from "../support/supports.js";
 
-/**
- * The class' `setup`/`teardown` (references_foreign_key_test.rb:113-121).
- * `testings` / `testing_parents` are not canonical-schema tables in Rails
- * either — the suite creates and drops them itself.
- */
 async function withTestingTables(conn: AbstractAdapter, body: () => Promise<void>): Promise<void> {
   await conn.createTable("testing_parents", { force: true });
   try {
@@ -34,8 +16,6 @@ async function withTestingTables(conn: AbstractAdapter, body: () => Promise<void
 
 describeIfSupports("foreign_keys", "Migration", () => {
   describe("ReferencesForeignKeyTest", () => {
-    // DDL can't run inside the transactional-fixtures wrapper (PG aborts the
-    // outer transaction on a failed statement).
     fixtures([], { useTransactionalTests: false });
 
     it("foreign keys cannot be added to polymorphic relations when creating the table", async () => {

@@ -664,6 +664,18 @@ export interface ColumnMethods {
   ): unknown;
 }
 
+/** @internal */
+export interface ReferenceDefinitionConnection {
+  addColumn(
+    tableName: string,
+    columnName: string,
+    type: ColumnType,
+    options?: ColumnOptions,
+  ): Promise<void>;
+  addIndex(tableName: string, columnNames: string[], options?: AddIndexOptions): Promise<void>;
+  addForeignKey(fromTable: string, toTable: string, options?: AddForeignKeyOptions): Promise<void>;
+}
+
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::ReferenceDefinition
  */
@@ -699,6 +711,22 @@ export class ReferenceDefinition {
     this.type = options.type ?? "bigint";
     const { polymorphic: _, foreignKey: _fk, index: _idx, type: _t, ...rest } = options;
     this.options = rest;
+  }
+
+  async add(tableName: string, connection: ReferenceDefinitionConnection): Promise<void> {
+    for (const [colName, colType, colOpts] of this._columns()) {
+      await connection.addColumn(tableName, colName, colType, colOpts);
+    }
+    if (this.index) {
+      await connection.addIndex(tableName, this.columnNames(), this.indexOptions(tableName));
+    }
+    if (this.foreignKey) {
+      await connection.addForeignKey(
+        tableName,
+        this.foreignTableName(),
+        this.foreignKeyOptions() as AddForeignKeyOptions,
+      );
+    }
   }
 
   addTo(table: TableDefinition): void {
