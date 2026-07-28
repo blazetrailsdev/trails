@@ -1,6 +1,6 @@
 import { it, expect, beforeEach, afterEach } from "vitest";
 import "../../index.js";
-import { describeIfSqlite } from "./test-helper.js";
+import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { BigIntegerType, IntegerType, BooleanType } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-fixtures.js";

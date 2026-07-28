@@ -2,7 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/sqlite3/virtual_column_test.rb
  */
 import { expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
-import { describeIfSqlite } from "./test-helper.js";
+import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { Base } from "../../index.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { FixtureSet } from "../../fixtures.js";

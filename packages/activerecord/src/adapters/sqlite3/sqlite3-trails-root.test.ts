@@ -9,7 +9,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { setTrailsRoot } from "@blazetrails/activesupport";
-import { describeIfSqlite } from "./test-helper.js";
+import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 
 describeIfSqlite("SQLite3 Trails.root path resolution", () => {
