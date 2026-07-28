@@ -3940,7 +3940,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async validateForeignKey(
     fromTable: string,
     toTable?: string,
-    options?: { name?: string },
+    options?: Omit<ForeignKeyLookupOptions, "toTable">,
   ): Promise<void> {
     await this.pgSchemaStatements().validateForeignKey(fromTable, toTable, options);
   }

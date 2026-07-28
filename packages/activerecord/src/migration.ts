@@ -18,6 +18,7 @@ import {
   type ColumnType,
   type ColumnOptions,
   type AddForeignKeyOptions,
+  type ForeignKeyLookupOptions,
   type AddIndexOptions,
   type IdHashOptions,
 } from "./connection-adapters/abstract/schema-definitions.js";
@@ -775,8 +776,8 @@ export abstract class Migration {
 
   async validateForeignKey(
     fromTable: string,
-    toTableOrOptions?: string | { name?: string },
-    options?: { name?: string },
+    toTableOrOptions?: string | Omit<ForeignKeyLookupOptions, "toTable">,
+    options?: Omit<ForeignKeyLookupOptions, "toTable">,
   ): Promise<void> {
     const toTable = typeof toTableOrOptions === "string" ? toTableOrOptions : undefined;
     const opts = typeof toTableOrOptions === "object" ? toTableOrOptions : (options ?? undefined);

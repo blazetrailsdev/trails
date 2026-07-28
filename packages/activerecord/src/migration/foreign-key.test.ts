@@ -24,6 +24,7 @@ import { adapterType } from "../test-adapter.js";
 import { adapterSupports, describeIfSupports, itIfSupports } from "../support/supports.js";
 import { assertQueriesMatch } from "../testing/query-assertions.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
+import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";
 import type { SchemaSource } from "../schema-dumper.js";
 import { Base } from "../base.js";
@@ -45,21 +46,12 @@ const supportsValidateConstraints = adapterSupports("validate_constraints");
 /**
  * `validate_foreign_key` / `validate_constraint` live on
  * PostgreSQL::SchemaStatements only, so they are absent from the
- * `AbstractAdapter` type the shared rocket-tables helper hands back. The cases
- * that call them are gated on `validate_constraints` (PostgreSQL-only), so the
- * narrowing is sound wherever it is used.
+ * `AbstractAdapter` type the shared rocket-tables helper hands back. Every
+ * caller below is gated on `validate_constraints` (PostgreSQL-only), so the
+ * downcast holds wherever it is used.
  */
-interface ValidatingAdapter {
-  validateForeignKey(
-    fromTable: string,
-    toTable?: string,
-    options?: { column?: string; name?: string },
-  ): Promise<void>;
-  validateConstraint(tableName: string, constraintName: string): Promise<void>;
-}
-
-function validating(conn: AbstractAdapter): ValidatingAdapter {
-  return conn as unknown as ValidatingAdapter;
+function validating(conn: AbstractAdapter): PostgreSQLAdapter {
+  return conn as PostgreSQLAdapter;
 }
 
 /** Rails' `silence_stream($stdout) { migration.migrate(...) }`. */
