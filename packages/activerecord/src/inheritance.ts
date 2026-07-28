@@ -399,6 +399,9 @@ export function demodulize(name: string): string {
 export function registerSubclass(klass: typeof Base): void {
   const parent = Object.getPrototypeOf(klass) as typeof Base;
   if (!parent || parent === Function.prototype) return;
+  // Guard before any mutation: a rejected registration must not leave the
+  // shadowing subclass permanently listed in subclasses()/descendants().
+  if (klass.name) registerModelConstant(klass.name, klass);
   if (!Object.prototype.hasOwnProperty.call(parent, "_subclasses")) {
     (parent as any)._subclasses = [];
   }
@@ -409,7 +412,6 @@ export function registerSubclass(klass: typeof Base): void {
   if (!(parent as any)._subclasses.includes(klass)) {
     (parent as any)._subclasses.push(klass);
   }
-  if (klass.name) registerModelConstant(klass.name, klass);
 }
 
 /**

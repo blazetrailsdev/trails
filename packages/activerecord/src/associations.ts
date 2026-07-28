@@ -243,23 +243,30 @@ class ModelRegistry extends Map<string, typeof Base> {
   }
 
   override set(name: string, model: typeof Base): this {
-    if (super.get(name) !== model) this.#generation++;
+    // Guard (inside registerModelConstant) before any mutation: a rejected
+    // registration must not bump the generation, which would invalidate every
+    // reflection memo for a write that never happened.
     registerModelConstant(name, model);
+    if (super.get(name) !== model) this.#generation++;
     return super.set(name, model);
   }
 
   override delete(name: string): boolean {
+    // The constant table is wider than the registry, so the name may since have
+    // been rebound (e.g. by registerSubclass) to a class this registry entry
+    // knows nothing about — only drop the constant when it is still ours.
+    const model = super.get(name);
     const deleted = super.delete(name);
     if (deleted) {
       this.#generation++;
-      unregisterConstant(name);
+      unregisterConstant(name, model);
     }
     return deleted;
   }
 
   override clear(): void {
     if (this.size > 0) this.#generation++;
-    for (const name of this.keys()) unregisterConstant(name);
+    for (const [name, model] of this) unregisterConstant(name, model);
     super.clear();
   }
 }

@@ -12,6 +12,7 @@
 import "./support/canonical-model-index.js";
 import { describe, it, expect } from "vitest";
 import { Base, registerModel, registerSubclass } from "./index.js";
+import { subclasses } from "./inheritance.js";
 import { modelRegistry } from "./associations.js";
 import { safeConstantize } from "@blazetrails/activesupport";
 import { Author } from "./test-helpers/models/author.js";
@@ -43,12 +44,25 @@ describe("registerModel canonical-name shadow guard", () => {
     const shadow = subclassNamed(RfStiParentXyz, "Author");
     expect(() => registerSubclass(shadow)).toThrow(/shadow the canonical model/);
     expect(safeConstantize("Author")).toBe(Author);
+    expect(subclasses(RfStiParentXyz)).not.toContain(shadow);
   });
 
   it("throws when a bespoke class reaches the registry through a bare set", () => {
     class RfBareSetXyz extends Base {}
+    const before = modelRegistry.generation;
     expect(() => modelRegistry.set("Author", RfBareSetXyz)).toThrow(/shadow the canonical model/);
     expect(modelRegistry.get("Author")).toBe(Author);
+    expect(modelRegistry.generation).toBe(before);
+  });
+
+  it("keeps a constant rebound by another writer when the registry entry is dropped", () => {
+    class RfRebindHostXyz extends Base {}
+    registerModel(RfRebindHostXyz);
+    const sub = subclassNamed(RfRebindHostXyz, "RfRebindHostXyz");
+    registerSubclass(sub);
+    expect(safeConstantize("RfRebindHostXyz")).toBe(sub);
+    modelRegistry.delete("RfRebindHostXyz");
+    expect(safeConstantize("RfRebindHostXyz")).toBe(sub);
   });
 
   it("registers an STI subclass as a constant without widening the registry", () => {
@@ -73,7 +87,13 @@ describe("registerModel canonical-name shadow guard", () => {
       modelRegistry.clear();
       for (const [name] of saved) expect(safeConstantize(name)).toBeUndefined();
     } finally {
-      for (const [name, model] of saved) registerModel(name, model);
+      // Replay each key the way it was installed: a bare `set` key (e.g. the
+      // habtm join key) must not come back with the `_registryKeys` entry and
+      // counter-cache flush that only `registerModel` performs.
+      for (const [name, model] of saved) {
+        if (model._registryKeys?.includes(name)) registerModel(name, model);
+        else modelRegistry.set(name, model);
+      }
     }
   });
 });
