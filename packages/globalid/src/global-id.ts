@@ -135,10 +135,8 @@ export class GlobalID {
    */
   get modelClass(): LocatorModel {
     const klass = constantize(this.modelName) as LocatorModel;
-    // Rails: `if model <= GlobalID then raise ArgumentError` — rejects
-    // GlobalID itself and any subclass. In Ruby SGID < GID so the
-    // single `<=` check covers both. In TS they're peers, and we also
-    // need to catch subclasses via prototype-chain checks. Guard the
+    // Rails' `if model <= GlobalID` covers SGID too because SGID < GID in
+    // Ruby. In TS they're peers, so both branches are needed.
     if (isOrExtends(klass, GlobalID) || isOrExtends(klass, SignedGlobalID)) {
       throw new Error("GlobalID and SignedGlobalID cannot be used as model_class.");
     }
