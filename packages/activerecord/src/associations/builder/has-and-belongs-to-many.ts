@@ -201,12 +201,15 @@ export class HasAndBelongsToMany {
     const middleName = [pluralize(model.name.toLowerCase()), name].sort().join("_");
     const middleOptions: Record<string, unknown> = {
       className: registryKey,
-      // Rails sets only `class_name` here (has_and_belongs_to_many.rb:73), but
-      // the constant it names was just marked private, and `const_get` on a
-      // private constant raises — Rails' association survives because it
-      // "resolves through the reflection, not the constant table". Hold the join
-      // model directly so `klass` short-circuits before any name lookup;
-      // `className` stays for fidelity and for anything reading the name.
+      // DEVIATION (trails-only, tracked by converge-constantize-ignores-private-constants):
+      // Rails sets only `class_name` here (has_and_belongs_to_many.rb:73) and
+      // resolves the join model straight back out of the constant table —
+      // `private_constant` blocks only a literal `A::B` reference, never
+      // `const_get`, so `Object.const_get("Category::HABTM_Posts")` succeeds in
+      // Ruby (verified on 3.3.11). trails' `constantize` raises for a private
+      // name, which it should not; until that is fixed, hold the join model
+      // directly so `klass` short-circuits before any name lookup. `className`
+      // stays exactly as Rails spells it.
       anonymousClass: JoinModel,
       foreignKey: ownerFk,
       dependent: "delete",
