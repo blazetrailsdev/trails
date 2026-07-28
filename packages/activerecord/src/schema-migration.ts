@@ -146,9 +146,9 @@ export class SchemaMigration {
    * This wrapper provides a standalone version for callers holding a
    * SchemaMigration instance directly. It uses stricter validation
    * (BigInt + /^\d+$/) and validates all inputs before any writes,
-   * whereas SchemaStatements may write before detecting duplicates.
-   * Versions are normalized via BigInt so "001" and "1" are treated
-   * as the same version.
+   * whereas SchemaStatements — like Rails — may write the target
+   * version before detecting a duplicate. Versions are normalized via
+   * BigInt so "001" and "1" are treated as the same version.
    */
   async assumeMigratedUptoVersion(
     version: number | string,
@@ -172,17 +172,6 @@ export class SchemaMigration {
       return { original: v, normalized: n, num: BigInt(n) };
     });
 
-    const seen = new Set<string>();
-    for (const { normalized: n, original } of candidates) {
-      if (seen.has(n)) {
-        throw new Error(
-          `Duplicate migration ${original}. Please renumber your migrations to resolve the conflict.`,
-        );
-      }
-      seen.add(n);
-    }
-
-    // All validation passed — now write.
     // Normalize existing versions the same way so "001" in the DB
     // matches "1" from the input.
     const rawMigrated = await this.allVersions();
@@ -196,30 +185,48 @@ export class SchemaMigration {
       }),
     );
 
-    const toInsert: string[] = [];
-    if (!migrated.has(normalized)) {
-      toInsert.push(normalized);
-    }
-    for (const { normalized: n, num } of candidates) {
-      if (num < versionNum && !migrated.has(n)) {
-        toInsert.push(n);
+    // Rails: inserting = (versions - migrated).select { |v| v < version }
+    // (schema_statements.rb:1375). The duplicate check runs over THIS set, not
+    // over every supplied version — a repeat that is already migrated, or that
+    // sits at or above the target, never reaches it and so never raises.
+    const inserting = candidates.filter(
+      ({ normalized: n, num }) => num < versionNum && !migrated.has(n),
+    );
+
+    const seen = new Set<string>();
+    for (const { normalized: n, original } of inserting) {
+      if (seen.has(n)) {
+        throw new Error(
+          `Duplicate migration ${original}. Please renumber your migrations to resolve the conflict.`,
+        );
       }
+      seen.add(n);
     }
 
-    if (toInsert.length > 0) {
+    // All validation passed — now write.
+    if (!migrated.has(normalized)) {
+      await this.createVersion(normalized);
+    }
+
+    if (inserting.length > 0) {
       const col = this.arelTable.get(this.primaryKey);
       const im = new InsertManager(this.arelTable);
       // Deviation: Rails uses no Arel here — it is raw `execute
       // insert_versions_sql(inserting)` (schema_statements.rb:1364-1383). This
       // wrapper hangs off a SchemaMigration instance with no
       // pool/migration_context, and its sibling writes (`createVersion`,
-      // `deleteVersion`) already build Arel, so the InsertManager stays.
+      // `deleteVersion`) already build Arel, so the InsertManager stays. Only
+      // the SQL text differs — Rails newline-joins the tuples and appends a
+      // `;` (schema_statements.rb:1881-1884); statement count and row order
+      // match.
       //
       // Rows carry the version raw, as Rails' do (`create_version` passes it
       // straight to `im.insert`, schema_migration.rb:21) — the ValuesList
       // visitor quotes it (to_sql.rb:112), whereas a Quoted wrap falls through
       // to `quote()`, which raises on a node (quoting.rb:86).
-      const rows = toInsert.map((v) => [v]);
+      //
+      // Reversed, as `insert_versions_sql` does (schema_statements.rb:1882).
+      const rows = inserting.map(({ normalized: n }) => [n]).reverse();
       im.ast.columns = [col];
       im.values = im.createValuesList(rows);
       await this._adapter.execute(this._adapter.toSql(im));

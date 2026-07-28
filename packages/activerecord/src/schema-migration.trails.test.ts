@@ -86,7 +86,7 @@ describe("SchemaMigration#assumeMigratedUptoVersion (trails)", () => {
       [20200101000000, 20200102000000],
     );
 
-    expect(insertStatements()).toHaveLength(1);
+    expect(insertStatements()).toHaveLength(2);
     expect(await schemaMigration.versions()).toEqual([
       "20200101000000",
       "20200102000000",
@@ -104,7 +104,7 @@ describe("SchemaMigration#assumeMigratedUptoVersion (trails)", () => {
     expect(await schemaMigration.versions()).toEqual(["1"]);
   });
 
-  it("raises on a duplicate migration version without inserting", async () => {
+  it("raises on a duplicate unmigrated version below the target", async () => {
     await expect(
       schemaMigration.assumeMigratedUptoVersion(20200103000000, [20200101000000, 20200101000000]),
     ).rejects.toThrow(
@@ -113,6 +113,30 @@ describe("SchemaMigration#assumeMigratedUptoVersion (trails)", () => {
 
     expect(insertStatements()).toEqual([]);
     expect(await schemaMigration.versions()).toEqual([]);
+  });
+
+  // Rails builds the duplicate check from `inserting`, not from every supplied
+  // version (schema_statements.rb:1375-1379), so an already-migrated repeat is
+  // subtracted out before the check ever sees it.
+  it("accepts a duplicate version that is already migrated", async () => {
+    await schemaMigration.createVersion("20200101000000");
+    executeSpy.mockClear();
+
+    await schemaMigration.assumeMigratedUptoVersion(
+      20200103000000,
+      [20200101000000, 20200101000000],
+    );
+
+    expect(await schemaMigration.versions()).toEqual(["20200101000000", "20200103000000"]);
+  });
+
+  it("accepts a duplicate version at or above the target", async () => {
+    await schemaMigration.assumeMigratedUptoVersion(
+      20200103000000,
+      [20200104000000, 20200104000000],
+    );
+
+    expect(await schemaMigration.versions()).toEqual(["20200103000000"]);
   });
 
   it("raises on a non-numeric version without inserting", async () => {
@@ -133,7 +157,11 @@ describe("SchemaMigration#assumeMigratedUptoVersion (trails)", () => {
     expect(await schemaMigration.versions()).toEqual([]);
   });
 
-  it("emits one multi-row INSERT carrying bare version values", async () => {
+  // Rails emits up to two statements: the target version on its own
+  // (schema_statements.rb:1372-1374), then `insert_versions_sql(inserting)`,
+  // which reverses the tuples (schema_statements.rb:1882). Only the SQL text
+  // differs here — Rails newline-joins the tuples and appends a `;`.
+  it("emits the target INSERT then a reversed multi-row INSERT", async () => {
     await schemaMigration.assumeMigratedUptoVersion(
       20200103000000,
       [20200101000000, 20200102000000],
@@ -142,7 +170,24 @@ describe("SchemaMigration#assumeMigratedUptoVersion (trails)", () => {
     const table = conn.quoteTableName(schemaMigration.tableName);
     const column = conn.quoteColumnName(schemaMigration.primaryKey);
     expect(insertStatements()).toEqual([
-      `INSERT INTO ${table} (${column}) VALUES ('20200103000000'), ('20200101000000'), ('20200102000000')`,
+      `INSERT INTO ${table} (${column}) VALUES ('20200103000000')`,
+      `INSERT INTO ${table} (${column}) VALUES ('20200102000000'), ('20200101000000')`,
+    ]);
+  });
+
+  it("emits only the backfill INSERT when the target is already migrated", async () => {
+    await schemaMigration.createVersion("20200103000000");
+    executeSpy.mockClear();
+
+    await schemaMigration.assumeMigratedUptoVersion(
+      20200103000000,
+      [20200101000000, 20200102000000],
+    );
+
+    const table = conn.quoteTableName(schemaMigration.tableName);
+    const column = conn.quoteColumnName(schemaMigration.primaryKey);
+    expect(insertStatements()).toEqual([
+      `INSERT INTO ${table} (${column}) VALUES ('20200102000000'), ('20200101000000')`,
     ]);
   });
 });
