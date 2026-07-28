@@ -37,7 +37,7 @@ import { Result } from "../../result.js";
 
 // Fabricated-error translate_exception checks. These don't touch a live
 // MySQL server (they feed Object.assign(new Error(...), { errno/code })
-// straight into translateException), so they live outside describeIfMysql
+// straight into translateException), so they live outside describeIfMysqlAdapter
 // to keep coverage on dev machines without MySQL installed.
 describe("Mysql2Adapter#translateException (fabricated errors)", () => {
   let adapter: Mysql2Adapter;

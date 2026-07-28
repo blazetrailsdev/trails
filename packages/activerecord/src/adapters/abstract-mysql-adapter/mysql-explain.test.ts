@@ -2,7 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/mysql_explain_test.rb
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { describeIfMysql, isMariaDb, Mysql2Adapter } from "./test-helper.js";
+import { describeIfMysqlAdapter, isMariaDb, Mysql2Adapter } from "./test-helper.js";
 import { Version } from "../../connection-adapters/abstract-adapter.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
@@ -10,12 +10,12 @@ import { Author } from "../../test-helpers/models/author.js";
 import { Post } from "../../test-helpers/models/post.js";
 import { registerModel } from "../../index.js";
 
-// The outer `describeIfMysql` beforeAll reads `Base.connection` before the
+// The outer `describeIfMysqlAdapter` beforeAll reads `Base.connection` before the
 // nested MySQLExplainTest `fixtures()` establishes it, so the handler wiring has
 // to be laid at file scope here — it is NOT redundant with the nested call.
 fixtures({}, { useTransactionalTests: false });
 
-describeIfMysql("Mysql2Adapter", () => {
+describeIfMysqlAdapter("Mysql2Adapter", () => {
   registerModel(Author);
   registerModel(Post);
 

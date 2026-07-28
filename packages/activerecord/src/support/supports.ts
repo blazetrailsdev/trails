@@ -3,7 +3,7 @@ import { adapterType } from "../test-adapter.js";
 
 /**
  * TS mirror of Rails' connection `supports_<feature>?` predicates — the
- * *feature* counterpart to {@link describeIfPg}/{@link describeIfMysql}/
+ * *feature* counterpart to {@link describeIfPg}/{@link describeIfMysqlAdapter}/
  * {@link describeIfSqlite}'s *adapter* gating. Use these to scope a suite or
  * test to the backends that support a DB capability, exactly as Rails does
  * with `skip unless supports_<feature>?`.

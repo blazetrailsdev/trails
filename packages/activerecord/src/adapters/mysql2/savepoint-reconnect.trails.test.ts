@@ -15,7 +15,7 @@
  */
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
-  describeIfMysql,
+  describeIfMysqlAdapter,
   Mysql2Adapter,
   MYSQL_TEST_URL,
 } from "../abstract-mysql-adapter/test-helper.js";
@@ -28,7 +28,7 @@ interface RetryLoopSeams {
   rawConnectionForBlock(): Promise<unknown>;
 }
 
-describeIfMysql("Mysql2Adapter savepoint statements dirty the parent (trails)", () => {
+describeIfMysqlAdapter("Mysql2Adapter savepoint statements dirty the parent (trails)", () => {
   let adapter: Mysql2Adapter;
 
   beforeEach(() => {

@@ -50,7 +50,7 @@ const SHARED_EXCLUDE = [
 // The pure-unit `connection-adapters/<db>/**` subdirs (OID types, quoting
 // helpers, schema-creation stubs) are NOT in this exclude — they run on every
 // CI job regardless of ARCONN. Live-DB cases inside them are wrapped in
-// `describeIfPg` / `describeIfMysql` / `describeIfSqlite`.
+// `describeIfPg` / `describeIfMysqlAdapter` / `describeIfSqlite`.
 //
 // CI sets ARCONN=postgresql on postgres-tests and ARCONN=mysql2 on
 // mysql-tests. sqlite-tests leaves ARCONN unset (defaults to sqlite3).

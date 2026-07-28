@@ -13,12 +13,12 @@ import { Base } from "../../base.js";
 export { withDbWarningsAction } from "../../support/with-db-warnings-action.js";
 
 // A *serialization* of the MySQL sub-settings (MYSQL_HOST/MYSQL_PORT/
-// MYSQL_USER/...), not an env var of its own: the suites still on
-// describeIfMysql probe the server directly regardless of ARCONN, so they need
-// a URL to hand the driver, but they no longer source one from the
-// environment. Being burned down in favour of describeIfMysqlAdapter +
-// leaseMysqlAdapter below; the remaining legitimate callers are the tests that
-// deliberately build a second, differently configured adapter.
+// MYSQL_USER/...), not an env var of its own. Its only callers are the tests
+// that deliberately build a *second*, differently configured adapter (a
+// non-strict sql_mode, ANSI_QUOTES, a statementLimit, a socket the retry loop
+// may tear down) — cases where the config itself is under test and must not
+// leak onto the shared leased connection. Everything else rides the ambient
+// `Base.connection` via leaseMysqlAdapter below.
 export const MYSQL_TEST_URL = mysqlUrl();
 
 /**
@@ -36,33 +36,31 @@ export const { arunit: ARUNIT_DATABASE, arunit2: ARUNIT2_DATABASE } = arunitData
   mysqlSettings().database,
 );
 
-let mysqlAvailable = false;
 let mariaDb = false;
 let mysqlVersionStr = "";
 
-async function checkMysql(): Promise<{ available: boolean; isMariaDb: boolean; version: string }> {
+// Probes the server once at module load purely to read VERSION(): the
+// supports* gates below mirror Rails' version-keyed `supports_*?` predicates,
+// which have no static answer (the mysql lane may be MySQL 8 or the MariaDB CI
+// stand-in). An unreachable server yields an empty version, which makes every
+// gate false rather than skipping any suite — suite selection is
+// describeIfMysqlAdapter's job.
+async function checkMysql(): Promise<{ isMariaDb: boolean; version: string }> {
   let conn: Awaited<ReturnType<typeof mysql.createConnection>> | undefined;
   try {
     conn = await mysql.createConnection({ uri: MYSQL_TEST_URL });
     const [rows] = await conn.query("SELECT VERSION() AS v");
     const ver = (rows as Array<{ v: string }>)[0]?.v ?? "";
-    return { available: true, isMariaDb: /mariadb/i.test(ver), version: ver };
+    return { isMariaDb: /mariadb/i.test(ver), version: ver };
   } catch {
-    return { available: false, isMariaDb: false, version: "" };
+    return { isMariaDb: false, version: "" };
   } finally {
     await conn?.end().catch(() => {});
   }
 }
 
-({ available: mysqlAvailable, isMariaDb: mariaDb, version: mysqlVersionStr } = await checkMysql());
+({ isMariaDb: mariaDb, version: mysqlVersionStr } = await checkMysql());
 
-/**
- * Server-reachability probe, NOT the port of `current_adapter?(:Mysql2Adapter)`
- * — use {@link describeIfMysqlAdapter} for that. A suite gated on this one runs
- * under every `ARCONN` against a self-built adapter, bypassing the leased pool
- * connection.
- */
-export const describeIfMysql = mysqlAvailable ? describe : (describe.skip as typeof describe);
 /** true when the connected server is MariaDB; false on MySQL or when MySQL is unavailable. */
 export const isMariaDb = mariaDb;
 /** Raw VERSION() string from the connected MySQL/MariaDB server (empty when unavailable). */
@@ -81,8 +79,7 @@ const _serverVersion = parseMysqlVersion(mysqlVersionStr);
  * never MariaDB. Lets adapter tests gate on hint support the way the Rails
  * suite wraps `OptimizerHintsTest` in `if supports_optimizer_hints?`.
  */
-export const supportsOptimizerHints =
-  mysqlAvailable && !mariaDb && _serverVersion?.gte("5.7.7") === true;
+export const supportsOptimizerHints = !mariaDb && _serverVersion?.gte("5.7.7") === true;
 
 /**
  * Mirrors `supports_default_expression?` (adapter_helper.rb:23) for MySQL: an
@@ -90,9 +87,9 @@ export const supportsOptimizerHints =
  * Gates the `defaults` table's `uuid` / `char2_concatenated` expression columns
  * exactly as Rails' mysql2_specific_schema.rb does.
  */
-export const supportsDefaultExpression =
-  mysqlAvailable &&
-  (mariaDb ? _serverVersion?.gte("10.2.1") === true : _serverVersion?.gte("8.0.13") === true);
+export const supportsDefaultExpression = mariaDb
+  ? _serverVersion?.gte("10.2.1") === true
+  : _serverVersion?.gte("8.0.13") === true;
 
 /**
  * Mirrors AbstractMysqlAdapter#supports_expression_index?
@@ -101,18 +98,15 @@ export const supportsDefaultExpression =
  * the answer into a static adapterType table — the mysql lane may be MySQL 8
  * (true) or the MariaDB CI stand-in (false).
  */
-export const supportsExpressionIndex =
-  mysqlAvailable && !mariaDb && _serverVersion?.gte("8.0.13") === true;
+export const supportsExpressionIndex = !mariaDb && _serverVersion?.gte("8.0.13") === true;
 
 export { Mysql2Adapter };
 
 /**
  * The port of `current_adapter?(:Mysql2Adapter)` — the gate every
- * `ActiveRecord::AbstractMysqlTestCase` suite runs under. `describeIfMysql`
- * above is a *server-reachability* probe (it runs these suites against a
- * self-built adapter under every `ARCONN`); this is the adapter gate, so the
- * suite rides the ambient `Base.connection` on the mysql2 lane and skips
- * everywhere else, exactly as Rails does.
+ * `ActiveRecord::AbstractMysqlTestCase` suite runs under. The suite rides the
+ * ambient `Base.connection` on the mysql2 lane and skips everywhere else,
+ * exactly as Rails does.
  */
 export const describeIfMysqlAdapter =
   adapterType === "mysql" ? describe : (describe.skip as typeof describe);

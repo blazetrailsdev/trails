@@ -55,7 +55,7 @@ export function mergeGate(base: TestGate | undefined, add: TestGate): TestGate {
  * Normalize a freshly-built gate's array fields (sort + de-dupe). A
  * *present-but-empty* `adapters` array is preserved (not dropped): it means
  * contradictory gates intersected to "runs on no adapter" (e.g. describeIfPg ▸
- * describeIfMysql), which is distinct from an absent key (= "runs on all").
+ * describeIfMysqlAdapter), which is distinct from an absent key (= "runs on all").
  * Mirrors the Ruby extractor's `finalize_gate` (`merged.key?(:adapters)`).
  */
 export function finalizeGate(gate: TestGate): TestGate {
@@ -68,7 +68,6 @@ export function finalizeGate(gate: TestGate): TestGate {
 
 export const ADAPTER_GATE_WRAPPERS = [
   "describeIfPg",
-  "describeIfMysql",
   "describeIfMysqlAdapter",
   "describeIfSqlite",
 ] as const;
@@ -108,10 +107,7 @@ export function gateFromWrapper(name: string, featureArg?: string | null): TestG
   switch (name) {
     case "describeIfPg":
       return { adapters: ["postgresql"], source: ["wrapper"] };
-    case "describeIfMysql":
-    // The port of `current_adapter?(:Mysql2Adapter)` — same gate as
-    // describeIfMysql, but keyed on the active adapter rather than on a
-    // server-reachability probe.
+    // The port of `current_adapter?(:Mysql2Adapter)`.
     case "describeIfMysqlAdapter":
       return { adapters: ["mysql"], source: ["wrapper"] };
     case "describeIfSqlite":
