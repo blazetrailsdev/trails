@@ -2386,11 +2386,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
           deserialized == null && defaultFunction != null ? () => defaultFunction : deserialized;
       }
 
+      // Left null rather than coerced to "" for a typeless (BLOB affinity)
+      // column: typeToSql renders a null type as the empty string, matching
+      // Rails' `type_to_sql(nil)` -> `nil.to_s`, but rejects a blank string.
       const columnType = column.isVirtual()
         ? "virtual"
         : column.isBigint()
           ? "bigint"
-          : (column.type ?? "");
+          : column.type;
       definition.column(column.name, columnType as ColumnType, options);
     }
 
