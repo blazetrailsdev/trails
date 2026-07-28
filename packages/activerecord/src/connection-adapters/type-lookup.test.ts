@@ -76,6 +76,9 @@ describe.skipIf(adapterType === "postgres")("TypeLookupTest", () => {
     assertLookupType("decimal", "numeric");
     assertLookupType("decimal", "numeric(2,8)");
     assertLookupType("decimal", "NUMERIC");
+    assertLookupType("decimal", "number");
+    assertLookupType("decimal", "number(2,8)");
+    assertLookupType("decimal", "NUMBER");
   });
 
   it("float types", () => {
@@ -104,7 +107,14 @@ describe.skipIf(adapterType === "postgres")("TypeLookupTest", () => {
   });
 
   it("decimal without scale", () => {
-    for (const sqlType of ["decimal(2)", "decimal(2,0)", "numeric(2)", "numeric(2,0)"]) {
+    for (const sqlType of [
+      "decimal(2)",
+      "decimal(2,0)",
+      "numeric(2)",
+      "numeric(2,0)",
+      "number(2)",
+      "number(2,0)",
+    ]) {
       const castType = adapter.lookupCastType(sqlType);
       expect(castType.type()).toBe("decimal");
       expect(castType.cast(2.1)).toBe(2);

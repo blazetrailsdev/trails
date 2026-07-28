@@ -3154,6 +3154,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     this.registerClassWithLimit(m, /binary/i, BinaryType);
     m.aliasType(/clob/i, "text");
     m.aliasType(/blob/i, "binary");
+    m.aliasType(/number/i, "decimal");
     this.registerClassWithLimit(m, /real|floa|doub/i, FloatType);
   }
 }
