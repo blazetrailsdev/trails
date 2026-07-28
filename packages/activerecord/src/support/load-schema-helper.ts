@@ -391,10 +391,6 @@ const ADAPTER_SPECIFIC_TABLES: Record<
     "test_unique_constraints",
   ],
   mysql: async (adapter) => {
-    // Same `supports_insert_returning?` gate the loader applies to
-    // `pk_autopopulated_by_a_trigger_records` (mysql2_specific_schema.rb:84).
-    // The version fetch mirrors the loader's, so a cold pool lease cannot
-    // answer `false` on MariaDB and leave the table unshielded.
     await adapter.getDatabaseVersion();
     return [
       "datetime_defaults",
