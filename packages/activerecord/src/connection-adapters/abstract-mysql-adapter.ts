@@ -69,7 +69,6 @@ import {
   CheckConstraintDefinition,
   ColumnDefinition,
   CreateIndexDefinition,
-  ForeignKeyDefinition,
   IndexDefinition,
 } from "./abstract/schema-definitions.js";
 import type {
@@ -83,6 +82,8 @@ import {
 } from "./mysql/schema-definitions.js";
 import {
   dataSourceSql as mysqlDataSourceSql,
+  extractForeignKeyAction as mysqlExtractForeignKeyAction,
+  foreignKeys as mysqlForeignKeys,
   isRowFormatDynamicByDefault,
   newColumnFromField,
   quotedScope,
@@ -1092,10 +1093,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return mysqlQuoteTableName(name);
   }
 
-  async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
-    void tableName;
-    return [];
-  }
+  declare foreignKeys: typeof mysqlForeignKeys;
+
+  /** @internal */
+  declare extractForeignKeyAction: typeof mysqlExtractForeignKeyAction;
 
   async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
     // supportsCheckConstraints() reads the cached databaseVersion, which throws
@@ -2231,3 +2232,5 @@ export class StatementPool extends ConnectionStatementPool<MysqlPreparedStatemen
 
 // Rails: `include MySQL::SchemaStatements` (abstract_mysql_adapter.rb:19).
 include(AbstractMysqlAdapter, MysqlSchemaStatements);
+AbstractMysqlAdapter.prototype.foreignKeys = mysqlForeignKeys;
+AbstractMysqlAdapter.prototype.extractForeignKeyAction = mysqlExtractForeignKeyAction;

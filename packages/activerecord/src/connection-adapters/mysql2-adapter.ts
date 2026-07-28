@@ -34,7 +34,6 @@ import {
   SQLWarning,
 } from "../errors.js";
 import { Result } from "../result.js";
-import { ForeignKeyDefinition } from "./abstract/schema-definitions.js";
 import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
 import {
   affectedRows as mysql2AffectedRows,
@@ -55,8 +54,6 @@ import type { SchemaSource } from "../schema-dumper.js";
 import { SchemaDumper as MysqlSchemaDumper } from "./mysql/schema-dumper.js";
 import { abandonRawSocket } from "./abandon-raw-socket.js";
 import {
-  foreignKeys as mysqlForeignKeys,
-  extractForeignKeyAction as mysqlExtractForeignKeyAction,
   indexes as mysqlIndexes,
   parseMysqlName as mysqlParseName,
   MysqlSchemaStatements,
@@ -1833,18 +1830,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       );
     }
     return this._client;
-  }
-
-  /** Delegates to {@link mysqlForeignKeys} in `mysql/schema-statements.ts`. */
-  override async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
-    return mysqlForeignKeys.call(
-      {
-        schemaQuery: this.schemaQuery.bind(this),
-        quote: this.quote.bind(this),
-        extractForeignKeyAction: mysqlExtractForeignKeyAction,
-      },
-      tableName,
-    );
   }
 
   /** @internal */

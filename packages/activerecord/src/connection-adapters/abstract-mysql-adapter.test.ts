@@ -819,3 +819,54 @@ describe("AbstractMysqlAdapter#checkVersion", () => {
     expect(() => adapter.checkVersion()).not.toThrow();
   });
 });
+
+describe("AbstractMysqlAdapter#foreignKeys", () => {
+  async function makeAdapter(rows: Record<string, unknown>[]) {
+    const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
+    const adapter = Object.create(AbstractMysqlAdapter.prototype) as InstanceType<
+      typeof AbstractMysqlAdapter
+    >;
+    Object.assign(adapter, {
+      schemaQuery: async () => rows,
+      quote: mysqlQuote,
+    });
+    return adapter;
+  }
+
+  it("reads foreign keys through the mixed-in MySQL::SchemaStatements method", async () => {
+    const adapter = await makeAdapter([
+      {
+        to_table: "rockets",
+        primary_key: "id",
+        column: "rocket_id",
+        name: "fk_rails_78e6cee8fd",
+        position: 1,
+        on_update: "CASCADE",
+        on_delete: "SET NULL",
+      },
+    ]);
+    const [fk] = await adapter.foreignKeys("astronauts");
+    expect(fk.fromTable).toBe("astronauts");
+    expect(fk.toTable).toBe("rockets");
+    expect(fk.column).toBe("rocket_id");
+    expect(fk.onUpdate).toBe("cascade");
+    expect(fk.onDelete).toBe("nullify");
+  });
+
+  it("reflects RESTRICT as nil", async () => {
+    const adapter = await makeAdapter([
+      {
+        to_table: "rockets",
+        primary_key: "id",
+        column: "rocket_id",
+        name: "fk_rails_78e6cee8fd",
+        position: 1,
+        on_update: "RESTRICT",
+        on_delete: "RESTRICT",
+      },
+    ]);
+    const [fk] = await adapter.foreignKeys("astronauts");
+    expect(fk.onUpdate).toBeUndefined();
+    expect(fk.onDelete).toBeUndefined();
+  });
+});
