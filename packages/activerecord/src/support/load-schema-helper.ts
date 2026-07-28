@@ -279,8 +279,6 @@ const ADAPTER_SPECIFIC_TABLES: Record<string, readonly string[]> = {
     "binary_fields",
     "key_tests",
     "collation_tests",
-    // Laid only behind `supportsInsertReturning()` (MariaDB), but listed
-    // unconditionally: this list only shields tables from the between-test drop.
     "pk_autopopulated_by_a_trigger_records",
   ],
   sqlite: ["defaults"],

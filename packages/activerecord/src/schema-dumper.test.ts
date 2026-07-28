@@ -537,8 +537,6 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "mysql")(
     "schema dump includes length for mysql binary fields",
     async () => {
-      // `binary_fields` is laid at boot by the mysql arm of `loadSchema`,
-      // mirroring mysql2_specific_schema.rb:28-49.
       const output = await SchemaDumper.dumpTableSchema(Base.connection, "binary_fields");
       expect(output).toMatch(/t\.binary\("var_binary", \{ limit: 255 \}\)/);
       expect(output).toMatch(/t\.binary\("var_binary_large", \{ limit: 4095 \}\)/);
@@ -577,8 +575,6 @@ describe("SchemaDumperTest", () => {
     },
   );
   it.skipIf(adapterType !== "mysql")("schema dumps index type", async () => {
-    // `key_tests` is laid at boot by the mysql arm of `loadSchema`, mirroring
-    // mysql2_specific_schema.rb:51-58.
     const output = await SchemaDumper.dumpTableSchema(Base.connection, "key_tests");
     expect(output).toContain(
       'addIndex("key_tests", "awesome", { name: "index_key_tests_on_awesome", type: "fulltext" })',

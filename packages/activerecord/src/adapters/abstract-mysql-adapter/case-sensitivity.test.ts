@@ -13,12 +13,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   });
 
   describe("CaseSensitivityTest", () => {
-    // `collation_tests` is laid at boot by the mysql arm of `loadSchema`,
-    // mirroring mysql2_specific_schema.rb:60-64. No explicit schema-cache
-    // priming needed: `columnForAttribute` falls back to `this.columns()` when
-    // pool is null and the cache is cold (the cache is cleared by
-    // `resetColumnInformation` when each `it` block defines a new
-    // `CollationTest` subclass).
     afterEach(async () => {
       await adapter.execute("DELETE FROM collation_tests");
     });
