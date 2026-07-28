@@ -456,6 +456,25 @@ tester.run("require-canonical-rebuild", rule, {
     },
 
     {
+      code:
+        "(await adapter.execute(`SELECT tablename FROM pg_tables WHERE tablename IN ('people')`)).rows.forEach(\n" +
+        '  (r) => adapter.exec(`DROP TABLE "${r.tablename}"`),\n' +
+        ");",
+      options,
+      errors: [{ messageId: "sweepReachesCanonical", data: { table: "people" } }],
+    },
+
+    {
+      code:
+        "const rows = (await adapter.execute(`SELECT tablename FROM pg_tables WHERE tablename IN ('widgets')`)).rows;\n" +
+        "for (let i = 0; i < rows.length; i++) {\n" +
+        '  await adapter.exec(`DROP TABLE "${rows[i].tablename}"`);\n' +
+        "}",
+      options,
+      errors: [{ messageId: "sweepReachesCanonical", data: { table: "widgets" } }],
+    },
+
+    {
       code: 'await ctx.dropTable("posts");\nawait ctx.dropTable("posts");',
       options,
       errors: [{ messageId: "missingRebuild", data: { table: "posts" }, line: 1 }],
