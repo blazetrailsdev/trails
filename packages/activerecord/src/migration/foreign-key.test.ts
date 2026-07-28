@@ -2,7 +2,8 @@
  * Port of the `add_foreign_key`, `remove_foreign_key` and `SchemaDumpingHelper`
  * halves of `ActiveRecord::Migration::ForeignKeyTest`
  * (vendor/rails/activerecord/test/cases/migration/foreign_key_test.rb:209-330,
- * :393-451, :453-535, :536-619, :643-747 and :749-773) plus all of its sibling
+ * :336-391, :393-451, :453-535, :536-619, :621-747, :749-773 and :775-823) plus
+ * all of its sibling
  * `ActiveRecord::Migration::CompositeForeignKeyTest` (:824-912).
  *
  * Driven by the ambient connection, mirroring Rails'
@@ -15,6 +16,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { StatementInvalid } from "../errors.js";
 import type { ReferentialAction } from "../connection-adapters/abstract/schema-definitions.js";
 import { fixtures } from "../test-fixtures.js";
+import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import {
   ambientConnection,
   withCompositeRocketTables,
@@ -290,6 +292,87 @@ describeIfSupports("foreign_keys", "Migration", () => {
       });
     });
 
+    it("foreign key exists", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.addForeignKey("astronauts", "rockets");
+
+        expect(await conn.foreignKeyExists("astronauts", "rockets")).toBe(true);
+        expect(await conn.foreignKeyExists("astronauts", "stars")).toBe(false);
+      });
+    });
+
+    it("foreign key exists referencing table having keyword as name", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.createTable("user", { force: true });
+        await conn.addColumn("rockets", "user_id", "bigint");
+        try {
+          await conn.addForeignKey("rockets", "user");
+          expect(await conn.foreignKeyExists("rockets", "user")).toBe(true);
+        } finally {
+          await conn.removeForeignKey("rockets", "user");
+          await conn.dropTable("user");
+        }
+      });
+    });
+
+    it("foreign key exists by column", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.addForeignKey("astronauts", "rockets", { column: "rocket_id" });
+
+        expect(await conn.foreignKeyExists("astronauts", { column: "rocket_id" })).toBe(true);
+        expect(await conn.foreignKeyExists("astronauts", { column: "star_id" })).toBe(false);
+      });
+    });
+
+    it.skipIf(adapterType === "sqlite")("foreign key exists by name", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.addForeignKey("astronauts", "rockets", {
+          column: "rocket_id",
+          name: "fancy_named_fk",
+        });
+
+        expect(await conn.foreignKeyExists("astronauts", { name: "fancy_named_fk" })).toBe(true);
+        expect(await conn.foreignKeyExists("astronauts", { name: "other_fancy_named_fk" })).toBe(
+          false,
+        );
+      });
+    });
+
+    it("foreign key exists in change table", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.changeTable("astronauts", async (t) => {
+          await t.foreignKey("rockets", { column: "rocket_id", name: "fancy_named_fk" });
+
+          expect(await t.isForeignKeyExists({ column: "rocket_id" })).toBe(true);
+          expect(await t.isForeignKeyExists({ column: "star_id" })).toBe(false);
+
+          if (unlessSqlite3Adapter) {
+            expect(await t.isForeignKeyExists({ name: "fancy_named_fk" })).toBe(true);
+            expect(await t.isForeignKeyExists({ name: "other_fancy_named_fk" })).toBe(false);
+          }
+        });
+      });
+    });
+
+    itIfSupports("sql_standard_drop_constraint", "remove constraint", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.addForeignKey("astronauts", "rockets", {
+          column: "rocket_id",
+          name: "fancy_named_fk",
+        });
+
+        expect((await conn.foreignKeys("astronauts")).length).toBe(1);
+        await conn.removeConstraint("astronauts", "fancy_named_fk");
+        expect(await conn.foreignKeys("astronauts")).toEqual([]);
+      });
+    });
+
     it("remove foreign key inferes column", async () => {
       const conn = await ambientConnection();
       await withRocketTables(conn, async () => {
@@ -558,6 +641,84 @@ describeIfSupports("foreign_keys", "Migration", () => {
         expect(await conn.foreignKeys("astronauts")).toEqual([]);
 
         await conn.removeForeignKey("astronauts", "rockets", { ifExists: true });
+      });
+    });
+
+    it("does not create foreign keys when bypassed by config", async () => {
+      const connection = new BetterSQLite3Adapter(":memory:", { foreignKeys: false });
+
+      try {
+        await connection.createTable("rockets", { force: true }, (t) => {
+          t.string("name");
+        });
+        await connection.createTable("astronauts", { force: true }, (t) => {
+          t.string("name");
+          t.references("rocket");
+        });
+
+        await connection.addForeignKey("astronauts", "rockets");
+
+        const foreignKeys = await connection.foreignKeys("astronauts");
+        expect(foreignKeys.length).toBe(0);
+      } finally {
+        connection.disconnectBang();
+      }
+    });
+
+    it("add foreign key with if not exists not set", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.addForeignKey("astronauts", "rockets");
+        expect((await conn.foreignKeys("astronauts")).length).toBe(1);
+
+        if (adapterType === "sqlite") {
+          await conn.addForeignKey("astronauts", "rockets");
+          return;
+        }
+
+        const error = await conn.addForeignKey("astronauts", "rockets").then(
+          () => undefined,
+          (err: unknown) => err,
+        );
+        const message = (error as Error).message;
+
+        if (adapterType === "mysql") {
+          const mysqlConn = conn as unknown as {
+            isMariadb?: () => boolean;
+            databaseVersion: unknown;
+          };
+          if (mysqlConn.isMariadb?.() === true) {
+            expect(message).toMatch(/Duplicate key on write or update/);
+          } else if (String(mysqlConn.databaseVersion) < "8.0") {
+            expect(message).toMatch(/Can't write; duplicate key in table/);
+          } else {
+            expect(message).toMatch(/Duplicate foreign key constraint name/);
+          }
+        } else {
+          expect(message).toMatch(/for relation "astronauts" already exists/);
+        }
+      });
+    });
+
+    it("add foreign key with if not exists set", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.addForeignKey("astronauts", "rockets");
+        expect((await conn.foreignKeys("astronauts")).length).toBe(1);
+
+        await conn.addForeignKey("astronauts", "rockets", { ifNotExists: true });
+      });
+    });
+
+    it("add foreign key preserves existing column types", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        const columnFor = async (tableName: string, columnName: string) =>
+          (await conn.columns(tableName)).find((column) => column.name === columnName);
+
+        expect((await columnFor("astronauts", "rocket_id"))?.isBigint()).toBe(true);
+        await conn.addForeignKey("astronauts", "rockets");
+        expect((await columnFor("astronauts", "rocket_id"))?.isBigint()).toBe(true);
       });
     });
 

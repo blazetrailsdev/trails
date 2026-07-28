@@ -192,7 +192,12 @@ export class SchemaCreation {
 
   /** @internal */
   protected useForeignKeys(): boolean {
-    return true;
+    const host = this.adapter as unknown as {
+      supportsForeignKeys?: () => boolean;
+      _config?: { foreignKeys?: boolean };
+    };
+    const supports = host.supportsForeignKeys?.() ?? true;
+    return supports && host._config?.foreignKeys !== false;
   }
 
   /** @internal */
