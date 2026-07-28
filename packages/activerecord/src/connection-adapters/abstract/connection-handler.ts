@@ -10,8 +10,10 @@ import {
   DatabaseConfig,
   _setAdapterClassResolver,
 } from "../../database-configurations/database-config.js";
-import { HashConfig } from "../../database-configurations/hash-config.js";
-import { DatabaseConfigurations } from "../../database-configurations.js";
+import {
+  configurationsStore as configurations,
+  symbolConnectionName,
+} from "../../database-configurations.js";
 import { PoolConfig } from "../pool-config.js";
 import { PoolManager } from "../pool-manager.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
@@ -63,21 +65,23 @@ export class ConnectionHandler {
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionHandler#determine_owner_name
    *
+   * Returns undefined where Rails returns `owner_name`'s default, `Base`:
+   * trails has no Base-as-default-owner (Base is a model class here, and
+   * importing it would close a cycle), so establishConnection supplies the
+   * fallback descriptor instead.
+   *
    * @internal
    */
   determineOwnerName(
-    owner: string | ConnectionOwner,
-    // Rails' third branch is `elsif config.is_a?(Symbol)` — the bare-name
-    // shorthand `establish_connection :primary`. It is deliberately NOT ported:
-    // Ruby distinguishes that Symbol from a String config (a connection URL),
-    // which falls through to `owner_name` unchanged, and TS collapses both onto
-    // `string`. Porting it as `typeof config === "string"` would misread a URL
-    // as a connection name. The parameter stays so the signature matches Rails
-    // and the branch can land once a Symbol-shaped config exists to key on.
-    _config?: DatabaseConfig | Record<string, unknown>,
-  ): ConnectionDescriptor | ConnectionOwner {
+    owner: string | ConnectionOwner | undefined,
+    config?: DatabaseConfig | string | Record<string, unknown>,
+  ): ConnectionDescriptor | ConnectionOwner | undefined {
     if (typeof owner === "string") {
       return new ConnectionDescriptor(owner);
+    }
+    const symbolName = symbolConnectionName(config);
+    if (symbolName != null) {
+      return new ConnectionDescriptor(symbolName);
     }
     return owner;
   }
@@ -115,7 +119,7 @@ export class ConnectionHandler {
   }
 
   establishConnection(
-    config: DatabaseConfig | Record<string, unknown>,
+    config: DatabaseConfig | string | Record<string, unknown>,
     options: {
       owner?: string | ConnectionOwner;
       role?: string;
@@ -125,11 +129,10 @@ export class ConnectionHandler {
     } = {},
   ): ConnectionPool {
     const ownerName =
-      options.owner != null
-        ? this.determineOwnerName(options.owner, config)
-        : config instanceof DatabaseConfig
-          ? new ConnectionDescriptor(config.name)
-          : new ConnectionDescriptor(typeof options.owner === "string" ? options.owner : "primary");
+      this.determineOwnerName(options.owner, config) ??
+      (config instanceof DatabaseConfig
+        ? new ConnectionDescriptor(config.name)
+        : new ConnectionDescriptor("primary"));
 
     const role = options.role ?? "writing";
     const shard = options.shard ?? "default";
@@ -345,17 +348,16 @@ export class ConnectionHandler {
 
   /** @internal */
   private resolvePoolConfig(
-    config: DatabaseConfig | Record<string, unknown>,
+    config: DatabaseConfig | string | Record<string, unknown>,
     ownerName: ConnectionDescriptor | ConnectionOwner,
     role: string,
     shard: string,
     options?: { adapterFactory?: () => DatabaseAdapter },
   ): PoolConfig {
-    const connectionName = ownerName.name;
-    const dbConfig =
-      config instanceof DatabaseConfig
-        ? config
-        : new HashConfig(DatabaseConfigurations.defaultEnv, connectionName, config as any);
+    const dbConfig = configurations().resolve(config);
+    // Rails calls db_config.validate! here (connection_handler.rb:277). Ours is
+    // async (it awaits adapterClass()) and this path is sync, so the adapter
+    // guard below stands in until establishConnection can await.
     if (!dbConfig.adapter) {
       throw new AdapterNotSpecified("database configuration does not specify adapter");
     }

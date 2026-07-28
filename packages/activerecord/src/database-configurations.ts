@@ -36,6 +36,40 @@ type DbConfigHandler = (
   config: DatabaseConfigOptions,
 ) => DatabaseConfig | null | undefined;
 
+/**
+ * The stand-in for Ruby's `config.is_a?(Symbol)`: TS collapses Ruby's Symbol
+ * and String onto `string`, so a non-empty scheme-less string is the connection
+ * name Ruby spells as a Symbol; anything with a scheme — and `""`, which Ruby
+ * can only mean as a String — is a URL config.
+ *
+ * @internal
+ */
+export function symbolConnectionName(config: unknown): string | undefined {
+  if (typeof config !== "string" || config === "") return undefined;
+  return /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(config) ? undefined : config;
+}
+
+// Backing store for ActiveRecord::Base.configurations (core.ts). It lives here,
+// not in core.ts, so leaf modules can read it without importing core.ts.
+let _configurations: DatabaseConfigurations | undefined;
+
+/** @internal */
+export function configurationsStore(): DatabaseConfigurations {
+  // Memoized on first read so `Base.configurations` holds one object, as Rails'
+  // @@configurations attribute does: save/restore round-trips must be no-ops.
+  _configurations ??= DatabaseConfigurations.fromEnv({});
+  return _configurations;
+}
+
+/** @internal */
+export function setConfigurationsStore(configs: DatabaseConfigurations): void {
+  _configurations = configs;
+  // Rails has one @@configurations, so `primary?` always answers from whatever
+  // Base.configurations= last stored (core.rb:71-79). Assigning an existing
+  // instance must re-register it, not just the constructor/fromRaw paths.
+  _currentConfigurations = configs;
+}
+
 export class DatabaseConfigurations {
   private static _defaultEnv: string | null = null;
 
@@ -254,8 +288,7 @@ export class DatabaseConfigurations {
       // Mirrors Rails: resolve(symbol) → resolve_symbol_connection → find_db_config
       // Strings with a URI scheme (e.g. "postgres://", "sqlite3:") are treated as URLs.
       // Strings without a scheme are treated as env names (mirrors Ruby symbol lookup).
-      const hasScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(config);
-      if (!hasScheme) {
+      if (symbolConnectionName(config) != null) {
         return this.resolveSymbolConnection(config);
       }
       return new UrlConfig(DatabaseConfigurations.defaultEnv, "primary", config);
