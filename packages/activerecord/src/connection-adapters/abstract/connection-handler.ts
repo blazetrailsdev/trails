@@ -11,7 +11,7 @@ import {
   _setAdapterClassResolver,
 } from "../../database-configurations/database-config.js";
 import {
-  configurationsStore as baseConfigurations,
+  configurationsStore as configurations,
   symbolConnectionName,
 } from "../../database-configurations.js";
 import { PoolConfig } from "../pool-config.js";
@@ -354,7 +354,7 @@ export class ConnectionHandler {
     shard: string,
     options?: { adapterFactory?: () => DatabaseAdapter },
   ): PoolConfig {
-    const dbConfig = baseConfigurations().resolve(config);
+    const dbConfig = configurations().resolve(config);
     // Rails calls db_config.validate! here (connection_handler.rb:277). Ours is
     // async (it awaits adapterClass()) and this path is sync, so the adapter
     // guard below stands in until establishConnection can await.
