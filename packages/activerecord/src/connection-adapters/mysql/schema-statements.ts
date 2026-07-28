@@ -554,7 +554,7 @@ export function parseMysqlName(name: string): { schema?: string; table: string }
 interface ForeignKeysHost {
   schemaQuery(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]>;
   quote(value: unknown): string;
-  _mysqlFkAction(action: string): "cascade" | "nullify" | "restrict" | undefined;
+  extractForeignKeyAction(specifier: string): "cascade" | "nullify" | "restrict" | undefined;
 }
 
 /** @internal
@@ -601,8 +601,8 @@ export async function foreignKeys(
     const first = group[0];
     const toTable = unquoteIdentifier(first.to_table as string) as string;
     const fkName = first.name as string;
-    const onDelete = this._mysqlFkAction(first.on_delete as string);
-    const onUpdate = this._mysqlFkAction(first.on_update as string);
+    const onDelete = this.extractForeignKeyAction(first.on_delete as string);
+    const onUpdate = this.extractForeignKeyAction(first.on_update as string);
     const column =
       group.length === 1
         ? (unquoteIdentifier(first.column as string) as string)
