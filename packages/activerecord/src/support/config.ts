@@ -21,8 +21,11 @@
  *     `connections:` hash (`test/support/connection.rb:10,14-19`). Nothing
  *     else selects a backend — there is no "is this env var set?" sniffing.
  *   - **How to reach it** comes from the connection entry itself, over which
- *     Rails interpolates exactly three env vars: `MYSQL_HOST` / `MYSQL_PORT` /
- *     `MYSQL_SOCK` (`config.example.yml:12-20`). The postgresql entries carry
+ *     Rails interpolates exactly four env vars: `MYSQL_HOST` / `MYSQL_PORT` /
+ *     `MYSQL_SOCK` (`config.example.yml:12-20`) and
+ *     `MYSQL_PREPARED_STATEMENTS` (`config.example.yml:7-11,26-30`), the last
+ *     of which selects a value rather than supplying one — see
+ *     {@link mysqlPreparedStatements}. The postgresql entries carry
  *     no connection fields at all (`config.example.yml:74-81`), leaving libpq
  *     to resolve `PGHOST` / `PGPORT` / `PGUSER` / `PGPASSWORD` itself.
  *
@@ -192,8 +195,8 @@ export function postgresSettings(read: EnvReader = getEnv): ServerSettings {
 /**
  * MySQL/MariaDB connection details.
  *
- * Exactly the three keys Rails interpolates — `MYSQL_HOST` / `MYSQL_PORT` /
- * `MYSQL_SOCK` (`config.example.yml:12-20`) — over the hard-coded
+ * Exactly the three connection keys Rails interpolates — `MYSQL_HOST` /
+ * `MYSQL_PORT` / `MYSQL_SOCK` (`config.example.yml:12-20`) — over the hard-coded
  * `username: rails` (`config.example.yml:4,24`) and the `expand_config`
  * database. The credential is not env-driven because Rails' is not.
  */
@@ -205,6 +208,22 @@ export function mysqlSettings(read: EnvReader = getEnv): ServerSettings {
     database: applySlot(ARUNIT_DATABASE, read),
     socket: present(read, "MYSQL_SOCK"),
   };
+}
+
+/**
+ * The mysql2 `prepared_statements` value for the `arunit` / `arunit2` entries:
+ * `true` when `MYSQL_PREPARED_STATEMENTS` is set, `false` otherwise
+ * (`config.example.yml:7-11,26-30`).
+ *
+ * Presence, not truthiness, and deliberately not routed through the
+ * empty-string rejection the other sub-settings use: Rails tests the variable
+ * with a bare `if`, under which `""` and `"0"` are both truthy, so
+ * `MYSQL_PREPARED_STATEMENTS=` turns prepared statements ON there and must here
+ * too. `arunit_without_prepared_statements` is unaffected — that entry exists
+ * to be the one with them off (`config.rb:27-28`).
+ */
+export function mysqlPreparedStatements(read: EnvReader = getEnv): boolean {
+  return read("MYSQL_PREPARED_STATEMENTS") !== undefined;
 }
 
 /**

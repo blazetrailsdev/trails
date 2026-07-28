@@ -36,6 +36,7 @@ import {
   CONNECTION_LANES,
   DEFAULT_CONNECTION,
   driverConfig,
+  mysqlPreparedStatements,
   mysqlSettings,
   postgresSettings,
   type ConnectionName,
@@ -193,7 +194,9 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
     // `config.example.yml:3-40`: `arunit` and `arunit2` differ — unicode vs
     // general collation, and only `arunit` carries the `time_zone` variable.
     // Rails leaves `arunit_without_prepared_statements` out for mysql2, so
-    // `expandConfig` synthesizes it from the defaults alone.
+    // `expandConfig` synthesizes it from the defaults alone — and pins its
+    // `preparedStatements: false` regardless of `MYSQL_PREPARED_STATEMENTS`,
+    // which is the whole point of that entry (`config.rb:27-28`).
     //
     // `buildAdapterArg` forwards the whole hash to mysql2, which logs
     // "Ignoring invalid configuration option" for the keys it does not know
@@ -204,12 +207,13 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
     // `mysql-adapter-arg-whitelist`.
     build: async () => {
       const shared = serverHash("mysql2", mysqlSettings());
+      const preparedStatements = mysqlPreparedStatements();
       return {
         arunit: {
           ...shared,
           encoding: "utf8mb4",
           collation: "utf8mb4_unicode_ci",
-          preparedStatements: false,
+          preparedStatements,
           variables: { time_zone: "+00:00" },
         },
         arunit2: {
@@ -217,7 +221,7 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
           database: undefined,
           encoding: "utf8mb4",
           collation: "utf8mb4_general_ci",
-          preparedStatements: false,
+          preparedStatements,
         },
       };
     },
