@@ -429,7 +429,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
     expect(establishSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         adapter: "sqlite3",
-        database: path.resolve(DatabaseTasks.root, "dev.db"),
+        database: "dev.db",
       }),
     );
   });
@@ -500,7 +500,7 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
     expect(establishSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         adapter: "sqlite3",
-        database: path.resolve(DatabaseTasks.root, "dev_primary.db"),
+        database: "dev_primary.db",
       }),
     );
   });
@@ -558,7 +558,7 @@ describe("DatabaseTasksDropAllTest", () => {
       development: { adapter: "sqlite3", database: "dev.db", host: "127.0.0.1" },
     });
     await DatabaseTasks.dropAll();
-    expect(dropped).toContain(path.resolve(DatabaseTasks.root, "dev.db"));
+    expect(dropped).toContain("dev.db");
   });
 
   it("drops configurations with local host", async () => {
@@ -566,7 +566,7 @@ describe("DatabaseTasksDropAllTest", () => {
       development: { adapter: "sqlite3", database: "dev.db", host: "localhost" },
     });
     await DatabaseTasks.dropAll();
-    expect(dropped).toContain(path.resolve(DatabaseTasks.root, "dev.db"));
+    expect(dropped).toContain("dev.db");
   });
 
   it("drops configurations with blank hosts", async () => {
@@ -574,7 +574,7 @@ describe("DatabaseTasksDropAllTest", () => {
       development: { adapter: "sqlite3", database: "dev.db", host: "" },
     });
     await DatabaseTasks.dropAll();
-    expect(dropped).toContain(path.resolve(DatabaseTasks.root, "dev.db"));
+    expect(dropped).toContain("dev.db");
   });
 });
 
@@ -602,7 +602,7 @@ describe("DatabaseTasksDropCurrentTest", () => {
   it("drops current environment database", async () => {
     DatabaseTasks.env = "test";
     await DatabaseTasks.dropCurrent("test");
-    expect(dropped).toContain(`test:${path.resolve(DatabaseTasks.root, "test.db")}`);
+    expect(dropped).toContain("test:test.db");
   });
 
   it("drops current environment database with url", async () => {
@@ -1299,24 +1299,18 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
 });
 
 describe("DatabaseTasksWithTemporaryPoolTest", () => {
-  afterEach(() => {
-    try {
-      Base.removeConnection();
-    } catch {
-      /* no pool */
-    }
+  afterEach(async () => {
+    await Base.establishConnection(ambientPoolConfiguration());
   });
 
-  it("reuses the ambient pool for a relative sqlite path", async () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-temp-pool-"));
-    const previousRoot = DatabaseTasks.root;
-    DatabaseTasks.root = tmp;
-    const config = new HashConfig(DatabaseTasks.env, "primary", {
-      adapter: "sqlite3",
-      database: "relative.sqlite3",
-      pool: 1,
-    });
-    try {
+  it.skipIf(adapterType !== "sqlite")(
+    "reuses the ambient pool for a relative sqlite path",
+    async () => {
+      const config = new HashConfig(DatabaseTasks.env, "primary", {
+        adapter: "sqlite3",
+        database: "db/relative.sqlite3",
+        pool: 1,
+      });
       await Base.establishConnection(config);
       const ambientPool = Base.connectionPool();
       let temporaryPool: ConnectionPool | null = null;
@@ -1325,9 +1319,30 @@ describe("DatabaseTasksWithTemporaryPoolTest", () => {
       });
       expect(temporaryPool).toBe(ambientPool);
       expect(Base.connectionPool()).toBe(ambientPool);
-      expect(config.database).toBe(path.join(tmp, "relative.sqlite3"));
+      // The relative path survives: nothing may rewrite the registry config
+      // (Rails' with_temporary_pool does no path work — database_tasks.rb:542).
+      expect(config.database).toBe("db/relative.sqlite3");
+    },
+  );
+
+  it.skipIf(adapterType !== "sqlite")("createAll restores the original pool", async () => {
+    const config = new HashConfig(DatabaseTasks.env, "primary", {
+      adapter: "sqlite3",
+      database: "db/ambient.sqlite3",
+      pool: 1,
+    });
+    await Base.establishConnection(config);
+    const ambientPool = Base.connectionPool();
+    DatabaseTasks.registerTask("sqlite", { create: async () => {} });
+    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+      [DatabaseTasks.env]: { adapter: "sqlite3", database: "db/other.sqlite3" },
+    });
+    try {
+      await DatabaseTasks.createAll();
+      expect(Base.connectionPool()).toBe(ambientPool);
     } finally {
-      DatabaseTasks.root = previousRoot;
+      DatabaseTasks.clearRegisteredTasks();
+      DatabaseTasks.databaseConfiguration = null;
     }
   });
 });
