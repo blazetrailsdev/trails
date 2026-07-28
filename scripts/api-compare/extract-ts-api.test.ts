@@ -1527,6 +1527,78 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     ).toBe("JS-only lifecycle hook");
   });
 
+  it("records the reason on a synthesized __mixin constructor", () => {
+    const info = extractFromFiles("/p", {
+      "attributes.ts": `
+        export function Attributes(Base: new () => object) {
+          class M extends Base {
+            /** @noRailsEquivalent JS constructors take no Ruby-style block */
+            constructor() { super(); }
+          }
+          return M;
+        }
+      `,
+    });
+    const ctor = info.modules["attributes.ts:Attributes__mixin"].instanceMethods.find(
+      (m) => m.name === "constructor",
+    )!;
+    expect(ctor.noRailsEquivalent).toBe("JS constructors take no Ruby-style block");
+    expect(ctor.line).toBe(5);
+    expect(ctor.declaredIn).toBeUndefined();
+  });
+
+  it("leaves a synthesized __mixin constructor bare when the inner class declares none", () => {
+    const info = extractFromFiles("/p", {
+      "base.ts": `
+        export class Base {
+          /** @noRailsEquivalent JS-only wiring */
+          constructor() {}
+        }
+      `,
+      "attributes.ts": `
+        import { Base } from "./base.js";
+        export function Attributes(B: typeof Base) {
+          class M extends B {}
+          return M;
+        }
+      `,
+    });
+    const ctor = info.modules["attributes.ts:Attributes__mixin"].instanceMethods.find(
+      (m) => m.name === "constructor",
+    )!;
+    expect(ctor.noRailsEquivalent).toBeUndefined();
+    expect(ctor.internal).toBeUndefined();
+    expect(ctor.declaredIn).toBe("base.ts");
+    expect(ctor.line).toBe(4);
+  });
+
+  it("inherits a foreign base constructor's visibility onto the synthesized __mixin entry", () => {
+    const info = extractFromFiles("/p", {
+      "base.ts": `
+        export class Base {
+          readonly tag = "base";
+
+          protected constructor() {}
+        }
+      `,
+      "attributes.ts": `
+        import { Base } from "./base.js";
+        export function Attributes(B: typeof Base) {
+          class M extends B {}
+          return M;
+        }
+      `,
+    });
+    const ctor = info.modules["attributes.ts:Attributes__mixin"].instanceMethods.find(
+      (m) => m.name === "constructor",
+    )!;
+    expect(ctor.visibility).toBe("protected");
+    expect(ctor.internal).toBe(true);
+    expect(ctor.declaredIn).toBe("base.ts");
+    // Line 5 of base.ts, not line 3 — the factory's line in attributes.ts.
+    expect(ctor.line).toBe(5);
+  });
+
   it("records the reason on tagged namespace members", () => {
     const info = extractFromFiles("/p", {
       "locator.ts": `
@@ -1908,6 +1980,9 @@ const EMIT_SITE_FIXTURE: Record<string, string> = {
 
     export function Attributes(Base: typeof MixinBase) {
       class M extends Base {
+        /** @noRailsEquivalent mixin constructor */
+        constructor(...args: any[]) { super(...args); }
+
         /** @noRailsEquivalent mixin own member */
         ownMember(): void {}
       }
@@ -1960,14 +2035,12 @@ function emitInventory(info: PackageInfo, file: string): EmitEntry[] {
 
 /**
  * The pinned inventory. Every entry has a tagged declaration behind it and so
- * expects `hasReason: true`, except four:
+ * expects `hasReason: true`, except three:
  *
  * - `<fileFunctions>#Attributes` — the mixin factory, left untagged so an
  *   untagged counted site is represented too.
  * - `<fileFunctions>#aliasTarget` / `#shorthandRef` — `extractFileLocalHelpers`
  *   output, always `internal: true`, so uncounted and never metadata-bearing.
- * - `Attributes__mixin#constructor` — synthesized from the factory's construct
- *   signature; counted, but there is no member declaration to read a tag off.
  * - `<fileFunctions>#renamedExport` — an untagged `export { x as y }` alias
  *   drops the declaration's reason: the reason justifies the declared
  *   spelling, not the alias. `#taggedAlias` is the tagged form.
@@ -1984,7 +2057,7 @@ const EMIT_SITE_INVENTORY: EmitEntry[] = [
     container: "emit-sites.ts:Attributes__mixin",
     name: "constructor",
     counted: true,
-    hasReason: false,
+    hasReason: true,
   },
   {
     container: "emit-sites.ts:Attributes__mixin",
