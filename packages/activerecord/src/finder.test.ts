@@ -13,7 +13,7 @@ import {
 } from "./index.js";
 import { sql as arelSql } from "@blazetrails/arel";
 
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { postFixtureData } from "./test-helpers/fixtures/posts.js";
 import { Account } from "./test-helpers/models/account.js";
 import { Client } from "./test-helpers/models/company.js";

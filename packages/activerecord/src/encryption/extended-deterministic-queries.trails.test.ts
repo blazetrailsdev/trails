@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { ExtendedDeterministicQueries, AdditionalValue } from "./extended-deterministic-queries.js";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";

@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Nodes } from "@blazetrails/arel";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Post } from "../test-helpers/models/post.js";
 import { Topic } from "../test-helpers/models/topic.js";

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Author } from "../test-helpers/models/author.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 // Rails' Class.new(Base) { self.table_name = "authors" } generates
 // name_changed? via attribute_method_suffix. Schema-reflected attributes

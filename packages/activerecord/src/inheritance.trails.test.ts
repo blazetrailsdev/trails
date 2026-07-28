@@ -3,7 +3,7 @@
  * `Base._instantiate`. See inheritance.test.ts for the Rails-mirrored suite.
  */
 import { describe, it, expect } from "vitest";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { Client } from "./test-helpers/models/company.js";
 
 describe("_instantiate STI dispatch", () => {

@@ -7,7 +7,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "./base.js";
 import { adapterType } from "./test-adapter.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { MigrationContext } from "./migration.js";
 import {
   introspectTables,

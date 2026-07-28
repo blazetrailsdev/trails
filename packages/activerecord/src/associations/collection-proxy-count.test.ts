@@ -22,7 +22,7 @@ import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, association, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 describe("CollectionProxy#count — non-through fast path", () => {
   // Ride the boot-laid canonical `authors` / `posts` / `comments` on

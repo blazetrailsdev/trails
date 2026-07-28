@@ -5,7 +5,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base } from "./base.js";
 import { rebuildCanonicalTables } from "./support/canonical-schema.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
 describe("DateTest", () => {

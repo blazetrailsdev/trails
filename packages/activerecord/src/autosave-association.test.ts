@@ -49,7 +49,7 @@ import {
   computePrimaryKey,
   addAutosaveAssociationCallbacks,
 } from "./autosave-association.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 
 function cacheAssoc(record: Base, name: string, value: unknown) {

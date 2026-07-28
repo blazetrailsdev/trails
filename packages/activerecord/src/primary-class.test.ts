@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { Base } from "./base.js";
 import { __resetPrimaryAbstractClass } from "./inheritance.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 class PrimaryAppRecord extends Base {}
 PrimaryAppRecord.abstractClass = true;

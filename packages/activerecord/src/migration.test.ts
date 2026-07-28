@@ -15,7 +15,7 @@ import { assertQueriesCount } from "./testing/query-assertions.js";
 import { quoteDefaultExpression } from "./connection-adapters/abstract/quoting.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Migration } from "./migration.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { rebuildCanonicalTables } from "./support/canonical-schema.js";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { SchemaCreation as PgSchemaCreation } from "./connection-adapters/postgresql/schema-creation.js";

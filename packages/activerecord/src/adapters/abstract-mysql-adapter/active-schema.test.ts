@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { captureSql } from "../../testing/sql-capture.js";
-import { fixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-fixtures.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;

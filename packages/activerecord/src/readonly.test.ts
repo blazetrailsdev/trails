@@ -17,7 +17,7 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { registerModel } from "./associations.js";
 
 import { Developer } from "./test-helpers/models/developer.js";

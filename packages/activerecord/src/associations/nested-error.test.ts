@@ -15,7 +15,7 @@ import {
   setIndexNestedAttributeErrors,
 } from "../index.js";
 import { NestedError } from "./nested-error.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { Guitar } from "../test-helpers/models/guitar.js";
 import { TuningPeg } from "../test-helpers/models/tuning-peg.js";

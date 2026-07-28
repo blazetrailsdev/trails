@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { readdir, readFile } from "node:fs/promises";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { findTarget } from "./has-many-association.js";
 import { Preloader } from "./preloader.js";
 import { AssociationTargetReplacedDuringLoad } from "../errors.js";

@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel, registerSubclass } from "../index.js";
 import { Company, Firm, Client } from "../test-helpers/models/company.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 type Rec = Record<string, unknown>;
 

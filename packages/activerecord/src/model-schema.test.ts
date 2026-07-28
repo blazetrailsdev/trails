@@ -6,7 +6,7 @@ import { describe, it, expect, vi } from "vitest";
 import { Base } from "./index.js";
 import { reconcileVirtualAttributes } from "./model-schema.js";
 
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { assertNoQueriesMatch } from "./testing/query-assertions.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");

@@ -22,7 +22,7 @@ import {
 import { describeIfPg } from "./adapters/postgresql/test-helper.js";
 import { describeIfSqlite } from "./adapters/sqlite3/test-helper.js";
 import { describeIfSupports, itIfSupports } from "./support/supports.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { Entrant } from "./test-helpers/models/entrant.js";
 
 // Ride the boot-laid `Base.connection` (single-pool test model) rather than a

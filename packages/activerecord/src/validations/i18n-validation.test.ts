@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Error as ActiveModelError, I18n } from "@blazetrails/activemodel";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { seedAssociationCache } from "../support/seed-association-cache.js";
 
 fixtures([]);

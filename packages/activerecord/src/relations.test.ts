@@ -11,7 +11,7 @@ import {
 } from "./index.js";
 import { assertQueriesCount } from "./testing/query-assertions.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { adapterType } from "./test-adapter.js";
 import { sql as arelSql } from "@blazetrails/arel";
 import { captureSql } from "./testing/sql-capture.js";

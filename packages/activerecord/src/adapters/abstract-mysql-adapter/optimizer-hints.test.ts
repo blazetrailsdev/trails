@@ -6,7 +6,7 @@ import { describeIfMysql, Mysql2Adapter } from "./test-helper.js";
 import { describeIfSupports } from "../../support/supports.js";
 import { captureSql } from "../../testing/sql-capture.js";
 import { Base } from "../../index.js";
-import { fixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-fixtures.js";
 import { Post } from "../../test-helpers/models/post.js";
 
 // Rails wraps the whole OptimizerHintsTest body in `if supports_optimizer_hints?`

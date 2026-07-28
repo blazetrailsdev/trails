@@ -6,7 +6,7 @@ import {
   restoreEncryptionConfig,
 } from "./test-helpers.js";
 import { Configurable } from "./configurable.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import {
   EncryptedBookWithSerializedFirstBinary,
   EncryptedBookWithSerializedSecondBinary,

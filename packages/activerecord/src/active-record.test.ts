@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Base, disconnectAllBang } from "./index.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 
 describe("ActiveRecordTest", () => {

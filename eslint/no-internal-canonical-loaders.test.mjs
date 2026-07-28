@@ -17,7 +17,7 @@ tester.run("no-internal-canonical-loaders", rule, {
     // The sanctioned surface — fixtures({}) — is never flagged.
     {
       filename: FILENAME,
-      code: 'import { fixtures } from "./test-helpers/fixtures.js";',
+      code: 'import { fixtures } from "./test-fixtures.js";',
     },
     // rebuildCanonicalTables is the documented anti-contamination shield — allowed.
     {

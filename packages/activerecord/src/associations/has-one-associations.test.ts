@@ -62,7 +62,7 @@ import {
   CpkNonCpkBook,
 } from "../test-helpers/models/cpk.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import {
   assertQueriesCount,
   assertNoQueries,

@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel, registerSubclass } from "../index.js";
 import { Associations } from "../associations.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 import { JoinAssociation } from "./join-dependency/join-association.js";
 import { Nodes } from "@blazetrails/arel";

@@ -13,7 +13,7 @@ import {
 } from "./delegation.js";
 import { NotImplementedError } from "../errors.js";
 import { CollectionProxy } from "../associations/collection-proxy.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Project } from "../test-helpers/models/project.js";

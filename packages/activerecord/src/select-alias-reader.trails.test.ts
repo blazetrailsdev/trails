@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { Comment } from "./test-helpers/models/comment.js";
 
 // trails-specific: Rails exposes a `SELECT ... AS post_count` alias on a loaded

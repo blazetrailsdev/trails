@@ -24,7 +24,7 @@ import {
   resolveAliasedColumn,
   create,
 } from "./reflection.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 fixtures({});
 

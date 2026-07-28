@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 import type { JoinDependency } from "./associations/join-dependency.js";
 import { lookupCastTypeFromJoinDependencies, typeFor } from "./relation/calculations.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 // Opt into the canonical-model autoload index so the `topics` association target
 // (`Topic`) resolves by name on first reference — no manual `registerModel`.
 import "./support/canonical-model-index.js";

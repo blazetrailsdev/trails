@@ -7,7 +7,7 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Developer } from "./test-helpers/models/developer.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 describe("timestamp alias resolution", () => {
   fixtures(["developers"]);

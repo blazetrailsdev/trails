@@ -16,7 +16,7 @@ import { describe, it, expect } from "vitest";
 import "../index.js";
 import { registerModel } from "../index.js";
 import { captureSql } from "../testing/sql-capture.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { adapterType } from "../test-adapter.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Topic } from "../test-helpers/models/topic.js";

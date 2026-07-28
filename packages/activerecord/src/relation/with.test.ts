@@ -6,7 +6,7 @@
 import { describe, it, expect } from "vitest";
 import { sql as arelSql } from "@blazetrails/arel";
 import "../index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Company } from "../test-helpers/models/company.js";

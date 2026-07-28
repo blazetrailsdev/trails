@@ -5,7 +5,7 @@ import { it, expect } from "vitest";
 import "../../index.js";
 import { describeIfSqlite } from "./test-helper.js";
 import { Base } from "../../base.js";
-import { fixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-fixtures.js";
 
 // Rails calls the private `copy_table` with `{ temporary: true }.merge(options)`.
 function copyTable(conn: any, from: string, to: string, options: Record<string, unknown> = {}) {

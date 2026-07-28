@@ -25,7 +25,7 @@ import { Comment } from "./test-helpers/models/comment.js";
 import { Tag } from "./test-helpers/models/tag.js";
 import { Tagging } from "./test-helpers/models/tagging.js";
 
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import "./associations/collection-proxy.js";
 import "./association-relation.js";
 

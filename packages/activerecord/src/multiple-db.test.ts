@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import "./index.js";
 import { Base } from "./base.js";
 import { StatementInvalid } from "./errors.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { withSecondPool } from "./support/setup-second-pool.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 import { Course } from "./test-helpers/models/course.js";

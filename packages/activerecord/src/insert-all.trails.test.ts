@@ -3,7 +3,7 @@
  * vendor/rails/activerecord/test/cases/insert_all_test.rb.
  */
 import { describe, it, expect } from "vitest";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import "./support/canonical-model-index.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import type { Base } from "./base.js";

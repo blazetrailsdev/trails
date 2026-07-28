@@ -6,7 +6,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { adapterType } from "./test-adapter.js";
 import { Base } from "./base.js";
 import { rebuildCanonicalTables } from "./support/canonical-schema.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { Person } from "./test-helpers/models/person.js";
 import { assertQueriesMatch } from "./testing/query-assertions.js";
 

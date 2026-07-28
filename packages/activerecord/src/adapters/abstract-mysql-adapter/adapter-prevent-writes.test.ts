@@ -5,7 +5,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { describeIfMysql, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../index.js";
 import { ReadOnlyError, QueryCanceled } from "../../errors.js";
-import { fixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-fixtures.js";
 
 describeIfMysql("Mysql2Adapter", () => {
   fixtures([]);

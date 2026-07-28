@@ -20,7 +20,7 @@ import {
   EagerLoadPolymorphicError,
 } from "./errors.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Author, AuthorAddress, AuthorFavorite } from "../test-helpers/models/author.js";
 import {
   Post,

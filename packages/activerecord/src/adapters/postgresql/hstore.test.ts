@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
-import { fixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-fixtures.js";
 import { Base, serialize, Migration } from "../../index.js";
 import { stringify as yamlStringify, parse as yamlParse } from "@blazetrails/activesupport/yaml";
 

@@ -21,7 +21,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Preloader } from "./preloader.js";
 import { ThroughAssociation } from "./preloader/through-association.js";
 import { CpkOrder, CpkOrderTag, CpkTag } from "../test-helpers/models/cpk.js";

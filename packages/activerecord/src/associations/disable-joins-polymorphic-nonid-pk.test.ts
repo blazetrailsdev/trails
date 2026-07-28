@@ -30,7 +30,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel, TableDefinition } from "../index.js";
 import { Associations } from "../associations.js";
 import { findTarget } from "./has-many-association.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
   fixtures([]);

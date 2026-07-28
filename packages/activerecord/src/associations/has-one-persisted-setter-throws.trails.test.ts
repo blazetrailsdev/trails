@@ -18,7 +18,7 @@ import { Account } from "../test-helpers/models/account.js";
 import { Member } from "../test-helpers/models/member.js";
 import { Membership } from "../test-helpers/models/membership.js";
 import { Club } from "../test-helpers/models/club.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 interface HasOneOwner {
   account?: unknown;

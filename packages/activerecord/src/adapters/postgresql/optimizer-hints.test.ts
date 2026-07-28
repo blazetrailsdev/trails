@@ -7,7 +7,7 @@ import { describeIfSupports } from "../../support/supports.js";
 import { assertQueriesMatch } from "../../testing/query-assertions.js";
 import { captureSql } from "../../testing/sql-capture.js";
 import { Base } from "../../index.js";
-import { fixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-fixtures.js";
 import { Post } from "../../test-helpers/models/post.js";
 
 // Rails wraps the whole PostgresqlOptimizerHintsTest body in

@@ -13,7 +13,7 @@ import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, beforeAll, afterAll, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { MigrationContext } from "../migration.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 describe("EagerSingularizationTest", () => {
   fixtures([]);

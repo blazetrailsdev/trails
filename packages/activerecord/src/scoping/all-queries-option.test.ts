@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import "../index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { DeveloperwithDefaultMentorScopeNot } from "../test-helpers/models/developer.js";
 
 // `Base.all(all_queries:)` threads the flag into build_default_scope (mirrors

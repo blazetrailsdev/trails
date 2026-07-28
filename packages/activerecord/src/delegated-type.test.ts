@@ -7,7 +7,7 @@ import { registerModel } from "./index.js";
 import { adapterType } from "./test-adapter.js";
 import { StringInquirer, travel, travelBack } from "@blazetrails/activesupport";
 import { rebuildCanonicalTables } from "./support/canonical-schema.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { Base } from "./base.js";
 import { delegatedType } from "./index.js";
 // Canonical models — mirror Rails' `require "models/{account,entry,message,recipient,comment}"`.

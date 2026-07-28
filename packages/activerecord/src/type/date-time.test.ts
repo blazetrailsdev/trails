@@ -2,7 +2,7 @@ import { describe, it, expect, afterAll, vi } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { DateTime } from "./date-time.js";
 import { Base } from "../index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 fixtures([]);

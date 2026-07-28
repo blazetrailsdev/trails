@@ -11,7 +11,7 @@ import type { MockInstance } from "vitest";
 import { Base } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 describe("SchemaMigration#assumeMigratedUptoVersion (trails)", () => {
   fixtures([], { useTransactionalTests: false });

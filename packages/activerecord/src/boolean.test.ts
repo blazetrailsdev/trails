@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { Topic } from "./test-helpers/models/topic.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 const { topics } = fixtures({
   topics: [

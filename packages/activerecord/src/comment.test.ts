@@ -7,7 +7,7 @@ import { Base } from "./index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { MigrationContext } from "./migration.js";
 import { adapterType } from "./test-adapter.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { itIfSupports } from "./support/supports.js";
 import { SchemaDumper } from "./schema-dumper.js";
 

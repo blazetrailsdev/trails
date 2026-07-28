@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
-import { fixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
 import { sql as arelSql } from "@blazetrails/arel";
 import type { TableDefinition as PgTableDefinition } from "../../connection-adapters/postgresql/schema-definitions.js";

@@ -6,7 +6,7 @@
 // passed through unchanged.
 import { describe, it, expect } from "vitest";
 import { registerModel } from "./index.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { Base } from "./base.js";
 import { Task } from "./test-helpers/models/task.js";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";

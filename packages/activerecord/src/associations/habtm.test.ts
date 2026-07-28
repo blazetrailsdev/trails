@@ -9,7 +9,7 @@
 import { describe, it, expect } from "vitest";
 import "../index.js";
 import { association } from "../associations.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 // Opt into the canonical-model autoload index so the `Developer`/`Project`
 // association targets resolve by name on first reference — no manual
 // `registerModel`.

@@ -7,7 +7,7 @@ import { Substitute } from "../statement-cache.js";
 import { Range } from "../connection-adapters/postgresql/oid/range.js";
 import { TableMetadata } from "../table-metadata.js";
 import { Base, registerModel, modelRegistry } from "../index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Reply } from "../test-helpers/models/reply.js";
 import { Author } from "../test-helpers/models/author.js";

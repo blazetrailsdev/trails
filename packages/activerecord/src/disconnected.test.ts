@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./index.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { adapterType } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 

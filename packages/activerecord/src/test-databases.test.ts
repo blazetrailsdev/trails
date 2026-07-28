@@ -4,7 +4,7 @@ import type { MigrationProxy } from "./migration.js";
 import { Base } from "./index.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { SchemaMigration } from "./schema-migration.js";
 
 // Build a (minimal) DatabaseConfigurations whose `configsFor` returns the

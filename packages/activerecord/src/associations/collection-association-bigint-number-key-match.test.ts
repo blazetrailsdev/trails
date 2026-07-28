@@ -15,7 +15,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import "../support/canonical-model-index.js";
 import { Firm } from "../test-helpers/models/company.js";
 

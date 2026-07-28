@@ -12,7 +12,7 @@ import { registerModel } from "../index.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Developer, AuditLog } from "../test-helpers/models/developer.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 interface AssociationLike {
   isFindFromTarget(): boolean;

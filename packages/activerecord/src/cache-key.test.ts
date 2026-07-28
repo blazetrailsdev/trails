@@ -5,7 +5,7 @@ import { MissingAttributeError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
 import { adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { setDefaultTimezone } from "./type/internal/timezone.js";
 
 // Mirrors Time#to_fs(:usec) → "YYYYMMDDHHMMSSuuuuuu" (20 chars).

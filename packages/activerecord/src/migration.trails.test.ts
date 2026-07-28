@@ -17,7 +17,7 @@ import { SchemaMigration } from "./schema-migration.js";
 import { newRawTestAdapter } from "./test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 describe("MigrationTest", () => {
   // Ride the primary schema-loaded pool (`Base.connection`); `newRawTestAdapter`

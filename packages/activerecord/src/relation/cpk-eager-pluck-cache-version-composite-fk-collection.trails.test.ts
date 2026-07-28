@@ -25,7 +25,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
 import { registerModel } from "../associations.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "../test-helpers/models/cpk.js";
 import { JoinDependency } from "../associations/join-dependency.js";
 import { Nodes } from "@blazetrails/arel";

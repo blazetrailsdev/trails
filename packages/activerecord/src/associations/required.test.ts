@@ -6,7 +6,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { MigrationContext } from "../migration.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { rebuildCanonicalTables } from "../support/canonical-schema.js";
 
 describe("RequiredAssociationsTest", () => {

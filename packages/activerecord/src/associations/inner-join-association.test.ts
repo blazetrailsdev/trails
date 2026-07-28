@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel, registerSubclass } from "../index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Table, Nodes } from "@blazetrails/arel";
 import { captureSql } from "../testing/sql-capture.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";

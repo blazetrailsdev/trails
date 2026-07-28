@@ -5,7 +5,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Base, UnknownAttributeReference, registerModel } from "./index.js";
 import { sql as arelSql } from "@blazetrails/arel";
 import { adapterType } from "./test-adapter.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { rebuildCanonicalTables } from "./support/canonical-schema.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Comment } from "./test-helpers/models/comment.js";

@@ -5,7 +5,7 @@ import { it, expect, beforeEach, afterEach } from "vitest";
 import "../../index.js";
 import { describeIfSqlite } from "./test-helper.js";
 import { Base } from "../../base.js";
-import { fixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-fixtures.js";
 import type { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 

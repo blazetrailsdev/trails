@@ -17,7 +17,7 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base } from "./index.js";
 
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 

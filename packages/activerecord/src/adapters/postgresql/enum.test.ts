@@ -6,7 +6,7 @@ import { describeIfPg, PostgreSQLAdapter, pgServerVersion } from "./test-helper.
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
 import { Base, Schema } from "../../index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { fixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-fixtures.js";
 
 // Rails: class PostgresqlEnum < ActiveRecord::Base
 //   enum :current_mood, { sad: "sad", okay: "ok", happy: "happy", aliased_field: "happy" }, prefix: true

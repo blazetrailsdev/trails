@@ -3,7 +3,7 @@ import { StringType } from "@blazetrails/activemodel";
 import { Table } from "@blazetrails/arel";
 import { Base } from "./index.js";
 import { TableMetadata } from "./table-metadata.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 class AuditLog extends Base {
   static override _tableName = "audit_logs";

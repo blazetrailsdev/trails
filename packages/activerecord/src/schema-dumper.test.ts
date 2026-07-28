@@ -6,7 +6,7 @@ import type { SchemaSource } from "./schema-dumper.js";
 import { adapterType } from "./test-adapter.js";
 import type { TestDatabaseAdapter } from "./test-adapter.js";
 import { itIfSupports, adapterSupports } from "./support/supports.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { rebuildCanonicalTables } from "./support/canonical-schema.js";
 import {
   dumpAllTableSchema,

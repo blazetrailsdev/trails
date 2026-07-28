@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { StringType } from "@blazetrails/activemodel";
 import { Connection } from "./connection.js";
 import { AttributedDeveloper, DeveloperName } from "../test-helpers/models/developer.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 describe("ConnectionTest", () => {
   fixtures(["developers"]);

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { BinaryData } from "@blazetrails/activemodel";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { Binary } from "./test-helpers/models/binary.js";
 import { Base } from "./base.js";
 

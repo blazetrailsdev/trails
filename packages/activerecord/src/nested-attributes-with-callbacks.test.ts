@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel, acceptsNestedAttributesFor } from "./index.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 // Shared callback sink — Rails uses a class variable `@@add_callback_called`
 // captured by the `before_add` procs declared on the associations below.

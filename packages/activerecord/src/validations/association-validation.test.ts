@@ -19,7 +19,7 @@ import { association } from "../associations.js";
 // (`Human`/`Interest`) resolve by name on first reference — no manual
 // `registerModel`.
 import "../support/canonical-model-index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { repairValidations } from "../cases/validations-repair-helper.js";
 import { seedAssociationCache } from "../support/seed-association-cache.js";
 import { Topic } from "../test-helpers/models/topic.js";

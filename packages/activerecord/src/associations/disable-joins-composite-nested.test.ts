@@ -33,7 +33,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import { Base, MigrationContext, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { findTarget } from "./has-many-association.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 function migrationCtx() {
   return new MigrationContext(Base.connection);

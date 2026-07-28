@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readFile } from "fs/promises";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { Binary } from "./test-helpers/models/binary.js";
 
 describe("BinaryTest", () => {

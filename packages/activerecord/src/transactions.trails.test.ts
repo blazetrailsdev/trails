@@ -12,7 +12,7 @@ import { describe, it, expect, afterEach, afterAll, vi } from "vitest";
 import { throwAbort } from "@blazetrails/activesupport";
 import { Base, transaction } from "./index.js";
 import { NullTransaction } from "./connection-adapters/abstract/transaction.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { WrongReply } from "./test-helpers/models/reply.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";

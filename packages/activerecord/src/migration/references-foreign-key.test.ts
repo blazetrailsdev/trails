@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { describeIfSupports, itIfSupports } from "../support/supports.js";
 import { assertQueriesCount } from "../testing/query-assertions.js";

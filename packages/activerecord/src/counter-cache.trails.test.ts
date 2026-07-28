@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, registerModel } from "./index.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { Post as CanonicalPost } from "./test-helpers/models/post.js";
 import { Comment as CanonicalComment } from "./test-helpers/models/comment.js";
 

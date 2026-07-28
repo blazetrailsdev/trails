@@ -5,7 +5,7 @@
 import { describe, it, expect } from "vitest";
 import { sql as arelSql } from "@blazetrails/arel";
 import { Base, Range, UnknownAttributeReference } from "./index.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 fixtures({});
 

@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { travel, travelBack } from "@blazetrails/activesupport";
 import { Base, MigrationContext, registerModel } from "./index.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import {
   Developer,
   DeveloperCalledJamis,

@@ -8,7 +8,7 @@ import { Nodes } from "@blazetrails/arel";
 import { sql as arelSql } from "@blazetrails/arel";
 
 import { registerModel, Range } from "../index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { itIfSupports } from "../support/supports.js";
 import { assertQueriesCount, assertQueriesMatch } from "../testing/query-assertions.js";
 import { quoteTableName, escapeRegExp } from "../support/quote-regex.js";

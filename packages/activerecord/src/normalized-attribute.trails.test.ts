@@ -15,7 +15,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { Company } from "./test-helpers/models/company.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 class NormalizedCompany extends Company {}
 class OtherCompany extends Company {}

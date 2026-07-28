@@ -1,7 +1,7 @@
 // activerecord/test/cases/encryption/encrypted_fixtures_test.rb
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import "../relation.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
   let restoreEncryption: (() => void) | undefined;

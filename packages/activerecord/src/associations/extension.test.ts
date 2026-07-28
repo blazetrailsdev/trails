@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 import { Base, CollectionProxy, association, registerModel } from "../index.js";
 import { HasMany } from "./builder/has-many.js";
 
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment, OopsError } from "../test-helpers/models/comment.js";
 import { Developer } from "../test-helpers/models/developer.js";

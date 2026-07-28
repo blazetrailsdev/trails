@@ -11,7 +11,7 @@ import { CpkBook } from "./test-helpers/models/cpk.js";
 import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
 import { travel, travelBack } from "@blazetrails/activesupport";
 import { generatesTokenFor, setTokenForSecret } from "./token-for.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 // Zeitwerk analog: Cpk::Book's counter-cached/association targets (Cpk::Order)
 // are resolved by name, as Rails resolves them from the autoloaded models tree.
 import "./support/canonical-model-index.js";

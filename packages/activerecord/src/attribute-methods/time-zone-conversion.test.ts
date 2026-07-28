@@ -8,7 +8,7 @@ import { typeRegistry, Types } from "@blazetrails/activemodel";
 import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base } from "../index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { loadSchemaFromAdapter } from "../model-schema.js";
 import { TimeZoneConverter } from "./time-zone-conversion.js";
 

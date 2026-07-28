@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import { Base } from "./base.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 describe("SchemaDumper trails-only cases", () => {

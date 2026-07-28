@@ -15,7 +15,7 @@ import {
   RecordNotFound,
   CollectionPersistedAssignmentError,
 } from "../index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 // Opt this file into the canonical-model autoload index (Zeitwerk analog):
 // `Comment`, `Tagging`, `Tag`, and `Owner` — association targets with no
 // fixture set of their own — resolve by name on first reference instead of

@@ -9,7 +9,7 @@
  */
 import { describe, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { fixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
 import { Professor } from "../../test-helpers/models/professor.js";
 import { ARUnit2Model } from "../../test-helpers/models/arunit2-model.js";

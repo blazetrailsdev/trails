@@ -2,7 +2,7 @@ import { describe, it, expect, afterAll, afterEach, vi } from "vitest";
 import { Base } from "../index.js";
 import { I18n } from "@blazetrails/activemodel";
 import { RecordInvalid } from "../validations.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 fixtures({});

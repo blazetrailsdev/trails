@@ -27,7 +27,7 @@ import {
   SelectedMembership,
   TenantMembership,
 } from "../test-helpers/models/membership.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 registerModel(Member);
 registerModel(Organization);

@@ -3,7 +3,7 @@ import { StringType } from "@blazetrails/activemodel";
 import { classify, underscore } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import * as Type from "./type.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import {
   stiName,
   isDescendsFromActiveRecord,

@@ -10,7 +10,7 @@ import type { MigrationProxy } from "./migration.js";
 import { Base } from "./base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { SchemaMigration } from "./schema-migration.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 // MIGRATIONS_ROOT — Rails reads fixture migration directories from disk; the
 // trails equivalents live under test-helpers/migrations.

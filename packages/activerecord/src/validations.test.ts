@@ -13,7 +13,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { DecimalType } from "@blazetrails/activemodel";
 import { Base, RecordInvalid } from "./index.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 // Opt into the canonical-model autoload index so association targets resolve by
 // name on first reference — no manual `registerModel`.
 import "./support/canonical-model-index.js";

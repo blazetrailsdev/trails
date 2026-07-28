@@ -6,7 +6,7 @@ import { describeIfSqlite } from "./test-helper.js";
 import { Base } from "../../index.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { FixtureSet } from "../../fixtures.js";
-import { fixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-fixtures.js";
 import { virtualColumnFixtureData } from "../../test-helpers/fixtures/virtual-columns.js";
 import { itIfSupports } from "../../support/supports.js";
 import type { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";

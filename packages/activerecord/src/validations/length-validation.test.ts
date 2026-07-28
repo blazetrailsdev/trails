@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import "../index.js";
 import { registerModel, association } from "../associations.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Owner } from "../test-helpers/models/owner.js";
 import { Pet } from "../test-helpers/models/pet.js";
 

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Base, TransactionIsolationError } from "./index.js";
 import { adapterType, ambientPoolConfiguration } from "./test-adapter.js";
 import { adapterSupports } from "./support/supports.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { transactionIsolationLevels } from "./connection-adapters/abstract/database-statements.js";
 
 // Runs when the adapter does NOT support transaction isolation (or is SQLite3).

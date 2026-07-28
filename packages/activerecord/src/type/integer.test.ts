@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { IntegerType } from "@blazetrails/activemodel";
 import { Base } from "../index.js";
 import { Firm } from "../test-helpers/models/company.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 fixtures({});
 

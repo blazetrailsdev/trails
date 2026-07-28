@@ -16,7 +16,7 @@ import { BigDecimal } from "@blazetrails/activesupport";
 
 import { registerModel } from "./associations.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { inTimeZone } from "./cases/helper.js";
 import { adapterType } from "./test-adapter.js";
 

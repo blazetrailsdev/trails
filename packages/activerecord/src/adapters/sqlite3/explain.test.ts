@@ -4,7 +4,7 @@
 import { it, expect } from "vitest";
 import "../../index.js";
 import { describeIfSqlite } from "./test-helper.js";
-import { fixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-fixtures.js";
 import { Author } from "../../test-helpers/models/author.js";
 // Opt into the canonical-model autoload index so `Author.has_many :posts`
 // resolves `Post` by name on first reference.

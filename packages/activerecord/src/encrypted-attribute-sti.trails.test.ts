@@ -19,7 +19,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Company } from "./test-helpers/models/company.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
 import {
   configureEncryption,

@@ -3,7 +3,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { describeIfSqlite } from "./test-helper.js";
-import { fixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-fixtures.js";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Post } from "../../test-helpers/models/post.js";
 

@@ -14,7 +14,7 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../associations.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { CpkBook, CpkOrder, CpkAuthor } from "../test-helpers/models/cpk.js";
 import { sql as arelSql } from "@blazetrails/arel";
 import { captureSql } from "../testing/sql-capture.js";

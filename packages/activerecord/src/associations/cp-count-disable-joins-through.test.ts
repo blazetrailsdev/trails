@@ -22,7 +22,7 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, MigrationContext, association, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 function migrationCtx() {
   return new MigrationContext(Base.connection);

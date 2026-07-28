@@ -2,7 +2,7 @@ import pg from "pg";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
 import { StatementInvalid } from "./errors.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { adapterType } from "./test-adapter.js";
 
 class MockDatabaseError extends Error {}

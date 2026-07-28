@@ -9,7 +9,7 @@
 import { describe, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "./index.js";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { rebuildCanonicalTables } from "./support/canonical-schema.js";
 import { adapterType } from "./test-adapter.js";
 import { describeIfSupports, itIfSupports } from "./support/supports.js";

@@ -3,7 +3,7 @@
  * model + handler `topics` fixtures, test names verbatim from the Ruby methods.
  */
 import { describe, it, expect } from "vitest";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
 describe("CloneTest", () => {

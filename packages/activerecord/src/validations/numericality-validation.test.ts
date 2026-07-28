@@ -7,7 +7,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { DecimalType } from "@blazetrails/activemodel";
 import { Base } from "../index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { NumericData } from "../test-helpers/models/numeric-data.js";
 
 fixtures({});

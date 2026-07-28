@@ -14,7 +14,7 @@ import { Base } from "../base.js";
 import { registerModel } from "../index.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
 import { Post } from "../test-helpers/models/post.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 // Rails defines `Namespaced::Post` inline (table "posts") with a polymorphic
 // has_one :tagging, as: :taggable. trails flattens the `::` into a collision-free

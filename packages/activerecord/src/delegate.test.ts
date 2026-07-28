@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Base, registerModel, delegate } from "./index.js";
 import { Associations } from "./associations.js";
-import { fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-fixtures.js";
 
 describe("Delegate (Rails-guided)", () => {
   fixtures([]);
