@@ -2,30 +2,38 @@
  * Mirrors Rails activerecord/test/cases/adapters/sqlite3/collation_test.rb
  */
 import { it, expect, beforeEach, afterEach } from "vitest";
+import "../../index.js";
 import { describeIfSqlite } from "./test-helper.js";
+import { Base } from "../../base.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 
 let adapter: AbstractSQLite3Adapter;
 
-beforeEach(async () => {
-  adapter = new BetterSQLite3Adapter(":memory:");
-  await adapter.exec(`CREATE TABLE "collation_table_sqlite3" (
+describeIfSqlite("SQLite3CollationTest", () => {
+  fixtures([], { useTransactionalTests: false });
+
+  // Rails `setup`: `@connection = ActiveRecord::Base.lease_connection`, then
+  // `create_table :collation_table_sqlite3, force: true`.
+  beforeEach(async () => {
+    adapter = (await Base.leaseConnection()) as unknown as AbstractSQLite3Adapter;
+    await adapter.exec(`DROP TABLE IF EXISTS "collation_table_sqlite3"`);
+    await adapter.exec(`CREATE TABLE "collation_table_sqlite3" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
     "string_nocase" VARCHAR(255) COLLATE "NOCASE",
     "text_rtrim" TEXT COLLATE "RTRIM",
     "decimal_col" DECIMAL(6, 2),
     "string_after_decimal_nocase" VARCHAR(255) COLLATE "NOCASE"
   )`);
-});
+  });
 
-afterEach(async () => {
-  await adapter.exec(`DROP TABLE IF EXISTS "collation_table_sqlite3"`).catch(() => undefined);
-  await adapter.close();
-});
+  // Rails `teardown`: drop_table :collation_table_sqlite3, if_exists: true.
+  // Required now that the ambient database outlives the test.
+  afterEach(async () => {
+    await adapter.exec(`DROP TABLE IF EXISTS "collation_table_sqlite3"`).catch(() => undefined);
+  });
 
-describeIfSqlite("SQLite3CollationTest", () => {
   it("string column with collation", async () => {
     const columns = await adapter.columns("collation_table_sqlite3");
 

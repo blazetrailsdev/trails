@@ -2,30 +2,35 @@
  * Mirrors Rails activerecord/test/cases/adapters/sqlite3/sqlite3_adapter_prevent_writes_test.rb
  */
 import { it, expect, beforeEach, afterEach } from "vitest";
+import "../../index.js";
 import { describeIfSqlite } from "./test-helper.js";
+import { Base } from "../../base.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { ReadOnlyError } from "../../errors.js";
 
 let adapter: AbstractSQLite3Adapter;
 
-beforeEach(() => {
-  adapter = new BetterSQLite3Adapter(":memory:");
-});
-
-afterEach(async () => {
-  // Throwaway :memory: tables; per-name IF EXISTS drops balance
-  // require-table-teardown (SQLite has no multi-table DROP).
-  await adapter
-    .exec(
-      `DROP TABLE IF EXISTS pw; DROP TABLE IF EXISTS pw2; DROP TABLE IF EXISTS pw3; DROP TABLE IF EXISTS pw4; DROP TABLE IF EXISTS pw5`,
-    )
-    .catch(() => undefined);
-  await adapter.close();
-});
-
 // -- Rails test class: sqlite3_adapter_prevent_writes_test.rb --
 describeIfSqlite("SQLite3AdapterPreventWritesTest", () => {
+  // Rails: `self.use_transactional_tests = false`.
+  fixtures([], { useTransactionalTests: false });
+
+  // Rails `setup`: `@conn = ActiveRecord::Base.lease_connection`.
+  beforeEach(async () => {
+    adapter = (await Base.leaseConnection()) as unknown as AbstractSQLite3Adapter;
+  });
+
+  // The ambient database outlives the test, so every ad-hoc table each case
+  // creates has to be dropped by name (SQLite has no multi-table DROP).
+  afterEach(async () => {
+    await adapter
+      .exec(
+        `DROP TABLE IF EXISTS pw; DROP TABLE IF EXISTS pw2; DROP TABLE IF EXISTS pw3; DROP TABLE IF EXISTS pw4; DROP TABLE IF EXISTS pw5`,
+      )
+      .catch(() => undefined);
+  });
+
   it("errors when an insert query is called while preventing writes", async () => {
     await adapter.exec(`CREATE TABLE "pw" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
     await adapter.withPreventedWrites(async () => {

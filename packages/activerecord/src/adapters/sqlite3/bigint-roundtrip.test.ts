@@ -1,17 +1,23 @@
 import { it, expect, beforeEach, afterEach } from "vitest";
+import "../../index.js";
 import { describeIfSqlite } from "./test-helper.js";
 import { BigIntegerType, IntegerType, BooleanType } from "@blazetrails/activemodel";
+import { Base } from "../../base.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 
 let adapter: AbstractSQLite3Adapter;
 const bigType = new BigIntegerType();
 const intType = new IntegerType();
 const boolType = new BooleanType();
 
-beforeEach(async () => {
-  adapter = new BetterSQLite3Adapter(":memory:");
-  await adapter.exec(`
+describeIfSqlite("SQLite3 bigint round-trip", () => {
+  fixtures([], { useTransactionalTests: false });
+
+  beforeEach(async () => {
+    adapter = (await Base.leaseConnection()) as unknown as AbstractSQLite3Adapter;
+    await adapter.exec(`DROP TABLE IF EXISTS "big_items"`);
+    await adapter.exec(`
     CREATE TABLE "big_items" (
       "id"     INTEGER PRIMARY KEY AUTOINCREMENT,
       "score"  BIGINT NOT NULL,
@@ -19,14 +25,13 @@ beforeEach(async () => {
       "active" INTEGER NOT NULL DEFAULT 1
     )
   `);
-});
+  });
 
-afterEach(async () => {
-  await adapter.exec(`DROP TABLE IF EXISTS "big_items"`).catch(() => undefined);
-  await adapter.close();
-});
+  // The ambient database outlives the test, so the ad-hoc table must be dropped.
+  afterEach(async () => {
+    await adapter.exec(`DROP TABLE IF EXISTS "big_items"`).catch(() => undefined);
+  });
 
-describeIfSqlite("SQLite3 bigint round-trip", () => {
   const BIG = 2n ** 62n; // 4611686018427387904 — well above Number.MAX_SAFE_INTEGER
 
   it("returns bigint for BIGINT column", async () => {
