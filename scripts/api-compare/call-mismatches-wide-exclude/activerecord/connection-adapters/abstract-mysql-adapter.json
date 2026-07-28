@@ -331,6 +331,13 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
+    "rubyName": "remove_foreign_key",
+    "call": "delete",
+    "reason": "Ruby's `options.delete(:on_delete)` is the JS `delete opts.onDelete` operator, which is syntax rather than a call the extractor can see."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "remove_index_for_alter",
     "call": "index_name_for_remove",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

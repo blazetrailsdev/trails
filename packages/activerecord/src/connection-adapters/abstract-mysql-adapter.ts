@@ -72,7 +72,11 @@ import {
   ForeignKeyDefinition,
   IndexDefinition,
 } from "./abstract/schema-definitions.js";
-import type { ColumnOptions, SchemaStatementsLike } from "./abstract/schema-definitions.js";
+import type {
+  ColumnOptions,
+  RemoveForeignKeyOptions,
+  SchemaStatementsLike,
+} from "./abstract/schema-definitions.js";
 import {
   TableDefinition as MysqlTableDefinition,
   Table as MysqlTable,
@@ -251,6 +255,27 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // across dialects.
     const { adapter: _adapterOpt, adapterName: _adapterNameOpt, ...rest } = options;
     return new MysqlTableDefinition(name, { ...rest, adapter: this });
+  }
+
+  /**
+   * RESTRICT is MySQL's default referential action, so `extractForeignKeyAction`
+   * reflects it back as `undefined` and a lookup keyed on `onDelete: "restrict"`
+   * could never match the live constraint. Drop those keys before resolving.
+   *
+   * Mirrors: `ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#remove_foreign_key`
+   */
+  override async removeForeignKey(
+    fromTable: string,
+    toTableOrOptions?: string | RemoveForeignKeyOptions,
+    options: RemoveForeignKeyOptions = {},
+  ): Promise<void> {
+    const optionsForm = typeof toTableOrOptions === "object" && toTableOrOptions !== null;
+    const opts: RemoveForeignKeyOptions = { ...(optionsForm ? toTableOrOptions : options) };
+    if (opts.onUpdate === "restrict") delete opts.onUpdate;
+    if (opts.onDelete === "restrict") delete opts.onDelete;
+    return optionsForm
+      ? super.removeForeignKey(fromTable, opts)
+      : super.removeForeignKey(fromTable, toTableOrOptions, opts);
   }
 
   /**

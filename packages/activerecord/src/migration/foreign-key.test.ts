@@ -24,8 +24,6 @@ import { describeIfSupports } from "../support/supports.js";
 // has no name to compare.
 const unlessSqlite3Adapter = adapterType !== "sqlite";
 
-const mysqlRestrictActionReflectsNil = adapterType === "mysql";
-
 describeIfSupports("foreign_keys", "Migration", () => {
   describe("ForeignKeyTest", () => {
     // DDL can't run inside the transactional-fixtures wrapper (PG aborts the
@@ -305,27 +303,15 @@ describeIfSupports("foreign_keys", "Migration", () => {
       });
     });
 
-    // Unreachable on the MySQL family: `extract_foreign_key_action` is overridden
-    // with `super unless specifier == "RESTRICT"` (mysql/schema_statements.rb:224-226),
-    // so the reflected fk stores `on_delete` as nil — the same fact Rails asserts in
-    // test_add_on_delete_restrict_foreign_key. `defined_for?` then compares
-    // `Array(nil)` against `["restrict"]` and never matches, so the removal raises.
-    // Rails leaves the case ungated because its own suite does not run it here,
-    // so the skip is ours, not a ported gate — held in a named boolean so
-    // test-compare records it as an incomparable guard rather than as an adapter
-    // restriction Rails never had.
-    it.skipIf(mysqlRestrictActionReflectsNil)(
-      "remove foreign key with restrict action",
-      async () => {
-        const conn = await ambientConnection();
-        await withRocketTables(conn, async () => {
-          await conn.addForeignKey("astronauts", "rockets", { onDelete: "restrict" });
-          expect((await conn.foreignKeys("astronauts")).length).toBe(1);
-          await conn.removeForeignKey("astronauts", "rockets", { onDelete: "restrict" });
-          expect(await conn.foreignKeys("astronauts")).toEqual([]);
-        });
-      },
-    );
+    it("remove foreign key with restrict action", async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.addForeignKey("astronauts", "rockets", { onDelete: "restrict" });
+        expect((await conn.foreignKeys("astronauts")).length).toBe(1);
+        await conn.removeForeignKey("astronauts", "rockets", { onDelete: "restrict" });
+        expect(await conn.foreignKeys("astronauts")).toEqual([]);
+      });
+    });
 
     it("remove foreign key with if exists not set", async () => {
       const conn = await ambientConnection();

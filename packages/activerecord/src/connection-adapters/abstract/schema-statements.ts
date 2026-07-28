@@ -852,7 +852,13 @@ export class SchemaStatements {
     options: RemoveForeignKeyOptions = {},
   ): Promise<void> {
     const adapter = this.adapter as any;
+    // `adapter !== this` keeps the dispatch one-way. When these methods run
+    // mixed into an adapter (`include(AbstractAdapter, SchemaStatements)`),
+    // `this.adapter` is the adapter itself, so an adapter override reaching the
+    // base body through `super` would otherwise be dispatched straight back to
+    // itself.
     if (
+      adapter !== (this as unknown) &&
       typeof adapter.removeForeignKey === "function" &&
       adapter.removeForeignKey !== SchemaStatements.prototype.removeForeignKey
     ) {
