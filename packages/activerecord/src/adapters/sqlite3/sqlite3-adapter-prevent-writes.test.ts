@@ -2,30 +2,27 @@
  * Mirrors Rails activerecord/test/cases/adapters/sqlite3/sqlite3_adapter_prevent_writes_test.rb
  */
 import { it, expect, beforeEach, afterEach } from "vitest";
+import "../../index.js";
 import { describeIfSqlite } from "./test-helper.js";
-import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
+import { Base } from "../../base.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
+import type { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { ReadOnlyError } from "../../errors.js";
 
 let adapter: AbstractSQLite3Adapter;
 
-beforeEach(() => {
-  adapter = new BetterSQLite3Adapter(":memory:");
-});
-
-afterEach(async () => {
-  // Throwaway :memory: tables; per-name IF EXISTS drops balance
-  // require-table-teardown (SQLite has no multi-table DROP).
-  await adapter
-    .exec(
-      `DROP TABLE IF EXISTS pw; DROP TABLE IF EXISTS pw2; DROP TABLE IF EXISTS pw3; DROP TABLE IF EXISTS pw4; DROP TABLE IF EXISTS pw5`,
-    )
-    .catch(() => undefined);
-  await adapter.close();
-});
-
 // -- Rails test class: sqlite3_adapter_prevent_writes_test.rb --
 describeIfSqlite("SQLite3AdapterPreventWritesTest", () => {
+  fixtures([], { useTransactionalTests: false });
+
+  beforeEach(async () => {
+    adapter = (await Base.leaseConnection()) as unknown as AbstractSQLite3Adapter;
+  });
+
+  afterEach(async () => {
+    await adapter.dropTable("pw", "pw2", "pw3", "pw4", "pw5", { ifExists: true });
+  });
+
   it("errors when an insert query is called while preventing writes", async () => {
     await adapter.exec(`CREATE TABLE "pw" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
     await adapter.withPreventedWrites(async () => {

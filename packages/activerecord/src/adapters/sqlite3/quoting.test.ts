@@ -2,29 +2,42 @@
  * Mirrors Rails activerecord/test/cases/adapters/sqlite3/quoting_test.rb
  */
 import { it, expect, beforeEach, afterEach } from "vitest";
+import "../../index.js";
 import { describeIfSqlite } from "./test-helper.js";
-import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
+import { Base } from "../../base.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
+import type { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 
 let adapter: AbstractSQLite3Adapter;
 
-beforeEach(() => {
-  adapter = new BetterSQLite3Adapter(":memory:");
-});
-
-afterEach(async () => {
-  // Throwaway :memory: tables; per-name IF EXISTS drops balance
-  // require-table-teardown (SQLite has no multi-table DROP).
-  await adapter
-    .exec(
-      `DROP TABLE IF EXISTS quote_test; DROP TABLE IF EXISTS q; DROP TABLE IF EXISTS "my table"; DROP TABLE IF EXISTS bin_enc; DROP TABLE IF EXISTS bool_test; DROP TABLE IF EXISTS bool_test2; DROP TABLE IF EXISTS bd_test; DROP TABLE IF EXISTS bin_quote; DROP TABLE IF EXISTS time_test; DROP TABLE IF EXISTS time_norm; DROP TABLE IF EXISTS time_utc; DROP TABLE IF EXISTS time_local; DROP TABLE IF EXISTS inf_test; DROP TABLE IF EXISTS nan_test`,
-    )
-    .catch(() => undefined);
-  await adapter.close();
-});
-
 // -- Rails test class: quoting_test.rb --
 describeIfSqlite("SQLite3QuotingTest", () => {
+  fixtures([]);
+
+  beforeEach(async () => {
+    adapter = (await Base.leaseConnection()) as unknown as AbstractSQLite3Adapter;
+  });
+
+  afterEach(async () => {
+    await adapter.dropTable(
+      "quote_test",
+      "q",
+      "my table",
+      "bin_enc",
+      "bool_test",
+      "bool_test2",
+      "bd_test",
+      "bin_quote",
+      "time_test",
+      "time_norm",
+      "time_utc",
+      "time_local",
+      "inf_test",
+      "nan_test",
+      { ifExists: true },
+    );
+  });
+
   it("quote string", async () => {
     // Rails asserts quote_string("'") == "''" (escaped content, no wrapping
     // quotes). Trails' quoteString wraps — round-trip the same "'" datum.

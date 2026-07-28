@@ -1,31 +1,35 @@
 import { it, expect, beforeEach, afterEach } from "vitest";
+import "../../index.js";
 import { describeIfSqlite } from "./test-helper.js";
-import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
+import { Base } from "../../base.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
+import type { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import type { Column } from "../../connection-adapters/sqlite3/column.js";
 
 let adapter: AbstractSQLite3Adapter;
-
-beforeEach(async () => {
-  adapter = new BetterSQLite3Adapter(":memory:");
-  await adapter.exec(
-    `CREATE TABLE "virtual_columns" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" varchar, "upper_name" varchar GENERATED ALWAYS AS (UPPER(name)) STORED, "lower_name" varchar GENERATED ALWAYS AS (LOWER(name)) VIRTUAL, "column1" integer)`,
-  );
-  await adapter.executeMutation(
-    `INSERT INTO "virtual_columns" ("name", "column1") VALUES ('Rails', 10)`,
-  );
-});
-
-afterEach(async () => {
-  await adapter.exec(`DROP TABLE IF EXISTS "virtual_columns"`).catch(() => undefined);
-  await adapter.close();
-});
 
 // TS-only regression coverage: Rails' alter_table rebuilds from columns(from)
 // and re-adds generated columns with as:/stored: (sqlite3_adapter.rb:623),
 // but PRAGMA table_info hides them — a table_info-sourced rebuild silently
 // drops every pre-existing generated column.
 describeIfSqlite("SQLite3VirtualColumnTest trails extras", () => {
+  fixtures([]);
+
+  beforeEach(async () => {
+    adapter = (await Base.leaseConnection()) as unknown as AbstractSQLite3Adapter;
+    await adapter.dropTable("virtual_columns", { ifExists: true });
+    await adapter.exec(
+      `CREATE TABLE "virtual_columns" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" varchar, "upper_name" varchar GENERATED ALWAYS AS (UPPER(name)) STORED, "lower_name" varchar GENERATED ALWAYS AS (LOWER(name)) VIRTUAL, "column1" integer)`,
+    );
+    await adapter.executeMutation(
+      `INSERT INTO "virtual_columns" ("name", "column1") VALUES ('Rails', 10)`,
+    );
+  });
+
+  afterEach(async () => {
+    await adapter.dropTable("virtual_columns", { ifExists: true });
+  });
+
   it("alter-table rebuild preserves pre-existing generated columns", async () => {
     await adapter.changeTable("virtual_columns", async (t) => {
       await t.virtual("decr_column1", { type: "integer", as: "column1 - 1", stored: true });
