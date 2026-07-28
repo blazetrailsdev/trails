@@ -2108,6 +2108,9 @@ export async function loadCanonicalSchema(adapter: DatabaseAdapter): Promise<voi
   (adapter as { clearCacheBang?: () => void }).clearCacheBang?.();
 }
 
+/** Memoized dependent-table edges, built once per module instance. */
+let _dependents: Map<string, string[]> | null = null;
+
 /**
  * Map of referenced table -> tables whose definition declares a foreign key into
  * it. Built by replaying each table's block against a probe TableDefinition that
@@ -2119,8 +2122,6 @@ export async function loadCanonicalSchema(adapter: DatabaseAdapter): Promise<voi
  * exporting the class would publish all fifteen of its `t.<type>()` members as
  * extra TS surface just to let a sibling module construct one throwaway probe.
  */
-let _dependents: Map<string, string[]> | null = null;
-
 export async function canonicalForeignKeyDependents(): Promise<Map<string, string[]>> {
   if (_dependents) return _dependents;
   const dependents = new Map<string, string[]>();
