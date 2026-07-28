@@ -3038,6 +3038,8 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
 
   /** @internal */
   static override initializeTypeMap(m: TypeMap): void {
+    super.initializeTypeMap(m);
+
     const sqlite3Int = (limit?: number) => new SQLite3IntegerType({ limit });
     m.registerType("string", new StringType());
     m.registerType("text", new TextType());
@@ -3089,9 +3091,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     this.registerClassWithLimit(m, /char/i, StringType);
     this.registerClassWithLimit(m, /text/i, TextType);
     this.registerClassWithLimit(m, /binary/i, BinaryType);
-    m.aliasType(/clob/i, "text");
-    m.aliasType(/blob/i, "binary");
-    m.aliasType(/number/i, "decimal");
     this.registerClassWithLimit(m, /real|floa|doub/i, FloatType);
   }
 }

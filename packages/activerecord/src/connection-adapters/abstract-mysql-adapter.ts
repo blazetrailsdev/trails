@@ -101,7 +101,6 @@ import {
   BooleanType,
   BinaryType,
   BinaryData,
-  DecimalType,
 } from "@blazetrails/activemodel";
 
 /**
@@ -138,12 +137,7 @@ class MysqlBigInteger extends BigIntegerType {
   }
 }
 import { UnsignedInteger } from "../type/unsigned-integer.js";
-import { DecimalWithoutScale } from "../type/decimal-without-scale.js";
-import { Date as DateType } from "../type/date.js";
-import { DateTime as DateTimeType } from "../type/date-time.js";
-import { Time as TimeType } from "../type/time.js";
 import { Text as TextType } from "../type/text.js";
-import { Json as JsonType } from "../type/json.js";
 
 const NATIVE_DATABASE_TYPES: Record<string, { name: string; limit?: number }> = {
   primary_key: { name: "bigint auto_increment PRIMARY KEY" },
@@ -1877,69 +1871,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /** @internal */
   static override initializeTypeMap(this: typeof AbstractMysqlAdapter, m: TypeMap): void {
-    /**
-     * Mirrors: abstract_mysql_adapter.rb#extract_precision — for the
-     * `(date)?time(stamp)?` family, a missing `(N)` modifier resolves to 0
-     * (TIME ≡ TIME(0) on MySQL/MariaDB), not nil.
-     */
-    function extractMysqlTimePrecision(sqlType: string): number {
-      const m = sqlType.match(/\((\d+)\)/);
-      return m ? Number(m[1]) : 0;
-    }
+    super.initializeTypeMap(m);
 
-    // Base types (mirrors AbstractAdapter#initialize_type_map via super)
-    m.registerType(/^boolean/i, undefined, () => new BooleanType());
-    // NOTE: char/varchar/enum/set string registrations do NOT belong here —
-    // they bind mysql2/trilogy-specific `"1"`/`"0"` boolean-string behavior to
-    // a concrete client, so Rails registers them in the concrete
-    // `Mysql2Adapter#initialize_type_map` (mysql2_adapter.rb:40-49), not in
-    // `AbstractMysqlAdapter#initialize_type_map` (abstract_mysql_adapter.rb:711,
-    // which has no such registration). See Mysql2Adapter.initializeTypeMap.
-    // Rails relies on super's `register_class_with_limit(m, /binary/i, Binary)`
-    // (abstract_mysql_adapter.rb has no binary override), so binary/varbinary
-    // carry the declared length as their limit — e.g. varbinary(255) → 255.
-    m.registerType(
-      /^binary/i,
-      undefined,
-      (sqlType) => new BinaryType({ limit: this.extractLimit(sqlType) }),
-    );
-    m.registerType(
-      /^varbinary/i,
-      undefined,
-      (sqlType) => new BinaryType({ limit: this.extractLimit(sqlType) }),
-    );
-    m.registerType(/^date$/i, new DateType());
-    m.registerType(
-      /^time\b/i,
-      undefined,
-      (sqlType) => new TimeType({ precision: extractMysqlTimePrecision(sqlType) }),
-    );
-    m.registerType(
-      /^datetime/i,
-      undefined,
-      (sqlType) => new DateTimeType({ precision: extractMysqlTimePrecision(sqlType) }),
-    );
-    // Mirrors AbstractAdapter#initialize_type_map's decimal registration
-    // (abstract_adapter.rb:906) — MySQL inherits it in Rails, so extract
-    // precision/scale from the sql_type rather than dropping them. Without
-    // this, `decimal(10,2)` columns build a scale-less DecimalType and values
-    // aren't truncated to the column's scale on cast.
-    const registerDecimal = (sqlType: string) => {
-      const scale = this.extractScale(sqlType);
-      const precision = this.extractPrecision(sqlType);
-      if (scale === 0) return new DecimalWithoutScale({ precision });
-      return new DecimalType({ precision, scale });
-    };
-    m.registerType(/decimal/i, undefined, registerDecimal);
-    m.registerType(/numeric/i, undefined, registerDecimal);
-    m.aliasType(/clob/i, "text");
-    m.aliasType(/number/i, "decimal");
-    m.registerType("json", new JsonType());
-
-    // MySQL-specific overrides (mirrors MySQL's initialize_type_map additions).
-    // Rails registers each lob variant with a fixed byte-size limit (2**8-1 …
-    // 2**32-1) rather than extracting it from the sql_type, so column
-    // introspection and the schema dumper's :size mapping see the right limit.
     m.registerType(/tinytext/i, undefined, () => new TextType({ limit: 2 ** 8 - 1 }));
     m.registerType(/tinyblob/i, undefined, () => new BinaryType({ limit: 2 ** 8 - 1 }));
     m.registerType(/text/i, undefined, () => new TextType({ limit: 2 ** 16 - 1 }));
@@ -1955,13 +1888,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     this.registerIntegerType(m, /^mediumint/i, { limit: 3 });
     this.registerIntegerType(m, /^smallint/i, { limit: 2 });
     this.registerIntegerType(m, /^tinyint/i, { limit: 1 });
-    m.registerType(/^year/i, undefined, () => new IntegerType());
-    m.registerType(/^bit/i, undefined, () => new BinaryType());
-    m.registerType(
-      /^timestamp/i,
-      undefined,
-      (sqlType) => new DateTimeType({ precision: extractMysqlTimePrecision(sqlType) }),
-    );
+    m.aliasType(/year/i, "integer");
+    m.aliasType(/bit/i, "binary");
   }
 
   /** @internal */
@@ -1975,6 +1903,13 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       if (options.limit === 8) return new MysqlBigInteger(options);
       return new IntegerType(options);
     });
+  }
+
+  /** @internal */
+  static override extractPrecision(sqlType: string): number | undefined {
+    const precision = super.extractPrecision(sqlType);
+    if (/^(?:date)?time(?:stamp)?\b/i.test(sqlType)) return precision ?? 0;
+    return precision;
   }
 
   /** @internal */
