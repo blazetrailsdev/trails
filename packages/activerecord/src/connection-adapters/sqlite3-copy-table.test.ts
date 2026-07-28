@@ -9,15 +9,20 @@ fixtures([], { useTransactionalTests: false });
 describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   let db: AbstractSQLite3Adapter;
 
-  beforeEach(() => {
-    db = Base.connection as AbstractSQLite3Adapter;
-  });
-
-  afterEach(async () => {
-    await db.exec(
+  // The ambient connection is a shared worker DB, so the scratch tables are
+  // cleared on the way in as well as out: a hard-killed run must not wedge the
+  // next one.
+  const dropScratchTables = (): Promise<void> =>
+    db.exec(
       `DROP TABLE IF EXISTS rebuild_users; DROP TABLE IF EXISTS rebuild_orders; DROP TABLE IF EXISTS src; DROP TABLE IF EXISTS dst`,
     );
+
+  beforeEach(async () => {
+    db = Base.connection as AbstractSQLite3Adapter;
+    await dropScratchTables();
   });
+
+  afterEach(dropScratchTables);
 
   // --- tableStructureSql ---
 

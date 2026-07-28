@@ -17,18 +17,25 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
   let adapter: AbstractSQLite3Adapter;
   let savedTransformers: QueryTransformer[];
 
-  beforeEach(() => {
+  // The ambient connection is a shared worker DB, so the scratch tables are
+  // cleared on the way in as well as out: a hard-killed run must not wedge the
+  // next one.
+  const dropScratchTables = (): Promise<void> =>
+    adapter.exec(
+      "DROP TABLE IF EXISTS widgets; DROP TABLE IF EXISTS t; DROP TABLE IF EXISTS a; DROP TABLE IF EXISTS b",
+    );
+
+  beforeEach(async () => {
     adapter = Base.connection as AbstractSQLite3Adapter;
     savedTransformers = queryTransformers.slice();
     queryTransformers.length = 0;
+    await dropScratchTables();
   });
 
   afterEach(async () => {
     queryTransformers.length = 0;
     queryTransformers.push(...savedTransformers);
-    await adapter.exec(
-      "DROP TABLE IF EXISTS widgets; DROP TABLE IF EXISTS t; DROP TABLE IF EXISTS a; DROP TABLE IF EXISTS b",
-    );
+    await dropScratchTables();
   });
 
   function captureSql<T>(fn: () => Promise<T>): Promise<{ result: T; sqls: string[] }> {
