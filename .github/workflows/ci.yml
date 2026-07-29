@@ -11,10 +11,10 @@ on:
     #   run-parity-mysql    — MySQL/MariaDB-specific parity (future)
     #   run-sqlite-mem      — the ARCONN=sqlite3_mem AR suite (otherwise only
     #                         main / the weekly sweep / workflow_dispatch).
-    #                         Runs the lane for a look; does NOT gate the merge
-    #                         — `sqlite-mem-tests` is deliberately absent from
-    #                         the `ci` aggregator's `needs:`, so a failure here
-    #                         is red on its own job and nothing else.
+    #                         Opting in also makes it GATE the merge: the job is
+    #                         in the `ci` aggregator's `needs:`, and the skip
+    #                         allowlist accepts its skip only on an unlabelled
+    #                         PR (or when no AR paths changed).
     #   website             — force the Website build on a PR that doesn't
     #                         touch packages/website/
     #   release             — implies `website` (release PRs need the site
@@ -874,11 +874,13 @@ jobs:
   # `ARCONN=sqlite3_mem` is the only lane where `in_memory_db?` is true, so
   # without it every `skipIf(inMemoryDb())` guard is dead code (RFC 0029).
   #
-  # A second full pass over the AR suite, so deliberately not in the `ci`
-  # aggregator's `needs:` and not on every PR: it runs on `main`, on the Monday
-  # sweep (where `changes` forces every gate true), on `workflow_dispatch`, and
-  # on a PR labelled `run-sqlite-mem`. Not `continue-on-error` — a failure is a
-  # red job.
+  # A second full pass over the AR suite, so not on every PR: it runs on `main`,
+  # on the Monday sweep (where `changes` forces every gate true), on
+  # `workflow_dispatch`, and on a PR labelled `run-sqlite-mem`. It IS in the `ci`
+  # aggregator's `needs:` — when the lane runs at all it gates the merge (RFC
+  # 0029 story sqlite-mem-lane-merge-gating-decision: the cheap half of the
+  # trade-off is opt-in cost, not opt-in enforcement). The aggregator's skip
+  # allowlist accepts the skip on an unlabelled PR.
   sqlite-mem-tests:
     name: "Active Record SQLite :memory: Tests"
     needs: changes
@@ -1727,6 +1729,7 @@ jobs:
       - actionpack-tests
       - trailties-tests
       - sqlite-tests
+      - sqlite-mem-tests
       - postgres-tests
       - mysql-tests
       - maria-tests
@@ -1762,6 +1765,7 @@ jobs:
           PARITY_SQLITE: ${{ needs.changes.outputs.parity_sqlite }}
           PARITY_POSTGRES: ${{ needs.changes.outputs.parity_postgres }}
           PARITY_MYSQL: ${{ needs.changes.outputs.parity_mysql }}
+          SQLITE_MEM_UNLABELLED: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'run-sqlite-mem') }}
         run: |
           set -euo pipefail
           echo "$NEEDS_JSON"
@@ -1808,6 +1812,15 @@ jobs:
                   # id here, so this one case covers all four legs — do NOT add
                   # per-leg names (they don't exist in the `needs` context).
                   [ "$AR_AFFECTED" = "false" ] && continue
+                  ;;
+                sqlite-mem-tests)
+                  # Opt-in lane: legitimately skipped when no AR paths changed,
+                  # or on a PR without the `run-sqlite-mem` label. When it does
+                  # run, a failure gates the merge like any other AR lane.
+                  if [ "$AR_AFFECTED" = "false" ] || \
+                     [ "$SQLITE_MEM_UNLABELLED" = "true" ]; then
+                    continue
+                  fi
                   ;;
                 actionpack-tests)
                   # Actionpack test skip is legitimate when no actionpack-affecting paths changed.
