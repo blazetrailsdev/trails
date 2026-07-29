@@ -22,6 +22,16 @@ describeIfSqlite("AbstractAdapter#isPreventingWrites with no connection descript
     });
   });
 
+  it("still consults pool.preventWrites when the pool carries a descriptor", () => {
+    (
+      adapter as unknown as {
+        pool: { preventWrites?: boolean; connectionDescriptor?: unknown };
+      }
+    ).pool = { preventWrites: true, connectionDescriptor: { name: "ActiveRecord::Base" } };
+
+    expect(adapter.isPreventingWrites()).toBe(true);
+  });
+
   it("still reports preventing writes for a standalone replica", async () => {
     const replica = new BetterSQLite3Adapter({ database: ":memory:", replica: true } as never);
     try {

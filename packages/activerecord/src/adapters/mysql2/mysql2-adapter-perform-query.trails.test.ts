@@ -43,7 +43,12 @@ describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
 
   function preventWrites(a: Mysql2Adapter): void {
     originalPool = (a as Mysql2Adapter & { pool: unknown }).pool;
-    (a as Mysql2Adapter & { pool: { preventWrites?: boolean } }).pool = { preventWrites: true };
+    (
+      a as Mysql2Adapter & { pool: { preventWrites?: boolean; connectionDescriptor?: unknown } }
+    ).pool = {
+      preventWrites: true,
+      connectionDescriptor: { name: "ActiveRecord::Base" },
+    };
   }
 
   it("execute runs a non-row-returning statement and returns no rows", async () => {
