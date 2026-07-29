@@ -165,6 +165,51 @@ describe("gates.ts pure helpers", () => {
     });
   });
 
+  it("drops the adapter set when the RUN condition is a disjunction", () => {
+    // `runIf(A || B)` runs on `mysql ∪ default_expression?` and the De Morgan
+    // twin `skipIf(A && B)` runs on the same union — neither is one adapter set,
+    // so the adapter half goes, mirroring the Ruby extractor's `has_or` rule.
+    expect(
+      gateFromGuardExpr('adapterType === "mysql" || adapterSupports("default_expression")', true),
+    ).toEqual({
+      features: ["default_expression"],
+      source: ["test"],
+    });
+    expect(
+      gateFromGuardExpr('adapterType !== "mysql" && !adapterSupports("default_expression")', false),
+    ).toEqual({
+      features: ["default_expression"],
+      source: ["test"],
+    });
+    // An adapter EXCLUSION is deliberately NOT tightened here — it is
+    // pre-existing behavior whose Ruby counterpart is looser still
+    // (foreign_key_test.rb:96 hides its second conjunct behind `send`, so Ruby
+    // emits the bare exclusion). Pinned so the scope stays explicit; tracked as
+    // `ts-gate-exclusion-ignores-run-disjunction`.
+    expect(
+      gateFromGuardExpr('adapterType === "sqlite" && !adapterSupports("insert_returning")', false),
+    ).toEqual({
+      adapters: ["mysql", "postgresql"],
+      features: ["insert_returning"],
+      source: ["test"],
+    });
+    // The conjunctive forms of the same two guards keep both dimensions.
+    expect(
+      gateFromGuardExpr('adapterType === "mysql" && adapterSupports("default_expression")', true),
+    ).toEqual({
+      adapters: ["mysql"],
+      features: ["default_expression"],
+      source: ["test"],
+    });
+    expect(
+      gateFromGuardExpr('adapterType !== "mysql" || !adapterSupports("default_expression")', false),
+    ).toEqual({
+      adapters: ["mysql"],
+      features: ["default_expression"],
+      source: ["test"],
+    });
+  });
+
   it("records a mariadb guard for isMariaDb terms, dropping nothing else", () => {
     // Guard-only: `it.skipIf(isMariaDb)` (mysql2-adapter.test.ts idiom).
     expect(gateFromGuardExpr("isMariaDb", false)).toEqual({
