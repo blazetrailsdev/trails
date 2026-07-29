@@ -15,23 +15,6 @@ import { ActiveRecord } from "./ar-config.js";
  * Mirrors: ActiveRecord::ReadonlyAttributeError (defined alongside
  * HasReadonlyAttributes in Rails' readonly_attributes.rb).
  */
-/**
- * Reads `ActiveRecord.raise_on_assign_to_attr_readonly` — the canonical module
- * flag lives in `ar-config.ts` (default false, active_record.rb:343). These two
- * wrappers keep the historic `getRaiseOnAssignToAttrReadonly`/
- * `setRaiseOnAssignToAttrReadonly` public surface in place while the home is the
- * single `ActiveRecord.raiseOnAssignToAttrReadonly` accessor.
- *
- * Mirrors: ActiveRecord.raise_on_assign_to_attr_readonly
- */
-export function getRaiseOnAssignToAttrReadonly(): boolean {
-  return ActiveRecord.raiseOnAssignToAttrReadonly;
-}
-
-export function setRaiseOnAssignToAttrReadonly(value: boolean): void {
-  ActiveRecord.raiseOnAssignToAttrReadonly = value;
-}
-
 export class ReadonlyAttributeError extends ActiveRecordError {
   readonly attribute: string;
   constructor(attribute: string) {

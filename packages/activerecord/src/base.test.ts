@@ -3,13 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, afterAll, afterEach, vi } from "vitest";
-import {
-  ActiveRecord,
-  Base,
-  NotImplementedError,
-  ReadonlyAttributeError,
-  getRaiseOnAssignToAttrReadonly,
-} from "./index.js";
+import { ActiveRecord, Base, NotImplementedError, ReadonlyAttributeError } from "./index.js";
 import { TableNotSpecified, ActiveRecordError } from "./errors.js";
 
 import { adapterType } from "./test-adapter.js";
@@ -1083,7 +1077,7 @@ describe("BasicsTest", () => {
     expect(ConcreteModel.readonlyAttributes).toContain("code");
   });
   it("readonly attributes when configured to not raise", async () => {
-    const prev = getRaiseOnAssignToAttrReadonly();
+    const prev = ActiveRecord.raiseOnAssignToAttrReadonly;
     ActiveRecord.raiseOnAssignToAttrReadonly = false;
     try {
       class NonRaisingPost extends Base {
