@@ -41,6 +41,9 @@ const TIME_PART = String.raw`(?:(\d{1,2}):(\d{2})(?::(\d{2})(\.\d+)?)?)`;
  */
 const ZONE_SUFFIX = /\s*(Z|[A-Za-z]{2,5}|[+-]\d{2}:?\d{2}|[+-]\d{2})$/;
 
+/** A time component, extended (`03:00`) or ISO basic (`T030000`). */
+const HAS_TIME = /\d{1,2}:\d{2}|T\d{4,6}/;
+
 /** The zone slot asctime puts before the year: `Sep 04 03:00:00 EAT 2013`. */
 const ZONE_BEFORE_YEAR = /\s+(Z|[A-Za-z]{2,5}|[+-]\d{2}:?\d{2})\s+(\d{4})$/;
 
@@ -327,8 +330,17 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     const body = s.replace(WEEKDAY_PREFIX, "").trim();
     const zone = ZONE_SUFFIX.exec(body);
     if (zone) {
-      const withoutZone = parseDateAndTime(body.slice(0, body.length - zone[0].length).trim());
-      if (withoutZone) return { ...withoutZone, offset: zoneOffsetSeconds(zone[1]) };
+      const stripped = body.slice(0, body.length - zone[0].length).trim();
+      const withoutZone = parseDateAndTime(stripped);
+      // Date._parse only reports an offset alongside a time: it returns a bare
+      // {year, mon, mday} for "2013-09-04Z", "2013-09-04UTC" and
+      // "2013-09-04-10", which new_time then reads in the default zone.
+      if (withoutZone) {
+        return {
+          ...withoutZone,
+          offset: HAS_TIME.test(stripped) ? zoneOffsetSeconds(zone[1]) : null,
+        };
+      }
     }
     const interior = ZONE_BEFORE_YEAR.exec(body);
     if (interior) {

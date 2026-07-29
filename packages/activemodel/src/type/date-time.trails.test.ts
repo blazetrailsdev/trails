@@ -63,3 +63,28 @@ describe("DateTimeType fallback zone and ordering coverage", () => {
     expect(cast("2013-09-04")).toBe("2013-09-04T00:00:00Z");
   });
 });
+
+// Date._parse reports a zone only alongside a time; a date-only string keeps
+// its trailing token out of the hash and is read in the default zone. Each
+// expectation below was checked against Ruby's Date._parse.
+describe("DateTimeType date-only strings with a zone token", () => {
+  const type = new Types.DateTimeType();
+  const cast = (s: string) => (type.cast(s) as Temporal.Instant | null)?.toString() ?? null;
+
+  it("ignores a trailing Z on a date-only string", () => {
+    expect(cast("2013-09-04Z")).toBe("2013-09-04T00:00:00Z");
+  });
+
+  it("ignores a trailing zone abbreviation on a date-only string", () => {
+    expect(cast("2013-09-04UTC")).toBe("2013-09-04T00:00:00Z");
+    expect(cast("2013-09-04 EAT")).toBe("2013-09-04T00:00:00Z");
+  });
+
+  it("ignores a trailing numeric offset on a date-only string", () => {
+    expect(cast("2013-09-04-10")).toBe("2013-09-04T00:00:00Z");
+  });
+
+  it("still applies the offset when a time is present", () => {
+    expect(cast("2013-09-04T03:00:00-10")).toBe("2013-09-04T13:00:00Z");
+  });
+});
