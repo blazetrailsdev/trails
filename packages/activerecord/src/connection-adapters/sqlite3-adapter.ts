@@ -14,6 +14,10 @@ import type { SQLite3AdapterOptions, SQLite3Config } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
 import { SchemaCreation as SQLite3SchemaCreation } from "./sqlite3/schema-creation.js";
+import {
+  SQLITE3_NATIVE_DATABASE_TYPES,
+  type NativeDatabaseTypes,
+} from "./abstract/native-database-types.js";
 import { TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema-definitions.js";
 import {
   dataSourceSql as sqliteDataSourceSql,
@@ -1425,22 +1429,8 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   // defines none), so it inherits the abstract `columnMethodNames()` list unchanged —
   // no override here is intentional.
 
-  nativeDatabaseTypes(): Record<string, { name: string; limit?: number }> {
-    return {
-      primary_key: { name: "integer" },
-      string: { name: "varchar" },
-      text: { name: "text" },
-      integer: { name: "integer" },
-      float: { name: "float" },
-      decimal: { name: "decimal" },
-      datetime: { name: "datetime" },
-      time: { name: "time" },
-      date: { name: "date" },
-      binary: { name: "blob" },
-      blob: { name: "blob" },
-      boolean: { name: "boolean" },
-      json: { name: "json" },
-    };
+  nativeDatabaseTypes(): NativeDatabaseTypes {
+    return SQLITE3_NATIVE_DATABASE_TYPES;
   }
 
   /**

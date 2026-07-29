@@ -819,11 +819,13 @@ export class RecorderTableProxy {
 }
 
 // nativeDatabaseTypes keys that Rails does NOT expose as plain column-type
-// shorthands via `define_column_methods`. `primaryKey` is a dedicated method
-// (`abstract/schema_definitions.rb:309` — it merges `primary_key: true` rather
-// than recording a "primaryKey"-typed column), so routing `t.primaryKey` to a
-// bare `column(name, "primaryKey")` would diverge. It is excluded here.
-const NON_COLUMN_METHOD_TYPES = new Set(["primaryKey"]);
+// shorthands via `define_column_methods`. `primary_key` is a dedicated method
+// (`abstract/schema_definitions.rb:308` — `primary_key(name, type = :primary_key,
+// **options)` merges `primary_key: true` and takes the second argument as the
+// column type), so routing it to a bare `column(name, "primary_key")` would
+// diverge. Both spellings are excluded: the native-type hashes key it
+// `primary_key`, the trails DSL method is `primaryKey`.
+const NON_COLUMN_METHOD_TYPES = new Set(["primaryKey", "primary_key"]);
 
 /**
  * Wrap a change_table proxy so adapter-specific column-type shorthands

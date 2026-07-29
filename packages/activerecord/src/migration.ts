@@ -999,11 +999,12 @@ export abstract class Migration {
     // per-operation recording in addColumn/removeColumn/etc. still applies.
     // Wrap so adapter column-type shorthands (t.hstore, t.jsonb, ...) resolve,
     // mirroring Rails' adapter ColumnMethods mixin on the yielded Table.
-    const columnTypes = Object.keys(
-      (
-        this.connection as { nativeDatabaseTypes?(): Record<string, unknown> }
-      ).nativeDatabaseTypes?.() ?? {},
-    );
+    const delegate = this.connection as {
+      columnMethodNames?(): string[];
+      nativeDatabaseTypes?(): Record<string, unknown>;
+    };
+    const columnTypes =
+      delegate.columnMethodNames?.() ?? Object.keys(delegate.nativeDatabaseTypes?.() ?? {});
     const table = withAdapterColumnMethods(new Table(tableName, this), columnTypes);
     if (callback) await callback(table);
   }

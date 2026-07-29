@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { CommandRecorder } from "./command-recorder.js";
+import { CommandRecorder, withAdapterColumnMethods } from "./command-recorder.js";
 import type { RecorderTableProxy } from "./command-recorder.js";
 import { IrreversibleMigration } from "../migration.js";
 
@@ -584,5 +584,29 @@ describe("CommandRecorder", () => {
       expect(recorder.commands[1].cmd).toBe("changeTable");
       expect(recorder.commands[1].args[0]).toBe("fruits");
     });
+  });
+});
+
+describe("withAdapterColumnMethods", () => {
+  // The shorthand set is Rails' `define_column_methods` list, exposed as
+  // `columnMethodNames()` — not the native-type hash, whose keys include
+  // `primary_key`. Rails defines `primary_key(name, type = :primary_key,
+  // **options)` separately (abstract/schema_definitions.rb:308): it takes the
+  // second argument as the column type and merges `primary_key: true`, so a
+  // generic shorthand routing it to `column(name, "primary_key")` would diverge.
+  it("never exposes primary_key as a generic column shorthand", () => {
+    const calls: Array<[string, string]> = [];
+    const base = { column: (name: string, type: string) => calls.push([name, type]) };
+    const proxy = withAdapterColumnMethods(base, ["primary_key", "primaryKey", "uuid"]) as Record<
+      string,
+      unknown
+    >;
+
+    expect(proxy["primary_key"]).toBeUndefined();
+    expect(proxy["primaryKey"]).toBeUndefined();
+    expect(typeof proxy["uuid"]).toBe("function");
+
+    (proxy["uuid"] as (n: string) => void)("token");
+    expect(calls).toEqual([["token", "uuid"]]);
   });
 });

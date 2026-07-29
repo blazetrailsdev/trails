@@ -138,24 +138,10 @@ class MysqlBigInteger extends BigIntegerType {
 }
 import { UnsignedInteger } from "../type/unsigned-integer.js";
 import { Text as TextType } from "../type/text.js";
-
-const NATIVE_DATABASE_TYPES: Record<string, { name: string; limit?: number }> = {
-  primary_key: { name: "bigint auto_increment PRIMARY KEY" },
-  string: { name: "varchar", limit: 255 },
-  text: { name: "text" },
-  integer: { name: "int" },
-  bigint: { name: "bigint" },
-  float: { name: "float", limit: 24 },
-  decimal: { name: "decimal" },
-  datetime: { name: "datetime" },
-  timestamp: { name: "timestamp" },
-  time: { name: "time" },
-  date: { name: "date" },
-  binary: { name: "blob" },
-  blob: { name: "blob" },
-  boolean: { name: "tinyint", limit: 1 },
-  json: { name: "json" },
-};
+import {
+  MYSQL_NATIVE_DATABASE_TYPES,
+  type NativeDatabaseTypes,
+} from "./abstract/native-database-types.js";
 
 const ER_DUP_ENTRY = 1062;
 const ER_CANNOT_ADD_FOREIGN = 1215;
@@ -594,8 +580,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return false;
   }
 
-  nativeDatabaseTypes(): Record<string, { name: string; limit?: number }> {
-    return NATIVE_DATABASE_TYPES;
+  nativeDatabaseTypes(): NativeDatabaseTypes {
+    return MYSQL_NATIVE_DATABASE_TYPES;
   }
 
   // Mirrors MySQL's explicit `ColumnMethods` list (`mysql/schema_definitions.rb:46`

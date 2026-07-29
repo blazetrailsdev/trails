@@ -304,8 +304,8 @@ describe("SchemaStatements privates (PR 8)", () => {
     const ss = makeStatements({ supportsDatetimeWithPrecision: () => true });
     const frags = await ss.addTimestampsForAlter("users");
     expect(frags).toHaveLength(2);
-    expect(frags[0]).toContain("DATETIME(6)");
-    expect(frags[1]).toContain("DATETIME(6)");
+    expect(frags[0]).toContain("datetime(6)");
+    expect(frags[1]).toContain("datetime(6)");
   });
 
   it("addTimestampsForAlter respects explicit null option", async () => {

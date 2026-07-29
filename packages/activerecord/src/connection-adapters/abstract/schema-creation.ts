@@ -22,32 +22,13 @@ import {
   TableDefinition,
 } from "./schema-definitions.js";
 import { ABSTRACT_SCHEMA_QUOTER } from "./quoting.js";
+import {
+  NATIVE_DATABASE_TYPES_BY_ADAPTER,
+  type NativeDatabaseType,
+  type NativeDatabaseTypes,
+} from "./native-database-types.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-
-/**
- * Per-adapter default column limits, mirroring the `:limit` keys carried by
- * each adapter's `NATIVE_DATABASE_TYPES` hash. Rails' `type_to_sql` reads that
- * hash (`native = native_database_types[type]`) and fills a missing limit
- * generically via `limit ||= native[:limit]` (abstract/schema_statements.rb:1404).
- * The only non-nil default across our three adapters is MySQL's `:string`
- * (`limit: 255`, abstract_mysql_adapter.rb:33); sqlite3 (`{ name: "varchar" }`,
- * sqlite3_adapter.rb:71) and PostgreSQL (`{ name: "character varying" }`,
- * postgresql_adapter.rb:136) carry none, so a bare `t.string` stays unbounded.
- * Keying the defaults off a table — rather than `adapterName` branches inside
- * each `type_to_sql` case — keeps the native-type knowledge in one place and
- * mirrors Rails' structure. (Only the default *limit* varies by adapter here;
- * PostgreSQL derives its distinct `character varying` type name in its own
- * `typeToSql` override, so the shared visitor emits a single `VARCHAR` name.)
- */
-const NATIVE_TYPE_LIMITS: Record<
-  "sqlite" | "postgres" | "mysql",
-  Partial<Record<ColumnType, number>>
-> = {
-  sqlite: {},
-  postgres: {},
-  mysql: { string: 255 },
-};
 
 type Definition =
   | TableDefinition
@@ -410,132 +391,48 @@ export class SchemaCreation {
       );
   }
 
+  /** @internal */
+  protected nativeDatabaseTypes(): NativeDatabaseTypes {
+    const fromAdapter = (
+      this.adapter as { nativeDatabaseTypes?(): NativeDatabaseTypes }
+    ).nativeDatabaseTypes?.();
+    return fromAdapter ?? NATIVE_DATABASE_TYPES_BY_ADAPTER[this.adapterName];
+  }
+
   typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
     let sql: string;
-    switch (type) {
-      case "string": {
-        // Rails derives the default limit from the adapter's native-type hash
-        // (`type_to_sql`: `limit ||= native[:limit]`). {@link NATIVE_TYPE_LIMITS}
-        // supplies that default per adapter — MySQL's `:string` is 255, sqlite3
-        // and PostgreSQL carry none, so a bare `t.string` stays unbounded there.
-        const limit = options.limit ?? NATIVE_TYPE_LIMITS[this.adapterName].string;
-        sql = limit != null ? `VARCHAR(${limit})` : "VARCHAR";
-        break;
-      }
-      case "text":
-        sql = "TEXT";
-        break;
-      case "integer":
-        // Rails' `type_to_sql` appends an explicit `limit` as `integer(N)`
-        // (schema_statements.rb:1409). SQLite stores the declared type
-        // verbatim, so reflecting it back recovers the byte-width limit — the
-        // dumper's `limit:` option round-trips only when it is emitted here.
-        sql = options.limit != null ? `INTEGER(${options.limit})` : "INTEGER";
-        break;
-      case "bigint":
-        sql = "BIGINT";
-        break;
-      case "float":
-        sql = this.adapterName === "postgres" ? "DOUBLE PRECISION" : "REAL";
-        break;
-      case "decimal": {
-        // Mirror Rails' `type_to_sql` decimal branch (schema_statements.rb:1390):
-        // the precision default is sourced from `native_database_types[:decimal]`,
-        // which carries no `:precision` on SQLite/MySQL/PostgreSQL — so a
-        // precision-less decimal emits a bare `DECIMAL` with no `(N)` clause and
-        // dumps bare, rather than defaulting to `(10)`. When a precision is given,
-        // append `(precision,scale)` / `(precision)` — no space after the comma,
-        // so `extract_scale`/`extract_precision` reflect it back byte-for-byte.
-        this.validateDecimalPrecision(options);
-        const precision = options.precision;
+    const native = type == null ? undefined : this.nativeDatabaseTypes()[type];
+    if (native === undefined) {
+      if (type == null) sql = "";
+      else if (!String(type).trim())
+        throw new Error(`Column has an empty or blank type — specify a valid SQL type`);
+      else sql = String(type);
+    } else {
+      // schema_statements.rb:1387 — `native.is_a?(Hash) ? native[:name] : native`.
+      const spec: NativeDatabaseType = typeof native === "string" ? { name: native } : native;
+      sql = spec.name ?? String(type);
+      let { precision, scale, limit } = options;
+      if (type === "decimal") {
+        scale ??= spec.scale;
+        precision ??= spec.precision;
         if (precision != null) {
-          sql =
-            options.scale != null
-              ? `DECIMAL(${precision},${options.scale})`
-              : `DECIMAL(${precision})`;
+          sql += scale != null ? `(${precision},${scale})` : `(${precision})`;
+        } else if (scale != null) {
+          this.validateDecimalPrecision(options);
+        }
+      } else if (
+        (type === "datetime" || type === "timestamp" || type === "time" || type === "interval") &&
+        (precision ??= spec.precision) != null
+      ) {
+        if (precision >= 0 && precision <= 6) {
+          sql += `(${precision})`;
         } else {
-          sql = "DECIMAL";
-        }
-        break;
-      }
-      case "boolean":
-        sql = "BOOLEAN";
-        break;
-      case "date":
-        sql = "DATE";
-        break;
-      case "time": {
-        const p = options.precision;
-        if (p != null && !(p >= 0 && p <= 6))
           throw new ArgumentError(
-            `No TIME type has precision of ${p}. The allowed range of precision is from 0 to 6`,
+            `No ${spec.name} type has precision of ${precision}. The allowed range of precision is from 0 to 6`,
           );
-        sql = p != null ? `TIME(${p})` : "TIME";
-        break;
-      }
-      case "datetime":
-      case "timestamp": {
-        const base = this.adapterName === "postgres" ? "TIMESTAMP" : "DATETIME";
-        const p = options.precision;
-        if (p != null && !(p >= 0 && p <= 6))
-          throw new ArgumentError(
-            `No ${base} type has precision of ${p}. The allowed range of precision is from 0 to 6`,
-          );
-        sql = p != null ? `${base}(${p})` : base;
-        break;
-      }
-      case "binary":
-        sql = this.adapterName === "postgres" ? "BYTEA" : "BLOB";
-        break;
-      case "json":
-        sql = "JSON";
-        break;
-      case "jsonb":
-        sql = this.adapterName === "postgres" ? "JSONB" : "JSON";
-        break;
-      case "char":
-        sql = `CHAR(${options.limit ?? 1})`;
-        break;
-      case "uuid":
-        if (this.adapterName === "postgres") sql = "UUID";
-        else if (this.adapterName === "mysql") sql = "CHAR(36)";
-        else sql = "VARCHAR(36)";
-        break;
-      case "primary_key":
-        if (this.adapterName === "postgres") sql = "SERIAL PRIMARY KEY";
-        else if (this.adapterName === "mysql") sql = "BIGINT AUTO_INCREMENT PRIMARY KEY";
-        else sql = "INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL";
-        break;
-      // No `:virtual` case: Rails' `type_to_sql` (schema_statements.rb:1385) has
-      // no `:virtual` in `native_database_types`, so `type_to_sql(:virtual)`
-      // returns `type.to_s` → "virtual" via the pass-through below. The
-      // :virtual → options[:type] mapping happens only in `newColumnDefinition`
-      // (with no fallback), so `o.type` is never literally "virtual" by the time
-      // it reaches this visitor — a `?? options.type ?? "string"` fallback here
-      // would contradict that no-fallback semantics.
-      default: {
-        // Pass-through for adapter-specific type strings (e.g.
-        // "timestamptz", "inet", "hstore", custom PG enum names).
-        // Rails' `type_to_sql` returns an unrecognized type verbatim
-        // (`type.to_s`, abstract/schema_statements.rb) — it never uppercases.
-        // We emit it verbatim too: DBs fold type-name case, and a literal type
-        // fragment carrying a value list or args — e.g. enum('text','blob') or
-        // set('a','b') — must keep its quoted member values, where case is
-        // significant.
-        // Rails' `type_to_sql` returns `type.to_s` for an unrecognized type, so
-        // a nil type (e.g. `t.virtual` with no `type:`) yields `""` — the column
-        // renders with no SQL type before its generated-column `AS (...)` clause.
-        // We keep the stricter blank-string guard for an explicitly empty type
-        // string (a likely developer typo), which never arises from a nil option.
-        if (type == null) {
-          sql = "";
-          break;
         }
-        if (!String(type).trim()) {
-          throw new Error(`Column has an empty or blank type — specify a valid SQL type`);
-        }
-        sql = String(type);
-        break;
+      } else if (type !== "primary_key" && (limit ??= spec.limit) != null) {
+        sql += `(${limit})`;
       }
     }
 

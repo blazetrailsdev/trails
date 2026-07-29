@@ -838,7 +838,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const types = PostgreSQLAdapter.nativeDatabaseTypes();
       expect(types.string).toEqual({ name: "character varying" });
       expect(types.binary).toEqual({ name: "bytea" });
-      expect(types.primaryKey).toBe("bigserial primary key");
+      expect(types.primary_key).toBe("bigserial primary key");
       expect(types.datetime).toBeDefined();
     });
 

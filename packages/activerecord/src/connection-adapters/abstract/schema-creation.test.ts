@@ -140,7 +140,7 @@ describe("SchemaCreation#typeToSql decimal precision/scale", () => {
 
   it("honors precision and scale when both are given", () => {
     expect(new SchemaCreation("sqlite").typeToSql("decimal", { precision: 8, scale: 2 })).toBe(
-      "DECIMAL(8,2)",
+      "decimal(8,2)",
     );
   });
 
@@ -148,8 +148,8 @@ describe("SchemaCreation#typeToSql decimal precision/scale", () => {
     // Rails sources the default from native_database_types[:decimal], which
     // carries no :precision on SQLite/MySQL/PostgreSQL — so a precision-less
     // decimal dumps bare rather than defaulting to (10).
-    expect(new SchemaCreation("sqlite").typeToSql("decimal")).toBe("DECIMAL");
-    expect(new SchemaCreation("mysql").typeToSql("decimal")).toBe("DECIMAL");
-    expect(new SchemaCreation("postgres").typeToSql("decimal")).toBe("DECIMAL");
+    expect(new SchemaCreation("sqlite").typeToSql("decimal")).toBe("decimal");
+    expect(new SchemaCreation("mysql").typeToSql("decimal")).toBe("decimal");
+    expect(new SchemaCreation("postgres").typeToSql("decimal")).toBe("decimal");
   });
 });
