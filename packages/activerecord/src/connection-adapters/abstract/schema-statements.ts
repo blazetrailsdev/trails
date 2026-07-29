@@ -1993,9 +1993,7 @@ export class SchemaStatements {
     const indexName =
       options.name?.toString() ?? this.indexName(tableName, this.indexNameOptions(columnNames));
 
-    if (!options.internal) {
-      this._validateIndexLength(tableName, indexName);
-    }
+    this.validateIndexLengthBang(tableName, indexName, options.internal);
 
     const idx = new IndexDefinition(tableName, indexName, !!options.unique, columnNames, {
       where: options.where,
@@ -2165,15 +2163,6 @@ export class SchemaStatements {
 
   maxIndexNameSize(): number {
     return 62;
-  }
-
-  private _validateIndexLength(tableName: string, indexName: string): void {
-    const limit = this.maxIndexNameSize();
-    if (indexName.length > limit) {
-      throw new Error(
-        `Index name '${indexName}' on table '${tableName}' is too long; the limit is ${limit} characters`,
-      );
-    }
   }
 
   /** @internal */
