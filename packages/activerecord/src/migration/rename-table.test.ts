@@ -39,9 +39,6 @@ describe("Migration", () => {
       await connection.renameTable("octopi", "test_models");
     }
     await connection.dropTable("test_models", { ifExists: true });
-    // No Rails counterpart: `references` is a canonical table on the shared
-    // per-worker database, so if the reserved-words case dies between its two
-    // renames the next file in this worker would find it missing.
     if (await connection.tableExists("old_references")) {
       await connection.dropTable("old_references", { ifExists: true });
       await rebuildCanonicalTables(connection, ["references"]);
