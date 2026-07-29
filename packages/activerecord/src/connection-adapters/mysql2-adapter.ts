@@ -271,7 +271,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   private _connectionConfigured = false;
   // Per-adapter StatementPool. Single connection → single pool.
   // Cleared on disconnect/reconnect; re-created on first query after reconnect.
-  private _stmtPool: Mysql2StatementPool | null = null;
+  private _statementPool: Mysql2StatementPool | null = null;
 
   /**
    * The timezone applied to result rows for the most recent query. Mirrors
@@ -303,7 +303,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   protected override _onStatementLimitChanged(value: number): void {
-    this._stmtPool?.setMaxSize(value);
+    this._statementPool?.setMaxSize(value);
   }
 
   /**
@@ -337,10 +337,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * connection.
    */
   private _getStmtPool(conn: mysql.Connection): Mysql2StatementPool {
-    if (!this._stmtPool) {
-      this._stmtPool = new Mysql2StatementPool(conn, this._statementLimit);
+    if (!this._statementPool) {
+      this._statementPool = new Mysql2StatementPool(conn, this._statementLimit);
     }
-    return this._stmtPool;
+    return this._statementPool;
   }
 
   /**
@@ -352,7 +352,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   private _shouldPrepare(binds: unknown[]): boolean {
     if (!this.preparedStatements || binds.length === 0) return false;
-    const poolLimit = this._stmtPool?.maxSize ?? this._statementLimit;
+    const poolLimit = this._statementPool?.maxSize ?? this._statementLimit;
     return poolLimit > 0;
   }
 
@@ -380,7 +380,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * @internal
    */
   _statementPoolForTest(): Mysql2StatementPool | undefined {
-    return this._stmtPool ?? undefined;
+    return this._statementPool ?? undefined;
   }
 
   /**
@@ -399,7 +399,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   override clearCacheBang(): void {
     super.clearCacheBang();
-    this._stmtPool?.clear();
+    this._statementPool?.clear();
   }
   private _fullVersionString: string | null = null;
   private _database: string | undefined;
@@ -818,7 +818,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         // is now satisfied, so connectBang fires once per connect rather than
         // on every withRawConnection call.
         this._client = conn;
-        this._stmtPool = null;
+        this._statementPool = null;
         this._activeState = true;
         // Configure the freshly-opened socket exactly as Rails does on every
         // fresh connect (attempt_configure_connection via connect!/reconnect!).
@@ -1718,8 +1718,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   private _closeRawHandle(): void {
     this._inTransaction = false;
     this._connectionConfigured = false;
-    this._stmtPool?.detach();
-    this._stmtPool = null;
+    this._statementPool?.detach();
+    this._statementPool = null;
     if (this._client) {
       // Chain onto any in-flight teardown so repeated disconnect/reconnect
       // cycles don't lose earlier end() promises.
@@ -1753,8 +1753,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     super.discardBang();
     this._inTransaction = false;
     this._connectionConfigured = false;
-    this._stmtPool?.detach();
-    this._stmtPool = null;
+    this._statementPool?.detach();
+    this._statementPool = null;
     // Safe to read `_client` after `super.discardBang()` — unlike
     // `disconnectBang`, the base `discardBang` (abstract-adapter.ts) is a true
     // no-op that never touches `_connection`, so the live handle survives here
@@ -1774,8 +1774,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._connectGeneration++;
     this._inTransaction = false;
     this._connectionConfigured = false;
-    this._stmtPool?.detach();
-    this._stmtPool = null;
+    this._statementPool?.detach();
+    this._statementPool = null;
     if (this._client) {
       await this._client.end();
       this._client = null;
