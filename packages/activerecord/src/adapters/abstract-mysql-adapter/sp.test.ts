@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/sp_test.rb
  */
-import { describe, it, beforeAll, afterAll, expect } from "vitest";
+import { describe, it, expect } from "vitest";
 import { describeIfMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../base.js";
 import { Topic } from "../../test-helpers/models/topic.js";
@@ -9,25 +9,7 @@ import { fixtures } from "../../test-fixtures.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   describe("StoredProcedureTest", () => {
-    // Rails `fixtures :topics` — load canonical topics via the handler connection.
     const { topics } = fixtures(["topics"]);
-
-    beforeAll(async () => {
-      await Base.connection.executeMutation("DROP PROCEDURE IF EXISTS ten");
-      await Base.connection.executeMutation(
-        `CREATE PROCEDURE ten() SQL SECURITY INVOKER BEGIN SELECT 10; END`,
-      );
-      await Base.connection.executeMutation("DROP PROCEDURE IF EXISTS topics");
-      await Base.connection.executeMutation(
-        `CREATE PROCEDURE topics(IN num INT) SQL SECURITY INVOKER` +
-          ` BEGIN SELECT * FROM topics LIMIT num; END`,
-      );
-    });
-
-    afterAll(async () => {
-      await Base.connection.executeMutation("DROP PROCEDURE IF EXISTS ten");
-      await Base.connection.executeMutation("DROP PROCEDURE IF EXISTS topics");
-    });
 
     it("multi results", async () => {
       const rows = await Base.connection.selectRows("CALL ten();");
