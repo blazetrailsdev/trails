@@ -231,6 +231,23 @@ tester.run("require-table-teardown", rule, {
       "for (const t of rows) {\n" +
       '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
       "}",
+    // The DROP half hoisted to a variable is the same sweep as the inline
+    // spelling: the resolved template is read one quasi at a time, so the
+    // interpolated name still reads as dynamic.
+    'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  const dropSql = `DROP TABLE IF EXISTS "${t.tablename}"`;\n' +
+      "  await adapter.exec(dropSql);\n" +
+      "}",
+    // A raw create and drop hoisted into variables balance each other exactly
+    // as the inline spelling does.
+    'const createSql = `CREATE TABLE "widgets" (id int)`;\n' +
+      "await adapter.exec(createSql);\n" +
+      'const dropSql = "DROP TABLE widgets";\n' +
+      "await adapter.exec(dropSql);",
   ],
   invalid: [
     // Dropping the truncated prefix of a spaced quoted name is not a teardown
@@ -746,6 +763,28 @@ tester.run("require-table-teardown", rule, {
         '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
         "}",
       errors: [{ messageId: "missingTeardown", data: { table: "EX_FOO" } }],
+    },
+    // A hoisted drop whose name is flush against a substitution names no
+    // knowable table and is not the drop half of a sweep either, so the file's
+    // prefixed create is still reported.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        "await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+        ");\n" +
+        "const dropSql = `DROP TABLE tmp_${suffix}`;\n" +
+        "await adapter.exec(dropSql);",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
+    },
+    // A hoisted DDL string that never reaches a sink arms nothing: the drop it
+    // spells is never executed, so the create it would balance still reports.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "widgets" (id int)`);\n' +
+        'const dropSql = "DROP TABLE widgets";\n' +
+        "expect(dropSql).toBe(rendered);",
+      errors: [{ messageId: "missingTeardown", data: { table: "widgets" } }],
     },
   ],
 });

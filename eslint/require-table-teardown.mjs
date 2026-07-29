@@ -138,21 +138,23 @@
  * filter spellings read are `LIKE`, `ILIKE`, `SIMILAR TO` and `~` / `~*`; their
  * negations are deliberately read as nothing (see `LIKE_PREFIX_RE`).
  *
- * The identifier in that list is the shared `sqlTexts` (`eslint/sql-texts.mjs`),
+ * The identifier in that list is the shared resolver (`eslint/sql-texts.mjs`),
  * so a filter hoisted to a `const SWEEP_SQL` — or assigned to a `let` after its
  * declaration — arms the same prefixes as the inline spelling, and the two rules
  * cannot disagree about which writes a hoisted query can carry. A string that
  * never reaches a sink still arms nothing, so an expected-SQL assertion over
- * rendered DDL stays quiet. A resolved template is read one quasi at a time
- * (`separateQuasis`), never joined: a joined `LIKE 'ex${suffix}%'` would read as
- * the static prefix `ex `, arming a prefix the query does not select and
- * suppressing the leak of a table like `ex leak`. Reading each quasi alone
- * leaves `LIKE 'ex` unterminated, so an interpolated pattern credits nothing —
- * the same answer the inline-template path gives, and the right one, since `_`
- * and `%` are wildcards whose meaning depends on text the lint pass cannot see.
- * Only the FILTER is read off a resolved variable, never a create or drop name:
- * a name at a quasi boundary needs the dynamic-end signal `recordText` carries,
- * which a resolved text has no node to supply.
+ * rendered DDL stays quiet. A resolved template is read one quasi at a time,
+ * never joined: a joined `LIKE 'ex${suffix}%'` would read as the static prefix
+ * `ex `, arming a prefix the query does not select and suppressing the leak of
+ * a table like `ex leak`. Reading each quasi alone leaves `LIKE 'ex`
+ * unterminated, so an interpolated pattern credits nothing — the same answer
+ * the inline-template path gives, and the right one, since `_` and `%` are
+ * wildcards whose meaning depends on text the lint pass cannot see. The whole
+ * reading is applied to a resolved string, not just the filter: the resolver
+ * hands back each string's quasi array (`createSqlTextGroups`), so every quasi
+ * gets the successor texts `recordText` needs, and a hoisted `DROP TABLE
+ * "${row.tablename}"` arms the sweep while a hoisted `DROP TABLE tmp_${suffix}`
+ * — a name flush against a substitution — still names nothing.
  *
  * This is deliberately independent of `require-canonical-rebuild`: the two
  * rules answer different questions. A sweep that can select a canonical table
@@ -186,7 +188,7 @@
 
 import { calledName, staticString, SQL_SINKS } from "./sql-call-shapes.mjs";
 import { createSweepBinding } from "./sweep-binding.mjs";
-import { createSqlTexts } from "./sql-texts.mjs";
+import { createSqlTextGroups } from "./sql-texts.mjs";
 
 /** The created table name (createTable's first arg), or null if not static. */
 function createdTableName(call) {
@@ -584,7 +586,7 @@ const rule = {
     const { isSweepBound, resolve } = createSweepBinding(context, {
       loopBindingNeedsSinkIterable: true,
     });
-    const sqlTexts = createSqlTexts(resolve, { separateQuasis: true });
+    const sqlTextGroups = createSqlTextGroups(resolve);
 
     // table name → first create node seen (for the report location).
     const created = new Map();
@@ -655,26 +657,31 @@ const rule = {
       if (hasDynamicDropName(text, nextTexts)) sawSweepDrop = true;
     }
 
+    // Each quasi is static text between interpolations; a quasi that is
+    // followed by an interpolation has a dynamic end (see rawCreateNames), and
+    // the quasis after it are where the interpolated values resume.
+    function recordQuasis(quasis, node) {
+      const last = quasis.length - 1;
+      quasis.forEach((text, i) => {
+        if (text) recordText(text, node, i < last ? quasis.slice(i + 1) : null);
+      });
+    }
+
     function recordSinkSql(call) {
       for (const arg of call.arguments) {
         if (arg.type === "Literal") {
           if (typeof arg.value === "string") recordText(arg.value, arg, null);
         } else if (arg.type === "TemplateLiteral") {
-          // Each quasi is static text between interpolations; a quasi that is
-          // followed by an interpolation has a dynamic end (see rawCreateNames),
-          // and the quasis after it are where the interpolated values resume.
-          const last = arg.quasis.length - 1;
-          arg.quasis.forEach((q, i) => {
-            if (q.value.cooked) {
-              recordText(
-                q.value.cooked,
-                arg,
-                i < last ? arg.quasis.slice(i + 1).map((n) => n.value.cooked) : null,
-              );
-            }
-          });
+          recordQuasis(
+            arg.quasis.map((q) => q.value.cooked),
+            arg,
+          );
         } else if (arg.type === "Identifier") {
-          for (const text of sqlTexts(arg)) sweptPrefixes.push(...sweepPrefixMatchers(text));
+          // A resolved string is read exactly like an inline one: its quasi
+          // group carries the same boundary information the AST would, so a
+          // hoisted sweep's DROP half arms and a hoisted raw CREATE/DROP folds
+          // into the same balance.
+          for (const quasis of sqlTextGroups(arg)) recordQuasis(quasis, arg);
         }
       }
     }
