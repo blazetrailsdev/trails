@@ -115,17 +115,6 @@ function validateDatabaseFlag(opts: DatabaseOpts): string | undefined {
   return trimmed;
 }
 
-/**
- * Iterate every named database config in the current env, optionally
- * filtered to a single name via `--database`. Mirrors Rails'
- * `DatabaseTasks.for_each(databases) { |name| ... }` which generates
- * per-name rake tasks. Commander can't generate dynamic subcommands,
- * so we use a `--database` flag instead.
- *
- * For each config: normalizes, builds a HashConfig, connects an adapter,
- * runs `fn`, closes the adapter. `fn` receives the adapter, the raw
- * config, the HashConfig, and the config name.
- */
 interface DatabaseEntry {
   name: string;
   raw: RawConfig;
@@ -158,6 +147,17 @@ async function taskableDatabaseEntries(opts: DatabaseOpts): Promise<DatabaseEntr
   return filtered;
 }
 
+/**
+ * Iterate every named database config in the current env, optionally
+ * filtered to a single name via `--database`. Mirrors Rails'
+ * `DatabaseTasks.for_each(databases) { |name| ... }` which generates
+ * per-name rake tasks. Commander can't generate dynamic subcommands,
+ * so we use a `--database` flag instead.
+ *
+ * For each config: connects an adapter, runs `fn`, closes the adapter.
+ * `fn` receives the adapter, the raw config, the HashConfig, and the
+ * config name.
+ */
 async function forEachDatabase(
   opts: DatabaseOpts,
   fn: (ctx: {
@@ -837,21 +837,34 @@ export function dbCommand(): Command {
       const envName = resolveEnv();
       const entries = await taskableDatabaseEntries({});
 
-      DatabaseTasks.registerMigrations([]);
-      for (const entry of entries) {
-        const dirs = await migrationsDirsForConfig(entry.name, entry.raw);
-        DatabaseTasks.registerMigrations(await discoverMigrationsFromDirs(dirs), entry.name);
+      if (entries.length === 0) {
+        throw new Error(`No database configuration found for environment "${envName}".`);
       }
+      const primaryIndex = Math.max(
+        entries.findIndex((entry) => entry.hashConfig.isPrimary()),
+        0,
+      );
+
+      const migrationSets = await Promise.all(
+        entries.map(async (entry) =>
+          discoverMigrationsFromDirs(await migrationsDirsForConfig(entry.name, entry.raw)),
+        ),
+      );
+      // Register the primary's set unnamed first: that clears any per-name
+      // registrations left by an earlier command and leaves a sensible
+      // fallback for a config with no directory of its own.
+      DatabaseTasks.registerMigrations(migrationSets[primaryIndex] ?? []);
+      entries.forEach((entry, i) => {
+        DatabaseTasks.registerMigrations(migrationSets[i] ?? [], entry.name);
+      });
 
       // Rails' load_seed runs against the established connection, which is
       // the primary's; Base has no connection here, so lend it one.
-      const seedTarget =
-        entries.find((entry) => entry.hashConfig.isPrimary())?.hashConfig ?? entries[0]?.hashConfig;
+      const seedTarget = entries[primaryIndex].hashConfig;
       const previousSeedLoader = DatabaseTasks.seedLoader;
       const previousFormat = DatabaseTasks.schemaFormat;
       DatabaseTasks.seedLoader = {
         async loadSeed() {
-          if (!seedTarget) return;
           await DatabaseTasks.withTemporaryPool(seedTarget, async (pool) => {
             await withSeedAdapter(await pool.leaseConnection(), runSeed);
           });
