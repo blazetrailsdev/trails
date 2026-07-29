@@ -6,12 +6,86 @@ import {
   type DateNegativeInfinity as DateNegativeInfinityType,
 } from "./internal/sentinels.js";
 import { ArgumentError } from "../attribute-assignment.js";
-import { AcceptsMultiparameterTime, isHash } from "./helpers/accepts-multiparameter-time.js";
+import {
+  AcceptsMultiparameterTime,
+  MONTH_ABBREVIATIONS,
+  isHash,
+} from "./helpers/accepts-multiparameter-time.js";
 import { isUtc } from "./helpers/timezone.js";
 import { fastStringToTime, newTime } from "./helpers/time-value.js";
 import { ValueType } from "./value.js";
 
 export type DateTimeCastResult = Temporal.Instant | DateInfinityType | DateNegativeInfinityType;
+
+/** The subset of `Date._parse`'s result hash that `fallback_string_to_time` reads. */
+interface TimeHash {
+  year: number;
+  mon: number;
+  mday: number;
+  hour: number;
+  min: number;
+  sec: number;
+  sec_fraction: number;
+  offset: number | null;
+}
+
+const WEEKDAY_PREFIX = /^(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?,?\s+/i;
+
+const RFC_DATETIME =
+  /^(\d{1,2})\s+([A-Za-z]{3,9})\.?\s+(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2})(\.\d+)?)?)?(?:\s+(\S+))?$/;
+
+/**
+ * Zone abbreviation → offset in seconds, the trails stand-in for the table
+ * `Date._parse` consults (Ruby's `Date::Format::ZONES`, generated from
+ * `zonetab.list`). Only the abbreviations that table resolves unambiguously
+ * are listed; anything else leaves `offset` nil, exactly as `Date._parse`
+ * does for an unknown zone.
+ */
+const ZONE_OFFSETS: Record<string, number> = {
+  ut: 0,
+  utc: 0,
+  gmt: 0,
+  z: 0,
+  wet: 0,
+  west: 3600,
+  bst: 3600,
+  cet: 3600,
+  cest: 7200,
+  eet: 7200,
+  eest: 10800,
+  eat: 10800,
+  msk: 10800,
+  jst: 32400,
+  kst: 32400,
+  aest: 36000,
+  aedt: 39600,
+  nzst: 43200,
+  nzdt: 46800,
+  hst: -36000,
+  akst: -32400,
+  akdt: -28800,
+  pst: -28800,
+  pdt: -25200,
+  mst: -25200,
+  mdt: -21600,
+  cst: -21600,
+  cdt: -18000,
+  est: -18000,
+  edt: -14400,
+  ast: -14400,
+  adt: -10800,
+  nst: -12600,
+};
+
+function zoneOffsetSeconds(zone: string): number | null {
+  const numeric = /^([+-])(\d{2}):?(\d{2})?$/.exec(zone);
+  if (numeric) {
+    const sign = numeric[1] === "-" ? -1 : 1;
+    return sign * (Number(numeric[2]) * 3600 + Number(numeric[3] ?? 0) * 60);
+  }
+  const named = ZONE_OFFSETS[zone.toLowerCase()];
+  return named === undefined ? null : named;
+}
 
 export class DateTimeType extends ValueType<DateTimeCastResult> {
   readonly name: string = "datetime";
@@ -133,31 +207,38 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     ) as DateTimeCastResult | null;
   }
 
-  private parseTimeHash(s: string): {
-    year: number;
-    mon: number;
-    mday: number;
-    hour: number;
-    min: number;
-    sec: number;
-    sec_fraction: number;
-    offset: number | null;
-  } | null {
-    const normalized = s
+  private parseTimeHash(s: string): TimeHash | null {
+    const withoutWeekday = s.replace(WEEKDAY_PREFIX, "");
+    const rfc = RFC_DATETIME.exec(withoutWeekday);
+    if (rfc) {
+      const mon = MONTH_ABBREVIATIONS.indexOf(rfc[2].slice(0, 3).toLowerCase()) + 1;
+      if (mon === 0) return null;
+      return {
+        year: Number(rfc[3]),
+        mon,
+        mday: Number(rfc[1]),
+        hour: Number(rfc[4] ?? 0),
+        min: Number(rfc[5] ?? 0),
+        sec: Number(rfc[6] ?? 0),
+        sec_fraction: rfc[7] ? Number(`0${rfc[7]}`) : 0,
+        offset: rfc[8] === undefined ? null : zoneOffsetSeconds(rfc[8]),
+      };
+    }
+
+    const normalized = withoutWeekday
       .replace(" ", "T")
-      .replace(/(T\d{2}:\d{2}:\d{2}(?:\.\d+)?)([-+]\d{2})$/, "$1$2:00");
+      .replace(
+        /(T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)\s*([-+]\d{2}):?(\d{2})?$/,
+        (_m, time: string, hours: string, minutes: string | undefined) =>
+          `${time}${hours}:${minutes ?? "00"}`,
+      );
     const zoneMatch = /(Z|[+-]\d{2}:\d{2})$/.exec(normalized);
     let offset: number | null = null;
     let body = normalized;
     if (zoneMatch) {
       const zone = zoneMatch[1];
       body = normalized.slice(0, normalized.length - zone.length);
-      if (zone === "Z") {
-        offset = 0;
-      } else {
-        const sign = zone.startsWith("-") ? -1 : 1;
-        offset = sign * (Number(zone.slice(1, 3)) * 3600 + Number(zone.slice(4, 6)) * 60);
-      }
+      offset = zoneOffsetSeconds(zone);
     }
     const datetimeString = /^\d{4}-?\d{2}-?\d{2}$/.test(body) ? `${body}T00:00:00` : body;
     let plain: Temporal.PlainDateTime;

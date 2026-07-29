@@ -25,7 +25,7 @@ export function isHash(value: unknown): value is Record<string, unknown> {
 }
 
 // Ruby Time's month-name coercion table (time.c months[]).
-const MONTH_ABBREVIATIONS = [
+export const MONTH_ABBREVIATIONS = [
   "jan",
   "feb",
   "mar",
