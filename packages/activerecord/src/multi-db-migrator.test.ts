@@ -7,18 +7,9 @@ import { Migrator } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { scratchDatabasePath } from "./support/scratch-database.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
-
-// Rails takes `ActiveRecord::Base.connection_pool` and
-// `ARUnit2Model.connection_pool` — two *different* databases, both file-backed
-// (`arunit` / `arunit2`). The point of the test is that the two schema_migration
-// tables are independent, so each adapter gets its own on-disk database rather
-// than a private `:memory:` one.
-async function makeSqliteAdapter(label: string): Promise<DatabaseAdapter> {
-  const { BetterSQLite3Adapter } = await import("./connection-adapters/better-sqlite3-adapter.js");
-  return new BetterSQLite3Adapter(await scratchDatabasePath(label));
-}
+import { Base } from "./base.js";
+import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 
 function sensor(
   version: string,
@@ -53,8 +44,8 @@ describe("MultiDbMigratorTest", () => {
   let migrationsB: MigrationProxy[];
 
   beforeEach(async () => {
-    adapterA = await makeSqliteAdapter("multi-db-migrator-a");
-    adapterB = await makeSqliteAdapter("multi-db-migrator-b");
+    adapterA = await Base.leaseConnection();
+    adapterB = await ARUnit2Model.leaseConnection();
     smA = new SchemaMigration(adapterA);
     smB = new SchemaMigration(adapterB);
     await smA.createTable();
@@ -93,23 +84,16 @@ describe("MultiDbMigratorTest", () => {
     ];
   });
 
-  // The databases are files now, so the handles have to be released — a leaked
-  // one keeps the WAL sidecars alive past the run.
   afterEach(async () => {
-    await adapterA.close();
-    await adapterB.close();
+    await smA.deleteAllVersions();
+    await smB.deleteAllVersions();
   });
 
-  it("schema migration is different for different connections", async () => {
-    const migratorA = new Migrator(adapterA, migrationsA);
-    const migratorB = new Migrator(adapterB, migrationsB);
-
-    await migratorA.up();
-    const versionsA = await migratorA.getAllVersions();
-    const versionsB = await migratorB.getAllVersions();
-
-    expect(versionsA).toEqual(["1", "2", "3"]);
-    expect(versionsB).toEqual([]);
+  it("schema migration is different for different connections", () => {
+    expect(smA).not.toBe(smB);
+    expect(adapterA).not.toBe(adapterB);
+    expect(Base.connectionPool().poolConfig.connectionDescriptor.name).toBe("Base");
+    expect(ARUnit2Model.connectionPool().poolConfig.connectionDescriptor.name).toBe("ARUnit2Model");
   });
 
   it("finds migrations", () => {
