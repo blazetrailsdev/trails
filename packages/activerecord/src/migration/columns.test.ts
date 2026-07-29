@@ -1,15 +1,3 @@
-/**
- * Port of the `rename_column`, `remove_column` and `change_column` families of
- * `ActiveRecord::Migration::ColumnsTest`
- * (vendor/rails/activerecord/test/cases/migration/columns_test.rb). The
- * adapter-gated cases and the `assert_queries_count` pair are still unported.
- *
- * Driven by the ambient connection, mirroring Rails'
- * `@connection = ActiveRecord::Base.lease_connection`. `test_models` is not a
- * canonical-schema table in Rails either — `Migration::TestHelper`'s setup
- * creates and drops it (migration/helper.rb:20-34) — so this mirrors that
- * rather than reaching for the canonical schema.
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../base.js";
 import type { Column } from "../connection-adapters/column.js";
@@ -34,7 +22,6 @@ function indexNameLength(conn: AbstractAdapter): number {
   return (conn as unknown as { indexNameLength(): number }).indexNameLength();
 }
 
-/** `ActiveRecord::Migration::TestHelper::TestModel`, migration/helper.rb:16-18. */
 class TestModel extends Base {
   static {
     this._tableName = "test_models";
