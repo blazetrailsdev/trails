@@ -520,6 +520,18 @@ tester.run("require-table-teardown", rule, {
         "}",
       errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
     },
+    // LIKE stays case-sensitive: only ILIKE's matcher carries the `i` flag.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "EX_FOO" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex!_%' ESCAPE '!'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "EX_FOO" } }],
+    },
     // NOT ILIKE is an exclusion filter too, and yields no prefix either.
     {
       code:

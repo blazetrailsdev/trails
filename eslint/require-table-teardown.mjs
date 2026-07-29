@@ -336,14 +336,14 @@ const CATALOGUE_SOURCE =
  * the `i` flag: `ILIKE 'ex_%'` really does select `EX_FOO`, and compiling it
  * case-sensitively would leave that create reported although the sweep drops it.
  *
- * `NOT LIKE` (and `NOT ILIKE`) is excluded, and it is not a nicety: an exclusion
- * filter selects
- * the complement of its pattern, so reading `NOT LIKE 'ex_%'` as a prefix would
- * make a sweep satisfy exactly the creates it deliberately spares. The empty
+ * `NOT LIKE` and `NOT ILIKE` are excluded, and it is not a nicety: an exclusion
+ * filter selects the complement of its pattern, so reading `NOT LIKE 'ex_%'` as
+ * a prefix would make a sweep satisfy exactly the creates it deliberately
+ * spares. The empty
  * pattern is likewise impossible to match (`[^'%]+`), so a bare `LIKE '%'`
  * selecting everything never becomes a prefix that satisfies everything.
  */
-const LIKE_PREFIX_RE = /(?<!\bnot\s+)\b(i?)like\s+'([^'%]+)%'/gi;
+const LIKE_PREFIX_RE = /(?<!\bnot\s+)\b(?<i>i?)like\s+'(?<pattern>[^'%]+)%'/gi;
 /** A trailing `ESCAPE '<char>'` clause, and the leading keyword on its own. */
 const ESCAPE_CLAUSE_RE = /^\s*escape\s+'([^'])'/i;
 const ESCAPE_KEYWORD_RE = /^\s*escape\b/i;
@@ -356,7 +356,8 @@ export function sweepPrefixMatchers(text) {
     const tail = text.slice(m.index + m[0].length);
     const clause = ESCAPE_CLAUSE_RE.exec(tail);
     if (clause === null && ESCAPE_KEYWORD_RE.test(tail)) continue;
-    const matcher = likePrefixMatcher(m[2], clause === null ? "\\" : clause[1], m[1] !== "");
+    const { i, pattern } = m.groups;
+    const matcher = likePrefixMatcher(pattern, clause === null ? "\\" : clause[1], i !== "");
     if (matcher !== null) matchers.push(matcher);
   }
   return matchers;
@@ -366,9 +367,11 @@ export function sweepPrefixMatchers(text) {
  * An anchored RegExp matching the names `<pattern>%` selects under
  * `escapeChar`, or null when the trailing `%` is itself escaped — `LIKE 'ex\%'`
  * matches the single literal name `ex%`, not a prefix, so it sweeps nothing
- * this rule should credit.
+ * this rule should credit. `caseInsensitive` is set for `ILIKE` filters only —
+ * `LIKE` is case-sensitive in PostgreSQL, so widening it would credit creates
+ * the sweep leaves behind.
  */
-function likePrefixMatcher(pattern, escapeChar, caseInsensitive = false) {
+function likePrefixMatcher(pattern, escapeChar, caseInsensitive) {
   let source = "";
   let escaped = false;
   for (const ch of pattern) {
