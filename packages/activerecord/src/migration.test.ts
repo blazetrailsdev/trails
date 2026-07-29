@@ -41,6 +41,7 @@ import { describeIfPg } from "./support/describe-if-pg.js";
 import { Mysql2Adapter } from "./connection-adapters/mysql2-adapter.js";
 import { describeIfMysqlAdapter } from "./support/describe-if-mysql-adapter.js";
 import { leaseMysqlAdapter } from "./adapters/abstract-mysql-adapter/test-helper.js";
+import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 
 async function freshContext(): Promise<{ adapter: DatabaseAdapter; ctx: MigrationContext }> {
   const adapter = Base.connection;
@@ -630,17 +631,17 @@ describe("MigrationTest", () => {
       {
         version: "1",
         name: "First",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
+        migration: () => anonymousMigration("First", "1"),
       },
       {
         version: "2",
         name: "Second",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
+        migration: () => anonymousMigration("Second", "2"),
       },
       {
         version: "3",
         name: "Third",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
+        migration: () => anonymousMigration("Third", "3"),
       },
     ];
     const migrator = new Migrator(adapter, migrations);
@@ -661,17 +662,17 @@ describe("MigrationTest", () => {
       {
         version: "1",
         name: "First",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
+        migration: () => anonymousMigration("First", "1"),
       },
       {
         version: "2",
         name: "Second",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
+        migration: () => anonymousMigration("Second", "2"),
       },
       {
         version: "3",
         name: "Third",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
+        migration: () => anonymousMigration("Third", "3"),
       },
     ];
     const migrator = new Migrator(adapter, migrations);
@@ -725,7 +726,7 @@ describe("MigrationTest", () => {
       {
         version: "1",
         name: "First",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
+        migration: () => anonymousMigration("First", "1"),
       },
     ];
     const migrator = new Migrator(adapter, migrations);
@@ -743,7 +744,7 @@ describe("MigrationTest", () => {
       {
         version: "1",
         name: "First",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
+        migration: () => anonymousMigration("First", "1"),
       },
     ]);
     expect(withMigrations.migrations.length).toBeGreaterThan(0);
@@ -758,7 +759,7 @@ describe("MigrationTest", () => {
       {
         version: "20131219224947",
         name: "VersionCheck",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
+        migration: () => anonymousMigration("VersionCheck", "20131219224947"),
       },
     ];
     const migrator = new Migrator(adapter, migrations);
@@ -907,22 +908,28 @@ describe("MigrationTest", () => {
       {
         version: "1",
         name: "First",
-        migration: () => ({
-          up: async () => {
-            ran.push("first");
-          },
-          down: async () => {},
-        }),
+        migration: () =>
+          anonymousMigration(
+            "First",
+            "1",
+            async () => {
+              ran.push("first");
+            },
+            async () => {},
+          ),
       },
       {
         version: "2",
         name: "Second",
-        migration: () => ({
-          up: async () => {
-            ran.push("second");
-          },
-          down: async () => {},
-        }),
+        migration: () =>
+          anonymousMigration(
+            "Second",
+            "2",
+            async () => {
+              ran.push("second");
+            },
+            async () => {},
+          ),
       },
     ];
     const migrator = new Migrator(adapter, migrations);
@@ -938,12 +945,15 @@ describe("MigrationTest", () => {
       {
         version: "100",
         name: "Broken",
-        migration: () => ({
-          up: async () => {
-            throw new Error("Something broke");
-          },
-          down: async () => {},
-        }),
+        migration: () =>
+          anonymousMigration(
+            "Broken",
+            "100",
+            async () => {
+              throw new Error("Something broke");
+            },
+            async () => {},
+          ),
       },
     ];
     const migrator = new Migrator(adapter, migrations);
@@ -962,12 +972,15 @@ describe("MigrationTest", () => {
         {
           version: "100",
           name: "Broken",
-          migration: () => ({
-            up: async () => {
-              throw new Error("Something broke");
-            },
-            down: async () => {},
-          }),
+          migration: () =>
+            anonymousMigration(
+              "Broken",
+              "100",
+              async () => {
+                throw new Error("Something broke");
+              },
+              async () => {},
+            ),
         },
       ];
       const migrator = new Migrator(adapter, migrations);
@@ -1080,7 +1093,7 @@ describe("MigrationTest", () => {
     const proxy: MigrationProxy = {
       version: "1",
       name: "M1",
-      migration: () => ({ up: async () => {}, down: async () => {} }),
+      migration: () => anonymousMigration("M1", "1"),
     };
     const migrator = new Migrator(adapter, [proxy], { environment: "staging" });
     await migrator.up();
@@ -1098,7 +1111,7 @@ describe("MigrationTest", () => {
     const proxy: MigrationProxy = {
       version: "1",
       name: "TestMigration",
-      migration: () => ({ up: async () => {}, down: async () => {} }),
+      migration: () => anonymousMigration("TestMigration", "1"),
     };
     const migrator = new Migrator(adapter, [proxy], { internalMetadataEnabled: false });
     await migrator.up();
@@ -1356,12 +1369,15 @@ describe("MigrationTest", () => {
     const proxy: MigrationProxy = {
       version: "100",
       name: "Broken",
-      migration: () => ({
-        up: async () => {
-          ran.push("ran");
-        },
-        down: async () => {},
-      }),
+      migration: () =>
+        anonymousMigration(
+          "Broken",
+          "100",
+          async () => {
+            ran.push("ran");
+          },
+          async () => {},
+        ),
     };
     const lockAdapter = makeLockAdapter({ acquires: false });
     const migrator = new Migrator(lockAdapter, [proxy]);
@@ -1374,12 +1390,15 @@ describe("MigrationTest", () => {
     const proxy: MigrationProxy = {
       version: "100",
       name: "Broken",
-      migration: () => ({
-        up: async () => {
-          ran.push("ran");
-        },
-        down: async () => {},
-      }),
+      migration: () =>
+        anonymousMigration(
+          "Broken",
+          "100",
+          async () => {
+            ran.push("ran");
+          },
+          async () => {},
+        ),
     };
     const lockAdapter = makeLockAdapter({ acquires: false });
     const migrator = new Migrator(lockAdapter, [proxy]);
@@ -1405,7 +1424,7 @@ describe("MigrationTest", () => {
         const proxy: MigrationProxy = {
           version: "200",
           name: "NoOp",
-          migration: () => ({ up: async () => {}, down: async () => {} }),
+          migration: () => anonymousMigration("NoOp", "200"),
         };
         const migrator = new Migrator(realAdapter, [proxy]);
         await migrator.migrate();

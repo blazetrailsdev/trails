@@ -8,6 +8,7 @@ import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { scratchDatabasePath } from "./support/scratch-database.js";
+import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 
 // Rails takes `ActiveRecord::Base.connection_pool` and
 // `ARUnit2Model.connection_pool` — two *different* databases, both file-backed
@@ -28,14 +29,17 @@ function sensor(
     name,
     wentUp: false,
     wentDown: false,
-    migration: () => ({
-      up: async () => {
-        proxy.wentUp = true;
-      },
-      down: async () => {
-        proxy.wentDown = true;
-      },
-    }),
+    migration: () =>
+      anonymousMigration(
+        name,
+        version,
+        async () => {
+          proxy.wentUp = true;
+        },
+        async () => {
+          proxy.wentDown = true;
+        },
+      ),
   };
   return proxy;
 }
@@ -62,29 +66,29 @@ describe("MultiDbMigratorTest", () => {
       {
         version: "1",
         name: "ValidPeopleHaveLastNames",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
+        migration: () => anonymousMigration("ValidPeopleHaveLastNames", "1"),
       },
       {
         version: "2",
         name: "WeNeedReminders",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
+        migration: () => anonymousMigration("WeNeedReminders", "2"),
       },
       {
         version: "3",
         name: "InnocentJointable",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
+        migration: () => anonymousMigration("InnocentJointable", "3"),
       },
     ];
     migrationsB = [
       {
         version: "1",
         name: "PeopleHaveHobbies",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
+        migration: () => anonymousMigration("PeopleHaveHobbies", "1"),
       },
       {
         version: "2",
         name: "PeopleHaveDescriptions",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
+        migration: () => anonymousMigration("PeopleHaveDescriptions", "2"),
       },
     ];
   });
@@ -190,12 +194,12 @@ describe("MultiDbMigratorTest", () => {
       {
         version: "1",
         name: "Foo",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
+        migration: () => anonymousMigration("Foo", "1"),
       },
       {
         version: "3",
         name: "Bar",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
+        migration: () => anonymousMigration("Bar", "3"),
       },
     ];
     const migratorA = new Migrator(adapterA, listA);
@@ -208,12 +212,12 @@ describe("MultiDbMigratorTest", () => {
       {
         version: "1",
         name: "Foo",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
+        migration: () => anonymousMigration("Foo", "1"),
       },
       {
         version: "3",
         name: "Bar",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
+        migration: () => anonymousMigration("Bar", "3"),
       },
     ];
     const migratorB = new Migrator(adapterB, listB);

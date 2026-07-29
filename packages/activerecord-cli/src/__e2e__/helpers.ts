@@ -4,16 +4,18 @@ import { tmpdir } from "os";
 import { join } from "path";
 
 export const MIGRATION_BODY = `\
-export default {
+import { Migration } from "@blazetrails/activerecord";
+
+export default class CreateUsers extends Migration {
   async up() {
     await this.connection.createTable("users", (t) => {
       t.string("name");
     });
-  },
+  }
   async down() {
     await this.connection.dropTable("users");
-  },
-};
+  }
+}
 `;
 
 export async function mkE2eTmpDir(prefix: string): Promise<string> {

@@ -1,7 +1,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
-import type { MigrationProxy } from "@blazetrails/activerecord";
+import type { Migration, MigrationProxy } from "@blazetrails/activerecord";
+import { camelize } from "@blazetrails/activesupport";
 
 // Rails uses `<timestamp>_<name>` (railties/lib/rails/generators/migration.rb).
 // trailties scaffolds in TS/JS, so the extension set is `ts|js` (no `rb`).
@@ -73,41 +74,20 @@ export async function discoverMigrations(migrationsDir: string): Promise<Migrati
     if (!match) continue;
 
     const version = match[1];
-    // Canonicalize the proxy name to the underscore form so
-    // Migrator.validate()'s duplicate-name check sees hyphen-alias and
-    // underscore-form migrations as the same logical name.
-    const name = match[2].replace(/-/g, "_");
+    // Rails camelizes the parsed name before building the proxy
+    // (migration.rb:1311); the hyphen alias is folded to the underscore form
+    // first so Migrator.validate()'s duplicate-name check sees hyphen-alias
+    // and underscore-form migrations as the same logical name.
+    const name = camelize(match[2].replace(/-/g, "_"));
     const filePath = path.join(migrationsDir, file);
 
     proxies.push({
       version,
       name,
       filename: filePath,
-      migration: () => {
-        const loader: import("@blazetrails/activerecord").MigrationLike = {
-          connection: undefined,
-          async up(): Promise<void> {
-            const adapter = loader.connection;
-            if (!adapter)
-              throw new Error(
-                "migration-loader: migration.connection must be set before calling up()",
-              );
-            const MigrationClass = await loadMigrationClass(filePath);
-            const instance = new MigrationClass();
-            await instance.run(adapter, "up");
-          },
-          async down(): Promise<void> {
-            const adapter = loader.connection;
-            if (!adapter)
-              throw new Error(
-                "migration-loader: migration.connection must be set before calling down()",
-              );
-            const MigrationClass = await loadMigrationClass(filePath);
-            const instance = new MigrationClass();
-            await instance.run(adapter, "down");
-          },
-        };
-        return loader;
+      migration: async () => {
+        const MigrationClass = await loadMigrationClass(filePath);
+        return new MigrationClass(name, version);
       },
     });
   }
@@ -123,7 +103,7 @@ function isMigrationClass(value: unknown): boolean {
 
 async function loadMigrationClass(
   filePath: string,
-): Promise<new () => { run(adapter: any, direction: "up" | "down"): Promise<void> }> {
+): Promise<new (name?: string, version?: string) => Migration> {
   let mod: any;
   try {
     mod = await import(pathToFileURL(filePath).href);

@@ -1,7 +1,7 @@
 import type { VirtualFS } from "./virtual-fs.js";
 import type { SqlJsAdapter } from "./sql-js-adapter.js";
 import { VfsModelGenerator, VfsMigrationGenerator, VfsAppGenerator } from "./vfs-generator.js";
-import type { MigrationProxy, MigrationLike } from "@blazetrails/activerecord/migration";
+import type { Migration, MigrationProxy } from "@blazetrails/activerecord/migration";
 import { Migrator } from "@blazetrails/activerecord/migration";
 import {
   camelize,
@@ -67,49 +67,17 @@ function discoverMigrations(
           version: match[1],
           name: camelize(match[2].replace(/-/g, "_")),
           filename: file.path,
-          migration: (): MigrationLike => {
-            const m: MigrationLike = {
-              connection: undefined,
-              async up() {
-                const adapter = m.connection;
-                if (!adapter)
-                  throw new Error(
-                    "trail-cli: migration.connection must be set before calling up()",
-                  );
-                const content = vfs.read(file.path)?.content;
-                if (!content) throw new Error(`File not found: ${file.path}`);
-                await executeCode(content);
-                const reg = getMigrations().find((r) => r.version === match[1]);
-                if (!reg) {
-                  throw new Error(
-                    `Migration ${match[1]} from ${file.path} did not register after execution`,
-                  );
-                }
-                const inner = await reg.migration();
-                inner.connection = adapter;
-                await inner.up();
-              },
-              async down() {
-                const adapter = m.connection;
-                if (!adapter)
-                  throw new Error(
-                    "trail-cli: migration.connection must be set before calling down()",
-                  );
-                const content = vfs.read(file.path)?.content;
-                if (!content) throw new Error(`File not found: ${file.path}`);
-                await executeCode(content);
-                const reg = getMigrations().find((r) => r.version === match[1]);
-                if (!reg) {
-                  throw new Error(
-                    `Migration ${match[1]} from ${file.path} did not register after execution`,
-                  );
-                }
-                const inner = await reg.migration();
-                inner.connection = adapter;
-                await inner.down();
-              },
-            };
-            return m;
+          migration: async (): Promise<Migration> => {
+            const content = vfs.read(file.path)?.content;
+            if (!content) throw new Error(`File not found: ${file.path}`);
+            await executeCode(content);
+            const reg = getMigrations().find((r) => r.version === match[1]);
+            if (!reg) {
+              throw new Error(
+                `Migration ${match[1]} from ${file.path} did not register after execution`,
+              );
+            }
+            return reg.migration();
           },
         },
       ];

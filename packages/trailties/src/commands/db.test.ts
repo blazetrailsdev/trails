@@ -633,11 +633,11 @@ describe("discoverMigrations", () => {
     const migrations = await discoverMigrations(tmpDir);
     expect(migrations).toHaveLength(2);
     expect(migrations[0].version).toBe("20260101000000");
-    // discoverMigrations canonicalizes proxy.name to the underscore form
-    // (Rails-faithful) regardless of the on-disk separator.
-    expect(migrations[0].name).toBe("create_users");
+    // discoverMigrations camelizes proxy.name as Rails does
+    // (migration.rb:1311) regardless of the on-disk separator.
+    expect(migrations[0].name).toBe("CreateUsers");
     expect(migrations[1].version).toBe("20260102000000");
-    expect(migrations[1].name).toBe("add_email_to_users");
+    expect(migrations[1].name).toBe("AddEmailToUsers");
   });
 
   it("sorts migrations by version", async () => {
@@ -986,8 +986,8 @@ export class CreatePosts extends Migration {
     expect(joined).toContain("You have 1 pending migration:");
     expect(joined).toContain("20260101000000");
     // migration-loader derives the display name from the filename suffix
-    // and canonicalizes hyphen separators to underscores (Rails-faithful).
-    expect(joined).toContain("create_posts");
+    // and camelizes it as Rails does (migration.rb:1311).
+    expect(joined).toContain("CreatePosts");
     expect(joined).toContain("Run `trails db migrate` to resolve this issue.");
   });
 
@@ -1335,36 +1335,28 @@ export class CreatePosts extends Migration {
   });
 
   it("Migrator with internalMetadataEnabled=false migrates without stamping", async () => {
-    const { Migrator } = await import("@blazetrails/activerecord");
+    const { Migration, Migrator } = await import("@blazetrails/activerecord");
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
 
     const dbFile = path.join(tmpDir, "no-metadata-migrate.sqlite3");
     const adapter = new BetterSQLite3Adapter(dbFile);
     try {
-      // Low-level MigrationLike shape (same pattern migrator.test.ts uses)
-      // — bypasses the Migration base class so the test doesn't depend on
-      // its schema-helper wiring.
       const migrations = [
         {
           version: "20260101000000",
           name: "CreateWidgets",
-          migration: () => {
-            const m: import("@blazetrails/activerecord").MigrationLike = {
-              connection: undefined,
-              async up() {
-                if (!m.connection) throw new Error("adapter required");
-                await m.connection.executeMutation(
+          migration: () =>
+            new (class extends Migration {
+              override async up(): Promise<void> {
+                await this.connection.executeMutation(
                   `CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)`,
                 );
-              },
-              async down() {
-                if (!m.connection) throw new Error("adapter required");
-                await m.connection.executeMutation(`DROP TABLE widgets`);
-              },
-            };
-            return m;
-          },
+              }
+              override async down(): Promise<void> {
+                await this.connection.executeMutation(`DROP TABLE widgets`);
+              }
+            })("CreateWidgets", "20260101000000"),
         },
       ];
       const migrator = new Migrator(adapter, migrations, {

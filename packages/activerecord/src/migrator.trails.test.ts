@@ -19,27 +19,24 @@ import {
 } from "./migration.js";
 import { resetVersionRegistry } from "./migration/compatibility.js";
 import type { MigrationProxy } from "./migration.js";
-import { ExecutionStrategy, type MigrationLike } from "./migration/execution-strategy.js";
 import { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 import { Base } from "./base.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { fixtures } from "./test-fixtures.js";
+import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 
 function makeMigration(
   version: string,
   name: string,
-  upFn?: (adapter?: DatabaseAdapter) => Promise<void>,
-  downFn?: (adapter?: DatabaseAdapter) => Promise<void>,
+  upFn?: () => Promise<void>,
+  downFn?: () => Promise<void>,
 ): MigrationProxy {
   return {
     version,
     name,
-    migration: () => ({
-      up: upFn ?? (async () => {}),
-      down: downFn ?? (async () => {}),
-    }),
+    migration: () => anonymousMigration(name, version, upFn, downFn),
   };
 }
 
@@ -145,40 +142,6 @@ describe("Migrator trails extensions", () => {
     });
     await migrator.up();
     await expect(migrator.checkProtectedEnvironments()).resolves.toBeUndefined();
-  });
-
-  it("uses custom execution strategy", async () => {
-    const log: string[] = [];
-    class LoggingStrategy extends ExecutionStrategy {
-      async exec(
-        direction: "up" | "down",
-        migration: MigrationLike,
-        a: DatabaseAdapter,
-      ): Promise<void> {
-        log.push(`before:${direction}`);
-        migration.connection = a;
-        if (direction === "up") {
-          await migration.up();
-        } else {
-          await migration.down();
-        }
-        log.push(`after:${direction}`);
-      }
-    }
-
-    const migrator = new Migrator(
-      adapter,
-      [
-        makeMigration("1", "M1", async () => {
-          log.push("up");
-        }),
-      ],
-      {
-        strategy: new LoggingStrategy(),
-      },
-    );
-    await migrator.up();
-    expect(log).toEqual(["before:up", "up", "after:up"]);
   });
 
   it("CheckPending with PendingMigrationConnection detects pending migrations", async () => {
