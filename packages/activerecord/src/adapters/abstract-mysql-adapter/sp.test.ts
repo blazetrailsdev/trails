@@ -9,7 +9,6 @@ import { fixtures } from "../../test-fixtures.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   describe("StoredProcedureTest", () => {
-    // Rails `fixtures :topics` — load canonical topics via the handler connection.
     const { topics } = fixtures(["topics"]);
 
     it("multi results", async () => {
