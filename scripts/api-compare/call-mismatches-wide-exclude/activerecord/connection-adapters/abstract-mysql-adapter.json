@@ -516,5 +516,12 @@
     "rubyName": "dbconsole",
     "call": "database_cli",
     "reason": "Rails reads the cli name only to pass it to `find_cmd_and_exec` (abstract_mysql_adapter.rb); that PTY exec is Ruby-only and unported, so our `dbconsole` returns the arg list and never needs the lookup."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
+    "rubyName": "type_cast",
+    "call": "default_timezone",
+    "reason": "Rails' MySQL type_cast branches on default_timezone inline (mysql/quoting.rb:100,106); trails' override delegates to mysql/quoting.ts typeCast, which reaches ActiveRecord.defaultTimezone via dispatchQuotedDate to quotedDate to defaultSqlTimezone()."
   }
 ]

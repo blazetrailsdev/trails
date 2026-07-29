@@ -12,5 +12,12 @@
     "rubyName": "type_cast",
     "call": "utc?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql/quoting.ts",
+    "rubyName": "type_cast",
+    "call": "default_timezone",
+    "reason": "Rails' MySQL type_cast branches on default_timezone for TimeWithZone/Time (mysql/quoting.rb:100,106); trails' typeCast routes both through dispatchQuotedDate to quotedDate to defaultSqlTimezone(), which reads ActiveRecord.defaultTimezone."
   }
 ]
