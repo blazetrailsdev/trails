@@ -247,6 +247,26 @@ describe("PostgreSQL::TableDefinition column methods", () => {
     }
   });
 
+  it("creates an index for every name when index is passed", () => {
+    for (const [method] of types) {
+      const td = new TableDefinition("t", { id: false });
+      (td as unknown as Record<string, (...args: unknown[]) => void>)[method]("a", "b", {
+        index: true,
+      });
+      expect(td.indexes.map((i) => i.columns)).toEqual([["a"], ["b"]]);
+      expect(td.columns.every((c) => !("index" in c.options))).toBe(true);
+    }
+  });
+
+  it("raises on a duplicate column name", () => {
+    for (const [method] of types) {
+      const td = new TableDefinition("t", { id: false });
+      expect(() =>
+        (td as unknown as Record<string, (...args: unknown[]) => void>)[method]("a", "a"),
+      ).toThrow("you can't define an already defined column 'a' on 't'.");
+    }
+  });
+
   it("keeps type-specific SQL types when defining multiple columns", () => {
     const td = new TableDefinition("t", { id: false });
     td.bit("a", "b", { limit: 8 });

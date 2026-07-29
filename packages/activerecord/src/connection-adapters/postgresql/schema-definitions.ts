@@ -527,12 +527,11 @@ export class TableDefinition extends AbstractTableDefinition {
     sqlType: string | undefined,
     options: ColumnOptions,
   ): this {
-    const col = new ColumnDefinition(name, type, options);
-    if (sqlType !== undefined) col.sqlType = sqlType;
-    // Mirror newColumnDefinition's datetime-family physical-type recording for
-    // the helper methods (e.g. t.timestamptz) that bypass newColumnDefinition.
-    if ((type as string) === "timestamptz") col.datetimePhysicalType = "timestamptz";
-    this.columns.push(col);
+    this.column(name, type, options as Parameters<TableDefinition["column"]>[2]);
+    if (sqlType !== undefined) {
+      const col = this.get(String(name));
+      if (col !== undefined) col.sqlType = sqlType;
+    }
     return this;
   }
 }
