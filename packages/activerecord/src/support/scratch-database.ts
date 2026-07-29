@@ -1,19 +1,23 @@
 /**
- * On-disk scratch sqlite databases for tests whose Rails counterpart runs
- * against a *distinct* database rather than `ActiveRecord::Base`'s own.
+ * On-disk scratch sqlite databases for the sqlite arm of
+ * {@link ../support/isolated-database.js openIsolatedDatabase}.
  *
- * Rails never opens a `:memory:` database in these spots — `arunit` and
- * `arunit2` are both files in `config.example.yml`, so a test that needs a
- * second, independent database (`MultiDbMigratorTest`'s two pools, the
- * `AnimalsBase` pool behind `OtherDog`) gets a file, and a test that mutates a
- * schema `ActiveRecord::Base` shares (`AdapterPreventWritesTest`'s
- * create/drop of `subscribers`) gets one too rather than scribbling on the
- * worker's canonical database.
+ * This is a trails-only construct: Rails' suite has exactly two databases,
+ * `arunit` and `arunit2` (`config.example.yml:83-91`), both fixed files reused
+ * across runs. A test needing a second database rides `ARUnit2Model`'s pool —
+ * `MultiDbMigratorTest` takes `ARUnit2Model.connection_pool`
+ * (`multi_db_migrator_test.rb:23`) and `OtherDog < ARUnit2Model`
+ * (`test/models/other_dog.rb`) is a canonical model, not an inline one. Both of
+ * those ride the canonical pair here too.
  *
- * `:memory:` is the wrong stand-in for either: it silently makes every
- * connection its own private database, which is exactly the divergence RFC
- * 0029 exists to remove. A file path keeps the "two adapters, one database"
- * and "two databases, one process" distinctions real.
+ * What remains is the case Rails genuinely has no counterpart for: a suite that
+ * wipes a database wholesale. Rails runs it in its own process against its own
+ * `arunit`; trails shares one database per *vitest worker* across files, so it
+ * needs a throwaway. Converging that away is story
+ * `converge-isolated-database-onto-canonical-pools`.
+ *
+ * `:memory:` is the wrong stand-in: it silently makes every connection its own
+ * private database, which is exactly the divergence RFC 0029 exists to remove.
  *
  * @internal
  */

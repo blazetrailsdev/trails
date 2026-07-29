@@ -44,7 +44,7 @@ import { markForDestruction, isMarkedForDestruction } from "./autosave-associati
 import { Preloader } from "./associations/preloader.js";
 import { Batch } from "./associations/preloader/batch.js";
 import { LoaderQuery } from "./associations/preloader/association.js";
-import { scratchDatabasePath } from "./support/scratch-database.js";
+import { OtherDog } from "./test-helpers/models/other-dog.js";
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -1003,65 +1003,20 @@ describe("PreloaderTest", () => {
     }).call();
     expect(spy).toHaveBeenCalledTimes(2);
   });
-  // Mirrors Rails' Dog (primary connection) and OtherDog (ARUnit2Model — a
-  // second database), both backed by a table named `dogs`. A polymorphic
-  // preload over comments pointing at each must run two queries rather than
-  // batch them together, because LoaderQuery#hashKey distinguishes loaders by
-  // connection identity.
   it("multi database polymorphic preload with same table name", async () => {
-    // Second database base (Rails: ARUnit2Model connected to arunit2 DB).
-    // Kept inline so connectsTo doesn't pollute the shared canonical ARUnit2Model.
-    class AnimalsBase extends Base {
-      static {
-        this.abstractClass = true;
-      }
-    }
-    class OtherDog extends AnimalsBase {
-      static {
-        this.tableName = "dogs";
-      }
-    }
-    registerModel("OtherDog", OtherDog);
+    registerModel(OtherDog);
 
-    // Rails' arunit2 is a file, not `:memory:` — the loaders must be
-    // distinguished by connection identity, and a real second database on disk
-    // is what makes that distinction observable.
-    const [secondaryPool] = AnimalsBase.connectsTo({
-      database: {
-        writing: {
-          adapter: "sqlite3",
-          database: await scratchDatabasePath("associations-animals"),
-          pool: 1,
-        },
-      },
-    });
-    try {
-      await secondaryPool.adapterReady;
-      // Canonical dogs shape in the secondary database.
-      await (
-        await OtherDog.leaseConnection()
-      ).executeMutation(
-        // It lives in this test's own scratch database file, not the shared
-        // per-worker one, so there is nothing to leak into.
-        // eslint-disable-next-line blazetrails/require-table-teardown
-        "CREATE TABLE `dogs` (`id` INTEGER PRIMARY KEY, `trainer_id` INTEGER, " +
-          "`breeder_id` INTEGER, `dog_lover_id` INTEGER, `alias` VARCHAR(255))",
-      );
+    const dogComment = new (Comment as any)({ origin_id: 1, origin_type: "Dog" });
+    const otherDogComment = new (Comment as any)({ origin_id: 1, origin_type: "OtherDog" });
 
-      const dogComment = new (Comment as any)({ origin_id: 1, origin_type: "Dog" });
-      const otherDogComment = new (Comment as any)({ origin_id: 1, origin_type: "OtherDog" });
-
-      // Same table name, same key, same id — these two loaders would coalesce
-      // into a single query were it not for their distinct connections.
-      const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-      await new Preloader({
-        records: [dogComment, otherDogComment],
-        associations: ["origin"],
-      }).call();
-      expect(spy).toHaveBeenCalledTimes(2);
-    } finally {
-      Base.connectionHandler.removeConnectionPool("AnimalsBase");
-    }
+    // Same table name, same key, same id — these two loaders would coalesce
+    // into a single query were it not for their distinct connections.
+    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
+    await new Preloader({
+      records: [dogComment, otherDogComment],
+      associations: ["origin"],
+    }).call();
+    expect(spy).toHaveBeenCalledTimes(2);
   });
 
   it("preload with available records", async () => {
