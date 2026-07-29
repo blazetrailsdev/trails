@@ -88,9 +88,14 @@
  *
  * Both halves must be present: a `LIKE` filter on a catalogue relation whose
  * pattern is a closed single-quoted literal ending in `%`, and a raw `DROP
- * TABLE` whose name position is an interpolation. A dynamic or absent filter
- * satisfies nothing — otherwise the rule would stop catching the bespoke tables
- * that outlive their test, which is why it exists. Matching is by prefix only,
+ * TABLE` whose name position is an interpolation *that is the table name*. In
+ * `DROP TABLE "${schema}"."fixed"` the dynamic part is only the qualifier and
+ * the table is named statically, so that drop is not a sweep and does not arm
+ * one — otherwise the file would stop reporting its own leaks; a qualified
+ * `DROP TABLE "${schema}"."${row.tablename}"` does arm, since the chain ends
+ * dynamically. A dynamic or absent filter satisfies nothing — otherwise the
+ * rule would stop catching the bespoke tables that outlive their test, which is
+ * why it exists. Matching is by prefix only,
  * so a create outside the swept prefix is still reported. `NOT LIKE` yields no
  * prefix — an exclusion filter selects the complement of its pattern, so
  * reading it as a prefix would satisfy exactly the creates the sweep spares.
@@ -340,18 +345,39 @@ export function sweepPrefixes(text) {
 }
 
 /**
- * Whether `text` ends in a `DROP TABLE` whose table name is the interpolation
- * that follows it (`DROP TABLE IF EXISTS "${t.tablename}"`) — the drop half of
- * a sweep, which names no table itself. Only meaningful when `endIsDynamic`.
+ * Whether `text` ends in a `DROP TABLE` whose table *name* is dynamic — the drop
+ * half of a sweep, which names no table itself. `nextTexts` is the static text
+ * of every template quasi following this one, in order, or null for a plain
+ * string (which can never end in an interpolation).
+ *
+ * An interpolation in the name position is not automatically the name. In
+ * `DROP TABLE "${schema}"."fixed"` the dynamic part is only the qualifier and
+ * the table is named statically, so no swept row name is dropped; such a drop
+ * must not arm a sweep, or a file combining it with a catalogue `LIKE` filter
+ * would stop reporting its own leaked creates. The chain is therefore followed
+ * to its end: a quasi that is nothing but a `.` separator (with optional quotes
+ * and whitespace) means another interpolation continues the qualified name, so
+ * `"${schema}"."${row.tablename}"` — a genuine sweep — still arms, while a
+ * chain ending in static text does not.
  */
-export function hasDynamicDropName(text, endIsDynamic) {
-  if (!endIsDynamic) return false;
+export function hasDynamicDropName(text, nextTexts) {
+  if (!nextTexts || nextTexts.length === 0) return false;
   DROP_TABLE_RE.lastIndex = 0;
   let m;
   while ((m = DROP_TABLE_RE.exec(text)) !== null) {
-    if (/^\s*["'`]?$/.test(text.slice(m.index + m[0].length))) return true;
+    if (/^\s*["'`]?$/.test(text.slice(m.index + m[0].length))) {
+      return dynamicNameEndsChain(nextTexts);
+    }
   }
   return false;
+}
+
+/** Whether the qualified name starting at the first interpolation ends dynamically. */
+function dynamicNameEndsChain(nextTexts) {
+  let i = 0;
+  while (i < nextTexts.length && /^["'`]?\s*\.\s*["'`]?$/.test(nextTexts[i])) i++;
+  if (i >= nextTexts.length) return true;
+  return !/^["'`]?\s*\./.test(nextTexts[i]);
 }
 
 /**
@@ -487,25 +513,33 @@ const rule = {
 
     // Scan an execution sink's string/template arguments for raw CREATE/DROP
     // TABLE statements, folding their names into the same create/drop balance.
-    function recordText(text, node, endIsDynamic) {
+    function recordText(text, node, nextTexts) {
+      const endIsDynamic = nextTexts !== null;
       for (const table of rawCreateNames(text, endIsDynamic)) {
         if (!created.has(table)) created.set(table, node);
       }
       for (const table of rawDropNames(text, endIsDynamic)) dropped.add(table);
       sweptPrefixes.push(...sweepPrefixes(text));
-      if (hasDynamicDropName(text, endIsDynamic)) sawSweepDrop = true;
+      if (hasDynamicDropName(text, nextTexts)) sawSweepDrop = true;
     }
 
     function recordSinkSql(call) {
       for (const arg of call.arguments) {
         if (arg.type === "Literal") {
-          if (typeof arg.value === "string") recordText(arg.value, arg, false);
+          if (typeof arg.value === "string") recordText(arg.value, arg, null);
         } else if (arg.type === "TemplateLiteral") {
           // Each quasi is static text between interpolations; a quasi that is
-          // followed by an interpolation has a dynamic end (see rawCreateNames).
+          // followed by an interpolation has a dynamic end (see rawCreateNames),
+          // and the quasis after it are where the interpolated values resume.
           const last = arg.quasis.length - 1;
           arg.quasis.forEach((q, i) => {
-            if (q.value.cooked) recordText(q.value.cooked, arg, i < last);
+            if (q.value.cooked) {
+              recordText(
+                q.value.cooked,
+                arg,
+                i < last ? arg.quasis.slice(i + 1).map((n) => n.value.cooked) : null,
+              );
+            }
           });
         }
       }

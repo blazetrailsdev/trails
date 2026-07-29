@@ -116,6 +116,14 @@ tester.run("require-table-teardown", rule, {
       "for (const t of rows) {\n" +
       '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}" CASCADE`);\n' +
       "}",
+    // A schema-qualified sweep drop still ends in the swept row name, so it arms.
+    'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${schema}"."${t.tablename}" CASCADE`);\n' +
+      "}",
   ],
   invalid: [
     // Dropping the truncated prefix of a spaced quoted name is not a teardown
@@ -341,6 +349,17 @@ tester.run("require-table-teardown", rule, {
         '  await adapter.exec(`DROP TABLE IF EXISTS "${t.name}"`);\n' +
         "}",
       errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
+    },
+    // A schema-qualified drop whose dynamic part is only the qualifier names its
+    // table statically, so it is not a sweep drop and arms no prefix.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_leak" (id int)`);\n' +
+        "await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+        ");\n" +
+        'await adapter.exec(`DROP TABLE IF EXISTS "${schema}"."fixed"`);',
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_leak" } }],
     },
     // NOT LIKE is an exclusion filter: it spares `ex_%` rather than sweeping it.
     {
