@@ -1,14 +1,10 @@
 /**
  * Mirrors `ActiveRecord::TestCase#with_postgresql_datetime_type`
- * (vendor/rails/activerecord/test/support/connection_helper.rb) — temporarily
- * flips `PostgreSQLAdapter.datetime_type` so `:datetime` resolves to
- * `:timestamptz`.
+ * (vendor/rails/activerecord/test/cases/test_case.rb:193).
  *
- * Lives here rather than in `adapters/postgresql/test-helper.ts` because that
- * module re-exports `support/describe-if-pg.js`, whose top-level `await` probes
- * a PostgreSQL server on *every* lane. Suites that are not PG-only (e.g.
- * `migration/change-schema.test.ts`) need the helper without paying that probe,
- * so the adapter import is deferred to call time.
+ * The adapter import is deferred to call time so non-PG lanes can import this
+ * module without loading `adapters/postgresql/test-helper.ts`, whose
+ * `describe-if-pg` re-export probes a PostgreSQL server at module scope.
  */
 export async function withPostgresqlDatetimeType<T>(
   type: string,

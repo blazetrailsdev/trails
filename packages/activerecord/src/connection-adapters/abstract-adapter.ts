@@ -333,8 +333,6 @@ export interface AbstractAdapter {
     options: { name?: string; column?: string | string[] },
   ): Promise<string>;
   tableExists(tableName: string): Promise<boolean>;
-  // Mixed in from SchemaStatements; declared here because Rails' migration
-  // tests call `connection.type_to_sql(...)` through the adapter.
   typeToSql(type: ColumnType, options?: ColumnOptions): string;
   // Options SchemaMigration / InternalMetadata pass to `t.string` for their
   // primary key. Mixed in from SchemaStatements; declared here so those

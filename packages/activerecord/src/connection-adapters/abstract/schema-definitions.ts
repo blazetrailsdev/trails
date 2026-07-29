@@ -1003,9 +1003,6 @@ export class TableDefinition {
         if (tdOptions.default !== undefined) pkOpts.default = tdOptions.default;
         if (tdOptions.autoIncrement !== undefined) pkOpts.autoIncrement = tdOptions.autoIncrement;
       }
-      // Rails' set_primary_key: `pk = primary_key || Base.get_primary_key(table_name.to_s.singularize)`
-      // (schema_definitions.rb:397) — the implicit PK column honours
-      // `Base.primary_key_prefix_type`, so `testings` becomes `testing_id`/`testingid`.
       const pkName = pkNameOverride ?? globalGetPrimaryKey(singularize(tableName));
       this.columns.push(this.newColumnDefinition(pkName, pkType, pkOpts));
     }
