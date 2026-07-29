@@ -1,8 +1,8 @@
 /**
- * Port of `test_rename_column` and `test_change_column` from
- * `ActiveRecord::Migration::ColumnsTest`
+ * Port of `test_rename_column`, the rename/remove-column index cluster and
+ * `test_change_column` from `ActiveRecord::Migration::ColumnsTest`
  * (vendor/rails/activerecord/test/cases/migration/columns_test.rb:43-51,
- * :181-204). The rest of columns_test.rb is unported.
+ * :96-155, :181-204). The rest of columns_test.rb is unported.
  *
  * Driven by the ambient connection, mirroring Rails'
  * `@connection = ActiveRecord::Base.lease_connection`. `test_models` is not a
@@ -13,7 +13,21 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../base.js";
 import type { Column } from "../connection-adapters/column.js";
+import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import { ambientConnection } from "../support/rocket-tables.js";
+import { adapterType } from "../test-adapter.js";
+import { isMariaDb, serverVersion } from "../support/mysql-server-version.js";
+
+const mariaDbRejectsUniqueColumnDrop =
+  adapterType === "mysql" && isMariaDb && serverVersion?.gte("10.2.8") === true;
+
+const indexesSurvivingColumnDrop =
+  adapterType === "postgres" ? [] : ["index_test_models_on_hat_style_and_hat_size"];
+
+async function indexNames(conn: AbstractAdapter, table: string): Promise<string[]> {
+  const indexes = (await conn.indexes(table)) as Array<{ name: string }>;
+  return indexes.map((i) => i.name);
+}
 
 /** `ActiveRecord::Migration::TestHelper::TestModel`, migration/helper.rb:16-18. */
 class TestModel extends Base {
@@ -49,6 +63,66 @@ describe("Migration", () => {
       await TestModel.loadSchema();
       expect(TestModel.columnNames()).toContain("nick_name");
       expect((await TestModel.all()).map((m) => m.nick_name)).toEqual(["foo"]);
+    });
+
+    it("rename column with an index", async () => {
+      const connection = await ambientConnection();
+      await connection.addColumn("test_models", "hat_name", "string");
+      await connection.addIndex("test_models", "hat_name");
+
+      expect((await connection.indexes("test_models")).length).toBe(1);
+      await connection.renameColumn("test_models", "hat_name", "name");
+
+      expect(await indexNames(connection, "test_models")).toEqual(["index_test_models_on_name"]);
+    });
+
+    it("rename column with multi column index", async () => {
+      const connection = await ambientConnection();
+      await connection.addColumn("test_models", "hat_size", "integer");
+      await connection.addColumn("test_models", "hat_style", "string", { limit: 100 });
+      await connection.addIndex("test_models", ["hat_style", "hat_size"], { unique: true });
+
+      await connection.renameColumn("test_models", "hat_size", "size");
+      expect(await indexNames(connection, "test_models")).toEqual([
+        "index_test_models_on_hat_style_and_size",
+      ]);
+
+      await connection.renameColumn("test_models", "hat_style", "style");
+      expect(await indexNames(connection, "test_models")).toEqual([
+        "index_test_models_on_style_and_size",
+      ]);
+    });
+
+    it("rename column does not rename custom named index", async () => {
+      const connection = await ambientConnection();
+      await connection.addColumn("test_models", "hat_name", "string");
+      await connection.addIndex("test_models", "hat_name", { name: "idx_hat_name" });
+
+      expect((await connection.indexes("test_models")).length).toBe(1);
+      await connection.renameColumn("test_models", "hat_name", "name");
+      expect(await indexNames(connection, "test_models")).toEqual(["idx_hat_name"]);
+    });
+
+    it("remove column with index", async () => {
+      const connection = await ambientConnection();
+      await connection.addColumn("test_models", "hat_name", "string");
+      await connection.addIndex("test_models", "hat_name");
+
+      expect((await connection.indexes("test_models")).length).toBe(1);
+      await connection.removeColumn("test_models", "hat_name");
+      expect((await connection.indexes("test_models")).length).toBe(0);
+    });
+
+    it.skipIf(mariaDbRejectsUniqueColumnDrop)("remove column with multi column index", async () => {
+      const connection = await ambientConnection();
+      await connection.addColumn("test_models", "hat_size", "integer");
+      await connection.addColumn("test_models", "hat_style", "string", { limit: 100 });
+      await connection.addIndex("test_models", ["hat_style", "hat_size"], { unique: true });
+
+      expect((await connection.indexes("test_models")).length).toBe(1);
+      await connection.removeColumn("test_models", "hat_size");
+
+      expect(await indexNames(connection, "test_models")).toEqual(indexesSurvivingColumnDrop);
     });
 
     it("change column", async () => {

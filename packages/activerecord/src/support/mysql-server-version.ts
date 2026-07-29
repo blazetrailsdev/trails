@@ -45,6 +45,9 @@ function parseMysqlVersion(full: string): Version | null {
 }
 const _serverVersion = parseMysqlVersion(mysqlVersionStr);
 
+/** The port of `connection.database_version`; null when MySQL is unavailable. */
+export const serverVersion = _serverVersion;
+
 /**
  * Mirrors AbstractMysqlAdapter#supports_optimizer_hints?: MySQL ≥ 5.7.7 only;
  * never MariaDB. Lets adapter tests gate on hint support the way the Rails
