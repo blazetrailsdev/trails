@@ -146,7 +146,10 @@
  * anchor, and a pattern that does not compile at all. A backslash inside a
  * bracket expression is read only in the `~` / `~*` spelling, where the engine
  * is known to be ARE and a bracketed `ARE_SHORTHANDS` member (`[\d]`) means what
- * the same shorthand means in a JS character class; anything else bracketed
+ * the same shorthand means in a JS character class; a bracketed POSIX character
+ * class translates through the subset spellings in `POSIX_CLASS_SOURCES`
+ * (`[[:digit:]]`), except under a negating `^`, where the complement of a subset
+ * would be wider; anything else bracketed
  * (`[\W]`, `[\b]`, `[\1]`, `[\\]`, a shorthand as a range endpoint) and every
  * backslash inside a `SIMILAR TO` bracket expression — whose interaction with
  * that grammar's `ESCAPE` character is unsettled — still refuses. Everything
@@ -468,9 +471,13 @@ const BOUND_RE = /^\{\d+(?:,\d*)?\}/;
  * expression is unterminated or uses syntax whose JS meaning differs.
  *
  * The two halves overlap almost exactly — a leading `^` negates, `a-z` is a
- * range, a `]` in first position is a literal — but two do not, and both are
- * refused rather than guessed: a POSIX class/collating/equivalence element
- * (`[[:alpha:]]`, `[[.x.]]`, `[[=a=]]`) has no JS spelling, and a backslash
+ * range, a `]` in first position is a literal — but two do not. A POSIX
+ * character class translates only through `POSIX_CLASS_SOURCES`, whose ASCII
+ * spellings are subsets of what a non-C locale selects; a collating element or
+ * equivalence class (`[[.x.]]`, `[[=a=]]`) has no JS spelling at all and
+ * refuses. Because those spellings are subsets, a *negated* bracket expression
+ * refuses them: the complement of a subset is a superset, which would credit a
+ * name the filter does not select. And a backslash
  * means different things in the two grammars. Bare POSIX brackets read it as an
  * ordinary literal, but PostgreSQL's engine is ARE, which reads it as an escape
  * inside brackets too (`[\d]` is the digits, not a backslash and a `d`), so
@@ -520,8 +527,14 @@ function bracketSource(pattern, start, escapeChar) {
   if (BRACKET_STRUCTURAL.has(escapeChar)) return null;
   let source = "[";
   let i = start + 1;
+  // A `POSIX_CLASS_SOURCES` spelling is safe in a plain class and unsafe in a
+  // negated one: it is an ASCII subset of what a non-C locale selects, and the
+  // complement of a subset is a *superset*, which would credit a name the filter
+  // does not select. So a POSIX class refuses under `^`.
+  let negated = false;
   if (pattern[i] === "^") {
     source += "^";
+    negated = true;
     i++;
   }
   if (pattern[i] === "]") {
@@ -533,7 +546,24 @@ function bracketSource(pattern, start, escapeChar) {
   const bodyStart = source.length;
   for (; i < pattern.length && pattern[i] !== "]"; i++) {
     const ch = pattern[i];
-    if (ch === "[" && ":.=".includes(pattern[i + 1] ?? "")) return null;
+    if (ch === "[" && ":.=".includes(pattern[i + 1] ?? "")) {
+      // A collating element (`[.ch.]`) or equivalence class (`[=a=]`) has no JS
+      // spelling at all, so only a character class can translate.
+      if (pattern[i + 1] !== ":") return null;
+      const end = pattern.indexOf(":]", i + 2);
+      if (end === -1) return null;
+      const classSource = POSIX_CLASS_SOURCES[pattern.slice(i + 2, end)];
+      // Every licensed spelling is a subset, so a negated class refuses; so does
+      // a name not on the list (`[[:punct:]]`, a locale-extending complement, a
+      // typo) and a class used as a range endpoint, which ARE rejects outright
+      // while JS's Annex B grammar would quietly read the `-` as a literal.
+      if (classSource === undefined || negated) return null;
+      if (source.endsWith("-") && source.length - 1 > bodyStart) return null;
+      if (pattern[end + 2] === "-" && (pattern[end + 3] ?? "]") !== "]") return null;
+      source += classSource;
+      i = end + 1;
+      continue;
+    }
     if (ch === "\\" && ch !== escapeChar) {
       source += "\\\\";
       continue;
@@ -574,6 +604,40 @@ function bracketSource(pattern, start, escapeChar) {
  * (`\Y` is ARE's *not* a word boundary, documented alongside the others).
  */
 const ARE_SHORTHANDS = new Set(["d", "w", "S"]);
+
+/**
+ * The JS character-class *body* fragment each licensed POSIX character class
+ * (`[[:digit:]]`) translates to inside a bracket expression, so
+ * `~ '^ex_[[:digit:]]'` can be translated rather than refused.
+ *
+ * This is the same argument `ARE_SHORTHANDS` records, read the other way round:
+ * ARE's class shorthands ARE these POSIX classes (`\d` is `[[:digit:]]`, `\w` is
+ * `[[:alnum:]_]`, `\s` is `[[:space:]]`), so the reasoning that licensed
+ * `[\d]` -> `\d` licenses `[[:digit:]]` -> `\d` too. A non-C database locale can
+ * extend every one of these past ASCII; the spellings here are all the ASCII
+ * reading, so each is a *subset* of what the filter selects and under-accepts at
+ * worst — never wider, which is the invariant that matters, since a wider
+ * matcher credits a name the filter does not select. (`digit` and `word` reuse
+ * the JS shorthands, which stay ASCII; the rest are spelled out because JS has
+ * no shorthand for them.)
+ *
+ * Every other class name refuses: `punct`, `graph`, `print`, `cntrl` and `ascii`
+ * are not spelled here because nothing needs them yet and each would need its
+ * own subset proof, and refusing costs only noise. Locale-extending complements
+ * never appear as a POSIX class name at all — the complement is spelled by
+ * negating the bracket expression, which refuses wholesale (see `bracketSource`).
+ */
+const POSIX_CLASS_SOURCES = {
+  alnum: "0-9A-Za-z",
+  alpha: "A-Za-z",
+  blank: " \\t",
+  digit: "\\d",
+  lower: "a-z",
+  space: " \\t\\n\\v\\f\\r",
+  upper: "A-Z",
+  word: "\\w",
+  xdigit: "0-9A-Fa-f",
+};
 
 /**
  * The JS regex source equivalent to the POSIX ERE `pattern`, or null when it

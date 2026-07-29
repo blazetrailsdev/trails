@@ -338,6 +338,39 @@ tester.run("require-table-teardown", rule, {
       "for (const t of rows) {\n" +
       '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
       "}",
+    // A POSIX character class is what the ARE shorthands are defined as, so the
+    // listed ASCII spellings translate: each is a subset of what a non-C locale
+    // selects, so the matcher under-accepts at worst.
+    'await adapter.exec(`CREATE TABLE "ex_12" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[[:digit:]]+'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
+    'await adapter.exec(`CREATE TABLE "ex_a1" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename SIMILAR TO 'ex_[[:alnum:]]%'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
+    // A class alongside ordinary members and another class in the same
+    // expression, and one spelled out because JS has no shorthand for it.
+    'await adapter.exec(`CREATE TABLE "ex_-A" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[-[:upper:][:digit:]]+'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
+    'await adapter.exec(`CREATE TABLE "ex_ff" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[[:xdigit:]]+'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
     // A static schema qualifier still leaves the interpolation in the name slot.
     'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
       "const rows = await adapter.execute(\n" +
@@ -924,17 +957,92 @@ tester.run("require-table-teardown", rule, {
         "}",
       errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
     },
-    // A POSIX class element has no JS spelling, so it is refused, not guessed.
+    // A POSIX class name with no listed subset spelling is refused, not guessed.
     {
       code:
-        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        'await adapter.exec(`CREATE TABLE "ex_." (id int)`);\n' +
         "const rows = await adapter.execute(\n" +
-        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[[:alpha:]]'`,\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[[:punct:]]'`,\n" +
         ");\n" +
         "for (const t of rows) {\n" +
         '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
         "}",
-      errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_." } }],
+    },
+    // Under a negating `^` the ASCII spelling is the *wider* of the two, so a
+    // POSIX class refuses there even when it translates unnegated.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_1" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[^[:alpha:]]'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_1" } }],
+    },
+    // A POSIX class as a range endpoint: ARE rejects it outright, while JS's
+    // Annex B grammar would read the `-` as a literal and credit `ex_-`.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_-" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[[:digit:]-a]'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_-" } }],
+    },
+    // A collating element has no JS spelling at all, so it stays refused.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_c" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[[.c.]]'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_c" } }],
+    },
+    // An equivalence class likewise: JS cannot spell locale equivalence.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_a" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[[=a=]]'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_a" } }],
+    },
+    // An unterminated `[:` names no class, so the expression refuses.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_d" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[[:digit]'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_d" } }],
+    },
+    // A translated class still credits only what it selects: `[[:digit:]]` does
+    // not select the underscore in `ex__`, so that create is still reported.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex__" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[[:digit:]]'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex__" } }],
     },
     // A backslash inside a bracket expression is an escape to PostgreSQL's ARE
     // engine and a literal to bare POSIX. `[\d]` is read as the digits, so it
