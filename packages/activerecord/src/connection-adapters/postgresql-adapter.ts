@@ -132,6 +132,10 @@ import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
 import type { SchemaSource } from "../schema-dumper.js";
 import { pgDatetimeConfig } from "./postgresql/pg-datetime-config.js";
 import { abandonRawSocket } from "./abandon-raw-socket.js";
+import {
+  POSTGRESQL_NATIVE_DATABASE_TYPES,
+  type NativeDatabaseType,
+} from "./abstract/native-database-types.js";
 
 const OID_JSON = 114;
 const OID_JSONB = 3802;
@@ -252,54 +256,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   // Mirrors: PostgreSQLAdapter::NATIVE_DATABASE_TYPES (postgresql_adapter.rb:134)
-  static readonly NATIVE_DATABASE_TYPES: Record<
-    string,
-    string | { name?: string; limit?: number }
-  > = {
-    primaryKey: "bigserial primary key",
-    string: { name: "character varying" },
-    text: { name: "text" },
-    integer: { name: "integer", limit: 4 },
-    bigint: { name: "bigint" },
-    float: { name: "float" },
-    decimal: { name: "decimal" },
-    timestamp: { name: "timestamp" },
-    timestamptz: { name: "timestamptz" },
-    time: { name: "time" },
-    date: { name: "date" },
-    daterange: { name: "daterange" },
-    numrange: { name: "numrange" },
-    tsrange: { name: "tsrange" },
-    tstzrange: { name: "tstzrange" },
-    int4range: { name: "int4range" },
-    int8range: { name: "int8range" },
-    binary: { name: "bytea" },
-    boolean: { name: "boolean" },
-    xml: { name: "xml" },
-    tsvector: { name: "tsvector" },
-    hstore: { name: "hstore" },
-    inet: { name: "inet" },
-    cidr: { name: "cidr" },
-    macaddr: { name: "macaddr" },
-    uuid: { name: "uuid" },
-    json: { name: "json" },
-    jsonb: { name: "jsonb" },
-    ltree: { name: "ltree" },
-    citext: { name: "citext" },
-    point: { name: "point" },
-    line: { name: "line" },
-    lseg: { name: "lseg" },
-    box: { name: "box" },
-    path: { name: "path" },
-    polygon: { name: "polygon" },
-    circle: { name: "circle" },
-    bit: { name: "bit" },
-    bitVarying: { name: "bit varying" },
-    money: { name: "money" },
-    interval: { name: "interval" },
-    oid: { name: "oid" },
-    enum: {},
-  };
+  static readonly NATIVE_DATABASE_TYPES: Record<string, NativeDatabaseType> =
+    POSTGRESQL_NATIVE_DATABASE_TYPES;
 
   // Mirrors: PostgreSQLAdapter.datetime_type class_attribute (postgresql_adapter.rb:123).
   // Proxied through pgDatetimeConfig so OID::DateTime.realTypeUnlessAliased can read
@@ -2540,17 +2498,17 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // Mirrors: PostgreSQLAdapter.native_database_types (postgresql_adapter.rb:404)
   // The datetime entry is resolved dynamically from datetimeType, matching Rails'
   // `types[:datetime] = types[datetime_type]`.
-  static nativeDatabaseTypes(): Record<string, string | { name?: string; limit?: number }> {
-    const types = {
-      ...this.NATIVE_DATABASE_TYPES,
-      ...pgDatetimeConfig.nativeDatabaseTypesOverrides,
-    };
+  static nativeDatabaseTypes(): Record<string, NativeDatabaseType> {
+    const types: Record<string, NativeDatabaseType> = { ...this.NATIVE_DATABASE_TYPES };
+    for (const [key, value] of Object.entries(pgDatetimeConfig.nativeDatabaseTypesOverrides)) {
+      types[key] = typeof value === "string" ? { name: value } : value;
+    }
     types["datetime"] = types[this.datetimeType] ?? { name: "timestamp" };
     return types;
   }
 
   // Mirrors: PostgreSQLAdapter#native_database_types (postgresql_adapter.rb:400)
-  nativeDatabaseTypes(): Record<string, string | { name?: string; limit?: number }> {
+  nativeDatabaseTypes(): Record<string, NativeDatabaseType> {
     return (this.constructor as typeof PostgreSQLAdapter).nativeDatabaseTypes();
   }
 

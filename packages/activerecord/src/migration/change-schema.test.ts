@@ -7,10 +7,6 @@
  * `@connection = ActiveRecord::Base.lease_connection`. `testings` is created
  * and dropped by the test in Rails too, so it is not a canonical-schema table.
  *
- * Four cases are still unported — the bigint/timestamp/datetime `sql_type`
- * assertions. Each needs `type_to_sql` to source its base names from
- * `native_database_types` rather than a hardcoded uppercase switch; tracked by
- * the `converge-type-to-sql-base-names-on-native-database-types` story.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../base.js";
@@ -24,6 +20,23 @@ import { adapterType } from "../test-adapter.js";
 import { describeIfSupports } from "../support/supports.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { Column } from "../connection-adapters/column.js";
+
+function expectedDatetimeSqlType(connection: AbstractAdapter, withPrecision: boolean): string {
+  if (adapterType === "postgres") {
+    return withPrecision ? "timestamp(6) without time zone" : "timestamp without time zone";
+  }
+  if (adapterType === "mysql") return withPrecision ? "datetime(6)" : "timestamp";
+  return connection.typeToSql("datetime(6)");
+}
+
+function assertBigintColumn(eight: Column): void {
+  if (adapterType === "sqlite") {
+    expect(eight.sqlType).toBe("bigint");
+    return;
+  }
+  expect(eight.type).toBe("integer");
+  expect(eight.limit).toBe(8);
+}
 
 class SilentMigration extends Migration {
   write(): void {}
@@ -415,6 +428,54 @@ describe("Migration", () => {
         await notnullMigration.migrate("down");
         expect(detect(await connection.columns("testings"), "foo").null).toBe(true);
       });
+    });
+
+    it("create table with bigint", async () => {
+      const connection = await ambientConnection();
+      await connection.createTable("testings", (t) => {
+        t.bigint("eight_int");
+      });
+      const columns = await connection.columns("testings");
+
+      assertBigintColumn(detect(columns, "eight_int"));
+    });
+
+    it("add column with timestamp type", async () => {
+      const connection = await ambientConnection();
+      await connection.createTable("testings", (t) => {
+        t.column("foo", "timestamp");
+      });
+
+      const column = detect(await connection.columns("testings"), "foo");
+
+      expect(column.type).toBe("datetime");
+      expect(column.sqlType).toBe(expectedDatetimeSqlType(connection, false));
+    });
+
+    it("add column with postgresql datetime type", async () => {
+      const connection = await ambientConnection();
+      await connection.createTable("testings", (t) => {
+        t.column("foo", "datetime");
+      });
+
+      const column = detect(await connection.columns("testings"), "foo");
+
+      expect(column.type).toBe("datetime");
+      expect(column.sqlType).toBe(expectedDatetimeSqlType(connection, true));
+    });
+
+    it("change column with timestamp type", async () => {
+      const connection = await ambientConnection();
+      await connection.createTable("testings", (t) => {
+        t.column("foo", "datetime", { null: false });
+      });
+
+      await connection.changeColumn("testings", "foo", "timestamp");
+
+      const column = detect(await connection.columns("testings"), "foo");
+
+      expect(column.type).toBe("datetime");
+      expect(column.sqlType).toBe(expectedDatetimeSqlType(connection, false));
     });
 
     it("column exists", async () => {

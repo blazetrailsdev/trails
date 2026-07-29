@@ -423,6 +423,7 @@ export interface AbstractAdapter {
   // resolves it through here rather than a duplicate on SchemaStatements.
   tableAliasLength(): number;
   nativeDatabaseTypes(): Record<string, unknown>;
+  typeToSql(type: ColumnType, options?: ColumnOptions): string;
   dataSources(): Promise<string[]>;
   isDataSourceExists(name: string): Promise<boolean>;
   // --- DatabaseStatements ---
