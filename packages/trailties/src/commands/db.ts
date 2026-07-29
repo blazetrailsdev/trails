@@ -835,36 +835,55 @@ export function dbCommand(): Command {
       "Create the database if it doesn't exist, run pending migrations, and seed when fresh",
     )
     .action(async () => {
-      const raw = normalizeRawConfig(await loadDatabaseConfig());
-      const config = toDbConfig(raw);
-      const { NoDatabaseError } = await import("@blazetrails/activerecord");
-
-      await DatabaseTasks.withTemporaryPool(config, async (pool) => {
-        let adapter: DatabaseAdapter;
-        let databaseAlreadyInitialized: boolean;
-        try {
-          adapter = await pool.leaseConnection();
-          databaseAlreadyInitialized = await createMigrator(
-            adapter,
-            [],
+      // Rails' db:prepare is `DatabaseTasks.prepare_all` — per-config
+      // initialize (create + load schema when a dump exists), per-version
+      // migrate across every current configuration, an optional schema dump,
+      // then a single seed load. All of that lives in DatabaseTasks; the CLI
+      // only supplies what it alone knows: the loaded configs, each config's
+      // migrations, and how to run db/seeds.ts.
+      const envName = resolveEnv();
+      const entries = (await loadAllDatabaseConfigs(envName))
+        .map(({ name, config: rawConfig }) => {
+          const raw = normalizeRawConfig(rawConfig);
+          return {
+            name,
             raw,
-          ).schemaMigrationTableExists();
-        } catch (error) {
-          if (!(error instanceof NoDatabaseError)) throw error;
-          await DatabaseTasks.create(config);
-          adapter = await pool.leaseConnection();
-          databaseAlreadyInitialized = await createMigrator(
-            adapter,
-            [],
-            raw,
-          ).schemaMigrationTableExists();
-        }
+            hashConfig: new HashConfig(envName, name, raw as Record<string, unknown>),
+          };
+        })
+        .filter((entry) => entry.hashConfig.databaseTasks());
 
-        await runMigrate(adapter, raw);
-        if (!databaseAlreadyInitialized) {
-          await withSeedAdapter(adapter, runSeed);
-        }
-      });
+      DatabaseTasks.registerMigrations([]);
+      for (const entry of entries) {
+        const dirs = await migrationsDirsForConfig(entry.name, entry.raw);
+        DatabaseTasks.registerMigrations(await discoverMigrationsFromDirs(dirs), entry.name);
+      }
+
+      const seedTarget = entries[0]?.hashConfig;
+      const previousSeedLoader = DatabaseTasks.seedLoader;
+      const previousFormat = DatabaseTasks.schemaFormat;
+      DatabaseTasks.seedLoader = {
+        async loadSeed() {
+          if (!seedTarget) return;
+          // Seeds touch models, so give Base a connection to the primary
+          // database for the duration — Rails gets this for free from the
+          // established connection.
+          await DatabaseTasks.withTemporaryPool(seedTarget, async (pool) => {
+            await withSeedAdapter(await pool.leaseConnection(), runSeed);
+          });
+        },
+      };
+      try {
+        DatabaseTasks.schemaFormat = await resolveSchemaFormat();
+        await withRegisteredConfigurations(
+          entries.map((entry) => entry.hashConfig),
+          envName,
+          () => DatabaseTasks.prepareAll(),
+        );
+      } finally {
+        DatabaseTasks.seedLoader = previousSeedLoader;
+        DatabaseTasks.schemaFormat = previousFormat;
+      }
     });
 
   cmd

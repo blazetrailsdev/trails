@@ -292,8 +292,36 @@ export class DatabaseTasks {
 
   private static _migrations: Array<import("../migration.js").MigrationProxy> = [];
 
-  static registerMigrations(migrations: Array<import("../migration.js").MigrationProxy>): void {
-    this._migrations = migrations;
+  private static _migrationsByConfigName = new Map<
+    string,
+    Array<import("../migration.js").MigrationProxy>
+  >();
+
+  /**
+   * Register the migrations the task methods run. Rails derives them per
+   * config from `db_config.migrations_paths` (via the pool's
+   * `migration_context`); we have no filesystem loader down here, so the
+   * caller pre-loads and registers them — optionally under a config name so
+   * a multi-database app can give each database its own set. Registering
+   * without a name resets the per-name registry, so a fresh CLI invocation
+   * never inherits a stale database's migrations.
+   */
+  static registerMigrations(
+    migrations: Array<import("../migration.js").MigrationProxy>,
+    configName?: string,
+  ): void {
+    if (configName === undefined) {
+      this._migrations = migrations;
+      this._migrationsByConfigName.clear();
+    } else {
+      this._migrationsByConfigName.set(configName, migrations);
+    }
+  }
+
+  private static _migrationsFor(
+    dbConfig: DatabaseConfig,
+  ): Array<import("../migration.js").MigrationProxy> {
+    return this._migrationsByConfigName.get(dbConfig.name) ?? this._migrations;
   }
 
   static async migrate(
@@ -1059,7 +1087,10 @@ export class DatabaseTasks {
           if (!dumpDbConfigs.includes(dbConfig)) dumpDbConfigs.push(dbConfig);
           await this.withTemporaryPool(dbConfig, async (pool) => {
             const { Migrator } = await import("../migration.js");
-            const migrator = new Migrator(await pool.leaseConnection(), this._migrations);
+            const migrator = new Migrator(
+              await pool.leaseConnection(),
+              this._migrationsFor(dbConfig),
+            );
             await migrator.migrate(version ?? null);
           });
         }
@@ -1086,7 +1117,7 @@ export class DatabaseTasks {
     const { Migrator } = await import("../migration.js");
     for (const config of this.configsFor(env)) {
       await this.withTemporaryPool(config, async (pool) => {
-        const migrator = new Migrator(await pool.leaseConnection(), this._migrations);
+        const migrator = new Migrator(await pool.leaseConnection(), this._migrationsFor(config));
         const versionsToRun = await migrator.pendingMigrationVersions();
         for (const version of versionsToRun) {
           if (targetVersion !== null && targetVersion !== Number(version)) continue;
