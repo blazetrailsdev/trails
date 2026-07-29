@@ -131,15 +131,21 @@
  * the under-accepting direction (a real sweep goes unrecognised and its creates
  * are reported, which is noise rather than a leak): SQL built by concatenation
  * or returned from a helper, since only a literal, a template, or an identifier
- * holding one is read. The variable half of that is CLOSED — a filter hoisted to
- * a `const SWEEP_SQL` (or assigned to a `let` later) and handed to a sink arms
- * the same prefixes as the inline spelling, resolved by the `sqlTexts` that
- * `require-canonical-rebuild` uses, so the two rules read a hoisted query the
- * same way; a string that never reaches a sink still arms nothing. Only the
- * FILTER is read off a resolved variable, never a create or drop name — see
- * `recordSinkSql`. Also gapped: a catalogue relation `CATALOGUE_SOURCE` does not
- * list; and a filter spelled as something other than `LIKE` or `ILIKE` —
- * `SIMILAR TO`, a regex operator — since only those two are read.
+ * holding one is read; a catalogue relation `CATALOGUE_SOURCE` does not list;
+ * and a filter spelled as something other than `LIKE` or `ILIKE` — `SIMILAR TO`,
+ * a regex operator — since only those two are read.
+ *
+ * The identifier in that list is the shared `sqlTexts` (`eslint/sql-texts.mjs`),
+ * so a filter hoisted to a `const SWEEP_SQL` — or assigned to a `let` after its
+ * declaration — arms the same prefixes as the inline spelling, and the two rules
+ * cannot disagree about which writes a hoisted query can carry. A string that
+ * never reaches a sink still arms nothing, so an expected-SQL assertion over
+ * rendered DDL stays quiet. Only the FILTER half is read off a resolved
+ * variable, never a create or drop name: `sqlTexts` joins a template's quasis
+ * with a space, which loses where the substitutions sat, and the create/drop
+ * scanners need exactly that to decide whether a name at a quasi boundary is
+ * complete. A prefix filter needs no such boundary, so reading it out of a
+ * joined text is sound where reading a name would not be.
  *
  * This is deliberately independent of `require-canonical-rebuild`: the two
  * rules answer different questions. A sweep that can select a canonical table
@@ -607,13 +613,6 @@ const rule = {
             }
           });
         } else if (arg.type === "Identifier") {
-          // A sweep's catalogue query hoisted to a variable — `const SWEEP_SQL =
-          // ...; execute(SWEEP_SQL)`. Only the FILTER half is read off the
-          // resolved text: sqlTexts joins a template's quasis with a space, which
-          // loses where the substitutions sat, and the create/drop scanners need
-          // that to decide whether a name at a quasi boundary is complete. A
-          // filter needs no such boundary, so reading it here is sound while
-          // reading names would not be.
           for (const text of sqlTexts(arg)) sweptPrefixes.push(...sweepPrefixMatchers(text));
         }
       }
