@@ -394,12 +394,11 @@ export class DatabaseTasks {
   /** Roll back the last N migrations (default 1). Mirrors `db:rollback`. */
   static async rollback(steps: number = 1): Promise<void> {
     if (!this.databaseConfiguration) return;
-    const configs = this.configsFor(this._normalizeEnv());
-    if (configs.length === 0) return;
-    const config = configs.find((c) => c.name === "primary") ?? configs[0];
+    if (this.configsFor(this._normalizeEnv()).length === 0) return;
     const { Migrator } = await import("../migration.js");
-    const adapter = await this._migrationAdapter();
-    const migrator = new Migrator(adapter, this._migrations);
+    const pool = await this.migrationConnectionPool();
+    const adapter = await pool.leaseConnection();
+    const migrator = new Migrator(adapter, this._migrationsFor(pool.dbConfig));
     await migrator.rollback(steps);
     adapter.schemaCache?.clear();
   }
@@ -1001,7 +1000,7 @@ export class DatabaseTasks {
     const pool = Base.connectionPool();
     const adapter = await pool.leaseConnection();
     const { Migrator } = await import("../migration.js");
-    const migrator = new Migrator(adapter, this._migrations);
+    const migrator = new Migrator(adapter, this._migrationsFor(pool.dbConfig));
     // Mirrors database_tasks.rb:302-305: abort unless schema_migrations exists.
     if (!(await migrator.schemaMigrationTableExists())) {
       throw new Error("Schema migrations table does not exist yet.");
@@ -1031,9 +1030,10 @@ export class DatabaseTasks {
    * (called by `rails db:version`).
    */
   static async currentVersion(): Promise<number> {
-    const adapter = await this._migrationAdapter();
+    const pool = await this.migrationConnectionPool();
+    const adapter = await pool.leaseConnection();
     const { Migrator } = await import("../migration.js");
-    const migrator = new Migrator(adapter, this._migrations);
+    const migrator = new Migrator(adapter, this._migrationsFor(pool.dbConfig));
     return migrator.currentVersionReadOnly();
   }
 
