@@ -5,7 +5,12 @@ import { ActiveRecordError, StatementInvalid } from "../errors.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { adapterType } from "../test-adapter.js";
-import { isMariaDb, serverVersion } from "../support/mysql-server-version.js";
+import {
+  isMariaDb,
+  serverVersion,
+  supportsDefaultExpression,
+} from "../support/mysql-server-version.js";
+import { adapterSupports } from "../support/supports.js";
 
 const mariaDbRejectsUniqueColumnDrop =
   adapterType === "mysql" && isMariaDb && serverVersion?.gte("10.2.8") === true;
@@ -414,6 +419,79 @@ describe("Migration", () => {
       TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       expect(TestModel.new().first_name).toBe("Tester");
+    });
+
+    it.skipIf(adapterType !== "mysql")("mysql rename column preserves auto increment", async () => {
+      const connection = await ambientConnection();
+      try {
+        await connection.renameColumn("test_models", "id", "id_test");
+        const renamed = (await connection.columns("test_models")).find(
+          (c) => c.name === "id_test",
+        ) as (Column & { autoIncrement?: boolean }) | undefined;
+        expect(renamed?.autoIncrement).toBe(true);
+        TestModel.resetColumnInformation();
+      } finally {
+        await connection.renameColumn("test_models", "id_test", "id");
+      }
+    });
+
+    it.skipIf(adapterType !== "sqlite")(
+      "change column default preserves existing column default function",
+      async () => {
+        const connection = await ambientConnection();
+        await connection.changeColumnDefault(
+          "test_models",
+          "created_at",
+          () => "CURRENT_TIMESTAMP",
+        );
+        TestModel.resetColumnInformation();
+        await TestModel.loadSchema();
+        expect(TestModel.columnsHash()["created_at"].defaultFunction).toBe("CURRENT_TIMESTAMP");
+
+        await connection.addColumn("test_models", "edited_at", "datetime");
+        await connection.changeColumnDefault("test_models", "edited_at", () => "CURRENT_TIMESTAMP");
+        TestModel.resetColumnInformation();
+        await TestModel.loadSchema();
+        expect(TestModel.columnsHash()["created_at"].defaultFunction).toBe("CURRENT_TIMESTAMP");
+        expect(TestModel.columnsHash()["edited_at"].defaultFunction).toBe("CURRENT_TIMESTAMP");
+      },
+    );
+
+    it.skipIf(adapterType !== "sqlite")(
+      "change column default supports default function with concatenation operator",
+      async () => {
+        const connection = await ambientConnection();
+        await connection.addColumn("test_models", "ruby_on_rails", "string");
+        await connection.changeColumnDefault(
+          "test_models",
+          "ruby_on_rails",
+          () => "('Ruby ' || 'on ' || 'Rails')",
+        );
+        TestModel.resetColumnInformation();
+        await TestModel.loadSchema();
+        expect(TestModel.columnsHash()["ruby_on_rails"].defaultFunction).toBe(
+          "'Ruby ' || 'on ' || 'Rails'",
+        );
+      },
+    );
+
+    it.skipIf(
+      adapterType !== "mysql" ||
+        !adapterSupports("default_expression") ||
+        !supportsDefaultExpression,
+    )("change column null does not change default functions", async () => {
+      const connection = await ambientConnection();
+      const fn = isMariaDb ? "current_timestamp(6)" : "(now())";
+
+      await connection.changeColumnDefault("test_models", "created_at", () => fn);
+      TestModel.resetColumnInformation();
+      await TestModel.loadSchema();
+      expect(TestModel.columnsHash()["created_at"].defaultFunction).toBe(fn);
+
+      await connection.changeColumnNull("test_models", "created_at", true);
+      TestModel.resetColumnInformation();
+      await TestModel.loadSchema();
+      expect(TestModel.columnsHash()["created_at"].defaultFunction).toBe(fn);
     });
   });
 });
