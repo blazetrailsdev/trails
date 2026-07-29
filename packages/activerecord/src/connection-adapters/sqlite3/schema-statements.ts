@@ -12,6 +12,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js"
 import type { CheckConstraintDefinition } from "../abstract/schema-definitions.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { SchemaCreation } from "./schema-creation.js";
+import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 import { SchemaDumper } from "./schema-dumper.js";
 import { Column } from "./column.js";
@@ -214,9 +215,19 @@ function validTableDefinitionOptions(): string[] {
 }
 
 /** @internal */
-function validateIndexLengthBang(_tableName: string, _newName: string, internal = false): void {
-  // SQLite skips index name length validation for internal indexes
+function validateIndexLengthBang(
+  this: { adapter: DatabaseAdapter },
+  tableName: string,
+  newName: string,
+  internal = false,
+): void {
   if (internal) return;
+  AbstractSchemaStatements.prototype.validateIndexLengthBang.call(
+    this,
+    tableName,
+    newName,
+    internal,
+  );
 }
 
 /** @internal */
