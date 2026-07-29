@@ -23,6 +23,23 @@ import { describe, it, expect } from "vitest";
  * there, so the gap stays documented rather than closed. This test is what keeps
  * that justification honest: the day an in-scope file assembles SQL this way, it
  * fails and the decision gets re-made against a non-zero population.
+ *
+ * UPPER BOUND, deliberately. The rules only read SQL that reaches an execution
+ * sink — that scoping is what keeps SQL-generation and expected-SQL assertions
+ * quiet (see the Raw-SQL leaks section of `require-table-teardown.mjs`) — and
+ * this probe does NOT check sink reachability. So it counts assemblies the rules
+ * would ignore, and what it reports is an upper bound on the real population
+ * rather than the population itself.
+ *
+ * That is the right direction for this measurement: a zero upper bound proves a
+ * zero population, so over-counting cannot make the "leave the gap open"
+ * conclusion unsafe — only premature. It does mean a future assertion-only
+ * assembly (`parts.push("SELECT …")` fed to `expect`, never to a sink) can fail
+ * this test even though neither rule would read it. Teaching the probe sink
+ * reachability against the shared `SQL_SINKS` is tracked as
+ * require-table-teardown-piecewise-probe-sink-reachability; until then the fix
+ * for such a failure is to assemble the string in one expression, which the
+ * failure message asks for anyway.
  */
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
