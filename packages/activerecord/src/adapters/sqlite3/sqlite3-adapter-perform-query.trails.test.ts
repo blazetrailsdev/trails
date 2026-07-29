@@ -9,6 +9,7 @@
  */
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
+import { Base } from "../../base.js";
 import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { ReadOnlyError } from "../../errors.js";
@@ -101,17 +102,26 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     expect([...ids].sort((a, b) => a - b)).toEqual(Array.from({ length: n }, (_, i) => i + 1));
   });
 
+  // Rails' `preventing_writes?` returns false when `connection_descriptor` is nil
+  // (abstract_adapter.rb:229), so a `Base` scope only reaches a pool-backed
+  // connection — these two lease rather than reuse the standalone adapter above.
+  // The guard itself lives in preprocess_query's check_if_write_query, so it
+  // covers execute and executeMutation alike.
   it("errors when a write is routed through execute while preventing writes", async () => {
-    // The guard lives in preprocess_query's check_if_write_query, so it covers
-    // execute and executeMutation alike.
+    const connection = (await Base.leaseConnection()) as unknown as AbstractSQLite3Adapter;
     await expect(
-      adapter.withPreventedWrites(() => adapter.execute(`INSERT INTO "pq" ("nick") VALUES ('a')`)),
+      Base.whilePreventingWrites(() =>
+        connection.execute(`INSERT INTO subscribers(nick) VALUES ('pq')`),
+      ),
     ).rejects.toThrow(ReadOnlyError);
   });
 
   it("does not prevent a read routed through execute while preventing writes", async () => {
-    await adapter.withPreventedWrites(async () => {
-      await expect(adapter.execute(`SELECT * FROM "pq"`)).resolves.toEqual([]);
+    const connection = (await Base.leaseConnection()) as unknown as AbstractSQLite3Adapter;
+    await Base.whilePreventingWrites(async () => {
+      await expect(
+        connection.execute(`SELECT * FROM subscribers WHERE nick = 'pq'`),
+      ).resolves.toEqual([]);
     });
   });
 
