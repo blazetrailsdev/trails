@@ -21,7 +21,7 @@ describe("ADAPTER_SPECIFIC_TABLES", () => {
     try {
       await loadAdapterSpecificSchema(adapter);
       const created = (await adapter.tables()).sort();
-      expect(created).toEqual([...adapterSpecificTableNames("sqlite")].sort());
+      expect(created).toEqual([...(await adapterSpecificTableNames(adapter))].sort());
     } finally {
       await (adapter as unknown as BetterSQLite3Adapter).close();
     }
@@ -29,7 +29,7 @@ describe("ADAPTER_SPECIFIC_TABLES", () => {
 
   it("lists tables the active lane actually has after boot", async () => {
     const adapter = Base.connection;
-    const declared = adapterSpecificTableNames(adapter.adapterName);
+    const declared = await adapterSpecificTableNames(adapter);
     expect(declared.length).toBeGreaterThan(0);
 
     const present = new Set(await adapter.tables());
