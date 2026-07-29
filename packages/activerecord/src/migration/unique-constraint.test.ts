@@ -65,13 +65,15 @@ describeIfSupports("unique_constraints", "Migration", () => {
         expect(constraint.deferrable).toBe(expected.deferrable);
       }
 
-      const nullsNotDistinct = uniqueConstraints.find(
-        (c) => c.name === expectedNullsNotDistinct.name,
-      )!;
-      expect(nullsNotDistinct.tableName).toBe("test_unique_constraints");
-      expect(nullsNotDistinct.name).toBe(expectedNullsNotDistinct.name);
-      expect(nullsNotDistinct.column).toEqual(expectedNullsNotDistinct.column);
-      expect(nullsNotDistinct.nullsNotDistinct).toBe(expectedNullsNotDistinct.nullsNotDistinct);
+      await connection.getDatabaseVersion();
+      // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors Rails' inline `if supports_nulls_not_distinct?` guard (PG 15+)
+      if (connection.supportsNullsNotDistinct()) {
+        const constraint = uniqueConstraints.find((c) => c.name === expectedNullsNotDistinct.name)!;
+        expect(constraint.tableName).toBe("test_unique_constraints");
+        expect(constraint.name).toBe(expectedNullsNotDistinct.name);
+        expect(constraint.column).toEqual(expectedNullsNotDistinct.column);
+        expect(constraint.nullsNotDistinct).toBe(expectedNullsNotDistinct.nullsNotDistinct);
+      }
     });
 
     it("add unique constraint without deferrable", async () => {
