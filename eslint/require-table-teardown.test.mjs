@@ -175,6 +175,22 @@ tester.run("require-table-teardown", rule, {
       "for (const t of rows) {\n" +
       "  await adapter.dropTable(t.tablename);\n" +
       "}",
+    // The filter hoisted to a const is the same sweep as the inline spelling.
+    'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+      "const SWEEP_SQL = `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`;\n" +
+      "const rows = await adapter.execute(SWEEP_SQL);\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
+    // ...and so is one assigned to a `let` after its declaration: which write
+    // reaches the sink is not decidable here, so every one it can hold counts.
+    'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+      "let sql;\n" +
+      "sql = `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`;\n" +
+      "const rows = await adapter.execute(sql);\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
   ],
   invalid: [
     // Dropping the truncated prefix of a spaced quoted name is not a teardown
@@ -539,6 +555,33 @@ tester.run("require-table-teardown", rule, {
         "const rows = await adapter.execute(\n" +
         "  `SELECT tablename FROM pg_tables WHERE tablename NOT ILIKE 'ex_%'`,\n" +
         ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
+    },
+    // A hoisted filter whose pattern is interpolated is not a knowable prefix:
+    // reading the template's quasis as one joined string would make `LIKE
+    // 'ex${suffix}%'` look like the static prefix `ex `, crediting a create the
+    // query need not select.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex leak" (id int)`);\n' +
+        "const sql = `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex${suffix}%'`;\n" +
+        "const rows = await adapter.execute(sql);\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex leak" } }],
+    },
+    // A filter string that never reaches an execution sink sweeps nothing — an
+    // expected-SQL assertion must not credit the file's creates.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        "const SWEEP_SQL = `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`;\n" +
+        "expect(builder.toSql()).toBe(SWEEP_SQL);\n" +
+        "const rows = await adapter.execute(`SELECT tablename FROM pg_tables`);\n" +
         "for (const t of rows) {\n" +
         '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
         "}",
