@@ -164,7 +164,18 @@ export const ARUNIT_DATABASE = "activerecord_unittest";
  * `<%= FIXTURES_ROOT %>/fixture_database.sqlite3`, a fixed file reused across
  * runs. trails has no `FIXTURES_ROOT` (see the module docs above), so the name
  * is relative and the sqlite driver resolves it against the working directory,
- * as it resolves any relative `database:`. `db/` is gitignored.
+ * as it resolves any relative `database:`.
+ *
+ * `db/` is the deliberate stand-in for `FIXTURES_ROOT`, not a leftover: Rails
+ * writes its pair into the checked-in `test/fixtures` directory and gitignores
+ * just the files (`activerecord/.gitignore:5`, `/test/fixtures/*.sqlite*`), so
+ * a gitignored directory holding exactly these two databases is the same
+ * arrangement with the one difference trails forces — no `FIXTURES_ROOT` to
+ * anchor the path to, hence repo-relative. The `/db/` entry in the root
+ * `.gitignore` is load-bearing for that and must stay. The trails-side fixture
+ * directory (`test-helpers/fixtures/`) is not the place for them: it is
+ * compiled source, and a generated binary inside `src/` would be swept by the
+ * build.
  *
  * It is a plain configured name on purpose: the previous spelling derived a
  * `<tmpdir>/ar-test-fallback-<run token>-<worker slot>.sqlite` path from the
