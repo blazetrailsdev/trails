@@ -181,6 +181,15 @@ tester.run("require-table-teardown", rule, {
       "for (const t of rows) {\n" +
       '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
       "}",
+    // The ESCAPE clause still applies inside a translated pattern: `!(` is a
+    // literal paren, so only the second `(` opens a group.
+    'await adapter.exec(`CREATE TABLE "ex(tmp" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename SIMILAR TO 'ex!((ex|tmp)%' ESCAPE '!'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
     // A bracket expression and a bounded repeat are spelled alike in JS.
     'await adapter.exec(`CREATE TABLE "ex12_int" (id int)`);\n' +
       "const rows = await adapter.execute(\n" +
@@ -711,6 +720,18 @@ tester.run("require-table-teardown", rule, {
         'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
         "const rows = await adapter.execute(\n" +
         "  `SELECT tablename FROM pg_tables WHERE tablename ~ 'ex_'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
+    },
+    // An unterminated bracket expression is malformed, so it credits nothing.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[0-9'`,\n" +
         ");\n" +
         "for (const t of rows) {\n" +
         '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
