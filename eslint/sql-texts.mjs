@@ -60,35 +60,39 @@ export function createSqlTexts(resolve) {
  * that body — or the concise-body expression of an arrow — goes back through
  * this same recursion, so a helper is read exactly as the SQL it hands back
  * would have been read inline. Several returns fan out, since which one runs is
- * not decidable here. A helper's PARAMETER is a dead end on purpose: its value
- * comes from the call site, so reading it as a substitution keeps the quasi
- * boundary a name or LIKE pattern flush against it needs — `` `… LIKE 'ex${p}%'`
- * `` credits nothing whether the pattern is interpolated at the call site or a
- * parameter deep in a helper. A callee that is not a resolvable local function —
- * an import, a global, a method call — stays a dead end and contributes no
- * strings, the same under-accepting direction the rest of this resolver takes.
+ * not decidable here. Arguments are deliberately NOT bound to parameters: a
+ * parameter binding has no initializer and no write, so it resolves to no
+ * strings and reads as a substitution — exactly the quasi boundary a name or
+ * LIKE pattern flush against it needs, since its value is the caller's to vary.
+ * So `` `… LIKE 'ex${prefix}%'` `` credits nothing whether the interpolation is
+ * written at the call site or sits a parameter deep in a helper, and `` `DROP
+ * TABLE tmp_${suffix}` `` returned from one names no knowable table. A callee
+ * that is not a resolvable local function — an import, a global, a method call —
+ * stays a dead end and contributes no strings, the same under-accepting
+ * direction the rest of this resolver takes.
  */
 export function createSqlTextGroups(resolve) {
-  /** The function a call's callee identifier names, or null when it names none. */
+  const isFunctionNode = (node) =>
+    node?.type === "FunctionDeclaration" ||
+    node?.type === "FunctionExpression" ||
+    node?.type === "ArrowFunctionExpression";
+
+  /**
+   * The `{ variable, fn }` a call's callee identifier names, or null when it
+   * names no local function — an import, a global, a method call, or a binding
+   * that holds something other than a function.
+   */
   function calleeFunction(node) {
     if (node?.type !== "Identifier") return null;
     const variable = resolve(node);
-    if (variable === null) return { variable: null, fn: null };
+    if (variable === null) return null;
     for (const def of variable.defs ?? []) {
       const defNode = def.node;
-      if (
-        defNode?.type === "FunctionDeclaration" ||
-        defNode?.type === "FunctionExpression" ||
-        defNode?.type === "ArrowFunctionExpression"
-      ) {
-        return { variable, fn: defNode };
-      }
+      if (isFunctionNode(defNode)) return { variable, fn: defNode };
       const init = defNode?.type === "VariableDeclarator" ? defNode.init : null;
-      if (init?.type === "ArrowFunctionExpression" || init?.type === "FunctionExpression") {
-        return { variable, fn: init };
-      }
+      if (isFunctionNode(init)) return { variable, fn: init };
     }
-    return { variable, fn: null };
+    return null;
   }
 
   /**
@@ -99,14 +103,7 @@ export function createSqlTextGroups(resolve) {
     if (fn.body?.type !== "BlockStatement") return fn.body ? [fn.body] : [];
     const out = [];
     const walk = (node) => {
-      if (!node || typeof node.type !== "string") return;
-      if (
-        node.type === "FunctionDeclaration" ||
-        node.type === "FunctionExpression" ||
-        node.type === "ArrowFunctionExpression"
-      ) {
-        return;
-      }
+      if (!node || typeof node.type !== "string" || isFunctionNode(node)) return;
       if (node.type === "ReturnStatement") {
         if (node.argument) out.push(node.argument);
         return;
@@ -139,8 +136,9 @@ export function createSqlTextGroups(resolve) {
       return out;
     }
     if (node?.type === "CallExpression") {
-      const { variable, fn } = calleeFunction(node.callee) ?? {};
-      if (!fn || variable === null || seen.has(variable)) return [];
+      const resolved = calleeFunction(node.callee);
+      if (resolved === null || seen.has(resolved.variable)) return [];
+      const { variable, fn } = resolved;
       seen.add(variable);
       const out = [];
       for (const returned of returnExpressions(fn)) {
@@ -151,9 +149,6 @@ export function createSqlTextGroups(resolve) {
     if (node?.type !== "Identifier") return [];
     const variable = resolve(node);
     if (variable === null || seen.has(variable)) return [];
-    // A parameter's value comes from the call site; reading it here would
-    // credit a name or pattern the caller can vary. Substitution, not a value.
-    if (variable.defs?.some((def) => def.type === "Parameter")) return [];
     seen.add(variable);
     const out = [];
     const init = variable.defs?.[0]?.node?.init;
