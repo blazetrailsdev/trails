@@ -148,6 +148,17 @@ tester.run("require-table-teardown", rule, {
       "for (const t of rows) {\n" +
       '  await adapter.exec(`DROP TABLE IF EXISTS "${schema}"."${t.tablename}" CASCADE`);\n' +
       "}",
+    // The helper spelling of the drop half: dropTable() on a swept row name is
+    // a sweep on the same footing as the raw one, so it satisfies the creates
+    // under the filter's prefix.
+    'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+      'await adapter.exec("CREATE TABLE ex_json (id int)");\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      "  await adapter.dropTable(t.tablename);\n" +
+      "}",
   ],
   invalid: [
     // Dropping the truncated prefix of a spaced quoted name is not a teardown
@@ -384,6 +395,49 @@ tester.run("require-table-teardown", rule, {
         ");\n" +
         'await adapter.exec(`DROP TABLE IF EXISTS "${schema}"."fixed"`);',
       errors: [{ messageId: "missingTeardown", data: { table: "ex_leak" } }],
+    },
+    // A fixed-name dropTable() arms no sweep, however many catalogue filters the
+    // file carries — otherwise the rule stops catching the bespoke tables that
+    // outlive their test. The named table is torn down; the other is reported.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        'await adapter.exec(`CREATE TABLE "ex_leak" (id int)`);\n' +
+        "await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+        ");\n" +
+        'await adapter.dropTable("ex_int");',
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_leak" } }],
+    },
+    // A fixed name held in a variable is not sweep-bound either: the dropTable()
+    // argument has to trace back to a row set, not merely be non-literal.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        "await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+        ");\n" +
+        'const name = "ex_int";\n' +
+        "await adapter.dropTable(name);",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
+    },
+    // A for-of over a hand-written array is not a sweep: it drops exactly the
+    // names it lists, so crediting it with the filter's whole prefix would
+    // suppress the leak of every other table under that prefix.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        'await adapter.exec(`CREATE TABLE "ex_leak" (id int)`);\n' +
+        "await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+        ");\n" +
+        'for (const t of ["ex_int"]) {\n' +
+        "  await adapter.dropTable(t);\n" +
+        "}",
+      errors: [
+        { messageId: "missingTeardown", data: { table: "ex_int" } },
+        { messageId: "missingTeardown", data: { table: "ex_leak" } },
+      ],
     },
     // An escaped `%` is a literal, not a prefix wildcard: `ex\%` names one table.
     {
