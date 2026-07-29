@@ -352,10 +352,6 @@ export function collectTaggedEntries(ts: ApiManifest): TaggedEntry[] {
         // have Ruby counterparts, so inheriting there would mask real drift.
         // A member's own tag still wins — members are pushed first.
         if (c.isInterface === true && c.noRailsEquivalent !== undefined) {
-          // Scoped to the interface's OWN members: when an `interface Foo` is
-          // declaration-merged with a `namespace Foo` they share this entry, and
-          // the namespace's members are real exported functions whose Ruby
-          // counterparts must keep being demanded.
           const covered = c.interfaceMembers;
           for (const m of c.instanceMethods) {
             if (covered && !covered.includes(m.name)) continue;
