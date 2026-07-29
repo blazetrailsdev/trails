@@ -230,11 +230,7 @@ export {
   TableNotSpecified,
   AsynchronousQueryInsideTransactionError,
 } from "./errors.js";
-export {
-  ReadonlyAttributeError,
-  getRaiseOnAssignToAttrReadonly,
-  setRaiseOnAssignToAttrReadonly,
-} from "./readonly-attributes.js";
+export { ReadonlyAttributeError } from "./readonly-attributes.js";
 export { RecordInvalid } from "./validations.js";
 export {
   AssociationNotFoundError,
