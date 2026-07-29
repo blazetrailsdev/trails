@@ -11,7 +11,7 @@ import {
   StatementInvalid,
   StrictLoadingViolationError,
 } from "./errors.js";
-import { actionOnStrictLoadingViolation } from "./ar-config.js";
+import { ActiveRecord } from "./ar-config.js";
 import { WRITING_ROLE } from "./roles.js";
 import {
   DatabaseConfigurations,
@@ -656,7 +656,7 @@ export function strictLoadingViolationBang(
   // Rails passes `owner.class` (Notifications payload + message subject); the
   // message builder stringifies it to the class name, matching Ruby's `#{owner}`.
   const ownerClass = typeof owner === "function" ? owner : owner?.constructor;
-  if (actionOnStrictLoadingViolation === "log") {
+  if (ActiveRecord.actionOnStrictLoadingViolation === "log") {
     Notifications.instrument("strict_loading_violation.active_record", {
       owner: ownerClass,
       reflection: reflectionLike,

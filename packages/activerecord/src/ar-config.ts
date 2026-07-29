@@ -11,136 +11,6 @@ import { DefaultStrategy } from "./migration/default-strategy.js";
 type AnyClass = abstract new (...args: never[]) => object;
 
 /**
- * Provides a mapping between database protocols/DBMSs and the underlying
- * database adapter to be used. This is used only by the `DATABASE_URL`
- * environment variable (and `url:` config keys). The protocol names are
- * arbitrary, so external database adapters can register custom protocols by
- * mutating this object or replacing it via {@link setProtocolAdapters}.
- *
- * Mirrors `ActiveRecord.protocol_adapters` (active_record.rb:490).
- */
-export let protocolAdapters: Record<string, string> = {
-  postgres: "postgresql",
-  postgresql: "postgresql",
-  mysql: "mysql2",
-  mysql2: "mysql2",
-  sqlite: "sqlite3",
-  sqlite3: "sqlite3",
-};
-
-export function setProtocolAdapters(value: Record<string, string>): void {
-  protocolAdapters = value;
-}
-
-/**
- * When true, prepared statements are disabled globally regardless of a
- * connection config's `preparedStatements: true`. Adapters consult this on
- * (re-)establishConnection — it is applied in the `preparedStatements` setter,
- * the single chokepoint every adapter constructor flows through. Mirrors
- * `ActiveRecord.disable_prepared_statements` (active_record.rb:182).
- */
-export let disablePreparedStatements = false;
-
-export function setDisablePreparedStatements(value: boolean): void {
-  disablePreparedStatements = value;
-}
-
-/**
- * When true, `before_committed!` runs on every distinct in-memory copy of a
- * record enrolled in a transaction; when false (the raw framework default) it
- * runs only on the first copy of each logical record (deduped by record
- * equality). Affects deferred-touch propagation through associations that hold
- * a second copy of a parent. Mirrors `ActiveRecord.before_committed_on_all_records`
- * (active_record.rb:348-349).
- */
-export let beforeCommittedOnAllRecords = false;
-
-export function setBeforeCommittedOnAllRecords(value: boolean): void {
-  beforeCommittedOnAllRecords = value;
-}
-
-/**
- * When true, `after_commit`/`after_rollback` callbacks run in the order they
- * were defined; when false (the raw framework default) they run in reverse
- * definition order. Only transactional (commit/rollback) callbacks are
- * affected — ordinary `after_*` callbacks always run in definition order.
- * Read at registration time and threaded into the callback chain as the
- * `prepend` flag, mirroring Rails' `prepend_option` (transactions.rb:320-327).
- * Mirrors `ActiveRecord.run_after_transaction_callbacks_in_order_defined`
- * (active_record.rb:351-352, default false).
- */
-export let runAfterTransactionCallbacksInOrderDefined = false;
-
-export function setRunAfterTransactionCallbacksInOrderDefined(value: boolean): void {
-  runAfterTransactionCallbacksInOrderDefined = value;
-}
-
-/**
- * Controls what happens when a strict-loading violation is detected: either
- * `"raise"` (the default — throw `StrictLoadingViolationError`) or `"log"`
- * (instrument `strict_loading_violation.active_record` and continue loading).
- *
- * Mirrors `ActiveRecord.action_on_strict_loading_violation` (active_record.rb:362).
- */
-export let actionOnStrictLoadingViolation: "raise" | "log" = "raise";
-
-export function setActionOnStrictLoadingViolation(value: "raise" | "log"): void {
-  actionOnStrictLoadingViolation = value;
-}
-
-/** @internal */
-export let indexNestedAttributeErrors = false;
-
-/** @internal */
-export function setIndexNestedAttributeErrors(value: boolean): void {
-  indexNestedAttributeErrors = value;
-}
-
-/**
- * A list of table names or regular expressions to match tables to ignore
- * when dumping the schema cache. Mirrors
- * `ActiveRecord.schema_cache_ignored_tables` (active_record.rb:197).
- *
- * @internal
- */
-export let schemaCacheIgnoredTables: ReadonlyArray<string | RegExp> = [];
-
-/** @internal */
-export function setSchemaCacheIgnoredTables(value: ReadonlyArray<string | RegExp>): void {
-  schemaCacheIgnoredTables = value;
-}
-
-/**
- * Controls what happens when `connection` (the soft-deprecated checkout alias)
- * is called on a model that has not yet made the lease permanent.
- *
- * - `true` (default): `connection` behaves exactly like `leaseConnection`.
- * - `'deprecated'`: emits a deprecation warning on the first checkout, then
- *   behaves like `leaseConnection`.
- * - `'disallowed'`: raises `ActiveRecordError` if the lease is not yet
- *   permanent (i.e. the caller should use `withConnection` or
- *   `leaseConnection` explicitly).
- *
- * Mirrors `ActiveRecord.permanent_connection_checkout` (active_record.rb:310).
- */
-export let permanentConnectionCheckout: true | "deprecated" | "disallowed" = true;
-
-/**
- * Writer for the `ActiveRecord.permanent_connection_checkout=` module attribute
- * (active_record.rb:314) — needed only because ESM live bindings are read-only
- * for importers. Converging it onto a module-object accessor is RFC 0081's
- * `module-level-config-accessor-shape` story, not a trails-only seam.
- */
-export function setPermanentConnectionCheckout(value: true | "deprecated" | "disallowed"): void {
-  if (value !== true && value !== "deprecated" && value !== "disallowed") {
-    throw new ArgumentError(
-      "permanentConnectionCheckout must be one of: `true`, `'deprecated'` or `'disallowed'`",
-    );
-  }
-  permanentConnectionCheckout = value;
-}
-
-/**
  * Returns true when `tableName` matches an entry in
  * `schemaCacheIgnoredTables`. Mirrors
  * `ActiveRecord.schema_cache_ignored_table?` (active_record.rb:205).
@@ -148,7 +18,7 @@ export function setPermanentConnectionCheckout(value: true | "deprecated" | "dis
  * @internal
  */
 export function isSchemaCacheIgnoredTable(tableName: string): boolean {
-  for (const entry of schemaCacheIgnoredTables) {
+  for (const entry of _schemaCacheIgnoredTables) {
     if (entry instanceof RegExp) {
       // Reset lastIndex so /g and /y patterns don't alternate between
       // matches across calls (same precaution SchemaDumper#isIgnored takes).
@@ -176,6 +46,21 @@ export function setDatabaseCli(value: Record<string, string | string[]>): void {
   databaseCli = value;
 }
 
+let _protocolAdapters: Record<string, string> = {
+  postgres: "postgresql",
+  postgresql: "postgresql",
+  mysql: "mysql2",
+  mysql2: "mysql2",
+  sqlite: "sqlite3",
+  sqlite3: "sqlite3",
+};
+let _disablePreparedStatements = false;
+let _beforeCommittedOnAllRecords = false;
+let _runAfterTransactionCallbacksInOrderDefined = false;
+let _actionOnStrictLoadingViolation: "raise" | "log" = "raise";
+let _indexNestedAttributeErrors = false;
+let _schemaCacheIgnoredTables: ReadonlyArray<string | RegExp> = [];
+let _permanentConnectionCheckout: true | "deprecated" | "disallowed" = true;
 let _asyncQueryExecutor: "global_thread_pool" | "multi_thread_pool" | null = null;
 let _queues: Record<string, unknown> = {};
 let _maintainTestSchema: boolean | null = null;
@@ -192,6 +77,139 @@ let _maintainTestSchema: boolean | null = null;
  * as `export let` below have not been migrated yet.
  */
 export const ActiveRecord = {
+  /**
+   * Provides a mapping between database protocols/DBMSs and the underlying
+   * database adapter to be used. This is used only by the `DATABASE_URL`
+   * environment variable (and `url:` config keys). The protocol names are
+   * arbitrary, so external database adapters can register custom protocols by
+   * mutating this object or replacing it.
+   *
+   * Mirrors `ActiveRecord.protocol_adapters` (active_record.rb:490).
+   */
+  get protocolAdapters(): Record<string, string> {
+    return _protocolAdapters;
+  },
+
+  set protocolAdapters(value: Record<string, string>) {
+    _protocolAdapters = value;
+  },
+
+  /**
+   * When true, prepared statements are disabled globally regardless of a
+   * connection config's `preparedStatements: true`. Adapters consult this on
+   * (re-)establishConnection — it is applied in the `preparedStatements` setter,
+   * the single chokepoint every adapter constructor flows through. Mirrors
+   * `ActiveRecord.disable_prepared_statements` (active_record.rb:182).
+   */
+  get disablePreparedStatements(): boolean {
+    return _disablePreparedStatements;
+  },
+
+  set disablePreparedStatements(value: boolean) {
+    _disablePreparedStatements = value;
+  },
+
+  /**
+   * When true, `before_committed!` runs on every distinct in-memory copy of a
+   * record enrolled in a transaction; when false (the raw framework default) it
+   * runs only on the first copy of each logical record (deduped by record
+   * equality). Affects deferred-touch propagation through associations that hold
+   * a second copy of a parent. Mirrors
+   * `ActiveRecord.before_committed_on_all_records` (active_record.rb:348-349).
+   */
+  get beforeCommittedOnAllRecords(): boolean {
+    return _beforeCommittedOnAllRecords;
+  },
+
+  set beforeCommittedOnAllRecords(value: boolean) {
+    _beforeCommittedOnAllRecords = value;
+  },
+
+  /**
+   * When true, `after_commit`/`after_rollback` callbacks run in the order they
+   * were defined; when false (the raw framework default) they run in reverse
+   * definition order. Only transactional (commit/rollback) callbacks are
+   * affected — ordinary `after_*` callbacks always run in definition order.
+   * Read at registration time and threaded into the callback chain as the
+   * `prepend` flag, mirroring Rails' `prepend_option` (transactions.rb:320-327).
+   * Mirrors `ActiveRecord.run_after_transaction_callbacks_in_order_defined`
+   * (active_record.rb:351-352, default false).
+   */
+  get runAfterTransactionCallbacksInOrderDefined(): boolean {
+    return _runAfterTransactionCallbacksInOrderDefined;
+  },
+
+  set runAfterTransactionCallbacksInOrderDefined(value: boolean) {
+    _runAfterTransactionCallbacksInOrderDefined = value;
+  },
+
+  /**
+   * Controls what happens when a strict-loading violation is detected: either
+   * `"raise"` (the default — throw `StrictLoadingViolationError`) or `"log"`
+   * (instrument `strict_loading_violation.active_record` and continue loading).
+   *
+   * Mirrors `ActiveRecord.action_on_strict_loading_violation`
+   * (active_record.rb:362).
+   */
+  get actionOnStrictLoadingViolation(): "raise" | "log" {
+    return _actionOnStrictLoadingViolation;
+  },
+
+  set actionOnStrictLoadingViolation(value: "raise" | "log") {
+    _actionOnStrictLoadingViolation = value;
+  },
+
+  /** @internal */
+  get indexNestedAttributeErrors(): boolean {
+    return _indexNestedAttributeErrors;
+  },
+
+  /** @internal */
+  set indexNestedAttributeErrors(value: boolean) {
+    _indexNestedAttributeErrors = value;
+  },
+
+  /**
+   * A list of table names or regular expressions to match tables to ignore
+   * when dumping the schema cache. Mirrors
+   * `ActiveRecord.schema_cache_ignored_tables` (active_record.rb:197).
+   *
+   * @internal
+   */
+  get schemaCacheIgnoredTables(): ReadonlyArray<string | RegExp> {
+    return _schemaCacheIgnoredTables;
+  },
+
+  /** @internal */
+  set schemaCacheIgnoredTables(value: ReadonlyArray<string | RegExp>) {
+    _schemaCacheIgnoredTables = value;
+  },
+
+  /**
+   * Controls what happens when `connection` (the soft-deprecated checkout alias)
+   * is called on a model that has not yet made the lease permanent.
+   *
+   * - `true` (default): `connection` behaves exactly like `leaseConnection`.
+   * - `'deprecated'`: emits a deprecation warning on the first checkout, then
+   *   behaves like `leaseConnection`.
+   * - `'disallowed'`: raises `ActiveRecordError` if the lease is not yet
+   *   permanent (i.e. the caller should use `withConnection` or
+   *   `leaseConnection` explicitly).
+   *
+   * Mirrors `ActiveRecord.permanent_connection_checkout` (active_record.rb:310).
+   */
+  get permanentConnectionCheckout(): true | "deprecated" | "disallowed" {
+    return _permanentConnectionCheckout;
+  },
+
+  set permanentConnectionCheckout(value: true | "deprecated" | "disallowed") {
+    if (value !== true && value !== "deprecated" && value !== "disallowed") {
+      throw new ArgumentError(
+        "permanentConnectionCheckout must be one of: `true`, `'deprecated'` or `'disallowed'`",
+      );
+    }
+    _permanentConnectionCheckout = value;
+  },
   /**
    * Selects the async query executor backing `load_async`. `null` (the
    * default) does not initialize an executor and runs async calls in the
@@ -325,9 +343,10 @@ export let raiseIntWiderThan64bit = true;
 
 /**
  * Writer for the `ActiveRecord.raise_int_wider_than_64bit=` module attribute
- * (`singleton_class.attr_accessor`, active_record.rb:446). Same ESM live-binding
- * constraint as `setPermanentConnectionCheckout`; covered by RFC 0081's
- * `module-level-config-accessor-shape` story.
+ * (`singleton_class.attr_accessor`, active_record.rb:446). Needed only because
+ * ESM live bindings are read-only for importers; converging it onto an
+ * `ActiveRecord` accessor is RFC 0081's `convert-ar-config-accessors-internal-flags`
+ * story.
  */
 export function setRaiseIntWiderThan64bit(value: boolean): void {
   raiseIntWiderThan64bit = value;

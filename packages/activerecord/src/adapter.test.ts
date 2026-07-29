@@ -7,9 +7,8 @@ import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { SchemaCreation } from "./connection-adapters/abstract/schema-creation.js";
 import { AdapterError, ConnectionFailed } from "./errors.js";
 import {
+  ActiveRecord,
   Base,
-  disablePreparedStatements,
-  setDisablePreparedStatements,
   NotNullViolation,
   RecordNotUnique,
   StatementInvalid,
@@ -390,18 +389,18 @@ describe("AdapterTest", () => {
   // Rails gates this `unless in_memory_db?` (adapter_test.rb:176): a
   // re-established `:memory:` connection is a fresh, empty database.
   it.skipIf(inMemoryDb())("disable prepared statements", async () => {
-    const original = disablePreparedStatements;
+    const original = ActiveRecord.disablePreparedStatements;
     try {
       await runWithoutConnection(async (origConnection) => {
         await Base.establishConnection({ ...origConnection, preparedStatements: true });
         expect((await Base.leaseConnection()).preparedStatements).toBe(true);
 
-        setDisablePreparedStatements(true);
+        ActiveRecord.disablePreparedStatements = true;
         await Base.establishConnection({ ...origConnection, preparedStatements: true });
         expect((await Base.leaseConnection()).preparedStatements).toBe(false);
       });
     } finally {
-      setDisablePreparedStatements(original);
+      ActiveRecord.disablePreparedStatements = original;
     }
   });
 

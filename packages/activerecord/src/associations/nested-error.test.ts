@@ -8,12 +8,7 @@
  * the faked `name`.
  */
 import { describe, it, expect } from "vitest";
-import {
-  Base,
-  registerModel,
-  indexNestedAttributeErrors,
-  setIndexNestedAttributeErrors,
-} from "../index.js";
+import { ActiveRecord, Base, registerModel } from "../index.js";
 import { NestedError } from "./nested-error.js";
 import { fixtures } from "../test-fixtures.js";
 import type { AssociationProxy } from "./collection-proxy.js";
@@ -129,8 +124,8 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
     registerModel("NestedErrorPetOwner", PetOwner);
 
     it("no index when singular association", async () => {
-      const oldAttributeConfig = indexNestedAttributeErrors;
-      setIndexNestedAttributeErrors(true);
+      const oldAttributeConfig = ActiveRecord.indexNestedAttributeErrors;
+      ActiveRecord.indexNestedAttributeErrors = true;
       try {
         const owner = new PetOwner({ petAttributes: { name: null } });
         await owner.isValid();
@@ -148,7 +143,7 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
         expect(error.message).toBe("can't be blank");
         expect(error.base).toBe(owner);
       } finally {
-        setIndexNestedAttributeErrors(oldAttributeConfig);
+        ActiveRecord.indexNestedAttributeErrors = oldAttributeConfig;
       }
     });
   });

@@ -23,7 +23,7 @@ import {
 } from "../errors.js";
 import { IsolatedExecutionState, Notifications } from "@blazetrails/activesupport";
 import type { EventPayload } from "@blazetrails/activesupport";
-import { disablePreparedStatements } from "../ar-config.js";
+import { ActiveRecord } from "../ar-config.js";
 import { Result, type ColumnTypes } from "../result.js";
 import { SchemaCache, SchemaReflection, BoundSchemaReflection } from "./schema-cache.js";
 import { NullPool, poolAbsent } from "./abstract/connection-pool.js";
@@ -1055,7 +1055,7 @@ export class AbstractAdapter implements Quoting {
     // (abstract_adapter.rb:159). Every concrete adapter assigns
     // `this.preparedStatements` from its config in the constructor, so honoring
     // the global toggle here covers (re-)establishConnection uniformly.
-    this._preparedStatements = value && !disablePreparedStatements;
+    this._preparedStatements = value && !ActiveRecord.disablePreparedStatements;
   }
 
   get active(): boolean {

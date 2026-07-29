@@ -27,7 +27,7 @@ import {
   NotImplementedError,
   ActiveRecordError,
 } from "./errors.js";
-import { permanentConnectionCheckout } from "./ar-config.js";
+import { ActiveRecord } from "./ar-config.js";
 import { setDefaultTimezone } from "./type/internal/timezone.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
@@ -491,7 +491,7 @@ export function connection(this: typeof Base): DatabaseAdapter {
   if ((this as any)._adapter) return (this as any)._adapter;
   const pool = connectionPool.call(this);
   if (pool.isPermanentLease()) {
-    const setting = permanentConnectionCheckout;
+    const setting = ActiveRecord.permanentConnectionCheckout;
     if (setting === "deprecated") {
       console.warn("DEPRECATION WARNING: " + CONNECTION_DEPRECATION_MSG);
     } else if (setting === "disallowed") {

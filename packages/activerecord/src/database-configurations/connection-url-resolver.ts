@@ -10,7 +10,7 @@
  *   //      database: "foo_test", username: "foo", password: "bar", pool: "5" }
  */
 import type { DatabaseConfigOptions } from "./database-config.js";
-import { protocolAdapters } from "../ar-config.js";
+import { ActiveRecord } from "../ar-config.js";
 
 export class ConnectionUrlResolver {
   private readonly _adapter: string | null;
@@ -39,7 +39,7 @@ export class ConnectionUrlResolver {
     const hasAuthority = !!schemeMatch[2];
     const rest = schemeMatch[3];
 
-    this._adapter = protocolAdapters[scheme] ?? scheme;
+    this._adapter = ActiveRecord.protocolAdapters[scheme] ?? scheme;
 
     if (hasAuthority) {
       // Standard URL: scheme://user:pass@host:port/path?query
