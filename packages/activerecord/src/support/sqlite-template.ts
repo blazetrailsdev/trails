@@ -70,11 +70,6 @@ const cleanupG = globalThis as typeof globalThis & { __arDbCleanupPaths?: Set<st
  * globalSetup's teardown is what guarantees the files go away; this listener
  * only makes them go away *sooner* when a worker does exit cleanly.
  *
- * Callers that must stay `process`-free (`support/connection.ts`, whose
- * fallback DB otherwise lingers in tmpdir after every setup-free run) route
- * their cleanup through here — this module already carries the `process`
- * exception documented at the top of the file.
- *
  * The de-dupe set hangs off `globalThis`, not module scope: vitest's
  * `isolate: true` reloads the module graph per test file, so a module-level
  * set would re-register — and leak — one exit listener per file.
@@ -99,8 +94,7 @@ export async function registerDbFileCleanupOnExit(base: string): Promise<void> {
 /**
  * Shared filename prefix of every temp sqlite DB the AR test harness creates:
  * the template, the per-worker clones, the scratch databases
- * (`support/scratch-database.ts`), the setup-free fallback DB
- * (`support/connection.ts`) and their `_arunit2` siblings.
+ * (`support/scratch-database.ts`) and their `_arunit2` siblings.
  */
 export const TEMP_DB_PREFIX = "ar-test-";
 

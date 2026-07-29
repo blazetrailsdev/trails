@@ -7,7 +7,7 @@
  *   - ARCONN=postgresql → PostgreSQLAdapter
  *   - ARCONN=mysql2     → Mysql2Adapter
  *   - (default)         → SQLite3Adapter (the per-worker template clone, or the
- *     run-scoped fallback file `support/connection.ts` resolves)
+ *     configured fixture database `support/connection.ts` resolves)
  *
  * RFC 0059 retired the standing sidecar `_pool`: Rails has no sidecar test
  * pool (`grep -r sidecar vendor/rails/activerecord/test` = 0 hits) — every
@@ -70,13 +70,13 @@ export type LeasedTestAdapter = DatabaseAdapter & {
 //
 // It is the `arunit` entry `connect()` establishes the primary pool from, so
 // the two cannot drift; resolved with top-level await because the sqlite3
-// database is only known asynchronously (`fallbackDatabasePath()`).
+// database is only known asynchronously (`sqliteHash()`).
 //
 // Order-dependent: this snapshot and `connect()` resolve the entry separately
 // and agree only because `test-setup-worker-db.ts` stamps AR_TEST_WORKER_DB /
 // AR_DB_SLOT before anything imports this module. A module in that setupFile's
 // graph reaching test-adapter.ts (or adapter-helper.ts, which imports it) would
-// snapshot the fallback database while Base rides the worker clone —
+// snapshot the fixture database while Base rides the worker clone —
 // `test-adapter.trails.test.ts` asserts the two stay equal.
 const _primaryConfiguration: Record<string, unknown> = {
   ...(await testConfigurationHashes()).envConfig.configurationHash,

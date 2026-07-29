@@ -1,9 +1,9 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
-import { registerDbFileCleanupOnExit } from "./sqlite-template.js";
 import { Base } from "../base.js";
 import { connect, testConfigurationHashes } from "./connection.js";
+import { SQLITE_FIXTURE_DATABASE } from "./config.js";
 
 // Only the cases asserting `connect`'s own side effects call it; everything
 // that merely checks which entry `ARCONN` resolves to uses
@@ -119,30 +119,24 @@ describe("connect", () => {
     vi.stubEnv("ARCONN", "sqlite3");
     vi.stubEnv("AR_TEST_WORKER_DB", "");
     const { envConfig } = await testConfigurationHashes();
-    expect(envConfig.database).not.toBe(":memory:");
-    expect(envConfig.database).toMatch(/\.sqlite$/);
+    expect(envConfig.database).toBe(SQLITE_FIXTURE_DATABASE);
     expect(envConfig.pool).toBe(5);
   });
 
-  it("reuses one fallback database path across calls", async () => {
+  // `config.example.yml:85` names one fixed file, reused across runs; nothing
+  // about the running process (a run token, a worker slot, a tmpdir) may enter
+  // the name.
+  it("names the same configured database on every call", async () => {
     vi.stubEnv("ARCONN", "sqlite3");
     vi.stubEnv("AR_TEST_WORKER_DB", "");
     const first = (await testConfigurationHashes()).envConfig.database;
+    vi.stubEnv("AR_TEST_RUN_TOKEN", "some-other-run");
+    vi.stubEnv("VITEST_POOL_ID", "7");
     const second = (await testConfigurationHashes()).envConfig.database;
     expect(second).toBe(first);
   });
 
-  it("registers the fallback database for cleanup on exit", async () => {
-    vi.stubEnv("ARCONN", "sqlite3");
-    vi.stubEnv("AR_TEST_WORKER_DB", "");
-    const database = String((await testConfigurationHashes()).envConfig.database);
-
-    const before = new Set(process.listeners("exit"));
-    await registerDbFileCleanupOnExit(database);
-    expect(process.listeners("exit").filter((fn) => !before.has(fn))).toHaveLength(0);
-  });
-
-  it("prefers AR_TEST_WORKER_DB over the fallback database", async () => {
+  it("prefers AR_TEST_WORKER_DB over the configured fixture database", async () => {
     vi.stubEnv("ARCONN", "sqlite3");
     vi.stubEnv("AR_TEST_WORKER_DB", "/tmp/ar-test-worker.sqlite3");
     const { envConfig } = await testConfigurationHashes();

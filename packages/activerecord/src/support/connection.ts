@@ -22,8 +22,8 @@
  * selects the backend.
  */
 
-import { getEnv, getOsAsync } from "@blazetrails/activesupport";
-import { getPathAsync } from "@blazetrails/activesupport/fs-adapter";
+import { getEnv } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../base.js";
 import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
@@ -39,6 +39,7 @@ import {
   mysqlPreparedStatements,
   mysqlSettings,
   postgresSettings,
+  SQLITE_FIXTURE_DATABASE,
   type ConnectionName,
   type EnvReader,
   type ServerSettings,
@@ -329,30 +330,43 @@ export async function testConfigurationHashes(): Promise<{
   return { adapter: connection.lane, envConfig, configurationHashes };
 }
 
-async function fallbackDatabasePath(): Promise<string> {
-  const g = globalThis as typeof globalThis & { __arFallbackDbPath?: string };
-  if (g.__arFallbackDbPath) return g.__arFallbackDbPath;
+/**
+ * The `sqlite3.arunit` database of `config.example.yml:83-91`: a fixed
+ * configured file, reused across runs, exactly as Rails names
+ * `<%= FIXTURES_ROOT %>/fixture_database.sqlite3`. The only difference is which
+ * root it hangs off — trails has no `FIXTURES_ROOT` (`config.ts`), so the name
+ * is repo-relative ({@link SQLITE_FIXTURE_DATABASE}) and the sqlite driver
+ * resolves it the way it resolves any relative `database:`.
+ *
+ * The directory is created because Rails' `test/fixtures` is a checked-in
+ * directory and ours is a gitignored build output; sqlite will not create a
+ * missing parent for a file DB.
+ *
+ * This replaces a per-process `<tmpdir>/ar-test-fallback-<token>.sqlite` path,
+ * which had no counterpart in Rails: the database name is configuration, not a
+ * function of the process that happens to read it.
+ */
+async function fixtureDatabase(): Promise<string> {
+  const fs = await getFsAsync();
   const path = await getPathAsync();
-  const os = await getOsAsync();
-  const runToken =
-    getEnv("AR_TEST_RUN_TOKEN") ||
-    `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-  const slot = getEnv("VITEST_POOL_ID") || getEnv("VITEST_WORKER_ID") || "1";
-  const token = `${runToken}-${slot}`;
-  const dbPath = path.join(os.tmpdir(), `ar-test-fallback-${token}.sqlite`);
-  // Imported lazily: `sqlite-template.ts` imports `activeLane` from this
-  // module, and a static import here would close that cycle at module-init time.
-  const { registerDbFileCleanupOnExit } = await import("./sqlite-template.js");
-  await registerDbFileCleanupOnExit(dbPath);
-  g.__arFallbackDbPath = dbPath;
-  return dbPath;
+  await fs.mkdir?.(path.dirname(SQLITE_FIXTURE_DATABASE), { recursive: true });
+  return SQLITE_FIXTURE_DATABASE;
 }
 
+/**
+ * The `sqlite3` connection's shared entry hash.
+ *
+ * `AR_TEST_WORKER_DB` is the per-worker template clone the setupFile publishes
+ * (`support/sqlite-template.ts`) — trails' stand-in for Rails' one
+ * already-prepared database, since vitest forks workers where Rails does not.
+ * With no worker clone (a setup-free single-file run) the entry names the
+ * configured fixture database, as `config.example.yml` always does.
+ */
 async function sqliteHash(): Promise<Record<string, unknown>> {
   const workerDb = getEnv("AR_TEST_WORKER_DB");
   return {
     adapter: "sqlite3",
-    database: workerDb || (await fallbackDatabasePath()),
+    database: workerDb || (await fixtureDatabase()),
     timeout: 5000,
     strict: true,
   };
