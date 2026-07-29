@@ -531,6 +531,14 @@ export function nextBundle(
   return best;
 }
 
+export function summarizeBundle(
+  rows: StoryEntry[],
+  maxLoc: number,
+): { total: number; leadExceedsBudget: boolean } {
+  const total = rows.reduce((a, s) => a + (s.est_loc ?? 0), 0);
+  return { total, leadExceedsBudget: total > maxLoc };
+}
+
 export function listFiltered(
   index: Index,
   opts: { rfc?: string; status?: string; cluster?: string } = {},
@@ -3115,15 +3123,25 @@ function main(): void {
         cluster: stringFlag(flags, "cluster"),
         rfc: stringFlag(flags, "rfc"),
       });
-      const total = rows.reduce((a, s) => a + (s.est_loc ?? 0), 0);
+      const { total, leadExceedsBudget } = summarizeBundle(rows, maxLoc);
       if (flags.json) {
         console.log(
-          JSON.stringify({ stories: rows, bundle_total_loc: total, max_loc: maxLoc }, null, 2),
+          JSON.stringify(
+            {
+              stories: rows,
+              bundle_total_loc: total,
+              max_loc: maxLoc,
+              lead_exceeds_budget: leadExceedsBudget,
+            },
+            null,
+            2,
+          ),
         );
       } else if (rows.length === 0) {
         console.log(`no ready stories within ${maxLoc} LOC`);
       } else {
-        console.log(`bundle (sum ${total} / max ${maxLoc}):`);
+        const note = leadExceedsBudget ? " — lead exceeds budget" : "";
+        console.log(`bundle (sum ${total} / max ${maxLoc}${note}):`);
         fmt(rows, undefined, rfcPriorityMap(idx));
       }
       break;
@@ -3339,6 +3357,8 @@ function usage(): never {
 
   ready [--json] [--rfc <slug>]
   next-bundle [--max-loc N] [--cluster <name>] [--rfc <slug>] [--json]
+                                               (a prioritized lead outranks --max-loc; the
+                                                banner and --json flag the overrun)
   list [--rfc <slug>] [--status <v>] [--cluster <n>] [--json]
   show <id>
   status
