@@ -516,9 +516,12 @@ function bracketSource(pattern, start, escapeChar) {
   for (; i < pattern.length && pattern[i] !== "]"; i++) {
     const ch = pattern[i];
     if (ch === "[" && ":.=".includes(pattern[i + 1] ?? "")) return null;
-    if (ch === escapeChar || ch === "\\") {
+    // A backslash that does not escape here is still refused rather than
+    // emitted: it is a literal to PostgreSQL but an escape to JS.
+    if (ch === "\\" && ch !== escapeChar) return null;
+    if (ch === escapeChar) {
       const next = pattern[i + 1];
-      if (ch !== escapeChar || next === undefined || !ARE_SHORTHANDS.has(next)) return null;
+      if (next === undefined || !ARE_SHORTHANDS.has(next)) return null;
       if (source.endsWith("-") && source.length - 1 > bodyStart) return null;
       if (pattern[i + 2] === "-" && (pattern[i + 3] ?? "]") !== "]") return null;
       source += `\\${next}`;
