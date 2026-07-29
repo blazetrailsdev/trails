@@ -624,9 +624,7 @@ export class DatabaseTasks {
       if (this._localDatabase(c)) {
         result.push(c);
       } else {
-        const stderr = (globalThis as { process?: { stderr?: { write: (s: string) => unknown } } })
-          .process?.stderr;
-        stderr?.write?.(
+        stderr.write(
           `This task only modifies local databases. ${c.database} is on a remote host.\n`,
         );
       }

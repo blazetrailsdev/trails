@@ -332,7 +332,7 @@ describe("DatabaseTasksCreateAllTest", () => {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       development: { adapter: "sqlite3", database: "dev.db", host: "my.server.tld" },
     });
-    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    vi.spyOn(stderr, "write").mockImplementation(() => true);
     await DatabaseTasks.createAll();
     expect(created).toHaveLength(0);
   });
@@ -341,7 +341,7 @@ describe("DatabaseTasksCreateAllTest", () => {
       development: { adapter: "sqlite3", database: "dev.db", host: "my.server.tld" },
     });
     const writes: string[] = [];
-    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+    vi.spyOn(stderr, "write").mockImplementation((chunk) => {
       writes.push(String(chunk));
       return true;
     });
@@ -555,7 +555,7 @@ describe("DatabaseTasksDropAllTest", () => {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       development: { adapter: "sqlite3", database: "dev.db", host: "my.server.tld" },
     });
-    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    vi.spyOn(stderr, "write").mockImplementation(() => true);
     await DatabaseTasks.dropAll();
     expect(dropped).toHaveLength(0);
   });
@@ -564,7 +564,7 @@ describe("DatabaseTasksDropAllTest", () => {
       development: { adapter: "sqlite3", database: "dev.db", host: "my.server.tld" },
     });
     const writes: string[] = [];
-    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+    vi.spyOn(stderr, "write").mockImplementation((chunk) => {
       writes.push(String(chunk));
       return true;
     });
