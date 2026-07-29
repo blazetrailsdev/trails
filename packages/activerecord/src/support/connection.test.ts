@@ -125,7 +125,12 @@ describe("connect", () => {
 
   // `config.example.yml:88-90` spells the second sqlite file out rather than
   // deriving it, and `expand_config` fills a `database` in only when the entry
-  // carries none (`support/config.rb:30-36`).
+  // carries none (`support/config.rb:30-36`). The third entry carries none on
+  // every lane, and Rails defaults it to `activerecord_unittest` — the same
+  // name `arunit` defaults to (`support/config.rb:28-29`), i.e. the same
+  // database. `expandConfig` keeps that identity by pointing it at whatever
+  // `arunit` resolved to, because trails' `arunit` name is worker-scoped where
+  // Rails' is a constant.
   it("names the configured second database on the sqlite3 arunit2 entry", async () => {
     vi.stubEnv("ARCONN", "sqlite3");
     vi.stubEnv("AR_TEST_WORKER_DB", "");
