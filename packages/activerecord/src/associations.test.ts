@@ -44,7 +44,6 @@ import "./test-helpers/models/price-estimate.js";
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
 import { Preloader } from "./associations/preloader.js";
 import { LoaderQuery } from "./associations/preloader/association.js";
-import { OtherDog } from "./test-helpers/models/other-dog.js";
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
