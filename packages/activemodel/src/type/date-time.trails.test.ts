@@ -42,3 +42,24 @@ describe("DateTimeType fallback string parsing", () => {
     expect(cast("Wed, 04 Sep 2013 03:00:00 XYZ")).toBe("2013-09-04T03:00:00Z");
   });
 });
+
+describe("DateTimeType fallback zone and ordering coverage", () => {
+  const type = new Types.DateTimeType();
+  const cast = (s: string) => (type.cast(s) as Temporal.Instant | null)?.toString() ?? null;
+
+  it("parses month-day-year order with a named zone", () => {
+    expect(cast("Sep 04 2013 03:00:00 EAT")).toBe("2013-09-04T00:00:00Z");
+  });
+
+  it("parses a zone abbreviation attached to an ISO datetime", () => {
+    expect(cast("2013-09-04T03:00:00EAT")).toBe("2013-09-04T00:00:00Z");
+  });
+
+  it("parses ISO basic format with a basic-format offset", () => {
+    expect(cast("20130904T030000+0900")).toBe("2013-09-03T18:00:00Z");
+  });
+
+  it("does not mistake the day of a bare date for an offset", () => {
+    expect(cast("2013-09-04")).toBe("2013-09-04T00:00:00Z");
+  });
+});

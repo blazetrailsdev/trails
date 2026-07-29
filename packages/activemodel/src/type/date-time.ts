@@ -33,19 +33,35 @@ const WEEKDAY_PREFIX = /^(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?,?\s+/i;
 
 const TIME_PART = String.raw`(?:(\d{1,2}):(\d{2})(?::(\d{2})(\.\d+)?)?)`;
 
-/** `04 Sep 2013 03:00:00 EAT` — RFC 2822 / HTTP order. */
-const DAY_MONTH_YEAR = new RegExp(
-  String.raw`^(\d{1,2})\s+([A-Za-z]{3,9})\.?\s+(\d{4})(?:\s+${TIME_PART})?(?:\s+(\S+))?$`,
-);
+/**
+ * Trailing zone token — an abbreviation (`EAT`), `Z`, or a numeric offset in
+ * any of `Date._parse`'s spellings (`+09:00`, `+0900`, `-10`), attached or
+ * space-separated. A candidate only wins if the rest of the string parses as
+ * a date, so a bare `2013-09-04` does not lose its `-04` to this.
+ */
+const ZONE_SUFFIX = /\s*(Z|[A-Za-z]{2,5}|[+-]\d{2}:?\d{2}|[+-]\d{2})$/;
 
-/** `Sep 04 03:00:00 EAT 2013` — asctime(3) / ctime order, year last. */
-const MONTH_DAY_TIME_YEAR = new RegExp(
-  String.raw`^([A-Za-z]{3,9})\.?\s+(\d{1,2})\s+${TIME_PART}(?:\s+(\S+))?\s+(\d{4})$`,
-);
+/** The zone slot asctime puts before the year: `Sep 04 03:00:00 EAT 2013`. */
+const ZONE_BEFORE_YEAR = /\s+(Z|[A-Za-z]{2,5}|[+-]\d{2}:?\d{2})\s+(\d{4})$/;
 
-/** `2013/09/04 03:00:00 EAT` and `2013.09.04` — numeric, year first. */
+/** `2013/09/04 03:00:00` and `2013.09.04` — numeric, year first. */
 const YEAR_MONTH_DAY = new RegExp(
-  String.raw`^(\d{4})[/.-](\d{1,2})[/.-](\d{1,2})(?:[T\s]+${TIME_PART})?(?:\s*(\S+))?$`,
+  String.raw`^(\d{4})[/.-](\d{1,2})[/.-](\d{1,2})(?:[T\s]+${TIME_PART})?$`,
+);
+
+/** `04 Sep 2013 03:00:00` — RFC 2822 / HTTP order. */
+const DAY_MONTH_YEAR = new RegExp(
+  String.raw`^(\d{1,2})\s+([A-Za-z]{3,9})\.?,?\s+(\d{4})(?:[T\s]+${TIME_PART})?$`,
+);
+
+/** `Sep 04 2013 03:00:00` — US order, year before the time. */
+const MONTH_DAY_YEAR = new RegExp(
+  String.raw`^([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})(?:[T\s]+${TIME_PART})?$`,
+);
+
+/** `Sep 04 03:00:00 2013` — asctime(3) / ctime order, year last. */
+const MONTH_DAY_TIME_YEAR = new RegExp(
+  String.raw`^([A-Za-z]{3,9})\.?\s+(\d{1,2})\s+${TIME_PART}\s+(\d{4})$`,
 );
 
 /**
@@ -101,7 +117,6 @@ function buildTimeHash(
   mon: number | null,
   mday: string,
   time: (string | undefined)[],
-  zone: string | undefined,
 ): TimeHash | null {
   if (mon === null) return null;
   const [hour, min, sec, fraction] = time;
@@ -113,7 +128,68 @@ function buildTimeHash(
     min: Number(min ?? 0),
     sec: Number(sec ?? 0),
     sec_fraction: fraction ? Number(`0${fraction}`) : 0,
-    offset: zone === undefined ? null : zoneOffsetSeconds(zone),
+    offset: null,
+  };
+}
+
+/**
+ * The zone-less half of the `Date._parse` stand-in: every date/time ordering
+ * it accepts as a complete datetime, tried widest-first. Temporal covers the
+ * extended and basic ISO spellings; the regexes cover the calendar orderings
+ * Temporal rejects.
+ */
+function parseDateAndTime(text: string): TimeHash | null {
+  const iso = parseIsoLike(text);
+  if (iso) return iso;
+
+  const yearFirst = YEAR_MONTH_DAY.exec(text);
+  if (yearFirst) {
+    return buildTimeHash(yearFirst[1], Number(yearFirst[2]), yearFirst[3], yearFirst.slice(4, 8));
+  }
+
+  const dayFirst = DAY_MONTH_YEAR.exec(text);
+  if (dayFirst) {
+    return buildTimeHash(dayFirst[3], monthNumber(dayFirst[2]), dayFirst[1], dayFirst.slice(4, 8));
+  }
+
+  const monthFirst = MONTH_DAY_YEAR.exec(text);
+  if (monthFirst) {
+    return buildTimeHash(
+      monthFirst[3],
+      monthNumber(monthFirst[1]),
+      monthFirst[2],
+      monthFirst.slice(4, 8),
+    );
+  }
+
+  const asctime = MONTH_DAY_TIME_YEAR.exec(text);
+  if (asctime) {
+    return buildTimeHash(asctime[7], monthNumber(asctime[1]), asctime[2], asctime.slice(3, 7));
+  }
+
+  return null;
+}
+
+function parseIsoLike(text: string): TimeHash | null {
+  const normalized = text.replace(" ", "T");
+  const datetimeString = /^\d{4}-?\d{2}-?\d{2}$/.test(normalized)
+    ? `${normalized}T00:00:00`
+    : normalized;
+  let plain: Temporal.PlainDateTime;
+  try {
+    plain = Temporal.PlainDateTime.from(datetimeString, { overflow: "reject" });
+  } catch {
+    return null;
+  }
+  return {
+    year: plain.year,
+    mon: plain.month,
+    mday: plain.day,
+    hour: plain.hour,
+    min: plain.minute,
+    sec: plain.second,
+    sec_fraction: (plain.millisecond * 1000 + plain.microsecond) / 1_000_000,
+    offset: null,
   };
 }
 
@@ -248,65 +324,18 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
   }
 
   private parseTimeHash(s: string): TimeHash | null {
-    const withoutWeekday = s.replace(WEEKDAY_PREFIX, "").trim();
-
-    const dayFirst = DAY_MONTH_YEAR.exec(withoutWeekday);
-    if (dayFirst) {
-      return buildTimeHash(
-        dayFirst[3],
-        monthNumber(dayFirst[2]),
-        dayFirst[1],
-        dayFirst.slice(4, 8),
-        dayFirst[8],
-      );
+    const body = s.replace(WEEKDAY_PREFIX, "").trim();
+    const zone = ZONE_SUFFIX.exec(body);
+    if (zone) {
+      const withoutZone = parseDateAndTime(body.slice(0, body.length - zone[0].length).trim());
+      if (withoutZone) return { ...withoutZone, offset: zoneOffsetSeconds(zone[1]) };
     }
-
-    const asctime = MONTH_DAY_TIME_YEAR.exec(withoutWeekday);
-    if (asctime) {
-      return buildTimeHash(
-        asctime[8],
-        monthNumber(asctime[1]),
-        asctime[2],
-        asctime.slice(3, 7),
-        asctime[7],
-      );
+    const interior = ZONE_BEFORE_YEAR.exec(body);
+    if (interior) {
+      const withoutZone = parseDateAndTime(`${body.slice(0, interior.index)} ${interior[2]}`);
+      if (withoutZone) return { ...withoutZone, offset: zoneOffsetSeconds(interior[1]) };
     }
-
-    const normalized = withoutWeekday
-      .replace(" ", "T")
-      .replace(
-        /(T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)\s*([-+]\d{2}):?(\d{2})?$/,
-        (_m, time: string, hours: string, minutes: string | undefined) =>
-          `${time}${hours}:${minutes ?? "00"}`,
-      );
-    const zoneMatch = /(Z|[+-]\d{2}:\d{2})$/.exec(normalized);
-    let offset: number | null = null;
-    let body = normalized;
-    if (zoneMatch) {
-      const zone = zoneMatch[1];
-      body = normalized.slice(0, normalized.length - zone.length);
-      offset = zoneOffsetSeconds(zone);
-    }
-    const datetimeString = /^\d{4}-?\d{2}-?\d{2}$/.test(body) ? `${body}T00:00:00` : body;
-    let plain: Temporal.PlainDateTime;
-    try {
-      plain = Temporal.PlainDateTime.from(datetimeString, { overflow: "reject" });
-    } catch {
-      const numeric = YEAR_MONTH_DAY.exec(withoutWeekday);
-      return numeric
-        ? buildTimeHash(numeric[1], Number(numeric[2]), numeric[3], numeric.slice(4, 8), numeric[8])
-        : null;
-    }
-    return {
-      year: plain.year,
-      mon: plain.month,
-      mday: plain.day,
-      hour: plain.hour,
-      min: plain.minute,
-      sec: plain.second,
-      sec_fraction: (plain.millisecond * 1000 + plain.microsecond) / 1_000_000,
-      offset,
-    };
+    return parseDateAndTime(body);
   }
 
   get isUtc(): boolean {
