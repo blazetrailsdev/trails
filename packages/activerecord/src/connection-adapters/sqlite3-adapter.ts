@@ -1670,7 +1670,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     options?: Record<string, unknown>,
   ): Promise<void> {
     if (isInvalidAlterTableType(type, options ?? {})) {
-      await this.alterTable(tableName, (definition) => {
+      await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
         definition.column(columnName, type as ColumnType, (options ?? {}) as ColumnOptions);
       });
       return;
@@ -1701,14 +1701,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     if ((columnName as string | undefined) === undefined) {
       throw new ArgumentError("wrong number of arguments (given 1, expected 2..3)");
     }
-    await this.alterTable(tableName, (definition) => {
+    await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
       definition.removeColumn(columnName);
       deleteForeignKeysForColumns(definition, [columnName]);
     });
   }
 
   async removeColumns(tableName: string, ...columnNames: string[]): Promise<void> {
-    await this.alterTable(tableName, (definition) => {
+    await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
       for (const col of columnNames) {
         definition.removeColumn(col);
       }
@@ -1726,7 +1726,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // `{}` is the literal default, not a changes hash.
     const newDefault = this.schemaStatements().extractNewDefaultValue(defaultOrChanges);
     this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
-    await this.alterTable(tableName, (definition) => {
+    await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
       // The raw value, not a literal: schemaCreation re-emits it through
       // quoteDefaultExpression, which serializes it through the column's cast
       // type, so `default: {}` on a json column quotes to `{}`. Unguarded, as
@@ -1752,7 +1752,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         `UPDATE ${quoteTableName(tableName)} SET ${quoteColumnName(columnName)} = ${quotedDefault} WHERE ${quoteColumnName(columnName)} IS NULL`,
       );
     }
-    await this.alterTable(tableName, (definition) => {
+    await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
       definition.get(columnName)!.options.null = allowNull;
     });
   }
@@ -1763,7 +1763,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     type: string,
     options?: Record<string, unknown>,
   ): Promise<void> {
-    await this.alterTable(tableName, (definition) => {
+    await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
       definition.changeColumn(columnName, type as ColumnType, (options ?? {}) as ColumnOptions);
     });
   }
@@ -1771,7 +1771,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   async renameColumn(tableName: string, columnName: string, newColumnName: string): Promise<void> {
     const column = await this.columnFor(tableName, columnName);
     this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
-    await this.alterTable(tableName, undefined, undefined, undefined, {
+    await this.alterTable(tableName, undefined, undefined, {
       rename: { [column.name]: newColumnName },
     });
     await this.schemaStatements().renameColumnIndexes(tableName, column.name, newColumnName);
@@ -1782,7 +1782,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     if (opts.null == null) opts.null = false;
     if (!("precision" in opts)) opts.precision = 6;
 
-    await this.alterTable(tableName, (definition) => {
+    await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
       definition.column("created_at", "datetime", opts);
       definition.column("updated_at", "datetime", opts);
     });
@@ -2194,7 +2194,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         return;
       }
     }
-    await this.alterTable(fromTable, (definition) => {
+    await this.alterTable(fromTable, undefined, undefined, undefined, (definition) => {
       definition.foreignKey(
         this.schemaStatements().stripTableNamePrefixAndSuffix(toTable),
         options,
@@ -2252,7 +2252,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     }
 
     const remainingFks = existingFks.filter((fk) => fk !== fkToRemove);
-    await this.alterTable(fromTable, undefined, remainingFks);
+    await this.alterTable(fromTable, remainingFks);
   }
 
   /**
@@ -2267,7 +2267,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       throw new Error("validate: false is only supported on PostgreSQL");
     }
     const { name } = options;
-    await this.alterTable(tableName, (definition) => {
+    await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
       definition.checkConstraint(expression, { name });
     });
   }
@@ -2307,17 +2307,17 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     }
 
     const remainingChecks = existingChecks.filter((c) => c.name !== nameToRemove);
-    await this.alterTable(tableName, undefined, undefined, remainingChecks);
+    await this.alterTable(tableName, undefined, remainingChecks);
   }
 
   // --- Private: alter_table copy strategy (Rails: SQLite3Adapter#alter_table) ---
 
   private async alterTable(
     tableName: string,
-    block?: (definition: SQLite3TableDefinition) => void,
     overrideForeignKeys?: ForeignKeyDefinition[],
     overrideCheckConstraints?: CheckConstraintDefinition[],
     options: { rename?: Record<string, string> } = {},
+    block?: (definition: SQLite3TableDefinition) => void,
   ): Promise<void> {
     await this.ensureConnected();
     const rename = options.rename ?? {};

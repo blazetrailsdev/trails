@@ -15,7 +15,6 @@ interface TableRebuildInternals {
   moveTable(from: string, to: string): Promise<void>;
   alterTable(
     tableName: string,
-    block: undefined,
     foreignKeys: undefined,
     checkConstraints: undefined,
     options: { rename?: Record<string, string> },
@@ -97,7 +96,7 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   });
 
   it("alterTable re-points a foreign key across a column rename", async () => {
-    await internals().alterTable("fk_test_has_fk", undefined, undefined, undefined, {
+    await internals().alterTable("fk_test_has_fk", undefined, undefined, {
       rename: { fk_id: "renamed_fk_id" },
     });
     const fks = await db.foreignKeys("fk_test_has_fk");
