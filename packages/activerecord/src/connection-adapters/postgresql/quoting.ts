@@ -9,6 +9,7 @@
  */
 
 import { BinaryData } from "@blazetrails/activemodel";
+import { ActiveRecord } from "../../ar-config.js";
 import {
   quote as abstractQuote,
   quotedDate as abstractQuotedDate,
@@ -44,11 +45,6 @@ export class IntegerOutOf64BitRange extends Error {
 
 const PG_INT64_MIN = BigInt("-9223372036854775808");
 const PG_INT64_MAX = BigInt("9223372036854775807");
-
-// Mirrors: ActiveRecord.raise_int_wider_than_64bit (active_record.rb:446).
-export const quotingConfig = {
-  raiseIntWiderThan64Bit: true,
-};
 
 export interface BinaryBind {
   value: string;
@@ -158,7 +154,7 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   // integer number values — JS integers beyond MAX_SAFE_INTEGER lose
   // precision silently, so they must be rejected the same way bigints are.
   if (typeof value === "bigint" || (typeof value === "number" && Number.isInteger(value))) {
-    if (quotingConfig.raiseIntWiderThan64Bit) checkIntegerRange(value);
+    if (ActiveRecord.raiseIntWiderThan64bit) checkIntegerRange(value);
     return String(value);
   }
   if (typeof value === "string") return quoteString(value);
@@ -263,7 +259,7 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
     return encodeRange.call(this, value);
   }
   if (typeof value === "bigint" || (typeof value === "number" && Number.isInteger(value))) {
-    if (quotingConfig.raiseIntWiderThan64Bit) checkIntegerRange(value);
+    if (ActiveRecord.raiseIntWiderThan64bit) checkIntegerRange(value);
   }
   return abstractTypeCast.call(this, value);
 }
