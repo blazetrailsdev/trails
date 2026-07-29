@@ -18,30 +18,44 @@
  * so hoisting a query to a `const SWEEP_SQL` does not hide it while an
  * expected-SQL assertion never reaches a sink and so arms nothing.
  *
- * A template's quasis are joined with a space by default, which is lossy about
- * where the substitutions sat: it can only ADD strings a reader might match, so
- * it is safe for a rule whose matches produce reports and unsafe for one whose
- * matches suppress them. `separateQuasis` yields each quasi as its own string
- * instead, so nothing spans a substitution — the reading the inline-template
- * path of `require-table-teardown` already uses, where a joined
- * `LIKE 'ex${suffix}%'` would otherwise read as the static prefix `ex `.
+ * A template's quasis are joined with a space, which is lossy about where the
+ * substitutions sat: it can only ADD strings a reader might match, so it is
+ * safe for a rule whose matches produce reports and unsafe for one whose
+ * matches suppress them. A rule that needs to know where the substitutions sat
+ * takes `createSqlTextGroups` below instead of joining.
  */
-export function createSqlTexts(resolve, { separateQuasis = false } = {}) {
-  return function sqlTexts(node, seen = new Set()) {
-    if (node?.type === "Literal") return typeof node.value === "string" ? [node.value] : [];
-    if (node?.type === "TemplateLiteral") {
-      const quasis = node.quasis.map((q) => q.value.cooked ?? "");
-      return separateQuasis ? quasis : [quasis.join(" ")];
-    }
+export function createSqlTexts(resolve) {
+  const sqlTextGroups = createSqlTextGroups(resolve);
+  return function sqlTexts(node) {
+    return sqlTextGroups(node).map((g) => g.join(" "));
+  };
+}
+
+/**
+ * The same resolution, but each resolved string is returned as its *quasi
+ * array* — one entry per static run, in order — rather than as a flat string.
+ *
+ * A caller reading a table NAME off a resolved string needs to know whether the
+ * name it found is complete or runs into a substitution, and the flat form has
+ * thrown that away: `DROP TABLE tmp_${suffix}` and `DROP TABLE tmp_` reduce to
+ * the same text. Keeping the group intact lets the caller pass each quasi its
+ * successors, which is exactly the dynamic-end signal the inline-template path
+ * already derives from the AST. A plain string resolves to a one-element group,
+ * which correctly reads as having no dynamic end anywhere.
+ */
+export function createSqlTextGroups(resolve) {
+  return function sqlTextGroups(node, seen = new Set()) {
+    if (node?.type === "Literal") return typeof node.value === "string" ? [[node.value]] : [];
+    if (node?.type === "TemplateLiteral") return [node.quasis.map((q) => q.value.cooked ?? "")];
     if (node?.type !== "Identifier") return [];
     const variable = resolve(node);
     if (variable === null || seen.has(variable)) return [];
     seen.add(variable);
     const out = [];
     const init = variable.defs?.[0]?.node?.init;
-    if (init) out.push(...sqlTexts(init, seen));
+    if (init) out.push(...sqlTextGroups(init, seen));
     for (const ref of variable.references) {
-      if (ref.writeExpr) out.push(...sqlTexts(ref.writeExpr, seen));
+      if (ref.writeExpr) out.push(...sqlTextGroups(ref.writeExpr, seen));
     }
     return out;
   };
