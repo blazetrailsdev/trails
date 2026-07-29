@@ -222,5 +222,12 @@
     "rubyName": "generated_association_methods",
     "call": "private_constant",
     "reason": "Rails hides the GeneratedAssociationMethods module constant; trails has no such constant to hide."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "core.ts",
+    "rubyName": "application_record_class?",
+    "call": "application_record_class",
+    "reason": "`applicationRecordClassQ` is ported in inheritance.ts, not core.ts, and does read `ActiveRecord.applicationRecordClass` there; the omission is the file placement, not a missing call."
   }
 ]

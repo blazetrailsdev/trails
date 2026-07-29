@@ -1404,16 +1404,21 @@ export abstract class Migration {
     // across iterations within the same second. Accepts bigint/string so
     // versions beyond Number.MAX_SAFE_INTEGER (e.g. future renumbering above
     // 9.0e15) survive without precision loss.
+    const raw =
+      number == null
+        ? 0n
+        : typeof number === "bigint"
+          ? number
+          : BigInt(typeof number === "number" ? Math.max(0, Math.trunc(number)) : number);
+    const n = raw < 0n ? 0n : raw;
+    // Rails' `else "%.3d" % number.to_i` branch: sequential numbering, no
+    // timestamp consulted at all (migration.rb:1128-1134).
+    if (!ActiveRecord.timestampedMigrations) return n.toString().padStart(3, "0");
     const stamp = Temporal.Now.instant()
       .toString()
       .replace(/[-T:Z.]/g, "")
       .slice(0, 14);
     if (number == null) return stamp;
-    const raw =
-      typeof number === "bigint"
-        ? number
-        : BigInt(typeof number === "number" ? Math.max(0, Math.trunc(number)) : number);
-    const n = raw < 0n ? 0n : raw;
     // Numeric (BigInt) comparison — string compare goes lexicographic once
     // either side exceeds 14 digits and would mis-order (e.g. a 15-digit
     // "100…" would sort below a 14-digit "2026…" string).
@@ -3204,7 +3209,7 @@ export class Migrator {
   // Rails: MigrationContext#validate_timestamp?
   /** @internal */
   isValidateTimestamp(): boolean {
-    return Migrator.validateMigrationTimestamps;
+    return ActiveRecord.timestampedMigrations && Migrator.validateMigrationTimestamps;
   }
 
   // Rails: MigrationContext#valid_migration_timestamp?

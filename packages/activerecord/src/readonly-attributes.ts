@@ -1,7 +1,7 @@
 import type { Base } from "./base.js";
 import { Model, MissingAttributeError, resolveAliasNameIn } from "@blazetrails/activemodel";
 import { ActiveRecordError } from "./errors.js";
-import { raiseOnAssignToAttrReadonly, setRaiseOnAssignToAttrReadonly } from "./ar-config.js";
+import { ActiveRecord } from "./ar-config.js";
 
 /**
  * Raised when a persisted record attempts to write to a column declared
@@ -17,17 +17,20 @@ import { raiseOnAssignToAttrReadonly, setRaiseOnAssignToAttrReadonly } from "./a
  */
 /**
  * Reads `ActiveRecord.raise_on_assign_to_attr_readonly` — the canonical module
- * flag lives in `ar-config.ts` (default false, active_record.rb:343). Re-exported
- * here so the historic `getRaiseOnAssignToAttrReadonly`/`setRaiseOnAssignToAttrReadonly`
- * public surface stays put while the home is the single ar-config binding.
+ * flag lives in `ar-config.ts` (default false, active_record.rb:343). These two
+ * wrappers keep the historic `getRaiseOnAssignToAttrReadonly`/
+ * `setRaiseOnAssignToAttrReadonly` public surface in place while the home is the
+ * single `ActiveRecord.raiseOnAssignToAttrReadonly` accessor.
  *
  * Mirrors: ActiveRecord.raise_on_assign_to_attr_readonly
  */
 export function getRaiseOnAssignToAttrReadonly(): boolean {
-  return raiseOnAssignToAttrReadonly;
+  return ActiveRecord.raiseOnAssignToAttrReadonly;
 }
 
-export { setRaiseOnAssignToAttrReadonly };
+export function setRaiseOnAssignToAttrReadonly(value: boolean): void {
+  ActiveRecord.raiseOnAssignToAttrReadonly = value;
+}
 
 export class ReadonlyAttributeError extends ActiveRecordError {
   readonly attribute: string;
@@ -67,7 +70,7 @@ export function attrReadonly(this: typeof Base, ...attributes: string[]): void {
   // flip of the live flag does not retroactively arm (or disarm) the guards on
   // an already-declared model. `include` is idempotent and one-way, so we never
   // clear the flag once set.
-  if (raiseOnAssignToAttrReadonly) {
+  if (ActiveRecord.raiseOnAssignToAttrReadonly) {
     this._readonlyAttributesRaise = true;
   }
 }

@@ -950,5 +950,12 @@
     "rubyName": "lookup_cast_type",
     "call": "query_value",
     "reason": "PG resolves the regtype OID through `schemaQuery` rather than `query_value`; the async signature that forces it is tracked by the `pg-lookup-cast-type-async-divergence` story."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql-adapter.ts",
+    "rubyName": "dbconsole",
+    "call": "database_cli",
+    "reason": "Rails reads the cli name only to pass it to `find_cmd_and_exec` (postgresql_adapter.rb); that PTY exec is Ruby-only and unported, so our `dbconsole` returns the arg list and never needs the lookup."
   }
 ]

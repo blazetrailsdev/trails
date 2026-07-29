@@ -38,12 +38,7 @@ import {
   appendInfoToPayload,
 } from "./trailties/controller-runtime.js";
 import { instrument } from "./trailties/job-runtime.js";
-import {
-  ActiveRecord,
-  setBelongsToRequiredValidatesForeignKey,
-  setGenerateSecureTokenOn,
-  setRaiseOnAssignToAttrReadonly,
-} from "./ar-config.js";
+import { ActiveRecord } from "./ar-config.js";
 
 export const ControllerRuntime = { processAction, cleanupViewRuntime, appendInfoToPayload };
 export const JobRuntime = { instrument };
@@ -86,7 +81,7 @@ export function loadDefaults(version: string): void {
     if (compareVersions(v, version) <= 0) {
       if (defaults.partialInserts !== undefined) Base.partialInserts = defaults.partialInserts;
       if (defaults.raiseOnAssignToAttrReadonly !== undefined) {
-        setRaiseOnAssignToAttrReadonly(defaults.raiseOnAssignToAttrReadonly);
+        ActiveRecord.raiseOnAssignToAttrReadonly = defaults.raiseOnAssignToAttrReadonly;
       }
     }
   }
@@ -235,9 +230,9 @@ export class Trailtie extends BaseRailtie {
       // source of truth at runtime.
       const cfg = this.config["activeRecord"] as ActiveRecordConfig;
       ActiveRecord.maintainTestSchema = cfg.maintainTestSchema;
-      setRaiseOnAssignToAttrReadonly(cfg.raiseOnAssignToAttrReadonly);
-      setBelongsToRequiredValidatesForeignKey(cfg.belongsToRequiredValidatesForeignKey);
-      setGenerateSecureTokenOn(cfg.generateSecureTokenOn);
+      ActiveRecord.raiseOnAssignToAttrReadonly = cfg.raiseOnAssignToAttrReadonly;
+      ActiveRecord.belongsToRequiredValidatesForeignKey = cfg.belongsToRequiredValidatesForeignKey;
+      ActiveRecord.generateSecureTokenOn = cfg.generateSecureTokenOn;
       ActiveRecord.queues = cfg.queues;
     });
 

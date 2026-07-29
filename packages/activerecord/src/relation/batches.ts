@@ -3,7 +3,7 @@
  *
  * Mirrors: ActiveRecord::Batches
  */
-import { errorOnIgnoredOrder } from "../ar-config.js";
+import { ActiveRecord } from "../ar-config.js";
 
 export class Batches {
   static readonly ORDER_IGNORE_MESSAGE =
@@ -120,7 +120,7 @@ export function buildBatchOrders(
 
 /** @internal */
 export function actOnIgnoredOrder(errorOnIgnore: boolean | undefined): void {
-  const raise = errorOnIgnore !== undefined ? errorOnIgnore : errorOnIgnoredOrder;
+  const raise = errorOnIgnore !== undefined ? errorOnIgnore : ActiveRecord.errorOnIgnoredOrder;
   if (raise) {
     throw new Error(Batches.ORDER_IGNORE_MESSAGE);
   }

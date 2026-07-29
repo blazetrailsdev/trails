@@ -1,5 +1,5 @@
 import { parse as yamlParse, stringify as yamlStringify } from "@blazetrails/activesupport/yaml";
-import { useYamlUnsafeLoad, yamlColumnPermittedClasses } from "../ar-config.js";
+import { ActiveRecord } from "../ar-config.js";
 import { ColumnSerializer } from "./column-serializer.js";
 
 type ClassLike = new (...args: unknown[]) => unknown;
@@ -40,7 +40,7 @@ class SafeCoder {
   ) {}
 
   dump(object: unknown): string {
-    if (!(this.unsafeLoad ?? useYamlUnsafeLoad)) this.assertDumpable(object);
+    if (!(this.unsafeLoad ?? ActiveRecord.useYamlUnsafeLoad)) this.assertDumpable(object);
     return yamlStringify(object, { directives: true });
   }
 
@@ -77,7 +77,10 @@ class SafeCoder {
       for (const element of Object.values(value)) this.assertDumpable(element, seen);
       return;
     }
-    for (const permitted of [...this.permittedClasses, ...yamlColumnPermittedClasses]) {
+    for (const permitted of [
+      ...this.permittedClasses,
+      ...ActiveRecord.yamlColumnPermittedClasses,
+    ]) {
       if (typeof permitted === "function" && value instanceof permitted) return;
     }
     throw new DisallowedClass("dump", value.constructor?.name ?? "Object");

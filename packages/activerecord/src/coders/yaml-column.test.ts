@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { YAMLColumn, DisallowedClass } from "./yaml-column.js";
-import { setUseYamlUnsafeLoad } from "../ar-config.js";
+import { ActiveRecord } from "../ar-config.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
 // Trails-only round-trip coverage plus the ported safe-dump restriction. The
@@ -32,7 +32,7 @@ describe("YAMLColumn round-trip", () => {
   // top-level or nested — while `ActiveRecord.use_yaml_unsafe_load = true`
   // switches to the unrestricted `::YAML.dump` branch (yaml_column.rb:15-24).
   describe("safe dump", () => {
-    afterEach(() => setUseYamlUnsafeLoad(false));
+    afterEach(() => (ActiveRecord.useYamlUnsafeLoad = false));
 
     class Unpermitted {
       secret = "s3cret";
@@ -48,7 +48,7 @@ describe("YAMLColumn round-trip", () => {
     });
 
     it("dumps unpermitted class instances when use_yaml_unsafe_load is set", () => {
-      setUseYamlUnsafeLoad(true);
+      ActiveRecord.useYamlUnsafeLoad = true;
       const coder = new YAMLColumn("params");
       expect(coder.dump(new Unpermitted())).toContain("s3cret");
     });

@@ -4,7 +4,7 @@
  * Mirrors: activerecord/test/cases/serialized_attribute_test.rb
  */
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
-import { setUseYamlUnsafeLoad } from "./ar-config.js";
+import { ActiveRecord } from "./ar-config.js";
 import { ValueType, MissingAttributeError } from "@blazetrails/activemodel";
 import { Base, serialize, SerializationTypeMismatch } from "./index.js";
 import { HashObject } from "./serialize.js";
@@ -42,8 +42,8 @@ describe("SerializedAttributeTest", () => {
   // Rails: `setup { ActiveRecord.use_yaml_unsafe_load = true }`
   // (serialized_attribute_test.rb:10) — the default YAML coder safe-dumps, and
   // these tests serialize non-permitted classes like MyObject.
-  beforeEach(() => setUseYamlUnsafeLoad(true));
-  afterAll(() => setUseYamlUnsafeLoad(false));
+  beforeEach(() => (ActiveRecord.useYamlUnsafeLoad = true));
+  afterAll(() => (ActiveRecord.useYamlUnsafeLoad = false));
 
   it("serialize does not eagerly load columns", () => {
     // Rails: assert_no_queries { Topic.serialize(:content) }

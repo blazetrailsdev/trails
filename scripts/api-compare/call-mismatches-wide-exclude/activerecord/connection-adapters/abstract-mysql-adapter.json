@@ -509,5 +509,12 @@
     "rubyName": "write_query?",
     "call": "match?",
     "reason": "Include stand-in: `MySQL::DatabaseStatements#write_query?` is ported in the Rails-layout file `connection-adapters/mysql/database-statements.ts` (`isWriteQuery`, which does run `READ_QUERY.test(sql)`); the adapter method is the `include` resolution point and only delegates."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
+    "rubyName": "dbconsole",
+    "call": "database_cli",
+    "reason": "Rails reads the cli name only to pass it to `find_cmd_and_exec` (abstract_mysql_adapter.rb); that PTY exec is Ruby-only and unported, so our `dbconsole` returns the arg list and never needs the lookup."
   }
 ]

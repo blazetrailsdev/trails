@@ -32,21 +32,6 @@ export function isSchemaCacheIgnoredTable(tableName: string): boolean {
   return false;
 }
 
-/**
- * Maps each DBMS to the command-line client invoked by `dbconsole`. Mirrors
- * `ActiveRecord.database_cli` (active_record.rb:211-212, default
- * `{ postgresql: "psql", mysql: %w[mysql mysql5], sqlite: "sqlite3" }`).
- */
-export let databaseCli: Record<string, string | string[]> = {
-  postgresql: "psql",
-  mysql: ["mysql", "mysql5"],
-  sqlite: "sqlite3",
-};
-
-export function setDatabaseCli(value: Record<string, string | string[]>): void {
-  databaseCli = value;
-}
-
 let _protocolAdapters: Record<string, string> = {
   postgres: "postgresql",
   postgresql: "postgresql",
@@ -66,6 +51,22 @@ let _asyncQueryExecutor: "global_thread_pool" | "multi_thread_pool" | null = nul
 let _queues: Record<string, unknown> = {};
 let _maintainTestSchema: boolean | null = null;
 let _queryTransformers: QueryTransformer[] = [];
+let _databaseCli: Record<string, string | string[]> = {
+  postgresql: "psql",
+  mysql: ["mysql", "mysql5"],
+  sqlite: "sqlite3",
+};
+let _belongsToRequiredValidatesForeignKey = true;
+let _applicationRecordClass: AnyClass | null = null;
+let _errorOnIgnoredOrder = false;
+let _timestampedMigrations = true;
+let _migrationStrategy: AnyClass = DefaultStrategy;
+let _verifyForeignKeysForFixtures = false;
+let _useYamlUnsafeLoad = false;
+let _raiseIntWiderThan64bit = true;
+let _yamlColumnPermittedClasses: unknown[] = [Symbol];
+let _generateSecureTokenOn: "create" | "initialize" = "create";
+let _raiseOnAssignToAttrReadonly = false;
 
 /**
  * The `ActiveRecord` module itself, as far as its singleton configuration
@@ -75,8 +76,8 @@ let _queryTransformers: QueryTransformer[] = [];
  * attributes: `ActiveRecord.maintain_test_schema = true`.
  *
  * ESM live bindings are read-only for importers, so a bare `export let` cannot
- * carry the writer half — hence the `get`/`set` accessors. Flags still declared
- * as `export let` below have not been migrated yet.
+ * carry the writer half — hence the `get`/`set` accessors. Every module-config
+ * flag now lives here; there is no `export let` left in this file.
  */
 export const ActiveRecord = {
   /**
@@ -263,137 +264,165 @@ export const ActiveRecord = {
   set queryTransformers(value: QueryTransformer[]) {
     _queryTransformers = value;
   },
+
+  /**
+   * Maps each DBMS to the command-line client invoked by `dbconsole`. Mirrors
+   * `ActiveRecord.database_cli` (active_record.rb:211-212, default
+   * `{ postgresql: "psql", mysql: %w[mysql mysql5], sqlite: "sqlite3" }`).
+   */
+  get databaseCli(): Record<string, string | string[]> {
+    return _databaseCli;
+  },
+
+  set databaseCli(value: Record<string, string | string[]>) {
+    _databaseCli = value;
+  },
+
+  /**
+   * When true (the default), a required `belongs_to` also validates that the
+   * association's foreign key is present, not just the association object.
+   * Mirrors `ActiveRecord.belongs_to_required_validates_foreign_key`
+   * (active_record.rb:345-346, default true).
+   */
+  get belongsToRequiredValidatesForeignKey(): boolean {
+    return _belongsToRequiredValidatesForeignKey;
+  },
+
+  set belongsToRequiredValidatesForeignKey(value: boolean) {
+    _belongsToRequiredValidatesForeignKey = value;
+  },
+
+  /**
+   * The application's primary abstract record class (`ApplicationRecord`).
+   * `null` until `primary_abstract_class` is declared. Mirrors
+   * `ActiveRecord.application_record_class` (active_record.rb:329-330, default nil).
+   */
+  get applicationRecordClass(): AnyClass | null {
+    return _applicationRecordClass;
+  },
+
+  set applicationRecordClass(value: AnyClass | null) {
+    _applicationRecordClass = value;
+  },
+
+  /**
+   * When true, a batch enumerator (`find_each`/`in_batches`) raises if the
+   * relation carries an explicit order it must ignore; when false (the default)
+   * it silently overrides the order. Mirrors
+   * `ActiveRecord.error_on_ignored_order` (active_record.rb:376-381, default false).
+   */
+  get errorOnIgnoredOrder(): boolean {
+    return _errorOnIgnoredOrder;
+  },
+
+  set errorOnIgnoredOrder(value: boolean) {
+    _errorOnIgnoredOrder = value;
+  },
+
+  /**
+   * When true (the default), generated migration filenames are prefixed with a
+   * UTC timestamp rather than a sequential number. Mirrors
+   * `ActiveRecord.timestamped_migrations` (active_record.rb:384-387, default true).
+   */
+  get timestampedMigrations(): boolean {
+    return _timestampedMigrations;
+  },
+
+  set timestampedMigrations(value: boolean) {
+    _timestampedMigrations = value;
+  },
+
+  /**
+   * The execution strategy migrations run through. Defaults to
+   * {@link DefaultStrategy}, which runs the migration's `up`/`down` directly.
+   * Mirrors `ActiveRecord.migration_strategy` (active_record.rb:398-401, default
+   * `Migration::DefaultStrategy`).
+   */
+  get migrationStrategy(): AnyClass {
+    return _migrationStrategy;
+  },
+
+  set migrationStrategy(value: AnyClass) {
+    _migrationStrategy = value;
+  },
+
+  /**
+   * When true, fixtures are loaded with foreign-key checks verified afterwards.
+   * Mirrors `ActiveRecord.verify_foreign_keys_for_fixtures`
+   * (active_record.rb:423-429, default false).
+   */
+  get verifyForeignKeysForFixtures(): boolean {
+    return _verifyForeignKeysForFixtures;
+  },
+
+  set verifyForeignKeysForFixtures(value: boolean) {
+    _verifyForeignKeysForFixtures = value;
+  },
+
+  /**
+   * When true, the YAML column coder loads with Psych's unsafe loader instead
+   * of `safe_load`. Mirrors `ActiveRecord.use_yaml_unsafe_load`
+   * (active_record.rb:435-439, default false).
+   */
+  get useYamlUnsafeLoad(): boolean {
+    return _useYamlUnsafeLoad;
+  },
+
+  set useYamlUnsafeLoad(value: boolean) {
+    _useYamlUnsafeLoad = value;
+  },
+
+  /**
+   * When true (the default), the PostgreSQL adapter raises if handed an integer
+   * wider than signed 64-bit. Mirrors `ActiveRecord.raise_int_wider_than_64bit`
+   * (active_record.rb:451-456, default true).
+   */
+  get raiseIntWiderThan64bit(): boolean {
+    return _raiseIntWiderThan64bit;
+  },
+
+  set raiseIntWiderThan64bit(value: boolean) {
+    _raiseIntWiderThan64bit = value;
+  },
+
+  /**
+   * Additional classes the YAML column coder permits during `safe_load`.
+   * Mirrors `ActiveRecord.yaml_column_permitted_classes`
+   * (active_record.rb:458-462, default `[Symbol]`).
+   */
+  get yamlColumnPermittedClasses(): unknown[] {
+    return _yamlColumnPermittedClasses;
+  },
+
+  set yamlColumnPermittedClasses(value: unknown[]) {
+    _yamlColumnPermittedClasses = value;
+  },
+
+  /**
+   * Controls when `has_secure_token` generates its value: `"create"` (the
+   * default) or `"initialize"`. Mirrors `ActiveRecord.generate_secure_token_on`
+   * (active_record.rb:464-468, default `:create`).
+   */
+  get generateSecureTokenOn(): "create" | "initialize" {
+    return _generateSecureTokenOn;
+  },
+
+  set generateSecureTokenOn(value: "create" | "initialize") {
+    _generateSecureTokenOn = value;
+  },
+
+  /**
+   * When true, assigning to a readonly attribute on a persisted record raises
+   * `ReadonlyAttributeError`; when false (the default) the write is silently
+   * skipped. Mirrors `ActiveRecord.raise_on_assign_to_attr_readonly`
+   * (active_record.rb:342-343, default false). The Rails 7.1 framework default
+   * and the AR test suite (`test/cases/helper.rb:42`) flip it to true.
+   */
+  get raiseOnAssignToAttrReadonly(): boolean {
+    return _raiseOnAssignToAttrReadonly;
+  },
+
+  set raiseOnAssignToAttrReadonly(value: boolean) {
+    _raiseOnAssignToAttrReadonly = value;
+  },
 };
-
-/**
- * When true (the default), a required `belongs_to` also validates that the
- * association's foreign key is present, not just the association object.
- * Mirrors `ActiveRecord.belongs_to_required_validates_foreign_key`
- * (active_record.rb:345-346, default true).
- */
-export let belongsToRequiredValidatesForeignKey = true;
-
-export function setBelongsToRequiredValidatesForeignKey(value: boolean): void {
-  belongsToRequiredValidatesForeignKey = value;
-}
-
-/**
- * The application's primary abstract record class (`ApplicationRecord`). `null`
- * until `primary_abstract_class` is declared. Mirrors
- * `ActiveRecord.application_record_class` (active_record.rb:329-330, default nil).
- */
-export let applicationRecordClass: AnyClass | null = null;
-
-export function setApplicationRecordClass(value: AnyClass | null): void {
-  applicationRecordClass = value;
-}
-
-/**
- * When true, a batch enumerator (`find_each`/`in_batches`) raises if the
- * relation carries an explicit order it must ignore; when false (the default)
- * it silently overrides the order. Mirrors `ActiveRecord.error_on_ignored_order`
- * (active_record.rb:376-381, default false).
- */
-export let errorOnIgnoredOrder = false;
-
-export function setErrorOnIgnoredOrder(value: boolean): void {
-  errorOnIgnoredOrder = value;
-}
-
-/**
- * When true (the default), generated migration filenames are prefixed with a
- * UTC timestamp rather than a sequential number. Mirrors
- * `ActiveRecord.timestamped_migrations` (active_record.rb:384-387, default true).
- */
-export let timestampedMigrations = true;
-
-export function setTimestampedMigrations(value: boolean): void {
-  timestampedMigrations = value;
-}
-
-/**
- * The execution strategy migrations run through. Defaults to
- * {@link DefaultStrategy}, which runs the migration's `up`/`down` directly.
- * Mirrors `ActiveRecord.migration_strategy` (active_record.rb:398-401, default
- * `Migration::DefaultStrategy`).
- */
-export let migrationStrategy: AnyClass = DefaultStrategy;
-
-export function setMigrationStrategy(value: AnyClass): void {
-  migrationStrategy = value;
-}
-
-/**
- * When true, fixtures are loaded with foreign-key checks verified afterwards.
- * Mirrors `ActiveRecord.verify_foreign_keys_for_fixtures`
- * (active_record.rb:423-429, default false).
- */
-export let verifyForeignKeysForFixtures = false;
-
-export function setVerifyForeignKeysForFixtures(value: boolean): void {
-  verifyForeignKeysForFixtures = value;
-}
-
-/**
- * When true, the YAML column coder loads with Psych's unsafe loader instead of
- * `safe_load`. Mirrors `ActiveRecord.use_yaml_unsafe_load`
- * (active_record.rb:435-439, default false).
- */
-export let useYamlUnsafeLoad = false;
-
-export function setUseYamlUnsafeLoad(value: boolean): void {
-  useYamlUnsafeLoad = value;
-}
-
-/**
- * When true (the default), the PostgreSQL adapter raises if handed an integer
- * wider than signed 64-bit. Mirrors `ActiveRecord.raise_int_wider_than_64bit`
- * (active_record.rb:451-456, default true).
- */
-export let raiseIntWiderThan64bit = true;
-
-/**
- * Writer for the `ActiveRecord.raise_int_wider_than_64bit=` module attribute
- * (`singleton_class.attr_accessor`, active_record.rb:446). Needed only because
- * ESM live bindings are read-only for importers; converging it onto an
- * `ActiveRecord` accessor is RFC 0081's `convert-ar-config-accessors-internal-flags`
- * story.
- */
-export function setRaiseIntWiderThan64bit(value: boolean): void {
-  raiseIntWiderThan64bit = value;
-}
-
-/**
- * Additional classes the YAML column coder permits during `safe_load`. Mirrors
- * `ActiveRecord.yaml_column_permitted_classes` (active_record.rb:458-462,
- * default `[Symbol]`).
- */
-export let yamlColumnPermittedClasses: unknown[] = [Symbol];
-
-export function setYamlColumnPermittedClasses(value: unknown[]): void {
-  yamlColumnPermittedClasses = value;
-}
-
-/**
- * Controls when `has_secure_token` generates its value: `"create"` (the
- * default) or `"initialize"`. Mirrors `ActiveRecord.generate_secure_token_on`
- * (active_record.rb:464-468, default `:create`).
- */
-export let generateSecureTokenOn: "create" | "initialize" = "create";
-
-export function setGenerateSecureTokenOn(value: "create" | "initialize"): void {
-  generateSecureTokenOn = value;
-}
-
-/**
- * When true, assigning to a readonly attribute on a persisted record raises
- * `ReadonlyAttributeError`; when false (the default) the write is silently
- * skipped. Mirrors `ActiveRecord.raise_on_assign_to_attr_readonly`
- * (active_record.rb:342-343, default false). The Rails 7.1 framework default
- * and the AR test suite (`test/cases/helper.rb:42`) flip it to true.
- */
-export let raiseOnAssignToAttrReadonly = false;
-
-export function setRaiseOnAssignToAttrReadonly(value: boolean): void {
-  raiseOnAssignToAttrReadonly = value;
-}
