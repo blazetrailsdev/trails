@@ -35,9 +35,9 @@ import { Movie } from "./test-helpers/models/movie.js";
 import { Subscriber } from "./test-helpers/models/subscriber.js";
 import { Event } from "./test-helpers/models/event.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
+import { Mysql2Adapter } from "./connection-adapters/mysql2-adapter.js";
 import {
   leaseMysqlAdapter,
-  Mysql2Adapter,
   ARUNIT_DATABASE,
   ARUNIT2_DATABASE,
 } from "./adapters/abstract-mysql-adapter/test-helper.js";

@@ -12,12 +12,9 @@ import { NotNullViolation } from "./errors.js";
 import { adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import {
-  describeIfMysqlAdapter,
-  isMariaDb,
-  Mysql2Adapter,
-  MYSQL_TEST_URL,
-} from "./adapters/abstract-mysql-adapter/test-helper.js";
+import { Mysql2Adapter } from "./connection-adapters/mysql2-adapter.js";
+import { describeIfMysqlAdapter } from "./support/describe-if-mysql-adapter.js";
+import { isMariaDb, MYSQL_TEST_URL } from "./support/mysql-server-version.js";
 import { describeIfPg } from "./support/describe-if-pg.js";
 import { describeIfSqlite } from "./support/describe-if-sqlite.js";
 import { describeIfSupports, itIfSupports } from "./support/supports.js";

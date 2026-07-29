@@ -6,7 +6,7 @@ import { adapterSupports, describeIfSupports, itIfSupports } from "./supports.js
 // attempt on the pg/sqlite lanes.
 const mysqlSupportsExpressionIndex =
   adapterType === "mysql"
-    ? (await import("../adapters/abstract-mysql-adapter/test-helper.js")).supportsExpressionIndex
+    ? (await import("./mysql-server-version.js")).supportsExpressionIndex
     : false;
 
 // Assertions are computed from `adapterType` so they hold on every CI lane

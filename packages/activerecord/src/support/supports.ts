@@ -47,7 +47,7 @@ type Backend = (typeof ALL)[number];
 // connection attempt off the pg/sqlite lanes.
 const mysqlExpressionIndex =
   adapterType === "mysql"
-    ? (await import("../adapters/abstract-mysql-adapter/test-helper.js")).supportsExpressionIndex
+    ? (await import("./mysql-server-version.js")).supportsExpressionIndex
     : false;
 
 const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {

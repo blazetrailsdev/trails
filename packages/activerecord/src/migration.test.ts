@@ -38,11 +38,9 @@ import { Person } from "./test-helpers/models/person.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 import { itIfSupports, describeIfSupports } from "./support/supports.js";
 import { describeIfPg } from "./support/describe-if-pg.js";
-import {
-  describeIfMysqlAdapter,
-  leaseMysqlAdapter,
-  Mysql2Adapter,
-} from "./adapters/abstract-mysql-adapter/test-helper.js";
+import { Mysql2Adapter } from "./connection-adapters/mysql2-adapter.js";
+import { describeIfMysqlAdapter } from "./support/describe-if-mysql-adapter.js";
+import { leaseMysqlAdapter } from "./adapters/abstract-mysql-adapter/test-helper.js";
 
 async function freshContext(): Promise<{ adapter: DatabaseAdapter; ctx: MigrationContext }> {
   const adapter = Base.connection;
