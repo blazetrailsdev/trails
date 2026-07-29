@@ -111,10 +111,6 @@ const sqliteAdapter: DbTemplateAdapter = {
     process.env[TEMPLATE_PATH_ENV] = templatePath;
     process.env[RUN_TOKEN_ENV] = runToken;
 
-    // Sweeps the whole run by token — the template, every worker clone and
-    // every scratch DB — because the workers' own `process.on("exit")` unlinks
-    // never fire under the fork pool (see `registerDbFileCleanupOnExit`), and
-    // this teardown is the only hook that outlives them all.
     return async () => {
       await sweepRunDbFiles(runToken);
     };

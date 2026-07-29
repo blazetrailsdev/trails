@@ -118,7 +118,6 @@ async function tempDbEntries(fs: FsAdapter): Promise<string[]> {
   try {
     return (await fs.readdir(await tmpRoot())).filter((name) => name.startsWith(TEMP_DB_PREFIX));
   } catch {
-    // tmpdir unreadable — cleanup is best-effort, never a run failure.
     return [];
   }
 }
@@ -127,7 +126,7 @@ async function unlinkQuietly(fs: FsAdapter, target: string): Promise<void> {
   try {
     await fs.unlink?.(target);
   } catch {
-    // already gone / raced with another sweep — nothing to do.
+    // best-effort
   }
 }
 
