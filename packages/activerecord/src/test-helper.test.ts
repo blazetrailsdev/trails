@@ -16,7 +16,7 @@ describe("withTimezoneConfig", () => {
     setZoneDefault(null);
   });
 
-  it("temporarily changes ActiveRecord.defaultTimezone and restores it", async () => {
+  it("temporarily changes defaultTimezone and restores it", async () => {
     const before = ActiveRecord.defaultTimezone;
     const captured: Array<"utc" | "local"> = [];
     await withTimezoneConfig({ default: "local" }, () => {
@@ -56,7 +56,7 @@ describe("withTimezoneConfig", () => {
     expect(getZone()).toBe(paris);
   });
 
-  it("restores ActiveRecord.defaultTimezone even if fn throws", async () => {
+  it("restores defaultTimezone even if fn throws", async () => {
     const before = ActiveRecord.defaultTimezone;
     await expect(
       withTimezoneConfig({ default: "local" }, () => {
