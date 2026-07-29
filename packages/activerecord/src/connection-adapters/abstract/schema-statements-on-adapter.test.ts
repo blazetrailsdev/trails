@@ -14,6 +14,12 @@ import { AbstractAdapter } from "../abstract-adapter.js";
 import { ForeignKeyDefinition } from "./schema-definitions.js";
 import { fixtures } from "../../test-fixtures.js";
 import { ambientConnection, withRocketTables } from "../../support/rocket-tables.js";
+import { adapterType } from "../../test-adapter.js";
+
+// sqlite3/schema_statements.rb:56-63 overrides add_foreign_key without the
+// abstract `if_not_exists` short-circuit, so the guard's no-op behavior is
+// only observable on the adapters that use the abstract implementation.
+const guardsIfNotExists = adapterType !== "sqlite";
 
 let adapter: AbstractSQLite3Adapter | undefined;
 
@@ -413,18 +419,38 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(opts).toContain("ifNotExists");
   });
 
-  it("addForeignKey with ifNotExists is a no-op when the FK already exists", async () => {
-    const conn = await ambientConnection();
-    await withRocketTables(conn, async () => {
-      await conn.addForeignKey("astronauts", "rockets", { column: "rocket_id" });
-      const before = (await conn.foreignKeys("astronauts")).length;
-      await conn.addForeignKey("astronauts", "rockets", {
-        column: "rocket_id",
-        ifNotExists: true,
+  it.skipIf(!guardsIfNotExists)(
+    "addForeignKey with ifNotExists is a no-op when the FK already exists",
+    async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.addForeignKey("astronauts", "rockets", { column: "rocket_id" });
+        const before = (await conn.foreignKeys("astronauts")).length;
+        await conn.addForeignKey("astronauts", "rockets", {
+          column: "rocket_id",
+          ifNotExists: true,
+        });
+        expect((await conn.foreignKeys("astronauts")).length).toBe(before);
       });
-      expect((await conn.foreignKeys("astronauts")).length).toBe(before);
-    });
-  });
+    },
+  );
+
+  it.skipIf(guardsIfNotExists)(
+    "addForeignKey with ifNotExists re-adds the FK on SQLite (no override guard)",
+    async () => {
+      const conn = await ambientConnection();
+      await withRocketTables(conn, async () => {
+        await conn.addForeignKey("astronauts", "rockets", { column: "rocket_id" });
+        await conn.addForeignKey("astronauts", "rockets", {
+          column: "rocket_id",
+          ifNotExists: true,
+        });
+        const fks = await conn.foreignKeys("astronauts");
+        expect(fks.length).toBe(2);
+        expect(fks.every((fk) => fk.toTable === "rockets" && fk.column === "rocket_id")).toBe(true);
+      });
+    },
+  );
 
   it("addForeignKey with ifNotExists creates the FK when none exists", async () => {
     const conn = await ambientConnection();
@@ -454,38 +480,41 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     });
   });
 
-  it("addForeignKey with ifNotExists is a no-op when a composite FK already exists", async () => {
-    // The composite `column: [...]` must match the existing FK by value, not by
-    // array identity. foreignKeys() reports composite columns as arrays (Rails
-    // parity), and the ifNotExists guard routes through foreignKeyExists ->
-    // isDefinedFor for an element-wise compare.
-    const conn = await ambientConnection();
-    await conn.createTable("rockets", { force: true, primaryKey: ["tenant_id", "id"] }, (t) => {
-      t.integer("tenant_id");
-      t.integer("id");
-    });
-    await conn.createTable("astronauts", { force: true }, (t) => {
-      t.integer("rocket_id");
-      t.integer("rocket_tenant_id");
-    });
-    try {
-      await conn.addForeignKey("astronauts", "rockets", {
-        column: ["rocket_tenant_id", "rocket_id"],
-        primaryKey: ["tenant_id", "id"],
+  it.skipIf(!guardsIfNotExists)(
+    "addForeignKey with ifNotExists is a no-op when a composite FK already exists",
+    async () => {
+      // The composite `column: [...]` must match the existing FK by value, not by
+      // array identity. foreignKeys() reports composite columns as arrays (Rails
+      // parity), and the ifNotExists guard routes through foreignKeyExists ->
+      // isDefinedFor for an element-wise compare.
+      const conn = await ambientConnection();
+      await conn.createTable("rockets", { force: true, primaryKey: ["tenant_id", "id"] }, (t) => {
+        t.integer("tenant_id");
+        t.integer("id");
       });
-      expect((await conn.foreignKeys("astronauts"))[0].column).toEqual([
-        "rocket_tenant_id",
-        "rocket_id",
-      ]);
-      const before = (await conn.foreignKeys("astronauts")).length;
-      await conn.addForeignKey("astronauts", "rockets", {
-        column: ["rocket_tenant_id", "rocket_id"],
-        primaryKey: ["tenant_id", "id"],
-        ifNotExists: true,
+      await conn.createTable("astronauts", { force: true }, (t) => {
+        t.integer("rocket_id");
+        t.integer("rocket_tenant_id");
       });
-      expect((await conn.foreignKeys("astronauts")).length).toBe(before);
-    } finally {
-      await conn.dropTable("astronauts", "rockets", { ifExists: true });
-    }
-  });
+      try {
+        await conn.addForeignKey("astronauts", "rockets", {
+          column: ["rocket_tenant_id", "rocket_id"],
+          primaryKey: ["tenant_id", "id"],
+        });
+        expect((await conn.foreignKeys("astronauts"))[0].column).toEqual([
+          "rocket_tenant_id",
+          "rocket_id",
+        ]);
+        const before = (await conn.foreignKeys("astronauts")).length;
+        await conn.addForeignKey("astronauts", "rockets", {
+          column: ["rocket_tenant_id", "rocket_id"],
+          primaryKey: ["tenant_id", "id"],
+          ifNotExists: true,
+        });
+        expect((await conn.foreignKeys("astronauts")).length).toBe(before);
+      } finally {
+        await conn.dropTable("astronauts", "rockets", { ifExists: true });
+      }
+    },
+  );
 });

@@ -2183,17 +2183,13 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     toTable: string,
     options: AddForeignKeyOptions = {},
   ): Promise<void> {
+    // sqlite3/schema_statements.rb:56-63 is a full override of the abstract
+    // add_foreign_key: it has exactly these two statements, so the abstract
+    // `if_not_exists` short-circuit (abstract/schema_statements.rb:1174) does
+    // not apply on SQLite. `ifNotExists: true` falls through to the rebuild,
+    // which SQLite accepts even when an identical FK already exists.
     assertValidDeferrable(options.deferrable);
 
-    if (options.ifNotExists === true) {
-      // foreignKeyExists routes through foreignKeyFor/isDefinedFor, which
-      // compares `column` element-wise, so composite (array) columns match by
-      // value rather than by array identity (a bare `===` is always false for
-      // distinct array instances). Mirrors the abstract addForeignKey guard.
-      if (await this.foreignKeyExists(fromTable, toTable, { column: options.column })) {
-        return;
-      }
-    }
     await this.alterTable(fromTable, undefined, undefined, undefined, (definition) => {
       definition.foreignKey(
         this.schemaStatements().stripTableNamePrefixAndSuffix(toTable),
