@@ -358,7 +358,9 @@ export default defineConfig({
           exclude: [...SHARED_EXCLUDE, ...ADAPTER_SPECIFIC_EXCLUDE, ...SQLITE_DRIVER_TESTS],
           // Phase 0 sqlite template-clone (perf): build the canonical schema
           // into a template file once for the whole run; workers clone it
-          // instead of re-issuing the DDL per file. No-op on PG/MySQL runs.
+          // instead of re-issuing the DDL per file. The template build is a
+          // no-op on PG/MySQL runs; the temp-DB sweep it arms is not — scratch
+          // and fallback sqlite files are minted on every lane.
           globalSetup: ["./packages/activerecord/src/support/template-global-setup.ts"],
           setupFiles: [
             "./packages/activerecord/src/test-setup-worker-db.ts",
