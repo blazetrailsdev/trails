@@ -2,9 +2,10 @@
  * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion
  */
 import type { Type } from "@blazetrails/activemodel";
-import { ValueType, isUtcTimezone } from "@blazetrails/activemodel";
+import { ValueType } from "@blazetrails/activemodel";
 import { TimeWithZone, TimeZone, getZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { isUtc } from "../type/internal/timezone.js";
 type ValueTypeInstance = InstanceType<typeof ValueType>;
 
 export interface TimeZoneConversion {
@@ -206,9 +207,17 @@ export class TimeZoneConverter extends ValueType<unknown> {
   }
 }
 
-/** @internal */
+/**
+ * The types TimeZoneConverter wraps are AR types, whose `is_utc?` comes from
+ * ActiveRecord::Type::Internal::Timezone (reading `ActiveRecord.default_timezone`)
+ * — not from ActiveModel's `Time.zone_default`-derived helper. When the wrapped
+ * subtype exposes no `is_utc?`, fall back to the same AR reader Rails would have
+ * resolved for it.
+ *
+ * @internal
+ */
 function zoneForIsUtc(subtypeIsUtc?: boolean): string {
-  return (subtypeIsUtc ?? isUtcTimezone()) ? "UTC" : Temporal.Now.timeZoneId();
+  return (subtypeIsUtc ?? isUtc()) ? "UTC" : Temporal.Now.timeZoneId();
 }
 
 /**
