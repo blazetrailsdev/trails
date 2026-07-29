@@ -8,12 +8,19 @@ import {
 import { ArgumentError } from "../attribute-assignment.js";
 import { AcceptsMultiparameterTime, isHash } from "./helpers/accepts-multiparameter-time.js";
 import { isUtc } from "./helpers/timezone.js";
+import { fastStringToTime, newTime } from "./helpers/time-value.js";
 import { ValueType } from "./value.js";
 
 export type DateTimeCastResult = Temporal.Instant | DateInfinityType | DateNegativeInfinityType;
 
 export class DateTimeType extends ValueType<DateTimeCastResult> {
   readonly name: string = "datetime";
+
+  /** Mixed in from Helpers::TimeValue (time_value.rb:79-89). @internal Rails-private helper. */
+  protected fastStringToTime = fastStringToTime;
+
+  /** Mixed in from Helpers::TimeValue (time_value.rb:48-65). @internal Rails-private helper. */
+  protected newTime = newTime;
 
   type(): string {
     return this.name;
@@ -31,7 +38,7 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     if (isHash(value)) return this.valueFromMultiparameterAssignment(value);
     const str = String(value).trim();
     if (str === "") return null;
-    return this.parseString(str);
+    return this.fastStringToTime(str) ?? this.fallbackStringToTime(str);
   }
 
   /**
@@ -67,15 +74,28 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
    *     new_time(*time_hash.values_at(:year, :mon, :mday, :hour, :min, :sec, :sec_fraction, :offset))
    *   end
    *
-   * Trails has no `Date._parse` equivalent; reuse Temporal's
-   * permissive parser plus the configured-zone resolution that
-   * `parseString` already implements. Returns null on parse failure.
+   * Trails has no `Date._parse` equivalent; `parseTimeHash` stands in
+   * for it, using Temporal's permissive parser to produce the same
+   * component hash. From there the Rails shape is preserved: normalize
+   * `sec_fraction` to microseconds, then hand the components to
+   * `new_time`. Returns null on parse failure.
    *
    * @internal Rails-private helper.
    */
   protected fallbackStringToTime(s: string): Temporal.Instant | null {
-    const result = this.parseString(s.trim());
-    return result instanceof Temporal.Instant ? result : null;
+    const timeHash = this.parseTimeHash(s.trim());
+    if (timeHash === null) return null;
+    const microsec = this.microseconds(timeHash);
+    return this.newTime(
+      timeHash.year,
+      timeHash.mon,
+      timeHash.mday,
+      timeHash.hour,
+      timeHash.min,
+      timeHash.sec,
+      microsec,
+      timeHash.offset,
+    );
   }
 
   /**
@@ -113,6 +133,54 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     ) as DateTimeCastResult | null;
   }
 
+  // `Date._parse` stand-in: decompose a datetime string into the component
+  // hash `fallbackStringToTime` feeds to `newTime`. Only reached for strings
+  // `fastStringToTime` rejects (notably ISO basic format, which has no "-").
+  private parseTimeHash(s: string): {
+    year: number;
+    mon: number;
+    mday: number;
+    hour: number;
+    min: number;
+    sec: number;
+    sec_fraction: number;
+    offset: number | null;
+  } | null {
+    const normalized = s
+      .replace(" ", "T")
+      .replace(/(T\d{2}:\d{2}:\d{2}(?:\.\d+)?)([-+]\d{2})$/, "$1$2:00");
+    const zoneMatch = /(Z|[+-]\d{2}:\d{2})$/.exec(normalized);
+    let offset: number | null = null;
+    let body = normalized;
+    if (zoneMatch) {
+      const zone = zoneMatch[1];
+      body = normalized.slice(0, normalized.length - zone.length);
+      if (zone === "Z") {
+        offset = 0;
+      } else {
+        const sign = zone.startsWith("-") ? -1 : 1;
+        offset = sign * (Number(zone.slice(1, 3)) * 3600 + Number(zone.slice(4, 6)) * 60);
+      }
+    }
+    const datetimeString = /^\d{4}-?\d{2}-?\d{2}$/.test(body) ? `${body}T00:00:00` : body;
+    let plain: Temporal.PlainDateTime;
+    try {
+      plain = Temporal.PlainDateTime.from(datetimeString, { overflow: "reject" });
+    } catch {
+      return null;
+    }
+    return {
+      year: plain.year,
+      mon: plain.month,
+      mday: plain.day,
+      hour: plain.hour,
+      min: plain.minute,
+      sec: plain.second,
+      sec_fraction: (plain.millisecond * 1000 + plain.microsecond) / 1_000_000,
+      offset,
+    };
+  }
+
   get isUtc(): boolean {
     return isUtc();
   }
@@ -145,37 +213,6 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     const roundedOff = subsec % mod;
     if (roundedOff === 0n) return value;
     return Temporal.Instant.fromEpochNanoseconds(value.epochNanoseconds - roundedOff);
-  }
-
-  private parseString(str: string): DateTimeCastResult | null {
-    // Normalize wire-format quirks before parsing:
-    //   space separator → T; short offset ±HH → ±HH:MM
-    const normalized = str
-      .replace(" ", "T")
-      .replace(/(T\d{2}:\d{2}:\d{2}(?:\.\d+)?)([-+]\d{2})$/, "$1$2:00");
-    // Date-only string (YYYY-MM-DD) → midnight PlainDateTime, matching Rails behavior.
-    const datetimeString = /^\d{4}-\d{2}-\d{2}$/.test(normalized)
-      ? `${normalized}T00:00:00`
-      : normalized;
-    const hasOffset = /Z$|[+-]\d{2}:\d{2}$/.test(datetimeString);
-    if (hasOffset) {
-      try {
-        return Temporal.Instant.from(datetimeString);
-      } catch {
-        return null;
-      }
-    }
-    try {
-      return (
-        Temporal.PlainDateTime.from(datetimeString, { overflow: "reject" })
-          // Rails branches on `is_utc?` between `::Time.utc` and `::Time.local`;
-          // Temporal has no `Time.local`, so the local arm names the host zone.
-          .toZonedDateTime(this.isUtc ? "UTC" : Temporal.Now.timeZoneId())
-          .toInstant()
-      );
-    } catch {
-      return null;
-    }
   }
 
   override isChanged(oldValue: unknown, newValue: unknown, _raw?: unknown): boolean {
