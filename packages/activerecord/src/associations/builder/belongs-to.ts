@@ -14,7 +14,7 @@ import {
 } from "../../counter-cache.js";
 import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 import { pendingCounterCacheColumns } from "../../counter-cache-state.js";
-import { belongsToRequiredValidatesForeignKey } from "../../ar-config.js";
+import { ActiveRecord } from "../../ar-config.js";
 
 /**
  * Mirrors: ActiveRecord::Associations::Builder::BelongsTo
@@ -387,7 +387,7 @@ export class BelongsTo extends SingularAssociation {
             record._readAttribute(attr) == null ||
             (typeof record.attributeChanged === "function" && record.attributeChanged(attr)),
         );
-      const railsRuns = belongsToRequiredValidatesForeignKey
+      const railsRuns = ActiveRecord.belongsToRequiredValidatesForeignKey
         ? () => true
         : (record: any) =>
             needsValidation(record, foreignKeys) ||

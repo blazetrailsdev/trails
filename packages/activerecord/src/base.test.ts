@@ -4,11 +4,11 @@
  */
 import { describe, it, expect, afterAll, afterEach, vi } from "vitest";
 import {
+  ActiveRecord,
   Base,
   NotImplementedError,
   ReadonlyAttributeError,
   getRaiseOnAssignToAttrReadonly,
-  setRaiseOnAssignToAttrReadonly,
 } from "./index.js";
 import { TableNotSpecified, ActiveRecordError } from "./errors.js";
 
@@ -1084,7 +1084,7 @@ describe("BasicsTest", () => {
   });
   it("readonly attributes when configured to not raise", async () => {
     const prev = getRaiseOnAssignToAttrReadonly();
-    setRaiseOnAssignToAttrReadonly(false);
+    ActiveRecord.raiseOnAssignToAttrReadonly = false;
     try {
       class NonRaisingPost extends Base {
         static {
@@ -1125,7 +1125,7 @@ describe("BasicsTest", () => {
       expect(post.readAttribute("title")).toBe("cannot change this");
       expect(post.readAttribute("body")).toBe("changed via update");
     } finally {
-      setRaiseOnAssignToAttrReadonly(prev);
+      ActiveRecord.raiseOnAssignToAttrReadonly = prev;
     }
   });
   it("readonly attributes on belongs to association", async () => {

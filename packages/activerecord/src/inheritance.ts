@@ -15,7 +15,7 @@ import {
   underscore,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { applicationRecordClass, setApplicationRecordClass } from "./ar-config.js";
+import { ActiveRecord } from "./ar-config.js";
 
 /**
  * Helper: cast inheritance column value through its attribute type.
@@ -699,12 +699,12 @@ export function isFinderNeedsTypeCondition(modelClass: typeof Base): boolean {
 
 /** Test-only: reset the primary abstract class singleton. */
 export function __resetPrimaryAbstractClass(): void {
-  setApplicationRecordClass(null);
+  ActiveRecord.applicationRecordClass = null;
 }
 
 /** @internal */
 export function getApplicationRecordClass(): typeof Base | null {
-  return applicationRecordClass as typeof Base | null;
+  return ActiveRecord.applicationRecordClass as typeof Base | null;
 }
 
 /**
@@ -717,8 +717,8 @@ export function getApplicationRecordClass(): typeof Base | null {
  * Mirrors: ActiveRecord::Core::ClassMethods#application_record_class?
  */
 export function applicationRecordClassQ(modelClass: typeof Base): boolean {
-  if (applicationRecordClass) {
-    return modelClass === applicationRecordClass;
+  if (ActiveRecord.applicationRecordClass) {
+    return modelClass === ActiveRecord.applicationRecordClass;
   }
   return modelClass === (globalThis as Record<string, unknown>)["ApplicationRecord"];
 }
@@ -731,14 +731,14 @@ export function applicationRecordClassQ(modelClass: typeof Base): boolean {
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#primary_abstract_class
  */
 export function primaryAbstractClass(modelClass: typeof Base): void {
-  if (applicationRecordClass && applicationRecordClass !== modelClass) {
+  if (ActiveRecord.applicationRecordClass && ActiveRecord.applicationRecordClass !== modelClass) {
     throw new ArgumentError(
-      `The \`primary_abstract_class\` is already set to ${applicationRecordClass.name}. ` +
+      `The \`primary_abstract_class\` is already set to ${ActiveRecord.applicationRecordClass.name}. ` +
         "There can only be one `primary_abstract_class` in an application.",
     );
   }
   (modelClass as any).abstractClass = true;
-  setApplicationRecordClass(modelClass);
+  ActiveRecord.applicationRecordClass = modelClass;
 }
 
 /**

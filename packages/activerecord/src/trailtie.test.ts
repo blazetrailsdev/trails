@@ -10,7 +10,7 @@ import { ExtendedDeterministicUniquenessValidator } from "./encryption/extended-
 import { installExtendedQueriesIfConfigured } from "./encryption/install.js";
 import { UniquenessValidator } from "./validations.js";
 import { deprecator } from "./deprecator.js";
-import { raiseOnAssignToAttrReadonly, setRaiseOnAssignToAttrReadonly } from "./ar-config.js";
+import { ActiveRecord } from "./ar-config.js";
 
 const { deprecators } = BaseRailtie;
 
@@ -39,7 +39,7 @@ describe("RailtieTest", () => {
     savedDecodeDates = PostgreSQLAdapter.decodeDates;
     savedEncryptionSupportUnencryptedData = EncryptionConfigurable.config.supportUnencryptedData;
     savedPartialInserts = Base.partialInserts;
-    savedRaiseOnAssignToAttrReadonly = raiseOnAssignToAttrReadonly;
+    savedRaiseOnAssignToAttrReadonly = ActiveRecord.raiseOnAssignToAttrReadonly;
     savedExtendQueries = EncryptionConfigurable.config.extendQueries;
 
     // Simulate a fresh app boot for each test: clear the load-hook registry
@@ -63,7 +63,7 @@ describe("RailtieTest", () => {
     PostgreSQLAdapter.decodeDates = savedDecodeDates;
     EncryptionConfigurable.config.supportUnencryptedData = savedEncryptionSupportUnencryptedData;
     Base.partialInserts = savedPartialInserts;
-    setRaiseOnAssignToAttrReadonly(savedRaiseOnAssignToAttrReadonly);
+    ActiveRecord.raiseOnAssignToAttrReadonly = savedRaiseOnAssignToAttrReadonly;
     // The suite boots with extended query support installed
     // (cases/helper.ts, mirroring helper.rb:104-107); tests here uninstall it
     // to observe the initializer doing the install, so put it back.
@@ -187,9 +187,9 @@ describe("RailtieTest", () => {
   });
 
   it("load_defaults 7.1 sets raise_on_assign_to_attr_readonly to true", () => {
-    setRaiseOnAssignToAttrReadonly(false); // framework default before load_defaults
+    ActiveRecord.raiseOnAssignToAttrReadonly = false; // framework default before load_defaults
     loadDefaults("7.1");
-    expect(raiseOnAssignToAttrReadonly).toBe(true);
+    expect(ActiveRecord.raiseOnAssignToAttrReadonly).toBe(true);
   });
 
   it("load_defaults raises for an unknown version string", () => {

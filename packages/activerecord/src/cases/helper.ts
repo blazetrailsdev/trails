@@ -14,10 +14,7 @@ import { beforeEach } from "vitest";
 import { Base } from "../base.js";
 import { getZone, setZone, resetZone, isZoneExplicit } from "@blazetrails/activesupport";
 import { DelegateCache } from "../relation/delegation.js";
-import {
-  setBelongsToRequiredValidatesForeignKey,
-  setRaiseOnAssignToAttrReadonly,
-} from "../ar-config.js";
+import { ActiveRecord } from "../ar-config.js";
 import { resetTestAdapterState } from "../test-adapter.js";
 import { shouldSkipGlobalReset } from "../support/skip-global-reset.js";
 import { registerFakeAdapter } from "../support/fake-adapter.js";
@@ -47,14 +44,14 @@ Base.automaticallyInvertPluralAssociations = true;
 // Mirror Rails activerecord/test/cases/helper.rb:42 — the AR test suite enables
 // raise-on-assign-to-readonly globally; the framework default (active_record.rb:343)
 // is false, flipped to true by load_defaults 7.1 (configuration.rb:286).
-setRaiseOnAssignToAttrReadonly(true);
+ActiveRecord.raiseOnAssignToAttrReadonly = true;
 
 // Mirror Rails activerecord/test/cases/helper.rb:43 — the AR test suite turns
 // off the required-`belongs_to` foreign-key presence check globally, so the
 // presence validation only runs when the FK (or polymorphic type) is nil or
 // changed. Production keeps the Rails default of `true` (active_record.rb:345-346);
 // only the test harness flips it.
-setBelongsToRequiredValidatesForeignKey(false);
+ActiveRecord.belongsToRequiredValidatesForeignKey = false;
 
 // Mirror Rails activerecord/test/cases/helper.rb:98-102 — configure encryption
 // once, suite-wide, BEFORE any model class loads, so a model's `encrypts`
