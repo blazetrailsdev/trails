@@ -2,9 +2,10 @@
  * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion
  */
 import type { Type } from "@blazetrails/activemodel";
-import { ValueType, isUtcTimezone } from "@blazetrails/activemodel";
+import { ValueType } from "@blazetrails/activemodel";
 import { TimeWithZone, TimeZone, getZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { isUtc } from "../type/internal/timezone.js";
 type ValueTypeInstance = InstanceType<typeof ValueType>;
 
 export interface TimeZoneConversion {
@@ -208,7 +209,7 @@ export class TimeZoneConverter extends ValueType<unknown> {
 
 /** @internal */
 function zoneForIsUtc(subtypeIsUtc?: boolean): string {
-  return (subtypeIsUtc ?? isUtcTimezone()) ? "UTC" : Temporal.Now.timeZoneId();
+  return (subtypeIsUtc ?? isUtc()) ? "UTC" : Temporal.Now.timeZoneId();
 }
 
 /**
