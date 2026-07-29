@@ -115,10 +115,6 @@ describe("connect", () => {
     expect(envConfig.pool).toBe(5);
   });
 
-  // The worker clone is trails' stand-in for Rails' one already-prepared
-  // database, so its name carries the run token and worker slot — but its
-  // arunit2 is still an explicitly named sibling file, not a suffix appended
-  // after the extension.
   it("names an explicit sibling file for the worker clone's arunit2 entry", async () => {
     vi.stubEnv("ARCONN", "sqlite3");
     vi.stubEnv("AR_TEST_WORKER_DB", "/tmp/ar-test-worker-abc-1.sqlite");

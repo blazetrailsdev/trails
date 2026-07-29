@@ -250,8 +250,6 @@ function expandConfig(
   entries: Partial<Record<ArunitEntryName, Record<string, unknown>>>,
 ): HashConfig[] {
   const primaryDatabase = String(entries.arunit?.database ?? "");
-  // No `:memory:` special case: both sqlite lanes spell their two databases out
-  // in the builder, so this default is only ever reached by a server adapter.
   const defaultDatabase: Record<ArunitEntryName, string> = {
     arunit: primaryDatabase,
     arunit2: arunitDatabaseNames(primaryDatabase).arunit2,

@@ -139,9 +139,9 @@ describe("MultipleDbTest", () => {
   // Rails guards these two with `unless in_memory_db?` (multiple_db_test.rb): its
   // in-memory harness can't give arunit2 a genuinely separate pool, so College
   // would resolve to Base's connection. trails' arunit2 is always a genuinely
-  // separate pool — a provisioned database on PG/MySQL, the `_2` sibling
-  // file on sqlite (`sqliteSiblingDatabase`, `support/config.ts`) — so the assertions hold and we
-  // run them. This differs from the primary-class pair, which stay skipped
+  // separate pool — a provisioned database on PG/MySQL, the `_2` sibling file
+  // on sqlite (`sqliteSiblingDatabase`, `support/config.ts`) — so the
+  // assertions hold and we run them. This differs from the primary-class pair, which stay skipped
   // because `connects_to(arunit/arunit)` is *expected* to share Base's
   // connection — which independent in-memory DBs can't do.
   it("count on custom connection", async () => {
