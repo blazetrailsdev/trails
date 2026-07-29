@@ -274,7 +274,10 @@ export default async function setup(): Promise<(() => Promise<void>) | undefined
   }
 
   return async () => {
-    await Promise.all(teardowns.map((t) => t()));
-    await sweepRunDbFiles(runToken);
+    try {
+      await Promise.all(teardowns.map((t) => t()));
+    } finally {
+      await sweepRunDbFiles(runToken);
+    }
   };
 }
