@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { SchemaCache, SchemaReflection, FakePool } from "./schema-cache.js";
 import { Column } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
-import { setSchemaCacheIgnoredTables } from "../ar-config.js";
+import { ActiveRecord } from "../ar-config.js";
 import { StatementInvalid } from "../errors.js";
 import { SchemaStatements } from "./abstract/schema-statements.js";
 import { TableDefinition } from "./abstract/schema-definitions.js";
@@ -350,7 +350,7 @@ describe("SchemaCacheTest", () => {
   });
 
   it("marshal dump and load with ignored tables", async () => {
-    setSchemaCacheIgnoredTables(["professors"]);
+    ActiveRecord.schemaCacheIgnoredTables = ["professors"];
     try {
       const fakeConn = {
         primaryKey: async (t: string) => (t === "courses" ? "id" : null),
@@ -390,7 +390,7 @@ describe("SchemaCacheTest", () => {
       expect(await cache.primaryKeys(pool, "professors")).toBeNull();
       expect(await cache.indexes(pool, "professors")).toEqual([]);
     } finally {
-      setSchemaCacheIgnoredTables([]);
+      ActiveRecord.schemaCacheIgnoredTables = [];
     }
   });
   it("marshal dump and load with gzip", () => {

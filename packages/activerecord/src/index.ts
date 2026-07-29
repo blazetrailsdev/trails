@@ -111,26 +111,7 @@ export {
 } from "./transactions.js";
 export { resetCallbacks } from "./callbacks.js";
 export { delegate } from "./delegate.js";
-export {
-  ActiveRecord,
-  indexNestedAttributeErrors,
-  setIndexNestedAttributeErrors,
-  schemaCacheIgnoredTables,
-  setSchemaCacheIgnoredTables,
-  isSchemaCacheIgnoredTable,
-  protocolAdapters,
-  setProtocolAdapters,
-  disablePreparedStatements,
-  setDisablePreparedStatements,
-  actionOnStrictLoadingViolation,
-  setActionOnStrictLoadingViolation,
-  permanentConnectionCheckout,
-  setPermanentConnectionCheckout,
-  beforeCommittedOnAllRecords,
-  setBeforeCommittedOnAllRecords,
-  runAfterTransactionCallbacksInOrderDefined,
-  setRunAfterTransactionCallbacksInOrderDefined,
-} from "./ar-config.js";
+export { ActiveRecord, isSchemaCacheIgnoredTable } from "./ar-config.js";
 export { defineEnum, readEnumValue, castEnumValue } from "./enum.js";
 export type { EnumMacroOptions } from "./enum.js";
 export { registerSubclass, findStiClass } from "./inheritance.js";

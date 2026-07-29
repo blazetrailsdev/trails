@@ -7,7 +7,7 @@ import {
   InvalidConfigurationError,
   type RawConfigurations,
 } from "../database-configurations.js";
-import { protocolAdapters, setProtocolAdapters } from "../ar-config.js";
+import { ActiveRecord } from "../ar-config.js";
 
 const DEFAULT_ENV = "default_env";
 
@@ -33,7 +33,7 @@ beforeEach(() => {
     delete process.env[key];
   }
   savedDefaultEnv = DatabaseConfigurations.defaultEnv;
-  savedProtocolMapping = { ...protocolAdapters };
+  savedProtocolMapping = { ...ActiveRecord.protocolAdapters };
   DatabaseConfigurations.defaultEnv = DEFAULT_ENV;
 });
 
@@ -43,7 +43,7 @@ afterEach(() => {
     else delete process.env[key];
   }
   DatabaseConfigurations.defaultEnv = savedDefaultEnv;
-  setProtocolAdapters(savedProtocolMapping);
+  ActiveRecord.protocolAdapters = savedProtocolMapping;
 });
 
 function resolveConfig(
@@ -434,7 +434,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   });
 
   it("protocol adapter mapping is used and can be updated", () => {
-    protocolAdapters.potato = "postgresql";
+    ActiveRecord.protocolAdapters.potato = "postgresql";
     process.env["DATABASE_URL"] = "potato://localhost/exampledb";
     DatabaseConfigurations.defaultEnv = "production";
     const actual = resolveDbConfig("production", {});
@@ -446,7 +446,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   });
 
   it("protocol adapter mapping translates underscores to dashes", () => {
-    protocolAdapters.custom_protocol = "postgresql";
+    ActiveRecord.protocolAdapters.custom_protocol = "postgresql";
     process.env["DATABASE_URL"] = "custom-protocol://localhost/exampledb";
     DatabaseConfigurations.defaultEnv = "production";
     const actual = resolveDbConfig("production", {});
@@ -458,7 +458,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   });
 
   it("protocol adapter mapping handles sqlite3 file urls", () => {
-    protocolAdapters.custom_protocol = "sqlite3";
+    ActiveRecord.protocolAdapters.custom_protocol = "sqlite3";
     process.env["DATABASE_URL"] = "custom-protocol:/path/to/db.sqlite3";
     DatabaseConfigurations.defaultEnv = "production";
     const actual = resolveDbConfig("production", {});

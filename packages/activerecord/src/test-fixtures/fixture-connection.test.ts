@@ -13,16 +13,16 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "../base.js";
-import { setPermanentConnectionCheckout } from "../ar-config.js";
+import { ActiveRecord } from "../ar-config.js";
 import { leaseFixtureConnection } from "./fixture-connection.js";
 
 describe("fixture connection source", () => {
   afterEach(() => {
-    setPermanentConnectionCheckout(true);
+    ActiveRecord.permanentConnectionCheckout = true;
   });
 
   it("leases without tripping permanentConnectionCheckout = disallowed", () => {
-    setPermanentConnectionCheckout("disallowed");
+    ActiveRecord.permanentConnectionCheckout = "disallowed";
 
     expect(() => leaseFixtureConnection()).not.toThrow();
   });
@@ -38,7 +38,7 @@ describe("fixture connection source", () => {
     const previous = Base._adapter;
     Base._adapter = sentinel;
     try {
-      setPermanentConnectionCheckout("disallowed");
+      ActiveRecord.permanentConnectionCheckout = "disallowed";
 
       expect(leaseFixtureConnection()).toBe(sentinel);
     } finally {

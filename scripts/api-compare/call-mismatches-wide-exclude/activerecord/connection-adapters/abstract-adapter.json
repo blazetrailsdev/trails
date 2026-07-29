@@ -94,6 +94,13 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "initialize",
+    "call": "disable_prepared_statements",
+    "reason": "Bucket (b): Rails reads `ActiveRecord.disable_prepared_statements` inline in `initialize` (abstract_adapter.rb:159); the port applies it in the `preparedStatements` setter (abstract-adapter.ts:1058), the chokepoint the constructor and every (re-)establishConnection flow through."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "initialize",
     "call": "build_statement_pool",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

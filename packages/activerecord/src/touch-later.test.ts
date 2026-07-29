@@ -11,7 +11,7 @@ import { fixtures } from "./test-fixtures.js";
 // Opt into the canonical-model autoload index so association targets resolve by
 // name on first reference — no manual `registerModel`.
 import "./support/canonical-model-index.js";
-import { setBeforeCommittedOnAllRecords } from "./ar-config.js";
+import { ActiveRecord } from "./ar-config.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { Invoice } from "./test-helpers/models/invoice.js";
 import { LineItem } from "./test-helpers/models/line-item.js";
@@ -165,7 +165,7 @@ describe("TouchLaterTest", () => {
   });
 
   it("touching through nested attributes without before committed on all records", async () => {
-    setBeforeCommittedOnAllRecords(false);
+    ActiveRecord.beforeCommittedOnAllRecords = false;
     try {
       const time = twentyFiveDaysAgo();
       const owner = owners("blackbeard") as any;
@@ -179,12 +179,12 @@ describe("TouchLaterTest", () => {
       // The second copy of the parent is not touched, so updated_at is unchanged.
       expect(toI((await owner.reload()).updated_at)).toBe(toI(time));
     } finally {
-      setBeforeCommittedOnAllRecords(false);
+      ActiveRecord.beforeCommittedOnAllRecords = false;
     }
   });
 
   it("touching through nested attributes with before committed on all records", async () => {
-    setBeforeCommittedOnAllRecords(true);
+    ActiveRecord.beforeCommittedOnAllRecords = true;
     try {
       const time = twentyFiveDaysAgo();
       const owner = owners("blackbeard") as any;
@@ -197,7 +197,7 @@ describe("TouchLaterTest", () => {
 
       expect(toI((await owner.reload()).updated_at)).not.toBe(toI(time));
     } finally {
-      setBeforeCommittedOnAllRecords(false);
+      ActiveRecord.beforeCommittedOnAllRecords = false;
     }
   });
 });

@@ -13,7 +13,7 @@ import {
   type AsyncContext,
   type NotificationHandle,
 } from "@blazetrails/activesupport";
-import { beforeCommittedOnAllRecords } from "../../ar-config.js";
+import { ActiveRecord } from "../../ar-config.js";
 
 /**
  * Equality-keyed lookup of the candidate instance whose transactional
@@ -495,7 +495,7 @@ export class Transaction {
         // (dedup by object identity); when false (the default), only the first
         // copy of each logical record runs (dedup by record equality), so a
         // deferred touch held on a second copy of a parent never flushes.
-        const ite = beforeCommittedOnAllRecords
+        const ite = ActiveRecord.beforeCommittedOnAllRecords
           ? this.uniqueRecords()
           : this.uniqueRecordsByEquality(recs);
         for (const record of ite) {

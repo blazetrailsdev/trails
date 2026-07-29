@@ -7,13 +7,12 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { throwAbort } from "@blazetrails/activesupport";
 import { I18n, Error as ModelError } from "@blazetrails/activemodel";
 import {
+  ActiveRecord,
   Base,
   registerModel,
   acceptsNestedAttributesFor,
   assignNestedAttributes,
   RecordInvalid,
-  indexNestedAttributeErrors,
-  setIndexNestedAttributeErrors,
 } from "./index.js";
 import { Associations, association } from "./associations.js";
 
@@ -2262,8 +2261,8 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     return { Parent, Child };
   }
   it("errors should be indexed when global flag is set", async () => {
-    const old = indexNestedAttributeErrors;
-    setIndexNestedAttributeErrors(true);
+    const old = ActiveRecord.indexNestedAttributeErrors;
+    ActiveRecord.indexNestedAttributeErrors = true;
     try {
       const { Parent, Child } = makeIndexedHasMany();
       const parent = new Parent({ name: "p" });
@@ -2272,7 +2271,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
       expect(parent.errors.where("children[1].name")).toHaveLength(1);
       expect(parent.errors.where("children.name")).toHaveLength(0);
     } finally {
-      setIndexNestedAttributeErrors(old);
+      ActiveRecord.indexNestedAttributeErrors = old;
     }
   });
   it("errors details should be indexed when passed as array", async () => {
@@ -2439,8 +2438,8 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     }
   });
   it("errors details should be indexed when global flag is set", async () => {
-    const old = indexNestedAttributeErrors;
-    setIndexNestedAttributeErrors(true);
+    const old = ActiveRecord.indexNestedAttributeErrors;
+    ActiveRecord.indexNestedAttributeErrors = true;
     try {
       const { Parent, Child } = makeIndexedHasMany();
       const parent = new Parent({ name: "p" });
@@ -2449,7 +2448,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
       expect(parent.errors.details.get("children[1].name")?.length ?? 0).toBeGreaterThan(0);
       expect(parent.errors.details.get("children.name") ?? []).toHaveLength(0);
     } finally {
-      setIndexNestedAttributeErrors(old);
+      ActiveRecord.indexNestedAttributeErrors = old;
     }
   });
 });

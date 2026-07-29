@@ -6,13 +6,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { findTarget } from "./associations/singular-association.js";
 import { Notifications } from "@blazetrails/activesupport";
-import {
-  Base,
-  StrictLoadingViolationError,
-  registerModel,
-  actionOnStrictLoadingViolation,
-  setActionOnStrictLoadingViolation,
-} from "./index.js";
+import { ActiveRecord, Base, StrictLoadingViolationError, registerModel } from "./index.js";
 import { association } from "./associations.js";
 import { fixtures } from "./test-fixtures.js";
 import { Developer, AuditLog, AuditLogRequired } from "./test-helpers/models/developer.js";
@@ -816,7 +810,7 @@ describe("StrictLoadingTest", () => {
 
   // Rails: test_strict_loading_violation_raises_by_default
   it("strict loading violation raises by default", async () => {
-    expect(actionOnStrictLoadingViolation).toBe("raise");
+    expect(ActiveRecord.actionOnStrictLoadingViolation).toBe("raise");
 
     const developer = await Developer.first();
     expect(developer!.isStrictLoading()).toBe(false);
@@ -834,8 +828,8 @@ describe("StrictLoadingTest", () => {
     const developer = await Developer.first();
     developer!.strictLoadingBang();
 
-    setActionOnStrictLoadingViolation("log");
-    expect(actionOnStrictLoadingViolation).toBe("log");
+    ActiveRecord.actionOnStrictLoadingViolation = "log";
+    expect(ActiveRecord.actionOnStrictLoadingViolation).toBe("log");
     let logged = false;
     const sub = Notifications.subscribe("strict_loading_violation.active_record", () => {
       logged = true;
@@ -845,7 +839,7 @@ describe("StrictLoadingTest", () => {
       expect(logged).toBe(true);
     } finally {
       Notifications.unsubscribe(sub);
-      setActionOnStrictLoadingViolation("raise");
+      ActiveRecord.actionOnStrictLoadingViolation = "raise";
     }
   });
 
@@ -875,7 +869,7 @@ describe("StrictLoadingTest", () => {
     treasure.strictLoadingBang();
     expect(treasure.isStrictLoading()).toBe(true);
 
-    setActionOnStrictLoadingViolation("log");
+    ActiveRecord.actionOnStrictLoadingViolation = "log";
     let logged: string | null = null;
     const sub = Notifications.subscribe("strict_loading_violation.active_record", (event: any) => {
       logged = event.payload.reflection.strictLoadingViolationMessage(event.payload.owner);
@@ -888,7 +882,7 @@ describe("StrictLoadingTest", () => {
       );
     } finally {
       Notifications.unsubscribe(sub);
-      setActionOnStrictLoadingViolation("raise");
+      ActiveRecord.actionOnStrictLoadingViolation = "raise";
     }
   });
 });

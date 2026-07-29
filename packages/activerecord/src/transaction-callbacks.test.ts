@@ -6,6 +6,7 @@ import type { AssociationProxy } from "./associations/collection-proxy.js";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { describe, it, expect, vi } from "vitest";
 import {
+  ActiveRecord,
   Base,
   transaction,
   beforeCommit,
@@ -15,7 +16,6 @@ import {
   afterUpdateCommit,
   afterDestroyCommit,
   afterRollback,
-  setRunAfterTransactionCallbacksInOrderDefined,
   currentTransaction,
   Rollback,
   registerModel,
@@ -1001,7 +1001,7 @@ describe("TransactionCallbacksTest", () => {
 
   describe("CallbackOrderTest", () => {
     it("callbacks run in order defined in model if not using run after transaction callbacks in order defined", async () => {
-      setRunAfterTransactionCallbacksInOrderDefined(false);
+      ActiveRecord.runAfterTransactionCallbacksInOrderDefined = false;
       const Topic = defineBehaviourTopic();
 
       const topic = new Topic() as any;
@@ -1169,11 +1169,11 @@ describe("TransactionCallbacksTest", () => {
   describe("CallbackOrderTest", () => {
     it("callbacks run in order defined in model if using run after transaction callbacks in order defined", async () => {
       let Topic: ReturnType<typeof defineBehaviourTopic>;
-      setRunAfterTransactionCallbacksInOrderDefined(true);
+      ActiveRecord.runAfterTransactionCallbacksInOrderDefined = true;
       try {
         Topic = defineBehaviourTopic();
       } finally {
-        setRunAfterTransactionCallbacksInOrderDefined(false);
+        ActiveRecord.runAfterTransactionCallbacksInOrderDefined = false;
       }
 
       const topic = new Topic() as any;

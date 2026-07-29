@@ -280,7 +280,7 @@ import {
   afterUpdateCommitMethod as _afterUpdateCommitMethod,
   afterDestroyCommitMethod as _afterDestroyCommitMethod,
 } from "./transactions.js";
-import { runAfterTransactionCallbacksInOrderDefined } from "./ar-config.js";
+import { ActiveRecord } from "./ar-config.js";
 
 /**
  * Threads ActiveRecord.run_after_transaction_callbacks_in_order_defined into a
@@ -294,7 +294,7 @@ import { runAfterTransactionCallbacksInOrderDefined } from "./ar-config.js";
 function _withTransactionCallbackOrder(
   conditions: Record<string, unknown> | undefined,
 ): Record<string, unknown> {
-  return { ...conditions, prepend: runAfterTransactionCallbacksInOrderDefined };
+  return { ...conditions, prepend: ActiveRecord.runAfterTransactionCallbacksInOrderDefined };
 }
 
 import {
@@ -5253,7 +5253,7 @@ runLoadHooks("active_record", Base);
 // async, and `to_sql` is synchronous in Rails and at every call site here, so
 // the engine must expose a *synchronous* connection. Assigning bare `Base` would
 // route through `Base.connection`, which is deprecated: under
-// `permanentConnectionCheckout = "disallowed"` it raises
+// `ActiveRecord.permanentConnectionCheckout = "disallowed"` it raises
 // (connection-handling.ts:461-463), so every `toSql()` in the app would throw —
 // something Rails' `with_connection`-based `to_sql` never does. This delegates
 // to the pool's non-deprecated sync surface instead: the already-checked-out
