@@ -12,6 +12,30 @@ import {
 } from "./table-name-options.js";
 
 /**
+ * Splits a `*names, **options` argument list the way Rails'
+ * `define_column_methods` generated bodies do: a trailing plain object is the
+ * options hash, everything before it is a column name, and an empty name list
+ * raises with Rails' snake_case column type in the message.
+ *
+ * @internal
+ */
+export function splitColumnNames(
+  args: unknown[],
+  columnType: string,
+): { names: string[]; options: ColumnOptions } {
+  const rest = [...args];
+  const last = rest[rest.length - 1];
+  const options =
+    typeof last === "object" && last !== null
+      ? (rest.pop() as ColumnOptions)
+      : ({} as ColumnOptions);
+  if (rest.length === 0) {
+    throw new ArgumentError(`Missing column name(s) for ${columnType}`);
+  }
+  return { names: rest as string[], options };
+}
+
+/**
  * @internal Shared identifier guard for MySQL bare-identifier emission
  * (charset/collation). MySQL requires `CHARACTER SET`/`COLLATE` as bare
  * identifiers — `quoteIdentifier` (backtick-wrapping) produces invalid DDL
@@ -1359,8 +1383,12 @@ export class TableDefinition {
     return this.column(name, "virtual" as ColumnType, options);
   }
 
-  jsonb(name: string, options: ColumnOptions = {}): this {
-    return this.column(name, "jsonb", options);
+  jsonb(...names: string[]): this;
+  jsonb(...args: [...names: string[], options: ColumnOptions]): this;
+  jsonb(...args: unknown[]): this {
+    const { names, options } = splitColumnNames(args, "jsonb");
+    for (const name of names) this.column(name, "jsonb", options);
+    return this;
   }
 
   char(name: string, options: ColumnOptions = {}): this {

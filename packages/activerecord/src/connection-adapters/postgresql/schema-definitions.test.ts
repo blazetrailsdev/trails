@@ -179,6 +179,92 @@ describe("TableDefinition", () => {
   });
 });
 
+describe("PostgreSQL::TableDefinition column methods", () => {
+  // Rails generates these through `define_column_methods`, whose body is
+  // `def #{type}(*names, **options)` — every type takes a variadic name list
+  // and raises on an empty one.
+  const types = [
+    ["bigserial", "bigserial"],
+    ["serial", "serial"],
+    ["bit", "bit"],
+    ["bitVarying", "bit_varying"],
+    ["uuid", "uuid"],
+    ["jsonb", "jsonb"],
+    ["daterange", "daterange"],
+    ["int4range", "int4range"],
+    ["int8range", "int8range"],
+    ["numrange", "numrange"],
+    ["timestamptz", "timestamptz"],
+    ["tsrange", "tsrange"],
+    ["tstzrange", "tstzrange"],
+    ["oid", "oid"],
+    ["cidr", "cidr"],
+    ["citext", "citext"],
+    ["hstore", "hstore"],
+    ["inet", "inet"],
+    ["interval", "interval"],
+    ["ltree", "ltree"],
+    ["macaddr", "macaddr"],
+    ["money", "money"],
+    ["point", "point"],
+    ["line", "line"],
+    ["lseg", "lseg"],
+    ["box", "box"],
+    ["path", "path"],
+    ["polygon", "polygon"],
+    ["circle", "circle"],
+    ["tsvector", "tsvector"],
+    ["xml", "xml"],
+  ] as const;
+
+  it("defines one column per name", () => {
+    for (const [method] of types) {
+      const td = new TableDefinition("t", { id: false });
+      (td as unknown as Record<string, (...args: unknown[]) => void>)[method]("a", "b", "c");
+      expect(td.columns.map((c) => c.name)).toEqual(["a", "b", "c"]);
+    }
+  });
+
+  it("applies the trailing options to every name", () => {
+    for (const [method] of types) {
+      const td = new TableDefinition("t", { id: false });
+      (td as unknown as Record<string, (...args: unknown[]) => void>)[method]("a", "b", {
+        null: false,
+      });
+      expect(td.columns).toHaveLength(2);
+      for (const col of td.columns) {
+        expect(col.options.null).toBe(false);
+      }
+    }
+  });
+
+  it("raises when given no column name", () => {
+    for (const [method, railsType] of types) {
+      const td = new TableDefinition("t", { id: false });
+      expect(() =>
+        (td as unknown as Record<string, (...args: unknown[]) => void>)[method](),
+      ).toThrow(`Missing column name(s) for ${railsType}`);
+      expect(() =>
+        (td as unknown as Record<string, (...args: unknown[]) => void>)[method]({ null: false }),
+      ).toThrow(`Missing column name(s) for ${railsType}`);
+    }
+  });
+
+  it("keeps type-specific SQL types when defining multiple columns", () => {
+    const td = new TableDefinition("t", { id: false });
+    td.bit("a", "b", { limit: 8 });
+    td.bitVarying("c", { limit: 4 });
+    td.bigserial("d", "e");
+    expect(td.columns.map((c) => c.sqlType)).toEqual([
+      "BIT(8)",
+      "BIT(8)",
+      "BIT VARYING(4)",
+      "BIGSERIAL",
+      "BIGSERIAL",
+    ]);
+  });
+});
+
 describe("AlterTable", () => {
   it("validateConstraint pushes to constraintValidations", () => {
     const td = new TableDefinition("products");
