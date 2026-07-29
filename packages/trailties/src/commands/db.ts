@@ -126,24 +126,22 @@ function validateDatabaseFlag(opts: DatabaseOpts): string | undefined {
  * runs `fn`, closes the adapter. `fn` receives the adapter, the raw
  * config, the HashConfig, and the config name.
  */
-async function forEachDatabase(
-  opts: DatabaseOpts,
-  fn: (ctx: {
-    adapter: DatabaseAdapter;
-    raw: RawConfig;
-    config: HashConfig;
-    name: string;
-    /** Prefix for log output — empty string for single-DB apps so
-     *  the output stays clean; "[name] " for multi-DB. */
-    prefix: string;
-  }) => Promise<void>,
-): Promise<void> {
+interface DatabaseEntry {
+  name: string;
+  raw: RawConfig;
+  hashConfig: HashConfig;
+}
+
+/**
+ * Every named config in the current env, optionally filtered to one name
+ * via `--database`. Builds HashConfigs first so we can filter by
+ * databaseTasks() — replicas and configs with `databaseTasks: false` are
+ * skipped, matching Rails' `configsFor(includeHidden: false)`.
+ */
+async function taskableDatabaseEntries(opts: DatabaseOpts): Promise<DatabaseEntry[]> {
   const envName = resolveEnv();
   const dbName = validateDatabaseFlag(opts);
   const allConfigs = await loadAllDatabaseConfigs(envName);
-  // Build HashConfigs first so we can filter by databaseTasks() —
-  // replicas and configs with databaseTasks: false should be skipped,
-  // matching Rails' configsFor(includeHidden: false) filter.
   const all = allConfigs.map(({ name, config: rawConfig }) => {
     const raw = normalizeRawConfig(rawConfig);
     return { name, raw, hashConfig: new HashConfig(envName, name, raw as Record<string, unknown>) };
@@ -157,6 +155,22 @@ async function forEachDatabase(
         `Available: ${available || "(none)"}`,
     );
   }
+  return filtered;
+}
+
+async function forEachDatabase(
+  opts: DatabaseOpts,
+  fn: (ctx: {
+    adapter: DatabaseAdapter;
+    raw: RawConfig;
+    config: HashConfig;
+    name: string;
+    /** Prefix for log output — empty string for single-DB apps so
+     *  the output stays clean; "[name] " for multi-DB. */
+    prefix: string;
+  }) => Promise<void>,
+): Promise<void> {
+  const filtered = await taskableDatabaseEntries(opts);
   const multiDb = filtered.length > 1;
   for (const { name, raw, hashConfig } of filtered) {
     const prefix = multiDb ? `[${name}] ` : "";
@@ -175,22 +189,7 @@ async function forEachDatabaseConfig(
   opts: DatabaseOpts,
   fn: (ctx: { raw: RawConfig; config: HashConfig; name: string; prefix: string }) => Promise<void>,
 ): Promise<void> {
-  const envName = resolveEnv();
-  const dbName = validateDatabaseFlag(opts);
-  const allConfigs = await loadAllDatabaseConfigs(envName);
-  const all = allConfigs.map(({ name, config: rawConfig }) => {
-    const raw = normalizeRawConfig(rawConfig);
-    return { name, raw, hashConfig: new HashConfig(envName, name, raw as Record<string, unknown>) };
-  });
-  const taskable = all.filter((c) => c.hashConfig.databaseTasks());
-  const filtered = dbName ? taskable.filter((c) => c.name === dbName) : taskable;
-  if (filtered.length === 0 && dbName) {
-    const available = taskable.map((c) => c.name).join(", ");
-    throw new Error(
-      `No database configuration named "${dbName}" in environment "${envName}". ` +
-        `Available: ${available || "(none)"}`,
-    );
-  }
+  const filtered = await taskableDatabaseEntries(opts);
   const multiDb = filtered.length > 1;
   for (const { name, raw, hashConfig } of filtered) {
     const prefix = multiDb ? `[${name}] ` : "";
@@ -835,23 +834,8 @@ export function dbCommand(): Command {
       "Create the database if it doesn't exist, run pending migrations, and seed when fresh",
     )
     .action(async () => {
-      // Rails' db:prepare is `DatabaseTasks.prepare_all` — per-config
-      // initialize (create + load schema when a dump exists), per-version
-      // migrate across every current configuration, an optional schema dump,
-      // then a single seed load. All of that lives in DatabaseTasks; the CLI
-      // only supplies what it alone knows: the loaded configs, each config's
-      // migrations, and how to run db/seeds.ts.
       const envName = resolveEnv();
-      const entries = (await loadAllDatabaseConfigs(envName))
-        .map(({ name, config: rawConfig }) => {
-          const raw = normalizeRawConfig(rawConfig);
-          return {
-            name,
-            raw,
-            hashConfig: new HashConfig(envName, name, raw as Record<string, unknown>),
-          };
-        })
-        .filter((entry) => entry.hashConfig.databaseTasks());
+      const entries = await taskableDatabaseEntries({});
 
       DatabaseTasks.registerMigrations([]);
       for (const entry of entries) {
@@ -859,15 +843,15 @@ export function dbCommand(): Command {
         DatabaseTasks.registerMigrations(await discoverMigrationsFromDirs(dirs), entry.name);
       }
 
-      const seedTarget = entries[0]?.hashConfig;
+      // Rails' load_seed runs against the established connection, which is
+      // the primary's; Base has no connection here, so lend it one.
+      const seedTarget =
+        entries.find((entry) => entry.hashConfig.isPrimary())?.hashConfig ?? entries[0]?.hashConfig;
       const previousSeedLoader = DatabaseTasks.seedLoader;
       const previousFormat = DatabaseTasks.schemaFormat;
       DatabaseTasks.seedLoader = {
         async loadSeed() {
           if (!seedTarget) return;
-          // Seeds touch models, so give Base a connection to the primary
-          // database for the duration — Rails gets this for free from the
-          // established connection.
           await DatabaseTasks.withTemporaryPool(seedTarget, async (pool) => {
             await withSeedAdapter(await pool.leaseConnection(), runSeed);
           });

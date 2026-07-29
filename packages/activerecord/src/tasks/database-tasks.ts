@@ -298,13 +298,12 @@ export class DatabaseTasks {
   >();
 
   /**
-   * Register the migrations the task methods run. Rails derives them per
-   * config from `db_config.migrations_paths` (via the pool's
-   * `migration_context`); we have no filesystem loader down here, so the
-   * caller pre-loads and registers them — optionally under a config name so
-   * a multi-database app can give each database its own set. Registering
-   * without a name resets the per-name registry, so a fresh CLI invocation
-   * never inherits a stale database's migrations.
+   * Rails derives migrations per config from `db_config.migrations_paths`
+   * via the pool's `migration_context`; there is no filesystem loader down
+   * here, so the caller pre-loads them and registers them under a config
+   * name. Registering without a name sets the fallback used by configs with
+   * no entry of their own, and resets the per-name registry so a fresh
+   * invocation never inherits a stale database's migrations.
    */
   static registerMigrations(
     migrations: Array<import("../migration.js").MigrationProxy>,
