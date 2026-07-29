@@ -107,6 +107,15 @@ tester.run("require-table-teardown", rule, {
     'await ctx.dropTable("a");\ndoSomething();\nawait ctx.dropTable("b");',
     // A dynamic-name drop can't be merged with its neighbour.
     'await ctx.dropTable(name);\nawait ctx.dropTable("b");',
+    // A catalogue prefix sweep is teardown for every create under its prefix.
+    'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+      'await adapter.exec("CREATE TABLE ex_json (id int)");\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'ex_%'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}" CASCADE`);\n' +
+      "}",
   ],
   invalid: [
     // Dropping the truncated prefix of a spaced quoted name is not a teardown
@@ -287,6 +296,31 @@ tester.run("require-table-teardown", rule, {
       code: 'ctx.dropTable("a");\nctx.dropTable("b");',
       errors: [{ messageId: "preferTableList" }],
       output: 'ctx.dropTable("a", "b");',
+    },
+    // A sweep covers only its own prefix: a create outside it still reports.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        'await adapter.exec("CREATE TABLE scratch_pad (id int)");\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "scratch_pad" } }],
+    },
+    // A dynamic filter is not statically readable, so it satisfies nothing.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename LIKE '${prefix}%'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
     },
   ],
 });

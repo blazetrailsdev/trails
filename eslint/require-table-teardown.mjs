@@ -77,6 +77,26 @@
  * `rawSql: false` option in eslint.config.mjs, fed by
  * `eslint/require-table-teardown-raw-sql-exclude.json`, and ratcheted to zero.
  *
+ * ── Prefix sweeps ──────────────────────────────────────────────────────────
+ * A file may tear its tables down by sweeping the catalogue instead of naming
+ * them: `SELECT tablename FROM pg_tables WHERE … tablename LIKE 'ex_%'` feeding
+ * a per-row `exec(`DROP TABLE "${row.tablename}"`)`. That sweep drops strictly
+ * more than any hand-written list, so it counts as teardown for every raw
+ * `CREATE TABLE ex_…` in the same file — the list such files used to carry only
+ * to satisfy this rule rots silently, holding names nothing creates and missing
+ * ones the sweep alone dropped.
+ *
+ * Both halves must be present: a `LIKE` filter on a catalogue relation whose
+ * pattern is a closed single-quoted literal ending in `%`, and a raw `DROP
+ * TABLE` whose name position is an interpolation. A dynamic or absent filter
+ * satisfies nothing — otherwise the rule would stop catching the bespoke tables
+ * that outlive their test, which is why it exists. Matching is by prefix only,
+ * so a create outside the swept prefix is still reported.
+ *
+ * This is deliberately independent of `require-canonical-rebuild`: the two
+ * rules answer different questions. A sweep that can select a canonical table
+ * still reports `sweepReachesCanonical` there, whatever this rule accepts here.
+ *
  * ── Prefer the dropTable list form ─────────────────────────────────────────
  * `dropTable` accepts several table names plus an optional trailing options
  * object in one call (`dropTable("a", "b", { ifExists: true })`), which the
@@ -277,6 +297,47 @@ export function rawDropNames(text, endIsDynamic = false) {
 }
 
 /**
+ * A catalogue relation a sweep can read its victims out of. Same set the
+ * `require-canonical-rebuild` rule recognises.
+ */
+const CATALOGUE_SOURCE =
+  /\b(?:pg_tables|pg_class|sqlite_master|sqlite_schema|pragma_table_list|information_schema\.tables)\b|\bshow\s+tables\b/i;
+
+/**
+ * The statically-readable prefixes of `LIKE '<prefix>%'` filters in a catalogue
+ * query. A filter whose pattern isn't a closed single-quoted literal ending in
+ * `%` — an interpolated or otherwise dynamic pattern — yields nothing, which is
+ * the point: an unreadable filter must satisfy no create, or the rule stops
+ * catching bespoke tables that outlive their test.
+ */
+const LIKE_PREFIX_RE = /\blike\s+'([^'%]+)%'/gi;
+export function sweepPrefixes(text) {
+  if (!CATALOGUE_SOURCE.test(text)) return [];
+  const prefixes = [];
+  LIKE_PREFIX_RE.lastIndex = 0;
+  let m;
+  while ((m = LIKE_PREFIX_RE.exec(text)) !== null) prefixes.push(m[1]);
+  return prefixes;
+}
+
+/**
+ * Whether `text` ends in a `DROP TABLE` whose table name is the interpolation
+ * that follows it (`DROP TABLE IF EXISTS "${t.tablename}"`) — the drop half of
+ * a sweep, which names no table itself. Only meaningful when `endIsDynamic`.
+ */
+export function hasDynamicDropName(text, endIsDynamic) {
+  if (!endIsDynamic) return false;
+  DROP_TABLE_RE.lastIndex = 0;
+  let m;
+  while ((m = DROP_TABLE_RE.exec(text)) !== null) {
+    // The name position must reach the interpolation with nothing but optional
+    // whitespace and an opening quote in between.
+    if (/^\s*["'`]?$/.test(text.slice(m.index + m[0].length))) return true;
+  }
+  return false;
+}
+
+/**
  * Inspect a statement for a mergeable `dropTable` call. Tolerates `await`
  * wrapping (`await x.dropTable(...)`). Returns the call's merge attributes, or
  * null when the statement is not a `dropTable` ExpressionStatement, or
@@ -353,6 +414,13 @@ const rule = {
     // table name → first create node seen (for the report location).
     const created = new Map();
     const dropped = new Set();
+    // Prefix sweeps: a catalogue query filtered on `LIKE '<prefix>%'` feeding a
+    // dynamically-named raw DROP TABLE tears down every table with that prefix,
+    // strictly more than a hand-maintained name list can. Both halves must be
+    // present — a filter with no sweep drop, or a sweep drop with no readable
+    // filter, satisfies nothing.
+    const sweptPrefixes = [];
+    let sawSweepDrop = false;
 
     // Flag (and autofix) a run of 2+ adjacent, mergeable dropTable calls in a
     // single statement list: same receiver, same await wrapping, compatible
@@ -412,6 +480,8 @@ const rule = {
         if (!created.has(table)) created.set(table, node);
       }
       for (const table of rawDropNames(text, endIsDynamic)) dropped.add(table);
+      sweptPrefixes.push(...sweepPrefixes(text));
+      if (hasDynamicDropName(text, endIsDynamic)) sawSweepDrop = true;
     }
 
     function recordSinkSql(call) {
@@ -462,8 +532,10 @@ const rule = {
 
       // Deferred so creates and drops in any order across the file are matched.
       "Program:exit"() {
+        const prefixes = sawSweepDrop ? sweptPrefixes : [];
         for (const [name, node] of created) {
           if (dropped.has(name)) continue;
+          if (prefixes.some((p) => name.startsWith(p))) continue;
           context.report({
             node,
             messageId: "missingTeardown",

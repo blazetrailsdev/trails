@@ -66,7 +66,10 @@ describeIfPg("PostgreSQLAdapter", () => {
   afterEach(async () => {
     try {
       await adapter.exec(
-        `DROP TABLE IF EXISTS abba, ex_arr, ex_backslash, ex_bigint, ex_bigserial, ex_bit, ex_bool, ex_cast, ex_child, ex_cidr, ex_class, ex_custom_seqt, ex_del, ex_dl, ex_float, ex_hs, ex_idx_opts, ex_inet, ex_insert_pkfalse, ex_insert_ret5, ex_int, ex_json, ex_jsonb, ex_lock, ex_long, ex_mac, ex_multi, ex_notnull, ex_null, ex_num, ex_numeric, ex_parent, ex_point, ex_ret, ex_ret2, ex_rng, ex_ser, ex_serial, ex_txn, ex_txn_rb, ex_txn_sp, ex_uniq, ex_upd, ex_uuid, ex_xml, test_no_returning CASCADE`,
+        // Only the tables the `ex_%` sweep below cannot reach: `test_no_returning`
+        // is TEMP (it lives in pg_temp, not the `public` schema pg_tables is
+        // filtered on), and `abba` carries no `ex_` prefix.
+        `DROP TABLE IF EXISTS abba, test_no_returning CASCADE`,
       );
 
       const tables = await adapter.execute(
