@@ -16,7 +16,6 @@
 import pg from "pg";
 import mysql from "mysql2/promise";
 import "../sqlite/better-sqlite3.js";
-import { getFsAsync } from "@blazetrails/activesupport/fs-adapter";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
@@ -29,8 +28,9 @@ import {
   RUN_TOKEN_ENV,
   TEMPLATE_PATH_ENV,
   isSqliteRun,
+  sweepRunDbFiles,
+  sweepStaleDbFiles,
   templatePathFor,
-  unlinkDbFiles,
 } from "./sqlite-template.js";
 import { slotPoolSize, workerForkCount } from "./ar-db-slots.js";
 import {
@@ -100,6 +100,8 @@ const sqliteAdapter: DbTemplateAdapter = {
       );
     }
 
+    await sweepStaleDbFiles();
+
     const runToken = `${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
     const templatePath = await templatePathFor(runToken);
 
@@ -109,8 +111,12 @@ const sqliteAdapter: DbTemplateAdapter = {
     process.env[TEMPLATE_PATH_ENV] = templatePath;
     process.env[RUN_TOKEN_ENV] = runToken;
 
+    // Sweeps the whole run by token — the template, every worker clone and
+    // every scratch DB — because the workers' own `process.on("exit")` unlinks
+    // never fire under the fork pool (see `registerDbFileCleanupOnExit`), and
+    // this teardown is the only hook that outlives them all.
     return async () => {
-      unlinkDbFiles(await getFsAsync(), templatePath);
+      await sweepRunDbFiles(runToken);
     };
   },
 };
