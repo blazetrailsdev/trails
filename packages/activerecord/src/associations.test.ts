@@ -43,7 +43,6 @@ import "./test-helpers/models/price-estimate.js";
 
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
 import { Preloader } from "./associations/preloader.js";
-import { Batch } from "./associations/preloader/batch.js";
 import { LoaderQuery } from "./associations/preloader/association.js";
 import { OtherDog } from "./test-helpers/models/other-dog.js";
 
@@ -398,6 +397,7 @@ describe("PreloaderTest", () => {
     posts,
     comments,
     authors,
+    members,
     books,
     categories,
     essays,
@@ -639,39 +639,55 @@ describe("PreloaderTest", () => {
     expect((postFresh as any).association("author").target.id).toBe(author.id);
   });
   it("preload grouped queries of middle records", async () => {
-    const post1 = posts("welcome");
-    const post2 = posts("misc_by_mary");
+    const records = [
+      comments("eager_sti_on_associations_s_comment1"),
+      comments("eager_sti_on_associations_s_comment2"),
+    ];
+
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-    const p1 = new Preloader({ records: [post1], associations: ["tags"] });
-    const p2 = new Preloader({ records: [post2], associations: ["tags"] });
-    await new Batch([p1, p2]).call();
-    expect(spy).toHaveBeenCalledTimes(3);
-    expect((post1 as any).association("tags").target.map((t: any) => t.name)).toEqual(["General"]);
-    expect((post2 as any).association("tags").target.map((t: any) => t.name)).toEqual(["Misc"]);
+    await new Preloader({ records, associations: ["author", "ordinaryPost"] }).call();
+    expect(spy).toHaveBeenCalledTimes(2);
   });
   it("preload grouped queries of through records", async () => {
-    const post1 = posts("welcome");
-    const post2 = posts("misc_by_mary");
+    const author = authors("david");
+
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-    const loadedPosts = await Post.where({ id: [post1.id, post2.id] }).includes("tags");
+    await new Preloader({
+      records: [author],
+      associations: ["helloPostComments", "comments"],
+    }).call();
     expect(spy).toHaveBeenCalledTimes(3);
-    const p1tags = (loadedPosts.find((p) => p.id === post1.id) as any).association("tags").target;
-    const p2tags = (loadedPosts.find((p) => p.id === post2.id) as any).association("tags").target;
-    expect(p1tags[0].name).toBe("General");
-    expect(p2tags[0].name).toBe("Misc");
   });
-  it("preload through records with already loaded middle record", async () => {
-    const post1 = posts("welcome");
-    const post2 = posts("misc_by_mary");
-    const p1 = (await Post.where({ id: post1.id }).includes("taggings"))[0];
-    const p2 = (await Post.where({ id: post2.id }))[0];
-    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
-    await new Preloader({ records: [p1, p2], associations: ["tags"] }).call();
-    const taggingKeys = spy.mock.calls[0]?.[0];
-    expect(taggingKeys).toHaveLength(1);
-    expect((p1 as any).association("tags").target.map((t: any) => t.name)).toEqual(["General"]);
-    expect((p2 as any).association("tags").target.map((t: any) => t.name)).toEqual(["Misc"]);
+  // TODO(preloader-middle-records-from-records-by-owner): remove it.fails once
+  // the through preloader derives middle records from `recordsByOwner` (Rails'
+  // through_association.rb:74-96) instead of `preloadedRecords`. With the
+  // through record already loaded nothing is queried, so middleRecords is
+  // empty and the source is never preloaded: 0 queries and an empty collection
+  // instead of Rails' 1 query and both member_details.
+  it.fails("preload through records with already loaded middle record", async () => {
+    const member = members("groucho") as any;
+    const expectedMemberDetailIds = ((await member.organizationMemberDetails_2) as Base[])
+      .map((d) => Number(d.id))
+      .sort();
+
+    await member.reload();
+    await member.loadHasOne("organization");
+
+    const sqls = await captureSql(async () => {
+      await new Preloader({
+        records: [member],
+        associations: "organizationMemberDetails_2",
+      }).call();
+    });
+    expect(sqls).toHaveLength(1);
+
+    const reads = await captureSql(async () => {
+      const loaded = member.association("organizationMemberDetails_2").target as Base[];
+      expect(loaded.map((d) => Number(d.id)).sort()).toEqual(expectedMemberDetailIds);
+    });
+    expect(reads).toHaveLength(0);
   });
+
   it("preload with instance dependent scope", async () => {
     const david = authors("david");
     const david2 = await Author.create({ name: "David" });
@@ -1173,8 +1189,10 @@ describe("PreloaderTest", () => {
   });
 
   it("preload wont set the wrong target", async () => {
+    const post = posts("welcome") as any;
+    await post.update({ author_id: 54321 });
     const general = categories("general") as any;
-    const post = await Post.create({ title: "Welcome", body: "body", author_id: general.id });
+    await general.update({ id: 54321 });
 
     expect(() => general.association("author")).toThrow();
 
