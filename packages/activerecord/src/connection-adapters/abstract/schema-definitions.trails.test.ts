@@ -228,7 +228,4 @@ describe("ColumnMethods#primary_key", () => {
     expect(td.columns[0].type).toBe("primary_key");
     expect(td.columns[0].options.primaryKey).toBe(true);
   });
-
-  // The change_table arm lives in migration/change-table.test.ts ("primary key
-  // creates primary key column"), mirroring change_table_test.rb.
 });

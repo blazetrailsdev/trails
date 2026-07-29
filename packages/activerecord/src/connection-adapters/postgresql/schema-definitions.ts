@@ -563,8 +563,6 @@ export class Table extends AbstractTable {
     this._pgSchema = schema;
   }
 
-  // PostgreSQL::ColumnMethods is mixed into Table as well as TableDefinition.
-  // Only the types exercised through change_table are mirrored here so far.
   async xml(...names: string[]): Promise<void>;
   async xml(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   async xml(...args: unknown[]): Promise<void> {

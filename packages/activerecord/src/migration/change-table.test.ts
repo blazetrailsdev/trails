@@ -1,27 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/migration/change_table_test.rb
- * (`ActiveRecord::Migration::TableTest`).
- *
- * Rails drives every case through a `Minitest::Mock` standing in for `@base`
- * and asserts the exact connection call each `change_table` shorthand makes:
- *
- *   with_change_table do |t|
- *     expect :add_column, nil, [:delete_me, :bar, :integer]
- *     t.column :bar, :integer
- *   end
- *
- * `mockConnection` below is that recorder. Two harness-level deviations, both
- * forced by the port and neither affecting what is asserted:
- *
- *  - Rails obtains the proxy via `lease_connection.update_table_definition`
- *    purely to pick the adapter's `Table` subclass; with a pure double there is
- *    no connection to lease, so the subclass is constructed directly (the PG
- *    block uses `PostgreSQL::Table`, as `update_table_definition` would).
- *  - trails' `Table` methods pass an options object unconditionally where Ruby
- *    splats `**options` (so an empty hash is *no* trailing argument). A
- *    trailing empty object is therefore dropped before comparison, letting the
- *    expectations stay Rails-literal.
- */
 import { describe, it, expect as vitestExpect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
@@ -206,9 +182,6 @@ describe("Migration", () => {
           "primary_key",
           { primaryKey: true, first: true },
         ]);
-        // `first:` is MySQL column positioning, still unported (story 0023
-        // `column-options-omit-mysql-first-and-after-positioning`) — it is an
-        // opaque pass-through option here, which is exactly what Rails asserts.
         await t.primaryKey("id", "primary_key", { first: true } as never);
       });
     });

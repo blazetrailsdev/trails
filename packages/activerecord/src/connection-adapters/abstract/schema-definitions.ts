@@ -1540,11 +1540,7 @@ export class Table {
     return name === "timestamp" ? "datetime" : fallback;
   }
 
-  /**
-   * Mirrors what `ColumnMethods.define_column_methods` generates for every
-   * column type: `def <type>(*names, **options)`.
-   * @internal
-   */
+  /** @internal */
   protected async definedColumn(type: ColumnType, args: unknown[]): Promise<void> {
     const { names, options } = splitColumnNames(args, type);
     for (const name of names) {
@@ -1616,8 +1612,6 @@ export class Table {
   async array(name: string, type: ColumnType, options: ColumnOptions = {}): Promise<void> {
     await this.column(name, type, { ...options, array: true });
   }
-  // Rails: `Table#remove(*column_names, **options)` forwards the whole name
-  // list to `@base.remove_columns` — a single ALTER, not one per column.
   async remove(...columnNames: string[]): Promise<void>;
   async remove(
     ...args: [...columnNames: string[], options: { type?: ColumnType; ifExists?: boolean }]
@@ -1656,13 +1650,19 @@ export class Table {
     this.raiseOnIfExistOptions(optionHash as Record<string, unknown>);
     await this._schema.removeIndex(this._tableName, columnOrOptions, options);
   }
-  async references(name: string, options: AddReferenceOptions = {}): Promise<void> {
+  async references(...refNames: string[]): Promise<void>;
+  async references(...args: [...refNames: string[], options: AddReferenceOptions]): Promise<void>;
+  async references(...args: unknown[]): Promise<void> {
+    const { names, options } = this._splitRefNames(args);
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    await this._schema.addReference(this._tableName, name, options);
+    for (const refName of names) {
+      await this._schema.addReference(this._tableName, refName, options);
+    }
   }
-  /** Alias of references (Rails: `alias :belongs_to :references`). */
-  async belongsTo(name: string, options: AddReferenceOptions = {}): Promise<void> {
-    return this.references(name, options);
+  async belongsTo(...refNames: string[]): Promise<void>;
+  async belongsTo(...args: [...refNames: string[], options: AddReferenceOptions]): Promise<void>;
+  async belongsTo(...args: unknown[]): Promise<void> {
+    return (this.references as (...a: unknown[]) => Promise<void>)(...args);
   }
   async timestamps(options: ColumnOptions = {}): Promise<void> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
@@ -1687,8 +1687,8 @@ export class Table {
     }
   }
 
-  async isColumnExists(columnName: string): Promise<boolean> {
-    return this._require("columnExists").call(this._schema, this._tableName, columnName);
+  async isColumnExists(columnName: string, type?: ColumnType): Promise<boolean> {
+    return this._require("columnExists").call(this._schema, this._tableName, columnName, type);
   }
 
   private _require<K extends keyof SchemaStatementsLike>(
@@ -1744,13 +1744,32 @@ export class Table {
     return this._require("removeTimestamps").call(this._schema, this._tableName, options);
   }
 
-  async removeReferences(name: string, options: AddReferenceOptions = {}): Promise<void> {
+  async removeReferences(...refNames: string[]): Promise<void>;
+  async removeReferences(
+    ...args: [...refNames: string[], options: AddReferenceOptions]
+  ): Promise<void>;
+  async removeReferences(...args: unknown[]): Promise<void> {
+    const { names, options } = this._splitRefNames(args);
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    return this._require("removeReference").call(this._schema, this._tableName, name, options);
+    for (const refName of names) {
+      await this._require("removeReference").call(this._schema, this._tableName, refName, options);
+    }
   }
-  /** Alias of removeReferences (Rails: `alias :remove_belongs_to :remove_references`). */
-  async removeBelongsTo(name: string, options: AddReferenceOptions = {}): Promise<void> {
-    return this.removeReferences(name, options);
+  async removeBelongsTo(...refNames: string[]): Promise<void>;
+  async removeBelongsTo(
+    ...args: [...refNames: string[], options: AddReferenceOptions]
+  ): Promise<void>;
+  async removeBelongsTo(...args: unknown[]): Promise<void> {
+    return (this.removeReferences as (...a: unknown[]) => Promise<void>)(...args);
+  }
+
+  private _splitRefNames(args: unknown[]): { names: string[]; options: AddReferenceOptions } {
+    const rest = [...args];
+    const last = rest[rest.length - 1];
+    const options = (
+      typeof last === "object" && last !== null ? rest.pop() : {}
+    ) as AddReferenceOptions;
+    return { names: rest as string[], options };
   }
 
   async foreignKey(toTable: string, options: Partial<AddForeignKeyOptions> = {}): Promise<void> {
