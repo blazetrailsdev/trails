@@ -390,12 +390,7 @@ export class SchemaCreation {
       );
   }
 
-  /**
-   * The adapter's `native_database_types` hash. Rails reads it straight off
-   * `@conn`; the visitor is also constructed host-less (adapter name only), so
-   * fall back to the transcribed table for that name.
-   * @internal
-   */
+  /** @internal */
   protected nativeDatabaseTypes(): Record<string, NativeDatabaseType> {
     const fromAdapter = (
       this.adapter as { nativeDatabaseTypes?(): Record<string, NativeDatabaseType> }
@@ -403,40 +398,16 @@ export class SchemaCreation {
     return fromAdapter ?? NATIVE_DATABASE_TYPES_BY_ADAPTER[this.adapterName];
   }
 
-  /**
-   * Mirrors `type_to_sql` (abstract/schema_statements.rb:1385-1415): the base
-   * name comes from `native_database_types[type][:name]` — lowercase on every
-   * adapter — and an unmapped type is returned verbatim as `type.to_s`. Only
-   * the precision/scale/limit suffix and its validation live here.
-   *
-   * Two observable consequences on SQLite, which stores the declared type text
-   * verbatim: `bigint` has no entry in `SQLITE3_NATIVE_DATABASE_TYPES`, so it
-   * emits and reflects back as `bigint`; and `typeToSql("datetime", { precision: 6 })`
-   * is `datetime(6)`, which compares equal to the verbatim pass-through of the
-   * string `"datetime(6)"`.
-   */
   typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
     let sql: string;
     const native = type == null ? undefined : this.nativeDatabaseTypes()[type];
     if (native === undefined) {
-      // Rails' `type.to_s` pass-through, used for adapter-specific type strings
-      // (e.g. "timestamptz", "inet", "hstore", custom PG enum names) and for
-      // anything the adapter declares no entry for. It never uppercases: DBs
-      // fold type-name case, and a literal type fragment carrying a value list
-      // — e.g. enum('text','blob') — must keep its quoted members verbatim.
-      //
-      // A nil type (e.g. `t.virtual` with no `type:`) is `""` in Rails too: the
-      // column renders with no SQL type before its `AS (...)` clause. We keep a
-      // stricter guard for an explicitly blank type string (a likely typo),
-      // which never arises from a nil option.
       if (type == null) sql = "";
       else if (!String(type).trim())
         throw new Error(`Column has an empty or blank type — specify a valid SQL type`);
       else sql = String(type);
     } else {
       sql = native.name ?? String(type);
-      // Ruby's `||=` here behaves as `??=` for these options: only `nil` falls
-      // through to the native default, and `precision: 0` stays 0.
       let { precision, scale, limit } = options;
       if (type === "decimal") {
         scale ??= native.scale;

@@ -1,20 +1,4 @@
-/**
- * The per-adapter `NATIVE_DATABASE_TYPES` hashes, transcribed from Rails.
- *
- * Rails declares each hash as a constant inside its adapter class. trails keeps
- * one copy per adapter here, in a leaf module with no imports, because the
- * shared `SchemaCreation` visitor also needs them: `type_to_sql` builds every
- * base type name from `native_database_types[type][:name]`
- * (abstract/schema_statements.rb:1385-1415), and the visitor is constructed
- * without an adapter on the host-less unit-test path. Each adapter's
- * `nativeDatabaseTypes()` returns the hash from here, so there is still exactly
- * one source per adapter.
- *
- * The names are lowercase in Rails and stay lowercase here — the declared type
- * text is what SQLite reflects back verbatim, so uppercasing it would diverge.
- */
-
-/** One entry of a `NATIVE_DATABASE_TYPES` hash — Rails' `{ name:, limit: }` shape. */
+/** Per-adapter `NATIVE_DATABASE_TYPES`, transcribed from Rails. */
 export interface NativeDatabaseType {
   name?: string;
   limit?: number;
@@ -22,7 +6,6 @@ export interface NativeDatabaseType {
   scale?: number;
 }
 
-/** Mirrors: `SQLite3Adapter::NATIVE_DATABASE_TYPES` (sqlite3_adapter.rb:69). */
 export const SQLITE3_NATIVE_DATABASE_TYPES: Record<string, NativeDatabaseType> = {
   primary_key: { name: "integer PRIMARY KEY AUTOINCREMENT NOT NULL" },
   string: { name: "varchar" },
@@ -38,7 +21,6 @@ export const SQLITE3_NATIVE_DATABASE_TYPES: Record<string, NativeDatabaseType> =
   json: { name: "json" },
 };
 
-/** Mirrors: `AbstractMysqlAdapter::NATIVE_DATABASE_TYPES` (abstract_mysql_adapter.rb:31). */
 export const MYSQL_NATIVE_DATABASE_TYPES: Record<string, NativeDatabaseType> = {
   primary_key: { name: "bigint auto_increment PRIMARY KEY" },
   string: { name: "varchar", limit: 255 },
@@ -57,11 +39,6 @@ export const MYSQL_NATIVE_DATABASE_TYPES: Record<string, NativeDatabaseType> = {
   json: { name: "json" },
 };
 
-/**
- * Mirrors: `PostgreSQLAdapter::NATIVE_DATABASE_TYPES` (postgresql_adapter.rb:134).
- * `datetime` is `{}` in Rails too — `native_database_types` fills it in from
- * `datetime_type` on every call.
- */
 export const POSTGRESQL_NATIVE_DATABASE_TYPES: Record<string, NativeDatabaseType> = {
   primary_key: { name: "bigserial primary key" },
   string: { name: "character varying" },
@@ -109,12 +86,6 @@ export const POSTGRESQL_NATIVE_DATABASE_TYPES: Record<string, NativeDatabaseType
   enum: {},
 };
 
-/**
- * Fallback lookup for the host-less `SchemaCreation` path, where the visitor is
- * built from an adapter *name* rather than a live adapter (see
- * `sqlite3/schema-statements.ts`). With an adapter threaded the visitor always
- * consults `adapter.nativeDatabaseTypes()` instead.
- */
 export const NATIVE_DATABASE_TYPES_BY_ADAPTER: Record<
   "sqlite" | "postgres" | "mysql",
   Record<string, NativeDatabaseType>
