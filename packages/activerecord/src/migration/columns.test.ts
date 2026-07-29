@@ -5,7 +5,11 @@ import { ActiveRecordError, StatementInvalid } from "../errors.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { adapterType } from "../test-adapter.js";
-import { isMariaDb, serverVersion } from "../support/mysql-server-version.js";
+import {
+  isMariaDb,
+  serverVersion,
+  supportsDefaultExpression,
+} from "../support/mysql-server-version.js";
 import { adapterSupports } from "../support/supports.js";
 
 const mariaDbRejectsUniqueColumnDrop =
@@ -471,22 +475,23 @@ describe("Migration", () => {
       },
     );
 
-    it.skipIf(adapterType !== "mysql" || !adapterSupports("default_expression"))(
-      "change column null does not change default functions",
-      async () => {
-        const connection = await ambientConnection();
-        const fn = isMariaDb ? "current_timestamp(6)" : "(now())";
+    it.skipIf(
+      adapterType !== "mysql" ||
+        !adapterSupports("default_expression") ||
+        !supportsDefaultExpression,
+    )("change column null does not change default functions", async () => {
+      const connection = await ambientConnection();
+      const fn = isMariaDb ? "current_timestamp(6)" : "(now())";
 
-        await connection.changeColumnDefault("test_models", "created_at", () => fn);
-        TestModel.resetColumnInformation();
-        await TestModel.loadSchema();
-        expect(TestModel.columnsHash()["created_at"].defaultFunction).toBe(fn);
+      await connection.changeColumnDefault("test_models", "created_at", () => fn);
+      TestModel.resetColumnInformation();
+      await TestModel.loadSchema();
+      expect(TestModel.columnsHash()["created_at"].defaultFunction).toBe(fn);
 
-        await connection.changeColumnNull("test_models", "created_at", true);
-        TestModel.resetColumnInformation();
-        await TestModel.loadSchema();
-        expect(TestModel.columnsHash()["created_at"].defaultFunction).toBe(fn);
-      },
-    );
+      await connection.changeColumnNull("test_models", "created_at", true);
+      TestModel.resetColumnInformation();
+      await TestModel.loadSchema();
+      expect(TestModel.columnsHash()["created_at"].defaultFunction).toBe(fn);
+    });
   });
 });
