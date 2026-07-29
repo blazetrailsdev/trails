@@ -381,9 +381,6 @@ describe("nextBundle", () => {
   });
 
   it("leads with a prioritized story whose est_loc exceeds the budget, flagged as over-budget", () => {
-    // Priority outranks the budget, so the oversized lead still leads — but
-    // the summary must say the total busted `maxLoc` rather than report it as
-    // a conforming bundle. The fill stays empty (negative leftover budget).
     const idx = index([
       story({ id: "big", cluster: "c1", est_loc: 450, priority: 2 }),
       story({ id: "f", cluster: "c1", est_loc: 80 }),
@@ -399,7 +396,6 @@ describe("nextBundle", () => {
       story({ id: "f", cluster: "c1", est_loc: 80 }),
     ]);
     const bundle = nextBundle(idx, { maxLoc: 250 });
-    // The null-est_loc lead counts as 0, so this stays within budget.
     expect(summarizeBundle(bundle, 250)).toEqual({ total: 80, leadExceedsBudget: false });
   });
 
