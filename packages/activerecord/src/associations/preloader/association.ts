@@ -29,15 +29,7 @@ export class Association {
   private _associate: boolean;
   private _model: typeof Base | null;
   private _run: boolean;
-  /**
-   * Memoized `records_by_owner`. Rails memoizes it with `@records_by_owner ||=`
-   * on both this class and `ThroughAssociation`, and reads it back
-   * *synchronously* from `ThroughAssociation#middle_records`. Ours is async, so
-   * a through preloader that already ran is read out of this field instead of
-   * re-awaiting — hence `protected`, and hence `ThroughAssociation` writes its
-   * own result here too.
-   * @internal
-   */
+  /** @internal */
   protected _recordsByOwner: Map<Base, Base[]> | undefined;
   private _preloadedRecords: Base[] | undefined;
   private _ownersByKey: Map<unknown, Base[]> | undefined;

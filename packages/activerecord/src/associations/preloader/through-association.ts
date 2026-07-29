@@ -7,16 +7,11 @@ import { pluralize, singularize } from "@blazetrails/activesupport";
 
 type AssociationLikeReflection = AssociationReflection | ThroughReflection;
 
-/**
- * Rails' `loaders.map(&:records_by_owner).reduce(:merge)` — `Hash#merge`, so a
- * key present in more than one loader's map takes the *last* loader's value
- * rather than the concatenation of both. Missing (not-yet-run) maps drop out,
- * matching `reduce` over an empty collection.
- * @internal
- */
-function mergeRecordsByOwner(maps: (Map<Base, Base[]> | undefined)[]): Map<Base, Base[]> {
+/** @internal */
+function mergeRecordsByOwner(loaders: Association[]): Map<Base, Base[]> {
   const merged = new Map<Base, Base[]>();
-  for (const map of maps) {
+  for (const loader of loaders) {
+    const map = (loader as any)._recordsByOwner as Map<Base, Base[]> | undefined;
     if (map === undefined) continue;
     for (const [owner, records] of map) {
       merged.set(owner, records);
@@ -59,12 +54,12 @@ export class ThroughAssociation extends Association {
 
   async recordsByOwner(): Promise<Map<Base, Base[]>> {
     if (this._recordsByOwner === undefined) {
-      this._recordsByOwner = await this._computeRecordsByOwner();
+      this._recordsByOwner = this._computeRecordsByOwner();
     }
     return this._recordsByOwner;
   }
 
-  private async _computeRecordsByOwner(): Promise<Map<Base, Base[]>> {
+  private _computeRecordsByOwner(): Map<Base, Base[]> {
     const result = new Map<Base, Base[]>();
 
     // When every owner already carries this association loaded — e.g. an outer
@@ -84,8 +79,8 @@ export class ThroughAssociation extends Association {
       return result;
     }
 
-    const throughRecordsByOwner = await this._getThroughRecordsByOwner();
-    const sourceRecordsByOwner = await this._getSourceRecordsByOwner();
+    const throughRecordsByOwner = this._getThroughRecordsByOwner();
+    const sourceRecordsByOwner = this._getSourceRecordsByOwner();
 
     const throughRefl = this._throughReflection;
     const firstOwner = this.owners[0] as any;
@@ -108,10 +103,6 @@ export class ThroughAssociation extends Association {
 
       let throughRecords = throughRecordsByOwner.get(owner) ?? [];
 
-      // Mirror Rails (through_association.rb:20-26): when the through
-      // reflection is already loaded on the owners, narrow through_records by
-      // source_type. The gate is unconditional on the reflection kind — only
-      // the row filter inside it is `source_type`-specific.
       if (throughLoadedOnFirst) {
         const sourceType = (this.reflection as any).options?.sourceType;
         const foreignType =
@@ -290,51 +281,21 @@ export class ThroughAssociation extends Association {
     return this._throughPreloaders;
   }
 
-  /**
-   * `middle_records` — `through_records_by_owner.values.flatten`
-   * (through_association.rb:74-76).
-   *
-   * Reading the through loaders' `records_by_owner` rather than their
-   * `preloaded_records` is what keeps an *already-loaded* through record in the
-   * middle set: `records_by_owner` answers `target_for(owner)` for a loaded
-   * owner, while `preloaded_records` is empty because no query ran. Deriving
-   * from `preloaded_records` instead made the source preloader see no middle
-   * records at all, so the target association was marked loaded with zero rows
-   * and zero queries.
-   */
   private _getMiddleRecords(): Base[] {
-    return [...this._getThroughRecordsByOwnerSync().values()].flat();
+    return [...this._getThroughRecordsByOwner().values()].flat();
   }
 
-  /**
-   * Synchronous view of `through_records_by_owner`. Rails reads it inline from
-   * `middle_records`; our `records_by_owner` is async, so we read each through
-   * loader's memoized map. Every call site (`_dataAvailable`, `futureClasses`,
-   * `runnableLoaders`, and `preloadedRecords` after `run`) is gated on the
-   * through loaders having run, which is exactly when the memo is populated —
-   * mirroring Rails, where `middle_records` is likewise only reachable once
-   * `through_preloaders.all?(&:run?)`.
-   * @internal
-   */
-  private _getThroughRecordsByOwnerSync(): Map<Base, Base[]> {
-    return mergeRecordsByOwner(
-      this._getThroughPreloaders().map(
-        (l) => (l as any)._recordsByOwner as Map<Base, Base[]> | undefined,
-      ),
-    );
-  }
-
-  private async _getSourceRecordsByOwner(): Promise<Map<Base, Base[]>> {
-    if (this._sourceRecordsByOwner !== undefined) return this._sourceRecordsByOwner;
-    const maps = await Promise.all(this._getSourcePreloaders().map((l) => l.recordsByOwner()));
-    this._sourceRecordsByOwner = mergeRecordsByOwner(maps);
+  private _getSourceRecordsByOwner(): Map<Base, Base[]> {
+    if (this._sourceRecordsByOwner === undefined) {
+      this._sourceRecordsByOwner = mergeRecordsByOwner(this._getSourcePreloaders());
+    }
     return this._sourceRecordsByOwner;
   }
 
-  private async _getThroughRecordsByOwner(): Promise<Map<Base, Base[]>> {
-    if (this._throughRecordsByOwner !== undefined) return this._throughRecordsByOwner;
-    const maps = await Promise.all(this._getThroughPreloaders().map((l) => l.recordsByOwner()));
-    this._throughRecordsByOwner = mergeRecordsByOwner(maps);
+  private _getThroughRecordsByOwner(): Map<Base, Base[]> {
+    if (this._throughRecordsByOwner === undefined) {
+      this._throughRecordsByOwner = mergeRecordsByOwner(this._getThroughPreloaders());
+    }
     return this._throughRecordsByOwner;
   }
 
