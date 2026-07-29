@@ -39,14 +39,6 @@ function adapterHelperSupport(feature: string, connection: LiveConnection): bool
   }
 }
 
-const KNOWN_DIVERGENCES: Readonly<Record<string, string>> = {
-  insert_returning:
-    "story mariadb-insert-returning-rows-dropped — the adapter answers Rails' " +
-    '`mariadb? && database_version >= "10.5.0"` correctly, but the MariaDB write ' +
-    "path yields no RETURNING rows, so the table holds the gate closed until the " +
-    "write path lands",
-};
-
 function methodName(feature: string): string {
   return `supports${feature.replace(/(^|_)([a-z])/g, (_m, _s, c: string) => c.toUpperCase())}`;
 }
@@ -70,13 +62,7 @@ describe("supports table vs. the live adapter", () => {
         live = typeof method === "function" && (method as () => boolean).call(connection) === true;
       }
       const table = adapterSupports(feature);
-      if (table === live) continue;
-      const known = KNOWN_DIVERGENCES[feature];
-      if (known) {
-        expect(table, `${feature} is held closed: ${known}`).toBe(false);
-        continue;
-      }
-      drift.push(`${feature}: table=${table} adapter=${live}`);
+      if (table !== live) drift.push(`${feature}: table=${table} adapter=${live}`);
     }
 
     expect(drift).toEqual([]);

@@ -141,12 +141,7 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // `supports_insert_returning?`: PostgreSQL true; MySQL family only for MariaDB
   // ≥ 10.5.0; SQLite ≥ 3.35.0 (current node sqlite qualifies).
   // (postgresql_adapter.rb:264, abstract_mysql_adapter.rb:173, sqlite3_adapter.rb:187)
-  // Held at false for the MySQL family against the adapter's own answer: on
-  // MariaDB 11 the write path yields no RETURNING rows, so the 7 tests this
-  // gate admits fail. Story mariadb-insert-returning-rows-dropped converges it;
-  // until then it is the single entry in the reconciliation suite's
-  // KNOWN_DIVERGENCES rather than a silent mis-gate.
-  insert_returning: ["postgres", "sqlite"],
+  insert_returning: withMysql(["postgres", "sqlite"], mysql.supportsInsertReturning),
   // `supports_text_column_with_default?`: MySQL family only for MariaDB ≥ 10.2.1;
   // all other adapters true. (adapter_helper.rb:42)
   text_column_with_default: withMysql(["postgres", "sqlite"], mysql.supportsTextColumnWithDefault),

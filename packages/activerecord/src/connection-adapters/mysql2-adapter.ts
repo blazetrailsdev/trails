@@ -3,7 +3,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
-import { execInsertReturningReadback } from "./abstract/database-statements.js";
+import { execInsertReturningReadback, sqlForInsert } from "./abstract/database-statements.js";
 import type { MysqlAdapterOptions } from "./pool-config.js";
 import {
   AbstractMysqlAdapter,
@@ -647,6 +647,24 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       returning,
     );
     if (readback !== undefined) return readback;
+    // Single-column RETURNING: the shared readback bails below two columns
+    // because most adapters can recover one value from the generated id. MySQL
+    // cannot when the PK is not AUTO_INCREMENT — a trigger-populated id makes
+    // last_insert_id 0 — and Rails' exec_insert has no such gate: sql_for_insert
+    // appends RETURNING whenever supports_insert_returning?
+    // (abstract/database_statements.rb:157-160). Follow Rails on MariaDB.
+    if (returning?.length === 1 && this.supportsInsertReturning()) {
+      const [returningSql, returningBinds] = sqlForInsert.call(
+        this as never,
+        sql,
+        pk ?? null,
+        binds,
+        returning,
+      );
+      const result = await this.internalExecQuery(returningSql, name ?? "SQL", returningBinds);
+      this.dirtyCurrentTransaction();
+      return result;
+    }
     return super.execInsert(sql, name, binds, pk, sequenceName, returning);
   }
 
