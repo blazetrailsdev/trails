@@ -314,6 +314,15 @@ tester.run("require-table-teardown", rule, {
       "for (const t of rows) {\n" +
       '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
       "}",
+    // Negation itself translates — both grammars read a leading `^` alike. It is
+    // only the locale-extensible spellings that refuse under it.
+    'await adapter.exec(`CREATE TABLE "ex_ab" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[^0-9]+'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
     // A shorthand alongside ordinary bracket members.
     'await adapter.exec(`CREATE TABLE "ex_-1" (id int)`);\n' +
       "const rows = await adapter.execute(\n" +
