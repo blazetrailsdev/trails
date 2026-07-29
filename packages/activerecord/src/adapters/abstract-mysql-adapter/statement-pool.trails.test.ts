@@ -21,13 +21,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     adapter = await leaseMysqlAdapter();
     originalPreparedStatements = adapter.preparedStatements;
     originalStatementLimit = adapter.statementLimit;
-    // Cold-pool guarantee. The afterEach below only covers statements this
-    // file's own tests cached; under `MYSQL_PREPARED_STATEMENTS` the adapter is
-    // prepared-by-default for the whole run, so the leased connection arrives
-    // already carrying worker-startup reflection — `test-setup-dy`'s
-    // `tableExists` assertion leaves the `information_schema.tables` probe in
-    // the pool, which made the very first test start at length 1. Drop the pool
-    // before the settings are flipped so both lanes assert on an empty one.
     adapter.disconnectBang();
     adapter.preparedStatements = true;
   });
