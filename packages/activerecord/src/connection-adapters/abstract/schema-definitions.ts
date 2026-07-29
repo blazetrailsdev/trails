@@ -1109,6 +1109,10 @@ export class TableDefinition {
     return name === "timestamp" ? "datetime" : fallback;
   }
 
+  primaryKey(name: string, type: ColumnType = "primary_key", options: ColumnOptions = {}): this {
+    return this.column(name, type, { ...options, primaryKey: true });
+  }
+
   column(
     name: string,
     type: ColumnType,
@@ -1747,8 +1751,12 @@ export class Table {
     return this._require("isCheckConstraintExists").call(this._schema, this._tableName, options);
   }
 
-  async primaryKey(): Promise<string | string[] | null> {
-    return this._require("primaryKey").call(this._schema, this._tableName);
+  async primaryKey(
+    name: string,
+    type: ColumnType = "primary_key",
+    options: ColumnOptions = {},
+  ): Promise<void> {
+    await this.column(name, type, { ...options, primaryKey: true });
   }
 
   async add(columnName: string, type: ColumnType, options?: ColumnOptions): Promise<void> {

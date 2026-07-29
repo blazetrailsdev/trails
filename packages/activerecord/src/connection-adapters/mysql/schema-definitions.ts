@@ -319,15 +319,6 @@ export class Table extends AbstractTable {
     super(tableName, schema);
   }
 
-  /**
-   * Returns the primary key column name for this table.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::Table#primary_key
-   */
-  override async primaryKey(): Promise<string | string[] | null> {
-    return super.primaryKey();
-  }
-
   // Mirrors the column-type methods MySQL::ColumnMethods mixes into both
   // TableDefinition and Table. The `unsigned_<type>` type is normalized to its
   // base type + `unsigned: true` by MySQL::TableDefinition#newColumnDefinition
