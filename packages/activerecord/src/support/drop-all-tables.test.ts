@@ -47,6 +47,7 @@ const pgBootListStubs = {
   getDatabaseVersion: async () => "17.0",
   supportsIdentityColumns: () => true,
   supportsPartitionedIndexes: () => true,
+  supportsInsertReturning: () => true,
 };
 
 describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
