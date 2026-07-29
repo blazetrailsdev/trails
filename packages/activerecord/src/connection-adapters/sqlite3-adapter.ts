@@ -2760,8 +2760,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
 
   /** @internal */
   private connect(): void {
-    // Built outside the try so a bad `timeout`/`retries` config surfaces as the
-    // ArgumentError/TypeError Rails raises, not a DatabaseConnectionError.
     const openConfig = this.openConfig();
     try {
       const factory = this.resolveDriverFactory();
@@ -2950,13 +2948,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return stmts;
   }
 
-  /**
-   * The `timeout`/`retries` half of Rails' `configure_connection`
-   * (`sqlite3_adapter.rb:821-826`): coerce `timeout` and reject a non-integer.
-   * Our drivers take the busy timeout as an open option instead of exposing a
-   * `busy_handler_timeout=` setter, so `openConfig()` reads the coerced value
-   * from here rather than the raw config. @internal
-   */
+  /** @internal */
   private castTimeout(): number | undefined {
     const cfg = this._config as SQLite3AdapterOptions;
     if (cfg.timeout != null && cfg.retries != null) {

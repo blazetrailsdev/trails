@@ -4,11 +4,6 @@ import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { deprecator } from "../deprecator.js";
 
-// Rails applies the sqlite `timeout`/`retries` options inside
-// `configure_connection` (sqlite3_adapter.rb:820-833): `timeout` is coerced with
-// `type_cast_config_to_integer`, a non-integer raises TypeError, and the two
-// options are mutually exclusive. Rails has no test coverage for that block, so
-// these are trails-only regression tests.
 describe("SQLite3Adapter timeout config coercion", () => {
   let adapter: AbstractSQLite3Adapter | undefined;
 
