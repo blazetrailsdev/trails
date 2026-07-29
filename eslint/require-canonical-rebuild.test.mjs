@@ -511,5 +511,65 @@ tester.run("require-canonical-rebuild", rule, {
       options,
       errors: [{ messageId: "missingRebuild", data: { table: "posts" }, line: 1 }],
     },
+
+    // A swept name laundered through a single-argument call. `String(t)` and
+    // any one-argument quoting helper used to be a hole; the drop-site walker
+    // now steps through the argument. Measured repo-wide at zero new reports.
+    {
+      code:
+        "const rows = await adapter.execute(`SELECT tablename FROM pg_tables WHERE tablename IN ('people')`);\n" +
+        'for (const t of rows) { await adapter.exec(`DROP TABLE "${String(t.tablename)}"`); }',
+      options,
+      errors: [{ messageId: "sweepReachesCanonical", data: { table: "people" } }],
+    },
+
+    {
+      code:
+        "const rows = await adapter.execute(`SELECT name FROM sqlite_master WHERE name IN ('widgets')`);\n" +
+        "for (const t of rows) { await ctx.dropTable(sqliteQuoteStringLiteral(t.name)); }",
+      options,
+      errors: [{ messageId: "sweepReachesCanonical", data: { table: "widgets" } }],
+    },
+
+    // A swept name aliased through a conditional.
+    {
+      code:
+        "const rows = await adapter.execute(`SELECT tablename FROM pg_tables WHERE tablename IN ('posts')`);\n" +
+        "for (const r of rows) {\n" +
+        '  const t = r.tablename ? r.tablename : "fallback";\n' +
+        '  await adapter.exec(`DROP TABLE "${t}"`);\n' +
+        "}",
+      options,
+      errors: [{ messageId: "sweepReachesCanonical", data: { table: "posts" } }],
+    },
+
+    // Catalogues added to the alternation by this story: each must drive the
+    // sweep check on its own, or the widening was cosmetic.
+    ...[
+      ["pg_views", "SELECT viewname FROM pg_views"],
+      ["pg_indexes", "SELECT tablename FROM pg_indexes"],
+      ["sqlite_temp_master", "SELECT name FROM sqlite_temp_master"],
+      ["sqlite_sequence", "SELECT name FROM sqlite_sequence"],
+      ["information_schema.views", "SELECT table_name FROM information_schema.views"],
+      [
+        "information_schema.table_constraints",
+        "SELECT table_name FROM information_schema.table_constraints",
+      ],
+      [
+        "information_schema.key_column_usage",
+        "SELECT table_name FROM information_schema.key_column_usage",
+      ],
+      [
+        "information_schema.referential_constraints",
+        "SELECT table_name FROM information_schema.referential_constraints",
+      ],
+      ["information_schema.statistics", "SELECT table_name FROM information_schema.statistics"],
+    ].map(([, select]) => ({
+      code:
+        `const rows = await adapter.execute(\`${select} WHERE x IN ('people')\`);\n` +
+        'for (const t of rows) { await adapter.exec(`DROP TABLE "${t.name}"`); }',
+      options,
+      errors: [{ messageId: "sweepReachesCanonical", data: { table: "people" } }],
+    })),
   ],
 });
