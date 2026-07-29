@@ -85,7 +85,7 @@ describe("sweepRunDbFiles", () => {
       seed(`ar-test-worker-${run}-1.sqlite`),
       seed(`ar-test-worker-${run}-1.sqlite-wal`),
       seed(`ar-test-worker-${run}-1.sqlite-shm`),
-      seed(`ar-test-worker-${run}-1.sqlite_arunit2`),
+      seed(`ar-test-worker-${run}-1_2.sqlite`),
       seed(`ar-test-animals-${run}-2.sqlite`),
     ]);
 

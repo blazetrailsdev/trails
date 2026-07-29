@@ -7,6 +7,7 @@ import {
   mysqlUrl,
   postgresSettings,
   postgresUrl,
+  sqliteSiblingDatabase,
   withDatabase,
 } from "./config.js";
 import { activeLane, connectionName } from "./connection.js";
@@ -219,5 +220,19 @@ describe("config", () => {
     expect(config).not.toHaveProperty("password");
     expect(config).not.toHaveProperty("socket");
     expect(config).not.toHaveProperty("socketPath");
+  });
+
+  it("sqliteSiblingDatabase puts _2 before the extension, as config.example.yml spells it", () => {
+    expect(sqliteSiblingDatabase("db/fixture_database.sqlite3")).toBe(
+      "db/fixture_database_2.sqlite3",
+    );
+    expect(sqliteSiblingDatabase("/tmp/ar-test-worker-abc-1.sqlite")).toBe(
+      "/tmp/ar-test-worker-abc-1_2.sqlite",
+    );
+  });
+
+  it("sqliteSiblingDatabase appends _2 when the name carries no extension", () => {
+    expect(sqliteSiblingDatabase("/tmp/ar-test-worker-abc-1")).toBe("/tmp/ar-test-worker-abc-1_2");
+    expect(sqliteSiblingDatabase("/tmp/.hidden")).toBe("/tmp/.hidden_2");
   });
 });

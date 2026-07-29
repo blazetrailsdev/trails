@@ -115,6 +115,17 @@ describe("connect", () => {
     expect(envConfig.pool).toBe(5);
   });
 
+  it("names an explicit sibling file for the worker clone's arunit2 entry", async () => {
+    vi.stubEnv("ARCONN", "sqlite3");
+    vi.stubEnv("AR_TEST_WORKER_DB", "/tmp/ar-test-worker-abc-1.sqlite");
+    const { configurationHashes } = await testConfigurationHashes();
+    expect(configurationHashes.map((c) => c.database)).toEqual([
+      "/tmp/ar-test-worker-abc-1.sqlite",
+      "/tmp/ar-test-worker-abc-1_2.sqlite",
+      "/tmp/ar-test-worker-abc-1.sqlite",
+    ]);
+  });
+
   it("falls back to a file-backed sqlite DB when AR_TEST_WORKER_DB is unset", async () => {
     vi.stubEnv("ARCONN", "sqlite3");
     vi.stubEnv("AR_TEST_WORKER_DB", "");
