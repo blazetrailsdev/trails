@@ -410,6 +410,19 @@ tester.run("require-table-teardown", rule, {
         "}",
       errors: [{ messageId: "missingTeardown", data: { table: "ex!A" } }],
     },
+    // A multi-character escape literal is not a readable single character
+    // either: the closing quote must follow the first character.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex!A" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex!_%' ESCAPE '!!'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex!A" } }],
+    },
     // An ESCAPE clause that is not a readable single character makes the whole
     // filter unreadable, so it credits nothing.
     {
