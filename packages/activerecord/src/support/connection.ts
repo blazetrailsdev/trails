@@ -147,8 +147,9 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
     adapter: "sqlite3",
     lane: "sqlite",
     // `config.example.yml:83-91`: two file databases, both `timeout`/`strict`.
-    // Rails names them under FIXTURES_ROOT; ours are the worker database and
-    // its derived sibling, filled in by `expandConfig`.
+    // Rails names both under FIXTURES_ROOT; ours is the configured fixture
+    // database (or this worker's clone of it) plus the sibling `expandConfig`
+    // derives.
     build: async () => {
       const shared = { ...(await sqliteHash()), timeout: 5000, strict: true };
       return { arunit: shared, arunit2: { ...shared, database: undefined } };
@@ -331,20 +332,12 @@ export async function testConfigurationHashes(): Promise<{
 }
 
 /**
- * The `sqlite3.arunit` database of `config.example.yml:83-91`: a fixed
- * configured file, reused across runs, exactly as Rails names
- * `<%= FIXTURES_ROOT %>/fixture_database.sqlite3`. The only difference is which
- * root it hangs off — trails has no `FIXTURES_ROOT` (`config.ts`), so the name
- * is repo-relative ({@link SQLITE_FIXTURE_DATABASE}) and the sqlite driver
- * resolves it the way it resolves any relative `database:`.
+ * The `sqlite3.arunit` database of `config.example.yml:83-91`
+ * ({@link SQLITE_FIXTURE_DATABASE}).
  *
- * The directory is created because Rails' `test/fixtures` is a checked-in
- * directory and ours is a gitignored build output; sqlite will not create a
- * missing parent for a file DB.
- *
- * This replaces a per-process `<tmpdir>/ar-test-fallback-<token>.sqlite` path,
- * which had no counterpart in Rails: the database name is configuration, not a
- * function of the process that happens to read it.
+ * The directory is created because Rails' `test/fixtures` is checked in and
+ * ours is a gitignored build output; sqlite will not create a missing parent
+ * for a file DB.
  */
 async function fixtureDatabase(): Promise<string> {
   const fs = await getFsAsync();
@@ -359,8 +352,7 @@ async function fixtureDatabase(): Promise<string> {
  * `AR_TEST_WORKER_DB` is the per-worker template clone the setupFile publishes
  * (`support/sqlite-template.ts`) — trails' stand-in for Rails' one
  * already-prepared database, since vitest forks workers where Rails does not.
- * With no worker clone (a setup-free single-file run) the entry names the
- * configured fixture database, as `config.example.yml` always does.
+ * With no worker clone the entry names the configured fixture database.
  */
 async function sqliteHash(): Promise<Record<string, unknown>> {
   const workerDb = getEnv("AR_TEST_WORKER_DB");
