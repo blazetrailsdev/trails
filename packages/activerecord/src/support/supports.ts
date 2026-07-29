@@ -45,10 +45,12 @@ type Backend = (typeof ALL)[number];
 // MySQL 8 (true) locally but the MariaDB stand-in (false) in CI. Probe the
 // server once, on the mysql lane only — the dynamic import keeps the probe's
 // connection attempt off the pg/sqlite lanes.
-const mysqlExpressionIndex =
+const mysqlServerSupports =
   adapterType === "mysql"
-    ? (await import("./mysql-server-version.js")).supportsExpressionIndex
-    : false;
+    ? await import("./mysql-server-version.js")
+    : { supportsExpressionIndex: false, supportsInsertReturning: false };
+const mysqlExpressionIndex = mysqlServerSupports.supportsExpressionIndex;
+const mysqlInsertReturning = mysqlServerSupports.supportsInsertReturning;
 
 const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // Available on every backend we test (pg17 / mysql:8 / recent sqlite).
@@ -109,10 +111,12 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // `supports_pgcrypto_uuid?`: PostgreSQL database_version >= 9.4.0 (pg17 qualifies);
   // PostgreSQL-only (abstract default false). (postgresql_adapter.rb:299)
   pgcrypto_uuid: ["postgres"],
-  // `supports_insert_returning?`: PostgreSQL true; MySQL only for MariaDB ≥ 10.5 (mysql:8
-  // is not MariaDB → false); SQLite ≥ 3.35.0 (current node sqlite qualifies → true).
+  // `supports_insert_returning?`: PostgreSQL true; SQLite ≥ 3.35.0 (current node
+  // sqlite qualifies → true); MySQL family per the live-server probe above
+  // (MariaDB ≥ 10.5 only), since the mysql lane may be MySQL 8 (false) or the
+  // MariaDB CI stand-in (true).
   // (postgresql_adapter.rb:264, abstract_mysql_adapter.rb:173, sqlite3_adapter.rb:187)
-  insert_returning: ["postgres", "sqlite"],
+  insert_returning: mysqlInsertReturning ? ALL : ["postgres", "sqlite"],
   // `supports_text_column_with_default?`: MySQL only for MariaDB ≥ 10.2.1 (mysql:8 is not
   // MariaDB → false); all other adapters true. (adapter_helper.rb:42)
   text_column_with_default: ["postgres", "sqlite"],

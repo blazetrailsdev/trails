@@ -38,6 +38,7 @@ import { Developer } from "./test-helpers/models/developer.js";
 import { Measurement } from "./test-helpers/models/measurement.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { Speedometer } from "./test-helpers/models/speedometer.js";
+import { escapeRegExp, quoteColumnName } from "./support/quote-regex.js";
 
 // Adapter capability gates (mirror Rails' supports_* predicates / current_adapter?).
 // Feature-gated tests use itIfSupports(...) / adapterSupports(...) so the
@@ -78,6 +79,14 @@ async function assertInsertAllReturningAlias(): Promise<void> {
   });
   expect(result.columns).toContain("title");
   expect(await Book.count()).toBe(before + 1);
+}
+
+// The RETURNING identifier is quoted by the active adapter (`"id"` on
+// PG/SQLite, `` `id` `` on the MySQL family), so build the pattern the way Rails
+// does with `Regexp.escape(quote_column_name(...))` rather than hard-coding
+// double quotes.
+function returningRe(column: string): RegExp {
+  return new RegExp(`RETURNING ${escapeRegExp(quoteColumnName(column))}`);
 }
 
 function getYear(val: unknown): number {
@@ -1042,12 +1051,12 @@ describe("InsertAllTest", () => {
   it.skipIf(!supportsInsertReturning)(
     "insert all returning uses schema-cache primary keys not the model primary key",
     async () => {
-      await assertQueriesMatch(/RETURNING "id"/, undefined, false, async () => {
+      await assertQueriesMatch(returningRe("id"), undefined, false, async () => {
         await DivergentPrimaryKeyBook.insertAll([
           { name: "Divergent", isbn: "9990000000001", author_id: 1 },
         ]);
       });
-      await assertNoQueriesMatch(/RETURNING "isbn"/, false, async () => {
+      await assertNoQueriesMatch(returningRe("isbn"), false, async () => {
         await DivergentPrimaryKeyBook.insertAll([
           { name: "Divergent II", isbn: "9990000000002", author_id: 1 },
         ]);

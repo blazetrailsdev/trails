@@ -75,6 +75,15 @@ export const supportsDefaultExpression = mariaDb
 export const supportsExpressionIndex = !mariaDb && _serverVersion?.gte("8.0.13") === true;
 
 /**
+ * Mirrors AbstractMysqlAdapter#supports_insert_returning?
+ * (abstract_mysql_adapter.rb:173): MariaDB ≥ 10.5 only; never MySQL. Feeds the
+ * `insert_returning` entry in support/supports.ts, which cannot bake the answer
+ * into a static adapterType table — the mysql lane may be MySQL 8 (false) or the
+ * MariaDB CI stand-in (true).
+ */
+export const supportsInsertReturning = mariaDb && _serverVersion?.gte("10.5.0") === true;
+
+/**
  * Mirrors AbstractMysqlAdapter#supports_rename_index?
  * (abstract_mysql_adapter.rb:896-901): MariaDB ≥ 10.5.2, MySQL ≥ 5.7.6. Lets a
  * test reproduce Rails' `skip "Cannot drop index, needed in a foreign key

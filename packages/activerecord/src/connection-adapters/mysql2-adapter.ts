@@ -620,13 +620,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   /**
    * Mirrors Rails' abstract `exec_insert` → `sql_for_insert` → `internal_exec_query`
-   * for the multi-column RETURNING read-back. MariaDB supports `INSERT ...
-   * RETURNING`, but the `executeMutation` write primitive returns only the
-   * generated id, so a multi-column auto-populated-columns list (Rails
-   * `_create_record` zips every returning column) would lose the non-PK values.
-   * Route that case through `execQuery` — bind-aware, and its `withRawConnection`
-   * materializes and dirties the transaction — to hand back the full `Result`.
-   * Single-column / no-RETURNING inserts (and MySQL 8, which lacks insert
+   * for the RETURNING read-back. MariaDB supports `INSERT ... RETURNING`, but the
+   * `executeMutation` write primitive returns only mysql2's `insertId`, which is
+   * 0 unless the primary key came from AUTO_INCREMENT — so every requested
+   * returning column has to come off the result set (hence `minColumns` 1, unlike
+   * SQLite, whose `last_insert_rowid` can still serve a single-column PK).
+   * Route that case through the bind-aware `internalExecQuery`, whose
+   * `withRawConnection` materializes and dirties the transaction, to hand back
+   * the full `Result`. No-RETURNING inserts (and MySQL 8, which lacks insert
    * returning, so `sql_for_insert` appends nothing) keep the `executeMutation`
    * path via `super`.
    */
@@ -645,6 +646,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       binds,
       pk,
       returning,
+      1,
     );
     if (readback !== undefined) return readback;
     return super.execInsert(sql, name, binds, pk, sequenceName, returning);

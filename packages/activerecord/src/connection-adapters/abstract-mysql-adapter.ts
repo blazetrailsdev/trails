@@ -1286,14 +1286,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       }
     }
 
-    // NB: Rails appends `RETURNING` here (outside the raw-alias branch), but
-    // trails `InsertAll#execute` consumes this SQL via `executeMutation`, which
-    // returns an affected-row count. The mysql2 driver returns a result set
-    // (no affectedRows) for a RETURNING statement, so emitting it would make
-    // `insertAll` return undefined on MariaDB >= 10.5. Surfacing MySQL RETURNING
-    // needs `execute` reworked to read the result set (Rails' exec_insert_all) —
-    // tracked separately. SQLite/PG carry the tail because their executeMutation
-    // tolerates RETURNING and still yields a count.
+    const returning = insert.returning();
+    if (returning) sql += ` RETURNING ${returning}`;
     return sql;
   }
 

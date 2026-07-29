@@ -559,8 +559,16 @@ export function execInsert(
  * bound INSERT through the adapter's bind-aware internalExecQuery (which
  * materializes the transaction) to hand back the whole Result, dirtying the
  * transaction as executeMutation would. Returns undefined when the caller should
- * keep its fast path (≤1 returning column, or sql_for_insert produced no
- * RETURNING clause — e.g. MySQL 8, which lacks INSERT ... RETURNING).
+ * keep its fast path (fewer than `minColumns` returning columns, or
+ * sql_for_insert produced no RETURNING clause — e.g. MySQL 8, which lacks
+ * INSERT ... RETURNING).
+ *
+ * `minColumns` defaults to 2 because an adapter whose executeMutation reports a
+ * usable generated id (SQLite’s `last_insert_rowid`) can serve a single-column
+ * primary-key read-back from it. MySQL passes 1: mysql2’s `insertId` is 0
+ * whenever the database populates the primary key by something other than
+ * AUTO_INCREMENT (a trigger, or an updateable view’s base table), so even one
+ * returning column has to come off the result set.
  *
  * @internal
  */
@@ -571,8 +579,9 @@ export async function execInsertReturningReadback(
   binds: unknown[],
   pk: string | false | null | undefined,
   returning: string[] | null | undefined,
+  minColumns = 2,
 ): Promise<Result | undefined> {
-  if (!returning || returning.length <= 1) return undefined;
+  if (!returning || returning.length < minColumns) return undefined;
   // Gate on the capability flag sql_for_insert itself checks
   // (supports_insert_returning?) rather than sniffing the generated SQL — on a
   // backend without INSERT ... RETURNING (MySQL 8) sql_for_insert appends
