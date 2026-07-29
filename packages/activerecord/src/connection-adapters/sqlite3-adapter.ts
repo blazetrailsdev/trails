@@ -2973,6 +2973,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     this.castTimeout();
     const retries = (this._config as SQLite3AdapterOptions).retries;
     if (retries != null && (this._config as SQLite3AdapterOptions).timeout == null) {
+      // Deviation: Rails' retries branch also installs
+      // `raw_connection.busy_handler { |count| count <= retries }`
+      // (sqlite3_adapter.rb:827-832), which is the sqlite3 gem's binding for
+      // `sqlite3_busy_handler`. None of our drivers (better-sqlite3, node:sqlite,
+      // libsql) expose that callback — they only accept a busy *timeout* at open
+      // — so there is nothing to install and adding a driver hook would be a
+      // stub no driver can implement. Rails itself deprecates the option for
+      // removal in 8.1, so we warn and let `timeout` be the supported path.
       deprecator().warn(
         "The retries option is deprecated and will be removed in Rails 8.1. Use timeout instead.\n",
       );

@@ -39,6 +39,15 @@ describe("buildAdapterArg", () => {
       expect(args).toEqual(["x.db", { strict: true, timeout: 5000 }]);
     });
 
+    it("preserves the SQLite retries option", () => {
+      const args = buildAdapterArg("sqlite3", {
+        adapter: "sqlite3",
+        database: "x.db",
+        retries: 3,
+      });
+      expect(args).toEqual(["x.db", { retries: 3 }]);
+    });
+
     it("ignores unrelated database.yml keys (pool, host, etc.)", () => {
       const args = buildAdapterArg("sqlite3", {
         adapter: "sqlite3",
