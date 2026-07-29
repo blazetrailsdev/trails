@@ -289,12 +289,6 @@ describe("DatabaseTasksDumpSchemaTest", () => {
   });
 });
 
-/**
- * Rails: `DatabaseTasksHelper#setup` / `#teardown` swap `$stdout` / `$stderr`
- * for `StringIO`s for the duration of each test and restore them afterwards
- * (vendor/rails/activerecord/test/cases/tasks/database_tasks_test.rb:26-32),
- * keeping the `create` / `drop` banners out of the test output.
- */
 function captureStdoutAndStderr(): void {
   let stdoutSpy: MockInstance;
   let stderrSpy: MockInstance;
