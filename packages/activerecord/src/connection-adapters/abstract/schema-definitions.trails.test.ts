@@ -4,6 +4,7 @@ import {
   CheckConstraintDefinition,
   ReferenceDefinition,
   TableDefinition,
+  Table,
   type ReferenceDefinitionConnection,
 } from "./schema-definitions.js";
 import { SchemaDumper } from "../../schema-dumper.js";
@@ -207,5 +208,42 @@ describe("TableDefinition column methods", () => {
     expect(() => (td.string as (o: object) => unknown)({ limit: 40 })).toThrow(
       "Missing column name(s) for string",
     );
+  });
+});
+
+describe("ColumnMethods#primary_key", () => {
+  it("merges primary_key: true and honours the type argument on create_table", () => {
+    const td = new TableDefinition("posts", { id: false });
+    td.primaryKey("id", "uuid", { default: "gen_random_uuid()" });
+
+    expect(td.columns.map((c) => c.name)).toEqual(["id"]);
+    expect(td.columns[0].type).toBe("uuid");
+    expect(td.columns[0].options.primaryKey).toBe(true);
+    expect(td.columns[0].options.default).toBe("gen_random_uuid()");
+  });
+
+  it("defaults the type to primary_key", () => {
+    const td = new TableDefinition("posts", { id: false });
+    td.primaryKey("id");
+
+    expect(td.columns[0].type).toBe("primary_key");
+    expect(td.columns[0].options.primaryKey).toBe(true);
+  });
+
+  it("adds a primary key column through change_table", async () => {
+    const calls: unknown[][] = [];
+    const schema = {
+      addColumn: (...args: unknown[]) => {
+        calls.push(args);
+        return Promise.resolve();
+      },
+    } as unknown as ConstructorParameters<typeof Table>[1];
+    const t = new Table("delete_me", schema);
+
+    await t.primaryKey("id", "primary_key", { comment: "Primary key comment" });
+
+    expect(calls).toEqual([
+      ["delete_me", "id", "primary_key", { comment: "Primary key comment", primaryKey: true }],
+    ]);
   });
 });
