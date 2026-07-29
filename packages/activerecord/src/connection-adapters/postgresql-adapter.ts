@@ -135,7 +135,7 @@ import { abandonRawSocket } from "./abandon-raw-socket.js";
 import {
   POSTGRESQL_NATIVE_DATABASE_TYPES,
   postgresqlNativeDatabaseTypes,
-  type NativeDatabaseType,
+  type NativeDatabaseTypes,
 } from "./abstract/native-database-types.js";
 
 const OID_JSON = 114;
@@ -257,8 +257,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   // Mirrors: PostgreSQLAdapter::NATIVE_DATABASE_TYPES (postgresql_adapter.rb:134)
-  static readonly NATIVE_DATABASE_TYPES: Record<string, NativeDatabaseType> =
-    POSTGRESQL_NATIVE_DATABASE_TYPES;
+  static readonly NATIVE_DATABASE_TYPES: NativeDatabaseTypes = POSTGRESQL_NATIVE_DATABASE_TYPES;
 
   // Mirrors: PostgreSQLAdapter.datetime_type class_attribute (postgresql_adapter.rb:123).
   // Proxied through pgDatetimeConfig so OID::DateTime.realTypeUnlessAliased can read
@@ -2499,7 +2498,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // Mirrors: PostgreSQLAdapter.native_database_types (postgresql_adapter.rb:404)
   // The datetime entry is resolved dynamically from datetimeType, matching Rails'
   // `types[:datetime] = types[datetime_type]`.
-  static nativeDatabaseTypes(): Record<string, NativeDatabaseType> {
+  static nativeDatabaseTypes(): NativeDatabaseTypes {
     return postgresqlNativeDatabaseTypes(
       this.datetimeType,
       pgDatetimeConfig.nativeDatabaseTypesOverrides,
@@ -2507,7 +2506,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   // Mirrors: PostgreSQLAdapter#native_database_types (postgresql_adapter.rb:400)
-  nativeDatabaseTypes(): Record<string, NativeDatabaseType> {
+  nativeDatabaseTypes(): NativeDatabaseTypes {
     return (this.constructor as typeof PostgreSQLAdapter).nativeDatabaseTypes();
   }
 

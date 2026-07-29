@@ -8,7 +8,7 @@ import { wrap } from "@blazetrails/activesupport";
 import { SchemaCreation as AbstractSchemaCreation } from "../abstract/schema-creation.js";
 import {
   postgresqlNativeDatabaseTypes,
-  type NativeDatabaseType,
+  type NativeDatabaseTypes,
 } from "../abstract/native-database-types.js";
 import { pgDatetimeConfig } from "./pg-datetime-config.js";
 import {
@@ -103,7 +103,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
    * unresolved placeholder and emit a literal `datetime`.
    * @internal
    */
-  protected override nativeDatabaseTypes(): Record<string, NativeDatabaseType> {
+  protected override nativeDatabaseTypes(): NativeDatabaseTypes {
     return postgresqlNativeDatabaseTypes(
       pgDatetimeConfig.datetimeType,
       pgDatetimeConfig.nativeDatabaseTypesOverrides,

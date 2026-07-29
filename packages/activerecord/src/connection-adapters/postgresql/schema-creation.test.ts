@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { SchemaCreation } from "./schema-creation.js";
+import { pgDatetimeConfig } from "./pg-datetime-config.js";
 import { quoteDefaultExpression } from "./quoting.js";
 import { ExclusionConstraintDefinition, UniqueConstraintDefinition } from "./schema-definitions.js";
 import { Column } from "./column.js";
@@ -228,6 +229,18 @@ describe("PostgreSQL SchemaCreation", () => {
       quoteDefaultExpression: (v: unknown) => ` DEFAULT ${v}`,
     } as any);
     expect(hostless.typeToSql("datetime", { precision: 6 })).toBe("timestamp(6)");
+    // `primary_key` is a bare String in Rails' hash, not a `{ name: }` entry.
     expect(hostless.typeToSql("primary_key")).toBe("bigserial primary key");
+
+    // Rails assigns `types[:datetime] = types[datetime_type]` with no default,
+    // so a datetime_type naming no entry leaves it nil and type_to_sql falls
+    // through to "datetime" rather than silently meaning timestamp.
+    const original = pgDatetimeConfig.datetimeType;
+    try {
+      pgDatetimeConfig.datetimeType = "nonesuch";
+      expect(hostless.typeToSql("datetime", { precision: 6 })).toBe("datetime");
+    } finally {
+      pgDatetimeConfig.datetimeType = original;
+    }
   });
 });

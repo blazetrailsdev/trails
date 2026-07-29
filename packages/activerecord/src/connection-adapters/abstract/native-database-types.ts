@@ -6,8 +6,15 @@ export interface NativeDatabaseType {
   scale?: number;
 }
 
-export const SQLITE3_NATIVE_DATABASE_TYPES: Record<string, NativeDatabaseType> = {
-  primary_key: { name: "integer PRIMARY KEY AUTOINCREMENT NOT NULL" },
+/**
+ * A whole hash. Rails stores `:primary_key` as a bare String and every other
+ * entry as a Hash; `type_to_sql` branches on `native.is_a?(Hash)`
+ * (abstract/schema_statements.rb:1387-1388), so both shapes are load-bearing.
+ */
+export type NativeDatabaseTypes = Record<string, string | NativeDatabaseType>;
+
+export const SQLITE3_NATIVE_DATABASE_TYPES: NativeDatabaseTypes = {
+  primary_key: "integer PRIMARY KEY AUTOINCREMENT NOT NULL",
   string: { name: "varchar" },
   text: { name: "text" },
   integer: { name: "integer" },
@@ -21,8 +28,8 @@ export const SQLITE3_NATIVE_DATABASE_TYPES: Record<string, NativeDatabaseType> =
   json: { name: "json" },
 };
 
-export const MYSQL_NATIVE_DATABASE_TYPES: Record<string, NativeDatabaseType> = {
-  primary_key: { name: "bigint auto_increment PRIMARY KEY" },
+export const MYSQL_NATIVE_DATABASE_TYPES: NativeDatabaseTypes = {
+  primary_key: "bigint auto_increment PRIMARY KEY",
   string: { name: "varchar", limit: 255 },
   text: { name: "text" },
   integer: { name: "int", limit: 4 },
@@ -39,8 +46,8 @@ export const MYSQL_NATIVE_DATABASE_TYPES: Record<string, NativeDatabaseType> = {
   json: { name: "json" },
 };
 
-export const POSTGRESQL_NATIVE_DATABASE_TYPES: Record<string, NativeDatabaseType> = {
-  primary_key: { name: "bigserial primary key" },
+export const POSTGRESQL_NATIVE_DATABASE_TYPES: NativeDatabaseTypes = {
+  primary_key: "bigserial primary key",
   string: { name: "character varying" },
   text: { name: "text" },
   integer: { name: "integer", limit: 4 },
@@ -94,19 +101,18 @@ export const POSTGRESQL_NATIVE_DATABASE_TYPES: Record<string, NativeDatabaseType
  */
 export function postgresqlNativeDatabaseTypes(
   datetimeType: string,
-  overrides: Record<string, string | NativeDatabaseType> = {},
-): Record<string, NativeDatabaseType> {
-  const types: Record<string, NativeDatabaseType> = { ...POSTGRESQL_NATIVE_DATABASE_TYPES };
-  for (const [key, value] of Object.entries(overrides)) {
-    types[key] = typeof value === "string" ? { name: value } : value;
-  }
-  types["datetime"] = types[datetimeType] ?? { name: "timestamp" };
+  overrides: NativeDatabaseTypes = {},
+): NativeDatabaseTypes {
+  const types: NativeDatabaseTypes = { ...POSTGRESQL_NATIVE_DATABASE_TYPES, ...overrides };
+  // Rails assigns with no default, so a `datetime_type` naming no entry leaves
+  // `:datetime` nil and `type_to_sql(:datetime)` falls through to "datetime".
+  types["datetime"] = types[datetimeType];
   return types;
 }
 
 export const NATIVE_DATABASE_TYPES_BY_ADAPTER: Record<
   "sqlite" | "postgres" | "mysql",
-  Record<string, NativeDatabaseType>
+  NativeDatabaseTypes
 > = {
   sqlite: SQLITE3_NATIVE_DATABASE_TYPES,
   postgres: POSTGRESQL_NATIVE_DATABASE_TYPES,

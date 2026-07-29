@@ -140,7 +140,7 @@ import { UnsignedInteger } from "../type/unsigned-integer.js";
 import { Text as TextType } from "../type/text.js";
 import {
   MYSQL_NATIVE_DATABASE_TYPES,
-  type NativeDatabaseType,
+  type NativeDatabaseTypes,
 } from "./abstract/native-database-types.js";
 
 const ER_DUP_ENTRY = 1062;
@@ -580,7 +580,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return false;
   }
 
-  nativeDatabaseTypes(): Record<string, NativeDatabaseType> {
+  nativeDatabaseTypes(): NativeDatabaseTypes {
     return MYSQL_NATIVE_DATABASE_TYPES;
   }
 

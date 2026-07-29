@@ -16,7 +16,7 @@ import { isRubyTruthy } from "../ruby-truthy.js";
 import { SchemaCreation as SQLite3SchemaCreation } from "./sqlite3/schema-creation.js";
 import {
   SQLITE3_NATIVE_DATABASE_TYPES,
-  type NativeDatabaseType,
+  type NativeDatabaseTypes,
 } from "./abstract/native-database-types.js";
 import { TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema-definitions.js";
 import {
@@ -1429,7 +1429,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   // defines none), so it inherits the abstract `columnMethodNames()` list unchanged —
   // no override here is intentional.
 
-  nativeDatabaseTypes(): Record<string, NativeDatabaseType> {
+  nativeDatabaseTypes(): NativeDatabaseTypes {
     return SQLITE3_NATIVE_DATABASE_TYPES;
   }
 

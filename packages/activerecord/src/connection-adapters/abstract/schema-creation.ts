@@ -25,6 +25,7 @@ import { ABSTRACT_SCHEMA_QUOTER } from "./quoting.js";
 import {
   NATIVE_DATABASE_TYPES_BY_ADAPTER,
   type NativeDatabaseType,
+  type NativeDatabaseTypes,
 } from "./native-database-types.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -391,9 +392,9 @@ export class SchemaCreation {
   }
 
   /** @internal */
-  protected nativeDatabaseTypes(): Record<string, NativeDatabaseType> {
+  protected nativeDatabaseTypes(): NativeDatabaseTypes {
     const fromAdapter = (
-      this.adapter as { nativeDatabaseTypes?(): Record<string, NativeDatabaseType> }
+      this.adapter as { nativeDatabaseTypes?(): NativeDatabaseTypes }
     ).nativeDatabaseTypes?.();
     return fromAdapter ?? NATIVE_DATABASE_TYPES_BY_ADAPTER[this.adapterName];
   }
@@ -407,11 +408,13 @@ export class SchemaCreation {
         throw new Error(`Column has an empty or blank type — specify a valid SQL type`);
       else sql = String(type);
     } else {
-      sql = native.name ?? String(type);
+      // schema_statements.rb:1387 — `native.is_a?(Hash) ? native[:name] : native`.
+      const spec: NativeDatabaseType = typeof native === "string" ? { name: native } : native;
+      sql = spec.name ?? String(type);
       let { precision, scale, limit } = options;
       if (type === "decimal") {
-        scale ??= native.scale;
-        precision ??= native.precision;
+        scale ??= spec.scale;
+        precision ??= spec.precision;
         if (precision != null) {
           sql += scale != null ? `(${precision},${scale})` : `(${precision})`;
         } else if (scale != null) {
@@ -419,16 +422,16 @@ export class SchemaCreation {
         }
       } else if (
         (type === "datetime" || type === "timestamp" || type === "time" || type === "interval") &&
-        (precision ??= native.precision) != null
+        (precision ??= spec.precision) != null
       ) {
         if (precision >= 0 && precision <= 6) {
           sql += `(${precision})`;
         } else {
           throw new ArgumentError(
-            `No ${native.name} type has precision of ${precision}. The allowed range of precision is from 0 to 6`,
+            `No ${spec.name} type has precision of ${precision}. The allowed range of precision is from 0 to 6`,
           );
         }
-      } else if (type !== "primary_key" && (limit ??= native.limit) != null) {
+      } else if (type !== "primary_key" && (limit ??= spec.limit) != null) {
         sql += `(${limit})`;
       }
     }
