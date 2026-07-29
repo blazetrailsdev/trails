@@ -86,6 +86,24 @@ export const POSTGRESQL_NATIVE_DATABASE_TYPES: Record<string, NativeDatabaseType
   enum: {},
 };
 
+/**
+ * Mirrors `PostgreSQLAdapter.native_database_types` (postgresql_adapter.rb:404-408):
+ * duplicates the constant and replaces the raw `datetime: {}` placeholder with
+ * the entry named by `datetime_type` before any caller reads it. `type_to_sql`
+ * never sees the unresolved placeholder.
+ */
+export function postgresqlNativeDatabaseTypes(
+  datetimeType: string,
+  overrides: Record<string, string | NativeDatabaseType> = {},
+): Record<string, NativeDatabaseType> {
+  const types: Record<string, NativeDatabaseType> = { ...POSTGRESQL_NATIVE_DATABASE_TYPES };
+  for (const [key, value] of Object.entries(overrides)) {
+    types[key] = typeof value === "string" ? { name: value } : value;
+  }
+  types["datetime"] = types[datetimeType] ?? { name: "timestamp" };
+  return types;
+}
+
 export const NATIVE_DATABASE_TYPES_BY_ADAPTER: Record<
   "sqlite" | "postgres" | "mysql",
   Record<string, NativeDatabaseType>

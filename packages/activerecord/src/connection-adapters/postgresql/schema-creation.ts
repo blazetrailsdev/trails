@@ -7,6 +7,11 @@
 import { wrap } from "@blazetrails/activesupport";
 import { SchemaCreation as AbstractSchemaCreation } from "../abstract/schema-creation.js";
 import {
+  postgresqlNativeDatabaseTypes,
+  type NativeDatabaseType,
+} from "../abstract/native-database-types.js";
+import { pgDatetimeConfig } from "./pg-datetime-config.js";
+import {
   type ForeignKeyDefinition,
   type ColumnOptions,
   type AddColumnOptions,
@@ -80,13 +85,6 @@ export class SchemaCreation extends AbstractSchemaCreation {
     type: Parameters<AbstractSchemaCreation["typeToSql"]>[0],
     options: Parameters<AbstractSchemaCreation["typeToSql"]>[1] = {},
   ): string {
-    if ((type as string) === "primary_key") {
-      // Mirrors Rails NATIVE_DATABASE_TYPES[:primary_key] = "bigserial primary
-      // key". PostgreSQLAdapter.typeToSql can't resolve it (NATIVE_DATABASE_TYPES
-      // is keyed camelCase `primaryKey`) and the abstract base returns int4
-      // "SERIAL PRIMARY KEY", so emit the native bigserial string directly.
-      return "bigserial primary key";
-    }
     // Delegate to the adapter's typeToSql when available (Rails parity:
     // `delegate :type_to_sql, to: :@conn`). Fall back to the abstract
     // implementation when no real adapter is present (e.g. unit-test context
@@ -95,6 +93,21 @@ export class SchemaCreation extends AbstractSchemaCreation {
       return this.adapter.typeToSql(type as string, options as Record<string, unknown>);
     }
     return super.typeToSql(type, options);
+  }
+
+  /**
+   * Mirrors `PostgreSQLAdapter#native_database_types` (postgresql_adapter.rb:404):
+   * the constant's raw `datetime: {}` placeholder is replaced by the entry named
+   * by `datetime_type` before `type_to_sql` reads it. Without this override the
+   * host-less path (no adapter threaded) would resolve `datetime` against the
+   * unresolved placeholder and emit a literal `datetime`.
+   * @internal
+   */
+  protected override nativeDatabaseTypes(): Record<string, NativeDatabaseType> {
+    return postgresqlNativeDatabaseTypes(
+      pgDatetimeConfig.datetimeType,
+      pgDatetimeConfig.nativeDatabaseTypesOverrides,
+    );
   }
 
   /** @internal */

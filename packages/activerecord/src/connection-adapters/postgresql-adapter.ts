@@ -134,6 +134,7 @@ import { pgDatetimeConfig } from "./postgresql/pg-datetime-config.js";
 import { abandonRawSocket } from "./abandon-raw-socket.js";
 import {
   POSTGRESQL_NATIVE_DATABASE_TYPES,
+  postgresqlNativeDatabaseTypes,
   type NativeDatabaseType,
 } from "./abstract/native-database-types.js";
 
@@ -2499,12 +2500,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // The datetime entry is resolved dynamically from datetimeType, matching Rails'
   // `types[:datetime] = types[datetime_type]`.
   static nativeDatabaseTypes(): Record<string, NativeDatabaseType> {
-    const types: Record<string, NativeDatabaseType> = { ...this.NATIVE_DATABASE_TYPES };
-    for (const [key, value] of Object.entries(pgDatetimeConfig.nativeDatabaseTypesOverrides)) {
-      types[key] = typeof value === "string" ? { name: value } : value;
-    }
-    types["datetime"] = types[this.datetimeType] ?? { name: "timestamp" };
-    return types;
+    return postgresqlNativeDatabaseTypes(
+      this.datetimeType,
+      pgDatetimeConfig.nativeDatabaseTypesOverrides,
+    );
   }
 
   // Mirrors: PostgreSQLAdapter#native_database_types (postgresql_adapter.rb:400)

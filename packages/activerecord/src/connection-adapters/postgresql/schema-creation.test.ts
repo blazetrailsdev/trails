@@ -216,4 +216,18 @@ describe("PostgreSQL SchemaCreation", () => {
     } as any) as any;
     expect(sc.quotedIncludeColumnsForIndex(["a", "b"])).toBe("<<delegated>>");
   });
+
+  // Rails' PostgreSQLAdapter#native_database_types replaces the constant's raw
+  // `datetime: {}` placeholder with `types[datetime_type]` before type_to_sql
+  // reads it (postgresql_adapter.rb:404-408), so `datetime` is never resolved
+  // against the empty placeholder — not even without an adapter threaded.
+  it("resolves datetime through datetimeType with no adapter threaded", () => {
+    const hostless = new SchemaCreation({
+      quoteIdentifier: (n: string) => `"${n}"`,
+      quoteTableName: (n: string) => `"${n}"`,
+      quoteDefaultExpression: (v: unknown) => ` DEFAULT ${v}`,
+    } as any);
+    expect(hostless.typeToSql("datetime", { precision: 6 })).toBe("timestamp(6)");
+    expect(hostless.typeToSql("primary_key")).toBe("bigserial primary key");
+  });
 });
