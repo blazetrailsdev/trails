@@ -492,13 +492,16 @@ function bracketSource(pattern, start, areEscapes = false) {
     source += "\\]";
     i++;
   }
+  // Where the members start, so a `-` in first position is read as the literal
+  // it is in both grammars rather than as the open end of a range.
+  const bodyStart = source.length;
   for (; i < pattern.length && pattern[i] !== "]"; i++) {
     const ch = pattern[i];
     if (ch === "[" && ":.=".includes(pattern[i + 1] ?? "")) return null;
     if (ch === "\\") {
       const next = pattern[i + 1];
       if (!areEscapes || next === undefined || !ARE_SHORTHANDS.has(next)) return null;
-      if (source.endsWith("-") && !source.endsWith("[-")) return null;
+      if (source.endsWith("-") && source.length - 1 > bodyStart) return null;
       if (pattern[i + 2] === "-" && (pattern[i + 3] ?? "]") !== "]") return null;
       source += `\\${next}`;
       i++;
