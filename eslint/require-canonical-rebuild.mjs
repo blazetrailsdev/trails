@@ -134,11 +134,9 @@ const rule = {
         case "TSNonNullExpression":
           return node.expression;
         case "ConditionalExpression":
+          return node.consequent;
         case "LogicalExpression":
-          // Both are two-successor nodes squeezed into a single-successor
-          // walker: follow the branch people actually write the real value in
-          // (`row.tablename ?? ""`, `row.tablename ? row.tablename : "x"`).
-          return node.type === "LogicalExpression" ? node.left : node.consequent;
+          return node.left;
         case "MemberExpression":
           return node.object;
         case "TemplateLiteral":

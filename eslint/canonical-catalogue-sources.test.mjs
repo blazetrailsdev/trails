@@ -10,11 +10,6 @@ import {
 
 const packagesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "packages");
 
-// A catalogue read: something in a relation position (`FROM x`, `JOIN x`) whose
-// name belongs to one of the catalogue families. Restricting to the relation
-// position is what makes this measurable — `pg_` and `sqlite_` also prefix
-// constants (`SQLITE_OPEN_URI`), env var names (`PG_TEST_URL`) and functions,
-// none of which a sweep can read a table name out of.
 const RELATION =
   /\b(?:from|join)\s+(pg_[a-z_]+|sqlite_[a-z_]+|pragma_[a-z_]+|information_schema\.[a-z_]+)\b/gi;
 
@@ -33,8 +28,8 @@ async function catalogueReads() {
     const source = await fs.readFile(file, "utf8");
     for (const [, name] of source.matchAll(RELATION)) {
       const key = name.toLowerCase();
-      if (!found.has(key)) found.set(key, new Set());
-      found.get(key).add(path.relative(packagesDir, file));
+      const files = found.get(key) ?? found.set(key, new Set()).get(key);
+      files.add(path.relative(packagesDir, file));
     }
   }
   return found;
@@ -42,16 +37,25 @@ async function catalogueReads() {
 
 describe("canonical catalogue sources", () => {
   it("classifies every catalogue relation read under packages/", async () => {
+    const reads = await catalogueReads();
+    expect(
+      reads.size,
+      "the packages/ scan matched nothing — the RELATION probe stopped working",
+    ).toBeGreaterThan(10);
+
     const unclassified = [];
-    for (const [name, files] of await catalogueReads()) {
+    for (const [name, files] of reads) {
       const known = CATALOGUE_SOURCE.test(name) || Object.hasOwn(NON_TABLE_CATALOGUES, name);
-      if (!known) unclassified.push(`${name} (e.g. ${[...files][0]})`);
+      if (!known) unclassified.push(`${name} (e.g. ${[...files].sort()[0]})`);
     }
     expect(
-      unclassified,
-      "A catalogue relation is read under packages/ that eslint/canonical-catalogue-sources.mjs " +
-        "does not classify. If a SELECT against it can return a TABLE NAME, add it to " +
-        "TABLE_NAME_CATALOGUES so require-canonical-rebuild sees sweeps driven by it; otherwise " +
+      unclassified.sort(),
+      "A catalogue relation is read in a relation position (FROM x / JOIN x) under packages/ that " +
+        "eslint/canonical-catalogue-sources.mjs does not classify. require-canonical-rebuild can " +
+        "only see a sweep whose catalogue it recognises, and that list rotted silently once " +
+        "already (pragma_table_list was missing until review round 2 of PR #5519, which left the " +
+        "whole SQLite lane blind) — this test exists so it cannot rot again. If a SELECT against " +
+        "the relation below can return a TABLE NAME, add it to TABLE_NAME_CATALOGUES; otherwise " +
         "add it to NON_TABLE_CATALOGUES with the reason it cannot name a table.",
     ).toEqual([]);
   });
@@ -59,14 +63,23 @@ describe("canonical catalogue sources", () => {
   it("never classifies a relation as both able and unable to name a table", () => {
     const both = TABLE_NAME_CATALOGUES.filter((name) => Object.hasOwn(NON_TABLE_CATALOGUES, name));
     expect(both).toEqual([]);
+    expect(TABLE_NAME_CATALOGUES).toEqual([...new Set(TABLE_NAME_CATALOGUES)]);
   });
 
   it("matches every table-name catalogue and no non-table one", () => {
-    for (const name of TABLE_NAME_CATALOGUES) expect(CATALOGUE_SOURCE.test(name)).toBe(true);
-    for (const name of Object.keys(NON_TABLE_CATALOGUES)) {
+    for (const name of TABLE_NAME_CATALOGUES) {
+      expect(CATALOGUE_SOURCE.test(name), `${name} must arm the sweep check`).toBe(true);
+    }
+    for (const [name, reason] of Object.entries(NON_TABLE_CATALOGUES)) {
       expect(CATALOGUE_SOURCE.test(name), `${name} is classified as unable to name a table`).toBe(
         false,
       );
+      expect(reason.length, `${name} needs a reason, not an empty string`).toBeGreaterThan(0);
     }
+  });
+
+  it("does not match a longer name that merely starts with a catalogue", () => {
+    expect(CATALOGUE_SOURCE.test("pg_tablespaces")).toBe(false);
+    expect(CATALOGUE_SOURCE.test("sqlite_masterful")).toBe(false);
   });
 });
