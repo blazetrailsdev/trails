@@ -54,16 +54,6 @@ function slotCount(): number {
   return workerForkCount() <= 1 ? 1 : slotPoolSize();
 }
 
-/**
- * Mint this invocation's run token and publish it to the workers.
- *
- * Every lane needs it, not just sqlite: `scratchDatabasePath` and
- * `fallbackDatabasePath` build on-disk sqlite files whatever the active
- * adapter is (`multi-db-migrator.test.ts` opens one on a PG run too), and the
- * teardown sweep only matches files stamped with the token. Without this the
- * token-less fallbacks (`"x"`, or a random per-process token) are reachable
- * only by the 6h stale sweep, which itself runs on sqlite runs alone.
- */
 function currentRunToken(): string {
   return (process.env[RUN_TOKEN_ENV] ??= `${Date.now()}-${Math.floor(Math.random() * 1e9)}`);
 }
@@ -273,9 +263,6 @@ const mysqlAdapter: DbTemplateAdapter = {
 const ADAPTERS: DbTemplateAdapter[] = [sqliteAdapter, pgAdapter, mysqlAdapter];
 
 export default async function setup(): Promise<(() => Promise<void>) | undefined> {
-  // Lane-independent: temp sqlite DBs are created on PG and MySQL runs too, so
-  // the stale sweep and the run-token sweep are armed before any adapter
-  // dispatch and torn down after all of them.
   await sweepStaleDbFiles();
   const runToken = currentRunToken();
   const teardowns: (() => Promise<void>)[] = [];
@@ -288,7 +275,6 @@ export default async function setup(): Promise<(() => Promise<void>) | undefined
 
   return async () => {
     await Promise.all(teardowns.map((t) => t()));
-    // Last, so files an adapter teardown itself leaves behind are still caught.
     await sweepRunDbFiles(runToken);
   };
 }

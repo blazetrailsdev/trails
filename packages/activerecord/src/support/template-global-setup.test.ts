@@ -1,13 +1,3 @@
-/**
- * Lane-independent probe: globalSetup must stamp the run token on *every*
- * adapter lane, not just sqlite.
- *
- * The teardown sweep (`sweepRunDbFiles`) matches temp DB files by run token,
- * and `scratchDatabasePath` / `fallbackDatabasePath` mint on-disk sqlite files
- * whatever the active lane is — `multi-db-migrator.test.ts` opens one on a PG
- * run too. If the token were sqlite-only those files would carry the `"x"` (or
- * a random per-process) fallback stamp and survive the run.
- */
 import { describe, it, expect } from "vitest";
 import { RUN_TOKEN_ENV } from "./sqlite-template.js";
 import { scratchDatabasePath } from "./scratch-database.js";
