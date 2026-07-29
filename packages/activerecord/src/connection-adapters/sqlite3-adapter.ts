@@ -2418,7 +2418,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       .map((c) => c.name)
       .filter((n) => colNames.includes(renamed(n)));
 
-    // Rails: transaction { disable_referential_integrity { move_table(...) } }
     await this.transaction(async () => {
       await this.disableReferentialIntegrity(async () => {
         // Rails' alter_table is two move_table calls, each copy_table + drop_table
