@@ -1,5 +1,6 @@
 import { describe, it, type SuiteFactory, type TestFunction } from "vitest";
 import { adapterType } from "../test-adapter.js";
+import { inMemoryDb } from "./adapter-helper.js";
 
 /**
  * TS mirror of Rails' connection `supports_<feature>?` predicates — the
@@ -29,6 +30,17 @@ import { adapterType } from "../test-adapter.js";
  * test converts directly to `itIfSupports("<key>", …)`. Add a key when a
  * suite first gates on it; an unknown key throws rather than silently running
  * everywhere — catching typos and undocumented capability assumptions.
+ *
+ * Why it is not the connection-backed lookup `adapter_helper.rb:66-83` uses
+ * (`define_method(m) { Base.lease_connection.public_send(m) }`): these gates are
+ * evaluated while vitest *collects* the file, and `describe`/`it` registration
+ * is synchronous, so there is nothing to await a lease on. The static table is
+ * therefore load-bearing and stays. What replaces the delegation's built-in
+ * accuracy is `supports-live-adapter.trails.test.ts`, which reconciles every
+ * key here against the running lane's real `supports_<key>?()` — generalizing
+ * the `expression_index` probe below from one key to all of them, so a
+ * transcription that drifts from the adapter fails loudly instead of silently
+ * mis-gating a suite.
  *
  * The table mirrors Rails' `supports_<feature>?` *for the matrix versions* —
  * it bakes in Rails' `mariadb?` / `database_version` branching for the fixed
@@ -60,8 +72,12 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   json: ALL,
   // SQL-standard COMMENT ON / inline column comments — not SQLite.
   comments: ["postgres", "mysql"],
-  // SQLite's in-memory shared-cache connection can't run truly concurrently.
-  concurrent_connections: ["postgres", "mysql"],
+  // `supports_concurrent_connections?`: `!@memory_database` on SQLite
+  // (sqlite3_adapter.rb:198), true elsewhere. The sqlite lane is file-backed by
+  // default and `:memory:` only under `sqlite3_mem`, so this one is config-
+  // derived rather than adapter-keyed — `inMemoryDb()` reads the same `arunit`
+  // entry the pool is established from, no connection required.
+  concurrent_connections: inMemoryDb() ? ["postgres", "mysql"] : ALL,
   // `ON CONFLICT (target)` — Postgres/SQLite only; MySQL has no conflict
   // target. Matches `adapterType !== "mysql"` in insert-all.test.ts.
   insert_conflict_target: ["postgres", "sqlite"],
@@ -167,6 +183,19 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // so re-introduces an adapter restriction the extractor will flag as wrong-gate.
   transaction_isolation: ALL,
 };
+
+/**
+ * Every feature key the table answers, in declaration order.
+ *
+ * The static table is load-bearing — {@link describeIfSupports} and
+ * {@link itIfSupports} run at test-collection time, before `Base` has a
+ * connection to ask, so the gates cannot delegate to the leased connection the
+ * way `adapter_helper.rb:66-83` does. This export exists so
+ * `supports-live-adapter.trails.test.ts` can reconcile every key against the
+ * running lane's live `supports_<key>?()` and fail loudly on drift, which is
+ * the safety net Rails gets for free by never transcribing the answers.
+ */
+export const SUPPORTS_FEATURES: readonly string[] = Object.keys(SUPPORTS);
 
 /**
  * Does the active backend support Rails' `supports_<feature>?` capability?

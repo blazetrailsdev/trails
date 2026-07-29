@@ -1324,6 +1324,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return this.databaseVersion.gte("3.24.0");
   }
 
+  override supportsInsertOnDuplicateSkip(): boolean {
+    return this.supportsInsertOnConflict();
+  }
+
+  override supportsInsertOnDuplicateUpdate(): boolean {
+    return this.supportsInsertOnConflict();
+  }
+
   override supportsInsertConflictTarget(): boolean {
     return this.supportsInsertOnConflict();
   }
