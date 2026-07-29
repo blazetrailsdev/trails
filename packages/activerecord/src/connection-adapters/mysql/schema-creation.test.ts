@@ -285,3 +285,37 @@ describe("MySQL::TableDefinition#toSql via SchemaCreation.accept", () => {
     expect(await toSql(td, host)).not.toContain("CHECK");
   });
 });
+
+describe("MySQL::TableDefinition column methods", () => {
+  it("defines one column per name, mirroring `names.each` in define_column_methods", () => {
+    const td = new MyTd("t", { id: false });
+    td.longtext("body", "summary");
+    td.unsignedInteger("hits", "misses");
+
+    expect(td.columns.map((c) => c.name)).toEqual(["body", "summary", "hits", "misses"]);
+    expect(td.columns.map((c) => c.sqlType)).toEqual([
+      "LONGTEXT",
+      "LONGTEXT",
+      "INT UNSIGNED",
+      "INT UNSIGNED",
+    ]);
+  });
+
+  it("applies the shared options and per-name sizing to every blob name", () => {
+    const td = new MyTd("t", { id: false });
+    td.blob("thumb", "preview", { limit: 300 });
+
+    expect(td.columns.map((c) => c.name)).toEqual(["thumb", "preview"]);
+    expect(td.columns.map((c) => c.sqlType)).toEqual(["BLOB", "BLOB"]);
+  });
+
+  it("raises when called with no column name", () => {
+    const td = new MyTd("t", { id: false });
+
+    expect(() => (td.blob as () => unknown)()).toThrow("Missing column name(s) for blob");
+    expect(() => (td.tinytext as () => unknown)()).toThrow("Missing column name(s) for tinytext");
+    expect(() => (td.unsignedBigint as () => unknown)()).toThrow(
+      "Missing column name(s) for unsigned_bigint",
+    );
+  });
+});

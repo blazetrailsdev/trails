@@ -43,6 +43,7 @@ import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { deduplicate } from "../deduplicable.js";
 import { singularize, pluralize, getCrypto, isPresent } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
+import { rubyInspect } from "../../relation/ruby-inspect.js";
 import { Utils as PgUtils } from "../postgresql/utils.js";
 import { indexes as sqliteIndexes } from "../sqlite3/schema-statements.js";
 import {
@@ -431,6 +432,9 @@ export class SchemaStatements {
     _type?: string,
     options: { ifExists?: boolean } = {},
   ): Promise<void> {
+    if (columnName === undefined) {
+      throw new ArgumentError("wrong number of arguments (given 1, expected 2..3)");
+    }
     if (options.ifExists && !(await this.columnExists(tableName, columnName))) {
       return;
     }
@@ -700,6 +704,7 @@ export class SchemaStatements {
     allowNull: boolean,
     defaultValue?: unknown,
   ): Promise<void> {
+    this.validateChangeColumnNullArgumentBang(allowNull);
     if (!allowNull && defaultValue !== undefined) {
       const quoted = await this.adapter.quoteDefaultExpression(defaultValue);
       await this.adapter.execute(
@@ -959,30 +964,19 @@ export class SchemaStatements {
   }
 
   async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
-    // Rails (abstract/schema_statements.rb:1459) issues a single combined ALTER TABLE for every
-    // adapter and relies on SQLite's adapter-level override to swap in the alter_table rebuild
-    // path. trails uses a wrapper SchemaAdapter that cannot dispatch back to inner-adapter
-    // overrides, so we branch on supportsBulkAlter() here: bulk-alter adapters (MySQL, PG) get
-    // the combined ALTER TABLE; non-bulk adapters fall back to two sequential addColumn calls.
-    // trails' SQLite3Adapter still defines its own addTimestamps override for direct callers.
-    if ((this.adapter as any).supportsBulkAlter?.() === true) {
-      const fragments = await this.addTimestampsForAlter(tableName, options);
-      await this.adapter.execute(`ALTER TABLE ${this._qt(tableName)} ${fragments.join(", ")}`);
-      return;
+    const adapter = this.adapter as any;
+    if (
+      adapter !== (this as unknown) &&
+      typeof adapter.addTimestamps === "function" &&
+      adapter.addTimestamps !== SchemaStatements.prototype.addTimestamps
+    ) {
+      return adapter.addTimestamps(tableName, options);
     }
-
-    const opts: ColumnOptions = { ...options, null: options.null ?? false };
-    if (!("precision" in opts) && (this.adapter as any).supportsDatetimeWithPrecision?.()) {
-      opts.precision = 6;
-    }
-    await this.addColumn(tableName, "created_at", "datetime", opts);
-    await this.addColumn(tableName, "updated_at", "datetime", opts);
+    const fragments = await this.addTimestampsForAlter(tableName, options);
+    await this.adapter.execute(`ALTER TABLE ${this._qt(tableName)} ${fragments.join(", ")}`);
   }
 
   async removeTimestamps(tableName: string): Promise<void> {
-    // Mirrors Rails (abstract/schema_statements.rb:1468): route through removeColumns so
-    // adapter overrides apply. The default removeColumns loops sequentially (matching Rails);
-    // SQLite overrides to use a single alter_table rebuild.
     await this.removeColumns(tableName, "updated_at", "created_at");
   }
 
@@ -1116,9 +1110,22 @@ export class SchemaStatements {
       ifExists?: boolean;
     };
     const columns = columnsOrOptions as string[];
-    for (const col of columns) {
-      await this.removeColumn(tableName, col, opts.type, { ifExists: opts.ifExists });
+    if (columns.length === 0) {
+      throw new ArgumentError(
+        "You must specify at least one column name. Example: remove_columns(:people, :first_name)",
+      );
     }
+    const adapter = this.adapter as any;
+    if (
+      adapter !== (this as unknown) &&
+      typeof adapter.removeColumns === "function" &&
+      adapter.removeColumns !== SchemaStatements.prototype.removeColumns
+    ) {
+      return adapter.removeColumns(tableName, ...columns);
+    }
+    this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
+    const fragments = this.removeColumnsForAlter(tableName, columns, opts);
+    await this.adapter.execute(`ALTER TABLE ${this._qt(tableName)} ${fragments.join(", ")}`);
   }
 
   async addColumns(
@@ -2180,7 +2187,7 @@ export class SchemaStatements {
   validateChangeColumnNullArgumentBang(value: unknown): void {
     if (value !== true && value !== false) {
       throw new ArgumentError(
-        `change_column_null expects a boolean value (true for NULL, false for NOT NULL). Got: ${String(value)}`,
+        `change_column_null expects a boolean value (true for NULL, false for NOT NULL). Got: ${rubyInspect(value)}`,
       );
     }
   }

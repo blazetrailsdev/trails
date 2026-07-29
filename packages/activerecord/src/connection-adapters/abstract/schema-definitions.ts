@@ -667,23 +667,40 @@ export class IndexDefinition {
  * Interface for column type methods shared between TableDefinition and Table.
  */
 export interface ColumnMethods {
-  string(name: string, options?: ColumnOptions): unknown;
-  text(name: string, options?: ColumnOptions): unknown;
-  integer(name: string, options?: ColumnOptions): unknown;
-  bigint(name: string, options?: ColumnOptions): unknown;
-  float(name: string, options?: ColumnOptions): unknown;
-  decimal(name: string, options?: ColumnOptions): unknown;
-  boolean(name: string, options?: ColumnOptions): unknown;
-  date(name: string, options?: ColumnOptions): unknown;
-  datetime(name: string, options?: ColumnOptions): unknown;
-  timestamp(name: string, options?: ColumnOptions): unknown;
-  binary(name: string, options?: ColumnOptions): unknown;
-  blob(name: string, options?: ColumnOptions): unknown;
-  numeric(name: string, options?: ColumnOptions): unknown;
-  json(name: string, options?: ColumnOptions): unknown;
+  string(...names: string[]): unknown;
+  string(...args: [...names: string[], options: ColumnOptions]): unknown;
+  text(...names: string[]): unknown;
+  text(...args: [...names: string[], options: ColumnOptions]): unknown;
+  integer(...names: string[]): unknown;
+  integer(...args: [...names: string[], options: ColumnOptions]): unknown;
+  bigint(...names: string[]): unknown;
+  bigint(...args: [...names: string[], options: ColumnOptions]): unknown;
+  float(...names: string[]): unknown;
+  float(...args: [...names: string[], options: ColumnOptions]): unknown;
+  decimal(...names: string[]): unknown;
+  decimal(...args: [...names: string[], options: ColumnOptions]): unknown;
+  boolean(...names: string[]): unknown;
+  boolean(...args: [...names: string[], options: ColumnOptions]): unknown;
+  date(...names: string[]): unknown;
+  date(...args: [...names: string[], options: ColumnOptions]): unknown;
+  datetime(...names: string[]): unknown;
+  datetime(...args: [...names: string[], options: ColumnOptions]): unknown;
+  timestamp(...names: string[]): unknown;
+  timestamp(...args: [...names: string[], options: ColumnOptions]): unknown;
+  binary(...names: string[]): unknown;
+  binary(...args: [...names: string[], options: ColumnOptions]): unknown;
+  blob(...names: string[]): unknown;
+  blob(...args: [...names: string[], options: ColumnOptions]): unknown;
+  numeric(...names: string[]): unknown;
+  numeric(...args: [...names: string[], options: ColumnOptions]): unknown;
+  json(...names: string[]): unknown;
+  json(...args: [...names: string[], options: ColumnOptions]): unknown;
+  virtual(...names: string[]): unknown;
   virtual(
-    name: string,
-    options?: ColumnOptions & { type?: ColumnType; as?: string; stored?: boolean },
+    ...args: [
+      ...names: string[],
+      options: ColumnOptions & { type?: ColumnType; as?: string; stored?: boolean },
+    ]
   ): unknown;
 }
 
@@ -1294,86 +1311,134 @@ export class TableDefinition {
       if (!(type in TableDefinition.prototype)) {
         (TableDefinition.prototype as any)[type] = function (
           this: TableDefinition,
-          name: string,
-          options: ColumnOptions = {},
+          ...args: unknown[]
         ) {
-          return this.column(name, type as ColumnType, options);
+          return this.definedColumn(type as ColumnType, args);
         };
       }
     }
   }
 
-  string(name: string, options: ColumnOptions = {}): this {
-    return this.column(name, "string", options);
+  /** @internal */
+  protected definedColumn(type: ColumnType, args: unknown[]): this {
+    const rest = [...args];
+    const last = rest[rest.length - 1];
+    const options = (typeof last === "object" && last !== null ? rest.pop() : {}) as ColumnOptions;
+    const names = rest as string[];
+    if (names.length === 0) {
+      throw new ArgumentError(`Missing column name(s) for ${type}`);
+    }
+    for (const name of names) {
+      this.column(name, type, options);
+    }
+    return this;
   }
 
-  text(name: string, options: ColumnOptions = {}): this {
-    return this.column(name, "text", options);
+  string(...names: string[]): this;
+  string(...args: [...names: string[], options: ColumnOptions]): this;
+  string(...args: unknown[]): this {
+    return this.definedColumn("string", args);
   }
 
-  integer(name: string, options: ColumnOptions = {}): this {
-    return this.column(name, "integer", options);
+  text(...names: string[]): this;
+  text(...args: [...names: string[], options: ColumnOptions]): this;
+  text(...args: unknown[]): this {
+    return this.definedColumn("text", args);
   }
 
-  bigint(name: string, options: ColumnOptions = {}): this {
-    return this.column(name, "bigint", options);
+  integer(...names: string[]): this;
+  integer(...args: [...names: string[], options: ColumnOptions]): this;
+  integer(...args: unknown[]): this {
+    return this.definedColumn("integer", args);
   }
 
-  float(name: string, options: ColumnOptions = {}): this {
-    return this.column(name, "float", options);
+  bigint(...names: string[]): this;
+  bigint(...args: [...names: string[], options: ColumnOptions]): this;
+  bigint(...args: unknown[]): this {
+    return this.definedColumn("bigint", args);
   }
 
-  decimal(name: string, options: ColumnOptions = {}): this {
+  float(...names: string[]): this;
+  float(...args: [...names: string[], options: ColumnOptions]): this;
+  float(...args: unknown[]): this {
+    return this.definedColumn("float", args);
+  }
+
+  decimal(...names: string[]): this;
+  decimal(...args: [...names: string[], options: ColumnOptions]): this;
+  decimal(...args: unknown[]): this {
     // Rails' TableDefinition#decimal performs no validation; a scale without a
     // precision is rejected later in type_to_sql (schema_statements.rb:1400),
     // so the same ArgumentError covers every column-creation path.
-    return this.column(name, "decimal", options);
+    return this.definedColumn("decimal", args);
   }
 
-  boolean(name: string, options: ColumnOptions = {}): this {
-    return this.column(name, "boolean", options);
+  boolean(...names: string[]): this;
+  boolean(...args: [...names: string[], options: ColumnOptions]): this;
+  boolean(...args: unknown[]): this {
+    return this.definedColumn("boolean", args);
   }
 
-  date(name: string, options: ColumnOptions = {}): this {
-    return this.column(name, "date", options);
+  date(...names: string[]): this;
+  date(...args: [...names: string[], options: ColumnOptions]): this;
+  date(...args: unknown[]): this {
+    return this.definedColumn("date", args);
   }
 
-  time(name: string, options: ColumnOptions = {}): this {
-    return this.column(name, "time", options);
+  time(...names: string[]): this;
+  time(...args: [...names: string[], options: ColumnOptions]): this;
+  time(...args: unknown[]): this {
+    return this.definedColumn("time", args);
   }
 
-  datetime(name: string, options: ColumnOptions = {}): this {
-    return this.column(name, "datetime", options);
+  datetime(...names: string[]): this;
+  datetime(...args: [...names: string[], options: ColumnOptions]): this;
+  datetime(...args: unknown[]): this {
+    return this.definedColumn("datetime", args);
   }
 
-  timestamp(name: string, options: ColumnOptions = {}): this {
-    return this.column(name, "timestamp", options);
+  timestamp(...names: string[]): this;
+  timestamp(...args: [...names: string[], options: ColumnOptions]): this;
+  timestamp(...args: unknown[]): this {
+    return this.definedColumn("timestamp", args);
   }
 
-  binary(name: string, options: ColumnOptions = {}): this {
-    return this.column(name, "binary", options);
+  binary(...names: string[]): this;
+  binary(...args: [...names: string[], options: ColumnOptions]): this;
+  binary(...args: unknown[]): this {
+    return this.definedColumn("binary", args);
   }
 
   // Mirrors Rails' `alias :blob :binary` / `alias :numeric :decimal` in
   // abstract/schema_definitions.rb — `t.blob`/`t.numeric` create binary/decimal
   // columns that introspect (and dump) back as `t.binary`/`t.decimal`.
-  blob(name: string, options: ColumnOptions = {}): this {
-    return this.binary(name, options);
+  blob(...names: string[]): this;
+  blob(...args: [...names: string[], options: ColumnOptions]): this;
+  blob(...args: unknown[]): this {
+    return this.definedColumn("binary", args);
   }
 
-  numeric(name: string, options: ColumnOptions = {}): this {
-    return this.decimal(name, options);
+  numeric(...names: string[]): this;
+  numeric(...args: [...names: string[], options: ColumnOptions]): this;
+  numeric(...args: unknown[]): this {
+    return this.definedColumn("decimal", args);
   }
 
-  json(name: string, options: ColumnOptions = {}): this {
-    return this.column(name, "json", options);
+  json(...names: string[]): this;
+  json(...args: [...names: string[], options: ColumnOptions]): this;
+  json(...args: unknown[]): this {
+    return this.definedColumn("json", args);
   }
 
+  virtual(...names: string[]): this;
   virtual(
-    name: string,
-    options: ColumnOptions & { type?: ColumnType; as?: string; stored?: boolean } = {},
-  ): this {
-    return this.column(name, "virtual" as ColumnType, options);
+    ...args: [
+      ...names: string[],
+      options: ColumnOptions & { type?: ColumnType; as?: string; stored?: boolean },
+    ]
+  ): this;
+  virtual(...args: unknown[]): this {
+    return this.definedColumn("virtual" as ColumnType, args);
   }
 
   jsonb(...names: string[]): this;

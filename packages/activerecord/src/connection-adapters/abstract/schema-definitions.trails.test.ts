@@ -183,3 +183,29 @@ describe("ReferenceDefinition#foreign_table_name", () => {
     expect(td.foreignKeys[0].toTable).toBe("accounts");
   });
 });
+
+describe("TableDefinition column methods", () => {
+  it("defines one column per name, mirroring `names.each` in define_column_methods", () => {
+    const td = new TableDefinition("posts", { id: false });
+    td.string("goat", "sheep", { limit: 40 });
+
+    expect(td.columns.map((c) => c.name)).toEqual(["goat", "sheep"]);
+    expect(td.columns.map((c) => c.options.limit)).toEqual([40, 40]);
+  });
+
+  it("defines a single column when no options are passed", () => {
+    const td = new TableDefinition("posts", { id: false });
+    td.integer("votes");
+
+    expect(td.columns.map((c) => c.name)).toEqual(["votes"]);
+  });
+
+  it("raises when called with no column name", () => {
+    const td = new TableDefinition("posts", { id: false });
+
+    expect(() => (td.timestamp as () => unknown)()).toThrow("Missing column name(s) for timestamp");
+    expect(() => (td.string as (o: object) => unknown)({ limit: 40 })).toThrow(
+      "Missing column name(s) for string",
+    );
+  });
+});

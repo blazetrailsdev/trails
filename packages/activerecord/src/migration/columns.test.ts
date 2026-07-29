@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../base.js";
 import type { Column } from "../connection-adapters/column.js";
-import { ActiveRecordError, StatementInvalid } from "../errors.js";
+import { ActiveRecordError, StatementInvalid, NotNullViolation } from "../errors.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { adapterType } from "../test-adapter.js";
@@ -10,6 +10,8 @@ import {
   serverVersion,
   supportsDefaultExpression,
 } from "../support/mysql-server-version.js";
+import { ArgumentError } from "@blazetrails/activemodel";
+import { assertQueriesCount } from "../testing/query-assertions.js";
 import { adapterSupports } from "../support/supports.js";
 
 const mariaDbRejectsUniqueColumnDrop =
@@ -17,6 +19,8 @@ const mariaDbRejectsUniqueColumnDrop =
 
 const indexesSurvivingColumnDrop =
   adapterType === "postgres" ? [] : ["index_test_models_on_hat_style_and_hat_size"];
+
+const expectedAlterQueryCount = adapterType === "sqlite" ? 14 : 1;
 
 async function indexNames(conn: AbstractAdapter, table: string): Promise<string[]> {
   const indexes = (await conn.indexes(table)) as Array<{ name: string }>;
@@ -492,6 +496,94 @@ describe("Migration", () => {
       TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       expect(TestModel.columnsHash()["created_at"].defaultFunction).toBe(fn);
+    });
+
+    it("change column null false", async () => {
+      const connection = await ambientConnection();
+      await connection.addColumn("test_models", "first_name", "string");
+      await connection.changeColumnNull("test_models", "first_name", false);
+      TestModel.resetColumnInformation();
+
+      await expect(TestModel.create({ first_name: null })).rejects.toThrow(NotNullViolation);
+    });
+
+    it("change column null true", async () => {
+      const connection = await ambientConnection();
+      await connection.addColumn("test_models", "first_name", "string");
+      await connection.changeColumnNull("test_models", "first_name", true);
+      TestModel.resetColumnInformation();
+
+      const before = (await TestModel.count()) as number;
+      await TestModel.create({ first_name: null });
+      expect(await TestModel.count()).toBe(before + 1);
+    });
+
+    it("change column null with non boolean arguments raises", async () => {
+      const connection = await ambientConnection();
+      await connection.addColumn("test_models", "first_name", "string");
+      await expect(
+        connection.changeColumnNull("test_models", "first_name", {
+          from: true,
+          to: false,
+        } as unknown as boolean),
+      ).rejects.toThrow(
+        "change_column_null expects a boolean value (true for NULL, false for NOT NULL). Got: {from: true, to: false}",
+      );
+    });
+
+    it("remove column no second parameter raises exception", async () => {
+      const connection = await ambientConnection();
+      await expect(
+        (connection.removeColumn as (t: string) => Promise<void>)("funny"),
+      ).rejects.toThrow(ArgumentError);
+    });
+
+    it("add column without column name", async () => {
+      const connection = await ambientConnection();
+      try {
+        await expect(
+          connection.createTable("my_table", { force: true }, (t) => {
+            (t.timestamp as () => unknown)();
+          }),
+        ).rejects.toThrow("Missing column name(s) for timestamp");
+      } finally {
+        await connection.dropTable("my_table", { ifExists: true });
+      }
+    });
+
+    it("remove columns single statement", async () => {
+      const connection = await ambientConnection();
+      try {
+        await connection.createTable("my_table", {}, (t) => {
+          t.integer("col_one");
+          t.integer("col_two");
+        });
+
+        await assertQueriesCount(expectedAlterQueryCount, false, async () => {
+          await connection.removeColumns("my_table", "col_one", "col_two");
+        });
+
+        const columns = (await connection.columns("my_table")).map((c) => c.name);
+        expect(columns).toEqual(["id"]);
+      } finally {
+        await connection.dropTable("my_table", { ifExists: true });
+      }
+    });
+
+    it("add timestamps single statement", async () => {
+      const connection = await ambientConnection();
+      try {
+        await connection.createTable("my_table");
+
+        await assertQueriesCount(expectedAlterQueryCount, false, async () => {
+          await connection.addTimestamps("my_table");
+        });
+
+        const columns = (await connection.columns("my_table")).map((c) => c.name);
+        expect(columns).toEqual(["id", "created_at", "updated_at"]);
+      } finally {
+        await connection.dropTable("my_table", { ifExists: true });
+      }
     });
   });
 });

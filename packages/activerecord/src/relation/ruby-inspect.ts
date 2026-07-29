@@ -47,9 +47,21 @@ export function rubyInspect(value: unknown): string {
     /* eslint-enable no-control-regex */
   }
   if (Array.isArray(value)) return rubyInspectArray(value);
+  if (isPlainObject(value)) return rubyInspectHash(value);
   // Fallback — Ruby's `Object#inspect` gives `#<Class …>`; here we
   // just call `String(value)` for anything unhandled.
   return String(value);
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null) return false;
+  const proto = Object.getPrototypeOf(value) as unknown;
+  return proto === Object.prototype || proto === null;
+}
+
+export function rubyInspectHash(value: Record<string, unknown>): string {
+  const pairs = Object.entries(value).map(([key, val]) => `${key}: ${rubyInspect(val)}`);
+  return `{${pairs.join(", ")}}`;
 }
 
 export function rubyInspectArray(values: unknown[]): string {
