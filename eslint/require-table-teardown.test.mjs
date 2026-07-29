@@ -988,17 +988,19 @@ tester.run("require-table-teardown", rule, {
       errors: [{ messageId: "missingTeardown", data: { table: "ex_1" } }],
     },
     // The same for a range: `[a-d]` under `ESCAPE '-'` is the digits, since the
-    // `-` escapes the `d` before it can be read as the middle of a range.
+    // `-` escapes the `d` before it can be read as the middle of a range — so
+    // reading it as a range would credit `ex_b`, which the filter does not
+    // select.
     {
       code:
-        'await adapter.exec(`CREATE TABLE "ex_1" (id int)`);\n' +
+        'await adapter.exec(`CREATE TABLE "ex_b" (id int)`);\n' +
         "const rows = await adapter.execute(\n" +
         "  `SELECT tablename FROM pg_tables WHERE tablename SIMILAR TO 'ex_[a-d]%' ESCAPE '-'`,\n" +
         ");\n" +
         "for (const t of rows) {\n" +
         '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
         "}",
-      errors: [{ messageId: "missingTeardown", data: { table: "ex_1" } }],
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_b" } }],
     },
     // An ESCAPE character with structural meaning inside a bracket expression
     // refuses it: `[^d]` under `ESCAPE '^'` is the digits, not a negated class.
