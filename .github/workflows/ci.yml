@@ -11,10 +11,8 @@ on:
     #   run-parity-mysql    — MySQL/MariaDB-specific parity (future)
     #   run-sqlite-mem      — the ARCONN=sqlite3_mem AR suite (otherwise only
     #                         main / the weekly sweep / workflow_dispatch).
-    #                         Opting in also makes it GATE the merge: the job is
-    #                         in the `ci` aggregator's `needs:`, and the skip
-    #                         allowlist accepts its skip only on an unlabelled
-    #                         PR (or when no AR paths changed).
+    #                         Opting in also gates the merge on it: the job is
+    #                         in the `ci` aggregator's `needs:`.
     #   website             — force the Website build on a PR that doesn't
     #                         touch packages/website/
     #   release             — implies `website` (release PRs need the site
@@ -876,11 +874,8 @@ jobs:
   #
   # A second full pass over the AR suite, so not on every PR: it runs on `main`,
   # on the Monday sweep (where `changes` forces every gate true), on
-  # `workflow_dispatch`, and on a PR labelled `run-sqlite-mem`. It IS in the `ci`
-  # aggregator's `needs:` — when the lane runs at all it gates the merge (RFC
-  # 0029 story sqlite-mem-lane-merge-gating-decision: the cheap half of the
-  # trade-off is opt-in cost, not opt-in enforcement). The aggregator's skip
-  # allowlist accepts the skip on an unlabelled PR.
+  # `workflow_dispatch`, and on a PR labelled `run-sqlite-mem`. It is in the `ci`
+  # aggregator's `needs:`, so whenever it does run a failure blocks the merge.
   sqlite-mem-tests:
     name: "Active Record SQLite :memory: Tests"
     needs: changes
@@ -1814,9 +1809,6 @@ jobs:
                   [ "$AR_AFFECTED" = "false" ] && continue
                   ;;
                 sqlite-mem-tests)
-                  # Opt-in lane: legitimately skipped when no AR paths changed,
-                  # or on a PR without the `run-sqlite-mem` label. When it does
-                  # run, a failure gates the merge like any other AR lane.
                   if [ "$AR_AFFECTED" = "false" ] || \
                      [ "$SQLITE_MEM_UNLABELLED" = "true" ]; then
                     continue
