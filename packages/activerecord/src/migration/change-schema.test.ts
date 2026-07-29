@@ -19,6 +19,7 @@ import { NotNullViolation, StatementInvalid } from "../errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { currentAdapter } from "../support/adapter-helper.js";
+import { adapterType } from "../test-adapter.js";
 import { describeIfSupports } from "../support/supports.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { Column } from "../connection-adapters/column.js";
@@ -122,7 +123,7 @@ describe("Migration", () => {
       if (!mysql) expect(five!.default).toBe("hello");
     });
 
-    it.skipIf(!currentAdapter("PostgreSQLAdapter"))("add column with array", async () => {
+    it.skipIf(adapterType !== "postgres")("add column with array", async () => {
       const connection = await ambientConnection();
       await connection.createTable("testings");
       await connection.addColumn("testings", "foo", "string", { array: true });
@@ -133,7 +134,7 @@ describe("Migration", () => {
       expect((arrayColumn as unknown as { isArray(): boolean }).isArray()).toBe(true);
     });
 
-    it.skipIf(!currentAdapter("PostgreSQLAdapter"))("create table with array column", async () => {
+    it.skipIf(adapterType !== "postgres")("create table with array column", async () => {
       const connection = await ambientConnection();
       await connection.createTable("testings", (t) => {
         t.string("foo", { array: true });
@@ -250,7 +251,7 @@ describe("Migration", () => {
 
     // SQLite3 will not allow you to add a NOT NULL
     // column to a table without a default value.
-    it.skipIf(currentAdapter("SQLite3Adapter"))("add column not null without default", async () => {
+    it.skipIf(adapterType === "sqlite")("add column not null without default", async () => {
       const connection = await ambientConnection();
       await connection.createTable("testings", (t) => {
         t.column("foo", "string");
@@ -495,7 +496,7 @@ describe("Migration", () => {
       }
     });
 
-    it.skipIf(currentAdapter("Mysql2Adapter", "TrilogyAdapter", "SQLite3Adapter"))(
+    it.skipIf(adapterType !== "postgres")(
       "create table with force cascade drops dependent objects",
       async () => {
         const connection = await ambientConnection();
