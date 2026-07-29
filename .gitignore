@@ -46,5 +46,8 @@ coverage/
 
 # Sqlite databases whose config names a relative path: the sqlite3 lane's
 # fixture database (support/config.ts, Rails' FIXTURES_ROOT/fixture_database
-# .sqlite3) plus stray db/primary.sqlite3 etc. — never checked-in databases
+# .sqlite3) plus stray db/primary.sqlite3 etc. — never checked-in databases.
+# Load-bearing, not transitional: Rails gitignores its own pair in place
+# (activerecord/.gitignore:5, /test/fixtures/*.sqlite*), so this entry is what
+# makes the configured fixture databases a legitimate writer under db/.
 /db/
