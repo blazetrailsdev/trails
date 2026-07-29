@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } fr
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { stdout } from "@blazetrails/activesupport";
+import { stdout, stderr } from "@blazetrails/activesupport";
 import { DatabaseTasks } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
@@ -289,7 +289,22 @@ describe("DatabaseTasksDumpSchemaTest", () => {
   });
 });
 
+function captureStdoutAndStderr(): void {
+  let stdoutSpy: MockInstance;
+  let stderrSpy: MockInstance;
+  beforeEach(() => {
+    stdoutSpy = vi.spyOn(stdout, "write").mockImplementation(() => true);
+    stderrSpy = vi.spyOn(stderr, "write").mockImplementation(() => true);
+  });
+  afterEach(() => {
+    stdoutSpy.mockRestore();
+    stderrSpy.mockRestore();
+  });
+}
+
 describe("DatabaseTasksCreateAllTest", () => {
+  captureStdoutAndStderr();
+
   let created: string[];
   beforeEach(() => {
     created = [];
@@ -362,6 +377,8 @@ describe("DatabaseTasksCreateAllTest", () => {
 });
 
 describe("DatabaseTasksCreateCurrentTest", () => {
+  captureStdoutAndStderr();
+
   let created: string[];
 
   let establishSpy: MockInstance<any>;
@@ -436,6 +453,8 @@ describe("DatabaseTasksCreateCurrentTest", () => {
 });
 
 describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
+  captureStdoutAndStderr();
+
   let created: string[];
 
   let establishSpy: MockInstance<any>;
@@ -507,6 +526,8 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
 });
 
 describe("DatabaseTasksDropAllTest", () => {
+  captureStdoutAndStderr();
+
   let dropped: string[];
   beforeEach(() => {
     dropped = [];
@@ -579,6 +600,8 @@ describe("DatabaseTasksDropAllTest", () => {
 });
 
 describe("DatabaseTasksDropCurrentTest", () => {
+  captureStdoutAndStderr();
+
   let dropped: string[];
   beforeEach(() => {
     dropped = [];
@@ -633,6 +656,8 @@ describe("DatabaseTasksDropCurrentTest", () => {
 });
 
 describe("DatabaseTasksDropCurrentThreeTierTest", () => {
+  captureStdoutAndStderr();
+
   let dropped: string[];
   beforeEach(() => {
     dropped = [];
