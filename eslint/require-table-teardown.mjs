@@ -673,7 +673,7 @@ const rule = {
           if (typeof arg.value === "string") recordText(arg.value, arg, null);
         } else if (arg.type === "TemplateLiteral") {
           recordQuasis(
-            arg.quasis.map((q) => q.value.cooked),
+            arg.quasis.map((q) => q.value.cooked ?? ""),
             arg,
           );
         } else if (arg.type === "Identifier") {

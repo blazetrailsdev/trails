@@ -764,6 +764,12 @@ tester.run("require-table-teardown", rule, {
         "}",
       errors: [{ messageId: "missingTeardown", data: { table: "EX_FOO" } }],
     },
+    // A raw create hoisted to a variable and then executed leaks exactly like
+    // the inline spelling, so it is reported when nothing drops it.
+    {
+      code: 'const createSql = `CREATE TABLE "widgets" (id int)`;\nawait adapter.exec(createSql);',
+      errors: [{ messageId: "missingTeardown", data: { table: "widgets" } }],
+    },
     // A hoisted drop whose name is flush against a substitution names no
     // knowable table and is not the drop half of a sweep either, so the file's
     // prefixed create is still reported.
