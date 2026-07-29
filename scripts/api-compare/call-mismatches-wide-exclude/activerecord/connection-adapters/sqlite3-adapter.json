@@ -9,20 +9,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "add_foreign_key",
-    "call": "assert_valid_deferrable",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "add_foreign_key",
-    "call": "strip_table_name_prefix_and_suffix",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "alter_table",
     "call": "check_constraint",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
