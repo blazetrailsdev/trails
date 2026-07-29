@@ -3,13 +3,6 @@ import type { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 import { Base } from "../base.js";
 
-// trails-only coverage: Rails' SQLite `add_foreign_key` strips the table name
-// prefix/suffix off `to_table` before `definition.foreign_key`
-// (sqlite3/schema_statements.rb:60), because `TableDefinition#foreign_key` ->
-// `new_foreign_key_definition` re-applies it. Rails' own
-// ForeignKeyTest#test_add_foreign_key_with_prefix passes unprefixed names, so it
-// never observes the double application; passing the real (already-prefixed)
-// table name — what the schema dumper emits — does.
 describe("SQLite3Adapter addForeignKey under a table name prefix/suffix", () => {
   let adapter: AbstractSQLite3Adapter;
 

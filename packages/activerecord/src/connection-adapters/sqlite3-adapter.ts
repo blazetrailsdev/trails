@@ -20,6 +20,7 @@ import {
 } from "./abstract/native-database-types.js";
 import { TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema-definitions.js";
 import {
+  assertValidDeferrable,
   dataSourceSql as sqliteDataSourceSql,
   extractValueFromDefault as sqliteExtractValueFromDefault,
   indexes as sqliteIndexes,
@@ -2182,6 +2183,8 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     toTable: string,
     options: AddForeignKeyOptions = {},
   ): Promise<void> {
+    assertValidDeferrable(options.deferrable);
+
     if (options.ifNotExists === true) {
       // foreignKeyExists routes through foreignKeyFor/isDefinedFor, which
       // compares `column` element-wise, so composite (array) columns match by
@@ -2192,8 +2195,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       }
     }
     await this.alterTable(fromTable, (definition) => {
-      // TableDefinition#foreignKey re-applies the table name prefix/suffix, so
-      // strip it here or a configured prefix lands on toTable twice.
       definition.foreignKey(
         this.schemaStatements().stripTableNamePrefixAndSuffix(toTable),
         options,
