@@ -71,6 +71,7 @@ const mysql =
         supportsNonUniqueConstraintName: false,
         supportsSqlStandardDropConstraint: false,
         supportsDefaultExpression: false,
+        supportsCheckConstraints: false,
       };
 
 function withMysql(base: readonly Backend[], supported: boolean): readonly Backend[] {
@@ -81,7 +82,9 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // Available on every backend we test (pg17 / mysql:8 / recent sqlite).
   savepoints: ALL,
   foreign_keys: ALL,
-  check_constraints: ALL,
+  // `supports_check_constraints?`: MySQL ≥ 8.0.16; MariaDB ≥ 10.3.10 or
+  // 10.2.22–10.2.x. (abstract_mysql_adapter.rb:128-132)
+  check_constraints: withMysql(["postgres", "sqlite"], mysql.supportsCheckConstraints),
   // `supports_json?`: `!mariadb? && database_version >= "5.7.8"`
   // (mysql2_adapter.rb:70).
   json: withMysql(["postgres", "sqlite"], mysql.supportsJson),

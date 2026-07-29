@@ -260,11 +260,14 @@ describe("UpdateableViewTest", () => {
     expect((newBook as any).name).toBe("Rails in Action");
   });
 
-  // Rails gates this `features=[insert_returning,views]` (runs on mysql +
-  // postgresql; SQLite excluded by the outer view block). Carry both features so
-  // the extracted gate is `mysql,postgresql|insert_returning,views`; at runtime
-  // MySQL (mysql:8, not MariaDB) lacks insert_returning, so itIfSupports skips it.
-  itIfSupports.skipIf(adapterType === "sqlite")(
+  // Rails runs this on PostgreSQL alone: the enclosing UpdateableViewTest body is
+  // `current_adapter?(:Mysql2Adapter, :TrilogyAdapter, :PostgreSQLAdapter)`
+  // (view_test.rb:158) and the test itself adds
+  // `current_adapter?(:PostgreSQLAdapter, :SQLite3Adapter) && supports_insert_returning?`
+  // (view_test.rb:197) — the intersection is PostgreSQL. The MySQL family is
+  // excluded by Rails, not by lacking insert_returning: MariaDB >= 10.5 has it
+  // and still must not run this.
+  itIfSupports.skipIf(adapterType !== "postgres")(
     "insert_returning,views",
     "insert record populates primary key",
     async () => {

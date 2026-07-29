@@ -113,3 +113,13 @@ export const supportsNonUniqueConstraintName = mariaDb;
 export const supportsSqlStandardDropConstraint = mariaDb
   ? _serverVersion?.gte("10.3.13") === true
   : _serverVersion?.gte("8.0.19") === true;
+
+/**
+ * Mirrors AbstractMysqlAdapter#supports_check_constraints?
+ * (abstract_mysql_adapter.rb:128-132): MySQL ≥ 8.0.16; MariaDB ≥ 10.3.10 or a
+ * pre-10.3 series from 10.2.22 (10.3.0–10.3.9 is excluded).
+ */
+export const supportsCheckConstraints = mariaDb
+  ? _serverVersion?.gte("10.3.10") === true ||
+    (_serverVersion?.lt("10.3") === true && _serverVersion?.gte("10.2.22") === true)
+  : _serverVersion?.gte("8.0.16") === true;

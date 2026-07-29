@@ -494,7 +494,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   supportsCheckConstraints(): boolean {
-    if (this._mariadb) return this._databaseVersion?.gte("10.2.1") === true;
+    if (this._mariadb) {
+      // Rails' two-branch MariaDB floor (abstract_mysql_adapter.rb:128-132):
+      // 10.3.10+, or a pre-10.3 series from 10.2.22 — 10.3.0..10.3.9 is
+      // excluded, which a single `>= 10.2.22` would wrongly admit.
+      const version = this._databaseVersion;
+      if (!version) return false;
+      return version.gte("10.3.10") || (version.lt("10.3") && version.gte("10.2.22"));
+    }
     return this._databaseVersion?.gte("8.0.16") === true;
   }
 
