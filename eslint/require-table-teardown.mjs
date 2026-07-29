@@ -77,6 +77,51 @@
  * `rawSql: false` option in eslint.config.mjs, fed by
  * `eslint/require-table-teardown-raw-sql-exclude.json`, and ratcheted to zero.
  *
+ * ── Prefix sweeps ──────────────────────────────────────────────────────────
+ * A file may tear its tables down by sweeping the catalogue instead of naming
+ * them: `SELECT tablename FROM pg_tables WHERE … tablename LIKE 'ex_%'` feeding
+ * a per-row `exec(`DROP TABLE "${row.tablename}"`)`. That sweep drops strictly
+ * more than any hand-written list, so it counts as teardown for every raw
+ * `CREATE TABLE ex_…` in the same file — the list such files used to carry only
+ * to satisfy this rule rots silently, holding names nothing creates and missing
+ * ones the sweep alone dropped.
+ *
+ * Both halves must be present: a `LIKE` filter on a catalogue relation whose
+ * pattern is a closed single-quoted literal ending in `%`, and a raw `DROP
+ * TABLE` whose name position is an interpolation *that is the table name*. A
+ * static qualifier ahead of it does not disqualify the drop (`DROP TABLE
+ * public."${row.tablename}"` is a sweep, the shape `require-canonical-rebuild`
+ * recognises too), but in `DROP TABLE "${schema}"."fixed"` the dynamic part is only the qualifier and
+ * the table is named statically, so that drop is not a sweep and does not arm
+ * one — otherwise the file would stop reporting its own leaks; a qualified
+ * `DROP TABLE "${schema}"."${row.tablename}"` does arm, since the chain ends
+ * dynamically. A dynamic or absent filter satisfies nothing — otherwise the
+ * rule would stop catching the bespoke tables that outlive their test, which is
+ * why it exists. Matching is by the filter pattern only, so a create outside it
+ * is still reported. The pattern is read as LIKE syntax rather than a literal
+ * string — `_` is a single-character wildcard, so `LIKE 'ex_%'` credits `exAfoo`
+ * as well as `ex_foo`, and a backslash escapes it (`\_`) or the trailing `%`
+ * (`LIKE 'ex\%'`, one literal name, which sweeps nothing). `NOT LIKE` yields no
+ * prefix — an exclusion filter selects the complement of its pattern, so
+ * reading it as a prefix would satisfy exactly the creates the sweep spares.
+ *
+ * The two halves are paired file-wide, not per string: the filter and the drop
+ * are normally written against different variables in different calls, and
+ * matching them up would trade a tolerable over-report for real misses. So a
+ * catalogue `LIKE` filter anywhere in the file, plus any dynamically-named raw
+ * drop anywhere in it, arms every prefix the file mentions. KNOWN GAPS, all in
+ * the under-accepting direction (a real sweep goes unrecognised and its creates
+ * are reported, which is noise rather than a leak): SQL built by concatenation
+ * or returned from a helper, since only literals and template quasis are read;
+ * a catalogue relation `CATALOGUE_SOURCE` does not list; a sweep whose drop runs
+ * through the `dropTable()` helper on a row value rather than raw SQL; and a
+ * filter spelled as something other than `LIKE` — `ILIKE`, `SIMILAR TO`, a
+ * regex operator — since only `LIKE` is read.
+ *
+ * This is deliberately independent of `require-canonical-rebuild`: the two
+ * rules answer different questions. A sweep that can select a canonical table
+ * still reports `sweepReachesCanonical` there, whatever this rule accepts here.
+ *
  * ── Prefer the dropTable list form ─────────────────────────────────────────
  * `dropTable` accepts several table names plus an optional trailing options
  * object in one call (`dropTable("a", "b", { ifExists: true })`), which the
@@ -277,6 +322,130 @@ export function rawDropNames(text, endIsDynamic = false) {
 }
 
 /**
+ * A catalogue relation a sweep can read its victims out of. Same set the
+ * `require-canonical-rebuild` rule recognises.
+ */
+const CATALOGUE_SOURCE =
+  /\b(?:pg_tables|pg_class|sqlite_master|sqlite_schema|pragma_table_list|information_schema\.tables)\b|\bshow\s+tables\b/i;
+
+/**
+ * Matchers for the statically-readable `LIKE '<pattern>%'` filters in a
+ * catalogue query — one anchored RegExp per filter, each testing whether a
+ * table name is one the sweep selects. A filter whose pattern isn't a closed
+ * single-quoted literal ending in an unescaped `%` — an interpolated or
+ * otherwise dynamic pattern — yields nothing, which is the point: an unreadable
+ * filter must satisfy no create, or the rule stops catching bespoke tables that
+ * outlive their test.
+ *
+ * The pattern is LIKE syntax, not a literal string. `_` matches any single
+ * character (Rails escapes it alongside `%` in `sanitize_sql_like`,
+ * activerecord/lib/active_record/sanitization.rb), so `LIKE 'ex_%'` selects
+ * `exAfoo` as surely as `ex_foo`, and reading it as the literal prefix `ex_`
+ * would leave those creates reported although the sweep does drop them.
+ *
+ * An escape character makes the next character literal, and which character
+ * escapes is part of the filter: Arel carries it on the LIKE node and emits the
+ * `ESCAPE` clause (arel/visitors/postgresql.rb), so `LIKE 'ex!_%' ESCAPE '!'`
+ * selects literal-underscore names and must NOT be read with the backslash
+ * default, which would compile `^ex!.` and credit `ex!A` — a leak. A statically
+ * readable clause is honoured; one that is dynamic, empty, or not a single
+ * character makes the whole filter unreadable, so it credits nothing. Absent a
+ * clause the escape is backslash, PostgreSQL's default and the one
+ * `sanitize_sql_like` emits.
+ *
+ * `NOT LIKE` is excluded, and it is not a nicety: an exclusion filter selects
+ * the complement of its pattern, so reading `NOT LIKE 'ex_%'` as a prefix would
+ * make a sweep satisfy exactly the creates it deliberately spares. The empty
+ * pattern is likewise impossible to match (`[^'%]+`), so a bare `LIKE '%'`
+ * selecting everything never becomes a prefix that satisfies everything.
+ */
+const LIKE_PREFIX_RE = /(?<!\bnot\s+)\blike\s+'([^'%]+)%'/gi;
+/** A trailing `ESCAPE '<char>'` clause, and the leading keyword on its own. */
+const ESCAPE_CLAUSE_RE = /^\s*escape\s+'([^'])'/i;
+const ESCAPE_KEYWORD_RE = /^\s*escape\b/i;
+export function sweepPrefixMatchers(text) {
+  if (!CATALOGUE_SOURCE.test(text)) return [];
+  const matchers = [];
+  LIKE_PREFIX_RE.lastIndex = 0;
+  let m;
+  while ((m = LIKE_PREFIX_RE.exec(text)) !== null) {
+    const tail = text.slice(m.index + m[0].length);
+    const clause = ESCAPE_CLAUSE_RE.exec(tail);
+    if (clause === null && ESCAPE_KEYWORD_RE.test(tail)) continue;
+    const matcher = likePrefixMatcher(m[1], clause === null ? "\\" : clause[1]);
+    if (matcher !== null) matchers.push(matcher);
+  }
+  return matchers;
+}
+
+/**
+ * An anchored RegExp matching the names `<pattern>%` selects under
+ * `escapeChar`, or null when the trailing `%` is itself escaped — `LIKE 'ex\%'`
+ * matches the single literal name `ex%`, not a prefix, so it sweeps nothing
+ * this rule should credit.
+ */
+function likePrefixMatcher(pattern, escapeChar) {
+  let source = "";
+  let escaped = false;
+  for (const ch of pattern) {
+    if (escaped) {
+      source += ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      escaped = false;
+    } else if (ch === escapeChar) {
+      escaped = true;
+    } else if (ch === "_") {
+      source += ".";
+    } else {
+      source += ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+  }
+  if (escaped) return null;
+  return new RegExp(`^${source}`);
+}
+
+/**
+ * Whether `text` ends in a `DROP TABLE` whose table *name* is dynamic — the drop
+ * half of a sweep, which names no table itself. `nextTexts` is the static text
+ * of every template quasi following this one, in order, or null for a plain
+ * string (which can never end in an interpolation).
+ *
+ * An interpolation in the name position is not automatically the name. In
+ * `DROP TABLE "${schema}"."fixed"` the dynamic part is only the qualifier and
+ * the table is named statically, so no swept row name is dropped; such a drop
+ * must not arm a sweep, or a file combining it with a catalogue `LIKE` filter
+ * would stop reporting its own leaked creates. The chain is therefore followed
+ * to its end: a quasi that is nothing but a `.` separator (with optional quotes
+ * and whitespace) means another interpolation continues the qualified name, so
+ * `"${schema}"."${row.tablename}"` — a genuine sweep — still arms, while a
+ * chain ending in static text does not.
+ *
+ * A *static* qualifier ahead of the interpolation is skipped rather than
+ * disqualifying: in `DROP TABLE IF EXISTS public."${row.tablename}"` the
+ * interpolation still occupies the table-name position, which is the shape
+ * `require-canonical-rebuild` recognises as a sweep too.
+ */
+const STATIC_QUALIFIER = /^\s*(?:(?:"[^"]*"|'[^']*'|`[^`]*`|\w+)\s*\.\s*)*["'`]?$/;
+export function hasDynamicDropName(text, nextTexts) {
+  if (!nextTexts || nextTexts.length === 0) return false;
+  DROP_TABLE_RE.lastIndex = 0;
+  let m;
+  while ((m = DROP_TABLE_RE.exec(text)) !== null) {
+    if (STATIC_QUALIFIER.test(text.slice(m.index + m[0].length))) {
+      return dynamicNameEndsChain(nextTexts);
+    }
+  }
+  return false;
+}
+
+/** Whether the qualified name starting at the first interpolation ends dynamically. */
+function dynamicNameEndsChain(nextTexts) {
+  let i = 0;
+  while (i < nextTexts.length && /^["'`]?\s*\.\s*["'`]?$/.test(nextTexts[i])) i++;
+  if (i >= nextTexts.length) return true;
+  return !/^["'`]?\s*\./.test(nextTexts[i]);
+}
+
+/**
  * Inspect a statement for a mergeable `dropTable` call. Tolerates `await`
  * wrapping (`await x.dropTable(...)`). Returns the call's merge attributes, or
  * null when the statement is not a `dropTable` ExpressionStatement, or
@@ -353,6 +522,8 @@ const rule = {
     // table name → first create node seen (for the report location).
     const created = new Map();
     const dropped = new Set();
+    const sweptPrefixes = [];
+    let sawSweepDrop = false;
 
     // Flag (and autofix) a run of 2+ adjacent, mergeable dropTable calls in a
     // single statement list: same receiver, same await wrapping, compatible
@@ -407,23 +578,33 @@ const rule = {
 
     // Scan an execution sink's string/template arguments for raw CREATE/DROP
     // TABLE statements, folding their names into the same create/drop balance.
-    function recordText(text, node, endIsDynamic) {
+    function recordText(text, node, nextTexts) {
+      const endIsDynamic = nextTexts !== null;
       for (const table of rawCreateNames(text, endIsDynamic)) {
         if (!created.has(table)) created.set(table, node);
       }
       for (const table of rawDropNames(text, endIsDynamic)) dropped.add(table);
+      sweptPrefixes.push(...sweepPrefixMatchers(text));
+      if (hasDynamicDropName(text, nextTexts)) sawSweepDrop = true;
     }
 
     function recordSinkSql(call) {
       for (const arg of call.arguments) {
         if (arg.type === "Literal") {
-          if (typeof arg.value === "string") recordText(arg.value, arg, false);
+          if (typeof arg.value === "string") recordText(arg.value, arg, null);
         } else if (arg.type === "TemplateLiteral") {
           // Each quasi is static text between interpolations; a quasi that is
-          // followed by an interpolation has a dynamic end (see rawCreateNames).
+          // followed by an interpolation has a dynamic end (see rawCreateNames),
+          // and the quasis after it are where the interpolated values resume.
           const last = arg.quasis.length - 1;
           arg.quasis.forEach((q, i) => {
-            if (q.value.cooked) recordText(q.value.cooked, arg, i < last);
+            if (q.value.cooked) {
+              recordText(
+                q.value.cooked,
+                arg,
+                i < last ? arg.quasis.slice(i + 1).map((n) => n.value.cooked) : null,
+              );
+            }
           });
         }
       }
@@ -462,8 +643,10 @@ const rule = {
 
       // Deferred so creates and drops in any order across the file are matched.
       "Program:exit"() {
+        const prefixes = sawSweepDrop ? sweptPrefixes : [];
         for (const [name, node] of created) {
           if (dropped.has(name)) continue;
+          if (prefixes.some((p) => p.test(name))) continue;
           context.report({
             node,
             messageId: "missingTeardown",

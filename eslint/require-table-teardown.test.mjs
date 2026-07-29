@@ -107,6 +107,47 @@ tester.run("require-table-teardown", rule, {
     'await ctx.dropTable("a");\ndoSomething();\nawait ctx.dropTable("b");',
     // A dynamic-name drop can't be merged with its neighbour.
     'await ctx.dropTable(name);\nawait ctx.dropTable("b");',
+    // A catalogue prefix sweep is teardown for every create under its prefix.
+    'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+      'await adapter.exec("CREATE TABLE ex_json (id int)");\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'ex_%'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}" CASCADE`);\n' +
+      "}",
+    // `_` is a LIKE wildcard, so `ex_%` selects `exAfoo` as surely as `ex_foo`.
+    'await adapter.exec(`CREATE TABLE "exAfoo" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
+    // An ESCAPE clause makes `!_` a literal underscore, which `ex_foo` matches.
+    'await adapter.exec(`CREATE TABLE "ex_foo" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex!_%' ESCAPE '!'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
+    // A static schema qualifier still leaves the interpolation in the name slot.
+    'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS public."${t.tablename}" CASCADE`);\n' +
+      "}",
+    // A schema-qualified sweep drop still ends in the swept row name, so it arms.
+    'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${schema}"."${t.tablename}" CASCADE`);\n' +
+      "}",
   ],
   invalid: [
     // Dropping the truncated prefix of a spaced quoted name is not a teardown
@@ -287,6 +328,127 @@ tester.run("require-table-teardown", rule, {
       code: 'ctx.dropTable("a");\nctx.dropTable("b");',
       errors: [{ messageId: "preferTableList" }],
       output: 'ctx.dropTable("a", "b");',
+    },
+    // A sweep covers only its own prefix: a create outside it still reports.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        'await adapter.exec("CREATE TABLE scratch_pad (id int)");\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "scratch_pad" } }],
+    },
+    // A dynamic filter is not statically readable, so it satisfies nothing.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename LIKE '${prefix}%'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
+    },
+    // A filter with no dynamically-named drop is not a sweep: nothing tears the
+    // selected tables down, so the create still reports.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        "await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+        ");",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
+    },
+    // A LIKE filter that reads no catalogue selects no tables to drop.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        "const rows = await adapter.execute(`SELECT name FROM widgets WHERE name LIKE 'ex_%'`);\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.name}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
+    },
+    // A schema-qualified drop whose dynamic part is only the qualifier names its
+    // table statically, so it is not a sweep drop and arms no prefix.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_leak" (id int)`);\n' +
+        "await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+        ");\n" +
+        'await adapter.exec(`DROP TABLE IF EXISTS "${schema}"."fixed"`);',
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_leak" } }],
+    },
+    // An escaped `%` is a literal, not a prefix wildcard: `ex\%` names one table.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex\\\\%'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
+    },
+    // Under `ESCAPE '!'` the `!_` is a literal underscore, so the filter does not
+    // select `ex!A` — reading it with the backslash default would credit a leak.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex!A" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex!_%' ESCAPE '!'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex!A" } }],
+    },
+    // A multi-character escape literal is not a readable single character
+    // either: the closing quote must follow the first character, so the whole
+    // filter is unreadable. `ex_foo` is the discriminating name — a parse that
+    // truncated `\'!!\'` to `!` would compile `^ex_` and credit it.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_foo" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex!_%' ESCAPE '!!'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_foo" } }],
+    },
+    // An ESCAPE clause that is not a readable single character makes the whole
+    // filter unreadable, so it credits nothing.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%' ESCAPE '${e}'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
+    },
+    // NOT LIKE is an exclusion filter: it spares `ex_%` rather than sweeping it.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename NOT LIKE 'ex_%'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
     },
   ],
 });
