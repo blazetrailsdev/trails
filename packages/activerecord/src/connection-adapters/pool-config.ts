@@ -321,8 +321,8 @@ export interface SQLite3AdapterOptions extends TrailsAdapterOptions {
   strict?: boolean;
   // Mirrors: database.yml `timeout:` — the driver's busy timeout, in ms
   // (`sqlite3_adapter.rb:821-826` sets `busy_handler_timeout`).
-  timeout?: number | string;
-  retries?: number | string;
+  timeout?: number | string | false;
+  retries?: number | string | false;
   // Driver-specific options passed through to SqliteOpenConfig.driverOptions.
   // Used by e.g. libsql-remote to forward `authToken` to the Database constructor.
   driverOptions?: Record<string, unknown>;

@@ -2951,10 +2951,10 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   /** @internal */
   private castTimeout(): number | undefined {
     const cfg = this._config as SQLite3AdapterOptions;
-    if (cfg.timeout != null && cfg.retries != null) {
+    if (isRubyTruthy(cfg.timeout) && isRubyTruthy(cfg.retries)) {
       throw new ArgumentError("Cannot specify both timeout and retries arguments");
     }
-    if (cfg.timeout == null) return undefined;
+    if (!isRubyTruthy(cfg.timeout)) return undefined;
     const timeout = AbstractSQLite3Adapter.typeCastConfigToInteger(cfg.timeout);
     if (typeof timeout !== "number" || !Number.isInteger(timeout)) {
       throw new TypeError(`timeout must be integer, not ${String(timeout)}`);
@@ -2971,8 +2971,8 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    */
   override configureConnection(): void | Promise<void> {
     this.castTimeout();
-    const retries = (this._config as SQLite3AdapterOptions).retries;
-    if (retries != null && (this._config as SQLite3AdapterOptions).timeout == null) {
+    const cfg = this._config as SQLite3AdapterOptions;
+    if (isRubyTruthy(cfg.retries) && !isRubyTruthy(cfg.timeout)) {
       // Deviation: Rails' retries branch also installs
       // `raw_connection.busy_handler { |count| count <= retries }`
       // (sqlite3_adapter.rb:827-832), which is the sqlite3 gem's binding for

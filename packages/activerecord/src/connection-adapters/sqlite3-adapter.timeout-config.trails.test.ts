@@ -31,6 +31,19 @@ describe("SQLite3Adapter timeout config coercion", () => {
     ).toThrow(new ArgumentError("Cannot specify both timeout and retries arguments"));
   });
 
+  it("treats a false timeout and a false retries as unset", async () => {
+    const warn = vi.spyOn(deprecator(), "warn").mockImplementation(() => {});
+    adapter = new BetterSQLite3Adapter({ database: ":memory:", timeout: false, retries: false });
+    await adapter.execute("SELECT 1");
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("treats a zero timeout as set", async () => {
+    adapter = new BetterSQLite3Adapter({ database: ":memory:", timeout: 0 });
+    const rows = await adapter.execute("PRAGMA busy_timeout");
+    expect(Number(rows[0].timeout)).toBe(0);
+  });
+
   it("deprecates the retries option", async () => {
     const warn = vi.spyOn(deprecator(), "warn").mockImplementation(() => {});
     adapter = new BetterSQLite3Adapter({ database: ":memory:", retries: 3 });
