@@ -525,9 +525,18 @@ function bracketSource(pattern, start, escapeChar) {
   for (; i < pattern.length && pattern[i] !== "]"; i++) {
     const ch = pattern[i];
     if (ch === "[" && ":.=".includes(pattern[i + 1] ?? "")) return null;
-    // A backslash that does not escape here is still refused rather than
-    // emitted: it is a literal to PostgreSQL but an escape to JS.
-    if (ch === "\\" && ch !== escapeChar) return null;
+    // A backslash that does not escape here is a literal to PostgreSQL and an
+    // escape to JS, so it is doubled rather than emitted bare — `[\d]` under
+    // `ESCAPE '#'` is the two literals `{\, d}`, which JS spells `[\\d]`
+    // exactly. Verified on PostgreSQL 17.7: `'ex_5' SIMILAR TO 'ex_[\d]%'
+    // ESCAPE '#'` is false while `'ex_d'` and `'ex_\'` are both true. A range
+    // endpoint needs no separate handling for the same reason: ranges compare
+    // code points in both grammars, so `[\-a]` and JS `[\\-a]` are the same
+    // U+005C–U+0061 span.
+    if (ch === "\\" && ch !== escapeChar) {
+      source += "\\\\";
+      continue;
+    }
     if (ch === escapeChar) {
       const next = pattern[i + 1];
       if (next === undefined || !ARE_SHORTHANDS.has(next)) return null;
@@ -648,7 +657,8 @@ function regexpPrefixMatcher(pattern, caseInsensitive) {
  * `ESCAPE` character inside a bracket expression and hands the pair to the
  * underlying ARE — so `[\d]` under the default backslash escape (the one
  * `sanitize_sql_like` emits) is the digits, exactly as on the `~` path, while a
- * backslash that is not the escape character is a literal there and refuses.
+ * backslash that is not the escape character is a literal member there and is
+ * translated as the doubled `\\`.
  */
 function similarPrefixMatcher(pattern, escapeChar, caseInsensitive) {
   let source = "";
