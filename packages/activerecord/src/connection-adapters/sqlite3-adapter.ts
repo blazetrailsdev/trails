@@ -1950,25 +1950,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   // (SQLite3::TableDefinition resolves :virtual that way; no type when the
   // option is absent).
   private _baseColumnType(type: string, options?: Record<string, unknown>): string {
-    if (type !== "virtual") return this.typeToSql(type, options);
-    return options?.type ? this.typeToSql(String(options.type), options) : "";
-  }
-
-  private typeToSql(type: string, options?: Record<string, unknown>): string {
-    const raw = this.nativeDatabaseTypes()[type]?.name ?? type.toUpperCase();
-    // Validate: only allow safe SQL type identifiers (letters, digits, underscores, spaces)
-    if (!/^[A-Za-z_][A-Za-z0-9_ ]*$/.test(raw)) {
-      throw new Error(`Invalid SQL type: ${raw}`);
-    }
-    const base = raw;
-    const precision =
-      typeof options?.precision === "number" ? Math.floor(options.precision) : undefined;
-    const scale = typeof options?.scale === "number" ? Math.floor(options.scale) : undefined;
-    const limit = typeof options?.limit === "number" ? Math.floor(options.limit) : undefined;
-    if (precision !== undefined && scale !== undefined) return `${base}(${precision},${scale})`;
-    if (precision !== undefined) return `${base}(${precision})`;
-    if (limit !== undefined) return `${base}(${limit})`;
-    return base;
+    const opts = (options ?? {}) as ColumnOptions;
+    if (type !== "virtual") return this.typeToSql(type as ColumnType, opts);
+    return options?.type ? this.typeToSql(String(options.type) as ColumnType, opts) : "";
   }
 
   private async _getCreateTableSql(tableName: string): Promise<string | null> {

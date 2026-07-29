@@ -16,19 +16,7 @@ export const pgSupportsOptimizerHints = pgAvailable && pgHasHintPlan;
 /** Mirrors PostgreSQLAdapter#supportsNativePartitioning — PG 10+ (100000). */
 export const pgSupportsNativePartitioning = pgServerVersion >= 100000;
 
-/** Mirrors Rails' with_postgresql_datetime_type — temporarily changes the adapter's datetimeType. */
-export async function withPostgresqlDatetimeType<T>(
-  type: string,
-  fn: () => T | Promise<T>,
-): Promise<T> {
-  const original = PostgreSQLAdapter.datetimeType;
-  PostgreSQLAdapter.datetimeType = type;
-  try {
-    return await fn();
-  } finally {
-    PostgreSQLAdapter.datetimeType = original;
-  }
-}
+export { withPostgresqlDatetimeType } from "../../support/with-postgresql-datetime-type.js";
 
 /** Temporarily registers extra entries in nativeDatabaseTypes, then restores the originals. */
 export async function withNativeDatabaseTypeOverrides<T>(

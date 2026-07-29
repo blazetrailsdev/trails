@@ -333,6 +333,7 @@ export interface AbstractAdapter {
     options: { name?: string; column?: string | string[] },
   ): Promise<string>;
   tableExists(tableName: string): Promise<boolean>;
+  typeToSql(type: ColumnType, options?: ColumnOptions): string;
   // Options SchemaMigration / InternalMetadata pass to `t.string` for their
   // primary key. Mixed in from SchemaStatements; declared here so those
   // callers can reach it through the AbstractAdapter type.

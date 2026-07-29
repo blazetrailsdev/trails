@@ -13,6 +13,7 @@ export interface TableNameOptionsSource {
   readonly tableNamePrefix: string;
   readonly tableNameSuffix: string;
   readonly pluralizeTableNames: boolean;
+  getPrimaryKey(baseName: string): string;
 }
 
 let _source: TableNameOptionsSource | null = null;
@@ -35,4 +36,9 @@ export function globalTableNameSuffix(): string {
 /** @internal */
 export function globalPluralizeTableNames(): boolean {
   return _source?.pluralizeTableNames ?? true;
+}
+
+/** @internal */
+export function globalGetPrimaryKey(baseName: string): string {
+  return _source?.getPrimaryKey(baseName) ?? "id";
 }

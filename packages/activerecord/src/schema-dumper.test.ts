@@ -13,24 +13,12 @@ import {
   dumpTableSchema,
   FULL_DUMP_TIMEOUT_MS,
 } from "./support/schema-dumping-helper.js";
+import { withPostgresqlDatetimeType } from "./support/with-postgresql-datetime-type.js";
 
 // The first describe uses `fixtures({})` (canonical schema + reset shield);
 // the later bespoke-table describes deliberately keep the global per-test reset,
 // so they only need `Base.connection` *established* — which the worker setup
 // file already did, as Rails' `cases/helper.rb` does for the whole process.
-
-// Mirrors: ActiveRecord::TestCase#with_postgresql_datetime_type. Temporarily
-// flips PostgreSQLAdapter.datetimeType so :datetime resolves to :timestamptz.
-async function withPostgresqlDatetimeType(type: string, fn: () => Promise<void>): Promise<void> {
-  const { PostgreSQLAdapter } = await import("./connection-adapters/postgresql-adapter.js");
-  const was = PostgreSQLAdapter.datetimeType;
-  PostgreSQLAdapter.datetimeType = type;
-  try {
-    await fn();
-  } finally {
-    PostgreSQLAdapter.datetimeType = was;
-  }
-}
 
 // Faithful port of the Rails cases that dump the *standard loaded schema*
 // (`standard_dump` / `dump_table_schema "companies"`). Rails loads `schema.rb`;
