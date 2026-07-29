@@ -181,7 +181,10 @@
  * template spellings answer. A CALL of a local helper resolves to every
  * expression that helper can return, so a sweep whose SELECT or DROP half is
  * hoisted into `const sweepSql = () => …` reads as if it were written inline;
- * several returns fan out, arguments are not bound to parameters — a parameter
+ * several returns fan out, and so do several functions the callee binding can
+ * hold (a helper assigned to a `let` is read alongside one declared or
+ * initialized, on the same every-write contract a hoisted SQL string takes);
+ * arguments are not bound to parameters — a parameter
  * resolves to no strings and so reads as a substitution, its value being the
  * caller's to vary, which is why a pattern interpolated through one credits
  * nothing and a name flush against one names no knowable table — and a callee

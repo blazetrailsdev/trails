@@ -422,6 +422,14 @@ tester.run("require-table-teardown", rule, {
       "for (const t of rows) {\n" +
       '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
       "}",
+    'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+      "let sweepSql;\n" +
+      "sweepSql = () =>\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`;\n" +
+      "const rows = await adapter.execute(sweepSql());\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
   ],
   invalid: [
     // Dropping the truncated prefix of a spaced quoted name is not a teardown

@@ -60,8 +60,11 @@ export function createSqlTexts(resolve) {
  * that body — or the concise-body expression of an arrow — goes back through
  * this same recursion, so a helper is read exactly as the SQL it hands back
  * would have been read inline. Several returns fan out, since which one runs is
- * not decidable here. Arguments are deliberately NOT bound to parameters: a
- * parameter binding has no initializer and no write, so it resolves to no
+ * not decidable here, and so do several functions the callee binding can hold:
+ * a helper ASSIGNED to a `let` is read alongside one declared or initialized,
+ * the same every-write contract the string path above takes. Arguments are
+ * deliberately NOT bound to parameters: a parameter binding has no initializer
+ * and no write, so it resolves to no
  * strings and reads as a substitution — exactly the quasi boundary a name or
  * LIKE pattern flush against it needs, since its value is the caller's to vary.
  * So `` `… LIKE 'ex${prefix}%'` `` credits nothing whether the interpolation is
@@ -78,21 +81,33 @@ export function createSqlTextGroups(resolve) {
     node?.type === "ArrowFunctionExpression";
 
   /**
-   * The `{ variable, fn }` a call's callee identifier names, or null when it
+   * The `{ variable, fns }` a call's callee identifier names, or null when it
    * names no local function — an import, a global, a method call, or a binding
    * that holds something other than a function.
+   *
+   * EVERY function the binding can hold counts, initializer and assignments
+   * alike, on the same contract the string path takes above: which write reaches
+   * the call is not decidable here, so `let sweepSql; sweepSql = () => …` is as
+   * real a helper as the `const` form, and reading only the declarator would
+   * leave the assigned spelling invisible. Several candidates fan out exactly as
+   * several returns from one candidate do.
    */
-  function calleeFunction(node) {
+  function calleeFunctions(node) {
     if (node?.type !== "Identifier") return null;
     const variable = resolve(node);
     if (variable === null) return null;
+    const fns = [];
     for (const def of variable.defs ?? []) {
       const defNode = def.node;
-      if (isFunctionNode(defNode)) return { variable, fn: defNode };
-      const init = defNode?.type === "VariableDeclarator" ? defNode.init : null;
-      if (isFunctionNode(init)) return { variable, fn: init };
+      if (isFunctionNode(defNode)) fns.push(defNode);
+      else if (defNode?.type === "VariableDeclarator" && isFunctionNode(defNode.init)) {
+        fns.push(defNode.init);
+      }
     }
-    return null;
+    for (const ref of variable.references) {
+      if (isFunctionNode(ref.writeExpr)) fns.push(ref.writeExpr);
+    }
+    return fns.length > 0 ? { variable, fns } : null;
   }
 
   /**
@@ -136,13 +151,14 @@ export function createSqlTextGroups(resolve) {
       return out;
     }
     if (node?.type === "CallExpression") {
-      const resolved = calleeFunction(node.callee);
+      const resolved = calleeFunctions(node.callee);
       if (resolved === null || seen.has(resolved.variable)) return [];
-      const { variable, fn } = resolved;
-      seen.add(variable);
+      seen.add(resolved.variable);
       const out = [];
-      for (const returned of returnExpressions(fn)) {
-        out.push(...sqlTextGroups(returned, new Set(seen)));
+      for (const fn of resolved.fns) {
+        for (const returned of returnExpressions(fn)) {
+          out.push(...sqlTextGroups(returned, new Set(seen)));
+        }
       }
       return out;
     }
