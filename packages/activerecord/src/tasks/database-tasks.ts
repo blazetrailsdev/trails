@@ -292,35 +292,43 @@ export class DatabaseTasks {
 
   private static _migrations: Array<import("../migration.js").MigrationProxy> = [];
 
-  private static _migrationsByConfigName = new Map<
+  private static _migrationsByConfig = new Map<
     string,
     Array<import("../migration.js").MigrationProxy>
   >();
 
   /**
    * Rails derives migrations per config from `db_config.migrations_paths`
-   * via the pool's `migration_context`; there is no filesystem loader down
-   * here, so the caller pre-loads them and registers them under a config
-   * name. Registering without a name sets the fallback used by configs with
-   * no entry of their own, and resets the per-name registry so a fresh
-   * invocation never inherits a stale database's migrations.
+   * via the pool's `migration_context` (`connection_pool.rb:294-299`); there
+   * is no filesystem loader down here, so the caller pre-loads them and
+   * registers them against a config. Registering without one sets the
+   * fallback used by configs with no entry of their own, and resets the
+   * per-config registry so a fresh invocation never inherits stale
+   * migrations.
    */
   static registerMigrations(
     migrations: Array<import("../migration.js").MigrationProxy>,
-    configName?: string,
+    dbConfig?: DatabaseConfig,
   ): void {
-    if (configName === undefined) {
+    if (dbConfig === undefined) {
       this._migrations = migrations;
-      this._migrationsByConfigName.clear();
+      this._migrationsByConfig.clear();
     } else {
-      this._migrationsByConfigName.set(configName, migrations);
+      this._migrationsByConfig.set(this._migrationsKey(dbConfig), migrations);
     }
+  }
+
+  // `configs_for(env_name:, name:)` is how Rails identifies one config, so
+  // env + name is the key — name alone collides across environments, which
+  // may carry different migrations_paths (`hash_config.rb:50-53`).
+  private static _migrationsKey(dbConfig: DatabaseConfig): string {
+    return `${dbConfig.envName}\u0000${dbConfig.name}`;
   }
 
   private static _migrationsFor(
     dbConfig: DatabaseConfig,
   ): Array<import("../migration.js").MigrationProxy> {
-    return this._migrationsByConfigName.get(dbConfig.name) ?? this._migrations;
+    return this._migrationsByConfig.get(this._migrationsKey(dbConfig)) ?? this._migrations;
   }
 
   static async migrate(

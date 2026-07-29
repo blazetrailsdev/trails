@@ -860,25 +860,20 @@ export function dbCommand(): Command {
         0,
       );
 
-      // One migration set per config name, preferring the current env's copy
-      // (allEntries leads with it) since the registry is keyed by name alone.
-      const byName = new Map<string, DatabaseEntry>();
-      for (const entry of allEntries) {
-        if (!byName.has(entry.name)) byName.set(entry.name, entry);
-      }
-      const names = [...byName.keys()];
+      // Per config, not per name: an env may point the same-named database at
+      // its own migrationsPaths.
       const migrationSets = await Promise.all(
-        [...byName.values()].map(async (entry) =>
+        allEntries.map(async (entry) =>
           discoverMigrationsFromDirs(await migrationsDirsForConfig(entry.name, entry.raw)),
         ),
       );
-      // Register the primary's set unnamed first: that clears any per-name
-      // registrations left by an earlier command and leaves a sensible
-      // fallback for a config with no directory of its own.
-      const primaryName = entries[primaryIndex].name;
-      DatabaseTasks.registerMigrations(migrationSets[names.indexOf(primaryName)] ?? []);
-      names.forEach((name, i) => {
-        DatabaseTasks.registerMigrations(migrationSets[i] ?? [], name);
+      // Register the current env's primary set unregistered first: that clears
+      // any per-config registrations left by an earlier command and leaves a
+      // sensible fallback for a config with no directory of its own.
+      // `allEntries` leads with the current env, so `primaryIndex` lines up.
+      DatabaseTasks.registerMigrations(migrationSets[primaryIndex] ?? []);
+      allEntries.forEach((entry, i) => {
+        DatabaseTasks.registerMigrations(migrationSets[i] ?? [], entry.hashConfig);
       });
 
       // Rails' load_seed runs against the established connection, which is

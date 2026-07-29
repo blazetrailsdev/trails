@@ -1635,6 +1635,66 @@ export class CreateDogs extends Migration {
     }
   });
 
+  it("db prepare honors per-environment migrationsPaths", async () => {
+    const devDb = path.join(tmpDir, "per-env-dev.sqlite3");
+    const testDb = path.join(tmpDir, "per-env-test.sqlite3");
+    fs.mkdirSync(path.join(tmpDir, "db", "migrations_test_env"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: { adapter: "sqlite3", database: ${JSON.stringify(devDb)} },
+  test: {
+    adapter: "sqlite3",
+    database: ${JSON.stringify(testDb)},
+    migrationsPaths: "db/migrations_test_env",
+  },
+};`,
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations", "20260101000000-create-users.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreateUsers extends Migration {
+  async up() { await this.createTable("users", (t) => { t.string("name"); }); }
+  async down() { await this.dropTable("users"); }
+}`,
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations_test_env", "20260101000001-create-fixtures.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreateFixtures extends Migration {
+  async up() { await this.createTable("fixtures", (t) => { t.string("label"); }); }
+  async down() { await this.dropTable("fixtures"); }
+}`,
+    );
+
+    await runDb(["prepare"]);
+
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    const dev = new BetterSQLite3Adapter(devDb);
+    try {
+      expect(
+        await dev.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'"),
+      ).toHaveLength(1);
+      expect(
+        await dev.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='fixtures'"),
+      ).toHaveLength(0);
+    } finally {
+      await dev.close();
+    }
+    const test = new BetterSQLite3Adapter(testDb);
+    try {
+      expect(
+        await test.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='fixtures'"),
+      ).toHaveLength(1);
+      expect(
+        await test.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'"),
+      ).toHaveLength(0);
+    } finally {
+      await test.close();
+    }
+  });
+
   it("db:prepare runs seeds once", async () => {
     const primaryDb = path.join(tmpDir, "seed-once-primary.sqlite3");
     const animalsDb = path.join(tmpDir, "seed-once-animals.sqlite3");
