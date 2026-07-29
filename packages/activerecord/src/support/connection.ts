@@ -40,6 +40,7 @@ import {
   mysqlSettings,
   postgresSettings,
   SQLITE_FIXTURE_DATABASE,
+  SQLITE_FIXTURE_DATABASE_2,
   type ConnectionName,
   type EnvReader,
   type ServerSettings,
@@ -146,14 +147,7 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
   sqlite3: {
     adapter: "sqlite3",
     lane: "sqlite",
-    // `config.example.yml:83-91`: two file databases, both `timeout`/`strict`.
-    // Rails names both under FIXTURES_ROOT; ours is the configured fixture
-    // database (or this worker's clone of it) plus the sibling `expandConfig`
-    // derives.
-    build: async () => {
-      const shared = { ...(await sqliteHash()), timeout: 5000, strict: true };
-      return { arunit: shared, arunit2: { ...shared, database: undefined } };
-    },
+    build: sqliteEntries,
   },
   sqlite3_mem: {
     adapter: "sqlite3",
@@ -332,35 +326,35 @@ export async function testConfigurationHashes(): Promise<{
 }
 
 /**
- * The `sqlite3.arunit` database of `config.example.yml:83-91`
- * ({@link SQLITE_FIXTURE_DATABASE}).
+ * The `sqlite3` connection's two entries, mirroring `config.example.yml:83-91`:
+ * `arunit` and `arunit2` each name their own file, with `timeout` and `strict`.
+ *
+ * `AR_TEST_WORKER_DB` is the per-worker template clone the setupFile publishes
+ * (`support/sqlite-template.ts`) — trails' stand-in for Rails' one
+ * already-prepared database, since vitest forks workers where Rails does not.
+ * Only that clone leaves `arunit2` for `expandConfig` to derive; the configured
+ * pair is spelled out here as the yml spells it, since `expand_config` fills a
+ * `database` in only when the entry carries none (`support/config.rb:30-36`).
  *
  * The directory is created because Rails' `test/fixtures` is checked in and
  * ours is a gitignored build output; sqlite will not create a missing parent
  * for a file DB.
  */
-async function fixtureDatabase(): Promise<string> {
+async function sqliteEntries(): Promise<Record<"arunit" | "arunit2", Record<string, unknown>>> {
+  const options = { adapter: "sqlite3", timeout: 5000, strict: true };
+  const workerDb = getEnv("AR_TEST_WORKER_DB");
+  if (workerDb) {
+    return {
+      arunit: { ...options, database: workerDb },
+      arunit2: { ...options, database: undefined },
+    };
+  }
   const fs = await getFsAsync();
   const path = await getPathAsync();
   await fs.mkdir?.(path.dirname(SQLITE_FIXTURE_DATABASE), { recursive: true });
-  return SQLITE_FIXTURE_DATABASE;
-}
-
-/**
- * The `sqlite3` connection's shared entry hash.
- *
- * `AR_TEST_WORKER_DB` is the per-worker template clone the setupFile publishes
- * (`support/sqlite-template.ts`) — trails' stand-in for Rails' one
- * already-prepared database, since vitest forks workers where Rails does not.
- * With no worker clone the entry names the configured fixture database.
- */
-async function sqliteHash(): Promise<Record<string, unknown>> {
-  const workerDb = getEnv("AR_TEST_WORKER_DB");
   return {
-    adapter: "sqlite3",
-    database: workerDb || (await fixtureDatabase()),
-    timeout: 5000,
-    strict: true,
+    arunit: { ...options, database: SQLITE_FIXTURE_DATABASE },
+    arunit2: { ...options, database: SQLITE_FIXTURE_DATABASE_2 },
   };
 }
 

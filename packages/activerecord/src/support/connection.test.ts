@@ -3,7 +3,7 @@ import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { Base } from "../base.js";
 import { connect, testConfigurationHashes } from "./connection.js";
-import { SQLITE_FIXTURE_DATABASE } from "./config.js";
+import { SQLITE_FIXTURE_DATABASE, SQLITE_FIXTURE_DATABASE_2 } from "./config.js";
 
 // Only the cases asserting `connect`'s own side effects call it; everything
 // that merely checks which entry `ARCONN` resolves to uses
@@ -121,6 +121,20 @@ describe("connect", () => {
     const { envConfig } = await testConfigurationHashes();
     expect(envConfig.database).toBe(SQLITE_FIXTURE_DATABASE);
     expect(envConfig.pool).toBe(5);
+  });
+
+  // `config.example.yml:88-90` spells the second sqlite file out rather than
+  // deriving it, and `expand_config` fills a `database` in only when the entry
+  // carries none (`support/config.rb:30-36`).
+  it("names the configured second database on the sqlite3 arunit2 entry", async () => {
+    vi.stubEnv("ARCONN", "sqlite3");
+    vi.stubEnv("AR_TEST_WORKER_DB", "");
+    const { configurationHashes } = await testConfigurationHashes();
+    expect(configurationHashes.map((c) => c.database)).toEqual([
+      SQLITE_FIXTURE_DATABASE,
+      SQLITE_FIXTURE_DATABASE_2,
+      SQLITE_FIXTURE_DATABASE,
+    ]);
   });
 
   // `config.example.yml:85` names one fixed file, reused across runs; nothing

@@ -174,6 +174,15 @@ export const ARUNIT_DATABASE = "activerecord_unittest";
 export const SQLITE_FIXTURE_DATABASE = "db/fixture_database.sqlite3";
 
 /**
+ * The `sqlite3.arunit2` database `config.example.yml:89` names —
+ * `<%= FIXTURES_ROOT %>/fixture_database_2.sqlite3`. Rails spells the second
+ * sqlite file out rather than deriving it, and `expand_config` fills a
+ * `database` in only when the entry carries none
+ * (`test/support/config.rb:30-36`), so it is a configured name here too.
+ */
+export const SQLITE_FIXTURE_DATABASE_2 = "db/fixture_database_2.sqlite3";
+
+/**
  * The credential `config.example.yml` hard-codes on both `mysql2.arunit` and
  * `mysql2.arunit2` (`config.example.yml:4,24`), provisioned by
  * `db:mysql:build_user` (`activerecord/Rakefile:227-235`) — `CREATE USER`, no
