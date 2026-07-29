@@ -1,12 +1,12 @@
-import { afterAll, afterEach, describe, it, expect, beforeAll, vi } from "vitest";
+import { afterEach, describe, it, expect, beforeAll, vi } from "vitest";
 import { Base } from "../base.js";
 import { setupHandlerSuite } from "./setup-handler-suite.js";
 import { dropAllTables, resetTestTables } from "./drop-all-tables.js";
-import { openIsolatedDatabase, type IsolatedDatabase } from "./isolated-database.js";
+import { provisionSecondDatabase } from "./setup-second-pool.js";
+import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
 let adapter: DatabaseAdapter;
-let isolated: IsolatedDatabase | undefined;
 
 async function listTables(a: DatabaseAdapter): Promise<string[]> {
   if (a.adapterName === "sqlite") {
@@ -168,19 +168,13 @@ describe("dropAllTables", () => {
   let dropAdapter: DatabaseAdapter;
 
   beforeAll(async () => {
-    isolated = await openIsolatedDatabase("drop-all-tables");
-    dropAdapter = isolated.adapter;
+    dropAdapter = await ARUnit2Model.leaseConnection();
   });
 
-  afterAll(async () => {
-    await isolated?.close();
-    isolated = undefined;
-  });
+  afterEach(provisionSecondDatabase);
 
   it("drops all tables", async () => {
-    await dropAdapter.executeMutation(`CREATE TABLE drop_t1 (id INTEGER PRIMARY KEY)`);
-    await dropAdapter.executeMutation(`CREATE TABLE drop_t2 (id INTEGER PRIMARY KEY)`);
-    await dropAdapter.executeMutation(`CREATE TABLE drop_t3 (id INTEGER PRIMARY KEY)`);
+    expect(await tableCount(dropAdapter)).toBeGreaterThan(0);
     await dropAllTables(dropAdapter);
     expect(await tableCount(dropAdapter)).toBe(0);
   });
