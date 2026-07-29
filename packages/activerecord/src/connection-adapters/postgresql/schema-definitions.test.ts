@@ -180,9 +180,6 @@ describe("TableDefinition", () => {
 });
 
 describe("PostgreSQL::TableDefinition column methods", () => {
-  // Rails generates these through `define_column_methods`, whose body is
-  // `def #{type}(*names, **options)` — every type takes a variadic name list
-  // and raises on an empty one.
   const types = [
     ["bigserial", "bigserial"],
     ["serial", "serial"],

@@ -11,14 +11,7 @@ import {
   globalGetPrimaryKey,
 } from "./table-name-options.js";
 
-/**
- * Splits a `*names, **options` argument list the way Rails'
- * `define_column_methods` generated bodies do: a trailing plain object is the
- * options hash, everything before it is a column name, and an empty name list
- * raises with Rails' snake_case column type in the message.
- *
- * @internal
- */
+/** @internal */
 export function splitColumnNames(
   args: unknown[],
   columnType: string,
