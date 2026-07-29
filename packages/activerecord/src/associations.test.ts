@@ -1009,8 +1009,6 @@ describe("PreloaderTest", () => {
     const dogComment = new (Comment as any)({ origin_id: 1, origin_type: "Dog" });
     const otherDogComment = new (Comment as any)({ origin_id: 1, origin_type: "OtherDog" });
 
-    // Same table name, same key, same id — these two loaders would coalesce
-    // into a single query were it not for their distinct connections.
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     await new Preloader({
       records: [dogComment, otherDogComment],
