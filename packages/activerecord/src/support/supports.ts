@@ -73,10 +73,8 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // SQL-standard COMMENT ON / inline column comments — not SQLite.
   comments: ["postgres", "mysql"],
   // `supports_concurrent_connections?`: `!@memory_database` on SQLite
-  // (sqlite3_adapter.rb:198), true elsewhere. The sqlite lane is file-backed by
-  // default and `:memory:` only under `sqlite3_mem`, so this one is config-
-  // derived rather than adapter-keyed — `inMemoryDb()` reads the same `arunit`
-  // entry the pool is established from, no connection required.
+  // (sqlite3_adapter.rb:198), true elsewhere — so it is config-derived, not
+  // adapter-keyed: only the `sqlite3_mem` lane is `:memory:`.
   concurrent_connections: inMemoryDb() ? ["postgres", "mysql"] : ALL,
   // `ON CONFLICT (target)` — Postgres/SQLite only; MySQL has no conflict
   // target. Matches `adapterType !== "mysql"` in insert-all.test.ts.

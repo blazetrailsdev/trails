@@ -5,18 +5,6 @@ import { fixtures } from "../test-fixtures.js";
 import { currentAdapter } from "./adapter-helper.js";
 import { adapterSupports, SUPPORTS_FEATURES } from "./supports.js";
 
-/**
- * Reconciles `support/supports.ts`'s static table against the live connection.
- *
- * Rails never transcribes these answers — `adapter_helper.rb:66-83` defines its
- * `supports_*?` set by `public_send`ing straight to
- * `ActiveRecord::Base.lease_connection`. trails cannot: `describeIfSupports` /
- * `itIfSupports` resolve at test-collection time, before `Base` has a
- * connection, so the table stays static and this suite is the drift alarm the
- * delegation would otherwise provide. It generalizes the `expression_index`
- * live-server probe: every key is checked, not just the one that already bit us.
- */
-
 const MYSQL_FAMILY = ["Mysql2Adapter", "TrilogyAdapter"] as const;
 
 type LiveConnection = {
@@ -29,12 +17,6 @@ function mysqlAtLeast(connection: LiveConnection, version: string): boolean {
   return (connection.databaseVersion as Version).gte(version);
 }
 
-/**
- * The four `adapter_helper.rb` predicates that are the helper module's own
- * branching rather than a connection method, computed off the live connection
- * exactly as Ruby does (adapter_helper.rb:23/33/42/51). Everything else in the
- * table names a real `supports_<key>?` on the adapter and is read directly.
- */
 function adapterHelperSupport(feature: string, connection: LiveConnection): boolean | undefined {
   const mysql = currentAdapter(...MYSQL_FAMILY);
   const mariadb = mysql && connection.isMariadb?.() === true;
@@ -66,8 +48,6 @@ describe("supports table vs. the live adapter", () => {
 
   it("answers each feature key exactly as the connection does", async () => {
     const connection = (await Base.leaseConnection()) as unknown as LiveConnection;
-    // The MySQL adapter's mariadb flag and database version are both cold on a
-    // fresh lease; every version-keyed predicate reads false until this awaits.
     await connection.getDatabaseVersion();
 
     const drift: string[] = [];
@@ -79,11 +59,6 @@ describe("supports table vs. the live adapter", () => {
         live = helperAnswer;
       } else {
         const method = connection[methodName(feature)];
-        // A predicate Rails defines on one adapter only (`supports_pgcrypto_uuid?`
-        // et al. live on PostgreSQLAdapter alone) is simply absent elsewhere —
-        // there `adapter_helper.rb`'s delegation would raise NoMethodError, so
-        // the only correct table entry is "unsupported". Absent reads as false,
-        // which still flags a table that claims support the adapter can't answer.
         live = typeof method === "function" && (method as () => boolean).call(connection) === true;
       }
       const table = adapterSupports(feature);
