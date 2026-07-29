@@ -88,15 +88,20 @@
  *
  * Both halves must be present: a `LIKE` filter on a catalogue relation whose
  * pattern is a closed single-quoted literal ending in `%`, and a raw `DROP
- * TABLE` whose name position is an interpolation *that is the table name*. In
- * `DROP TABLE "${schema}"."fixed"` the dynamic part is only the qualifier and
+ * TABLE` whose name position is an interpolation *that is the table name*. A
+ * static qualifier ahead of it does not disqualify the drop (`DROP TABLE
+ * public."${row.tablename}"` is a sweep, the shape `require-canonical-rebuild`
+ * recognises too), but in `DROP TABLE "${schema}"."fixed"` the dynamic part is only the qualifier and
  * the table is named statically, so that drop is not a sweep and does not arm
  * one — otherwise the file would stop reporting its own leaks; a qualified
  * `DROP TABLE "${schema}"."${row.tablename}"` does arm, since the chain ends
  * dynamically. A dynamic or absent filter satisfies nothing — otherwise the
  * rule would stop catching the bespoke tables that outlive their test, which is
- * why it exists. Matching is by prefix only,
- * so a create outside the swept prefix is still reported. `NOT LIKE` yields no
+ * why it exists. Matching is by the filter pattern only, so a create outside it
+ * is still reported. The pattern is read as LIKE syntax rather than a literal
+ * string — `_` is a single-character wildcard, so `LIKE 'ex_%'` credits `exAfoo`
+ * as well as `ex_foo`, and a backslash escapes it (`\_`) or the trailing `%`
+ * (`LIKE 'ex\%'`, one literal name, which sweeps nothing). `NOT LIKE` yields no
  * prefix — an exclusion filter selects the complement of its pattern, so
  * reading it as a prefix would satisfy exactly the creates the sweep spares.
  *
@@ -108,8 +113,10 @@
  * the under-accepting direction (a real sweep goes unrecognised and its creates
  * are reported, which is noise rather than a leak): SQL built by concatenation
  * or returned from a helper, since only literals and template quasis are read;
- * a catalogue relation `CATALOGUE_SOURCE` does not list; and a sweep whose drop
- * runs through the `dropTable()` helper on a row value rather than raw SQL.
+ * a catalogue relation `CATALOGUE_SOURCE` does not list; a sweep whose drop runs
+ * through the `dropTable()` helper on a row value rather than raw SQL; and a
+ * filter using LIKE syntax beyond `%`/`_`/backslash escapes, such as a
+ * `SIMILAR TO` or regex operator.
  *
  * This is deliberately independent of `require-canonical-rebuild`: the two
  * rules answer different questions. A sweep that can select a canonical table
@@ -322,11 +329,20 @@ const CATALOGUE_SOURCE =
   /\b(?:pg_tables|pg_class|sqlite_master|sqlite_schema|pragma_table_list|information_schema\.tables)\b|\bshow\s+tables\b/i;
 
 /**
- * The statically-readable prefixes of `LIKE '<prefix>%'` filters in a catalogue
- * query. A filter whose pattern isn't a closed single-quoted literal ending in
- * `%` — an interpolated or otherwise dynamic pattern — yields nothing, which is
- * the point: an unreadable filter must satisfy no create, or the rule stops
- * catching bespoke tables that outlive their test.
+ * Matchers for the statically-readable `LIKE '<pattern>%'` filters in a
+ * catalogue query — one anchored RegExp per filter, each testing whether a
+ * table name is one the sweep selects. A filter whose pattern isn't a closed
+ * single-quoted literal ending in an unescaped `%` — an interpolated or
+ * otherwise dynamic pattern — yields nothing, which is the point: an unreadable
+ * filter must satisfy no create, or the rule stops catching bespoke tables that
+ * outlive their test.
+ *
+ * The pattern is LIKE syntax, not a literal string. `_` matches any single
+ * character (Rails escapes it alongside `%` in `sanitize_sql_like`,
+ * activerecord/lib/active_record/sanitization.rb), so `LIKE 'ex_%'` selects
+ * `exAfoo` as surely as `ex_foo`, and reading it as the literal prefix `ex_`
+ * would leave those creates reported although the sweep does drop them. A
+ * backslash escapes the next character, making `\_` and `\%` literal.
  *
  * `NOT LIKE` is excluded, and it is not a nicety: an exclusion filter selects
  * the complement of its pattern, so reading `NOT LIKE 'ex_%'` as a prefix would
@@ -335,13 +351,40 @@ const CATALOGUE_SOURCE =
  * selecting everything never becomes a prefix that satisfies everything.
  */
 const LIKE_PREFIX_RE = /(?<!\bnot\s+)\blike\s+'([^'%]+)%'/gi;
-export function sweepPrefixes(text) {
+export function sweepPrefixMatchers(text) {
   if (!CATALOGUE_SOURCE.test(text)) return [];
-  const prefixes = [];
+  const matchers = [];
   LIKE_PREFIX_RE.lastIndex = 0;
   let m;
-  while ((m = LIKE_PREFIX_RE.exec(text)) !== null) prefixes.push(m[1]);
-  return prefixes;
+  while ((m = LIKE_PREFIX_RE.exec(text)) !== null) {
+    const matcher = likePrefixMatcher(m[1]);
+    if (matcher !== null) matchers.push(matcher);
+  }
+  return matchers;
+}
+
+/**
+ * An anchored RegExp matching the names `<pattern>%` selects, or null when the
+ * trailing `%` is itself escaped — `LIKE 'ex\%'` matches the single literal
+ * name `ex%`, not a prefix, so it sweeps nothing this rule should credit.
+ */
+function likePrefixMatcher(pattern) {
+  let source = "";
+  let escaped = false;
+  for (const ch of pattern) {
+    if (escaped) {
+      source += ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      escaped = false;
+    } else if (ch === "\\") {
+      escaped = true;
+    } else if (ch === "_") {
+      source += ".";
+    } else {
+      source += ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+  }
+  if (escaped) return null;
+  return new RegExp(`^${source}`);
 }
 
 /**
@@ -359,13 +402,19 @@ export function sweepPrefixes(text) {
  * and whitespace) means another interpolation continues the qualified name, so
  * `"${schema}"."${row.tablename}"` — a genuine sweep — still arms, while a
  * chain ending in static text does not.
+ *
+ * A *static* qualifier ahead of the interpolation is skipped rather than
+ * disqualifying: in `DROP TABLE IF EXISTS public."${row.tablename}"` the
+ * interpolation still occupies the table-name position, which is the shape
+ * `require-canonical-rebuild` recognises as a sweep too.
  */
+const STATIC_QUALIFIER = /^\s*(?:(?:"[^"]*"|'[^']*'|`[^`]*`|\w+)\s*\.\s*)*["'`]?$/;
 export function hasDynamicDropName(text, nextTexts) {
   if (!nextTexts || nextTexts.length === 0) return false;
   DROP_TABLE_RE.lastIndex = 0;
   let m;
   while ((m = DROP_TABLE_RE.exec(text)) !== null) {
-    if (/^\s*["'`]?$/.test(text.slice(m.index + m[0].length))) {
+    if (STATIC_QUALIFIER.test(text.slice(m.index + m[0].length))) {
       return dynamicNameEndsChain(nextTexts);
     }
   }
@@ -519,7 +568,7 @@ const rule = {
         if (!created.has(table)) created.set(table, node);
       }
       for (const table of rawDropNames(text, endIsDynamic)) dropped.add(table);
-      sweptPrefixes.push(...sweepPrefixes(text));
+      sweptPrefixes.push(...sweepPrefixMatchers(text));
       if (hasDynamicDropName(text, nextTexts)) sawSweepDrop = true;
     }
 
@@ -581,7 +630,7 @@ const rule = {
         const prefixes = sawSweepDrop ? sweptPrefixes : [];
         for (const [name, node] of created) {
           if (dropped.has(name)) continue;
-          if (prefixes.some((p) => name.startsWith(p))) continue;
+          if (prefixes.some((p) => p.test(name))) continue;
           context.report({
             node,
             messageId: "missingTeardown",

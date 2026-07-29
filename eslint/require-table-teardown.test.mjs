@@ -116,6 +116,22 @@ tester.run("require-table-teardown", rule, {
       "for (const t of rows) {\n" +
       '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}" CASCADE`);\n' +
       "}",
+    // `_` is a LIKE wildcard, so `ex_%` selects `exAfoo` as surely as `ex_foo`.
+    'await adapter.exec(`CREATE TABLE "exAfoo" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
+    // A static schema qualifier still leaves the interpolation in the name slot.
+    'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS public."${t.tablename}" CASCADE`);\n' +
+      "}",
     // A schema-qualified sweep drop still ends in the swept row name, so it arms.
     'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
       "const rows = await adapter.execute(\n" +
@@ -360,6 +376,18 @@ tester.run("require-table-teardown", rule, {
         ");\n" +
         'await adapter.exec(`DROP TABLE IF EXISTS "${schema}"."fixed"`);',
       errors: [{ messageId: "missingTeardown", data: { table: "ex_leak" } }],
+    },
+    // An escaped `%` is a literal, not a prefix wildcard: `ex\%` names one table.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex\\\\%'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
     },
     // NOT LIKE is an exclusion filter: it spares `ex_%` rather than sweeping it.
     {
