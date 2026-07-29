@@ -63,6 +63,8 @@ import {
   listFiltered,
   newRfc,
   newStory,
+  emptyBundleReason,
+  formatEmptyBundle,
   nextBundle,
   summarizeBundle,
   numberFlag,
@@ -419,6 +421,59 @@ describe("nextBundle", () => {
     const bundle = nextBundle(idx, { maxLoc: 250 });
     // Both clusters tie at 100; either may win, but never both together.
     expect(bundle.length).toBe(1);
+  });
+
+  it("returns [] when the filters select no ready story", () => {
+    const idx = index([story({ id: "a", cluster: "c1", est_loc: 100, priority: 1 })]);
+    expect(nextBundle(idx, { maxLoc: 250, cluster: "nope" })).toEqual([]);
+  });
+
+  it("returns [] when in-scope stories exist but none fit the budget", () => {
+    // No priorities anywhere, so the knapsack path runs and nothing packs:
+    // one story has no estimate, the other is over budget.
+    const idx = index([
+      story({ id: "a", cluster: "c1", est_loc: null }),
+      story({ id: "b", cluster: "c1", est_loc: 900 }),
+    ]);
+    expect(nextBundle(idx, { maxLoc: 250 })).toEqual([]);
+  });
+
+  it("never returns [] once any in-scope story is prioritized", () => {
+    const idx = index([story({ id: "a", cluster: "c1", est_loc: 900, priority: 1 })]);
+    expect(nextBundle(idx, { maxLoc: 250 }).map((s) => s.id)).toEqual(["a"]);
+  });
+});
+
+describe("emptyBundleReason", () => {
+  it("reports no-matching-stories when the filters select nothing", () => {
+    const idx = index([story({ id: "a", cluster: "c1", est_loc: 100 })]);
+    expect(emptyBundleReason(idx, { cluster: "nope" })).toBe("no-matching-stories");
+  });
+
+  it("reports none-within-budget when the selection is non-empty", () => {
+    const idx = index([story({ id: "a", cluster: "c1", est_loc: 900 })]);
+    expect(emptyBundleReason(idx, {})).toBe("none-within-budget");
+  });
+});
+
+describe("formatEmptyBundle", () => {
+  it("omits the LOC budget when nothing matched the filters", () => {
+    expect(formatEmptyBundle("no-matching-stories", 250, { rfc: "0024-tasks-cli-coverage" })).toBe(
+      "no ready stories matching rfc 0024-tasks-cli-coverage",
+    );
+  });
+
+  it("names both filters when both are set", () => {
+    expect(formatEmptyBundle("no-matching-stories", 250, { rfc: "0024", cluster: "c1" })).toBe(
+      "no ready stories matching rfc 0024 + cluster c1",
+    );
+  });
+
+  it("reports the budget when the selection was non-empty", () => {
+    expect(formatEmptyBundle("none-within-budget", 250)).toBe("no ready stories within 250 LOC");
+    expect(formatEmptyBundle("none-within-budget", 250, { cluster: "c1" })).toBe(
+      "no ready stories matching cluster c1 within 250 LOC",
+    );
   });
 });
 
