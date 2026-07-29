@@ -7,9 +7,6 @@
  * Rails iterates this list in `preprocess_query`:
  * `ActiveRecord.query_transformers.each { |t| sql = t.call(sql, self) }`.
  *
- * The list itself lives on the `ActiveRecord` module object in `ar-config.ts`,
- * alongside the other `singleton_class.attr_accessor` flags.
- *
  * A transformer is any object responding to `call(sql, connection)` and
  * returning the (possibly rewritten) SQL — `ActiveRecord::QueryLogs` is the
  * canonical one. The `connection` slot is opaque to the registry, hence

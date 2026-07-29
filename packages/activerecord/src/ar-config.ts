@@ -237,14 +237,7 @@ export const ActiveRecord = {
     _maintainTestSchema = value;
   },
 
-  /**
-   * The mutable, process-global transformer list applied to every SQL
-   * statement before execution. Mutate in place
-   * (`ActiveRecord.queryTransformers.push(...)`) to register or reset, exactly
-   * as Rails appends to and resets `ActiveRecord.query_transformers`; assigning
-   * replaces the list wholesale. Mirrors `ActiveRecord.query_transformers`
-   * (active_record.rb:431, default `[]`).
-   */
+  /** Mirrors `ActiveRecord.query_transformers` (active_record.rb:431-432, default `[]`). */
   get queryTransformers(): QueryTransformer[] {
     return _queryTransformers;
   },
