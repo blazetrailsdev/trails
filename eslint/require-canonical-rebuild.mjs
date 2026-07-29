@@ -2,6 +2,7 @@ import { calledName, staticString, SQL_SINKS } from "./sql-call-shapes.mjs";
 import { rawDropNames } from "./require-table-teardown.mjs";
 import { createSweepBinding } from "./sweep-binding.mjs";
 import { CATALOGUE_SOURCE } from "./canonical-catalogue-sources.mjs";
+import { createSqlTexts } from "./sql-texts.mjs";
 
 const DROP_TABLE = /\bdrop\s+table\b/i;
 
@@ -65,28 +66,7 @@ const rule = {
 
     const { resolve, isSweepBound: isLoopBound } = createSweepBinding(context);
 
-    /**
-     * Every string a sink argument could carry: the initializer AND all later
-     * assignments, since a `let` reassigned to the catalogue query before the
-     * call is as real as one initialized to it, and which write reaches the
-     * sink is not decidable here.
-     */
-    function sqlTexts(node, seen = new Set()) {
-      if (node?.type === "Literal") return typeof node.value === "string" ? [node.value] : [];
-      if (node?.type === "TemplateLiteral")
-        return [node.quasis.map((q) => q.value.cooked ?? "").join(" ")];
-      if (node?.type !== "Identifier") return [];
-      const variable = resolve(node);
-      if (variable === null || seen.has(variable)) return [];
-      seen.add(variable);
-      const out = [];
-      const init = variable.defs?.[0]?.node?.init;
-      if (init) out.push(...sqlTexts(init, seen));
-      for (const ref of variable.references) {
-        if (ref.writeExpr) out.push(...sqlTexts(ref.writeExpr, seen));
-      }
-      return out;
-    }
+    const sqlTexts = createSqlTexts(resolve);
 
     function recordSinkSql(call) {
       for (const arg of call.arguments) {

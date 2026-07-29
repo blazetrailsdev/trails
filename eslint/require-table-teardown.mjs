@@ -130,10 +130,16 @@
  * drop anywhere in it, arms every prefix the file mentions. KNOWN GAPS, all in
  * the under-accepting direction (a real sweep goes unrecognised and its creates
  * are reported, which is noise rather than a leak): SQL built by concatenation
- * or returned from a helper, since only literals and template quasis are read;
- * a catalogue relation `CATALOGUE_SOURCE` does not list; and a
- * filter spelled as something other than `LIKE` or `ILIKE` — `SIMILAR TO`, a
- * regex operator — since only those two are read.
+ * or returned from a helper, since only a literal, a template, or an identifier
+ * holding one is read. The variable half of that is CLOSED — a filter hoisted to
+ * a `const SWEEP_SQL` (or assigned to a `let` later) and handed to a sink arms
+ * the same prefixes as the inline spelling, resolved by the `sqlTexts` that
+ * `require-canonical-rebuild` uses, so the two rules read a hoisted query the
+ * same way; a string that never reaches a sink still arms nothing. Only the
+ * FILTER is read off a resolved variable, never a create or drop name — see
+ * `recordSinkSql`. Also gapped: a catalogue relation `CATALOGUE_SOURCE` does not
+ * list; and a filter spelled as something other than `LIKE` or `ILIKE` —
+ * `SIMILAR TO`, a regex operator — since only those two are read.
  *
  * This is deliberately independent of `require-canonical-rebuild`: the two
  * rules answer different questions. A sweep that can select a canonical table
@@ -167,6 +173,7 @@
 
 import { calledName, staticString, SQL_SINKS } from "./sql-call-shapes.mjs";
 import { createSweepBinding } from "./sweep-binding.mjs";
+import { createSqlTexts } from "./sql-texts.mjs";
 
 /** The created table name (createTable's first arg), or null if not static. */
 function createdTableName(call) {
@@ -507,7 +514,10 @@ const rule = {
     const sourceCode = context.sourceCode ?? context.getSourceCode();
     // Arming SUPPRESSES reports here, so a loop binding counts only when the
     // loop iterates sink-derived rows — see createSweepBinding's doc.
-    const { isSweepBound } = createSweepBinding(context, { loopBindingNeedsSinkIterable: true });
+    const { isSweepBound, resolve } = createSweepBinding(context, {
+      loopBindingNeedsSinkIterable: true,
+    });
+    const sqlTexts = createSqlTexts(resolve);
 
     // table name → first create node seen (for the report location).
     const created = new Map();
@@ -596,6 +606,15 @@ const rule = {
               );
             }
           });
+        } else if (arg.type === "Identifier") {
+          // A sweep's catalogue query hoisted to a variable — `const SWEEP_SQL =
+          // ...; execute(SWEEP_SQL)`. Only the FILTER half is read off the
+          // resolved text: sqlTexts joins a template's quasis with a space, which
+          // loses where the substitutions sat, and the create/drop scanners need
+          // that to decide whether a name at a quasi boundary is complete. A
+          // filter needs no such boundary, so reading it here is sound while
+          // reading names would not be.
+          for (const text of sqlTexts(arg)) sweptPrefixes.push(...sweepPrefixMatchers(text));
         }
       }
     }
