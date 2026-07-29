@@ -135,10 +135,12 @@
  * an unanchored regex (`~` / `~*`) filter, which matches mid-name and is no
  * prefix at all; and, in either regex spelling, a construct whose JS meaning
  * differs from its POSIX one and so is refused rather than mistranslated — a
- * POSIX class or collating element (`[[:alpha:]]`), a back reference or class
- * shorthand (`\1`, `\d`), an `^` or `$` past the leading anchor, and a pattern
- * that does not compile at all. Everything else in the two regex grammars —
- * alternation, grouping, `* + ?`, `{n,m}` bounds, bracket expressions, `.` — is
+ * POSIX class or collating element (`[[:alpha:]]`), a back reference (`\1`), an
+ * ARE-only escape (`\A`, `\Z`, `\y`, `\m`, `\M`, and `\b`, which PostgreSQL
+ * also spells backspace with inside brackets), an `^` or `$` past the leading
+ * anchor, and a pattern that does not compile at all. Everything else in the
+ * two regex grammars — alternation, grouping, `* + ?`, `{n,m}` bounds, bracket
+ * expressions, `.`, the ARE class shorthands `\d \D \s \S \w \W` — is
  * translated (`posixRegexpSource`, `similarPrefixMatcher`). The
  * filter spellings read are `LIKE`, `ILIKE`, `SIMILAR TO` and `~` / `~*`; their
  * negations are deliberately read as nothing (see `LIKE_PREFIX_RE`).
@@ -465,6 +467,17 @@ function bracketSource(pattern, start) {
 }
 
 /**
+ * The class shorthands PostgreSQL's regex engine (ARE, not bare POSIX ERE)
+ * reads and JS reads identically, so `~ '^ex_\d+'` can be translated rather
+ * than refused. Deliberately just the six classes: `\b` is a word boundary in
+ * both but ALSO PostgreSQL's spelling of backspace inside a bracket
+ * expression, and `\A` / `\Z` / `\y` / `\m` / `\M` are ARE-only constraints
+ * with no JS equivalent, so all of those stay refused alongside back
+ * references.
+ */
+const ARE_SHORTHANDS = new Set(["d", "D", "s", "S", "w", "W"]);
+
+/**
  * The JS regex source equivalent to the POSIX ERE `pattern`, or null when it
  * uses a construct this compiler will not translate. Refusing is always safe
  * (the sweep goes unrecognised and its creates are reported as noise); guessing
@@ -472,11 +485,13 @@ function bracketSource(pattern, start) {
  *
  * Alternation, grouping and the quantifiers `* + ?` are spelled identically in
  * both, as are `{n,m}` bounds and `.`; bracket expressions go through
- * `bracketSource`. Refused: a backslash escape of a word character, since
- * POSIX-ERE back references (`\1`) and PostgreSQL's ARE class shorthands (`\d`)
- * do not mean in JS what they mean here; a `{` that does not open a bound; and
- * an `^` or `$` past the leading anchor, which would constrain a position this
- * prefix reading does not model.
+ * `bracketSource`. A backslash escape of a word character is translated only
+ * for the ARE class shorthands whose JS meaning is identical (`ARE_SHORTHANDS`);
+ * every other one is refused, since a back reference (`\1`) means something
+ * else once the `^(?:…)` wrapper adds a group, and the ARE-only escapes (`\A`,
+ * `\Z`, `\y`, `\m`, `\M`) have no JS spelling at all. Also refused: a `{` that
+ * does not open a bound, and an `^` or `$` past the leading anchor, which would
+ * constrain a position this prefix reading does not model.
  */
 function posixRegexpSource(pattern) {
   let source = "";
@@ -490,7 +505,8 @@ function posixRegexpSource(pattern) {
       i = bracket.next;
     } else if (ch === "\\") {
       const next = pattern[i + 1];
-      if (next === undefined || /\w/.test(next)) return null;
+      if (next === undefined) return null;
+      if (/\w/.test(next) && !ARE_SHORTHANDS.has(next)) return null;
       source += `\\${next}`;
       i += 2;
     } else if (ch === "{") {
