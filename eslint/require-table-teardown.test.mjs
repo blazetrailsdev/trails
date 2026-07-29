@@ -322,6 +322,17 @@ tester.run("require-table-teardown", rule, {
     // as the inline spelling: two static operands join into one quasi.
     'await adapter.exec("CREATE TABLE " + \'"widgets"\' + " (id int)");\n' +
       'await adapter.exec("DROP TABLE " + \'"widgets"\');',
+    // An operand that is itself a resolved identifier carrying several strings
+    // fans out, so every combination the concatenation can produce is read —
+    // both writes of the filter here spell the same prefix.
+    'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+      "let filter = \"tablename LIKE 'ex_%'\";\n" +
+      "filter = \"schemaname = 'public' AND tablename LIKE 'ex_%'\";\n" +
+      'const sql = "SELECT tablename FROM pg_tables WHERE " + filter;\n' +
+      "const rows = await adapter.execute(sql);\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
   ],
   invalid: [
     // Dropping the truncated prefix of a spaced quoted name is not a teardown

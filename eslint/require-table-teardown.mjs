@@ -133,7 +133,10 @@
  * are reported, which is noise rather than a leak): SQL returned from a helper,
  * since resolving that needs the callee's body — a `+` concatenation IS read,
  * and only a literal, a template, a `+` chain over those, or an identifier
- * holding one is; a catalogue relation `CATALOGUE_SOURCE` does not list;
+ * holding one is; SQL appended piecewise (`sql += " WHERE …"`), since a
+ * compound assignment's write is only its right-hand side and stitching the
+ * pieces back together needs an order the scope graph does not give; a
+ * catalogue relation `CATALOGUE_SOURCE` does not list;
  * an unanchored regex (`~` / `~*`) filter, which matches mid-name and is no
  * prefix at all; and, in either regex spelling, a construct whose JS meaning
  * differs from its POSIX one and so is refused rather than mistranslated — a
