@@ -100,10 +100,13 @@
  * `eslint/sweep-binding.mjs` — so the two rules cannot disagree about what a
  * swept name is. `dropTable("ex_foo")` is a fixed name and arms nothing, for
  * the same reason a statically-named raw drop does not, and neither does a
- * fixed name held in a variable. A name bound by a for-of over a hand-written
- * array does arm, an over-accept inherited from the shared resolver and left
- * as-is: such a loop is still a drop of every name it iterates, so crediting
- * it costs only the creates that loop already tears down. A
+ * fixed name held in a variable. Nor does a name bound by a for-of over a
+ * hand-written array (`for (const t of ["ex_int"]) dropTable(t)`): the resolver
+ * is asked here for its strict mode, in which a loop binding counts only when
+ * the loop iterates sink-derived rows. `require-canonical-rebuild` accepts any
+ * loop binding, and the difference is not an inconsistency but the two rules'
+ * opposite polarity — arming ADDS reports there and SUPPRESSES them here, so
+ * the loose reading is a tolerable over-report there and a leaked table here. A
  * static qualifier ahead of it does not disqualify the drop (`DROP TABLE
  * public."${row.tablename}"` is a sweep, the shape `require-canonical-rebuild`
  * recognises too), but in `DROP TABLE "${schema}"."fixed"` the dynamic part is only the qualifier and
@@ -492,7 +495,9 @@ const rule = {
     const checkRawSql = context.options[0]?.rawSql !== false;
 
     const sourceCode = context.sourceCode ?? context.getSourceCode();
-    const { isSweepBound } = createSweepBinding(context);
+    // Arming SUPPRESSES reports here, so a loop binding counts only when the
+    // loop iterates sink-derived rows — see createSweepBinding's doc.
+    const { isSweepBound } = createSweepBinding(context, { loopBindingNeedsSinkIterable: true });
 
     // table name → first create node seen (for the report location).
     const created = new Map();

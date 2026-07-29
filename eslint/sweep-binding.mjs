@@ -26,8 +26,21 @@ import { calledName, SQL_SINKS } from "./sql-call-shapes.mjs";
  * `{ resolve, isSweepBound }`: `resolve` maps an Identifier node to its scope
  * variable, and `isSweepBound` answers whether an expression's value traces
  * back to a sink-derived row binding.
+ *
+ * `loopBindingNeedsSinkIterable` picks which side to err on when a for-of/for-in
+ * binding's iterable is NOT sink-derived (`for (const t of ["ex_int"])`), and
+ * the two rules need opposite answers because arming means opposite things to
+ * them. In `require-canonical-rebuild` an armed sweep ADDS reports, so accepting
+ * every loop binding is a tolerable over-report — and a deliberate one: it is
+ * what covers the index and while loops whose variable has no binding form to
+ * detect. In `require-table-teardown` an armed sweep SUPPRESSES reports, since
+ * a sweep counts as teardown for every create under its prefix, so the same
+ * acceptance is a false negative: a file with a catalogue `LIKE` filter and
+ * `for (const t of ["ex_int"]) dropTable(t)` would stop reporting a leaked
+ * `ex_leak`, which is the exact leak the rule exists to catch. Set there, the
+ * flag requires the iterable itself to be sink-derived.
  */
-export function createSweepBinding(context) {
+export function createSweepBinding(context, { loopBindingNeedsSinkIterable = false } = {}) {
   function resolve(node) {
     if (node?.type !== "Identifier") return null;
     const scope = context.sourceCode.getScope(node);
@@ -122,7 +135,7 @@ export function createSweepBinding(context) {
         (loop?.type === "ForOfStatement" || loop?.type === "ForInStatement") &&
         loop.left === declaration
       ) {
-        return true;
+        return loopBindingNeedsSinkIterable ? isSinkDerived(loop.right, seen) : true;
       }
       return declarator.init ? isSinkDerived(declarator.init, seen) : false;
     });

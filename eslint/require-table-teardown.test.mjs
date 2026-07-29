@@ -421,6 +421,24 @@ tester.run("require-table-teardown", rule, {
         "await adapter.dropTable(name);",
       errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
     },
+    // A for-of over a hand-written array is not a sweep: it drops exactly the
+    // names it lists, so crediting it with the filter's whole prefix would
+    // suppress the leak of every other table under that prefix.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        'await adapter.exec(`CREATE TABLE "ex_leak" (id int)`);\n' +
+        "await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+        ");\n" +
+        'for (const t of ["ex_int"]) {\n' +
+        "  await adapter.dropTable(t);\n" +
+        "}",
+      errors: [
+        { messageId: "missingTeardown", data: { table: "ex_int" } },
+        { messageId: "missingTeardown", data: { table: "ex_leak" } },
+      ],
+    },
     // An escaped `%` is a literal, not a prefix wildcard: `ex\%` names one table.
     {
       code:
