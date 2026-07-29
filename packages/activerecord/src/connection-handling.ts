@@ -28,7 +28,6 @@ import {
   ActiveRecordError,
 } from "./errors.js";
 import { ActiveRecord } from "./ar-config.js";
-import { setDefaultTimezone } from "./type/internal/timezone.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   connectedToStack,
@@ -801,7 +800,7 @@ export async function establishConnection(
  * Rails stores the connection's `default_timezone` as per-adapter instance
  * state (`AbstractAdapter#default_timezone`, abstract_adapter.rb:167/219-220),
  * so two simultaneous connections can cast in different zones. Our date/time
- * casting resolves the zone from the process-wide `setDefaultTimezone`, so the
+ * casting resolves the zone from the process-wide `ActiveRecord.defaultTimezone`, so the
  * caller applies the validated value to that singleton on success — giving the
  * same observable result for the single-connection case the tests exercise.
  * The multi-connection divergence (last establish_connection wins for all
@@ -861,7 +860,7 @@ async function establishWithDbConfig(
   }
 
   await establishWithConfig(modelClass, adapterName, connectUrl, configForConnect, dbConfig);
-  if (tz) setDefaultTimezone(tz);
+  if (tz) ActiveRecord.defaultTimezone = tz;
 }
 
 /**

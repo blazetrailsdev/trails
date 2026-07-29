@@ -50,7 +50,7 @@ describe("formatInstantForSql", () => {
   });
 
   it("converts a non-UTC instant to UTC when default_timezone is utc (the default)", () => {
-    // getDefaultTimezone() returns "utc" in tests; local-tz path is
+    // defaultTimezone is "utc" in tests; local-tz path is
     // integration-tested in PR 7 (timestamp.test.ts with time-travel).
     const v = Temporal.Instant.from("2026-04-26T16:23:55+02:00");
     expect(formatInstantForSql(v)).toBe("2026-04-26 14:23:55");

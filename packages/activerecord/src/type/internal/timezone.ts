@@ -11,32 +11,10 @@ export interface TimezoneOptions {
   limit?: number;
 }
 
-import { ArgumentError } from "@blazetrails/activemodel";
-
-let defaultTimezone: "utc" | "local" = "utc";
-
-export function getDefaultTimezone(): "utc" | "local" {
-  return defaultTimezone;
-}
-
-/**
- * This is the port of `ActiveRecord.default_timezone=` (active_record.rb:218) —
- * not of anything in `type/internal/timezone.rb`, which carries readers only.
- * It lives here because the module-level state it writes is read by `isUtc` /
- * `Timezone#defaultTimezone` below. Converging it onto `ar-config.ts` (where
- * the rest of the `active_record.rb` module attributes live) is tracked by RFC
- * 0081's `relocate-ar-default-timezone-to-ar-config` story.
- */
-export function setDefaultTimezone(tz: "utc" | "local"): void {
-  if (tz !== "utc" && tz !== "local")
-    throw new ArgumentError(
-      `"${tz}" is not a valid value for default_timezone. Valid values are :utc and :local`,
-    );
-  defaultTimezone = tz;
-}
+import { ActiveRecord } from "../../ar-config.js";
 
 export function isUtc(timezone?: "utc" | "local"): boolean {
-  return (timezone ?? defaultTimezone) === "utc";
+  return (timezone ?? ActiveRecord.defaultTimezone) === "utc";
 }
 
 /**
@@ -57,6 +35,6 @@ export class Timezone {
   }
 
   get defaultTimezone(): "utc" | "local" {
-    return this._timezone ?? getDefaultTimezone();
+    return this._timezone ?? ActiveRecord.defaultTimezone;
   }
 }

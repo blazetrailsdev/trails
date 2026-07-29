@@ -12,7 +12,7 @@ import { isRubyTruthy } from "../ruby-truthy.js";
 import { Result } from "../result.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
 import { TypeMap } from "../type/type-map.js";
-import { getDefaultTimezone } from "../type/internal/timezone.js";
+import { ActiveRecord } from "../ar-config.js";
 import { Name, Utils } from "./postgresql/utils.js";
 import {
   checkAllForeignKeysValidBang,
@@ -869,9 +869,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // Rails threads @default_timezone into the instance initializer so
       // time / timestamp registrations use the connection's timezone
       // preference. We read the repo-wide default here so that
-      // setDefaultTimezone() is honored consistently with the quoting
+      // (ActiveRecord.defaultTimezone = ) is honored consistently with the quoting
       // path.
-      initializeInstanceTypeMap(this._typeMap, getDefaultTimezone());
+      initializeInstanceTypeMap(this._typeMap, ActiveRecord.defaultTimezone);
     }
     return this._typeMap;
   }
@@ -5128,7 +5128,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // (postgresql_adapter.rb:1005): configure_connection already applied it and
     // it must never be overridden by the default_timezone SET below.
     if (this._sessionVariables["timezone"]) return;
-    const tz = getDefaultTimezone();
+    const tz = ActiveRecord.defaultTimezone;
     // Off the withRawConnection loop. This runs as the first step of
     // performQuery (database-statements.ts), which is itself the block
     // executing inside withRawConnection on the same async chain. Re-entering
@@ -5210,7 +5210,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // the hot path. node-pg uses custom type parsers registered at pool
     // construction time via getTypeParser (see constructor); a timezone change
     // only requires a session-level SET so subsequent result sets decode right.
-    const tz = getDefaultTimezone();
+    const tz = ActiveRecord.defaultTimezone;
     if (this._mappedDefaultTimezone === tz) return;
     this._mappedDefaultTimezone = tz;
     await this.reconfigureConnectionTimezone();

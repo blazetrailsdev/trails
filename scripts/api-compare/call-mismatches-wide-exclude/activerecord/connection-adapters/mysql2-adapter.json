@@ -75,5 +75,12 @@
     "rubyName": "reconnect",
     "call": "synchronize",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql2-adapter.ts",
+    "rubyName": "configure_connection",
+    "call": "default_timezone",
+    "reason": "Rails sets query_options[:database_timezone] = default_timezone inline (mysql2_adapter.rb:160); trails keeps databaseTimezone current via _syncDatabaseTimezone(), which assigns ActiveRecord.defaultTimezone on every perform-query entry point instead."
   }
 ]

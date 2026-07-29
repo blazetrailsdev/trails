@@ -47,6 +47,7 @@ let _actionOnStrictLoadingViolation: "raise" | "log" = "raise";
 let _indexNestedAttributeErrors = false;
 let _schemaCacheIgnoredTables: ReadonlyArray<string | RegExp> = [];
 let _permanentConnectionCheckout: true | "deprecated" | "disallowed" = true;
+let _defaultTimezone: "utc" | "local" = "utc";
 let _asyncQueryExecutor: "global_thread_pool" | "multi_thread_pool" | null = null;
 let _queues: Record<string, unknown> = {};
 let _maintainTestSchema: boolean | null = null;
@@ -186,6 +187,22 @@ export const ActiveRecord = {
   /** @internal */
   set schemaCacheIgnoredTables(value: ReadonlyArray<string | RegExp>) {
     _schemaCacheIgnoredTables = value;
+  },
+
+  /**
+   * Determines whether to use UTC (`"utc"`) or the local zone (`"local"`) when
+   * pulling dates and times from the database. Mirrors
+   * `ActiveRecord.default_timezone` (active_record.rb:214-226, default :utc).
+   */
+  get defaultTimezone(): "utc" | "local" {
+    return _defaultTimezone;
+  },
+
+  set defaultTimezone(value: "utc" | "local") {
+    if (value !== "utc" && value !== "local") {
+      throw new ArgumentError("default_timezone must be either :utc (default) or :local.");
+    }
+    _defaultTimezone = value;
   },
 
   /**

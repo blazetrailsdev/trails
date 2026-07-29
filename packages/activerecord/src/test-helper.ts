@@ -3,7 +3,7 @@
  *
  * Mirrors: activerecord/test/cases/test_case.rb
  */
-import { getDefaultTimezone, setDefaultTimezone } from "./type/internal/timezone.js";
+import { ActiveRecord } from "./ar-config.js";
 import { Base } from "./base.js";
 import { getZone, setZone, resetZone, isZoneExplicit } from "@blazetrails/activesupport";
 
@@ -27,7 +27,7 @@ export async function withTimezoneConfig(
   cfg: TimezoneConfig,
   fn: () => Promise<void> | void,
 ): Promise<void> {
-  const oldDefault = getDefaultTimezone();
+  const oldDefault = ActiveRecord.defaultTimezone;
   const base = Base as any;
 
   // Snapshot existence + value so restore is symmetric: if the property wasn't
@@ -40,7 +40,7 @@ export async function withTimezoneConfig(
   const oldZone = getZone();
 
   try {
-    if (cfg.default !== undefined) setDefaultTimezone(cfg.default);
+    if (cfg.default !== undefined) ActiveRecord.defaultTimezone = cfg.default;
     // Apply unconditionally — mirrors Rails' Base.time_zone_aware_attributes = cfg[:aware_attributes].
     // If Base doesn't define the property yet the assignment still takes effect (JS class property),
     // making the helper forward-compatible when the wiring lands.
@@ -49,7 +49,7 @@ export async function withTimezoneConfig(
     if (cfg.zone !== undefined) setZone(cfg.zone);
     await fn();
   } finally {
-    setDefaultTimezone(oldDefault);
+    ActiveRecord.defaultTimezone = oldDefault;
     if (hadAwareAttributes) {
       base.timeZoneAwareAttributes = oldAwareAttributes;
     } else {

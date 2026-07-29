@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { TimeZoneConverter } from "./time-zone-conversion.js";
 import { DateTime } from "../type/date-time.js";
-import { getDefaultTimezone, setDefaultTimezone } from "../type/internal/timezone.js";
+import { ActiveRecord } from "../ar-config.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { TimeWithZone, TimeZone, setZone, resetZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -150,10 +150,10 @@ describe("TimeZoneConverterTest", () => {
   });
 
   it("falls back to ActiveRecord.default_timezone when the subtype has no is_utc?", () => {
-    const previous = getDefaultTimezone();
+    const previous = ActiveRecord.defaultTimezone;
     vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue("America/New_York");
     setZone("UTC");
-    setDefaultTimezone("local");
+    ActiveRecord.defaultTimezone = "local";
     try {
       class ZonelessDateTime extends ValueType<unknown> {
         override type(): string {
@@ -168,7 +168,7 @@ describe("TimeZoneConverterTest", () => {
       expect(result).toBeInstanceOf(TimeWithZone);
       expect((result as TimeWithZone).utc().toString()).toBe("2024-06-15T10:00:00Z");
     } finally {
-      setDefaultTimezone(previous);
+      ActiveRecord.defaultTimezone = previous;
     }
   });
 });

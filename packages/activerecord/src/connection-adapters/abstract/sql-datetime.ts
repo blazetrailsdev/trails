@@ -13,7 +13,7 @@
  */
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { getDefaultTimezone } from "../../type/internal/timezone.js";
+import { ActiveRecord } from "../../ar-config.js";
 
 /**
  * Return the IANA timezone string for SQL datetime serialization/deserialization,
@@ -21,7 +21,7 @@ import { getDefaultTimezone } from "../../type/internal/timezone.js";
  * by `SQLiteDateTimeType#cast` so both directions always agree on the timezone.
  */
 export function defaultSqlTimezone(): string {
-  return getDefaultTimezone() === "utc" ? "UTC" : Temporal.Now.timeZoneId();
+  return ActiveRecord.defaultTimezone === "utc" ? "UTC" : Temporal.Now.timeZoneId();
 }
 
 /**

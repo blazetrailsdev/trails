@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { withTimezoneConfig } from "./test-helper.js";
-import { getDefaultTimezone } from "./type/internal/timezone.js";
+import { ActiveRecord } from "./ar-config.js";
 import {
   getZone,
   setZone,
@@ -17,13 +17,13 @@ describe("withTimezoneConfig", () => {
   });
 
   it("temporarily changes defaultTimezone and restores it", async () => {
-    const before = getDefaultTimezone();
+    const before = ActiveRecord.defaultTimezone;
     const captured: Array<"utc" | "local"> = [];
     await withTimezoneConfig({ default: "local" }, () => {
-      captured.push(getDefaultTimezone());
+      captured.push(ActiveRecord.defaultTimezone);
     });
     expect(captured[0]).toBe("local");
-    expect(getDefaultTimezone()).toBe(before);
+    expect(ActiveRecord.defaultTimezone).toBe(before);
   });
 
   it("restores zone to unset state when zone was not explicitly set before", async () => {
@@ -57,12 +57,12 @@ describe("withTimezoneConfig", () => {
   });
 
   it("restores defaultTimezone even if fn throws", async () => {
-    const before = getDefaultTimezone();
+    const before = ActiveRecord.defaultTimezone;
     await expect(
       withTimezoneConfig({ default: "local" }, () => {
         throw new Error("boom");
       }),
     ).rejects.toThrow("boom");
-    expect(getDefaultTimezone()).toBe(before);
+    expect(ActiveRecord.defaultTimezone).toBe(before);
   });
 });
