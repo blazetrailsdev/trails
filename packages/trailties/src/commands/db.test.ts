@@ -1575,18 +1575,6 @@ export class CreateDogs extends Migration {
   async down() { await this.dropTable("dogs"); }
 }`,
     );
-    // Rails' prepare_all seeds once after every database is initialized,
-    // not once per database.
-    const seedMarker = path.join(tmpDir, "db", "seed-runs");
-    fs.writeFileSync(
-      path.join(tmpDir, "db", "seeds.ts"),
-      `import * as fs from "node:fs";
-const prev = fs.existsSync(${JSON.stringify(seedMarker)})
-  ? Number(fs.readFileSync(${JSON.stringify(seedMarker)}, "utf8"))
-  : 0;
-fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
-    );
-
     expect(fs.existsSync(primaryDb)).toBe(false);
     expect(fs.existsSync(animalsDb)).toBe(false);
 
@@ -1594,7 +1582,6 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
 
     expect(fs.existsSync(primaryDb)).toBe(true);
     expect(fs.existsSync(animalsDb)).toBe(true);
-    expect(fs.readFileSync(seedMarker, "utf8")).toBe("1");
 
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
@@ -1620,6 +1607,57 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
     } finally {
       await animals.close();
     }
+  });
+
+  it("db:prepare runs seeds once", async () => {
+    const primaryDb = path.join(tmpDir, "seed-once-primary.sqlite3");
+    const animalsDb = path.join(tmpDir, "seed-once-animals.sqlite3");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: {
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+  },
+  test: {
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+  },
+};`,
+    );
+    fs.mkdirSync(path.join(tmpDir, "db", "migrations_animals"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations", "20260101000000-create-users.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreateUsers extends Migration {
+  async up() { await this.createTable("users", (t) => { t.string("name"); }); }
+  async down() { await this.dropTable("users"); }
+}`,
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations_animals", "20260101000001-create-dogs.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreateDogs extends Migration {
+  async up() { await this.createTable("dogs", (t) => { t.string("breed"); }); }
+  async down() { await this.dropTable("dogs"); }
+}`,
+    );
+    const seedMarker = path.join(tmpDir, "db", "seed-runs");
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "seeds.ts"),
+      `import * as fs from "node:fs";
+const prev = fs.existsSync(${JSON.stringify(seedMarker)})
+  ? Number(fs.readFileSync(${JSON.stringify(seedMarker)}, "utf8"))
+  : 0;
+fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
+    );
+
+    await runDb(["prepare"]);
+    expect(fs.readFileSync(seedMarker, "utf8")).toBe("1");
+
+    // Both databases are initialized now, so a second prepare seeds nothing.
+    await runDb(["prepare"]);
+    expect(fs.readFileSync(seedMarker, "utf8")).toBe("1");
   });
 
   it("db seed:replant truncates tables then runs seeds", async () => {
