@@ -137,7 +137,11 @@ export function gateFromWrapper(name: string, featureArg?: string | null): TestG
  *     the De-Morgan'd skip form of Rails' `if supports_insert_returning? &&
  *     !current_adapter?(:SQLite3Adapter)`) → the run condition is the pure
  *     conjunction `!sqlite && insert_returning?`, so BOTH the adapter exclusion
- *     `[mysql,postgresql]` and the feature set are sound and emitted.
+ *     `[mysql,postgresql]` and the feature set are sound and emitted. When the
+ *     run condition is instead a DISJUNCTION (`skipIf(adapterType === "mysql" &&
+ *     !supportsRenameIndex)` runs when `!mysql || supportsRenameIndex`) the
+ *     exclusion is unsound — the test does run on the excluded adapter wherever
+ *     the other term holds — so it too is dropped.
  *   - POSITIVE (`adapterType !== "mysql" || !adapterSupports("expression_index")`)
  *     → the run condition is again a pure conjunction (`mysql && expression_index?`),
  *     so the adapter set and the feature set are BOTH sound and emitted — the
@@ -207,11 +211,14 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
   // sound as the INTERSECTION `adapter ∩ feature` — also when a feature rides
   // along on a disjunctive run condition, where the real run-on set is the union
   // `adapter ∪ feature`. That second clause is the twin of Ruby gating the same
-  // case on `!acc[:has_or]`. An adapter EXCLUSION is left alone here: it is
-  // pre-existing behavior with its own (looser) Ruby counterpart, tracked
-  // separately as `ts-gate-exclusion-ignores-run-disjunction`.
-  const mixed =
-    adapterIsPositive && (guards.length > 0 || (featureMatches.length > 0 && runIsDisjunctive));
+  // case on `!acc[:has_or]`. An adapter EXCLUSION is sound only while the run
+  // condition stays a conjunction, so it is dropped whenever the condition is
+  // disjunctive — the test does run on the excluded adapter wherever the other
+  // term holds. That is the twin of Ruby's negated-adapter branch, likewise
+  // gated on `!acc[:has_or]`.
+  const mixed = adapterIsPositive
+    ? guards.length > 0 || (featureMatches.length > 0 && runIsDisjunctive)
+    : runIsDisjunctive;
   const gate: TestGate = { source: ["test"] };
   if (adapters && !mixed) gate.adapters = adapters;
   if (featureMatches.length) gate.features = sortedUnique(featureMatches);

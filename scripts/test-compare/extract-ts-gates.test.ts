@@ -165,7 +165,7 @@ describe("gates.ts pure helpers", () => {
     });
   });
 
-  it("drops the adapter set when the RUN condition is a disjunction", () => {
+  it("drops the adapter set, positive or exclusion, when the RUN condition is a disjunction", () => {
     // `runIf(A || B)` runs on `mysql ∪ default_expression?` and the De Morgan
     // twin `skipIf(A && B)` runs on the same union — neither is one adapter set,
     // so the adapter half goes, mirroring the Ruby extractor's `has_or` rule.
@@ -181,16 +181,28 @@ describe("gates.ts pure helpers", () => {
       features: ["default_expression"],
       source: ["test"],
     });
-    // An adapter EXCLUSION is deliberately NOT tightened here — it is
-    // pre-existing behavior whose Ruby counterpart is looser still
-    // (foreign_key_test.rb:96 hides its second conjunct behind `send`, so Ruby
-    // emits the bare exclusion). Pinned so the scope stays explicit; tracked as
-    // `ts-gate-exclusion-ignores-run-disjunction`.
+    // An adapter EXCLUSION goes the same way: `skipIf(sqlite && !insert_returning?)`
+    // runs when `!sqlite || insert_returning?`, so the test DOES run on SQLite
+    // wherever the feature holds and the `[mysql,postgresql]` exclusion is unsound.
     expect(
       gateFromGuardExpr('adapterType === "sqlite" && !adapterSupports("insert_returning")', false),
     ).toEqual({
-      adapters: ["mysql", "postgresql"],
       features: ["insert_returning"],
+      source: ["test"],
+    });
+    // foreign-key.test.ts:1130 — `skipIf(adapterType === "mysql" && !supportsRenameIndex)`
+    // runs when `!mysql || supportsRenameIndex`. Nothing but the adapter term is
+    // recognized, so dropping the exclusion leaves the `unknown` fallback —
+    // matching the Ruby side, which drops the same set once
+    // `send(:supports_rename_index?)` is seen.
+    expect(gateFromGuardExpr('adapterType === "mysql" && !supportsRenameIndex', false)).toEqual({
+      guards: ["unknown"],
+      source: ["test"],
+    });
+    // `runIf` mirrors it: the run condition is the expression itself, so `||` is
+    // what makes the exclusion unsound there.
+    expect(gateFromGuardExpr('adapterType !== "mysql" || supportsRenameIndex', true)).toEqual({
+      guards: ["unknown"],
       source: ["test"],
     });
     // The conjunctive forms of the same two guards keep both dimensions.
