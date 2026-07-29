@@ -54,8 +54,86 @@ export function createSqlTexts(resolve) {
  * that carries several strings fans out, so every combination is returned. The
  * `seen` set is forked per operand: a variable read on both sides resolves on
  * both, rather than going dynamic on whichever side is visited second.
+ *
+ * A CALL of a local helper resolves to what the helper can return: the callee
+ * identifier resolves to its function binding, and every `return` expression in
+ * that body — or the concise-body expression of an arrow — goes back through
+ * this same recursion, so a helper is read exactly as the SQL it hands back
+ * would have been read inline. Several returns fan out, since which one runs is
+ * not decidable here, and so do several functions the callee binding can hold:
+ * a helper ASSIGNED to a `let` is read alongside one declared or initialized,
+ * the same every-write contract the string path above takes. Arguments are
+ * deliberately NOT bound to parameters: a parameter binding has no initializer
+ * and no write, so it resolves to no
+ * strings and reads as a substitution — exactly the quasi boundary a name or
+ * LIKE pattern flush against it needs, since its value is the caller's to vary.
+ * So `` `… LIKE 'ex${prefix}%'` `` credits nothing whether the interpolation is
+ * written at the call site or sits a parameter deep in a helper, and `` `DROP
+ * TABLE tmp_${suffix}` `` returned from one names no knowable table. A callee
+ * that is not a resolvable local function — an import, a global, a method call —
+ * stays a dead end and contributes no strings, the same under-accepting
+ * direction the rest of this resolver takes.
  */
 export function createSqlTextGroups(resolve) {
+  const isFunctionNode = (node) =>
+    node?.type === "FunctionDeclaration" ||
+    node?.type === "FunctionExpression" ||
+    node?.type === "ArrowFunctionExpression";
+
+  /**
+   * The `{ variable, fns }` a call's callee identifier names, or null when it
+   * names no local function — an import, a global, a method call, or a binding
+   * that holds something other than a function.
+   *
+   * EVERY function the binding can hold counts, initializer and assignments
+   * alike, on the same contract the string path takes above: which write reaches
+   * the call is not decidable here, so `let sweepSql; sweepSql = () => …` is as
+   * real a helper as the `const` form, and reading only the declarator would
+   * leave the assigned spelling invisible. Several candidates fan out exactly as
+   * several returns from one candidate do.
+   */
+  function calleeFunctions(node) {
+    if (node?.type !== "Identifier") return null;
+    const variable = resolve(node);
+    if (variable === null) return null;
+    const fns = [];
+    for (const def of variable.defs ?? []) {
+      const defNode = def.node;
+      if (isFunctionNode(defNode)) fns.push(defNode);
+      else if (defNode?.type === "VariableDeclarator" && isFunctionNode(defNode.init)) {
+        fns.push(defNode.init);
+      }
+    }
+    for (const ref of variable.references) {
+      if (isFunctionNode(ref.writeExpr)) fns.push(ref.writeExpr);
+    }
+    return fns.length > 0 ? { variable, fns } : null;
+  }
+
+  /**
+   * Every value the function can hand back. Nested functions are skipped: their
+   * returns are the inner function's, not this one's.
+   */
+  function returnExpressions(fn) {
+    if (fn.body?.type !== "BlockStatement") return fn.body ? [fn.body] : [];
+    const out = [];
+    const walk = (node) => {
+      if (!node || typeof node.type !== "string" || isFunctionNode(node)) return;
+      if (node.type === "ReturnStatement") {
+        if (node.argument) out.push(node.argument);
+        return;
+      }
+      for (const key of Object.keys(node)) {
+        if (key === "parent") continue;
+        const child = node[key];
+        if (Array.isArray(child)) child.forEach(walk);
+        else walk(child);
+      }
+    };
+    walk(fn.body);
+    return out;
+  }
+
   return function sqlTextGroups(node, seen = new Set()) {
     if (node?.type === "Literal") return typeof node.value === "string" ? [[node.value]] : [];
     if (node?.type === "TemplateLiteral") return [node.quasis.map((q) => q.value.cooked ?? "")];
@@ -68,6 +146,18 @@ export function createSqlTextGroups(resolve) {
       for (const left of operandGroups(node.left)) {
         for (const right of operandGroups(node.right)) {
           out.push([...left.slice(0, -1), left[left.length - 1] + right[0], ...right.slice(1)]);
+        }
+      }
+      return out;
+    }
+    if (node?.type === "CallExpression") {
+      const resolved = calleeFunctions(node.callee);
+      if (resolved === null || seen.has(resolved.variable)) return [];
+      seen.add(resolved.variable);
+      const out = [];
+      for (const fn of resolved.fns) {
+        for (const returned of returnExpressions(fn)) {
+          out.push(...sqlTextGroups(returned, new Set(seen)));
         }
       }
       return out;

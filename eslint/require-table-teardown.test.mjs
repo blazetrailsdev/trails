@@ -396,6 +396,40 @@ tester.run("require-table-teardown", rule, {
       "for (const t of rows) {\n" +
       '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
       "}",
+    'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+      "const sweepSql = () =>\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`;\n" +
+      "const rows = await adapter.execute(sweepSql());\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
+    'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+      "function dropSql(name) {\n" +
+      '  return `DROP TABLE IF EXISTS "${name}"`;\n' +
+      "}\n" +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      "  await adapter.exec(dropSql(t.tablename));\n" +
+      "}",
+    'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+      "function sweepSql(all) {\n" +
+      "  if (all) return `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`;\n" +
+      "  return `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'ex_%'`;\n" +
+      "}\n" +
+      "const rows = await adapter.execute(sweepSql(true));\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
+    'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+      "let sweepSql;\n" +
+      "sweepSql = () =>\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`;\n" +
+      "const rows = await adapter.execute(sweepSql());\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
   ],
   invalid: [
     // Dropping the truncated prefix of a spaced quoted name is not a teardown
@@ -1252,6 +1286,34 @@ tester.run("require-table-teardown", rule, {
         'const dropSql = "DROP TABLE " + \'"widgets"\';\n' +
         "expect(dropSql).toBe(rendered);",
       errors: [{ messageId: "missingTeardown", data: { table: "widgets" } }],
+    },
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex leak" (id int)`);\n' +
+        "const sweepSql = (prefix) =>\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename LIKE '${prefix}_%'`;\n" +
+        'const rows = await adapter.execute(sweepSql("ex"));\n' +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex leak" } }],
+    },
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "tmp_widgets" (id int)`);\n' +
+        "const dropSql = (suffix) => `DROP TABLE tmp_${suffix}`;\n" +
+        'await adapter.exec(dropSql("widgets"));',
+      errors: [{ messageId: "missingTeardown", data: { table: "tmp_widgets" } }],
+    },
+    {
+      code:
+        'import { sweepSql } from "./helpers.js";\n' +
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        "const rows = await adapter.execute(sweepSql());\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
     },
   ],
 });
