@@ -132,6 +132,22 @@ tester.run("require-table-teardown", rule, {
       "for (const t of rows) {\n" +
       '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
       "}",
+    // ILIKE is case-insensitive, so `ex_%` selects `EX_FOO` too.
+    'await adapter.exec(`CREATE TABLE "EX_FOO" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename ILIKE 'ex_%'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
+    // The ESCAPE clause is honoured on ILIKE as well: `!_` is a literal `_`.
+    'await adapter.exec(`CREATE TABLE "EX_FOO" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename ILIKE 'ex!_%' ESCAPE '!'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
     // A static schema qualifier still leaves the interpolation in the name slot.
     'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
       "const rows = await adapter.execute(\n" +
@@ -498,6 +514,30 @@ tester.run("require-table-teardown", rule, {
         'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
         "const rows = await adapter.execute(\n" +
         "  `SELECT tablename FROM pg_tables WHERE tablename NOT LIKE 'ex_%'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
+    },
+    // LIKE stays case-sensitive: only ILIKE's matcher carries the `i` flag.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "EX_FOO" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex!_%' ESCAPE '!'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "EX_FOO" } }],
+    },
+    // NOT ILIKE is an exclusion filter too, and yields no prefix either.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename NOT ILIKE 'ex_%'`,\n" +
         ");\n" +
         "for (const t of rows) {\n" +
         '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
