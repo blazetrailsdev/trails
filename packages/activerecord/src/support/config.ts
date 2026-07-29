@@ -183,6 +183,21 @@ export const SQLITE_FIXTURE_DATABASE = "db/fixture_database.sqlite3";
 export const SQLITE_FIXTURE_DATABASE_2 = "db/fixture_database_2.sqlite3";
 
 /**
+ * The `arunit2` sibling of a sqlite file database, spelled the way
+ * `config.example.yml:85,89` spells its pair: the same name with `_2` before
+ * the extension. Used for the per-worker template clone, whose primary name is
+ * stamped per run and so cannot be a checked-in constant like
+ * {@link SQLITE_FIXTURE_DATABASE_2}; the sibling is still an explicit file
+ * name rather than a suffix appended after the extension.
+ */
+export function sqliteSiblingDatabase(database: string): string {
+  const dot = database.lastIndexOf(".");
+  const slash = Math.max(database.lastIndexOf("/"), database.lastIndexOf("\\"));
+  if (dot <= slash + 1) return `${database}_2`;
+  return `${database.slice(0, dot)}_2${database.slice(dot)}`;
+}
+
+/**
  * The credential `config.example.yml` hard-codes on both `mysql2.arunit` and
  * `mysql2.arunit2` (`config.example.yml:4,24`), provisioned by
  * `db:mysql:build_user` (`activerecord/Rakefile:227-235`) — `CREATE USER`, no

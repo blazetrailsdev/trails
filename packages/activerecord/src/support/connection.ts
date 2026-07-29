@@ -41,6 +41,7 @@ import {
   postgresSettings,
   SQLITE_FIXTURE_DATABASE,
   SQLITE_FIXTURE_DATABASE_2,
+  sqliteSiblingDatabase,
   type ConnectionName,
   type EnvReader,
   type ServerSettings,
@@ -249,11 +250,11 @@ function expandConfig(
   entries: Partial<Record<ArunitEntryName, Record<string, unknown>>>,
 ): HashConfig[] {
   const primaryDatabase = String(entries.arunit?.database ?? "");
-  const secondDatabase =
-    primaryDatabase === ":memory:" ? primaryDatabase : arunitDatabaseNames(primaryDatabase).arunit2;
+  // No `:memory:` special case: both sqlite lanes spell their two databases out
+  // in the builder, so this default is only ever reached by a server adapter.
   const defaultDatabase: Record<ArunitEntryName, string> = {
     arunit: primaryDatabase,
-    arunit2: secondDatabase,
+    arunit2: arunitDatabaseNames(primaryDatabase).arunit2,
     arunit_without_prepared_statements: primaryDatabase,
   };
 
@@ -332,9 +333,11 @@ export async function testConfigurationHashes(): Promise<{
  * `AR_TEST_WORKER_DB` is the per-worker template clone the setupFile publishes
  * (`support/sqlite-template.ts`) — trails' stand-in for Rails' one
  * already-prepared database, since vitest forks workers where Rails does not.
- * Only that clone leaves `arunit2` for `expandConfig` to derive; the configured
- * pair is spelled out here as the yml spells it, since `expand_config` fills a
- * `database` in only when the entry carries none (`support/config.rb:30-36`).
+ * Its `arunit2` is the clone path's `_2` sibling ({@link sqliteSiblingDatabase})
+ * rather than a checked-in constant, because the clone name carries the run
+ * token and worker slot. Either way both entries name their own file here, as
+ * the yml does, since `expand_config` fills a `database` in only when the entry
+ * carries none (`support/config.rb:30-36`).
  *
  * The directory is created because Rails' `test/fixtures` is checked in and
  * ours is a gitignored build output; sqlite will not create a missing parent
@@ -346,7 +349,7 @@ async function sqliteEntries(): Promise<Record<"arunit" | "arunit2", Record<stri
   if (workerDb) {
     return {
       arunit: { ...options, database: workerDb },
-      arunit2: { ...options, database: undefined },
+      arunit2: { ...options, database: sqliteSiblingDatabase(workerDb) },
     };
   }
   const fs = await getFsAsync();
