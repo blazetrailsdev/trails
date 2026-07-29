@@ -496,9 +496,18 @@ const BOUND_RE = /^\{\d+(?:,\d*)?\}/;
  * `'ex_d'` is not, so the escape+letter pair reaches the underlying ARE as the
  * class shorthand; `'ex_5' SIMILAR TO 'ex_[#d]%' ESCAPE '#'` is TRUE the same
  * way. It follows that a backslash which is NOT the escape character is a plain
- * literal there (`[\d]` under `ESCAPE '#'` selects a backslash or a `d`, and
- * TRUE for neither digit nor `\d`'s JS meaning), so it must refuse rather than
- * translate — the JS class would otherwise be the wider of the two.
+ * literal there: `'ex_5' SIMILAR TO 'ex_[\d]%' ESCAPE '#'` is FALSE while
+ * `'ex_d'` and `'ex_\'` are both TRUE, so the class is the two literals
+ * `{\, d}` — which JS spells exactly as `[\\d]`. Doubling it translates the
+ * narrow reading; emitting it bare would give JS the wider `\d`, which is why
+ * only the bare emission was ever unsafe.
+ *
+ * The same doubling settles a literal backslash used as a range endpoint,
+ * because ranges compare code points in both grammars: `[\-a]` and JS `[\\-a]`
+ * are the same U+005C–U+0061 span. A range that runs the other way (`[a-\]`)
+ * needs no decision here: `compileMatcher` catches the descending-range
+ * SyntaxError and credits nothing, which is the safe answer whichever way
+ * PostgreSQL reads it.
  *
  * An escape character with structural meaning inside a bracket expression
  * (`[`, `]`, `^`, `-`) refuses the expression outright: `ESCAPE '^'` makes
@@ -525,14 +534,6 @@ function bracketSource(pattern, start, escapeChar) {
   for (; i < pattern.length && pattern[i] !== "]"; i++) {
     const ch = pattern[i];
     if (ch === "[" && ":.=".includes(pattern[i + 1] ?? "")) return null;
-    // A backslash that does not escape here is a literal to PostgreSQL and an
-    // escape to JS, so it is doubled rather than emitted bare — `[\d]` under
-    // `ESCAPE '#'` is the two literals `{\, d}`, which JS spells `[\\d]`
-    // exactly. Verified on PostgreSQL 17.7: `'ex_5' SIMILAR TO 'ex_[\d]%'
-    // ESCAPE '#'` is false while `'ex_d'` and `'ex_\'` are both true. A range
-    // endpoint needs no separate handling for the same reason: ranges compare
-    // code points in both grammars, so `[\-a]` and JS `[\\-a]` are the same
-    // U+005C–U+0061 span.
     if (ch === "\\" && ch !== escapeChar) {
       source += "\\\\";
       continue;
