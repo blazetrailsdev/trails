@@ -23,7 +23,6 @@ import { describeIfSupports } from "../support/supports.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { Column } from "../connection-adapters/column.js";
 
-/** Rails' `suppress_messages { migration.migrate(...) }`. */
 class SilentMigration extends Migration {
   write(): void {}
 }
@@ -34,7 +33,6 @@ class NotnullMigration extends SilentMigration {
   }
 }
 
-/** change_schema_test.rb:489-495. */
 async function testingTableWithOnlyFooAttribute(
   connection: AbstractAdapter,
   body: () => Promise<void>,
@@ -46,7 +44,6 @@ async function testingTableWithOnlyFooAttribute(
   await body();
 }
 
-/** Rails' `columns.detect { |c| c.name == name }`. */
 function detect(columns: readonly Column[], name: string): Column {
   return columns.find((c) => c.name === name)!;
 }
@@ -121,8 +118,6 @@ describe("Migration", () => {
         false,
       );
       expect(four.default).toBe("1");
-      // Mirrors Rails' `assert_equal "hello", five.default unless mysql`
-      // (change_schema_test.rb:76).
       // eslint-disable-next-line vitest/no-conditional-in-test
       if (!mysql) expect(five!.default).toBe("hello");
     });
@@ -171,8 +166,6 @@ describe("Migration", () => {
       const four = detect(columns, "four_int");
       const eight = detect(columns, "eight_int");
 
-      // Mirrors Rails' per-adapter sql_type branch (change_schema_test.rb:139-149);
-      // the SQLite lane asserts nothing here, exactly as Rails does.
       // eslint-disable-next-line vitest/no-conditional-in-test
       if (currentAdapter("PostgreSQLAdapter")) {
         expect(defaultInt.sqlType).toBe("integer");
@@ -312,8 +305,6 @@ describe("Migration", () => {
       });
       class PersonKlass extends Base {}
       PersonKlass.tableName = "testings";
-      // Rails re-reads `person_klass.lease_connection` at each step; it is the
-      // same leased connection throughout, so hoist it once here.
       const personConnection = await PersonKlass.leaseConnection();
 
       await personConnection.addColumn("testings", "wealth", "integer", {
@@ -488,8 +479,6 @@ describe("Migration", () => {
   describeIfSupports("foreign_keys", "ChangeSchemaWithDependentObjectsTest", () => {
     beforeEach(async () => {
       const connection = await ambientConnection();
-      // Both tables are dropped by the afterEach loop below (Rails'
-      // `[:wagons, :trains].each`), which the lint rule cannot see through.
       // eslint-disable-next-line blazetrails/require-table-teardown
       await connection.createTable("trains");
       // eslint-disable-next-line blazetrails/require-table-teardown
