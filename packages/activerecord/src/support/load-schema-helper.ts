@@ -12,12 +12,12 @@ import { loadCanonicalSchema } from "./canonical-schema.js";
  * `defaults` (lines 4-48), and the plain `create_table` remainder:
  * `postgresql_times`, `postgresql_oids`, `limitless_fields`, `bigint_array`,
  * the four `uuid_*` tables and the exclusion/unique constraint tables, the
- * `supports_identity_columns?` tables (50-66) and the
- * `supports_insert_returning?` trigger table (203-225).
+ * `supports_identity_columns?` tables (50-66), the `companies_nonstd_seq`/`setval`
+ * sequence pass and the partition + `timestamp_with_zones` raw-DDL block (77-128),
+ * and the `supports_insert_returning?` trigger table (203-225).
  *
- * Still unported: the `companies_nonstd_seq`/`setval` sequence pass and the
- * partition + `timestamp_with_zones` raw-DDL block (77-128), and the
- * `measurements*` partitioned tables and `company_include_index` (187-201).
+ * Still unported: the `measurements*` partitioned tables and
+ * `company_include_index` (187-201).
  */
 async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise<void> {
   // `supportsPgcryptoUuid()` / `supportsVirtualColumns()` read the cached
@@ -119,6 +119,67 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
   await adapter.createTable("postgresql_oids", { force: true }, (t) => {
     (t as PgTableDefinition).oid("obj_id");
   });
+
+  await adapter.dropTable("postgresql_timestamp_with_zones", { ifExists: true });
+  await adapter.dropTable("postgresql_partitioned_table", { ifExists: true });
+  await adapter.dropTable("postgresql_partitioned_table_parent", { ifExists: true });
+
+  await adapter.execute("DROP SEQUENCE IF EXISTS companies_nonstd_seq CASCADE");
+  await adapter.execute("CREATE SEQUENCE companies_nonstd_seq START 101 OWNED BY companies.id");
+  await adapter.execute(
+    "ALTER TABLE companies ALTER COLUMN id SET DEFAULT nextval('companies_nonstd_seq')",
+  );
+  await adapter.execute("DROP SEQUENCE IF EXISTS companies_id_seq");
+
+  await adapter.execute("DROP FUNCTION IF EXISTS partitioned_insert_trigger()");
+
+  for (const seqName of [
+    "accounts_id_seq",
+    "developers_id_seq",
+    "projects_id_seq",
+    "topics_id_seq",
+    "customers_id_seq",
+    "orders_id_seq",
+  ]) {
+    await adapter.execute(`SELECT setval('${seqName}', 100)`);
+  }
+
+  await adapter.execute(
+    "CREATE TABLE postgresql_timestamp_with_zones (\n" +
+      "  id SERIAL PRIMARY KEY,\n" +
+      "  time TIMESTAMP WITH TIME ZONE\n" +
+      ")",
+  );
+
+  // Rails wraps the block below in a `rescue StatementInvalid` that runs
+  // `CREATE LANGUAGE 'plpgsql'` and retries (lines 122-128). plpgsql has been
+  // installed by default since PostgreSQL 9.0, below trails' supported floor,
+  // so the rescue arm has no reachable counterpart here.
+  await adapter.execute(
+    "CREATE TABLE postgresql_partitioned_table_parent (\n" +
+      "  id SERIAL PRIMARY KEY,\n" +
+      "  number integer\n" +
+      ")",
+  );
+  await adapter.execute(
+    "CREATE TABLE postgresql_partitioned_table ( )\n" +
+      "  INHERITS (postgresql_partitioned_table_parent)",
+  );
+  await adapter.execute(
+    "CREATE OR REPLACE FUNCTION partitioned_insert_trigger()\n" +
+      "RETURNS TRIGGER AS $$\n" +
+      "BEGIN\n" +
+      "  INSERT INTO postgresql_partitioned_table VALUES (NEW.*);\n" +
+      "  RETURN NULL;\n" +
+      "END;\n" +
+      "$$\n" +
+      "LANGUAGE plpgsql",
+  );
+  await adapter.execute(
+    "CREATE TRIGGER insert_partitioning_trigger\n" +
+      "  BEFORE INSERT ON postgresql_partitioned_table_parent\n" +
+      "  FOR EACH ROW EXECUTE PROCEDURE partitioned_insert_trigger()",
+  );
 
   await adapter.createTable("limitless_fields", { force: true }, (t) => {
     const pg = t as PgTableDefinition;
@@ -427,6 +488,9 @@ const ADAPTER_SPECIFIC_TABLES: Record<
     "defaults",
     "postgresql_times",
     "postgresql_oids",
+    "postgresql_timestamp_with_zones",
+    "postgresql_partitioned_table_parent",
+    "postgresql_partitioned_table",
     "limitless_fields",
     "bigint_array",
     "uuid_comments",
