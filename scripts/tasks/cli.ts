@@ -531,6 +531,19 @@ export function nextBundle(
   return best;
 }
 
+// A prioritized lead outranks the budget by design (see `nextBundle`), so a
+// bundle's total can legitimately exceed `maxLoc` — but only ever because of
+// the lead, never the packing (`bestBundle` gets the leftover budget and
+// returns [] when it's negative). Callers report `leadExceedsBudget` instead
+// of printing a total above `max` as if the budget had held.
+export function summarizeBundle(
+  rows: StoryEntry[],
+  maxLoc: number,
+): { total: number; leadExceedsBudget: boolean } {
+  const total = rows.reduce((a, s) => a + (s.est_loc ?? 0), 0);
+  return { total, leadExceedsBudget: total > maxLoc };
+}
+
 export function listFiltered(
   index: Index,
   opts: { rfc?: string; status?: string; cluster?: string } = {},
@@ -3115,15 +3128,25 @@ function main(): void {
         cluster: stringFlag(flags, "cluster"),
         rfc: stringFlag(flags, "rfc"),
       });
-      const total = rows.reduce((a, s) => a + (s.est_loc ?? 0), 0);
+      const { total, leadExceedsBudget: overBudget } = summarizeBundle(rows, maxLoc);
       if (flags.json) {
         console.log(
-          JSON.stringify({ stories: rows, bundle_total_loc: total, max_loc: maxLoc }, null, 2),
+          JSON.stringify(
+            {
+              stories: rows,
+              bundle_total_loc: total,
+              max_loc: maxLoc,
+              lead_exceeds_budget: overBudget,
+            },
+            null,
+            2,
+          ),
         );
       } else if (rows.length === 0) {
         console.log(`no ready stories within ${maxLoc} LOC`);
       } else {
-        console.log(`bundle (sum ${total} / max ${maxLoc}):`);
+        const note = overBudget ? " — lead exceeds budget" : "";
+        console.log(`bundle (sum ${total} / max ${maxLoc}${note}):`);
         fmt(rows, undefined, rfcPriorityMap(idx));
       }
       break;

@@ -64,6 +64,7 @@ import {
   newRfc,
   newStory,
   nextBundle,
+  summarizeBundle,
   numberFlag,
   parseFlags,
   ready,
@@ -377,6 +378,29 @@ describe("nextBundle", () => {
     const bundle = nextBundle(idx, { maxLoc: 250 });
     expect(bundle[0].id).toBe("p");
     expect(bundle.map((s) => s.id)).toEqual(["p", "f"]);
+  });
+
+  it("leads with a prioritized story whose est_loc exceeds the budget, flagged as over-budget", () => {
+    // Priority outranks the budget, so the oversized lead still leads — but
+    // the summary must say the total busted `maxLoc` rather than report it as
+    // a conforming bundle. The fill stays empty (negative leftover budget).
+    const idx = index([
+      story({ id: "big", cluster: "c1", est_loc: 450, priority: 2 }),
+      story({ id: "f", cluster: "c1", est_loc: 80 }),
+    ]);
+    const bundle = nextBundle(idx, { maxLoc: 250 });
+    expect(bundle.map((s) => s.id)).toEqual(["big"]);
+    expect(summarizeBundle(bundle, 250)).toEqual({ total: 450, leadExceedsBudget: true });
+  });
+
+  it("does not flag a bundle whose total fits the budget", () => {
+    const idx = index([
+      story({ id: "p", cluster: "c1", est_loc: null, priority: 1 }),
+      story({ id: "f", cluster: "c1", est_loc: 80 }),
+    ]);
+    const bundle = nextBundle(idx, { maxLoc: 250 });
+    // The null-est_loc lead counts as 0, so this stays within budget.
+    expect(summarizeBundle(bundle, 250)).toEqual({ total: 80, leadExceedsBudget: false });
   });
 
   it("orders multiple prioritized stories by ascending priority (lower N first)", () => {
