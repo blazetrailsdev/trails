@@ -496,9 +496,18 @@ const BOUND_RE = /^\{\d+(?:,\d*)?\}/;
  * `'ex_d'` is not, so the escape+letter pair reaches the underlying ARE as the
  * class shorthand; `'ex_5' SIMILAR TO 'ex_[#d]%' ESCAPE '#'` is TRUE the same
  * way. It follows that a backslash which is NOT the escape character is a plain
- * literal there (`[\d]` under `ESCAPE '#'` selects a backslash or a `d`, and
- * TRUE for neither digit nor `\d`'s JS meaning), so it must refuse rather than
- * translate — the JS class would otherwise be the wider of the two.
+ * literal there: `'ex_5' SIMILAR TO 'ex_[\d]%' ESCAPE '#'` is FALSE while
+ * `'ex_d'` and `'ex_\'` are both TRUE, so the class is the two literals
+ * `{\, d}` — which JS spells exactly as `[\\d]`. Doubling it translates the
+ * narrow reading; emitting it bare would give JS the wider `\d`, which is why
+ * only the bare emission was ever unsafe.
+ *
+ * The same doubling settles a literal backslash used as a range endpoint,
+ * because ranges compare code points in both grammars: `[\-a]` and JS `[\\-a]`
+ * are the same U+005C–U+0061 span. A range that runs the other way (`[a-\]`)
+ * needs no decision here: `compileMatcher` catches the descending-range
+ * SyntaxError and credits nothing, which is the safe answer whichever way
+ * PostgreSQL reads it.
  *
  * An escape character with structural meaning inside a bracket expression
  * (`[`, `]`, `^`, `-`) refuses the expression outright: `ESCAPE '^'` makes
@@ -525,9 +534,10 @@ function bracketSource(pattern, start, escapeChar) {
   for (; i < pattern.length && pattern[i] !== "]"; i++) {
     const ch = pattern[i];
     if (ch === "[" && ":.=".includes(pattern[i + 1] ?? "")) return null;
-    // A backslash that does not escape here is still refused rather than
-    // emitted: it is a literal to PostgreSQL but an escape to JS.
-    if (ch === "\\" && ch !== escapeChar) return null;
+    if (ch === "\\" && ch !== escapeChar) {
+      source += "\\\\";
+      continue;
+    }
     if (ch === escapeChar) {
       const next = pattern[i + 1];
       if (next === undefined || !ARE_SHORTHANDS.has(next)) return null;
@@ -648,7 +658,8 @@ function regexpPrefixMatcher(pattern, caseInsensitive) {
  * `ESCAPE` character inside a bracket expression and hands the pair to the
  * underlying ARE — so `[\d]` under the default backslash escape (the one
  * `sanitize_sql_like` emits) is the digits, exactly as on the `~` path, while a
- * backslash that is not the escape character is a literal there and refuses.
+ * backslash that is not the escape character is a literal member there and is
+ * translated as the doubled `\\`.
  */
 function similarPrefixMatcher(pattern, escapeChar, caseInsensitive) {
   let source = "";

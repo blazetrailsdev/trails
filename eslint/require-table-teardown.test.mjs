@@ -209,6 +209,24 @@ tester.run("require-table-teardown", rule, {
       "for (const t of rows) {\n" +
       '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
       "}",
+    // A backslash that is not the ESCAPE character is a literal member, so
+    // `[\d]` under `ESCAPE '#'` is `{\, d}` and selects `ex_d`.
+    'await adapter.exec(`CREATE TABLE "ex_d" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename SIMILAR TO 'ex_[\\\\d]%' ESCAPE '#'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
+    // As a range endpoint it is the same literal: `[\-a]` is U+005C–U+0061,
+    // which contains the `_` of `ex__`.
+    'await adapter.exec(`CREATE TABLE "ex__" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename SIMILAR TO 'ex_[\\\\-a]%' ESCAPE '#'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
     // A bracket expression and a bounded repeat are spelled alike in JS.
     'await adapter.exec(`CREATE TABLE "ex12_int" (id int)`);\n' +
       "const rows = await adapter.execute(\n" +
@@ -1007,9 +1025,8 @@ tester.run("require-table-teardown", rule, {
         "}",
       errors: [{ messageId: "missingTeardown", data: { table: "ex_-" } }],
     },
-    // A backslash that is NOT the pattern's ESCAPE character is a literal
-    // backslash inside a `SIMILAR TO` bracket expression, so `[\d]` selects a
-    // backslash or a `d` and crediting the digits would be the wider reading.
+    // That literal reading is the narrow one: `[\d]` under `ESCAPE '#'` selects
+    // a backslash or a `d`, never a digit, so `ex_1` goes uncredited.
     {
       code:
         'await adapter.exec(`CREATE TABLE "ex_1" (id int)`);\n' +
@@ -1020,6 +1037,31 @@ tester.run("require-table-teardown", rule, {
         '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
         "}",
       errors: [{ messageId: "missingTeardown", data: { table: "ex_1" } }],
+    },
+    // And the range built on it stops at U+0061, so `ex_b` is past its top end.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_b" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename SIMILAR TO 'ex_[\\\\-a]%' ESCAPE '#'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_b" } }],
+    },
+    // A range running the other way (`[a-\]`) is a descending one JS will not
+    // compile, so it credits nothing rather than throwing out of the lint pass.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_a" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename SIMILAR TO 'ex_[a-\\\\]%' ESCAPE '#'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_a" } }],
     },
     // The same for a range: `[a-d]` under `ESCAPE '-'` is the digits, since the
     // `-` escapes the `d` before it can be read as the middle of a range — so
