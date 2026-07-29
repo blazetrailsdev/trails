@@ -260,12 +260,6 @@ describe("UpdateableViewTest", () => {
     expect((newBook as any).name).toBe("Rails in Action");
   });
 
-  // Rails gates this `current_adapter?(:PostgreSQLAdapter, :SQLite3Adapter) &&
-  // supports_insert_returning?` — the MySQL family is excluded by name: a
-  // MariaDB view reports no auto_increment Extra for the base table's key, so
-  // the column is never auto-populated and LAST_INSERT_ID() through the view is
-  // 0. SQLite is excluded here too because its views do not support DML. Carry
-  // both features so the extracted gate still reconciles view_test.rb.
   itIfSupports.skipIf(adapterType === "sqlite" || adapterType === "mysql")(
     "insert_returning,views",
     "insert record populates primary key",
