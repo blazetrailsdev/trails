@@ -65,6 +65,11 @@ const cleanupG = globalThis as typeof globalThis & { __arDbCleanupPaths?: Set<st
  * Register a best-effort `process.on("exit")` unlink of a sqlite file DB and
  * its WAL sidecars, at most once per path per process.
  *
+ * Best-effort really means it: vitest's fork pool signals its workers dead, and
+ * a signalled process never runs `"exit"` listeners. {@link sweepRunDbFiles} in
+ * globalSetup's teardown is what guarantees the files go away; this listener
+ * only makes them go away *sooner* when a worker does exit cleanly.
+ *
  * Callers that must stay `process`-free (`support/connection.ts`, whose
  * fallback DB otherwise lingers in tmpdir after every setup-free run) route
  * their cleanup through here — this module already carries the `process`
@@ -89,6 +94,87 @@ export async function registerDbFileCleanupOnExit(base: string): Promise<void> {
     registered.delete(base);
     throw error;
   }
+}
+
+/**
+ * Shared filename prefix of every temp sqlite DB the AR test harness creates:
+ * the template, the per-worker clones, the scratch databases
+ * (`support/scratch-database.ts`), the setup-free fallback DB
+ * (`support/connection.ts`) and their `_arunit2` siblings.
+ */
+export const TEMP_DB_PREFIX = "ar-test-";
+
+/**
+ * Age past which an `ar-test-*` file in tmpdir is assumed to be orphaned by an
+ * earlier run and swept. No AR test run comes near this, so the cutoff cannot
+ * pull a file out from under a *concurrent* run — which a blanket
+ * prefix-unlink would, since parallel worktrees share one tmpdir.
+ */
+const STALE_DB_AGE_MS = 6 * 60 * 60 * 1000;
+
+/** Temp-dir entries the harness owns, or `[]` when the fs adapter can't list. */
+async function tempDbEntries(fs: FsAdapter): Promise<string[]> {
+  if (!fs.readdir) return [];
+  try {
+    return (await fs.readdir(await tmpRoot())).filter((name) => name.startsWith(TEMP_DB_PREFIX));
+  } catch {
+    return [];
+  }
+}
+
+async function unlinkQuietly(fs: FsAdapter, target: string): Promise<void> {
+  try {
+    await fs.unlink?.(target);
+  } catch {
+    // best-effort
+  }
+}
+
+/**
+ * Unlink every temp DB file stamped with `runToken`, whatever created it.
+ *
+ * This is the cleanup that actually survives the run: the
+ * `registerDbFileCleanupOnExit` listeners live in vitest's forked workers, and
+ * tinypool tears those down with a signal rather than a clean shutdown, so
+ * `"exit"` handlers never run and each run leaks its worker clones, scratch
+ * DBs and WAL sidecars. Sweeping from globalSetup's teardown — the one place
+ * that outlives every worker — collects them regardless of how the worker died.
+ *
+ * Matching is by run token, not by prefix alone, so a concurrent run's live
+ * databases are never touched.
+ */
+export async function sweepRunDbFiles(runToken: string): Promise<void> {
+  const [fs, path] = [await getFsAsync(), await getPathAsync()];
+  const root = await tmpRoot();
+  const stamp = `-${runToken}`;
+  await Promise.all(
+    (await tempDbEntries(fs))
+      .filter((name) => name.includes(stamp))
+      .map((name) => unlinkQuietly(fs, path.join(root, name))),
+  );
+}
+
+/**
+ * Unlink temp DB files left behind by runs that predate the token sweep (or
+ * that were killed before their teardown ran, e.g. a `^C`-ed vitest). Runs at
+ * globalSetup time, when nothing of this run exists yet.
+ */
+export async function sweepStaleDbFiles(): Promise<void> {
+  const [fs, path] = [await getFsAsync(), await getPathAsync()];
+  if (!fs.stat) return;
+  const root = await tmpRoot();
+  const cutoff = Date.now() - STALE_DB_AGE_MS;
+  await Promise.all(
+    (await tempDbEntries(fs)).map(async (name) => {
+      const target = path.join(root, name);
+      try {
+        if ((await fs.stat!(target)).mtime.getTime() >= cutoff) return;
+      } catch {
+        return;
+      }
+      await unlinkQuietly(fs, target);
+    }),
+  );
 }
 
 /** Env var: absolute path of the canonical template DB built by globalSetup. */

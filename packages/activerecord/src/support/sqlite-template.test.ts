@@ -15,6 +15,8 @@ import {
   WORKER_DB_ENV,
   isSqliteRun,
   registerDbFileCleanupOnExit,
+  sweepRunDbFiles,
+  sweepStaleDbFiles,
   unlinkDbFiles,
 } from "./sqlite-template.js";
 
@@ -62,6 +64,61 @@ describe("registerDbFileCleanupOnExit", () => {
     const fs = await getFsAsync();
     const base = await tmpPath();
     expect(() => unlinkDbFiles(fs, base)).not.toThrow();
+  });
+});
+
+describe("sweepRunDbFiles", () => {
+  const token = () => `sweep${Math.random().toString(36).slice(2)}`;
+
+  async function seed(name: string): Promise<string> {
+    const [fs, os] = [await getFsAsync(), await getOsAsync()];
+    const target = `${os.tmpdir()}/${name}`;
+    fs.writeFileSync(target, "");
+    return target;
+  }
+
+  it("unlinks every temp DB stamped with the run token, sidecars included", async () => {
+    const fs = await getFsAsync();
+    const run = token();
+    const seeded = await Promise.all([
+      seed(`ar-test-template-${run}.sqlite`),
+      seed(`ar-test-worker-${run}-1.sqlite`),
+      seed(`ar-test-worker-${run}-1.sqlite-wal`),
+      seed(`ar-test-worker-${run}-1.sqlite-shm`),
+      seed(`ar-test-worker-${run}-1.sqlite_arunit2`),
+      seed(`ar-test-animals-${run}-2.sqlite`),
+    ]);
+
+    await sweepRunDbFiles(run);
+
+    for (const target of seeded) expect(await fs.exists(target), target).toBe(false);
+  });
+
+  it("leaves a concurrent run's files alone", async () => {
+    const fs = await getFsAsync();
+    const other = await seed(`ar-test-worker-${token()}-1.sqlite`);
+    try {
+      await sweepRunDbFiles(token());
+      expect(await fs.exists(other)).toBe(true);
+    } finally {
+      unlinkDbFiles(fs, other);
+    }
+  });
+});
+
+describe("sweepStaleDbFiles", () => {
+  it("keeps a temp DB that a running suite could still be using", async () => {
+    const fs = await getFsAsync();
+    const fresh = `${(await getOsAsync()).tmpdir()}/ar-test-worker-stale${Math.random()
+      .toString(36)
+      .slice(2)}-1.sqlite`;
+    fs.writeFileSync(fresh, "");
+    try {
+      await sweepStaleDbFiles();
+      expect(await fs.exists(fresh)).toBe(true);
+    } finally {
+      unlinkDbFiles(fs, fresh);
+    }
   });
 });
 
