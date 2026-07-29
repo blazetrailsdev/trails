@@ -411,17 +411,19 @@ tester.run("require-table-teardown", rule, {
       errors: [{ messageId: "missingTeardown", data: { table: "ex!A" } }],
     },
     // A multi-character escape literal is not a readable single character
-    // either: the closing quote must follow the first character.
+    // either: the closing quote must follow the first character, so the whole
+    // filter is unreadable. `ex_foo` is the discriminating name — a parse that
+    // truncated `\'!!\'` to `!` would compile `^ex_` and credit it.
     {
       code:
-        'await adapter.exec(`CREATE TABLE "ex!A" (id int)`);\n' +
+        'await adapter.exec(`CREATE TABLE "ex_foo" (id int)`);\n' +
         "const rows = await adapter.execute(\n" +
         "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex!_%' ESCAPE '!!'`,\n" +
         ");\n" +
         "for (const t of rows) {\n" +
         '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
         "}",
-      errors: [{ messageId: "missingTeardown", data: { table: "ex!A" } }],
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_foo" } }],
     },
     // An ESCAPE clause that is not a readable single character makes the whole
     // filter unreadable, so it credits nothing.
