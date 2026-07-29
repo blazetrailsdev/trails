@@ -136,7 +136,7 @@
  * prefix at all; and, in either regex spelling, a construct whose JS meaning
  * differs from its POSIX one and so is refused rather than mistranslated — a
  * POSIX class or collating element (`[[:alpha:]]`), a back reference (`\1`), an
- * ARE-only escape (`\A`, `\Z`, `\y`, `\m`, `\M`, and `\b`, which PostgreSQL
+ * ARE-only escape (`\A`, `\Z`, `\y`, `\Y`, `\m`, `\M`, and `\b`, which PostgreSQL
  * also spells backspace with inside brackets), a shorthand JS reads more widely
  * than ARE does (`\D`, `\W`, `\s`), a backslash inside a bracket
  * expression, whose meaning depends on which regex engine reads it, an `^` or
@@ -492,7 +492,8 @@ function bracketSource(pattern, start) {
  *
  * Refused alongside them: back references, `\b` (a word boundary in both, but
  * ALSO PostgreSQL's spelling of backspace inside a bracket expression), and the
- * ARE-only `\A` / `\Z` / `\y` / `\m` / `\M`, which JS cannot spell at all.
+ * ARE-only `\A` / `\Z` / `\y` / `\Y` / `\m` / `\M`, which JS cannot spell at all
+ * (`\Y` is ARE's *not* a word boundary, documented alongside the others).
  */
 const ARE_SHORTHANDS = new Set(["d", "w", "S"]);
 
@@ -508,7 +509,7 @@ const ARE_SHORTHANDS = new Set(["d", "w", "S"]);
  * for the ARE class shorthands whose JS meaning is identical (`ARE_SHORTHANDS`);
  * every other one is refused, since a back reference (`\1`) means something
  * else once the `^(?:…)` wrapper adds a group, and the ARE-only escapes (`\A`,
- * `\Z`, `\y`, `\m`, `\M`) have no JS spelling at all. Also refused: a `{` that
+ * `\Z`, `\y`, `\Y`, `\m`, `\M`) have no JS spelling at all. Also refused: a `{` that
  * does not open a bound, and an `^` or `$` past the leading anchor, which would
  * constrain a position this prefix reading does not model.
  */

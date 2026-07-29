@@ -842,12 +842,24 @@ tester.run("require-table-teardown", rule, {
         "}",
       errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
     },
-    // `\y`, `\m` and `\M` are ARE word-boundary constraints JS cannot spell.
+    // `\y`, `\Y`, `\m` and `\M` are ARE word-boundary constraints JS cannot
+    // spell — `\Y` is the negated one, "not beginning or end of a word".
     {
       code:
         'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
         "const rows = await adapter.execute(\n" +
         "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^\\\\yex_'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
+    },
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_\\\\Y'`,\n" +
         ");\n" +
         "for (const t of rows) {\n" +
         '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
