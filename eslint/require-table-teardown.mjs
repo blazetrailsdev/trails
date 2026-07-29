@@ -143,10 +143,16 @@
  * POSIX class or collating element (`[[:alpha:]]`), a back reference (`\1`), an
  * ARE-only escape (`\A`, `\Z`, `\y`, `\Y`, `\m`, `\M`, and `\b`, which PostgreSQL
  * also spells backspace with inside brackets), a shorthand JS reads more widely
- * than ARE does (`\D`, `\W`, `\s`), a backslash inside a bracket
- * expression, whose meaning depends on which regex engine reads it, an `^` or
+ * than ARE does (`\D`, `\W`, `\s`), an `^` or
  * `$` past the leading
- * anchor, and a pattern that does not compile at all. Everything else in the
+ * anchor, and a pattern that does not compile at all. A backslash inside a
+ * bracket expression is read only in the `~` / `~*` spelling, where the engine
+ * is known to be ARE and a bracketed `ARE_SHORTHANDS` member (`[\d]`) means what
+ * the same shorthand means in a JS character class; anything else bracketed
+ * (`[\W]`, `[\b]`, `[\1]`, `[\\]`, a shorthand as a range endpoint) and every
+ * backslash inside a `SIMILAR TO` bracket expression — whose interaction with
+ * that grammar's `ESCAPE` character is unsettled — still refuses. Everything
+ * else in the
  * two regex grammars — alternation, grouping, `* + ?`, `{n,m}` bounds, bracket
  * expressions, `.`, and the ARE class shorthands whose JS set is no wider
  * (`\d`, `\w`, `\S` — see `ARE_SHORTHANDS`) — is
@@ -460,10 +466,22 @@ const BOUND_RE = /^\{\d+(?:,\d*)?\}/;
  * ordinary literal, but PostgreSQL's engine is ARE, which reads it as an escape
  * inside brackets too (`[\d]` is the digits, not a backslash and a `d`), so
  * emitting it doubled would credit `exd` for `~ '^ex[\d]'` — a name the filter
- * does not select. Which reading is right depends on the engine, so a backslash
- * in a bracket expression refuses the whole filter instead.
+ * does not select.
+ *
+ * `areEscapes` says which reading applies, so the caller that knows the engine
+ * decides. The `~` / `~*` path sets it: those patterns are read by ARE, where a
+ * bracketed `ARE_SHORTHANDS` member means exactly what the same shorthand means
+ * in a JS character class, so `[\d]` translates. Every other backslash inside
+ * brackets still refuses — the complements (`[\W]`), `\b` (backspace here, not
+ * a word boundary), a back reference (`[\1]`), and a bare `[\\]`, whose ARE
+ * meaning is a literal backslash but whose bare-POSIX one is two of them. A
+ * shorthand used as a range endpoint (`[a-\d]`, `[\d-z]`) is refused too: ARE
+ * rejects it outright, while JS's Annex B grammar quietly reads the `-` as a
+ * literal and would credit a name containing one. Unset (the `SIMILAR TO`
+ * path), any backslash refuses: that grammar carries its own `ESCAPE`
+ * character, and how it composes with a bracketed backslash is unsettled.
  */
-function bracketSource(pattern, start) {
+function bracketSource(pattern, start, areEscapes = false) {
   let source = "[";
   let i = start + 1;
   if (pattern[i] === "^") {
@@ -474,10 +492,21 @@ function bracketSource(pattern, start) {
     source += "\\]";
     i++;
   }
+  // Where the members start, so a `-` in first position is read as the literal
+  // it is in both grammars rather than as the open end of a range.
+  const bodyStart = source.length;
   for (; i < pattern.length && pattern[i] !== "]"; i++) {
     const ch = pattern[i];
     if (ch === "[" && ":.=".includes(pattern[i + 1] ?? "")) return null;
-    if (ch === "\\") return null;
+    if (ch === "\\") {
+      const next = pattern[i + 1];
+      if (!areEscapes || next === undefined || !ARE_SHORTHANDS.has(next)) return null;
+      if (source.endsWith("-") && source.length - 1 > bodyStart) return null;
+      if (pattern[i + 2] === "-" && (pattern[i + 3] ?? "]") !== "]") return null;
+      source += `\\${next}`;
+      i++;
+      continue;
+    }
     source += ch === "[" ? "\\[" : ch === "^" ? "\\^" : ch;
   }
   if (i >= pattern.length) return null;
@@ -514,7 +543,9 @@ const ARE_SHORTHANDS = new Set(["d", "w", "S"]);
  *
  * Alternation, grouping and the quantifiers `* + ?` are spelled identically in
  * both, as are `{n,m}` bounds and `.`; bracket expressions go through
- * `bracketSource`. A backslash escape of a word character is translated only
+ * `bracketSource` in its ARE reading, so a bracketed `ARE_SHORTHANDS` member
+ * (`[\d]`) translates like the bare one. A backslash escape of a word character
+ * is translated only
  * for the ARE class shorthands whose JS meaning is identical (`ARE_SHORTHANDS`);
  * every other one is refused, since a back reference (`\1`) means something
  * else once the `^(?:…)` wrapper adds a group, and the ARE-only escapes (`\A`,
@@ -528,7 +559,7 @@ function posixRegexpSource(pattern) {
   while (i < pattern.length) {
     const ch = pattern[i];
     if (ch === "[") {
-      const bracket = bracketSource(pattern, i);
+      const bracket = bracketSource(pattern, i, true);
       if (bracket === null) return null;
       source += bracket.source;
       i = bracket.next;

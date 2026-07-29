@@ -261,6 +261,46 @@ tester.run("require-table-teardown", rule, {
       "for (const t of rows) {\n" +
       '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
       "}",
+    // Inside a bracket expression the same ARE shorthands mean what they mean in
+    // a JS character class, so `[\d]` translates rather than refusing the filter.
+    'await adapter.exec(`CREATE TABLE "ex_12" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[\\\\d]+'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
+    'await adapter.exec(`CREATE TABLE "ex_foo" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[\\\\w]+'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
+    // A shorthand alongside ordinary bracket members, and under negation.
+    'await adapter.exec(`CREATE TABLE "ex_-1" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[-\\\\S]+'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
+    'await adapter.exec(`CREATE TABLE "ex_ab" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[^\\\\d]+'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
+    // A `-` in first position is a literal in both grammars, even under
+    // negation, so the shorthand after it is not a range endpoint.
+    'await adapter.exec(`CREATE TABLE "ex_ab" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[^-\\\\d]+'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
     // A static schema qualifier still leaves the interpolation in the name slot.
     'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
       "const rows = await adapter.execute(\n" +
@@ -826,9 +866,8 @@ tester.run("require-table-teardown", rule, {
       errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
     },
     // A backslash inside a bracket expression is an escape to PostgreSQL's ARE
-    // engine and a literal to bare POSIX, so the filter is refused: reading
-    // `[\d]` as a literal backslash-or-`d` would credit `exd`, which
-    // `~ '^ex[\d]'` does not select.
+    // engine and a literal to bare POSIX. `[\d]` is read as the digits, so it
+    // still credits nothing for `exd` — the literal reading would.
     {
       code:
         'await adapter.exec(`CREATE TABLE "exd" (id int)`);\n' +
@@ -839,6 +878,94 @@ tester.run("require-table-teardown", rule, {
         '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
         "}",
       errors: [{ messageId: "missingTeardown", data: { table: "exd" } }],
+    },
+    // `\W` is wider in JS than ARE's `[^[:alnum:]_]` need be, so it stays
+    // refused inside brackets exactly as it is outside them.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_-" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[\\\\W]'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_-" } }],
+    },
+    // `\b` inside a bracket expression is PostgreSQL's backspace, not JS's word
+    // boundary, so it is refused rather than translated.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_b" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[\\\\b]'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_b" } }],
+    },
+    // A back reference inside brackets is not a shorthand, so it refuses too.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_1" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^(ex)_[\\\\1]'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_1" } }],
+    },
+    // A bare `[\\]` is one literal backslash to ARE and two characters to bare
+    // POSIX, so which set it denotes still depends on the engine.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_x" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[\\\\\\\\]'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_x" } }],
+    },
+    // A shorthand as a range endpoint is an error to ARE, but JS's Annex B
+    // grammar reads the `-` as a literal — which would credit `ex_-`.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_-" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[a-\\\\d]'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_-" } }],
+    },
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_-" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[\\\\d-z]'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_-" } }],
+    },
+    // `SIMILAR TO` carries its own ESCAPE character, and how that composes with
+    // a backslash inside brackets is unsettled, so that path still refuses.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_1" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename SIMILAR TO 'ex_[\\\\d]%'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_1" } }],
     },
     // A back reference means something else once the `^(?:…)` wrapper adds a
     // group, so it stays refused although JS spells it identically.
