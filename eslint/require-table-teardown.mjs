@@ -130,11 +130,8 @@
  * catalogue `LIKE` filter anywhere in the file, plus any dynamically-named raw
  * drop anywhere in it, arms every prefix the file mentions. KNOWN GAPS, all in
  * the under-accepting direction (a real sweep goes unrecognised and its creates
- * are reported, which is noise rather than a leak): SQL appended piecewise
- * (`sql += " WHERE …"`), since a
- * compound assignment's write is only its right-hand side and stitching the
- * pieces back together needs an order the scope graph does not give; a
- * catalogue relation `CATALOGUE_SOURCE` does not list;
+ * are reported, which is noise rather than a leak): a catalogue relation
+ * `CATALOGUE_SOURCE` does not list;
  * an unanchored regex (`~` / `~*`) filter, which matches mid-name and is no
  * prefix at all; and, in either regex spelling, a construct whose JS meaning
  * differs from its POSIX one and so is refused rather than mistranslated — a
@@ -190,6 +187,24 @@
  * nothing and a name flush against one names no knowable table — and a callee
  * that is not a resolvable local function — an import, a global, a method call —
  * stays a dead end and arms nothing.
+ *
+ * What the resolver does NOT read is SQL appended piecewise (`sql += " WHERE
+ * …"`): a compound assignment's write is only its right-hand side, so each
+ * fragment resolves as an independent string and the concatenation the code
+ * executes is never formed. That gap is left OPEN deliberately, and it is the
+ * one gap here not purely in the under-accepting direction — a fragment that
+ * happens to close a `LIKE '…%'` pattern credits a prefix off SQL whose real
+ * text may select more, while a pattern split across two appends credits
+ * nothing. Closing it would need the writes ordered by source position within
+ * the enclosing function, which the scope graph does not give. It stays open
+ * because the population is zero: `eslint/piecewise-sql-population.test.mjs`
+ * parses every AR test file this rule or `require-canonical-rebuild` is enabled
+ * on — the scope asked of ESLint's own config resolution, so the `ignores` and
+ * the shrinking exclude lists cannot drift out from under it — and finds no SQL
+ * string built that way. The shape is common elsewhere — 85
+ * appends across 13 files under `packages/<pkg>/src` — but all of it is adapter and
+ * association source, which neither rule reads. That test fails the day one
+ * appears, so the measurement cannot go stale unnoticed.
  *
  * This is deliberately independent of `require-canonical-rebuild`: the two
  * rules answer different questions. A sweep that can select a canonical table

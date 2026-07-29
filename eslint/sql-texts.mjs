@@ -73,6 +73,19 @@ export function createSqlTexts(resolve) {
  * that is not a resolvable local function — an import, a global, a method call —
  * stays a dead end and contributes no strings, the same under-accepting
  * direction the rest of this resolver takes.
+ *
+ * A **compound assignment** (`sql += " WHERE …"`) is the one build spelling not
+ * read as the string it produces: the scope graph gives only the right-hand
+ * side as the write, so the fragments resolve as independent strings in no
+ * particular order. Stitching them would need the writes sorted by source
+ * position within the enclosing function; that is left undone deliberately,
+ * because `eslint/piecewise-sql-population.test.mjs` measures the population in
+ * the files either teardown rule is enabled on (a scope resolved by ESLint, not
+ * restated) at zero and fails if it stops being
+ * zero. Note the gap is not purely under-accepting the way this resolver's
+ * remaining dead ends are: each fragment is read whole, so a fragment closing a
+ * `LIKE '…%'` pattern credits a prefix while the same pattern split across two
+ * credits nothing.
  */
 export function createSqlTextGroups(resolve) {
   const isFunctionNode = (node) =>
