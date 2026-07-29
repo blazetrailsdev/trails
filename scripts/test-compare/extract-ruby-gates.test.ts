@@ -182,6 +182,31 @@ describe("Ruby extractor gate detection", () => {
     });
   });
 
+  it("reads a supports_X? predicate reached through send", () => {
+    const g = rubyGates({
+      // Mirrors migration/foreign_key_test.rb:96 — `supports_rename_index?` is
+      // private, so the test reaches it via `send`. Without seeing through it the
+      // skip guard looks feature-free and emits an unsound `[postgresql,sqlite]`.
+      "cases/bar_test.rb": `
+        class BarTest < ActiveRecord::TestCase
+          def test_rename_index_send
+            skip "x" if current_adapter?(:Mysql2Adapter) && !@connection.send(:supports_rename_index?)
+          end
+          def test_send_only
+            skip "x" unless @connection.send(:supports_rename_index?)
+          end
+        end
+      `,
+    });
+    // The feature makes the compound `mixed`, so the adapter set is dropped; the
+    // skip-if polarity inverts the feature into a `no_` guard.
+    expect(g["rename index send"]).toEqual({
+      guards: ["no_rename_index"],
+      source: ["body-skip"],
+    });
+    expect(g["send only"]).toEqual({ features: ["rename_index"], source: ["body-skip"] });
+  });
+
   it("does not emit an adapter exclusion under `unless` (negation → disjunction)", () => {
     const g = rubyGates({
       // `unless feature && !sqlite` runs when `!feature || sqlite` — a disjunction

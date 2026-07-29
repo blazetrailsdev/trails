@@ -694,6 +694,17 @@ class TestExtractor
       elsif name =~ /\Asupports_.+\?\z/
         acc[:features] << name.sub(/\Asupports_/, "").sub(/\?\z/, "")
         return
+      elsif name == "send" || name == "public_send"
+        # `@connection.send(:supports_rename_index?)` (foreign_key_test.rb) — a
+        # feature predicate reached through `send` because it is private. Read the
+        # symbol argument so the feature is recorded, exactly as the direct call
+        # would be; otherwise the condition looks feature-free and a compound like
+        # `mysql? && !send(:supports_rename_index?)` emits an unsound adapter set.
+        syms = extract_symbol_args(node).grep(/\Asupports_.+\?\z/)
+        unless syms.empty?
+          syms.each { |s| acc[:features] << s.sub(/\Asupports_/, "").sub(/\?\z/, "") }
+          return
+        end
       elsif name == "prepared_statements" || name == "prepared_statements?"
         # A runtime predicate (per-connection config) the extractor cannot
         # evaluate statically. Recording it as a guard makes any compound that
