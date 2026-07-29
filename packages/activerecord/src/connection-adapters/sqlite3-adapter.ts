@@ -2562,7 +2562,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         scale: column.scale,
         null: column.null,
         collation: column.collation,
-        primaryKey: !compositePk && column.name === fromPrimaryKey,
+        primaryKey: !compositePk && renamed(column.name) === fromPrimaryKey,
       };
 
       if (column.isVirtual()) {
@@ -2600,7 +2600,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   ): Promise<void> {
     const fromPrimaryKey = await this.primaryKey(from);
     const rename = options.rename ?? {};
-    const renamed = (name: string): string => rename[name] ?? name;
     const sourceColumns = (await this.columns(from)) as Sqlite3Column[];
     const { rename: _rename, ...createOptions } = options;
 
@@ -2610,7 +2609,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       {
         ...createOptions,
         id: false,
-        ...(Array.isArray(fromPrimaryKey) ? { primaryKey: fromPrimaryKey.map(renamed) } : {}),
+        ...(Array.isArray(fromPrimaryKey) ? { primaryKey: fromPrimaryKey } : {}),
       },
       (td) => {
         definition = td as SQLite3TableDefinition;
