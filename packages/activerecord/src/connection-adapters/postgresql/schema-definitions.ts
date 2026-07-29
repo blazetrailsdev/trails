@@ -15,6 +15,7 @@ import {
   TableDefinition as AbstractTableDefinition,
   ColumnDefinition,
   Table as AbstractTable,
+  splitColumnNames,
   AlterTable as AbstractAlterTable,
 } from "../abstract/schema-definitions.js";
 import type {
@@ -30,37 +31,68 @@ export namespace PostgreSQL {
 }
 
 export interface ColumnMethods {
-  bigserial(name: string, options?: ColumnOptions): unknown;
-  bit(name: string, options?: ColumnOptions & { limit?: number }): unknown;
-  bitVarying(name: string, options?: ColumnOptions & { limit?: number }): unknown;
-  cidr(name: string, options?: ColumnOptions): unknown;
-  citext(name: string, options?: ColumnOptions): unknown;
-  daterange(name: string, options?: ColumnOptions): unknown;
-  hstore(name: string, options?: ColumnOptions): unknown;
-  inet(name: string, options?: ColumnOptions): unknown;
-  int4range(name: string, options?: ColumnOptions): unknown;
-  int8range(name: string, options?: ColumnOptions): unknown;
-  interval(name: string, options?: ColumnOptions): unknown;
-  jsonb(name: string, options?: ColumnOptions): unknown;
-  ltree(name: string, options?: ColumnOptions): unknown;
-  macaddr(name: string, options?: ColumnOptions): unknown;
-  money(name: string, options?: ColumnOptions): unknown;
-  numrange(name: string, options?: ColumnOptions): unknown;
-  oid(name: string, options?: ColumnOptions): unknown;
-  point(name: string, options?: ColumnOptions): unknown;
-  line(name: string, options?: ColumnOptions): unknown;
-  lseg(name: string, options?: ColumnOptions): unknown;
-  box(name: string, options?: ColumnOptions): unknown;
-  path(name: string, options?: ColumnOptions): unknown;
-  polygon(name: string, options?: ColumnOptions): unknown;
-  circle(name: string, options?: ColumnOptions): unknown;
-  serial(name: string, options?: ColumnOptions): unknown;
-  timestamptz(name: string, options?: ColumnOptions): unknown;
-  tsrange(name: string, options?: ColumnOptions): unknown;
-  tstzrange(name: string, options?: ColumnOptions): unknown;
-  tsvector(name: string, options?: ColumnOptions): unknown;
-  uuid(name: string, options?: ColumnOptions): unknown;
-  xml(name: string, options?: ColumnOptions): unknown;
+  bigserial(...names: string[]): unknown;
+  bigserial(...args: [...names: string[], options: ColumnOptions]): unknown;
+  bit(...names: string[]): unknown;
+  bit(...args: [...names: string[], options: ColumnOptions & { limit?: number }]): unknown;
+  bitVarying(...names: string[]): unknown;
+  bitVarying(...args: [...names: string[], options: ColumnOptions & { limit?: number }]): unknown;
+  cidr(...names: string[]): unknown;
+  cidr(...args: [...names: string[], options: ColumnOptions]): unknown;
+  citext(...names: string[]): unknown;
+  citext(...args: [...names: string[], options: ColumnOptions]): unknown;
+  daterange(...names: string[]): unknown;
+  daterange(...args: [...names: string[], options: ColumnOptions]): unknown;
+  hstore(...names: string[]): unknown;
+  hstore(...args: [...names: string[], options: ColumnOptions]): unknown;
+  inet(...names: string[]): unknown;
+  inet(...args: [...names: string[], options: ColumnOptions]): unknown;
+  int4range(...names: string[]): unknown;
+  int4range(...args: [...names: string[], options: ColumnOptions]): unknown;
+  int8range(...names: string[]): unknown;
+  int8range(...args: [...names: string[], options: ColumnOptions]): unknown;
+  interval(...names: string[]): unknown;
+  interval(...args: [...names: string[], options: ColumnOptions]): unknown;
+  jsonb(...names: string[]): unknown;
+  jsonb(...args: [...names: string[], options: ColumnOptions]): unknown;
+  ltree(...names: string[]): unknown;
+  ltree(...args: [...names: string[], options: ColumnOptions]): unknown;
+  macaddr(...names: string[]): unknown;
+  macaddr(...args: [...names: string[], options: ColumnOptions]): unknown;
+  money(...names: string[]): unknown;
+  money(...args: [...names: string[], options: ColumnOptions]): unknown;
+  numrange(...names: string[]): unknown;
+  numrange(...args: [...names: string[], options: ColumnOptions]): unknown;
+  oid(...names: string[]): unknown;
+  oid(...args: [...names: string[], options: ColumnOptions]): unknown;
+  point(...names: string[]): unknown;
+  point(...args: [...names: string[], options: ColumnOptions]): unknown;
+  line(...names: string[]): unknown;
+  line(...args: [...names: string[], options: ColumnOptions]): unknown;
+  lseg(...names: string[]): unknown;
+  lseg(...args: [...names: string[], options: ColumnOptions]): unknown;
+  box(...names: string[]): unknown;
+  box(...args: [...names: string[], options: ColumnOptions]): unknown;
+  path(...names: string[]): unknown;
+  path(...args: [...names: string[], options: ColumnOptions]): unknown;
+  polygon(...names: string[]): unknown;
+  polygon(...args: [...names: string[], options: ColumnOptions]): unknown;
+  circle(...names: string[]): unknown;
+  circle(...args: [...names: string[], options: ColumnOptions]): unknown;
+  serial(...names: string[]): unknown;
+  serial(...args: [...names: string[], options: ColumnOptions]): unknown;
+  timestamptz(...names: string[]): unknown;
+  timestamptz(...args: [...names: string[], options: ColumnOptions]): unknown;
+  tsrange(...names: string[]): unknown;
+  tsrange(...args: [...names: string[], options: ColumnOptions]): unknown;
+  tstzrange(...names: string[]): unknown;
+  tstzrange(...args: [...names: string[], options: ColumnOptions]): unknown;
+  tsvector(...names: string[]): unknown;
+  tsvector(...args: [...names: string[], options: ColumnOptions]): unknown;
+  uuid(...names: string[]): unknown;
+  uuid(...args: [...names: string[], options: ColumnOptions]): unknown;
+  xml(...names: string[]): unknown;
+  xml(...args: [...names: string[], options: ColumnOptions]): unknown;
   enumType(name: string, enumName: string, options?: ColumnOptions): unknown;
   enum(name: string, options: ColumnOptions & { enum_type: string }): unknown;
 }
@@ -261,145 +293,232 @@ export class TableDefinition extends AbstractTableDefinition {
   static override defineColumnMethods(...columnTypes: string[]): void {
     for (const type of columnTypes) {
       if (!(type in this.prototype)) {
-        (this.prototype as any)[type] = function (
-          this: TableDefinition,
-          name: string,
-          options: ColumnOptions = {},
-        ) {
-          return this.column(name, type as ColumnType, options);
+        (this.prototype as any)[type] = function (this: TableDefinition, ...args: unknown[]) {
+          const { names, options } = splitColumnNames(args, type);
+          for (const name of names) this.column(name, type as ColumnType, options);
+          return this;
         };
       }
     }
   }
 
-  bigserial(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "bigint" as ColumnType, "BIGSERIAL", options);
+  bigserial(...names: string[]): this;
+  bigserial(...args: [...names: string[], options: ColumnOptions]): this;
+  bigserial(...args: unknown[]): this {
+    return this.definedPgColumn("bigserial", "bigint" as ColumnType, "BIGSERIAL", args);
   }
 
-  serial(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "integer" as ColumnType, "SERIAL", options);
+  serial(...names: string[]): this;
+  serial(...args: [...names: string[], options: ColumnOptions]): this;
+  serial(...args: unknown[]): this {
+    return this.definedPgColumn("serial", "integer" as ColumnType, "SERIAL", args);
   }
 
-  bit(name: string, options: ColumnOptions & { limit?: number } = {}): this {
-    const sqlType = options.limit ? `BIT(${options.limit})` : "BIT";
-    return this.pgColumn(name, "string" as ColumnType, sqlType, options);
+  bit(...names: string[]): this;
+  bit(...args: [...names: string[], options: ColumnOptions & { limit?: number }]): this;
+  bit(...args: unknown[]): this {
+    return this.definedPgColumn(
+      "bit",
+      "string" as ColumnType,
+      (options) =>
+        (options as { limit?: number }).limit
+          ? `BIT(${(options as { limit?: number }).limit})`
+          : "BIT",
+      args,
+    );
   }
 
-  bitVarying(name: string, options: ColumnOptions & { limit?: number } = {}): this {
-    const sqlType = options.limit ? `BIT VARYING(${options.limit})` : "BIT VARYING";
-    return this.pgColumn(name, "string" as ColumnType, sqlType, options);
+  bitVarying(...names: string[]): this;
+  bitVarying(...args: [...names: string[], options: ColumnOptions & { limit?: number }]): this;
+  bitVarying(...args: unknown[]): this {
+    return this.definedPgColumn(
+      "bit_varying",
+      "string" as ColumnType,
+      (options) =>
+        (options as { limit?: number }).limit
+          ? `BIT VARYING(${(options as { limit?: number }).limit})`
+          : "BIT VARYING",
+      args,
+    );
   }
 
-  uuid(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "uuid" as ColumnType, undefined, options);
+  uuid(...names: string[]): this;
+  uuid(...args: [...names: string[], options: ColumnOptions]): this;
+  uuid(...args: unknown[]): this {
+    return this.definedPgColumn("uuid", "uuid" as ColumnType, undefined, args);
   }
 
-  jsonb(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "jsonb" as ColumnType, undefined, options);
+  jsonb(...names: string[]): this;
+  jsonb(...args: [...names: string[], options: ColumnOptions]): this;
+  jsonb(...args: unknown[]): this {
+    return this.definedPgColumn("jsonb", "jsonb" as ColumnType, undefined, args);
   }
 
-  daterange(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "daterange" as ColumnType, undefined, options);
+  daterange(...names: string[]): this;
+  daterange(...args: [...names: string[], options: ColumnOptions]): this;
+  daterange(...args: unknown[]): this {
+    return this.definedPgColumn("daterange", "daterange" as ColumnType, undefined, args);
   }
 
-  int4range(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "int4range" as ColumnType, undefined, options);
+  int4range(...names: string[]): this;
+  int4range(...args: [...names: string[], options: ColumnOptions]): this;
+  int4range(...args: unknown[]): this {
+    return this.definedPgColumn("int4range", "int4range" as ColumnType, undefined, args);
   }
 
-  int8range(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "int8range" as ColumnType, undefined, options);
+  int8range(...names: string[]): this;
+  int8range(...args: [...names: string[], options: ColumnOptions]): this;
+  int8range(...args: unknown[]): this {
+    return this.definedPgColumn("int8range", "int8range" as ColumnType, undefined, args);
   }
 
-  numrange(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "numrange" as ColumnType, undefined, options);
+  numrange(...names: string[]): this;
+  numrange(...args: [...names: string[], options: ColumnOptions]): this;
+  numrange(...args: unknown[]): this {
+    return this.definedPgColumn("numrange", "numrange" as ColumnType, undefined, args);
   }
 
-  timestamptz(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "timestamptz" as ColumnType, undefined, options);
+  timestamptz(...names: string[]): this;
+  timestamptz(...args: [...names: string[], options: ColumnOptions]): this;
+  timestamptz(...args: unknown[]): this {
+    return this.definedPgColumn("timestamptz", "timestamptz" as ColumnType, undefined, args);
   }
 
-  tsrange(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "tsrange" as ColumnType, undefined, options);
+  tsrange(...names: string[]): this;
+  tsrange(...args: [...names: string[], options: ColumnOptions]): this;
+  tsrange(...args: unknown[]): this {
+    return this.definedPgColumn("tsrange", "tsrange" as ColumnType, undefined, args);
   }
 
-  tstzrange(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "tstzrange" as ColumnType, undefined, options);
+  tstzrange(...names: string[]): this;
+  tstzrange(...args: [...names: string[], options: ColumnOptions]): this;
+  tstzrange(...args: unknown[]): this {
+    return this.definedPgColumn("tstzrange", "tstzrange" as ColumnType, undefined, args);
   }
 
-  oid(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "oid" as ColumnType, undefined, options);
+  oid(...names: string[]): this;
+  oid(...args: [...names: string[], options: ColumnOptions]): this;
+  oid(...args: unknown[]): this {
+    return this.definedPgColumn("oid", "oid" as ColumnType, undefined, args);
   }
 
-  cidr(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "cidr" as ColumnType, undefined, options);
+  cidr(...names: string[]): this;
+  cidr(...args: [...names: string[], options: ColumnOptions]): this;
+  cidr(...args: unknown[]): this {
+    return this.definedPgColumn("cidr", "cidr" as ColumnType, undefined, args);
   }
 
-  citext(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "citext" as ColumnType, undefined, options);
+  citext(...names: string[]): this;
+  citext(...args: [...names: string[], options: ColumnOptions]): this;
+  citext(...args: unknown[]): this {
+    return this.definedPgColumn("citext", "citext" as ColumnType, undefined, args);
   }
 
-  hstore(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "hstore" as ColumnType, undefined, options);
+  hstore(...names: string[]): this;
+  hstore(...args: [...names: string[], options: ColumnOptions]): this;
+  hstore(...args: unknown[]): this {
+    return this.definedPgColumn("hstore", "hstore" as ColumnType, undefined, args);
   }
 
-  inet(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "inet" as ColumnType, undefined, options);
+  inet(...names: string[]): this;
+  inet(...args: [...names: string[], options: ColumnOptions]): this;
+  inet(...args: unknown[]): this {
+    return this.definedPgColumn("inet", "inet" as ColumnType, undefined, args);
   }
 
-  interval(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "interval" as ColumnType, undefined, options);
+  interval(...names: string[]): this;
+  interval(...args: [...names: string[], options: ColumnOptions]): this;
+  interval(...args: unknown[]): this {
+    return this.definedPgColumn("interval", "interval" as ColumnType, undefined, args);
   }
 
-  ltree(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "ltree" as ColumnType, undefined, options);
+  ltree(...names: string[]): this;
+  ltree(...args: [...names: string[], options: ColumnOptions]): this;
+  ltree(...args: unknown[]): this {
+    return this.definedPgColumn("ltree", "ltree" as ColumnType, undefined, args);
   }
 
-  macaddr(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "macaddr" as ColumnType, undefined, options);
+  macaddr(...names: string[]): this;
+  macaddr(...args: [...names: string[], options: ColumnOptions]): this;
+  macaddr(...args: unknown[]): this {
+    return this.definedPgColumn("macaddr", "macaddr" as ColumnType, undefined, args);
   }
 
-  money(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "money" as ColumnType, undefined, options);
+  money(...names: string[]): this;
+  money(...args: [...names: string[], options: ColumnOptions]): this;
+  money(...args: unknown[]): this {
+    return this.definedPgColumn("money", "money" as ColumnType, undefined, args);
   }
 
-  point(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "point" as ColumnType, undefined, options);
+  point(...names: string[]): this;
+  point(...args: [...names: string[], options: ColumnOptions]): this;
+  point(...args: unknown[]): this {
+    return this.definedPgColumn("point", "point" as ColumnType, undefined, args);
   }
 
-  line(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "line" as ColumnType, undefined, options);
+  line(...names: string[]): this;
+  line(...args: [...names: string[], options: ColumnOptions]): this;
+  line(...args: unknown[]): this {
+    return this.definedPgColumn("line", "line" as ColumnType, undefined, args);
   }
 
-  lseg(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "lseg" as ColumnType, undefined, options);
+  lseg(...names: string[]): this;
+  lseg(...args: [...names: string[], options: ColumnOptions]): this;
+  lseg(...args: unknown[]): this {
+    return this.definedPgColumn("lseg", "lseg" as ColumnType, undefined, args);
   }
 
-  box(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "box" as ColumnType, undefined, options);
+  box(...names: string[]): this;
+  box(...args: [...names: string[], options: ColumnOptions]): this;
+  box(...args: unknown[]): this {
+    return this.definedPgColumn("box", "box" as ColumnType, undefined, args);
   }
 
-  path(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "path" as ColumnType, undefined, options);
+  path(...names: string[]): this;
+  path(...args: [...names: string[], options: ColumnOptions]): this;
+  path(...args: unknown[]): this {
+    return this.definedPgColumn("path", "path" as ColumnType, undefined, args);
   }
 
-  polygon(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "polygon" as ColumnType, undefined, options);
+  polygon(...names: string[]): this;
+  polygon(...args: [...names: string[], options: ColumnOptions]): this;
+  polygon(...args: unknown[]): this {
+    return this.definedPgColumn("polygon", "polygon" as ColumnType, undefined, args);
   }
 
-  circle(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "circle" as ColumnType, undefined, options);
+  circle(...names: string[]): this;
+  circle(...args: [...names: string[], options: ColumnOptions]): this;
+  circle(...args: unknown[]): this {
+    return this.definedPgColumn("circle", "circle" as ColumnType, undefined, args);
   }
 
-  tsvector(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "tsvector" as ColumnType, undefined, options);
+  tsvector(...names: string[]): this;
+  tsvector(...args: [...names: string[], options: ColumnOptions]): this;
+  tsvector(...args: unknown[]): this {
+    return this.definedPgColumn("tsvector", "tsvector" as ColumnType, undefined, args);
   }
 
-  xml(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "xml" as ColumnType, undefined, options);
+  xml(...names: string[]): this;
+  xml(...args: [...names: string[], options: ColumnOptions]): this;
+  xml(...args: unknown[]): this {
+    return this.definedPgColumn("xml", "xml" as ColumnType, undefined, args);
   }
 
   enumType(name: string, enumName: string, options: ColumnOptions = {}): this {
     return this.pgColumn(name, "string" as ColumnType, enumName, options);
+  }
+
+  /** @internal */
+  private definedPgColumn(
+    columnType: string,
+    type: ColumnType,
+    sqlType: string | undefined | ((options: ColumnOptions) => string | undefined),
+    args: unknown[],
+  ): this {
+    const { names, options } = splitColumnNames(args, columnType);
+    const resolved = typeof sqlType === "function" ? sqlType(options) : sqlType;
+    for (const name of names) this.pgColumn(name, type, resolved, options);
+    return this;
   }
 
   private pgColumn(
@@ -408,12 +527,11 @@ export class TableDefinition extends AbstractTableDefinition {
     sqlType: string | undefined,
     options: ColumnOptions,
   ): this {
-    const col = new ColumnDefinition(name, type, options);
-    if (sqlType !== undefined) col.sqlType = sqlType;
-    // Mirror newColumnDefinition's datetime-family physical-type recording for
-    // the helper methods (e.g. t.timestamptz) that bypass newColumnDefinition.
-    if ((type as string) === "timestamptz") col.datetimePhysicalType = "timestamptz";
-    this.columns.push(col);
+    this.column(name, type, options as Parameters<TableDefinition["column"]>[2]);
+    if (sqlType !== undefined) {
+      const col = this.get(String(name));
+      if (col !== undefined) col.sqlType = sqlType;
+    }
     return this;
   }
 }

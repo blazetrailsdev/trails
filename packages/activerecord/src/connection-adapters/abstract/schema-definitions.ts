@@ -11,6 +11,23 @@ import {
   globalGetPrimaryKey,
 } from "./table-name-options.js";
 
+/** @internal */
+export function splitColumnNames(
+  args: unknown[],
+  columnType: string,
+): { names: string[]; options: ColumnOptions } {
+  const rest = [...args];
+  const last = rest[rest.length - 1];
+  const options =
+    typeof last === "object" && last !== null
+      ? (rest.pop() as ColumnOptions)
+      : ({} as ColumnOptions);
+  if (rest.length === 0) {
+    throw new ArgumentError(`Missing column name(s) for ${columnType}`);
+  }
+  return { names: rest as string[], options };
+}
+
 /**
  * @internal Shared identifier guard for MySQL bare-identifier emission
  * (charset/collation). MySQL requires `CHARACTER SET`/`COLLATE` as bare
@@ -1359,8 +1376,12 @@ export class TableDefinition {
     return this.column(name, "virtual" as ColumnType, options);
   }
 
-  jsonb(name: string, options: ColumnOptions = {}): this {
-    return this.column(name, "jsonb", options);
+  jsonb(...names: string[]): this;
+  jsonb(...args: [...names: string[], options: ColumnOptions]): this;
+  jsonb(...args: unknown[]): this {
+    const { names, options } = splitColumnNames(args, "jsonb");
+    for (const name of names) this.column(name, "jsonb", options);
+    return this;
   }
 
   char(name: string, options: ColumnOptions = {}): this {
