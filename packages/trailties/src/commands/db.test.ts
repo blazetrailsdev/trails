@@ -960,6 +960,20 @@ describe("db subcommand CLI actions", () => {
     await program.parseAsync(["node", "trails", "db", ...args]);
   }
 
+  async function tableExists(dbFile: string, table: string): Promise<boolean> {
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    const adapter = new BetterSQLite3Adapter(dbFile);
+    try {
+      const rows = await adapter.execute(
+        `SELECT name FROM sqlite_master WHERE type='table' AND name='${table}'`,
+      );
+      return rows.length === 1;
+    } finally {
+      await adapter.close();
+    }
+  }
+
   it("db version prints 0 against a fresh database", async () => {
     await runDb(["version"]);
     expect(logs).toContain("Current version: 0");
@@ -1955,11 +1969,6 @@ export class CreateDogs extends Migration {
   });
 
   it("db:rollback:namespace works", async () => {
-    // Rails' `db:rollback:<name>` rolls one database back through
-    // `with_temporary_pool_for_each { pool.migration_context.rollback(step) }`
-    // (railties/databases.rake:247-259), so each database's rollback must use
-    // that database's own migration set. `--database=<name>` is our stand-in
-    // for the generated namespace task.
     const primaryDb = path.join(tmpDir, "rollback-primary.sqlite3");
     const animalsDb = path.join(tmpDir, "rollback-animals.sqlite3");
     fs.writeFileSync(
@@ -1996,31 +2005,69 @@ export class CreateDogs extends Migration {
     await runDb(["create"]);
     await runDb(["migrate"]);
 
-    const { BetterSQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
-    const tableExists = async (dbFile: string, table: string): Promise<boolean> => {
-      const adapter = new BetterSQLite3Adapter(dbFile);
-      try {
-        const rows = await adapter.execute(
-          `SELECT name FROM sqlite_master WHERE type='table' AND name='${table}'`,
-        );
-        return rows.length === 1;
-      } finally {
-        await adapter.close();
-      }
-    };
-
     expect(await tableExists(primaryDb, "users")).toBe(true);
     expect(await tableExists(animalsDb, "dogs")).toBe(true);
 
     await runDb(["rollback", "--database=primary"]);
     expect(await tableExists(primaryDb, "users")).toBe(false);
-    // The animals database resolves its own migration set, so rolling back
-    // primary must leave it alone.
     expect(await tableExists(animalsDb, "dogs")).toBe(true);
 
     await runDb(["rollback", "--database=animals"]);
     expect(await tableExists(animalsDb, "dogs")).toBe(false);
+  });
+
+  it("db forward and db migrate:redo step the named database", async () => {
+    const primaryDb = path.join(tmpDir, "forward-primary.sqlite3");
+    const animalsDb = path.join(tmpDir, "forward-animals.sqlite3");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: {
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+  },
+  test: {
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+  },
+};`,
+    );
+    fs.mkdirSync(path.join(tmpDir, "db", "migrations_animals"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations", "20260101000000-create-users.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreateUsers extends Migration {
+  async up() { await this.createTable("users", (t) => { t.string("name"); }); }
+  async down() { await this.dropTable("users"); }
+}`,
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations_animals", "20260101000001-create-dogs.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreateDogs extends Migration {
+  async up() { await this.createTable("dogs", (t) => { t.string("breed"); }); }
+  async down() { await this.dropTable("dogs"); }
+}`,
+    );
+
+    await runDb(["create"]);
+    await runDb(["migrate"]);
+    await runDb(["rollback"]);
+    expect(await tableExists(primaryDb, "users")).toBe(false);
+    expect(await tableExists(animalsDb, "dogs")).toBe(false);
+
+    await runDb(["forward", "--database=animals"]);
+    expect(await tableExists(animalsDb, "dogs")).toBe(true);
+    expect(await tableExists(primaryDb, "users")).toBe(false);
+
+    await runDb(["forward", "--database=primary"]);
+    expect(await tableExists(primaryDb, "users")).toBe(true);
+
+    logs.length = 0;
+    await runDb(["migrate:redo", "--database=animals"]);
+    expect(await tableExists(animalsDb, "dogs")).toBe(true);
+    expect(await tableExists(primaryDb, "users")).toBe(true);
+    expect(logs).toContain("All migrations are up to date.");
   });
 
   it("db migrate --database=animals targets only the named DB", async () => {

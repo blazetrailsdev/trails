@@ -605,22 +605,6 @@ async function withPrefixedStdout(prefix: string, fn: () => Promise<void>): Prom
   }
 }
 
-/**
- * The `db:rollback:<name>` / `db:forward` / `db:migrate:redo` seam. Rails'
- * rake bodies drive `migration_connection_pool.migration_context`
- * (`railties/databases.rake:254,269,278`), i.e. the migration set the pool's
- * own `migrations_paths` produced — never a process-global list. The trails
- * counterpart is `DatabaseTasks.registerMigrations(migrations, config)`, which
- * `DatabaseTasks` then resolves per config via `_migrationsFor(pool.dbConfig)`;
- * `withRegisteredConfiguration` supplies the `databaseConfiguration` those
- * entry points consult before they touch a pool.
- *
- * `forEachDatabase` has already established the pool for `ctx.config`, so
- * `DatabaseTasks.migrationConnectionPool()` resolves to this database — the
- * same targeting Rails gets from `with_temporary_pool_for_each`. The trailing
- * schema dump is the rake tasks' `db:_dump[:name]` invocation, gated on
- * `dump_schema_after_migration` inside {@link dumpSchemaAfterMigrate}.
- */
 async function withMigrationTasksForDb(
   ctx: {
     adapter: DatabaseAdapter;
@@ -1022,11 +1006,6 @@ export function dbCommand(): Command {
         return;
       }
       await forEachDatabase(opts, async (ctx) => {
-        // Rails' `db:migrate:redo` with no VERSION invokes `db:rollback`
-        // then `db:migrate` (`railties/databases.rake:132-144`). Both run
-        // against one registration so the "No migrations found." notice
-        // can't print twice, and the dump happens once at the end — Rails'
-        // `db:_dump` reenable collapses the two invocations the same way.
         await withMigrationTasksForDb(
           ctx,
           async () => {
