@@ -7,6 +7,9 @@
  * Rails iterates this list in `preprocess_query`:
  * `ActiveRecord.query_transformers.each { |t| sql = t.call(sql, self) }`.
  *
+ * The list itself lives on the `ActiveRecord` module object in `ar-config.ts`,
+ * alongside the other `singleton_class.attr_accessor` flags.
+ *
  * A transformer is any object responding to `call(sql, connection)` and
  * returning the (possibly rewritten) SQL — `ActiveRecord::QueryLogs` is the
  * canonical one. The `connection` slot is opaque to the registry, hence
@@ -15,23 +18,4 @@
 
 export interface QueryTransformer {
   call(sql: string, connection: unknown): string;
-}
-
-/**
- * The mutable, process-global transformer list. Mutate in place
- * (`queryTransformers.push(...)`, `queryTransformers.length = 0`) to register
- * or reset, exactly as Rails appends to and resets
- * `ActiveRecord.query_transformers`. Consumers import this live binding and
- * iterate it fresh on every query, so {@link setQueryTransformers} (a
- * wholesale reassignment, mirroring Rails' `query_transformers=`) is also
- * observed.
- */
-export let queryTransformers: QueryTransformer[] = [];
-
-/**
- * Replaces the transformer list wholesale. Mirrors
- * `ActiveRecord.query_transformers=` (active_record.rb:431).
- */
-export function setQueryTransformers(value: QueryTransformer[]): void {
-  queryTransformers = value;
 }

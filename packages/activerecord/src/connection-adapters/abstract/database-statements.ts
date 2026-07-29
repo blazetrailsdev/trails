@@ -46,7 +46,7 @@ import { TransactionManager } from "./transaction.js";
 import { exceedsBindParamsLimit } from "./database-limits.js";
 import { Result } from "../../result.js";
 import { isWriteQuerySql } from "../sql-classification.js";
-import { queryTransformers } from "../../query-transformers.js";
+import { ActiveRecord } from "../../ar-config.js";
 
 /**
  * A single entry in `Relation#explain`'s options list. Either a bare
@@ -1934,7 +1934,7 @@ export function preprocessQuery(this: DatabaseStatementsHost, sql: string): stri
   }
   host._inQueryTransformers = true;
   try {
-    for (const t of queryTransformers) {
+    for (const t of ActiveRecord.queryTransformers) {
       sql = t.call(sql, this);
     }
   } finally {

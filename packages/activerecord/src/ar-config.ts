@@ -6,6 +6,7 @@
  */
 import { ArgumentError } from "@blazetrails/activemodel";
 import { DefaultStrategy } from "./migration/default-strategy.js";
+import type { QueryTransformer } from "./query-transformers.js";
 
 /** Any constructable class — used for module-config flags that hold a class. */
 type AnyClass = abstract new (...args: never[]) => object;
@@ -179,6 +180,7 @@ export function setDatabaseCli(value: Record<string, string | string[]>): void {
 let _asyncQueryExecutor: "global_thread_pool" | "multi_thread_pool" | null = null;
 let _queues: Record<string, unknown> = {};
 let _maintainTestSchema: boolean | null = null;
+let _queryTransformers: QueryTransformer[] = [];
 
 /**
  * The `ActiveRecord` module itself, as far as its singleton configuration
@@ -233,6 +235,22 @@ export const ActiveRecord = {
 
   set maintainTestSchema(value: boolean | null) {
     _maintainTestSchema = value;
+  },
+
+  /**
+   * The mutable, process-global transformer list applied to every SQL
+   * statement before execution. Mutate in place
+   * (`ActiveRecord.queryTransformers.push(...)`) to register or reset, exactly
+   * as Rails appends to and resets `ActiveRecord.query_transformers`; assigning
+   * replaces the list wholesale. Mirrors `ActiveRecord.query_transformers`
+   * (active_record.rb:431, default `[]`).
+   */
+  get queryTransformers(): QueryTransformer[] {
+    return _queryTransformers;
+  },
+
+  set queryTransformers(value: QueryTransformer[]) {
+    _queryTransformers = value;
   },
 };
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { queryTransformers } from "./query-transformers.js";
+import { ActiveRecord } from "./ar-config.js";
 import type { QueryTransformer } from "./query-transformers.js";
 import { QueryLogs } from "./query-logs.js";
 
@@ -10,26 +10,26 @@ describe("queryTransformers", () => {
   // it nor leak an emptied registry into sibling suites.
   let saved: QueryTransformer[];
   beforeEach(() => {
-    saved = [...queryTransformers];
+    saved = [...ActiveRecord.queryTransformers];
   });
   afterEach(() => {
-    queryTransformers.splice(0, queryTransformers.length, ...saved);
+    ActiveRecord.queryTransformers.splice(0, ActiveRecord.queryTransformers.length, ...saved);
   });
 
   it("defaults to an empty list", () => {
-    expect(queryTransformers).toEqual([]);
+    expect(ActiveRecord.queryTransformers).toEqual([]);
   });
 
   it("is mutable in place — push registers a transformer", () => {
     const t: QueryTransformer = { call: (sql) => `${sql} /*x*/` };
-    queryTransformers.push(t);
-    expect(queryTransformers).toContain(t);
+    ActiveRecord.queryTransformers.push(t);
+    expect(ActiveRecord.queryTransformers).toContain(t);
   });
 
   it("a registered transformer rewrites SQL via call(sql, connection)", () => {
-    queryTransformers.push({ call: (sql) => `${sql} -- tagged` });
+    ActiveRecord.queryTransformers.push({ call: (sql) => `${sql} -- tagged` });
     let sql = "SELECT 1";
-    for (const t of queryTransformers) sql = t.call(sql, null);
+    for (const t of ActiveRecord.queryTransformers) sql = t.call(sql, null);
     expect(sql).toBe("SELECT 1 -- tagged");
   });
 
@@ -37,7 +37,7 @@ describe("queryTransformers", () => {
     const logs = new QueryLogs();
     logs.tags = [{ app: "MyApp" }];
     const transformer: QueryTransformer = logs;
-    queryTransformers.push(transformer);
+    ActiveRecord.queryTransformers.push(transformer);
     expect(transformer.call("SELECT 1", null)).toContain("MyApp");
   });
 });
