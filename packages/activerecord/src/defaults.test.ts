@@ -18,7 +18,7 @@ import {
   Mysql2Adapter,
   MYSQL_TEST_URL,
 } from "./adapters/abstract-mysql-adapter/test-helper.js";
-import { describeIfPg } from "./adapters/postgresql/test-helper.js";
+import { describeIfPg } from "./support/describe-if-pg.js";
 import { describeIfSqlite } from "./support/describe-if-sqlite.js";
 import { describeIfSupports, itIfSupports } from "./support/supports.js";
 import { fixtures } from "./test-fixtures.js";

@@ -8,7 +8,8 @@ import { ReadOnlyError, StatementInvalid } from "./errors.js";
 import { itIfSupports } from "./support/supports.js";
 import { adapterType } from "./test-adapter.js";
 import { scratchDatabasePath } from "./support/scratch-database.js";
-import { PostgreSQLAdapter, PG_TEST_URL } from "./adapters/postgresql/test-helper.js";
+import { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
+import { PG_TEST_URL } from "./support/describe-if-pg.js";
 
 // Rails' `setup` is `@connection = ActiveRecord::Base.lease_connection` — the
 // ambient file-backed `arunit` connection, with `subscribers` coming from

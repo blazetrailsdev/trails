@@ -12,7 +12,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { PostgreSQLAdapter, PG_TEST_URL } from "../adapters/postgresql/test-helper.js";
+import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
+import { PG_TEST_URL } from "../support/describe-if-pg.js";
 import { describeIfSupports } from "../support/supports.js";
 import { rebuildCanonicalTables } from "../support/canonical-table-rebuild.js";
 
