@@ -40,6 +40,15 @@ beforeAll(() => {
   adapter = Base.adapter;
 });
 
+// `adapterSpecificTableNames`'s postgres arm resolves its boot list against the
+// live adapter's support gates, so a fake standing in for a PG adapter has to
+// answer them. PG >= 11 is what every lane we run reports.
+const pgBootListStubs = {
+  getDatabaseVersion: async () => "17.0",
+  supportsIdentityColumns: () => true,
+  supportsPartitionedIndexes: () => true,
+};
+
 describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
   afterEach(() => vi.restoreAllMocks());
 
@@ -51,6 +60,7 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
     let executeCallCount = 0;
     const fakeAdapter = {
       adapterName: "postgres" as const,
+      ...pgBootListStubs,
       execute: vi.fn(async () => {
         executeCallCount++;
         if (executeCallCount === 1) throw connErr;
@@ -70,6 +80,7 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
     const appErr = new Error("syntax error");
     const fakeAdapter = {
       adapterName: "postgres" as const,
+      ...pgBootListStubs,
       execute: vi.fn(async () => {
         throw appErr;
       }),
@@ -88,6 +99,7 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
     let mutationCallCount = 0;
     const fakeAdapter = {
       adapterName: "postgres" as const,
+      ...pgBootListStubs,
       execute: vi.fn(async (sql: string) => {
         // Return one matview on first pass; empty on retry.
         if (sql.includes("matviewname")) {
