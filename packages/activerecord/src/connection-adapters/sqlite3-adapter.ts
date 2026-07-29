@@ -46,6 +46,7 @@ import {
   TransactionIsolationError,
 } from "../errors.js";
 import { ArgumentError, BinaryData } from "@blazetrails/activemodel";
+import { deprecator } from "../deprecator.js";
 import { TypeMap } from "../type/type-map.js";
 import { Date as DateType } from "../type/date.js";
 import { DateTime as ARDateTimeType } from "../type/date-time.js";
@@ -2769,6 +2770,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
 
   /** @internal */
   private connect(): void {
+    const openConfig = this.openConfig();
     try {
       const factory = this.resolveDriverFactory();
       if (!factory.openSync) {
@@ -2776,7 +2778,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         this._asyncConnectPending = true;
         return;
       }
-      const syncConn = factory.openSync(this.openConfig());
+      const syncConn = factory.openSync(openConfig);
       // Pre-warm version cache while the connection is a known-sync handle so
       // getDatabaseVersion() never needs to touch this.driver directly. (#1269)
       const vRow = syncConn.prepare("SELECT sqlite_version() AS v").get() as any;
@@ -2805,7 +2807,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       database: this._filename,
       readOnly: this._readonly,
       strict: this._strict,
-      timeout: cfg.timeout,
+      timeout: this.castTimeout(),
       noMutex: cfg.noMutex,
       driverOptions: cfg.driverOptions,
     };
@@ -2813,9 +2815,10 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
 
   /** Async counterpart to `connect()` for async-only drivers. @internal */
   private async connectAsync(): Promise<void> {
+    const openConfig = this.openConfig();
     try {
       const factory = this.resolveDriverFactory();
-      const conn = await factory.open(this.openConfig());
+      const conn = await factory.open(openConfig);
       const vStmt = await conn.prepare("SELECT sqlite_version() AS v");
       const vRow = (await vStmt.get()) as any;
       this._databaseVersion = new Version(vRow?.v ?? "0.0.0");
@@ -2955,6 +2958,20 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return stmts;
   }
 
+  /** @internal */
+  private castTimeout(): number | undefined {
+    const cfg = this._config as SQLite3AdapterOptions;
+    if (isRubyTruthy(cfg.timeout) && isRubyTruthy(cfg.retries)) {
+      throw new ArgumentError("Cannot specify both timeout and retries arguments");
+    }
+    if (!isRubyTruthy(cfg.timeout)) return undefined;
+    const timeout = AbstractSQLite3Adapter.typeCastConfigToInteger(cfg.timeout);
+    if (typeof timeout !== "number" || !Number.isInteger(timeout)) {
+      throw new TypeError(`timeout must be integer, not ${String(timeout)}`);
+    }
+    return timeout;
+  }
+
   /**
    * Mirrors Rails: AbstractAdapter#configure_connection → check_version. Sync
    * for in-process drivers; for async-only drivers (no `openSync()`) returns a
@@ -2963,6 +2980,21 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * @internal
    */
   override configureConnection(): void | Promise<void> {
+    this.castTimeout();
+    const cfg = this._config as SQLite3AdapterOptions;
+    if (isRubyTruthy(cfg.retries) && !isRubyTruthy(cfg.timeout)) {
+      // Deviation: Rails' retries branch also installs
+      // `raw_connection.busy_handler { |count| count <= retries }`
+      // (sqlite3_adapter.rb:827-832), which is the sqlite3 gem's binding for
+      // `sqlite3_busy_handler`. None of our drivers (better-sqlite3, node:sqlite,
+      // libsql) expose that callback — they only accept a busy *timeout* at open
+      // — so there is nothing to install and adding a driver hook would be a
+      // stub no driver can implement. Rails itself deprecates the option for
+      // removal in 8.1, so we warn and let `timeout` be the supported path.
+      deprecator().warn(
+        "The retries option is deprecated and will be removed in Rails 8.1. Use timeout instead.\n",
+      );
+    }
     // Base only runs the sync version check; SQLite's PRAGMAs are the async
     // work, awaited by the driver-async branch below. Void the base call.
     void super.configureConnection();
