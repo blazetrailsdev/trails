@@ -131,10 +131,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("timestamp with zone values with rails time zone support and no time zone set", async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
-      await adapter.exec(
-        `CREATE TABLE postgresql_timestamp_with_zones (id SERIAL PRIMARY KEY, "time" TIMESTAMP WITH TIME ZONE)`,
-      );
       await adapter.execute(
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );
@@ -157,15 +153,11 @@ describeIfPg("PostgreSQLAdapter", () => {
         });
       } finally {
         await adapter.reconnect();
-        await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
+        await adapter.execute(`DELETE FROM postgresql_timestamp_with_zones`);
       }
     });
 
     it("timestamp with zone values without rails time zone support", async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
-      await adapter.exec(
-        `CREATE TABLE postgresql_timestamp_with_zones (id SERIAL PRIMARY KEY, "time" TIMESTAMP WITH TIME ZONE)`,
-      );
       await adapter.execute(
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );
@@ -188,17 +180,13 @@ describeIfPg("PostgreSQLAdapter", () => {
         });
       } finally {
         await adapter.reconnect();
-        await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
+        await adapter.execute(`DELETE FROM postgresql_timestamp_with_zones`);
       }
     });
   });
 
   describe("PostgreSQLTimestampWithAwareTypesTest", () => {
     it("timestamp with zone values with rails time zone support and time zone set", async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
-      await adapter.exec(
-        `CREATE TABLE postgresql_timestamp_with_zones (id SERIAL PRIMARY KEY, "time" TIMESTAMP WITH TIME ZONE)`,
-      );
       await adapter.execute(
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );
@@ -229,17 +217,13 @@ describeIfPg("PostgreSQLAdapter", () => {
         );
       } finally {
         await adapter.reconnect();
-        await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
+        await adapter.execute(`DELETE FROM postgresql_timestamp_with_zones`);
       }
     });
   });
 
   describe("PostgreSQLTimestampWithTimeZoneTest", () => {
     it("timestamp with zone values with rails time zone support and timestamptz and no time zone set", async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
-      await adapter.exec(
-        `CREATE TABLE postgresql_timestamp_with_zones (id SERIAL PRIMARY KEY, "time" TIMESTAMP WITH TIME ZONE)`,
-      );
       await adapter.execute(
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );
@@ -271,14 +255,10 @@ describeIfPg("PostgreSQLAdapter", () => {
         });
       } finally {
         await adapter.reconnect();
-        await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
+        await adapter.execute(`DELETE FROM postgresql_timestamp_with_zones`);
       }
     });
     it("timestamp with zone values with rails time zone support and timestamptz and time zone set", async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
-      await adapter.exec(
-        `CREATE TABLE postgresql_timestamp_with_zones (id SERIAL PRIMARY KEY, "time" TIMESTAMP WITH TIME ZONE)`,
-      );
       await adapter.execute(
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );
@@ -309,7 +289,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         });
       } finally {
         await adapter.reconnect();
-        await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
+        await adapter.execute(`DELETE FROM postgresql_timestamp_with_zones`);
       }
     });
   });
@@ -426,9 +406,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgreSQLTimestampMigrationTest", () => {
     it("adds column as timestamp", async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones CASCADE`);
       try {
-        await adapter.exec(`CREATE TABLE postgresql_timestamp_with_zones (id serial primary key)`);
         await adapter.addColumn("postgresql_timestamp_with_zones", "times", "datetime");
         const rows = await adapter.execute(
           `SELECT data_type FROM information_schema.columns
@@ -436,17 +414,16 @@ describeIfPg("PostgreSQLAdapter", () => {
         );
         expect(rows[0]?.data_type).toBe("timestamp without time zone");
       } finally {
-        await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones CASCADE`);
+        // Rails leans on transactional tests to roll the added column back;
+        // this file is non-transactional (the three classes above set
+        // use_transactional_tests = false), so it is removed by hand.
+        await adapter.removeColumn("postgresql_timestamp_with_zones", "times");
       }
     });
 
     it("adds column as timestamptz if datetime type changed", async () => {
       await withPostgresqlDatetimeType("timestamptz", async () => {
-        await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones CASCADE`);
         try {
-          await adapter.exec(
-            `CREATE TABLE postgresql_timestamp_with_zones (id serial primary key)`,
-          );
           await adapter.addColumn("postgresql_timestamp_with_zones", "times", "datetime");
           const rows = await adapter.execute(
             `SELECT data_type FROM information_schema.columns
@@ -454,17 +431,15 @@ describeIfPg("PostgreSQLAdapter", () => {
           );
           expect(rows[0]?.data_type).toBe("timestamp with time zone");
         } finally {
-          await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones CASCADE`);
+          await adapter.removeColumn("postgresql_timestamp_with_zones", "times");
         }
       });
     });
 
     it("adds column as custom type", async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones CASCADE`);
       await adapter.exec(`DROP TYPE IF EXISTS custom_time_format`);
       try {
         await adapter.exec(`CREATE TYPE custom_time_format AS ENUM ('past', 'present', 'future')`);
-        await adapter.exec(`CREATE TABLE postgresql_timestamp_with_zones (id serial primary key)`);
         await withNativeDatabaseTypeOverrides(
           { datetimes_as_enum: { name: "custom_time_format" } },
           () =>
@@ -481,7 +456,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(rows[0]?.data_type).toBe("USER-DEFINED");
         expect(rows[0]?.udt_name).toBe("custom_time_format");
       } finally {
-        await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones CASCADE`);
+        await adapter.removeColumn("postgresql_timestamp_with_zones", "times");
         await adapter.exec(`DROP TYPE IF EXISTS custom_time_format`);
       }
     });
