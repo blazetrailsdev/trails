@@ -1,9 +1,3 @@
-/**
- * trails-only coverage for `preventing_writes?`'s nil-descriptor branch
- * (abstract_adapter.rb:229). A standalone adapter has no pool and therefore no
- * connection descriptor, so an ambient `Base.while_preventing_writes` scope —
- * which Rails resolves through that descriptor — cannot reach it.
- */
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfSqlite } from "../support/describe-if-sqlite.js";
 import { Base } from "../base.js";

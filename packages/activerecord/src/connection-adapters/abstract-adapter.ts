@@ -1416,13 +1416,11 @@ export class AbstractAdapter implements Quoting {
 
   isPreventingWrites(): boolean {
     if (this.isReplica()) return true;
+    if (this.connectionDescriptor === null) return false;
     const pool = this.pool as any;
     if (pool?.preventWrites === true) return true;
     if (pool?.dbConfig?.preventWrites === true) return true;
     if (this._config.preventWrites === true) return true;
-    // abstract_adapter.rb:229 — with no descriptor there is nothing to resolve
-    // the scope against, so a standalone adapter is never prevented.
-    if (this.connectionDescriptor === null) return false;
     // Mirrors Rails: connection_descriptor.current_preventing_writes →
     // Base.preventing_writes?(class_name). Walks the stack in reverse and
     // returns the entry's prevent_writes flag when (a) it includes Base by
