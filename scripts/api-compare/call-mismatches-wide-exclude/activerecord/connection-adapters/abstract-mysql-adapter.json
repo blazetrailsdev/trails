@@ -401,13 +401,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "rename_table",
-    "call": "validate_table_length!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "returning_column_values",
     "call": "first",
     "reason": "Include stand-in: `MySQL::DatabaseStatements#returning_column_values` is ported in the Rails-layout file `connection-adapters/mysql/database-statements.ts` (`returningColumnValues`, which does read `result.rows[0]`); the adapter method is the `include` resolution point and only delegates."
