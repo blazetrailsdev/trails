@@ -633,11 +633,11 @@ describe("discoverMigrations", () => {
     const migrations = await discoverMigrations(tmpDir);
     expect(migrations).toHaveLength(2);
     expect(migrations[0].version).toBe("20260101000000");
-    // discoverMigrations canonicalizes proxy.name to the underscore form
-    // (Rails-faithful) regardless of the on-disk separator.
-    expect(migrations[0].name).toBe("create_users");
+    // discoverMigrations camelizes proxy.name as Rails does
+    // (migration.rb:1311) regardless of the on-disk separator.
+    expect(migrations[0].name).toBe("CreateUsers");
     expect(migrations[1].version).toBe("20260102000000");
-    expect(migrations[1].name).toBe("add_email_to_users");
+    expect(migrations[1].name).toBe("AddEmailToUsers");
   });
 
   it("sorts migrations by version", async () => {
@@ -986,8 +986,8 @@ export class CreatePosts extends Migration {
     expect(joined).toContain("You have 1 pending migration:");
     expect(joined).toContain("20260101000000");
     // migration-loader derives the display name from the filename suffix
-    // and canonicalizes hyphen separators to underscores (Rails-faithful).
-    expect(joined).toContain("create_posts");
+    // and camelizes it as Rails does (migration.rb:1311).
+    expect(joined).toContain("CreatePosts");
     expect(joined).toContain("Run `trails db migrate` to resolve this issue.");
   });
 

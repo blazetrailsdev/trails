@@ -22,8 +22,8 @@ describe("discoverMigrations", () => {
     write("20260102000000_add_email_to_users.ts");
     const found = await discoverMigrations(tmpDir);
     expect(found.map((m) => `${m.version}:${m.name}`)).toEqual([
-      "20260101000000:create_posts",
-      "20260102000000:add_email_to_users",
+      "20260101000000:CreatePosts",
+      "20260102000000:AddEmailToUsers",
     ]);
   });
 

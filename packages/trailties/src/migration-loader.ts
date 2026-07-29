@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Migration, MigrationProxy } from "@blazetrails/activerecord";
+import { camelize } from "@blazetrails/activesupport";
 
 // Rails uses `<timestamp>_<name>` (railties/lib/rails/generators/migration.rb).
 // trailties scaffolds in TS/JS, so the extension set is `ts|js` (no `rb`).
@@ -73,10 +74,11 @@ export async function discoverMigrations(migrationsDir: string): Promise<Migrati
     if (!match) continue;
 
     const version = match[1];
-    // Canonicalize the proxy name to the underscore form so
-    // Migrator.validate()'s duplicate-name check sees hyphen-alias and
-    // underscore-form migrations as the same logical name.
-    const name = match[2].replace(/-/g, "_");
+    // Rails camelizes the parsed name before building the proxy
+    // (migration.rb:1311); the hyphen alias is folded to the underscore form
+    // first so Migrator.validate()'s duplicate-name check sees hyphen-alias
+    // and underscore-form migrations as the same logical name.
+    const name = camelize(match[2].replace(/-/g, "_"));
     const filePath = path.join(migrationsDir, file);
 
     proxies.push({
