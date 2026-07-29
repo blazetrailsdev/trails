@@ -133,9 +133,6 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     ) as DateTimeCastResult | null;
   }
 
-  // `Date._parse` stand-in: decompose a datetime string into the component
-  // hash `fallbackStringToTime` feeds to `newTime`. Only reached for strings
-  // `fastStringToTime` rejects (notably ISO basic format, which has no "-").
   private parseTimeHash(s: string): {
     year: number;
     mon: number;
