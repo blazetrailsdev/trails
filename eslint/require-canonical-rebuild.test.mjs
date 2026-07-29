@@ -204,6 +204,13 @@ tester.run("require-canonical-rebuild", rule, {
       options,
     },
 
+    {
+      code:
+        "const rows = await adapter.execute(`SELECT tablename FROM pg_tables WHERE tablename IN ('people')`);\n" +
+        "for (const t of rows) { await ctx.dropTable(qualify(SCHEMA, t.tablename)); }",
+      options,
+    },
+
     { code: 'await ctx.dropTable("posts");', options: [{}] },
   ],
 
