@@ -506,6 +506,13 @@ export function extractFromProgram(
           // declarations; without this the reason is lost whenever the tagged
           // half is not the first one walked.
           existing.noRailsEquivalent ??= extracted.noRailsEquivalent;
+          existing.isInterface = true;
+          existing.interfaceMembers = [
+            ...new Set([
+              ...(existing.interfaceMembers ?? []),
+              ...(extracted.interfaceMembers ?? []),
+            ]),
+          ];
         } else {
           info.modules[modKey] = extracted;
         }
@@ -514,7 +521,17 @@ export function extractFromProgram(
         if (!isExported(node)) return;
         const name = node.name.text;
         const modKey = `${relPath}:${name}`;
-        info.modules[modKey] = extractNamespace(node, checker, relPath);
+        const extracted = extractNamespace(node, checker, relPath);
+        const existing = info.modules[modKey];
+        if (existing) {
+          const existingNames = new Set(existing.instanceMethods.map((m) => m.name));
+          for (const m of extracted.instanceMethods) {
+            if (!existingNames.has(m.name)) existing.instanceMethods.push(m);
+          }
+          existing.noRailsEquivalent ??= extracted.noRailsEquivalent;
+        } else {
+          info.modules[modKey] = extracted;
+        }
         fileHasClassOrModule = true;
       } else if (ts.isExportDeclaration(node)) {
         // Handle `export * as Foo from "./bar.js"` — namespace re-exports
@@ -1989,6 +2006,7 @@ function extractInterface(
     instanceMethods,
     classMethods: [],
     isInterface: true,
+    interfaceMembers: instanceMethods.map((m) => m.name),
     ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
   };
 }

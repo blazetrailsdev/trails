@@ -127,6 +127,14 @@ export interface ClassInfo {
    */
   isInterface?: boolean;
   /**
+   * Names of the members that came from `interface` declarations. Present only
+   * when `isInterface` is set. An `interface Foo` merged with a `namespace Foo`
+   * shares one entry, and the namespace's members are real exported functions
+   * with Ruby counterparts — so container-level tag inheritance must apply to
+   * this list, never to the whole merged member set.
+   */
+  interfaceMembers?: string[];
+  /**
    * Reason prose of an `@noRailsEquivalent` tag written on the class /
    * interface / namespace DECLARATION itself, justifying the declared name as
    * deliberate trails-only surface. Members carry their own tag on
