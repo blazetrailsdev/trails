@@ -31,8 +31,22 @@ interface TimeHash {
 
 const WEEKDAY_PREFIX = /^(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?,?\s+/i;
 
-const RFC_DATETIME =
-  /^(\d{1,2})\s+([A-Za-z]{3,9})\.?\s+(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2})(\.\d+)?)?)?(?:\s+(\S+))?$/;
+const TIME_PART = String.raw`(?:(\d{1,2}):(\d{2})(?::(\d{2})(\.\d+)?)?)`;
+
+/** `04 Sep 2013 03:00:00 EAT` — RFC 2822 / HTTP order. */
+const DAY_MONTH_YEAR = new RegExp(
+  String.raw`^(\d{1,2})\s+([A-Za-z]{3,9})\.?\s+(\d{4})(?:\s+${TIME_PART})?(?:\s+(\S+))?$`,
+);
+
+/** `Sep 04 03:00:00 EAT 2013` — asctime(3) / ctime order, year last. */
+const MONTH_DAY_TIME_YEAR = new RegExp(
+  String.raw`^([A-Za-z]{3,9})\.?\s+(\d{1,2})\s+${TIME_PART}(?:\s+(\S+))?\s+(\d{4})$`,
+);
+
+/** `2013/09/04 03:00:00 EAT` and `2013.09.04` — numeric, year first. */
+const YEAR_MONTH_DAY = new RegExp(
+  String.raw`^(\d{4})[/.-](\d{1,2})[/.-](\d{1,2})(?:[T\s]+${TIME_PART})?(?:\s*(\S+))?$`,
+);
 
 /**
  * Zone abbreviation → offset in seconds, the trails stand-in for the table
@@ -76,6 +90,32 @@ const ZONE_OFFSETS: Record<string, number> = {
   adt: -10800,
   nst: -12600,
 };
+
+function monthNumber(name: string): number | null {
+  const index = MONTH_ABBREVIATIONS.indexOf(name.slice(0, 3).toLowerCase());
+  return index === -1 ? null : index + 1;
+}
+
+function buildTimeHash(
+  year: string,
+  mon: number | null,
+  mday: string,
+  time: (string | undefined)[],
+  zone: string | undefined,
+): TimeHash | null {
+  if (mon === null) return null;
+  const [hour, min, sec, fraction] = time;
+  return {
+    year: Number(year),
+    mon,
+    mday: Number(mday),
+    hour: Number(hour ?? 0),
+    min: Number(min ?? 0),
+    sec: Number(sec ?? 0),
+    sec_fraction: fraction ? Number(`0${fraction}`) : 0,
+    offset: zone === undefined ? null : zoneOffsetSeconds(zone),
+  };
+}
 
 function zoneOffsetSeconds(zone: string): number | null {
   const numeric = /^([+-])(\d{2}):?(\d{2})?$/.exec(zone);
@@ -208,21 +248,28 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
   }
 
   private parseTimeHash(s: string): TimeHash | null {
-    const withoutWeekday = s.replace(WEEKDAY_PREFIX, "");
-    const rfc = RFC_DATETIME.exec(withoutWeekday);
-    if (rfc) {
-      const mon = MONTH_ABBREVIATIONS.indexOf(rfc[2].slice(0, 3).toLowerCase()) + 1;
-      if (mon === 0) return null;
-      return {
-        year: Number(rfc[3]),
-        mon,
-        mday: Number(rfc[1]),
-        hour: Number(rfc[4] ?? 0),
-        min: Number(rfc[5] ?? 0),
-        sec: Number(rfc[6] ?? 0),
-        sec_fraction: rfc[7] ? Number(`0${rfc[7]}`) : 0,
-        offset: rfc[8] === undefined ? null : zoneOffsetSeconds(rfc[8]),
-      };
+    const withoutWeekday = s.replace(WEEKDAY_PREFIX, "").trim();
+
+    const dayFirst = DAY_MONTH_YEAR.exec(withoutWeekday);
+    if (dayFirst) {
+      return buildTimeHash(
+        dayFirst[3],
+        monthNumber(dayFirst[2]),
+        dayFirst[1],
+        dayFirst.slice(4, 8),
+        dayFirst[8],
+      );
+    }
+
+    const asctime = MONTH_DAY_TIME_YEAR.exec(withoutWeekday);
+    if (asctime) {
+      return buildTimeHash(
+        asctime[8],
+        monthNumber(asctime[1]),
+        asctime[2],
+        asctime.slice(3, 7),
+        asctime[7],
+      );
     }
 
     const normalized = withoutWeekday
@@ -245,7 +292,10 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     try {
       plain = Temporal.PlainDateTime.from(datetimeString, { overflow: "reject" });
     } catch {
-      return null;
+      const numeric = YEAR_MONTH_DAY.exec(withoutWeekday);
+      return numeric
+        ? buildTimeHash(numeric[1], Number(numeric[2]), numeric[3], numeric.slice(4, 8), numeric[8])
+        : null;
     }
     return {
       year: plain.year,
