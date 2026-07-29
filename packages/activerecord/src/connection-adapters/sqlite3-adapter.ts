@@ -2419,16 +2419,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       .filter((n) => colNames.includes(renamed(n)));
 
     // Rails: transaction { disable_referential_integrity { move_table(...) } }
-    // Use savepoint if already inside a transaction (e.g. migration),
-    // since SQLite doesn't allow nested BEGIN.
-    const alreadyInTransaction = this._inTransaction;
-    const savepointName = `alter_table_${bareTable.replace(/[^a-zA-Z0-9_]/g, "_")}`;
-    if (alreadyInTransaction) {
-      await this.createSavepoint(savepointName);
-    } else {
-      await this.beginTransaction();
-    }
-    try {
+    await this.transaction(async () => {
       await this.disableReferentialIntegrity(async () => {
         // Rails' alter_table is two move_table calls, each copy_table + drop_table
         // (sqlite3_adapter.rb:585-596). The first move is Rails' verbatim: the
@@ -2445,21 +2436,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         await this.copyTableContents(alteredTableName, tableName, originalColNames.map(renamed));
         await this.execCopyTable(`DROP TABLE ${quoteTableName(alteredTableName)}`);
       });
-
-      if (alreadyInTransaction) {
-        await this.releaseSavepoint(savepointName);
-      } else {
-        await this.commit();
-      }
-    } catch (err) {
-      if (alreadyInTransaction) {
-        await this.rollbackToSavepoint(savepointName);
-        await this.releaseSavepoint(savepointName);
-      } else {
-        await this.rollback();
-      }
-      throw err;
-    }
+    });
 
     this.schemaCache.clear();
     // The rebuild issues its DDL via driver.exec (to manage savepoint nesting),
