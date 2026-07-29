@@ -403,6 +403,26 @@ export class DatabaseTasks {
     adapter.schemaCache?.clear();
   }
 
+  /**
+   * Push the schema forward N migrations (default 1). Mirrors `db:forward`,
+   * whose body is `migration_connection_pool.migration_context.forward(step)`
+   * (`railties/databases.rake:275-280`) — the exact counterpart of the
+   * `db:rollback` line {@link rollback} ports. Rails has no
+   * `DatabaseTasks.forward`; trails' `MigrationContext` is the schema DSL
+   * rather than Rails' migration-set context, so the rake body lands here
+   * beside `rollback` instead of on the pool.
+   */
+  static async forward(steps: number = 1): Promise<void> {
+    if (!this.databaseConfiguration) return;
+    if (this.configsFor(this._normalizeEnv()).length === 0) return;
+    const { Migrator } = await import("../migration.js");
+    const pool = await this.migrationConnectionPool();
+    const adapter = await pool.leaseConnection();
+    const migrator = new Migrator(adapter, this._migrationsFor(pool.dbConfig));
+    await migrator.forward(steps);
+    adapter.schemaCache?.clear();
+  }
+
   // Cached sync reference to Base, populated on the first _migrationAdapter() call.
   // Lets migrationConnection() (which must be synchronous) lease from the pool
   // without a top-level import that would create a circular-dependency cycle.
