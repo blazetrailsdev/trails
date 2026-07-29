@@ -66,9 +66,9 @@ describeIfPg("PostgreSQLAdapter", () => {
   afterEach(async () => {
     try {
       await adapter.exec(
-        // Only the tables the `ex_%` sweep below cannot reach: `test_no_returning`
-        // is TEMP (it lives in pg_temp, not the `public` schema pg_tables is
-        // filtered on), and `abba` carries no `ex_` prefix.
+        // The `ex_%` sweep below cannot reach these two: `test_no_returning` is
+        // TEMP, so it lives in pg_temp rather than the `public` schema the sweep
+        // filters on, and `abba` carries no `ex_` prefix.
         `DROP TABLE IF EXISTS abba, test_no_returning CASCADE`,
       );
 

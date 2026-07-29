@@ -91,7 +91,20 @@
  * TABLE` whose name position is an interpolation. A dynamic or absent filter
  * satisfies nothing — otherwise the rule would stop catching the bespoke tables
  * that outlive their test, which is why it exists. Matching is by prefix only,
- * so a create outside the swept prefix is still reported.
+ * so a create outside the swept prefix is still reported. `NOT LIKE` yields no
+ * prefix — an exclusion filter selects the complement of its pattern, so
+ * reading it as a prefix would satisfy exactly the creates the sweep spares.
+ *
+ * The two halves are paired file-wide, not per string: the filter and the drop
+ * are normally written against different variables in different calls, and
+ * matching them up would trade a tolerable over-report for real misses. So a
+ * catalogue `LIKE` filter anywhere in the file, plus any dynamically-named raw
+ * drop anywhere in it, arms every prefix the file mentions. KNOWN GAPS, all in
+ * the under-accepting direction (a real sweep goes unrecognised and its creates
+ * are reported, which is noise rather than a leak): SQL built by concatenation
+ * or returned from a helper, since only literals and template quasis are read;
+ * a catalogue relation `CATALOGUE_SOURCE` does not list; and a sweep whose drop
+ * runs through the `dropTable()` helper on a row value rather than raw SQL.
  *
  * This is deliberately independent of `require-canonical-rebuild`: the two
  * rules answer different questions. A sweep that can select a canonical table
@@ -309,8 +322,14 @@ const CATALOGUE_SOURCE =
  * `%` — an interpolated or otherwise dynamic pattern — yields nothing, which is
  * the point: an unreadable filter must satisfy no create, or the rule stops
  * catching bespoke tables that outlive their test.
+ *
+ * `NOT LIKE` is excluded, and it is not a nicety: an exclusion filter selects
+ * the complement of its pattern, so reading `NOT LIKE 'ex_%'` as a prefix would
+ * make a sweep satisfy exactly the creates it deliberately spares. The empty
+ * pattern is likewise impossible to match (`[^'%]+`), so a bare `LIKE '%'`
+ * selecting everything never becomes a prefix that satisfies everything.
  */
-const LIKE_PREFIX_RE = /\blike\s+'([^'%]+)%'/gi;
+const LIKE_PREFIX_RE = /(?<!\bnot\s+)\blike\s+'([^'%]+)%'/gi;
 export function sweepPrefixes(text) {
   if (!CATALOGUE_SOURCE.test(text)) return [];
   const prefixes = [];
@@ -330,8 +349,6 @@ export function hasDynamicDropName(text, endIsDynamic) {
   DROP_TABLE_RE.lastIndex = 0;
   let m;
   while ((m = DROP_TABLE_RE.exec(text)) !== null) {
-    // The name position must reach the interpolation with nothing but optional
-    // whitespace and an opening quote in between.
     if (/^\s*["'`]?$/.test(text.slice(m.index + m[0].length))) return true;
   }
   return false;
@@ -414,11 +431,6 @@ const rule = {
     // table name → first create node seen (for the report location).
     const created = new Map();
     const dropped = new Set();
-    // Prefix sweeps: a catalogue query filtered on `LIKE '<prefix>%'` feeding a
-    // dynamically-named raw DROP TABLE tears down every table with that prefix,
-    // strictly more than a hand-maintained name list can. Both halves must be
-    // present — a filter with no sweep drop, or a sweep drop with no readable
-    // filter, satisfies nothing.
     const sweptPrefixes = [];
     let sawSweepDrop = false;
 
