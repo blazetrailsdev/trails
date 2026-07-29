@@ -6,6 +6,7 @@ import { DatabaseConfigurations } from "./database-configurations.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 import { fixtures } from "./test-fixtures.js";
 import { SchemaMigration } from "./schema-migration.js";
+import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 
 // Build a (minimal) DatabaseConfigurations whose `configsFor` returns the
 // supplied stubbed configs. They also go through the array constructor arm so
@@ -266,12 +267,15 @@ describe("TestDatabasesTest", () => {
       {
         version: "1",
         name: "M1",
-        migration: () => ({
-          up: async () => {
-            log.push("up");
-          },
-          down: async () => {},
-        }),
+        migration: () =>
+          anonymousMigration(
+            "M1",
+            "1",
+            async () => {
+              log.push("up");
+            },
+            async () => {},
+          ),
       },
     ];
 

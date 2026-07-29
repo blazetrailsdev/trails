@@ -18,6 +18,7 @@ import { newRawTestAdapter } from "./test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 import { fixtures } from "./test-fixtures.js";
+import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 
 describe("MigrationTest", () => {
   // Ride the primary schema-loaded pool (`Base.connection`); `newRawTestAdapter`
@@ -83,7 +84,7 @@ describe("MigrationTest", () => {
       {
         version: "1",
         name: "AsyncFirst",
-        migration: async () => ({ up: async () => {}, down: async () => {} }),
+        migration: async () => anonymousMigration("AsyncFirst", "1"),
       },
     ];
     const migrator = new Migrator(adapter, migrations);

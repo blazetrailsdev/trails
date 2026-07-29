@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
+import { Migration } from "@blazetrails/activerecord";
 import type { MigrationProxy } from "@blazetrails/activerecord";
 
 // Rails uses `<timestamp>_<name>` (railties/lib/rails/generators/migration.rb).
@@ -83,32 +84,20 @@ export async function discoverMigrations(migrationsDir: string): Promise<Migrati
       version,
       name,
       filename: filePath,
-      migration: () => {
-        const loader: import("@blazetrails/activerecord").MigrationLike = {
-          connection: undefined,
-          async up(): Promise<void> {
-            const adapter = loader.connection;
-            if (!adapter)
-              throw new Error(
-                "migration-loader: migration.connection must be set before calling up()",
-              );
+      migration: () =>
+        new (class extends Migration {
+          override async up(): Promise<void> {
+            await this.runLoaded("up");
+          }
+          override async down(): Promise<void> {
+            await this.runLoaded("down");
+          }
+          private async runLoaded(direction: "up" | "down"): Promise<void> {
             const MigrationClass = await loadMigrationClass(filePath);
             const instance = new MigrationClass();
-            await instance.run(adapter, "up");
-          },
-          async down(): Promise<void> {
-            const adapter = loader.connection;
-            if (!adapter)
-              throw new Error(
-                "migration-loader: migration.connection must be set before calling down()",
-              );
-            const MigrationClass = await loadMigrationClass(filePath);
-            const instance = new MigrationClass();
-            await instance.run(adapter, "down");
-          },
-        };
-        return loader;
-      },
+            await instance.run(this.connection, direction);
+          }
+        })(name, version),
     });
   }
 

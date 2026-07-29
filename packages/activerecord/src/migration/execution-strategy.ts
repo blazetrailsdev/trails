@@ -8,15 +8,7 @@
  */
 
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-
-export interface MigrationLike {
-  up(): Promise<void>;
-  down(): Promise<void>;
-  /** When true, Migrator skips DDL transaction wrapping for this migration. */
-  disableDdlTransaction?: boolean;
-  /** Adapter for this migration; mirrors Rails' Migration#connection (@connection field). */
-  connection?: DatabaseAdapter;
-}
+import type { Migration } from "../migration.js";
 
 export abstract class ExecutionStrategy {
   protected migration: unknown;
@@ -27,7 +19,7 @@ export abstract class ExecutionStrategy {
 
   abstract exec(
     direction: "up" | "down",
-    migration: MigrationLike,
+    migration: Migration,
     adapter: DatabaseAdapter,
   ): Promise<void>;
 }

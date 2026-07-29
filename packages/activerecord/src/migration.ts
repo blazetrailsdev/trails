@@ -32,7 +32,7 @@ import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { DefaultStrategy } from "./migration/default-strategy.js";
-import type { ExecutionStrategy, MigrationLike } from "./migration/execution-strategy.js";
+import type { ExecutionStrategy } from "./migration/execution-strategy.js";
 import type { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 import { registerVersion, findVersion, CURRENT_VERSION } from "./migration/compatibility.js";
 
@@ -41,7 +41,7 @@ export type {
   AddForeignKeyOptions,
 } from "./connection-adapters/abstract/schema-definitions.js";
 
-export { ExecutionStrategy, type MigrationLike } from "./migration/execution-strategy.js";
+export { ExecutionStrategy } from "./migration/execution-strategy.js";
 export { DefaultStrategy } from "./migration/default-strategy.js";
 export { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 export {
@@ -2074,11 +2074,11 @@ export interface MigrationProxy {
   filename?: string;
   /** Mirrors: ActiveRecord::MigrationProxy#scope — engine name for copied engine migrations */
   scope?: string;
-  migration: () => MigrationLike | Promise<MigrationLike>;
+  migration: () => Migration | Promise<Migration>;
   /** @internal Mirrors: ActiveRecord::MigrationProxy#basename */
   basename?(): string;
   /** @internal Mirrors: ActiveRecord::MigrationProxy#load_migration */
-  loadMigration?(): Promise<MigrationLike>;
+  loadMigration?(): Promise<Migration>;
 }
 
 /**
@@ -2091,31 +2091,16 @@ async function loadMigrationFrom(
   mod: Record<string, unknown>,
   name: string,
   version: string,
-): Promise<MigrationLike> {
+): Promise<Migration> {
   const exported = mod[name] ?? mod.default;
   if (typeof exported === "function") {
     return new (exported as new (name?: string, version?: string) => Migration)(name, version);
   }
-  return exported as MigrationLike;
-}
-
-/** Mirrors: ActiveRecord::MigrationProxy (`migration.rb:1187`) */
-class MigrationProxyDelegate extends Migration {
-  constructor(
-    proxy: MigrationProxy,
-    private readonly _loaded: MigrationLike,
-    private readonly _execStrategy: ExecutionStrategy,
-  ) {
-    super(proxy.name, proxy.version);
-  }
-
-  override get disableDdlTransaction(): boolean {
-    return this._loaded.disableDdlTransaction ?? false;
-  }
-
-  override async execMigration(conn: DatabaseAdapter, direction: "up" | "down"): Promise<void> {
-    await this._execStrategy.exec(direction, this._loaded, conn);
-  }
+  if (exported instanceof Migration) return exported;
+  throw new Error(
+    `Migration ${name} must export a Migration class named "${name}" ` +
+      `(or a Migration instance as the default export)`,
+  );
 }
 
 /**
@@ -2126,7 +2111,6 @@ class MigrationProxyDelegate extends Migration {
  */
 type MigratorOptions = {
   environment?: string;
-  strategy?: ExecutionStrategy;
   /**
    * Set to false when the db_config opts out of metadata storage
    * (Rails' `use_metadata_table: false`). environment stamping is a
@@ -2145,7 +2129,6 @@ export class Migrator {
   private _schemaMigration: SchemaMigration;
   private _internalMetadata: InternalMetadata;
   private _environment: string;
-  private _strategy: ExecutionStrategy;
   private readonly _options: MigratorOptions;
   private readonly _direction: "up" | "down";
   private readonly _targetVersion: number | string | null;
@@ -2168,7 +2151,6 @@ export class Migrator {
       getEnv("TRAILS_ENV") ??
       getEnv("NODE_ENV") ??
       DatabaseConfigurations.defaultEnv;
-    this._strategy = options.strategy ?? new DefaultStrategy();
     this.validate(migrations);
     const normalized = migrations.map((m) => ({
       ...m,
@@ -2455,12 +2437,12 @@ export class Migrator {
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#ddl_transaction */
-  async ddlTransaction(migration: MigrationLike, fn: () => Promise<void>): Promise<void> {
+  async ddlTransaction(migration: Migration, fn: () => Promise<void>): Promise<void> {
     return this._ddlTransaction(migration, fn);
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#use_transaction? */
-  isUseTransaction(migration: MigrationLike): boolean {
+  isUseTransaction(migration: Migration): boolean {
     return this._useTransaction(migration);
   }
 
@@ -2923,15 +2905,10 @@ export class Migrator {
   }
 
   private async _runMigration(proxy: MigrationProxy, direction: "up" | "down"): Promise<void> {
-    const loaded = await proxy.migration();
     // Rails' MigrationProxy delegates migrate/announce/write to the real
-    // Migration (`migration.rb:1187`), so a subclass override is honoured. The
-    // wrapper is only for the trails-only bare `{ up, down }` proxy shape,
-    // which has no migrate/announce of its own.
-    const migration =
-      loaded instanceof Migration
-        ? loaded
-        : new MigrationProxyDelegate(proxy, loaded, this._strategy);
+    // Migration it loads (`migration.rb:1187`), so a subclass override is
+    // honoured.
+    const migration = await proxy.migration();
     migration.connection = this._adapter;
     // Rails wraps both the migration execution AND the version
     // stamping inside the same ddl_transaction so they commit/rollback
@@ -2972,7 +2949,7 @@ export class Migrator {
    *       end
    *     end
    */
-  private async _ddlTransaction(migration: MigrationLike, fn: () => Promise<void>): Promise<void> {
+  private async _ddlTransaction(migration: Migration, fn: () => Promise<void>): Promise<void> {
     if (this._useTransaction(migration)) {
       // Skip wrapping if the adapter is already in a transaction
       // (e.g. a caller wrapped the entire migrate in a transaction).
@@ -3004,7 +2981,7 @@ export class Migrator {
    * Mirrors Rails' `Migrator#use_transaction?`:
    * `!migration.disable_ddl_transaction && connection.supports_ddl_transactions?`
    */
-  private _useTransaction(migration: MigrationLike): boolean {
+  private _useTransaction(migration: Migration): boolean {
     if (migration.disableDdlTransaction) return false;
     // Check adapter support via the DatabaseAdapter interface.
     // SQLite returns true, PG returns true, MySQL returns false.

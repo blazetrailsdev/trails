@@ -8,15 +8,15 @@
  */
 
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
+import type { Migration } from "../migration.js";
 import { ExecutionStrategy } from "./execution-strategy.js";
-import type { MigrationLike } from "./execution-strategy.js";
 
 export class DefaultStrategy extends ExecutionStrategy {
   private _adapter: DatabaseAdapter | null = null;
 
   async exec(
     direction: "up" | "down",
-    migration: MigrationLike,
+    migration: Migration,
     adapter: DatabaseAdapter,
   ): Promise<void> {
     this.migration = migration;
@@ -33,7 +33,7 @@ export class DefaultStrategy extends ExecutionStrategy {
   connection(): DatabaseAdapter {
     // Mirrors Rails: DefaultStrategy#connection → migration.connection.
     // _adapter is our exec()-time fallback; per-migration connection wins.
-    const conn = (this.migration as MigrationLike | null)?.connection ?? this._adapter;
+    const conn = (this.migration as Migration | null)?.connection ?? this._adapter;
     if (!conn)
       throw new Error("DefaultStrategy: no adapter available (exec() has not been called)");
     return conn;

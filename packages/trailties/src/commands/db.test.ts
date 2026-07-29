@@ -1335,36 +1335,28 @@ export class CreatePosts extends Migration {
   });
 
   it("Migrator with internalMetadataEnabled=false migrates without stamping", async () => {
-    const { Migrator } = await import("@blazetrails/activerecord");
+    const { Migration, Migrator } = await import("@blazetrails/activerecord");
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
 
     const dbFile = path.join(tmpDir, "no-metadata-migrate.sqlite3");
     const adapter = new BetterSQLite3Adapter(dbFile);
     try {
-      // Low-level MigrationLike shape (same pattern migrator.test.ts uses)
-      // — bypasses the Migration base class so the test doesn't depend on
-      // its schema-helper wiring.
       const migrations = [
         {
           version: "20260101000000",
           name: "CreateWidgets",
-          migration: () => {
-            const m: import("@blazetrails/activerecord").MigrationLike = {
-              connection: undefined,
-              async up() {
-                if (!m.connection) throw new Error("adapter required");
-                await m.connection.executeMutation(
+          migration: () =>
+            new (class extends Migration {
+              override async up(): Promise<void> {
+                await this.connection.executeMutation(
                   `CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)`,
                 );
-              },
-              async down() {
-                if (!m.connection) throw new Error("adapter required");
-                await m.connection.executeMutation(`DROP TABLE widgets`);
-              },
-            };
-            return m;
-          },
+              }
+              override async down(): Promise<void> {
+                await this.connection.executeMutation(`DROP TABLE widgets`);
+              }
+            })("CreateWidgets", "20260101000000"),
         },
       ];
       const migrator = new Migrator(adapter, migrations, {

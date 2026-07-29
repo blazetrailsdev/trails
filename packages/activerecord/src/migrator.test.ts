@@ -12,6 +12,7 @@ import { Base } from "./base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { fixtures } from "./test-fixtures.js";
+import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 
 // MIGRATIONS_ROOT — Rails reads fixture migration directories from disk; the
 // trails equivalents live under test-helpers/migrations.
@@ -28,7 +29,7 @@ function migration(name: string, version?: number): MigrationProxy {
   return {
     version: version === undefined ? (null as unknown as string) : String(version),
     name,
-    migration: () => ({ up: async () => {}, down: async () => {} }),
+    migration: () => anonymousMigration(name, version === undefined ? undefined : String(version)),
   };
 }
 
@@ -42,14 +43,17 @@ function sensors(count: number): { calls: Array<[string, number]>; migrations: M
     migrations.push({
       version: String(version),
       name: `Sensor${version}`,
-      migration: () => ({
-        up: async () => {
-          calls.push(["up", version]);
-        },
-        down: async () => {
-          calls.push(["down", version]);
-        },
-      }),
+      migration: () =>
+        anonymousMigration(
+          `Sensor${version}`,
+          String(version),
+          async () => {
+            calls.push(["up", version]);
+          },
+          async () => {
+            calls.push(["down", version]);
+          },
+        ),
     });
   }
   return { calls, migrations };
@@ -622,14 +626,17 @@ function trackedSensor(
   const proxy: MigrationProxy = {
     version: String(version),
     name: name ?? `Sensor${version}`,
-    migration: () => ({
-      up: async () => {
-        state.wentUp = true;
-      },
-      down: async () => {
-        state.wentDown = true;
-      },
-    }),
+    migration: () =>
+      anonymousMigration(
+        name ?? `Sensor${version}`,
+        String(version),
+        async () => {
+          state.wentUp = true;
+        },
+        async () => {
+          state.wentDown = true;
+        },
+      ),
   };
   return { proxy, state };
 }

@@ -13,6 +13,7 @@ import type { ConnectionPool } from "../connection-adapters/abstract/connection-
 import { adapterType, ambientPoolConfiguration } from "../test-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { fixtures } from "../test-fixtures.js";
+import { anonymousMigration } from "../test-helpers/anonymous-migration.js";
 
 describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
   it("raises an error when called with protected environment", async () => {
@@ -835,12 +836,15 @@ describe("DatabaseTasksMigrateTest", () => {
         {
           version: "1",
           name: "M1",
-          migration: () => ({
-            up: async () => {
-              migrated = true;
-            },
-            down: async () => {},
-          }),
+          migration: () =>
+            anonymousMigration(
+              "M1",
+              "1",
+              async () => {
+                migrated = true;
+              },
+              async () => {},
+            ),
         },
       ]);
       process.env.VERSION = "";
@@ -873,13 +877,13 @@ describe("DatabaseTasksMigrateScopeTest", () => {
       {
         version: "1",
         name: "Unscoped",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
+        migration: () => anonymousMigration("Unscoped", "1"),
       },
       {
         version: "2",
         name: "MysqlOnly",
         scope: "mysql",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
+        migration: () => anonymousMigration("MysqlOnly", "2"),
       },
     ]);
   });
@@ -943,17 +947,17 @@ describe("DatabaseTasksMigrateStatusTest", () => {
       {
         version: "1",
         name: "Valid people have last names",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
+        migration: () => anonymousMigration("Valid people have last names", "1"),
       },
       {
         version: "2",
         name: "We need reminders",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
+        migration: () => anonymousMigration("We need reminders", "2"),
       },
       {
         version: "3",
         name: "Innocent jointable",
-        migration: () => ({ up: async () => {}, down: async () => {} }),
+        migration: () => anonymousMigration("Innocent jointable", "3"),
       },
     ]);
   });
