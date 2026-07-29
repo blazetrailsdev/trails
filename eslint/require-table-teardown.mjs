@@ -140,10 +140,16 @@
  * an unanchored regex (`~` / `~*`) filter, which matches mid-name and is no
  * prefix at all; and, in either regex spelling, a construct whose JS meaning
  * differs from its POSIX one and so is refused rather than mistranslated — a
- * POSIX class or collating element (`[[:alpha:]]`), a back reference or class
- * shorthand (`\1`, `\d`), an `^` or `$` past the leading anchor, and a pattern
- * that does not compile at all. Everything else in the two regex grammars —
- * alternation, grouping, `* + ?`, `{n,m}` bounds, bracket expressions, `.` — is
+ * POSIX class or collating element (`[[:alpha:]]`), a back reference (`\1`), an
+ * ARE-only escape (`\A`, `\Z`, `\y`, `\Y`, `\m`, `\M`, and `\b`, which PostgreSQL
+ * also spells backspace with inside brackets), a shorthand JS reads more widely
+ * than ARE does (`\D`, `\W`, `\s`), a backslash inside a bracket
+ * expression, whose meaning depends on which regex engine reads it, an `^` or
+ * `$` past the leading
+ * anchor, and a pattern that does not compile at all. Everything else in the
+ * two regex grammars — alternation, grouping, `* + ?`, `{n,m}` bounds, bracket
+ * expressions, `.`, and the ARE class shorthands whose JS set is no wider
+ * (`\d`, `\w`, `\S` — see `ARE_SHORTHANDS`) — is
  * translated (`posixRegexpSource`, `similarPrefixMatcher`). The
  * filter spellings read are `LIKE`, `ILIKE`, `SIMILAR TO` and `~` / `~*`; their
  * negations are deliberately read as nothing (see `LIKE_PREFIX_RE`).
@@ -449,9 +455,13 @@ const BOUND_RE = /^\{\d+(?:,\d*)?\}/;
  * The two halves overlap almost exactly — a leading `^` negates, `a-z` is a
  * range, a `]` in first position is a literal — but two do not, and both are
  * refused rather than guessed: a POSIX class/collating/equivalence element
- * (`[[:alpha:]]`, `[[.x.]]`, `[[=a=]]`) has no JS spelling, and a backslash is
- * an ordinary literal character inside POSIX brackets while JS reads it as an
- * escape, so it is emitted doubled rather than passed through.
+ * (`[[:alpha:]]`, `[[.x.]]`, `[[=a=]]`) has no JS spelling, and a backslash
+ * means different things in the two grammars. Bare POSIX brackets read it as an
+ * ordinary literal, but PostgreSQL's engine is ARE, which reads it as an escape
+ * inside brackets too (`[\d]` is the digits, not a backslash and a `d`), so
+ * emitting it doubled would credit `exd` for `~ '^ex[\d]'` — a name the filter
+ * does not select. Which reading is right depends on the engine, so a backslash
+ * in a bracket expression refuses the whole filter instead.
  */
 function bracketSource(pattern, start) {
   let source = "[";
@@ -467,11 +477,34 @@ function bracketSource(pattern, start) {
   for (; i < pattern.length && pattern[i] !== "]"; i++) {
     const ch = pattern[i];
     if (ch === "[" && ":.=".includes(pattern[i + 1] ?? "")) return null;
-    source += ch === "\\" ? "\\\\" : ch === "[" ? "\\[" : ch === "^" ? "\\^" : ch;
+    if (ch === "\\") return null;
+    source += ch === "[" ? "\\[" : ch === "^" ? "\\^" : ch;
   }
   if (i >= pattern.length) return null;
   return { source: `${source}]`, next: i + 1 };
 }
+
+/**
+ * The class shorthands PostgreSQL's regex engine (ARE, not bare POSIX ERE)
+ * reads and JS reads alike, so `~ '^ex_\d+'` can be translated rather than
+ * refused.
+ *
+ * Only the three whose JS character set cannot be the *wider* of the two are
+ * here, because a wider matcher credits a name the filter does not select.
+ * ARE's classes are the POSIX ones (`\d` is `[[:digit:]]`, `\w` is
+ * `[[:alnum:]_]`, `\s` is `[[:space:]]`), which a non-C database locale can
+ * extend beyond ASCII; JS's `\d` and `\w` stay ASCII, so both are subsets and
+ * under-accept at worst, and `\S` is the complement of the JS `\s` superset, so
+ * it is a subset too. The complements `\D` and `\W` — and `\s` itself, which JS
+ * extends to Unicode separators PostgreSQL's `[[:space:]]` need not include —
+ * run the other way and stay refused.
+ *
+ * Refused alongside them: back references, `\b` (a word boundary in both, but
+ * ALSO PostgreSQL's spelling of backspace inside a bracket expression), and the
+ * ARE-only `\A` / `\Z` / `\y` / `\Y` / `\m` / `\M`, which JS cannot spell at all
+ * (`\Y` is ARE's *not* a word boundary, documented alongside the others).
+ */
+const ARE_SHORTHANDS = new Set(["d", "w", "S"]);
 
 /**
  * The JS regex source equivalent to the POSIX ERE `pattern`, or null when it
@@ -481,11 +514,13 @@ function bracketSource(pattern, start) {
  *
  * Alternation, grouping and the quantifiers `* + ?` are spelled identically in
  * both, as are `{n,m}` bounds and `.`; bracket expressions go through
- * `bracketSource`. Refused: a backslash escape of a word character, since
- * POSIX-ERE back references (`\1`) and PostgreSQL's ARE class shorthands (`\d`)
- * do not mean in JS what they mean here; a `{` that does not open a bound; and
- * an `^` or `$` past the leading anchor, which would constrain a position this
- * prefix reading does not model.
+ * `bracketSource`. A backslash escape of a word character is translated only
+ * for the ARE class shorthands whose JS meaning is identical (`ARE_SHORTHANDS`);
+ * every other one is refused, since a back reference (`\1`) means something
+ * else once the `^(?:…)` wrapper adds a group, and the ARE-only escapes (`\A`,
+ * `\Z`, `\y`, `\Y`, `\m`, `\M`) have no JS spelling at all. Also refused: a `{` that
+ * does not open a bound, and an `^` or `$` past the leading anchor, which would
+ * constrain a position this prefix reading does not model.
  */
 function posixRegexpSource(pattern) {
   let source = "";
@@ -499,7 +534,8 @@ function posixRegexpSource(pattern) {
       i = bracket.next;
     } else if (ch === "\\") {
       const next = pattern[i + 1];
-      if (next === undefined || /\w/.test(next)) return null;
+      if (next === undefined) return null;
+      if (/\w/.test(next) && !ARE_SHORTHANDS.has(next)) return null;
       source += `\\${next}`;
       i += 2;
     } else if (ch === "{") {
