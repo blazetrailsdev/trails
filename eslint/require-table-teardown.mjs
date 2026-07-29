@@ -388,13 +388,15 @@ const SIMILAR_PREFIX_RE = /(?<!\bnot\s+)\bsimilar\s+to\s+'(?<pattern>[^'%]+)%'/g
  * matches mid-name (`fooex1bar`) and selects far more than the prefix, but
  * crediting it as a prefix would be under-crediting, not a leak — the risk runs
  * the other way, so the `^` is required and an unanchored pattern yields no
- * matcher. Past the anchor only a metachar-free literal is read: the remaining
- * POSIX regex syntax is not JS regex syntax (bracket expressions, back
- * references, `{n,m}` bounds), so translating it would be guesswork, and reading
- * it literally would credit names the sweep does not select.
+ * matcher. Past the anchor only a metachar-free literal is read, optionally
+ * followed by a trailing `.*` (which constrains nothing, so `^ex_.*` is the same
+ * prefix as `^ex_`): the remaining POSIX regex syntax is not JS regex syntax
+ * (bracket expressions, back references, `{n,m}` bounds), so translating it
+ * would be guesswork, and reading it literally would credit names the sweep does
+ * not select.
  */
 const REGEXP_PREFIX_RE = /(?<![!~])(?<op>~\*?)\s*'(?<pattern>[^']*)'/g;
-const REGEXP_LITERAL_RE = /^\^(?<literal>[^.*+?^${}()|[\]\\]*)$/;
+const REGEXP_LITERAL_RE = /^\^(?<literal>[^.*+?^${}()|[\]\\]+)(?:\.\*)?$/;
 /** A trailing `ESCAPE '<char>'` clause, and the leading keyword on its own. */
 const ESCAPE_CLAUSE_RE = /^\s*escape\s+'([^'])'/i;
 const ESCAPE_KEYWORD_RE = /^\s*escape\b/i;
@@ -415,7 +417,7 @@ export function sweepPrefixMatchers(text) {
       const matcher = likePrefixMatcher(
         pattern,
         clause === null ? "\\" : clause[1],
-        i !== undefined && i !== "",
+        Boolean(i),
         similar,
       );
       if (matcher !== null) matchers.push(matcher);
@@ -425,7 +427,7 @@ export function sweepPrefixMatchers(text) {
   let m;
   while ((m = REGEXP_PREFIX_RE.exec(text)) !== null) {
     const literal = REGEXP_LITERAL_RE.exec(m.groups.pattern);
-    if (literal === null || literal.groups.literal === "") continue;
+    if (literal === null) continue;
     matchers.push(new RegExp(`^${literal.groups.literal}`, m.groups.op === "~*" ? "i" : ""));
   }
   return matchers;
