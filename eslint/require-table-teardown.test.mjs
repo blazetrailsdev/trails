@@ -256,28 +256,7 @@ tester.run("require-table-teardown", rule, {
       "}",
     'await adapter.exec(`CREATE TABLE "ex_foo" (id int)`);\n' +
       "const rows = await adapter.execute(\n" +
-      "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_\\\\D'`,\n" +
-      ");\n" +
-      "for (const t of rows) {\n" +
-      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
-      "}",
-    'await adapter.exec(`CREATE TABLE "ex_foo" (id int)`);\n' +
-      "const rows = await adapter.execute(\n" +
       "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_\\\\S'`,\n" +
-      ");\n" +
-      "for (const t of rows) {\n" +
-      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
-      "}",
-    'await adapter.exec(`CREATE TABLE "ex_ 1" (id int)`);\n' +
-      "const rows = await adapter.execute(\n" +
-      "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_\\\\s'`,\n" +
-      ");\n" +
-      "for (const t of rows) {\n" +
-      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
-      "}",
-    'await adapter.exec(`CREATE TABLE "ex_-1" (id int)`);\n' +
-      "const rows = await adapter.execute(\n" +
-      "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_\\\\W'`,\n" +
       ");\n" +
       "for (const t of rows) {\n" +
       '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
@@ -811,6 +790,21 @@ tester.run("require-table-teardown", rule, {
         "}",
       errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
     },
+    // A backslash inside a bracket expression is an escape to PostgreSQL's ARE
+    // engine and a literal to bare POSIX, so the filter is refused: reading
+    // `[\d]` as a literal backslash-or-`d` would credit `exd`, which
+    // `~ '^ex[\d]'` does not select.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "exd" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex[\\\\d]'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "exd" } }],
+    },
     // A back reference means something else once the `^(?:…)` wrapper adds a
     // group, so it stays refused although JS spells it identically.
     {
@@ -908,17 +902,41 @@ tester.run("require-table-teardown", rule, {
         "}",
       errors: [{ messageId: "missingTeardown", data: { table: "ex_foo" } }],
     },
-    // `\D` is likewise read for what it means: it does not select `ex_1`.
+    // `\D`, `\W` and `\s` are wider in JS than ARE's locale-dependent POSIX
+    // classes, so translating them could credit a name the filter does not
+    // select; they are refused rather than accepted on the resemblance.
     {
       code:
-        'await adapter.exec(`CREATE TABLE "ex_1" (id int)`);\n' +
+        'await adapter.exec(`CREATE TABLE "ex_foo" (id int)`);\n' +
         "const rows = await adapter.execute(\n" +
         "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_\\\\D'`,\n" +
         ");\n" +
         "for (const t of rows) {\n" +
         '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
         "}",
-      errors: [{ messageId: "missingTeardown", data: { table: "ex_1" } }],
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_foo" } }],
+    },
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_-1" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_\\\\W'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_-1" } }],
+    },
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_ 1" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_\\\\s'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_ 1" } }],
     },
     // An `$` past the leading anchor constrains a position this reading models
     // as open-ended, so the filter is refused rather than read as a prefix.
