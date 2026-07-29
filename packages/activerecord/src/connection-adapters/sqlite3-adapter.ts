@@ -1654,11 +1654,13 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   async renameTable(tableName: string, newName: string): Promise<void> {
+    this.schemaStatements().validateTableLengthBang(newName);
     this.schemaCache.clearDataSourceCacheBang(this.pool, tableName);
     this.schemaCache.clearDataSourceCacheBang(this.pool, newName);
     await this.execute(
       `ALTER TABLE ${quoteTableName(tableName)} RENAME TO ${quoteTableName(newName)}`,
     );
+    await this.schemaStatements().renameTableIndexes(tableName, newName);
   }
 
   async addColumn(
