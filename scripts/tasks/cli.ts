@@ -474,21 +474,12 @@ export function bestBundle(items: StoryEntry[], budget: number): StoryEntry[] {
   return chosen.reverse();
 }
 
-// The ready stories a bundle may draw from, in `ready()`'s priority order.
-// Shared with `emptyBundleReason` so the "nothing matched" diagnosis is
-// computed from the same selection the bundle itself packs.
 export function bundleScope(index: Index, opts: { cluster?: string; rfc?: string }): StoryEntry[] {
   return ready(index, { rfc: opts.rfc }).filter((s) =>
     opts.cluster ? s.cluster === opts.cluster : true,
   );
 }
 
-// Why `nextBundle` returned nothing. Only meaningful for an empty result, and
-// an empty result implies no in-scope story carries a priority: the prioritized
-// branch always returns `[lead, ...fill]`. That leaves two distinguishable
-// causes — the filters selected no ready story at all (usually a typo in
-// `--rfc`/`--cluster`), or the selection was non-empty but nothing fit the
-// budget (every candidate missing an `est_loc`, or all of them over it).
 export type EmptyBundleReason = "no-matching-stories" | "none-within-budget";
 
 export function emptyBundleReason(
@@ -561,9 +552,6 @@ export function summarizeBundle(
   return { total, leadExceedsBudget: total > maxLoc };
 }
 
-// The line `next-bundle` prints instead of a bundle banner when it has no
-// rows. Naming the active filters matters most for `no-matching-stories`,
-// where the usual cause is a filter value that matches nothing.
 export function formatEmptyBundle(
   reason: EmptyBundleReason,
   maxLoc: number,
@@ -3169,6 +3157,7 @@ function main(): void {
               bundle_total_loc: total,
               max_loc: maxLoc,
               lead_exceeds_budget: leadExceedsBudget,
+              empty_reason: rows.length === 0 ? emptyBundleReason(idx, filters) : null,
             },
             null,
             2,
