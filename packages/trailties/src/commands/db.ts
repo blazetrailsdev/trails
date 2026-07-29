@@ -15,7 +15,12 @@ import {
   type DatabaseConfig as RawConfig,
 } from "../database.js";
 import { discoverMigrations } from "../migration-loader.js";
-import { DatabaseTasks, HashConfig, Migrator } from "@blazetrails/activerecord";
+import {
+  DatabaseTasks,
+  HashConfig,
+  Migrator,
+  eachCurrentEnvironment,
+} from "@blazetrails/activerecord";
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
 
 async function closeAdapter(adapter: DatabaseAdapter): Promise<void> {
@@ -127,8 +132,10 @@ interface DatabaseEntry {
  * databaseTasks() — replicas and configs with `databaseTasks: false` are
  * skipped, matching Rails' `configsFor(includeHidden: false)`.
  */
-async function taskableDatabaseEntries(opts: DatabaseOpts): Promise<DatabaseEntry[]> {
-  const envName = resolveEnv();
+async function taskableDatabaseEntries(
+  opts: DatabaseOpts,
+  envName: string = resolveEnv(),
+): Promise<DatabaseEntry[]> {
   const dbName = validateDatabaseFlag(opts);
   const allConfigs = await loadAllDatabaseConfigs(envName);
   const all = allConfigs.map(({ name, config: rawConfig }) => {
@@ -835,27 +842,43 @@ export function dbCommand(): Command {
     )
     .action(async () => {
       const envName = resolveEnv();
-      const entries = await taskableDatabaseEntries({});
-
+      // prepare_all walks each_current_environment, which appends "test" to a
+      // development run (`database_tasks.rb:592-595`), so the test databases
+      // must be registered too or prepareAll finds no configs for them.
+      const entriesByEnv = await Promise.all(
+        eachCurrentEnvironment(envName).map((environment) =>
+          taskableDatabaseEntries({}, environment),
+        ),
+      );
+      const entries = entriesByEnv[0];
       if (entries.length === 0) {
         throw new Error(`No database configuration found for environment "${envName}".`);
       }
+      const allEntries = entriesByEnv.flat();
       const primaryIndex = Math.max(
         entries.findIndex((entry) => entry.hashConfig.isPrimary()),
         0,
       );
 
+      // One migration set per config name, preferring the current env's copy
+      // (allEntries leads with it) since the registry is keyed by name alone.
+      const byName = new Map<string, DatabaseEntry>();
+      for (const entry of allEntries) {
+        if (!byName.has(entry.name)) byName.set(entry.name, entry);
+      }
+      const names = [...byName.keys()];
       const migrationSets = await Promise.all(
-        entries.map(async (entry) =>
+        [...byName.values()].map(async (entry) =>
           discoverMigrationsFromDirs(await migrationsDirsForConfig(entry.name, entry.raw)),
         ),
       );
       // Register the primary's set unnamed first: that clears any per-name
       // registrations left by an earlier command and leaves a sensible
       // fallback for a config with no directory of its own.
-      DatabaseTasks.registerMigrations(migrationSets[primaryIndex] ?? []);
-      entries.forEach((entry, i) => {
-        DatabaseTasks.registerMigrations(migrationSets[i] ?? [], entry.name);
+      const primaryName = entries[primaryIndex].name;
+      DatabaseTasks.registerMigrations(migrationSets[names.indexOf(primaryName)] ?? []);
+      names.forEach((name, i) => {
+        DatabaseTasks.registerMigrations(migrationSets[i] ?? [], name);
       });
 
       // Rails' load_seed runs against the established connection, which is
@@ -873,7 +896,7 @@ export function dbCommand(): Command {
       try {
         DatabaseTasks.schemaFormat = await resolveSchemaFormat();
         await withRegisteredConfigurations(
-          entries.map((entry) => entry.hashConfig),
+          allEntries.map((entry) => entry.hashConfig),
           envName,
           () => DatabaseTasks.prepareAll(),
         );

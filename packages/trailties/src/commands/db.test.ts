@@ -1545,6 +1545,10 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, "ran");`,
   it("db:prepare works on all databases", async () => {
     const primaryDb = path.join(tmpDir, "prepare-primary.sqlite3");
     const animalsDb = path.join(tmpDir, "prepare-animals.sqlite3");
+    // Distinct files per environment: a development prepare also prepares
+    // the test databases (Rails' each_current_environment).
+    const testPrimaryDb = path.join(tmpDir, "prepare-primary-test.sqlite3");
+    const testAnimalsDb = path.join(tmpDir, "prepare-animals-test.sqlite3");
     fs.writeFileSync(
       path.join(tmpDir, "config", "database.ts"),
       `export default {
@@ -1553,8 +1557,8 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, "ran");`,
     animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
   },
   test: {
-    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
-    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(testPrimaryDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(testAnimalsDb)} },
   },
 };`,
     );
@@ -1582,6 +1586,8 @@ export class CreateDogs extends Migration {
 
     expect(fs.existsSync(primaryDb)).toBe(true);
     expect(fs.existsSync(animalsDb)).toBe(true);
+    expect(fs.existsSync(testPrimaryDb)).toBe(true);
+    expect(fs.existsSync(testAnimalsDb)).toBe(true);
 
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
@@ -1607,6 +1613,26 @@ export class CreateDogs extends Migration {
     } finally {
       await animals.close();
     }
+    const testPrimary = new BetterSQLite3Adapter(testPrimaryDb);
+    try {
+      expect(
+        await testPrimary.execute(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='users'",
+        ),
+      ).toHaveLength(1);
+    } finally {
+      await testPrimary.close();
+    }
+    const testAnimals = new BetterSQLite3Adapter(testAnimalsDb);
+    try {
+      expect(
+        await testAnimals.execute(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='dogs'",
+        ),
+      ).toHaveLength(1);
+    } finally {
+      await testAnimals.close();
+    }
   });
 
   it("db:prepare runs seeds once", async () => {
@@ -1620,8 +1646,8 @@ export class CreateDogs extends Migration {
     animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
   },
   test: {
-    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
-    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb + ".test")} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb + ".test")} },
   },
 };`,
     );
