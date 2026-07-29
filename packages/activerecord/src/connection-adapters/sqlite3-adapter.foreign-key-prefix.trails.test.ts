@@ -32,4 +32,12 @@ describe("SQLite3Adapter addForeignKey under a table name prefix/suffix", () => 
     expect(foreignKeys.length).toBe(1);
     expect(foreignKeys[0].toTable).toBe("p_rockets_s");
   });
+
+  it("reflects the singly prefixed table for a schema qualified toTable", async () => {
+    await adapter.addForeignKey("p_astronauts_s", "main.p_rockets_s", { column: "rocket_id" });
+
+    const foreignKeys = await adapter.foreignKeys("p_astronauts_s");
+    expect(foreignKeys.length).toBe(1);
+    expect(foreignKeys[0].toTable).toBe("p_rockets_s");
+  });
 });

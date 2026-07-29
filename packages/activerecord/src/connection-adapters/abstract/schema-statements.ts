@@ -2431,12 +2431,8 @@ export class SchemaStatements {
     const prefix: string = adapter.tableNamePrefix ?? globalTableNamePrefix();
     const suffix: string = adapter.tableNameSuffix ?? globalTableNameSuffix();
     const str = String(tableName);
-    if (prefix || suffix) {
-      const re = new RegExp(`^${prefix}(.+)${suffix}$`);
-      const m = str.match(re);
-      if (m) return m[1];
-    }
-    return str;
+    const m = str.match(new RegExp(`${prefix}(.+)${suffix}`));
+    return m ? m[1] : str;
   }
 
   /** @internal */

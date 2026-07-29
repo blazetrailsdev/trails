@@ -8,6 +8,7 @@
  * (via alterTable rebuild). The functions below delegate to the adapter.
  */
 
+import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { CheckConstraintDefinition } from "../abstract/schema-definitions.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
@@ -318,8 +319,8 @@ export function assertValidDeferrable(deferrable: unknown): void {
     deferrable === "deferred"
   )
     return;
-  throw new Error(
-    `deferrable must be "immediate" or "deferred", got: ${JSON.stringify(deferrable)}`,
+  throw new ArgumentError(
+    `deferrable must be \`"immediate"\` or \`"deferred"\`, got: \`${JSON.stringify(deferrable)}\``,
   );
 }
 
