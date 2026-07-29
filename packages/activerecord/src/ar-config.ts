@@ -6,6 +6,7 @@
  */
 import { ArgumentError } from "@blazetrails/activemodel";
 import { DefaultStrategy } from "./migration/default-strategy.js";
+import type { QueryTransformer } from "./query-transformers.js";
 
 /** Any constructable class — used for module-config flags that hold a class. */
 type AnyClass = abstract new (...args: never[]) => object;
@@ -64,6 +65,7 @@ let _permanentConnectionCheckout: true | "deprecated" | "disallowed" = true;
 let _asyncQueryExecutor: "global_thread_pool" | "multi_thread_pool" | null = null;
 let _queues: Record<string, unknown> = {};
 let _maintainTestSchema: boolean | null = null;
+let _queryTransformers: QueryTransformer[] = [];
 
 /**
  * The `ActiveRecord` module itself, as far as its singleton configuration
@@ -251,6 +253,15 @@ export const ActiveRecord = {
 
   set maintainTestSchema(value: boolean | null) {
     _maintainTestSchema = value;
+  },
+
+  /** Mirrors `ActiveRecord.query_transformers` (active_record.rb:431-432, default `[]`). */
+  get queryTransformers(): QueryTransformer[] {
+    return _queryTransformers;
+  },
+
+  set queryTransformers(value: QueryTransformer[]) {
+    _queryTransformers = value;
   },
 };
 

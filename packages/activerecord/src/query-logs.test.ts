@@ -5,7 +5,8 @@ import { Base } from "./base.js";
 import { QueryLogs, escapeComment, GetKeyHandler } from "./query-logs.js";
 import { LegacyFormatter, SQLCommenter } from "./query-logs-formatter.js";
 import { queryLogs } from "./query-logs-instance.js";
-import { queryTransformers, type QueryTransformer } from "./query-transformers.js";
+import { ActiveRecord } from "./ar-config.js";
+import type { QueryTransformer } from "./query-transformers.js";
 import { assertQueriesMatch } from "./testing/query-assertions.js";
 import { fixtures } from "./test-fixtures.js";
 import { Dashboard } from "./test-helpers/models/dashboard.js";
@@ -20,7 +21,8 @@ function leaseConnection(): RawAdapter {
 // Mirrors: activerecord/test/cases/query_logs_test.rb
 //
 // These tests drive real queries through the full pipeline — the
-// `queryTransformers` loop wired into `preprocessQuery` (QL PR 3) appends the
+// `ActiveRecord.queryTransformers` loop wired into `preprocessQuery` (QL PR 3) appends
+// the
 // QueryLogs comment, and the `sql.active_record` notification carries the
 // post-transform SQL — and assert the tagged SQL via `assertQueriesMatch`
 // (Rails' `assert_queries_match` / `SQLCounter`), exactly as the Rails
@@ -41,9 +43,9 @@ describe("QueryLogsTest", () => {
   // sharing the process-global registry / singleton.
   beforeEach(() => {
     ExecutionContext.clear();
-    originalTransformers = [...queryTransformers];
-    queryTransformers.length = 0;
-    queryTransformers.push(queryLogs);
+    originalTransformers = [...ActiveRecord.queryTransformers];
+    ActiveRecord.queryTransformers.length = 0;
+    ActiveRecord.queryTransformers.push(queryLogs);
     queryLogs.prependComment = false;
     queryLogs.cacheQueryLogTags = false;
     queryLogs.clearCache();
@@ -54,8 +56,8 @@ describe("QueryLogsTest", () => {
   });
 
   afterEach(() => {
-    queryTransformers.length = 0;
-    queryTransformers.push(...originalTransformers);
+    ActiveRecord.queryTransformers.length = 0;
+    ActiveRecord.queryTransformers.push(...originalTransformers);
     queryLogs.prependComment = false;
     queryLogs.cacheQueryLogTags = false;
     queryLogs.tags = [];

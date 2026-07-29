@@ -4,7 +4,8 @@ import { Base } from "../base.js";
 import { fixtures } from "../test-fixtures.js";
 import { describeIfSqlite } from "../support/describe-if-sqlite.js";
 import type { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
-import { queryTransformers, type QueryTransformer } from "../query-transformers.js";
+import { ActiveRecord } from "../ar-config.js";
+import type { QueryTransformer } from "../query-transformers.js";
 
 fixtures([]);
 
@@ -19,13 +20,13 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
 
   beforeEach(() => {
     adapter = Base.connection as AbstractSQLite3Adapter;
-    savedTransformers = queryTransformers.slice();
-    queryTransformers.length = 0;
+    savedTransformers = ActiveRecord.queryTransformers.slice();
+    ActiveRecord.queryTransformers.length = 0;
   });
 
   afterEach(() => {
-    queryTransformers.length = 0;
-    queryTransformers.push(...savedTransformers);
+    ActiveRecord.queryTransformers.length = 0;
+    ActiveRecord.queryTransformers.push(...savedTransformers);
   });
 
   function captureSql<T>(fn: () => Promise<T>): Promise<{ result: T; sqls: string[] }> {
@@ -39,7 +40,7 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
   }
 
   it("appends the comment to read queries and instruments the commented SQL", async () => {
-    queryTransformers.push({ call: (sql) => `${sql} /*app:test*/` });
+    ActiveRecord.queryTransformers.push({ call: (sql) => `${sql} /*app:test*/` });
     const { result, sqls } = await captureSql(() => adapter.execute("SELECT 1 AS one"));
     // The query still executes correctly with the comment appended.
     expect(result).toEqual([{ one: 1 }]);
@@ -48,7 +49,7 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
   });
 
   it("applies the comment on write queries too", async () => {
-    queryTransformers.push({ call: (sql) => `${sql} /*app:test*/` });
+    ActiveRecord.queryTransformers.push({ call: (sql) => `${sql} /*app:test*/` });
     const { sqls } = await captureSql(() =>
       adapter.executeMutation("INSERT INTO customers (name) VALUES ('x')"),
     );
@@ -64,7 +65,7 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
   });
 
   it("leaves executeBatch statements uncommented (matches Rails execute_batch)", async () => {
-    queryTransformers.push({ call: (sql) => `${sql} /*app:test*/` });
+    ActiveRecord.queryTransformers.push({ call: (sql) => `${sql} /*app:test*/` });
     const { sqls } = await captureSql(() =>
       adapter.executeBatch([
         "INSERT INTO customers (name) VALUES ('a')",
@@ -79,7 +80,7 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
     // The batch-suppression flag is consumed synchronously inside preprocessQuery
     // (before any await), so a query interleaved with an in-flight batch still
     // gets transformed. If the flag spanned the await, this comment would be lost.
-    queryTransformers.push({ call: (sql) => `${sql} /*app:test*/` });
+    ActiveRecord.queryTransformers.push({ call: (sql) => `${sql} /*app:test*/` });
     const { sqls } = await captureSql(() =>
       Promise.all([
         adapter.executeBatch([
@@ -96,7 +97,7 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
 
   it("applies each transformer exactly once per query", async () => {
     let calls = 0;
-    queryTransformers.push({
+    ActiveRecord.queryTransformers.push({
       call: (sql) => {
         calls++;
         return `${sql} /*c1*/`;
