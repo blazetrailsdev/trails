@@ -314,26 +314,10 @@ tester.run("require-table-teardown", rule, {
       "for (const t of rows) {\n" +
       '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
       "}",
-    // A shorthand alongside ordinary bracket members, and under negation.
+    // A shorthand alongside ordinary bracket members.
     'await adapter.exec(`CREATE TABLE "ex_-1" (id int)`);\n' +
       "const rows = await adapter.execute(\n" +
       "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[-\\\\S]+'`,\n" +
-      ");\n" +
-      "for (const t of rows) {\n" +
-      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
-      "}",
-    'await adapter.exec(`CREATE TABLE "ex_ab" (id int)`);\n' +
-      "const rows = await adapter.execute(\n" +
-      "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[^\\\\d]+'`,\n" +
-      ");\n" +
-      "for (const t of rows) {\n" +
-      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
-      "}",
-    // A `-` in first position is a literal in both grammars, even under
-    // negation, so the shorthand after it is not a range endpoint.
-    'await adapter.exec(`CREATE TABLE "ex_ab" (id int)`);\n' +
-      "const rows = await adapter.execute(\n" +
-      "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[^-\\\\d]+'`,\n" +
       ");\n" +
       "for (const t of rows) {\n" +
       '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
@@ -983,7 +967,33 @@ tester.run("require-table-teardown", rule, {
       errors: [{ messageId: "missingTeardown", data: { table: "ex_c" } }],
     },
     // Under a negating `^` the ASCII spelling is the *wider* of the two, so a
-    // POSIX class refuses there even when it translates unnegated.
+    // POSIX class refuses there even when it translates unnegated — and so does
+    // a bracketed `ARE_SHORTHANDS` member, which IS one of those classes: JS
+    // `[^\d]` matches a non-ASCII digit that ARE's complement excludes.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_ab" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[^\\\\d]+'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_ab" } }],
+    },
+    // A `-` in first position is a literal in both grammars, so the shorthand
+    // after it is not a range endpoint — the negation is what refuses here.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_ab" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[^-\\\\d]+'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_ab" } }],
+    },
     {
       code:
         'await adapter.exec(`CREATE TABLE "ex_1" (id int)`);\n' +

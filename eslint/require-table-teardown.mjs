@@ -148,8 +148,8 @@
  * is known to be ARE and a bracketed `ARE_SHORTHANDS` member (`[\d]`) means what
  * the same shorthand means in a JS character class; a bracketed POSIX character
  * class translates through the subset spellings in `POSIX_CLASS_SOURCES`
- * (`[[:digit:]]`), except under a negating `^`, where the complement of a subset
- * would be wider; anything else bracketed
+ * (`[[:digit:]]`). Both refuse under a negating `^`, where the complement of a
+ * subset would be wider (`[^\d]`, `[^[:digit:]]`); anything else bracketed
  * (`[\W]`, `[\b]`, `[\1]`, `[\\]`, a shorthand as a range endpoint) and every
  * backslash inside a `SIMILAR TO` bracket expression — whose interaction with
  * that grammar's `ESCAPE` character is unsettled — still refuses. Everything
@@ -476,8 +476,9 @@ const BOUND_RE = /^\{\d+(?:,\d*)?\}/;
  * spellings are subsets of what a non-C locale selects; a collating element or
  * equivalence class (`[[.x.]]`, `[[=a=]]`) has no JS spelling at all and
  * refuses. Because those spellings are subsets, a *negated* bracket expression
- * refuses them: the complement of a subset is a superset, which would credit a
- * name the filter does not select. And a backslash
+ * refuses them — and refuses a bracketed `ARE_SHORTHANDS` member with them, since
+ * that shorthand IS one of those classes: the complement of a subset is a
+ * superset, which would credit a name the filter does not select. And a backslash
  * means different things in the two grammars. Bare POSIX brackets read it as an
  * ordinary literal, but PostgreSQL's engine is ARE, which reads it as an escape
  * inside brackets too (`[\d]` is the digits, not a backslash and a `d`), so
@@ -488,7 +489,8 @@ const BOUND_RE = /^\{\d+(?:,\d*)?\}/;
  * that knows the engine decides which reading applies. The `~` / `~*` path
  * passes the backslash ARE spells its escapes with, where a bracketed
  * `ARE_SHORTHANDS` member means exactly what the same shorthand means in a JS
- * character class, so `[\d]` translates. Every other escape inside brackets
+ * character class, so `[\d]` translates — under a negating `^` it does not, for
+ * the subset/complement reason above. Every other escape inside brackets
  * refuses — the complements (`[\W]`), `\b` (backspace here, not a word
  * boundary), a back reference (`[\1]`), and a bare `[\\]`, whose ARE meaning is
  * a literal backslash but whose bare-POSIX one is two of them. A shorthand used
@@ -527,10 +529,11 @@ function bracketSource(pattern, start, escapeChar) {
   if (BRACKET_STRUCTURAL.has(escapeChar)) return null;
   let source = "[";
   let i = start + 1;
-  // A `POSIX_CLASS_SOURCES` spelling is safe in a plain class and unsafe in a
+  // A `POSIX_CLASS_SOURCES` spelling — and equally an `ARE_SHORTHANDS` member,
+  // which IS one of those classes — is safe in a plain class and unsafe in a
   // negated one: it is an ASCII subset of what a non-C locale selects, and the
   // complement of a subset is a *superset*, which would credit a name the filter
-  // does not select. So a POSIX class refuses under `^`.
+  // does not select. So both refuse under `^`.
   let negated = false;
   if (pattern[i] === "^") {
     source += "^";
@@ -570,7 +573,8 @@ function bracketSource(pattern, start, escapeChar) {
     }
     if (ch === escapeChar) {
       const next = pattern[i + 1];
-      if (next === undefined || !ARE_SHORTHANDS.has(next)) return null;
+      // Subset under `^` becomes superset (see the `negated` comment above).
+      if (next === undefined || !ARE_SHORTHANDS.has(next) || negated) return null;
       if (source.endsWith("-") && source.length - 1 > bodyStart) return null;
       if (pattern[i + 2] === "-" && (pattern[i + 3] ?? "]") !== "]") return null;
       source += `\\${next}`;
@@ -648,7 +652,8 @@ const POSIX_CLASS_SOURCES = new Map([
  * Alternation, grouping and the quantifiers `* + ?` are spelled identically in
  * both, as are `{n,m}` bounds and `.`; bracket expressions go through
  * `bracketSource` in its ARE reading, so a bracketed `ARE_SHORTHANDS` member
- * (`[\d]`) translates like the bare one. A backslash escape of a word character
+ * (`[\d]`) translates like the bare one — except under a negating `^`, which
+ * refuses, since the complement of a subset is a superset. A backslash escape of a word character
  * is translated only
  * for the ARE class shorthands whose JS meaning is identical (`ARE_SHORTHANDS`);
  * every other one is refused, since a back reference (`\1`) means something
