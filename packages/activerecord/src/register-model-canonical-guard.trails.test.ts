@@ -90,6 +90,18 @@ describe("registerModel canonical-name shadow guard", () => {
     expect(safeConstantize("RfDroppedXyz")).toBeUndefined();
   });
 
+  it("leaves no per-class map holding a model the registry has dropped", () => {
+    class RfNoSideMapXyz extends Base {}
+    registerModel(RfNoSideMapXyz);
+    modelRegistry.delete("RfNoSideMapXyz");
+
+    const holders = Object.getOwnPropertyNames(Base).filter((key) => {
+      const value = Object.getOwnPropertyDescriptor(Base, key)?.value;
+      return value instanceof Map && [...value.values()].includes(RfNoSideMapXyz);
+    });
+    expect(holders).toEqual([]);
+  });
+
   it("leaves no model constants behind when the registry is cleared", () => {
     const saved = [...modelRegistry.entries()];
     try {

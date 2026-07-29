@@ -995,7 +995,6 @@ export class Base extends Model {
    * AR model without requiring explicit registerModel() calls.
    * @internal
    */
-  static _modelsByName: Map<string, typeof Base> = new Map();
   static _connectionHandler: ConnectionHandler = new ConnectionHandler();
   static _configPath: string | null = null;
   static _abstractClass = false;
@@ -1358,7 +1357,6 @@ export class Base extends Model {
     // adapter with the schema reset below never run.
     if (this !== Base && this.name) {
       registerModelConstant(this.name, this);
-      Base._modelsByName.set(this.name, this);
     }
     this._adapter = adapter;
 

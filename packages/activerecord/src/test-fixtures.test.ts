@@ -893,11 +893,10 @@ describe("useFixtures encryption add-on is opt-in", () => {
     const originalModel = entry.model;
     const order: string[] = [];
     // A minimal class (not a bare object): `resolveFixtureNames` now folds in
-    // `registerModel`, which writes the model's static `_modelsByName` map, so
-    // the stub must carry that shape. `tableName` keeps the resolver happy.
+    // `registerModel`, so the stub must look like an AR model class.
+    // `tableName` keeps the resolver happy.
     class StubModel {
       static tableName = "encrypted_books";
-      static _modelsByName = new Map<string, unknown>();
     }
     const stubModel = StubModel as unknown as typeof Base;
     entry.addOn = vi.fn(async () => {

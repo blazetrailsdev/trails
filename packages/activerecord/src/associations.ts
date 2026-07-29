@@ -286,7 +286,7 @@ export const modelRegistry = new ModelRegistry();
 /**
  * Find the framework `Base` class in `model`'s prototype chain without
  * importing the `Base` value (which would create a module-init cycle). `Base`
- * is the single class that *owns* the static `_modelsByName` map; subclasses
+ * is the single class that *owns* the `_isActiveRecordBase` sentinel; subclasses
  * inherit it. Falls back to `null` for the (impossible-in-practice) case of a
  * class that never reaches `Base`.
  * @internal
@@ -294,7 +294,7 @@ export const modelRegistry = new ModelRegistry();
 function frameworkBase(model: typeof Base): typeof Base | null {
   let c: unknown = model;
   while (typeof c === "function" && c !== Function.prototype) {
-    if (Object.prototype.hasOwnProperty.call(c, "_modelsByName")) return c as typeof Base;
+    if (Object.prototype.hasOwnProperty.call(c, "_isActiveRecordBase")) return c as typeof Base;
     c = Object.getPrototypeOf(c);
   }
   return null;
@@ -330,8 +330,7 @@ function guardCanonicalNameShadow(name: string, model: typeof Base): void {
  *
  * Deliberately narrow: it does NOT write `modelRegistry` (the constant table is
  * the wider, fallback-only namespace — `registerSubclass` and `Base.adapter=`
- * must not promote a throwaway subclass into association resolution) and it does
- * NOT write `_modelsByName`, which its own callers still own.
+ * must not promote a throwaway subclass into association resolution).
  * @internal
  */
 export function registerModelConstant(name: string, model: typeof Base): void {
@@ -376,7 +375,7 @@ export function registerModel(
       // STI subclass: its direct prototype is another AR model, not the
       // framework `Base` (a base model's prototype is `Base` directly). We
       // locate `Base` by walking the chain for the class that *owns*
-      // `_modelsByName` — `Base` declares it; every subclass inherits it —
+      // `_isActiveRecordBase` — `Base` declares it; every subclass inherits it —
       // rather than importing the `Base` value (that would create an
       // associations.ts ⇄ base.ts module-init cycle).
       const proto = Object.getPrototypeOf(m) as typeof Base;
@@ -389,7 +388,6 @@ export function registerModel(
   if (typeof nameOrModel === "string") {
     if (!model) throw new Error("registerModel(name, model) requires a model class");
     modelRegistry.set(nameOrModel, model);
-    model._modelsByName.set(nameOrModel, model);
     // Attach registry key so counter-cache pending-map lookup can match it.
     const keys: string[] = model._registryKeys ?? [];
     if (!keys.includes(nameOrModel)) keys.push(nameOrModel);
@@ -397,7 +395,6 @@ export function registerModel(
     flushPendingCounterCacheColumns(model);
   } else {
     modelRegistry.set(nameOrModel.name, nameOrModel);
-    nameOrModel._modelsByName.set(nameOrModel.name, nameOrModel);
     // A namespaced model carries its Ruby module path via `static moduleName`;
     // derive the `::`-qualified registry key from it (e.g.
     // "MyApplication::Billing::Firm") so cross-namespace `className` resolution
