@@ -171,15 +171,9 @@ describe("dropAllTables", () => {
     dropAdapter = await ARUnit2Model.leaseConnection();
   });
 
-  // Rails wipes a database in a process of its own and lets the damage die with
-  // it; trails shares arunit2 with every other file the worker runs, so each
-  // wipe is followed by the same re-provisioning `teardownSecondPool` does for
-  // the primary database.
   afterEach(provisionSecondDatabase);
 
   it("drops all tables", async () => {
-    // arunit2 arrives carrying `schema.rb:1444-1462`'s tables, so the drop has
-    // real subjects without any bespoke DDL.
     expect(await tableCount(dropAdapter)).toBeGreaterThan(0);
     await dropAllTables(dropAdapter);
     expect(await tableCount(dropAdapter)).toBe(0);
