@@ -115,8 +115,8 @@
  * or returned from a helper, since only literals and template quasis are read;
  * a catalogue relation `CATALOGUE_SOURCE` does not list; a sweep whose drop runs
  * through the `dropTable()` helper on a row value rather than raw SQL; and a
- * filter using LIKE syntax beyond `%`/`_`/backslash escapes, such as a
- * `SIMILAR TO` or regex operator.
+ * filter spelled as something other than `LIKE` — `ILIKE`, `SIMILAR TO`, a
+ * regex operator — since only `LIKE` is read.
  *
  * This is deliberately independent of `require-canonical-rebuild`: the two
  * rules answer different questions. A sweep that can select a canonical table
@@ -341,8 +341,17 @@ const CATALOGUE_SOURCE =
  * character (Rails escapes it alongside `%` in `sanitize_sql_like`,
  * activerecord/lib/active_record/sanitization.rb), so `LIKE 'ex_%'` selects
  * `exAfoo` as surely as `ex_foo`, and reading it as the literal prefix `ex_`
- * would leave those creates reported although the sweep does drop them. A
- * backslash escapes the next character, making `\_` and `\%` literal.
+ * would leave those creates reported although the sweep does drop them.
+ *
+ * An escape character makes the next character literal, and which character
+ * escapes is part of the filter: Arel carries it on the LIKE node and emits the
+ * `ESCAPE` clause (arel/visitors/postgresql.rb), so `LIKE 'ex!_%' ESCAPE '!'`
+ * selects literal-underscore names and must NOT be read with the backslash
+ * default, which would compile `^ex!.` and credit `ex!A` — a leak. A statically
+ * readable clause is honoured; one that is dynamic, empty, or not a single
+ * character makes the whole filter unreadable, so it credits nothing. Absent a
+ * clause the escape is backslash, PostgreSQL's default and the one
+ * `sanitize_sql_like` emits.
  *
  * `NOT LIKE` is excluded, and it is not a nicety: an exclusion filter selects
  * the complement of its pattern, so reading `NOT LIKE 'ex_%'` as a prefix would
@@ -351,31 +360,38 @@ const CATALOGUE_SOURCE =
  * selecting everything never becomes a prefix that satisfies everything.
  */
 const LIKE_PREFIX_RE = /(?<!\bnot\s+)\blike\s+'([^'%]+)%'/gi;
+/** A trailing `ESCAPE '<char>'` clause, and the leading keyword on its own. */
+const ESCAPE_CLAUSE_RE = /^\s*escape\s+'([^'])'/i;
+const ESCAPE_KEYWORD_RE = /^\s*escape\b/i;
 export function sweepPrefixMatchers(text) {
   if (!CATALOGUE_SOURCE.test(text)) return [];
   const matchers = [];
   LIKE_PREFIX_RE.lastIndex = 0;
   let m;
   while ((m = LIKE_PREFIX_RE.exec(text)) !== null) {
-    const matcher = likePrefixMatcher(m[1]);
+    const tail = text.slice(m.index + m[0].length);
+    const clause = ESCAPE_CLAUSE_RE.exec(tail);
+    if (clause === null && ESCAPE_KEYWORD_RE.test(tail)) continue;
+    const matcher = likePrefixMatcher(m[1], clause === null ? "\\" : clause[1]);
     if (matcher !== null) matchers.push(matcher);
   }
   return matchers;
 }
 
 /**
- * An anchored RegExp matching the names `<pattern>%` selects, or null when the
- * trailing `%` is itself escaped — `LIKE 'ex\%'` matches the single literal
- * name `ex%`, not a prefix, so it sweeps nothing this rule should credit.
+ * An anchored RegExp matching the names `<pattern>%` selects under
+ * `escapeChar`, or null when the trailing `%` is itself escaped — `LIKE 'ex\%'`
+ * matches the single literal name `ex%`, not a prefix, so it sweeps nothing
+ * this rule should credit.
  */
-function likePrefixMatcher(pattern) {
+function likePrefixMatcher(pattern, escapeChar) {
   let source = "";
   let escaped = false;
   for (const ch of pattern) {
     if (escaped) {
       source += ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       escaped = false;
-    } else if (ch === "\\") {
+    } else if (ch === escapeChar) {
       escaped = true;
     } else if (ch === "_") {
       source += ".";
