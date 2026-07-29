@@ -344,6 +344,29 @@ tester.run("require-table-teardown", rule, {
       "for (const t of rows) {\n" +
       '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
       "}",
+    // ── The over-accepting edge of the cross-statement assembly gap.
+    // When ONE fragment carries both the catalogue relation and a closed
+    // pattern, that fragment is credited on its own. Usually sound — its text
+    // sits verbatim in the executed SQL, so the sweep really does select `ex_%`.
+    'await adapter.exec("CREATE TABLE ex_int (id int)");\n' +
+      'let sql = "SELECT tablename ";\n' +
+      "sql += \"FROM pg_tables WHERE tablename LIKE 'ex_%'\";\n" +
+      "const rows = await adapter.execute(sql);\n" +
+      'for (const t of rows) await adapter.exec(`DROP TABLE "${t.tablename}"`);',
+    // KNOWN HAZARD, not desired behaviour — pinned so that closing the gap has
+    // to fix it deliberately. The first fragment ends in a `--` comment, so the
+    // executed query selects only `zz_%` and `ex_int` is NOT swept; the credited
+    // fragment is dead text. The rule credits `ex_` anyway and suppresses the
+    // report, which is the one direction of this gap that leaks a table rather
+    // than merely adding noise. It needs a neighbouring fragment to change the
+    // credited one's meaning (a comment, a negation, a splice) — which is why
+    // the population measurement, not this edge, is what justifies leaving the
+    // gap open.
+    'await adapter.exec("CREATE TABLE ex_int (id int)");\n' +
+      "let sql = \"SELECT tablename FROM pg_tables WHERE tablename LIKE 'zz_%' -- \";\n" +
+      "sql += \"FROM pg_tables WHERE tablename LIKE 'ex_%'\";\n" +
+      "const rows = await adapter.execute(sql);\n" +
+      'for (const t of rows) await adapter.exec(`DROP TABLE "${t.tablename}"`);',
     // The DROP half hoisted to a variable is the same sweep as the inline
     // spelling: the resolved template is read one quasi at a time, so the
     // interpolated name still reads as dynamic.
@@ -432,6 +455,67 @@ tester.run("require-table-teardown", rule, {
       "}",
   ],
   invalid: [
+    // ── The cross-statement assembly gap (eslint/piecewise-sql-population.test.mjs)
+    // Four spellings of a filter assembled across statements. The resolver reads
+    // each fragment on its own, so the fragment holding the LIKE pattern carries
+    // no catalogue relation and arms nothing — the sweep goes unrecognised and
+    // the create it does tear down is reported. That is the under-accepting
+    // direction: noise, not a leak. These cases pin it, so closing the gap has to
+    // flip them deliberately rather than by accident.
+    {
+      // `sql += …` — the spelling the gap is named for.
+      code:
+        'await adapter.exec("CREATE TABLE ex_leak (id int)");\n' +
+        'let sql = "SELECT tablename FROM pg_tables";\n' +
+        "sql += \" WHERE tablename LIKE 'ex_%'\";\n" +
+        "const rows = await adapter.execute(sql);\n" +
+        'for (const t of rows) await adapter.exec(`DROP TABLE "${t.tablename}"`);',
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_leak" } }],
+    },
+    {
+      // `sql = sql + …` — the self-read is already in `seen`, so it resolves to
+      // no strings and reads as a quasi boundary, exactly as `+=` does.
+      code:
+        'await adapter.exec("CREATE TABLE ex_leak (id int)");\n' +
+        'let sql = "SELECT tablename FROM pg_tables";\n' +
+        "sql = sql + \" WHERE tablename LIKE 'ex_%'\";\n" +
+        "const rows = await adapter.execute(sql);\n" +
+        'for (const t of rows) await adapter.exec(`DROP TABLE "${t.tablename}"`);',
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_leak" } }],
+    },
+    {
+      // The same self-read spelled as a template substitution.
+      code:
+        'await adapter.exec("CREATE TABLE ex_leak (id int)");\n' +
+        'let sql = "SELECT tablename FROM pg_tables";\n' +
+        "sql = `${sql} WHERE tablename LIKE 'ex_%'`;\n" +
+        "const rows = await adapter.execute(sql);\n" +
+        'for (const t of rows) await adapter.exec(`DROP TABLE "${t.tablename}"`);',
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_leak" } }],
+    },
+    {
+      // Array accumulation joined at the sink, which the resolver does not model.
+      code:
+        'await adapter.exec("CREATE TABLE ex_leak (id int)");\n' +
+        'const parts = ["SELECT tablename FROM pg_tables"];\n' +
+        "parts.push(\" WHERE tablename LIKE 'ex_%'\");\n" +
+        'const rows = await adapter.execute(parts.join(""));\n' +
+        'for (const t of rows) await adapter.exec(`DROP TABLE "${t.tablename}"`);',
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_leak" } }],
+    },
+    {
+      // A pattern split ACROSS two fragments credits no prefix either way: the
+      // first fragment's `LIKE 'ex` never closes and the second carries no
+      // catalogue relation, so neither half arms. (Acceptance criterion of the
+      // piecewise story: a split pattern must not be credited.)
+      code:
+        'await adapter.exec("CREATE TABLE ex_leak (id int)");\n' +
+        'let sql = "SELECT tablename FROM pg_tables WHERE tablename LIKE \'ex";\n' +
+        'sql += "_%\'";\n' +
+        "const rows = await adapter.execute(sql);\n" +
+        'for (const t of rows) await adapter.exec(`DROP TABLE "${t.tablename}"`);',
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_leak" } }],
+    },
     // Dropping the truncated prefix of a spaced quoted name is not a teardown
     // of the real table — the create is still reported by its full name.
     {

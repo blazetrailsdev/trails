@@ -188,23 +188,34 @@
  * that is not a resolvable local function — an import, a global, a method call —
  * stays a dead end and arms nothing.
  *
- * What the resolver does NOT read is SQL appended piecewise (`sql += " WHERE
- * …"`): a compound assignment's write is only its right-hand side, so each
- * fragment resolves as an independent string and the concatenation the code
- * executes is never formed. That gap is left OPEN deliberately, and it is the
- * one gap here not purely in the under-accepting direction — a fragment that
- * happens to close a `LIKE '…%'` pattern credits a prefix off SQL whose real
- * text may select more, while a pattern split across two appends credits
- * nothing. Closing it would need the writes ordered by source position within
- * the enclosing function, which the scope graph does not give. It stays open
+ * What the resolver does NOT read is SQL assembled ACROSS STATEMENTS. `sql +=
+ * " WHERE …"` is the spelling it is named for, but `sql = sql + " WHERE …"`,
+ * `` sql = `${sql} WHERE …` `` and `parts.push(…)` + `join("")` all resolve the
+ * same way: a write is only its own right-hand side (and a self-read is already
+ * in `seen`, so it resolves to no strings and reads as a quasi boundary), so
+ * each fragment resolves independently and the concatenation the code executes
+ * is never formed. All four are pinned in the rule's tests.
+ *
+ * Both directions are reachable, and which one you get depends on where the
+ * fragments were cut. Normally the catalogue relation and the `LIKE` pattern end
+ * up in DIFFERENT fragments, so neither fragment is a filter, the sweep goes
+ * unrecognised, and the file's creates are reported — under-accepting, noise
+ * rather than a leak, like the rest of this list. But when ONE fragment carries
+ * both, that fragment is credited alone: usually sound, since its text sits
+ * verbatim in the executed SQL, yet WRONG when a neighbouring fragment changes
+ * its meaning — a first fragment ending in `-- ` comments the credited filter
+ * out entirely, and the prefix is still credited, suppressing a real leak. A
+ * pattern split across two fragments credits nothing either way. Closing this
+ * would need the writes ordered by source position within the enclosing
+ * function, which the scope graph does not give. It stays open
  * because the population is zero: `eslint/piecewise-sql-population.test.mjs`
- * parses every AR test file this rule or `require-canonical-rebuild` is enabled
- * on — the scope asked of ESLint's own config resolution, so the `ignores` and
- * the shrinking exclude lists cannot drift out from under it — and finds no SQL
- * string built that way. The shape is common elsewhere — 85
- * appends across 13 files under `packages/<pkg>/src` — but all of it is adapter and
- * association source, which neither rule reads. That test fails the day one
- * appears, so the measurement cannot go stale unnoticed.
+ * parses every test file this rule or `require-canonical-rebuild` is enabled on
+ * — the scope asked of ESLint's own config resolution, so the `ignores` and the
+ * shrinking exclude lists cannot drift out from under it — and finds none of the
+ * four shapes. The `+=` shape is common elsewhere (85 appends across 13 files
+ * under `packages/<pkg>/src`) but all of it is adapter and association source,
+ * which neither rule reads. That test fails the day one appears in scope, so the
+ * measurement cannot go stale unnoticed.
  *
  * This is deliberately independent of `require-canonical-rebuild`: the two
  * rules answer different questions. A sweep that can select a canonical table

@@ -74,18 +74,27 @@ export function createSqlTexts(resolve) {
  * stays a dead end and contributes no strings, the same under-accepting
  * direction the rest of this resolver takes.
  *
- * A **compound assignment** (`sql += " WHERE …"`) is the one build spelling not
- * read as the string it produces: the scope graph gives only the right-hand
- * side as the write, so the fragments resolve as independent strings in no
- * particular order. Stitching them would need the writes sorted by source
- * position within the enclosing function; that is left undone deliberately,
- * because `eslint/piecewise-sql-population.test.mjs` measures the population in
- * the files either teardown rule is enabled on (a scope resolved by ESLint, not
- * restated) at zero and fails if it stops being
- * zero. Note the gap is not purely under-accepting the way this resolver's
- * remaining dead ends are: each fragment is read whole, so a fragment closing a
- * `LIKE '…%'` pattern credits a prefix while the same pattern split across two
- * credits nothing.
+ * What is NOT read as the string it produces is SQL assembled ACROSS
+ * STATEMENTS, in any of four spellings: `sql += …`, `sql = sql + …`,
+ * `` sql = `${sql}…` ``, and `parts.push(…)` joined at the sink. A write is only
+ * its own right-hand side, and a self-read is already in `seen` by the time it is
+ * visited — so it resolves to no strings and reads as a quasi boundary — which
+ * leaves the fragments independent and in no particular order. Stitching them
+ * would need the writes sorted by source position within the enclosing function;
+ * that is left undone deliberately, because
+ * `eslint/piecewise-sql-population.test.mjs` measures the population in the files
+ * either teardown rule is enabled on (a scope resolved by ESLint, not restated)
+ * at zero for all four, and fails if it stops being zero.
+ *
+ * Unlike this resolver's remaining dead ends, the direction is not always
+ * under-accepting. Each fragment is read whole, so a fragment that carries both a
+ * catalogue relation and a closed `LIKE '…%'` credits that prefix by itself —
+ * sound when the fragment's text survives into the executed SQL, wrong when a
+ * neighbour comments it out or negates it. Cut the other way, the relation and
+ * the pattern land in different fragments and nothing is credited at all. A
+ * pattern split across two fragments credits nothing either way. All four
+ * spellings and both directions are pinned in
+ * `eslint/require-table-teardown.test.mjs`.
  */
 export function createSqlTextGroups(resolve) {
   const isFunctionNode = (node) =>

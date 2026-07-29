@@ -7,96 +7,170 @@ import { describe, it, expect } from "vitest";
 
 /**
  * The measurement behind a deliberately-open gap in `eslint/sql-texts.mjs`:
- * SQL appended piecewise (`sql += " WHERE …"`) resolves to one group per
- * fragment rather than to the concatenation the code executes, because a
- * compound assignment's write is only its right-hand side and the scope graph
- * gives the writes no order.
+ * SQL assembled ACROSS STATEMENTS resolves to one group per fragment rather
+ * than to the concatenation the code executes, because a write is only its own
+ * right-hand side and the scope graph gives the writes no order.
+ *
+ * `sql += …` is the spelling the gap is named for, but not the only one — see
+ * `ASSEMBLY_SHAPES`. All of them resolve the same way, so a probe that measured
+ * only `+=` would have sized something narrower than the gap it justifies
+ * leaving open.
  *
  * Stitching the fragments back together is only worth its complexity if the
- * shape occurs in the population the two teardown rules read — the AR test
- * files `eslint.config.mjs` has `require-table-teardown` or
- * `require-canonical-rebuild` enabled on, asked of ESLint below rather than
- * restated. It occurs zero times there — the 85 such
- * appends under `packages/<pkg>/src` all sit in adapter and association *source*,
- * which neither rule lints — so the gap stays documented rather than closed. This test is what
- * keeps that justification honest: the day a test file builds SQL this way,
- * it fails and the decision gets re-made against a non-zero population.
+ * shape occurs in the population the two teardown rules read — the files
+ * `eslint.config.mjs` has `require-table-teardown` or `require-canonical-rebuild`
+ * enabled on, asked of ESLint below rather than restated. It occurs zero times
+ * there, so the gap stays documented rather than closed. This test is what keeps
+ * that justification honest: the day an in-scope file assembles SQL this way, it
+ * fails and the decision gets re-made against a non-zero population.
  */
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
-const lintedDir = path.join(repoRoot, "packages", "activerecord", "src");
 
-/**
- * Every `x += …` onto a plain identifier in `source`, as `{ target, appended,
- * line }` — the appended text being the RHS's WHOLE source range.
- *
- * Parsed rather than matched: a compound assignment's right-hand side is an
- * expression, not a line, and the shapes that matter most here are exactly the
- * ones a line-scoped regex loses — a template holding a formatted query spans
- * several lines, so `` out += `\nSELECT …` `` would read as an append of
- * nothing. Since the whole point of this file is to size a population before
- * declining to handle it, a probe that under-reads the population is worse than
- * no probe.
- *
- * Restricted to Identifier targets because the resolver only reaches variables:
- * `record.name += "-changed"` is a model attribute, not a SQL buffer.
- */
-function piecewiseAppends(source) {
-  const { ast } = parser.parseForESLint(source, {
-    range: true,
-    loc: true,
-    jsx: false,
-  });
-  const out = [];
-  const visit = (node) => {
-    if (node === null || typeof node !== "object") return;
-    if (Array.isArray(node)) {
-      for (const child of node) visit(child);
-      return;
-    }
-    if (typeof node.type !== "string") return;
-    if (
-      node.type === "AssignmentExpression" &&
-      node.operator === "+=" &&
-      node.left.type === "Identifier"
-    ) {
-      out.push({
-        target: node.left.name,
-        appended: source.slice(node.right.range[0], node.right.range[1]),
-        line: node.loc.start.line,
-      });
-    }
-    for (const key of Object.keys(node)) {
-      if (key !== "parent") visit(node[key]);
-    }
-  };
-  visit(ast);
-  return out;
-}
+const packagesDir = path.join(repoRoot, "packages");
 
-/**
- * An append counts as SQL either because the appended text says so, or because
- * the buffer's NAME does. The second half is what catches `sql += clause` and
- * `sql += buildFilter(x)`, where the fragment is not a literal at all — those
- * are the same piecewise build and would resolve the same way, so a probe
- * reading only literals would under-measure the population it exists to size.
- */
+/** Cheap textual gate on the shapes below, applied before the parse. */
+const ASSEMBLY_CHARS = /\+=|\.concat\(|\.push\(|=/;
+
 const SQL_KEYWORD =
   /\b(select|insert\s+into|update|delete\s+from|drop\s+table|create\s+table|from|where|join|like|ilike|similar\s+to)\b/i;
-const SQL_BUFFER_NAME = /^(sql|query|stmt|statement|ddl|where|clause|filter|sweep)[\w$]*$/i;
+const SQL_BUFFER_NAME =
+  /^(sql|query|stmt|statement|ddl|where|clause|filter|sweep|parts|fragments|pieces)[\w$]*$/i;
 
-/** A multi-line RHS is the case this probe exists to catch, so the failure
- * message has to show more of it than its first line. */
-function oneLine(text) {
-  const flat = text.replace(/\s+/g, " ").trim();
-  return flat.length > 120 ? `${flat.slice(0, 117)}…` : flat;
+/**
+ * The spellings of "assembled across statements" that `createSqlTextGroups`
+ * resolves fragment-at-a-time, each verified against the rule in
+ * `require-table-teardown.test.mjs`:
+ *
+ *   compoundAppend  `sql += " WHERE …"`          the write is the RHS alone
+ *   selfReassign    `sql = sql + " WHERE …"`      the self-read is already in
+ *                                                `seen`, so it resolves to no
+ *                                                strings and reads as a boundary
+ *   selfRewrap      `` sql = `${sql} WHERE …` ``  the same self-read, spelled as
+ *                                                a template substitution
+ *   pushJoin        `parts.push(…)` + `join("")`  array accumulation, which the
+ *                                                resolver does not model at all
+ *
+ * Naming them individually is the point: the failure message has to say which
+ * spelling was found, since the fix differs (the first three collapse into one
+ * template or a `+` chain; the last into an array literal joined in place).
+ */
+const ASSEMBLY_SHAPES = ["compoundAppend", "selfReassign", "selfRewrap", "pushJoin"];
+
+function walkAst(node, visit) {
+  if (node === null || typeof node !== "object") return;
+  if (Array.isArray(node)) {
+    for (const child of node) walkAst(child, visit);
+    return;
+  }
+  if (typeof node.type !== "string") return;
+  visit(node);
+  for (const key of Object.keys(node)) {
+    if (key !== "parent") walkAst(node[key], visit);
+  }
 }
 
-async function* testFiles(dir) {
+function readsName(node, name) {
+  let found = false;
+  walkAst(node, (n) => {
+    if (n.type === "Identifier" && n.name === name) found = true;
+  });
+  return found;
+}
+
+/**
+ * Every cross-statement SQL assembly in `source`, as `{ shape, target, detail,
+ * line }`.
+ *
+ * Parsed rather than matched: a write's right-hand side is an expression, not a
+ * line, and the shape that matters most here is exactly the one a line-scoped
+ * regex loses — a template holding a formatted query spans several lines, so
+ * `` out += `\nSELECT …` `` would read as an append of nothing. A probe that
+ * under-reads the population is worse than no probe, since the whole point is to
+ * size that population before declining to handle it.
+ *
+ * Assignment targets are restricted to plain identifiers because the resolver
+ * only reaches variables: `record.name += "-changed"` is a model attribute, not
+ * a SQL buffer.
+ */
+function sqlAssemblies(source) {
+  const { ast } = parser.parseForESLint(source, { range: true, loc: true, jsx: false });
+  const text = (node) => source.slice(node.range[0], node.range[1]);
+  const oneLine = (raw) => {
+    const flat = raw.replace(/\s+/g, " ").trim();
+    return flat.length > 120 ? `${flat.slice(0, 117)}…` : flat;
+  };
+
+  const found = [];
+  const pushedOnto = new Map();
+  const joinedOn = new Set();
+
+  walkAst(ast, (node) => {
+    if (node.type === "AssignmentExpression" && node.left.type === "Identifier") {
+      const target = node.left.name;
+      const appended = text(node.right);
+      if (!SQL_KEYWORD.test(appended) && !SQL_BUFFER_NAME.test(target)) return;
+      const at = { target, line: node.loc.start.line, detail: oneLine(appended) };
+      if (node.operator === "+=") found.push({ shape: "compoundAppend", ...at });
+      else if (node.operator === "=" && readsName(node.right, target)) {
+        // Only a `+` chain or a template is string assembly. Requiring that is
+        // not fussiness: `relation = relation.merge(…)`, `developers =
+        // developers.where(…)`, `rel = rel.joins(…)` are all self-referential
+        // reassignments whose text carries `where`/`join`/`from`/`select`,
+        // because those are Relation METHOD names as much as SQL keywords — the
+        // same collision require-canonical-rebuild's doc block records for
+        // `columns`/`values`/`select`. Measured over packages/, the loose reading
+        // returned 6 hits and every one was a Relation chain. A method-chain
+        // reassignment is a different gap anyway (an unfollowable call, which
+        // reads as nothing and so under-accepts), not this one.
+        const rhs = node.right;
+        const concatenates =
+          (rhs.type === "BinaryExpression" && rhs.operator === "+") ||
+          rhs.type === "TemplateLiteral";
+        if (concatenates)
+          found.push({
+            shape: rhs.type === "TemplateLiteral" ? "selfRewrap" : "selfReassign",
+            ...at,
+          });
+      }
+      return;
+    }
+    if (node.type !== "CallExpression" || node.callee.type !== "MemberExpression") return;
+    const object = node.callee.object;
+    if (object?.type !== "Identifier") return;
+    const property = node.callee.property?.name;
+    const args = node.arguments.map(text).join(", ");
+    if (property === "concat" && (SQL_KEYWORD.test(args) || SQL_BUFFER_NAME.test(object.name))) {
+      // `.concat` on a string is the same fragment-at-a-time read as `+=`, and on
+      // an array the same as `push`; either way the resolver meets a call it
+      // cannot follow, so it counts under the assembly it resembles.
+      found.push({
+        shape: "compoundAppend",
+        target: object.name,
+        line: node.loc.start.line,
+        detail: oneLine(`${object.name}.concat(${args})`),
+      });
+    }
+    if (property === "push" && (SQL_KEYWORD.test(args) || SQL_BUFFER_NAME.test(object.name))) {
+      pushedOnto.set(object.name, { line: node.loc.start.line, detail: oneLine(args) });
+    }
+    if (property === "join") joinedOn.add(object.name);
+  });
+
+  for (const [name, where] of pushedOnto) {
+    // A push alone is an ordinary array append; it only assembles a STRING once
+    // the array is joined, so both halves have to be present in the file.
+    if (joinedOn.has(name))
+      found.push({ shape: "pushJoin", target: name, line: where.line, detail: where.detail });
+  }
+  return found;
+}
+
+async function* tsTestFiles(dir) {
   for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
     if (entry.name === "node_modules" || entry.name === "dist") continue;
     const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) yield* testFiles(full);
+    if (entry.isDirectory()) yield* tsTestFiles(full);
     else if (full.endsWith(".test.ts")) yield full;
   }
 }
@@ -107,8 +181,8 @@ const TEARDOWN_RULES = [
 ];
 
 /**
- * Whether either teardown rule is actually ON for `file`, asked of ESLint
- * rather than restated here.
+ * Whether either teardown rule is actually ON for `file`, asked of ESLint rather
+ * than restated here.
  *
  * The two rule blocks in `eslint.config.mjs` carry `ignores` — `test-helpers/**`
  * and `support/**` (the loaders' own subject-under-test), the fixture suites,
@@ -123,7 +197,7 @@ const TEARDOWN_RULES = [
  * in more places, and a file only the other rule lints is still a file the
  * shared resolver reads.
  */
-async function lintedByTeardownRules() {
+function lintedByTeardownRules() {
   const eslint = new ESLint({ cwd: repoRoot });
   return async (file) => {
     const config = await eslint.calculateConfigForFile(file);
@@ -135,46 +209,115 @@ async function lintedByTeardownRules() {
   };
 }
 
-async function piecewiseSqlAppends() {
-  const found = [];
-  let scanned = 0;
-  const isLinted = await lintedByTeardownRules();
-  for await (const file of testFiles(lintedDir)) {
-    if (!(await isLinted(file))) continue;
-    scanned += 1;
-    const source = await fs.readFile(file, "utf8");
-    // Textual prefilter only, and a strict superset: every compound append
-    // contains these two characters, so skipping files without them cannot
-    // drop one. It keeps the parse off the ~90% of AR test files that have no
-    // `+=` at all, which is the difference between a few seconds and a minute.
-    if (!source.includes("+=")) continue;
-    for (const { target, appended, line } of piecewiseAppends(source)) {
-      if (SQL_KEYWORD.test(appended) || SQL_BUFFER_NAME.test(target))
-        found.push(`${path.relative(repoRoot, file)}:${line}: ${target} += ${oneLine(appended)}`);
+/**
+ * The packages worth walking, derived rather than hardcoded.
+ *
+ * Hardcoding `packages/activerecord/src` would silently stop measuring the day
+ * either rule is enabled on a second package; walking all of `packages/` instead
+ * cost 19s, because ~600 files then need a parse to find the nothing that is
+ * there. So ask the config which packages could contain an in-scope file — two
+ * synthetic probe paths per package, one shallow and one nested so a `**` glob
+ * anchored anywhere under the package still answers yes — and walk only those.
+ * `calculateConfigForFile` happily resolves a path that does not exist, since it
+ * is matching globs, not reading files.
+ *
+ * The per-file filter still applies inside a walked package, so this can only
+ * ever narrow the walk, never the population.
+ */
+async function inScopePackageRoots(isLinted) {
+  const roots = [];
+  for (const entry of await fs.readdir(packagesDir, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name === "node_modules") continue;
+    const root = path.join(packagesDir, entry.name);
+    const probes = [
+      path.join(root, "src", "__scope-probe__.test.ts"),
+      path.join(root, "src", "nested", "deeper", "__scope-probe__.test.ts"),
+    ];
+    for (const probe of probes) {
+      if (await isLinted(probe)) {
+        roots.push(path.join(root, "src"));
+        break;
+      }
     }
   }
-  return { found, scanned };
+  return roots;
+}
+
+/**
+ * Parse first, resolve config second.
+ *
+ * Within a walked package the obvious order — filter to in-scope files, then look
+ * for assemblies — costs one `calculateConfigForFile` per file, and a textual
+ * prefilter cannot avoid it because `=` appears in every file. Asking about only
+ * the files that actually hold a candidate inverts that: the population is
+ * normally empty, so the config resolver is normally never called on this path at
+ * all, and the expensive check lands on the rare branch instead of the common one.
+ */
+async function sqlAssemblyPopulation() {
+  const isLinted = lintedByTeardownRules();
+  const roots = await inScopePackageRoots(isLinted);
+  const candidates = [];
+  let walked = 0;
+  for (const root of roots) {
+    for await (const file of tsTestFiles(root)) {
+      walked += 1;
+      const source = await fs.readFile(file, "utf8");
+      if (!ASSEMBLY_CHARS.test(source)) continue;
+      for (const { shape, target, detail, line } of sqlAssemblies(source)) {
+        candidates.push({ file, line, text: `${shape} — {} ${target} ← ${detail}` });
+      }
+    }
+  }
+  const found = [];
+  for (const { file, line, text } of candidates) {
+    if (!(await isLinted(file))) continue;
+    found.push(text.replace("{}", `${path.relative(repoRoot, file)}:${line}:`));
+  }
+  return { found, walked };
 }
 
 describe("piecewise-appended SQL population", () => {
   it("is empty in the files the teardown rules lint", { timeout: 120_000 }, async () => {
-    const { found, scanned } = await piecewiseSqlAppends();
+    const { found, walked } = await sqlAssemblyPopulation();
     expect(
-      scanned,
-      "the scan walked almost no AR test files — either the probe stopped working or the two " +
-        "rules' config blocks stopped matching them",
-    ).toBeGreaterThan(100);
+      walked,
+      "the scan walked almost no test files — the walk stopped working",
+    ).toBeGreaterThan(300);
 
     expect(
       found.sort(),
-      'An AR test file now builds a SQL string by appending to it (`sql += " WHERE …"`). ' +
+      "An in-scope test file now assembles a SQL string across statements. " +
         "`createSqlTextGroups` in eslint/sql-texts.mjs reads each fragment as an independent " +
-        "string, so a sweep filter or a CREATE/DROP TABLE split across two appends resolves to " +
-        "neither half's meaning — a `LIKE 'ex_%'` closed inside one fragment credits a prefix " +
-        "while the same pattern split across two credits nothing. The gap was left open because " +
-        "this population measured zero; it no longer does. Either rewrite the SQL below as one " +
-        "literal, a template, or a `+` chain (all of which the resolver reads), or close the gap " +
-        "in createSqlTextGroups by stitching the writes in source order.",
+        "string, so a filter or a CREATE/DROP TABLE split across fragments resolves to neither " +
+        "half's meaning: a fragment carrying a catalogue relation AND a closed `LIKE 'ex_%'` " +
+        "credits that prefix on its own, while a pattern split across two fragments credits " +
+        "nothing. The gap was left open because this population measured zero; it no longer " +
+        "does. Either assemble the SQL in one expression — a single template, a `+` chain, or an " +
+        "array literal joined in place, all of which the resolver reads — or close the gap in " +
+        "createSqlTextGroups by ordering the writes by source position. The shape prefix on each " +
+        `line below is one of ${ASSEMBLY_SHAPES.join(", ")}, each explained where that list is ` +
+        "declared.",
     ).toEqual([]);
+  });
+
+  /**
+   * The measurement is only as good as its scope, and the scope is one predicate.
+   * Counting how many files it admitted would not catch it admitting the WRONG
+   * ones, so assert its answer on a file from each side instead: an ordinary AR
+   * test (both rules on), two files the config ignores (a `support/**` loader
+   * test and one of the fixture suites), a file in another package, and a file on
+   * `require-canonical-rebuild-exclude.json`'s `privateAdapter` list, which must
+   * still count because `require-table-teardown` is on for it — the union that
+   * makes this the two rules' population rather than one rule's.
+   */
+  it("counts a file exactly when either teardown rule is enabled on it", async () => {
+    const isLinted = lintedByTeardownRules();
+    const scopeOf = async (rel) => isLinted(path.join(repoRoot, rel));
+
+    expect(await scopeOf("packages/activerecord/src/relations.test.ts")).toBe(true);
+    expect(await scopeOf("packages/activerecord/src/support/ar-db-slots.test.ts")).toBe(false);
+    expect(await scopeOf("packages/activerecord/src/fixtures.test.ts")).toBe(false);
+    expect(await scopeOf("packages/activerecord/src/adapter-prevent-writes.test.ts")).toBe(true);
+    expect(await scopeOf("packages/activesupport/src/include.test.ts")).toBe(false);
   });
 });
