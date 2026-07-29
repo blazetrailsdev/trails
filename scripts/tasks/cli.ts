@@ -474,13 +474,26 @@ export function bestBundle(items: StoryEntry[], budget: number): StoryEntry[] {
   return chosen.reverse();
 }
 
+export function bundleScope(index: Index, opts: { cluster?: string; rfc?: string }): StoryEntry[] {
+  return ready(index, { rfc: opts.rfc }).filter((s) =>
+    opts.cluster ? s.cluster === opts.cluster : true,
+  );
+}
+
+export type EmptyBundleReason = "no-matching-stories" | "none-within-budget";
+
+export function emptyBundleReason(
+  index: Index,
+  opts: { cluster?: string; rfc?: string },
+): EmptyBundleReason {
+  return bundleScope(index, opts).length === 0 ? "no-matching-stories" : "none-within-budget";
+}
+
 export function nextBundle(
   index: Index,
   opts: { maxLoc: number; cluster?: string; rfc?: string },
 ): StoryEntry[] {
-  const inScope = ready(index, { rfc: opts.rfc }).filter((s) =>
-    opts.cluster ? s.cluster === opts.cluster : true,
-  );
+  const inScope = bundleScope(index, opts);
   // Priority overrides cluster-LOC packing. The legend says "lower N = higher
   // priority"; honor it literally — any prioritized story outranks every
   // unprioritized one, regardless of cluster or how well it fills the budget.
@@ -537,6 +550,21 @@ export function summarizeBundle(
 ): { total: number; leadExceedsBudget: boolean } {
   const total = rows.reduce((a, s) => a + (s.est_loc ?? 0), 0);
   return { total, leadExceedsBudget: total > maxLoc };
+}
+
+export function formatEmptyBundle(
+  reason: EmptyBundleReason,
+  maxLoc: number,
+  filters: { cluster?: string; rfc?: string } = {},
+): string {
+  const named = [
+    filters.rfc ? `rfc ${filters.rfc}` : null,
+    filters.cluster ? `cluster ${filters.cluster}` : null,
+  ].filter((p): p is string => p !== null);
+  const scope = named.length ? ` matching ${named.join(" + ")}` : "";
+  return reason === "no-matching-stories"
+    ? `no ready stories${scope}`
+    : `no ready stories${scope} within ${maxLoc} LOC`;
 }
 
 export function listFiltered(
@@ -3118,11 +3146,8 @@ function main(): void {
       if (!/^\d+$/.test(maxLocRaw) || Number(maxLocRaw) <= 0) usage();
       const maxLoc = Number(maxLocRaw);
       const idx = readIndexSource().index;
-      const rows = nextBundle(idx, {
-        maxLoc,
-        cluster: stringFlag(flags, "cluster"),
-        rfc: stringFlag(flags, "rfc"),
-      });
+      const filters = { cluster: stringFlag(flags, "cluster"), rfc: stringFlag(flags, "rfc") };
+      const rows = nextBundle(idx, { maxLoc, ...filters });
       const { total, leadExceedsBudget } = summarizeBundle(rows, maxLoc);
       if (flags.json) {
         console.log(
@@ -3132,13 +3157,14 @@ function main(): void {
               bundle_total_loc: total,
               max_loc: maxLoc,
               lead_exceeds_budget: leadExceedsBudget,
+              empty_reason: rows.length === 0 ? emptyBundleReason(idx, filters) : null,
             },
             null,
             2,
           ),
         );
       } else if (rows.length === 0) {
-        console.log(`no ready stories within ${maxLoc} LOC`);
+        console.log(formatEmptyBundle(emptyBundleReason(idx, filters), maxLoc, filters));
       } else {
         const note = leadExceedsBudget ? " — lead exceeds budget" : "";
         console.log(`bundle (sum ${total} / max ${maxLoc}${note}):`);
