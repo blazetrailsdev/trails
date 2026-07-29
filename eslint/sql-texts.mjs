@@ -54,8 +54,74 @@ export function createSqlTexts(resolve) {
  * that carries several strings fans out, so every combination is returned. The
  * `seen` set is forked per operand: a variable read on both sides resolves on
  * both, rather than going dynamic on whichever side is visited second.
+ *
+ * A CALL of a local helper resolves to what the helper can return: the callee
+ * identifier resolves to its function binding, and every `return` expression in
+ * that body — or the concise-body expression of an arrow — goes back through
+ * this same recursion, so a helper is read exactly as the SQL it hands back
+ * would have been read inline. Several returns fan out, since which one runs is
+ * not decidable here. A helper's PARAMETER is a dead end on purpose: its value
+ * comes from the call site, so reading it as a substitution keeps the quasi
+ * boundary a name or LIKE pattern flush against it needs — `` `… LIKE 'ex${p}%'`
+ * `` credits nothing whether the pattern is interpolated at the call site or a
+ * parameter deep in a helper. A callee that is not a resolvable local function —
+ * an import, a global, a method call — stays a dead end and contributes no
+ * strings, the same under-accepting direction the rest of this resolver takes.
  */
 export function createSqlTextGroups(resolve) {
+  /** The function a call's callee identifier names, or null when it names none. */
+  function calleeFunction(node) {
+    if (node?.type !== "Identifier") return null;
+    const variable = resolve(node);
+    if (variable === null) return { variable: null, fn: null };
+    for (const def of variable.defs ?? []) {
+      const defNode = def.node;
+      if (
+        defNode?.type === "FunctionDeclaration" ||
+        defNode?.type === "FunctionExpression" ||
+        defNode?.type === "ArrowFunctionExpression"
+      ) {
+        return { variable, fn: defNode };
+      }
+      const init = defNode?.type === "VariableDeclarator" ? defNode.init : null;
+      if (init?.type === "ArrowFunctionExpression" || init?.type === "FunctionExpression") {
+        return { variable, fn: init };
+      }
+    }
+    return { variable, fn: null };
+  }
+
+  /**
+   * Every value the function can hand back. Nested functions are skipped: their
+   * returns are the inner function's, not this one's.
+   */
+  function returnExpressions(fn) {
+    if (fn.body?.type !== "BlockStatement") return fn.body ? [fn.body] : [];
+    const out = [];
+    const walk = (node) => {
+      if (!node || typeof node.type !== "string") return;
+      if (
+        node.type === "FunctionDeclaration" ||
+        node.type === "FunctionExpression" ||
+        node.type === "ArrowFunctionExpression"
+      ) {
+        return;
+      }
+      if (node.type === "ReturnStatement") {
+        if (node.argument) out.push(node.argument);
+        return;
+      }
+      for (const key of Object.keys(node)) {
+        if (key === "parent") continue;
+        const child = node[key];
+        if (Array.isArray(child)) child.forEach(walk);
+        else walk(child);
+      }
+    };
+    walk(fn.body);
+    return out;
+  }
+
   return function sqlTextGroups(node, seen = new Set()) {
     if (node?.type === "Literal") return typeof node.value === "string" ? [[node.value]] : [];
     if (node?.type === "TemplateLiteral") return [node.quasis.map((q) => q.value.cooked ?? "")];
@@ -72,9 +138,22 @@ export function createSqlTextGroups(resolve) {
       }
       return out;
     }
+    if (node?.type === "CallExpression") {
+      const { variable, fn } = calleeFunction(node.callee) ?? {};
+      if (!fn || variable === null || seen.has(variable)) return [];
+      seen.add(variable);
+      const out = [];
+      for (const returned of returnExpressions(fn)) {
+        out.push(...sqlTextGroups(returned, new Set(seen)));
+      }
+      return out;
+    }
     if (node?.type !== "Identifier") return [];
     const variable = resolve(node);
     if (variable === null || seen.has(variable)) return [];
+    // A parameter's value comes from the call site; reading it here would
+    // credit a name or pattern the caller can vary. Substitution, not a value.
+    if (variable.defs?.some((def) => def.type === "Parameter")) return [];
     seen.add(variable);
     const out = [];
     const init = variable.defs?.[0]?.node?.init;

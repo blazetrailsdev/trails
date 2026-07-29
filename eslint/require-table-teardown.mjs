@@ -130,10 +130,8 @@
  * catalogue `LIKE` filter anywhere in the file, plus any dynamically-named raw
  * drop anywhere in it, arms every prefix the file mentions. KNOWN GAPS, all in
  * the under-accepting direction (a real sweep goes unrecognised and its creates
- * are reported, which is noise rather than a leak): SQL returned from a helper,
- * since resolving that needs the callee's body — a `+` concatenation IS read,
- * and only a literal, a template, a `+` chain over those, or an identifier
- * holding one is; SQL appended piecewise (`sql += " WHERE …"`), since a
+ * are reported, which is noise rather than a leak): SQL appended piecewise
+ * (`sql += " WHERE …"`), since a
  * compound assignment's write is only its right-hand side and stitching the
  * pieces back together needs an order the scope graph does not give; a
  * catalogue relation `CATALOGUE_SOURCE` does not list;
@@ -180,7 +178,14 @@
  * concatenation resolves through the same path with its non-string operands
  * read as substitutions, so `'DROP TABLE "' + row.tablename + '"'` arms and
  * `"… LIKE 'ex" + suffix + "%'"` credits nothing, matching what the equivalent
- * template spellings answer.
+ * template spellings answer. A CALL of a local helper resolves to every
+ * expression that helper can return, so a sweep whose SELECT or DROP half is
+ * hoisted into `const sweepSql = () => …` reads as if it were written inline;
+ * several returns fan out, a helper PARAMETER reads as a substitution (its value
+ * comes from the call site, so a pattern interpolated through one credits
+ * nothing and a name flush against one names no knowable table), and a callee
+ * that is not a resolvable local function — an import, a global, a method call —
+ * stays a dead end and arms nothing.
  *
  * This is deliberately independent of `require-canonical-rebuild`: the two
  * rules answer different questions. A sweep that can select a canonical table
