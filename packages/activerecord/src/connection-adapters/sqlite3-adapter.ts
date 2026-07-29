@@ -2328,7 +2328,12 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // already raises StatementInvalid naming the table (foreign_key_test.rb:322).
     const fromPrimaryKey = await this.primaryKey(tableName);
     const sourceColumns = (await this.columns(tableName)) as Sqlite3Column[];
-    const definition = this.copyTableDefinition(tableName, fromPrimaryKey, sourceColumns, rename);
+    const definition = new SQLite3TableDefinition(tableName, {
+      id: false,
+      adapter: this,
+      ...(Array.isArray(fromPrimaryKey) ? { primaryKey: fromPrimaryKey.map(renamed) } : {}),
+    });
+    this.copyTableColumns(definition, fromPrimaryKey, sourceColumns, rename);
 
     // Attached before the block runs, as in Rails' alter_table lambda
     // (sqlite3_adapter.rb:566-583) — that ordering is what lets remove_column
@@ -2540,31 +2545,15 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     await this.execCopyTable(`DROP TABLE ${quoteTableName(from)}`);
   }
 
-  /**
-   * The `create_table(to, **options) do |definition| ... end` body of Rails'
-   * copy_table (sqlite3_adapter.rb:599-648): reflect the source table's columns
-   * and hand each one to the definition as *options*, so type resolution,
-   * default-expression quoting and primary-key handling all stay in
-   * schema_creation. alter_table shares it — its first move is copy_table's
-   * verbatim, and its second builds the same definition off the same reflection.
-   * @internal
-   */
-  private copyTableDefinition(
-    to: string,
+  /** @internal */
+  private copyTableColumns(
+    definition: SQLite3TableDefinition,
     fromPrimaryKey: string | string[] | null,
     sourceColumns: Sqlite3Column[],
     rename: Record<string, string> = {},
-    options: { temporary?: boolean } = {},
-  ): SQLite3TableDefinition {
+  ): void {
     const renamed = (name: string): string => rename[name] ?? name;
     const compositePk = Array.isArray(fromPrimaryKey);
-
-    const definition = new SQLite3TableDefinition(to, {
-      id: false,
-      adapter: this,
-      ...(options.temporary ? { temporary: true } : {}),
-      ...(compositePk ? { primaryKey: fromPrimaryKey.map(renamed) } : {}),
-    });
 
     for (const column of sourceColumns) {
       const columnOptions: Record<string, unknown> = {
@@ -2585,16 +2574,10 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         const deserialized: unknown = this.lookupCastTypeFromColumn(column).deserialize(
           column.default,
         );
-        // Rails: `default = -> { column.default_function } if default.nil?`. The
-        // extra `defaultFunction` guard is trails-only: quoteDefaultExpression
-        // rejects a callable returning null, where Ruby's `quote(nil)` yields NULL.
         columnOptions.default =
           deserialized == null && defaultFunction != null ? () => defaultFunction : deserialized;
       }
 
-      // Left null rather than coerced to "" for a typeless (BLOB affinity)
-      // column: typeToSql renders a null type as the empty string, matching
-      // Rails' `type_to_sql(nil)` -> `nil.to_s`, but rejects a blank string.
       const columnType = column.isVirtual()
         ? "virtual"
         : column.isBigint()
@@ -2602,33 +2585,41 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
           : column.type;
       definition.column(renamed(column.name), columnType as ColumnType, columnOptions);
     }
-
-    return definition;
   }
 
   /** @internal */
   private async copyTable(
     from: string,
     to: string,
-    options: { rename?: Record<string, string>; temporary?: boolean } = {},
+    options: {
+      rename?: Record<string, string>;
+      temporary?: boolean;
+      force?: boolean | "cascade";
+    } = {},
     block?: (definition: SQLite3TableDefinition) => void,
   ): Promise<void> {
     const fromPrimaryKey = await this.primaryKey(from);
     const rename = options.rename ?? {};
-    const definition = this.copyTableDefinition(
+    const renamed = (name: string): string => rename[name] ?? name;
+    const sourceColumns = (await this.columns(from)) as Sqlite3Column[];
+    const { rename: _rename, ...createOptions } = options;
+
+    let definition!: SQLite3TableDefinition;
+    await this.createTable(
       to,
-      fromPrimaryKey,
-      (await this.columns(from)) as Sqlite3Column[],
-      rename,
-      { temporary: options.temporary },
+      {
+        ...createOptions,
+        id: false,
+        ...(Array.isArray(fromPrimaryKey) ? { primaryKey: fromPrimaryKey.map(renamed) } : {}),
+      },
+      (td) => {
+        definition = td as SQLite3TableDefinition;
+        this.copyTableColumns(definition, fromPrimaryKey, sourceColumns, rename);
+        block?.(definition);
+      },
     );
 
-    block?.(definition);
-
-    await this.execCopyTable(await this.schemaCreation.accept(definition));
     await this.copyTableIndexes(from, to, rename);
-    // Rails: columns_to_copy rejects the columns whose options carry `:as` —
-    // generated columns are computed, never inserted into (sqlite3_adapter.rb:645).
     const columnsToCopy = definition.columns
       .filter((col) => (col.options as Record<string, unknown>)["as"] === undefined)
       .map((col) => col.name);
