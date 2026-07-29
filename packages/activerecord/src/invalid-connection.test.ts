@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, it, expect } from "vitest";
 import { Base } from "./base.js";
-import { describeIfMysqlAdapter } from "./adapters/abstract-mysql-adapter/test-helper.js";
+import { describeIfMysqlAdapter } from "./support/describe-if-mysql-adapter.js";
 
 // Mirrors: activerecord/test/cases/invalid_connection_test.rb
 //

@@ -3,7 +3,7 @@
  */
 import { it, expect, beforeEach } from "vitest";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
-import { describeIfMysqlAdapter } from "../adapters/abstract-mysql-adapter/test-helper.js";
+import { describeIfMysqlAdapter } from "../support/describe-if-mysql-adapter.js";
 
 // Minimal subclass of the *concrete* Mysql2Adapter — char/varchar/enum/set
 // string registrations live on the concrete adapter (mysql2_adapter.rb:40-49),

@@ -29,7 +29,7 @@ import { adapterSupports, describeIfSupports, itIfSupports } from "../support/su
 import { assertQueriesMatch } from "../testing/query-assertions.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
-import { supportsRenameIndex } from "../adapters/abstract-mysql-adapter/test-helper.js";
+import { supportsRenameIndex } from "../support/mysql-server-version.js";
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";
 import type { SchemaSource } from "../schema-dumper.js";
 import { Base } from "../base.js";
