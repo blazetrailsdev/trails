@@ -152,14 +152,60 @@ describe("gates.ts pure helpers", () => {
       source: ["test"],
     });
     // POSITIVE adapter + feature: `adapterType !== "mysql"` runs when true (a
-    // positive mysql set), and mixing a positive adapter set with a feature is
-    // unsound (`&&` vs `||` changes the run-on set), so the adapter set is
-    // dropped and only the feature survives — mirroring the Ruby extractor's
-    // `mixed` rule (positive `adapter_syms` + feature → drop the adapter set).
+    // positive mysql set). In the standard skip idiom the run condition is the
+    // pure conjunction `mysql && expression_index?`, so the intersection is
+    // exactly what runs — both dimensions survive, mirroring the Ruby
+    // extractor's `mixed` rule for `current_adapter?(…) && supports_X?`.
     expect(
       gateFromGuardExpr('adapterType !== "mysql" || !adapterSupports("expression_index")', false),
     ).toEqual({
+      adapters: ["mysql"],
       features: ["expression_index"],
+      source: ["test"],
+    });
+  });
+
+  it("drops the adapter set when the RUN condition is a disjunction", () => {
+    // `runIf(A || B)` runs on `mysql ∪ default_expression?` and the De Morgan
+    // twin `skipIf(A && B)` runs on the same union — neither is one adapter set,
+    // so the adapter half goes, mirroring the Ruby extractor's `has_or` rule.
+    expect(
+      gateFromGuardExpr('adapterType === "mysql" || adapterSupports("default_expression")', true),
+    ).toEqual({
+      features: ["default_expression"],
+      source: ["test"],
+    });
+    expect(
+      gateFromGuardExpr('adapterType !== "mysql" && !adapterSupports("default_expression")', false),
+    ).toEqual({
+      features: ["default_expression"],
+      source: ["test"],
+    });
+    // An adapter EXCLUSION is deliberately NOT tightened here — it is
+    // pre-existing behavior whose Ruby counterpart is looser still
+    // (foreign_key_test.rb:96 hides its second conjunct behind `send`, so Ruby
+    // emits the bare exclusion). Pinned so the scope stays explicit; tracked as
+    // `ts-gate-exclusion-ignores-run-disjunction`.
+    expect(
+      gateFromGuardExpr('adapterType === "sqlite" && !adapterSupports("insert_returning")', false),
+    ).toEqual({
+      adapters: ["mysql", "postgresql"],
+      features: ["insert_returning"],
+      source: ["test"],
+    });
+    // The conjunctive forms of the same two guards keep both dimensions.
+    expect(
+      gateFromGuardExpr('adapterType === "mysql" && adapterSupports("default_expression")', true),
+    ).toEqual({
+      adapters: ["mysql"],
+      features: ["default_expression"],
+      source: ["test"],
+    });
+    expect(
+      gateFromGuardExpr('adapterType !== "mysql" || !adapterSupports("default_expression")', false),
+    ).toEqual({
+      adapters: ["mysql"],
+      features: ["default_expression"],
       source: ["test"],
     });
   });

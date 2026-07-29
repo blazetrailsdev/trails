@@ -139,10 +139,13 @@ export function gateFromWrapper(name: string, featureArg?: string | null): TestG
  *     conjunction `!sqlite && insert_returning?`, so BOTH the adapter exclusion
  *     `[mysql,postgresql]` and the feature set are sound and emitted.
  *   - POSITIVE (`adapterType !== "mysql" || !adapterSupports("expression_index")`)
- *     → mixing a positive adapter set with a feature is unsound (the run-on set
- *     differs under `&&` vs `||`), so the adapter set is DROPPED and only the
- *     feature set survives — exactly as Ruby drops a positive `adapter_syms` set
- *     whenever the condition also carries a feature or guard.
+ *     → the run condition is again a pure conjunction (`mysql && expression_index?`),
+ *     so the adapter set and the feature set are BOTH sound and emitted — the
+ *     intersection is exactly what runs. Mirrors Ruby keeping a positive
+ *     `adapter_syms` set alongside a feature in a pure `&&` condition.
+ *   - A `mariadb` GUARD is different: it is a runtime predicate neither side can
+ *     evaluate statically, so a positive adapter set mixed with one is dropped
+ *     rather than over-claiming a partial restriction (Ruby does the same).
  * Anything with neither adapter nor feature resolves to a `guards: ["unknown"]`
  * gate so the comparison knows the test is conditional without inventing an
  * adapter set.
@@ -158,7 +161,8 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
   // adapterType term is supported (the suite's idiom); the first is used. In the
   // standard skip idiom `skipIf(A || B || …)` (run iff every term is false) the
   // adapter term's contribution is evaluated in isolation — exactly the
-  // single-term polarity below — and likewise for `runIf(A && B && …)`.
+  // single-term polarity below — and likewise for `runIf(A && B && …)`. Any
+  // other shape makes the run-on set a disjunction; see `runIsDisjunctive`.
   const adapterMatch = text.match(/adapterType\s*(===|!==)\s*["']([a-z0-9]+)["']/);
   let adapters: GateAdapter[] | undefined;
   let adapterIsPositive = false;
@@ -190,10 +194,24 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
   const guards: string[] = [];
   if (/isMaria[Dd]b\b/.test(text)) guards.push("mariadb");
 
-  // The `mixed` rule (see the docstring): a POSITIVE adapter set is unsound and
-  // must be dropped once the compound also carries a feature or guard; an
-  // adapter EXCLUSION composes soundly and stays. Mirrors `gate_from_run_condition`.
-  const mixed = adapterIsPositive && (guards.length > 0 || featureMatches.length > 0);
+  // The TS twin of the Ruby extractor's `has_or`. The run condition is `expr`
+  // for `runIf` and `!expr` for `skipIf`, so the operator that makes the run-on
+  // set a DISJUNCTION differs by form: `||` under `runIf`, and (by De Morgan)
+  // `&&` under `skipIf`. Deliberately coarse and textual, like
+  // `scan_run_condition`, which sets `has_or` for a `||` anywhere in the
+  // condition sexp rather than only at the top level.
+  const runIsDisjunctive = runsWhenTrue ? text.includes("||") : text.includes("&&");
+
+  // The `mixed` rule (see the docstring): a POSITIVE adapter set is dropped when
+  // the compound carries a non-comparable guard, and — since the set is only
+  // sound as the INTERSECTION `adapter ∩ feature` — also when a feature rides
+  // along on a disjunctive run condition, where the real run-on set is the union
+  // `adapter ∪ feature`. That second clause is the twin of Ruby gating the same
+  // case on `!acc[:has_or]`. An adapter EXCLUSION is left alone here: it is
+  // pre-existing behavior with its own (looser) Ruby counterpart, tracked
+  // separately as `ts-gate-exclusion-ignores-run-disjunction`.
+  const mixed =
+    adapterIsPositive && (guards.length > 0 || (featureMatches.length > 0 && runIsDisjunctive));
   const gate: TestGate = { source: ["test"] };
   if (adapters && !mixed) gate.adapters = adapters;
   if (featureMatches.length) gate.features = sortedUnique(featureMatches);

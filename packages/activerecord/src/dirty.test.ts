@@ -27,7 +27,8 @@ import { TimeWithZone, getZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
 import { MigrationContext } from "./migration.js";
-import { describeIfSupports } from "./support/supports.js";
+import { itIfSupports } from "./support/supports.js";
+import { describeIfPg } from "./support/describe-if-pg.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { fixtures } from "./test-fixtures.js";
 import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
@@ -1185,21 +1186,25 @@ describe("DirtyTest", () => {
 // Mirrors: activerecord/test/cases/dirty_test.rb
 //   if current_adapter?(:PostgreSQLAdapter) && supports_identity_columns?
 // ==========================================================================
-describeIfSupports("identity_columns", "DirtyTest", () => {
+describeIfPg("DirtyTest", () => {
   fixtures([], { useTransactionalTests: false });
 
-  it("partial insert off with changed composite identity primary key attribute", async () => {
-    const klass = class extends Base {
-      static {
-        this.tableName = "cpk_postgresql_identity_table";
-      }
-    };
-    await klass.loadSchema();
+  itIfSupports(
+    "identity_columns",
+    "partial insert off with changed composite identity primary key attribute",
+    async () => {
+      const klass = class extends Base {
+        static {
+          this.tableName = "cpk_postgresql_identity_table";
+        }
+      };
+      await klass.loadSchema();
 
-    await withPartialWrites(klass, false, async () => {
-      const record = (await klass.createBang({ another_id: 10 })) as Rec;
-      expect(record.another_id).toBe(10);
-      expect(record.id).not.toBeNull();
-    });
-  });
+      await withPartialWrites(klass, false, async () => {
+        const record = (await klass.createBang({ another_id: 10 })) as Rec;
+        expect(record.another_id).toBe(10);
+        expect(record.id).not.toBeNull();
+      });
+    },
+  );
 });

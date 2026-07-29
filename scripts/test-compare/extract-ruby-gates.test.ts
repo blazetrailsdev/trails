@@ -146,6 +146,42 @@ describe("Ruby extractor gate detection", () => {
     expect(g["or compound"]).toEqual({ features: ["insert_returning"], source: ["class"] });
   });
 
+  it("keeps a positive adapter set conjoined with a feature, intersecting the class guard", () => {
+    const g = rubyGates({
+      // Mirrors view_test.rb:158/197 — a method-level
+      // `current_adapter?(:PostgreSQLAdapter, :SQLite3Adapter) && supports_insert_returning?`
+      // nested in a mysql+postgresql class guard. The true run-on set is the
+      // intersection: PostgreSQL.
+      "cases/view_test.rb": `
+        if current_adapter?(:Mysql2Adapter, :TrilogyAdapter, :PostgreSQLAdapter)
+          def test_insert_record_populates_primary_key; end if current_adapter?(:PostgreSQLAdapter, :SQLite3Adapter) && supports_insert_returning?
+        end
+      `,
+      "cases/bar_test.rb": `
+        def test_pg_and_feature; end if current_adapter?(:PostgreSQLAdapter) && supports_insert_returning?
+        def test_pg_or_feature; end if current_adapter?(:PostgreSQLAdapter) || supports_insert_returning?
+        def test_unless_pg_and_feature; end unless current_adapter?(:PostgreSQLAdapter) && supports_insert_returning?
+      `,
+    });
+    expect(g["insert record populates primary key"]).toEqual({
+      adapters: ["postgresql"],
+      features: ["insert_returning"],
+      source: ["class"],
+    });
+    expect(g["pg and feature"]).toEqual({
+      adapters: ["postgresql"],
+      features: ["insert_returning"],
+      source: ["class"],
+    });
+    // `||` → the run-on set is a union no single adapter set captures → dropped.
+    expect(g["pg or feature"]).toEqual({ features: ["insert_returning"], source: ["class"] });
+    // `unless (A && feature)` negates the conjunction into that same union.
+    expect(g["unless pg and feature"]).toEqual({
+      guards: ["no_insert_returning"],
+      source: ["class"],
+    });
+  });
+
   it("does not emit an adapter exclusion under `unless` (negation → disjunction)", () => {
     const g = rubyGates({
       // `unless feature && !sqlite` runs when `!feature || sqlite` — a disjunction
