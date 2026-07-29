@@ -494,7 +494,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   supportsCheckConstraints(): boolean {
-    if (this._mariadb) return this._databaseVersion?.gte("10.2.1") === true;
+    if (this._mariadb) {
+      // Rails' two-branch MariaDB floor (abstract_mysql_adapter.rb:128-132):
+      // 10.3.10+, or a pre-10.3 series from 10.2.22 — 10.3.0..10.3.9 is
+      // excluded, which a single `>= 10.2.22` would wrongly admit.
+      const version = this._databaseVersion;
+      if (!version) return false;
+      return version.gte("10.3.10") || (version.lt("10.3") && version.gte("10.2.22"));
+    }
     return this._databaseVersion?.gte("8.0.16") === true;
   }
 
@@ -1286,14 +1293,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       }
     }
 
-    // NB: Rails appends `RETURNING` here (outside the raw-alias branch), but
-    // trails `InsertAll#execute` consumes this SQL via `executeMutation`, which
-    // returns an affected-row count. The mysql2 driver returns a result set
-    // (no affectedRows) for a RETURNING statement, so emitting it would make
-    // `insertAll` return undefined on MariaDB >= 10.5. Surfacing MySQL RETURNING
-    // needs `execute` reworked to read the result set (Rails' exec_insert_all) —
-    // tracked separately. SQLite/PG carry the tail because their executeMutation
-    // tolerates RETURNING and still yields a count.
+    const returning = insert.returning();
+    if (returning) sql += ` RETURNING ${returning}`;
+
     return sql;
   }
 

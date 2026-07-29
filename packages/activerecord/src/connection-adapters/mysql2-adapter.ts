@@ -3,7 +3,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
-import { execInsertReturningReadback } from "./abstract/database-statements.js";
+import { sqlForInsert } from "./abstract/database-statements.js";
 import type { MysqlAdapterOptions } from "./pool-config.js";
 import {
   AbstractMysqlAdapter,
@@ -619,16 +619,16 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * (the `prepare:` keyword routing) + Rails' exec_query tolerating no-result DML.
    */
   /**
-   * Mirrors Rails' abstract `exec_insert` → `sql_for_insert` → `internal_exec_query`
-   * for the multi-column RETURNING read-back. MariaDB supports `INSERT ...
-   * RETURNING`, but the `executeMutation` write primitive returns only the
-   * generated id, so a multi-column auto-populated-columns list (Rails
-   * `_create_record` zips every returning column) would lose the non-PK values.
-   * Route that case through `execQuery` — bind-aware, and its `withRawConnection`
-   * materializes and dirties the transaction — to hand back the full `Result`.
-   * Single-column / no-RETURNING inserts (and MySQL 8, which lacks insert
-   * returning, so `sql_for_insert` appends nothing) keep the `executeMutation`
-   * path via `super`.
+   * Mirrors Rails' abstract `exec_insert`: `sql_for_insert` first, then
+   * `internal_exec_query` (abstract/database_statements.rb:157-160). MariaDB
+   * supports `INSERT ... RETURNING`, and `sql_for_insert` derives
+   * `returning_columns = returning || Array(pk)` (line 702-713), so an insert
+   * with no explicit `returning:` still gets `RETURNING <pk>` — which the
+   * `executeMutation` primitive cannot carry, since it reports only the
+   * generated id (0 when the PK is trigger-populated rather than
+   * AUTO_INCREMENT). MySQL 8 has no insert returning, so it keeps the
+   * `executeMutation` fast path via `super`, where `sql_for_insert` would append
+   * nothing anyway.
    */
   override async execInsert(
     sql: string,
@@ -638,15 +638,19 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     sequenceName?: string | null,
     returning?: string[] | null,
   ): Promise<Result | number> {
-    const readback = await execInsertReturningReadback.call(
-      this as never,
-      sql,
-      name,
-      binds,
-      pk,
-      returning,
-    );
-    if (readback !== undefined) return readback;
+    const inferredFromPk = pk !== false && pk != null;
+    if (this.supportsInsertReturning() && (returning?.length || inferredFromPk)) {
+      const [returningSql, returningBinds] = sqlForInsert.call(
+        this as never,
+        sql,
+        pk ?? null,
+        binds,
+        returning ?? null,
+      );
+      const result = await this.internalExecQuery(returningSql, name ?? "SQL", returningBinds);
+      this.dirtyCurrentTransaction();
+      return result;
+    }
     return super.execInsert(sql, name, binds, pk, sequenceName, returning);
   }
 

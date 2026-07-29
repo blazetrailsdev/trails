@@ -1,5 +1,6 @@
 import { describe, it, type SuiteFactory, type TestFunction } from "vitest";
 import { adapterType } from "../test-adapter.js";
+import { inMemoryDb } from "./adapter-helper.js";
 
 /**
  * TS mirror of Rails' connection `supports_<feature>?` predicates — the
@@ -30,38 +31,69 @@ import { adapterType } from "../test-adapter.js";
  * suite first gates on it; an unknown key throws rather than silently running
  * everywhere — catching typos and undocumented capability assumptions.
  *
- * The table mirrors Rails' `supports_<feature>?` *for the matrix versions* —
- * it bakes in Rails' `mariadb?` / `database_version` branching for the fixed
- * CI backends (pg17 / mysql:8 / in-memory sqlite). Match Rails here (not our
- * own adapter, which may differ) so the gate-mismatch diagnostics compare like
- * with like.
+ * Why it is not the connection-backed lookup `adapter_helper.rb:66-83` uses
+ * (`define_method(m) { Base.lease_connection.public_send(m) }`): these gates are
+ * evaluated while vitest *collects* the file, and `describe`/`it` registration
+ * is synchronous, so there is nothing to await a lease on. The static table is
+ * therefore load-bearing and stays. What replaces the delegation's built-in
+ * accuracy is `supports-live-adapter.trails.test.ts`, which reconciles every
+ * key here against the running lane's real `supports_<key>?()` — generalizing
+ * the `expression_index` probe below from one key to all of them, so a
+ * transcription that drifts from the adapter fails loudly instead of silently
+ * mis-gating a suite.
+ *
+ * The table mirrors Rails' `supports_<feature>?`. Version-independent answers
+ * are keyed off {@link adapterType}; every predicate Rails branches on
+ * `mariadb?` / `database_version` for is resolved from the live server instead
+ * (see the mysql probe below) — the mysql lane is MySQL 8 locally and a MariaDB
+ * stand-in in CI, so those have no static answer. Match Rails here (not our own
+ * adapter, which may differ) so the gate-mismatch diagnostics compare like with
+ * like.
  */
 const ALL = ["postgres", "mysql", "sqlite"] as const;
 type Backend = (typeof ALL)[number];
 
-// `supports_expression_index?` on the MySQL family is a live-server predicate
-// (`!mariadb? && database_version >= "8.0.13"`, abstract_mysql_adapter.rb:104)
-// that a static adapterType table cannot bake in: the mysql lane runs against
-// MySQL 8 (true) locally but the MariaDB stand-in (false) in CI. Probe the
-// server once, on the mysql lane only — the dynamic import keeps the probe's
-// connection attempt off the pg/sqlite lanes.
-const mysqlExpressionIndex =
+// The MySQL-family `supports_*?` predicates that branch on `mariadb?` /
+// `database_version` have no static answer: the mysql lane runs MySQL 8 locally
+// but a MariaDB stand-in in CI, and the two disagree. Probe the server once, on
+// the mysql lane only — the dynamic import keeps the probe's connection attempt
+// off the pg/sqlite lanes, where the literals below stand in for a lane that
+// never asks.
+const mysql =
   adapterType === "mysql"
-    ? (await import("./mysql-server-version.js")).supportsExpressionIndex
-    : false;
+    ? await import("./mysql-server-version.js")
+    : {
+        supportsExpressionIndex: false,
+        supportsJson: false,
+        supportsOptimizerHints: false,
+        supportsInsertReturning: false,
+        supportsTextColumnWithDefault: false,
+        supportsNonUniqueConstraintName: false,
+        supportsSqlStandardDropConstraint: false,
+        supportsDefaultExpression: false,
+        supportsCheckConstraints: false,
+      };
+
+function withMysql(base: readonly Backend[], supported: boolean): readonly Backend[] {
+  return supported ? [...base, "mysql"] : base;
+}
 
 const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // Available on every backend we test (pg17 / mysql:8 / recent sqlite).
   savepoints: ALL,
   foreign_keys: ALL,
-  check_constraints: ALL,
-  // Rails `supports_json?` is `!mariadb? && database_version >= "5.7.8"`.
-  // MySQL 8 is not MariaDB and is ≥ 5.7.8 → true. (mysql2_adapter.rb:70)
-  json: ALL,
+  // `supports_check_constraints?`: MySQL ≥ 8.0.16; MariaDB ≥ 10.3.10 or
+  // 10.2.22–10.2.x. (abstract_mysql_adapter.rb:128-132)
+  check_constraints: withMysql(["postgres", "sqlite"], mysql.supportsCheckConstraints),
+  // `supports_json?`: `!mariadb? && database_version >= "5.7.8"`
+  // (mysql2_adapter.rb:70).
+  json: withMysql(["postgres", "sqlite"], mysql.supportsJson),
   // SQL-standard COMMENT ON / inline column comments — not SQLite.
   comments: ["postgres", "mysql"],
-  // SQLite's in-memory shared-cache connection can't run truly concurrently.
-  concurrent_connections: ["postgres", "mysql"],
+  // `supports_concurrent_connections?`: `!@memory_database` on SQLite
+  // (sqlite3_adapter.rb:198), true elsewhere — so it is config-derived, not
+  // adapter-keyed: only the `sqlite3_mem` lane is `:memory:`.
+  concurrent_connections: inMemoryDb() ? ["postgres", "mysql"] : ALL,
   // `ON CONFLICT (target)` — Postgres/SQLite only; MySQL has no conflict
   // target. Matches `adapterType !== "mysql"` in insert-all.test.ts.
   insert_conflict_target: ["postgres", "sqlite"],
@@ -78,10 +110,10 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // `supports_deferrable_constraints?`: PostgreSQL + SQLite true, abstract
   // default false. (postgresql_adapter.rb:236, sqlite3_adapter.rb:249)
   deferrable_constraints: ["postgres", "sqlite"],
-  // `supports_expression_index?`: PG + SQLite always; MySQL family per the
-  // live-server probe above (MySQL ≥ 8.0.13, never MariaDB).
-  // (postgresql_adapter.rb:208, sqlite3_adapter.rb:155, abstract_mysql_adapter.rb:104)
-  expression_index: mysqlExpressionIndex ? ALL : ["postgres", "sqlite"],
+  // `supports_expression_index?`: PG + SQLite always; MySQL ≥ 8.0.13, never
+  // MariaDB. (postgresql_adapter.rb:208, sqlite3_adapter.rb:155,
+  // abstract_mysql_adapter.rb:104)
+  expression_index: withMysql(["postgres", "sqlite"], mysql.supportsExpressionIndex),
   // `supports_bulk_alter?`: PostgreSQL + MySQL true, abstract default false.
   // (postgresql_adapter.rb:188, abstract_mysql_adapter.rb:96)
   bulk_alter: ["postgres", "mysql"],
@@ -109,21 +141,20 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // `supports_pgcrypto_uuid?`: PostgreSQL database_version >= 9.4.0 (pg17 qualifies);
   // PostgreSQL-only (abstract default false). (postgresql_adapter.rb:299)
   pgcrypto_uuid: ["postgres"],
-  // `supports_insert_returning?`: PostgreSQL true; MySQL only for MariaDB ≥ 10.5 (mysql:8
-  // is not MariaDB → false); SQLite ≥ 3.35.0 (current node sqlite qualifies → true).
+  // `supports_insert_returning?`: PostgreSQL true; MySQL family only for MariaDB
+  // ≥ 10.5.0; SQLite ≥ 3.35.0 (current node sqlite qualifies).
   // (postgresql_adapter.rb:264, abstract_mysql_adapter.rb:173, sqlite3_adapter.rb:187)
-  insert_returning: ["postgres", "sqlite"],
-  // `supports_text_column_with_default?`: MySQL only for MariaDB ≥ 10.2.1 (mysql:8 is not
-  // MariaDB → false); all other adapters true. (adapter_helper.rb:42)
-  text_column_with_default: ["postgres", "sqlite"],
+  insert_returning: withMysql(["postgres", "sqlite"], mysql.supportsInsertReturning),
+  // `supports_text_column_with_default?`: MySQL family only for MariaDB ≥ 10.2.1;
+  // all other adapters true. (adapter_helper.rb:42)
+  text_column_with_default: withMysql(["postgres", "sqlite"], mysql.supportsTextColumnWithDefault),
   // `supports_non_unique_constraint_name?`: MySQL family only, and only on
-  // MariaDB (mysql:8 is not MariaDB → false); every other adapter false.
-  // (adapter_helper.rb:33)
-  non_unique_constraint_name: [],
+  // MariaDB; every other adapter false. (adapter_helper.rb:33)
+  non_unique_constraint_name: withMysql([], mysql.supportsNonUniqueConstraintName),
   // `supports_sql_standard_drop_constraint?`: SQLite false; MySQL family needs
-  // ≥ 8.0.19 non-MariaDB (mysql:8 qualifies → true); all other adapters true.
+  // MariaDB ≥ 10.3.13 or MySQL ≥ 8.0.19; all other adapters true.
   // (adapter_helper.rb:51)
-  sql_standard_drop_constraint: ["postgres", "mysql"],
+  sql_standard_drop_constraint: withMysql(["postgres"], mysql.supportsSqlStandardDropConstraint),
   // `supports_common_table_expressions?`: PostgreSQL true; MySQL ≥ 8.0.1 (mysql:8 qualifies);
   // SQLite ≥ 3.8.3 (current node sqlite qualifies). (postgresql_adapter.rb:451,
   // abstract_mysql_adapter.rb:153, sqlite3_adapter.rb:183)
@@ -148,14 +179,14 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // `supports_foreign_tables?`: PostgreSQL only. (postgresql_adapter.rb:255; abstract default false)
   foreign_tables: ["postgres"] as readonly Backend[],
   // `supports_default_expression?` (adapter_helper.rb:23): PostgreSQL always true;
-  // MySQL true for mysql:8 (≥ 8.0.13, not MariaDB); falsy for SQLite (the method
-  // only branches on PG / Mysql2 / Trilogy).
-  default_expression: ["postgres", "mysql"] as readonly Backend[],
-  // `supports_optimizer_hints?`: MySQL only in CI. PostgreSQL checks
+  // MySQL family needs MariaDB ≥ 10.2.1 or MySQL ≥ 8.0.13; falsy for SQLite (the
+  // method only branches on PG / Mysql2 / Trilogy).
+  default_expression: withMysql(["postgres"], mysql.supportsDefaultExpression),
+  // `supports_optimizer_hints?`: MySQL ≥ 5.7.7, never MariaDB
+  // (abstract_mysql_adapter.rb:149). PostgreSQL checks
   // extension_available?("pg_hint_plan") at runtime (postgresql_adapter.rb:295) — CI
   // does not have pg_hint_plan installed, so PG effectively returns false.
-  // (abstract_mysql_adapter.rb:148; abstract default false)
-  optimizer_hints: ["mysql"] as readonly Backend[],
+  optimizer_hints: withMysql([], mysql.supportsOptimizerHints),
   // `supports_transaction_isolation?`: PostgreSQL + MySQL + SQLite (sqlite3_adapter.rb:147).
   // The Rails test (transaction_isolation_test.rb:20) ANDs this with
   // !current_adapter?(:SQLite3Adapter). The test:compare Ruby extractor drops the
@@ -169,6 +200,19 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
 };
 
 /**
+ * Every feature key the table answers, in declaration order.
+ *
+ * The static table is load-bearing — {@link describeIfSupports} and
+ * {@link itIfSupports} run at test-collection time, before `Base` has a
+ * connection to ask, so the gates cannot delegate to the leased connection the
+ * way `adapter_helper.rb:66-83` does. This export exists so
+ * `supports-live-adapter.trails.test.ts` can reconcile every key against the
+ * running lane's live `supports_<key>?()` and fail loudly on drift, which is
+ * the safety net Rails gets for free by never transcribing the answers.
+ */
+export const SUPPORTS_FEATURES: readonly string[] = Object.keys(SUPPORTS);
+
+/**
  * Does the active backend support Rails' `supports_<feature>?` capability?
  *
  * A comma-joined key (`"insert_conflict_target,insert_on_duplicate_update"`)
@@ -179,7 +223,11 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
  */
 export function adapterSupports(feature: string): boolean {
   if (feature.includes(",")) {
-    return feature.split(",").every((f) => adapterSupports(f.trim()));
+    // Resolve every member before folding: `.every()` short-circuits on the
+    // first false, which would let an unknown key downstream of an unsupported
+    // one pass silently on exactly the lanes where the typo matters.
+    const answers = feature.split(",").map((f) => adapterSupports(f.trim()));
+    return answers.every(Boolean);
   }
   const backends = SUPPORTS[feature];
   if (!backends) {

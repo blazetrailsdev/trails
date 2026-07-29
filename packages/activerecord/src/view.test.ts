@@ -15,6 +15,12 @@ import { adapterType } from "./test-adapter.js";
 import { describeIfSupports, itIfSupports } from "./support/supports.js";
 import { dumpTableSchema } from "./support/schema-dumping-helper.js";
 
+// The MariaDB CI stand-in for the mysql lane — see the gate note on
+// "insert record populates primary key". Lane-gated so the pg/sqlite lanes never
+// open a MySQL connection.
+const mariadbStandIn =
+  adapterType === "mysql" ? (await import("./support/mysql-server-version.js")).isMariaDb : false;
+
 // In Rails, AbstractAdapter includes SchemaStatements, so introspection
 // methods (views, viewExists, tableExists, isDataSourceExists) live directly
 // on the connection object. Cast once here; all helpers pass through.
@@ -260,11 +266,23 @@ describe("UpdateableViewTest", () => {
     expect((newBook as any).name).toBe("Rails in Action");
   });
 
-  // Rails gates this `features=[insert_returning,views]` (runs on mysql +
-  // postgresql; SQLite excluded by the outer view block). Carry both features so
-  // the extracted gate is `mysql,postgresql|insert_returning,views`; at runtime
-  // MySQL (mysql:8, not MariaDB) lacks insert_returning, so itIfSupports skips it.
-  itIfSupports.skipIf(adapterType === "sqlite")(
+  // Rails gates this `features=[insert_returning,views]` on `adapters=[mysql,
+  // postgresql]` — the class body is `current_adapter?(:Mysql2Adapter,
+  // :TrilogyAdapter, :PostgreSQLAdapter)` (view_test.rb:158) — so `skipIf` carries
+  // exactly that, which is what the test:compare gate extractor compares against.
+  //
+  // Rails' *effective* set is narrower: the test adds
+  // `current_adapter?(:PostgreSQLAdapter, :SQLite3Adapter) && supports_insert_returning?`
+  // (view_test.rb:197), and intersected with the class guard that is PostgreSQL
+  // alone. The Ruby extractor drops that second adapter clause on a mixed
+  // adapter+feature condition (extract-ruby-tests.rb:629-640), so the narrowing
+  // cannot live in `skipIf` without reporting a wrong-gate. It rides
+  // `mariadbStandIn` instead: MySQL 8 is already excluded by lacking
+  // insert_returning, so MariaDB is the only MySQL-family server that would
+  // otherwise reach a test Rails never runs on MySQL at all. Story
+  // ruby-gate-extractor-drops-conjoined-adapter-set moves this back into the
+  // skipIf once the extractor intersects the two clauses.
+  itIfSupports.skipIf(adapterType === "sqlite" || mariadbStandIn)(
     "insert_returning,views",
     "insert record populates primary key",
     async () => {
