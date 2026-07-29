@@ -21,6 +21,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     adapter = await leaseMysqlAdapter();
     originalPreparedStatements = adapter.preparedStatements;
     originalStatementLimit = adapter.statementLimit;
+    adapter.disconnectBang();
     adapter.preparedStatements = true;
   });
   afterEach(() => {
