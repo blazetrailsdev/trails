@@ -409,6 +409,18 @@ tester.run("require-table-teardown", rule, {
         'await adapter.dropTable("ex_int");',
       errors: [{ messageId: "missingTeardown", data: { table: "ex_leak" } }],
     },
+    // A fixed name held in a variable is not sweep-bound either: the dropTable()
+    // argument has to trace back to a row set, not merely be non-literal.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        "await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+        ");\n" +
+        'const name = "ex_int";\n' +
+        "await adapter.dropTable(name);",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
+    },
     // An escaped `%` is a literal, not a prefix wildcard: `ex\%` names one table.
     {
       code:

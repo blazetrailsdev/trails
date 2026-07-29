@@ -19,7 +19,7 @@
  * arms, what does not, and the accepted over- and under-approximations; this
  * module is that description's implementation.
  */
-import { calledName, SQL_SINKS } from "./require-table-teardown.mjs";
+import { calledName, SQL_SINKS } from "./sql-call-shapes.mjs";
 
 /**
  * A sweep-binding resolver bound to one lint `context`. Returns
@@ -127,8 +127,8 @@ export function createSweepBinding(context) {
       return declarator.init ? isSinkDerived(declarator.init, seen) : false;
     });
     if (boundByDef) return true;
-    // `let name; name = row.tablename;` binds by assignment, not initializer —
-    // the same spelling sqlTexts already follows on the SQL side.
+    // `let name; name = row.tablename;` binds by assignment, not initializer,
+    // and is as much a sweep binding as the `const` form.
     return variable.references.some((ref) => ref.writeExpr && isSinkDerived(ref.writeExpr, seen));
   }
 

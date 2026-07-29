@@ -1,4 +1,5 @@
-import { calledName, staticString, rawDropNames, SQL_SINKS } from "./require-table-teardown.mjs";
+import { calledName, staticString, SQL_SINKS } from "./sql-call-shapes.mjs";
+import { rawDropNames } from "./require-table-teardown.mjs";
 import { createSweepBinding } from "./sweep-binding.mjs";
 import { CATALOGUE_SOURCE } from "./canonical-catalogue-sources.mjs";
 

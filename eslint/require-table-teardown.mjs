@@ -57,7 +57,8 @@
  * helper-created ones, and they are the bulk of the ~2,600 distinct tables the
  * `dropAllTables` fan-out re-drops every run (RFC 0028 Path D). When the
  * `rawSql` option is on (the default), the rule scans the **string/template
- * arguments of execution-sink calls** (see `SQL_SINKS`) for `CREATE TABLE` /
+ * arguments of execution-sink calls** (see `SQL_SINKS` in
+ * `eslint/sql-call-shapes.mjs`) for `CREATE TABLE` /
  * `DROP TABLE` statements and folds their table names into the same per-name
  * create/drop balance — a raw create may be torn down by a raw drop or by the
  * `dropTable` helper, and vice versa.
@@ -98,7 +99,11 @@
  * resolver is shared with `require-canonical-rebuild` — see
  * `eslint/sweep-binding.mjs` — so the two rules cannot disagree about what a
  * swept name is. `dropTable("ex_foo")` is a fixed name and arms nothing, for
- * the same reason a statically-named raw drop does not. A
+ * the same reason a statically-named raw drop does not, and neither does a
+ * fixed name held in a variable. A name bound by a for-of over a hand-written
+ * array does arm, an over-accept inherited from the shared resolver and left
+ * as-is: such a loop is still a drop of every name it iterates, so crediting
+ * it costs only the creates that loop already tears down. A
  * static qualifier ahead of it does not disqualify the drop (`DROP TABLE
  * public."${row.tablename}"` is a sweep, the shape `require-canonical-rebuild`
  * recognises too), but in `DROP TABLE "${schema}"."fixed"` the dynamic part is only the qualifier and
@@ -157,38 +162,8 @@
  * side are still flagged independently).
  */
 
-// Cyclic with this module by design: sweep-binding.mjs reads `calledName` and
-// `SQL_SINKS` from here, and touches both only at lint time, so neither module
-// observes the other half-initialized.
+import { calledName, staticString, SQL_SINKS } from "./sql-call-shapes.mjs";
 import { createSweepBinding } from "./sweep-binding.mjs";
-
-/**
- * The called function's name, whether it's a bare call (`createTable(...)`) or
- * a method call (`recv.createTable(...)`). Receiver-agnostic by design — the
- * rule cares about the operation, not what it's invoked on. Returns null for
- * dynamic/computed callees (`recv[fn](...)`).
- */
-export function calledName(callee) {
-  if (callee.type === "Identifier") return callee.name;
-  if (callee.type !== "MemberExpression") return null;
-  if (callee.computed || callee.property.type !== "Identifier") return null;
-  return callee.property.name;
-}
-
-/**
- * The static string value of a node, or null when it isn't statically known.
- * Plain string literals (`"foo"`) and template literals with no substitutions
- * (`` `foo` ``) both qualify; a template with an interpolation (`` `${s}.foo` ``)
- * does not — its table name can't be matched statically, so it's skipped.
- */
-export function staticString(node) {
-  if (!node) return null;
-  if (node.type === "Literal" && typeof node.value === "string") return node.value;
-  if (node.type === "TemplateLiteral" && node.expressions.length === 0) {
-    return node.quasis[0].value.cooked;
-  }
-  return null;
-}
 
 /** The created table name (createTable's first arg), or null if not static. */
 function createdTableName(call) {
@@ -266,21 +241,6 @@ const CREATE_TABLE_RE = new RegExp(
 const DROP_TABLE_RE = /\bdrop\s+table\s+(?:if\s+exists\s+)?/gi;
 /** A single (optionally quoted) table name at the start of `rest`. */
 const NAME_RE = new RegExp(`^\\s*${NAME_SRC}`);
-
-/**
- * Call names that execute a raw SQL string against the database. A `CREATE
- * TABLE` handed to one of these leaks a real table; the same string passed to
- * `expect(...).toContain` does not. Receiver-agnostic, like every other name
- * the rule matches. Extend this set if a new execution sink appears.
- */
-export const SQL_SINKS = new Set([
-  "exec",
-  "execute",
-  "executeMutation",
-  "internalExecute",
-  "execQuery",
-  "query",
-]);
 
 /**
  * Statically-knowable `CREATE TABLE` names in `text`. When `endIsDynamic` (this
