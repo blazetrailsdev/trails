@@ -14,10 +14,8 @@ import { loadCanonicalSchema } from "./canonical-schema.js";
  * the four `uuid_*` tables and the exclusion/unique constraint tables, the
  * `supports_identity_columns?` tables (50-66), the `companies_nonstd_seq`/`setval`
  * sequence pass and the partition + `timestamp_with_zones` raw-DDL block (77-128),
- * and the `supports_insert_returning?` trigger table (203-225).
- *
- * Still unported: the `measurements*` partitioned tables and
- * `company_include_index` (187-201).
+ * the `measurements*` partitioned tables and `company_include_index` (187-201),
+ * and the `supports_insert_returning?` trigger table (203-225) — the file whole.
  */
 async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise<void> {
   // `supportsPgcryptoUuid()` / `supportsVirtualColumns()` read the cached
@@ -270,6 +268,39 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
     });
   });
 
+  if (adapter.supportsPartitionedIndexes()) {
+    await adapter.createTable(
+      "measurements",
+      { id: false, force: true, options: "PARTITION BY LIST (city_id)" },
+      (t) => {
+        const pg = t as PgTableDefinition;
+        pg.string("city_id", { null: false });
+        pg.date("logdate", { null: false });
+        pg.integer("peaktemp");
+        pg.integer("unitsales");
+        pg.index(["logdate", "city_id"], { unique: true });
+      },
+    );
+    await adapter.createTable("measurements_toronto", {
+      id: false,
+      force: true,
+      options: "PARTITION OF measurements FOR VALUES IN (1)",
+    });
+    await adapter.createTable("measurements_concepcion", {
+      id: false,
+      force: true,
+      options: "PARTITION OF measurements FOR VALUES IN (2)",
+    });
+  }
+
+  // Deviation from Rails' bare `add_index` (line 201): trails re-runs this loader
+  // on every worker boot against a database that may already carry the index.
+  await adapter.addIndex("companies", ["firm_id", "type"], {
+    name: "company_include_index",
+    include: ["name", "account_id"],
+    ifNotExists: true,
+  });
+
   if (adapter.supportsInsertReturning()) {
     await adapter.createTable(
       "pk_autopopulated_by_a_trigger_records",
@@ -452,11 +483,9 @@ async function loadSqliteSpecificSchema(adapter: DatabaseAdapter): Promise<void>
  * `<adapter>_specific_schema` loader when trails has one, and to nothing when it
  * does not.
  *
- * `sqlite_specific_schema.rb` and `mysql2_specific_schema.rb` are ported whole.
- * The postgres arm is still partial — the remaining tables of
- * `postgresql_specific_schema.rb:50-225` are owned by story
- * `port-postgresql-specific-schema-remainder`, not a claim that the gap does not
- * exist. `trilogy_specific_schema.rb` is the one genuine no-op: trails has no
+ * `sqlite_specific_schema.rb`, `mysql2_specific_schema.rb` and
+ * `postgresql_specific_schema.rb` are ported whole.
+ * `trilogy_specific_schema.rb` is the one genuine no-op: trails has no
  * Trilogy adapter, so no adapter name ever selects it.
  */
 const ADAPTER_SPECIFIC_SCHEMAS: Record<string, (adapter: DatabaseAdapter) => Promise<void>> = {
@@ -480,29 +509,35 @@ const ADAPTER_SPECIFIC_TABLES: Record<
   string,
   (adapter: DatabaseAdapter) => Promise<readonly string[]>
 > = {
-  postgres: async () => [
-    "chat_messages",
-    "chat_messages_custom_pk",
-    "uuid_parents",
-    "uuid_children",
-    "defaults",
-    "postgresql_times",
-    "postgresql_oids",
-    "postgresql_timestamp_with_zones",
-    "postgresql_partitioned_table_parent",
-    "postgresql_partitioned_table",
-    "limitless_fields",
-    "bigint_array",
-    "uuid_comments",
-    "uuid_entries",
-    "uuid_items",
-    "uuid_messages",
-    "test_exclusion_constraints",
-    "test_unique_constraints",
-    "postgresql_identity_table",
-    "cpk_postgresql_identity_table",
-    "pk_autopopulated_by_a_trigger_records",
-  ],
+  postgres: async (adapter) => {
+    await adapter.getDatabaseVersion();
+    return [
+      "chat_messages",
+      "chat_messages_custom_pk",
+      "uuid_parents",
+      "uuid_children",
+      "defaults",
+      "postgresql_times",
+      "postgresql_oids",
+      "postgresql_timestamp_with_zones",
+      "postgresql_partitioned_table_parent",
+      "postgresql_partitioned_table",
+      "limitless_fields",
+      "bigint_array",
+      "uuid_comments",
+      "uuid_entries",
+      "uuid_items",
+      "uuid_messages",
+      "test_exclusion_constraints",
+      "test_unique_constraints",
+      "postgresql_identity_table",
+      "cpk_postgresql_identity_table",
+      ...(adapter.supportsPartitionedIndexes()
+        ? ["measurements", "measurements_toronto", "measurements_concepcion"]
+        : []),
+      "pk_autopopulated_by_a_trigger_records",
+    ];
+  },
   mysql: async (adapter) => {
     await adapter.getDatabaseVersion();
     return [

@@ -35,6 +35,7 @@ import { Book } from "./test-helpers/models/book.js";
 import { Cart } from "./test-helpers/models/cart.js";
 import { Category, SpecialCategory } from "./test-helpers/models/category.js";
 import { Developer } from "./test-helpers/models/developer.js";
+import { Measurement } from "./test-helpers/models/measurement.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { Speedometer } from "./test-helpers/models/speedometer.js";
 
@@ -1003,54 +1004,13 @@ describe("InsertAllTest", () => {
 
   // Rails gates test_upsert_all_works_with_partitioned_indexes on
   // supports_insert_on_duplicate_update? && supports_insert_conflict_target? &&
-  // supports_partitioned_indexes? → PostgreSQL >= 11 only. The canonical
-  // `measurements` partitioned table (postgresql_specific_schema.rb:186-198) has
-  // no partition DSL in our defineSchema, so it is built via raw PG DDL below.
+  // supports_partitioned_indexes? → PostgreSQL >= 11 only. The `measurements`
+  // partitioned table (postgresql_specific_schema.rb:186-198) is laid at boot by
+  // loadPostgresqlSpecificSchema under the same supports_partitioned_indexes? gate.
   itIfSupports(
     "insert_conflict_target,insert_on_duplicate_update,partitioned_indexes",
     "upsert all works with partitioned indexes",
     async () => {
-      // supports_partitioned_indexes? is PostgreSQL >= 11; every PG lane we run
-      // (CI uses postgres:17) clears that, and the conjunction's other two features
-      // (insert_conflict_target, insert_on_duplicate_update) keep the runtime to PG.
-      const conn = Base.connection as any;
-
-      await conn.executeMutation('DROP TABLE IF EXISTS "measurements" CASCADE');
-      await conn.executeMutation(
-        'CREATE TABLE "measurements" (' +
-          '"city_id" character varying NOT NULL, ' +
-          '"logdate" date NOT NULL, ' +
-          '"peaktemp" integer, ' +
-          '"unitsales" integer' +
-          ") PARTITION BY LIST (city_id)",
-      );
-      await conn.executeMutation(
-        'CREATE UNIQUE INDEX "index_measurements_on_logdate_and_city_id" ' +
-          'ON "measurements" ("logdate", "city_id")',
-      );
-      await conn.executeMutation(
-        'CREATE TABLE "measurements_toronto" PARTITION OF "measurements" FOR VALUES IN (1)',
-      );
-      await conn.executeMutation(
-        'CREATE TABLE "measurements_concepcion" PARTITION OF "measurements" FOR VALUES IN (2)',
-      );
-      conn.schemaCache?.clear();
-
-      // Rails uses the empty `models/measurement.rb` and introspects the
-      // partitioned table's columns + (absent) primary key. Our PK introspection
-      // still defaults a no-PK table to "id", so the columns and `primaryKey = ""`
-      // (no PK, mirroring the partitioned table) are declared here instead — the
-      // alternative the story sanctions over DB introspection.
-      class Measurement extends Base {
-        static {
-          this.primaryKey = "";
-          this.attribute("city_id", "string");
-          this.attribute("logdate", "date");
-          this.attribute("peaktemp", "integer");
-          this.attribute("unitsales", "integer");
-        }
-      }
-
       const today = Temporal.Now.plainDateISO();
       const oneDayAgo = today.subtract({ days: 1 });
       const twoDaysAgo = today.subtract({ days: 2 });
@@ -1077,13 +1037,6 @@ describe("InsertAllTest", () => {
         [twoDaysAgo.toString(), 2, 2],
         [threeDaysAgo.toString(), 0, 0],
       ]);
-
-      // The partitions are dropped by the CASCADE below; name them explicitly so
-      // require-table-teardown balances the raw-created partition tables.
-      await conn.executeMutation(
-        'DROP TABLE IF EXISTS "measurements_toronto", "measurements_concepcion" CASCADE',
-      );
-      await conn.executeMutation('DROP TABLE IF EXISTS "measurements" CASCADE');
     },
   );
 
