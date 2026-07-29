@@ -149,12 +149,19 @@ describe("connect", () => {
     expect(envConfig.database).toBe("/tmp/ar-test-worker.sqlite3");
   });
 
-  it("pins pool 1 on the sqlite3_mem :memory: connection", async () => {
+  // `config.example.yml:93-99` carries `adapter` and `database` alone, so the
+  // built hash must too — no `pool:`, and therefore Rails' default pool size,
+  // the same one the file-backed lane above inherits.
+  it("builds the sqlite3_mem entries from adapter and database alone", async () => {
     vi.stubEnv("ARCONN", "sqlite3_mem");
     vi.stubEnv("AR_TEST_WORKER_DB", "");
-    const { adapter, envConfig } = await testConfigurationHashes();
+    const { adapter, envConfig, configurationHashes } = await testConfigurationHashes();
     expect(adapter).toBe("sqlite");
-    expect(envConfig.pool).toBe(1);
+    expect(configurationHashes.slice(0, 2).map((c) => c.configurationHash)).toEqual([
+      { adapter: "sqlite3", database: ":memory:" },
+      { adapter: "sqlite3", database: ":memory:" },
+    ]);
+    expect(envConfig.pool).toBe(5);
   });
 
   it("selects the postgresql connection named by ARCONN", async () => {

@@ -46,14 +46,13 @@ describe("createPooledTestAdapter (Phase B smoke)", () => {
     }
   });
 
-  // The duplicate pool inherits the primary's size, which `sqlite3_mem` pins to
-  // 1. This test needs two: the setup lease above plus the pinned one. So
-  // `pinConnectionBang` raises ConnectionTimeoutError ("All 1 connections are
-  // in use") before it issues any SQL.
-  //
-  // Checkout starvation, NOT the duplicate pool landing on its own empty
-  // `:memory:` database — the setup CREATE TABLE on the preceding line
-  // succeeds, as does the CREATE-then-read in the schemaCache case above.
+  // This test needs two connections: the setup lease above plus the pinned one.
+  // A SQLite `:memory:` database belongs to the connection that opened it, so
+  // on `sqlite3_mem` the second one is a second, EMPTY database and the pinned
+  // INSERT raises `no such table` — it never sees the setup CREATE TABLE.
+  // Rails guards its own pinned-connection case the same way —
+  // `skip("Can't test with in-memory dbs") if in_memory_db?`
+  // (`connection_pool_test.rb:891`).
   it.skipIf(inMemoryDb())(
     "pinConnectionBang + write + unpinConnectionBang rolls back",
     async () => {

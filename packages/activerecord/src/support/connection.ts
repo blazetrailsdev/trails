@@ -145,7 +145,7 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
   sqlite3: {
     adapter: "sqlite3",
     lane: "sqlite",
-    // `config.example.yml:82-89`: two file databases, both `timeout`/`strict`.
+    // `config.example.yml:83-91`: two file databases, both `timeout`/`strict`.
     // Rails names them under FIXTURES_ROOT; ours are the worker database and
     // its derived sibling, filled in by `expandConfig`.
     build: async () => {
@@ -156,18 +156,14 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
   sqlite3_mem: {
     adapter: "sqlite3",
     lane: "sqlite",
-    // `config.example.yml:91-97` — both entries are their own `:memory:` database.
+    // `config.example.yml:93-99` — both entries are their own `:memory:` database,
+    // carrying `adapter` and `database` and nothing else.
     // Exercised by ci.yml's `sqlite-mem-tests` job — the only lane where
     // `inMemoryDb()` is true, and so the only thing keeping the
     // `skipIf(inMemoryDb())` guards from rotting.
-    //
-    // `pool: 1` has no counterpart in the yml: a `:memory:` database belongs to
-    // its connection, so a second pool member would silently be a second, empty
-    // database. Rails never notices — its suite checks out one connection at a
-    // time; our pool leases concurrently.
     build: async () => ({
-      arunit: { adapter: "sqlite3", database: ":memory:", pool: 1 },
-      arunit2: { adapter: "sqlite3", database: ":memory:", pool: 1 },
+      arunit: { adapter: "sqlite3", database: ":memory:" },
+      arunit2: { adapter: "sqlite3", database: ":memory:" },
     }),
   },
   postgresql: {
