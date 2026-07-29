@@ -218,8 +218,6 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
       },
     );
 
-    // Rails issues the function and the trigger as a single heredoc `execute`;
-    // split here so each statement goes through the adapter on its own.
     await adapter.execute(
       "CREATE OR REPLACE FUNCTION populate_column()\n" +
         "RETURNS TRIGGER AS $$\n" +
@@ -230,10 +228,9 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
         "    NEW.id = COALESCE(max_value, 0) + 1;\n" +
         "    RETURN NEW;\n" +
         "END;\n" +
-        "$$ LANGUAGE plpgsql;\n",
-    );
-    await adapter.execute(
-      "CREATE TRIGGER before_insert_trigger\n" +
+        "$$ LANGUAGE plpgsql;\n" +
+        "\n" +
+        "CREATE TRIGGER before_insert_trigger\n" +
         "BEFORE INSERT ON pk_autopopulated_by_a_trigger_records\n" +
         "FOR EACH ROW\n" +
         "EXECUTE FUNCTION populate_column();\n",
