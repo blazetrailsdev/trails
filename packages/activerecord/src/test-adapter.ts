@@ -267,5 +267,4 @@ export async function resetTestAdapterState(): Promise<void> {
       { preventPermanentCheckout: true },
     );
   }
-  Base._modelsByName.clear();
 }

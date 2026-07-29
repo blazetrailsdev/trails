@@ -501,10 +501,10 @@ function useFixtures(
       // `resolveFixtureNames` (fixtures-register-model-on-resolution, #4348):
       // declaring the set is the opt-in, so no test needs a manual
       // `registerModel` call for a fixture-backed model. Idempotent. Guarded to
-      // real AR model classes (they inherit Base's static `_modelsByName`), so
+      // real AR model classes (they inherit Base's `_isActiveRecordBase`), so
       // the lightweight `{ tableName, ... }` stubs some infra tests pass through
       // the object-map form are left untouched.
-      if (model !== null && "_modelsByName" in model) {
+      if (model !== null && "_isActiveRecordBase" in model) {
         registerModel(model);
       }
       prepared.push(
