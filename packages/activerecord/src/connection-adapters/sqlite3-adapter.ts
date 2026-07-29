@@ -2192,7 +2192,12 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       }
     }
     await this.alterTable(fromTable, (definition) => {
-      definition.foreignKey(toTable, options);
+      // TableDefinition#foreignKey re-applies the table name prefix/suffix, so
+      // strip it here or a configured prefix lands on toTable twice.
+      definition.foreignKey(
+        this.schemaStatements().stripTableNamePrefixAndSuffix(toTable),
+        options,
+      );
     });
   }
 
