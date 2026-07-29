@@ -340,8 +340,12 @@ export class DatabaseTasks {
 
     const runMigration = async (
       adapter: import("../connection-adapters/abstract-adapter.js").AbstractAdapter,
+      dbConfig: DatabaseConfig,
     ) => {
-      const migrator = new Migrator(adapter, this._migrations);
+      // Rails builds the migrator from `migration_connection_pool.migration_context`
+      // (`connection_pool.rb:294-299`), i.e. from the pool's own
+      // `db_config.migrations_paths` — not from a process-global list.
+      const migrator = new Migrator(adapter, this._migrationsFor(dbConfig));
       // Rails block: `version.blank? ? (scope.blank? || scope == m.scope) : m.version == version`
       // `version` is the *method parameter* (explicit arg), NOT ENV["VERSION"].
       // The rake task always calls migrate() with no arg, so version is nil → scope filter only.
@@ -373,7 +377,7 @@ export class DatabaseTasks {
     try {
       const pool = await this.migrationConnectionPool();
       if (!skipInitialize) await initializeDatabase(pool.dbConfig);
-      await runMigration(await pool.leaseConnection());
+      await runMigration(await pool.leaseConnection(), pool.dbConfig);
     } finally {
       Migration.verbose = verboseWas;
     }
@@ -1054,7 +1058,7 @@ export class DatabaseTasks {
       for (const dbConfig of dbConfigs) {
         await this.withTemporaryConnection(dbConfig, async (adapter) => {
           const { Migrator } = await import("../migration.js");
-          const migrator = new Migrator(adapter, this._migrations);
+          const migrator = new Migrator(adapter, this._migrationsFor(dbConfig));
           await migrator.migrate(version ?? null);
           adapter.schemaCache?.clear();
         });
