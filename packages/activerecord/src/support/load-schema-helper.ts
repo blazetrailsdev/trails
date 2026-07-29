@@ -510,7 +510,8 @@ const ADAPTER_SPECIFIC_TABLES: Record<
   (adapter: DatabaseAdapter) => Promise<readonly string[]>
 > = {
   postgres: async (adapter) => {
-    await adapter.getDatabaseVersion();
+    const pg = adapter as unknown as PostgreSQLAdapter;
+    await pg.getDatabaseVersion();
     return [
       "chat_messages",
       "chat_messages_custom_pk",
@@ -530,9 +531,10 @@ const ADAPTER_SPECIFIC_TABLES: Record<
       "uuid_messages",
       "test_exclusion_constraints",
       "test_unique_constraints",
-      "postgresql_identity_table",
-      "cpk_postgresql_identity_table",
-      ...(adapter.supportsPartitionedIndexes()
+      ...(pg.supportsIdentityColumns()
+        ? ["postgresql_identity_table", "cpk_postgresql_identity_table"]
+        : []),
+      ...(pg.supportsPartitionedIndexes()
         ? ["measurements", "measurements_toronto", "measurements_concepcion"]
         : []),
       "pk_autopopulated_by_a_trigger_records",
