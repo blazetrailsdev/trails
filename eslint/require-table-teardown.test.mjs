@@ -560,6 +560,20 @@ tester.run("require-table-teardown", rule, {
         "}",
       errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
     },
+    // A hoisted filter whose pattern is interpolated is not a knowable prefix:
+    // reading the template's quasis as one joined string would make `LIKE
+    // 'ex${suffix}%'` look like the static prefix `ex `, crediting a create the
+    // query need not select.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex leak" (id int)`);\n' +
+        "const sql = `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex${suffix}%'`;\n" +
+        "const rows = await adapter.execute(sql);\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex leak" } }],
+    },
     // A filter string that never reaches an execution sink sweeps nothing — an
     // expected-SQL assertion must not credit the file's creates.
     {

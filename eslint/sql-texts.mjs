@@ -18,15 +18,21 @@
  * so hoisting a query to a `const SWEEP_SQL` does not hide it while an
  * expected-SQL assertion never reaches a sink and so arms nothing.
  *
- * A template's quasis are joined with a space, which is lossy about where the
- * substitutions sat — enough to read a `LIKE` filter or a catalogue name out of
- * it, not enough to decide whether a name at a quasi boundary is complete.
+ * A template's quasis are joined with a space by default, which is lossy about
+ * where the substitutions sat: it can only ADD strings a reader might match, so
+ * it is safe for a rule whose matches produce reports and unsafe for one whose
+ * matches suppress them. `separateQuasis` yields each quasi as its own string
+ * instead, so nothing spans a substitution — the reading the inline-template
+ * path of `require-table-teardown` already uses, where a joined
+ * `LIKE 'ex${suffix}%'` would otherwise read as the static prefix `ex `.
  */
-export function createSqlTexts(resolve) {
+export function createSqlTexts(resolve, { separateQuasis = false } = {}) {
   return function sqlTexts(node, seen = new Set()) {
     if (node?.type === "Literal") return typeof node.value === "string" ? [node.value] : [];
-    if (node?.type === "TemplateLiteral")
-      return [node.quasis.map((q) => q.value.cooked ?? "").join(" ")];
+    if (node?.type === "TemplateLiteral") {
+      const quasis = node.quasis.map((q) => q.value.cooked ?? "");
+      return separateQuasis ? quasis : [quasis.join(" ")];
+    }
     if (node?.type !== "Identifier") return [];
     const variable = resolve(node);
     if (variable === null || seen.has(variable)) return [];

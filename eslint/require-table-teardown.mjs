@@ -140,12 +140,16 @@
  * declaration — arms the same prefixes as the inline spelling, and the two rules
  * cannot disagree about which writes a hoisted query can carry. A string that
  * never reaches a sink still arms nothing, so an expected-SQL assertion over
- * rendered DDL stays quiet. Only the FILTER half is read off a resolved
- * variable, never a create or drop name: `sqlTexts` joins a template's quasis
- * with a space, which loses where the substitutions sat, and the create/drop
- * scanners need exactly that to decide whether a name at a quasi boundary is
- * complete. A prefix filter needs no such boundary, so reading it out of a
- * joined text is sound where reading a name would not be.
+ * rendered DDL stays quiet. A resolved template is read one quasi at a time
+ * (`separateQuasis`), never joined: a joined `LIKE 'ex${suffix}%'` would read as
+ * the static prefix `ex `, arming a prefix the query does not select and
+ * suppressing the leak of a table like `ex leak`. Reading each quasi alone
+ * leaves `LIKE 'ex` unterminated, so an interpolated pattern credits nothing —
+ * the same answer the inline-template path gives, and the right one, since `_`
+ * and `%` are wildcards whose meaning depends on text the lint pass cannot see.
+ * Only the FILTER is read off a resolved variable, never a create or drop name:
+ * a name at a quasi boundary needs the dynamic-end signal `recordText` carries,
+ * which a resolved text has no node to supply.
  *
  * This is deliberately independent of `require-canonical-rebuild`: the two
  * rules answer different questions. A sweep that can select a canonical table
@@ -523,7 +527,7 @@ const rule = {
     const { isSweepBound, resolve } = createSweepBinding(context, {
       loopBindingNeedsSinkIterable: true,
     });
-    const sqlTexts = createSqlTexts(resolve);
+    const sqlTexts = createSqlTexts(resolve, { separateQuasis: true });
 
     // table name → first create node seen (for the report location).
     const created = new Map();
