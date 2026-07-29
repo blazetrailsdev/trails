@@ -21,7 +21,7 @@ describe("fixture connection source", () => {
     ActiveRecord.permanentConnectionCheckout = true;
   });
 
-  it("leases without tripping ActiveRecord.permanentConnectionCheckout = disallowed", () => {
+  it("leases without tripping permanentConnectionCheckout = disallowed", () => {
     ActiveRecord.permanentConnectionCheckout = "disallowed";
 
     expect(() => leaseFixtureConnection()).not.toThrow();
