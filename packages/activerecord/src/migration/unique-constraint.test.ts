@@ -2,8 +2,7 @@
  * Mirrors Rails activerecord/test/cases/migration/unique_constraint_test.rb
  * (PostgreSQL-only — `supports_unique_constraints?`).
  *
- * The model-backed and schema-scoped arms, and the arms that need Rails'
- * `test_unique_constraints` fixture table, are not ported here.
+ * The model-backed and schema-scoped arms are not ported here.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -24,14 +23,60 @@ describeIfSupports("unique_constraints", "Migration", () => {
 
   afterEach(async () => {
     await connection.dropTable("sections", { ifExists: true });
-    // Rails' setup replaces `sections` with a single-column table and its
-    // teardown drops it; restore the canonical shape so the shared per-worker
-    // database does not drift for the files that run next.
     await rebuildCanonicalTables(connection, ["sections"]);
     await connection.close();
   });
 
   describe("UniqueConstraintTest", () => {
+    it("unique constraints", async () => {
+      const uniqueConstraints = await connection.uniqueConstraints("test_unique_constraints");
+
+      const expectedConstraints = [
+        {
+          name: "test_unique_constraints_position_deferrable_false",
+          deferrable: false,
+          column: ["position_1"],
+        },
+        {
+          name: "test_unique_constraints_position_deferrable_immediate",
+          deferrable: "immediate",
+          column: ["position_2"],
+        },
+        {
+          name: "test_unique_constraints_position_deferrable_deferred",
+          deferrable: "deferred",
+          column: ["position_3"],
+        },
+        {
+          name: "test_unique_constraints_position_nulls_not_distinct",
+          nullsNotDistinct: true,
+          column: ["position_4"],
+        },
+      ];
+
+      expect(uniqueConstraints.length).toBe(expectedConstraints.length);
+
+      const expectedNullsNotDistinct = expectedConstraints.pop()!;
+
+      for (const expected of expectedConstraints) {
+        const constraint = uniqueConstraints.find((c) => c.name === expected.name)!;
+        expect(constraint.tableName).toBe("test_unique_constraints");
+        expect(constraint.name).toBe(expected.name);
+        expect(constraint.column).toEqual(expected.column);
+        expect(constraint.deferrable).toBe(expected.deferrable);
+      }
+
+      await connection.getDatabaseVersion();
+      // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors Rails' inline `if supports_nulls_not_distinct?` guard (PG 15+)
+      if (connection.supportsNullsNotDistinct()) {
+        const constraint = uniqueConstraints.find((c) => c.name === expectedNullsNotDistinct.name)!;
+        expect(constraint.tableName).toBe("test_unique_constraints");
+        expect(constraint.name).toBe(expectedNullsNotDistinct.name);
+        expect(constraint.column).toEqual(expectedNullsNotDistinct.column);
+        expect(constraint.nullsNotDistinct).toBe(expectedNullsNotDistinct.nullsNotDistinct);
+      }
+    });
+
     it("add unique constraint without deferrable", async () => {
       await connection.addUniqueConstraint("sections", ["position"]);
 

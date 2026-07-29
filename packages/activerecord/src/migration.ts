@@ -659,7 +659,9 @@ export abstract class Migration {
       return;
     }
     tableName = this._pt(tableName);
-    await this.schema.changeColumnNull(tableName, columnName, allowNull, defaultValue);
+    const conn = this.connection;
+    assertSchemaAdapter(conn);
+    await conn.changeColumnNull(tableName, columnName, allowNull, defaultValue);
   }
 
   async addReference(

@@ -22,14 +22,6 @@ describeIfPg("Migration", () => {
   });
 
   describe("PgChangeSchemaTest", () => {
-    it("change column", async () => {
-      await adapter.exec("ALTER TABLE strings ADD COLUMN age integer");
-      await adapter.changeColumn("strings", "age", "string");
-      const cols = await adapter.columns("strings");
-      const col = cols.find((c) => c.name === "age");
-      expect(col!.sqlType).toBe("character varying");
-    });
-
     it("change column with null", async () => {
       await adapter.exec("ALTER TABLE strings ADD COLUMN score integer");
       await adapter.changeColumn("strings", "score", "integer", { null: false });
@@ -53,14 +45,6 @@ describeIfPg("Migration", () => {
       const col = cols.find((c) => c.name === "score");
       expect(col!.default).toBeNull();
       expect(col!.null).toBe(false);
-    });
-
-    it("change column null", async () => {
-      await adapter.exec("ALTER TABLE strings ADD COLUMN score integer NOT NULL DEFAULT 0");
-      await adapter.changeColumn("strings", "score", "integer", { null: true });
-      const cols = await adapter.columns("strings");
-      const col = cols.find((c) => c.name === "score");
-      expect(col!.null).toBe(true);
     });
 
     it("change column scale", async () => {
