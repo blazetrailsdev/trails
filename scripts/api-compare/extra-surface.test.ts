@@ -1563,6 +1563,25 @@ describe("buildReport — @noRailsEquivalent tags", () => {
     expect(report.tagged).toEqual({ total: 0, matched: 0, inheritedMatched: 1, stale: [] });
   });
 
+  it("does not extend a merged interface's tag to the namespace half's members", () => {
+    const m = makeManifests();
+    m.ts.packages.activemodel.modules.Shape = {
+      name: "Shape",
+      file: "foo.ts",
+      includes: [],
+      extends: [],
+      instanceMethods: [method("tsOnlyHelper"), method("namespaceFn")],
+      classMethods: [],
+      isInterface: true,
+      interfaceMembers: ["tsOnlyHelper"],
+      noRailsEquivalent: "duck-typed collaborator shape",
+    };
+    const report = run(m);
+    expect(report.packages[0].totalAllowlisted).toBe(1);
+    expect(report.packages[0].totalNovel).toBe(1);
+    expect(report.tagged.inheritedMatched).toBe(1);
+  });
+
   it("does not judge tags of packages this run never scanned", () => {
     const report = buildReport(
       makeManifests("no counterpart").ruby,

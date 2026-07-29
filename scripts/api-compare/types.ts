@@ -126,6 +126,7 @@ export interface ClassInfo {
    * `collectTaggedEntries` in extra-surface.ts.
    */
   isInterface?: boolean;
+  interfaceMembers?: string[];
   /**
    * Reason prose of an `@noRailsEquivalent` tag written on the class /
    * interface / namespace DECLARATION itself, justifying the declared name as

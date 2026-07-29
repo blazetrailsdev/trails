@@ -2112,3 +2112,40 @@ describe("extract-ts-api — MethodInfo emit-site inventory", () => {
     );
   });
 });
+
+describe("extractFromProgram — interface merged with a namespace of the same name", () => {
+  const IFACE = `
+    /** @noRailsEquivalent duck-typed collaborator shape */
+    export interface Locator {
+      locate(gid: unknown): unknown;
+    }
+  `;
+  const NAMESPACE = `
+    export namespace Locator {
+      export function use(name: string): void {}
+    }
+  `;
+
+  const entry = (source: string): ClassInfo => {
+    const info = extractFromFiles("/p", { "locator.ts": source });
+    return info.modules["locator.ts:Locator"];
+  };
+
+  it("keeps the interface's metadata when the namespace is declared last", () => {
+    const merged = entry(`${IFACE}\n${NAMESPACE}`);
+
+    expect(merged.isInterface).toBe(true);
+    expect(merged.noRailsEquivalent).toBe("duck-typed collaborator shape");
+    expect(merged.instanceMethods.map((m) => m.name).sort()).toEqual(["locate", "use"]);
+    expect(merged.interfaceMembers).toEqual(["locate"]);
+  });
+
+  it("keeps the interface's metadata when the namespace is declared first", () => {
+    const merged = entry(`${NAMESPACE}\n${IFACE}`);
+
+    expect(merged.isInterface).toBe(true);
+    expect(merged.noRailsEquivalent).toBe("duck-typed collaborator shape");
+    expect(merged.instanceMethods.map((m) => m.name).sort()).toEqual(["locate", "use"]);
+    expect(merged.interfaceMembers).toEqual(["locate"]);
+  });
+});

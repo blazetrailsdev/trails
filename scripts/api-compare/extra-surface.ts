@@ -352,7 +352,11 @@ export function collectTaggedEntries(ts: ApiManifest): TaggedEntry[] {
         // have Ruby counterparts, so inheriting there would mask real drift.
         // A member's own tag still wins — members are pushed first.
         if (c.isInterface === true && c.noRailsEquivalent !== undefined) {
-          for (const m of c.instanceMethods) push(pkg, c.file, m.name, c.noRailsEquivalent, true);
+          const covered = c.interfaceMembers;
+          for (const m of c.instanceMethods) {
+            if (covered && !covered.includes(m.name)) continue;
+            push(pkg, c.file, m.name, c.noRailsEquivalent, true);
+          }
         }
       }
     }
