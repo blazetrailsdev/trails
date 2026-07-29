@@ -552,7 +552,7 @@ function bracketSource(pattern, start, escapeChar) {
       if (pattern[i + 1] !== ":") return null;
       const end = pattern.indexOf(":]", i + 2);
       if (end === -1) return null;
-      const classSource = POSIX_CLASS_SOURCES[pattern.slice(i + 2, end)];
+      const classSource = POSIX_CLASS_SOURCES.get(pattern.slice(i + 2, end));
       // Every licensed spelling is a subset, so a negated class refuses; so does
       // a name not on the list (`[[:punct:]]`, a locale-extending complement, a
       // typo) and a class used as a range endpoint, which ARE rejects outright
@@ -627,17 +627,17 @@ const ARE_SHORTHANDS = new Set(["d", "w", "S"]);
  * never appear as a POSIX class name at all — the complement is spelled by
  * negating the bracket expression, which refuses wholesale (see `bracketSource`).
  */
-const POSIX_CLASS_SOURCES = {
-  alnum: "0-9A-Za-z",
-  alpha: "A-Za-z",
-  blank: " \\t",
-  digit: "\\d",
-  lower: "a-z",
-  space: " \\t\\n\\v\\f\\r",
-  upper: "A-Z",
-  word: "\\w",
-  xdigit: "0-9A-Fa-f",
-};
+const POSIX_CLASS_SOURCES = new Map([
+  ["alnum", "0-9A-Za-z"],
+  ["alpha", "A-Za-z"],
+  ["blank", " \\t"],
+  ["digit", "\\d"],
+  ["lower", "a-z"],
+  ["space", " \\t\\n\\v\\f\\r"],
+  ["upper", "A-Z"],
+  ["word", "\\w"],
+  ["xdigit", "0-9A-Fa-f"],
+]);
 
 /**
  * The JS regex source equivalent to the POSIX ERE `pattern`, or null when it

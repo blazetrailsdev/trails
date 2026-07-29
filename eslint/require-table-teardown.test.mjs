@@ -969,6 +969,19 @@ tester.run("require-table-teardown", rule, {
         "}",
       errors: [{ messageId: "missingTeardown", data: { table: "ex_." } }],
     },
+    // A class name that happens to name an `Object.prototype` property is still
+    // not a class name (`POSIX_CLASS_SOURCES` is a Map, not an object literal).
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_c" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[[:constructor:]]'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_c" } }],
+    },
     // Under a negating `^` the ASCII spelling is the *wider* of the two, so a
     // POSIX class refuses there even when it translates unnegated.
     {
