@@ -1542,6 +1542,210 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, "ran");`,
     }
   });
 
+  it("db:prepare works on all databases", async () => {
+    const primaryDb = path.join(tmpDir, "prepare-primary.sqlite3");
+    const animalsDb = path.join(tmpDir, "prepare-animals.sqlite3");
+    // Distinct files per environment: a development prepare also prepares
+    // the test databases (Rails' each_current_environment).
+    const testPrimaryDb = path.join(tmpDir, "prepare-primary-test.sqlite3");
+    const testAnimalsDb = path.join(tmpDir, "prepare-animals-test.sqlite3");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: {
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+  },
+  test: {
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(testPrimaryDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(testAnimalsDb)} },
+  },
+};`,
+    );
+    fs.mkdirSync(path.join(tmpDir, "db", "migrations_animals"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations", "20260101000000-create-users.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreateUsers extends Migration {
+  async up() { await this.createTable("users", (t) => { t.string("name"); }); }
+  async down() { await this.dropTable("users"); }
+}`,
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations_animals", "20260101000001-create-dogs.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreateDogs extends Migration {
+  async up() { await this.createTable("dogs", (t) => { t.string("breed"); }); }
+  async down() { await this.dropTable("dogs"); }
+}`,
+    );
+    expect(fs.existsSync(primaryDb)).toBe(false);
+    expect(fs.existsSync(animalsDb)).toBe(false);
+
+    await runDb(["prepare"]);
+
+    expect(fs.existsSync(primaryDb)).toBe(true);
+    expect(fs.existsSync(animalsDb)).toBe(true);
+    expect(fs.existsSync(testPrimaryDb)).toBe(true);
+    expect(fs.existsSync(testAnimalsDb)).toBe(true);
+
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    const primary = new BetterSQLite3Adapter(primaryDb);
+    try {
+      expect(
+        await primary.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'"),
+      ).toHaveLength(1);
+      expect(
+        await primary.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='dogs'"),
+      ).toHaveLength(0);
+    } finally {
+      await primary.close();
+    }
+    const animals = new BetterSQLite3Adapter(animalsDb);
+    try {
+      expect(
+        await animals.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='dogs'"),
+      ).toHaveLength(1);
+      expect(
+        await animals.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'"),
+      ).toHaveLength(0);
+    } finally {
+      await animals.close();
+    }
+    const testPrimary = new BetterSQLite3Adapter(testPrimaryDb);
+    try {
+      expect(
+        await testPrimary.execute(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='users'",
+        ),
+      ).toHaveLength(1);
+    } finally {
+      await testPrimary.close();
+    }
+    const testAnimals = new BetterSQLite3Adapter(testAnimalsDb);
+    try {
+      expect(
+        await testAnimals.execute(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='dogs'",
+        ),
+      ).toHaveLength(1);
+    } finally {
+      await testAnimals.close();
+    }
+  });
+
+  it("db prepare honors per-environment migrationsPaths", async () => {
+    const devDb = path.join(tmpDir, "per-env-dev.sqlite3");
+    const testDb = path.join(tmpDir, "per-env-test.sqlite3");
+    fs.mkdirSync(path.join(tmpDir, "db", "migrations_test_env"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: { adapter: "sqlite3", database: ${JSON.stringify(devDb)} },
+  test: {
+    adapter: "sqlite3",
+    database: ${JSON.stringify(testDb)},
+    migrationsPaths: "db/migrations_test_env",
+  },
+};`,
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations", "20260101000000-create-users.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreateUsers extends Migration {
+  async up() { await this.createTable("users", (t) => { t.string("name"); }); }
+  async down() { await this.dropTable("users"); }
+}`,
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations_test_env", "20260101000001-create-fixtures.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreateFixtures extends Migration {
+  async up() { await this.createTable("fixtures", (t) => { t.string("label"); }); }
+  async down() { await this.dropTable("fixtures"); }
+}`,
+    );
+
+    await runDb(["prepare"]);
+
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    const dev = new BetterSQLite3Adapter(devDb);
+    try {
+      expect(
+        await dev.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'"),
+      ).toHaveLength(1);
+      expect(
+        await dev.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='fixtures'"),
+      ).toHaveLength(0);
+    } finally {
+      await dev.close();
+    }
+    const test = new BetterSQLite3Adapter(testDb);
+    try {
+      expect(
+        await test.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='fixtures'"),
+      ).toHaveLength(1);
+      expect(
+        await test.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'"),
+      ).toHaveLength(0);
+    } finally {
+      await test.close();
+    }
+  });
+
+  it("db:prepare runs seeds once", async () => {
+    const primaryDb = path.join(tmpDir, "seed-once-primary.sqlite3");
+    const animalsDb = path.join(tmpDir, "seed-once-animals.sqlite3");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: {
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+  },
+  test: {
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb + ".test")} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb + ".test")} },
+  },
+};`,
+    );
+    fs.mkdirSync(path.join(tmpDir, "db", "migrations_animals"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations", "20260101000000-create-users.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreateUsers extends Migration {
+  async up() { await this.createTable("users", (t) => { t.string("name"); }); }
+  async down() { await this.dropTable("users"); }
+}`,
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations_animals", "20260101000001-create-dogs.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreateDogs extends Migration {
+  async up() { await this.createTable("dogs", (t) => { t.string("breed"); }); }
+  async down() { await this.dropTable("dogs"); }
+}`,
+    );
+    const seedMarker = path.join(tmpDir, "db", "seed-runs");
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "seeds.ts"),
+      `import * as fs from "node:fs";
+const prev = fs.existsSync(${JSON.stringify(seedMarker)})
+  ? Number(fs.readFileSync(${JSON.stringify(seedMarker)}, "utf8"))
+  : 0;
+fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
+    );
+
+    await runDb(["prepare"]);
+    expect(fs.readFileSync(seedMarker, "utf8")).toBe("1");
+
+    // Both databases are initialized now, so a second prepare seeds nothing.
+    await runDb(["prepare"]);
+    expect(fs.readFileSync(seedMarker, "utf8")).toBe("1");
+  });
+
   it("db seed:replant truncates tables then runs seeds", async () => {
     const dbFile = path.join(tmpDir, "replant.sqlite3");
     fs.writeFileSync(

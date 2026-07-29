@@ -307,6 +307,7 @@ export { ConnectionHandler } from "./connection-adapters/abstract/connection-han
 export { ConnectionManagement, BodyProxy } from "./connection-adapters/connection-management.js";
 export { DatabaseTasks, DatabaseNotSupported } from "./tasks/database-tasks.js";
 export type { DatabaseTaskHandler, SchemaFormat } from "./tasks/database-tasks.js";
+export { eachCurrentEnvironment } from "./tasks/database-tasks.js";
 export { SQLiteDatabaseTasks } from "./tasks/sqlite-database-tasks.js";
 export { PostgreSQLDatabaseTasks } from "./tasks/postgresql-database-tasks.js";
 export { MySQLDatabaseTasks } from "./tasks/mysql-database-tasks.js";
