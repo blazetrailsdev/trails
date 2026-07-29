@@ -190,6 +190,25 @@ tester.run("require-table-teardown", rule, {
       "for (const t of rows) {\n" +
       '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
       "}",
+    // PostgreSQL applies the ESCAPE character inside a bracket expression too,
+    // so a bracketed shorthand under the default backslash escape is the ARE
+    // class it is on the `~` path: `SIMILAR TO 'ex_[\d]%'` sweeps `ex_1`.
+    'await adapter.exec(`CREATE TABLE "ex_1" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename SIMILAR TO 'ex_[\\\\d]%'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
+    // The same holds for a non-backslash ESCAPE character: `[#d]` under
+    // `ESCAPE '#'` reaches the ARE as `[\d]` and selects `ex_1`.
+    'await adapter.exec(`CREATE TABLE "ex_1" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename SIMILAR TO 'ex_[#d]%' ESCAPE '#'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
     // A bracket expression and a bounded repeat are spelled alike in JS.
     'await adapter.exec(`CREATE TABLE "ex12_int" (id int)`);\n' +
       "const rows = await adapter.execute(\n" +
@@ -988,13 +1007,42 @@ tester.run("require-table-teardown", rule, {
         "}",
       errors: [{ messageId: "missingTeardown", data: { table: "ex_-" } }],
     },
-    // `SIMILAR TO` carries its own ESCAPE character, and how that composes with
-    // a backslash inside brackets is unsettled, so that path still refuses.
+    // A backslash that is NOT the pattern's ESCAPE character is a literal
+    // backslash inside a `SIMILAR TO` bracket expression, so `[\d]` selects a
+    // backslash or a `d` and crediting the digits would be the wider reading.
     {
       code:
         'await adapter.exec(`CREATE TABLE "ex_1" (id int)`);\n' +
         "const rows = await adapter.execute(\n" +
-        "  `SELECT tablename FROM pg_tables WHERE tablename SIMILAR TO 'ex_[\\\\d]%'`,\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename SIMILAR TO 'ex_[\\\\d]%' ESCAPE '#'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_1" } }],
+    },
+    // The same for a range: `[a-d]` under `ESCAPE '-'` is the digits, since the
+    // `-` escapes the `d` before it can be read as the middle of a range — so
+    // reading it as a range would credit `ex_b`, which the filter does not
+    // select.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_b" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename SIMILAR TO 'ex_[a-d]%' ESCAPE '-'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_b" } }],
+    },
+    // An ESCAPE character with structural meaning inside a bracket expression
+    // refuses it: `[^d]` under `ESCAPE '^'` is the digits, not a negated class.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_1" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename SIMILAR TO 'ex_[^d]%' ESCAPE '^'`,\n" +
         ");\n" +
         "for (const t of rows) {\n" +
         '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +

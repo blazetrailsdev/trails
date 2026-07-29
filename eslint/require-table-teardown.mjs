@@ -477,20 +477,38 @@ const BOUND_RE = /^\{\d+(?:,\d*)?\}/;
  * emitting it doubled would credit `exd` for `~ '^ex[\d]'` — a name the filter
  * does not select.
  *
- * `areEscapes` says which reading applies, so the caller that knows the engine
- * decides. The `~` / `~*` path sets it: those patterns are read by ARE, where a
- * bracketed `ARE_SHORTHANDS` member means exactly what the same shorthand means
- * in a JS character class, so `[\d]` translates. Every other backslash inside
- * brackets still refuses — the complements (`[\W]`), `\b` (backspace here, not
- * a word boundary), a back reference (`[\1]`), and a bare `[\\]`, whose ARE
- * meaning is a literal backslash but whose bare-POSIX one is two of them. A
- * shorthand used as a range endpoint (`[a-\d]`, `[\d-z]`) is refused too: ARE
- * rejects it outright, while JS's Annex B grammar quietly reads the `-` as a
- * literal and would credit a name containing one. Unset (the `SIMILAR TO`
- * path), any backslash refuses: that grammar carries its own `ESCAPE`
- * character, and how it composes with a bracketed backslash is unsettled.
+ * `escapeChar` is the character that introduces an escape here, so the caller
+ * that knows the engine decides which reading applies. The `~` / `~*` path
+ * passes the backslash ARE spells its escapes with, where a bracketed
+ * `ARE_SHORTHANDS` member means exactly what the same shorthand means in a JS
+ * character class, so `[\d]` translates. Every other escape inside brackets
+ * refuses — the complements (`[\W]`), `\b` (backspace here, not a word
+ * boundary), a back reference (`[\1]`), and a bare `[\\]`, whose ARE meaning is
+ * a literal backslash but whose bare-POSIX one is two of them. A shorthand used
+ * as a range endpoint (`[a-\d]`, `[\d-z]`) is refused too: ARE rejects it
+ * outright, while JS's Annex B grammar quietly reads the `-` as a literal and
+ * would credit a name containing one.
+ *
+ * The `SIMILAR TO` path passes its own `ESCAPE` character, which PostgreSQL
+ * applies inside bracket expressions as well — settled against a live server
+ * (17.7), since the grammar in the docs does not say either way:
+ * `'ex_5' SIMILAR TO 'ex_[\d]%'` is TRUE under the default backslash escape and
+ * `'ex_d'` is not, so the escape+letter pair reaches the underlying ARE as the
+ * class shorthand; `'ex_5' SIMILAR TO 'ex_[#d]%' ESCAPE '#'` is TRUE the same
+ * way. It follows that a backslash which is NOT the escape character is a plain
+ * literal there (`[\d]` under `ESCAPE '#'` selects a backslash or a `d`, and
+ * TRUE for neither digit nor `\d`'s JS meaning), so it must refuse rather than
+ * translate — the JS class would otherwise be the wider of the two.
+ *
+ * An escape character with structural meaning inside a bracket expression
+ * (`[`, `]`, `^`, `-`) refuses the expression outright: `ESCAPE '^'` makes
+ * `[^d]` the digits rather than a negated class, and the members are parsed
+ * before the escape could be honoured.
  */
-function bracketSource(pattern, start, areEscapes = false) {
+const BRACKET_STRUCTURAL = new Set(["[", "]", "^", "-"]);
+
+function bracketSource(pattern, start, escapeChar) {
+  if (BRACKET_STRUCTURAL.has(escapeChar)) return null;
   let source = "[";
   let i = start + 1;
   if (pattern[i] === "^") {
@@ -507,9 +525,12 @@ function bracketSource(pattern, start, areEscapes = false) {
   for (; i < pattern.length && pattern[i] !== "]"; i++) {
     const ch = pattern[i];
     if (ch === "[" && ":.=".includes(pattern[i + 1] ?? "")) return null;
-    if (ch === "\\") {
+    // A backslash that does not escape here is still refused rather than
+    // emitted: it is a literal to PostgreSQL but an escape to JS.
+    if (ch === "\\" && ch !== escapeChar) return null;
+    if (ch === escapeChar) {
       const next = pattern[i + 1];
-      if (!areEscapes || next === undefined || !ARE_SHORTHANDS.has(next)) return null;
+      if (next === undefined || !ARE_SHORTHANDS.has(next)) return null;
       if (source.endsWith("-") && source.length - 1 > bodyStart) return null;
       if (pattern[i + 2] === "-" && (pattern[i + 3] ?? "]") !== "]") return null;
       source += `\\${next}`;
@@ -568,7 +589,7 @@ function posixRegexpSource(pattern) {
   while (i < pattern.length) {
     const ch = pattern[i];
     if (ch === "[") {
-      const bracket = bracketSource(pattern, i, true);
+      const bracket = bracketSource(pattern, i, "\\");
       if (bracket === null) return null;
       source += bracket.source;
       i = bracket.next;
@@ -622,6 +643,12 @@ function regexpPrefixMatcher(pattern, caseInsensitive) {
  * matches the entire name: in `'ex|tmp%'` the `%` belongs to the second branch
  * only, so a prefix reading of the alternation would credit `exFOO`, which the
  * filter does not select.
+ *
+ * `escapeChar` reaches `bracketSource` too, because PostgreSQL honours the
+ * `ESCAPE` character inside a bracket expression and hands the pair to the
+ * underlying ARE — so `[\d]` under the default backslash escape (the one
+ * `sanitize_sql_like` emits) is the digits, exactly as on the `~` path, while a
+ * backslash that is not the escape character is a literal there and refuses.
  */
 function similarPrefixMatcher(pattern, escapeChar, caseInsensitive) {
   let source = "";
@@ -634,7 +661,7 @@ function similarPrefixMatcher(pattern, escapeChar, caseInsensitive) {
       source += next.replace(JS_METACHAR_RE, "\\$&");
       i += 2;
     } else if (ch === "[") {
-      const bracket = bracketSource(pattern, i);
+      const bracket = bracketSource(pattern, i, escapeChar);
       if (bracket === null) return null;
       source += bracket.source;
       i = bracket.next;
