@@ -132,8 +132,8 @@
  * are reported, which is noise rather than a leak): SQL built by concatenation
  * or returned from a helper, since only literals and template quasis are read;
  * a catalogue relation `CATALOGUE_SOURCE` does not list; and a
- * filter spelled as something other than `LIKE` — `ILIKE`, `SIMILAR TO`, a
- * regex operator — since only `LIKE` is read.
+ * filter spelled as something other than `LIKE` or `ILIKE` — `SIMILAR TO`, a
+ * regex operator — since only those two are read.
  *
  * This is deliberately independent of `require-canonical-rebuild`: the two
  * rules answer different questions. A sweep that can select a canonical table
@@ -330,13 +330,20 @@ const CATALOGUE_SOURCE =
  * clause the escape is backslash, PostgreSQL's default and the one
  * `sanitize_sql_like` emits.
  *
- * `NOT LIKE` is excluded, and it is not a nicety: an exclusion filter selects
+ * PostgreSQL's `ILIKE` is the case-insensitive spelling of the same filter —
+ * Arel emits both from `visit_Arel_Nodes_Matches` (arel/visitors/postgresql.rb),
+ * `ESCAPE` clause included — so it is read the same way, but its matcher carries
+ * the `i` flag: `ILIKE 'ex_%'` really does select `EX_FOO`, and compiling it
+ * case-sensitively would leave that create reported although the sweep drops it.
+ *
+ * `NOT LIKE` (and `NOT ILIKE`) is excluded, and it is not a nicety: an exclusion
+ * filter selects
  * the complement of its pattern, so reading `NOT LIKE 'ex_%'` as a prefix would
  * make a sweep satisfy exactly the creates it deliberately spares. The empty
  * pattern is likewise impossible to match (`[^'%]+`), so a bare `LIKE '%'`
  * selecting everything never becomes a prefix that satisfies everything.
  */
-const LIKE_PREFIX_RE = /(?<!\bnot\s+)\blike\s+'([^'%]+)%'/gi;
+const LIKE_PREFIX_RE = /(?<!\bnot\s+)\b(i?)like\s+'([^'%]+)%'/gi;
 /** A trailing `ESCAPE '<char>'` clause, and the leading keyword on its own. */
 const ESCAPE_CLAUSE_RE = /^\s*escape\s+'([^'])'/i;
 const ESCAPE_KEYWORD_RE = /^\s*escape\b/i;
@@ -349,7 +356,7 @@ export function sweepPrefixMatchers(text) {
     const tail = text.slice(m.index + m[0].length);
     const clause = ESCAPE_CLAUSE_RE.exec(tail);
     if (clause === null && ESCAPE_KEYWORD_RE.test(tail)) continue;
-    const matcher = likePrefixMatcher(m[1], clause === null ? "\\" : clause[1]);
+    const matcher = likePrefixMatcher(m[2], clause === null ? "\\" : clause[1], m[1] !== "");
     if (matcher !== null) matchers.push(matcher);
   }
   return matchers;
@@ -361,7 +368,7 @@ export function sweepPrefixMatchers(text) {
  * matches the single literal name `ex%`, not a prefix, so it sweeps nothing
  * this rule should credit.
  */
-function likePrefixMatcher(pattern, escapeChar) {
+function likePrefixMatcher(pattern, escapeChar, caseInsensitive = false) {
   let source = "";
   let escaped = false;
   for (const ch of pattern) {
@@ -377,7 +384,7 @@ function likePrefixMatcher(pattern, escapeChar) {
     }
   }
   if (escaped) return null;
-  return new RegExp(`^${source}`);
+  return new RegExp(`^${source}`, caseInsensitive ? "i" : "");
 }
 
 /**
