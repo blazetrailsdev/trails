@@ -1002,11 +1002,6 @@ describe("InsertAllTest", () => {
     );
   });
 
-  // Rails gates test_upsert_all_works_with_partitioned_indexes on
-  // supports_insert_on_duplicate_update? && supports_insert_conflict_target? &&
-  // supports_partitioned_indexes? → PostgreSQL >= 11 only. The `measurements`
-  // partitioned table (postgresql_specific_schema.rb:186-198) is laid at boot by
-  // loadPostgresqlSpecificSchema under the same supports_partitioned_indexes? gate.
   itIfSupports(
     "insert_conflict_target,insert_on_duplicate_update,partitioned_indexes",
     "upsert all works with partitioned indexes",

@@ -996,8 +996,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.createSchemaDumper(adapter).dumpTable(lines, "companies");
       const indexLine = lines.find((l) => l.includes("company_include_index"))?.trim();
       expect(indexLine).toBeDefined();
-      // INCLUDE columns must not appear in the key columns list (PG11+ stores
-      // them in indkey), so the key columns argument is the same either way.
       expect(indexLine).toContain(`"companies", ["firm_id", "type"]`);
       expect(indexLine).not.toContain(`["firm_id", "type", "name"`);
       expect(indexLine?.includes(`include: ["name","account_id"]`)).toBe(
