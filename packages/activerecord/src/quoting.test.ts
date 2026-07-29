@@ -35,11 +35,11 @@ import {
   formatInstantForSql,
   formatPlainTimeForSql,
 } from "./connection-adapters/abstract/sql-datetime.js";
-import { setDefaultTimezone } from "./type/internal/timezone.js";
+import { ActiveRecord } from "./ar-config.js";
 import { NotImplementedError } from "./errors.js";
 
 afterEach(() => {
-  setDefaultTimezone("utc");
+  ActiveRecord.defaultTimezone = "utc";
 });
 
 describe("QuotingTest", () => {
@@ -159,7 +159,7 @@ describe("QuotingTest", () => {
     expect(() => quoteTableName("foo")).toThrow(NotImplementedError);
   });
   it("quoted timestamp local", () => {
-    setDefaultTimezone("local");
+    ActiveRecord.defaultTimezone = "local";
     const zone = Temporal.Now.timeZoneId();
     const zdt = Temporal.ZonedDateTime.from(`2026-04-07T15:30:00[${zone}]`);
     expect(quotedDate(zdt.toInstant())).toBe("2026-04-07 15:30:00");
@@ -168,7 +168,7 @@ describe("QuotingTest", () => {
     // Mirrors Rails' with_timezone_config(:local); quotedTime takes only naive
     // types (PlainTime/PlainDateTime), so the local setting is intentionally a
     // no-op here — kept to parallel the Rails test's structure.
-    setDefaultTimezone("local");
+    ActiveRecord.defaultTimezone = "local";
     const t = Temporal.PlainTime.from("15:30:45");
     expect(quotedTime(t)).toBe("15:30:45");
   });
@@ -178,7 +178,7 @@ describe("QuotingTest", () => {
   });
   it("quoted datetime local", () => {
     // DateTime has no getlocal, so the local setting is a no-op for naive values.
-    setDefaultTimezone("local");
+    ActiveRecord.defaultTimezone = "local";
     const t = Temporal.PlainDateTime.from("2026-04-07T15:30:00");
     expect(quotedDate(t)).toBe("2026-04-07 15:30:00");
   });

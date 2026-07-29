@@ -4,25 +4,25 @@ import { TimeZone, TimeWithZone, setZone, resetZone } from "@blazetrails/actives
 import { TimeZoneConverter } from "../attribute-methods/time-zone-conversion.js";
 import { Range, RangeType } from "../connection-adapters/postgresql/oid/range.js";
 import { DateTime } from "./date-time.js";
-import { setDefaultTimezone } from "./internal/timezone.js";
+import { ActiveRecord } from "../ar-config.js";
 
 afterEach(() => {
-  setDefaultTimezone("utc");
+  ActiveRecord.defaultTimezone = "utc";
   resetZone();
 });
 
 describe("ActiveRecord::Type::DateTime timezone dispatch", () => {
   it("is_utc? follows ActiveRecord.default_timezone", () => {
-    setDefaultTimezone("local");
+    ActiveRecord.defaultTimezone = "local";
     expect(new DateTime().isUtc).toBe(false);
-    setDefaultTimezone("utc");
+    ActiveRecord.defaultTimezone = "utc";
     expect(new DateTime().isUtc).toBe(true);
   });
 
   it("is_utc? follows the per-type timezone override", () => {
-    setDefaultTimezone("utc");
+    ActiveRecord.defaultTimezone = "utc";
     expect(new DateTime({ timezone: "local" }).isUtc).toBe(false);
-    setDefaultTimezone("local");
+    ActiveRecord.defaultTimezone = "local";
     expect(new DateTime({ timezone: "utc" }).isUtc).toBe(true);
   });
 
@@ -33,12 +33,12 @@ describe("ActiveRecord::Type::DateTime timezone dispatch", () => {
       .toZonedDateTime(Temporal.Now.timeZoneId())
       .toInstant();
 
-    setDefaultTimezone("utc");
+    ActiveRecord.defaultTimezone = "utc";
     expect((new DateTime().cast(bare) as Temporal.Instant).epochNanoseconds).toBe(
       utc.epochNanoseconds,
     );
 
-    setDefaultTimezone("local");
+    ActiveRecord.defaultTimezone = "local";
     expect((new DateTime().cast(bare) as Temporal.Instant).epochNanoseconds).toBe(
       local.epochNanoseconds,
     );

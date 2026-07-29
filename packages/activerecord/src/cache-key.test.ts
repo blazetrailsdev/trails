@@ -6,7 +6,7 @@ import { Base } from "./index.js";
 import { adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import { fixtures } from "./test-fixtures.js";
-import { setDefaultTimezone } from "./type/internal/timezone.js";
+import { ActiveRecord } from "./ar-config.js";
 
 // Mirrors Time#to_fs(:usec) → "YYYYMMDDHHMMSSuuuuuu" (20 chars).
 function usec(ts: unknown): string {
@@ -173,12 +173,12 @@ describe("CacheKeyTest", () => {
       const record = await CacheMeWithVersion.create({});
       const recordFromDb = await CacheMeWithVersion.find(record.id);
       const spy = vi.spyOn(recordFromDb, "readAttribute");
-      setDefaultTimezone("local");
+      ActiveRecord.defaultTimezone = "local";
       try {
         recordFromDb.cacheVersion();
         expect(spy).toHaveBeenCalledWith("updated_at");
       } finally {
-        setDefaultTimezone("utc");
+        ActiveRecord.defaultTimezone = "utc";
       }
     },
   );

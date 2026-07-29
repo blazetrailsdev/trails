@@ -48,7 +48,7 @@ import {
   temporalToBindString,
   transactionIsolationLevels,
 } from "./abstract/database-statements.js";
-import { getDefaultTimezone } from "../type/internal/timezone.js";
+import { ActiveRecord } from "../ar-config.js";
 import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
 import type { SchemaSource } from "../schema-dumper.js";
 import { SchemaDumper as MysqlSchemaDumper } from "./mysql/schema-dumper.js";
@@ -299,7 +299,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * line in `Mysql2Adapter#perform_query`.
    */
   private _syncDatabaseTimezone(): void {
-    this.databaseTimezone = getDefaultTimezone();
+    this.databaseTimezone = ActiveRecord.defaultTimezone;
   }
 
   protected override _onStatementLimitChanged(value: number): void {

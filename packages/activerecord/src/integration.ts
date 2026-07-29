@@ -7,7 +7,7 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { squish, parameterize, truncate } from "@blazetrails/activesupport";
-import { getDefaultTimezone } from "./type/internal/timezone.js";
+import { ActiveRecord } from "./ar-config.js";
 
 interface Identifiable {
   id: unknown;
@@ -255,7 +255,7 @@ const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,6})?$/;
  * usec format, default_timezone == utc, not user-assigned, and expected DB
  * timestamp shape. Rails reads the timezone via
  * `with_connection(&:default_timezone) == :utc`; trails reads it synchronously
- * from the process-wide `getDefaultTimezone()` (kept in lockstep with the
+ * from the process-wide `defaultTimezone` (kept in lockstep with the
  * connection's configured `default_timezone` by `establishConnection`), which
  * realizes Rails' own FIXME to cache this rather than checking out a connection.
  * When default_timezone is not UTC, the raw DB string can't be reused verbatim,
@@ -273,7 +273,7 @@ export function canUseFastCacheVersion(record: Identifiable, timestamp: unknown)
   if (typeof timestamp !== "string") return false;
   const klass = record.constructor as any;
   if ((klass.cacheTimestampFormat ?? "usec") !== "usec") return false;
-  if (getDefaultTimezone() !== "utc") return false;
+  if (ActiveRecord.defaultTimezone !== "utc") return false;
   if (record.cameFromUser("updated_at")) return false;
   return TIMESTAMP_RE.test(timestamp);
 }
