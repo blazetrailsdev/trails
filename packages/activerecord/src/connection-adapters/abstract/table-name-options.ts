@@ -13,6 +13,8 @@ export interface TableNameOptionsSource {
   readonly tableNamePrefix: string;
   readonly tableNameSuffix: string;
   readonly pluralizeTableNames: boolean;
+  /** `Base.get_primary_key(base_name)` — read by `TableDefinition#set_primary_key`. */
+  getPrimaryKey(baseName: string): string;
 }
 
 let _source: TableNameOptionsSource | null = null;
@@ -35,4 +37,14 @@ export function globalTableNameSuffix(): string {
 /** @internal */
 export function globalPluralizeTableNames(): boolean {
   return _source?.pluralizeTableNames ?? true;
+}
+
+/**
+ * @internal Rails' `TableDefinition#set_primary_key` names the implicit PK
+ * column with `Base.get_primary_key(table_name.to_s.singularize)`, which
+ * honours `Base.primary_key_prefix_type`. Before `Base` has loaded (adapter
+ * used standalone) there is no prefix type to apply, so "id" is the answer.
+ */
+export function globalGetPrimaryKey(baseName: string): string {
+  return _source?.getPrimaryKey(baseName) ?? "id";
 }

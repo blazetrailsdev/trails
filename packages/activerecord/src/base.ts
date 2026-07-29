@@ -197,6 +197,7 @@ import {
   toKey as _toKey,
   PrimaryKey as _PrimaryKey,
   getPrimaryKeyAttr as _getPrimaryKeyAttr,
+  getPrimaryKey as _getPrimaryKey,
   setPrimaryKeyAttr as _setPrimaryKeyAttr,
   isCompositePrimaryKey as _isCompositePrimaryKey,
 } from "./attribute-methods/primary-key.js";
@@ -4388,6 +4389,8 @@ export class Base extends Model {
   // Mirrors: ActiveRecord::ModelSchema.primary_key_prefix_type (model_schema.rb:163).
   static primaryKeyPrefixType: string | null = null;
 
+  static getPrimaryKey = _getPrimaryKey;
+
   // Column used to order records when no explicit order is given (e.g. for
   // `first`/`last`). nil by default. Read by relation/finder-methods.ts.
   // Mirrors: ActiveRecord::ModelSchema.implicit_order_column (model_schema.rb:169).
@@ -5193,6 +5196,9 @@ registerTableNameOptions({
   },
   get pluralizeTableNames() {
     return Base.pluralizeTableNames;
+  },
+  getPrimaryKey(baseName: string) {
+    return Base.getPrimaryKey(baseName);
   },
 });
 

@@ -7,10 +7,10 @@
  * `@connection = ActiveRecord::Base.lease_connection`. `testings` is created
  * and dropped by the test in Rails too, so it is not a canonical-schema table.
  *
- * Seven cases are still unported — the bigint/timestamp/datetime `sql_type`
- * assertions and the two `primary_key_prefix_type` ones. Each fails on a
- * production divergence, not a porting gap; tracked by the
- * `port-migration-change-schema-type-reflection-cases` story.
+ * Four cases are still unported — the bigint/timestamp/datetime `sql_type`
+ * assertions. Each needs `type_to_sql` to source its base names from
+ * `native_database_types` rather than a hardcoded uppercase switch; tracked by
+ * the `converge-type-to-sql-base-names-on-native-database-types` story.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../base.js";
@@ -18,6 +18,7 @@ import { Migration } from "../migration.js";
 import { NotNullViolation, StatementInvalid } from "../errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { ambientConnection } from "../support/rocket-tables.js";
+import { withPostgresqlDatetimeType } from "../support/with-postgresql-datetime-type.js";
 import { currentAdapter } from "../support/adapter-helper.js";
 import { adapterType } from "../test-adapter.js";
 import { describeIfSupports } from "../support/supports.js";
@@ -181,6 +182,32 @@ describe("Migration", () => {
       }
     });
 
+    it("create table with primary key prefix as table name with underscore", async () => {
+      Base.primaryKeyPrefixType = "table_name_with_underscore";
+      const connection = await ambientConnection();
+      await connection.createTable("testings", (t) => {
+        t.column("foo", "string");
+      });
+
+      expect((await connection.columns("testings")).map((c) => c.name)).toEqual([
+        "testing_id",
+        "foo",
+      ]);
+    });
+
+    it("create table with primary key prefix as table name", async () => {
+      Base.primaryKeyPrefixType = "table_name";
+      const connection = await ambientConnection();
+      await connection.createTable("testings", (t) => {
+        t.column("foo", "string");
+      });
+
+      expect((await connection.columns("testings")).map((c) => c.name)).toEqual([
+        "testingid",
+        "foo",
+      ]);
+    });
+
     it("create table raises when redefining primary key column", async () => {
       const connection = await ambientConnection();
       await expect(
@@ -283,6 +310,22 @@ describe("Migration", () => {
         ),
       ).rejects.toThrow(NotNullViolation);
     });
+
+    it.skipIf(adapterType !== "postgres")(
+      "add column with datetime in timestamptz mode",
+      async () => {
+        await withPostgresqlDatetimeType("timestamptz", async () => {
+          const connection = await ambientConnection();
+          await connection.createTable("testings", (t) => {
+            t.column("foo", "datetime");
+          });
+
+          const column = detect(await connection.columns("testings"), "foo");
+          expect(column.type).toBe("datetime");
+          expect(column.sqlType).toBe("timestamp(6) with time zone");
+        });
+      },
+    );
 
     it("change column quotes column names", async () => {
       const connection = await ambientConnection();

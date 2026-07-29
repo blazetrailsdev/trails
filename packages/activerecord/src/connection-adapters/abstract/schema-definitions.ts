@@ -8,6 +8,7 @@ import {
   globalPluralizeTableNames,
   globalTableNamePrefix,
   globalTableNameSuffix,
+  globalGetPrimaryKey,
 } from "./table-name-options.js";
 
 /**
@@ -1002,7 +1003,11 @@ export class TableDefinition {
         if (tdOptions.default !== undefined) pkOpts.default = tdOptions.default;
         if (tdOptions.autoIncrement !== undefined) pkOpts.autoIncrement = tdOptions.autoIncrement;
       }
-      this.columns.push(this.newColumnDefinition(pkNameOverride ?? "id", pkType, pkOpts));
+      // Rails' set_primary_key: `pk = primary_key || Base.get_primary_key(table_name.to_s.singularize)`
+      // (schema_definitions.rb:397) — the implicit PK column honours
+      // `Base.primary_key_prefix_type`, so `testings` becomes `testing_id`/`testingid`.
+      const pkName = pkNameOverride ?? globalGetPrimaryKey(singularize(tableName));
+      this.columns.push(this.newColumnDefinition(pkName, pkType, pkOpts));
     }
   }
 
@@ -1012,7 +1017,7 @@ export class TableDefinition {
    *   caller uses it directly with a hash-form id it must pre-process the hash.
    */
   setPrimaryKey(
-    _tableName: string,
+    tableName: string,
     id: ColumnType | false,
     primaryKey?: string,
     _options: Record<string, unknown> = {},
@@ -1026,7 +1031,7 @@ export class TableDefinition {
     // their columns defined by the SELECT, so never add a PK column.
     if (id === false || this.as) return;
 
-    const pkName = primaryKey ?? "id";
+    const pkName = primaryKey ?? globalGetPrimaryKey(singularize(tableName));
     const pkType = typeof id === "string" ? id : "primary_key";
     this.columns.unshift(this.newColumnDefinition(pkName, pkType, { primaryKey: true }));
   }
