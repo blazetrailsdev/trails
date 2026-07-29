@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant, plainDateTime } from "@blazetrails/activesupport/testing/temporal-helpers";
+import { TimeZone, setZoneDefault } from "@blazetrails/activesupport";
 import { Types } from "../index.js";
 
 describe("DateTimeTest", () => {
@@ -77,6 +78,20 @@ describe("DateTimeTest", () => {
 
   it("casts empty string to null", () => {
     expect(type.cast("")).toBe(null);
+  });
+
+  it("string to time with timezone", () => {
+    for (const zone of ["UTC", "US/Eastern"]) {
+      setZoneDefault(TimeZone.find(zone));
+      try {
+        const t = new Types.DateTimeType();
+        expect((t.cast("Wed, 04 Sep 2013 03:00:00 EAT") as Temporal.Instant).toString()).toBe(
+          "2013-09-04T00:00:00Z",
+        );
+      } finally {
+        setZoneDefault(null);
+      }
+    }
   });
 
   it("hash with wrong keys", () => {
@@ -161,7 +176,7 @@ describe("DateTimeTest", () => {
   });
   it("serialize_cast_value is equivalent to serialize after cast", () => {
     const type = new Types.DateTimeType({ precision: 1 });
-    const value = type.cast("1999-12-31T12:34:56.789-10:00");
+    const value = type.cast("1999-12-31 12:34:56.789 -1000");
 
     expect(type.serializeCastValue(value)).toEqual(type.serialize(value));
     expect((type.serializeCastValue(value) as Temporal.Instant).toString()).toBe(

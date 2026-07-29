@@ -1313,7 +1313,7 @@ describe("BasicsTest", () => {
   });
   // `establish_connection(default_timezone:)` is observed through default-string
   // casting: the offset-less `"2004-01-01 00:00:00"` default is parsed lazily at
-  // read time by DateTimeType.cast → parseString, which interprets it in
+  // read time by DateTimeType.cast → fastStringToTime, which interprets it in
   // getDefaultTimezone() (the singleton establishConnection updates). Same cast
   // path as the `default in utc` test above; Rails reaches it via DB column
   // defaults + reset_column_information, we via attribute() defaults.
