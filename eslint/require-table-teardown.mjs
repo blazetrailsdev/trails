@@ -132,8 +132,11 @@
  * are reported, which is noise rather than a leak): SQL built by concatenation
  * or returned from a helper, since only a literal, a template, or an identifier
  * holding one is read; a catalogue relation `CATALOGUE_SOURCE` does not list;
- * and a filter spelled as something other than `LIKE` or `ILIKE` — `SIMILAR TO`,
- * a regex operator — since only those two are read.
+ * a `SIMILAR TO` pattern using regex syntax the LIKE compiler does not translate
+ * (`| * + ? ( ) [ ] { }` unescaped); and a regex (`~` / `~*`) filter that is
+ * either unanchored or whose pattern past the `^` is not a plain literal. The
+ * filter spellings read are `LIKE`, `ILIKE`, `SIMILAR TO` and `~` / `~*`; their
+ * negations are deliberately read as nothing (see `LIKE_PREFIX_RE`).
  *
  * The identifier in that list is the shared `sqlTexts` (`eslint/sql-texts.mjs`),
  * so a filter hoisted to a `const SWEEP_SQL` — or assigned to a `let` after its
@@ -361,21 +364,69 @@ const CATALOGUE_SOURCE =
  * selecting everything never becomes a prefix that satisfies everything.
  */
 const LIKE_PREFIX_RE = /(?<!\bnot\s+)\b(?<i>i?)like\s+'(?<pattern>[^'%]+)%'/gi;
+/**
+ * `SIMILAR TO` is the same catalogue filter in SQL-standard regex spelling: `%`
+ * and `_` stay LIKE wildcards and the `ESCAPE` clause still applies, so it is
+ * read through the same compiler — but it ALSO gives regex meaning to
+ * `| * + ? ( ) [ ] { }`, which LIKE does not. Those are refused rather than
+ * translated (`similarMetacharUnreadable`): reading `SIMILAR TO '(ex|tmp)_%'`
+ * as the literal prefix `(ex|tmp)` would credit nothing anyway, and reading
+ * `'ex*_%'` as a literal asterisk would credit `ex*A` — a name that sweep does
+ * not select, which is a leak. Escaping one (`ex\*_%` under the default escape)
+ * makes it the literal it says it is, and that IS read. `NOT SIMILAR TO` is an
+ * exclusion filter and yields no prefix, exactly as `NOT LIKE` does.
+ */
+const SIMILAR_PREFIX_RE = /(?<!\bnot\s+)\bsimilar\s+to\s+'(?<pattern>[^'%]+)%'/gi;
+/**
+ * PostgreSQL's regex match operators, which Arel emits from
+ * `visit_Arel_Nodes_Regexp` (arel/visitors/postgresql.rb). `~*` is the
+ * case-insensitive spelling, so its matcher carries the `i` flag as `ILIKE`
+ * does; the negated `!~` / `!~*` are excluded by the lookbehind, since an
+ * exclusion filter would otherwise satisfy exactly the creates it spares.
+ *
+ * A regex filter is a prefix filter ONLY when the pattern is anchored: `~ 'ex_'`
+ * matches mid-name (`fooex1bar`) and selects far more than the prefix, but
+ * crediting it as a prefix would be under-crediting, not a leak — the risk runs
+ * the other way, so the `^` is required and an unanchored pattern yields no
+ * matcher. Past the anchor only a metachar-free literal is read: the remaining
+ * POSIX regex syntax is not JS regex syntax (bracket expressions, back
+ * references, `{n,m}` bounds), so translating it would be guesswork, and reading
+ * it literally would credit names the sweep does not select.
+ */
+const REGEXP_PREFIX_RE = /(?<![!~])(?<op>~\*?)\s*'(?<pattern>[^']*)'/g;
+const REGEXP_LITERAL_RE = /^\^(?<literal>[^.*+?^${}()|[\]\\]*)$/;
 /** A trailing `ESCAPE '<char>'` clause, and the leading keyword on its own. */
 const ESCAPE_CLAUSE_RE = /^\s*escape\s+'([^'])'/i;
 const ESCAPE_KEYWORD_RE = /^\s*escape\b/i;
 export function sweepPrefixMatchers(text) {
   if (!CATALOGUE_SOURCE.test(text)) return [];
   const matchers = [];
-  LIKE_PREFIX_RE.lastIndex = 0;
+  for (const [re, similar] of [
+    [LIKE_PREFIX_RE, false],
+    [SIMILAR_PREFIX_RE, true],
+  ]) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      const tail = text.slice(m.index + m[0].length);
+      const clause = ESCAPE_CLAUSE_RE.exec(tail);
+      if (clause === null && ESCAPE_KEYWORD_RE.test(tail)) continue;
+      const { i, pattern } = m.groups;
+      const matcher = likePrefixMatcher(
+        pattern,
+        clause === null ? "\\" : clause[1],
+        i !== undefined && i !== "",
+        similar,
+      );
+      if (matcher !== null) matchers.push(matcher);
+    }
+  }
+  REGEXP_PREFIX_RE.lastIndex = 0;
   let m;
-  while ((m = LIKE_PREFIX_RE.exec(text)) !== null) {
-    const tail = text.slice(m.index + m[0].length);
-    const clause = ESCAPE_CLAUSE_RE.exec(tail);
-    if (clause === null && ESCAPE_KEYWORD_RE.test(tail)) continue;
-    const { i, pattern } = m.groups;
-    const matcher = likePrefixMatcher(pattern, clause === null ? "\\" : clause[1], i !== "");
-    if (matcher !== null) matchers.push(matcher);
+  while ((m = REGEXP_PREFIX_RE.exec(text)) !== null) {
+    const literal = REGEXP_LITERAL_RE.exec(m.groups.pattern);
+    if (literal === null || literal.groups.literal === "") continue;
+    matchers.push(new RegExp(`^${literal.groups.literal}`, m.groups.op === "~*" ? "i" : ""));
   }
   return matchers;
 }
@@ -386,9 +437,11 @@ export function sweepPrefixMatchers(text) {
  * matches the single literal name `ex%`, not a prefix, so it sweeps nothing
  * this rule should credit. `caseInsensitive` is set for `ILIKE` filters only —
  * `LIKE` is case-sensitive in PostgreSQL, so widening it would credit creates
- * the sweep leaves behind.
+ * the sweep leaves behind. `similarMetacharUnreadable` is set for `SIMILAR TO`,
+ * where an unescaped regex metacharacter carries meaning this compiler does not
+ * translate and so makes the whole filter unreadable.
  */
-function likePrefixMatcher(pattern, escapeChar, caseInsensitive) {
+function likePrefixMatcher(pattern, escapeChar, caseInsensitive, similarMetacharUnreadable) {
   let source = "";
   let escaped = false;
   for (const ch of pattern) {
@@ -399,6 +452,8 @@ function likePrefixMatcher(pattern, escapeChar, caseInsensitive) {
       escaped = true;
     } else if (ch === "_") {
       source += ".";
+    } else if (similarMetacharUnreadable && "|*+?()[]{}".includes(ch)) {
+      return null;
     } else {
       source += ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     }
