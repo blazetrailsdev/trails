@@ -1696,6 +1696,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   async removeColumn(tableName: string, columnName: string, _type?: string): Promise<void> {
+    if ((columnName as string | undefined) === undefined) {
+      throw new ArgumentError("wrong number of arguments (given 1, expected 2..3)");
+    }
     await this.alterTable(tableName, (definition) => {
       definition.removeColumn(columnName);
       deleteForeignKeysForColumns(definition, [columnName]);
@@ -1736,6 +1739,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     allowNull: boolean,
     defaultValue?: unknown,
   ): Promise<void> {
+    this.schemaStatements().validateChangeColumnNullArgumentBang(allowNull);
     if (!allowNull && defaultValue !== undefined) {
       // Rails backfills NULLs via quote_default_expression, which serializes the
       // value through the column's cast type (abstract/schema_statements.rb).
@@ -1772,12 +1776,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   async addTimestamps(tableName: string, options?: Record<string, unknown>): Promise<void> {
-    const opts = {
-      null: false,
-      ...options,
-    };
-    await this.addColumn(tableName, "created_at", "datetime", opts);
-    await this.addColumn(tableName, "updated_at", "datetime", opts);
+    const opts: Record<string, unknown> = { ...options };
+    if (opts.null == null) opts.null = false;
+    if (!("precision" in opts)) opts.precision = 6;
+
+    await this.alterTable(tableName, (definition) => {
+      definition.column("created_at", "datetime", opts);
+      definition.column("updated_at", "datetime", opts);
+    });
   }
 
   async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
@@ -1919,16 +1925,17 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
 
   override async disableReferentialIntegrity(fn: () => Promise<void>): Promise<void> {
     await this.ensureConnected();
-    const oldForeignKeys = ((await this.driver.pragma("foreign_keys")) as any[])[0]?.foreign_keys;
-    const oldDefer = ((await this.driver.pragma("defer_foreign_keys")) as any[])[0]
-      ?.defer_foreign_keys;
+    const pragmaValue = async (sql: string): Promise<unknown> =>
+      Object.values((await this.execute(sql))[0] ?? {})[0];
+    const oldForeignKeys = await pragmaValue("PRAGMA foreign_keys");
+    const oldDeferForeignKeys = await pragmaValue("PRAGMA defer_foreign_keys");
     try {
-      await this.driver.pragma("defer_foreign_keys = ON");
-      await this.driver.pragma("foreign_keys = OFF");
+      await this.execute("PRAGMA defer_foreign_keys = ON");
+      await this.execute("PRAGMA foreign_keys = OFF");
       await fn();
     } finally {
-      await this.driver.pragma(`defer_foreign_keys = ${oldDefer ?? 0}`);
-      await this.driver.pragma(`foreign_keys = ${oldForeignKeys ?? 1}`);
+      await this.execute(`PRAGMA defer_foreign_keys = ${String(oldDeferForeignKeys)}`);
+      await this.execute(`PRAGMA foreign_keys = ${String(oldForeignKeys)}`);
     }
   }
 
@@ -2548,11 +2555,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * @internal
    */
   private async execCopyTable(sql: string): Promise<void> {
-    try {
-      await this.driver.exec(sql);
-    } catch (e) {
-      throw this._translateException(e, sql, []);
-    }
+    const payload = this._notificationPayload(sql, [], "SQL");
+    await Notifications.instrumentAsync("sql.active_record", payload, async () => {
+      try {
+        await this.driver.exec(sql);
+      } catch (e) {
+        throw this._translateException(e, sql, []);
+      }
+    });
   }
 
   /** @internal */
