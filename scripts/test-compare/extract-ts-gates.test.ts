@@ -152,13 +152,14 @@ describe("gates.ts pure helpers", () => {
       source: ["test"],
     });
     // POSITIVE adapter + feature: `adapterType !== "mysql"` runs when true (a
-    // positive mysql set), and mixing a positive adapter set with a feature is
-    // unsound (`&&` vs `||` changes the run-on set), so the adapter set is
-    // dropped and only the feature survives — mirroring the Ruby extractor's
-    // `mixed` rule (positive `adapter_syms` + feature → drop the adapter set).
+    // positive mysql set). In the standard skip idiom the run condition is the
+    // pure conjunction `mysql && expression_index?`, so the intersection is
+    // exactly what runs — both dimensions survive, mirroring the Ruby
+    // extractor's `mixed` rule for `current_adapter?(…) && supports_X?`.
     expect(
       gateFromGuardExpr('adapterType !== "mysql" || !adapterSupports("expression_index")', false),
     ).toEqual({
+      adapters: ["mysql"],
       features: ["expression_index"],
       source: ["test"],
     });

@@ -628,13 +628,22 @@ class TestExtractor
       gate[:adapters] = []
     end
     # A POSITIVE adapter set isn't sound — and must be dropped — when the
-    # condition mixes it with a feature/guard (`supports_X? && current_adapter?`
-    # could be `&&` or `||`; the run-on set differs), or with a negated adapter
-    # under `||` (`current_adapter?(:A) || !current_adapter?(:B)` is the
-    # complement of B, not A). A pure positive `||` (`A || B`) stays sound — it
-    # is the union the concat already collected.
+    # condition mixes it with a feature under `||` or on the run-when-false path
+    # (`current_adapter?(:A) || supports_X?` runs on a union no single adapter
+    # set captures, and `unless A && supports_X?` negates the conjunction into
+    # exactly such a union); when it mixes with a guard at all (a guard is a
+    # runtime predicate the extractor deliberately treats as non-comparable, so
+    # a partial adapter restriction alongside it would over-claim); or when it
+    # mixes with a negated adapter under `||` (`current_adapter?(:A) ||
+    # !current_adapter?(:B)` is the complement of B, not A). A pure positive
+    # `||` (`A || B`) stays sound — it is the union the concat already
+    # collected. A pure CONJUNCTION with a feature (`if A && supports_X?`) is
+    # also sound: the test runs on `A ∩ supports_X?`, which the adapter set plus
+    # the feature gate expresses exactly — the same reasoning the
+    # negated-adapter branch below uses.
     mixed = !adapters.empty? &&
-            (!(acc[:features].empty? && acc[:guards].empty?) ||
+            (!acc[:guards].empty? ||
+             (!acc[:features].empty? && (acc[:has_or] || !positive)) ||
              (acc[:has_or] && !neg_adapters.empty?))
     if !adapters.empty? && !mixed
       gate[:adapters] = positive ? adapters : (ALL_ADAPTERS - adapters)

@@ -80,4 +80,31 @@ describe("classifyGateMismatch", () => {
     // same adapter AND same feature → agree
     expect(classifyGateMismatch(pgJson, { ...pgJson, source: ["wrapper"] }, false)).toBeNull();
   });
+
+  it("compares the intersected set from a pure-`&&` adapter+feature condition", () => {
+    // view_test.rb:197 — `current_adapter?(:PostgreSQLAdapter, :SQLite3Adapter)
+    // && supports_insert_returning?` under a mysql+postgresql class guard; the
+    // extractor now keeps the intersection instead of dropping the adapter half.
+    const railsGate: TestGate = {
+      adapters: ["postgresql"],
+      features: ["insert_returning", "views"],
+      source: ["class"],
+    };
+    // matching TS gate (`itIfSupports.skipIf(adapterType !== "postgres")`) agrees
+    expect(
+      classifyGateMismatch(railsGate, { ...railsGate, source: ["test", "wrapper"] }, false),
+    ).toBeNull();
+    // the pre-fix TS gate, which ran the test on MySQL too, is a wrong-gate
+    expect(
+      classifyGateMismatch(
+        railsGate,
+        {
+          adapters: ["mysql", "postgresql"],
+          features: ["insert_returning", "views"],
+          source: ["test", "wrapper"],
+        },
+        false,
+      ),
+    ).toBe("wrong-gate");
+  });
 });

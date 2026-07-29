@@ -139,10 +139,13 @@ export function gateFromWrapper(name: string, featureArg?: string | null): TestG
  *     conjunction `!sqlite && insert_returning?`, so BOTH the adapter exclusion
  *     `[mysql,postgresql]` and the feature set are sound and emitted.
  *   - POSITIVE (`adapterType !== "mysql" || !adapterSupports("expression_index")`)
- *     → mixing a positive adapter set with a feature is unsound (the run-on set
- *     differs under `&&` vs `||`), so the adapter set is DROPPED and only the
- *     feature set survives — exactly as Ruby drops a positive `adapter_syms` set
- *     whenever the condition also carries a feature or guard.
+ *     → the run condition is again a pure conjunction (`mysql && expression_index?`),
+ *     so the adapter set and the feature set are BOTH sound and emitted — the
+ *     intersection is exactly what runs. Mirrors Ruby keeping a positive
+ *     `adapter_syms` set alongside a feature in a pure `&&` condition.
+ *   - A `mariadb` GUARD is different: it is a runtime predicate neither side can
+ *     evaluate statically, so a positive adapter set mixed with one is dropped
+ *     rather than over-claiming a partial restriction (Ruby does the same).
  * Anything with neither adapter nor feature resolves to a `guards: ["unknown"]`
  * gate so the comparison knows the test is conditional without inventing an
  * adapter set.
@@ -191,9 +194,10 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
   if (/isMaria[Dd]b\b/.test(text)) guards.push("mariadb");
 
   // The `mixed` rule (see the docstring): a POSITIVE adapter set is unsound and
-  // must be dropped once the compound also carries a feature or guard; an
-  // adapter EXCLUSION composes soundly and stays. Mirrors `gate_from_run_condition`.
-  const mixed = adapterIsPositive && (guards.length > 0 || featureMatches.length > 0);
+  // must be dropped once the compound also carries a non-comparable guard; an
+  // adapter EXCLUSION, and a positive set intersected with a feature, compose
+  // soundly and stay. Mirrors `gate_from_run_condition`.
+  const mixed = adapterIsPositive && guards.length > 0;
   const gate: TestGate = { source: ["test"] };
   if (adapters && !mixed) gate.adapters = adapters;
   if (featureMatches.length) gate.features = sortedUnique(featureMatches);
