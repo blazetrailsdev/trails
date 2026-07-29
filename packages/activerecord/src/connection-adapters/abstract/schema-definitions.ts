@@ -1152,11 +1152,11 @@ export class TableDefinition {
     const existing = this.columns.find((c) => c.name === name);
     if (existing) {
       if (existing.options.primaryKey) {
-        throw new Error(
+        throw new ArgumentError(
           `you can't redefine the primary key column '${name}' on '${this.tableName}'. To define a custom primary key, pass { id: false } to create_table.`,
         );
       } else {
-        throw new Error(
+        throw new ArgumentError(
           `you can't define an already defined column '${name}' on '${this.tableName}'.`,
         );
       }
