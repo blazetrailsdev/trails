@@ -44,6 +44,7 @@ eslint/.tmp-*.json
 # vitest coverage reports (reporting-only CI job)
 coverage/
 
-# Stray sqlite files from tests whose config names a relative database
-# (db/primary.sqlite3 etc. — config values only, never checked-in databases)
+# Sqlite databases whose config names a relative path: the sqlite3 lane's
+# fixture database (support/config.ts, Rails' FIXTURES_ROOT/fixture_database
+# .sqlite3) plus stray db/primary.sqlite3 etc. — never checked-in databases
 /db/

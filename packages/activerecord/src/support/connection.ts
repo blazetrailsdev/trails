@@ -22,8 +22,8 @@
  * selects the backend.
  */
 
-import { getEnv, getOsAsync } from "@blazetrails/activesupport";
-import { getPathAsync } from "@blazetrails/activesupport/fs-adapter";
+import { getEnv } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../base.js";
 import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
@@ -39,6 +39,8 @@ import {
   mysqlPreparedStatements,
   mysqlSettings,
   postgresSettings,
+  SQLITE_FIXTURE_DATABASE,
+  SQLITE_FIXTURE_DATABASE_2,
   type ConnectionName,
   type EnvReader,
   type ServerSettings,
@@ -145,13 +147,7 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
   sqlite3: {
     adapter: "sqlite3",
     lane: "sqlite",
-    // `config.example.yml:83-91`: two file databases, both `timeout`/`strict`.
-    // Rails names them under FIXTURES_ROOT; ours are the worker database and
-    // its derived sibling, filled in by `expandConfig`.
-    build: async () => {
-      const shared = { ...(await sqliteHash()), timeout: 5000, strict: true };
-      return { arunit: shared, arunit2: { ...shared, database: undefined } };
-    },
+    build: sqliteEntries,
   },
   sqlite3_mem: {
     adapter: "sqlite3",
@@ -329,32 +325,36 @@ export async function testConfigurationHashes(): Promise<{
   return { adapter: connection.lane, envConfig, configurationHashes };
 }
 
-async function fallbackDatabasePath(): Promise<string> {
-  const g = globalThis as typeof globalThis & { __arFallbackDbPath?: string };
-  if (g.__arFallbackDbPath) return g.__arFallbackDbPath;
-  const path = await getPathAsync();
-  const os = await getOsAsync();
-  const runToken =
-    getEnv("AR_TEST_RUN_TOKEN") ||
-    `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-  const slot = getEnv("VITEST_POOL_ID") || getEnv("VITEST_WORKER_ID") || "1";
-  const token = `${runToken}-${slot}`;
-  const dbPath = path.join(os.tmpdir(), `ar-test-fallback-${token}.sqlite`);
-  // Imported lazily: `sqlite-template.ts` imports `activeLane` from this
-  // module, and a static import here would close that cycle at module-init time.
-  const { registerDbFileCleanupOnExit } = await import("./sqlite-template.js");
-  await registerDbFileCleanupOnExit(dbPath);
-  g.__arFallbackDbPath = dbPath;
-  return dbPath;
-}
-
-async function sqliteHash(): Promise<Record<string, unknown>> {
+/**
+ * The `sqlite3` connection's two entries, mirroring `config.example.yml:83-91`:
+ * `arunit` and `arunit2` each name their own file, with `timeout` and `strict`.
+ *
+ * `AR_TEST_WORKER_DB` is the per-worker template clone the setupFile publishes
+ * (`support/sqlite-template.ts`) — trails' stand-in for Rails' one
+ * already-prepared database, since vitest forks workers where Rails does not.
+ * Only that clone leaves `arunit2` for `expandConfig` to derive; the configured
+ * pair is spelled out here as the yml spells it, since `expand_config` fills a
+ * `database` in only when the entry carries none (`support/config.rb:30-36`).
+ *
+ * The directory is created because Rails' `test/fixtures` is checked in and
+ * ours is a gitignored build output; sqlite will not create a missing parent
+ * for a file DB.
+ */
+async function sqliteEntries(): Promise<Record<"arunit" | "arunit2", Record<string, unknown>>> {
+  const options = { adapter: "sqlite3", timeout: 5000, strict: true };
   const workerDb = getEnv("AR_TEST_WORKER_DB");
+  if (workerDb) {
+    return {
+      arunit: { ...options, database: workerDb },
+      arunit2: { ...options, database: undefined },
+    };
+  }
+  const fs = await getFsAsync();
+  const path = await getPathAsync();
+  await fs.mkdir?.(path.dirname(SQLITE_FIXTURE_DATABASE), { recursive: true });
   return {
-    adapter: "sqlite3",
-    database: workerDb || (await fallbackDatabasePath()),
-    timeout: 5000,
-    strict: true,
+    arunit: { ...options, database: SQLITE_FIXTURE_DATABASE },
+    arunit2: { ...options, database: SQLITE_FIXTURE_DATABASE_2 },
   };
 }
 
