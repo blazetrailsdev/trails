@@ -2905,9 +2905,6 @@ export class Migrator {
   }
 
   private async _runMigration(proxy: MigrationProxy, direction: "up" | "down"): Promise<void> {
-    // Rails' MigrationProxy delegates migrate/announce/write to the real
-    // Migration it loads (`migration.rb:1187`), so a subclass override is
-    // honoured.
     const migration = await proxy.migration();
     migration.connection = this._adapter;
     // Rails wraps both the migration execution AND the version
