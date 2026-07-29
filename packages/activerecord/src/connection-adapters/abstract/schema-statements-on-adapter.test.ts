@@ -16,9 +16,6 @@ import { fixtures } from "../../test-fixtures.js";
 import { ambientConnection, withRocketTables } from "../../support/rocket-tables.js";
 import { adapterType } from "../../test-adapter.js";
 
-// sqlite3/schema_statements.rb:56-63 overrides add_foreign_key without the
-// abstract `if_not_exists` short-circuit, so the guard's no-op behavior is
-// only observable on the adapters that use the abstract implementation.
 const guardsIfNotExists = adapterType !== "sqlite";
 
 let adapter: AbstractSQLite3Adapter | undefined;
@@ -483,10 +480,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   it.skipIf(!guardsIfNotExists)(
     "addForeignKey with ifNotExists is a no-op when a composite FK already exists",
     async () => {
-      // The composite `column: [...]` must match the existing FK by value, not by
-      // array identity. foreignKeys() reports composite columns as arrays (Rails
-      // parity), and the ifNotExists guard routes through foreignKeyExists ->
-      // isDefinedFor for an element-wise compare.
       const conn = await ambientConnection();
       await conn.createTable("rockets", { force: true, primaryKey: ["tenant_id", "id"] }, (t) => {
         t.integer("tenant_id");
