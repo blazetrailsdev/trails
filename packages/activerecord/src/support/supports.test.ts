@@ -4,10 +4,10 @@ import { adapterSupports, describeIfSupports, itIfSupports } from "./supports.js
 
 // Same lane-gated probe supports.ts itself uses — avoids a MySQL connection
 // attempt on the pg/sqlite lanes.
-const mysqlSupportsExpressionIndex =
+const mysqlProbe =
   adapterType === "mysql"
-    ? (await import("./mysql-server-version.js")).supportsExpressionIndex
-    : false;
+    ? await import("./mysql-server-version.js")
+    : { supportsExpressionIndex: false, supportsJson: false };
 
 // Assertions are computed from `adapterType` so they hold on every CI lane
 // (sqlite / postgres / mysql:8), not just the default sqlite run.
@@ -15,17 +15,17 @@ describe("adapterSupports", () => {
   it("is true for capabilities available on every backend", () => {
     expect(adapterSupports("savepoints")).toBe(true);
     expect(adapterSupports("foreign_keys")).toBe(true);
-    // json: `!mariadb? && >= 5.7.8` — MySQL 8 is not MariaDB → true on all CI lanes.
-    expect(adapterSupports("json")).toBe(true);
   });
 
   it("reflects the active adapter for backend-specific capabilities", () => {
     expect(adapterSupports("comments")).toBe(adapterType !== "sqlite");
     expect(adapterSupports("insert_conflict_target")).toBe(adapterType !== "mysql");
+    // json: `!mariadb? && >= 5.7.8` — true off the mysql lane, live-probed on it.
+    expect(adapterSupports("json")).toBe(adapterType !== "mysql" || mysqlProbe.supportsJson);
     // expression_index: PG + SQLite always; the MySQL family follows the live
     // server (MySQL ≥ 8.0.13 true, MariaDB false) via the mysql test-helper probe.
     expect(adapterSupports("expression_index")).toBe(
-      adapterType !== "mysql" || mysqlSupportsExpressionIndex,
+      adapterType !== "mysql" || mysqlProbe.supportsExpressionIndex,
     );
     // advisory_locks: PG + MySQL, not SQLite (mirrors the old skipIf(=== sqlite)).
     expect(adapterSupports("advisory_locks")).toBe(adapterType !== "sqlite");

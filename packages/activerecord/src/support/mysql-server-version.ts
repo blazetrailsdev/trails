@@ -84,3 +84,32 @@ export const supportsExpressionIndex = !mariaDb && _serverVersion?.gte("8.0.13")
 export const supportsRenameIndex = mariaDb
   ? _serverVersion?.gte("10.5.2") === true
   : _serverVersion?.gte("5.7.6") === true;
+
+/** Mirrors Mysql2Adapter#supports_json? (mysql2_adapter.rb:70): MySQL ≥ 5.7.8; never MariaDB. */
+export const supportsJson = !mariaDb && _serverVersion?.gte("5.7.8") === true;
+
+/**
+ * Mirrors AbstractMysqlAdapter#supports_insert_returning?
+ * (abstract_mysql_adapter.rb:173): MariaDB ≥ 10.5.0 only; never MySQL.
+ */
+export const supportsInsertReturning = mariaDb && _serverVersion?.gte("10.5.0") === true;
+
+/**
+ * Mirrors `supports_text_column_with_default?` (adapter_helper.rb:42) for the
+ * MySQL family: MariaDB ≥ 10.2.1 only.
+ */
+export const supportsTextColumnWithDefault = mariaDb && _serverVersion?.gte("10.2.1") === true;
+
+/**
+ * Mirrors `supports_non_unique_constraint_name?` (adapter_helper.rb:33) for the
+ * MySQL family: MariaDB only, no version floor.
+ */
+export const supportsNonUniqueConstraintName = mariaDb;
+
+/**
+ * Mirrors `supports_sql_standard_drop_constraint?` (adapter_helper.rb:51) for the
+ * MySQL family: MariaDB ≥ 10.3.13, MySQL ≥ 8.0.19.
+ */
+export const supportsSqlStandardDropConstraint = mariaDb
+  ? _serverVersion?.gte("10.3.13") === true
+  : _serverVersion?.gte("8.0.19") === true;
