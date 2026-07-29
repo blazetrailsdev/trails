@@ -198,6 +198,9 @@ describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite restoreFro
     removeTempFiles();
     const tpl = await nodeSqliteDriver.open({ database: templatePath });
     await tpl.exec(
+      // The table lives in this suite's own temp template file, which
+      // afterAll deletes wholesale — there is no shared database to leak into.
+      // eslint-disable-next-line blazetrails/require-table-teardown
       "CREATE TABLE gadgets (id INTEGER PRIMARY KEY, label TEXT);" +
         "INSERT INTO gadgets (label) VALUES ('alpha'), ('beta');",
     );

@@ -72,8 +72,9 @@
  *
  * Only statically-knowable names count: a name that sits in (or runs up to) an
  * interpolation — `CREATE TABLE ${name}`, or the `tmp_` prefix of `CREATE TABLE
- * tmp_${suffix}` — is invisible, like a computed helper name, and SQL built in a
- * variable and executed later (`exec(sql)`) is not seen. Files with
+ * tmp_${suffix}` — is invisible, like a computed helper name. SQL built in a
+ * variable and executed later (`exec(sql)`), or built by `+` concatenation, IS
+ * seen: both resolve through `eslint/sql-texts.mjs`. Files with
  * a backlog of un-torn-down raw creates are grandfathered via the
  * `rawSql: false` option in eslint.config.mjs, fed by
  * `eslint/require-table-teardown-raw-sql-exclude.json`, and ratcheted to zero.
@@ -129,9 +130,13 @@
  * catalogue `LIKE` filter anywhere in the file, plus any dynamically-named raw
  * drop anywhere in it, arms every prefix the file mentions. KNOWN GAPS, all in
  * the under-accepting direction (a real sweep goes unrecognised and its creates
- * are reported, which is noise rather than a leak): SQL built by concatenation
- * or returned from a helper, since only a literal, a template, or an identifier
- * holding one is read; a catalogue relation `CATALOGUE_SOURCE` does not list;
+ * are reported, which is noise rather than a leak): SQL returned from a helper,
+ * since resolving that needs the callee's body — a `+` concatenation IS read,
+ * and only a literal, a template, a `+` chain over those, or an identifier
+ * holding one is; SQL appended piecewise (`sql += " WHERE …"`), since a
+ * compound assignment's write is only its right-hand side and stitching the
+ * pieces back together needs an order the scope graph does not give; a
+ * catalogue relation `CATALOGUE_SOURCE` does not list;
  * an unanchored regex (`~` / `~*`) filter, which matches mid-name and is no
  * prefix at all; and, in either regex spelling, a construct whose JS meaning
  * differs from its POSIX one and so is refused rather than mistranslated — a
@@ -159,7 +164,11 @@
  * hands back each string's quasi array (`createSqlTextGroups`), so every quasi
  * gets the successor texts `recordText` needs, and a hoisted `DROP TABLE
  * "${row.tablename}"` arms the sweep while a hoisted `DROP TABLE tmp_${suffix}`
- * — a name flush against a substitution — still names nothing.
+ * — a name flush against a substitution — still names nothing. A `+`
+ * concatenation resolves through the same path with its non-string operands
+ * read as substitutions, so `'DROP TABLE "' + row.tablename + '"'` arms and
+ * `"… LIKE 'ex" + suffix + "%'"` credits nothing, matching what the equivalent
+ * template spellings answer.
  *
  * This is deliberately independent of `require-canonical-rebuild`: the two
  * rules answer different questions. A sweep that can select a canonical table
@@ -810,21 +819,14 @@ const rule = {
     }
 
     function recordSinkSql(call) {
+      // Every shape goes through the shared resolver: an inline literal and an
+      // inline template resolve to their own quasi group unchanged, so reading
+      // them here would duplicate it. A resolved string is read exactly like an
+      // inline one — its quasi group carries the same boundary information the
+      // AST would, so a hoisted or concatenated sweep's DROP half arms and a
+      // hoisted or concatenated raw CREATE/DROP folds into the same balance.
       for (const arg of call.arguments) {
-        if (arg.type === "Literal") {
-          if (typeof arg.value === "string") recordText(arg.value, arg, null);
-        } else if (arg.type === "TemplateLiteral") {
-          recordQuasis(
-            arg.quasis.map((q) => q.value.cooked ?? ""),
-            arg,
-          );
-        } else if (arg.type === "Identifier") {
-          // A resolved string is read exactly like an inline one: its quasi
-          // group carries the same boundary information the AST would, so a
-          // hoisted sweep's DROP half arms and a hoisted raw CREATE/DROP folds
-          // into the same balance.
-          for (const quasis of sqlTextGroups(arg)) recordQuasis(quasis, arg);
-        }
+        for (const quasis of sqlTextGroups(arg)) recordQuasis(quasis, arg);
       }
     }
 

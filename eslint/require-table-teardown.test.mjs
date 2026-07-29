@@ -298,6 +298,41 @@ tester.run("require-table-teardown", rule, {
       "await adapter.exec(createSql);\n" +
       'const dropSql = "DROP TABLE widgets";\n' +
       "await adapter.exec(dropSql);",
+    // A DROP half built by `+` concatenation is the same sweep as the template
+    // spelling: the non-string operand is read as a substitution, so the name
+    // is dynamic and the drop arms.
+    'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      "  const dropSql = 'DROP TABLE IF EXISTS \"' + t.tablename + '\"';\n" +
+      "  await adapter.exec(dropSql);\n" +
+      "}",
+    // A concatenated filter whose pattern is closed within one operand is a
+    // knowable prefix — the concatenation boundary falls past the pattern.
+    'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+      "const sql =\n" +
+      "  \"SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'\" + orderClause;\n" +
+      "const rows = await adapter.execute(sql);\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
+    // A raw create and drop built by concatenation fold into the same balance
+    // as the inline spelling: two static operands join into one quasi.
+    'await adapter.exec("CREATE TABLE " + \'"widgets"\' + " (id int)");\n' +
+      'await adapter.exec("DROP TABLE " + \'"widgets"\');',
+    // An operand that is itself a resolved identifier carrying several strings
+    // fans out, so every combination the concatenation can produce is read —
+    // both writes of the filter here spell the same prefix.
+    'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+      "let filter = \"tablename LIKE 'ex_%'\";\n" +
+      "filter = \"schemaname = 'public' AND tablename LIKE 'ex_%'\";\n" +
+      'const sql = "SELECT tablename FROM pg_tables WHERE " + filter;\n' +
+      "const rows = await adapter.execute(sql);\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
   ],
   invalid: [
     // Dropping the truncated prefix of a spaced quoted name is not a teardown
@@ -877,6 +912,46 @@ tester.run("require-table-teardown", rule, {
       code:
         'await adapter.exec(`CREATE TABLE "widgets" (id int)`);\n' +
         'const dropSql = "DROP TABLE widgets";\n' +
+        "expect(dropSql).toBe(rendered);",
+      errors: [{ messageId: "missingTeardown", data: { table: "widgets" } }],
+    },
+    // A raw create built by concatenation leaks exactly like the inline
+    // spelling, so it is reported when nothing drops it.
+    {
+      code: 'await adapter.exec("CREATE TABLE " + \'"widgets"\' + " (id int)");',
+      errors: [{ messageId: "missingTeardown", data: { table: "widgets" } }],
+    },
+    // A pattern interpolated by concatenation is no more knowable than the
+    // template spelling: the operand boundary splits `LIKE 'ex` from `%'`, so
+    // the filter credits nothing and the create under it still reports.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex leak" (id int)`);\n' +
+        "const sql =\n" +
+        '  "SELECT tablename FROM pg_tables WHERE tablename LIKE \'ex" + suffix + "%\'";\n' +
+        "const rows = await adapter.execute(sql);\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex leak" } }],
+    },
+    // A concatenated drop whose name runs into a substitution names no knowable
+    // table, exactly as the template spelling does.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        "await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+        ");\n" +
+        'const dropSql = "DROP TABLE tmp_" + suffix;\n' +
+        "await adapter.exec(dropSql);",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
+    },
+    // A concatenated string that never reaches a sink arms nothing.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "widgets" (id int)`);\n' +
+        'const dropSql = "DROP TABLE " + \'"widgets"\';\n' +
         "expect(dropSql).toBe(rendered);",
       errors: [{ messageId: "missingTeardown", data: { table: "widgets" } }],
     },
