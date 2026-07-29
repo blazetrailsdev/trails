@@ -18,7 +18,7 @@ type AnyClass = abstract new (...args: never[]) => object;
  * @internal
  */
 export function isSchemaCacheIgnoredTable(tableName: string): boolean {
-  for (const entry of _schemaCacheIgnoredTables) {
+  for (const entry of ActiveRecord.schemaCacheIgnoredTables) {
     if (entry instanceof RegExp) {
       // Reset lastIndex so /g and /y patterns don't alternate between
       // matches across calls (same precaution SchemaDumper#isIgnored takes).
