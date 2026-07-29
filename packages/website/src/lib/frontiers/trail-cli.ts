@@ -1,8 +1,8 @@
 import type { VirtualFS } from "./virtual-fs.js";
 import type { SqlJsAdapter } from "./sql-js-adapter.js";
 import { VfsModelGenerator, VfsMigrationGenerator, VfsAppGenerator } from "./vfs-generator.js";
-import type { MigrationProxy } from "@blazetrails/activerecord/migration";
-import { Migration, Migrator } from "@blazetrails/activerecord/migration";
+import type { Migration, MigrationProxy } from "@blazetrails/activerecord/migration";
+import { Migrator } from "@blazetrails/activerecord/migration";
 import {
   camelize,
   getProcessAdapter,
@@ -67,29 +67,18 @@ function discoverMigrations(
           version: match[1],
           name: camelize(match[2].replace(/-/g, "_")),
           filename: file.path,
-          migration: (): Migration =>
-            new (class extends Migration {
-              override async up(): Promise<void> {
-                await (await this.loadRegistered()).up();
-              }
-              override async down(): Promise<void> {
-                await (await this.loadRegistered()).down();
-              }
-              private async loadRegistered(): Promise<Migration> {
-                const content = vfs.read(file.path)?.content;
-                if (!content) throw new Error(`File not found: ${file.path}`);
-                await executeCode(content);
-                const reg = getMigrations().find((r) => r.version === match[1]);
-                if (!reg) {
-                  throw new Error(
-                    `Migration ${match[1]} from ${file.path} did not register after execution`,
-                  );
-                }
-                const inner = await reg.migration();
-                inner.connection = this.connection;
-                return inner;
-              }
-            })(camelize(match[2].replace(/-/g, "_")), match[1]),
+          migration: async (): Promise<Migration> => {
+            const content = vfs.read(file.path)?.content;
+            if (!content) throw new Error(`File not found: ${file.path}`);
+            await executeCode(content);
+            const reg = getMigrations().find((r) => r.version === match[1]);
+            if (!reg) {
+              throw new Error(
+                `Migration ${match[1]} from ${file.path} did not register after execution`,
+              );
+            }
+            return reg.migration();
+          },
         },
       ];
     });

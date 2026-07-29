@@ -1,8 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
-import { Migration } from "@blazetrails/activerecord";
-import type { MigrationProxy } from "@blazetrails/activerecord";
+import type { Migration, MigrationProxy } from "@blazetrails/activerecord";
 
 // Rails uses `<timestamp>_<name>` (railties/lib/rails/generators/migration.rb).
 // trailties scaffolds in TS/JS, so the extension set is `ts|js` (no `rb`).
@@ -84,20 +83,10 @@ export async function discoverMigrations(migrationsDir: string): Promise<Migrati
       version,
       name,
       filename: filePath,
-      migration: () =>
-        new (class extends Migration {
-          override async up(): Promise<void> {
-            await this.runLoaded("up");
-          }
-          override async down(): Promise<void> {
-            await this.runLoaded("down");
-          }
-          private async runLoaded(direction: "up" | "down"): Promise<void> {
-            const MigrationClass = await loadMigrationClass(filePath);
-            const instance = new MigrationClass();
-            await instance.run(this.connection, direction);
-          }
-        })(name, version),
+      migration: async () => {
+        const MigrationClass = await loadMigrationClass(filePath);
+        return new MigrationClass(name, version);
+      },
     });
   }
 
@@ -112,7 +101,7 @@ function isMigrationClass(value: unknown): boolean {
 
 async function loadMigrationClass(
   filePath: string,
-): Promise<new () => { run(adapter: any, direction: "up" | "down"): Promise<void> }> {
+): Promise<new (name?: string, version?: string) => Migration> {
   let mod: any;
   try {
     mod = await import(pathToFileURL(filePath).href);
