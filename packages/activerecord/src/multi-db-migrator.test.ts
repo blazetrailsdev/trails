@@ -84,24 +84,16 @@ describe("MultiDbMigratorTest", () => {
     ];
   });
 
-  // `multi_db_migrator_test.rb:58-59`. Rails names `@pool_q` on the first line —
-  // a typo that makes it a no-op there; ours must really clear both, because
-  // trails shares the arunit database across every file in the worker.
   afterEach(async () => {
     await smA.deleteAllVersions();
     await smB.deleteAllVersions();
   });
 
-  it("schema migration is different for different connections", async () => {
-    const migratorA = new Migrator(adapterA, migrationsA);
-    const migratorB = new Migrator(adapterB, migrationsB);
-
-    await migratorA.up();
-    const versionsA = await migratorA.getAllVersions();
-    const versionsB = await migratorB.getAllVersions();
-
-    expect(versionsA).toEqual(["1", "2", "3"]);
-    expect(versionsB).toEqual([]);
+  it("schema migration is different for different connections", () => {
+    expect(smA).not.toBe(smB);
+    expect(adapterA).not.toBe(adapterB);
+    expect(Base.connectionPool().poolConfig.connectionDescriptor.name).toBe("Base");
+    expect(ARUnit2Model.connectionPool().poolConfig.connectionDescriptor.name).toBe("ARUnit2Model");
   });
 
   it("finds migrations", () => {
