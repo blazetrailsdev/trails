@@ -132,9 +132,14 @@
  * are reported, which is noise rather than a leak): SQL built by concatenation
  * or returned from a helper, since only a literal, a template, or an identifier
  * holding one is read; a catalogue relation `CATALOGUE_SOURCE` does not list;
- * a `SIMILAR TO` pattern using regex syntax the LIKE compiler does not translate
- * (`| * + ? ( ) [ ] { }` unescaped); and a regex (`~` / `~*`) filter that is
- * either unanchored or whose pattern past the `^` is not a plain literal. The
+ * an unanchored regex (`~` / `~*`) filter, which matches mid-name and is no
+ * prefix at all; and, in either regex spelling, a construct whose JS meaning
+ * differs from its POSIX one and so is refused rather than mistranslated — a
+ * POSIX class or collating element (`[[:alpha:]]`), a back reference or class
+ * shorthand (`\1`, `\d`), an `^` or `$` past the leading anchor, and a pattern
+ * that does not compile at all. Everything else in the two regex grammars —
+ * alternation, grouping, `* + ?`, `{n,m}` bounds, bracket expressions, `.` — is
+ * translated (`posixRegexpSource`, `similarPrefixMatcher`). The
  * filter spellings read are `LIKE`, `ILIKE`, `SIMILAR TO` and `~` / `~*`; their
  * negations are deliberately read as nothing (see `LIKE_PREFIX_RE`).
  *
@@ -366,15 +371,12 @@ const CATALOGUE_SOURCE =
 const LIKE_PREFIX_RE = /(?<!\bnot\s+)\b(?<i>i?)like\s+'(?<pattern>[^'%]+)%'/gi;
 /**
  * `SIMILAR TO` is the same catalogue filter in SQL-standard regex spelling: `%`
- * and `_` stay LIKE wildcards and the `ESCAPE` clause still applies, so it is
- * read through the same compiler — but it ALSO gives regex meaning to
- * `| * + ? ( ) [ ] { }`, which LIKE does not. Those are refused rather than
- * translated (`similarMetacharUnreadable`): reading `SIMILAR TO '(ex|tmp)_%'`
- * as the literal prefix `(ex|tmp)` would credit nothing anyway, and reading
- * `'ex*_%'` as a literal asterisk would credit `ex*A` — a name that sweep does
- * not select, which is a leak. Escaping one (`ex\*_%` under the default escape)
- * makes it the literal it says it is, and that IS read. `NOT SIMILAR TO` is an
- * exclusion filter and yields no prefix, exactly as `NOT LIKE` does.
+ * and `_` stay LIKE wildcards and the `ESCAPE` clause still applies — but it
+ * ALSO gives regex meaning to `| * + ? ( ) [ ] { }`, which LIKE does not, so it
+ * gets its own compiler (`similarPrefixMatcher`) rather than the LIKE one.
+ * Escaping a metacharacter (`ex\*_%` under the default escape) makes it the
+ * literal it says it is. `NOT SIMILAR TO` is an exclusion filter and yields no
+ * prefix, exactly as `NOT LIKE` does.
  */
 const SIMILAR_PREFIX_RE = /(?<!\bnot\s+)\bsimilar\s+to\s+'(?<pattern>[^'%]+)%'/gi;
 /**
@@ -388,24 +390,20 @@ const SIMILAR_PREFIX_RE = /(?<!\bnot\s+)\bsimilar\s+to\s+'(?<pattern>[^'%]+)%'/g
  * matches mid-name (`fooex1bar`) and selects far more than the prefix, but
  * crediting it as a prefix would be under-crediting, not a leak — the risk runs
  * the other way, so the `^` is required and an unanchored pattern yields no
- * matcher. Past the anchor only a metachar-free literal is read, optionally
- * followed by a trailing `.*` (which constrains nothing, so `^ex_.*` is the same
- * prefix as `^ex_`): the remaining POSIX regex syntax is not JS regex syntax
- * (bracket expressions, back references, `{n,m}` bounds), so translating it
- * would be guesswork, and reading it literally would credit names the sweep does
- * not select.
+ * matcher. Past the anchor the pattern is translated by `posixRegexpSource`,
+ * never handed to `new RegExp` as-is: POSIX ERE is not JS regex syntax, so every
+ * construct is either translated explicitly or refuses the whole filter.
  */
 const REGEXP_PREFIX_RE = /(?<![!~])(?<op>~\*?)\s*'(?<pattern>[^']*)'/g;
-const REGEXP_LITERAL_RE = /^\^(?<literal>[^.*+?^${}()|[\]\\]+)(?:\.\*)?$/;
 /** A trailing `ESCAPE '<char>'` clause, and the leading keyword on its own. */
 const ESCAPE_CLAUSE_RE = /^\s*escape\s+'([^'])'/i;
 const ESCAPE_KEYWORD_RE = /^\s*escape\b/i;
 export function sweepPrefixMatchers(text) {
   if (!CATALOGUE_SOURCE.test(text)) return [];
   const matchers = [];
-  for (const [re, similar] of [
-    [LIKE_PREFIX_RE, false],
-    [SIMILAR_PREFIX_RE, true],
+  for (const [re, compile] of [
+    [LIKE_PREFIX_RE, likePrefixMatcher],
+    [SIMILAR_PREFIX_RE, similarPrefixMatcher],
   ]) {
     re.lastIndex = 0;
     let m;
@@ -414,23 +412,170 @@ export function sweepPrefixMatchers(text) {
       const clause = ESCAPE_CLAUSE_RE.exec(tail);
       if (clause === null && ESCAPE_KEYWORD_RE.test(tail)) continue;
       const { i, pattern } = m.groups;
-      const matcher = likePrefixMatcher(
-        pattern,
-        clause === null ? "\\" : clause[1],
-        Boolean(i),
-        similar,
-      );
+      const matcher = compile(pattern, clause === null ? "\\" : clause[1], Boolean(i));
       if (matcher !== null) matchers.push(matcher);
     }
   }
   REGEXP_PREFIX_RE.lastIndex = 0;
   let m;
   while ((m = REGEXP_PREFIX_RE.exec(text)) !== null) {
-    const literal = REGEXP_LITERAL_RE.exec(m.groups.pattern);
-    if (literal === null) continue;
-    matchers.push(new RegExp(`^${literal.groups.literal}`, m.groups.op === "~*" ? "i" : ""));
+    const matcher = regexpPrefixMatcher(m.groups.pattern, m.groups.op === "~*");
+    if (matcher !== null) matchers.push(matcher);
   }
   return matchers;
+}
+
+/** The characters that must be backslash-escaped to stay literal in a JS regex. */
+const JS_METACHAR_RE = /[.*+?^${}()|[\]\\]/g;
+/** A bounded repeat, `{n}` / `{n,}` / `{n,m}` — the one spelling JS reads alike. */
+const BOUND_RE = /^\{\d+(?:,\d*)?\}/;
+
+/**
+ * A JS character class equivalent to the POSIX bracket expression starting at
+ * `pattern[start]`, plus the index just past its `]`, or null when the
+ * expression is unterminated or uses syntax whose JS meaning differs.
+ *
+ * The two halves overlap almost exactly — a leading `^` negates, `a-z` is a
+ * range, a `]` in first position is a literal — but two do not, and both are
+ * refused rather than guessed: a POSIX class/collating/equivalence element
+ * (`[[:alpha:]]`, `[[.x.]]`, `[[=a=]]`) has no JS spelling, and a backslash is
+ * an ordinary literal character inside POSIX brackets while JS reads it as an
+ * escape, so it is emitted doubled rather than passed through.
+ */
+function bracketSource(pattern, start) {
+  let source = "[";
+  let i = start + 1;
+  if (pattern[i] === "^") {
+    source += "^";
+    i++;
+  }
+  if (pattern[i] === "]") {
+    source += "\\]";
+    i++;
+  }
+  for (; i < pattern.length && pattern[i] !== "]"; i++) {
+    const ch = pattern[i];
+    if (ch === "[" && ":.=".includes(pattern[i + 1] ?? "")) return null;
+    source += ch === "\\" ? "\\\\" : ch === "[" ? "\\[" : ch === "^" ? "\\^" : ch;
+  }
+  if (i >= pattern.length) return null;
+  return { source: `${source}]`, next: i + 1 };
+}
+
+/**
+ * The JS regex source equivalent to the POSIX ERE `pattern`, or null when it
+ * uses a construct this compiler will not translate. Refusing is always safe
+ * (the sweep goes unrecognised and its creates are reported as noise); guessing
+ * is not, since a widened matcher credits a name the filter does not select.
+ *
+ * Alternation, grouping and the quantifiers `* + ?` are spelled identically in
+ * both, as are `{n,m}` bounds and `.`; bracket expressions go through
+ * `bracketSource`. Refused: a backslash escape of a word character, since
+ * POSIX-ERE back references (`\1`) and PostgreSQL's ARE class shorthands (`\d`)
+ * do not mean in JS what they mean here; a `{` that does not open a bound; and
+ * an `^` or `$` past the leading anchor, which would constrain a position this
+ * prefix reading does not model.
+ */
+function posixRegexpSource(pattern) {
+  let source = "";
+  let i = 0;
+  while (i < pattern.length) {
+    const ch = pattern[i];
+    if (ch === "[") {
+      const bracket = bracketSource(pattern, i);
+      if (bracket === null) return null;
+      source += bracket.source;
+      i = bracket.next;
+    } else if (ch === "\\") {
+      const next = pattern[i + 1];
+      if (next === undefined || /\w/.test(next)) return null;
+      source += `\\${next}`;
+      i += 2;
+    } else if (ch === "{") {
+      const bound = BOUND_RE.exec(pattern.slice(i));
+      if (bound === null) return null;
+      source += bound[0];
+      i += bound[0].length;
+    } else if (ch === "^" || ch === "$") {
+      return null;
+    } else {
+      source += "()|*+?.".includes(ch) ? ch : ch.replace(JS_METACHAR_RE, "\\$&");
+      i++;
+    }
+  }
+  return source;
+}
+
+/**
+ * An anchored RegExp matching the names the regex filter `pattern` selects, or
+ * null when it is unanchored or untranslatable. A bare `^` selects every name
+ * and is no prefix, so it too yields nothing.
+ *
+ * The translated source is wrapped in a group before the anchor is reapplied:
+ * `^(?:a|b)` is what `^a|b` means here, whereas the unwrapped `^a|b` would read
+ * the anchor as binding to the first branch alone. That the POSIX match is a
+ * *search* past the anchor needs no `.*` — a name our matcher accepts matched
+ * the whole translated pattern at position 0, so the filter matches it too.
+ */
+function regexpPrefixMatcher(pattern, caseInsensitive) {
+  if (!pattern.startsWith("^")) return null;
+  const source = posixRegexpSource(pattern.slice(1));
+  if (source === null || source === "") return null;
+  return compileMatcher(`^(?:${source})`, caseInsensitive);
+}
+
+/**
+ * An anchored RegExp matching the names `<pattern>%` selects under
+ * `escapeChar`, or null when the pattern is untranslatable. `SIMILAR TO` reads
+ * `_` and `%` as LIKE wildcards and everything in `| * + ? ( ) [ ] { }` as
+ * regex, which is why it cannot share the LIKE compiler.
+ *
+ * The trailing `%` is translated with the rest (`.*`) and the whole thing
+ * full-matched rather than treated as an implicit prefix, because `SIMILAR TO`
+ * matches the entire name: in `'ex|tmp%'` the `%` belongs to the second branch
+ * only, so a prefix reading of the alternation would credit `exFOO`, which the
+ * filter does not select.
+ */
+function similarPrefixMatcher(pattern, escapeChar, caseInsensitive) {
+  let source = "";
+  let i = 0;
+  while (i < pattern.length) {
+    const ch = pattern[i];
+    if (ch === escapeChar) {
+      const next = pattern[i + 1];
+      if (next === undefined) return null;
+      source += next.replace(JS_METACHAR_RE, "\\$&");
+      i += 2;
+    } else if (ch === "[") {
+      const bracket = bracketSource(pattern, i);
+      if (bracket === null) return null;
+      source += bracket.source;
+      i = bracket.next;
+    } else if (ch === "{") {
+      const bound = BOUND_RE.exec(pattern.slice(i));
+      if (bound === null) return null;
+      source += bound[0];
+      i += bound[0].length;
+    } else {
+      source += ch === "_" ? "." : "()|*+?".includes(ch) ? ch : ch.replace(JS_METACHAR_RE, "\\$&");
+      i++;
+    }
+  }
+  return compileMatcher(`^(?:${source}.*)$`, caseInsensitive);
+}
+
+/**
+ * `new RegExp(source)`, or null when the source does not compile — a pattern
+ * whose grouping or quantifier placement is unbalanced (`'(ex_%'`, `'*ex_%'`)
+ * is malformed rather than translatable, and must credit nothing rather than
+ * throw out of the lint pass.
+ */
+function compileMatcher(source, caseInsensitive) {
+  try {
+    return new RegExp(source, caseInsensitive ? "i" : "");
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -439,25 +584,22 @@ export function sweepPrefixMatchers(text) {
  * matches the single literal name `ex%`, not a prefix, so it sweeps nothing
  * this rule should credit. `caseInsensitive` is set for `ILIKE` filters only —
  * `LIKE` is case-sensitive in PostgreSQL, so widening it would credit creates
- * the sweep leaves behind. `similarMetacharUnreadable` is set for `SIMILAR TO`,
- * where an unescaped regex metacharacter carries meaning this compiler does not
- * translate and so makes the whole filter unreadable.
+ * the sweep leaves behind. `SIMILAR TO` gives regex meaning to characters LIKE
+ * reads literally and goes through `similarPrefixMatcher` instead.
  */
-function likePrefixMatcher(pattern, escapeChar, caseInsensitive, similarMetacharUnreadable) {
+function likePrefixMatcher(pattern, escapeChar, caseInsensitive) {
   let source = "";
   let escaped = false;
   for (const ch of pattern) {
     if (escaped) {
-      source += ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      source += ch.replace(JS_METACHAR_RE, "\\$&");
       escaped = false;
     } else if (ch === escapeChar) {
       escaped = true;
     } else if (ch === "_") {
       source += ".";
-    } else if (similarMetacharUnreadable && "|*+?()[]{}".includes(ch)) {
-      return null;
     } else {
-      source += ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      source += ch.replace(JS_METACHAR_RE, "\\$&");
     }
   }
   if (escaped) return null;

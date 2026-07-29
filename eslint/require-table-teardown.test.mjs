@@ -164,6 +164,31 @@ tester.run("require-table-teardown", rule, {
       "for (const t of rows) {\n" +
       '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
       "}",
+    // An alternation is translated: both branches are prefixes the sweep drops.
+    'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+      'await adapter.exec(`CREATE TABLE "tmp_int" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename SIMILAR TO '(ex|tmp)_%'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
+    // `ex*` is `e` followed by any run of `x`, so `ex*foo` is a name it selects.
+    'await adapter.exec(`CREATE TABLE "ex*foo" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename SIMILAR TO 'ex*%'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
+    // A bracket expression and a bounded repeat are spelled alike in JS.
+    'await adapter.exec(`CREATE TABLE "ex12_int" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename SIMILAR TO 'ex[0-9]{2}_%'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
     // An anchored `~` pattern is a prefix filter.
     'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
       "const rows = await adapter.execute(\n" +
@@ -184,6 +209,22 @@ tester.run("require-table-teardown", rule, {
     'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
       "const rows = await adapter.execute(\n" +
       "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_.*'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
+    // POSIX alternation past the anchor is translated, not refused.
+    'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^(ex|tmp)_'`,\n" +
+      ");\n" +
+      "for (const t of rows) {\n" +
+      '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "}",
+    // A bracket expression and a `+` quantifier past the anchor are translated.
+    'await adapter.exec(`CREATE TABLE "ex_12" (id int)`);\n' +
+      "const rows = await adapter.execute(\n" +
+      "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[0-9]+'`,\n" +
       ");\n" +
       "for (const t of rows) {\n" +
       '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
@@ -639,29 +680,30 @@ tester.run("require-table-teardown", rule, {
         "}",
       errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
     },
-    // An alternation is regex syntax under SIMILAR TO, not a literal prefix.
+    // SIMILAR TO matches the whole name, so the `%` belongs to the last branch
+    // alone: `ex|tmp%` selects exactly `ex`, never the prefix `ex`.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "exfoo" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename SIMILAR TO 'ex|tmp%'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "exfoo" } }],
+    },
+    // A quantifier with nothing to quantify is malformed, not translatable.
     {
       code:
         'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
         "const rows = await adapter.execute(\n" +
-        "  `SELECT tablename FROM pg_tables WHERE tablename SIMILAR TO '(ex|tmp)_%'`,\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename SIMILAR TO '*ex_%'`,\n" +
         ");\n" +
         "for (const t of rows) {\n" +
         '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
         "}",
       errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
-    },
-    // `*` is a repeat under SIMILAR TO, so it is not read as a literal asterisk.
-    {
-      code:
-        'await adapter.exec(`CREATE TABLE "ex*foo" (id int)`);\n' +
-        "const rows = await adapter.execute(\n" +
-        "  `SELECT tablename FROM pg_tables WHERE tablename SIMILAR TO 'ex*%'`,\n" +
-        ");\n" +
-        "for (const t of rows) {\n" +
-        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
-        "}",
-      errors: [{ messageId: "missingTeardown", data: { table: "ex*foo" } }],
     },
     // An unanchored `~` pattern matches mid-name, so it is not a prefix filter.
     {
@@ -675,12 +717,37 @@ tester.run("require-table-teardown", rule, {
         "}",
       errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
     },
-    // Regex syntax past the anchor is not translated, so it credits nothing.
+    // A POSIX class element has no JS spelling, so it is refused, not guessed.
     {
       code:
         'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
         "const rows = await adapter.execute(\n" +
-        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^(ex|tmp)_'`,\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_[[:alpha:]]'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
+    },
+    // A backslash escape of a word character means something else in JS.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_\\\\d'`,\n" +
+        ");\n" +
+        "for (const t of rows) {\n" +
+        '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+        "}",
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
+    },
+    // An `$` past the leading anchor constrains a position this reading models
+    // as open-ended, so the filter is refused rather than read as a prefix.
+    {
+      code:
+        'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+        "const rows = await adapter.execute(\n" +
+        "  `SELECT tablename FROM pg_tables WHERE tablename ~ '^ex_$'`,\n" +
         ");\n" +
         "for (const t of rows) {\n" +
         '  await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
