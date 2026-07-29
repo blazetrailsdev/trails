@@ -87,8 +87,18 @@
  * ones the sweep alone dropped.
  *
  * Both halves must be present: a `LIKE` filter on a catalogue relation whose
- * pattern is a closed single-quoted literal ending in `%`, and a raw `DROP
- * TABLE` whose name position is an interpolation *that is the table name*. A
+ * pattern is a closed single-quoted literal ending in `%`, and a drop that
+ * names no table itself. The drop is recognised in either spelling, on the same
+ * footing: a raw `DROP TABLE` whose name position is an interpolation *that is
+ * the table name*, or a `dropTable()` helper call whose argument traces back to
+ * a sink-derived row binding (`for (const t of rows) await
+ * adapter.dropTable(t.tablename)`). The helper form is the one CLAUDE.md steers
+ * tests toward, so recognising only the raw one left a file written the
+ * recommended way reporting every create it does tear down. The binding
+ * resolver is shared with `require-canonical-rebuild` — see
+ * `eslint/sweep-binding.mjs` — so the two rules cannot disagree about what a
+ * swept name is. `dropTable("ex_foo")` is a fixed name and arms nothing, for
+ * the same reason a statically-named raw drop does not. A
  * static qualifier ahead of it does not disqualify the drop (`DROP TABLE
  * public."${row.tablename}"` is a sweep, the shape `require-canonical-rebuild`
  * recognises too), but in `DROP TABLE "${schema}"."fixed"` the dynamic part is only the qualifier and
@@ -113,8 +123,7 @@
  * the under-accepting direction (a real sweep goes unrecognised and its creates
  * are reported, which is noise rather than a leak): SQL built by concatenation
  * or returned from a helper, since only literals and template quasis are read;
- * a catalogue relation `CATALOGUE_SOURCE` does not list; a sweep whose drop runs
- * through the `dropTable()` helper on a row value rather than raw SQL; and a
+ * a catalogue relation `CATALOGUE_SOURCE` does not list; and a
  * filter spelled as something other than `LIKE` — `ILIKE`, `SIMILAR TO`, a
  * regex operator — since only `LIKE` is read.
  *
@@ -147,6 +156,11 @@
  * dynamic/computed table name breaks the run (any contiguous sub-runs on either
  * side are still flagged independently).
  */
+
+// Cyclic with this module by design: sweep-binding.mjs reads `calledName` and
+// `SQL_SINKS` from here, and touches both only at lint time, so neither module
+// observes the other half-initialized.
+import { createSweepBinding } from "./sweep-binding.mjs";
 
 /**
  * The called function's name, whether it's a bare call (`createTable(...)`) or
@@ -518,6 +532,7 @@ const rule = {
     const checkRawSql = context.options[0]?.rawSql !== false;
 
     const sourceCode = context.sourceCode ?? context.getSourceCode();
+    const { isSweepBound } = createSweepBinding(context);
 
     // table name → first create node seen (for the report location).
     const created = new Map();
@@ -623,6 +638,12 @@ const rule = {
           if (table !== null && !created.has(table)) created.set(table, node);
         } else if (name === "dropTable") {
           for (const table of droppedTableNames(node)) dropped.add(table);
+          // The helper spelling of a sweep's drop half: `dropTable(row.name)`
+          // names no table itself, so it arms only when its argument traces
+          // back to a sink-derived row binding. A fixed name arms nothing.
+          for (const arg of node.arguments) {
+            if (staticString(arg) === null && isSweepBound(arg)) sawSweepDrop = true;
+          }
         } else if (checkRawSql && name !== null && SQL_SINKS.has(name)) {
           recordSinkSql(node);
         }

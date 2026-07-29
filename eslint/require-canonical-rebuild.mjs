@@ -1,4 +1,5 @@
 import { calledName, staticString, rawDropNames, SQL_SINKS } from "./require-table-teardown.mjs";
+import { createSweepBinding } from "./sweep-binding.mjs";
 import { CATALOGUE_SOURCE } from "./canonical-catalogue-sources.mjs";
 
 const DROP_TABLE = /\bdrop\s+table\b/i;
@@ -61,15 +62,7 @@ const rule = {
       if (canonical.has(table) && !dropped.has(table)) dropped.set(table, node);
     }
 
-    function resolve(node) {
-      if (node?.type !== "Identifier") return null;
-      const scope = context.sourceCode.getScope(node);
-      for (let s = scope; s; s = s.upper) {
-        const found = s.variables.find((v) => v.name === node.name);
-        if (found) return found;
-      }
-      return null;
-    }
+    const { resolve, isSweepBound: isLoopBound } = createSweepBinding(context);
 
     /**
      * Every string a sink argument could carry: the initializer AND all later
@@ -119,126 +112,6 @@ const rule = {
       for (const [, name] of text.matchAll(/'([A-Za-z_][A-Za-z0-9_]*)'/g)) {
         if (canonical.has(name)) namesInScope.add(name);
       }
-    }
-
-    /**
-     * One unwrapping step shared by both walkers, so they cannot drift apart:
-     * they differ only in that isSinkDerived also descends a CallExpression.
-     * Returns undefined when the node is not a wrapper, null at a dead end.
-     */
-    function unwrapStep(node) {
-      switch (node?.type) {
-        case "AwaitExpression":
-          return node.argument;
-        case "ChainExpression":
-        case "TSNonNullExpression":
-          return node.expression;
-        case "ConditionalExpression":
-          return node.consequent;
-        case "LogicalExpression":
-          return node.left;
-        case "MemberExpression":
-          return node.object;
-        case "TemplateLiteral":
-          return node.expressions.length === 1 ? node.expressions[0] : null;
-        default:
-          return undefined;
-      }
-    }
-
-    function rootIdentifier(expr) {
-      let cur = expr;
-      for (;;) {
-        if (!cur) return null;
-        if (cur.type === "CallExpression" && cur.arguments.length === 1) {
-          cur = cur.arguments[0];
-          continue;
-        }
-        const next = unwrapStep(cur);
-        if (next === undefined) return cur.type === "Identifier" ? cur : null;
-        cur = next;
-      }
-    }
-
-    /**
-     * A value read out of a query's result rows — the row source of a sweep.
-     * The sink call can sit at ANY level of the chain, not just the top:
-     * `(await execute(sql)).rows` and `(await execute(sql)).rows.forEach` both
-     * bottom out in a call rather than an identifier, so stopping at the first
-     * non-call would miss the collapsed one-liner form while reporting the
-     * two-step `const res = …; const rows = res.rows;` spelling.
-     */
-    function isSinkDerived(node, seen) {
-      let cur = node;
-      for (;;) {
-        if (!cur) return false;
-        if (cur.type === "CallExpression") {
-          if (SQL_SINKS.has(calledName(cur.callee))) return true;
-          // Toward the function, never the arguments: this exists only to reach
-          // a member chain's object (`res.rows.filter(cb)`). Landing on a plain
-          // function binding is an accepted dead end, not an error.
-          cur = cur.callee;
-          continue;
-        }
-        const next = unwrapStep(cur);
-        if (next === undefined) break;
-        cur = next;
-      }
-      return cur?.type === "Identifier" ? varIsSweepBound(resolve(cur), seen) : false;
-    }
-
-    /**
-     * The variable must BE the sweep binding, never merely be enclosed by one:
-     * walking up to an enclosing construct arms every fixed name declared
-     * inside a describe/it callback or a loop body.
-     */
-    function varIsSweepBound(variable, seen = new Set()) {
-      if (variable === null || seen.has(variable)) return false;
-      seen.add(variable);
-      const boundByDef = variable.defs.some((def) => {
-        if (def.type === "Parameter") return isRowCallbackParam(def.node, seen);
-        const declarator = def.node;
-        if (declarator?.type !== "VariableDeclarator") return false;
-        const declaration = declarator.parent;
-        const loop = declaration?.parent;
-        if (
-          (loop?.type === "ForOfStatement" || loop?.type === "ForInStatement") &&
-          loop.left === declaration
-        ) {
-          return true;
-        }
-        return declarator.init ? isSinkDerived(declarator.init, seen) : false;
-      });
-      if (boundByDef) return true;
-      // `let name; name = row.tablename;` binds by assignment, not initializer —
-      // the same spelling sqlTexts already follows on the SQL side.
-      return variable.references.some((ref) => ref.writeExpr && isSinkDerived(ref.writeExpr, seen));
-    }
-
-    /**
-     * A parameter of a callback whose call also carries the row set — as the
-     * callee's object (`tables.map(cb)`) or as a sibling argument
-     * (`eachRow(rows, cb)`, `pMap(rows, cb)`). Shape, not method name: a name
-     * list misses every non-member spelling, and `withConnection((conn) => …)`
-     * stays quiet here because it carries no sink-derived value at all.
-     *
-     * Arming is per-CALL, not per-parameter: every parameter of every callback
-     * in a qualifying call counts, whatever its role. A `reduce` accumulator
-     * arms, and so does the resource parameter of
-     * `withRows(rows, (conn) => …)`. Over-report direction, accepted.
-     */
-    function isRowCallbackParam(fn, seen) {
-      if (fn?.type !== "ArrowFunctionExpression" && fn?.type !== "FunctionExpression") return false;
-      const call = fn.parent;
-      if (call?.type !== "CallExpression" || !call.arguments.includes(fn)) return false;
-      const callee = call.callee;
-      if (callee?.type === "MemberExpression" && isSinkDerived(callee.object, seen)) return true;
-      return call.arguments.some((arg) => arg !== fn && isSinkDerived(arg, seen));
-    }
-
-    function isLoopBound(expr) {
-      const root = rootIdentifier(expr);
-      return root === null ? false : varIsSweepBound(resolve(root));
     }
 
     return {
