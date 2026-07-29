@@ -537,7 +537,7 @@ const ADAPTER_SPECIFIC_TABLES: Record<
       ...(pg.supportsPartitionedIndexes()
         ? ["measurements", "measurements_toronto", "measurements_concepcion"]
         : []),
-      "pk_autopopulated_by_a_trigger_records",
+      ...(pg.supportsInsertReturning() ? ["pk_autopopulated_by_a_trigger_records"] : []),
     ];
   },
   mysql: async (adapter) => {
