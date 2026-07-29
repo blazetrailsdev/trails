@@ -1041,6 +1041,9 @@ describe("PreloaderTest", () => {
       await (
         await OtherDog.leaseConnection()
       ).executeMutation(
+        // It lives in this test's own scratch database file, not the shared
+        // per-worker one, so there is nothing to leak into.
+        // eslint-disable-next-line blazetrails/require-table-teardown
         "CREATE TABLE `dogs` (`id` INTEGER PRIMARY KEY, `trainer_id` INTEGER, " +
           "`breeder_id` INTEGER, `dog_lover_id` INTEGER, `alias` VARCHAR(255))",
       );

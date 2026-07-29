@@ -72,8 +72,9 @@
  *
  * Only statically-knowable names count: a name that sits in (or runs up to) an
  * interpolation — `CREATE TABLE ${name}`, or the `tmp_` prefix of `CREATE TABLE
- * tmp_${suffix}` — is invisible, like a computed helper name, and SQL built in a
- * variable and executed later (`exec(sql)`) is not seen. Files with
+ * tmp_${suffix}` — is invisible, like a computed helper name. SQL built in a
+ * variable and executed later (`exec(sql)`), or built by `+` concatenation, IS
+ * seen: both resolve through `eslint/sql-texts.mjs`. Files with
  * a backlog of un-torn-down raw creates are grandfathered via the
  * `rawSql: false` option in eslint.config.mjs, fed by
  * `eslint/require-table-teardown-raw-sql-exclude.json`, and ratcheted to zero.
