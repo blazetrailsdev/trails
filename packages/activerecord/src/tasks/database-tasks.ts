@@ -396,10 +396,6 @@ export class DatabaseTasks {
     if (!this.databaseConfiguration) return;
     if (this.configsFor(this._normalizeEnv()).length === 0) return;
     const { Migrator } = await import("../migration.js");
-    // Rails' `db:rollback` rolls back through
-    // `migration_connection_pool.migration_context` (`connection_pool.rb:294-299`),
-    // so the migration set is the one belonging to that pool's db_config —
-    // not a process-global list shared across databases.
     const pool = await this.migrationConnectionPool();
     const adapter = await pool.leaseConnection();
     const migrator = new Migrator(adapter, this._migrationsFor(pool.dbConfig));

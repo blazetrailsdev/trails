@@ -6,16 +6,6 @@ import { Base } from "../base.js";
 import type { MigrationProxy } from "../migration.js";
 import { anonymousMigration } from "../test-helpers/anonymous-migration.js";
 
-/**
- * Trails-only: Rails covers this through `db:rollback:namespace works`
- * (`vendor/rails/railties/test/application/rake/multi_dbs_test.rb:827`), which
- * shells out to rake in a generated multi-database app — there is no rake here,
- * and `trailties`' `db rollback` builds its own Migrator per database rather
- * than calling `DatabaseTasks.rollback`. So the per-config migration set that
- * `rollback` hands to the Migrator is asserted directly against
- * `DatabaseTasks`, the way `migrate` resolves it (`database-tasks.ts`,
- * `connection_pool.rb:294-299`).
- */
 describe("DatabaseTasksRollbackTest", () => {
   afterEach(() => {
     DatabaseTasks.registerMigrations([]);
@@ -23,7 +13,7 @@ describe("DatabaseTasksRollbackTest", () => {
     try {
       Base.removeConnection();
     } catch {
-      /* no pool */
+      void 0;
     }
   });
 
@@ -54,8 +44,6 @@ describe("DatabaseTasksRollbackTest", () => {
     const primary = configs.find((c) => c.name === "primary")!;
     const animals = configs.find((c) => c.name === "animals")!;
 
-    // The fallback list stands in for another database's migrations: rollback
-    // must not reach for it once the pool's own config has a set registered.
     DatabaseTasks.registerMigrations([migration("1", "Fallback")]);
     DatabaseTasks.registerMigrations([migration("2", "PrimaryOnly")], primary);
     DatabaseTasks.registerMigrations([migration("3", "AnimalsOnly")], animals);
