@@ -15,13 +15,7 @@ import {
   type DatabaseConfig as RawConfig,
 } from "../database.js";
 import { discoverMigrations } from "../migration-loader.js";
-import {
-  DatabaseTasks,
-  HashConfig,
-  Migrator,
-  DatabaseAlreadyExists,
-  NoDatabaseError,
-} from "@blazetrails/activerecord";
+import { DatabaseTasks, HashConfig, Migrator } from "@blazetrails/activerecord";
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
 
 async function closeAdapter(adapter: DatabaseAdapter): Promise<void> {
@@ -523,35 +517,15 @@ function displayNameFor(config: HashConfig, raw: RawConfig): string {
 }
 
 async function runCreate(opts: DatabaseOpts = {}): Promise<void> {
-  await forEachDatabaseConfig(opts, async ({ raw, config, prefix }) => {
-    const displayName = displayNameFor(config, raw);
-    try {
-      await DatabaseTasks.create(config);
-      console.log(`${prefix}Created database '${displayName}'`);
-    } catch (error) {
-      if (error instanceof DatabaseAlreadyExists) {
-        console.error(`${prefix}Database '${displayName}' already exists`);
-        return;
-      }
-      throw error;
-    }
+  await forEachDatabaseConfig(opts, async ({ config }) => {
+    await DatabaseTasks.create(config);
   });
 }
 
 async function runDrop(opts: DatabaseOpts = {}): Promise<void> {
-  await forEachDatabaseConfig(opts, async ({ raw, config, prefix }) => {
-    const displayName = displayNameFor(config, raw);
+  await forEachDatabaseConfig(opts, async ({ config }) => {
     await runProtectedEnvCheck(config, config.envName);
-    try {
-      await DatabaseTasks.drop(config);
-      console.log(`${prefix}Dropped database '${displayName}'`);
-    } catch (error) {
-      if (error instanceof NoDatabaseError) {
-        console.error(`${prefix}Database '${displayName}' does not exist`);
-        return;
-      }
-      throw error;
-    }
+    await DatabaseTasks.drop(config);
   });
 }
 
@@ -861,31 +835,33 @@ export function dbCommand(): Command {
       "Create the database if it doesn't exist, run pending migrations, and seed when fresh",
     )
     .action(async () => {
-      // Create the DB first, then connect via withTemporaryPool — establishing
-      // the pool before creation would fail for pg/mysql when the DB doesn't exist.
       const raw = normalizeRawConfig(await loadDatabaseConfig());
       const config = toDbConfig(raw);
-      const { DatabaseAlreadyExists } = await import("@blazetrails/activerecord");
-
-      try {
-        await DatabaseTasks.create(config);
-        console.log(`Created database '${displayNameFor(config, raw)}'`);
-      } catch (error) {
-        if (!(error instanceof DatabaseAlreadyExists)) throw error;
-      }
+      const { NoDatabaseError } = await import("@blazetrails/activerecord");
 
       await DatabaseTasks.withTemporaryPool(config, async (pool) => {
-        // Rails measures "fresh" via `!schema_migration.table_exists?`,
-        // matching its `initialize_database` contract. A sqlite DB file
-        // may have been created by either our DatabaseTasks.create call
-        // above or by better-sqlite3 on connect; the meaningful signal
-        // is whether migrations have been applied.
-        const adapter = await pool.leaseConnection();
-        const migrator = createMigrator(adapter, [], raw);
-        const wasFresh = !(await migrator.schemaMigrationTableExists());
+        let adapter: DatabaseAdapter;
+        let databaseAlreadyInitialized: boolean;
+        try {
+          adapter = await pool.leaseConnection();
+          databaseAlreadyInitialized = await createMigrator(
+            adapter,
+            [],
+            raw,
+          ).schemaMigrationTableExists();
+        } catch (error) {
+          if (!(error instanceof NoDatabaseError)) throw error;
+          await DatabaseTasks.create(config);
+          adapter = await pool.leaseConnection();
+          databaseAlreadyInitialized = await createMigrator(
+            adapter,
+            [],
+            raw,
+          ).schemaMigrationTableExists();
+        }
 
         await runMigrate(adapter, raw);
-        if (wasFresh) {
+        if (!databaseAlreadyInitialized) {
           await withSeedAdapter(adapter, runSeed);
         }
       });

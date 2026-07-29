@@ -54,7 +54,6 @@ describe("DbTasksTest", () => {
     const code = await run(["db:create"], dir);
     expect(code).toBe(0);
     expect(createAll).toHaveBeenCalledOnce();
-    expect(out.join("\n")).toContain("Created database ':memory:'");
   });
 
   it("db:create --all calls DatabaseTasks.create for every config", async () => {
@@ -70,7 +69,6 @@ describe("DbTasksTest", () => {
     const code = await run(["db:drop"], dir);
     expect(code).toBe(0);
     expect(dropAll).toHaveBeenCalledOnce();
-    expect(out.join("\n")).toContain("Dropped database ':memory:'");
   });
 
   it("db:drop --all calls DatabaseTasks.drop for every config", async () => {
