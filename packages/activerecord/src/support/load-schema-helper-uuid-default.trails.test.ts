@@ -59,9 +59,9 @@ describeIfPg("load_schema_helper: uuid_default without pgcrypto", () => {
         },
       });
 
-      await expect(
-        loadSchema(async () => probe as unknown as AbstractAdapter),
-      ).rejects.toBeInstanceOf(StopLoad);
+      await expect(loadSchema(probe as unknown as AbstractAdapter)).rejects.toBeInstanceOf(
+        StopLoad,
+      );
 
       for (const name of ["chat_messages", "uuid_parents", "uuid_children"]) {
         expect(emitted.get(name)).toContain(
