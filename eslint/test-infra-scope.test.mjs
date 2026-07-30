@@ -1,3 +1,4 @@
+import { stat } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
   activerecordSrcRoot,
@@ -36,6 +37,16 @@ describe("test-infra lint scope", () => {
       "canonical-table-rebuild",
       "load-schema-helper",
     ]);
+  });
+
+  // A stale entry is invisible at lint time — ESLint silently matches nothing —
+  // so an RFC 0064 file move that skipped this file would go unnoticed, which is
+  // the failure mode the single source of truth exists to prevent.
+  it("names paths that still exist", async () => {
+    for (const entry of [...testInfraExemptIgnores, ...canonicalLoaderSelfTests]) {
+      const target = entry.replace(/\/\*\*$/, "");
+      await expect(stat(target), target).resolves.toBeTruthy();
+    }
   });
 
   it("shares one root with the no-raw-sql scope", () => {

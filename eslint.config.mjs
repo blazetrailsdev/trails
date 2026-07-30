@@ -470,7 +470,7 @@ export default defineConfig(
   //    test. See eslint/require-table-teardown.mjs. ──
   {
     files: ["packages/activerecord/src/**/*.test.ts"],
-    ignores: [...testInfraExemptIgnores],
+    ignores: testInfraExemptIgnores,
     rules: {
       "blazetrails/require-table-teardown": ["error", { rawSql: true }],
     },

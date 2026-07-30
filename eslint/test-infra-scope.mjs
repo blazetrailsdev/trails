@@ -23,7 +23,7 @@ export const activerecordSrcRoot = "packages/activerecord/src";
  * `activerecordSrcRoot`. `fixtures.ts` / `test-fixtures.ts` are anchored as
  * exact ported files rather than by basename — see no-raw-sql-scope.mjs.
  */
-export const testInfraExemptGlobs = [
+const testInfraExemptGlobs = [
   "test-helpers/**",
   "support/**",
   "fixtures.test.ts",
