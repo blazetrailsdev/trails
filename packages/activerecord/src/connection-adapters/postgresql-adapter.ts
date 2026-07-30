@@ -1525,15 +1525,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     });
     this._maintenanceTail = prev.then(() => gate);
     await prev.catch(() => {});
-    // Claim the in-flight marker here, not at `_runQuery` entry: a query that is
-    // merely queued behind a foreign one must not overwrite `_queryInFlightOwner`
-    // while that foreign query is still on the wire, or a rollback from the
-    // queued query's chain would pass `_cancelAnyRunningQuery`'s ownership guard
-    // and cancel a statement it does not own. Claiming inside the serializer also
-    // makes the *clear* exact (one holder at a time) instead of
-    // first-finisher-wins. Rails gets this for free because
-    // `cancel_any_running_query` only runs under `@connection.lock.synchronize`
-    // (transaction.rb:611 → postgresql/database_statements.rb:127).
     this._queryInFlight = true;
     this._queryInFlightOwner = this._transactionManager.currentLockToken;
     try {
