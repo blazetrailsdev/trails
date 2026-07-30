@@ -136,7 +136,7 @@ export class HasOneAssociation extends SingularAssociation {
     await transactionIf(this, save, async () => {
       // `this.target` is still `displaced`, so `removeTargetBang` removes it.
       if (displaced && !(displaced as any).isDestroyed?.() && !sameRecord(displaced, record)) {
-        await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "");
+        await this.removeTargetBang((this.reflection.options.dependent as string) ?? "");
       }
       if (record) {
         this.setOwnerAttributes(record);
@@ -500,7 +500,7 @@ export class HasOneAssociation extends SingularAssociation {
     if ((displaced as { isDestroyed?: () => boolean }).isDestroyed?.()) return;
     if (sameRecord(displaced, this.target)) return;
     try {
-      await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "", displaced);
+      await this.removeTargetBang((this.reflection.options.dependent as string) ?? "", displaced);
     } catch (error) {
       this.target = displaced;
       throw error;
@@ -646,6 +646,50 @@ export class HasOneAssociation extends SingularAssociation {
     }
   }
 
+  private async removeTargetBang(
+    method: string,
+    // Rails' `remove_target!` always acts on `self.target`, which is still the
+    // displaced record inside `replace`'s transaction (persistImmediate keeps
+    // that shape, so it takes the default). Every deferred displacement path
+    // instead removes a record while `this.target` is already the replacement —
+    // flipping the cached target back mid-await is observable to synchronous
+    // readers — so `detachDisplacedTarget` names the record explicitly.
+    target: Base | null = this.target,
+  ): Promise<void> {
+    if (!target) return;
+    if (method === "delete") {
+      await ((target as any).delete?.() ?? Promise.resolve());
+      return;
+    }
+    if (method === "destroy") {
+      // Tag the record with the association that is destroying it (so its own
+      // destroy callbacks can read `destroyed_by_association`) before
+      // destroying, and only destroy when the record is actually persisted.
+      (target as any).destroyedByAssociation = this.reflection;
+      await preloadDestroyInverseBelongsTo(this, target);
+      if (target.isPersisted()) await ((target as any).destroy?.() ?? Promise.resolve());
+      return;
+    }
+    // The `else` branch (no `dependent`, or `:nullify`): drop the foreign key on
+    // the previously associated record, clear the inverse, and save it. A plain
+    // replacement always nullifies the old record's FK; the `dependent` option
+    // only governs the owner-destroy path. A failed nullify-save aborts the
+    // replacement.
+    this.nullifyOwnerAttributes(target);
+    this.removeInverseInstance(target);
+    if (target.isPersisted() && (this.owner as any).isPersisted?.()) {
+      const saved = await ((target as any).save?.() ?? Promise.resolve(true));
+      if (saved === false) {
+        this.setOwnerAttributes(target);
+        throw new RecordNotSaved(
+          `Failed to remove the existing associated ${this.reflection.name}. ` +
+            `The record failed to save after its foreign key was set to nil.`,
+          target,
+        );
+      }
+    }
+  }
+
   private nullifyOwnerAttributes(record: Base): void {
     // Source the column list from the Rails-named helper so custom
     // foreignKey/foreignType (incl. composite PKs and polymorphic `as`)
@@ -731,53 +775,6 @@ async function preloadDestroyInverseBelongsTo(
     } catch {
       // A non-loadable back-reference (e.g. a missing FK row) is simply skipped;
       // the callback then sees an unloaded association, as it would in Rails.
-    }
-  }
-}
-
-/** @internal */
-async function removeTargetBang(
-  assoc: HasOneAssociation,
-  method: string,
-  // Rails' `remove_target!` always acts on `self.target`, which is still the
-  // displaced record inside `replace`'s transaction (persistImmediate keeps that
-  // shape, so it takes the default). Every deferred displacement path instead
-  // removes a record while `assoc.target` is already the replacement — flipping
-  // the cached target back mid-await is observable to synchronous readers — so
-  // `detachDisplacedTarget` names the record explicitly.
-  target: Base | null = assoc.target,
-): Promise<void> {
-  if (!target) return;
-  if (method === "delete") {
-    await ((target as any).delete?.() ?? Promise.resolve());
-    return;
-  }
-  if (method === "destroy") {
-    // Mirrors Rails HasOneAssociation#remove_target!: tag the record with the
-    // association that is destroying it (so its own destroy callbacks can read
-    // `destroyed_by_association`) before destroying, and only destroy when the
-    // record is actually persisted.
-    (target as any).destroyedByAssociation = assoc.reflection;
-    await preloadDestroyInverseBelongsTo(assoc, target);
-    if (target.isPersisted()) await ((target as any).destroy?.() ?? Promise.resolve());
-    return;
-  }
-  // Mirrors Rails HasOneAssociation#remove_target!'s `else` branch (no
-  // `dependent`, or `:nullify`): drop the foreign key on the previously
-  // associated record, clear the inverse, and save it. A plain replacement
-  // always nullifies the old record's FK; the `dependent` option only governs
-  // the owner-destroy path. A failed nullify-save aborts the replacement.
-  (assoc as any).nullifyOwnerAttributes(target);
-  assoc.removeInverseInstance(target);
-  if (target.isPersisted() && (assoc.owner as any).isPersisted?.()) {
-    const saved = await ((target as any).save?.() ?? Promise.resolve(true));
-    if (saved === false) {
-      (assoc as any).setOwnerAttributes(target);
-      throw new RecordNotSaved(
-        `Failed to remove the existing associated ${assoc.reflection.name}. ` +
-          `The record failed to save after its foreign key was set to nil.`,
-        target,
-      );
     }
   }
 }
