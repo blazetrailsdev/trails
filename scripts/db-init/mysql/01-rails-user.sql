@@ -1,17 +1,38 @@
--- Rails' `rails` test user, as `rake db:mysql:build_user` provisions it
--- (vendor/rails/activerecord/Rakefile:227-235): CREATE USER with no
--- IDENTIFIED BY, so the user has no password — which is what
--- `username: rails` in test/config.example.yml:4,24 connects as.
+-- rake db:mysql:build_user (vendor/rails/activerecord/Rakefile:227-235), which
+-- CREATEs the user with no IDENTIFIED BY — `username: rails` in
+-- test/config.example.yml:4,24 connects with no password.
 --
--- Rails grants on the test database plus inexistent_activerecord_unittest;
--- this grants globally instead, because each vitest worker creates its own
--- AR_DB_SLOT copy of the database (activerecord_unittest_2, _3, …) and
--- Rails' single-database run never needs that.
+-- Rails' grant is on the literal test database. Widened here to the
+-- `activerecord\_unittest%` pattern, which is what lets the user CREATE its own
+-- AR_DB_SLOT copies (activerecord_unittest_<token>_1, _2, …, and the arunit2
+-- database activerecord_unittest2) — Rails' single-database run never needs
+-- that. Deliberately not widened to *.*: `mysql` stays unreachable.
+--
+-- The underscores are backslash-escaped because MySQL reads `_` and `%` in a
+-- database-level GRANT as LIKE wildcards (dev.mysql.com/doc/en/grant.html).
+-- Left bare, the pattern would also authorize names like activerecordXunittest_1
+-- — broader than this file means. Only the trailing % is a wildcard on purpose.
+--
+-- Rails' second grant is reproduced literally, bare underscores and all, since
+-- it is a verbatim port of the Rakefile statement: it is what makes a
+-- connection to inexistent_activerecord_unittest fail with "Unknown database"
+-- instead of "access denied", which abstract-mysql-adapter/connection.test.ts
+-- and mysql2-adapter.test.ts assert on.
+--
+-- ar\_cli\_e2e% is trails-only, with no Rails counterpart: the activerecord-cli
+-- E2E suite drives `ar db:create` as this same user against a throwaway
+-- ar_cli_e2e_<hrtime> database (activerecord-cli/src/__e2e__/*-happy-path.test.ts).
+-- Postgres needs no equivalent — that role has CREATEDB, which is not
+-- per-database.
 CREATE USER IF NOT EXISTS 'rails'@'%';
-GRANT ALL PRIVILEGES ON *.* TO 'rails'@'%';
--- MYSQL_SOCK is a first-class sub-setting here (config.example.yml:18-19), and
--- a socket connection authenticates as 'rails'@'localhost', which '%' does not
--- cover. Rails' rake task grants only '%' because its own runs are over TCP.
+GRANT ALL PRIVILEGES ON `activerecord\_unittest%`.* TO 'rails'@'%';
+GRANT ALL PRIVILEGES ON inexistent_activerecord_unittest.* TO 'rails'@'%';
+GRANT ALL PRIVILEGES ON `ar\_cli\_e2e%`.* TO 'rails'@'%';
+-- PERMANENT DEVIATION: Rails grants only '%' because its runs are over TCP.
+-- MYSQL_SOCK is a first-class sub-setting here (config.example.yml:18-19) and a
+-- socket connection authenticates as 'rails'@'localhost', which '%' misses.
 CREATE USER IF NOT EXISTS 'rails'@'localhost';
-GRANT ALL PRIVILEGES ON *.* TO 'rails'@'localhost';
+GRANT ALL PRIVILEGES ON `activerecord\_unittest%`.* TO 'rails'@'localhost';
+GRANT ALL PRIVILEGES ON inexistent_activerecord_unittest.* TO 'rails'@'localhost';
+GRANT ALL PRIVILEGES ON `ar\_cli\_e2e%`.* TO 'rails'@'localhost';
 FLUSH PRIVILEGES;
