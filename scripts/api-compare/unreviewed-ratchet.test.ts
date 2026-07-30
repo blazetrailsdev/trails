@@ -84,6 +84,10 @@ describe("loadMark / writeMark", () => {
     expect(await fs.readFile(file, "utf-8")).toBe('{\n  "max": 7\n}\n');
     expect(await loadMark(file)).toBe(7);
   });
+
+  it("names the missing ratchet file rather than surfacing a bare ENOENT", async () => {
+    await expect(loadMark(path.join(dir, "gone.json"))).rejects.toThrow(/committed ratchet file/);
+  });
 });
 
 describe("renderExcess", () => {
@@ -91,6 +95,8 @@ describe("renderExcess", () => {
     const msg = renderExcess(4445, 4441, "scripts/api-compare/mark.json");
     expect(msg).toContain("4445");
     expect(msg).toContain("4 more than the committed high-water mark of 4441");
+    // Both ways a row can gain the placeholder — a reseed, or a reverted reason.
+    expect(msg).toContain("reverted to the seed");
     expect(msg).toContain("only shrinks");
   });
 });

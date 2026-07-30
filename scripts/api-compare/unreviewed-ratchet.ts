@@ -59,7 +59,19 @@ export function parseMark(text: string): number {
 }
 
 export async function loadMark(file: string): Promise<number> {
-  return parseMark(await fs.readFile(file, "utf-8"));
+  let text: string;
+  try {
+    text = await fs.readFile(file, "utf-8");
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+    // Deleting the mark is how the ratchet would be silently disarmed, so say
+    // what it is rather than surfacing a bare ENOENT.
+    throw new Error(
+      `unreviewed high-water mark: ${file} is missing. It is a committed ratchet file; ` +
+        "restore it from git rather than regenerating, or the mark is lost.",
+    );
+  }
+  return parseMark(text);
 }
 
 // Only-shrink: the stored mark never rises, so a reseed that adds unreviewed
@@ -77,8 +89,9 @@ export function renderExcess(count: number, mark: number, markPath: string): str
   return (
     `\nwide call-mismatches unreviewed ratchet: ${count} baselined entr(ies) still carry the ` +
     `seeded default reason, ${excess} more than the committed high-water mark of ${mark}.\n` +
-    `Those ${excess} row(s) were seeded after the mark was set — a new baseline entry must be ` +
-    "reviewed as it is added, not inherited as unreviewed debt. Replace their placeholder " +
+    `That means ${excess} row(s) gained the placeholder reason since the mark was set — either ` +
+    "newly seeded by a reseed, or a reviewed reason reverted to the seed. A baseline entry must " +
+    "be reviewed as it is added, not inherited as unreviewed debt: replace each placeholder " +
     `\`reason\` with a real one-line explanation, then re-run \`--write\` to lower ${markPath}.\n` +
     "(The mark only shrinks; reseeding can never raise it.)"
   );

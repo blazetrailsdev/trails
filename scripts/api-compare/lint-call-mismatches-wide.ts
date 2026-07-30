@@ -81,6 +81,7 @@ import {
   nextMark,
   renderExcess,
   renderWriteSummary,
+  unreviewedEntries,
   writeMark,
 } from "./unreviewed-ratchet.js";
 import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "./conventions.js";
@@ -312,18 +313,20 @@ function section(title: string, rows: [string, number][], top?: number): string 
 }
 
 export function unreviewedCount(entries: ExcludeEntry[]): number {
-  return entries.filter((e) => e.reason === DEFAULT_REASON).length;
+  return unreviewedEntries(entries, DEFAULT_REASON).length;
 }
 
 export function renderReport(
   entries: ExcludeEntry[],
   index: TsMemberIndex | undefined,
   top: number,
+  mark?: number,
 ): string {
   const files = new Set(entries.map((e) => `${e.package} ${e.tsFile}`)).size;
   const parts = [
     `wide call-mismatches report: ${entries.length} entr(ies) across ${files} file(s)`,
-    `  unreviewed (reason still the seeded default): ${unreviewedCount(entries)} of ${entries.length}`,
+    `  unreviewed (reason still the seeded default): ${unreviewedCount(entries)} of ${entries.length}` +
+      (mark === undefined ? "" : ` — high-water mark ${mark}`),
     section(
       "By package",
       tally(entries, (e) => e.package),
@@ -483,7 +486,14 @@ async function reportMain(top: number, unreviewedOnly: boolean): Promise<number>
   }
 
   const manifest = await readJsonIfPresent<ApiManifest>(TS_API_PATH);
-  console.log(renderReport(sortKeys(entries), manifest && indexTsMembers(manifest), top));
+  console.log(
+    renderReport(
+      sortKeys(entries),
+      manifest && indexTsMembers(manifest),
+      top,
+      await loadMark(MARK_PATH),
+    ),
+  );
   return 0;
 }
 
