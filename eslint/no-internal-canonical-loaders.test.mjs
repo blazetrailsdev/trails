@@ -115,7 +115,7 @@ const srcDir = path.join(
  */
 const nonLoaderBannedExporters = new Set(["model-schema.ts"]);
 
-/** Names exported by `source`, covering the export forms used in `support/`. */
+/** Names exported by `source`, covering the export forms used in activerecord. */
 function exportedNames(source) {
   const names = new Set();
   for (const [, name] of source.matchAll(
@@ -150,23 +150,32 @@ async function* srcSources(dir = srcDir) {
   }
 }
 
-/** src-relative path → the BANNED symbols that module exports. */
-async function bannedExportsBySrcModule() {
+/**
+ * src-relative path → the BANNED symbols that module exports, for every module
+ * in the tree including the non-loader exporters. Walked once and shared: the
+ * tree is ~1550 files, so each extra walk costs real time.
+ */
+const bannedExportsBySrcModule = (async () => {
   const byModule = new Map();
   for await (const file of srcSources()) {
-    const relative = path.relative(srcDir, file);
-    if (nonLoaderBannedExporters.has(relative)) continue;
     const source = await fs.readFile(file, "utf8");
     const banned = [...exportedNames(source)].filter((name) => BANNED.has(name)).sort();
-    if (banned.length > 0) byModule.set(relative, banned);
+    if (banned.length > 0) byModule.set(path.relative(srcDir, file), banned);
   }
   return byModule;
+})();
+
+/** The same map with the sanctioned non-loader exporters dropped. */
+async function loaderCandidates() {
+  return [...(await bannedExportsBySrcModule)].filter(
+    ([file]) => !nonLoaderBannedExporters.has(file),
+  );
 }
 
 describe("no-internal-canonical-loaders module matcher", () => {
   it("matches every activerecord module that exports a banned loader", async () => {
     const unmatched = [];
-    for (const [file, banned] of await bannedExportsBySrcModule()) {
+    for (const [file, banned] of await loaderCandidates()) {
       if (!isCanonicalSchemaModule(`./${file.replace(/\.ts$/, ".js")}`)) {
         unmatched.push(`${file} exports ${banned.join(", ")}`);
       }
@@ -176,10 +185,16 @@ describe("no-internal-canonical-loaders module matcher", () => {
 
   it("lists no module that has stopped exporting a banned loader", async () => {
     const found = new Set(
-      [...(await bannedExportsBySrcModule()).keys()].map((file) =>
-        moduleBasename(file.replace(/\.ts$/, "")),
-      ),
+      (await loaderCandidates()).map(([file]) => moduleBasename(file.replace(/\.ts$/, ""))),
     );
     expect(canonicalLoaderModules.filter((module) => !found.has(module))).toEqual([]);
+  });
+
+  // Without this the allowlist is a silent hole of its own: if model-schema.ts
+  // moves or stops exporting `loadSchema`, the stale entry would keep excusing
+  // a path nobody is checking.
+  it("allowlists only non-loader modules that still export a banned name", async () => {
+    const exporters = await bannedExportsBySrcModule;
+    expect([...nonLoaderBannedExporters].filter((file) => !exporters.has(file))).toEqual([]);
   });
 });
