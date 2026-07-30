@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { PostgreSQLSchemaStatements } from "./schema-statements-class.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
+import { Table as PgTable } from "./schema-definitions.js";
 
 interface FakeOptions {
   logger?: { warn: (msg: string) => void };
@@ -231,5 +232,17 @@ describe("PostgreSQLSchemaStatements#typeToSql enum validation", () => {
     expect(() => ss.typeToSql("enum")).toThrow(
       new ArgumentError("enum_type is required for enums"),
     );
+  });
+});
+
+describe("PostgreSQLSchemaStatements#changeTable", () => {
+  it("yields the PostgreSQL Table subclass", async () => {
+    const { adapter } = makeAdapter();
+    const ss = new PostgreSQLSchemaStatements(adapter);
+    let yielded: unknown;
+    await ss.changeTable("things", (t) => {
+      yielded = t;
+    });
+    expect(yielded).toBeInstanceOf(PgTable);
   });
 });
