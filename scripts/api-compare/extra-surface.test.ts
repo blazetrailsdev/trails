@@ -8,6 +8,7 @@ import {
   parseArgs,
   collectTsFileNames,
   collectTaggedEntries,
+  classifyReason,
 } from "./extra-surface.js";
 import { extractFromProgram } from "./extract-ts-api.js";
 
@@ -1501,7 +1502,26 @@ describe("buildReport — @noRailsEquivalent tags", () => {
     expect(pkg.totalNovel).toBe(0);
     expect(pkg.totalAllowlisted).toBe(1);
     expect(pkg.extraFiles).toEqual([]);
-    expect(report.tagged).toEqual({ total: 1, matched: 1, inheritedMatched: 0, stale: [] });
+    expect(report.tagged).toEqual({
+      total: 1,
+      matched: 1,
+      inheritedMatched: 0,
+      stale: [],
+      classification: {
+        permanent: 0,
+        convergeable: 0,
+        unclassified: 1,
+        unclassifiedByPackage: { activemodel: 1 },
+        unclassifiedEntries: [
+          {
+            package: "activemodel",
+            tsFile: "foo.ts",
+            name: "tsOnlyHelper",
+            reason: "public registry seam, no Rails counterpart",
+          },
+        ],
+      },
+    });
     expect(report).not.toHaveProperty("allowlist");
   });
 
@@ -1560,7 +1580,21 @@ describe("buildReport — @noRailsEquivalent tags", () => {
     const report = run(m);
     expect(report.packages[0].totalNovel).toBe(0);
     expect(report.packages[0].totalAllowlisted).toBe(1);
-    expect(report.tagged).toEqual({ total: 0, matched: 0, inheritedMatched: 1, stale: [] });
+    expect(report.tagged).toEqual({
+      total: 0,
+      matched: 0,
+      inheritedMatched: 1,
+      stale: [],
+      // Inherited entries repeat one declaration's reason, so they are not
+      // classified — the claim is counted once, where it is written.
+      classification: {
+        permanent: 0,
+        convergeable: 0,
+        unclassified: 0,
+        unclassifiedByPackage: {},
+        unclassifiedEntries: [],
+      },
+    });
   });
 
   it("does not extend a merged interface's tag to the namespace half's members", () => {
@@ -1831,7 +1865,7 @@ describe("@noRailsEquivalent — extractor to report", () => {
       novelOnly: false,
       topN: 50,
     });
-    expect(report.tagged).toEqual({
+    expect(report.tagged).toMatchObject({
       total: 1,
       matched: 1,
       inheritedMatched: 0,
@@ -1879,7 +1913,7 @@ describe("@noRailsEquivalent — extractor to report", () => {
       { source: "typescript", generatedAt: "", packages: { activerecord: tsPkg } },
       { filterPkg: null, excludeGlobs: [], novelOnly: false, topN: 50 },
     );
-    expect(report.tagged).toEqual({ total: 1, matched: 1, inheritedMatched: 0, stale: [] });
+    expect(report.tagged).toMatchObject({ total: 1, matched: 1, inheritedMatched: 0, stale: [] });
     expect(report.packages[0].totalAllowlisted).toBe(1);
     expect(report.packages[0].totalNovel).toBe(0);
   });
@@ -2021,5 +2055,105 @@ describe("buildReport — TS files with no Rails counterpart", () => {
       topN: 50,
     });
     expect(report.packages[0].extraFiles).toEqual([]);
+  });
+});
+
+describe("classifyReason", () => {
+  it("reads a leading PERMANENT or CONVERGEABLE token", () => {
+    expect(classifyReason("PERMANENT. Rails gains these bodies with `include`")).toBe("permanent");
+    expect(classifyReason("CONVERGEABLE — see story port-constantize")).toBe("convergeable");
+    expect(classifyReason("  PERMANENT: JS iteration protocol")).toBe("permanent");
+  });
+
+  it("treats a reason stating no claim as unclassified", () => {
+    expect(classifyReason("Rails nests this class inside NullPool")).toBe("unclassified");
+    expect(classifyReason("")).toBe("unclassified");
+  });
+
+  it("requires the token on a word boundary, not as a prefix of prose", () => {
+    // The audit's failure mode is prose that is accurate about a mechanism and
+    // reads as a permanence claim without making one; only the exact token is
+    // a claim.
+    expect(classifyReason("PERMANENTLY divergent accessor")).toBe("unclassified");
+    expect(classifyReason("Permanent: JS-only")).toBe("unclassified");
+  });
+});
+
+describe("buildReport — permanence classification", () => {
+  const run = (reason: string) => {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            "ActiveModel::Foo": rubyClass({
+              name: "Foo",
+              file: "foo.rb",
+              instance: [method("bar")],
+            }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const tsManifest: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            Foo: {
+              name: "Foo",
+              file: "foo.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [
+                method("bar"),
+                { ...method("tsOnlyHelper"), noRailsEquivalent: reason },
+              ],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    return buildReport(ruby, tsManifest, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+  };
+
+  it("counts a PERMANENT tag as classified", () => {
+    const c = run("PERMANENT. JS iteration protocol, no Ruby method to mirror").tagged
+      .classification;
+    expect(c).toEqual({
+      permanent: 1,
+      convergeable: 0,
+      unclassified: 0,
+      unclassifiedByPackage: {},
+      unclassifiedEntries: [],
+    });
+  });
+
+  it("counts a CONVERGEABLE tag apart from an unclassified one", () => {
+    expect(run("CONVERGEABLE — story registered").tagged.classification.convergeable).toBe(1);
+    expect(run("Rails has no such accessor").tagged.classification.unclassified).toBe(1);
+  });
+
+  it("keeps an unclassified tag allowed and non-stale — the signal is advisory", () => {
+    const report = run("Rails has no such accessor");
+    expect(report.tagged.stale).toEqual([]);
+    expect(report.packages[0].totalAllowlisted).toBe(1);
+    expect(report.packages[0].totalNovel).toBe(0);
+  });
+
+  it("breaks unclassified tags down by package", () => {
+    expect(run("Rails has no such accessor").tagged.classification.unclassifiedByPackage).toEqual({
+      activemodel: 1,
+    });
   });
 });

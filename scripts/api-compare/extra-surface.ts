@@ -44,6 +44,9 @@
  *      that is a declaration rather than a member still has an inline form.
  *      On an `interface` the declaration tag additionally covers every member
  *      — see `collectTaggedEntries`.
+ *   6. Classify each written tag's permanence claim — see `classifyReason`.
+ *      Advisory only: the count of tags that never state one is reported so a
+ *      batch of new tags is visible, but it does not affect the exit code.
  *
  * Manifests are produced by `pnpm api:compare`; if they're missing the
  * script bails with a hint (same convention as `api:moves`).
@@ -274,6 +277,40 @@ export interface TaggedEntry {
   inherited?: boolean;
 }
 
+/**
+ * The permanence claim a tag's reason makes about itself.
+ *
+ * `permanent` — a language-level or runtime-level fact no port can remove.
+ * `convergeable` — unfinished porting, a fixable collision, a comparator gap:
+ * the tag is a placeholder for work, and the reason should name its story.
+ * `unclassified` — the reason makes no claim either way.
+ */
+export type Permanence = "permanent" | "convergeable" | "unclassified";
+
+const PERMANENCE_TOKENS: Record<string, Permanence> = {
+  PERMANENT: "permanent",
+  CONVERGEABLE: "convergeable",
+};
+
+/**
+ * Read the leading classification token off a `@noRailsEquivalent` reason.
+ *
+ * The tag audit (RFC 0080) found 42 of 79 tags describing convergeable
+ * surface: each reason was factually accurate about its mechanism and merely
+ * drew "therefore permanent" from it, so nothing in the report could tell the
+ * two populations apart. Requiring the claim to be stated as a token makes an
+ * unstated one countable — a tag that says neither word is `unclassified`
+ * rather than assumed permanent.
+ *
+ * The token must be the reason's first word (uppercase, on a word boundary, so
+ * prose like "PERMANENTLY" does not qualify); any punctuation may follow it.
+ */
+export function classifyReason(reason: string): Permanence {
+  const first = /^\s*([A-Z]+)\b/.exec(reason);
+  if (!first) return "unclassified";
+  return PERMANENCE_TOKENS[first[1]] ?? "unclassified";
+}
+
 export function allowKeyOf(e: { package: string; tsFile: string; name: string }): string {
   return `${e.package} ${e.tsFile} ${e.name}`;
 }
@@ -418,6 +455,20 @@ interface TaggedSummary {
    */
   inheritedMatched: number;
   stale: TaggedEntry[];
+  /**
+   * Permanence claims across the WRITTEN tags (`total`) — advisory, never part
+   * of the exit code. An inherited entry repeats its interface declaration's
+   * reason, so counting it would multiply one claim by the interface's member
+   * count.
+   */
+  classification: {
+    permanent: number;
+    convergeable: number;
+    /** Tags stating no claim. Listed too, since acting on them needs the names. */
+    unclassified: number;
+    unclassifiedByPackage: Record<string, number>;
+    unclassifiedEntries: TaggedEntry[];
+  };
 }
 
 interface Report {
@@ -453,7 +504,9 @@ extractor reads lib/ only. The NoCntrp column reports that slice separately.
 Reasoned exceptions: an extra is allowed by tagging its TS declaration
 \`@noRailsEquivalent <reason>\` in JSDoc. Allowed extras are subtracted from the
 novel/moved counts and reported as an "Allowed" total; a tag on a name that no
-longer flags is STALE and fails the run.
+longer flags is STALE and fails the run. A reason opening with PERMANENT or
+CONVERGEABLE states its permanence claim; the count of tags stating neither is
+reported (advisory — it never affects the exit code).
 
 Requires: pnpm api:compare must have run first to produce
   scripts/api-compare/output/{rails-api.json,ts-api.json}.
@@ -1106,6 +1159,33 @@ function padNumCell(n: number, colored: string, width: number): string {
   return " ".repeat(gap) + colored;
 }
 
+/**
+ * Advisory-only: prints the permanence split and names the unclassified tags.
+ * Deliberately NOT a gate — most of the population predates the convention, so
+ * failing on it would block every unrelated PR. See `classifyReason`.
+ */
+function printClassificationBlock(tagged: TaggedSummary, p: Palette, maxDetail: number): void {
+  const c = tagged.classification;
+  console.log(
+    `${p.dim}  permanence claims: ${c.permanent} PERMANENT, ${c.convergeable} CONVERGEABLE, ` +
+      `${c.unclassified} unclassified.${p.reset}`,
+  );
+  if (c.unclassified === 0) return;
+  const byPkg = Object.entries(c.unclassifiedByPackage)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([pkg, n]) => `${pkg} ${n}`)
+    .join(", ");
+  console.log(
+    `${p.dim}  Unclassified by package: ${byPkg}. Open each reason with PERMANENT ` +
+      `(a language- or runtime-level fact no port can remove) or CONVERGEABLE ` +
+      `(unfinished porting, a fixable collision, a comparator gap — name the story).${p.reset}`,
+  );
+  const shown = maxDetail > 0 ? c.unclassifiedEntries.slice(0, maxDetail) : c.unclassifiedEntries;
+  for (const e of shown) console.log(`${p.dim}    ${e.package}  ${e.tsFile}  ${e.name}${p.reset}`);
+  const elided = c.unclassifiedEntries.length - shown.length;
+  if (elided > 0) console.log(`${p.dim}    … +${elided} more${p.reset}`);
+}
+
 function printHumanReport(report: Report, topN: number, maxDetail: number): void {
   const { palette: p } = pickPalette();
 
@@ -1138,6 +1218,7 @@ function printHumanReport(report: Report, topN: number, maxDetail: number): void
         : "") +
       ` — allowed extras are subtracted from the counts above.${p.reset}`,
   );
+  printClassificationBlock(report.tagged, p, maxDetail);
 
   console.log(
     `\n${p.bold}Top ${Math.min(topN, report.topN.length)} most-divergent files${p.reset}  ${p.dim}(ranked by novel count, then total)${p.reset}`,
@@ -1238,11 +1319,25 @@ export function buildReport(
   const inheritedKeys = new Set(tagged.filter((e) => e.inherited).map(allowKeyOf));
   const inheritedMatched = [...matchedTagKeys].filter((k) => inheritedKeys.has(k)).length;
 
+  const written = tagged.filter((e) => !e.inherited);
+  const unclassifiedEntries = written.filter((e) => classifyReason(e.reason) === "unclassified");
+  const unclassifiedByPackage: Record<string, number> = {};
+  for (const e of unclassifiedEntries) {
+    unclassifiedByPackage[e.package] = (unclassifiedByPackage[e.package] ?? 0) + 1;
+  }
+
   const taggedSummary: TaggedSummary = {
-    total: tagged.filter((e) => !e.inherited).length,
+    total: written.length,
     matched: matchedTagKeys.size - inheritedMatched,
     inheritedMatched,
     stale: staleTagged,
+    classification: {
+      permanent: written.filter((e) => classifyReason(e.reason) === "permanent").length,
+      convergeable: written.filter((e) => classifyReason(e.reason) === "convergeable").length,
+      unclassified: unclassifiedEntries.length,
+      unclassifiedByPackage,
+      unclassifiedEntries,
+    },
   };
   return {
     generatedAt: new Date().toISOString(),

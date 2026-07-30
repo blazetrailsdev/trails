@@ -416,6 +416,52 @@ Rails-layout file, do not tag it. Tagging a moved extra asserts something
 false, and the stale-tag gate enforces the boundary mechanically where it
 can.
 
+### Permanence claim: open the reason with `PERMANENT` or `CONVERGEABLE`
+
+The RFC 0080 tag audit found 42 of 79 `@noRailsEquivalent` tags describing
+**convergeable** surface — unfinished porting, a fixable collision, a
+comparator gap — not the language- or runtime-level fact the bar above
+demands. Every one passed `api:extra` cleanly for as long as it existed,
+because each reason was accurate about its mechanism and merely drew
+"therefore permanent" from it. `api:extra` gates the opposite direction only:
+a **stale** tag (one on a name that no longer flags) fails the run; a tag that
+should never have been written does not.
+
+So the reason states its claim as a leading token:
+
+```text
+@noRailsEquivalent PERMANENT. Rails gains these bodies with `include SchemaStatements`…
+@noRailsEquivalent CONVERGEABLE — <mechanism>; story <story-slug>.
+```
+
+`classifyReason` (`extra-surface.ts`) reads the first word; anything else is
+**unclassified**, and `api:extra` reports the unclassified count, a
+per-package breakdown, and the names, alongside the existing tag totals
+(`tagged.classification` in the JSON report). This is **advisory** — the exit
+code still fails on stale entries and on empty reasons only. Most of the
+population predates the convention, so failing on unclassified tags would
+block unrelated work; the signal lands first, and a ratchet or gate is a
+follow-up once the population is classified.
+
+A `CONVERGEABLE` tag is a documented exception to "not for deferred work"
+above, not a licence for it: it is written only alongside a registered story
+that removes it, and the reason names that story.
+
+### Re-audit cadence
+
+The 2026-07-27 audit happened because a story was written for it; nothing
+scheduled the next one, which is how a batch of tags can re-accumulate the
+same debt silently. The standing cadence is therefore:
+
+- **Every two quarters**, or **whenever `tagged.total` grows by 10 or more
+  since the last audit** (whichever comes first), register a re-audit story
+  under RFC 0080 and apply the bar above to every tag added since.
+- The owner is whoever schedules RFC 0080 work; the trigger is checkable from
+  the `api:extra` JSON report alone (`tagged.total` plus
+  `tagged.classification.unclassified`), which the stats DB already ingests.
+- An audit's output is one disposition per tag and a story per convergeable
+  one — never a bulk edit, which is what keeps each removal reviewable.
+
 ### Tag configuration
 
 Both tags are machinery, not user documentation, so the docs-site
