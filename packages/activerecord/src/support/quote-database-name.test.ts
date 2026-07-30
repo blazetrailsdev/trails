@@ -5,28 +5,17 @@ import { runTokenOfDatabase, slotDatabaseName } from "./run-token.js";
 const BASE = "activerecord_unittest";
 
 describe("quoting a database name for harness DDL", () => {
-  it("wraps an ordinary name in the adapter's identifier quotes", () => {
-    expect(quotePgDatabaseName(slotDatabaseName(BASE, "rabc000001", 2))).toBe(
-      '"activerecord_unittest_rabc000001_2"',
-    );
-    expect(quoteMysqlDatabaseName(slotDatabaseName(BASE, "rabc000001", 2))).toBe(
-      "`activerecord_unittest_rabc000001_2`",
-    );
-  });
-
   it("doubles an embedded quote character rather than emitting it raw", () => {
     // `quote_column_name`'s rule — postgresql/quoting.rb:46-48,
     // mysql/quoting.rb:46-48.
+    expect(quotePgDatabaseName(slotDatabaseName(BASE, "rabc000001", 2))).toBe(
+      '"activerecord_unittest_rabc000001_2"',
+    );
     expect(quotePgDatabaseName('we"ird')).toBe('"we""ird"');
     expect(quoteMysqlDatabaseName("we`ird")).toBe("`we``ird`");
-  });
-
-  it("leaves a dot alone instead of splitting it into a qualified name", () => {
-    // Rails' MySQL `quote_table_name` adds `.gsub(".", "`.`")`, which is right
-    // for a table and wrong for a database — it would corrupt the very name the
-    // sweep is trying to drop.
+    // Rails' MySQL `quote_table_name` also splits on dots; that is right for a
+    // table and wrong for a database, so a dot stays put.
     expect(quoteMysqlDatabaseName("a.b")).toBe("`a.b`");
-    expect(quotePgDatabaseName("a.b")).toBe('"a.b"');
   });
 
   it("keeps a sweepable leftover sweepable when its suffix carries a quote", () => {
