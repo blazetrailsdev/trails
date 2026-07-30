@@ -964,7 +964,7 @@ export class TableDefinition {
   constructor(
     tableName: string,
     tdOptions: {
-      id?: boolean | PrimaryKeyType | IdHashOptions;
+      id?: boolean | ColumnType | IdHashOptions;
       primaryKey?: string | string[] | false;
       adapterName?: "sqlite" | "postgres" | "mysql";
       adapter?: SchemaQuoter;
@@ -1035,7 +1035,9 @@ export class TableDefinition {
     if (typeof id === "object" && id !== null) {
       const { type, ...rest } = id;
       pkOptions = { ...pkOptions, ...(rest as Partial<ColumnOptions>) };
-      pkType = type || "primary_key";
+      // Rails' `id.fetch(:type, :primary_key)` is key-presence, not truthiness:
+      // an explicitly supplied falsy type is passed through, not defaulted.
+      pkType = "type" in id ? (type as ColumnType) : "primary_key";
     }
 
     if (Array.isArray(pk)) {

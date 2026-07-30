@@ -4,7 +4,7 @@ import {
   canRemoveIndexByName,
   indexNameForRemoveFrom,
 } from "./schema-statements.js";
-import { ForeignKeyDefinition, TableDefinition } from "./schema-definitions.js";
+import { ForeignKeyDefinition, TableDefinition, type ColumnType } from "./schema-definitions.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 
 function makeStatements(adapterOverrides: Record<string, unknown> = {}) {
@@ -724,5 +724,27 @@ describe("buildCreateTableDefinition primaryKey: false", () => {
     const td = ss.buildCreateTableDefinition("users", { id: false, primaryKey: false });
 
     expect(td.columns.find((c) => c.options.primaryKey)).toBeUndefined();
+  });
+});
+
+describe("buildCreateTableDefinition hash-form id type fetch", () => {
+  it("passes an explicitly supplied falsy type through instead of defaulting", () => {
+    const ss = makeStatements();
+
+    const td = ss.buildCreateTableDefinition("users", {
+      id: { type: "" as unknown as ColumnType, limit: 4 },
+    });
+
+    const pk = td.columns.find((c) => c.options.primaryKey);
+    expect(pk?.type).toBe("");
+    expect(pk?.options).toMatchObject({ limit: 4 });
+  });
+
+  it("defaults to primary_key only when the type key is absent", () => {
+    const ss = makeStatements();
+
+    const td = ss.buildCreateTableDefinition("users", { id: { limit: 4 } });
+
+    expect(td.columns.find((c) => c.options.primaryKey)?.type).toBe("primary_key");
   });
 });

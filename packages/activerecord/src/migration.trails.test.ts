@@ -233,3 +233,25 @@ describe("MigrationTest", () => {
     expect(seen).toEqual([["people", m]]);
   });
 });
+
+describe("Migration#createTable id option type", () => {
+  it("accepts every Rails-valid id type the schema dumper emits", () => {
+    // The dumper emits `createTable("int_defaults", { id: "bigint", ... })`
+    // (primary-keys.test.ts asserts that string), so the public signature has to
+    // admit any ColumnType — not just "uuid". This is a compile-time guard: on a
+    // narrowed signature the assignments below fail `tsc`, not the assertion.
+    type CreateTableOptions = Extract<Parameters<Migration["createTable"]>[1], { id?: unknown }>;
+
+    const bigint: CreateTableOptions = { id: "bigint" };
+    const integer: CreateTableOptions = { id: "integer" };
+    const uuid: CreateTableOptions = { id: "uuid" };
+    const hash: CreateTableOptions = { id: { type: "string", limit: 36 } };
+
+    expect([bigint.id, integer.id, uuid.id, hash.id]).toEqual([
+      "bigint",
+      "integer",
+      "uuid",
+      { type: "string", limit: 36 },
+    ]);
+  });
+});

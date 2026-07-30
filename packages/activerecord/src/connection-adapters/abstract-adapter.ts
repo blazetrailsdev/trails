@@ -214,7 +214,7 @@ export interface AbstractAdapter {
     name: string,
     optionsOrFn?:
       | {
-          id?: boolean | "uuid" | IdHashOptions;
+          id?: boolean | ColumnType | IdHashOptions;
           primaryKey?: string | string[] | false;
           force?: boolean | "cascade";
           ifNotExists?: boolean;
