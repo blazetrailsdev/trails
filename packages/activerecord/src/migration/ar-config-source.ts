@@ -15,16 +15,6 @@ export function registerMigrationArConfig(config: MigrationArConfig): void {
 }
 
 /** @internal */
-export function migrationTableNamePrefix(): string {
-  return _arConfig?.tableNamePrefix ?? "";
-}
-
-/** @internal */
-export function migrationTableNameSuffix(): string {
-  return _arConfig?.tableNameSuffix ?? "";
-}
-
-/** @internal */
-export function migrationLeaseConnection(): DatabaseAdapter {
-  return _arConfig!.leaseConnection!();
+export function migrationArConfig(): MigrationArConfig | null {
+  return _arConfig;
 }

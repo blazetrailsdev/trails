@@ -31,11 +31,7 @@ import { CommandRecorder } from "./migration/command-recorder.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
-import {
-  migrationLeaseConnection,
-  migrationTableNamePrefix,
-  migrationTableNameSuffix,
-} from "./migration/ar-config-source.js";
+import { migrationArConfig } from "./migration/ar-config-source.js";
 import { DefaultStrategy } from "./migration/default-strategy.js";
 import type { ExecutionStrategy } from "./migration/execution-strategy.js";
 import type { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
@@ -1320,7 +1316,7 @@ export abstract class Migration {
   get connection(): DatabaseAdapter {
     // Rails: `@connection || ActiveRecord::Base.lease_connection`. A bare
     // migration with no assigned connection leases one from the migration pool.
-    return this._connectionOverride ?? this.adapter ?? migrationLeaseConnection();
+    return this._connectionOverride ?? this.adapter ?? migrationArConfig()!.leaseConnection!();
   }
 
   set connection(conn: DatabaseAdapter | undefined) {
@@ -1426,8 +1422,8 @@ export abstract class Migration {
 
   static tableNameOptions(): { tableNamePrefix: string; tableNameSuffix: string } {
     return {
-      tableNamePrefix: migrationTableNamePrefix(),
-      tableNameSuffix: migrationTableNameSuffix(),
+      tableNamePrefix: migrationArConfig()?.tableNamePrefix ?? "",
+      tableNameSuffix: migrationArConfig()?.tableNameSuffix ?? "",
     };
   }
 
