@@ -2067,11 +2067,7 @@ export class SchemaStatements {
     const nonCombinable: Array<() => Promise<void>> = [];
 
     for (const { cmd: command, args } of operations) {
-      // Mirrors Rails' `table, arguments = args.shift, args` — the recorded
-      // command's first argument is always the table name.
       const [table, ...arguments_] = args as [string, ...unknown[]];
-      // Prefer adapter-specific *ForAlter over the generic SchemaStatements one — mirrors Rails
-      // where bulk_change_table and all *_for_alter methods live on the same adapter object.
       const forAlterTarget =
         typeof (this.adapter as any)[`${command}ForAlter`] === "function"
           ? (this.adapter as any)
