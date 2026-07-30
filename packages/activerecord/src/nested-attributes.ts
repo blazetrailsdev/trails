@@ -679,7 +679,9 @@ interface OneToOneAssociation {
   buildDisplacementOwnedByCaller?: boolean;
   initializeAttributes(record: Base): void;
   isLoaded?(): boolean;
-  loadTarget?(): Promise<Base | Base[] | null>;
+  // Rails' `send(association_name)` — `SingularAssociation#reader`, which is
+  // where trails raises strict-loading violations (singular-association.ts:210).
+  readonly reader?: Base | null | Promise<Base | null>;
   detachDisplacedTarget?(displaced: Base | null): Promise<void>;
   detachDisplacedForSyncBuild?(): Promise<void> | null;
 }
@@ -803,11 +805,11 @@ function loadExistingThenAssign(
   options: NestedAttributeOptions,
 ): Promise<void> | null {
   if (assoc.isLoaded?.() !== false) return null;
-  if (typeof assoc.loadTarget !== "function") return null;
-  const load = assoc.loadTarget();
+  if (!("reader" in assoc)) return null;
+  const read = assoc.reader;
+  if (!(read instanceof Promise)) return null;
   return (async () => {
-    const loaded = await load;
-    const existing = Array.isArray(loaded) ? null : loaded;
+    const existing = await read;
     const id = (attributes as any).id;
 
     // Rails nested_attributes.rb:436.

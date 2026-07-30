@@ -5,12 +5,13 @@
  * loads the association, so the update lands in place at the assignment.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel, type Base } from "./index.js";
+import { registerModel, StrictLoadingViolationError, type Base } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { Pirate } from "./test-helpers/models/pirate.js";
 import { Ship } from "./test-helpers/models/ship.js";
 
 interface PirateHandle {
+  strictLoadingBang(): void;
   id: number;
   ship: Promise<Base | null>;
   updateOnlyShip: Promise<Base | null>;
@@ -99,5 +100,16 @@ describe("nested attributes update on an unloaded one-to-one association", () =>
     await expect(
       pirate.setShipAttributes({ id: (ship as unknown as { id: number }).id + 1000, name: "X" }),
     ).rejects.toThrow(/Couldn't find/);
+  });
+  it("raises a strict-loading violation instead of lazy-loading the unloaded record", async () => {
+    const [pirate, ship] = await pirateWithUnloadedShip();
+    pirate.strictLoadingBang();
+
+    expect(() => {
+      (pirate as unknown as { shipAttributes: unknown }).shipAttributes = {
+        id: (ship as unknown as { id: number }).id,
+        name: "Davy Jones Gold Dagger",
+      };
+    }).toThrow(StrictLoadingViolationError);
   });
 });
