@@ -218,7 +218,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       await Schema.define(adapter, async (schema) => {
         await schema.createEnum("color", ["blue", "green"]);
         await schema.changeTable("postgresql_enums", async (t) => {
-          // ColumnType accepts arbitrary strings (string & {}), so no cast needed
           await t.column("best_color", "color", { default: "blue", null: false });
         });
       });

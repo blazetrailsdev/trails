@@ -6,7 +6,10 @@ import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { Base, Rollback } from "../../index.js";
 import { fixtures } from "../../test-fixtures.js";
-import type { TableDefinition as PgTableDefinition } from "../../connection-adapters/postgresql/schema-definitions.js";
+import type {
+  TableDefinition as PgTableDefinition,
+  Table as PgTable,
+} from "../../connection-adapters/postgresql/schema-definitions.js";
 import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 
 class Citext extends Base {
@@ -58,10 +61,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("change table supports json", async () => {
       try {
         await connection.transaction(async () => {
-          // Rails: t.citext "username" — PgTable (change_table builder) lacks citext();
-          // TODO: add citext() to PgTable so this mirrors t.citext "username" exactly.
           await connection.changeTable("citexts", async (t) => {
-            await t.column("username", "citext");
+            await (t as PgTable).citext("username");
           });
           Citext.resetColumnInformation();
           // Rails: assert_equal :citext, Citext.columns_hash["username"].type (citext_test.rb:47-48)

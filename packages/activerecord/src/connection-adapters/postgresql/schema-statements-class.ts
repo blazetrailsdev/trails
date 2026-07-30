@@ -860,7 +860,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
           );
         break;
       case "enum":
-        if (!enumType) throw new Error("enumType is required for enums");
+        if (enumType == null) throw new ArgumentError("enum_type is required for enums");
         sql = enumType;
         break;
       default: {
