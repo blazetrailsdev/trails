@@ -37,16 +37,6 @@ export class SqlTypeMetadata implements Deduplicable {
     this.scale = options.scale ?? null;
   }
 
-  /**
-   * Mirrors: SqlTypeMetadata#== (sql_type_metadata.rb:19) — an `is_a?` guard
-   * plus attribute-by-attribute value equality.
-   *
-   * Ruby aliases `eql?` to this and pairs it with `hash`
-   * (sql_type_metadata.rb:27); both are in api-compare's `SKIP_GROUPS` (Ruby
-   * value-protocol methods with no meaningful TS surface), and the `hash` role
-   * — feeding `Deduplicable`'s identity map — is carried by `deduplicateKey`
-   * below. So `equals` is the whole port.
-   */
   equals(other: unknown): boolean {
     return (
       other instanceof SqlTypeMetadata &&

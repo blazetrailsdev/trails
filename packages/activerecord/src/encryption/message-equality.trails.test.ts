@@ -2,14 +2,6 @@ import { describe, it, expect } from "vitest";
 import { Message } from "./message.js";
 import { Properties } from "./properties.js";
 
-/**
- * Trails-only coverage for `Message#==` (message.rb:21) and the `==` that
- * `Properties` delegates to its data hash (properties.rb:20). Rails exercises
- * them only indirectly, through the serializer round trips
- * (`message_serializer_test.rb:14` / `:22`, both `assert_equal message,
- * deserialized_message`) — those assertions are ported in place; the edge cases
- * below have no Rails test to be named after.
- */
 describe("MessageEqualityTrails", () => {
   it("compares payload and headers", () => {
     const build = () => {
@@ -31,9 +23,6 @@ describe("MessageEqualityTrails", () => {
   });
 
   it("compares string and Buffer payloads on bytes", () => {
-    // Ruby has one String type for both; trails splits it into `string` and
-    // `Buffer`, and a serialize→deserialize round trip returns the Buffer form,
-    // so the two must not compare unequal purely on JS type.
     expect(new Message("hello").equals(new Message(Buffer.from("hello")))).toBe(true);
     expect(new Message("hello").equals(new Message(Buffer.from("hellO")))).toBe(false);
   });

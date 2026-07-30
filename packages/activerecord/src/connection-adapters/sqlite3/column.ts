@@ -65,16 +65,6 @@ export class Column extends BaseColumn {
     return super.hasDefault && !this.isVirtual();
   }
 
-  /**
-   * Mirrors: SQLite3::Column#== (sqlite3/column.rb:46) — the base comparison
-   * plus `auto_increment?`. The `is_a?(Column)` guard there resolves to
-   * SQLite3::Column (lexical scope), so a base Column never equals one of
-   * these from this side.
-   *
-   * Rails' paired `hash` (:53) also folds in `rowid`, but `==` does not —
-   * keep the asymmetry rather than "fixing" it. `eql?`/`hash` are both in
-   * api-compare's `SKIP_GROUPS`.
-   */
   override equals(other: unknown): boolean {
     return (
       other instanceof Column && super.equals(other) && this.autoIncrement === other.autoIncrement

@@ -14,8 +14,6 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
     // strings; the consumer interprets them.
     expect(loaded.payload.toString()).toBe("hello");
     expect((loaded.headers.get("iv") as Buffer).toString()).toBe("test-iv");
-    // Rails' assertion is `assert_equal message, deserialized_message`
-    // (message_serializer_test.rb:14) — i.e. Message#==.
     expect(message.equals(loaded)).toBe(true);
   });
 
@@ -33,8 +31,6 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
     const nested = loaded.headers.get("nested") as Message;
     expect(nested).toBeInstanceOf(Message);
     expect(nested.payload.toString()).toBe("inner-payload");
-    // message_serializer_test.rb:22 `assert_equal message, deserialized_message`
-    // — the nested Message must compare through Properties#== too.
     expect(outer.equals(loaded)).toBe(true);
   });
 

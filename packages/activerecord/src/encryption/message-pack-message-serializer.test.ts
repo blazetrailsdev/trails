@@ -23,8 +23,6 @@ describe("ActiveRecord::Encryption::MessagePackMessageSerializerTest", () => {
     message.headers.set("key_1", "1");
 
     const deserialized = serializer.load(serializer.dump(message));
-    // Rails asserts `assert_equal message, deserialized_message`
-    // (message_pack_message_serializer_test.rb:15) — i.e. Message#==.
     expect(message.equals(deserialized)).toBe(true);
   });
 

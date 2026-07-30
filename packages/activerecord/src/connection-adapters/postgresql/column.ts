@@ -120,14 +120,6 @@ export class Column extends BaseColumn {
     return this.sqlTypeMetadata?.type === "enum";
   }
 
-  /**
-   * Mirrors: PostgreSQL::Column#== (postgresql/column.rb:64) — the base
-   * comparison plus the two PostgreSQL flags. The `is_a?(Column)` guard there
-   * resolves to PostgreSQL::Column (lexical scope), so a base Column never
-   * equals a PG one from this side even when every shared attribute matches.
-   *
-   * `eql?` (alias) and `hash` (:72) are in api-compare's `SKIP_GROUPS`.
-   */
   override equals(other: unknown): boolean {
     return (
       other instanceof Column &&

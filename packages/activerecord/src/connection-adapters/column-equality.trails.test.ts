@@ -4,14 +4,6 @@ import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { Column as PostgreSQLColumn } from "./postgresql/column.js";
 import { Column as SQLite3Column } from "./sqlite3/column.js";
 
-/**
- * Trails-only coverage for the `==` ports on `Column`, its PostgreSQL/SQLite3
- * subclasses, and `SqlTypeMetadata`. Rails ships no test that exercises those
- * methods directly (`pnpm rails:find "test_.*equal"` turns up nothing in the
- * adapter suites — they are only reached indirectly, through schema-cache
- * comparisons), so these live here rather than under an invented Rails name.
- */
-
 function meta(overrides: NonNullable<ConstructorParameters<typeof SqlTypeMetadata>[0]> = {}) {
   return new SqlTypeMetadata({ sqlType: "varchar(255)", type: "string", limit: 255, ...overrides });
 }
@@ -38,9 +30,6 @@ describe("ColumnEqualityTrails", () => {
   });
 
   it("ignores primaryKey, which Rails' Column does not carry", () => {
-    // column.rb:75 compares name/default/sql_type_metadata/null/default_function/
-    // collation/comment and nothing else; `primaryKey` is a trails-side flag, so
-    // folding it in would make two columns Rails calls equal compare unequal.
     const a = new Column("id", null, meta(), false, { primaryKey: true });
     const b = new Column("id", null, meta(), false, { primaryKey: false });
     expect(a.equals(b)).toBe(true);
@@ -71,11 +60,9 @@ describe("ColumnEqualityTrails", () => {
   });
 
   it("narrows the guard to the adapter class in PostgreSQL::Column", () => {
-    // postgresql/column.rb:64's `other.is_a?(Column)` resolves to
-    // PostgreSQL::Column, so the check is one-way: the base class still accepts
-    // a PG column whose shared attributes match.
     const pg = new PostgreSQLColumn("id", null, { sqlType: "integer", type: "integer" }, false);
-    const base = new Column("id", null, new SqlTypeMetadata({ sqlType: "integer", type: "integer" }), false); // prettier-ignore
+    const metadata = new SqlTypeMetadata({ sqlType: "integer", type: "integer" });
+    const base = new Column("id", null, metadata, false);
     expect(pg.equals(base)).toBe(false);
     expect(base.equals(pg)).toBe(true);
   });
@@ -99,8 +86,6 @@ describe("ColumnEqualityTrails", () => {
     expect(plain.equals(new SQLite3Column("id", null, opts, false, { autoIncrement: true }))).toBe(
       false,
     );
-    // sqlite3/column.rb:53 folds `rowid` into `hash` but :46 leaves it out of
-    // `==` — keep that asymmetry rather than "fixing" it.
     expect(plain.equals(new SQLite3Column("id", null, opts, false, { rowid: true }))).toBe(true);
   });
 
