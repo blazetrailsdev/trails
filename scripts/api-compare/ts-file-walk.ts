@@ -33,6 +33,8 @@ export const COMMITTED_TS_FILES: TsFilePopulation = {
 };
 
 export const COMPARED_TS_FILES: TsFilePopulation = {
+  // No name-based pruning: the extractor's callers pass the exact subtrees to
+  // skip as full-path `excludeDirs`, and its roots are package `src` dirs.
   skipDirs: new Set(),
   includeFile: (name) =>
     name.endsWith(".ts") && !name.endsWith(".test.ts") && !name.endsWith(".d.ts"),

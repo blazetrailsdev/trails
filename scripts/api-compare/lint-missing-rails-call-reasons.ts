@@ -27,8 +27,9 @@ const PACKAGES_DIR = path.join(ROOT_DIR, "packages");
 const JSDOC_BLOCK = /\/\*\*[\s\S]*?\*\//g;
 
 /** Every `.ts` file under `<packagesDir>/<pkg>/src`, sorted for stable output.
- *  Includes `*.test.ts` (unlike the extractor's `getAllTsFiles`): the contract
- *  is about what is committed, not about what api-compare measures. */
+ *  The committed population — `*.test.ts` counts, unlike the extractor's
+ *  compared population: the contract is about what is committed, not about
+ *  what api-compare measures. */
 export async function listSourceFiles(packagesDir: string): Promise<string[]> {
   return walkPackageTsFiles(packagesDir, COMMITTED_TS_FILES);
 }
