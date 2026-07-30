@@ -29,7 +29,8 @@ export class Association {
   private _associate: boolean;
   private _model: typeof Base | null;
   private _run: boolean;
-  private _recordsByOwner: Map<Base, Base[]> | undefined;
+  /** @internal */
+  protected _recordsByOwner: Map<Base, Base[]> | undefined;
   private _preloadedRecords: Base[] | undefined;
   private _ownersByKey: Map<unknown, Base[]> | undefined;
   private _scope: any;

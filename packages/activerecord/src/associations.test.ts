@@ -657,13 +657,7 @@ describe("PreloaderTest", () => {
     }).call();
     expect(spy).toHaveBeenCalledTimes(3);
   });
-  // TODO(preloader-middle-records-from-records-by-owner): remove it.fails once
-  // the through preloader derives middle records from `recordsByOwner` (Rails'
-  // through_association.rb:74-96) instead of `preloadedRecords`. With the
-  // through record already loaded nothing is queried, so middleRecords is
-  // empty and the source is never preloaded: 0 queries and an empty collection
-  // instead of Rails' 1 query and both member_details.
-  it.fails("preload through records with already loaded middle record", async () => {
+  it("preload through records with already loaded middle record", async () => {
     const member = members("groucho") as any;
     const expectedMemberDetailIds = ((await member.organizationMemberDetails_2) as Base[])
       .map((d) => Number(d.id))
