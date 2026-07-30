@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./base.js";
 import { withQueryConnection, threadedConnectionFor } from "./connection-handling.js";
 import { ActiveRecord } from "./ar-config.js";
@@ -16,7 +16,6 @@ import {
   withIsolatedConnectionState,
 } from "./core.js";
 import { setTrailsRoot } from "@blazetrails/activesupport";
-import type { DatabaseConfig } from "./database-configurations/database-config.js";
 import { adapterType } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import * as nodeFs from "node:fs";
@@ -28,31 +27,27 @@ async function restoreWorkerConnection(): Promise<void> {
 }
 
 describe("ConnectionHandlingTest", () => {
-  let ambientDbConfig: DatabaseConfig;
-
-  async function setupConnection() {
-    await Base.establishConnection(ambientDbConfig);
-  }
-
-  beforeAll(async () => {
-    ambientDbConfig = Base.connectionDbConfig();
+  // Mirrors Rails `ConnectionHandlingTest` (connection_handling_test.rb:7-16):
+  // one class, `fixtures :posts`, riding the ambient pool `cases/helper.rb`
+  // established. `common APIs ...` asserts the pool releases its connection
+  // after each common API, so it must run OUTSIDE transactional fixtures
+  // (which pin a connection for the wrapping transaction); the trails-only
+  // cases that swap `Base`'s pool opt out for the same reason.
+  fixtures(["posts"], {
+    usesTransaction: [
+      "common APIs don't permanently hold a connection when permanent checkout is deprecated or disallowed",
+      "establish_connection with a url stores a UrlConfig with discrete fields",
+      "remove_connection removes the pool",
+      "remove_connection returns undefined when no pool exists",
+    ],
   });
 
-  beforeEach(async () => {
-    await setupConnection();
-  });
-
-  // Under ARCONN=sqlite3_mem this teardown discards the database along with the
-  // connections and re-establishes an EMPTY one, so no case in this describe
-  // may depend on the canonical schema — including the ones left unguarded
-  // below. Today none does. A ported case that touches a table has to either
-  // take `it.skipIf(inMemoryDb())` like its neighbours or live in the
-  // fixture-bearing describe at the bottom of this file.
   afterEach(async () => {
     connectedToStack().length = 0;
-    await Base.connectionHandler.clearAllConnectionsBang();
     ActiveRecord.permanentConnectionCheckout = true;
-    await setupConnection();
+    // `common APIs ...` runs outside transactional fixtures, so its insert is
+    // committed — clean it up so it can't perturb the shared worker DB.
+    await Post.where({ title: "foo" }).deleteAll();
   });
 
   // Rails puts every one of its `ConnectionHandlingTest` cases inside
@@ -208,6 +203,24 @@ describe("ConnectionHandlingTest", () => {
     },
   );
 
+  it.skipIf(inMemoryDb())(
+    "common APIs don't permanently hold a connection when permanent checkout is deprecated or disallowed",
+    async () => {
+      ActiveRecord.permanentConnectionCheckout = "deprecated";
+      Base.releaseConnection();
+      expect(Base.connectionPool().activeConnection).toBeNull();
+
+      await Post.createBang({ title: "foo", body: "bar" });
+      expect(Post.connectionPool().activeConnection).toBeNull();
+
+      await Post.first();
+      expect(Post.connectionPool().activeConnection).toBeNull();
+
+      await Post.count();
+      expect(Post.connectionPool().activeConnection).toBeNull();
+    },
+  );
+
   it("connected_to switches role for block", async () => {
     expect(currentRole.call(Base)).toBe("writing");
     Base.connectedTo({ role: "reading" }, () => {
@@ -301,20 +314,29 @@ describe("ConnectionHandlingTest", () => {
   });
 
   it("connection_db_config", async () => {
-    expect(Base.connectionDbConfig()).toBe(ambientDbConfig);
+    expect(Base.connectionDbConfig()).toBe(Base.connectionPool().dbConfig);
+    expect(Base.connectionDbConfig().adapter).toBeTruthy();
   });
 
   // Rails' build_db_config_from_hash deletes :url before constructing the
   // UrlConfig, so configuration_hash carries the parsed discrete fields and
   // never the verbatim URL string. establish_connection({ adapter, url })
   // must mirror that shape, matching the resolver's "url removed from hash".
-  it("establish_connection with a url stores a UrlConfig with discrete fields", async () => {
-    await Base.establishConnection({ adapter: "sqlite3", url: "sqlite3:db/discrete.sqlite3" });
-    const config = Base.connectionDbConfig();
-    expect(config.adapter).toBe("sqlite3");
-    expect(config.database).toBe("db/discrete.sqlite3");
-    expect(config.configurationHash).not.toHaveProperty("url");
-  });
+  // Swaps `Base`'s own pool (the resolver plants the spec name on the receiver,
+  // so a subclass wouldn't exercise the primary path), hence the restore at the
+  // end. Skipped under ARCONN=sqlite3_mem, where the restore would hand the
+  // worker a fresh, EMPTY in-memory database.
+  it.skipIf(inMemoryDb())(
+    "establish_connection with a url stores a UrlConfig with discrete fields",
+    async () => {
+      await Base.establishConnection({ adapter: "sqlite3", url: "sqlite3:db/discrete.sqlite3" });
+      const config = Base.connectionDbConfig();
+      expect(config.adapter).toBe("sqlite3");
+      expect(config.database).toBe("db/discrete.sqlite3");
+      expect(config.configurationHash).not.toHaveProperty("url");
+      await restoreWorkerConnection();
+    },
+  );
 
   it("is_connected?", async () => {
     const pool = Base.connectionPool();
@@ -367,21 +389,24 @@ describe("ConnectionHandlingTest", () => {
     expect(() => Base.clearCacheBang()).not.toThrow();
   });
 
-  it("remove_connection removes the pool", async () => {
+  // Both cases below remove `Base`'s pool outright — only the primary pool can
+  // be observed going away (a subclass falls back to `Base`'s), so they restore
+  // the worker connection at the end and skip the in-memory lane, where the
+  // restore would produce an EMPTY database.
+  it.skipIf(inMemoryDb())("remove_connection removes the pool", async () => {
+    const ambientDbConfig = Base.connectionDbConfig();
     expect(Base.connectionPool()).toBeTruthy();
     // Mirrors Rails `remove_connection`: returns the removed pool's db_config.
     const removed = Base.removeConnection();
     expect(removed).toBe(ambientDbConfig);
     expect(() => Base.connectionPool()).toThrow(/No database connection/);
-    // Re-establish for other tests
-    await setupConnection();
+    await restoreWorkerConnection();
   });
 
-  it("remove_connection returns undefined when no pool exists", async () => {
+  it.skipIf(inMemoryDb())("remove_connection returns undefined when no pool exists", async () => {
     Base.removeConnection();
     expect(Base.removeConnection()).toBeUndefined();
-    // Re-establish for other tests
-    await setupConnection();
+    await restoreWorkerConnection();
   });
 
   it("connected_to stack is isolated per async context", async () => {
@@ -479,6 +504,7 @@ describe("ConnectionHandlingTest", () => {
 
   it("#connection leases a connection when none is active", async () => {
     const pool = Base.connectionPool();
+    Base.releaseConnection();
     expect(pool.activeConnection).toBeNull();
     const conn = Base.connection;
     expect(conn).toBeTruthy();
@@ -528,7 +554,7 @@ describe("ConnectionHandlingTest", () => {
     try {
       const inMemory = new DatabaseConfigurations([
         new HashConfig(env, "primary", {
-          ...ambientDbConfig.configurationHash,
+          ...Base.connectionDbConfig().configurationHash,
           database: "db/common.sqlite3",
         }),
       ]);
@@ -679,9 +705,24 @@ describe("withRoleAndShard loads Relation return values within scope (Story K ga
 });
 
 describe("AbstractAdapter#isPreventingWrites stack matching", () => {
+  // Each case establishes its own abstract-class pools; tear down exactly those
+  // rather than clearing every pool, which would take `Base`'s ambient worker
+  // connection with it.
   afterEach(async () => {
     connectedToStack().length = 0;
-    await Base.connectionHandler.clearAllConnectionsBang();
+    for (const name of [
+      "UnrelatedAbstract",
+      "AnimalsRecord",
+      "MealsRecord",
+      "ApplicationRecord",
+      "OtherAbstract",
+    ]) {
+      Base.connectionHandler.removeConnectionPool(name);
+    }
+    // The primary-class case deliberately registers its pool under the
+    // PoolConfig-normalized name "Base" (that normalization is the thing under
+    // test), so it displaces the ambient worker pool and has to restore it.
+    await restoreWorkerConnection();
   });
 
   it("Base.connectedTo preventing writes applies globally to unrelated pools", async () => {
@@ -852,46 +893,6 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
   });
 });
 
-// Second `ConnectionHandlingTest` block: this test needs `fixtures :posts`
-// while the block above runs fixture-less against a hand-established pool.
-describe("ConnectionHandlingTest", () => {
-  // Mirrors Rails `ConnectionHandlingTest` with `fixtures :posts`. The test
-  // asserts the pool releases its connection after each common API, so it must
-  // run OUTSIDE transactional fixtures (which hold a permanent lease for the
-  // wrapping transaction) — opt out by name via `usesTransaction`.
-  fixtures(["posts"], {
-    usesTransaction: [
-      "common APIs don't permanently hold a connection when permanent checkout is deprecated or disallowed",
-    ],
-  });
-
-  afterEach(async () => {
-    ActiveRecord.permanentConnectionCheckout = true;
-    // The test runs outside transactional fixtures (it asserts the pool
-    // releases its connection), so the inserted row is committed — clean it up
-    // to avoid perturbing the shared worker DB for sibling test files.
-    await Post.where({ title: "foo" }).deleteAll();
-  });
-
-  it.skipIf(inMemoryDb())(
-    "common APIs don't permanently hold a connection when permanent checkout is deprecated or disallowed",
-    async () => {
-      ActiveRecord.permanentConnectionCheckout = "deprecated";
-      Base.releaseConnection();
-      expect(Base.connectionPool().activeConnection).toBeNull();
-
-      await Post.createBang({ title: "foo", body: "bar" });
-      expect(Post.connectionPool().activeConnection).toBeNull();
-
-      await Post.first();
-      expect(Post.connectionPool().activeConnection).toBeNull();
-
-      await Post.count();
-      expect(Post.connectionPool().activeConnection).toBeNull();
-    },
-  );
-});
-
 // trails-internal mechanism (no Rails counterpart): the connection threaded by
 // `withQueryConnection` is only adopted by a model's internal reads when it
 // belongs to *that model's own pool*, so a statement for a different-pool model
@@ -914,10 +915,10 @@ describe("threadedConnectionFor pool-identity guard", () => {
     Secondary.connectionSpecificationName = "Secondary";
   });
 
+  // Only `Secondary`'s own pool is torn down: `Base` keeps riding the ambient
+  // worker pool, so nothing here needs a re-establish.
   afterEach(async () => {
-    await Base.connectionHandler.clearAllConnectionsBang();
-    Base.connectionSpecificationName = "Base";
-    await restoreWorkerConnection();
+    Base.connectionHandler.removeConnectionPool("Secondary");
   });
 
   it("adopts the threaded connection for its own pool but not a foreign pool", async () => {
@@ -939,9 +940,13 @@ describe("threadedConnectionFor pool-identity guard", () => {
 });
 
 describe("establish_connection accepts a DatabaseConfig", () => {
+  // Drives its own model rather than swapping `Base`'s pool: the round trip
+  // under test is `remove_connection` → `establish_connection(db_config)`, and
+  // that is observable on any class with a pool of its own.
+  class CapturedConfigModel extends Base {}
+
   afterEach(async () => {
-    await Base.connectionHandler.clearAllConnectionsBang();
-    await restoreWorkerConnection();
+    CapturedConfigModel.removeConnection();
   });
 
   // Mirrors Rails `establish_connection(db_config)` (the faithful
@@ -955,14 +960,15 @@ describe("establish_connection accepts a DatabaseConfig", () => {
       pool: 5,
       reapingFrequency: null,
     });
-    Base.connectionHandler.establishConnection(config, { owner: "Base" });
+    Base.connectionHandler.establishConnection(config, { owner: "CapturedConfigModel" });
+    CapturedConfigModel.connectionSpecificationName = "CapturedConfigModel";
 
-    const captured = Base.removeConnection()!;
+    const captured = CapturedConfigModel.removeConnection()!;
     expect(captured).toBeInstanceOf(HashConfig);
 
-    await Base.establishConnection(captured);
+    await CapturedConfigModel.establishConnection(captured);
 
-    const restored = Base.connectionDbConfig();
+    const restored = CapturedConfigModel.connectionDbConfig();
     expect(restored).toBe(captured);
     expect(restored.adapter).toBe("sqlite3");
     expect(restored.configurationHash.database).toBe("db/primary.sqlite3");
@@ -971,6 +977,8 @@ describe("establish_connection accepts a DatabaseConfig", () => {
 
 describe("loadConfigFile resolves config/database.* against Trails.root", () => {
   let tmpRoot: string;
+
+  class RootConfigModel extends Base {}
 
   // See establish-connection.test.ts: the worker's setup file assigns
   // `Base.configurations`, which short-circuits the config-file lookup this
@@ -981,11 +989,12 @@ describe("loadConfigFile resolves config/database.* against Trails.root", () => 
     Base.configurations({});
   });
 
+  // Only the model established below is torn down — `Base`'s pool is never
+  // touched here, just its `configurations` registry.
   afterEach(async () => {
     setTrailsRoot(null);
     Base.configurations(originalConfigurations);
-    await Base.connectionHandler.clearAllConnectionsBang();
-    await restoreWorkerConnection();
+    RootConfigModel.removeConnection();
     if (tmpRoot) nodeFs.rmSync(tmpRoot, { recursive: true, force: true });
   });
 
@@ -1000,8 +1009,6 @@ describe("loadConfigFile resolves config/database.* against Trails.root", () => 
       JSON.stringify({ test: { adapter: "sqlite3", database: "db/primary.sqlite3" } }),
     );
     setTrailsRoot(tmpRoot);
-
-    class RootConfigModel extends Base {}
 
     await RootConfigModel.establishConnection();
 
