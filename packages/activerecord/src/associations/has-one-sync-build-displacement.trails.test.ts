@@ -158,6 +158,13 @@ describe("has_one displacement via the synchronous build path", () => {
 
     const refetched = (await Pirate.find((pirate as unknown as { id: number }).id)) as Base;
     const assoc = refetched.association("ship") as unknown as { build(a: object): unknown };
+    // A pure ordering guard, not user-visible behavior: `build` is stubbed
+    // because the production path has no reachable raise left to provoke —
+    // `assertNestedAttributesAreKnown` pre-empts the unknown-attribute one, and
+    // the post-`build_record` raises Rails *does* query before are unreachable
+    // here (see `prepareDetachDisplacedForSyncBuild`). It pins that the query is
+    // issued downstream of the construction, so a future raise added to
+    // `build_record` cannot regress the order.
     assoc.build = () => {
       throw new Error("build exploded");
     };

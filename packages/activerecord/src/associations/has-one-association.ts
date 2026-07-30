@@ -529,6 +529,15 @@ export class HasOneAssociation extends SingularAssociation {
    * marks the association loaded, so the writer takes the decision here, before
    * the build, and invokes the thunk after it.
    *
+   * The writer invokes the thunk only when `build` returns normally, which
+   * would suppress a query for a throw from the `set_new_record` half — Rails
+   * reaches everything past has_one_association.rb:62 with `load_target`
+   * already run. That half is unreachable on this path: `raise_on_type_mismatch!`
+   * (:60) is the sole pre-`load_target` raise and cannot fire for a record the
+   * association built from its own reflection, and with
+   * `buildDisplacementOwnedByCaller` set the remainder is `setNewRecord`'s
+   * in-memory foreign-key/inverse writes.
+   *
    * `protected` for the same reason as `buildDisplacementOwnedByCaller`: this is
    * association-internal bookkeeping, not API surface. The writer lives outside
    * the class hierarchy and reaches it through its duck-typed handle.
