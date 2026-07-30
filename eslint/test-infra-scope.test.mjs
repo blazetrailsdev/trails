@@ -31,6 +31,7 @@ describe("test-infra lint scope", () => {
       `${SRC}/support/canonical-table-rebuild.test.ts`,
       `${SRC}/support/load-schema-helper.test.ts`,
       `${SRC}/support/load-schema-helper.trails.test.ts`,
+      `${SRC}/support/load-schema-helper-uuid-default.trails.test.ts`,
     ]);
     expect([...ALLOW]).toEqual(canonicalLoaderSelfTests);
     expect(canonicalLoaderModules).toEqual([

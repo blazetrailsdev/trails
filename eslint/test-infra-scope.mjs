@@ -55,4 +55,5 @@ export const canonicalLoaderSelfTests = [
   // `load-schema-helper` has a second self-test: the trails-only guard on the
   // boot-laid table snapshot the adapter-specific arm feeds.
   `${activerecordSrcRoot}/support/load-schema-helper.trails.test.ts`,
+  `${activerecordSrcRoot}/support/load-schema-helper-uuid-default.trails.test.ts`,
 ];
