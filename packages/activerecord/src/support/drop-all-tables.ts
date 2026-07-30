@@ -50,7 +50,8 @@ function bootLaidTableNames(): ReadonlySet<string> {
  * Drops every user table/view/matview in the database. Idempotent; per-DROP
  * errors are swallowed so teardown noise never aborts the sequence.
  * PG covers all schemas in `current_schemas(false)` (not just `public`).
- * MySQL uses a pinned pool connection with `FOREIGN_KEY_CHECKS=0`.
+ * MySQL uses a pinned pool connection with `FOREIGN_KEY_CHECKS=0`; sqlite goes
+ * through `disableReferentialIntegrity`.
  */
 export async function dropAllTables(adapter: DatabaseAdapter): Promise<void> {
   await resetTables(adapter, "drop-all");
@@ -254,23 +255,25 @@ async function resetSqliteTables(
   bootLaid: ReadonlySet<string>,
 ): Promise<void> {
   const toTruncate: string[] = [];
-  for (const { name } of (await adapter.execute(
-    `SELECT name FROM sqlite_master WHERE type='view' AND name NOT LIKE 'sqlite_%'`,
-  )) as { name: string }[]) {
-    try {
-      await adapter.executeMutation(`DROP VIEW IF EXISTS "${name}"`);
-    } catch {}
-  }
-  for (const { name } of (await adapter.execute(
-    `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
-  )) as { name: string }[]) {
-    if (mode === "reset" && bootLaid.has(name)) {
-      toTruncate.push(name);
-      continue;
+  await adapter.disableReferentialIntegrity(async () => {
+    for (const { name } of (await adapter.execute(
+      `SELECT name FROM sqlite_master WHERE type='view' AND name NOT LIKE 'sqlite_%'`,
+    )) as { name: string }[]) {
+      try {
+        await adapter.executeMutation(`DROP VIEW IF EXISTS "${name}"`);
+      } catch {}
     }
-    try {
-      await adapter.executeMutation(`DROP TABLE IF EXISTS "${name}"`);
-    } catch {}
-  }
+    for (const { name } of (await adapter.execute(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
+    )) as { name: string }[]) {
+      if (mode === "reset" && bootLaid.has(name)) {
+        toTruncate.push(name);
+        continue;
+      }
+      try {
+        await adapter.executeMutation(`DROP TABLE IF EXISTS "${name}"`);
+      } catch {}
+    }
+  });
   await truncateNonEmpty(adapter, toTruncate);
 }
