@@ -273,8 +273,9 @@ export class HasOneAssociation extends SingularAssociation {
    * `detachDisplacedTarget`) and the nested-attributes writer
    * (nested-attributes.ts, a synchronous property setter that starts
    * `detachDisplacedTarget` — for a loaded target — or
-   * `detachDisplacedForSyncBuild` — for an unloaded one, which runs the leading
-   * `load_target` itself — at assignment, and drains it in its `save` wrapper).
+   * `prepareDetachDisplacedForSyncBuild` — for an unloaded one, which runs the
+   * leading `load_target` itself — around the build, and drains it in its `save`
+   * wrapper).
    * Both call `build` on their way through, and without this flag `build` would
    * re-run the load and start a *second*, concurrent removal of the same row.
    *
@@ -520,11 +521,25 @@ export class HasOneAssociation extends SingularAssociation {
    * in memory; this covers the row that only ever existed in the DB.
    *
    * The synchronous writer (`pirate.shipAttributes = {...}`) cannot await the
-   * SELECT, so it calls this at assignment — Rails' timing for *issuing* the
-   * query — and parks the returned promise on the owner, draining it in the
-   * `save` wrapper exactly like `detachDisplacedTarget`'s. Null when Rails would
-   * issue no query at all (`find_target?`) or when the target is already loaded,
+   * SELECT, so it parks the promise on the owner and drains it in the `save`
+   * wrapper exactly like `detachDisplacedTarget`'s. Null when Rails would issue
+   * no query at all (`find_target?`) or when the target is already loaded,
    * which keeps the writer synchronous on those paths.
+   *
+   * Returns a *thunk* rather than the promise: Rails reaches `load_target` from
+   * `set_new_record`, i.e. after `build_record`, so a build that raises issues
+   * no query. The gate (`find_target?`) stops being observable once `build`
+   * marks the association loaded, so the writer takes the decision here, before
+   * the build, and invokes the thunk after it.
+   *
+   * The writer invokes the thunk only when `build` returns normally, which
+   * would suppress a query for a throw from the `set_new_record` half — Rails
+   * reaches everything past has_one_association.rb:62 with `load_target`
+   * already run. That half is unreachable on this path: `raise_on_type_mismatch!`
+   * (:60) is the sole pre-`load_target` raise and cannot fire for a record the
+   * association built from its own reflection, and with
+   * `buildDisplacementOwnedByCaller` set the remainder is `setNewRecord`'s
+   * in-memory foreign-key/inverse writes.
    *
    * `protected` for the same reason as `buildDisplacementOwnedByCaller`: this is
    * association-internal bookkeeping, not API surface. The writer lives outside
@@ -537,10 +552,10 @@ export class HasOneAssociation extends SingularAssociation {
    *
    * @internal
    */
-  protected detachDisplacedForSyncBuild(): Promise<void> | null {
+  protected prepareDetachDisplacedForSyncBuild(): (() => Promise<void>) | null {
     if (this.loaded) return null;
     if (!this.needsTargetLoadForBuild()) return null;
-    return this.findThenDetachDisplaced();
+    return () => this.findThenDetachDisplaced();
   }
 
   private async findThenDetachDisplaced(): Promise<void> {

@@ -189,7 +189,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    *
    * @internal
    */
-  protected override detachDisplacedForSyncBuild(): Promise<void> | null {
+  protected override prepareDetachDisplacedForSyncBuild(): (() => Promise<void>) | null {
     return null;
   }
 

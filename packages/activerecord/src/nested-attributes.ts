@@ -680,7 +680,7 @@ interface OneToOneAssociation {
   initializeAttributes(record: Base): void;
   isLoaded?(): boolean;
   detachDisplacedTarget?(displaced: Base | null): Promise<void>;
-  detachDisplacedForSyncBuild?(): Promise<void> | null;
+  prepareDetachDisplacedForSyncBuild?(): (() => Promise<void>) | null;
 }
 
 /**
@@ -916,20 +916,14 @@ export function assignNestedAttributesForOneToOneAssociation(
         const displaced = assoc.isLoaded?.() === false ? null : existing;
         // Rails' `replace` opens with `load_target`, so an association that was
         // never loaded still discovers the row in the DB and removes it. That
-        // SELECT is issued here, at assignment (Rails' timing), and only its
-        // completion is deferred to the same drain — see
-        // `HasOneAssociation#detachDisplacedForSyncBuild`.
-        //
-        // Rails reaches `load_target` from `set_new_record`, i.e. just AFTER
-        // `build_record`; this issues it just before. It has to: the load is
-        // gated on `find_target?`, which `build` falsifies by marking the
-        // association loaded, so there is no post-build moment at which the
-        // decision is still observable. The window the swap opens is a build
-        // that throws after a query Rails would not have run —
-        // `assertNestedAttributesAreKnown` above already raised for the
-        // attribute errors that reach this path.
-        const unloadedRemoval = assoc.detachDisplacedForSyncBuild?.() ?? null;
-        if (unloadedRemoval) parkDisplacedRemoval(record, unloadedRemoval);
+        // SELECT is issued just AFTER the build, where Rails reaches
+        // `load_target` — from `set_new_record`, i.e. after `build_record` — so
+        // a build that raises queries nothing. Only its completion is deferred
+        // to the same drain; see
+        // `HasOneAssociation#prepareDetachDisplacedForSyncBuild`. The decision
+        // to issue it has to be taken here, before the build, because `build`
+        // marks the association loaded and so falsifies its `find_target?` gate.
+        const startUnloadedRemoval = assoc.prepareDetachDisplacedForSyncBuild?.() ?? null;
         // `HasOneAssociation#build` runs the removal itself for direct callers
         // (returning a promise they can await). This writer is synchronous and
         // owns the removal through `detachDisplacedAtAssignment` below, so
@@ -942,6 +936,7 @@ export function assignNestedAttributesForOneToOneAssociation(
         } finally {
           assoc.buildDisplacementOwnedByCaller = false;
         }
+        if (startUnloadedRemoval) parkDisplacedRemoval(record, startUnloadedRemoval());
         detachDisplacedAtAssignment(record, assoc, displaced);
       }
     }
