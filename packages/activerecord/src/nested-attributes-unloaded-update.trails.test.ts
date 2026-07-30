@@ -84,4 +84,20 @@ describe("nested attributes update on an unloaded one-to-one association", () =>
     const reloaded = (await Ship.find(shipId)) as unknown as { name: string };
     expect(reloaded.name).toBe("Davy Jones Gold Dagger");
   });
+  it("builds a new record with update_only when the unloaded association has none", async () => {
+    const pirate = (await Pirate.createBang({ catchphrase: "Aye" })) as unknown as PirateHandle;
+
+    await pirate.setUpdateOnlyShipAttributes({ name: "Davy Jones Gold Dagger" });
+
+    const target = (await pirate.updateOnlyShip) as unknown as { name: string };
+    expect(target.name).toBe("Davy Jones Gold Dagger");
+  });
+
+  it("raises RecordNotFound when the unloaded association's record has another id", async () => {
+    const [pirate, ship] = await pirateWithUnloadedShip();
+
+    await expect(
+      pirate.setShipAttributes({ id: (ship as unknown as { id: number }).id + 1000, name: "X" }),
+    ).rejects.toThrow(/Couldn't find/);
+  });
 });

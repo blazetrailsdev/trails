@@ -795,7 +795,7 @@ async function awaitPendingDisplacedRemovals(record: Base): Promise<void> {
 }
 
 /** @internal */
-function loadExistingThenAssignInPlace(
+function loadExistingThenAssign(
   record: Base,
   assoc: OneToOneAssociation,
   associationName: string,
@@ -808,15 +808,24 @@ function loadExistingThenAssignInPlace(
   return (async () => {
     const loaded = await load;
     const existing = Array.isArray(loaded) ? null : loaded;
-    const matches =
-      existing && (options.updateOnly || String(existing.id) === String((attributes as any).id));
-    if (!matches) {
-      storePendingNestedAttributes(record, associationName, [attributes]);
+    const id = (attributes as any).id;
+
+    // Rails nested_attributes.rb:436.
+    if (existing && (options.updateOnly || String(existing.id) === String(id))) {
+      if (!callRejectIf(record, associationName, attributes)) {
+        assignToOrMarkForDestruction(existing, attributes, options.allowDestroy ?? false);
+      }
       return;
     }
-    if (!callRejectIf(record, associationName, attributes)) {
-      assignToOrMarkForDestruction(existing, attributes, options.allowDestroy ?? false);
+
+    // Rails nested_attributes.rb:439-440.
+    if (hasNestedId(attributes)) {
+      raiseNestedAttributesRecordNotFoundBang(record, associationName, id);
     }
+
+    // Rails nested_attributes.rb:442-452 — `update_only` with no `id` and no
+    // existing record builds instead.
+    buildNestedRecord(record, assoc, associationName, attributes, existing);
   })();
 }
 
@@ -896,7 +905,7 @@ export function assignNestedAttributesForOneToOneAssociation(
   }
 
   if (hasId || updateOnly) {
-    const pendingUpdate = loadExistingThenAssignInPlace(
+    const pendingUpdate = loadExistingThenAssign(
       record,
       assoc,
       associationName,
@@ -905,12 +914,23 @@ export function assignNestedAttributesForOneToOneAssociation(
     );
     if (pendingUpdate) {
       parkDisplacedRemoval(record, pendingUpdate);
-      return;
+    } else {
+      storePendingNestedAttributes(record, associationName, [attributes]);
     }
-    storePendingNestedAttributes(record, associationName, [attributes]);
     return;
   }
 
+  buildNestedRecord(record, assoc, associationName, attributes, existing);
+}
+
+/** @internal */
+function buildNestedRecord(
+  record: Base,
+  assoc: OneToOneAssociation,
+  associationName: string,
+  attributes: Record<string, unknown>,
+  existing: Base | null,
+): void {
   // Rails nested_attributes.rb:443 — build a new record (no matching id).
   if (!isRejectNewRecord(record, associationName, attributes)) {
     const assignable = assignableNestedAttributes(attributes);
