@@ -775,10 +775,6 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
         return true;
       }
     }
-    // The "Base"-normalized pool name collides with the ambient worker pool, so
-    // both pools live on an isolated handler and the connections are leased off
-    // the pools directly — establishing them on `Base.connectionHandler` would
-    // displace the worker connection for the rest of the file.
     const handler = new ConnectionHandler();
     const appPool = handler.establishConnection(
       new HashConfig("test", "ApplicationRecord", { adapter: "sqlite3", database: ":memory:" }),
