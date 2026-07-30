@@ -28,6 +28,7 @@
  */
 
 import path from "path";
+import { canonicalLoaderModules, canonicalLoaderSelfTests } from "./test-infra-scope.mjs";
 
 /** Repo-relative path under packages/; null if outside the repo tree. */
 export function repoRel(filename) {
@@ -43,11 +44,9 @@ export function repoRel(filename) {
 export const BANNED = new Set(["ensureCanonicalTables", "loadCanonicalSchema", "loadSchema"]);
 
 // Test files permitted to import the banned loaders (they test them directly).
-export const ALLOW = new Set([
-  "packages/activerecord/src/support/canonical-schema.test.ts",
-  "packages/activerecord/src/support/canonical-table-rebuild.test.ts",
-  "packages/activerecord/src/support/load-schema-helper.test.ts",
-]);
+export const ALLOW = new Set(canonicalLoaderSelfTests);
+
+const canonicalModuleRe = new RegExp(`(?:^|/)(?:${canonicalLoaderModules.join("|")})(?:\\.js)?$`);
 
 /** True when `source` resolves to one of the canonical-schema test helper modules. */
 function isCanonicalSchemaModule(source) {
@@ -58,9 +57,7 @@ function isCanonicalSchemaModule(source) {
   // `canonical-table-rebuild` is listed because `ensureCanonicalTables` moved
   // there when the schema.rb transcription split from the drop/rebuild
   // machinery; omitting it would leave the ban open under the new path.
-  return /(?:^|\/)(?:canonical-schema|canonical-table-rebuild|load-schema-helper)(?:\.js)?$/.test(
-    source,
-  );
+  return canonicalModuleRe.test(source);
 }
 
 /** @type {import("eslint").Rule.RuleModule} */
