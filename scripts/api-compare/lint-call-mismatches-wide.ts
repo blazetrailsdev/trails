@@ -15,7 +15,10 @@
  * one-line `reason`, and CI fails on:
  *
  *   - any NEW wide mismatch absent from the baseline (the ratchet);
- *   - any STALE baseline entry that no longer flags (only-shrink).
+ *   - any STALE baseline entry that no longer flags (only-shrink);
+ *   - more entries still carrying the seeded {@link DEFAULT_REASON} than the
+ *     committed high-water mark in call-mismatches-wide-unreviewed.json
+ *     (RFC 0083 — see unreviewed-ratchet.ts for why that is a second ratchet).
  *
  * The wide population is large and dominated by bucket-(b) confirmed
  * equivalents and bucket-(c) tooling noise (see RFC 0047 README). The baseline
@@ -72,6 +75,14 @@ import {
   reseed,
 } from "./lint-call-mismatches.js";
 import { reportNonCanonicalBaselines, serializeBaseline } from "./baseline-json.js";
+import {
+  loadMark,
+  newlySeeded,
+  nextMark,
+  renderExcess,
+  renderWriteSummary,
+  writeMark,
+} from "./unreviewed-ratchet.js";
 import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "./conventions.js";
 import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
 
@@ -101,6 +112,13 @@ export function relPathFor(k: CallMismatchKey): string {
 // Gates the full-surface wide artifact only — privates are advisory-only
 // throughout the compare tooling (mirrors lint-call-mismatches.ts).
 const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-mismatches-wide.json");
+
+// Committed high-water mark for the unreviewed-reason counter (RFC 0083); see
+// unreviewed-ratchet.ts.
+const MARK_PATH = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "call-mismatches-wide-unreviewed.json",
+);
 
 export const DEFAULT_REASON =
   "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; " +
@@ -378,6 +396,14 @@ async function main(write: boolean): Promise<number> {
     console.log(
       `Wrote ${path.relative(ROOT_DIR, BASELINE_DIR)}/: ${next.length} baselined wide call mismatches`,
     );
+
+    const count = unreviewedCount(next);
+    const newly = sortKeys(newlySeeded(next, baseline, DEFAULT_REASON));
+    // Rows this reseed just seeded are held out of the mark, so a reseed can
+    // never buy unreviewed headroom (see unreviewed-ratchet.ts header).
+    const mark = nextMark(count - newly.length, await loadMark(MARK_PATH));
+    await writeMark(MARK_PATH, mark);
+    console.log(renderWriteSummary(count, newly, mark, path.relative(ROOT_DIR, MARK_PATH)));
     return 0;
   }
 
@@ -386,8 +412,17 @@ async function main(write: boolean): Promise<number> {
 
   const { added, stale } = diffAgainstBaseline(current, baseline);
 
+  const unreviewed = unreviewedCount(baseline);
+  const mark = await loadMark(MARK_PATH);
+  const overMark = unreviewed > mark;
+  if (overMark) console.error(renderExcess(unreviewed, mark, path.relative(ROOT_DIR, MARK_PATH)));
+
   if (added.length === 0 && stale.length === 0) {
-    console.log(`wide call-mismatches ratchet: OK (${baseline.length} baselined)`);
+    if (overMark) return 1;
+    console.log(
+      `wide call-mismatches ratchet: OK (${baseline.length} baselined, ` +
+        `${unreviewed} unreviewed <= mark ${mark})`,
+    );
     return 0;
   }
 
@@ -427,7 +462,8 @@ async function reportMain(top: number, unreviewedOnly: boolean): Promise<number>
   if (unreviewedOnly) {
     console.log(
       `wide call-mismatches: ${unreviewedCount(baseline)} of ${baseline.length} baselined ` +
-        "entr(ies) still carry the seeded default reason (unreviewed).",
+        `entr(ies) still carry the seeded default reason (unreviewed); high-water mark ` +
+        `${await loadMark(MARK_PATH)}.`,
     );
     return 0;
   }

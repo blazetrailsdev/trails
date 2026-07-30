@@ -30,6 +30,7 @@
     "api:calls:reseed": "API_COMPARE_FORCE=1 pnpm api:compare && pnpm tsx scripts/api-compare/lint-call-mismatches.ts --write",
     "api:calls:wide": "pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts",
     "api:calls:wide:report": "pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts --report",
+    "api:calls:wide:unreviewed": "pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts --unreviewed",
     "api:calls:wide:reseed": "API_COMPARE_FORCE=1 pnpm api:compare --wide-calls && pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts --write",
     "api:arity": "pnpm tsx scripts/api-compare/lint-arity-excludes.ts",
     "api:pins": "pnpm tsx scripts/api-compare/lint-body-pins.ts",
