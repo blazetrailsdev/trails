@@ -40,7 +40,6 @@ import {
   ARUNIT_DATABASE,
   ARUNIT2_DATABASE,
 } from "./adapters/abstract-mysql-adapter/test-helper.js";
-import { provisionSecondDatabase } from "./support/setup-second-pool.js";
 
 // Drives Rails' AdapterTest casted/non-casted bind probes against the leased
 // connection and the canonical `events` table. The insert return value is
@@ -1269,35 +1268,14 @@ describe.runIf(adapterType === "mysql")("AdapterTest", () => {
   });
 
   it("not specifying database name for cross database selects", async () => {
-    for (const database of [ARUNIT_DATABASE, ARUNIT2_DATABASE]) {
-      await adapter.execute(`DROP DATABASE IF EXISTS ${database}`);
-      await adapter.execute(`CREATE DATABASE ${database}`);
-    }
-    await adapter.execute(
-      `CREATE TABLE ${ARUNIT_DATABASE}.pirates (id INT AUTO_INCREMENT PRIMARY KEY, catchphrase VARCHAR(255), parrot_id INT, non_validated_parrot_id INT, created_on DATETIME, updated_on DATETIME)`,
-    );
-    await adapter.execute(
-      `CREATE TABLE ${ARUNIT2_DATABASE}.courses (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL, college_id INT)`,
-    );
-
-    try {
-      await runWithoutConnection(async ({ database: _database, ...exceptDatabase }) => {
-        await Base.establishConnection(exceptDatabase);
-        const connection = await leaseMysqlAdapter();
-        await connection.execute(
-          `SELECT ${ARUNIT_DATABASE}.pirates.*, ${ARUNIT2_DATABASE}.courses.* ` +
-            `FROM ${ARUNIT_DATABASE}.pirates, ${ARUNIT2_DATABASE}.courses`,
-        );
-      });
-    } finally {
+    await runWithoutConnection(async ({ database: _database, ...exceptDatabase }) => {
+      await Base.establishConnection(exceptDatabase);
       const connection = await leaseMysqlAdapter();
-      for (const database of [ARUNIT_DATABASE, ARUNIT2_DATABASE]) {
-        await connection.execute(`DROP DATABASE IF EXISTS ${database}`);
-      }
-      // ARUNIT2_DATABASE is this worker's real second database, which
-      // `ARUnit2Model` holds a pool on for the whole run.
-      await provisionSecondDatabase();
-    }
+      await connection.execute(
+        `SELECT ${ARUNIT_DATABASE}.pirates.*, ${ARUNIT2_DATABASE}.courses.* ` +
+          `FROM ${ARUNIT_DATABASE}.pirates, ${ARUNIT2_DATABASE}.courses`,
+      );
+    });
   });
 });
 
