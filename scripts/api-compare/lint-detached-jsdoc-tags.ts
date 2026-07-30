@@ -36,6 +36,12 @@
  *     is inert there too, but JSDoc on statements is legitimate prose in this
  *     tree and flagging it would be noise.
  *
+ * Population: every `.ts` file under `packages/<pkg>/src`, the same set
+ * `api:reasons` checks — that is exactly where a tag has api-compare meaning.
+ * `*.test.ts` is included (a detached tag misleads a reader wherever it sits),
+ * so a block quoted inside a string or template literal has to be excluded
+ * explicitly; see `isCommentPosition`.
+ *
  * Usage:
  *   pnpm api:detached
  *
@@ -95,6 +101,23 @@ function boundBlocks(sourceFile: ts.SourceFile, text: string): Map<number, Bound
   return bound;
 }
 
+/** True when `pos` falls in a token's leading trivia — i.e. it really is a
+ *  comment, and not a `/**` sequence inside a string or template literal (test
+ *  fixtures quote these blocks, and an unbound match there is not a defect). */
+function isCommentPosition(sourceFile: ts.SourceFile, pos: number): boolean {
+  let node: ts.Node = sourceFile;
+  for (;;) {
+    // JSDoc nodes appear among a token's children and start AT the comment,
+    // which would read as "inside a token" — descend past them.
+    const child = node
+      .getChildren(sourceFile)
+      .find((c) => !ts.isJSDoc(c) && pos >= c.pos && pos < c.end);
+    if (!child) break;
+    node = child;
+  }
+  return pos < node.getStart(sourceFile);
+}
+
 /** The bound declaration's name, for the report. A `VariableStatement` holds
  *  the JSDoc but its declaration holds the name, hence the descent. */
 function describe(node: ts.Node): string {
@@ -134,12 +157,13 @@ export function lintFileText(fileName: string, text: string): Detachment[] {
       new RegExp(`(^|[\\s*])@${tag}\\b`).test(match[0]),
     );
     if (tags.length === 0) continue;
+    if (!isCommentPosition(sourceFile, match.index)) continue;
     found.push({
       file: fileName,
       line: lineOf(match.index),
       tags,
       kind: "unbound",
-      detail: "bound to no declaration",
+      detail: "bound to no declaration — the tag is inert",
     });
   }
 

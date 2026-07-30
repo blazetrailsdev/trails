@@ -62,9 +62,22 @@ describe("lintFileText", () => {
         line: 3,
         kind: "unbound",
         tags: ["internal"],
-        detail: "bound to no declaration",
+        detail: "bound to no declaration — the tag is inert",
       },
     ]);
+  });
+
+  it("ignores a tag block quoted inside a string literal", () => {
+    const found = lintFileText(
+      "a.test.ts",
+      ['const fixture = "/** @internal */\\nfunction a() {}";', ""].join("\n"),
+    );
+    expect(found).toEqual([]);
+  });
+
+  it("ignores a tag block quoted inside a template literal", () => {
+    const found = lintFileText("a.test.ts", "const fixture = `/** @noRailsEquivalent x */`;\n");
+    expect(found).toEqual([]);
   });
 
   it("reports each detachment in a file, in source order", () => {
