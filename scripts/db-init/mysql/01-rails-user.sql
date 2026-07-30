@@ -12,13 +12,21 @@
 -- inexistent_activerecord_unittest fail with "Unknown database" instead of
 -- "access denied", which abstract-mysql-adapter/connection.test.ts and
 -- mysql2-adapter.test.ts assert on.
+--
+-- ar_cli_e2e% is trails-only, with no Rails counterpart: the activerecord-cli
+-- E2E suite drives `ar db:create` as this same user against a throwaway
+-- ar_cli_e2e_<hrtime> database (activerecord-cli/src/__e2e__/*-happy-path.test.ts).
+-- Postgres needs no equivalent — that role has CREATEDB, which is not
+-- per-database.
 CREATE USER IF NOT EXISTS 'rails'@'%';
 GRANT ALL PRIVILEGES ON `activerecord_unittest%`.* TO 'rails'@'%';
 GRANT ALL PRIVILEGES ON inexistent_activerecord_unittest.* TO 'rails'@'%';
+GRANT ALL PRIVILEGES ON `ar_cli_e2e%`.* TO 'rails'@'%';
 -- PERMANENT DEVIATION: Rails grants only '%' because its runs are over TCP.
 -- MYSQL_SOCK is a first-class sub-setting here (config.example.yml:18-19) and a
 -- socket connection authenticates as 'rails'@'localhost', which '%' misses.
 CREATE USER IF NOT EXISTS 'rails'@'localhost';
 GRANT ALL PRIVILEGES ON `activerecord_unittest%`.* TO 'rails'@'localhost';
 GRANT ALL PRIVILEGES ON inexistent_activerecord_unittest.* TO 'rails'@'localhost';
+GRANT ALL PRIVILEGES ON `ar_cli_e2e%`.* TO 'rails'@'localhost';
 FLUSH PRIVILEGES;
