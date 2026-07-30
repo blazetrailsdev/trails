@@ -315,10 +315,6 @@ export class SchemaStatements {
       this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, name);
     }
 
-    // Rails: `td = build_create_table_definition(table_name, id:, primary_key:, **options, &block)`
-    // — which in turn dispatches to the adapter's dialect-specific
-    // TableDefinition (e.g. PostgreSQL::TableDefinition with range/hstore/jsonb
-    // column methods) and routes the primary key through `set_primary_key`.
     const td = this.buildCreateTableDefinition(name, options, definer);
 
     // Prime the cached database version before the visitor emits DDL: inline
@@ -1600,15 +1596,6 @@ export class SchemaStatements {
     return this.viewExists(name);
   }
 
-  /**
-   * Mirrors Rails `abstract/schema_statements.rb:333`. The two `options.extract!`
-   * calls are what split the hash: `valid_table_definition_options` reach the
-   * TableDefinition constructor, `valid_primary_key_options` reach
-   * `set_primary_key` and land on the PK column. Building the definition through
-   * `createTableDefinition` (rather than `new TableDefinition`) is what makes the
-   * adapter's own TableDefinition subclass — and therefore its dialect column
-   * methods — available inside the block.
-   */
   buildCreateTableDefinition(
     tableName: string,
     options: {
@@ -1625,30 +1612,31 @@ export class SchemaStatements {
       if (rest[key] !== undefined) tdOptions[key] = rest[key];
     }
     const pkOptions: Record<string, unknown> = {};
-    // `autoIncrement` is not in Rails' valid_primary_key_options (it is MySQL's
-    // addition), but createTable has always accepted it dialect-agnostically.
     for (const key of [...this.validPrimaryKeyOptions(), "autoIncrement"]) {
       if (rest[key] !== undefined) pkOptions[key] = rest[key];
     }
 
-    // `id: false` because Rails' create_table_definition never sees `:id` — the
-    // primary key is added afterwards by set_primary_key. Trails' constructor
-    // would otherwise build (and we would immediately discard) a default PK.
     const ctdOptions = {
       ...tdOptions,
       id: false,
       adapterName: this.adapterName,
       adapter: this.adapter,
     };
-    const td = this.adapter.createTableDefinition
+    const tableDefinition = this.adapter.createTableDefinition
       ? this.adapter.createTableDefinition(tableName, ctdOptions)
       : this.createTableDefinition(tableName, ctdOptions);
-    // `primaryKey: false` is Rails' `id: false` spelling; a composite array PK is
-    // passed as both arguments so set_primary_key's `if id` guard stays satisfied.
-    const pkArg = primaryKey === false ? false : Array.isArray(primaryKey) ? primaryKey : id;
-    td.setPrimaryKey(tableName, pkArg, primaryKey === false ? undefined : primaryKey, pkOptions);
-    if (fn) fn(td);
-    return td;
+    tableDefinition.setPrimaryKey(
+      tableName,
+      // A composite primaryKey overrides `id: false`: Rails' guard would skip it,
+      // but trails' callers spell a composite PK as `id: false, primaryKey: [...]`.
+      primaryKey === false ? false : Array.isArray(primaryKey) ? true : id,
+      primaryKey === false ? undefined : primaryKey,
+      pkOptions,
+    );
+
+    if (fn) fn(tableDefinition);
+
+    return tableDefinition;
   }
 
   buildCreateJoinTableDefinition(
