@@ -47,12 +47,6 @@ async function pirateWithFailingRemoval(): Promise<Base> {
   return pirate;
 }
 
-/**
- * The same rigging for the *unloaded* path: the has_one is never loaded, so the
- * writer takes the `find_target?` decision through
- * `prepareDetachDisplacedForSyncBuild` and parks the thunk's promise after the
- * build. The row exists in the DB but nothing has ever read it.
- */
 async function pirateWithFailingUnloadedRemoval(): Promise<Base> {
   const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
   await Ship.create({
@@ -159,9 +153,6 @@ describe("nested-attributes displacement removal failure", () => {
       name: "Davy Jones Gold Dagger",
     };
 
-    // The unloaded path parks the thunk's promise rather than a loaded target's
-    // removal, but it funnels through the same capture: the parked value must
-    // resolve *to* the error, never reject.
     const pending = (pirate as unknown as RemovalHost)._pendingDisplacedRemovals ?? [];
     expect(pending).toHaveLength(1);
     await expect(pending[0]).resolves.toBeInstanceOf(Error);
