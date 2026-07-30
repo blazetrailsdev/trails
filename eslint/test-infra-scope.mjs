@@ -50,6 +50,9 @@ export const canonicalLoaderModules = [
 ];
 
 /** Each loader module's own unit test (repo-relative), allowed to import it. */
-export const canonicalLoaderSelfTests = canonicalLoaderModules.map(
-  (name) => `${activerecordSrcRoot}/support/${name}.test.ts`,
-);
+export const canonicalLoaderSelfTests = [
+  ...canonicalLoaderModules.map((name) => `${activerecordSrcRoot}/support/${name}.test.ts`),
+  // `load-schema-helper` has a second self-test: the trails-only guard on the
+  // boot-laid table snapshot the adapter-specific arm feeds.
+  `${activerecordSrcRoot}/support/load-schema-helper.trails.test.ts`,
+];

@@ -30,6 +30,7 @@ describe("test-infra lint scope", () => {
       `${SRC}/support/canonical-schema.test.ts`,
       `${SRC}/support/canonical-table-rebuild.test.ts`,
       `${SRC}/support/load-schema-helper.test.ts`,
+      `${SRC}/support/load-schema-helper.trails.test.ts`,
     ]);
     expect([...ALLOW]).toEqual(canonicalLoaderSelfTests);
     expect(canonicalLoaderModules).toEqual([
