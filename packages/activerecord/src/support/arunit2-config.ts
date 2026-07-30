@@ -11,9 +11,10 @@
  * trails provisions a single server per adapter, so rather than maintaining a
  * separate config file we derive the two database names from the primary
  * connection's `database` sub-setting. This keeps the names config-derived
- * (not invented per call) and dedicated to the cross-pool work — off the
- * shared primary database whose canonical tables parallel workers create and
- * drop.
+ * (not invented per call): `arunit` is that primary database, the one
+ * `ActiveRecord::Base` is established on (`connection.rb:31-33`) and the one
+ * `expand_config` defaults to `activerecord_unittest` (`config.rb:26-35`), and
+ * `arunit2` its sibling.
  *
  * The *connection names* are already first-class: `support/connection.ts`
  * publishes `arunit`, `arunit2` and `arunit_without_prepared_statements` as
