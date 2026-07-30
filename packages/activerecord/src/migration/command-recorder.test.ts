@@ -648,3 +648,31 @@ describe("CommandRecorder", () => {
     });
   });
 });
+
+describe("Migration", () => {
+  describe("CommandRecorderTest", () => {
+    it("respond to delegates", () => {
+      const recorder = new CommandRecorder({ america() {} }) as unknown as {
+        america: unknown;
+      };
+      expect(typeof recorder.america).toBe("function");
+    });
+
+    it("send delegates to record", () => {
+      const recorder = new CommandRecorder({ createTable(_name: string) {} });
+      // The recorder only records the command — no DDL runs, so there is no table to tear down.
+      // eslint-disable-next-line blazetrails/require-table-teardown
+      (recorder as unknown as { createTable(name: string): void }).createTable("horses");
+      expect(recorder.commands).toEqual([{ cmd: "createTable", args: ["horses"] }]);
+    });
+
+    it("unknown commands delegate", () => {
+      const recorder = new CommandRecorder({
+        foo(kw: string) {
+          return kw;
+        },
+      }) as unknown as { foo(kw: string): string };
+      expect(recorder.foo("bar")).toBe("bar");
+    });
+  });
+});

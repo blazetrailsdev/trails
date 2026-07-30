@@ -18,6 +18,23 @@ export class CommandRecorder {
 
   constructor(delegate?: unknown) {
     this._delegate = delegate ?? null;
+    // Stands in for Rails' `method_missing` / `respond_to_missing?`
+    // (command_recorder.rb:395-406), which forward any method the recorder does
+    // not define to the delegate. JS has no method_missing, so the forwarding
+    // lives in a Proxy returned from the constructor — class-wide, as in Rails.
+    return new Proxy(this, {
+      get(target, prop, receiver) {
+        if (Reflect.has(target, prop)) return Reflect.get(target, prop, receiver);
+        const delegate = target._delegate as Record<string | symbol, unknown> | null;
+        const forwarded = delegate?.[prop];
+        return typeof forwarded === "function" ? forwarded.bind(delegate) : undefined;
+      },
+      has(target, prop) {
+        if (Reflect.has(target, prop)) return true;
+        const delegate = target._delegate as Record<string | symbol, unknown> | null;
+        return delegate != null && prop in delegate;
+      },
+    });
   }
 
   get delegate(): unknown {
