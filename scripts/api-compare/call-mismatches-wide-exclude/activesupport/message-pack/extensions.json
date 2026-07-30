@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "message-pack/extensions.ts",
+    "rubyName": "write_datetime",
+    "call": "sec_fraction",
+    "reason": "Satisfied by a different path: the ported `secFraction` takes a JS Date at millisecond resolution, so a Temporal.PlainDateTime's sub-second fraction is read from its millisecond/microsecond/nanosecond fields instead, preserving the nanosecond precision write_rational needs."
+  }
+]
