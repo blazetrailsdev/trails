@@ -38,9 +38,6 @@ describe("ProtectedParams", () => {
       toH: "not a method",
       first_name: "Guille",
     });
-    // The method wins over the same-named parameter on property access (and so
-    // on spread, which reads through the same path); `toH()` is how a colliding
-    // parameter is read back.
     expect(typeof params["keys"]).toBe("function");
     expect(params["first_name"]).toBe("Guille");
     expect({ ...params }.first_name).toBe("Guille");
