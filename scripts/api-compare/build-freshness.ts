@@ -1,6 +1,7 @@
 /**
- * Guard against measuring `api:compare` / `api:extra` against a BUILD that
- * belongs to a different commit than the checked-out sources.
+ * Guard against measuring `api:compare` / `api:extra` against a BUILD that does
+ * not correspond to the checked-out sources — one belonging to a different
+ * commit, or (see `staleBuilds`) no build at all.
  *
  * The TS extractor compiles each package with the real module resolver, so an
  * `import … from "@blazetrails/activesupport"` resolves through pnpm's
@@ -168,10 +169,13 @@ async function hasDeclarations(dir: string): Promise<boolean> {
  * benign ("resolves to nothing at every commit, so it's consistent"), and that
  * is measurably false: on an UNBUILT worktree the extractor cannot resolve a
  * type an importer pulls from a sibling package's declarations, so the method
- * carrying it silently drops out of the advisory populations. `serializableHash`
- * (activerecord/serialization.ts), whose options type comes from activemodel,
- * is one such — the option-key summary prints 103 pairs on an unbuilt tree and
- * 104 on the same tree after `pnpm build`. A run-order-dependent total is
+ * carrying it silently leaves whichever population needed that type.
+ * `serializableHash` (activerecord/serialization.ts) takes its options type
+ * from activemodel, and the option-key summary prints 103 pairs on an unbuilt
+ * tree against 104 on the same tree after `pnpm build`. (Only the option-key
+ * total moved on that tree — arity, literals and calls were identical — but
+ * nothing confines the mechanism to option keys; any total read off a
+ * cross-package type can move the same way.) A run-order-dependent total is
  * exactly the fabricated ±1 this guard exists to prevent, so an unbuilt package
  * has to fail the same way a stale one does.
  *
@@ -189,12 +193,10 @@ export async function staleBuilds(roots: readonly PackageRoots[]): Promise<Stale
     });
   }
   const candidates = referenceClosure([...seeds.values()]);
-  const checked = await Promise.all(
-    candidates.map(async (project) => ((await hasDeclarations(project.distDir)) ? project : null)),
-  );
-  const built = checked.filter((project): project is Project => project !== null);
+  const hasDist = await Promise.all(candidates.map((project) => hasDeclarations(project.distDir)));
+  const built = candidates.filter((_, i) => hasDist[i]);
   const stale: StaleBuild[] = candidates
-    .filter((project) => !built.includes(project))
+    .filter((_, i) => !hasDist[i])
     .map((project) => ({ dir: project.dir, status: NOT_BUILT }));
 
   if (built.length > 0) {
@@ -274,21 +276,30 @@ async function newestSourceMtime(dir: string): Promise<number> {
 /** The operator-facing failure text for a non-empty `staleBuilds` result. */
 export function staleBuildMessage(stale: StaleBuild[]): string {
   const missing = stale.filter((entry) => entry.status === NOT_BUILT).length;
+  const noun = missing === stale.length ? "a missing build" : "a stale build";
   return [
-    `api:compare would measure ${stale.length} package(s) against a stale build:`,
+    `api:compare would measure ${stale.length} package(s) against ${noun}:`,
     ...stale.map((entry) => `  packages/${entry.dir} — ${entry.status}`),
     "",
-    "Cross-package imports resolve through packages/<pkg>/dist/*.d.ts, which git",
-    "does not update on checkout, so these totals would mix one commit's sources",
-    "with another commit's build output. Run `pnpm build` and re-run.",
+    "Cross-package imports resolve through packages/<pkg>/dist/*.d.ts, so what",
+    "the extractor sees depends on those declarations. Run `pnpm build` and",
+    "re-run.",
+    ...(missing < stale.length
+      ? [
+          "",
+          "git does not update dist on checkout, so a stale one makes these totals",
+          "mix one commit's sources with another commit's build output.",
+        ]
+      : []),
     ...(missing > 0
       ? [
           "",
           `${missing} of those have no dist at all. An unbuilt package does not`,
-          "resolve to nothing harmlessly: types an importer pulls from it go",
-          "unresolved, and the methods carrying them drop out of the advisory",
-          "option-key and arity populations, so the totals move on the next run",
-          "purely because a build happened in between.",
+          "resolve to nothing harmlessly: a type an importer pulls from it goes",
+          "unresolved, and the method carrying it drops out of the advisory",
+          "populations — the option-key summary alone moves by a pair — so the",
+          "totals change on the next run purely because a build happened in",
+          "between.",
         ]
       : []),
     "",

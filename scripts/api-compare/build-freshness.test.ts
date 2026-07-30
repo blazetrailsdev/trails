@@ -14,7 +14,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import ts from "typescript";
-import { staleBuilds, staleBuildMessage, manifestIsStale } from "./build-freshness.js";
+import { NOT_BUILT, staleBuilds, staleBuildMessage, manifestIsStale } from "./build-freshness.js";
 import type { PackageRoots } from "./config.js";
 
 const tmpDirs: string[] = [];
@@ -165,7 +165,7 @@ describe("staleBuilds", () => {
     fs.rmSync(path.join(pkg, "dist"), { recursive: true });
 
     expect(await staleBuilds([rootFor(packagesDir, "arel")])).toEqual([
-      { dir: "arel", status: "NotBuilt" },
+      { dir: "arel", status: NOT_BUILT },
     ]);
   });
 
@@ -178,8 +178,8 @@ describe("staleBuilds", () => {
     // The state a freshly created worktree is in before its first `pnpm build`,
     // and the one the guard used to wave through entirely.
     expect(await staleBuilds([...rootsOf(packagesDir, "activesupport", "arel")])).toEqual([
-      { dir: "activesupport", status: "NotBuilt" },
-      { dir: "arel", status: "NotBuilt" },
+      { dir: "activesupport", status: NOT_BUILT },
+      { dir: "arel", status: NOT_BUILT },
     ]);
   });
 
@@ -195,7 +195,7 @@ describe("staleBuilds", () => {
     fs.rmSync(path.join(tse, "dist"), { recursive: true });
 
     expect(await staleBuilds([rootFor(packagesDir, "actionview")])).toEqual([
-      { dir: "tse-compiler", status: "NotBuilt" },
+      { dir: "tse-compiler", status: NOT_BUILT },
     ]);
   });
 
@@ -390,11 +390,19 @@ describe("staleBuildMessage", () => {
 
   it("calls out unbuilt packages separately from stale ones", () => {
     const message = staleBuildMessage([
-      { dir: "activemodel", status: "NotBuilt" },
+      { dir: "activemodel", status: NOT_BUILT },
       { dir: "arel", status: "OutOfDateWithSelf" },
     ]);
     expect(message).toContain("packages/activemodel — NotBuilt");
     expect(message).toContain("1 of those have no dist at all");
+  });
+
+  it("says MISSING rather than stale when nothing was built at all", () => {
+    // The fresh-worktree case: calling a tree that was never built "stale"
+    // sends the reader looking for a checkout that never happened.
+    const message = staleBuildMessage([{ dir: "arel", status: NOT_BUILT }]);
+    expect(message).toContain("against a missing build");
+    expect(message).not.toContain("against a stale build");
   });
 
   it("omits the unbuilt paragraph when every package merely went stale", () => {
