@@ -410,7 +410,9 @@ async function main(write: boolean): Promise<number> {
     return 0;
   }
 
-  const files = await listJsonFiles(BASELINE_DIR);
+  // The mark is committed and `--write`-generated like the split baseline
+  // files, so it is held to the same canonical form.
+  const files = [...(await listJsonFiles(BASELINE_DIR)), MARK_PATH];
   if (await reportNonCanonicalBaselines(files, "wide call-mismatches ratchet")) return 1;
 
   const { added, stale } = diffAgainstBaseline(current, baseline);
