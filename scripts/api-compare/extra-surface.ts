@@ -443,7 +443,7 @@ interface PackageTotals {
   extraFiles: ExtraFile[];
 }
 
-interface TaggedSummary {
+export interface TaggedSummary {
   /** Tags actually WRITTEN in the source — inherited entries excluded. */
   total: number;
   /** Written tags that matched an extra. */
@@ -1108,7 +1108,7 @@ function buildPackageReport(
   return result;
 }
 
-interface Palette {
+export interface Palette {
   red: string;
   yellow: string;
   dim: string;
@@ -1164,7 +1164,11 @@ function padNumCell(n: number, colored: string, width: number): string {
  * Deliberately NOT a gate — most of the population predates the convention, so
  * failing on it would block every unrelated PR. See `classifyReason`.
  */
-function printClassificationBlock(tagged: TaggedSummary, p: Palette, maxDetail: number): void {
+export function printClassificationBlock(
+  tagged: TaggedSummary,
+  p: Palette,
+  maxDetail: number,
+): void {
   const c = tagged.classification;
   console.log(
     `${p.dim}  permanence claims: ${c.permanent} PERMANENT, ${c.convergeable} CONVERGEABLE, ` +
@@ -1320,9 +1324,14 @@ export function buildReport(
   const inheritedMatched = [...matchedTagKeys].filter((k) => inheritedKeys.has(k)).length;
 
   const written = tagged.filter((e) => !e.inherited);
-  const unclassifiedEntries = written.filter((e) => classifyReason(e.reason) === "unclassified");
+  const claims: Record<Permanence, number> = { permanent: 0, convergeable: 0, unclassified: 0 };
+  const unclassifiedEntries: TaggedEntry[] = [];
   const unclassifiedByPackage: Record<string, number> = {};
-  for (const e of unclassifiedEntries) {
+  for (const e of written) {
+    const claim = classifyReason(e.reason);
+    claims[claim]++;
+    if (claim !== "unclassified") continue;
+    unclassifiedEntries.push(e);
     unclassifiedByPackage[e.package] = (unclassifiedByPackage[e.package] ?? 0) + 1;
   }
 
@@ -1332,9 +1341,9 @@ export function buildReport(
     inheritedMatched,
     stale: staleTagged,
     classification: {
-      permanent: written.filter((e) => classifyReason(e.reason) === "permanent").length,
-      convergeable: written.filter((e) => classifyReason(e.reason) === "convergeable").length,
-      unclassified: unclassifiedEntries.length,
+      permanent: claims.permanent,
+      convergeable: claims.convergeable,
+      unclassified: claims.unclassified,
       unclassifiedByPackage,
       unclassifiedEntries,
     },

@@ -9,7 +9,9 @@ import {
   collectTsFileNames,
   collectTaggedEntries,
   classifyReason,
+  printClassificationBlock,
 } from "./extra-surface.js";
+import type { TaggedEntry, TaggedSummary } from "./extra-surface.js";
 import { extractFromProgram } from "./extract-ts-api.js";
 
 function method(name: string, internal = false): MethodInfo {
@@ -2155,5 +2157,67 @@ describe("buildReport — permanence classification", () => {
     expect(run("Rails has no such accessor").tagged.classification.unclassifiedByPackage).toEqual({
       activemodel: 1,
     });
+  });
+});
+
+describe("printClassificationBlock", () => {
+  const plain = { red: "", yellow: "", dim: "", bold: "", reset: "" };
+  const entry = (pkg: string, name: string): TaggedEntry => ({
+    package: pkg,
+    tsFile: `${name}.ts`,
+    name,
+    reason: "no claim",
+  });
+
+  const capture = (tagged: TaggedSummary, maxDetail = 40): string => {
+    const lines: string[] = [];
+    const spy = vi
+      .spyOn(console, "log")
+      .mockImplementation((line: string) => void lines.push(line));
+    printClassificationBlock(tagged, plain, maxDetail);
+    spy.mockRestore();
+    return lines.join("\n");
+  };
+
+  const summary = (unclassifiedEntries: TaggedEntry[]): TaggedSummary => {
+    const unclassifiedByPackage: Record<string, number> = {};
+    for (const e of unclassifiedEntries) {
+      unclassifiedByPackage[e.package] = (unclassifiedByPackage[e.package] ?? 0) + 1;
+    }
+    return {
+      total: unclassifiedEntries.length + 3,
+      matched: unclassifiedEntries.length + 3,
+      inheritedMatched: 0,
+      stale: [],
+      classification: {
+        permanent: 2,
+        convergeable: 1,
+        unclassified: unclassifiedEntries.length,
+        unclassifiedByPackage,
+        unclassifiedEntries,
+      },
+    };
+  };
+
+  it("prints only the split when every tag states a claim", () => {
+    const out = capture(summary([]));
+    expect(out).toContain("2 PERMANENT, 1 CONVERGEABLE, 0 unclassified");
+    expect(out).not.toContain("Unclassified by package");
+  });
+
+  it("breaks the unclassified tags down by package, most first, and names them", () => {
+    const out = capture(
+      summary([entry("activerecord", "aa"), entry("activerecord", "bb"), entry("arel", "cc")]),
+    );
+    expect(out).toContain("Unclassified by package: activerecord 2, arel 1");
+    expect(out).toContain("activerecord  aa.ts  aa");
+    expect(out).toContain("arel  cc.ts  cc");
+  });
+
+  it("elides names past --max-detail", () => {
+    const out = capture(summary([entry("arel", "aa"), entry("arel", "bb")]), 1);
+    expect(out).toContain("arel  aa.ts  aa");
+    expect(out).not.toContain("bb.ts");
+    expect(out).toContain("… +1 more");
   });
 });

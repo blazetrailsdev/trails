@@ -457,8 +457,8 @@ same debt silently. The standing cadence is therefore:
   since the last audit** (whichever comes first), register a re-audit story
   under RFC 0080 and apply the bar above to every tag added since.
 - The owner is whoever schedules RFC 0080 work; the trigger is checkable from
-  the `api:extra` JSON report alone (`tagged.total` plus
-  `tagged.classification.unclassified`), which the stats DB already ingests.
+  the `api:extra` JSON report alone — `tagged.total`, which the stats DB
+  already ingests, plus `tagged.classification.unclassified`.
 - An audit's output is one disposition per tag and a story per convergeable
   one — never a bulk edit, which is what keeps each removal reviewable.
 
