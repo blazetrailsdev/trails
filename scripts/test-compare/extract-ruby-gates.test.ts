@@ -210,6 +210,27 @@ describe("Ruby extractor gate detection", () => {
     });
   });
 
+  it("separates the polarities of two conjoined feature predicates", () => {
+    const g = rubyGates({
+      // Mirrors insert_all_test.rb:282/403 — the only sites in the vendored suite
+      // that conjoin a positive and a negated feature. `skip unless X` runs when X
+      // holds, so this runs on adapters that DO skip-on-duplicate and do NOT
+      // support a conflict target.
+      "cases/insert_all_test.rb": `
+        class InsertAllTest < ActiveRecord::TestCase
+          def test_insert_all_and_upsert_all_with_composite_pk
+            skip unless supports_insert_on_duplicate_skip? && !supports_insert_conflict_target?
+          end
+        end
+      `,
+    });
+    expect(g["insert all and upsert all with composite pk"]).toEqual({
+      features: ["insert_on_duplicate_skip"],
+      guards: ["no_insert_conflict_target"],
+      source: ["body-skip"],
+    });
+  });
+
   it("reads a supports_X? predicate reached through send", () => {
     const g = rubyGates({
       // Mirrors migration/foreign_key_test.rb:96 — `supports_rename_index?` is

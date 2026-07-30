@@ -610,16 +610,16 @@ class TestExtractor
             has_or: false }
     scan_run_condition(cond, acc)
 
-    # A NEGATED feature predicate is only separable on the run-when-true path of a
+    # A NEGATED feature predicate only decomposes on the run-when-true path of a
     # pure conjunction (`if current_adapter?(:X) && !supports_y?`): there the test
-    # runs on `X ∩ ¬y`, which the adapter set plus a `no_y` guard states exactly.
-    # Anywhere else (a `||` disjunction, or the `unless` path where the whole
-    # conjunction is negated) the run-on set isn't that intersection, so the
-    # polarity-blind lumping stays — it is the same conservative "this capability
-    # is involved" claim the comparison already relies on.
-    split_feature_polarity = positive && !acc[:has_or]
-    features = split_feature_polarity ? acc[:features] : acc[:features] + acc[:neg_features]
-    inverted_features = split_feature_polarity ? acc[:neg_features] : []
+    # runs on `X ∩ ¬y`, which a surviving adapter set plus a `no_y` guard states
+    # exactly — while lumping `y` into `:features` would claim the OPPOSITE
+    # capability alongside that adapter set. Elsewhere the run-on set isn't that
+    # intersection, so the polarity-blind lumping stays.
+    split = positive && !acc[:has_or]
+    features = split ? acc[:features] : acc[:features] + acc[:neg_features]
+    inverted_features = split ? acc[:neg_features] : []
+    any_feature = !features.empty? || !inverted_features.empty?
 
     adapters = acc[:adapter_syms].map { |s| ADAPTER_SYMBOL_MAP[s] }.compact.uniq
     neg_adapters = acc[:neg_adapter_syms].map { |s| ADAPTER_SYMBOL_MAP[s] }.compact.uniq
@@ -636,7 +636,7 @@ class TestExtractor
     # Restricted to pure adapter conditions: a compound like `if Trilogy &&
     # supports_x?` keeps its feature/guard gate instead — conservative, but
     # comparable, and no such compound exists in the Rails suite today.
-    if trilogy_only && positive && features.empty? && inverted_features.empty? && acc[:guards].empty?
+    if trilogy_only && positive && !any_feature && acc[:guards].empty?
       gate[:adapters] = []
     end
     # A POSITIVE adapter set isn't sound — and must be dropped — when the
@@ -655,7 +655,7 @@ class TestExtractor
     # negated-adapter branch below uses.
     mixed = !adapters.empty? &&
             (!acc[:guards].empty? ||
-             (!features.empty? && (acc[:has_or] || !positive)) ||
+             (any_feature && (acc[:has_or] || !positive)) ||
              (acc[:has_or] && !neg_adapters.empty?))
     if !adapters.empty? && !mixed
       gate[:adapters] = positive ? adapters : (ALL_ADAPTERS - adapters)

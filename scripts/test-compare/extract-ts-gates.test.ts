@@ -187,6 +187,23 @@ describe("gates.ts pure helpers", () => {
     });
   });
 
+  it("separates the polarities of two conjoined feature predicates", () => {
+    // The TS twin of insert_all_test.rb:282 (`skip unless
+    // supports_insert_on_duplicate_skip? && !supports_insert_conflict_target?`),
+    // as insert-all.test.ts writes it: an `itIfSupports` wrapper carrying the
+    // positive feature plus a `.skipIf` carrying the negated one. Under `skipIf`
+    // the run condition is the negation, so the conflict target is run-NEGATED.
+    expect(
+      mergeGate(gateFromWrapper("itIfSupports", "insert_on_duplicate_skip") ?? undefined, {
+        ...gateFromGuardExpr('adapterSupports("insert_conflict_target")', false),
+      }),
+    ).toEqual({
+      features: ["insert_on_duplicate_skip"],
+      guards: ["no_insert_conflict_target"],
+      source: ["test", "wrapper"],
+    });
+  });
+
   it("combines an adapterType term and feature predicates in one compound guard", () => {
     // De-Morgan'd skip form of Rails `if supports_insert_returning? &&
     // !current_adapter?(:SQLite3Adapter)` → adapters [mysql,postgresql] + feature.
