@@ -55,9 +55,8 @@ if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
     await DatabaseTasks.truncateTables(envConfig);
   }
 } else {
-  // Empty the database, then `load_schema_helper.rb:4-21`, both arms.
-  // `DatabaseTasks.purge` re-establishes Base's pool on the recreated database
-  // itself, so the connection has to be leased after it, not before.
+  // `DatabaseTasks.purge` re-establishes Base's pool on the recreated database,
+  // so the connection has to be leased after it, not before.
   if (ownsDatabase) {
     await DatabaseTasks.purge(envConfig);
   } else {
