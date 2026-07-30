@@ -546,14 +546,14 @@ describe("Response Cache::Response wiring", () => {
     const res = new Response();
     const t = new Date("1994-11-06T08:49:37Z");
     res.lastModified = t;
-    expect(res.hasLastModified).toBe(true);
+    expect(res.isLastModified).toBe(true);
     expect(res.getHeader("Last-Modified")).toBe("Sun, 06 Nov 1994 08:49:37 GMT");
     expect(res.lastModified?.getTime()).toBe(t.getTime());
   });
 
   it("lastModified returns undefined when absent", () => {
     const res = new Response();
-    expect(res.hasLastModified).toBe(false);
+    expect(res.isLastModified).toBe(false);
     expect(res.lastModified).toBeUndefined();
   });
 
@@ -561,7 +561,7 @@ describe("Response Cache::Response wiring", () => {
     const res = new Response();
     const t = new Date("1994-11-06T08:49:37Z");
     res.date = t;
-    expect(res.hasDate).toBe(true);
+    expect(res.isDate).toBe(true);
     expect(res.date?.getTime()).toBe(t.getTime());
   });
 
@@ -572,7 +572,7 @@ describe("Response Cache::Response wiring", () => {
     expect(e.startsWith('W/"')).toBe(true);
     expect(res.isWeakEtag()).toBe(true);
     expect(res.isStrongEtag()).toBe(false);
-    expect(res.hasEtag).toBe(true);
+    expect(res.isEtag).toBe(e);
     // Case-insensitive read: same value via any casing.
     expect(res.getHeader("etag")).toBe(e);
     expect(res.getHeader("ETAG")).toBe(e);

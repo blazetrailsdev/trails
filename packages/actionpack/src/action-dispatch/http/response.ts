@@ -16,9 +16,9 @@ import {
   generateWeakEtag as _generateWeakEtag,
   Response as CacheResponse,
   handleConditionalGetBang as _handleConditionalGetBang,
-  hasDate as _hasDate,
-  hasEtag as _hasEtag,
-  hasLastModified as _hasLastModified,
+  isDate as _isDate,
+  isEtag as _isEtag,
+  isLastModified as _isLastModified,
   isStrongEtag as _isStrongEtag,
   mergeAndNormalizeCacheControlBang as _mergeAndNormalizeCacheControlBang,
   isWeakEtag as _isWeakEtag,
@@ -342,9 +342,9 @@ export class Response {
   declare lastModified: Date | undefined;
   declare date: Date | undefined;
   declare etag: string | undefined;
-  declare readonly hasLastModified: boolean;
-  declare readonly hasDate: boolean;
-  declare readonly hasEtag: boolean;
+  declare readonly isLastModified: boolean;
+  declare readonly isDate: boolean;
+  declare readonly isEtag: string | undefined;
   declare weakEtag: (validators: unknown) => void;
   declare strongEtag: (validators: unknown) => void;
   declare isWeakEtag: () => boolean;
@@ -648,21 +648,21 @@ for (const name of ["lastModified", "date", "etag"] as const) {
     configurable: true,
   });
 }
-Object.defineProperty(Response.prototype, "hasLastModified", {
+Object.defineProperty(Response.prototype, "isLastModified", {
   get(this: Response) {
-    return _hasLastModified.call(this);
+    return _isLastModified.call(this);
   },
   configurable: true,
 });
-Object.defineProperty(Response.prototype, "hasDate", {
+Object.defineProperty(Response.prototype, "isDate", {
   get(this: Response) {
-    return _hasDate.call(this);
+    return _isDate.call(this);
   },
   configurable: true,
 });
-Object.defineProperty(Response.prototype, "hasEtag", {
+Object.defineProperty(Response.prototype, "isEtag", {
   get(this: Response) {
-    return _hasEtag.call(this);
+    return _isEtag.call(this);
   },
   configurable: true,
 });
