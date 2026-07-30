@@ -37,8 +37,10 @@ export interface Rendering {
 }
 
 /**
- * Stub for `ActionView::Layouts` (`action_view/layouts.rb:205`).
+ * Stub for `ActionView::Layouts` (`action_view/layouts.rb:205`) — real impl
+ * in Phase 4, as the sibling stubs above say.
  *
+ * @internal
  * @noRailsEquivalent CONVERGEABLE (story:
  * port-action-view-layouts-behind-rendering-stubs). Deleted once the module
  * is ported to `actionview/src/layouts.ts`.
