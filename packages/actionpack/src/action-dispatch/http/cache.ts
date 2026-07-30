@@ -26,8 +26,6 @@ const MUST_REVALIDATE = "must-revalidate",
 
 export const CacheConfig = { strictFreshness: false };
 
-// --- Request -----------------------------------------------------------------
-
 export interface RequestCacheHost {
   getHeader(name: string): string | undefined;
 }
@@ -76,16 +74,10 @@ export function fresh(this: RequestCacheHost, response: CacheResponseLike): bool
   return ok;
 }
 
-// --- Response ----------------------------------------------------------------
-
 export interface ResponseCacheHost {
   getHeader(key: string): string | undefined;
   setHeader(key: string, value: string): void;
-  hasHeader?(key: string): boolean;
-}
-
-function hdrSet(host: ResponseCacheHost, key: string): boolean {
-  return host.hasHeader ? host.hasHeader(key) : host.getHeader(key) !== undefined;
+  hasHeader(key: string): boolean;
 }
 
 const RFC1123_RE =
@@ -128,12 +120,10 @@ export function parseRfc2822Date(s: string | undefined): Date | undefined {
     h = Number(hh),
     mi = Number(mm),
     s2 = Number(ss);
-  // Rails' Time.rfc2822 raises ArgumentError on out-of-range components.
   if (d < 1 || d > 31 || h > 23 || mi > 59 || s2 > 60) return undefined;
   let year = Number(yr);
   if (year < 50) year += 2000;
   else if (year < 1000) year += 1900;
-  // Round-trip-validate calendar day (rejects 31 Feb, 30 Feb, etc.).
   // boundary: probe Date used only to read normalized UTC components.
   const probe = new Date(Date.UTC(year, MONTHS[mon], d));
   if (probe.getUTCMonth() !== MONTHS[mon] || probe.getUTCDate() !== d) return undefined;
@@ -173,10 +163,8 @@ export function parseHttpDate(s: string | undefined): Date | undefined {
     h = Number(hh),
     mi = Number(mm),
     s2 = Number(ss);
-  // Rails' Time.httpdate raises ArgumentError on out-of-range components.
   if (d < 1 || d > 31 || h > 23 || mi > 59 || s2 > 60) return undefined;
   const yr = Number(year);
-  // Round-trip-validate calendar day (rejects 31 Feb, 30 Feb, etc.).
   // boundary: probe Date used only to read normalized UTC components.
   const probe = new Date(Date.UTC(yr, MONTHS[mon], d));
   if (probe.getUTCMonth() !== MONTHS[mon] || probe.getUTCDate() !== d) return undefined;
@@ -190,6 +178,7 @@ type R = ResponseCacheHost;
 export class Response {
   declare getHeader: ResponseCacheHost["getHeader"];
   declare setHeader: ResponseCacheHost["setHeader"];
+  declare hasHeader: ResponseCacheHost["hasHeader"];
 
   get lastModified(): Date | undefined {
     return parseHttpDate(this.getHeader(LAST_MODIFIED));
@@ -217,16 +206,14 @@ export class Response {
 }
 
 export function isLastModified(this: R) {
-  return hdrSet(this, LAST_MODIFIED);
+  return this.hasHeader(LAST_MODIFIED);
 }
 export function isDate(this: R) {
-  return hdrSet(this, DATE);
+  return this.hasHeader(DATE);
 }
-/** Rails' `Cache::Response#weak_etag=`. */
 export function weakEtag(this: R, v: unknown) {
   this.setHeader(ETAG, generateWeakEtag(v));
 }
-/** Rails' `Cache::Response#strong_etag=`. */
 export function strongEtag(this: R, v: unknown) {
   this.setHeader(ETAG, generateStrongEtag(v));
 }
@@ -234,8 +221,7 @@ export function isEtag(this: R) {
   return !!this.getHeader(ETAG);
 }
 export function isWeakEtag(this: R) {
-  const e = this.getHeader(ETAG);
-  return !!e && e.startsWith('W/"');
+  return isEtag.call(this) && this.getHeader(ETAG)!.startsWith('W/"');
 }
 export function isStrongEtag(this: R) {
   return isEtag.call(this) && !isWeakEtag.call(this);
@@ -287,7 +273,6 @@ export function cacheControlHeaders(this: ResponseCacheHost): CacheControlHash {
   return result;
 }
 
-/** Rails' `attr_reader :cache_control` — returns the parsed hash. */
 export function cacheControl(this: ResponseCacheHost): CacheControlHash {
   return cacheControlHeaders.call(this);
 }

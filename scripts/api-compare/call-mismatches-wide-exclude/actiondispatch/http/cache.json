@@ -9,13 +9,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "http/cache.ts",
-    "rubyName": "date?",
-    "call": "has_header?",
-    "reason": "Satisfied by a different path: the body calls the local hdrSet helper, which forwards to hasHeader when the host provides it and falls back to a getHeader undefined check, because ResponseCacheHost declares hasHeader as optional."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/cache.ts",
     "rubyName": "etag?",
     "call": "etag",
     "reason": "Satisfied by a different path: the body reads the ETag header directly via getHeader rather than going through the etag accessor, which is a class getter here and not callable as a module function."
@@ -33,13 +26,6 @@
     "rubyName": "if_modified_since",
     "call": "rfc2822",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/cache.ts",
-    "rubyName": "last_modified?",
-    "call": "has_header?",
-    "reason": "Satisfied by a different path: the body calls the local hdrSet helper, which forwards to hasHeader when the host provides it and falls back to a getHeader undefined check, because ResponseCacheHost declares hasHeader as optional."
   },
   {
     "package": "actiondispatch",
@@ -74,13 +60,6 @@
     "tsFile": "http/cache.ts",
     "rubyName": "weak_etag?",
     "call": "etag",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/cache.ts",
-    "rubyName": "weak_etag?",
-    "call": "etag?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]
