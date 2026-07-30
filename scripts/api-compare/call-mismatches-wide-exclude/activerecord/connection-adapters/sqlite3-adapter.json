@@ -164,6 +164,13 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "copy_table",
+    "call": "collation",
+    "reason": "Satisfied by copyTableColumns, the extracted body of copy_table's create_table block; the wide gate is lexical per method, and these column reads sit alongside the already-baselined bigint?/column/limit/type reads from the same loop."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/sqlite3-adapter.ts",
+    "rubyName": "copy_table",
     "call": "column",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -171,8 +178,8 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "copy_table",
-    "call": "create_table",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "call": "default",
+    "reason": "Satisfied by copyTableColumns, the extracted body of copy_table's create_table block; the wide gate is lexical per method, and these column reads sit alongside the already-baselined bigint?/column/limit/type reads from the same loop."
   },
   {
     "package": "activerecord",
@@ -199,14 +206,14 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "copy_table",
-    "call": "primary_keys",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "call": "null",
+    "reason": "Satisfied by copyTableColumns, the extracted body of copy_table's create_table block; the wide gate is lexical per method, and these column reads sit alongside the already-baselined bigint?/column/limit/type reads from the same loop."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "copy_table",
-    "call": "reject",
+    "call": "primary_keys",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -215,6 +222,13 @@
     "rubyName": "copy_table",
     "call": "type",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/sqlite3-adapter.ts",
+    "rubyName": "copy_table",
+    "call": "virtual?",
+    "reason": "Satisfied by copyTableColumns, the extracted body of copy_table's create_table block; the wide gate is lexical per method, and these column reads sit alongside the already-baselined bigint?/column/limit/type reads from the same loop."
   },
   {
     "package": "activerecord",

@@ -2319,50 +2319,12 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // already raises StatementInvalid naming the table (foreign_key_test.rb:322).
     const fromPrimaryKey = await this.primaryKey(tableName);
     const sourceColumns = (await this.columns(tableName)) as Sqlite3Column[];
-    const compositePk = Array.isArray(fromPrimaryKey);
-
     const definition = new SQLite3TableDefinition(tableName, {
       id: false,
       adapter: this,
-      ...(compositePk ? { primaryKey: fromPrimaryKey.map(renamed) } : {}),
+      ...(Array.isArray(fromPrimaryKey) ? { primaryKey: fromPrimaryKey.map(renamed) } : {}),
     });
-
-    for (const column of sourceColumns) {
-      const columnOptions: Record<string, unknown> = {
-        limit: column.limit,
-        precision: column.precision,
-        scale: column.scale,
-        null: column.null,
-        collation: column.collation,
-        primaryKey: !compositePk && column.name === fromPrimaryKey,
-      };
-
-      if (column.isVirtual()) {
-        columnOptions.as = column.defaultFunction;
-        columnOptions.stored = column.isVirtualStored();
-        columnOptions.type = column.type;
-      } else if (column.hasDefault && !column.autoIncrement) {
-        const defaultFunction = column.defaultFunction;
-        const deserialized: unknown = this.lookupCastTypeFromColumn(column).deserialize(
-          column.default,
-        );
-        // Rails: `default = -> { column.default_function } if default.nil?`. The
-        // extra `defaultFunction` guard is trails-only: quoteDefaultExpression
-        // rejects a callable returning null, where Ruby's `quote(nil)` yields NULL.
-        columnOptions.default =
-          deserialized == null && defaultFunction != null ? () => defaultFunction : deserialized;
-      }
-
-      // Left null rather than coerced to "" for a typeless (BLOB affinity)
-      // column: typeToSql renders a null type as the empty string, matching
-      // Rails' `type_to_sql(nil)` -> `nil.to_s`, but rejects a blank string.
-      const columnType = column.isVirtual()
-        ? "virtual"
-        : column.isBigint()
-          ? "bigint"
-          : column.type;
-      definition.column(renamed(column.name), columnType as ColumnType, columnOptions);
-    }
+    this.copyTableColumns(definition, fromPrimaryKey, sourceColumns, rename);
 
     // Attached before the block runs, as in Rails' alter_table lambda
     // (sqlite3_adapter.rb:566-583) — that ordering is what lets remove_column
@@ -2568,66 +2530,90 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     from: string,
     to: string,
     options: { rename?: Record<string, string>; temporary?: boolean } = {},
-    block?: (colDefs: string[]) => void,
+    block?: (definition: SQLite3TableDefinition) => void,
   ): Promise<void> {
     await this.copyTable(from, to, options, block);
     await this.execCopyTable(`DROP TABLE ${quoteTableName(from)}`);
   }
 
   /** @internal */
+  private copyTableColumns(
+    definition: SQLite3TableDefinition,
+    fromPrimaryKey: string | string[] | null,
+    sourceColumns: Sqlite3Column[],
+    rename: Record<string, string> = {},
+  ): void {
+    const renamed = (name: string): string => rename[name] ?? name;
+    const compositePk = Array.isArray(fromPrimaryKey);
+
+    for (const column of sourceColumns) {
+      const columnOptions: Record<string, unknown> = {
+        limit: column.limit,
+        precision: column.precision,
+        scale: column.scale,
+        null: column.null,
+        collation: column.collation,
+        primaryKey: !compositePk && renamed(column.name) === fromPrimaryKey,
+      };
+
+      if (column.isVirtual()) {
+        columnOptions.as = column.defaultFunction;
+        columnOptions.stored = column.isVirtualStored();
+        columnOptions.type = column.type;
+      } else if (column.hasDefault && !column.autoIncrement) {
+        const defaultFunction = column.defaultFunction;
+        const deserialized: unknown = this.lookupCastTypeFromColumn(column).deserialize(
+          column.default,
+        );
+        columnOptions.default =
+          deserialized == null && defaultFunction != null ? () => defaultFunction : deserialized;
+      }
+
+      const columnType = column.isVirtual()
+        ? "virtual"
+        : column.isBigint()
+          ? "bigint"
+          : column.type;
+      definition.column(renamed(column.name), columnType as ColumnType, columnOptions);
+    }
+  }
+
+  /** @internal */
   private async copyTable(
     from: string,
     to: string,
-    options: { rename?: Record<string, string>; temporary?: boolean } = {},
-    block?: (colDefs: string[]) => void,
+    options: {
+      rename?: Record<string, string>;
+      temporary?: boolean;
+      force?: boolean | "cascade";
+    } = {},
+    block?: (definition: SQLite3TableDefinition) => void,
   ): Promise<void> {
-    const fromPk = await this.primaryKey(from);
-    const fromCols = await this.columns(from);
+    const fromPrimaryKey = await this.primaryKey(from);
     const rename = options.rename ?? {};
-    const pkCols: string[] = Array.isArray(fromPk) ? fromPk : fromPk ? [fromPk] : [];
-    const compositePk = pkCols.length > 1;
-    const colDefs: string[] = [];
-    const contentCols: string[] = [];
-    for (const col of fromCols) {
-      const sqlite3Col = col as Sqlite3Column;
-      const destName = rename[col.name] ?? col.name;
-      const sqlType = col.sqlTypeMetadata?.sqlType ?? "TEXT";
-      let def = `${quoteColumnName(destName)} ${sqlType}`;
-      if (col.collation) def += ` COLLATE ${quoteColumnName(col.collation)}`;
-      if (sqlite3Col.isVirtual()) {
-        // Re-emit the GENERATED clause so the copy stays a generated column
-        // (Rails copy_table passes as:/stored:/type: through to create_table).
-        def += ` GENERATED ALWAYS AS (${col.defaultFunction})`;
-        def += sqlite3Col.isVirtualStored() ? " STORED" : " VIRTUAL";
-      } else {
-        if (!compositePk && pkCols.includes(col.name)) def += " PRIMARY KEY";
-        if (!col.null) def += " NOT NULL";
-        if (!sqlite3Col.autoIncrement) {
-          if (col.default !== null && col.default !== undefined) {
-            def += ` DEFAULT ${this.quoteDefault(col.default)}`;
-          } else if (col.defaultFunction) {
-            // Rails swaps in `-> { column.default_function }` when the
-            // deserialized default is nil (sqlite3_adapter.rb:630), and a proc
-            // default is emitted raw by quote_default_expression. Without this
-            // a `DEFAULT CURRENT_TIMESTAMP` column loses its default in the copy.
-            def += ` DEFAULT ${col.defaultFunction}`;
-          }
-        }
-        // Generated columns are computed, never copied as content (Rails rejects
-        // columns whose options carry `:as`).
-        contentCols.push(destName);
-      }
-      colDefs.push(def);
-    }
-    if (compositePk) {
-      const renamedPks = pkCols.map((c) => rename[c] ?? c);
-      colDefs.push(`PRIMARY KEY(${renamedPks.map((n) => quoteColumnName(n)).join(", ")})`);
-    }
-    if (block) block(colDefs);
-    const prefix = options.temporary ? "CREATE TEMPORARY TABLE" : "CREATE TABLE";
-    await this.execCopyTable(`${prefix} ${quoteTableName(to)} (${colDefs.join(", ")})`);
+    const sourceColumns = (await this.columns(from)) as Sqlite3Column[];
+    const { rename: _rename, ...createOptions } = options;
+
+    let definition!: SQLite3TableDefinition;
+    await this.createTable(
+      to,
+      {
+        ...createOptions,
+        id: false,
+        ...(Array.isArray(fromPrimaryKey) ? { primaryKey: fromPrimaryKey } : {}),
+      },
+      (td) => {
+        definition = td as SQLite3TableDefinition;
+        this.copyTableColumns(definition, fromPrimaryKey, sourceColumns, rename);
+        block?.(definition);
+      },
+    );
+
     await this.copyTableIndexes(from, to, rename);
-    await this.copyTableContents(from, to, contentCols, rename);
+    const columnsToCopy = definition.columns
+      .filter((col) => (col.options as Record<string, unknown>)["as"] === undefined)
+      .map((col) => col.name);
+    await this.copyTableContents(from, to, columnsToCopy, rename);
   }
 
   /** @internal */
