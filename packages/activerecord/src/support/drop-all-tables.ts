@@ -27,7 +27,13 @@ let _bootLaidTableNames: ReadonlySet<string> | null = null;
  *
  * Taken from the database rather than declared: whatever the loaders create is
  * what is protected, on whichever lane is running, with nothing to keep in step.
- * Called once per worker from `test-setup-dy.ts`, immediately after the load.
+ *
+ * Every table then present must therefore *be* boot-laid. `test-setup-dy.ts`
+ * guarantees that by running {@link resetTestTables} between the canonical load
+ * and the adapter-specific arm: `DatabaseTasks.loadSchema` only drop+recreates
+ * the tables the schema file declares, so on the shared PG/MySQL database a
+ * bespoke table from a previous run would otherwise be snapshotted as boot-laid
+ * and never dropped again.
  *
  * @internal Boot/template setup paths only.
  */

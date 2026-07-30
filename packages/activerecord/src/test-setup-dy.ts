@@ -77,10 +77,19 @@ if (missingTables.length > 0) {
 // only schema.rb's mirror, so the `<adapter>_specific_schema.rb` tables have to
 // be laid here, on the same per-worker DB (the reconstruct path purges whatever
 // the template carried).
+// `DatabaseTasks.loadSchema` drop+recreates the *declared* tables (force:
+// "cascade") on the shared PG/MySQL database; it purges nothing else, so a
+// bespoke table a previous run left behind is still here. Drop it before the
+// snapshot below, or it would be recorded as boot-laid and truncated for the
+// rest of the run instead of dropped. Pre-snapshot, the reset's boot-laid set is
+// the canonical registry, which is exactly the "keep schema.rb, drop the rest"
+// purge wanted here.
+const { recordBootLaidTables, resetTestTables } = await import("./support/drop-all-tables.js");
+await resetTestTables(await Base.leaseConnection());
+
 const { loadAdapterSpecificSchema } = await import("./support/load-schema-helper.js");
 await loadAdapterSpecificSchema(await Base.leaseConnection());
 
-const { recordBootLaidTables } = await import("./support/drop-all-tables.js");
 await recordBootLaidTables(await Base.leaseConnection());
 
 // `schema.rb:1444-1462` — the arunit2 tables Rails creates through

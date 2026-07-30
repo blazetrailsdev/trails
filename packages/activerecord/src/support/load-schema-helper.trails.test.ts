@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { Base } from "../base.js";
-import { resetTestTables } from "./drop-all-tables.js";
+import { recordBootLaidTables, resetTestTables } from "./drop-all-tables.js";
 import { loadAdapterSpecificSchema } from "./load-schema-helper.js";
 
 describe("boot-laid table snapshot", () => {
@@ -26,5 +26,26 @@ describe("boot-laid table snapshot", () => {
 
     const after = new Set(await adapter.tables());
     expect(laid.filter((name) => !after.has(name))).toEqual([]);
+  });
+
+  it("excludes a table left in the database before the schema load", async () => {
+    const adapter = Base.connection;
+    await adapter.executeMutation(`CREATE TABLE leftover_boot_t (id INTEGER PRIMARY KEY)`);
+
+    // `test-setup-dy.ts`'s boot order, replayed: DatabaseTasks has laid the
+    // canonical tables (and left anything else alone), then the purge, then the
+    // adapter-specific arm, then the snapshot.
+    await resetTestTables(adapter);
+    await loadAdapterSpecificSchema(adapter);
+    await recordBootLaidTables(adapter);
+
+    expect(await adapter.tables()).not.toContain("leftover_boot_t");
+
+    await adapter.executeMutation(`CREATE TABLE leftover_boot_t (id INTEGER PRIMARY KEY)`);
+    await resetTestTables(adapter);
+
+    const after = await adapter.tables();
+    expect(after).not.toContain("leftover_boot_t");
+    expect(after).toContain("defaults");
   });
 });
