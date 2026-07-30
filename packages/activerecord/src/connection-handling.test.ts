@@ -7,6 +7,7 @@ import { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { fixtures } from "./test-fixtures.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
+import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 import { Post } from "./test-helpers/models/post.js";
 import {
   connectedToStack,
@@ -704,19 +705,9 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
   // connection with it.
   afterEach(async () => {
     connectedToStack().length = 0;
-    for (const name of [
-      "UnrelatedAbstract",
-      "AnimalsRecord",
-      "MealsRecord",
-      "ApplicationRecord",
-      "OtherAbstract",
-    ]) {
+    for (const name of ["UnrelatedAbstract", "AnimalsRecord", "MealsRecord"]) {
       Base.connectionHandler.removeConnectionPool(name);
     }
-    // The primary-class case deliberately registers its pool under the
-    // PoolConfig-normalized name "Base" (that normalization is the thing under
-    // test), so it displaces the ambient worker pool and has to restore it.
-    await restoreWorkerConnection();
   });
 
   it("Base.connectedTo preventing writes applies globally to unrelated pools", async () => {
@@ -784,27 +775,30 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
         return true;
       }
     }
-    class OtherAbstract extends Base {
-      static {
-        this.abstractClass = true;
-        this.connectionClass = true;
-      }
-    }
-    const appPool = Base.connectionHandler.establishConnection(
+    // The "Base"-normalized pool name collides with the ambient worker pool, so
+    // both pools live on an isolated handler and the connections are leased off
+    // the pools directly — establishing them on `Base.connectionHandler` would
+    // displace the worker connection for the rest of the file.
+    const handler = new ConnectionHandler();
+    const appPool = handler.establishConnection(
       new HashConfig("test", "ApplicationRecord", { adapter: "sqlite3", database: ":memory:" }),
       { owner: ApplicationRecord, role: "writing" },
     );
-    const otherPool = Base.connectionHandler.establishConnection(
+    const otherPool = handler.establishConnection(
       new HashConfig("test", "OtherAbstract", { adapter: "sqlite3", database: ":memory:" }),
       { owner: "OtherAbstract", role: "writing" },
     );
-    await Promise.all([appPool.adapterReady, otherPool.adapterReady]);
-    const appConn = await ApplicationRecord.leaseConnection();
-    const otherConn = await OtherAbstract.leaseConnection();
-    ApplicationRecord.connectedTo({ role: "writing", preventWrites: true }, () => {
-      expect(appConn.isPreventingWrites()).toBe(true);
-      expect(otherConn.isPreventingWrites()).toBe(false);
-    });
+    try {
+      await Promise.all([appPool.adapterReady, otherPool.adapterReady]);
+      const appConn = await appPool.leaseConnection();
+      const otherConn = await otherPool.leaseConnection();
+      ApplicationRecord.connectedTo({ role: "writing", preventWrites: true }, () => {
+        expect(appConn.isPreventingWrites()).toBe(true);
+        expect(otherConn.isPreventingWrites()).toBe(false);
+      });
+    } finally {
+      await handler.clearAllConnectionsBang();
+    }
   });
 });
 
