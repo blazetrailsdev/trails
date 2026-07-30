@@ -1,8 +1,7 @@
 /**
  * D-Y vitest setupFile for the activerecord project: calls `ARTest.connect`'s
  * port (`support/connection.ts`) and loads the canonical fixture schema once
- * per worker through `support/load-schema-helper.ts`'s `loadSchema`, whose
- * canonical arm is `DatabaseTasks` here (this DB has to be purged first).
+ * per worker through `support/load-schema-helper.ts`'s `loadSchema`.
  *
  * The pool it opens lives for the whole worker, as Rails' does for the whole
  * process (`cases/helper.rb` calls `ARTest.connect` at load and never
@@ -11,22 +10,26 @@
  * Must run AFTER cases/helper.ts so better-sqlite3 is registered and
  * Base.establishConnection can open the pool.
  *
- * Driver gate (RFC 0002 §Design):
- *   - sqlite :memory: → loadSchema (fresh DB, no existing tables)
- *   - sqlite file → reconstructFromSchema (per-worker isolated file; purge is
- *     safe — no other worker shares this file path)
+ * What Rails has no counterpart for is the step *before* the load: this
+ * database is not freshly created, so it has to be emptied first. Which form
+ * that takes is the driver gate (RFC 0002 §Design):
+ *   - already laid by this run (`canonicalSchemaUpToDate`) → TRUNCATE only, no
+ *     DDL. This is the PG template-clone fast path: a slot DB cloned from the
+ *     stamped template carries both arms of the load already, and the stamp is
+ *     gone the moment a test file's reset runs, so a database that still
+ *     reports up-to-date is one no test has touched.
+ *   - sqlite file → purge (per-worker isolated file; drop+create is safe — no
+ *     other worker shares this file path).
  *   - PG/MySQL slot >1 (AR_PG_EXCLUSIVE_DB / AR_MYSQL_EXCLUSIVE_DB set by
- *     test-setup-worker-db.ts) → reconstructFromSchema; the worker owns its
- *     own suffixed DB (activerecord_unittest_N), so purge+load is safe.
- *   - PG/MySQL slot 1 → loadSchema (base URL unchanged; the advisory-lock
- *     bootstrap pg.Client / GET_LOCK connection lives in the same DB as the
- *     worker pool, so DROP DATABASE fails with PG error 55006 and releasing
- *     GET_LOCK would allow slot races on MySQL. The schema file uses
- *     force:"cascade" for per-table drop+recreate instead.)
+ *     test-setup-worker-db.ts) → purge; the worker owns its own suffixed DB
+ *     (activerecord_unittest_N), so drop+create is safe.
+ *   - otherwise (sqlite `:memory:`, PG/MySQL slot 1) → drop every table. The
+ *     base URL is unchanged there, and the advisory-lock bootstrap pg.Client /
+ *     GET_LOCK connection lives in the same DB as the worker pool, so DROP
+ *     DATABASE fails with PG error 55006 and releasing GET_LOCK would allow
+ *     slot races on MySQL.
  */
 import { connect } from "./support/connection.js";
-import { generateSchemaFile } from "./support/schema-file-generator.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { getEnv } from "@blazetrails/activesupport";
 import { Base } from "./base.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
@@ -37,49 +40,33 @@ import "./relation.js";
 
 const { adapter, envConfig } = await connect();
 
-// Resolve `supports_expression_index?` from the live connection BEFORE
-// generating the schema file: without it the generator falls back to its
-// coarse `adapterName === "mysql"` skip and this per-worker rebuild silently
-// strips the canonical expression indexes a MySQL-8 template DB carries
-// (company_expression_index / full_name_index), diverging from schema.rb.
-const { supportsExpressionIndex } = await import("./support/schema-types.js");
-const schemaFilePath = await generateSchemaFile(
-  TEST_SCHEMA,
-  adapter,
-  await supportsExpressionIndex(await Base.leaseConnection()),
-);
-
 const pgExclusive = adapter === "postgres" && !!getEnv("AR_PG_EXCLUSIVE_DB");
 const mysqlExclusive = adapter === "mysql" && !!getEnv("AR_MYSQL_EXCLUSIVE_DB");
+const ownsDatabase =
+  (adapter === "sqlite" && envConfig.database !== ":memory:") || pgExclusive || mysqlExclusive;
 
-const { recordBootLaidTables, resetTestTables } = await import("./support/drop-all-tables.js");
+const { recordBootLaidTables, dropAllTables } = await import("./support/drop-all-tables.js");
 const { loadSchema } = await import("./support/load-schema-helper.js");
+const { canonicalSchemaUpToDate, stampCanonicalSchema } =
+  await import("./support/canonical-schema-stamp.js");
 
-// `load_schema_helper.rb:4-21`, both arms. Only the canonical arm differs from
-// the template build's: this worker's DB has to be purged/reconstructed first,
-// which Rails' single-process suite never does.
-await loadSchema(async () => {
-  if (
-    (adapter === "sqlite" && envConfig.database !== ":memory:") ||
-    pgExclusive ||
-    mysqlExclusive
-  ) {
-    await DatabaseTasks.reconstructFromSchema(envConfig, "ts", schemaFilePath);
-  } else {
-    await DatabaseTasks.loadSchema(envConfig, "ts", schemaFilePath);
+if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
+  if (getEnv("SKIP_TEST_DATABASE_TRUNCATE") === undefined) {
+    await DatabaseTasks.truncateTables(envConfig);
   }
-
-  // `DatabaseTasks.loadSchema` drop+recreates the *declared* tables (force:
-  // "cascade") on the shared PG/MySQL database; it purges nothing else, so a
-  // bespoke table a previous run left behind is still here. Drop it before the
-  // snapshot below, or it would be recorded as boot-laid and truncated for the
-  // rest of the run instead of dropped. Pre-snapshot, the reset's boot-laid set
-  // is the canonical registry, which is exactly the "keep schema.rb, drop the
-  // rest" purge wanted here.
+} else {
+  // Empty the database, then `load_schema_helper.rb:4-21`, both arms.
+  // `DatabaseTasks.purge` re-establishes Base's pool on the recreated database
+  // itself, so the connection has to be leased after it, not before.
+  if (ownsDatabase) {
+    await DatabaseTasks.purge(envConfig);
+  } else {
+    await dropAllTables(await Base.leaseConnection());
+  }
   const canonicalConn = await Base.leaseConnection();
-  await resetTestTables(canonicalConn);
-  return canonicalConn;
-});
+  await loadSchema(canonicalConn);
+  await stampCanonicalSchema(canonicalConn);
+}
 
 // Permanent worker-startup assertion: a broken arm of the load path fails here
 // rather than as a per-file "relation does not exist". `defaults` is the one

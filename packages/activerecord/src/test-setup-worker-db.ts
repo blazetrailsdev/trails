@@ -165,7 +165,8 @@ if (lane === "postgres") {
   const slot = await acquireAdvisorySlotPg();
   process.env[SLOT_ENV] = String(slot);
   // A slot above 1 means this worker owns an exclusive per-worker DB;
-  // test-setup-dy.ts uses reconstructFromSchema (purge+load) instead of loadSchema.
+  // test-setup-dy.ts purges it before the schema load instead of dropping the
+  // tables in place.
   if (slot > 1) process.env.AR_PG_EXCLUSIVE_DB = "1";
 }
 if (lane === "mysql") {

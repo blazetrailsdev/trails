@@ -11,14 +11,15 @@
 import { describe, expect, it } from "vitest";
 import { Base } from "../base.js";
 import { recordBootLaidTables, resetTestTables } from "./drop-all-tables.js";
-import { loadSchema } from "./load-schema-helper.js";
+import { loadAdapterSpecificSchema } from "./load-schema-helper.js";
 
 describe("boot-laid table snapshot", () => {
   it("survives the reset for every table the adapter-specific arm lays", async () => {
     const adapter = Base.connection;
 
-    // The canonical half is already on this worker's DB, so the arm lays nothing.
-    await loadSchema(async () => adapter);
+    // The canonical half is already on this worker's DB, so only the
+    // adapter-specific arm is replayed here.
+    await loadAdapterSpecificSchema(adapter);
     const bookkeeping = new Set(["schema_migrations", "ar_internal_metadata"]);
     const laid = (await adapter.tables()).filter((name) => !bookkeeping.has(name));
     expect(laid).toContain("defaults");
@@ -33,13 +34,12 @@ describe("boot-laid table snapshot", () => {
     const adapter = Base.connection;
     await adapter.executeMutation(`CREATE TABLE leftover_boot_t (id INTEGER PRIMARY KEY)`);
 
-    // `test-setup-dy.ts`'s boot order, replayed: DatabaseTasks has laid the
-    // canonical tables (and left anything else alone), then the purge, then the
-    // adapter-specific arm, then the snapshot.
-    await loadSchema(async () => {
-      await resetTestTables(adapter);
-      return adapter;
-    });
+    // `test-setup-dy.ts`'s boot order, replayed: the database is emptied of
+    // everything that is not canonical, then the schema is laid — here only its
+    // adapter-specific arm, the canonical half already being on this worker's
+    // DB — then the snapshot.
+    await resetTestTables(adapter);
+    await loadAdapterSpecificSchema(adapter);
     await recordBootLaidTables(adapter);
 
     expect(await adapter.tables()).not.toContain("leftover_boot_t");
