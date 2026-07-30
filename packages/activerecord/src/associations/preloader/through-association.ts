@@ -60,34 +60,8 @@ export class ThroughAssociation extends Association {
   }
 
   async recordsByOwner(): Promise<Map<Base, Base[]>> {
-    if (this._recordsByOwner === undefined) {
-      await this._loadChildRecordsByOwner();
-      this._recordsByOwner = this._computeRecordsByOwner();
-    }
-    return this._recordsByOwner;
-  }
+    if (this._recordsByOwner !== undefined) return this._recordsByOwner;
 
-  /**
-   * Rails reaches `through_records_by_owner` / `source_records_by_owner`
-   * through the public `records_by_owner` reader, which forces `load_records`
-   * (preloader/association.rb:148-151). Our readers are synchronous — they are
-   * called from `middle_records` on the `runnable_loaders` / `future_classes`
-   * paths, which cannot await — so the forcing happens here, on the one path
-   * that can await. Through loaders first: `source_preloaders` is derived from
-   * the middle records they produce.
-   *
-   * Skipped when every owner is already loaded, matching the early `next` in
-   * `records_by_owner` (through_association.rb:13-16) under which Rails never
-   * forces either reader.
-   */
-  private async _loadChildRecordsByOwner(): Promise<void> {
-    if (this.owners.length > 0 && this.owners.every((owner) => this.isLoaded(owner))) return;
-
-    await Promise.all(this._getThroughPreloaders().map((l) => l.recordsByOwner()));
-    await Promise.all(this._getSourcePreloaders().map((l) => l.recordsByOwner()));
-  }
-
-  private _computeRecordsByOwner(): Map<Base, Base[]> {
     const result = new Map<Base, Base[]>();
 
     // When every owner already carries this association loaded — e.g. an outer
@@ -104,8 +78,19 @@ export class ThroughAssociation extends Association {
       for (const owner of this.owners) {
         result.set(owner, this.targetFor(owner));
       }
+      this._recordsByOwner = result;
       return result;
     }
+
+    // Rails reaches `through_records_by_owner` / `source_records_by_owner`
+    // through the public `records_by_owner` reader, which forces `load_records`
+    // (preloader/association.rb:148-151). Both readers below are synchronous —
+    // `middle_records` calls them from `runnable_loaders` / `future_classes`,
+    // which cannot await — so the forcing happens here, on the one path that
+    // can. Through loaders first: `source_preloaders` is derived from the
+    // middle records they produce.
+    await Promise.all(this._getThroughPreloaders().map((l) => l.recordsByOwner()));
+    await Promise.all(this._getSourcePreloaders().map((l) => l.recordsByOwner()));
 
     const throughRecordsByOwner = this._getThroughRecordsByOwner();
     const sourceRecordsByOwner = this._getSourceRecordsByOwner();
@@ -164,6 +149,7 @@ export class ThroughAssociation extends Association {
       result.set(owner, records);
     }
 
+    this._recordsByOwner = result;
     return result;
   }
 
