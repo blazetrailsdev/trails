@@ -1,5 +1,67 @@
+import { underscore } from "@blazetrails/activesupport";
+
 import type { AssociationReflection } from "../reflection.js";
 import type { Base } from "../base.js";
+
+/**
+ * Resolve a foreign association's (has_one / has_many / through) owner-side
+ * foreign key column(s).
+ *
+ * Rails resolves this in exactly one place — `reflection.foreign_key`
+ * (reflection.rb `compute_foreign_key`), keyed on `reflection.active_record`,
+ * the class that *declared* the association. For an STI subclass owner — e.g.
+ * a `SpecialPost` row whose `has_many :special_comments` is declared on `Post`
+ * — that yields `post_id`, not `special_post_id`.
+ *
+ * The rungs below the rich reflection exist only for trails' inline
+ * (unregistered) association fallbacks, where no reflection is resolvable.
+ *
+ * @internal trails-only: the reflection rungs have no Rails counterpart.
+ */
+export function ownerForeignKeyColumns(
+  ctor: typeof Base,
+  assocName: string,
+  options: {
+    foreignKey?: string | string[];
+    as?: string;
+    primaryKey?: string | string[];
+    queryConstraints?: string[];
+  },
+): string[] {
+  const fk = options.foreignKey;
+  if (typeof fk === "string") return [fk];
+  if (Array.isArray(fk)) return fk;
+
+  const reflectionFk = ownerReflectionForeignKey(ctor, assocName);
+  if (typeof reflectionFk === "string") return [reflectionFk];
+  if (Array.isArray(reflectionFk)) return reflectionFk;
+
+  if (options.as) return [`${underscore(options.as)}_id`];
+  if (options.queryConstraints) return options.queryConstraints;
+
+  const pk = options.primaryKey ?? ctor.primaryKey ?? "id";
+  if (Array.isArray(pk)) return pk.map((col) => `${underscore(ctor.name)}_${col}`);
+  return [`${underscore(ctor.name)}_id`];
+}
+
+/**
+ * The rich reflection's foreign key, derived from the class that *declared*
+ * the association (`reflection.active_record`), not the owner instance's
+ * class. Returns `undefined` for an unregistered association so
+ * `ownerForeignKeyColumns` can fall through to its inline rungs.
+ *
+ * @internal
+ */
+export function ownerReflectionForeignKey(
+  ctor: typeof Base,
+  assocName: string,
+): string | string[] | undefined {
+  return (
+    ctor as unknown as {
+      _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | undefined;
+    }
+  )._reflectOnAssociation?.(assocName)?.foreignKey;
+}
 
 /**
  * Mirrors `ActiveRecord::Associations::ForeignAssociation#foreign_key_present?`

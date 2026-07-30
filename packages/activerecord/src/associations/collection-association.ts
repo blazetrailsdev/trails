@@ -3,7 +3,7 @@ import type { AssociationDefinition } from "../associations.js";
 import { association as associationProxy } from "../associations.js";
 import { underscore, isAbortSignal } from "@blazetrails/activesupport";
 import { Association } from "./association.js";
-import { foreignKeyPresentFor } from "./foreign-association.js";
+import { foreignKeyPresentFor, ownerForeignKeyColumns } from "./foreign-association.js";
 import { throughForeignKeyPresent } from "./through-association.js";
 import type { AssociationReflection } from "../reflection.js";
 import { RecordNotSaved, Rollback } from "../errors.js";
@@ -949,31 +949,11 @@ export class CollectionAssociation extends Association {
   // --- Private helpers ---
 
   private foreignKeyColumns(): string[] {
-    const fk = this.reflection.options.foreignKey;
-    if (typeof fk === "string") return [fk];
-    if (Array.isArray(fk)) return fk;
-    const ctor = this.owner.constructor as typeof Base & {
-      _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | undefined;
-    };
-    // Prefer the *rich* reflection's foreign key, derived from the class that
-    // *declared* the association (`reflection.active_record`), not the owner
-    // instance's class. `this.reflection` is the lightweight AssociationDefinition
-    // with no `foreignKey` getter, so resolve the registered Reflection the same
-    // way `foreignKeyPresent` does. For an STI subclass owner (e.g. a `SpecialPost`
-    // whose `has_many :special_comments` is declared on `Post`) this yields
-    // `post_id`, not `special_post_id` — mirrors Rails `reflection.foreign_key`.
-    const reflectionFk = ctor._reflectOnAssociation?.(this.reflection.name)?.foreignKey;
-    if (typeof reflectionFk === "string") return [reflectionFk];
-    if (Array.isArray(reflectionFk)) return reflectionFk;
-    if (this.reflection.options.as) {
-      return [`${underscore(this.reflection.options.as)}_id`];
-    }
-    // Derive composite FKs for CPK owners (mirrors findTarget)
-    const pk = this.reflection.options.primaryKey ?? ctor.primaryKey ?? "id";
-    if (Array.isArray(pk)) {
-      return pk.map((col: string) => `${underscore(ctor.name)}_${col}`);
-    }
-    return [`${underscore(ctor.name)}_id`];
+    return ownerForeignKeyColumns(
+      this.owner.constructor as typeof Base,
+      this.reflection.name,
+      this.reflection.options as Parameters<typeof ownerForeignKeyColumns>[2],
+    );
   }
 
   private foreignKeyColumn(): string {

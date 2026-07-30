@@ -4,7 +4,11 @@ import { DeleteRestrictionError, HasOnePersistedAssignmentError } from "./errors
 import { RecordNotSaved } from "../errors.js";
 import { underscore } from "@blazetrails/activesupport";
 import { reflectOnAllAssociations } from "../reflection.js";
-import { ForeignAssociation, foreignKeyPresentFor } from "./foreign-association.js";
+import {
+  ForeignAssociation,
+  foreignKeyPresentFor,
+  ownerForeignKeyColumns,
+} from "./foreign-association.js";
 import type { AssociationReflection } from "../reflection.js";
 import { findTarget, SingularAssociation } from "./singular-association.js";
 import { polymorphicName } from "../inheritance.js";
@@ -555,30 +559,11 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   private foreignKeyColumns(): string[] {
-    const fk = this.reflection.options.foreignKey;
-    if (typeof fk === "string") return [fk];
-    if (Array.isArray(fk)) return fk;
-    const ctor = (this.owner as any).constructor;
-    if (this.reflection.options.as) {
-      return [`${underscore(this.reflection.options.as)}_id`];
-    }
-    // Rails' `reflection.foreign_key` derives from `reflection.active_record`
-    // — the class that *declared* the association — not the owner instance's
-    // class. For an STI subclass owner (a `SpecialPost` whose
-    // `has_one :very_special_comment` is declared on `Post`) that is `post_id`,
-    // not `special_post_id`. The rich reflection already applies that rule.
-    const declared = (
-      ctor as {
-        _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | undefined;
-      }
-    )._reflectOnAssociation?.(this.reflection.name)?.foreignKey;
-    if (typeof declared === "string") return [declared];
-    if (Array.isArray(declared)) return declared;
-    const pk = this.reflection.options.primaryKey ?? ctor.primaryKey ?? "id";
-    if (Array.isArray(pk)) {
-      return pk.map((col: string) => `${underscore(ctor.name)}_${col}`);
-    }
-    return [`${underscore(ctor.name)}_id`];
+    return ownerForeignKeyColumns(
+      this.owner.constructor as typeof Base,
+      this.reflection.name,
+      this.reflection.options as Parameters<typeof ownerForeignKeyColumns>[2],
+    );
   }
 
   private foreignKeyColumn(): string {

@@ -1427,28 +1427,6 @@ function _associationForeignKeyPresent(
 }
 
 /**
- * Resolve a foreign association's (has_one / has_many / through) owner foreign
- * key from the *rich* reflection, which derives it from the class that
- * *declared* the association (`reflection.active_record`), not the owner
- * instance's class. For an STI subclass owner — e.g. a `SpecialPost` row whose
- * `has_many :special_comments` is declared on `Post` — this yields `post_id`,
- * not `special_post_id`. Mirrors Rails `reflection.foreign_key`. Returns
- * `undefined` for an unregistered association so callers keep their fallback.
- *
- * @internal
- */
-export function ownerReflectionForeignKey(
-  ctor: typeof Base,
-  assocName: string,
-): string | string[] | undefined {
-  return (
-    ctor as unknown as {
-      _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | undefined;
-    }
-  )._reflectOnAssociation?.(assocName)?.foreignKey;
-}
-
-/**
  * Resolve the owner-side key for an inline (no-reflection) association
  * fallback, mirroring `reflection.activeRecordPrimaryKey` semantics
  * (reflection.rb:587 `active_record_primary_key`): for a composite-FK

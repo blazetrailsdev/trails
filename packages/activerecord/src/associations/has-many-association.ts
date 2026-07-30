@@ -15,7 +15,6 @@ import {
   _violatesStrictLoading,
   _wireInverseAssociation,
   applyAssociationScope,
-  ownerReflectionForeignKey,
   resolveAssocClass,
   syncToAssociationInstance,
   validateInverseOf,
@@ -29,7 +28,7 @@ import { CompositePrimaryKeyMismatchError, DeleteRestrictionError } from "./erro
 import { polymorphicName } from "../inheritance.js";
 import { RecordInvalid } from "../validations.js";
 import { CollectionAssociation, includesRecord } from "./collection-association.js";
-import { ForeignAssociation } from "./foreign-association.js";
+import { ForeignAssociation, ownerForeignKeyColumns } from "./foreign-association.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
 import { camelize, singularize, underscore } from "@blazetrails/activesupport";
 
@@ -587,18 +586,11 @@ export async function findTarget(
   }
 
   // Resolve FK columns (may be array for CPK; `:as` swaps to the
-  // polymorphic FK column). Prefer the rich reflection's foreign key so an STI
-  // subclass owner uses the declaring class's column (see
-  // `ownerReflectionForeignKey`).
-  const foreignKey = options.as
-    ? (options.foreignKey ?? `${underscore(options.as)}_id`)
-    : (options.foreignKey ??
-      ownerReflectionForeignKey(ctor, assocName) ??
-      (options.queryConstraints
-        ? options.queryConstraints
-        : Array.isArray(primaryKey)
-          ? primaryKey.map((col: string) => `${underscore(ctor.name)}_${col}`)
-          : `${underscore(ctor.name)}_id`));
+  // polymorphic FK column) through the single derivation site shared with the
+  // OO association classes (see `ownerForeignKeyColumns`).
+  const foreignKeyColumns = ownerForeignKeyColumns(ctor, assocName, { ...options, primaryKey });
+  const foreignKey: string | string[] =
+    foreignKeyColumns.length === 1 ? foreignKeyColumns[0] : foreignKeyColumns;
 
   // Polymorphic `:as` requires a scalar FK. A composite FK is always
   // rejected. A composite owner PK collapses to "id" when present

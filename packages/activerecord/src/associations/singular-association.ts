@@ -17,12 +17,12 @@ import {
   _violatesStrictLoading,
   _wireInverseAssociation,
   applyAssociationScope,
-  ownerReflectionForeignKey,
   resolveAssocClass,
   syncToAssociationInstance,
   validateInverseOf,
 } from "../associations.js";
 import { Association } from "./association.js";
+import { ownerForeignKeyColumns } from "./foreign-association.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import {
   routeThroughCheckValidity,
@@ -586,18 +586,11 @@ async function _findHasOneTarget(
   }
 
   // Resolve FK columns (may be array for CPK; `:as` swaps to the
-  // polymorphic FK column). Prefer the rich reflection's foreign key so an STI
-  // subclass owner uses the declaring class's column (see
-  // `ownerReflectionForeignKey`).
-  const foreignKey = options.as
-    ? (options.foreignKey ?? `${underscore(options.as)}_id`)
-    : (options.foreignKey ??
-      ownerReflectionForeignKey(ctor, assocName) ??
-      (options.queryConstraints
-        ? options.queryConstraints
-        : Array.isArray(primaryKey)
-          ? primaryKey.map((col: string) => `${underscore(ctor.name)}_${col}`)
-          : `${underscore(ctor.name)}_id`));
+  // polymorphic FK column) through the single derivation site shared with the
+  // OO association classes (see `ownerForeignKeyColumns`).
+  const foreignKeyColumns = ownerForeignKeyColumns(ctor, assocName, { ...options, primaryKey });
+  const foreignKey: string | string[] =
+    foreignKeyColumns.length === 1 ? foreignKeyColumns[0] : foreignKeyColumns;
 
   // Polymorphic `:as` requires a scalar FK. A composite FK is always
   // rejected. A composite owner PK collapses to "id" when present
