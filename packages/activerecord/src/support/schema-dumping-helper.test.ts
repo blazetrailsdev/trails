@@ -19,8 +19,8 @@ beforeAll(() => {
 });
 
 // Track the bespoke `sdh_*` tables each test creates so afterEach can drop
-// exactly those. This suite runs under skipGlobalResetForFile(), which opts out of the
-// global truncation reset, so nothing clears these between tests in-file — one
+// exactly those. This suite runs under skipGlobalResetForFile(), so nothing
+// clears these between tests in-file — one
 // test reuses `sdh_kept` and would hit "table already exists" if left. Dropping
 // only the created tables (RFC 0060) replaces the old afterAll/afterEach
 // dropAllTables' ~330-table canonical DROP fan-out; any leak past the file is

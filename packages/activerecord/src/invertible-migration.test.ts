@@ -3,8 +3,8 @@
  *   activerecord/test/cases/invertible_migration_test.rb
  *
  * Test names mirror the Rails `test_*` methods so `test:compare` can map them.
- * Migrations and the `Horse` model both lease the shared worker connection via
- * `skipGlobalResetForFile()`, exactly as Rails routes everything through
+ * Migrations and the `Horse` model both lease the shared worker connection,
+ * exactly as Rails routes everything through
  * `ActiveRecord::Base.lease_connection`. The scratch tables (`horses`,
  * `new_horses`) are Rails' own — created and dropped per test, never canonical.
  */

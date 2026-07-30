@@ -29,8 +29,6 @@ class HandlerResolvedComment extends Base {
 }
 
 describe("handler-resolved adapter (Phase D-0)", () => {
-  // Bootstraps Base.connectionHandler and skips the global resetTestAdapterState()
-  // for this suite. D-1..N test files use the same one-liner.
   skipGlobalResetForFile();
 
   // Table laid via Base.connection — the connection itself resolves through
