@@ -727,10 +727,11 @@ export interface Quoting {
   /**
    * Identifier-form quoting. PG/SQLite double-quote, MySQL backtick.
    *
-   * @noRailsEquivalent PERMANENT — a pure synonym of `quote_column_name`.
-   * Rails' `Quoting` has no `quote_identifier`; the name exists only so
-   * call sites quoting a non-column identifier read honestly. Retiring it
-   * means rewriting those call sites, not porting anything.
+   * @noRailsEquivalent CONVERGEABLE (story:
+   * converge-quote-identifier-onto-quote-column-name). Rails' `Quoting` has
+   * no `quote_identifier`; every adapter implements this as a pure synonym
+   * of `quoteColumnName`, so converging is a call-site rewrite (~123 of
+   * them), not a port.
    */
   quoteIdentifier(name: string): string;
 
