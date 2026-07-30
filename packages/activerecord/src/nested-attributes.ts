@@ -797,38 +797,52 @@ async function awaitPendingDisplacedRemovals(record: Base): Promise<void> {
 }
 
 /** @internal */
-function loadExistingThenAssign(
+function assignExistingOrBuild(
   record: Base,
   assoc: OneToOneAssociation,
   associationName: string,
   attributes: Record<string, unknown>,
   options: NestedAttributeOptions,
-): Promise<void> | null {
-  if (assoc.isLoaded?.() !== false) return null;
-  if (!("reader" in assoc)) return null;
+  existing: Base | null,
+): void {
+  const id = (attributes as any).id;
+
+  // Rails nested_attributes.rb:436.
+  if (existing && (options.updateOnly || String(existing.id) === String(id))) {
+    if (!callRejectIf(record, associationName, attributes)) {
+      assignToOrMarkForDestruction(existing, attributes, options.allowDestroy ?? false);
+    }
+    return;
+  }
+
+  // Rails nested_attributes.rb:439-440.
+  if (hasNestedId(attributes)) {
+    raiseNestedAttributesRecordNotFoundBang(record, associationName, id);
+  }
+
+  // Rails nested_attributes.rb:442-452.
+  buildNestedRecord(record, assoc, associationName, attributes, existing);
+}
+
+/** @internal */
+function readExistingThenAssign(
+  record: Base,
+  assoc: OneToOneAssociation,
+  associationName: string,
+  attributes: Record<string, unknown>,
+  options: NestedAttributeOptions,
+): boolean {
+  if (assoc.isLoaded?.() !== false) return false;
+  if (!("reader" in assoc)) return false;
   const read = assoc.reader;
-  if (!(read instanceof Promise)) return null;
-  return (async () => {
-    const existing = await read;
-    const id = (attributes as any).id;
-
-    // Rails nested_attributes.rb:436.
-    if (existing && (options.updateOnly || String(existing.id) === String(id))) {
-      if (!callRejectIf(record, associationName, attributes)) {
-        assignToOrMarkForDestruction(existing, attributes, options.allowDestroy ?? false);
-      }
-      return;
-    }
-
-    // Rails nested_attributes.rb:439-440.
-    if (hasNestedId(attributes)) {
-      raiseNestedAttributesRecordNotFoundBang(record, associationName, id);
-    }
-
-    // Rails nested_attributes.rb:442-452 — `update_only` with no `id` and no
-    // existing record builds instead.
-    buildNestedRecord(record, assoc, associationName, attributes, existing);
-  })();
+  const assign = (existing: Base | null): void =>
+    assignExistingOrBuild(record, assoc, associationName, attributes, options, existing);
+  if (read instanceof Promise) {
+    parkDisplacedRemoval(record, read.then(assign));
+  } else {
+    assign(read ?? null);
+  }
+  return true;
 }
 
 /** @internal */
@@ -907,17 +921,8 @@ export function assignNestedAttributesForOneToOneAssociation(
   }
 
   if (hasId || updateOnly) {
-    const pendingUpdate = loadExistingThenAssign(
-      record,
-      assoc,
-      associationName,
-      attributes,
-      options,
-    );
-    if (pendingUpdate) {
-      parkDisplacedRemoval(record, pendingUpdate);
-    } else {
-      storePendingNestedAttributes(record, associationName, [attributes]);
+    if (!readExistingThenAssign(record, assoc, associationName, attributes, options)) {
+      assignExistingOrBuild(record, assoc, associationName, attributes, options, existing);
     }
     return;
   }
