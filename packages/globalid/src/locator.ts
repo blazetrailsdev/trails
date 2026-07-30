@@ -13,7 +13,12 @@ import type { MessageVerifier } from "@blazetrails/activesupport/message-verifie
 /**
  * Duck-typed model interface; globalid stays AR-agnostic.
  *
- * @noRailsEquivalent CONVERGEABLE (story: extra-surface-skip-duck-typed-interface-members).
+ * @noRailsEquivalent PERMANENT (`vendor/globalid/lib/global_id/locator.rb:165`, `:196` — Ruby's
+ *   `BaseLocator` calls `model_class.find` / `model_class.where` on an undeclared duck type;
+ *   TypeScript needs a declared interface to type the same collaborator, and no Ruby entity maps
+ *   onto it. The interface-level tag is the end state of
+ *   `extra-surface-skip-duck-typed-interface-members` (PR #5467), which chose declaration-level
+ *   marking over a member-by-member rule.)
  * Declares the Active Record surface Rails' BaseLocator
  * calls duck-typed — `model_class.find gid.model_id` and
  * `model_class.where(primary_key => ids)` on the ignore_missing path. Ruby
