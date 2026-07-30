@@ -71,13 +71,6 @@
   },
   {
     "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "alter_table",
-    "call": "transaction",
-    "reason": "Confirmed equivalent (RFC 0044, transaction-wrapping-cluster): Rails wraps the table rebuild in `transaction { disable_referential_integrity { move_table(...) } }` (sqlite3_adapter.rb:586). trails' `alterTable` achieves the same atomicity via an explicit transaction boundary — `beginTransaction()` + `commit()`/`rollback()` around the `disableReferentialIntegrity` rebuild (sqlite3-adapter.ts:2312-2349), using a savepoint when already inside a transaction since SQLite forbids nested BEGIN. The wrap uses the begin/commit primitives rather than the `transaction` closure helper, so the extractor doesn't see a literal `transaction` call — false positive, no omission."
-  },
-  {
-    "package": "activerecord",
     "tsFile": "internal-metadata.ts",
     "rubyName": "update_entry",
     "call": "update",
