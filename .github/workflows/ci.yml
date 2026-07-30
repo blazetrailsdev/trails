@@ -1137,12 +1137,13 @@ jobs:
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
       - run: pnpm build
-      # Mirrors rake db:mysql:build_user / db:postgresql:build
-      # (activerecord/Rakefile:227-241,258-262): the suite connects as Rails'
-      # own `rails` user, not as the image superuser. CREATEDB (rather than
-      # Rails' plain GRANT) is what trails adds — each vitest worker creates its
-      # own AR_DB_SLOT copy of the database, which Rails' single-database run
-      # never needs.
+      # Mirrors rake db:postgresql:build (activerecord/Rakefile:258-262): the
+      # suite connects as Rails' own `rails` user, not as the image superuser.
+      # CREATEDB is what trails adds — each vitest worker creates its own
+      # AR_DB_SLOT copy of the database, which Rails' single-database run never
+      # needs. SUPERUSER is a permanent deviation the suite's untrusted
+      # extensions (postgres_fdw, pg_hint_plan) require; see
+      # scripts/db-init/postgres/01-rails-role.sql for the full reasoning.
       - name: Provision Rails' test role
         run: |
           psql -h localhost -U postgres -d activerecord_unittest \
@@ -1220,17 +1221,24 @@ jobs:
       # rake db:mysql:build_user (activerecord/Rakefile:227-235): CREATE USER
       # with no IDENTIFIED BY — Rails' `rails` user has no password — then
       # GRANT. Rails grants on the test database plus
-      # inexistent_activerecord_unittest; trails grants globally instead because
-      # each vitest worker creates its own AR_DB_SLOT copy of the database,
-      # which Rails' single-database run never needs.
+      # inexistent_activerecord_unittest; the first grant is widened to an
+      # `activerecord_unittest%` pattern (not to *.*) because each vitest worker
+      # creates its own AR_DB_SLOT copy of the database, which Rails'
+      # single-database run never needs. Mirrors
+      # scripts/db-init/mysql/01-rails-user.sql — keep the two in step.
+      # Heredoc, not -e "...": the backtick-quoted pattern would otherwise be
+      # command substitution in the double-quoted shell word.
       - name: Provision Rails' test user
         run: |
-          mysql -h 127.0.0.1 -uroot -e "
+          mysql -h 127.0.0.1 -uroot <<'SQL'
             CREATE USER IF NOT EXISTS 'rails'@'%';
-            GRANT ALL PRIVILEGES ON *.* TO 'rails'@'%';
+            GRANT ALL PRIVILEGES ON `activerecord_unittest%`.* TO 'rails'@'%';
+            GRANT ALL PRIVILEGES ON inexistent_activerecord_unittest.* TO 'rails'@'%';
             CREATE USER IF NOT EXISTS 'rails'@'localhost';
-            GRANT ALL PRIVILEGES ON *.* TO 'rails'@'localhost';
-            FLUSH PRIVILEGES;"
+            GRANT ALL PRIVILEGES ON `activerecord_unittest%`.* TO 'rails'@'localhost';
+            GRANT ALL PRIVILEGES ON inexistent_activerecord_unittest.* TO 'rails'@'localhost';
+            FLUSH PRIVILEGES;
+          SQL
       # Trailing slash is load-bearing: the bare `packages/activerecord` filter
       # is a substring match that also sweeps in packages/activerecord-cli/**.
       # Those already run in the dedicated step below, so the slash avoids a
@@ -1300,17 +1308,24 @@ jobs:
       # rake db:mysql:build_user (activerecord/Rakefile:227-235): CREATE USER
       # with no IDENTIFIED BY — Rails' `rails` user has no password — then
       # GRANT. Rails grants on the test database plus
-      # inexistent_activerecord_unittest; trails grants globally instead because
-      # each vitest worker creates its own AR_DB_SLOT copy of the database,
-      # which Rails' single-database run never needs.
+      # inexistent_activerecord_unittest; the first grant is widened to an
+      # `activerecord_unittest%` pattern (not to *.*) because each vitest worker
+      # creates its own AR_DB_SLOT copy of the database, which Rails'
+      # single-database run never needs. Mirrors
+      # scripts/db-init/mysql/01-rails-user.sql — keep the two in step.
+      # Heredoc, not -e "...": the backtick-quoted pattern would otherwise be
+      # command substitution in the double-quoted shell word.
       - name: Provision Rails' test user
         run: |
-          mysql -h 127.0.0.1 -uroot -e "
+          mysql -h 127.0.0.1 -uroot <<'SQL'
             CREATE USER IF NOT EXISTS 'rails'@'%';
-            GRANT ALL PRIVILEGES ON *.* TO 'rails'@'%';
+            GRANT ALL PRIVILEGES ON `activerecord_unittest%`.* TO 'rails'@'%';
+            GRANT ALL PRIVILEGES ON inexistent_activerecord_unittest.* TO 'rails'@'%';
             CREATE USER IF NOT EXISTS 'rails'@'localhost';
-            GRANT ALL PRIVILEGES ON *.* TO 'rails'@'localhost';
-            FLUSH PRIVILEGES;"
+            GRANT ALL PRIVILEGES ON `activerecord_unittest%`.* TO 'rails'@'localhost';
+            GRANT ALL PRIVILEGES ON inexistent_activerecord_unittest.* TO 'rails'@'localhost';
+            FLUSH PRIVILEGES;
+          SQL
       # Trailing slash is load-bearing: the bare `packages/activerecord` filter
       # is a substring match that also sweeps in packages/activerecord-cli/**.
       # Those already run in the dedicated step below, so the slash avoids a
