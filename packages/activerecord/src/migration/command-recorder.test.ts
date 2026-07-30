@@ -5,10 +5,6 @@ import { Table } from "../connection-adapters/abstract/schema-definitions.js";
 import { Table as PgTable } from "../connection-adapters/postgresql/schema-definitions.js";
 import { Table as MysqlTable } from "../connection-adapters/mysql/schema-definitions.js";
 
-// Stand-ins for the connection adapter CommandRecorder delegates to: Rails'
-// `change_table` only needs `update_table_definition` (plus `supports_bulk_alter?`
-// on the bulk path), and it is that method which decides whose `ColumnMethods`
-// the yielded Table carries.
 const abstractDelegate = {
   updateTableDefinition: (tableName: string, base: unknown) => new Table(tableName, base as never),
 };
@@ -449,10 +445,6 @@ describe("CommandRecorder", () => {
       expect(recorder.commands[0].cmd).toBe("addColumn");
     });
 
-    // Rails' Table#remove forwards the whole name list to
-    // `@base.remove_columns(name, *column_names, **options)`, so the recorder
-    // sees one `remove_columns` — inverted by `invert_remove_columns` into
-    // `add_columns` (command_recorder.rb:233-239).
     it("remove with multiple columns records a single removeColumns", async () => {
       const recorder = new CommandRecorder(abstractDelegate);
       await recorder.changeTable("fruits", async (t) => {
@@ -525,14 +517,9 @@ describe("CommandRecorder", () => {
       ]);
     });
 
-    // Rails' `define_column_methods` list — the source of the shorthands — never
-    // includes `primary_key`: that is a dedicated method taking the column type
-    // as its second argument (abstract/schema_definitions.rb:308), so a generic
-    // shorthand routing it to `column(name, "primary_key")` would diverge.
     it("never exposes primary_key as a generic column shorthand", async () => {
       const recorder = new CommandRecorder(pgDelegate);
       await recorder.changeTable("fruits", async (t) => {
-        // The snake spelling only ever appeared as a native-type hash key.
         expect((t as unknown as Record<string, unknown>)["primary_key"]).toBeUndefined();
         await t.primaryKey("token", "uuid");
       });

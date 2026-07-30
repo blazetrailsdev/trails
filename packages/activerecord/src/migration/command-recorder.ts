@@ -117,10 +117,6 @@ export class CommandRecorder {
         "changeTable requires a callback. Rails change_table always takes a block.",
       );
     }
-    // Mirrors Rails: the adapter builds its own `Table` subclass over the
-    // recorder as `base`, so the block sees the adapter's `ColumnMethods`
-    // (`t.citext`, `t.unsignedInteger`, ...) while every operation lands in
-    // `record()` via the generated recordable methods below.
     const delegate = this._delegate as {
       supportsBulkAlter?(): boolean;
       updateTableDefinition(tableName: string, base: unknown): Table;
@@ -675,15 +671,7 @@ export class CommandRecorder {
   }
 }
 
-/**
- * Rails' `CommandRecorder::ReversibleAndIrreversibleMethods` — every migration
- * method the recorder answers by recording the call. Rails generates them with
- * `class_eval "def #{method}(*args, &block); record(:\"#{method}\", args, &block); end"`
- * (`migration/command_recorder.rb:125-132`); we install the same bodies onto the
- * prototype below. They are what makes the recorder usable as a `Table`'s
- * `base`, the way `change_table` yields `delegate.update_table_definition(
- * table_name, self)`.
- */
+/** Mirrors: ActiveRecord::Migration::CommandRecorder::ReversibleAndIrreversibleMethods */
 const REVERSIBLE_AND_IRREVERSIBLE_METHODS = [
   "createTable",
   "createJoinTable",
@@ -730,13 +718,7 @@ const REVERSIBLE_AND_IRREVERSIBLE_METHODS = [
   "dropVirtualTable",
 ] as const;
 
-// Installed on the prototype rather than declared on the class: the only caller
-// is a `Table` reaching them through its `base`, which is already typed as the
-// schema-statements host, so no declaration merging (and no
-// no-unsafe-declaration-merging suppression) is needed to reach them.
 for (const method of REVERSIBLE_AND_IRREVERSIBLE_METHODS) {
-  // `changeTable` and the `add_belongs_to` / `remove_belongs_to` aliases are
-  // spelled out in the class body; Ruby's class_eval would clobber them.
   if (method in CommandRecorder.prototype) continue;
   (CommandRecorder.prototype as unknown as Record<string, unknown>)[method] = function (
     this: CommandRecorder,

@@ -319,10 +319,10 @@ export class Table extends AbstractTable {
     super(tableName, schema);
   }
 
-  // Mirrors `define_column_methods :blob, :tinyblob, …, :unsigned_decimal` —
-  // the MySQL::ColumnMethods list mixed into both TableDefinition and Table.
-  // The `unsigned_<type>` type is normalized to its base type + `unsigned: true`
-  // by MySQL::TableDefinition#newColumnDefinition along the addColumn/alter path.
+  // Mirrors the column-type methods MySQL::ColumnMethods mixes into both
+  // TableDefinition and Table. The `unsigned_<type>` type is normalized to its
+  // base type + `unsigned: true` by MySQL::TableDefinition#newColumnDefinition
+  // along the addColumn/alter path.
   async blob(...args: unknown[]): Promise<void> {
     await this.definedColumn("blob" as ColumnType, args);
   }

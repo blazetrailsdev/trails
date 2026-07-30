@@ -101,15 +101,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     return this.adapter as unknown as PgSchemaAdapter;
   }
 
-  /**
-   * Instantiate the PostgreSQL-specific {@link PgTable} so `change_table` blocks
-   * expose PG's `ColumnMethods` (`t.citext`, `t.hstore`, `t.serial`, ...) and
-   * constraint helpers. This is the single home for the override;
-   * `PostgreSQLAdapter#updateTableDefinition` delegates here so the
-   * adapter-direct and `Migration#schema` paths agree.
-   *
-   * Mirrors: PostgreSQL::SchemaStatements#update_table_definition
-   */
+  /** Mirrors: PostgreSQL::SchemaStatements#update_table_definition */
   override updateTableDefinition(tableName: string, base?: unknown): PgTable {
     return new PgTable(tableName, (base ?? this) as SchemaStatementsConstraintLike);
   }

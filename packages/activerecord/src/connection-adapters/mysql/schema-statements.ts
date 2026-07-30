@@ -32,15 +32,7 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
     return (this._mysqlSchemaCreation ??= new MysqlSchemaCreation(this.adapter));
   }
 
-  /**
-   * Instantiate the MySQL-specific {@link MysqlTable} so `change_table` blocks
-   * expose MySQL's `ColumnMethods` (`t.unsignedInteger`, `t.longblob`, ...).
-   * This is the single home for the override: `AbstractMysqlAdapter` picks it up
-   * through `include(AbstractMysqlAdapter, MysqlSchemaStatements)`, so both the
-   * adapter-direct and `Migration#schema` paths reach it.
-   *
-   * Mirrors: MySQL::SchemaStatements#update_table_definition
-   */
+  /** Mirrors: MySQL::SchemaStatements#update_table_definition */
   override updateTableDefinition(tableName: string, base?: unknown): MysqlTable {
     return new MysqlTable(tableName, (base ?? this) as SchemaStatementsLike);
   }
