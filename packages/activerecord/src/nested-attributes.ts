@@ -682,7 +682,7 @@ interface OneToOneAssociation {
   // Rails' `send(association_name)` — `SingularAssociation#reader`, which is
   // where trails raises strict-loading violations (singular-association.ts:210).
   readonly reader?: Base | null | Promise<Base | null>;
-  detachDisplacedTarget?(displaced: Base | null): Promise<void>;
+  detachDisplacedTarget?(): Promise<void>;
   prepareDetachDisplacedForSyncBuild?(): (() => Promise<void>) | null;
 }
 
@@ -694,9 +694,11 @@ interface OneToOneAssociation {
  * (has_one_association.rb:69) — the nested-attributes writer is a synchronous
  * property setter (`pirate.shipAttributes = {...}`), so it cannot `await` the
  * nullify save. It CAN issue it: `detachDisplacedTarget` is kicked off here,
- * inline at assignment exactly as in Rails, and only its *completion* is
- * deferred — to the nested-attributes `save` wrapper, which drains this list
- * before the parent (and its autosaved new target) is persisted. That keeps
+ * inline at assignment exactly as in Rails — and, crucially, *before* the build
+ * swaps the replacement into `assoc.target`, so the removal binds to the
+ * displaced record with no parked state. Only its *completion* is deferred — to
+ * the nested-attributes `save` wrapper, which drains the parked list before the
+ * parent (and its autosaved new target) is persisted. That keeps
  * Rails' write ordering (displaced row nullified before the replacement is
  * inserted) and, like Rails, removes the displaced record even if the owner is
  * never saved.
@@ -730,14 +732,14 @@ interface OneToOneAssociation {
  * instance.
  * @internal
  */
-function detachDisplacedAtAssignment(
-  record: Base,
-  assoc: OneToOneAssociation,
-  displaced: Base | null,
-): void {
-  if (!displaced) return;
-  if (typeof assoc.detachDisplacedTarget !== "function") return;
-  parkDisplacedRemoval(record, assoc.detachDisplacedTarget(displaced));
+function detachDisplacedAtAssignment(assoc: OneToOneAssociation): Promise<void> | null {
+  if (assoc.isLoaded?.() === false) return null;
+  if (!assoc.target) return null;
+  if (typeof assoc.detachDisplacedTarget !== "function") return null;
+  // Started BEFORE the build: `removeTargetBang` reads `this.target` on entry,
+  // before its first `await`, so the removal binds to the displaced record even
+  // though the synchronous build swaps in the replacement immediately after.
+  return assoc.detachDisplacedTarget();
 }
 
 /**
@@ -923,9 +925,6 @@ export function assignNestedAttributesForOneToOneAssociation(
       } else {
         // Rails' `build_#{name}` → `set_new_record` → `replace(record, false)`
         // removes the displaced target inline (has_one_association.rb:69).
-        // Capture it before the build overwrites `assoc.target`, then start that
-        // removal here — see `detachDisplacedAtAssignment`.
-        const displaced = assoc.isLoaded?.() === false ? null : existing;
         // Rails' `replace` opens with `load_target`, so an association that was
         // never loaded still discovers the row in the DB and removes it. That
         // SELECT is issued just AFTER the build, where Rails reaches
@@ -936,11 +935,14 @@ export function assignNestedAttributesForOneToOneAssociation(
         // to issue it has to be taken here, before the build, because `build`
         // marks the association loaded and so falsifies its `find_target?` gate.
         const startUnloadedRemoval = assoc.prepareDetachDisplacedForSyncBuild?.() ?? null;
+        // The loaded arm — started before the build, while the association
+        // still caches the displaced record. See `detachDisplacedAtAssignment`.
+        const loadedRemoval = detachDisplacedAtAssignment(assoc);
         // `HasOneAssociation#build` runs the removal itself for direct callers
         // (returning a promise they can await). This writer is synchronous and
-        // owns the removal through `detachDisplacedAtAssignment` below, so
-        // suppress the association's own — two concurrent removals of the same
-        // row would double-destroy it under `dependent: :destroy`.
+        // owns the removal, so suppress the association's own — two concurrent
+        // removals of the same row would double-destroy it under
+        // `dependent: :destroy`, and a returned promise would strand the write.
         assoc.buildDisplacementOwnedByCaller = true;
         try {
           // Never a promise with the flag set — `void` states that statically.
@@ -949,7 +951,7 @@ export function assignNestedAttributesForOneToOneAssociation(
           assoc.buildDisplacementOwnedByCaller = false;
         }
         if (startUnloadedRemoval) parkDisplacedRemoval(record, startUnloadedRemoval());
-        detachDisplacedAtAssignment(record, assoc, displaced);
+        if (loadedRemoval) parkDisplacedRemoval(record, loadedRemoval);
       }
     }
   }
