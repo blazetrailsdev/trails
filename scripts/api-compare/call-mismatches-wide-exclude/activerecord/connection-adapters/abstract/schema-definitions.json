@@ -135,20 +135,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
-    "rubyName": "remove",
-    "call": "raise_on_if_exist_options",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-definitions.ts",
-    "rubyName": "remove",
-    "call": "remove_columns",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "remove_column",
     "call": "delete",
     "reason": "Newly comparable (RFC 0072 arity sweep): Rails deletes from the `@columns_hash` Hash; TableDefinition here stores `columns` as an ordered array, so the same removal is a findIndex/splice. Equivalent — no Hash to delete from."
