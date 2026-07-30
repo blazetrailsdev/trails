@@ -59,8 +59,6 @@ describeIfPg("load_schema_helper: uuid_default without pgcrypto", () => {
         },
       });
 
-      // The already-laid-canonical arm (the thunk overload), so only the
-      // adapter-specific half of `load_schema` runs against the probe.
       await expect(
         loadSchema(async () => probe as unknown as AbstractAdapter),
       ).rejects.toBeInstanceOf(StopLoad);
