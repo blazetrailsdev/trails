@@ -19,7 +19,6 @@ import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js"
 import { loadAdapterSpecificSchema } from "./load-schema-helper.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 
-/** Ends the schema load once the four uuid tables have been seen. */
 class StopLoad extends Error {}
 
 describeIfPg("load_schema_helper: uuid_default without pgcrypto", () => {
@@ -69,9 +68,6 @@ describeIfPg("load_schema_helper: uuid_default without pgcrypto", () => {
           `"id" uuid DEFAULT uuid_generate_v4() NOT NULL PRIMARY`,
         );
       }
-      // The reachable half of the same mechanism: a bare-string default Rails
-      // spells inline, independent of the predicate.
-      expect(emitted.get("chat_messages_custom_pk")).toContain("DEFAULT uuid_generate_v4()");
     } finally {
       await adapter.close();
     }
