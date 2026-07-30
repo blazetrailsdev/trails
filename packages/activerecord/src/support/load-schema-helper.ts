@@ -515,37 +515,31 @@ const ADAPTER_SPECIFIC_SCHEMAS: Record<string, (adapter: DatabaseAdapter) => Pro
  *   every migration line, whereas laying the schema through the adapter prints
  *   nothing.
  *
- * Deviation — the optional canonical arm: trails lays schema.rb's mirror through
- * two mechanisms, `loadCanonicalSchema` (template build, adapter clusters) and
- * `DatabaseTasks` on a generated schema file (`test-setup-dy.ts`, which also has
- * to purge). Rails has one mechanism and needs no such seam. Taking the arm as a
- * parameter keeps both lanes inside this one function, so the two arms of
- * `load_schema` cannot be applied to one path and not the other — the bug PR
- * #5523 found. The thunk returns the connection because the `DatabaseTasks` path
- * swaps the pool underneath it (`withTemporaryPool`).
+ * Every caller — the template build, the adapter clusters, and the per-worker
+ * boot (`test-setup-dy.ts`) — lays schema.rb's mirror through the one mechanism
+ * `loadCanonicalSchema`, so this takes a connection and nothing else, as
+ * `load_schema` does. The per-worker path purges its database *before* calling
+ * in; that purge is a trails invention (Rails' single process never re-loads a
+ * database), so it lives at the call site rather than as an arm here.
  *
  * @internal Boot/template setup paths only. Test files wire the canonical schema
  * + fixtures through `fixtures({ ... })`; the
  * `blazetrails/no-internal-canonical-loaders` ESLint rule enforces that.
  */
-export async function loadSchema(
-  adapterOrCanonicalArm: DatabaseAdapter | (() => Promise<DatabaseAdapter>),
-): Promise<void> {
-  let adapter: DatabaseAdapter;
-  if (typeof adapterOrCanonicalArm === "function") {
-    adapter = await adapterOrCanonicalArm();
-  } else {
-    adapter = adapterOrCanonicalArm;
-    await loadCanonicalSchema(adapter);
-  }
+export async function loadSchema(adapter: DatabaseAdapter): Promise<void> {
+  await loadCanonicalSchema(adapter);
   await loadAdapterSpecificSchema(adapter);
 }
 
 /**
  * The `load adapter_specific_schema_file if File.exist?(...)` arm of
- * `load_schema_helper.rb:15`, on its own. Reaching for this arm alone is
- * exactly how the two halves of `load_schema` drifted apart before — go
- * through {@link loadSchema}.
+ * `load_schema_helper.rb:15`, on its own. Go through {@link loadSchema} for a
+ * schema load: reaching for this arm alone is exactly how the two halves of
+ * `load_schema` drifted apart before. It is exported for the trails-only tests
+ * that pin the arm's own content, and for the per-worker boot's fast path,
+ * which replays it against a database whose canonical half is already laid.
+ *
+ * @internal
  */
 export async function loadAdapterSpecificSchema(adapter: DatabaseAdapter): Promise<void> {
   const adapterSpecificSchema = ADAPTER_SPECIFIC_SCHEMAS[adapter.adapterName];

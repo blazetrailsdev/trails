@@ -20,10 +20,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { loadSchema } from "./load-schema-helper.js";
-import { generateSchemaFile } from "./schema-file-generator.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
-import { InternalMetadata } from "../internal-metadata.js";
-import { schemaSha1 } from "../tasks/database-tasks.js";
+import { stampCanonicalSchema } from "./canonical-schema-stamp.js";
 import {
   TEMPLATE_PATH_ENV,
   isSqliteRun,
@@ -187,13 +184,11 @@ const pgAdapter: DbTemplateAdapter = {
     try {
       await loadSchema(adapter);
       // Stamp ar_internal_metadata so every slot cloned from this template
-      // reports `schemaUpToDate` → each worker's reconstructFromSchema only
-      // TRUNCATEs (no DDL) instead of paying a full purge+reload per test
-      // file. The SHA1 must match the file workers generate from TEST_SCHEMA
-      // (generateSchemaFile + reconstructFromSchema in test-setup-dy.ts).
-      const schemaFile = await generateSchemaFile(TEST_SCHEMA, "postgres");
-      const sha1 = await schemaSha1(schemaFile);
-      await new InternalMetadata(adapter).createTableAndSetFlags("test", sha1);
+      // reports `canonicalSchemaUpToDate` → the worker that claims it only
+      // TRUNCATEs (no DDL) instead of paying a full purge+reload. The run token
+      // is passed explicitly: it is published to the environment further down,
+      // after the slot DBs exist.
+      await stampCanonicalSchema(adapter, runToken);
     } finally {
       // Teardown must not mask a build/stamp failure: if the loader threw,
       // a disconnect/terminate that also throws would replace the original
