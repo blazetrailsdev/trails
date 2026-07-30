@@ -37,7 +37,10 @@ import {
   withTransactionalFixtures,
   type WithTransactionalFixturesOptions,
 } from "./test-fixtures/with-transactional-fixtures.js";
-import { leaseFixtureConnection } from "./test-fixtures/fixture-connection.js";
+import {
+  leaseFixtureConnection,
+  leaseFixtureConnectionFor,
+} from "./test-fixtures/fixture-connection.js";
 
 /**
  * A tableless fixture entry: seeds rows directly into the named table with no
@@ -478,7 +481,12 @@ function useFixtures(
   const store: Record<string, Record<string, unknown>> = {};
   // Whether the most recent seed ran inside an open transaction (the fixture
   // pin). Read in afterEach — see shouldDeleteFixtureRows.
-  let seededInTransaction = false;
+  // Per seeding connection: fixture sets whose model lives in another database
+  // seed through that model's pool, so the flag is not global to the scope.
+  const seededInTransaction = new Map<DatabaseAdapter, boolean>();
+  // The connection each set was seeded through, so teardown deletes its rows
+  // from the database they actually landed in.
+  const setAdapters = new Map<string, DatabaseAdapter>();
 
   // TODO(fixtures-adoption Spike S1): seed once per worker in a global beforeAll
   // (before the pinned transaction opens) when transactional fixtures are
@@ -489,13 +497,16 @@ function useFixtures(
     // the (mutable-assignable) array after this call, which would otherwise seed a
     // different set than the accessors built below from `keys`.
     if (!fixtures) fixtures = await resolveFixtureNames(keys as readonly FixtureName[]);
-    const adapter = getAdapter();
+    const fixtureConnection = getAdapter();
     // Prepare every set (in declaration order, so a later set's ref() resolves
-    // ids a prior set registered), then insert them all through ONE
-    // insertFixturesSet — one referential-integrity toggle per load, mirroring
-    // Rails' fixtures.rb `insert` merging table_rows into one insert_fixtures_set.
-    const prepared: PreparedFixtureSet[] = [];
-    const preparedKeys: string[] = [];
+    // ids a prior set registered), then insert each connection's sets through
+    // ONE insertFixturesSet — one referential-integrity toggle per load per
+    // connection, mirroring Rails' fixtures.rb `insert`, which groups the sets
+    // by `model_class.connection_pool` and merges each group's table_rows into
+    // a single insert_fixtures_set.
+    const groups = new Map<DatabaseAdapter, { prepared: PreparedFixtureSet[]; keys: string[] }>();
+    seededInTransaction.clear();
+    setAdapters.clear();
     for (const [key, { table, model, data }] of Object.entries(fixtures)) {
       // Auto-register the (object-map) model, mirroring the by-name path's
       // `resolveFixtureNames` (fixtures-register-model-on-resolution, #4348):
@@ -507,31 +518,41 @@ function useFixtures(
       if (model !== null && "_isActiveRecordBase" in model) {
         registerModel(model);
       }
-      prepared.push(
+      const adapter = await leaseFixtureConnectionFor(model, fixtureConnection);
+      setAdapters.set(key, adapter);
+      let group = groups.get(adapter);
+      if (group === undefined) {
+        group = { prepared: [], keys: [] };
+        groups.set(adapter, group);
+      }
+      group.prepared.push(
         model === null
           ? await prepareJoinTableFixtures(adapter, table, data)
           : await prepareModelFixtures(adapter, model, data),
       );
-      preparedKeys.push(key);
+      group.keys.push(key);
     }
-    const results = await insertPreparedFixtureSets(adapter, prepared);
-    seededInTransaction = adapter.openTransactions > 0;
-    results.forEach((result, i) => {
-      store[preparedKeys[i]] = result;
-    });
+    for (const [adapter, group] of groups) {
+      const results = await insertPreparedFixtureSets(adapter, group.prepared);
+      seededInTransaction.set(adapter, adapter.openTransactions > 0);
+      results.forEach((result, i) => {
+        store[group.keys[i]] = result;
+      });
+    }
   });
 
   afterEach(async () => {
     if (!fixtures) return;
-    const adapter = getAdapter();
-    if (shouldDeleteFixtureRows(adapter, seededInTransaction)) {
-      // Delete in reverse insertion order to respect FK constraints.
-      for (const { table } of Object.values(fixtures).reverse()) {
-        try {
-          await adapter.executeMutation(`DELETE FROM ${adapter.quoteTableName(table)}`);
-        } catch (e) {
-          if (!isTableMissingError(e)) throw e;
-        }
+    const fixtureConnection = getAdapter();
+    // Delete in reverse insertion order to respect FK constraints, each set
+    // through the connection it was seeded on.
+    for (const [key, { table }] of Object.entries(fixtures).reverse()) {
+      const adapter = setAdapters.get(key) ?? fixtureConnection;
+      if (!shouldDeleteFixtureRows(adapter, seededInTransaction.get(adapter) ?? false)) continue;
+      try {
+        await adapter.executeMutation(`DELETE FROM ${adapter.quoteTableName(table)}`);
+      } catch (e) {
+        if (!isTableMissingError(e)) throw e;
       }
     }
     for (const key of Object.keys(store)) {
