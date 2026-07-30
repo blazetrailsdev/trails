@@ -50,8 +50,8 @@ function bootLaidTableNames(): ReadonlySet<string> {
  * Drops every user table/view/matview in the database. Idempotent; per-DROP
  * errors are swallowed so teardown noise never aborts the sequence.
  * PG covers all schemas in `current_schemas(false)` (not just `public`).
- * MySQL uses a pinned pool connection with `FOREIGN_KEY_CHECKS=0`; sqlite
- * flips `PRAGMA foreign_keys` off for the sweep.
+ * MySQL uses a pinned pool connection with `FOREIGN_KEY_CHECKS=0`; sqlite goes
+ * through `disableReferentialIntegrity`.
  */
 export async function dropAllTables(adapter: DatabaseAdapter): Promise<void> {
   await resetTables(adapter, "drop-all");
@@ -255,13 +255,7 @@ async function resetSqliteTables(
   bootLaid: ReadonlySet<string>,
 ): Promise<void> {
   const toTruncate: string[] = [];
-  // sqlite connections boot with `PRAGMA foreign_keys = ON` (Rails'
-  // DEFAULT_PRAGMAS), so dropping a referenced table before its referencing one
-  // raises and the table survives the sweep. MySQL gets this from
-  // FOREIGN_KEY_CHECKS=0 and PG from CASCADE; sqlite needs the pragma flipped.
-  const oldForeignKeys = Object.values((await adapter.execute(`PRAGMA foreign_keys`))[0] ?? {})[0];
-  await adapter.execute(`PRAGMA foreign_keys = OFF`);
-  try {
+  await adapter.disableReferentialIntegrity(async () => {
     for (const { name } of (await adapter.execute(
       `SELECT name FROM sqlite_master WHERE type='view' AND name NOT LIKE 'sqlite_%'`,
     )) as { name: string }[]) {
@@ -280,10 +274,6 @@ async function resetSqliteTables(
         await adapter.executeMutation(`DROP TABLE IF EXISTS "${name}"`);
       } catch {}
     }
-  } finally {
-    try {
-      await adapter.execute(`PRAGMA foreign_keys = ${String(oldForeignKeys ?? 1)}`);
-    } catch {}
-  }
+  });
   await truncateNonEmpty(adapter, toTruncate);
 }
