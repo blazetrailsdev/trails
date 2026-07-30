@@ -1,0 +1,30 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "messages/metadata.ts",
+    "rubyName": "pick_expiry",
+    "call": "advance",
+    "reason": "Rails advances a `Time` with `Time.now.utc.advance(seconds:)`; trails' `Time` analogue is `Temporal.Instant`, whose equivalent is `add({ milliseconds })`."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "messages/metadata.ts",
+    "rubyName": "pick_expiry",
+    "call": "iso8601",
+    "reason": "Rails formats the expiry with `Time#iso8601(3)`; `Temporal.Instant#toString({ smallestUnit: \"millisecond\" })` emits the identical millisecond-precision string (pinned by the Rails 7.0 fixtures in `message-verifier-metadata.test.ts`)."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "messages/metadata.ts",
+    "rubyName": "parse_expiry",
+    "call": "iso8601",
+    "reason": "Rails parses with `Time.iso8601`; trails parses the same ISO 8601 string with `Temporal.Instant.from`."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "messages/metadata.ts",
+    "rubyName": "parse_expiry",
+    "call": "parse",
+    "reason": "`Time.parse` is Rails' non-ISO branch, reached only when `ActiveSupport.use_standard_json_time_format` is false; trails has no such setting, so only the ISO branch exists (story `activesupport-message-metadata-shared-suite`)."
+  }
+]

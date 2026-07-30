@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "message-verifier.ts",
+    "rubyName": "generate_digest",
+    "call": "hexdigest",
+    "reason": "Rails calls `OpenSSL::HMAC.hexdigest`; trails routes every HMAC through the crypto adapter (`createHmac(...).digest(\"hex\")`), which is the same digest by a different call."
+  }
+]

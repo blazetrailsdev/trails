@@ -12,5 +12,12 @@
     "rubyName": "verify",
     "call": "read_message",
     "reason": "Rails delegates signing to a nested @verifier MessageVerifier (verify -> @verifier.read_message); trails' encryptor HMACs inline, a pre-existing structural divergence tracked separately from the Codec port."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "message-encryptor.ts",
+    "rubyName": "sign",
+    "call": "create_message",
+    "reason": "Rails delegates signing to a nested `@verifier` MessageVerifier (`sign` -> `@verifier.create_message`); trails' encryptor HMACs inline, the same pre-existing structural divergence already recorded for `verify`."
   }
 ]
