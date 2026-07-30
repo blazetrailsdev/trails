@@ -2185,15 +2185,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   ): Promise<void> {
     assertValidDeferrable(options.deferrable);
 
-    if (options.ifNotExists === true) {
-      // foreignKeyExists routes through foreignKeyFor/isDefinedFor, which
-      // compares `column` element-wise, so composite (array) columns match by
-      // value rather than by array identity (a bare `===` is always false for
-      // distinct array instances). Mirrors the abstract addForeignKey guard.
-      if (await this.foreignKeyExists(fromTable, toTable, { column: options.column })) {
-        return;
-      }
-    }
     await this.alterTable(fromTable, undefined, undefined, undefined, (definition) => {
       definition.foreignKey(
         this.schemaStatements().stripTableNamePrefixAndSuffix(toTable),
