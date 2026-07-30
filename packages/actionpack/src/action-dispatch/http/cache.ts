@@ -284,7 +284,10 @@ export function prepareCacheControlBang(this: ResponseCacheHost): CacheControlHa
 }
 
 export function handleConditionalGetBang(this: ResponseCacheHost): void {
-  if ((isEtag.call(this) || isLastModified.call(this)) && !this.getHeader(CACHE_CONTROL)) {
+  if (
+    (isEtag.call(this) !== undefined || isLastModified.call(this)) &&
+    !this.getHeader(CACHE_CONTROL)
+  ) {
     this.setHeader(CACHE_CONTROL, DEFAULT_CACHE_CONTROL);
   }
 }
