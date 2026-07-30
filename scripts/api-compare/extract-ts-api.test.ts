@@ -2102,14 +2102,19 @@ describe("extract-ts-api — MethodInfo emit-site inventory", () => {
         .filter((e) => e.counted)
         .map((e) => e.name),
     );
-    expect(counted).toEqual(
-      collectTsFileNames(
-        file,
-        Object.values(info.classes),
-        Object.values(info.modules),
-        info.fileFunctions[file],
-      ),
+    // The inventory covers MethodInfo emit sites only, so the extra-surface
+    // set is exactly it plus the file's declaration names (the `__mixin`
+    // pseudo-module's synthesized name is not one).
+    const names = collectTsFileNames(
+      file,
+      Object.values(info.classes),
+      Object.values(info.modules),
+      info.fileFunctions[file],
     );
+    expect(new Set([...names].filter((n) => !counted.has(n)))).toEqual(
+      new Set(["Locator", "Quoting", "Registry", "Widget"]),
+    );
+    expect([...counted].filter((n) => !names.has(n))).toEqual([]);
   });
 });
 

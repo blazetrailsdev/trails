@@ -21,8 +21,11 @@
  *      "allowed" TS name set.
  *   3. Collect public TS names declared in the matching TS file — each
  *      class/module's *own* methods (skipping inherited surface so the
- *      diff measures this file's drift, not its ancestor's) plus top-level
- *      `fileFunctions`. Filter out `internal: true` (Ruby private/protected,
+ *      diff measures this file's drift, not its ancestor's), each
+ *      class / interface / namespace DECLARATION name, plus top-level
+ *      `fileFunctions`. Declaration names are scored on the same footing as
+ *      members: step 2 allows every entity name the matched `.rb` declares, so
+ *      a faithfully ported class is not extra and a trails-only one is. Filter out `internal: true` (Ruby private/protected,
  *      TS private/protected, TS `#`-prefixed fields, and `@internal` JSDoc
  *      on a top-level exported function) and
  *      separately filter `_`-prefixed names — the extractor keeps those as
@@ -41,9 +44,11 @@
  *      former extra-surface-allow.json sidecar is gone — and a tag on a name
  *      that no longer flags is STALE and fails the run. The tag is read on
  *      members AND on class / interface / namespace declarations, so an extra
- *      that is a declaration rather than a member still has an inline form.
- *      On an `interface` the declaration tag additionally covers every member
- *      — see `collectTaggedEntries`.
+ *      that is a declaration rather than a member has the same inline form
+ *      its members do — the declaration name is scored surface (step 3), so
+ *      such a tag matches and goes stale like any other. On an `interface` the
+ *      declaration tag additionally covers every member — see
+ *      `collectTaggedEntries`.
  *   6. Classify each written tag's permanence claim — see `classifyReason`.
  *      Advisory only: the count of tags that never state one is reported so a
  *      batch of new tags is visible, but it does not affect the exit code.
@@ -100,8 +105,6 @@ import { manifestIsStale } from "./build-freshness.js";
 interface RubyEntity {
   fqn: string;
   info: ClassInfo;
-  /** Declared inside another class in the same Ruby file (`class Outer; class Inner`). */
-  nestedInEnclosingClass?: boolean;
 }
 
 /**
@@ -268,8 +271,10 @@ export interface TaggedEntry {
   reason: string;
   /**
    * True when the entry derives from a tagged `interface` DECLARATION rather
-   * than from a tag written on this name — its members, and the interface's own
-   * name. Such entries allow extra surface like any other, but they are
+   * than from a tag written on this name — i.e. one of its MEMBERS. The
+   * interface's own name is a written tag: declaration names are extra surface
+   * (`collectTsFileNames`), so that entry can match and can go stale like any
+   * other. Inherited entries allow extra surface like any other, but they are
    * excluded from the tag total and from the stale check: the interface tag is
    * written once for the whole shape, so a member of it that happens not to
    * flag as extra is not a stale tag anyone can delete.
@@ -371,11 +376,7 @@ export function collectTaggedEntries(ts: ApiManifest): TaggedEntry[] {
         // LAST on purpose: a member sharing the container's name occupies the
         // same key (see the dedup note above — one key is all the extra set
         // has), so the more specific member reason wins the tie.
-        // An interface's own name is not member surface, so it never appears in
-        // the extra set `collectTsFileNames` builds and its entry can never
-        // match — flagged inherited so the stale check doesn't demand its
-        // deletion. The tag is still doing work: it covers the members below.
-        push(pkg, c.file, c.name, c.noRailsEquivalent, c.isInterface === true);
+        push(pkg, c.file, c.name, c.noRailsEquivalent);
         // A tagged `interface` covers its MEMBERS as well as its own name. An
         // interface is type-only: the ones that need the tag exist solely to
         // declare the shape of a duck-typed collaborator (e.g. globalid's
@@ -585,6 +586,17 @@ export function parseArgs(argv: string[]): CliArgs {
  * `internal: true`; class/module members take the flag from their TS
  * visibility modifier only). The Rails-private
  * convention in this repo means we filter `_`-prefix here too.
+ *
+ * A class / interface / namespace DECLARATION name counts as surface too, on
+ * the same footing as a member: `class QueryLogger` in a file whose Rails
+ * counterpart declares no such constant is exactly the drift this report
+ * exists to find, and before RFC 0080 it was invisible — which also left the
+ * declaration-level `@noRailsEquivalent` form with nothing to match unless the
+ * name happened to be re-attached as a static (see `collectTaggedEntries`).
+ * The Ruby side answers symmetrically: `collectAllowedNames` allows every
+ * entity name the matched `.rb` declares, so a faithfully ported class is not
+ * extra. Synthesized pseudo-modules are excluded — their `<fn>__mixin` name is
+ * an extractor artifact, not source text.
  */
 export function collectTsFileNames(
   file: string,
@@ -598,13 +610,20 @@ export function collectTsFileNames(
     if (m.name.startsWith("_")) return;
     out.add(m.name);
   };
+  const pushDeclaration = (c: ClassInfo): void => {
+    if (c.synthesizedMixin === true) return;
+    if (c.name.startsWith("_")) return;
+    out.add(c.name);
+  };
   for (const c of classes) {
     if (c.file !== file) continue;
+    pushDeclaration(c);
     for (const m of c.instanceMethods) push(m);
     for (const m of c.classMethods) push(m);
   }
   for (const m of modules) {
     if (m.file !== file) continue;
+    pushDeclaration(m);
     const skipForeign = m.synthesizedMixin === true;
     for (const im of m.instanceMethods) {
       if (skipForeign && im.declaredIn !== undefined) continue;
@@ -747,14 +766,16 @@ function collectAllowedNames(
     for (const inc of mod.includes ?? []) walkMixin(inc, fqn);
   };
 
-  for (const { fqn, info, nestedInEnclosingClass } of entities) {
-    // A nested class is a constant ON its enclosing class, so a member of that
-    // name is the faithful port — spelled either as a real TS nested class or
-    // as `static readonly Inner = Inner` re-attaching a sibling export.
-    if (nestedInEnclosingClass) {
-      const short = fqn.split("::").pop();
-      if (short) for (const c of rubyConstantCandidates(short)) allowed.add(c);
-    }
+  for (const { fqn, info } of entities) {
+    // The entity's own short name: since declaration names are TS surface
+    // (`collectTsFileNames`), the Ruby constant they port has to be allowed
+    // surface, or every faithfully ported class would read as drift. This
+    // covers the nested case too — a nested class is a constant ON its
+    // enclosing class, so a member of that name is the faithful port, spelled
+    // either as a real TS nested class or as `static readonly Inner = Inner`
+    // re-attaching a sibling export.
+    const short = fqn.split("::").pop();
+    if (short) for (const c of rubyConstantCandidates(short)) allowed.add(c);
     addMethods(info.instanceMethods);
     addMethods(info.classMethods);
     for (const inc of info.includes ?? []) walkMixin(inc, fqn);
@@ -795,6 +816,10 @@ export function buildGlobalRubyCandidates(ruby: ApiManifest): Set<string> {
     }
     const entities = [...Object.values(pkg.classes), ...Object.values(pkg.modules)] as ClassInfo[];
     for (const e of entities) {
+      // Declaration names join the oracle on the same rule as methods and
+      // constants: a TS class named after a Ruby class declared in a DIFFERENT
+      // `.rb` is `moved`, not `novel`.
+      for (const c of rubyConstantCandidates(e.name)) all.add(c);
       for (const m of [...e.instanceMethods, ...e.classMethods]) {
         const candidates = rubyMethodCandidates(m.name);
         if (!candidates) continue;
@@ -956,33 +981,12 @@ function buildPackageReport(
   // coverage denominator. Extra surface is the inverse question and needs the
   // opposite answer: the nested class IS surface the enclosing file declares,
   // so counting the TS port of it as drift is wrong. It therefore enters the
-  // file's allow-set flagged `nestedInEnclosingClass` rather than being
-  // dropped — deliberately NOT mirroring compare.ts's use of the same filter.
-  const classFqnsPerFile = new Map<string, Set<string>>();
-  for (const [fqn, info] of Object.entries(rubyPkg.classes) as [string, ClassInfo][]) {
-    if (!info.file) continue;
-    const set = classFqnsPerFile.get(info.file) ?? new Set<string>();
-    set.add(fqn);
-    classFqnsPerFile.set(info.file, set);
-  }
-  const hasEnclosingClassInFile = (fqn: string, file: string): boolean => {
-    const siblings = classFqnsPerFile.get(file);
-    if (!siblings) return false;
-    const parts = fqn.split("::");
-    for (let i = parts.length - 1; i > 0; i--) {
-      if (siblings.has(parts.slice(0, i).join("::"))) return true;
-    }
-    return false;
-  };
-
+  // file's allow-set like any other entity — deliberately NOT mirroring
+  // compare.ts's use of the same filter.
   const rubyFiles = new Map<string, RubyEntity[]>();
   for (const [fqn, info] of Object.entries(rubyPkg.classes) as [string, ClassInfo][]) {
     if (!info.file) continue;
-    pushTo(rubyFiles, info.file, {
-      fqn,
-      info,
-      nestedInEnclosingClass: hasEnclosingClassInFile(fqn, info.file),
-    });
+    pushTo(rubyFiles, info.file, { fqn, info });
   }
   for (const [fqn, info] of Object.entries(rubyPkg.modules) as [string, ClassInfo][]) {
     if (!info.file) continue;

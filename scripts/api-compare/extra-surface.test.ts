@@ -1160,7 +1160,9 @@ describe("buildReport — novel vs moved classification", () => {
     });
     const f = report.packages[0].extraFiles.find((x) => x.tsFile === "trailtie.ts");
     expect(f).toBeDefined();
-    expect(f!.extras.map((e) => e.name)).toEqual(["genuinelyNovel"]);
+    // `Trailtie` is the declaration name, and railtie.rb declares `Railtie` —
+    // a renamed port is drift the declaration-name pass now reports.
+    expect(f!.extras.map((e) => e.name)).toEqual(["genuinelyNovel", "Trailtie"]);
   });
 
   it("resolves the unported guard against a cross-package module's OWNING package", () => {
@@ -1372,6 +1374,17 @@ describe("collectTsFileNames — `__mixin` pseudo-modules", () => {
     expect(names.has("toSlug")).toBe(false);
   });
 
+  it("does not count the `__mixin` pseudo-module's synthesized name", () => {
+    const info = extract(FILES);
+    const names = collectTsFileNames(
+      "inheritance.ts",
+      [],
+      Object.values(info.modules),
+      info.fileFunctions?.["inheritance.ts"],
+    );
+    expect(names.has("stiClassFor__mixin")).toBe(false);
+  });
+
   it("still counts the mixin function's own name as inheritance.ts surface", () => {
     const info = extract(FILES);
     const names = collectTsFileNames(
@@ -1381,6 +1394,73 @@ describe("collectTsFileNames — `__mixin` pseudo-modules", () => {
       info.fileFunctions?.["inheritance.ts"],
     );
     expect(names.has("stiClassFor")).toBe(true);
+  });
+});
+
+describe("buildReport — declaration names", () => {
+  const run = (ruby: ApiManifest, ts: ApiManifest) =>
+    buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+
+  const ruby: ApiManifest = {
+    source: "ruby",
+    generatedAt: "",
+    packages: {
+      activemodel: {
+        classes: {
+          "ActiveModel::Foo": rubyClass({ name: "Foo", file: "foo.rb" }),
+          // A class nested in a same-file parent: still a constant the file
+          // declares, so its TS port is not drift.
+          "ActiveModel::Foo::Inner": rubyClass({ name: "Inner", file: "foo.rb" }),
+          "ActiveModel::Elsewhere": rubyClass({ name: "Elsewhere", file: "elsewhere.rb" }),
+        },
+        modules: {},
+      },
+    },
+  };
+
+  const tsWith = (names: string[]): ApiManifest => ({
+    source: "typescript",
+    generatedAt: "",
+    packages: {
+      activemodel: {
+        classes: Object.fromEntries(
+          names.map((n) => [
+            `foo.ts:${n}`,
+            {
+              name: n,
+              file: "foo.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [],
+              classMethods: [],
+            },
+          ]),
+        ),
+        modules: {},
+      },
+    },
+  });
+
+  it("allows a declaration name the matched Ruby file declares", () => {
+    const report = run(ruby, tsWith(["Foo", "Inner"]));
+    expect(report.packages[0].extraFiles).toEqual([]);
+  });
+
+  it("reports a declaration name no Ruby file declares as novel", () => {
+    const report = run(ruby, tsWith(["Foo", "QueryLogger"]));
+    expect(report.packages[0].extraFiles[0].extras).toEqual([
+      { name: "QueryLogger", kind: "novel" },
+    ]);
+  });
+
+  it("reports a declaration name Rails declares in a DIFFERENT file as moved", () => {
+    const report = run(ruby, tsWith(["Foo", "Elsewhere"]));
+    expect(report.packages[0].extraFiles[0].extras).toEqual([{ name: "Elsewhere", kind: "moved" }]);
   });
 });
 
@@ -1581,20 +1661,30 @@ describe("buildReport — @noRailsEquivalent tags", () => {
     };
     const report = run(m);
     expect(report.packages[0].totalNovel).toBe(0);
-    expect(report.packages[0].totalAllowlisted).toBe(1);
+    // `tsOnlyHelper` (inherited) plus the interface's own name `Shape`, which
+    // is extra surface in its own right and matches the written tag.
+    expect(report.packages[0].totalAllowlisted).toBe(2);
     expect(report.tagged).toEqual({
-      total: 0,
-      matched: 0,
+      total: 1,
+      matched: 1,
       inheritedMatched: 1,
       stale: [],
       // Inherited entries repeat one declaration's reason, so they are not
-      // classified — the claim is counted once, where it is written.
+      // classified — the claim is counted once, where it is written (on the
+      // declaration name).
       classification: {
         permanent: 0,
         convergeable: 0,
-        unclassified: 0,
-        unclassifiedByPackage: {},
-        unclassifiedEntries: [],
+        unclassified: 1,
+        unclassifiedByPackage: { activemodel: 1 },
+        unclassifiedEntries: [
+          {
+            package: "activemodel",
+            tsFile: "foo.ts",
+            name: "Shape",
+            reason: "duck-typed collaborator shape",
+          },
+        ],
       },
     });
   });
@@ -1613,7 +1703,9 @@ describe("buildReport — @noRailsEquivalent tags", () => {
       noRailsEquivalent: "duck-typed collaborator shape",
     };
     const report = run(m);
-    expect(report.packages[0].totalAllowlisted).toBe(1);
+    // `tsOnlyHelper` (inherited) and the declaration name `Shape` (written);
+    // `namespaceFn` stays novel.
+    expect(report.packages[0].totalAllowlisted).toBe(2);
     expect(report.packages[0].totalNovel).toBe(1);
     expect(report.tagged.inheritedMatched).toBe(1);
   });
@@ -1765,7 +1857,6 @@ describe("collectTaggedEntries", () => {
         tsFile: "locator.ts",
         name: "LocatorModel",
         reason: "duck-typed collaborator shape",
-        inherited: true,
       },
       {
         package: "globalid",
