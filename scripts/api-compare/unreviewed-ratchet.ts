@@ -19,8 +19,24 @@
  * unreviewed rows into the mark and the counter would report progress that
  * never happened. So `--write` lowers the mark using only the rows that were
  * ALREADY in the baseline, and lists the newly-seeded keys separately. The
- * gate then fails on the excess until those new rows carry a real reason —
- * i.e. a new baseline entry must be reviewed as it is added.
+ * gate then fails on the excess until those new rows carry a real reason.
+ *
+ * ── What the gate actually enforces (and what it does not) ──────────────────
+ * The gate arm is AGGREGATE: it compares one number, `unreviewedCount(baseline)`,
+ * against the mark. It holds no record of WHICH keys were seeded when the mark
+ * was set — that would mean committing a second ~270KB mirror of the 4441
+ * seeded keys, duplicating data the baseline already carries.
+ *
+ * The per-key rule therefore binds only through `--write`, which does have both
+ * states in hand: reseeding after adding a mismatch lowers the mark by the
+ * newly-seeded rows, so the gate goes red until they are given real reasons.
+ * A HAND-EDITED baseline is caught only in aggregate: adding one row with the
+ * seed string while reviewing one old row leaves the count unchanged, and the
+ * gate passes. That swap is a strictly-neutral trade (unreviewed debt is
+ * conserved, never grown), which is the contract to rely on — not "every new
+ * entry is individually forced to carry a real reason". The reviewer of the
+ * baseline diff is what enforces the stronger rule; this counter guarantees
+ * only that the total never rises.
  *
  * Hard rules: no node:* imports, no process.*, async fs.
  */

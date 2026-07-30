@@ -54,6 +54,36 @@ describe("nextMark", () => {
   });
 });
 
+describe("the aggregate contract", () => {
+  // Pins the documented limit (unreviewed-ratchet.ts header): the gate compares
+  // one number, so a hand-edited baseline that swaps a reviewed row for a newly
+  // seeded one passes. The guarantee is that the total never rises, NOT that
+  // every new entry individually carries a real reason.
+  it("passes a one-for-one swap of a reviewed reason for a newly seeded row", () => {
+    const before = [entry("a"), entry("b")];
+    const mark = unreviewedEntries(before, SEED).length;
+    const after = [entry("a", "reviewed: satisfied by Arel"), entry("b"), entry("c")];
+    expect(unreviewedEntries(after, SEED).length).toBe(mark);
+  });
+
+  it("still fails when the swap grows the total", () => {
+    const after = [entry("a"), entry("b"), entry("c")];
+    expect(unreviewedEntries(after, SEED).length).toBeGreaterThan(2);
+  });
+
+  // `--write` DOES have both states, so the per-key rule binds on the reseed
+  // path: the new row is held out of the lowered mark and the gate goes red.
+  it("holds a newly seeded row out of the mark on the reseed path", () => {
+    const prior = [entry("a"), entry("b")];
+    const next = [entry("a", "reviewed"), entry("b"), entry("c")];
+    const newly = newlySeeded(next, prior, SEED);
+    const count = unreviewedEntries(next, SEED).length;
+    expect(newly.map((k) => k.call)).toEqual(["c"]);
+    expect(nextMark(count - newly.length, 2)).toBe(1);
+    expect(count).toBeGreaterThan(1);
+  });
+});
+
 describe("parseMark", () => {
   it("reads the committed shape", () => {
     expect(parseMark('{ "max": 12 }')).toBe(12);
