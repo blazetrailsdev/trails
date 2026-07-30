@@ -11,12 +11,15 @@
  *
  * The predicate is stubbed false on a real adapter and `createTable` is
  * intercepted, so the DDL is emitted and asserted without laying anything on
- * the shared per-worker database.
+ * the shared per-worker database. That is also why it pins
+ * `loadAdapterSpecificSchema` rather than `loadSchema`: the uuid tables live
+ * wholly inside the adapter-specific arm, and `loadSchema`'s canonical half
+ * would lay schema.rb's mirror on that database for real.
  */
 import { expect, it } from "vitest";
 import { describeIfPg, PG_TEST_URL } from "./describe-if-pg.js";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
-import { loadSchema } from "./load-schema-helper.js";
+import { loadAdapterSpecificSchema } from "./load-schema-helper.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 
 class StopLoad extends Error {}
@@ -59,9 +62,9 @@ describeIfPg("load_schema_helper: uuid_default without pgcrypto", () => {
         },
       });
 
-      await expect(loadSchema(probe as unknown as AbstractAdapter)).rejects.toBeInstanceOf(
-        StopLoad,
-      );
+      await expect(
+        loadAdapterSpecificSchema(probe as unknown as AbstractAdapter),
+      ).rejects.toBeInstanceOf(StopLoad);
 
       for (const name of ["chat_messages", "uuid_parents", "uuid_children"]) {
         expect(emitted.get(name)).toContain(
