@@ -80,8 +80,6 @@ if (missingTables.length > 0) {
 const { loadAdapterSpecificSchema } = await import("./support/load-schema-helper.js");
 await loadAdapterSpecificSchema(await Base.leaseConnection());
 
-// The schema is now fully laid, so the live table list *is* the boot-laid set
-// the between-test reset must truncate rather than drop.
 const { recordBootLaidTables } = await import("./support/drop-all-tables.js");
 await recordBootLaidTables(await Base.leaseConnection());
 

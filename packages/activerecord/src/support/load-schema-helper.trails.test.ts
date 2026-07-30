@@ -17,8 +17,6 @@ describe("boot-laid table snapshot", () => {
   it("survives the reset for every table the adapter-specific arm lays", async () => {
     const adapter = Base.connection;
 
-    // Re-running the arm is how the lane's own tables are named without a second
-    // list: whatever it lays here is what the snapshot had to have captured.
     await loadAdapterSpecificSchema(adapter);
     const bookkeeping = new Set(["schema_migrations", "ar_internal_metadata"]);
     const laid = (await adapter.tables()).filter((name) => !bookkeeping.has(name));
