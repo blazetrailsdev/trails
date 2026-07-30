@@ -48,13 +48,7 @@ export class KeyError extends Error {
   }
 }
 
-/**
- * Stand-in for Ruby's `throw`/`catch` — the non-local exit `Codec` and
- * `Metadata` use for `:invalid_message_format`, `:invalid_message_serialization`,
- * and `:invalid_message_content`. It lives in this leaf module rather than
- * `codec.ts` so `metadata.ts` — which `Codec` extends — can throw it without an
- * import cycle back through `codec.ts`. @internal
- */
+/** @internal */
 export class Thrown extends Error {
   constructor(
     readonly tag: string,

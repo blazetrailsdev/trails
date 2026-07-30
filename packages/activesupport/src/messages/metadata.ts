@@ -1,15 +1,3 @@
-/**
- * Mirrors Rails `ActiveSupport::Messages::Metadata` (messages/metadata.rb) —
- * the metadata envelope shared by `MessageVerifier` and `MessageEncryptor`:
- * `expires_at:` / `expires_in:` / `purpose:` are wrapped under a `"_rails"`
- * key, either through the codec's own serializer (the modern format) or through
- * a JSON envelope carrying a Base64 string of the serialized message (the
- * legacy, dual-serialized format).
- *
- * Rails mixes this in with `include Metadata`; see `Codec` for why the TS port
- * extends it instead.
- */
-
 import { coder } from "../cache/coder.js";
 import { ActiveSupportJSON } from "../json.js";
 import { MessagePack } from "../message-pack/index.js";
@@ -18,50 +6,28 @@ import { currentTimeInstant } from "../time-travel.js";
 import type { MessageSerializer } from "./codec.js";
 import { SERIALIZERS, Thrown } from "./serializer-with-fallback.js";
 
-/** `purpose` is `unknown` because Rails only ever compares it through `to_s`. */
 export interface MetadataOptions {
   expiresAt?: Temporal.Instant | null;
   expiresIn?: number | null;
   purpose?: unknown;
 }
 
-/** Metadata options accepted when reading a message. */
 export interface ExpectedMetadataOptions {
   purpose?: unknown;
 }
 
-/**
- * Rails' `nil.to_s` is `""`, and `hash["pur"].to_s != purpose.to_s` leans on
- * that to treat a missing purpose and an unspecified purpose as equal.
- */
 function toS(value: unknown): string {
   return value == null ? "" : String(value);
 }
 
-/**
- * Ruby's `if value` / `any? { |k, v| v }` reject only `nil` and `false` — `0`
- * and `""` are truthy there, so JS truthiness would silently drop
- * `expires_in: 0` and `purpose: ""`.
- */
 function isPresent(value: unknown): boolean {
   return value != null && value !== false;
 }
 
 export abstract class Metadata {
-  /**
-   * Rails: `singleton_class.attr_accessor :use_message_serializer_for_metadata`.
-   * @internal
-   */
+  /** @internal */
   static useMessageSerializerForMetadata = false;
 
-  /**
-   * Rails also lists `ActiveSupport::JSON`, `::JSON`, and `Marshal`. In trails a
-   * codec serializer is an object with `dump`/`load`; `ActiveSupportJSON` exposes
-   * `encode`/`decode`, so it can never be one, and `coder` is the Marshal
-   * analogue (see serializer-with-fallback.ts). Rails appends
-   * `ActiveSupport::MessagePack` from an `on_load(:message_pack)` hook; message_pack
-   * is a bundled dep here, so it is listed unconditionally.
-   */
   static readonly ENVELOPE_SERIALIZERS: readonly unknown[] = [
     ...Object.values(SERIALIZERS),
     coder,
@@ -180,18 +146,12 @@ export abstract class Metadata {
     }
 
     if (!Metadata.TIMESTAMP_SERIALIZERS.includes(this.serializer)) {
-      // Ruby's `iso8601(3)` — millisecond precision, `Z`-suffixed.
       return expiry?.toString({ smallestUnit: "millisecond" });
     }
 
     return expiry;
   }
 
-  /**
-   * Rails picks `Time.iso8601` or the laxer `Time.parse` on
-   * `ActiveSupport.use_standard_json_time_format`. trails has no such setting
-   * yet, so only the standard (ISO 8601) branch exists.
-   */
   protected parseExpiry(expiresAt: string | Temporal.Instant): Temporal.Instant {
     if (typeof expiresAt !== "string") {
       return expiresAt;

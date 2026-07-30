@@ -19,13 +19,6 @@ export interface CodecOptions {
   forceLegacyMetadataSerializer?: boolean;
 }
 
-/**
- * Rails' `Codec` does `include Metadata` (codec.rb:9) and then overrides
- * `use_message_serializer_for_metadata?` with a body that calls `super`. Ruby's
- * `include` puts the module in the ancestor chain directly above `Object`, so
- * extending it here reproduces that chain — and the `super` call the override
- * needs, which a copy-onto-the-prototype mixin could not provide.
- */
 export class Codec extends Metadata {
   static defaultSerializer: Format | MessageSerializer = "marshal";
 
