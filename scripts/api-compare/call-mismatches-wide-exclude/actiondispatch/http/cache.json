@@ -9,6 +9,20 @@
   {
     "package": "actiondispatch",
     "tsFile": "http/cache.ts",
+    "rubyName": "date?",
+    "call": "has_header?",
+    "reason": "Satisfied by a different path: the body calls the local hdrSet helper, which forwards to hasHeader when the host provides it and falls back to a getHeader undefined check, because ResponseCacheHost declares hasHeader as optional."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/cache.ts",
+    "rubyName": "etag?",
+    "call": "etag",
+    "reason": "Satisfied by a different path: the body reads the ETag header directly via getHeader rather than going through the etag accessor, which is a class getter here and not callable as a module function."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/cache.ts",
     "rubyName": "generate_strong_etag",
     "call": "hexdigest",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -16,23 +30,16 @@
   {
     "package": "actiondispatch",
     "tsFile": "http/cache.ts",
-    "rubyName": "handle_conditional_get!",
-    "call": "etag?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/cache.ts",
-    "rubyName": "handle_conditional_get!",
-    "call": "last_modified?",
-    "reason": "Satisfied by a different path: the body calls hasLastModified (our spelling of last_modified?); the mapped candidates for the predicate are is/lastModified, and the lastModified accessor's setter is what promoted it past the args gate."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/cache.ts",
     "rubyName": "if_modified_since",
     "call": "rfc2822",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/cache.ts",
+    "rubyName": "last_modified?",
+    "call": "has_header?",
+    "reason": "Satisfied by a different path: the body calls the local hdrSet helper, which forwards to hasHeader when the host provides it and falls back to a getHeader undefined check, because ResponseCacheHost declares hasHeader as optional."
   },
   {
     "package": "actiondispatch",
@@ -60,13 +67,6 @@
     "tsFile": "http/cache.ts",
     "rubyName": "merge_and_normalize_cache_control!",
     "call": "merge!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/cache.ts",
-    "rubyName": "strong_etag?",
-    "call": "etag?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

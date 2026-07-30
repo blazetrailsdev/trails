@@ -216,10 +216,10 @@ export class Response {
   }
 }
 
-export function hasLastModified(this: R) {
+export function isLastModified(this: R) {
   return hdrSet(this, LAST_MODIFIED);
 }
-export function hasDate(this: R) {
+export function isDate(this: R) {
   return hdrSet(this, DATE);
 }
 /** Rails' `Cache::Response#weak_etag=`. */
@@ -230,7 +230,7 @@ export function weakEtag(this: R, v: unknown) {
 export function strongEtag(this: R, v: unknown) {
   this.setHeader(ETAG, generateStrongEtag(v));
 }
-export function hasEtag(this: R) {
+export function isEtag(this: R) {
   return !!this.getHeader(ETAG);
 }
 export function isWeakEtag(this: R) {
@@ -238,7 +238,7 @@ export function isWeakEtag(this: R) {
   return !!e && e.startsWith('W/"');
 }
 export function isStrongEtag(this: R) {
-  return hasEtag.call(this) && !isWeakEtag.call(this);
+  return isEtag.call(this) && !isWeakEtag.call(this);
 }
 
 /** @internal */
@@ -298,7 +298,7 @@ export function prepareCacheControlBang(this: ResponseCacheHost): CacheControlHa
 }
 
 export function handleConditionalGetBang(this: ResponseCacheHost): void {
-  if ((hasEtag.call(this) || hasLastModified.call(this)) && !this.getHeader(CACHE_CONTROL)) {
+  if ((isEtag.call(this) || isLastModified.call(this)) && !this.getHeader(CACHE_CONTROL)) {
     this.setHeader(CACHE_CONTROL, DEFAULT_CACHE_CONTROL);
   }
 }
