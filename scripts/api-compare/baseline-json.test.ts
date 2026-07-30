@@ -108,6 +108,7 @@ describe("committed api-compare baselines", () => {
       path.join(HERE, "call-mismatches-exclude.json"),
       path.join(HERE, "body-pins.json"),
       path.join(HERE, "arity-exclude.json"),
+      path.join(HERE, "call-mismatches-wide-unreviewed.json"),
     ];
     expect(await findNonCanonicalBaselines(files)).toEqual([]);
   });

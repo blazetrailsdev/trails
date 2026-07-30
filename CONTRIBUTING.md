@@ -106,6 +106,25 @@ tracked in the `wide-calls-exclude-reseed-reorders-untouched-packages` story.
 Any PR that converges a visitor or method body toward Rails can trip this, so
 run the wide ratchet locally whenever you change a ported method body.
 
+The same gate carries a **second only-shrink counter** (RFC 0083): the number
+of baseline entries whose `reason` is still the verbatim seed string, held
+against the high-water mark committed in
+`scripts/api-compare/call-mismatches-wide-unreviewed.json`. Replacing a seeded
+placeholder with a real one-line reason lowers the count — that is how review
+progress registers even when no entry converges. `--write` lowers the mark and
+never raises it, and it holds out rows the reseed itself seeded — so reseeding
+after adding a mismatch turns the gate red until those rows are given real
+reasons.
+
+The gate arm itself compares only the **aggregate** count against the mark; it
+keeps no record of which keys were seeded when the mark was set. So a
+hand-edited baseline that adds one seeded row while reviewing one old row
+leaves the count unchanged and passes. The guarantee is therefore that
+**unreviewed debt never grows** — not that every individual new entry is forced
+to carry a real reason (writing one is still the rule, enforced by whoever
+reviews the baseline diff). `pnpm api:calls:wide:unreviewed` prints the count
+and the mark.
+
 Decision (this story): the wide lint is deliberately **kept out of
 `pnpm api:compare`** and documented here instead. Folding it in would make the
 common narrow run pay for the wide-artifact regeneration on every invocation,

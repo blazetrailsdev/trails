@@ -302,6 +302,12 @@ describe("renderReport", () => {
     expect(out).toContain("By cause bucket: SKIPPED");
   });
 
+  it("shows the unreviewed high-water mark when one is supplied", () => {
+    expect(renderReport(entries, undefined, 20, 2)).toContain(
+      "unreviewed (reason still the seeded default): 1 of 3 — high-water mark 2",
+    );
+  });
+
   it("truncates the per-file listing to the requested top N", () => {
     const out = renderReport(entries, undefined, 1);
     expect(out).toContain("By file (top 1 of 2)");

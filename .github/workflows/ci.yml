@@ -1417,7 +1417,9 @@ jobs:
         run: pnpm exec tsx scripts/api-compare/compare.ts --wide-calls
       - name: Wide call-mismatches ratchet
         # Gates the RFC 0047 wide artifact against the split call-mismatches-wide-exclude/ baseline dir.
-        # Fails on a new wide mismatch or a stale baseline entry; reseed with
+        # Fails on a new wide mismatch, a stale baseline entry, or more
+        # still-unreviewed (seeded-default-reason) entries than the committed
+        # high-water mark in call-mismatches-wide-unreviewed.json; reseed with
         # `pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts --write`.
         run: pnpm exec tsx scripts/api-compare/lint-call-mismatches-wide.ts
       - name: Conventions doc up to date
