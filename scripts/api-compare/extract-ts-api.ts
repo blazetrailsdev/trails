@@ -700,19 +700,10 @@ export function extractFromProgram(
         // tag copied off an inherited base-class method would never match here
         // and would read as stale on top of its correct match on the base file.
         const noRailsEquivalent = declFile === relPath ? noRailsEquivalentReason(decl) : undefined;
-        // Params/optionKeys are structural, not provenance: unlike the JSDoc
-        // reason they describe the member's own arity, which the arity check
-        // compares against the Ruby entry regardless of which file declared it.
-        // So a FOREIGN member gets them too — the same shape the base class's
-        // own entry reports.
-        const declParams = parameterListOf(decl);
-        const propOptionKeys =
-          declParams !== undefined ? extractOptionKeys(declParams, checker) : undefined;
         mixinMethods.push({
           name: prop.name,
           visibility,
-          params: declParams !== undefined ? extractParameters(declParams) : [],
-          ...(propOptionKeys !== undefined ? { optionKeys: propOptionKeys } : {}),
+          ...declarationArity(decl, checker),
           isStatic: false,
           line,
           file: relPath,
@@ -743,13 +734,10 @@ export function extractFromProgram(
         const ctorVisibility = ctorDecl !== undefined ? memberVisibility(ctorDecl) : "public";
         const ctorReason = ownCtor !== undefined ? noRailsEquivalentReason(ownCtor) : undefined;
         const ctorNode = ctorDecl ?? node;
-        const ctorOptionKeys =
-          ctorDecl !== undefined ? extractOptionKeys(ctorDecl.parameters, checker) : undefined;
         mixinMethods.push({
           name: "constructor",
           visibility: ctorVisibility,
-          params: ctorDecl !== undefined ? extractParameters(ctorDecl.parameters) : [],
-          ...(ctorOptionKeys !== undefined ? { optionKeys: ctorOptionKeys } : {}),
+          ...declarationArity(ctorDecl, checker),
           isStatic: false,
           line:
             ctorNode.getSourceFile().getLineAndCharacterOfPosition(ctorNode.getStart()).line + 1,
@@ -2515,23 +2503,38 @@ function getMemberName(member: ts.ClassElement): string | undefined {
 }
 
 /**
- * Returns the effective visibility of a class member, treating
- * `#`-prefixed private fields as `private`.
+ * Arity of a member the `__mixin` walker reached through the type checker: it
+ * holds a symbol's declaration rather than a syntax node, so the kind split
+ * the top-level class walker gets for free happens here instead — methods and
+ * set accessors carry parameters, getters and property declarations report
+ * none. Unlike the JSDoc reason, this is extracted for a FOREIGN declaration
+ * too: arity is the member's own signature, which the arity check compares
+ * against the Ruby entry whichever file declared it.
  */
-/**
- * Parameter list of a member declaration reached through the type checker
- * (the synthesized `__mixin` walker has a symbol, not a syntax node, so it
- * can't branch on the declaration kind inline). Mirrors the top-level class
- * walker's split: methods and set accessors carry parameters; getters and
- * property declarations report none, so they get `undefined` here and the
- * caller falls back to `[]`.
- */
+function declarationArity(
+  decl: ts.Declaration | undefined,
+  checker: ts.TypeChecker,
+): { params: ParamInfo[]; optionKeys?: string[] | null } {
+  const parameters = decl !== undefined ? parameterListOf(decl) : undefined;
+  if (parameters === undefined) return { params: [] };
+  const optionKeys = extractOptionKeys(parameters, checker);
+  return {
+    params: extractParameters(parameters),
+    ...(optionKeys !== undefined ? { optionKeys } : {}),
+  };
+}
+
 function parameterListOf(decl: ts.Declaration): ts.NodeArray<ts.ParameterDeclaration> | undefined {
   if (ts.isMethodDeclaration(decl) || ts.isMethodSignature(decl)) return decl.parameters;
-  if (ts.isSetAccessorDeclaration(decl)) return decl.parameters;
+  if (ts.isSetAccessorDeclaration(decl) || ts.isConstructorDeclaration(decl))
+    return decl.parameters;
   return undefined;
 }
 
+/**
+ * Returns the effective visibility of a class member, treating
+ * `#`-prefixed private fields as `private`.
+ */
 function memberVisibility(member: ts.ClassElement): "public" | "private" | "protected" {
   if (hasModifier(member, ts.SyntaxKind.PrivateKeyword)) return "private";
   if (hasModifier(member, ts.SyntaxKind.ProtectedKeyword)) return "protected";
