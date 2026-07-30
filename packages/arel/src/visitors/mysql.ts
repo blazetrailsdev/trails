@@ -85,57 +85,8 @@ export class MySQL extends ToSql {
     node: Nodes.SelectCore,
     collector: SQLString,
   ): SQLString {
-    collector.append("SELECT");
-
-    this.emitOptimizerHints(node, collector);
-
-    if (node.setQuantifier) {
-      collector.append(" ");
-      this.visit(node.setQuantifier, collector);
-    }
-
-    if (node.projections.length > 0) {
-      collector.append(" ");
-      this.injectJoin(node.projections, ", ", collector);
-    }
-
-    // MySQL emits FROM DUAL for empty FROM.
-    if (node.source.left) {
-      collector.append(" FROM ");
-      this.visit(node.source, collector);
-    } else {
-      collector.append(" FROM DUAL");
-    }
-
-    if (node.wheres.length > 0) {
-      collector.append(" WHERE ");
-      const conditions = node.wheres.length === 1 ? node.wheres[0] : new Nodes.And(node.wheres);
-      this.visit(conditions, collector);
-    }
-
-    if (node.groups.length > 0) {
-      collector.append(" GROUP BY ");
-      this.injectJoin(node.groups, ", ", collector);
-    }
-
-    if (node.havings.length > 0) {
-      collector.append(" HAVING ");
-      const conditions = node.havings.length === 1 ? node.havings[0] : new Nodes.And(node.havings);
-      this.visit(conditions, collector);
-    }
-
-    if (node.windows.length > 0) {
-      collector.append(" WINDOW ");
-      this.injectJoin(node.windows, ", ", collector);
-    }
-
-    // Mirrors base ToSql#visitArelNodesSelectCore — emits the optional
-    // SQL comment after WINDOW. Rails' MySQL visitor (mysql.rb) inherits
-    // the SelectCore visitor from to_sql.rb; Trails overrides for the
-    // FROM DUAL behavior so the comment emission has to be replicated.
-    this.maybeVisit(node.comment ?? null, collector);
-
-    return collector;
+    node.froms ??= new Nodes.SqlLiteral("DUAL", { retryable: true });
+    return super.visitArelNodesSelectCore(node, collector);
   }
 
   protected override visitArelNodesConcat(node: Nodes.Concat, collector: SQLString): SQLString {
