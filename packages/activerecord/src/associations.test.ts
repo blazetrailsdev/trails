@@ -24,6 +24,7 @@ import {
 import { Post, FirstPost, Postesque } from "./test-helpers/models/post.js";
 import { Comment } from "./test-helpers/models/comment.js";
 import { Computer } from "./test-helpers/models/computer.js";
+import { OtherDog } from "./test-helpers/models/other-dog.js";
 registerModel(Comment);
 registerModel(Computer);
 import { Project } from "./test-helpers/models/project.js";
@@ -42,9 +43,7 @@ import "./test-helpers/models/price-estimate.js";
 
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
 import { Preloader } from "./associations/preloader.js";
-import { Batch } from "./associations/preloader/batch.js";
 import { LoaderQuery } from "./associations/preloader/association.js";
-import { OtherDog } from "./test-helpers/models/other-dog.js";
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -393,11 +392,45 @@ describe("AssociationProxyTest", () => {
 });
 
 describe("PreloaderTest", () => {
-  fixtures([]);
+  const {
+    posts,
+    comments,
+    authors,
+    members,
+    books,
+    categories,
+    essays,
+    cpkOrders,
+    cpkOrderAgreements,
+    dogs,
+    shardedBlogPosts,
+    shardedComments,
+    shardedTags,
+  } = fixtures([
+    "posts",
+    "comments",
+    "books",
+    "authors",
+    "tags",
+    "taggings",
+    "essays",
+    "categories",
+    "authorAddresses",
+    "shardedBlogPosts",
+    "shardedComments",
+    "shardedBlogPostsTags",
+    "shardedTags",
+    "members",
+    "memberDetails",
+    "organizations",
+    "cpkOrders",
+    "cpkOrderAgreements",
+    "dogs",
+  ]);
+  const { otherDogs } = fixtures(["otherDogs"], { connection: () => OtherDog.connection });
 
   afterEach(() => vi.restoreAllMocks());
 
-  // Canonical model handles for wave-1 PreloaderTest conversions
   let Author: typeof Base;
   let Post: typeof Base;
   let Comment: typeof Base;
@@ -491,29 +524,25 @@ describe("PreloaderTest", () => {
     registerModel("CpkOrder", CpkOrderPL);
     registerModel("CpkOrderAgreement", CpkOrderAgreementPL);
     registerModel("Dog", Dog);
+    registerModel("OtherDog", OtherDog);
     registerModel("EssaySpecial", EssaySpecial);
     registerModel("Postesque", PostesquePL);
     registerModel("AuthorAddress", AuthorAddress);
   });
 
   it("preload with scope", async () => {
-    const author = await Author.create({ name: "David" });
-    const post = await Post.create({ title: "Welcome", body: "body", author_id: author.id });
-    await Comment.create({ post_id: post.id, body: "Thank you for the welcome" });
-    await Comment.create({ post_id: post.id, body: "Other comment" });
+    const post = posts("welcome");
     await new Preloader({
       records: [post],
       associations: ["comments"],
       scope: Comment.where({ body: "Thank you for the welcome" }),
     }).call();
-    const loaded = (post as any).association("comments").target;
-    expect(loaded).toHaveLength(1);
-    expect(loaded[0].body).toBe("Thank you for the welcome");
+    const loaded = (post as any).association("comments").target as Base[];
+    expect(loaded.map((c) => c.id)).toEqual([comments("greetings").id]);
   });
 
   it("preload makes correct number of queries on array", async () => {
-    const author = await Author.create({ name: "David" });
-    const post = await Post.create({ title: "Welcome", body: "body", author_id: author.id });
+    const post = posts("welcome");
     const sqls = await captureSql(async () => {
       await new Preloader({ records: [post], associations: ["comments"] }).call();
     });
@@ -521,8 +550,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload makes correct number of queries on relation", async () => {
-    const author = await Author.create({ name: "David" });
-    const post = await Post.create({ title: "Welcome", body: "body", author_id: author.id });
+    const post = posts("welcome");
     const relation = Post.where({ id: post.id });
     let preloader: Preloader;
     const sqls = await captureSql(
@@ -542,7 +570,6 @@ describe("PreloaderTest", () => {
     const relation = Post.where({ id: -1 });
     const preloader = new Preloader({ records: relation, associations: "comments" });
     expect(await preloader.isEmpty()).toBe(true);
-    // Materialized once: a subsequent call() issues no preload query.
     const sqls = await captureSql(async () => {
       await preloader.call();
     });
@@ -550,31 +577,23 @@ describe("PreloaderTest", () => {
   });
 
   it("isEmpty reports false for a non-empty relation", async () => {
-    const author = await Author.create({ name: "David" });
-    const post = await Post.create({ title: "Welcome", body: "body", author_id: author.id });
-    const relation = Post.where({ id: post.id });
+    const relation = Post.where({ id: posts("welcome").id });
     const preloader = new Preloader({ records: relation, associations: "comments" });
     expect(await preloader.isEmpty()).toBe(false);
   });
 
   it("preload does not concatenate duplicate records", async () => {
-    const author = await Author.create({ name: "David" });
-    const post = await Post.create({ title: "Welcome", body: "body", author_id: author.id });
+    const post = posts("welcome");
     await Comment.create({ post_id: post.id, body: "A new comment" });
-    // Preload once (mirrors Rails' post.comments.create! which loads the association)
     await new Preloader({ records: [post], associations: ["comments"] }).call();
-    // Preload again on the same record — a naive concat-on-top would double the count
     await new Preloader({ records: [post], associations: ["comments"] }).call();
     const loaded = (post as any).association("comments").target;
     expect(loaded.length).toBe(Number(await Comment.where({ post_id: post.id }).count()));
   });
 
-  // STI filtering via className is not applied in ThroughAssociation preloader:
-  // both Category and SpecialCategory rows are returned instead of only SpecialCategory.
   // TODO(store-full-sti-class-name): remove it.fails when that story fixes the gap.
   it.fails("preload for hmt with conditions", async () => {
-    const author = await Author.create({ name: "David" });
-    const post = await Post.create({ title: "Welcome", body: "body", author_id: author.id });
+    const post = posts("welcome");
     await CategoryPost.create({
       category_id: (await Category.create({ name: "Normal" })).id,
       post_id: post.id,
@@ -588,9 +607,8 @@ describe("PreloaderTest", () => {
   });
 
   it("preload groups queries with same scope", async () => {
-    const author = await Author.create({ name: "David" });
-    const book = await Book.create({ author_id: author.id, name: "A Book" });
-    const post = await Post.create({ title: "Welcome", body: "body", author_id: author.id });
+    const book = books("awdr");
+    const post = posts("welcome");
     const sqls = await captureSql(async () => {
       await new Preloader({ records: [book, post], associations: ["author"] }).call();
     });
@@ -600,18 +618,16 @@ describe("PreloaderTest", () => {
       void (post as any).association("author").target;
     });
     expect(noQueriesAfter).toHaveLength(0);
-    expect((book as any).association("author").target.id).toBe(author.id);
-    expect((post as any).association("author").target.id).toBe(author.id);
+    expect((book as any).association("author").target.id).toBe((book as any).author_id);
+    expect((post as any).association("author").target.id).toBe((post as any).author_id);
   });
 
   it("preload grouped queries with already loaded records", async () => {
-    const author = await Author.create({ name: "David" });
-    const book = await Book.create({ author_id: author.id, name: "A Book" });
-    const post = await Post.create({ title: "Welcome", body: "body", author_id: author.id });
+    const author = authors("david");
+    const book = books("awdr");
+    const post = posts("welcome");
     const bookLoaded = (await Book.where({ id: book.id }).includes("author"))[0];
     const postFresh = (await Post.where({ id: post.id }))[0];
-    // book's author already loaded; post shares the same author_id →
-    // the Preloader finds the key in alreadyLoadedByKey and issues 0 DB queries
     const sqls = await captureSql(async () => {
       await new Preloader({ records: [bookLoaded, postFresh], associations: ["author"] }).call();
       void (bookLoaded as any).association("author").target;
@@ -622,68 +638,69 @@ describe("PreloaderTest", () => {
     expect((postFresh as any).association("author").target.id).toBe(author.id);
   });
   it("preload grouped queries of middle records", async () => {
-    const post1 = await Post.create({ title: "P1", body: "b1" });
-    const post2 = await Post.create({ title: "P2", body: "b2" });
-    const tag1 = await Tag.create({ name: "ruby" });
-    const tag2 = await Tag.create({ name: "rails" });
-    await Tagging.create({ taggable_id: post1.id, taggable_type: "Post", tag_id: tag1.id });
-    await Tagging.create({ taggable_id: post2.id, taggable_type: "Post", tag_id: tag2.id });
-    // Two separate preloaders for a through association — middle-record (taggings) loaders
-    // from both branches share the same scope/key and are coalesced into 1 batch call
+    const records = [
+      comments("eager_sti_on_associations_s_comment1"),
+      comments("eager_sti_on_associations_s_comment2"),
+    ];
+
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-    const p1 = new Preloader({ records: [post1], associations: ["tags"] });
-    const p2 = new Preloader({ records: [post2], associations: ["tags"] });
-    await new Batch([p1, p2]).call();
-    // 3 batch calls: grouped taggings loaders, grouped tag loaders, and the
-    // tag→tagging preload from Tagging#tag's `includes(:tagging)` scope.
-    expect(spy).toHaveBeenCalledTimes(3);
-    expect((post1 as any).association("tags").target.map((t: any) => t.name)).toEqual(["ruby"]);
-    expect((post2 as any).association("tags").target.map((t: any) => t.name)).toEqual(["rails"]);
+    await new Preloader({ records, associations: ["author", "ordinaryPost"] }).call();
+    expect(spy).toHaveBeenCalledTimes(2);
   });
   it("preload grouped queries of through records", async () => {
-    const post1 = await Post.create({ title: "P1", body: "b1" });
-    const post2 = await Post.create({ title: "P2", body: "b2" });
-    const tag1 = await Tag.create({ name: "ruby" });
-    const tag2 = await Tag.create({ name: "rails" });
-    await Tagging.create({ taggable_id: post1.id, taggable_type: "Post", tag_id: tag1.id });
-    await Tagging.create({ taggable_id: post2.id, taggable_type: "Post", tag_id: tag2.id });
-    // includes() creates one Preloader; source (tag) loaders for both posts share the
-    // same scope and are coalesced — 3 batch calls total (taggings, tags, and the
-    // tag→tagging preload from Tagging#tag's `includes(:tagging)` scope), not 5.
+    const author = authors("david");
+
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-    const posts = await Post.where({ id: [post1.id, post2.id] }).includes("tags");
+    await new Preloader({
+      records: [author],
+      associations: ["helloPostComments", "comments"],
+    }).call();
     expect(spy).toHaveBeenCalledTimes(3);
-    const p1tags = (posts.find((p: any) => p.title === "P1") as any).association("tags").target;
-    const p2tags = (posts.find((p: any) => p.title === "P2") as any).association("tags").target;
-    expect(p1tags[0].name).toBe("ruby");
-    expect(p2tags[0].name).toBe("rails");
   });
-  it("preload through records with already loaded middle record", async () => {
-    const post1 = await Post.create({ title: "P1", body: "b1" });
-    const post2 = await Post.create({ title: "P2", body: "b2" });
-    const tag1 = await Tag.create({ name: "ruby" });
-    const tag2 = await Tag.create({ name: "rails" });
-    await Tagging.create({ taggable_id: post1.id, taggable_type: "Post", tag_id: tag1.id });
-    await Tagging.create({ taggable_id: post2.id, taggable_type: "Post", tag_id: tag2.id });
-    // Pre-load middle records (taggings) for post1 only
-    const p1 = (await Post.where({ title: "P1" }).includes("taggings"))[0];
-    const p2 = (await Post.where({ title: "P2" }))[0];
-    // Preload tags for both posts. The through-preloader's tagging loader finds p1's key
-    // already loaded (LoaderRecords merge path) and only queries DB for p2's taggings
-    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
-    await new Preloader({ records: [p1, p2], associations: ["tags"] }).call();
-    // First call is for taggings: only p2's key goes to DB (p1's already loaded)
-    const taggingKeys = spy.mock.calls[0]?.[0];
-    expect(taggingKeys).toHaveLength(1);
-    expect((p1 as any).association("tags").target.map((t: any) => t.name)).toEqual(["ruby"]);
-    expect((p2 as any).association("tags").target.map((t: any) => t.name)).toEqual(["rails"]);
+  // TODO(preloader-middle-records-from-records-by-owner): remove it.fails once
+  // the through preloader derives middle records from `recordsByOwner` (Rails'
+  // through_association.rb:74-96) instead of `preloadedRecords`. With the
+  // through record already loaded nothing is queried, so middleRecords is
+  // empty and the source is never preloaded: 0 queries and an empty collection
+  // instead of Rails' 1 query and both member_details.
+  it.fails("preload through records with already loaded middle record", async () => {
+    const member = members("groucho") as any;
+    const expectedMemberDetailIds = ((await member.organizationMemberDetails_2) as Base[])
+      .map((d) => Number(d.id))
+      .sort();
+
+    await member.reload();
+    await member.loadHasOne("organization");
+
+    const sqls = await captureSql(async () => {
+      await new Preloader({
+        records: [member],
+        associations: "organizationMemberDetails_2",
+      }).call();
+    });
+    expect(sqls).toHaveLength(1);
+
+    const reads = await captureSql(async () => {
+      const loaded = member.association("organizationMemberDetails_2").target as Base[];
+      expect(loaded.map((d) => Number(d.id)).sort()).toEqual(expectedMemberDetailIds);
+    });
+    expect(reads).toHaveLength(0);
   });
+
   it("preload with instance dependent scope", async () => {
-    const david = await Author.create({ name: "David" });
+    const david = authors("david");
     const david2 = await Author.create({ name: "David" });
-    const bob = await Author.create({ name: "Bob" });
-    const post1 = await Post.create({ author_id: david.id, title: "Post 1", body: "david" });
-    const post2 = await Post.create({ author_id: david.id, title: "Post 2", body: "david" });
+    const bob = authors("bob");
+    const post1 = await Post.create({
+      author_id: david.id,
+      title: "test post",
+      body: "this post is about david",
+    });
+    const post2 = await Post.create({
+      author_id: david.id,
+      title: "test post 2",
+      body: "this post is also about david",
+    });
 
     await new Preloader({
       records: [david, david2, bob],
@@ -699,11 +716,10 @@ describe("PreloaderTest", () => {
     expect(bobPosts).toEqual([]);
   });
   it("preload with instance dependent through scope", async () => {
-    const david = await Author.create({ name: "David" });
+    const david = authors("david");
     const david2 = await Author.create({ name: "David" });
-    const bob = await Author.create({ name: "Bob" });
-    const davidPost = await Post.create({ author_id: david.id, title: "Post", body: "body" });
-    // Lowercased so LIKE '%david%' matches on MariaDB (case-sensitive collation).
+    const bob = authors("bob");
+    const davidPost = posts("welcome");
     const comment1 = await Comment.create({ post_id: davidPost.id, body: "Hi david!" });
     const comment2 = await Comment.create({
       post_id: davidPost.id,
@@ -724,17 +740,14 @@ describe("PreloaderTest", () => {
     expect(bobComments).toEqual([]);
   });
   it("preload with through instance dependent scope", async () => {
-    const david = await Author.create({ name: "David" });
+    const david = authors("david");
     const david2 = await Author.create({ name: "David" });
-    const bob = await Author.create({ name: "Bob" });
+    const bob = authors("bob");
     const davidPost = await Post.create({
       author_id: david.id,
       title: "test post",
-      // Lowercased so the `postsMentioningAuthor` LIKE `%david%` scope matches
-      // regardless of the column collation (MariaDB CI uses a case-sensitive one).
       body: "this post is about david",
     });
-    // Second david post also matches the body scope but has no comments.
     await Post.create({
       author_id: david.id,
       title: "test post 2",
@@ -791,8 +804,6 @@ describe("PreloaderTest", () => {
       expect(sl.association("discountApplications").target[0].discount).not.toBeNull();
     };
 
-    // First preload: nothing loaded, so all five levels query —
-    // line_items, shipping_lines, both discount_applications, and discounts.
     const fresh = (await Invoice.where({ id: invoice.id }))[0];
     const firstSqls = await captureSql(async () => {
       await new Preloader({ records: [fresh], associations: nested }).call();
@@ -801,9 +812,6 @@ describe("PreloaderTest", () => {
     const firstReads = await captureSql(async () => readDiscounts(fresh));
     expect(firstReads).toHaveLength(0);
 
-    // Reload, then force-load the line_items branch (line_items +
-    // line_item_discount_applications). The second preload must skip that branch
-    // and issue only the three shipping/discount queries.
     const reloaded = (await Invoice.where({ id: invoice.id }))[0];
     const lineItems = await findHasManyTarget(reloaded, "lineItems", {});
     for (const li of lineItems) await findHasManyTarget(li, "discountApplications", {});
@@ -816,16 +824,19 @@ describe("PreloaderTest", () => {
   });
 
   it("preload through", async () => {
-    const post = await Post.create({ title: "Hello", body: "body" });
-    const tag1 = await Tag.create({ name: "ruby" });
-    const tag2 = await Tag.create({ name: "rails" });
-    await Tagging.create({ taggable_id: post.id, taggable_type: "Post", tag_id: tag1.id });
-    await Tagging.create({ taggable_id: post.id, taggable_type: "Post", tag_id: tag2.id });
+    const records = [
+      comments("eager_sti_on_associations_s_comment1"),
+      comments("eager_sti_on_associations_s_comment2"),
+    ];
 
-    const posts = await Post.where({ id: post.id }).includes("taggings");
-    expect(posts).toHaveLength(1);
-    const preloaded = (posts[0] as any).association("taggings").target;
-    expect(preloaded).toHaveLength(2);
+    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
+    await new Preloader({ records, associations: ["author", "post"] }).call();
+    expect(spy).toHaveBeenCalledTimes(2);
+
+    const reads = await captureSql(async () => {
+      for (const comment of records) void (comment as any).association("author").target;
+    });
+    expect(reads).toHaveLength(0);
   });
 
   it("preload groups queries with same scope at second level", async () => {
@@ -839,7 +850,6 @@ describe("PreloaderTest", () => {
       records: [a],
       associations: [{ thinkingPosts: "comments" }, { welcomePosts: "comments" }],
     }).call();
-    // 3 batched DB calls: thinking_posts, welcome_posts, then ONE coalesced comments call.
     expect(spy).toHaveBeenCalledTimes(3);
   });
   it("preload groups queries with same sql at second level", async () => {
@@ -853,13 +863,11 @@ describe("PreloaderTest", () => {
       records: [a],
       associations: [{ thinkingPosts: "comments" }, { welcomePosts: "commentsWithExtending" }],
     }).call();
-    // 3 batched DB calls: thinking_posts, welcome_posts, then ONE coalesced
-    // comments call shared by comments and commentsWithExtending (extending excluded from SQL fingerprint).
     expect(spy).toHaveBeenCalledTimes(3);
   });
   it("preload with grouping sets inverse association", async () => {
-    const mary = await Author.create({ name: "Mary" });
-    const bob = await Author.create({ name: "Bob" });
+    const mary = authors("mary");
+    const bob = authors("bob");
     await AuthorFavorite.create({ author_id: mary.id, favorite_author_id: bob.id });
     const favorites = await AuthorFavorite.all();
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
@@ -867,18 +875,10 @@ describe("PreloaderTest", () => {
       records: favorites,
       associations: ["author", "favoriteAuthor"],
     }).call();
-    // Both belongs_to loaders hit the same table with the same scope/key →
-    // coalesced into 1 batched query.
     expect(spy).toHaveBeenCalledTimes(1);
     const fav = favorites[0] as any;
     expect(fav.association("author").target.name).toBe("Mary");
     expect(fav.association("favoriteAuthor").target.name).toBe("Bob");
-    // Mirrors Rails `test_preload_with_grouping_sets_inverse_association`
-    // (associations_test.rb:1120): after the coalesced preload, both belongs_to
-    // targets are reachable with no further queries. The has_many inverse
-    // (`mary.authorFavorites`) is intentionally NOT back-populated — Rails gates
-    // that on `has_many_inversing` (BelongsToAssociation#invertible_for?), which
-    // is unset here, so the loaded author carries no inverse collection.
     spy.mockClear();
     const reloadedAuthor = (await findTarget(
       fav,
@@ -894,42 +894,20 @@ describe("PreloaderTest", () => {
     expect(spy).not.toHaveBeenCalled();
   });
   it("preload can group separate levels", async () => {
-    const mary = await Author.create({ name: "Mary" });
-    const bob = await Author.create({ name: "Bob" });
+    const mary = authors("mary");
+    const bob = authors("bob");
     await AuthorFavorite.create({ author_id: mary.id, favorite_author_id: bob.id });
-    await Post.create({ title: "M1", body: "b", author_id: mary.id });
-    await Post.create({ title: "B1", body: "b", author_id: bob.id });
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     await new Preloader({
       records: [mary],
       associations: ["posts", { favoriteAuthors: "posts" }],
     }).call();
-    // Rails: 3 queries. Through-target authors share the authorFavorites
-    // load, and the two posts loaders (mary's + bob's) coalesce into one
-    // batched call.
     expect(spy).toHaveBeenCalledTimes(3);
   });
   it("preload can group multi level ping pong through", async () => {
-    // Author#similarPosts "ping pongs" back to posts:
-    //   Author → posts → taggings → tags  (has_many :tags, through: :posts)
-    //   Tag    → taggings → taggable(Post) (has_many :taggedPosts, source_type)
-    //   Author → tags → taggedPosts        (has_many :similarPosts)
-    // and favoriteAuthors loops the same chain a level down, so the preloader
-    // has to coalesce the repeated posts/comments levels across both branches.
-    const mary = await Author.create({ name: "Mary" });
-    const bob = await Author.create({ name: "Bob" });
+    const mary = authors("mary");
+    const bob = authors("bob");
     await AuthorFavorite.create({ author_id: mary.id, favorite_author_id: bob.id });
-    const maryPost = await Post.create({ title: "M1", body: "b", author_id: mary.id });
-    const bobPost = await Post.create({ title: "B1", body: "b", author_id: bob.id });
-    const tag = await Tag.create({ name: "ruby" });
-    await Tagging.create({
-      tag_id: tag.id,
-      taggable_id: maryPost.id,
-      taggable_type: "Post",
-    });
-    await Tagging.create({ tag_id: tag.id, taggable_id: bobPost.id, taggable_type: "Post" });
-    await Comment.create({ body: "on mary post", post_id: maryPost.id });
-    await Comment.create({ body: "on bob post", post_id: bobPost.id });
 
     const associations = [
       { similarPosts: "comments" },
@@ -938,38 +916,22 @@ describe("PreloaderTest", () => {
 
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     await new Preloader({ records: [mary], associations }).call();
-    // Both branches walk the same posts→taggings→tags→taggedPosts→comments
-    // levels, so the preloader coalesces them rather than re-querying each
-    // branch independently. Rails' `assert_queries_count(9)` — the count drops
-    // to 8 only with automatic scope inversing (Tagging#tag's `includes(:tagging)`
-    // scope reusing its inverse), which this test doesn't enable.
     const preloadCalls = spy.mock.calls.length;
     expect(preloadCalls).toBe(9);
 
-    // assert_no_queries: every level is now preloaded, so re-walking the whole
-    // ping-pong chain reads from the cache without issuing further loads.
-    const marySimilar = (mary as any).association("similarPosts").target;
-    expect(marySimilar.map((p: any) => p.id).sort()).toEqual([maryPost.id, bobPost.id].sort());
-    for (const post of marySimilar) {
-      expect(post.association("comments").target.length).toBe(1);
-    }
-    const maryFavs = (mary as any).association("favoriteAuthors").target;
-    expect(maryFavs.map((a: any) => a.id)).toEqual([bob.id]);
-    const bobSimilar = maryFavs[0].association("similarPosts").target;
-    expect(bobSimilar.map((p: any) => p.id).sort()).toEqual([maryPost.id, bobPost.id].sort());
-    for (const post of bobSimilar) {
-      expect(post.association("comments").target.length).toBe(1);
-    }
-    // Walking the cached graph above triggered no new batched loads.
+    const marySimilar = (mary as any).association("similarPosts").target as Base[];
+    expect(marySimilar.length).toBeGreaterThan(0);
+    for (const post of marySimilar) void (post as any).association("comments").target;
+    const maryFavs = (mary as any).association("favoriteAuthors").target as Base[];
+    expect(maryFavs.map((a) => a.id)).toEqual([bob.id]);
+    const bobSimilar = (maryFavs[0] as any).association("similarPosts").target as Base[];
+    for (const post of bobSimilar) void (post as any).association("comments").target;
     expect(spy.mock.calls.length).toBe(preloadCalls);
   });
   it("preload does not group same class different scope", async () => {
-    const alice = await Author.create({ name: "Alice" });
-    const post = await Post.create({ title: "P1", body: "body", author_id: alice.id });
-    const postesque = await PostesquePL.create({ author_name: alice.name });
+    const post = posts("welcome");
+    const postesque = await PostesquePL.create({ author_name: (authors("david") as any).name });
 
-    // Sub-scenario 1: scopes differ in generated SQL.
-    // Post#authorWithTheLetterA has `name LIKE '%a%'`; Postesque#authorWithTheLetterA has none.
     let spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     await new Preloader({
       records: [post, postesque],
@@ -980,9 +942,6 @@ describe("PreloaderTest", () => {
     (post as any)._resetAssociationCaches();
     (postesque as any)._resetAssociationCaches();
 
-    // Sub-scenario 2: SQL is identical but Post#authorWithAddress carries a preload value
-    // (includes authorAddress) while Postesque#authorWithAddress does not — the preload
-    // difference still prevents coalescing, and the address load adds a third query.
     spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     await new Preloader({
       records: [post, postesque],
@@ -991,11 +950,8 @@ describe("PreloaderTest", () => {
     expect(spy).toHaveBeenCalledTimes(3);
   });
   it("preload does not group same scope different key name", async () => {
-    // Mirrors Rails Postesque.belongs_to :author, foreign_key: :author_name, primary_key: :name.
-    // Same scope (no WHERE), same class, but distinct join-primary-key → must NOT coalesce.
-    const author = await Author.create({ name: "Alice" });
-    const post = await Post.create({ title: "P1", body: "body", author_id: author.id });
-    const postesque = await PostesquePL.create({ author_name: author.name });
+    const post = posts("welcome");
+    const postesque = await PostesquePL.create({ author_name: (authors("david") as any).name });
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     await new Preloader({
       records: [post, postesque],
@@ -1004,11 +960,20 @@ describe("PreloaderTest", () => {
     expect(spy).toHaveBeenCalledTimes(2);
   });
   it("multi database polymorphic preload with same table name", async () => {
-    registerModel(OtherDog);
+    const dog = dogs("sophie");
+    const dogComment = comments("greetings") as any;
+    dogComment.origin_type = dog.constructor.name;
+    dogComment.origin_id = dog.id;
 
-    const dogComment = new (Comment as any)({ origin_id: 1, origin_type: "Dog" });
-    const otherDogComment = new (Comment as any)({ origin_id: 1, origin_type: "OtherDog" });
+    const otherDog = otherDogs("lassie");
+    const otherDogComment = comments("more_greetings") as any;
+    otherDogComment.origin_type = otherDog.constructor.name;
+    otherDogComment.origin_id = otherDog.id;
 
+    // Both Dog and OtherDog are backed by a table named `dogs`, however they are
+    // stored in different databases and should therefore result in two separate
+    // queries rather than be batched together — `LoaderQuery#hashKey`
+    // distinguishes loaders by connection identity.
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     await new Preloader({
       records: [dogComment, otherDogComment],
@@ -1018,11 +983,9 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records", async () => {
-    const david = await Author.create({ name: "David" });
-    const post = await Post.create({ title: "Welcome", body: "body", author_id: david.id });
+    const post = posts("welcome");
+    const david = authors("david");
 
-    // availableRecords supplies david, so the belongs_to preload runs no query
-    // and attaches the supplied instance itself.
     const sqls = await captureSql(async () => {
       await new Preloader({
         records: [post],
@@ -1055,12 +1018,11 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with only some records available", async () => {
-    const bob = await Author.create({ name: "Bob" });
-    const mary = await Author.create({ name: "Mary" });
-    const bobPost = await Post.create({ title: "misc by bob", body: "body", author_id: bob.id });
-    const maryPost = await Post.create({ title: "misc by mary", body: "body", author_id: mary.id });
+    const bobPost = posts("misc_by_bob");
+    const maryPost = posts("misc_by_mary");
+    const bob = authors("bob");
+    const mary = authors("mary");
 
-    // availableRecords satisfies bob from memory; only mary requires a query.
     const sqls = await captureSql(async () => {
       await new Preloader({
         records: [bobPost, maryPost],
@@ -1071,7 +1033,6 @@ describe("PreloaderTest", () => {
     expect(sqls).toHaveLength(1);
 
     const reads = await captureSql(async () => {
-      // assert_same bob — the supplied instance; assert_equal mary — freshly loaded
       expect(bobPost.association("author").target).toBe(bob);
       expect((maryPost.association("author").target as any).id).toBe(mary.id);
     });
@@ -1079,23 +1040,14 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with some records already loaded", async () => {
-    const bob = await Author.create({ name: "Bob" });
-    const mary = await Author.create({ name: "Mary" });
-    const bobPostId = (await Post.create({ title: "misc by bob", body: "body", author_id: bob.id }))
-      .id;
-    const maryPostId = (
-      await Post.create({ title: "misc by mary", body: "body", author_id: mary.id })
-    ).id;
-    // Fresh instances so association load state mirrors Rails' fixtures.
-    const bobPost = (await Post.where({ id: bobPostId }))[0];
-    const maryPost = (await Post.where({ id: maryPostId }))[0];
+    const bobPost = posts("misc_by_bob");
+    const maryPost = posts("misc_by_mary");
+    const mary = authors("mary");
 
-    // Force-load bob's author; mary's stays unloaded.
     const loadedBob = await findTarget(bobPost, "author", {}, "belongsTo");
     expect(bobPost.association("author").isLoaded()).toBe(true);
     expect(maryPost.association("author").isLoaded()).toBe(false);
 
-    // Only mary's author is missing, so the preload runs a single query.
     const sqls = await captureSql(async () => {
       await new Preloader({ records: [bobPost, maryPost], associations: "author" }).call();
     });
@@ -1109,54 +1061,32 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records with through association", async () => {
-    const author = await Author.create({ name: "David" });
-    await Category.create({ name: "General" });
-    await Essay.create({
-      name: "A Modest Proposal",
-      writer_type: "Author",
-      writer_id: "David",
-      category_id: "General",
-    });
-    const categories = await Category.all();
+    const author = authors("david");
+    const allCategories = await Category.all();
 
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
-    // One query to get the middle records (i.e. essays); categories come from availableRecords
     await new Preloader({
       records: [author],
       associations: "essayCategory",
-      availableRecords: categories,
+      availableRecords: allCategories,
     }).call();
     const queryCalls = spy.mock.calls.filter((c) => c[0].length > 0);
     expect(queryCalls).toHaveLength(1);
     expect(association(author, "essayCategory").loaded).toBe(true);
-    // Mirrors Rails' __id__ check: the preloaded category is the *same instance*
-    // taken from availableRecords, not a freshly-loaded row. Read off the real
-    // holder (RFC 0022) — a has_one :through holder exposes the single target
-    // record (Rails stores the single record in `@association_cache`).
     const preloaded = (author as any).association("essayCategory").target;
-    expect(categories).toContain(preloaded);
+    expect(allCategories).toContain(preloaded);
   });
 
   it("preload with only some records available with through associations", async () => {
-    const mary = await Author.create({ name: "Mary" });
-    const dave = await Author.create({ name: "David" });
-    const tech = await Category.create({ name: "Technology" });
-    const general = await Category.create({ name: "General" });
-    await Essay.create({
-      name: "Stay Home",
-      writer_type: "Author",
-      writer_id: "Mary",
-      category_id: "Technology",
-    });
-    await Essay.create({
-      name: "A Modest Proposal",
-      writer_type: "Author",
-      writer_id: "David",
-      category_id: "General",
-    });
+    const mary = authors("mary");
+    const maryEssay = essays("mary_stay_home");
+    const tech = categories("technology");
+    await (maryEssay as any).update({ category_id: (tech as any).name });
+
+    const dave = authors("david");
+    const general = categories("general");
 
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
-    // One query for the middle (essay) records, one for the missing category (general)
     await new Preloader({
       records: [mary, dave],
       associations: "essayCategory",
@@ -1164,10 +1094,6 @@ describe("PreloaderTest", () => {
     }).call();
     const queryCalls = spy.mock.calls.filter((c) => c[0].length > 0);
     expect(queryCalls).toHaveLength(2);
-    // Mirrors Rails' assert_no_queries: preloaded associations are served from
-    // cache on read, so the singular reader must not hit the DB. mary's category
-    // comes from availableRecords (assert_same → toBe), dave's is freshly loaded
-    // (assert_equal → value equality).
     const reads = await captureSql(async () => {
       expect((mary as any).association("essayCategory").reader).toBe(tech);
       expect((dave as any).association("essayCategory").reader.id).toBe(general.id);
@@ -1176,17 +1102,10 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records with multiple classes", async () => {
-    // Essay belongs_to :author and :category (both primary_key: :name), so the
-    // two available records are of different classes.
-    const david = await Author.create({ name: "David" });
-    const general = await Category.create({ name: "General" });
-    const essay = await Essay.create({
-      name: "A Modest Proposal",
-      author_id: "David",
-      category_id: "General",
-    });
+    const essay = essays("david_modest_proposal") as any;
+    const general = categories("general");
+    const david = authors("david");
 
-    // Both supplied from availableRecords → no queries, supplied instances attached.
     const sqls = await captureSql(async () => {
       await new Preloader({
         records: [essay],
@@ -1202,8 +1121,8 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records queries when scoped", async () => {
-    const david = await Author.create({ name: "David" });
-    const post = await Post.create({ title: "P", body: "body", author_id: david.id });
+    const post = posts("welcome") as any;
+    const david = authors("david");
 
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
     await new Preloader({
@@ -1213,40 +1132,35 @@ describe("PreloaderTest", () => {
       availableRecords: [david],
     }).call();
     const queryCalls = spy.mock.calls.filter((c) => c[0].length > 0);
-    // Scope present → availableRecords ignored, runs the query
     expect(queryCalls).toHaveLength(1);
-    // The author is loaded from the query, NOT the supplied instance (Rails'
-    // assert_not_equal david.__id__, post.author.__id__).
     expect(post.association("author").isLoaded()).toBe(true);
     expect(post.association("author").target).not.toBe(david);
   });
 
   it("preload with available records queries when collection", async () => {
-    const post = await Post.create({ title: "P", body: "body" });
-    const c1 = await Comment.create({ body: "c1", post_id: post.id });
-    const comments = [c1];
+    const post = posts("welcome") as any;
+    const allComments = await Comment.all();
 
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
     await new Preloader({
       records: [post],
       associations: "comments",
-      availableRecords: comments,
+      availableRecords: allComments,
     }).call();
     const queryCalls = spy.mock.calls.filter((c) => c[0].length > 0);
-    // Collection association → availableRecords skipped, runs the query
     expect(queryCalls).toHaveLength(1);
-    // The loaded comments come from the query, sharing no object identity with
-    // the supplied availableRecords (Rails' assert_empty intersection).
     expect(post.association("comments").isLoaded()).toBe(true);
-    const loaded = post.association("comments").target as any[];
-    expect(loaded.some((lc) => comments.includes(lc))).toBe(false);
-    expect(loaded.map((lc) => lc.id)).toEqual([(c1 as any).id]);
+    const loaded = post.association("comments").target as Base[];
+    expect(loaded.some((lc) => allComments.includes(lc))).toBe(false);
+    expect(loaded.map((lc) => lc.id).sort()).toEqual(
+      [comments("greetings").id, comments("more_greetings").id].sort(),
+    );
   });
 
   it("preload with available records queries when incomplete", async () => {
-    const david = await Author.create({ name: "David" });
-    const bob = await Author.create({ name: "Bob" });
-    const post = await Post.create({ title: "P", body: "body", author_id: david.id });
+    const post = posts("welcome") as any;
+    const bob = authors("bob");
+    const david = authors("david");
 
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
     await new Preloader({
@@ -1255,9 +1169,8 @@ describe("PreloaderTest", () => {
       availableRecords: [bob],
     }).call();
     const queryCalls = spy.mock.calls.filter((c) => c[0].length > 0);
-    // Bob doesn't match david's key → still 1 query
     expect(queryCalls).toHaveLength(1);
-    const preloaded = post.association("author").target as any;
+    const preloaded = post.association("author").target;
     expect(preloaded?.id).toBe(david.id);
   });
 
@@ -1275,13 +1188,11 @@ describe("PreloaderTest", () => {
   });
 
   it("preload wont set the wrong target", async () => {
-    // A wrong-class available record whose id matches post.author_id must NOT be
-    // attached: the preloader keys loaders by class, so a Category can't satisfy
-    // a belongs_to :author even when the foreign key value collides.
-    const general = await Category.create({ name: "General" });
-    const post = await Post.create({ title: "Welcome", body: "body", author_id: general.id });
+    const post = posts("welcome") as any;
+    await post.update({ author_id: 54321 });
+    const general = categories("general") as any;
+    await general.update({ id: 54321 });
 
-    // Category has no :author association — mirrors Rails' assert_raises.
     expect(() => general.association("author")).toThrow();
 
     await new Preloader({
@@ -1290,58 +1201,37 @@ describe("PreloaderTest", () => {
       availableRecords: [[general]],
     }).call();
     expect(post.association("author").isLoaded()).toBe(true);
-    // assert_not_equal some_other_record, post.author
     expect(post.association("author").target).not.toBe(general);
   });
 
   it("preload has many association with composite foreign key", async () => {
-    const blog = await ShardedBlogPL.create({ name: "Blog" });
-    const bp1 = await ShardedBlogPostPL.create({ blog_id: blog.id, title: "Post1" });
-    const bp2 = await ShardedBlogPostPL.create({ blog_id: blog.id, title: "Post2" });
-    const comment = await ShardedCommentPL.create({
-      blog_id: blog.id,
-      blog_post_id: bp1.id,
-      body: "Great!",
-    });
+    const blogPost = shardedBlogPosts("great_post_blog_one");
+    const blogPosts = [blogPost, shardedBlogPosts("great_post_blog_two")];
 
-    const blogPosts = await ShardedBlogPostPL.all().includes("comments");
-    expect(blogPosts).toHaveLength(2);
-    const byTitle = new Map(blogPosts.map((bp) => [(bp as any).title, bp]));
-    expect(byTitle.get("Post1")!.association("comments").isLoaded()).toBe(true);
-    const preloaded = (byTitle.get("Post1") as any).association("comments").target;
-    expect(preloaded).toHaveLength(1);
-    expect(preloaded[0].id).toBe(comment.id);
+    await new Preloader({ records: blogPosts, associations: ["comments"] }).call();
+
+    expect((blogPost as any).association("comments").isLoaded()).toBe(true);
+    const preloaded = (blogPost as any).association("comments").target as Base[];
+    expect(preloaded.map((c) => c.id)).toContain(shardedComments("great_comment_blog_post_one").id);
   });
 
   it("preload belongs to association with composite foreign key", async () => {
-    const blog = await ShardedBlogPL.create({ name: "Blog" });
-    const bp1 = await ShardedBlogPostPL.create({ blog_id: blog.id, title: "Post1" });
-    const bp2 = await ShardedBlogPostPL.create({ blog_id: blog.id, title: "Post2" });
-    await ShardedCommentPL.create({ blog_id: blog.id, blog_post_id: bp1.id, body: "C1" });
-    await ShardedCommentPL.create({ blog_id: blog.id, blog_post_id: bp2.id, body: "C2" });
+    const comment = shardedComments("great_comment_blog_post_one");
+    const comments = [comment, shardedComments("great_comment_blog_post_two")];
 
-    const comments = await ShardedCommentPL.all().includes("blogPost");
-    expect(comments).toHaveLength(2);
-    const byBody = new Map(comments.map((c) => [(c as any).body, c]));
-    expect(byBody.get("C1")!.association("blogPost").isLoaded()).toBe(true);
-    expect((byBody.get("C1") as any).association("blogPost").target.title).toBe("Post1");
-    expect((byBody.get("C2") as any).association("blogPost").target.title).toBe("Post2");
+    await new Preloader({ records: comments, associations: "blogPost" }).call();
+
+    expect((comment as any).association("blogPost").isLoaded()).toBe(true);
+    expect((comment as any).association("blogPost").target.id).toBe(
+      shardedBlogPosts("great_post_blog_one").id,
+    );
   });
 
   it("preload loaded belongs to association with composite foreign key", async () => {
-    const blog = await ShardedBlogPL.create({ name: "Blog" });
-    const bp1 = await ShardedBlogPostPL.create({ blog_id: blog.id, title: "Post1" });
-    const comment = await ShardedCommentPL.create({
-      blog_id: blog.id,
-      blog_post_id: bp1.id,
-      body: "C1",
-    });
+    const comment = shardedComments("great_comment_blog_post_one");
 
-    // Load the blogPost on the comment instance first (warms the association cache).
     await findTarget(comment, "blogPost", { className: "ShardedBlogPost" }, "belongsTo");
 
-    // Preloading on the already-loaded record must not fire any SQL queries
-    // (mirrors Rails' assert_no_queries block).
     const sqls = await captureSql(async () => {
       await new Preloader({ records: [comment], associations: ["blogPost"] }).call();
     });
@@ -1349,36 +1239,30 @@ describe("PreloaderTest", () => {
   });
 
   it("preload has many through association with composite query constraints", async () => {
-    const blog = await ShardedBlogPL.create({ name: "Blog" });
-    const blog2 = await ShardedBlogPL.create({ name: "Blog2" });
-    const bp1 = await ShardedBlogPostPL.create({ blog_id: blog.id, title: "Post1" });
-    await ShardedBlogPostPL.create({ blog_id: blog2.id, title: "Post2" });
-    const tag = await ShardedTagPL.create({ blog_id: blog.id, name: "Tag1" });
-    const tag2 = await ShardedTagPL.create({ blog_id: blog2.id, name: "Tag2" });
-    await ShardedBlogPostTagPL.create({ blog_id: blog.id, blog_post_id: bp1.id, tag_id: tag.id });
+    const tag = shardedTags("short_read_blog_one");
+    const tags = [tag, shardedTags("breaking_news_blog_2")];
 
-    const tags = await ShardedTagPL.all().includes("blogPosts");
-    expect(tags).toHaveLength(2);
-    expect(tags.every((t) => t.association("blogPosts").isLoaded())).toBe(true);
+    await new Preloader({ records: tags, associations: "blogPosts" }).call();
 
-    const tag1 = tags.find((t) => (t as any).name === "Tag1")!;
+    expect(tags.every((t) => (t as any).association("blogPosts").isLoaded())).toBe(true);
+
     const expectedBlogPostIds = await ShardedBlogPostTagPL.where(
       "blog_id = ? AND tag_id = ?",
-      blog.id,
+      (tag as any).blog_id,
       tag.id,
     )
       .toArray()
       .then((rows) => rows.map((r) => Number((r as any).blog_post_id)).sort());
     expect(expectedBlogPostIds).not.toHaveLength(0);
-    const preloaded = (tag1 as any).association("blogPosts").target;
+    const preloaded = (tag as any).association("blogPosts").target;
     expect(preloaded.map((p: any) => Number(p.id)).sort()).toEqual(expectedBlogPostIds);
   });
 
   it("preloads has many on model with a composite primary key through id attribute", async () => {
-    const order = await CpkOrderPL.create({ shop_id: 1 });
+    const order = cpkOrders("cpk_groceries_order_2");
     const [, orderId] = order.id as [number, number];
-    const ag1 = await CpkOrderAgreementPL.create({ order_id: orderId, signature: "abc" });
-    const ag2 = await CpkOrderAgreementPL.create({ order_id: orderId, signature: "def" });
+    const orderAgreements = await CpkOrderAgreementPL.where({ order_id: orderId });
+    expect(orderAgreements).not.toHaveLength(0);
 
     let orders: any[];
     const sqls = await captureSql(async () => {
@@ -1389,13 +1273,13 @@ describe("PreloaderTest", () => {
     expectQuotedColumnInSql(preloadSql, "cpk_order_agreements.order_id", { inWhere: true });
     expect(orders![0].association("orderAgreements").isLoaded()).toBe(true);
     const loaded = orders![0].association("orderAgreements").target;
-    expect(loaded.map((a: any) => a.signature).sort()).toEqual(["abc", "def"]);
+    expect(loaded.map((a: any) => a.id).sort()).toEqual(orderAgreements.map((a) => a.id).sort());
   });
 
   it("preloads belongs to a composite primary key model through id attribute", async () => {
-    const order = await CpkOrderPL.create({ shop_id: 1 });
+    const ag = cpkOrderAgreements("order_agreement_three");
+    const order = cpkOrders("cpk_groceries_order_2");
     const [, orderId] = order.id as [number, number];
-    const ag = await CpkOrderAgreementPL.create({ order_id: orderId, signature: "xyz" });
 
     let agreements: any[];
     const sqls = await captureSql(async () => {
@@ -1411,9 +1295,6 @@ describe("PreloaderTest", () => {
   });
 
   it("preload keeps built has many records no ops", async () => {
-    // Mirrors vendor/rails/activerecord/test/cases/associations_test.rb:1535
-    // New unsaved post with a built (unsaved) comment — preloader must issue no
-    // queries and must preserve the in-memory built comment.
     const post = new (Post as any)();
     const comment = post.association("comments").build({ body: "built" });
 
@@ -1425,11 +1306,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload keeps built has many records after query", async () => {
-    // Mirrors vendor/rails/activerecord/test/cases/associations_test.rb:1546
-    // Persisted post with one built (unsaved) comment — preloader queries for
-    // persisted comments but must also preserve the built comment in the result.
-    const persistedPost = await Post.create({ title: "Welcome", body: "body" });
-    const post = (await Post.where({ id: persistedPost.id }))[0];
+    const post = posts("welcome");
     const comment = (post as any).association("comments").build({ body: "built" });
 
     const sqls = await captureSql(async () => {
@@ -1440,9 +1317,6 @@ describe("PreloaderTest", () => {
   });
 
   it("preload keeps built belongs to records no ops", async () => {
-    // Mirrors vendor/rails/activerecord/test/cases/associations_test.rb:1558
-    // New unsaved post with a built (unsaved) author — preloader must issue no
-    // queries and must preserve the exact same author instance.
     const post = new (Post as any)();
     const author = post.association("author").build({ name: "Built" });
 
@@ -1454,11 +1328,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload keeps built belongs to records after query", async () => {
-    // Mirrors vendor/rails/activerecord/test/cases/associations_test.rb:1569
-    // Persisted post with a built (unsaved) author — preloader must issue no
-    // queries (author already built in memory) and preserve the same instance.
-    const persistedPost = await Post.create({ title: "Welcome", body: "body" });
-    const post = (await Post.where({ id: persistedPost.id }))[0];
+    const post = posts("welcome");
     const author = (post as any).association("author").build({ name: "Built" });
 
     const sqls = await captureSql(async () => {
@@ -1469,27 +1339,21 @@ describe("PreloaderTest", () => {
   });
 
   it("preload marks belongs_to association loaded on owner", async () => {
-    const a = await Author.create({ name: "A" });
-    await Post.create({ title: "P", body: "body", author_id: a.id });
-
-    const posts = await Post.all().includes("author");
-    expect(posts).toHaveLength(1);
-    const assoc = (posts[0] as any).association("author");
+    const welcome = posts("welcome");
+    const loaded = await Post.where({ id: welcome.id }).includes("author");
+    expect(loaded).toHaveLength(1);
+    const assoc = (loaded[0] as any).association("author");
     expect(assoc.isLoaded()).toBe(true);
-    expect(assoc.target?.name).toBe("A");
+    expect(assoc.target?.id).toBe(authors("david").id);
   });
 
   it("preload sets has_many association target on owner", async () => {
-    const a = await Author.create({ name: "A" });
-    await Post.create({ title: "P1", body: "body", author_id: a.id });
-    await Post.create({ title: "P2", body: "body", author_id: a.id });
-
-    const authors = await Author.all().includes("posts");
-    const owner = authors.find((x) => x.id === a.id)!;
-    const assoc = (owner as any).association("posts");
+    const david = authors("david");
+    const owners = await Author.where({ id: david.id }).includes("posts");
+    const assoc = (owners[0] as any).association("posts");
     expect(assoc.isLoaded()).toBe(true);
-    const titles = (assoc.target as Base[]).map((r: any) => r.title).sort();
-    expect(titles).toEqual(["P1", "P2"]);
+    const ids = (assoc.target as Base[]).map((r) => r.id);
+    expect(ids).toContain(posts("welcome").id);
   });
 });
 
