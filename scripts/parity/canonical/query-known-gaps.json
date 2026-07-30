@@ -39,10 +39,6 @@
     "side": "diff",
     "reason": "has_many with a default scope does not embed the scope condition in the JOIN ON clause: Rails resolves joins(:published_books) to INNER JOIN \"books\" ON \"books\".\"status\" = 'published' AND \"books\".\"author_id\" = ...; Trails emits only INNER JOIN \"books\" ON \"books\".\"author_id\" = ... (scope condition dropped). Real fix: _resolveAssociationJoin must apply the association's :scope condition to the JOIN ON predicate when building the join for a scoped has_many."
   },
-  "ar-153": {
-    "side": "trails-missing",
-    "reason": "Table#join(...).on(...).joinSources() crashes: Arel's Table#join returns a SelectManager whose ast.cores is undefined (the join builder path does not populate cores), so calling joinSources() throws TypeError: Cannot read properties of undefined (reading 'cores'). Rails returns a fully-formed join-sources array from the same call. Real fix: Table#join must build a SelectManager with a populated SelectCore so joinSources() can read the join list."
-  },
   "ar-154": {
     "side": "trails-missing",
     "reason": "group() does not accept Arel node arguments: group(new Nodes.NamedFunction(...)) throws TypeError: col.trim is not a function because the group implementation calls .trim() on each argument assuming strings. Rails accepts any Arel::Node in group() and passes it to the GROUP BY clause via the Arel visitor. Real fix: the groupBang implementation must handle Arel node arguments by calling .toSql() (or passing them directly to the Arel manager) instead of treating them as strings."

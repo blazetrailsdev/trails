@@ -13,7 +13,7 @@ describe("SelectManagerTest (trails)", () => {
   it("promotes a SqlLiteral relation to a StringJoin", () => {
     const mgr = new SelectManager(users);
     mgr.join(new Nodes.SqlLiteral("comments ON comments.user_id = users.id"));
-    expect(mgr.joinSources[0]).toBeInstanceOf(Nodes.StringJoin);
+    expect(mgr.joinSources()[0]).toBeInstanceOf(Nodes.StringJoin);
     expect(mgr.toSql()).toContain("comments ON comments.user_id = users.id");
   });
 
@@ -32,7 +32,7 @@ describe("SelectManagerTest (trails)", () => {
   it("promotes a bare string relation to a StringJoin", () => {
     const mgr = new SelectManager(users);
     mgr.join("comments ON comments.user_id = users.id");
-    expect(mgr.joinSources[0]).toBeInstanceOf(Nodes.StringJoin);
+    expect(mgr.joinSources()[0]).toBeInstanceOf(Nodes.StringJoin);
   });
 
   // Trails-only coverage for Arel::SelectManager#lock's `case` arms

@@ -16,8 +16,9 @@ describe("SelectManagerTest", () => {
   const posts = new Table("posts");
   const visitor = new Visitors.ToSql(testConnection);
   it("join sources", () => {
-    const mgr = users.project(star);
-    expect(mgr.joinSources).toEqual([]);
+    const manager = new SelectManager();
+    manager.joinSources().push(new Nodes.StringJoin(new Nodes.Quoted("foo")));
+    expect(manager.toSql()).toBe("SELECT FROM 'foo'");
   });
 
   describe("backwards compatibility", () => {
@@ -1240,7 +1241,7 @@ describe("SelectManagerTest", () => {
 
   it("returns empty array when no joins", () => {
     const manager = users.project("*");
-    expect(manager.joinSources).toEqual([]);
+    expect(manager.joinSources()).toEqual([]);
   });
 
   it("returns join nodes after join()", () => {
@@ -1248,8 +1249,8 @@ describe("SelectManagerTest", () => {
       .project("*")
       .join(posts)
       .on(users.attr("id").eq(posts.attr("user_id")));
-    expect(manager.joinSources.length).toBe(1);
-    expect(manager.joinSources[0]).toBeInstanceOf(Nodes.InnerJoin);
+    expect(manager.joinSources().length).toBe(1);
+    expect(manager.joinSources()[0]).toBeInstanceOf(Nodes.InnerJoin);
   });
 
   it("returns multiple join nodes", () => {
@@ -1260,9 +1261,9 @@ describe("SelectManagerTest", () => {
       .on(users.attr("id").eq(posts.attr("user_id")))
       .outerJoin(comments)
       .on(posts.attr("id").eq(comments.attr("post_id")));
-    expect(manager.joinSources.length).toBe(2);
-    expect(manager.joinSources[0]).toBeInstanceOf(Nodes.InnerJoin);
-    expect(manager.joinSources[1]).toBeInstanceOf(Nodes.OuterJoin);
+    expect(manager.joinSources().length).toBe(2);
+    expect(manager.joinSources()[0]).toBeInstanceOf(Nodes.InnerJoin);
+    expect(manager.joinSources()[1]).toBeInstanceOf(Nodes.OuterJoin);
   });
 
   it("returns the FROM source", () => {
@@ -1311,7 +1312,7 @@ describe("SelectManagerTest", () => {
       const mgr = users
         .project(star)
         .fullOuterJoin(posts, users.get("id").eq(posts.get("user_id")));
-      expect(mgr.joinSources[0]).toBeInstanceOf(Nodes.FullOuterJoin);
+      expect(mgr.joinSources()[0]).toBeInstanceOf(Nodes.FullOuterJoin);
       expect(mgr.toSql()).toContain("FULL OUTER JOIN");
     });
 
@@ -1319,7 +1320,7 @@ describe("SelectManagerTest", () => {
       const mgr = users
         .project(star)
         .rightOuterJoin(posts, users.get("id").eq(posts.get("user_id")));
-      expect(mgr.joinSources[0]).toBeInstanceOf(Nodes.RightOuterJoin);
+      expect(mgr.joinSources()[0]).toBeInstanceOf(Nodes.RightOuterJoin);
       expect(mgr.toSql()).toContain("RIGHT OUTER JOIN");
     });
   });

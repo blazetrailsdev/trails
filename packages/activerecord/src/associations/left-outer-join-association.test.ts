@@ -162,7 +162,7 @@ describe("LeftOuterJoinAssociationTest", () => {
     const comments = new Table("comments");
     const postsTable = new Table("posts");
     const constraint = comments.get("post_id").eq(postsTable.get("id"));
-    const arelJoin = comments.outerJoin(comments).on(constraint).joinSources[0];
+    const arelJoin = comments.outerJoin(comments).on(constraint).joinSources()[0];
 
     expect(await Author.leftOuterJoins("posts").joins(arelJoin).count()).toBe(17);
   });

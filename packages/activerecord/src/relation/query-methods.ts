@@ -3195,5 +3195,8 @@ export function buildWithJoinNode(
     throw new ActiveRecordError("Cannot build CTE join node with composite primary keys");
   }
   const pk = mc?.primaryKey ?? "id";
-  return table.join(withTable, kind).on(withTable.get(fk).eq(table.get(pk))).joinSources[0];
+  return table
+    .join(withTable, kind)
+    .on(withTable.get(fk).eq(table.get(pk)))
+    .joinSources()[0];
 }
