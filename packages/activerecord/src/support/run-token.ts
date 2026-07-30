@@ -39,22 +39,30 @@ export const RUN_TOKEN_ENV = "AR_TEST_RUN_TOKEN";
  */
 export const STALE_DB_AGE_MS = 6 * 60 * 60 * 1000;
 
-// `<base36 millis>x<base36 random>`. The leading millis is not decoration: a
-// database name is all the stale sweep has to go on — unlike a temp file, a
-// PostgreSQL database carries no mtime to compare against the cutoff.
-const TOKEN_PATTERN = "[0-9a-z]+x[0-9a-z]+";
+// `r<base36 millis><base36 random>`, the random half fixed-width so the two
+// halves split without a separator — every character base36 produces is itself
+// a legal separator candidate, so there is no safe one to pick.
+//
+// The leading millis is not decoration: a database name is all the stale sweep
+// has to go on — unlike a temp file, a PostgreSQL database carries no mtime to
+// compare against the cutoff. The `r` prefix is what keeps a legacy unstamped
+// leftover like `activerecord_unittest_2_arunit2` from parsing as a run token
+// whose "start time" is the epoch, which would make the sweep drop it.
+const RANDOM_LENGTH = 6;
+const TOKEN_PATTERN = "r[0-9a-z]+";
 
 /** A fresh token for this vitest invocation. */
 export function newRunToken(): string {
-  const random = Math.floor(Math.random() * 36 ** 6).toString(36);
-  return `${Date.now().toString(36)}x${random}`;
+  const random = Math.floor(Math.random() * 36 ** RANDOM_LENGTH)
+    .toString(36)
+    .padStart(RANDOM_LENGTH, "0");
+  return `r${Date.now().toString(36)}${random}`;
 }
 
 /** When the run that minted `runToken` started, or `null` if unparseable. */
 export function runTokenStartedAt(runToken: string): number | null {
-  const split = runToken.indexOf("x");
-  if (split <= 0) return null;
-  const millis = parseInt(runToken.slice(0, split), 36);
+  if (!runToken.startsWith("r") || runToken.length <= RANDOM_LENGTH + 1) return null;
+  const millis = parseInt(runToken.slice(1, -RANDOM_LENGTH), 36);
   return Number.isFinite(millis) && millis > 0 ? millis : null;
 }
 
