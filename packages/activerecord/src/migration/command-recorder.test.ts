@@ -483,6 +483,16 @@ describe("CommandRecorder", () => {
       ]);
     });
 
+    it("removeIndex with an explicit nil column keeps the second-argument options", async () => {
+      const recorder = new CommandRecorder(abstractDelegate);
+      await recorder.changeTable("fruits", async (t) => {
+        await t.removeIndex(undefined, { name: "index_fruits_on_kind" });
+      });
+      expect(recorder.commands).toEqual([
+        { cmd: "removeIndex", args: ["fruits", undefined, { name: "index_fruits_on_kind" }] },
+      ]);
+    });
+
     it("removeIndex with a column inverts back to addIndex", async () => {
       const recorder = new CommandRecorder(abstractDelegate);
       await recorder.revert(async () => {

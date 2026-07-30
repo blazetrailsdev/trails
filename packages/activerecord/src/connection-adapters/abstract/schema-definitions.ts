@@ -1667,7 +1667,9 @@ export class Table {
     // `remove_index(column_name = nil, **options)`: an options-only call leaves
     // column_name nil rather than passing the hash as the column.
     const columnName = isColumn ? columnOrOptions : undefined;
-    const optionHash = isColumn ? options : columnOrOptions;
+    // Ruby's `**options` collects the hash from either position, so an explicit
+    // nil column with the options behind it keeps them.
+    const optionHash = isColumn ? options : { ...columnOrOptions, ...options };
     this.raiseOnIfExistOptions(optionHash as Record<string, unknown>);
     await this._schema.removeIndex(this._tableName, columnName, optionHash);
   }
