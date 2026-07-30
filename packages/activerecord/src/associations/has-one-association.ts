@@ -662,19 +662,11 @@ export class HasOneAssociation extends SingularAssociation {
       return;
     }
     if (method === "destroy") {
-      // Tag the record with the association that is destroying it (so its own
-      // destroy callbacks can read `destroyed_by_association`) before
-      // destroying, and only destroy when the record is actually persisted.
       (target as any).destroyedByAssociation = this.reflection;
       await preloadDestroyInverseBelongsTo(this, target);
       if (target.isPersisted()) await ((target as any).destroy?.() ?? Promise.resolve());
       return;
     }
-    // The `else` branch (no `dependent`, or `:nullify`): drop the foreign key on
-    // the previously associated record, clear the inverse, and save it. A plain
-    // replacement always nullifies the old record's FK; the `dependent` option
-    // only governs the owner-destroy path. A failed nullify-save aborts the
-    // replacement.
     this.nullifyOwnerAttributes(target);
     this.removeInverseInstance(target);
     if (target.isPersisted() && (this.owner as any).isPersisted?.()) {
