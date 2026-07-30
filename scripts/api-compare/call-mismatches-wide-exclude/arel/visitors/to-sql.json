@@ -163,13 +163,6 @@
   {
     "package": "arel",
     "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_JoinSource",
-    "call": "inject_join",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
     "rubyName": "visit_Arel_Nodes_LessThan",
     "call": "unboundable?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
