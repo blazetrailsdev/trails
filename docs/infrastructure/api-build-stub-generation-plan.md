@@ -286,7 +286,9 @@ report). They therefore share:
   a class, interface, or namespace DECLARATION, where it justifies the
   declared name itself — the only inline form available to an extra that is a
   declaration rather than a member (e.g. a class Rails nests but TS must
-  export as a sibling). On an `interface` the declaration tag additionally
+  export as a sibling). A declaration name is scored surface in its own right
+  (`collectTsFileNames`), so such a tag matches, and goes stale, exactly like a
+  member's. On an `interface` the declaration tag additionally
   covers every MEMBER: an interface that types a duck-typed collaborator has no
   Ruby counterpart by construction, so neither can its members, and Ruby writes
   no such declaration to compare against. Classes are excluded from that spread

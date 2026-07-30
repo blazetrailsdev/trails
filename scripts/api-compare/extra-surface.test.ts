@@ -1451,6 +1451,31 @@ describe("buildReport — declaration names", () => {
     expect(report.packages[0].extraFiles).toEqual([]);
   });
 
+  it("allows a folded `ClassMethods` submodule's name, which the file still declares", () => {
+    // foldClassMethodsModules merges the submodule's methods into the parent
+    // and drops it from the file's entity walk; its NAME must survive, or every
+    // ported `ClassMethods` namespace reads as drift.
+    const withConcern: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {},
+          modules: {
+            "ActiveModel::Foo": rubyClass({ name: "Foo", file: "foo.rb" }),
+            "ActiveModel::Foo::ClassMethods": rubyClass({
+              name: "ClassMethods",
+              file: "foo.rb",
+              instance: [method("build_it")],
+            }),
+          },
+        },
+      },
+    };
+    const report = run(withConcern, tsWith(["Foo", "ClassMethods"]));
+    expect(report.packages[0].extraFiles).toEqual([]);
+  });
+
   it("reports a declaration name no Ruby file declares as novel", () => {
     const report = run(ruby, tsWith(["Foo", "QueryLogger"]));
     expect(report.packages[0].extraFiles[0].extras).toEqual([

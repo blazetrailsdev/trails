@@ -25,9 +25,10 @@
  *      class / interface / namespace DECLARATION name, plus top-level
  *      `fileFunctions`. Declaration names are scored on the same footing as
  *      members: step 2 allows every entity name the matched `.rb` declares, so
- *      a faithfully ported class is not extra and a trails-only one is. Filter out `internal: true` (Ruby private/protected,
- *      TS private/protected, TS `#`-prefixed fields, and `@internal` JSDoc
- *      on a top-level exported function) and
+ *      a faithfully ported class is not extra and a trails-only one is.
+ *      Filter out `internal: true` (Ruby private/protected, TS
+ *      private/protected, TS `#`-prefixed fields, and `@internal` JSDoc on a
+ *      top-level exported function) and
  *      separately filter `_`-prefixed names — the extractor keeps those as
  *      public exports; the Rails-private convention in this repo means they
  *      should not count toward extra surface.
@@ -105,6 +106,15 @@ import { manifestIsStale } from "./build-freshness.js";
 interface RubyEntity {
   fqn: string;
   info: ClassInfo;
+  /**
+   * Contribute only the entity's own constant name to the allow-set, not its
+   * methods or mixins. Used for a `Foo::ClassMethods` submodule whose methods
+   * `foldClassMethodsModules` already merged into `Foo.classMethods`: the
+   * declaration is still a constant the file declares (so a TS `ClassMethods`
+   * namespace is a faithful port, not drift), but walking it again would
+   * double-count its methods.
+   */
+  nameOnly?: boolean;
 }
 
 /**
@@ -766,7 +776,7 @@ function collectAllowedNames(
     for (const inc of mod.includes ?? []) walkMixin(inc, fqn);
   };
 
-  for (const { fqn, info } of entities) {
+  for (const { fqn, info, nameOnly } of entities) {
     // The entity's own short name: since declaration names are TS surface
     // (`collectTsFileNames`), the Ruby constant they port has to be allowed
     // surface, or every faithfully ported class would read as drift. This
@@ -776,6 +786,7 @@ function collectAllowedNames(
     // re-attaching a sibling export.
     const short = fqn.split("::").pop();
     if (short) for (const c of rubyConstantCandidates(short)) allowed.add(c);
+    if (nameOnly) continue;
     addMethods(info.instanceMethods);
     addMethods(info.classMethods);
     for (const inc of info.includes ?? []) walkMixin(inc, fqn);
@@ -990,8 +1001,7 @@ function buildPackageReport(
   }
   for (const [fqn, info] of Object.entries(rubyPkg.modules) as [string, ClassInfo][]) {
     if (!info.file) continue;
-    if (foldedFqns.has(fqn)) continue;
-    pushTo(rubyFiles, info.file, { fqn, info });
+    pushTo(rubyFiles, info.file, { fqn, info, ...(foldedFqns.has(fqn) ? { nameOnly: true } : {}) });
   }
 
   const tsClassesByFile = new Map<string, ClassInfo[]>();
