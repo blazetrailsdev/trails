@@ -27,12 +27,8 @@ async function restoreWorkerConnection(): Promise<void> {
 }
 
 describe("ConnectionHandlingTest", () => {
-  // Mirrors Rails `ConnectionHandlingTest` (connection_handling_test.rb:7-16):
-  // one class, `fixtures :posts`, riding the ambient pool `cases/helper.rb`
-  // established. `common APIs ...` asserts the pool releases its connection
-  // after each common API, so it must run OUTSIDE transactional fixtures
-  // (which pin a connection for the wrapping transaction); the trails-only
-  // cases that swap `Base`'s pool opt out for the same reason.
+  // The opted-out cases assert the pool releases its connection, which
+  // transactional fixtures defeat by pinning one for the wrapping transaction.
   fixtures(["posts"], {
     usesTransaction: [
       "common APIs don't permanently hold a connection when permanent checkout is deprecated or disallowed",
@@ -42,20 +38,20 @@ describe("ConnectionHandlingTest", () => {
     ],
   });
 
+  let permanentConnectionCheckoutWas: true | "deprecated" | "disallowed";
+
+  beforeEach(() => {
+    permanentConnectionCheckoutWas = ActiveRecord.permanentConnectionCheckout;
+  });
+
   afterEach(async () => {
+    ActiveRecord.permanentConnectionCheckout = permanentConnectionCheckoutWas;
     connectedToStack().length = 0;
-    ActiveRecord.permanentConnectionCheckout = true;
-    // `common APIs ...` runs outside transactional fixtures, so its insert is
-    // committed — clean it up so it can't perturb the shared worker DB.
+    // `common APIs ...` opts out of transactional fixtures, so its insert is
+    // committed and would otherwise perturb the shared worker DB.
     await Post.where({ title: "foo" }).deleteAll();
   });
 
-  // Rails puts every one of its `ConnectionHandlingTest` cases inside
-  // `unless in_memory_db?` (connection_handling_test.rb:18-185): they release
-  // and re-lease `Base`'s connection, and on `:memory:` the released connection
-  // takes the database with it. Per-`it` rather than a wrapping `describe`
-  // because this file also holds cases with no Rails counterpart, and the
-  // test:compare gate extractor only resolves inline `it.skipIf(...)`.
   it.skipIf(inMemoryDb())(
     "#with_connection lease the connection for the duration of the block",
     async () => {
@@ -322,10 +318,9 @@ describe("ConnectionHandlingTest", () => {
   // UrlConfig, so configuration_hash carries the parsed discrete fields and
   // never the verbatim URL string. establish_connection({ adapter, url })
   // must mirror that shape, matching the resolver's "url removed from hash".
-  // Swaps `Base`'s own pool (the resolver plants the spec name on the receiver,
-  // so a subclass wouldn't exercise the primary path), hence the restore at the
-  // end. Skipped under ARCONN=sqlite3_mem, where the restore would hand the
-  // worker a fresh, EMPTY in-memory database.
+  // Only the primary pool exercises this path, so `Base`'s is swapped and
+  // restored; under ARCONN=sqlite3_mem the restore would hand the worker a
+  // fresh, EMPTY database, hence the skip.
   it.skipIf(inMemoryDb())(
     "establish_connection with a url stores a UrlConfig with discrete fields",
     async () => {
@@ -389,10 +384,9 @@ describe("ConnectionHandlingTest", () => {
     expect(() => Base.clearCacheBang()).not.toThrow();
   });
 
-  // Both cases below remove `Base`'s pool outright — only the primary pool can
-  // be observed going away (a subclass falls back to `Base`'s), so they restore
-  // the worker connection at the end and skip the in-memory lane, where the
-  // restore would produce an EMPTY database.
+  // Both cases below remove `Base`'s pool: only the primary pool can be
+  // observed going away (a subclass falls back to `Base`'s). Same restore and
+  // in-memory skip as above.
   it.skipIf(inMemoryDb())("remove_connection removes the pool", async () => {
     const ambientDbConfig = Base.connectionDbConfig();
     expect(Base.connectionPool()).toBeTruthy();
@@ -915,8 +909,8 @@ describe("threadedConnectionFor pool-identity guard", () => {
     Secondary.connectionSpecificationName = "Secondary";
   });
 
-  // Only `Secondary`'s own pool is torn down: `Base` keeps riding the ambient
-  // worker pool, so nothing here needs a re-establish.
+  // `Base` keeps riding the ambient worker pool, so only `Secondary`'s own
+  // pool is torn down and nothing here needs a re-establish.
   afterEach(async () => {
     Base.connectionHandler.removeConnectionPool("Secondary");
   });
@@ -940,9 +934,8 @@ describe("threadedConnectionFor pool-identity guard", () => {
 });
 
 describe("establish_connection accepts a DatabaseConfig", () => {
-  // Drives its own model rather than swapping `Base`'s pool: the round trip
-  // under test is `remove_connection` → `establish_connection(db_config)`, and
-  // that is observable on any class with a pool of its own.
+  // The round trip under test is observable on any class with a pool of its
+  // own, so this drives its own model rather than swapping `Base`'s pool.
   class CapturedConfigModel extends Base {}
 
   afterEach(async () => {
@@ -989,8 +982,7 @@ describe("loadConfigFile resolves config/database.* against Trails.root", () => 
     Base.configurations({});
   });
 
-  // Only the model established below is torn down — `Base`'s pool is never
-  // touched here, just its `configurations` registry.
+  // `Base`'s pool is never touched here, only its `configurations` registry.
   afterEach(async () => {
     setTrailsRoot(null);
     Base.configurations(originalConfigurations);
