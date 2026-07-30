@@ -80,6 +80,11 @@ if (missingTables.length > 0) {
 const { loadAdapterSpecificSchema } = await import("./support/load-schema-helper.js");
 await loadAdapterSpecificSchema(await Base.leaseConnection());
 
+// The schema is now fully laid, so the live table list *is* the boot-laid set
+// the between-test reset must truncate rather than drop.
+const { recordBootLaidTables } = await import("./support/drop-all-tables.js");
+await recordBootLaidTables(await Base.leaseConnection());
+
 // `schema.rb:1444-1462` — the arunit2 tables Rails creates through
 // `Course.lease_connection`. Imported lazily so the second-database models load
 // after the canonical schema is in place.
