@@ -585,9 +585,6 @@ export async function findTarget(
     validateInverseOf(targetModel, assocName, options.inverseOf);
   }
 
-  // Resolve FK columns (may be array for CPK; `:as` swaps to the
-  // polymorphic FK column) through the single derivation site shared with the
-  // OO association classes (see `ownerForeignKeyColumns`).
   const foreignKeyColumns = ownerForeignKeyColumns(ctor, assocName, { ...options, primaryKey });
   const foreignKey: string | string[] =
     foreignKeyColumns.length === 1 ? foreignKeyColumns[0] : foreignKeyColumns;

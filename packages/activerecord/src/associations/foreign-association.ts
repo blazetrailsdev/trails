@@ -4,19 +4,12 @@ import type { AssociationReflection } from "../reflection.js";
 import type { Base } from "../base.js";
 
 /**
- * Resolve a foreign association's (has_one / has_many / through) owner-side
- * foreign key column(s).
+ * Mirrors `reflection.foreign_key` (reflection.rb `compute_foreign_key`),
+ * keyed on `reflection.active_record` — the class that *declared* the
+ * association. The rungs below the reflection serve trails' inline
+ * (unregistered) association fallbacks, which have no Rails counterpart.
  *
- * Rails resolves this in exactly one place — `reflection.foreign_key`
- * (reflection.rb `compute_foreign_key`), keyed on `reflection.active_record`,
- * the class that *declared* the association. For an STI subclass owner — e.g.
- * a `SpecialPost` row whose `has_many :special_comments` is declared on `Post`
- * — that yields `post_id`, not `special_post_id`.
- *
- * The rungs below the rich reflection exist only for trails' inline
- * (unregistered) association fallbacks, where no reflection is resolvable.
- *
- * @internal trails-only: the reflection rungs have no Rails counterpart.
+ * @internal
  */
 export function ownerForeignKeyColumns(
   ctor: typeof Base,
@@ -45,10 +38,8 @@ export function ownerForeignKeyColumns(
 }
 
 /**
- * The rich reflection's foreign key, derived from the class that *declared*
- * the association (`reflection.active_record`), not the owner instance's
- * class. Returns `undefined` for an unregistered association so
- * `ownerForeignKeyColumns` can fall through to its inline rungs.
+ * Mirrors `reflection.foreign_key`, returning `undefined` for an unregistered
+ * association so `ownerForeignKeyColumns` falls through to its inline rungs.
  *
  * @internal
  */
