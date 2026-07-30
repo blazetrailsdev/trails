@@ -1,7 +1,25 @@
 import { describe, it, expect } from "vitest";
-import { CommandRecorder, withAdapterColumnMethods } from "./command-recorder.js";
-import type { RecorderTableProxy } from "./command-recorder.js";
+import { CommandRecorder } from "./command-recorder.js";
 import { IrreversibleMigration } from "../migration.js";
+import { Table } from "../connection-adapters/abstract/schema-definitions.js";
+import { Table as PgTable } from "../connection-adapters/postgresql/schema-definitions.js";
+import { Table as MysqlTable } from "../connection-adapters/mysql/schema-definitions.js";
+
+// Stand-ins for the connection adapter CommandRecorder delegates to: Rails'
+// `change_table` only needs `update_table_definition` (plus `supports_bulk_alter?`
+// on the bulk path), and it is that method which decides whose `ColumnMethods`
+// the yielded Table carries.
+const abstractDelegate = {
+  updateTableDefinition: (tableName: string, base: unknown) => new Table(tableName, base as never),
+};
+const pgDelegate = {
+  updateTableDefinition: (tableName: string, base: unknown) =>
+    new PgTable(tableName, base as never),
+};
+const mysqlDelegate = {
+  updateTableDefinition: (tableName: string, base: unknown) =>
+    new MysqlTable(tableName, base as never),
+};
 
 describe("CommandRecorder", () => {
   it("records commands", () => {
@@ -423,32 +441,34 @@ describe("CommandRecorder", () => {
 
   describe("invert change table (non-bulk)", () => {
     it("accepts (tableName, fn) without explicit options", async () => {
-      const recorder = new CommandRecorder();
+      const recorder = new CommandRecorder(abstractDelegate);
       // short form: no options argument
       await recorder.changeTable("fruits", async (t) => {
-        t.string("name");
+        await t.string("name");
       });
       expect(recorder.commands[0].cmd).toBe("addColumn");
     });
 
-    it("remove with multiple columns records individual removeColumn per name", async () => {
-      const recorder = new CommandRecorder();
+    // Rails' Table#remove forwards the whole name list to
+    // `@base.remove_columns(name, *column_names, **options)`, so the recorder
+    // sees one `remove_columns` — inverted by `invert_remove_columns` into
+    // `add_columns` (command_recorder.rb:233-239).
+    it("remove with multiple columns records a single removeColumns", async () => {
+      const recorder = new CommandRecorder(abstractDelegate);
       await recorder.changeTable("fruits", async (t) => {
-        t.remove("name", "kind", { type: "string" });
+        await t.remove("name", "kind", { type: "string" });
       });
-      expect(recorder.commands).toHaveLength(2);
-      expect(recorder.commands[0].cmd).toBe("removeColumn");
-      expect(recorder.commands[0].args).toEqual(["fruits", "name", "string"]);
-      expect(recorder.commands[1].cmd).toBe("removeColumn");
-      expect(recorder.commands[1].args).toEqual(["fruits", "kind", "string"]);
+      expect(recorder.commands).toEqual([
+        { cmd: "removeColumns", args: ["fruits", "name", "kind", { type: "string" }] },
+      ]);
     });
 
     it("reverts string + rename inside change_table block", async () => {
-      const recorder = new CommandRecorder();
+      const recorder = new CommandRecorder(abstractDelegate);
       await recorder.revert(async () => {
         await recorder.changeTable("fruits", async (t) => {
-          t.string("name");
-          t.rename("kind", "cultivar");
+          await t.string("name");
+          await t.rename("kind", "cultivar");
         });
       });
       // Reversed order and inverted: renameColumn first, then removeColumn
@@ -462,11 +482,11 @@ describe("CommandRecorder", () => {
     });
 
     it("raises IrreversibleMigration when remove lacks type", async () => {
-      const recorder = new CommandRecorder();
+      const recorder = new CommandRecorder(abstractDelegate);
       await expect(
         recorder.revert(async () => {
           await recorder.changeTable("fruits", async (t) => {
-            t.remove("kind"); // no type → not reversible
+            await t.remove("kind"); // no type → not reversible
           });
         }),
       ).rejects.toThrow(IrreversibleMigration);
@@ -477,7 +497,7 @@ describe("CommandRecorder", () => {
     // Mirrors Rails: the PG `ColumnMethods` mixin exposes `t.serial` /
     // `t.bigserial` (SERIAL/BIGSERIAL) inside change_table — shorthands the
     // adapter advertises via columnMethodNames() beyond NATIVE_DATABASE_TYPES.
-    const pgLike = { columnMethodNames: () => ["serial", "bigserial"] };
+    const pgLike = pgDelegate;
 
     it("records addColumn for t.serial and t.bigserial (up adds)", async () => {
       const recorder = new CommandRecorder(pgLike);
@@ -505,8 +525,24 @@ describe("CommandRecorder", () => {
       ]);
     });
 
+    // Rails' `define_column_methods` list — the source of the shorthands — never
+    // includes `primary_key`: that is a dedicated method taking the column type
+    // as its second argument (abstract/schema_definitions.rb:308), so a generic
+    // shorthand routing it to `column(name, "primary_key")` would diverge.
+    it("never exposes primary_key as a generic column shorthand", async () => {
+      const recorder = new CommandRecorder(pgDelegate);
+      await recorder.changeTable("fruits", async (t) => {
+        // The snake spelling only ever appeared as a native-type hash key.
+        expect((t as unknown as Record<string, unknown>)["primary_key"]).toBeUndefined();
+        await t.primaryKey("token", "uuid");
+      });
+      expect(recorder.commands).toEqual([
+        { cmd: "addColumn", args: ["fruits", "token", "uuid", { primaryKey: true }] },
+      ]);
+    });
+
     it("records the snake_case type for PG bitVarying (multi-word shorthand)", async () => {
-      const recorder = new CommandRecorder({ columnMethodNames: () => ["bitVarying"] });
+      const recorder = new CommandRecorder(pgDelegate);
       await recorder.changeTable("fruits", async (t) => {
         await (t as any).bitVarying("mask");
       });
@@ -525,9 +561,7 @@ describe("CommandRecorder", () => {
     // Rails' `define_column_methods` records (`unsignedInteger` ->
     // `unsigned_integer`); single-token shorthands (mediumtext, longblob) are
     // unchanged.
-    const mysqlLike = {
-      columnMethodNames: () => ["unsignedInteger", "mediumtext", "longblob"],
-    };
+    const mysqlLike = mysqlDelegate;
 
     it("records addColumn for MySQL shorthands (up adds)", async () => {
       const recorder = new CommandRecorder(mysqlLike);
@@ -560,12 +594,12 @@ describe("CommandRecorder", () => {
 
   describe("bulk invert change table", () => {
     it("records two changeTable commands from revert + revert-of-revert", async () => {
-      const delegate = { supportsBulkAlter: () => true };
+      const delegate = { ...abstractDelegate, supportsBulkAlter: () => true };
       const recorder = new CommandRecorder(delegate);
 
-      const block = async (t: RecorderTableProxy) => {
-        t.string("name");
-        t.rename("kind", "cultivar");
+      const block = async (t: Table) => {
+        await t.string("name");
+        await t.rename("kind", "cultivar");
       };
 
       await recorder.revert(async () => {
@@ -584,29 +618,5 @@ describe("CommandRecorder", () => {
       expect(recorder.commands[1].cmd).toBe("changeTable");
       expect(recorder.commands[1].args[0]).toBe("fruits");
     });
-  });
-});
-
-describe("withAdapterColumnMethods", () => {
-  // The shorthand set is Rails' `define_column_methods` list, exposed as
-  // `columnMethodNames()` — not the native-type hash, whose keys include
-  // `primary_key`. Rails defines `primary_key(name, type = :primary_key,
-  // **options)` separately (abstract/schema_definitions.rb:308): it takes the
-  // second argument as the column type and merges `primary_key: true`, so a
-  // generic shorthand routing it to `column(name, "primary_key")` would diverge.
-  it("never exposes primary_key as a generic column shorthand", () => {
-    const calls: Array<[string, string]> = [];
-    const base = { column: (name: string, type: string) => calls.push([name, type]) };
-    const proxy = withAdapterColumnMethods(base, ["primary_key", "primaryKey", "uuid"]) as Record<
-      string,
-      unknown
-    >;
-
-    expect(proxy["primary_key"]).toBeUndefined();
-    expect(proxy["primaryKey"]).toBeUndefined();
-    expect(typeof proxy["uuid"]).toBe("function");
-
-    (proxy["uuid"] as (n: string) => void)("token");
-    expect(calls).toEqual([["token", "uuid"]]);
   });
 });

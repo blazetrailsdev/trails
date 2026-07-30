@@ -22,6 +22,8 @@ import { unquoteIdentifier, splitQuotedIdentifier, Name, Utils } from "./utils.j
 import type { CreateDatabaseOptions, PgIndexDefinition } from "./schema-statements.js";
 import {
   type AlterTable as PgAlterTable,
+  Table as PgTable,
+  type SchemaStatementsConstraintLike,
   ExclusionConstraintDefinition,
   type ExclusionConstraintOptions,
   UniqueConstraintDefinition,
@@ -97,6 +99,19 @@ interface PgSchemaAdapter {
 export class PostgreSQLSchemaStatements extends SchemaStatements {
   private get pg(): PgSchemaAdapter {
     return this.adapter as unknown as PgSchemaAdapter;
+  }
+
+  /**
+   * Instantiate the PostgreSQL-specific {@link PgTable} so `change_table` blocks
+   * expose PG's `ColumnMethods` (`t.citext`, `t.hstore`, `t.serial`, ...) and
+   * constraint helpers. This is the single home for the override;
+   * `PostgreSQLAdapter#updateTableDefinition` delegates here so the
+   * adapter-direct and `Migration#schema` paths agree.
+   *
+   * Mirrors: PostgreSQL::SchemaStatements#update_table_definition
+   */
+  override updateTableDefinition(tableName: string, base?: unknown): PgTable {
+    return new PgTable(tableName, (base ?? this) as SchemaStatementsConstraintLike);
   }
 
   override async dropTable(...args: Parameters<SchemaStatements["dropTable"]>): Promise<void> {

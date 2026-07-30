@@ -71,15 +71,8 @@ import {
   CreateIndexDefinition,
   IndexDefinition,
 } from "./abstract/schema-definitions.js";
-import type {
-  ColumnOptions,
-  RemoveForeignKeyOptions,
-  SchemaStatementsLike,
-} from "./abstract/schema-definitions.js";
-import {
-  TableDefinition as MysqlTableDefinition,
-  Table as MysqlTable,
-} from "./mysql/schema-definitions.js";
+import type { ColumnOptions, RemoveForeignKeyOptions } from "./abstract/schema-definitions.js";
+import { TableDefinition as MysqlTableDefinition } from "./mysql/schema-definitions.js";
 import {
   dataSourceSql as mysqlDataSourceSql,
   extractForeignKeyAction as mysqlExtractForeignKeyAction,
@@ -258,18 +251,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return optionsForm
       ? super.removeForeignKey(fromTable, opts)
       : super.removeForeignKey(fromTable, toTableOrOptions, opts);
-  }
-
-  /**
-   * Override `SchemaStatements#updateTableDefinition` to instantiate the
-   * MySQL-specific {@link MysqlTable} subclass, so `changeTable` blocks expose
-   * MySQL's `ColumnMethods` (`t.unsignedInteger`, `t.unsignedFloat`, ...).
-   *
-   * Mirrors: `ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#update_table_definition`
-   * @internal
-   */
-  updateTableDefinition(tableName: string, base?: unknown): MysqlTable {
-    return new MysqlTable(tableName, (base ?? this) as SchemaStatementsLike);
   }
 
   protected _mariadb = false;
