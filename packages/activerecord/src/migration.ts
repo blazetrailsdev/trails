@@ -27,7 +27,7 @@ import {
   assertSchemaAdapter,
   type JoinTableOptions,
 } from "./connection-adapters/abstract/schema-statements.js";
-import { CommandRecorder, withAdapterColumnMethods } from "./migration/command-recorder.js";
+import { CommandRecorder } from "./migration/command-recorder.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
@@ -995,17 +995,12 @@ export abstract class Migration {
       await this.schema.changeTable(tname, options, callback);
       return;
     }
-    // Build Table against Migration (not SchemaStatements) so that
-    // per-operation recording in addColumn/removeColumn/etc. still applies.
-    // Wrap so adapter column-type shorthands (t.hstore, t.jsonb, ...) resolve,
-    // mirroring Rails' adapter ColumnMethods mixin on the yielded Table.
-    const delegate = this.connection as {
-      columnMethodNames?(): string[];
-      nativeDatabaseTypes?(): Record<string, unknown>;
+    const delegate = this.connection as unknown as {
+      updateTableDefinition?(tableName: string, base: unknown): Table;
     };
-    const columnTypes =
-      delegate.columnMethodNames?.() ?? Object.keys(delegate.nativeDatabaseTypes?.() ?? {});
-    const table = withAdapterColumnMethods(new Table(tableName, this), columnTypes);
+    const table = delegate.updateTableDefinition
+      ? delegate.updateTableDefinition(tableName, this)
+      : this.schema.updateTableDefinition(tableName, this);
     if (callback) await callback(table);
   }
 

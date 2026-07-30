@@ -1598,6 +1598,31 @@ export class Table {
   async json(...args: unknown[]): Promise<void> {
     await this.definedColumn("json", args);
   }
+  async time(...names: string[]): Promise<void>;
+  async time(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
+  async time(...args: unknown[]): Promise<void> {
+    await this.definedColumn("time", args);
+  }
+  async timestamp(...names: string[]): Promise<void>;
+  async timestamp(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
+  async timestamp(...args: unknown[]): Promise<void> {
+    await this.definedColumn("timestamp", args);
+  }
+  async binary(...names: string[]): Promise<void>;
+  async binary(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
+  async binary(...args: unknown[]): Promise<void> {
+    await this.definedColumn("binary", args);
+  }
+  async blob(...names: string[]): Promise<void>;
+  async blob(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
+  async blob(...args: unknown[]): Promise<void> {
+    await this.definedColumn("binary", args);
+  }
+  async numeric(...names: string[]): Promise<void>;
+  async numeric(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
+  async numeric(...args: unknown[]): Promise<void> {
+    await this.definedColumn("decimal", args);
+  }
   async char(...names: string[]): Promise<void>;
   async char(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   async char(...args: unknown[]): Promise<void> {

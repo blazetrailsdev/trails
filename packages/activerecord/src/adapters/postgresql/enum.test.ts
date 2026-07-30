@@ -7,6 +7,7 @@ import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.j
 import { Base, Schema } from "../../index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { fixtures } from "../../test-fixtures.js";
+import type { Table as PgTable } from "../../connection-adapters/postgresql/schema-definitions.js";
 
 // Rails: class PostgresqlEnum < ActiveRecord::Base
 //   enum :current_mood, { sad: "sad", okay: "ok", happy: "happy", aliased_field: "happy" }, prefix: true
@@ -218,7 +219,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       await Schema.define(adapter, async (schema) => {
         await schema.createEnum("color", ["blue", "green"]);
         await schema.changeTable("postgresql_enums", async (t) => {
-          await t.column("best_color", "color", { default: "blue", null: false });
+          await (t as PgTable).enum("best_color", {
+            enum_type: "color",
+            default: "blue",
+            null: false,
+          });
         });
       });
       PostgresqlEnum.resetColumnInformation();

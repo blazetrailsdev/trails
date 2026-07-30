@@ -563,12 +563,6 @@ export class Table extends AbstractTable {
     this._pgSchema = schema;
   }
 
-  async xml(...names: string[]): Promise<void>;
-  async xml(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
-  async xml(...args: unknown[]): Promise<void> {
-    await this.definedColumn("xml" as ColumnType, args);
-  }
-
   exclusionConstraint(expression: string, options?: ExclusionConstraintOptions): Promise<void> {
     this._requireConstraint("addExclusionConstraint");
     return this._pgSchema.addExclusionConstraint!(this._pgTableName, expression, options);
