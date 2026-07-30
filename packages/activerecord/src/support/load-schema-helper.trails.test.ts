@@ -11,13 +11,16 @@
 import { describe, expect, it } from "vitest";
 import { Base } from "../base.js";
 import { recordBootLaidTables, resetTestTables } from "./drop-all-tables.js";
-import { loadAdapterSpecificSchema } from "./load-schema-helper.js";
+import { loadSchema } from "./load-schema-helper.js";
 
 describe("boot-laid table snapshot", () => {
   it("survives the reset for every table the adapter-specific arm lays", async () => {
     const adapter = Base.connection;
 
-    await loadAdapterSpecificSchema(adapter);
+    // The canonical half is already on this worker's DB, so the arm passed here
+    // lays nothing and just hands `loadSchema` the connection to run the
+    // adapter-specific arm on.
+    await loadSchema(async () => adapter);
     const bookkeeping = new Set(["schema_migrations", "ar_internal_metadata"]);
     const laid = (await adapter.tables()).filter((name) => !bookkeeping.has(name));
     expect(laid).toContain("defaults");
@@ -35,8 +38,10 @@ describe("boot-laid table snapshot", () => {
     // `test-setup-dy.ts`'s boot order, replayed: DatabaseTasks has laid the
     // canonical tables (and left anything else alone), then the purge, then the
     // adapter-specific arm, then the snapshot.
-    await resetTestTables(adapter);
-    await loadAdapterSpecificSchema(adapter);
+    await loadSchema(async () => {
+      await resetTestTables(adapter);
+      return adapter;
+    });
     await recordBootLaidTables(adapter);
 
     expect(await adapter.tables()).not.toContain("leftover_boot_t");

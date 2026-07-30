@@ -515,30 +515,43 @@ const ADAPTER_SPECIFIC_SCHEMAS: Record<string, (adapter: DatabaseAdapter) => Pro
  *   every migration line, whereas laying the schema through the adapter prints
  *   nothing.
  *
+ * Deviation, and why it is a parameter rather than a second entry point: trails
+ * lays the canonical half through two different mechanisms depending on the
+ * lane — `loadCanonicalSchema` (the sqlite/PG template build, the adapter
+ * clusters) and `DatabaseTasks.reconstructFromSchema`/`loadSchema` on a
+ * generated schema file (`test-setup-dy.ts`, the per-worker DB every ordinary
+ * AR test actually rides, which also has to purge). Rails has one mechanism and
+ * so needs no such seam. Passing the canonical arm in keeps both lanes inside
+ * this one function, so the two arms of `load_schema` cannot be applied to one
+ * path and not the other — the bug PR #5523 found. The thunk returns the
+ * connection the adapter-specific arm should run on because the
+ * `DatabaseTasks` path swaps the pool underneath it (`withTemporaryPool`), so
+ * the caller cannot lease it up front.
+ *
  * @internal Boot/template setup paths only. Test files wire the canonical schema
  * + fixtures through `fixtures({ ... })`; the
  * `blazetrails/no-internal-canonical-loaders` ESLint rule enforces that.
  */
-export async function loadSchema(adapter: DatabaseAdapter): Promise<void> {
-  await loadCanonicalSchema(adapter);
+export async function loadSchema(
+  adapterOrCanonicalArm: DatabaseAdapter | (() => Promise<DatabaseAdapter>),
+): Promise<void> {
+  let adapter: DatabaseAdapter;
+  if (typeof adapterOrCanonicalArm === "function") {
+    adapter = await adapterOrCanonicalArm();
+  } else {
+    adapter = adapterOrCanonicalArm;
+    await loadCanonicalSchema(adapter);
+  }
   await loadAdapterSpecificSchema(adapter);
 }
 
 /**
  * The `load adapter_specific_schema_file if File.exist?(...)` arm of
- * `load_schema_helper.rb:15`, on its own.
- *
- * Exported because trails lays the canonical half through two different
- * mechanisms depending on the lane: {@link loadSchema} (the sqlite/PG template
- * build) and `DatabaseTasks.reconstructFromSchema`/`loadSchema` on the
- * generated schema file (`test-setup-dy.ts`, the per-worker DB every AR test
- * actually rides). The latter knows only about schema.rb's mirror and purges
- * whatever the template carried, so it has to call this arm itself — otherwise
- * the `<adapter>_specific_schema.rb` tables exist only in the template.
- *
- * @internal Boot/template setup paths only.
+ * `load_schema_helper.rb:15`, on its own. Not exported: reaching for this arm
+ * alone is exactly how the two halves of `load_schema` drifted apart before —
+ * go through {@link loadSchema}.
  */
-export async function loadAdapterSpecificSchema(adapter: DatabaseAdapter): Promise<void> {
+async function loadAdapterSpecificSchema(adapter: DatabaseAdapter): Promise<void> {
   const adapterSpecificSchema = ADAPTER_SPECIFIC_SCHEMAS[adapter.adapterName];
   if (adapterSpecificSchema) await adapterSpecificSchema(adapter);
 }

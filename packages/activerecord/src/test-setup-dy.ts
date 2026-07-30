@@ -1,7 +1,8 @@
 /**
  * D-Y vitest setupFile for the activerecord project: calls `ARTest.connect`'s
  * port (`support/connection.ts`) and loads the canonical fixture schema once
- * per worker via `DatabaseTasks`.
+ * per worker through `support/load-schema-helper.ts`'s `loadSchema`, whose
+ * canonical arm is `DatabaseTasks` here (this DB has to be purged first).
  *
  * The pool it opens lives for the whole worker, as Rails' does for the whole
  * process (`cases/helper.rb` calls `ARTest.connect` at load and never
@@ -50,45 +51,57 @@ const schemaFilePath = await generateSchemaFile(
 
 const pgExclusive = adapter === "postgres" && !!getEnv("AR_PG_EXCLUSIVE_DB");
 const mysqlExclusive = adapter === "mysql" && !!getEnv("AR_MYSQL_EXCLUSIVE_DB");
-if ((adapter === "sqlite" && envConfig.database !== ":memory:") || pgExclusive || mysqlExclusive) {
-  await DatabaseTasks.reconstructFromSchema(envConfig, "ts", schemaFilePath);
-} else {
-  await DatabaseTasks.loadSchema(envConfig, "ts", schemaFilePath);
-}
 
-// Permanent worker-startup assertion: key canonical tables must exist after
-// DatabaseTasks loads the schema. Failure here means the load path is broken,
-// not just the signature cache. Cast because tableExists is on the concrete
-// adapter class, not the DatabaseAdapter interface.
+const { recordBootLaidTables, resetTestTables } = await import("./support/drop-all-tables.js");
+const { loadSchema } = await import("./support/load-schema-helper.js");
+
+// `load_schema_helper.rb:4-21`, both arms, through the one entry point the
+// template build and the adapter clusters also use. Only the canonical arm
+// differs here: this worker's DB has to be purged/reconstructed first, which
+// Rails' single-process suite never does, so `DatabaseTasks` lays schema.rb's
+// mirror instead of `loadCanonicalSchema`.
+await loadSchema(async () => {
+  if (
+    (adapter === "sqlite" && envConfig.database !== ":memory:") ||
+    pgExclusive ||
+    mysqlExclusive
+  ) {
+    await DatabaseTasks.reconstructFromSchema(envConfig, "ts", schemaFilePath);
+  } else {
+    await DatabaseTasks.loadSchema(envConfig, "ts", schemaFilePath);
+  }
+
+  // `DatabaseTasks.loadSchema` drop+recreates the *declared* tables (force:
+  // "cascade") on the shared PG/MySQL database; it purges nothing else, so a
+  // bespoke table a previous run left behind is still here. Drop it before the
+  // snapshot below, or it would be recorded as boot-laid and truncated for the
+  // rest of the run instead of dropped. Pre-snapshot, the reset's boot-laid set
+  // is the canonical registry, which is exactly the "keep schema.rb, drop the
+  // rest" purge wanted here.
+  const canonicalConn = await Base.leaseConnection();
+  await resetTestTables(canonicalConn);
+  return canonicalConn;
+});
+
+// Permanent worker-startup assertion: key canonical tables and at least one
+// `<adapter>_specific_schema.rb` table (`defaults`, the one table all three
+// adapter arms lay) must exist after the schema load. Failure here means an arm
+// of the load path is broken, not just the signature cache — and it surfaces at
+// worker startup instead of as a per-file "relation does not exist". Cast
+// because tableExists is on the concrete adapter class, not the DatabaseAdapter
+// interface.
 const _conn = (await Base.leaseConnection()) as unknown as {
   tableExists(n: string): Promise<boolean>;
 };
 const missingTables: string[] = [];
-for (const t of ["accounts", "topics", "posts"]) {
+for (const t of ["accounts", "topics", "posts", "defaults"]) {
   if (!(await _conn.tableExists(t))) missingTables.push(t);
 }
 if (missingTables.length > 0) {
   throw new Error(
-    `[test-setup-dy] DatabaseTasks schema load incomplete — missing tables: ${missingTables.join(", ")}`,
+    `[test-setup-dy] schema load incomplete — missing tables: ${missingTables.join(", ")}`,
   );
 }
-
-// `load_schema_helper.rb:15` — the adapter-specific arm. DatabaseTasks lays
-// only schema.rb's mirror, so the `<adapter>_specific_schema.rb` tables have to
-// be laid here, on the same per-worker DB (the reconstruct path purges whatever
-// the template carried).
-// `DatabaseTasks.loadSchema` drop+recreates the *declared* tables (force:
-// "cascade") on the shared PG/MySQL database; it purges nothing else, so a
-// bespoke table a previous run left behind is still here. Drop it before the
-// snapshot below, or it would be recorded as boot-laid and truncated for the
-// rest of the run instead of dropped. Pre-snapshot, the reset's boot-laid set is
-// the canonical registry, which is exactly the "keep schema.rb, drop the rest"
-// purge wanted here.
-const { recordBootLaidTables, resetTestTables } = await import("./support/drop-all-tables.js");
-await resetTestTables(await Base.leaseConnection());
-
-const { loadAdapterSpecificSchema } = await import("./support/load-schema-helper.js");
-await loadAdapterSpecificSchema(await Base.leaseConnection());
 
 await recordBootLaidTables(await Base.leaseConnection());
 
