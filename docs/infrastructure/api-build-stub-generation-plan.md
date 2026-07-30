@@ -445,7 +445,11 @@ Two boundaries follow from the extra set being a flat set of bare names:
 
 - A name a class, namespace, member, or file function in the same file also
   declares is **not** exempt — one name carries one verdict, and exempting on
-  the interface's behalf would absolve the other declaration silently.
+  the interface's behalf would absolve the other declaration silently. This
+  includes the `namespace` half of a declaration-merged `interface` +
+  `namespace` pair: the extractor collapses the pair into one entry carrying
+  `isInterface`, so it also records `declaredAsNamespace` to keep the
+  non-interface half visible here.
 - An interface's MEMBERS are not exempt. Only the declaration name is; members
   still need the declaration-level tag described above, which is why tagging an
   exempt-by-kind interface is still meaningful. The tag check runs _before_ the
