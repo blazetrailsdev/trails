@@ -1629,8 +1629,8 @@ export class SchemaStatements {
       tableName,
       // A composite primaryKey overrides `id: false`: Rails' guard would skip it,
       // but trails' callers spell a composite PK as `id: false, primaryKey: [...]`.
-      primaryKey === false ? false : Array.isArray(primaryKey) ? true : id,
-      primaryKey === false ? undefined : primaryKey,
+      Array.isArray(primaryKey) ? true : id,
+      primaryKey,
       pkOptions,
     );
 

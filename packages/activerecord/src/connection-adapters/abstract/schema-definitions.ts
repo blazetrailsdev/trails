@@ -1014,7 +1014,7 @@ export class TableDefinition {
   setPrimaryKey(
     tableName: string,
     id: boolean | ColumnType | IdHashOptions,
-    primaryKey?: string | string[],
+    primaryKey?: string | string[] | false,
     options: Record<string, unknown> = {},
   ): void {
     // Rails has no equivalent: its set_primary_key only ever runs on a fresh
@@ -1026,7 +1026,9 @@ export class TableDefinition {
 
     if (!id || this.as) return;
 
-    const pk = primaryKey ?? globalGetPrimaryKey(singularize(tableName));
+    // Rails' `primary_key || Base.get_primary_key(...)` — `||`, not `??`, so an
+    // explicit `primaryKey: false` still falls back to the conventional name.
+    const pk = primaryKey || globalGetPrimaryKey(singularize(tableName));
 
     let pkOptions: ColumnOptions = { ...(options as Partial<ColumnOptions>) };
     let pkType: ColumnType = typeof id === "string" ? id : "primary_key";

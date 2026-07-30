@@ -706,3 +706,23 @@ describe("buildCreateTableDefinition routing", () => {
     expect(pkColumn(td)?.options).toMatchObject({ limit: 8 });
   });
 });
+
+describe("buildCreateTableDefinition primaryKey: false", () => {
+  it("still builds the conventional primary key column", () => {
+    const ss = makeStatements();
+
+    const td = ss.buildCreateTableDefinition("users", { primaryKey: false });
+
+    const pk = td.columns.find((c) => c.options.primaryKey);
+    expect(pk?.name).toBe("id");
+    expect(pk?.type).toBe("primary_key");
+  });
+
+  it("emits no primary key column when id is false", () => {
+    const ss = makeStatements();
+
+    const td = ss.buildCreateTableDefinition("users", { id: false, primaryKey: false });
+
+    expect(td.columns.find((c) => c.options.primaryKey)).toBeUndefined();
+  });
+});
