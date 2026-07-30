@@ -68,31 +68,20 @@ export class HasOne extends SingularAssociation {
           typeof assoc.needsTargetLoadForBuild === "function" &&
           assoc.needsTargetLoadForBuild()
         ) {
-          // `loadTargetForBuild` loads the direct-FK target for a plain has_one
-          // (the record `remove_target!` will detach), but a has_one_through
-          // overrides it to load the *through* proxy — Rails' has_one_through
-          // `replace` runs no `load_target`/`remove_target!` on the target; its
-          // `create_through_record` loads the through instead. The through's
-          // `detachDisplacedTarget` is a no-op, so the proxy passed as
-          // `displaced` here is inert.
-          return assoc.loadTargetForBuild().then((displaced: unknown) => {
-            const record = buildOwningDisplacement(assoc, args);
-            return assoc.detachDisplacedTarget(displaced).then(() => record);
-          });
+          // `loadTargetForBuild` caches the direct-FK target for a plain
+          // has_one, but a has_one_through overrides it to load the *through*
+          // proxy — Rails' has_one_through `replace` runs no
+          // `load_target`/`remove_target!` on the target; its
+          // `create_through_record` loads the through instead, and the through's
+          // `detachDisplacedOnBuild` is a no-op. With the target cached, `build`
+          // owns the removal and returns the promise to `await`.
+          return assoc.loadTargetForBuild().then(() => assoc.build(...args));
         }
-        // The target may already be loaded (so `needsTargetLoadForBuild` is
-        // false): Rails' `set_new_record` → `replace` still runs `remove_target!`
-        // on it, detaching the prior record (FK nullified / destroyed per
-        // `:dependent`). That removal needs an `await`, so return a Promise for
-        // the loaded-target case only — a new-record / no-target build keeps its
-        // synchronous return (the shape the STI-build tests assert).
-        const displaced =
-          typeof assoc.isLoaded === "function" && assoc.isLoaded() ? assoc.target : null;
-        const record = buildOwningDisplacement(assoc, args);
-        if (displaced && typeof assoc.detachDisplacedTarget === "function") {
-          return assoc.detachDisplacedTarget(displaced).then(() => record);
-        }
-        return record;
+        // An already-loaded target still gets `remove_target!` (FK nullified /
+        // destroyed per `:dependent`), so `build` returns a Promise for that
+        // case only — a new-record / no-target build keeps its synchronous
+        // return, the shape the STI-build tests assert.
+        return assoc.build(...args);
       },
       writable: true,
       configurable: true,
@@ -257,24 +246,5 @@ export class HasOne extends SingularAssociation {
         }
       });
     }
-  }
-}
-
-/**
- * Run `association.build` with the association's own displaced-record removal
- * suppressed: this accessor awaits `detachDisplacedTarget` itself (with Rails'
- * target-on-failure semantics), and a second, concurrent removal of the same
- * row would double-destroy it. `HasOneAssociation#build` keeps the removal for
- * the direct `record.association(name).build(...)` callers, which have no other
- * hook to run it from.
- *
- * @internal
- */
-function buildOwningDisplacement(assoc: any, args: unknown[]): any {
-  assoc.buildDisplacementOwnedByCaller = true;
-  try {
-    return assoc.build(...args);
-  } finally {
-    assoc.buildDisplacementOwnedByCaller = false;
   }
 }
