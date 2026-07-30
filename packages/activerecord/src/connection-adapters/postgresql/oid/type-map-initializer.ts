@@ -9,6 +9,15 @@ import { Enum } from "./enum.js";
 import { RangeType, type RangeSubtype } from "./range.js";
 import { Vector } from "./vector.js";
 
+/**
+ * The oid-keyed store this initializer populates.
+ *
+ * @noRailsEquivalent CONVERGEABLE (story:
+ * converge-pg-type-map-initializer-onto-ported-type-map). Rails passes a real
+ * `ActiveRecord::Type::HashLookupTypeMap`; trails ports the `Type::TypeMap`
+ * base (`type/type-map.ts`) but not that oid-keyed subclass, so the shape
+ * stands in until it exists.
+ */
 export interface TypeMap {
   registerType(
     oid: number | string,

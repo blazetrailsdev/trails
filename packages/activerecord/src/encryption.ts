@@ -38,6 +38,12 @@ import type { Config } from "./encryption/config.js";
  * `LegacyEncryptorShim.isEncrypted`). Custom encryptors whose `decrypt`
  * accepts plaintext without throwing should also implement
  * `isEncrypted(text)` to avoid misclassification.
+ *
+ * @noRailsEquivalent CONVERGEABLE (story:
+ * converge-encryption-simple-encryptor-onto-encryptor-like). Rails has one
+ * encryptor contract, `Encryption::Encryptor`, which trails ports as a class
+ * plus the `EncryptorLike` shape; this narrow surface and its shim exist only
+ * for older call sites.
  */
 export interface Encryptor {
   encrypt(value: string): string;

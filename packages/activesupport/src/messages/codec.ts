@@ -6,6 +6,14 @@ import {
   type Format,
 } from "./serializer-with-fallback.js";
 
+/**
+ * The duck type a custom `serializer:` must satisfy. Rails calls
+ * `serializer.dump` / `serializer.load` bare, naming no constant.
+ *
+ * @noRailsEquivalent PERMANENT — name collision only. Ruby's
+ * `MessageSerializer` (`ActiveRecord::Encryption::MessageSerializer`)
+ * serializes encryption messages and lives in a different framework.
+ */
 export interface MessageSerializer {
   dump(value: unknown): string;
   load(dumped: string): unknown;

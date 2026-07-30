@@ -12,6 +12,14 @@ import { ExceptionWrapper } from "./exception-wrapper.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
 
+/**
+ * The duck type this middleware needs from `env["action_dispatch.logger"]`.
+ * Rails names no constant for it — `logger` is called bare.
+ *
+ * @noRailsEquivalent PERMANENT — name collision only. Ruby's `Logger`
+ * constants (`AbstractController::Logger`, the `ActiveSupport::Logger` class)
+ * are a controller mixin and a concrete logger; neither is this receiver shape.
+ */
 export interface Logger {
   error(message: string): void;
   warn?(message: string): void;

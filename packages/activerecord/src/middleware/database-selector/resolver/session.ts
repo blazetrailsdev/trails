@@ -4,6 +4,14 @@
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
+/**
+ * The duck type `Resolver::Session` requires of `request.session` — Rails
+ * calls `session[]`/`session[]=`/`session.delete` bare, naming no constant.
+ *
+ * @noRailsEquivalent PERMANENT — name collision only. Ruby's `SessionStore`
+ * (`ActionController::RequestForgeryProtection::SessionStore`) is the CSRF
+ * token store strategy, unrelated to this session-hash shape.
+ */
 export interface SessionStore {
   get(key: string): unknown;
   set(key: string, value: unknown): void;

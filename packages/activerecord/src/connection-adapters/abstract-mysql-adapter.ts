@@ -1300,7 +1300,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /**
    * Escape-only string quoting per the Quoting interface contract
-   * (`abstract/quoting-interface.ts`). Mirrors Rails MySQL
+   * (`abstract/quoting.ts`). Mirrors Rails MySQL
    * `quote_string` (`abstract_mysql_adapter.rb`): backslash-escapes
    * `'` and the control chars MySQL's wire protocol requires (`\0 \n
    * \r \Z \\`). Distinct from `quote()`, which wraps with surrounding

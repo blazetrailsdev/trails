@@ -12,7 +12,7 @@ import {
   castBoundValue as abstractCastBoundValue,
   columnNameWithOrderMatcher as abstractColumnNameWithOrderMatcher,
 } from "./connection-adapters/abstract/quoting.js";
-import type { Quoting } from "./connection-adapters/abstract/quoting-interface.js";
+import type { Quoting } from "./connection-adapters/abstract/quoting.js";
 import {
   ConnectionNotDefined,
   PreparedStatementInvalid,

@@ -44,6 +44,14 @@ export interface MethodParam {
   name: string;
   type: FieldType;
 }
+/**
+ * A method node in the template builder's code-generation AST.
+ *
+ * @noRailsEquivalent PERMANENT — name collision only. Ruby's `Method`
+ * constants are the core reflection class and
+ * `ActiveRecord::DynamicMatchers::Method`, a `method_missing` matcher;
+ * neither is a codegen node.
+ */
 export interface Method {
   name: string;
   params: MethodParam[];

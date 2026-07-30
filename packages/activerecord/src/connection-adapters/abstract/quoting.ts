@@ -693,6 +693,98 @@ export function lookupCastType(this: { typeMap: TypeMap }, sqlType: string | nul
 }
 
 /**
+ * Quoting interface — the contract every connection adapter satisfies
+ * for value/identifier quoting.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::Quoting (mixed into
+ * AbstractAdapter; PG/MySQL/SQLite override what differs).
+ *
+ * Call sites depend on this interface — never on the standalone
+ * functions below — so dialect dispatch happens via the active adapter
+ * rather than a string-enum parameter.
+ *
+ * @internal
+ */
+export interface Quoting {
+  /** Mirrors: Quoting#quote — SQL-literal form of a value. */
+  quote(value: unknown): string;
+
+  /**
+   * Mirrors: Quoting#quote_string — **escape-only**. Doubles `'` and
+   * applies any dialect-specific escape rules (MySQL `\\\0\n\r\Z`; PG
+   * may switch to `E'…'` form for backslashes inside `quote()`). Never
+   * adds surrounding `'`. For a fully-quoted SQL literal use
+   * `quote(value)` instead.
+   *
+   * Note: per-adapter standalone `quoteString` exports in
+   * `{sqlite3,mysql}/quoting.ts` historically wrap with surrounding
+   * `'...'` and are NOT escape-only. Adapter classes override
+   * `quoteString` to honor this contract; the standalones stay as
+   * literal-quoting helpers for legacy call sites.
+   */
+  quoteString(s: string): string;
+
+  /**
+   * Identifier-form quoting. PG/SQLite double-quote, MySQL backtick.
+   *
+   * @noRailsEquivalent PERMANENT — a pure synonym of `quote_column_name`.
+   * Rails' `Quoting` has no `quote_identifier`; the name exists only so
+   * call sites quoting a non-column identifier read honestly. Retiring it
+   * means rewriting those call sites, not porting anything.
+   */
+  quoteIdentifier(name: string): string;
+
+  /** Mirrors: Quoting#quote_table_name (handles schema-qualified names). */
+  quoteTableName(name: string): string;
+
+  /** Mirrors: Quoting#quote_column_name. */
+  quoteColumnName(name: string): string;
+
+  /** Mirrors: Quoting#quote_table_name_for_assignment (`UPDATE ... SET col = ...`). */
+  quoteTableNameForAssignment(table: string, attr: string): string;
+
+  /** Mirrors: Quoting#quote_default_expression (DDL DEFAULT clause).
+   * Awaitable: PG's override resolves the column's cast type with a live
+   * `SELECT '<sql_type>'::regtype::oid` query (postgresql/quoting.rb:195),
+   * so callers must `await` the result; the other adapters return plain
+   * strings. */
+  quoteDefaultExpression(value: unknown, column?: unknown): string | Promise<string>;
+
+  /** Mirrors: Quoting#quoted_true. Abstract/PG/MySQL: `"TRUE"`; SQLite: `"1"`. */
+  quotedTrue(): string;
+
+  /** Mirrors: Quoting#quoted_false. */
+  quotedFalse(): string;
+
+  /** Mirrors: Quoting#unquoted_true. PG: `true`; MySQL/SQLite: `1`. */
+  unquotedTrue(): boolean | number;
+
+  /** Mirrors: Quoting#unquoted_false. */
+  unquotedFalse(): boolean | number;
+
+  /** Mirrors: Quoting#quoted_binary — adapter-specific binary literal. */
+  quotedBinary(value: unknown): string;
+
+  /** Mirrors: Quoting#type_cast — primitive form for bind params. */
+  typeCast(value: unknown): unknown;
+
+  /** Mirrors: Quoting#cast_bound_value — bound-param coercion. */
+  castBoundValue(value: unknown): unknown;
+
+  /** Mirrors: Quoting#sanitize_as_sql_comment — strip comment-close sequences from comment text. */
+  sanitizeAsSqlComment(value: unknown): string;
+}
+
+// `column_name_matcher` / `column_name_with_order_matcher` are deliberately
+// NOT on this interface. In Rails they live in `Quoting::ClassMethods`
+// (active_record/connection_adapters/abstract/quoting.rb:18, :33) — the
+// regexes don't depend on instance state, so they're class methods.
+// Trails mirrors that with `static columnNameMatcher()` on each concrete
+// adapter (e.g. SQLite3Adapter:97). Call sites resolve them via
+// `adapter.constructor.columnNameMatcher()` (relation.ts:211,
+// query-methods.ts:155).
+
+/**
  * Mixin object for AbstractAdapter: bundles standalone Quoting helpers so
  * `include(AbstractAdapter, Quoting)` credits them to the host class.
  *

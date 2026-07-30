@@ -28,7 +28,13 @@ export class LocationParsingError extends Error {
 }
 
 /** Minimal shape needed from a JS backtrace location. Matches the property
- *  V8/Node expose on `CallSite` / parsed stack frames. */
+ *  V8/Node expose on `CallSite` / parsed stack frames.
+ *
+ * @noRailsEquivalent PERMANENT — name collision only. Ruby's
+ * `ActiveSupport::SyntaxErrorProxy::BacktraceLocation` is a `Struct` that
+ * *fakes* a `Thread::Backtrace::Location` for a `SyntaxError`; this is the
+ * real V8 frame shape, read rather than constructed.
+ */
 export interface BacktraceLocation {
   lineno: number;
 }

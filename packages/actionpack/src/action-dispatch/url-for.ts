@@ -4,6 +4,15 @@
  * URL generation from options hash, mirroring Rails' url_for behavior.
  */
 
+/**
+ * The options hash this file's `urlFor` accepts (snake-cased keys, as Rails
+ * spells them). In Ruby this is a bare `Hash` with no constant of its own.
+ *
+ * @noRailsEquivalent PERMANENT — name collision only. The Ruby
+ * `ActionDispatch::Integration::UrlOptions` (`testing/integration.rb`) is an
+ * integration-test mixin that supplies `url_options`; it has nothing to do
+ * with this option-hash shape.
+ */
 export interface UrlOptions {
   protocol?: string | false;
   host?: string;
