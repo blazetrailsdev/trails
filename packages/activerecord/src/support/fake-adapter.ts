@@ -3,29 +3,24 @@ import { Column } from "../connection-adapters/column.js";
 import type { SqlTypeMetadata } from "../connection-adapters/sql-type-metadata.js";
 import { register } from "../connection-adapters.js";
 
-/**
- * Rails' fake adapter redefines inherited members with incompatible shapes:
- * `attr_accessor :data_sources` turns the `data_sources` method into a plain
- * attribute, and `primary_key` / `columns` / `active?` become synchronous
- * in-memory lookups where AbstractAdapter's reach the database. TS forbids
- * narrowing an inherited member that way, so the base is widened with those
- * members dropped — the alternative is renaming them, which would lose the
- * Rails names this port exists to preserve.
- */
-const FakeAdapterBase = AbstractAdapter as unknown as new () => Omit<
-  AbstractAdapter,
-  "dataSources" | "primaryKey" | "columns" | "active"
->;
-
 export interface MergeColumnOptions {
   default?: unknown;
   null?: boolean;
 }
 
 /** Mirrors: FakeActiveRecordAdapter */
-export class FakeActiveRecordAdapter extends FakeAdapterBase {
+export class FakeActiveRecordAdapter extends AbstractAdapter {
   static readonly columns = new Map<string, Column[]>();
 
+  /**
+   * Rails' `attr_accessor :data_sources` replaces the inherited
+   * `data_sources` method with a plain attribute; Ruby allows the reshape,
+   * TS does not (AbstractAdapter declares `dataSources(): Promise<string[]>`).
+   * The suppression keeps the Rails superclass chain and the Rails member
+   * name — the alternatives are interposing a base class that drops the
+   * member, or renaming it, and both lose what this port exists to preserve.
+   */
+  // @ts-expect-error -- deliberate Ruby-style member reshape, see above
   dataSources: string[];
   primaryKeys: Record<string, string>;
 
@@ -46,7 +41,12 @@ export class FakeActiveRecordAdapter extends FakeAdapterBase {
     this._fakeColumns = FakeActiveRecordAdapter.columns;
   }
 
-  /** Mirrors: FakeActiveRecordAdapter#primary_key */
+  /**
+   * Mirrors: FakeActiveRecordAdapter#primary_key. Synchronous in-memory
+   * lookup where AbstractAdapter's reaches the database and returns a
+   * promise; same deliberate reshape as `dataSources` above.
+   */
+  // @ts-expect-error -- deliberate Ruby-style member reshape, see dataSources
   primaryKey(table: string): string {
     return this.primaryKeys[table] ?? "id";
   }
@@ -63,7 +63,12 @@ export class FakeActiveRecordAdapter extends FakeAdapterBase {
     );
   }
 
-  /** Mirrors: FakeActiveRecordAdapter#columns */
+  /**
+   * Mirrors: FakeActiveRecordAdapter#columns. Synchronous in-memory lookup
+   * where AbstractAdapter's reaches the database and returns a promise; same
+   * deliberate reshape as `dataSources` above.
+   */
+  // @ts-expect-error -- deliberate Ruby-style member reshape, see dataSources
   columns(tableName: string): Column[] {
     const existing = this._fakeColumns.get(tableName);
     if (existing) return existing;
@@ -83,7 +88,7 @@ export class FakeActiveRecordAdapter extends FakeAdapterBase {
   }
 
   private fetchTypeMetadata(sqlType: string | null): SqlTypeMetadata {
-    return (this as unknown as AbstractAdapter).schemaStatements().fetchTypeMetadata(sqlType);
+    return this.schemaStatements().fetchTypeMetadata(sqlType);
   }
 }
 
