@@ -1857,6 +1857,7 @@ export const ARUNIT2_SCHEMA: Schema = {
       course_id: "integer",
       professor_id: "integer",
     },
+    indexes: [{ columns: "course_id" }, { columns: "professor_id" }],
     primaryKey: false,
   },
 };
