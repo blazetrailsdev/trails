@@ -499,15 +499,12 @@ export class HasOneAssociation extends SingularAssociation {
     if (!displaced) return;
     if ((displaced as { isDestroyed?: () => boolean }).isDestroyed?.()) return;
     if (sameRecord(displaced, this.target)) return;
-    const previous = this.pendingRemovalTarget;
-    this.pendingRemovalTarget = displaced;
     try {
+      this.pendingRemovalTarget = displaced;
       await this.removeTargetBang((this.reflection.options.dependent as string) ?? "");
     } catch (error) {
       this.target = displaced;
       throw error;
-    } finally {
-      this.pendingRemovalTarget = previous;
     }
   }
 
@@ -654,6 +651,7 @@ export class HasOneAssociation extends SingularAssociation {
 
   private async removeTargetBang(method: string): Promise<void> {
     const target = this.pendingRemovalTarget ?? this.target;
+    this.pendingRemovalTarget = null;
     if (!target) return;
     if (method === "delete") {
       await ((target as any).delete?.() ?? Promise.resolve());
