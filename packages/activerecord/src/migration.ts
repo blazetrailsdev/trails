@@ -31,6 +31,7 @@ import { CommandRecorder } from "./migration/command-recorder.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
+import { migrationArConfig } from "./migration/ar-config-source.js";
 import { DefaultStrategy } from "./migration/default-strategy.js";
 import type { ExecutionStrategy } from "./migration/execution-strategy.js";
 import type { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
@@ -90,24 +91,6 @@ export interface ColumnExistsOptions {
   null?: unknown;
   collation?: unknown;
   comment?: unknown;
-}
-
-export interface MigrationArConfig {
-  tableNamePrefix: string;
-  tableNameSuffix: string;
-  // Mirrors Rails' `Migration#connection` fallback to the migration connection
-  // pool (`ActiveRecord::Base.lease_connection`) when no per-migration
-  // connection has been assigned. Injected by Base to avoid the import cycle.
-  // Sync: since trails' Rails-named `leaseConnection` is now async (awaits
-  // per-checkout `verifyBang`), this is wired to the sync `leaseConnectionSync`
-  // escape hatch — it resolves a pinned connection / establishes a first lease
-  // synchronously, skipping only the async per-checkout verify.
-  leaseConnection?: () => DatabaseAdapter;
-}
-let _arConfig: MigrationArConfig | null = null;
-/** @internal */
-export function registerMigrationArConfig(config: MigrationArConfig): void {
-  _arConfig = config;
 }
 
 // Mirrors Zlib.crc32 (ISO 3309 / ITU-T V.42 polynomial) operating on UTF-8 bytes.
@@ -1333,7 +1316,7 @@ export abstract class Migration {
   get connection(): DatabaseAdapter {
     // Rails: `@connection || ActiveRecord::Base.lease_connection`. A bare
     // migration with no assigned connection leases one from the migration pool.
-    return this._connectionOverride ?? this.adapter ?? _arConfig!.leaseConnection!();
+    return this._connectionOverride ?? this.adapter ?? migrationArConfig()!.leaseConnection!();
   }
 
   set connection(conn: DatabaseAdapter | undefined) {
@@ -1439,8 +1422,8 @@ export abstract class Migration {
 
   static tableNameOptions(): { tableNamePrefix: string; tableNameSuffix: string } {
     return {
-      tableNamePrefix: _arConfig?.tableNamePrefix ?? "",
-      tableNameSuffix: _arConfig?.tableNameSuffix ?? "",
+      tableNamePrefix: migrationArConfig()?.tableNamePrefix ?? "",
+      tableNameSuffix: migrationArConfig()?.tableNameSuffix ?? "",
     };
   }
 

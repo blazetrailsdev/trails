@@ -133,7 +133,7 @@ import {
   getVerboseQueryLogs as _getVerboseQueryLogs,
   setVerboseQueryLogs as _setVerboseQueryLogs,
 } from "./log-subscriber.js";
-import { registerMigrationArConfig } from "./migration.js";
+import { registerMigrationArConfig } from "./migration/ar-config-source.js";
 import { registerTableNameOptions } from "./connection-adapters/abstract/table-name-options.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 import * as LockingOptimistic from "./locking/optimistic.js";
