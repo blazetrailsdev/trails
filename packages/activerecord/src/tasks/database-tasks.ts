@@ -353,7 +353,10 @@ export class DatabaseTasks {
       // Rails builds the migrator from `migration_connection_pool.migration_context`
       // (`connection_pool.rb:294-299`), i.e. from the pool's own
       // `db_config.migrations_paths` — not from a process-global list.
-      const migrator = new Migrator(adapter, this._migrationsFor(dbConfig));
+      const migrator = new Migrator(adapter, this._migrationsFor(dbConfig), {
+        environment: dbConfig.envName,
+        internalMetadataEnabled: dbConfig.useMetadataTable,
+      });
       // Rails block: `version.blank? ? (scope.blank? || scope == m.scope) : m.version == version`
       // `version` is the *method parameter* (explicit arg), NOT ENV["VERSION"].
       // The rake task always calls migrate() with no arg, so version is nil → scope filter only.
@@ -393,13 +396,28 @@ export class DatabaseTasks {
 
   /** Roll back the last N migrations (default 1). Mirrors `db:rollback`. */
   static async rollback(steps: number = 1): Promise<void> {
+    await this._stepMigrations("rollback", steps);
+  }
+
+  static async forward(steps: number = 1): Promise<void> {
+    await this._stepMigrations("forward", steps);
+  }
+
+  private static async _stepMigrations(
+    direction: "rollback" | "forward",
+    steps: number,
+  ): Promise<void> {
     if (!this.databaseConfiguration) return;
     if (this.configsFor(this._normalizeEnv()).length === 0) return;
     const { Migrator } = await import("../migration.js");
     const pool = await this.migrationConnectionPool();
     const adapter = await pool.leaseConnection();
-    const migrator = new Migrator(adapter, this._migrationsFor(pool.dbConfig));
-    await migrator.rollback(steps);
+    const dbConfig = pool.dbConfig;
+    const migrator = new Migrator(adapter, this._migrationsFor(dbConfig), {
+      environment: dbConfig.envName,
+      internalMetadataEnabled: dbConfig.useMetadataTable,
+    });
+    await migrator[direction](steps);
     adapter.schemaCache?.clear();
   }
 

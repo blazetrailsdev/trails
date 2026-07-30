@@ -567,15 +567,25 @@ async function withMigratorForDb(
     environment: ctx.config.envName,
     internalMetadataEnabled: ctx.config.useMetadataTable,
   });
-  // Migration output goes to stdout (Rails' Migration#write is `puts`), so the
-  // per-database prefix is applied by swapping in a stdout-wrapping process
-  // adapter for the duration of the run.
-  const prevAdapter = ctx.prefix ? getProcessAdapter() : null;
+  await withPrefixedStdout(ctx.prefix, async () => {
+    await operation(migrator);
+    if (opts?.afterOutput) await opts.afterOutput(migrator);
+  });
+  if (!opts?.skipDump) await dumpSchemaAfterMigrate(ctx.raw, ctx.config);
+}
+
+/**
+ * Migration output goes to stdout (Rails' Migration#write is `puts`), so the
+ * per-database prefix is applied by swapping in a stdout-wrapping process
+ * adapter for the duration of the run.
+ */
+async function withPrefixedStdout(prefix: string, fn: () => Promise<void>): Promise<void> {
+  const prevAdapter = prefix ? getProcessAdapter() : null;
   if (prevAdapter) {
     registerProcessAdapter({
       ...prevAdapter,
       stdout: {
-        write: (chunk) => prevAdapter.stdout.write(`${ctx.prefix}${chunk}`),
+        write: (chunk) => prevAdapter.stdout.write(`${prefix}${chunk}`),
         get isTTY() {
           return prevAdapter.stdout.isTTY;
         },
@@ -589,12 +599,41 @@ async function withMigratorForDb(
     });
   }
   try {
-    await operation(migrator);
-    if (opts?.afterOutput) await opts.afterOutput(migrator);
+    await fn();
   } finally {
     if (prevAdapter) registerProcessAdapter(prevAdapter);
   }
-  if (!opts?.skipDump) await dumpSchemaAfterMigrate(ctx.raw, ctx.config);
+}
+
+async function withMigrationTasksForDb(
+  ctx: {
+    adapter: DatabaseAdapter;
+    raw: RawConfig;
+    name: string;
+    prefix: string;
+    config: HashConfig;
+  },
+  operation: () => Promise<void>,
+  opts?: { afterPending?: (pending: number) => void },
+): Promise<void> {
+  const mDirs = await migrationsDirsForConfig(ctx.name, ctx.raw);
+  const migrations = await discoverMigrationsFromDirs(mDirs);
+  if (migrations.length === 0) {
+    console.log(`${ctx.prefix}No migrations found.`);
+    return;
+  }
+  DatabaseTasks.registerMigrations(migrations, ctx.config);
+  await withPrefixedStdout(ctx.prefix, async () => {
+    await withRegisteredConfiguration(ctx.config, operation);
+  });
+  if (opts?.afterPending) {
+    const migrator = new Migrator(ctx.adapter, migrations, {
+      environment: ctx.config.envName,
+      internalMetadataEnabled: ctx.config.useMetadataTable,
+    });
+    opts.afterPending((await migrator.pendingMigrations()).length);
+  }
+  await dumpSchemaAfterMigrate(ctx.raw, ctx.config);
 }
 
 export function dbCommand(): Command {
@@ -643,9 +682,7 @@ export function dbCommand(): Command {
         return;
       }
       await forEachDatabase(opts, async (ctx) => {
-        await withMigratorForDb(ctx, async (migrator) => {
-          await migrator.rollback(step);
-        });
+        await withMigrationTasksForDb(ctx, () => DatabaseTasks.rollback(step));
       });
     });
 
@@ -662,9 +699,7 @@ export function dbCommand(): Command {
         return;
       }
       await forEachDatabase(opts, async (ctx) => {
-        await withMigratorForDb(ctx, async (migrator) => {
-          await migrator.forward(step);
-        });
+        await withMigrationTasksForDb(ctx, () => DatabaseTasks.forward(step));
       });
     });
 
@@ -971,19 +1006,15 @@ export function dbCommand(): Command {
         return;
       }
       await forEachDatabase(opts, async (ctx) => {
-        // Discover once, run rollback then migrate on the same
-        // migrator — avoids double "No migrations found." and
-        // produces the same post-migrate output as `db migrate`.
-        await withMigratorForDb(
+        await withMigrationTasksForDb(
           ctx,
-          async (migrator) => {
-            await migrator.rollback(step);
-            await migrator.migrate(null);
+          async () => {
+            await DatabaseTasks.rollback(step);
+            await DatabaseTasks.migrate();
           },
           {
-            afterOutput: async (migrator) => {
-              const pending = await migrator.pendingMigrations();
-              if (pending.length === 0) {
+            afterPending: (pending) => {
+              if (pending === 0) {
                 console.log(`${ctx.prefix}All migrations are up to date.`);
               }
             },
