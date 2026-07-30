@@ -9,8 +9,10 @@
  * from the globs below: rename a scoped-out file, edit exactly this file.
  */
 
+import { activerecordSrcRoot } from "./test-infra-scope.mjs";
+
 /** Root the rule and its scope globs are anchored to (repo-relative). */
-export const noRawSqlRoot = "packages/activerecord/src";
+export const noRawSqlRoot = activerecordSrcRoot;
 
 /** Files the rule applies to (repo-relative glob). */
 export const noRawSqlFiles = [`${noRawSqlRoot}/**/*.ts`];

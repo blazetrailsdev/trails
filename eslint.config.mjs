@@ -27,6 +27,7 @@ import requireTableTeardown from "./eslint/require-table-teardown.mjs";
 import requireCanonicalRebuild from "./eslint/require-canonical-rebuild.mjs";
 import noRawSql from "./eslint/no-raw-sql.mjs";
 import { noRawSqlFiles, noRawSqlIgnores } from "./eslint/no-raw-sql-scope.mjs";
+import { testInfraExemptIgnores } from "./eslint/test-infra-scope.mjs";
 import noStandaloneAssociations from "./eslint/no-standalone-associations.mjs";
 import noInternalCanonicalLoaders from "./eslint/no-internal-canonical-loaders.mjs";
 import noExplicitAnyDisable from "./eslint/no-explicit-any-disable.mjs";
@@ -469,14 +470,7 @@ export default defineConfig(
   //    test. See eslint/require-table-teardown.mjs. ──
   {
     files: ["packages/activerecord/src/**/*.test.ts"],
-    ignores: [
-      "packages/activerecord/src/test-helpers/**",
-      "packages/activerecord/src/support/**",
-      "packages/activerecord/src/fixtures.test.ts",
-      "packages/activerecord/src/naked-fixtures.test.ts",
-      "packages/activerecord/src/test-fixtures.test.ts",
-      "packages/activerecord/src/test-fixtures/**",
-    ],
+    ignores: [...testInfraExemptIgnores],
     rules: {
       "blazetrails/require-table-teardown": ["error", { rawSql: true }],
     },
@@ -506,12 +500,7 @@ export default defineConfig(
   {
     files: ["packages/activerecord/src/**/*.test.ts"],
     ignores: [
-      "packages/activerecord/src/test-helpers/**",
-      "packages/activerecord/src/support/**",
-      "packages/activerecord/src/fixtures.test.ts",
-      "packages/activerecord/src/naked-fixtures.test.ts",
-      "packages/activerecord/src/test-fixtures.test.ts",
-      "packages/activerecord/src/test-fixtures/**",
+      ...testInfraExemptIgnores,
       ...requireCanonicalRebuildExclude.privateAdapter,
       ...requireCanonicalRebuildExclude.nonExecuting,
     ],
