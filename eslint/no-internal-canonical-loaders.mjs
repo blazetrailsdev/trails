@@ -46,18 +46,34 @@ export const BANNED = new Set(["ensureCanonicalTables", "loadCanonicalSchema", "
 // Test files permitted to import the banned loaders (they test them directly).
 export const ALLOW = new Set(canonicalLoaderSelfTests);
 
-const canonicalModuleRe = new RegExp(`(?:^|/)(?:${canonicalLoaderModules.join("|")})(?:\\.js)?$`);
+/**
+ * True when `source` resolves to one of the canonical-schema test helper
+ * modules. Matched on the basename regardless of directory depth, so a
+ * same-directory import from inside `support/` (`./canonical-schema.js`) is
+ * caught and not just the `../../support/canonical-schema.js` form; the
+ * basenames are unique in the repo, so basename matching is safe.
+ *
+ * An ESLint rule runs synchronously with no filesystem access, so the module
+ * list cannot be derived from where the BANNED symbols actually live; it is
+ * pinned instead by the guard test in this rule's `*.test.mjs`, which reads the
+ * real `support/` tree and fails when a module exports a BANNED symbol and is
+ * not listed in `canonicalLoaderModules`. Without that guard a file move — the
+ * way `ensureCanonicalTables` moved into `canonical-table-rebuild.ts` — reopens
+ * the ban silently: a banned symbol imported from an unlisted module is simply
+ * not reported.
+ */
+export function isCanonicalSchemaModule(source) {
+  return canonicalLoaderModuleSet.has(moduleBasename(source));
+}
 
-/** True when `source` resolves to one of the canonical-schema test helper modules. */
-function isCanonicalSchemaModule(source) {
-  // Match on the module basename regardless of directory depth so a
-  // same-directory import from inside support/ (`./canonical-schema.js`)
-  // is caught, not just the `../../support/canonical-schema.js` form. The
-  // basenames are unique in the repo, so basename matching is safe.
-  // `canonical-table-rebuild` is listed because `ensureCanonicalTables` moved
-  // there when the schema.rb transcription split from the drop/rebuild
-  // machinery; omitting it would leave the ban open under the new path.
-  return canonicalModuleRe.test(source);
+const canonicalLoaderModuleSet = new Set(canonicalLoaderModules);
+
+/** `"../support/canonical-schema.js"` → `"canonical-schema"`. */
+export function moduleBasename(source) {
+  return source
+    .split("/")
+    .pop()
+    .replace(/\.[cm]?js$/, "");
 }
 
 /** @type {import("eslint").Rule.RuleModule} */
