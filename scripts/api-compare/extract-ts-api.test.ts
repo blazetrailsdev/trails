@@ -1599,6 +1599,102 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     expect(ctor.line).toBe(5);
   });
 
+  it("extracts parameters onto a synthesized __mixin member", () => {
+    const info = extractFromFiles("/p", {
+      "attributes.ts": `
+        export function Attributes(Base: new () => object) {
+          class M extends Base {
+            writeAttribute(name: string, value?: unknown): void {}
+            get attributes(): object { return {}; }
+          }
+          return M;
+        }
+      `,
+    });
+    const mixin = info.modules["attributes.ts:Attributes__mixin"];
+    expect(mixin.instanceMethods.find((m) => m.name === "writeAttribute")!.params).toEqual([
+      { name: "name", kind: "required", type: "string" },
+      { name: "value", kind: "optional", type: "unknown" },
+    ]);
+    expect(mixin.instanceMethods.find((m) => m.name === "attributes")!.params).toEqual([]);
+  });
+
+  it("extracts parameters onto a foreign synthesized __mixin member", () => {
+    const info = extractFromFiles("/p", {
+      "base.ts": `
+        export class Base {
+          dispose(reason: string): void {}
+        }
+      `,
+      "attributes.ts": `
+        import { Base } from "./base.js";
+        export function Attributes(B: typeof Base) {
+          class M extends B {}
+          return M;
+        }
+      `,
+    });
+    const dispose = info.modules["attributes.ts:Attributes__mixin"].instanceMethods.find(
+      (m) => m.name === "dispose",
+    )!;
+    expect(dispose.declaredIn).toBe("base.ts");
+    expect(dispose.params).toEqual([{ name: "reason", kind: "required", type: "string" }]);
+  });
+
+  it("extracts option keys onto a synthesized __mixin member", () => {
+    const info = extractFromFiles("/p", {
+      "attributes.ts": `
+        export function Attributes(Base: new () => object) {
+          class M extends Base {
+            reload(options: { lock?: boolean; readonly?: boolean }): void {}
+          }
+          return M;
+        }
+      `,
+    });
+    expect(
+      info.modules["attributes.ts:Attributes__mixin"].instanceMethods.find(
+        (m) => m.name === "reload",
+      )!.optionKeys,
+    ).toEqual(["lock", "readonly"]);
+  });
+
+  it("extracts parameters onto a synthesized __mixin constructor", () => {
+    const info = extractFromFiles("/p", {
+      "attributes.ts": `
+        export function Attributes(Base: new () => object) {
+          class M extends Base {
+            constructor(attrs: object, options: { strict?: boolean } = {}) { super(); }
+          }
+          return M;
+        }
+      `,
+    });
+    const ctor = info.modules["attributes.ts:Attributes__mixin"].instanceMethods.find(
+      (m) => m.name === "constructor",
+    )!;
+    expect(ctor.params.map((p) => [p.name, p.kind])).toEqual([
+      ["attrs", "required"],
+      ["options", "optional"],
+    ]);
+    expect(ctor.optionKeys).toEqual(["strict"]);
+  });
+
+  it("leaves a synthesized __mixin constructor's params empty when the inner class declares none", () => {
+    const info = extractFromFiles("/p", {
+      "attributes.ts": `
+        export function Attributes(Base: new () => object) {
+          class M extends Base {}
+          return M;
+        }
+      `,
+    });
+    const ctor = info.modules["attributes.ts:Attributes__mixin"].instanceMethods.find(
+      (m) => m.name === "constructor",
+    )!;
+    expect(ctor.params).toEqual([]);
+  });
+
   it("records the reason on tagged namespace members", () => {
     const info = extractFromFiles("/p", {
       "locator.ts": `

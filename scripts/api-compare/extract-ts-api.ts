@@ -703,7 +703,7 @@ export function extractFromProgram(
         mixinMethods.push({
           name: prop.name,
           visibility,
-          params: [],
+          ...declarationArity(decl, checker),
           isStatic: false,
           line,
           file: relPath,
@@ -737,7 +737,7 @@ export function extractFromProgram(
         mixinMethods.push({
           name: "constructor",
           visibility: ctorVisibility,
-          params: [],
+          ...declarationArity(ctorDecl, checker),
           isStatic: false,
           line:
             ctorNode.getSourceFile().getLineAndCharacterOfPosition(ctorNode.getStart()).line + 1,
@@ -2499,6 +2499,35 @@ function getMemberName(member: ts.ClassElement): string | undefined {
       return member.name.getText();
     }
   }
+  return undefined;
+}
+
+/**
+ * Arity of a member the `__mixin` walker reached through the type checker: it
+ * holds a symbol's declaration rather than a syntax node, so the kind split
+ * the top-level class walker gets for free happens here instead — methods and
+ * set accessors carry parameters, getters and property declarations report
+ * none. Unlike the JSDoc reason, this is extracted for a FOREIGN declaration
+ * too: arity is the member's own signature, which the arity check compares
+ * against the Ruby entry whichever file declared it.
+ */
+function declarationArity(
+  decl: ts.Declaration | undefined,
+  checker: ts.TypeChecker,
+): { params: ParamInfo[]; optionKeys?: string[] | null } {
+  const parameters = decl !== undefined ? parameterListOf(decl) : undefined;
+  if (parameters === undefined) return { params: [] };
+  const optionKeys = extractOptionKeys(parameters, checker);
+  return {
+    params: extractParameters(parameters),
+    ...(optionKeys !== undefined ? { optionKeys } : {}),
+  };
+}
+
+function parameterListOf(decl: ts.Declaration): ts.NodeArray<ts.ParameterDeclaration> | undefined {
+  if (ts.isMethodDeclaration(decl) || ts.isMethodSignature(decl)) return decl.parameters;
+  if (ts.isSetAccessorDeclaration(decl) || ts.isConstructorDeclaration(decl))
+    return decl.parameters;
   return undefined;
 }
 
