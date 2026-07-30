@@ -174,13 +174,21 @@ describe("dropAllTables", () => {
 
   it("drops 3-table FK chain without error", async () => {
     const int = dropAdapter.adapterName === "mysql" ? "INT" : "INTEGER";
+    // Real REFERENCES, plus rows: an empty referencing table lets sqlite drop
+    // the parent happily, so the constraint alone would leave the guard
+    // vacuous on that lane.
     await dropAdapter.executeMutation(`CREATE TABLE fk_parent (id ${int} PRIMARY KEY)`);
     await dropAdapter.executeMutation(
-      `CREATE TABLE fk_child (id ${int} PRIMARY KEY, parent_id ${int})`,
+      // Table-level FOREIGN KEY, not column-level REFERENCES: MySQL parses the
+      // inline form and then silently discards it.
+      `CREATE TABLE fk_child (id ${int} PRIMARY KEY, parent_id ${int}, FOREIGN KEY (parent_id) REFERENCES fk_parent(id))`,
     );
     await dropAdapter.executeMutation(
-      `CREATE TABLE fk_grandchild (id ${int} PRIMARY KEY, child_id ${int})`,
+      `CREATE TABLE fk_grandchild (id ${int} PRIMARY KEY, child_id ${int}, FOREIGN KEY (child_id) REFERENCES fk_child(id))`,
     );
+    await dropAdapter.executeMutation(`INSERT INTO fk_parent (id) VALUES (1)`);
+    await dropAdapter.executeMutation(`INSERT INTO fk_child (id, parent_id) VALUES (1, 1)`);
+    await dropAdapter.executeMutation(`INSERT INTO fk_grandchild (id, child_id) VALUES (1, 1)`);
     await dropAllTables(dropAdapter);
     expect(await tableCount(dropAdapter)).toBe(0);
   });
