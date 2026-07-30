@@ -1769,9 +1769,6 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.bigInteger("toooooooo_long_b_id", { null: false });
   });
 
-  // schema.rb:1444-1460 — created through the second connection
-  // (`Course`/`College`/`Professor.lease_connection`), so `arunit2: true` keeps
-  // them out of the primary database's load.
   await define("courses", { arunit2: true }, (t) => {
     t.string("name", { null: false });
     t.integer("college_id");
