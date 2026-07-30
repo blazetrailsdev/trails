@@ -12,11 +12,6 @@ services:
       POSTGRES_INITDB_ARGS: "--no-sync"
     volumes:
       - ./scripts/db-init/postgres:/docker-entrypoint-initdb.d:ro
-    # tmpfs: keeps the data dir in RAM so per-DDL fsync traffic never hits
-    # disk. Mirrors CI (.github/workflows/ci.yml), where a side-by-side
-    # experiment measured ~17% faster on this DDL-heavy suite. Without it,
-    # DDL-heavy files (e.g. drop-all-tables.test.ts) blow their default
-    # vitest timeouts locally. The DB is throwaway per-run.
     tmpfs:
       - /var/lib/postgresql/data
     healthcheck:
@@ -34,8 +29,6 @@ services:
       MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
     volumes:
       - ./scripts/db-init/mysql:/docker-entrypoint-initdb.d:ro
-    # tmpfs: see the postgres service above — same rationale, same CI mirror
-    # (--mount type=tmpfs,destination=/var/lib/mysql).
     tmpfs:
       - /var/lib/mysql
     healthcheck:

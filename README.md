@@ -272,7 +272,11 @@ the harness connects as `username: rails` with no password
 `ARTest.expand_config` fills in (`test/support/config.rb:28-34`).
 `docker-compose.yml` and the CI service containers provision that user the way
 `rake db:mysql:build_user` does (`activerecord/Rakefile:227-235`) — so
-`docker compose up` is all a local run needs. On Postgres, Rails' entries carry
+`docker compose up` is all a local run needs. Both services keep their data
+directory on `tmpfs`, matching the CI service containers: the test databases are
+throwaway, and keeping per-DDL fsync traffic in RAM is what keeps DDL-heavy
+files inside their default timeouts. Restarting a container therefore re-runs
+the init scripts from an empty datadir. On Postgres, Rails' entries carry
 no credential at all, so `PGUSER` / `PGPASSWORD` stay unset unless you set them
 and `pg` resolves libpq's own defaults.
 
