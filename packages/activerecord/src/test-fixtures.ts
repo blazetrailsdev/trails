@@ -480,12 +480,10 @@ function useFixtures(
   // Per-test mutable state: populated in beforeEach, cleared in afterEach.
   const store: Record<string, Record<string, unknown>> = {};
   // Whether the most recent seed ran inside an open transaction (the fixture
-  // pin). Read in afterEach — see shouldDeleteFixtureRows.
-  // Per seeding connection: fixture sets whose model lives in another database
-  // seed through that model's pool, so the flag is not global to the scope.
+  // pin), keyed by seeding connection — a set whose model lives in another
+  // database seeds through that model's pool. Read in afterEach — see
+  // shouldDeleteFixtureRows.
   const seededInTransaction = new Map<DatabaseAdapter, boolean>();
-  // The connection each set was seeded through, so teardown deletes its rows
-  // from the database they actually landed in.
   const setAdapters = new Map<string, DatabaseAdapter>();
 
   // TODO(fixtures-adoption Spike S1): seed once per worker in a global beforeAll
