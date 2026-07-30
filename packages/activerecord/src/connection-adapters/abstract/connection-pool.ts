@@ -170,7 +170,8 @@ export class NullPool implements AbstractPool {
  * the schema-cache / bare-adapter fallbacks that historically keyed off
  * `pool == null` use this so a NullPool is treated the same as "no pool".
  *
- * @noRailsEquivalent Rails' `NullPool` answers the whole pool protocol, so
+ * @noRailsEquivalent CONVERGEABLE (story: converge-nullpool-protocol-retire-poolabsent-realpool).
+ * Rails' `NullPool` answers the whole pool protocol, so
  * Ruby callers never ask whether a pool is real. See above.
  */
 export function poolAbsent(pool: unknown): boolean {
@@ -184,7 +185,8 @@ export function poolAbsent(pool: unknown): boolean {
  * `adapter.pool ?? adapter` to yield a schema-cache target that can actually
  * check out a connection.
  *
- * @noRailsEquivalent NullPool-aware form of `adapter.pool ?? fallback`;
+ * @noRailsEquivalent CONVERGEABLE (story: converge-nullpool-protocol-retire-poolabsent-realpool).
+ * NullPool-aware form of `adapter.pool ?? fallback`;
  * unnecessary in Rails for the same reason as `poolAbsent`. See above.
  */
 export function realPool(pool: unknown): unknown | null {
@@ -281,7 +283,8 @@ export class ExecutorHooks {
    *
    * @internal Wiring only; called exactly once, from `index.ts`.
    *
-   * @noRailsEquivalent Wiring hook. Ruby resolves the `ActiveRecord::Base`
+   * @noRailsEquivalent CONVERGEABLE (story: retire-connection-pool-async-resolution-shims).
+   * Wiring hook. Ruby resolves the `ActiveRecord::Base`
    * constant at call time; a TS import here would be a module cycle. See
    * above.
    */
@@ -337,7 +340,8 @@ export class ConnectionPool implements ReapablePool {
    * defaults to a resolved promise for pools whose adapterFactory is
    * supplied directly.
    *
-   * @noRailsEquivalent Rails' `require` is synchronous, so
+   * @noRailsEquivalent CONVERGEABLE (story: retire-connection-pool-async-resolution-shims).
+   * Rails' `require` is synchronous, so
    * `establish_connection` returns with the adapter class resolvable;
    * trails resolves adapters via dynamic `import()`. See above.
    */
@@ -404,7 +408,12 @@ export class ConnectionPool implements ReapablePool {
     return this.inspect();
   }
 
-  /** @noRailsEquivalent Node inspection hook — a JS runtime protocol, not a Rails method */
+  /**
+   * @noRailsEquivalent PERMANENT
+   *   (`vendor/rails/activerecord/lib/active_record/connection_adapters/abstract/connection_pool.rb:278`
+   *   — Ruby's inspection hook is `def inspect`, a plain method name already matched).
+   * Node inspection hook — a JS runtime protocol, not a Rails method
+   */
   [Symbol.for("nodejs.util.inspect.custom")](): string {
     return this.inspect();
   }
@@ -577,7 +586,8 @@ export class ConnectionPool implements ReapablePool {
    * asked of the *normalized* value, which is what this getter delegates to.
    * Consumed by `QueryCache.run`'s skip guard in query-cache.ts.
    *
-   * @noRailsEquivalent Rails asks `pool.db_config&.query_cache == false`
+   * @noRailsEquivalent CONVERGEABLE (story: retire-connection-pool-async-resolution-shims).
+   * Rails asks `pool.db_config&.query_cache == false`
    * inline; trails' config also accepts a "disabled" alias, so the
    * predicate must read the normalized value. See above.
    */
@@ -664,7 +674,8 @@ export class ConnectionPool implements ReapablePool {
    *
    * @internal
    *
-   * @noRailsEquivalent Sync lease for callers mirroring Rails' synchronous
+   * @noRailsEquivalent CONVERGEABLE (story: retire-connection-pool-async-resolution-shims).
+   * Sync lease for callers mirroring Rails' synchronous
    * `lease_connection` that cannot await, since trails' `leaseConnection`
    * had to become async. See above.
    */
@@ -1059,7 +1070,8 @@ export class ConnectionPool implements ReapablePool {
    *
    * @internal
    *
-   * @noRailsEquivalent Rails' `discard!` is fully synchronous and has no
+   * @noRailsEquivalent CONVERGEABLE (story: retire-connection-pool-async-resolution-shims).
+   * Rails' `discard!` is fully synchronous and has no
    * async closes to hand back. See above.
    */
   discardBangDraining(): Array<Promise<void>> {
@@ -1249,7 +1261,8 @@ export class ConnectionPool implements ReapablePool {
    *
    * @internal
    *
-   * @noRailsEquivalent Ruby's `driver.close` is synchronous, so Rails'
+   * @noRailsEquivalent CONVERGEABLE (story: retire-connection-pool-async-resolution-shims).
+   * Ruby's `driver.close` is synchronous, so Rails'
    * discard paths complete the close before returning and need no drain
    * bookkeeping. See above.
    */

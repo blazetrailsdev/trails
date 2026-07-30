@@ -314,7 +314,9 @@ export class AttributeSet {
    * Make AttributeSet iterable — yields [name, value] pairs for compatibility
    * with code that iterates `for (const [k, v] of _attributes)`.
    *
-   * @noRailsEquivalent JS iteration protocol — Ruby reaches iteration through Enumerable#each
+   * @noRailsEquivalent PERMANENT (`vendor/rails/activemodel/lib/active_model/attribute_set.rb:10` —
+   *   `delegate :each_value, to: :attributes`).
+   * JS iteration protocol — Ruby reaches iteration through Enumerable#each
    */
   *[Symbol.iterator](): IterableIterator<[string, unknown]> {
     for (const name of this.keys()) {

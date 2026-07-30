@@ -47,7 +47,12 @@ export class Routes implements Iterable<Route> {
     return this.routes[this.routes.length - 1];
   }
 
-  /** @noRailsEquivalent JS iteration protocol — Ruby reaches iteration through Enumerable#each */
+  /**
+   * @noRailsEquivalent PERMANENT
+   *   (`vendor/rails/actionpack/lib/action_dispatch/journey/routes.rb:10, :35` — `include
+   *   Enumerable` plus `def each`).
+   * JS iteration protocol — Ruby reaches iteration through Enumerable#each
+   */
   [Symbol.iterator](): Iterator<Route> {
     return this.routes[Symbol.iterator]();
   }

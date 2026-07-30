@@ -44,7 +44,12 @@ export class BatchEnumerator<T extends BatchRelation> {
     this.relation = options?.relation ?? null;
   }
 
-  /** @noRailsEquivalent JS async-iteration protocol — Ruby's Enumerable#each is synchronous */
+  /**
+   * @noRailsEquivalent PERMANENT
+   *   (`vendor/rails/activerecord/lib/active_record/relation/batches/batch_enumerator.rb:6, :108` —
+   *   `include Enumerable` plus a synchronous `def each`).
+   * JS async-iteration protocol — Ruby's Enumerable#each is synchronous
+   */
   async *[Symbol.asyncIterator](): AsyncIterableIterator<T> {
     yield* this._generator();
   }
@@ -141,11 +146,21 @@ export interface BatchEnumerator<T extends BatchRelation> {
     onfulfilled?: ((value: T[]) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
   ): Promise<TResult1 | TResult2>;
-  /** @noRailsEquivalent JS Promise protocol — Ruby has no thenable */
+  /**
+   * @noRailsEquivalent PERMANENT
+   *   (`vendor/rails/activerecord/lib/active_record/relation/batches/batch_enumerator.rb:108` —
+   *   `def each` is synchronous; Ruby has no thenable to mirror).
+   * JS Promise protocol — Ruby has no thenable
+   */
   catch<TResult = never>(
     onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | null,
   ): Promise<T[] | TResult>;
-  /** @noRailsEquivalent JS Promise protocol — Ruby has no thenable */
+  /**
+   * @noRailsEquivalent PERMANENT
+   *   (`vendor/rails/activerecord/lib/active_record/relation/batches/batch_enumerator.rb:108` —
+   *   `def each` is synchronous; Ruby has no thenable to mirror).
+   * JS Promise protocol — Ruby has no thenable
+   */
   finally(onfinally?: (() => void) | null): Promise<T[]>;
 }
 

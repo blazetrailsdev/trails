@@ -119,11 +119,19 @@ export interface CollectionProxy<T extends Base = Base> {
     onfulfilled?: ((value: T[]) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
   ): Promise<TResult1 | TResult2>;
-  /** @noRailsEquivalent JS Promise protocol — Ruby has no thenable */
+  /**
+   * @noRailsEquivalent PERMANENT (`vendor/rails/activerecord/lib/active_record/relation.rb:1179` —
+   *   `def load` materializes synchronously; Ruby has no thenable to mirror).
+   * JS Promise protocol — Ruby has no thenable
+   */
   catch<TResult = never>(
     onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | null,
   ): Promise<T[] | TResult>;
-  /** @noRailsEquivalent JS Promise protocol — Ruby has no thenable */
+  /**
+   * @noRailsEquivalent PERMANENT (`vendor/rails/activerecord/lib/active_record/relation.rb:1179` —
+   *   `def load` materializes synchronously; Ruby has no thenable to mirror).
+   * JS Promise protocol — Ruby has no thenable
+   */
   finally(onfinally?: (() => void) | null): Promise<T[]>;
 }
 
@@ -387,7 +395,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return (await this.loadTarget()).length;
   }
 
-  /** @noRailsEquivalent JS iteration protocol — Ruby uses Enumerable#each */
+  /**
+   * @noRailsEquivalent PERMANENT
+   *   (`vendor/rails/activerecord/lib/active_record/relation/delegation.rb:101` — `each` is
+   *   delegated to the loaded records).
+   * JS iteration protocol — Ruby uses Enumerable#each
+   */
   [Symbol.iterator](): IterableIterator<T> {
     return this._target[Symbol.iterator]();
   }
@@ -4470,7 +4483,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /**
    * Async iterator — allows `for await (const record of proxy)`.
    *
-   * @noRailsEquivalent JS async-iteration protocol — Ruby's Enumerable#each
+   * @noRailsEquivalent PERMANENT
+   *   (`vendor/rails/activerecord/lib/active_record/relation/delegation.rb:101` — the delegated
+   *   `each` is synchronous and has no async twin).
+   * JS async-iteration protocol — Ruby's Enumerable#each
    * is synchronous and has no async counterpart
    */
   async *[Symbol.asyncIterator](): AsyncIterableIterator<T> {

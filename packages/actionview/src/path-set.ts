@@ -64,7 +64,11 @@ export class PathSet implements Iterable<PathSetResolver> {
     return this.paths.includes(resolver);
   }
 
-  /** @noRailsEquivalent JS iteration protocol — Ruby reaches iteration through Enumerable#each */
+  /**
+   * @noRailsEquivalent PERMANENT (`vendor/rails/actionview/lib/action_view/path_set.rb:12, :16` —
+   *   `include Enumerable` plus `delegate :each, to: :paths`).
+   * JS iteration protocol — Ruby reaches iteration through Enumerable#each
+   */
   *[Symbol.iterator](): IterableIterator<PathSetResolver> {
     for (const r of this.paths) yield r;
   }

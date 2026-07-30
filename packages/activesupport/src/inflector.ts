@@ -170,7 +170,11 @@ const _constants = new Map<string, unknown>();
 const _privateConstants = new Set<string>();
 
 /**
- * @noRailsEquivalent The registration half of Ruby's constant table. `class Foo`
+ * @noRailsEquivalent PERMANENT
+ *   (`vendor/rails/activesupport/lib/active_support/inflector/methods.rb:289` — `constantize` walks
+ *   Ruby's constant namespace; ESM has neither a constant namespace nor an autoload hook, so
+ *   application code must register what exists).
+ * The registration half of Ruby's constant table. `class Foo`
  * writes Ruby's global constant namespace as a side effect of definition; ESM
  * classes are module-local bindings with no such namespace, so a JS host names
  * its classes explicitly. Only registration is invented — lookup goes through
@@ -181,7 +185,10 @@ export function registerConstant(name: string, value: unknown): void {
 }
 
 /**
- * @noRailsEquivalent The removal half of the invented constant table (see
+ * @noRailsEquivalent PERMANENT
+ *   (`vendor/rails/activesupport/lib/active_support/inflector/methods.rb:289` — the registry stands
+ *   in for Ruby's constant namespace, which `remove_const` unwinds; ESM has no constant namespace).
+ * The removal half of the invented constant table (see
  * {@link registerConstant}). Ruby constants are removed with
  * `Object.send(:remove_const, …)`, which has no ESM analogue; trails needs it so
  * a registry teardown cannot leave a name resolvable through
@@ -199,7 +206,10 @@ export function unregisterConstant(name: string, expected: unknown): void {
 }
 
 /**
- * @noRailsEquivalent The visibility half of Ruby's constant table, mirroring
+ * @noRailsEquivalent PERMANENT
+ *   (`vendor/rails/activesupport/lib/active_support/inflector/methods.rb:289` — `constantize`
+ *   honours Ruby's `private_constant` visibility; ESM has no constant visibility to consult).
+ * The visibility half of Ruby's constant table, mirroring
  * `Module#private_constant` (a language feature Rails calls, not one it
  * defines). Ruby's constant table carries per-constant visibility;
  * trails' invented table (see {@link registerConstant}) is flat, so the private

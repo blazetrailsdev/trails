@@ -487,7 +487,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Mirrors: `database.yml`'s `statement_limit` — read by Rails as
    * `config[:statement_limit]` in PostgreSQLAdapter#initialize.
    *
-   * @noRailsEquivalent `statement_limit` is a `database.yml` config key Rails reads as
+   * @noRailsEquivalent CONVERGEABLE (story: retire-public-statement-limit-accessor).
+   * `statement_limit` is a `database.yml` config key Rails reads as
    *   `config[:statement_limit]` in
    *   each adapter's `initialize` (abstract_mysql_adapter.rb, postgresql_adapter.rb,
    *   sqlite3_adapter.rb) — a config option, never a Ruby `def`, so there is nothing for the
@@ -2515,7 +2516,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // exposed as `change_table` shorthands. Multi-word names use the camelCase form of
   // the trails TableDefinition method (e.g. `bit_varying` -> `bitVarying`).
   /**
-   * @noRailsEquivalent Rails spells this list as the `ColumnMethods` modules'
+   * @noRailsEquivalent CONVERGEABLE (story: mark-column-method-names-internal).
+   * Rails spells this list as the `ColumnMethods` modules'
    *   `define_column_methods` metaprogramming
    *   (abstract/schema_definitions.rb:324 plus the per-adapter ColumnMethods modules), not as a
    *   `def`, so the Ruby extractor records no counterpart. TypeScript has no `define_method`, so
@@ -2716,7 +2718,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   /**
    * Returns true for raw pg errors that indicate the database doesn't exist (SQLSTATE 3D000).
    *
-   * @noRailsEquivalent Rails recognizes the no-such-database condition inline at the connect site
+   * @noRailsEquivalent CONVERGEABLE (story: converge-no-database-error-to-connect-site).
+   * Rails recognizes the no-such-database condition inline at the connect site
    *   and raises
    *   `ActiveRecord::NoDatabaseError` there (postgresql_adapter.rb:63, sqlite3_adapter.rb:38,120) —
    *   there is no named predicate to mirror. trails needs the predicate separated from raising
@@ -4262,7 +4265,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // ---------------------------------------------------------------------------
 
   /**
-   * @noRailsEquivalent Rails has no range-type DDL helper anywhere — ranges are created with a raw
+   * @noRailsEquivalent CONVERGEABLE (story: delete-invented-pg-range-ddl-helpers).
+   * Rails has no range-type DDL helper anywhere — ranges are created with a raw
    *   `execute("CREATE
    *   TYPE … AS RANGE")`. trails adds `createRange`/`dropRange` following Rails' own type-DDL helpers
    *   (create_enum/drop_enum/rename_enum, postgresql_adapter.rb:541-615), including their
@@ -4279,7 +4283,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
-   * @noRailsEquivalent Rails has no range-type DDL helper anywhere — ranges are created with a raw
+   * @noRailsEquivalent CONVERGEABLE (story: delete-invented-pg-range-ddl-helpers).
+   * Rails has no range-type DDL helper anywhere — ranges are created with a raw
    *   `execute("CREATE
    *   TYPE … AS RANGE")`. trails adds `createRange`/`dropRange` following Rails' own type-DDL helpers
    *   (create_enum/drop_enum/rename_enum, postgresql_adapter.rb:541-615), including their

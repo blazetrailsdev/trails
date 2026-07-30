@@ -568,7 +568,11 @@ export class Scalar {
     return String(this.value);
   }
 
-  /** @noRailsEquivalent JS primitive-coercion protocol — Ruby coerces through to_s/to_i instead */
+  /**
+   * @noRailsEquivalent PERMANENT (`vendor/rails/activesupport/lib/active_support/duration.rb:353,
+   *   :377` — `def to_s` and `def to_i` are the Ruby coercion hooks).
+   * JS primitive-coercion protocol — Ruby coerces through to_s/to_i instead
+   */
   valueOf(): number {
     return this.value;
   }

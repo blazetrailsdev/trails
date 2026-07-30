@@ -30,7 +30,12 @@ export class StringInquirer {
   toString(): string {
     return this._value;
   }
-  /** @noRailsEquivalent JS primitive-coercion protocol — Ruby coerces through to_s/to_i instead */
+  /**
+   * @noRailsEquivalent PERMANENT
+   *   (`vendor/rails/activesupport/lib/active_support/string_inquirer.rb:21` — `class
+   *   StringInquirer < String`, so Ruby coerces through String itself).
+   * JS primitive-coercion protocol — Ruby coerces through to_s/to_i instead
+   */
   valueOf(): string {
     return this._value;
   }

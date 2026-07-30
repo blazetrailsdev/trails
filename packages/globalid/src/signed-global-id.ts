@@ -78,7 +78,8 @@ export class SignedGlobalID {
   /**
    * The raw GID URI string, e.g. `gid://MyApp/User/1`
    *
-   * @noRailsEquivalent Inherited from GlobalID in Ruby (`attr_reader :uri`);
+   * @noRailsEquivalent CONVERGEABLE (story: globalid-sgid-inherits-globalid).
+   * Inherited from GlobalID in Ruby (`attr_reader :uri`);
    * re-declared because the TS classes are peers, not a hierarchy. See the
    * `create` entry for this file.
    */
@@ -117,7 +118,8 @@ export class SignedGlobalID {
    *
    * Mirrors: GlobalID.create
    *
-   * @noRailsEquivalent Rails' `SignedGlobalID < GlobalID` inherits
+   * @noRailsEquivalent CONVERGEABLE (story: globalid-sgid-inherits-globalid).
+   * Rails' `SignedGlobalID < GlobalID` inherits
    * `GlobalID.create` (polymorphic `new`). In TS the two are peer classes —
    * SignedGlobalID's fields (verifier/purpose/expiresAt) come from options its
    * base has no notion of — so `create` is re-declared here. Unifying them
@@ -293,7 +295,8 @@ export class SignedGlobalID {
   /**
    * Mirrors: GlobalID#model_id
    *
-   * @noRailsEquivalent Inherited from GlobalID in Ruby (`delegate :model_id, to: :uri`);
+   * @noRailsEquivalent CONVERGEABLE (story: globalid-sgid-inherits-globalid).
+   * Inherited from GlobalID in Ruby (`delegate :model_id, to: :uri`);
    * re-declared because the TS classes are peers, not a hierarchy. See the
    * `create` entry for this file.
    */
@@ -304,7 +307,8 @@ export class SignedGlobalID {
   /**
    * Mirrors: GlobalID#model_name
    *
-   * @noRailsEquivalent Inherited from GlobalID in Ruby (`delegate :model_name, to: :uri`);
+   * @noRailsEquivalent CONVERGEABLE (story: globalid-sgid-inherits-globalid).
+   * Inherited from GlobalID in Ruby (`delegate :model_name, to: :uri`);
    * re-declared because the TS classes are peers, not a hierarchy. See the
    * `create` entry for this file.
    */
@@ -315,7 +319,8 @@ export class SignedGlobalID {
   /**
    * Mirrors: GlobalID#params
    *
-   * @noRailsEquivalent Inherited from GlobalID in Ruby (`delegate :params, to: :uri`);
+   * @noRailsEquivalent CONVERGEABLE (story: globalid-sgid-inherits-globalid).
+   * Inherited from GlobalID in Ruby (`delegate :params, to: :uri`);
    * re-declared because the TS classes are peers, not a hierarchy. See the
    * `create` entry for this file.
    */
@@ -330,7 +335,8 @@ export class SignedGlobalID {
    * the peer class repeats it so a misregistered constant can't slip
    * either identity through.
    *
-   * @noRailsEquivalent Inherited from GlobalID in Ruby; re-declared because the
+   * @noRailsEquivalent CONVERGEABLE (story: globalid-sgid-inherits-globalid).
+   * Inherited from GlobalID in Ruby; re-declared because the
    * TS classes are peers, not a hierarchy. See the `create` entry for this
    * file.
    */

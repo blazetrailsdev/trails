@@ -145,7 +145,12 @@ export class SafeBuffer {
     return this._value.length;
   }
 
-  /** @noRailsEquivalent JS primitive-coercion protocol — Ruby coerces through to_s/to_i instead */
+  /**
+   * @noRailsEquivalent PERMANENT
+   *   (`vendor/rails/activesupport/lib/active_support/core_ext/string/output_safety.rb:138` — `def
+   *   to_s` is the Ruby coercion hook).
+   * JS primitive-coercion protocol — Ruby coerces through to_s/to_i instead
+   */
   valueOf(): string {
     return this._value;
   }
