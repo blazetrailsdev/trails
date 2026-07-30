@@ -25,13 +25,20 @@ import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { InternalMetadata } from "../internal-metadata.js";
 import { schemaSha1 } from "../tasks/database-tasks.js";
 import {
-  RUN_TOKEN_ENV,
   TEMPLATE_PATH_ENV,
   isSqliteRun,
   sweepRunDbFiles,
   sweepStaleDbFiles,
   templatePathFor,
 } from "./sqlite-template.js";
+import {
+  RUN_TOKEN_ENV,
+  newRunToken,
+  ownRunDatabases,
+  runDatabasePrefix,
+  slotDatabaseName,
+  staleRunDatabases,
+} from "./run-token.js";
 import { slotPoolSize, workerForkCount } from "./ar-db-slots.js";
 import {
   driverConfig,
@@ -102,7 +109,7 @@ const sqliteAdapter: DbTemplateAdapter = {
 
     await sweepStaleDbFiles();
 
-    const runToken = `${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
+    const runToken = newRunToken();
     const templatePath = await templatePathFor(runToken);
 
     const adapter = new BetterSQLite3Adapter(templatePath);
@@ -133,20 +140,43 @@ async function pgTerminateConnections(admin: pg.Client, dbName: string): Promise
   );
 }
 
+async function pgDatabaseNames(admin: pg.Client): Promise<string[]> {
+  const res = await admin.query<{ datname: string }>("SELECT datname FROM pg_database");
+  return res.rows.map((row) => row.datname);
+}
+
+async function pgDropDatabases(admin: pg.Client, names: string[]): Promise<void> {
+  // Sequential: DROP DATABASE takes an exclusive lock on the server's shared
+  // catalogs, so concurrent drops serialize anyway and only add deadlock risk.
+  for (const name of names) {
+    await pgTerminateConnections(admin, name);
+    await admin.query(`DROP DATABASE IF EXISTS "${name}"`);
+  }
+}
+
 const pgAdapter: DbTemplateAdapter = {
   isActive: () => activeLane() === "postgres",
 
   async provision() {
     const settings = postgresSettings();
-    const templateDb = `${settings.database}_template`;
+    // Unstamped, because nothing has stamped `RUN_TOKEN_ENV` yet: `applySlot`
+    // falls through to the bare `activerecord_unittest` in the main process.
+    // That bare name is the *base* every per-run name is built from — it is
+    // never itself provisioned or dropped.
+    const base = settings.database;
+    const runToken = newRunToken();
+    const templateDb = `${runDatabasePrefix(base, runToken)}template`;
 
     // Derive both connections from the settings rather than rewriting the URL
     // string: a socket-directory PGHOST does not survive `new URL()` surgery.
     const admin = new pg.Client(settingsUrl("postgres", withDatabase(settings, "postgres")));
     await admin.connect();
 
-    await pgTerminateConnections(admin, templateDb);
-    await admin.query(`DROP DATABASE IF EXISTS "${templateDb}"`);
+    // Reclaim what killed runs left behind, before anything of this run exists
+    // — the PG analogue of `sweepStaleDbFiles`. Only foreign tokens older than
+    // the cutoff, so a concurrent run's live databases are out of reach.
+    await pgDropDatabases(admin, staleRunDatabases(base, runToken, await pgDatabaseNames(admin)));
+
     await admin.query(`CREATE DATABASE "${templateDb}"`);
 
     const adapter = new PostgreSQLAdapter({
@@ -175,21 +205,28 @@ const pgAdapter: DbTemplateAdapter = {
       }
     }
 
+    // No DROP in front of the CREATE: the names carry this run's token, so
+    // nothing can be occupying them — and a DROP here could only ever hit
+    // another run's live database.
     for (let slot = 1; slot <= slotCount(); slot++) {
-      const slotDb = slot === 1 ? settings.database : `${settings.database}_${slot}`;
-      await pgTerminateConnections(admin, slotDb);
-      await admin.query(`DROP DATABASE IF EXISTS "${slotDb}"`);
+      const slotDb = slotDatabaseName(base, runToken, slot);
       await admin.query(`CREATE DATABASE "${slotDb}" TEMPLATE "${templateDb}"`);
     }
 
     process.env[PG_TEMPLATE_ENV] = templateDb;
+    process.env[RUN_TOKEN_ENV] = runToken;
     await admin.end();
 
     return async () => {
       const cleanup = new pg.Client(settingsUrl("postgres", withDatabase(settings, "postgres")));
       await cleanup.connect();
-      await pgTerminateConnections(cleanup, templateDb);
-      await cleanup.query(`DROP DATABASE IF EXISTS "${templateDb}"`);
+      // Every database this run created — the template, the slot DBs, and the
+      // `_arunit2` siblings suites create off a slot name — shares the run's
+      // prefix, so one filtered sweep reclaims the lot.
+      await pgDropDatabases(
+        cleanup,
+        ownRunDatabases(base, runToken, await pgDatabaseNames(cleanup)),
+      );
       await cleanup.end();
     };
   },
@@ -207,13 +244,30 @@ const pgAdapter: DbTemplateAdapter = {
 
 export const MYSQL_TEMPLATE_ENV = "AR_TEST_MYSQL_TEMPLATE";
 
+async function mysqlDatabaseNames(admin: mysql.Connection): Promise<string[]> {
+  // Aliased: MySQL and MariaDB disagree on the case of `SCHEMA_NAME` in the
+  // result set, and `SHOW DATABASES` names its column `Database`.
+  const [rows] = await admin.query<mysql.RowDataPacket[]>(
+    "SELECT schema_name AS name FROM information_schema.schemata",
+  );
+  return rows.map((row) => String((row as { name: string }).name));
+}
+
+async function mysqlDropDatabases(admin: mysql.Connection, names: string[]): Promise<void> {
+  for (const name of names) {
+    await admin.query(`DROP DATABASE IF EXISTS \`${name}\``);
+  }
+}
+
 const mysqlAdapter: DbTemplateAdapter = {
   isActive: () => activeLane() === "mysql",
 
   async provision() {
     const { Mysql2Adapter } = await import("../connection-adapters/mysql2-adapter.js");
     const settings = mysqlSettings();
+    // Unstamped in the main process, exactly as on the PG path above.
     const baseDb = settings.database;
+    const runToken = newRunToken();
     const n = slotCount();
 
     // Built from the config hash rather than a URL so a socket-configured run
@@ -222,16 +276,24 @@ const mysqlAdapter: DbTemplateAdapter = {
     // through Mysql2Adapter, so it does not get the adapter's `username` → `user`
     // or `socket` → `socketPath` mappings — spell the driver-native keys here.
     const { database: _adminDb, username, socket, ...adminOpts } = driverConfig(settings);
-    // CREATE DATABASE for all slots first (sequential — DDL against the same
-    // server, DROP/CREATE must not race with themselves).
-    const admin = await mysql.createConnection({
+    const adminOptions = {
       ...adminOpts,
       user: username,
       ...(socket === undefined ? {} : { socketPath: socket }),
-    } as mysql.ConnectionOptions);
+    } as mysql.ConnectionOptions;
+    // CREATE DATABASE for all slots first (sequential — DDL against the same
+    // server, CREATE must not race with itself).
+    const admin = await mysql.createConnection(adminOptions);
+    // Reclaim what killed runs left behind — the MySQL analogue of
+    // `sweepStaleDbFiles`; foreign tokens past the cutoff only.
+    await mysqlDropDatabases(
+      admin,
+      staleRunDatabases(baseDb, runToken, await mysqlDatabaseNames(admin)),
+    );
+    // No DROP in front of the CREATE: the names carry this run's token, so
+    // nothing can be occupying them.
     for (let slot = 1; slot <= n; slot++) {
-      const slotDb = slot === 1 ? settings.database : `${settings.database}_${slot}`;
-      await admin.query(`DROP DATABASE IF EXISTS \`${slotDb}\``);
+      const slotDb = slotDatabaseName(baseDb, runToken, slot);
       await admin.query(`CREATE DATABASE \`${slotDb}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_bin`);
     }
     await admin.end();
@@ -243,7 +305,7 @@ const mysqlAdapter: DbTemplateAdapter = {
     await Promise.all(
       Array.from({ length: n }, (_, i) => i + 1).map(async (slot) => {
         const adapter = new Mysql2Adapter({
-          ...driverConfig(withDatabase(settings, slot === 1 ? baseDb : `${baseDb}_${slot}`)),
+          ...driverConfig(withDatabase(settings, slotDatabaseName(baseDb, runToken, slot))),
           connectionLimit: 1,
           flags: ["FOUND_ROWS"],
         }) as unknown as DatabaseAdapter;
@@ -254,7 +316,18 @@ const mysqlAdapter: DbTemplateAdapter = {
     );
 
     process.env[MYSQL_TEMPLATE_ENV] = "1";
-    return undefined;
+    process.env[RUN_TOKEN_ENV] = runToken;
+
+    return async () => {
+      const cleanup = await mysql.createConnection(adminOptions);
+      // Slot DBs plus the `_arunit2` siblings suites create off a slot name —
+      // all share this run's prefix, so one filtered sweep reclaims the lot.
+      await mysqlDropDatabases(
+        cleanup,
+        ownRunDatabases(baseDb, runToken, await mysqlDatabaseNames(cleanup)),
+      );
+      await cleanup.end();
+    };
   },
 };
 

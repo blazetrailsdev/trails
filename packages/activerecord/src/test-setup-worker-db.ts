@@ -14,8 +14,12 @@
  * every consumer derives the same worker database from one signal instead of
  * reading a mutated string.
  *
- *   PG:      pg_try_advisory_lock(N)
- *   MariaDB: GET_LOCK('ar_test_slot_N', 0)  — 0-second timeout = non-blocking
+ *   PG:      pg_try_advisory_lock(hash(runToken), N)
+ *   MariaDB: GET_LOCK('ar_test_slot_<runToken>_N', 0) — 0s timeout = non-blocking
+ *
+ * Both keys carry the run token because advisory locks are server-wide, not
+ * database-scoped: without it, a second concurrent run against the same server
+ * competes for — and exhausts — this run's pool of `workers + headroom` locks.
  *
  * Idempotent: the claimed slot is cached on globalThis so re-evaluation
  * (e.g. hot-module reloading in vitest watch mode) returns the same slot
@@ -37,7 +41,17 @@ import "./sqlite/better-sqlite3.js";
 import { WORKER_DB_ENV, ensureWorkerClone } from "./support/sqlite-template.js";
 import { slotPoolSize, workerForkCount } from "./support/ar-db-slots.js";
 import { SLOT_ENV, mysqlSettings, postgresSettings } from "./support/config.js";
+import { RUN_TOKEN_ENV, mysqlAdvisoryLockName, pgAdvisoryLockKey } from "./support/run-token.js";
 import { activeLane } from "./support/connection.js";
+
+// The run token globalSetup stamped before this worker forked. Advisory locks
+// are server-wide, not database-scoped, so keying them on the bare slot number
+// let a second concurrent run exhaust this run's slot pool. Deriving the key
+// from the token gives each run a disjoint key space. Empty when globalSetup
+// did not run, which is still a single consistent key space for that run.
+function runToken(): string {
+  return process.env[RUN_TOKEN_ENV] ?? "";
+}
 
 // Shared by all evaluations of this module within the same worker process.
 const g = globalThis as typeof globalThis & {
@@ -87,8 +101,8 @@ async function acquireAdvisorySlotPg(): Promise<number> {
   for (let attempt = 0; attempt < SLOT_RETRY_ATTEMPTS; attempt++) {
     for (let slot = 1; slot <= slots; slot++) {
       const res = await client.query<{ locked: boolean }>(
-        "SELECT pg_try_advisory_lock($1) AS locked",
-        [slot],
+        "SELECT pg_try_advisory_lock($1, $2) AS locked",
+        pgAdvisoryLockKey(runToken(), slot),
       );
       if (res.rows[0]?.locked) {
         g.__arAdvisorySlotPg = slot;
@@ -127,7 +141,7 @@ async function acquireAdvisorySlotMysql(): Promise<number> {
 
   for (let attempt = 0; attempt < SLOT_RETRY_ATTEMPTS; attempt++) {
     for (let slot = 1; slot <= slots; slot++) {
-      const lockName = `ar_test_slot_${slot}`;
+      const lockName = mysqlAdvisoryLockName(runToken(), slot);
       // GET_LOCK returns 1 when acquired, 0 when timeout (0 s = non-blocking).
       const [rows] = await conn.query<mysql.RowDataPacket[]>("SELECT GET_LOCK(?, 0) AS acquired", [
         lockName,

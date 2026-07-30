@@ -40,7 +40,10 @@ import type { FsAdapter } from "@blazetrails/activesupport/fs-adapter";
 import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
 import { getOsAsync } from "@blazetrails/activesupport";
 import { betterSqlite3Driver } from "../sqlite/better-sqlite3.js";
+import { RUN_TOKEN_ENV, STALE_DB_AGE_MS } from "./run-token.js";
 import { activeLane } from "./connection.js";
+
+export { RUN_TOKEN_ENV };
 
 /** WAL sidecars sqlite writes alongside a file DB, plus the DB file itself. */
 const DB_FILE_SUFFIXES = ["", "-wal", "-shm"] as const;
@@ -96,14 +99,6 @@ export async function registerDbFileCleanupOnExit(base: string): Promise<void> {
  * the template, the per-worker clones and their `_2` arunit2 siblings.
  */
 export const TEMP_DB_PREFIX = "ar-test-";
-
-/**
- * Age past which an `ar-test-*` file in tmpdir is assumed to be orphaned by an
- * earlier run and swept. No AR test run comes near this, so the cutoff cannot
- * pull a file out from under a *concurrent* run — which a blanket
- * prefix-unlink would, since parallel worktrees share one tmpdir.
- */
-const STALE_DB_AGE_MS = 6 * 60 * 60 * 1000;
 
 /** Temp-dir entries the harness owns, or `[]` when the fs adapter can't list. */
 async function tempDbEntries(fs: FsAdapter): Promise<string[]> {
@@ -172,8 +167,6 @@ export async function sweepStaleDbFiles(): Promise<void> {
 
 /** Env var: absolute path of the canonical template DB built by globalSetup. */
 export const TEMPLATE_PATH_ENV = "AR_TEST_TEMPLATE_PATH";
-/** Env var: per-run token (stamped by globalSetup) so concurrent worktrees don't collide. */
-export const RUN_TOKEN_ENV = "AR_TEST_RUN_TOKEN";
 /** Env var: per-worker restored DB path (stamped by the worker setupFile). */
 export const WORKER_DB_ENV = "AR_TEST_WORKER_DB";
 

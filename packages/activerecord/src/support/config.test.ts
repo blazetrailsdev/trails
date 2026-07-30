@@ -89,9 +89,9 @@ describe("config", () => {
     // (config.example.yml:12-20) plus MYSQL_PREPARED_STATEMENTS
     // (config.example.yml:7-11,27-31) and hard-codes the credential and database;
     // its postgresql: entries carry no fields so libpq reads PG* itself
-    // (config.example.yml:74-81). AR_DB_SLOT is the one trails addition — the
-    // per-worker database copy Rails has no analogue for. Re-widening this set
-    // is a decision, not a detail.
+    // (config.example.yml:74-81). AR_DB_SLOT and AR_TEST_RUN_TOKEN are the two
+    // trails additions — the per-worker, per-run database copy Rails has no
+    // analogue for. Re-widening this set is a decision, not a detail.
     const seen: string[] = [];
     const recording = (env: Record<string, string>) => (key: string) => {
       seen.push(key);
@@ -107,13 +107,14 @@ describe("config", () => {
         "MYSQL_SOCK",
         "MYSQL_PREPARED_STATEMENTS",
         "AR_DB_SLOT",
+        "AR_TEST_RUN_TOKEN",
       ]),
     );
 
     seen.length = 0;
     postgresSettings(recording({}));
     expect(new Set(seen)).toEqual(
-      new Set(["PGHOST", "PGPORT", "PGUSER", "PGPASSWORD", "AR_DB_SLOT"]),
+      new Set(["PGHOST", "PGPORT", "PGUSER", "PGPASSWORD", "AR_DB_SLOT", "AR_TEST_RUN_TOKEN"]),
     );
   });
 
@@ -127,9 +128,24 @@ describe("config", () => {
   });
 
   it("suffixes the database with the worker isolation slot above slot 1", () => {
+    // No run token: globalSetup provisioned nothing, so the historical
+    // shared-base-plus-`_N` naming stands.
     expect(postgresSettings(reader({ AR_DB_SLOT: "1" })).database).toBe("activerecord_unittest");
     expect(postgresSettings(reader({ AR_DB_SLOT: "4" })).database).toBe("activerecord_unittest_4");
     expect(mysqlSettings(reader({ AR_DB_SLOT: "2" })).database).toBe("activerecord_unittest_2");
+  });
+
+  it("stamps the run token into the database name, slot 1 included", () => {
+    // With a run token stamped, slot 1 stops aliasing the bare base database:
+    // that alias is what made two concurrent runs collide on the un-suffixed
+    // name, leaving globalSetup free to DROP a live run's database.
+    const stamped = (slot: string) =>
+      postgresSettings(reader({ AR_DB_SLOT: slot, AR_TEST_RUN_TOKEN: "aaax1" })).database;
+    expect(stamped("1")).toBe("activerecord_unittest_aaax1_1");
+    expect(stamped("4")).toBe("activerecord_unittest_aaax1_4");
+    expect(mysqlSettings(reader({ AR_DB_SLOT: "2", AR_TEST_RUN_TOKEN: "bbbx2" })).database).toBe(
+      "activerecord_unittest_bbbx2_2",
+    );
   });
 
   it("treats an empty sub-setting as unset rather than as an empty value", () => {
