@@ -45,7 +45,7 @@ describe("connect", () => {
     const { configurationHashes } = await testConfigurationHashes();
     const [arunit, arunit2, withoutPrepared] = configurationHashes;
     expect(arunit2.database).not.toBe(arunit.database);
-    expect(arunit2.database).toMatch(/_arunit2$/);
+    expect(arunit2.database).toMatch(/^activerecord_unittest2(_\d+)?$/);
     expect(withoutPrepared.database).toBe(arunit.database);
     expect(withoutPrepared.configurationHash.preparedStatements).toBe(false);
   });

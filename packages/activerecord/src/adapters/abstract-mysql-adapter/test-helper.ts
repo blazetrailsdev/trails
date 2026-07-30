@@ -28,11 +28,11 @@ export {
  * `arunit2` — and reads both names from `ARTest.test_configuration_hashes`.
  * Rails' cross-database-select probe references them by those configured
  * names rather than inventing throwaway databases. trails provisions a single
- * MySQL server, so the names are derived from its `database` sub-setting
- * by suffixing the primary database (see `arunit2-config`). They are dedicated
- * to the cross-database probe — kept off the shared primary, whose canonical
- * tables parallel test workers create and drop — but config-derived, not
- * invented per call.
+ * MySQL server, so the names are derived from its `database` sub-setting (see
+ * `arunit2-config`). They are config-derived, not invented per call, and
+ * `arunit` is kept off the shared primary — whose canonical tables parallel
+ * test workers create and drop — because this probe drops and recreates both
+ * databases it names.
  */
 export const { arunit: ARUNIT_DATABASE, arunit2: ARUNIT2_DATABASE } = arunitDatabaseNames(
   mysqlSettings().database,
