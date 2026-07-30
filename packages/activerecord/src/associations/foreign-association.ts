@@ -1,5 +1,58 @@
+import { underscore } from "@blazetrails/activesupport";
+
 import type { AssociationReflection } from "../reflection.js";
 import type { Base } from "../base.js";
+
+/**
+ * Mirrors `reflection.foreign_key` (reflection.rb `compute_foreign_key`),
+ * keyed on `reflection.active_record` — the class that *declared* the
+ * association. The rungs below the reflection serve trails' inline
+ * (unregistered) association fallbacks, which have no Rails counterpart.
+ *
+ * @internal
+ */
+export function ownerForeignKeyColumns(
+  ctor: typeof Base,
+  assocName: string,
+  options: {
+    foreignKey?: string | string[];
+    as?: string;
+    primaryKey?: string | string[];
+    queryConstraints?: string[];
+  },
+): string[] {
+  const fk = options.foreignKey;
+  if (typeof fk === "string") return [fk];
+  if (Array.isArray(fk)) return fk;
+
+  const reflectionFk = ownerReflectionForeignKey(ctor, assocName);
+  if (typeof reflectionFk === "string") return [reflectionFk];
+  if (Array.isArray(reflectionFk)) return reflectionFk;
+
+  if (options.as) return [`${underscore(options.as)}_id`];
+  if (options.queryConstraints) return options.queryConstraints;
+
+  const pk = options.primaryKey ?? ctor.primaryKey ?? "id";
+  if (Array.isArray(pk)) return pk.map((col) => `${underscore(ctor.name)}_${col}`);
+  return [`${underscore(ctor.name)}_id`];
+}
+
+/**
+ * Mirrors `reflection.foreign_key`, returning `undefined` for an unregistered
+ * association so `ownerForeignKeyColumns` falls through to its inline rungs.
+ *
+ * @internal
+ */
+export function ownerReflectionForeignKey(
+  ctor: typeof Base,
+  assocName: string,
+): string | string[] | undefined {
+  return (
+    ctor as unknown as {
+      _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | undefined;
+    }
+  )._reflectOnAssociation?.(assocName)?.foreignKey;
+}
 
 /**
  * Mirrors `ActiveRecord::Associations::ForeignAssociation#foreign_key_present?`
