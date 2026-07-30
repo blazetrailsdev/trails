@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
+import type { Table as PgTable } from "../../connection-adapters/postgresql/schema-definitions.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base, serialize, Migration } from "../../index.js";
 import { stringify as yamlStringify, parse as yamlParse } from "@blazetrails/activesupport/yaml";
@@ -149,7 +150,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       // Rails wraps in a transaction and raises ActiveRecord::Rollback to undo —
       // afterEach drops and recreates the table, so no manual rollback is needed.
       await connection.changeTable("hstores", async (t) => {
-        await t.column("users", "hstore", { default: "" });
+        await (t as PgTable).hstore("users", { default: "" });
       });
       Hstore.resetColumnInformation();
       await Hstore.loadSchema();
@@ -163,6 +164,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       //        end
       class HstoreMigration extends Migration {
         async change() {
+          // Migration#changeTable yields an abstract Table behind
+          // withAdapterColumnMethods (not PostgreSQL::Table), so `hstore` here is
+          // the synthesized shorthand, not PgTable#hstore.
           await this.changeTable("hstores", async (t) => {
             await (t as any).hstore("keys");
           });

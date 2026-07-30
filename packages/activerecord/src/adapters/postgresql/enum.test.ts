@@ -218,7 +218,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       await Schema.define(adapter, async (schema) => {
         await schema.createEnum("color", ["blue", "green"]);
         await schema.changeTable("postgresql_enums", async (t) => {
-          // ColumnType accepts arbitrary strings (string & {}), so no cast needed
+          // Rails: t.enum :best_color, enum_type: "color", ... — Migration#changeTable
+          // yields an abstract Table behind withAdapterColumnMethods rather than
+          // PostgreSQL::Table, and that shorthand drops enum_type, so name the enum
+          // type directly (ColumnType accepts arbitrary strings).
           await t.column("best_color", "color", { default: "blue", null: false });
         });
       });
