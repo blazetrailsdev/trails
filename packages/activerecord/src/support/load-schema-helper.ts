@@ -543,11 +543,11 @@ export async function loadSchema(
 
 /**
  * The `load adapter_specific_schema_file if File.exist?(...)` arm of
- * `load_schema_helper.rb:15`, on its own. Not exported: reaching for this arm
- * alone is exactly how the two halves of `load_schema` drifted apart before —
- * go through {@link loadSchema}.
+ * `load_schema_helper.rb:15`, on its own. Reaching for this arm alone is
+ * exactly how the two halves of `load_schema` drifted apart before — go
+ * through {@link loadSchema}.
  */
-async function loadAdapterSpecificSchema(adapter: DatabaseAdapter): Promise<void> {
+export async function loadAdapterSpecificSchema(adapter: DatabaseAdapter): Promise<void> {
   const adapterSpecificSchema = ADAPTER_SPECIFIC_SCHEMAS[adapter.adapterName];
   if (adapterSpecificSchema) await adapterSpecificSchema(adapter);
 }
