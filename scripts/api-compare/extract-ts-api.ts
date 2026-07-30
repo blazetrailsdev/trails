@@ -542,7 +542,14 @@ export function extractFromProgram(
         if (node.exportClause && ts.isNamespaceExport(node.exportClause)) {
           const name = node.exportClause.name.text;
           const modKey = `${relPath}:${name}`;
-          if (info.modules[modKey]) return;
+          const existing = info.modules[modKey];
+          if (existing) {
+            // An interface/namespace declaration already owns the entry; keep
+            // its members, but still record this namespace binding of the name
+            // (same reason as the `export namespace` merge branch above).
+            existing.declaredAsNamespace = true;
+            return;
+          }
           info.modules[modKey] = {
             name,
             file: relPath,
