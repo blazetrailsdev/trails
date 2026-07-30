@@ -443,6 +443,12 @@ interface PackageTotals {
   totalMoved: number;
   totalAllowlisted: number;
   /**
+   * Names dropped by the interface-declaration kind exemption
+   * (`collectInterfaceOnlyNames`). Reported so the exemption stays measurable:
+   * it is the one allowance with no per-declaration tag to count.
+   */
+  totalInterfaceExempt: number;
+  /**
    * The `rubyFile === null` slice of the totals above — files no Rails file
    * maps onto. Broken out so a consumer can tell how much of a package's
    * extra surface comes from that population (it was unmeasured before this
@@ -511,6 +517,11 @@ TS files that no Rails file maps onto are scored too, with an empty allowed
 set — every public name in them is extra. Trees mirroring Rails' test/ code
 (test-helpers/, support/, cases/, fixture corpora) are held out, since the Ruby
 extractor reads lib/ only. The NoCntrp column reports that slice separately.
+
+A novel \`interface\` DECLARATION name is exempt by kind and needs no tag: it is a
+type-only shape Ruby leaves to duck typing, so no Ruby counterpart is possible.
+An interface name that does appear in Rails stays scored (as moved) — that is
+the drift case a blanket exemption would hide.
 
 Reasoned exceptions: an extra is allowed by tagging its TS declaration
 \`@noRailsEquivalent <reason>\` in JSDoc. Allowed extras are subtracted from the
@@ -607,6 +618,11 @@ export function parseArgs(argv: string[]): CliArgs {
  * entity name the matched `.rb` declares, so a faithfully ported class is not
  * extra. Synthesized pseudo-modules are excluded — their `<fn>__mixin` name is
  * an extractor artifact, not source text.
+ *
+ * Interface declaration names are collected here like any other; the
+ * kind-level exemption that removes most of them is applied by the scorer,
+ * which needs the novel/moved verdict this function cannot see (see
+ * `collectInterfaceOnlyNames`).
  */
 export function collectTsFileNames(
   file: string,
@@ -646,6 +662,59 @@ export function collectTsFileNames(
   }
   for (const fn of fileFunctions ?? []) push(fn);
   return out;
+}
+
+/**
+ * The names a file contributes ONLY as an `interface` declaration — nothing
+ * else in the file declares or defines that name.
+ *
+ * RFC 0080 policy, decided here: an interface declaration name is exempt from
+ * extra surface BY KIND, but only when it is also **novel** (the name appears
+ * nowhere in the Rails source — the scorer applies that half). The reasoning
+ * is the one `collectTaggedEntries` already applies to a tagged interface's
+ * members: an `interface` is type-only, and the overwhelming majority of ours
+ * exist because TS must write down a shape Ruby leaves to duck typing
+ * (`…Options` bags, `…Host` collaborator seams, `…Like` structural stand-ins).
+ * A Ruby counterpart is impossible by construction, and the alternative was
+ * ~600 near-identical `@noRailsEquivalent` tags, whose sheer volume would
+ * drown the tag report the same RFC exists to make readable.
+ *
+ * The novelty half answers the counter-argument — a TS `interface` is
+ * sometimes a real port of a Ruby module's shape, and a blanket exemption
+ * would hide that drift. If the name exists anywhere in Rails, the exemption
+ * does NOT apply: a `Quoting` or `TypeMap` interface declared in a file whose
+ * Rails counterpart doesn't declare it is precisely the misplacement this
+ * report is for, and it stays scored (as `moved`) and stays tag-able. Only
+ * names Rails never uses at all — which therefore cannot be a drifting port of
+ * anything — drop out.
+ *
+ * Names shared with a member or with a class/namespace declaration are NOT
+ * exempt: the extra set is a flat Set of bare names (see `allowKeyOf`), so one
+ * name carries one verdict, and exempting on the interface's behalf would
+ * silently absolve the non-interface declaration sharing it.
+ */
+export function collectInterfaceOnlyNames(
+  file: string,
+  classes: ClassInfo[],
+  modules: ClassInfo[],
+  fileFunctions: MethodInfo[] | undefined,
+): Set<string> {
+  const interfaces = new Set<string>();
+  const others = new Set<string>();
+  for (const c of [...classes, ...modules]) {
+    if (c.file !== file) continue;
+    if (c.synthesizedMixin === true) {
+      for (const m of [...c.instanceMethods, ...c.classMethods]) {
+        if (m.declaredIn === undefined) others.add(m.name);
+      }
+      continue;
+    }
+    (c.isInterface === true ? interfaces : others).add(c.name);
+    for (const m of [...c.instanceMethods, ...c.classMethods]) others.add(m.name);
+  }
+  for (const fn of fileFunctions ?? []) others.add(fn.name);
+  for (const name of others) interfaces.delete(name);
+  return interfaces;
 }
 
 /**
@@ -966,6 +1035,7 @@ function buildPackageReport(
     totalNovel: 0,
     totalMoved: 0,
     totalAllowlisted: 0,
+    totalInterfaceExempt: 0,
     noCounterpartFiles: 0,
     noCounterpartExtras: 0,
     noCounterpartNovel: 0,
@@ -1049,6 +1119,7 @@ function buildPackageReport(
 
     const tsNames = collectTsFileNames(expectedTs, classes, modules, fileFns);
     if (tsNames.size === 0) continue;
+    const interfaceOnly = collectInterfaceOnlyNames(expectedTs, classes, modules, fileFns);
 
     const allowed =
       rubyFile === null
@@ -1067,6 +1138,7 @@ function buildPackageReport(
     let novelCount = 0;
     let movedCount = 0;
     let allowlistedCount = 0;
+    let interfaceExemptCount = 0;
     for (const name of tsNames) {
       if (allowed.has(name)) continue;
       const allowKey = allowKeyOf({ package: pkg, tsFile: expectedTs, name });
@@ -1076,12 +1148,21 @@ function buildPackageReport(
         continue;
       }
       const kind: ExtraKind = globalRubyCandidates.has(name) ? "moved" : "novel";
+      // Exempt by kind — see `collectInterfaceOnlyNames`. Deliberately AFTER
+      // the tag check: an interface tagged to cover its MEMBERS keeps matching
+      // its own name, so the tag doesn't go stale and the inheritance in
+      // `collectTaggedEntries` keeps working.
+      if (kind === "novel" && interfaceOnly.has(name)) {
+        interfaceExemptCount++;
+        continue;
+      }
       if (novelOnly && kind !== "novel") continue;
       extras.push({ name, kind });
       if (kind === "novel") novelCount++;
       else movedCount++;
     }
     result.totalAllowlisted += allowlistedCount;
+    result.totalInterfaceExempt += interfaceExemptCount;
     if (extras.length === 0) continue;
 
     // Sort novel before moved, then alphabetical — novel is the higher-signal
@@ -1227,6 +1308,11 @@ function printHumanReport(report: Report, topN: number, maxDetail: number): void
   }
   console.log(
     `${p.dim}  NoCntrp = the slice of Total from TS files no Rails file maps onto (scored with an empty allowed set).${p.reset}`,
+  );
+  const interfaceExempt = report.packages.reduce((n, pkg) => n + pkg.totalInterfaceExempt, 0);
+  console.log(
+    `${p.dim}  Excluded by kind: ${interfaceExempt} novel \`interface\` declaration name(s) — type-only shapes Ruby ` +
+      `leaves to duck typing. An interface name Rails DOES use stays scored as moved.${p.reset}`,
   );
   console.log(
     `\n${p.dim}@noRailsEquivalent tags: ${report.tagged.total} tag(s), ` +

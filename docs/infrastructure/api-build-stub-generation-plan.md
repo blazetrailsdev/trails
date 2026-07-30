@@ -293,7 +293,8 @@ report). They therefore share:
   Ruby counterpart by construction, so neither can its members, and Ruby writes
   no such declaration to compare against. Classes are excluded from that spread
   — a tagged class name is an extractor-shape artifact whose members do have
-  Ruby counterparts.
+  Ruby counterparts. Most interface declaration names never need the tag at
+  all; see "Interface declaration names are exempt by kind" below.
 - **Grammar** — free prose after the tag; where a key token precedes the
   reason it is em-dash-separated (`@missingRailsCall` takes a Ruby call name
   as that token, `@noRailsEquivalent` takes none); continuation lines with no
@@ -417,6 +418,43 @@ method ported into the wrong file) is a misplaced port: relocate it to its
 Rails-layout file, do not tag it. Tagging a moved extra asserts something
 false, and the stale-tag gate enforces the boundary mechanically where it
 can.
+
+### Interface declaration names are exempt by kind
+
+A **novel** `interface` DECLARATION name is not extra surface and needs no tag.
+The exemption is applied by the scorer (`collectInterfaceOnlyNames` in
+`extra-surface.ts`), not by anything written in the source.
+
+Why by kind: an `interface` is type-only, and ours exist because TypeScript has
+to write down the shape Ruby leaves to duck typing — 582 of the 604 interface
+declaration names scored when PR 5653 first counted declarations were `…Options`
+bags, `…Host` collaborator seams, `…Like` structural stand-ins and the like. A
+Ruby counterpart is impossible by construction, which is the same reasoning that
+already spreads a tagged interface's tag to its members. The alternative was
+~600 near-identical `@noRailsEquivalent` tags, whose volume would have drowned
+the tag report this RFC exists to make readable.
+
+Why only when novel: a TS `interface` is sometimes a real port of a Ruby
+module's shape, and a blanket exemption would hide that drift. So the exemption
+stops at names Rails never uses. If the name appears anywhere in the Rails
+source, it stays scored as a `moved` extra — a `Quoting` or `TypeMap` interface
+in a file whose Rails counterpart doesn't declare it is precisely the
+misplacement the report is for, and it stays tag-able like any other extra.
+
+Two boundaries follow from the extra set being a flat set of bare names:
+
+- A name a class, namespace, member, or file function in the same file also
+  declares is **not** exempt — one name carries one verdict, and exempting on
+  the interface's behalf would absolve the other declaration silently.
+- An interface's MEMBERS are not exempt. Only the declaration name is; members
+  still need the declaration-level tag described above, which is why tagging an
+  exempt-by-kind interface is still meaningful. The tag check runs _before_ the
+  by-kind exemption, so such a tag keeps matching its own name and never goes
+  stale.
+
+`api:extra` prints the count it dropped ("Excluded by kind: N") and reports it
+per package as `totalInterfaceExempt` in the JSON, so the one allowance with no
+tag to count stays measurable.
 
 ### Permanence claim: open the reason with `PERMANENT` or `CONVERGEABLE`
 
