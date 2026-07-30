@@ -47,6 +47,28 @@ async function pirateWithFailingRemoval(): Promise<Base> {
   return pirate;
 }
 
+/**
+ * The same rigging for the *unloaded* path: the has_one is never loaded, so the
+ * writer takes the `find_target?` decision through
+ * `prepareDetachDisplacedForSyncBuild` and parks the thunk's promise after the
+ * build. The row exists in the DB but nothing has ever read it.
+ */
+async function pirateWithFailingUnloadedRemoval(): Promise<Base> {
+  const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
+  await Ship.create({
+    name: "Nights Dirty Lightning",
+    pirate_id: (pirate as unknown as { id: number }).id,
+  });
+
+  const assoc = pirate.association("ship") as unknown as {
+    detachDisplacedTarget: () => Promise<void>;
+    isLoaded(): boolean;
+  };
+  expect(assoc.isLoaded()).toBe(false);
+  assoc.detachDisplacedTarget = () => Promise.reject(new Error("removal exploded"));
+  return pirate;
+}
+
 describe("nested-attributes displacement removal failure", () => {
   fixtures(["pirates", "ships"]);
 
@@ -125,6 +147,21 @@ describe("nested-attributes displacement removal failure", () => {
 
     // The captured promise resolves *to* the error rather than rejecting, so a
     // never-drained removal cannot surface as an unhandled rejection.
+    const pending = (pirate as unknown as RemovalHost)._pendingDisplacedRemovals ?? [];
+    expect(pending).toHaveLength(1);
+    await expect(pending[0]).resolves.toBeInstanceOf(Error);
+  });
+
+  it("does not leave a floating rejection when an unloaded removal is never drained", async () => {
+    const pirate = await pirateWithFailingUnloadedRemoval();
+
+    (pirate as unknown as { shipAttributes: unknown }).shipAttributes = {
+      name: "Davy Jones Gold Dagger",
+    };
+
+    // The unloaded path parks the thunk's promise rather than a loaded target's
+    // removal, but it funnels through the same capture: the parked value must
+    // resolve *to* the error, never reject.
     const pending = (pirate as unknown as RemovalHost)._pendingDisplacedRemovals ?? [];
     expect(pending).toHaveLength(1);
     await expect(pending[0]).resolves.toBeInstanceOf(Error);
