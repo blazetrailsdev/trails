@@ -743,9 +743,11 @@ async function main(): Promise<void> {
   // mixin wiring to first construction), so `isWrappedSchema` imports cleanly.
   let schemaColumnsByTable: SchemaColumnsByTable = {};
   if (targets.some((f) => f.startsWith(modelsDirPrefix))) {
-    const { TEST_SCHEMA } = await import("../src/test-helpers/test-schema.js");
+    const { TEST_SCHEMA, ARUNIT2_SCHEMA } = await import("../src/test-helpers/test-schema.js");
     const { isWrappedSchema } = await import("../src/support/schema-types.js");
-    schemaColumnsByTable = normalizeSchema(TEST_SCHEMA, isWrappedSchema);
+    // The arunit2-only tables live in a separate export (they are not in the
+    // primary database), but Course/College/Professor still need their columns.
+    schemaColumnsByTable = normalizeSchema({ ...TEST_SCHEMA, ...ARUNIT2_SCHEMA }, isWrappedSchema);
   }
   const associationLookup = buildModelAssociationLookup(registry);
   const globalSuperNameOf = buildGlobalSuperNameOf(registry);

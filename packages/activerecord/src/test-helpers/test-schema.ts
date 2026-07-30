@@ -1714,27 +1714,6 @@ export const TEST_SCHEMA: Schema = {
     toooooooo_long_b_id: { type: "big_integer", null: false },
   },
 
-  // Rails declares these on alternate connections (Course/College/
-  // Professor.lease_connection). In our test suite the canonical schema
-  // loads them on the default adapter; per-connection placement is the
-  // responsibility of multi-DB tests.
-  courses: {
-    columns: {
-      name: { type: "string", null: false },
-      college_id: "integer",
-    },
-    indexes: [{ columns: "college_id" }],
-  },
-  colleges: { name: { type: "string", null: false } },
-  professors: { name: { type: "string", null: false } },
-  courses_professors: {
-    columns: {
-      course_id: "integer",
-      professor_id: "integer",
-    },
-    primaryKey: false,
-  },
-
   // to_be_linked fixtures (no corresponding model class; inline inline-map only).
   to_be_linked_accounts: {
     name: "string",
@@ -1850,6 +1829,36 @@ export const TEST_SCHEMA: Schema = {
   tenants: { tenant_id: "integer" },
   top_users: { name: "string" },
   topic2s: { title: "string" },
+};
+
+/**
+ * Mirror of `schema.rb:1444-1460` — the tables Rails creates through the
+ * *second* connection (`Course`/`College`/`Professor.lease_connection`), so they
+ * exist in `arunit2` and never in the primary `arunit` database. They are kept
+ * out of {@link TEST_SCHEMA} for that reason: `MultipleDbTest` asserts that a
+ * `SELECT` on the primary pool raises for these tables.
+ *
+ * `dogs` is deliberately absent: `schema.rb:559` puts the full-shape table in
+ * the primary database and `schema.rb:1462` a bare id-only one in arunit2, so
+ * arunit2's copy is laid by `setup-second-pool.ts` rather than from here.
+ */
+export const ARUNIT2_SCHEMA: Schema = {
+  courses: {
+    columns: {
+      name: { type: "string", null: false },
+      college_id: "integer",
+    },
+    indexes: [{ columns: "college_id" }],
+  },
+  colleges: { name: { type: "string", null: false } },
+  professors: { name: { type: "string", null: false } },
+  courses_professors: {
+    columns: {
+      course_id: "integer",
+      professor_id: "integer",
+    },
+    primaryKey: false,
+  },
 };
 
 /**
