@@ -159,15 +159,15 @@ describe("has_one displacement via the synchronous build path", () => {
     })) as Base;
 
     const refetched = (await Pirate.find((pirate as unknown as { id: number }).id)) as Base;
-    const assoc = refetched.association("ship") as unknown as { build(a: object): unknown };
-    // A pure ordering guard, not user-visible behavior: `build` is stubbed
+    const assoc = refetched.association("ship") as unknown as { buildRecord(a: object): unknown };
+    // A pure ordering guard, not user-visible behavior: `buildRecord` is stubbed
     // because the production path has no reachable raise left to provoke —
     // `assertNestedAttributesAreKnown` pre-empts the unknown-attribute one, and
     // the post-`build_record` raises Rails *does* query before are unreachable
     // here (see `prepareDetachDisplacedForSyncBuild`). It pins that the query is
     // issued downstream of the construction, so a future raise added to
     // `build_record` cannot regress the order.
-    assoc.build = () => {
+    assoc.buildRecord = () => {
       throw new Error("build exploded");
     };
 
@@ -224,6 +224,44 @@ describe("has_one displacement via the synchronous build path", () => {
 
     expect(built).not.toBeInstanceOf(Promise);
     expect((built as { name: string }).name).toBe("Black Pearl");
+  });
+
+  it("leaves the displaced record attached when the build raises", async () => {
+    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
+    const displaced = (await Ship.create({
+      name: "Nights Dirty Lightning",
+      pirate_id: (pirate as unknown as { id: number }).id,
+    })) as Base;
+    await (pirate as unknown as { ship: Promise<Base | null> }).ship;
+
+    // Rails runs `build_record` first (singular_association.rb:29-31) and only
+    // reaches `remove_target!` from `set_new_record` (has_one_association.rb:69),
+    // so a construction error — an invalid STI `type`, `SubclassNotFound` —
+    // never detaches anything.
+    const assoc = pirate.association("ship") as unknown as {
+      buildRecord: () => Base;
+      detachDisplacedTarget: () => Promise<void>;
+    };
+    let detached = false;
+    assoc.detachDisplacedTarget = () => {
+      detached = true;
+      return Promise.resolve();
+    };
+    assoc.buildRecord = () => {
+      throw new Error("build exploded");
+    };
+
+    expect(() => {
+      (pirate as unknown as { shipAttributes: unknown }).shipAttributes = {
+        name: "Davy Jones Gold Dagger",
+      };
+    }).toThrow("build exploded");
+
+    expect(detached).toBe(false);
+    const reloaded = (await Ship.find((displaced as unknown as { id: number }).id)) as Base;
+    expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(
+      (pirate as unknown as { id: number }).id,
+    );
   });
 
   it("runs remove_target!'s delete arm over an unsaved displaced record", async () => {

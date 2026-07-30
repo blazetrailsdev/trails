@@ -268,19 +268,21 @@ export class HasOneAssociation extends SingularAssociation {
 
   /**
    * Set by the one caller that owns Rails' leading `load_target` and the
-   * `remove_target!` that follows it itself: the nested-attributes writer
-   * (nested-attributes.ts), a synchronous property setter that starts
-   * `detachDisplacedTarget` — for a loaded target — or
-   * `prepareDetachDisplacedForSyncBuild` — for an unloaded one, which runs the
-   * leading `load_target` itself — around the build, and drains it in its `save`
-   * wrapper.
-   * It calls `build` on its way through, and without this flag `build` would
-   * re-run the load and start a *second*, concurrent removal of the same row —
-   * and would return a promise the synchronous setter cannot hand back.
+   * `remove_target!` that follows it itself: `buildThroughProxyRecord`
+   * (has-one-through-association.ts), which rebuilds a has_one_through's join
+   * record on the through proxy — itself a has_one association. Rails'
+   * `create_through_record` (has_one_through_association.rb:15-40), not
+   * `SingularAssociation#build`, owns that join row's displacement, so the
+   * proxy's own build must neither re-run the load nor start a second,
+   * concurrent removal of the same row — and must stay synchronous.
+   *
+   * The nested-attributes writer does NOT use this: it runs `buildRecord` and
+   * `setNewRecord` separately so the removal can sit between them, and so never
+   * enters `build`.
    *
    * `protected` because it is association-internal bookkeeping, not API surface;
-   * the writer reaches it through its existing duck-typed handle on the
-   * association (it lives outside the class hierarchy).
+   * the through helper reaches it through its duck-typed handle on the proxy
+   * (it lives outside the class hierarchy).
    *
    * @internal
    */
@@ -526,22 +528,22 @@ export class HasOneAssociation extends SingularAssociation {
    *
    * Returns a *thunk* rather than the promise: Rails reaches `load_target` from
    * `set_new_record`, i.e. after `build_record`, so a build that raises issues
-   * no query. The gate (`find_target?`) stops being observable once `build`
-   * marks the association loaded, so the writer takes the decision here, before
-   * the build, and invokes the thunk after it.
+   * no query. The gate (`find_target?`) stops being observable once
+   * `setNewRecord` marks the association loaded, so the writer takes the
+   * decision here, before `buildRecord`, and invokes the thunk after
+   * `setNewRecord`.
    *
-   * The writer invokes the thunk only when `build` returns normally, which
-   * would suppress a query for a throw from the `set_new_record` half — Rails
-   * reaches everything past has_one_association.rb:62 with `load_target`
+   * The writer invokes the thunk only when `buildRecord` returns normally,
+   * which would suppress a query for a throw from the `set_new_record` half —
+   * Rails reaches everything past has_one_association.rb:62 with `load_target`
    * already run. That half is unreachable on this path: `raise_on_type_mismatch!`
    * (:60) is the sole pre-`load_target` raise and cannot fire for a record the
-   * association built from its own reflection, and with
-   * `buildDisplacementOwnedByCaller` set the remainder is `setNewRecord`'s
-   * in-memory foreign-key/inverse writes.
+   * association built from its own reflection, and the remainder is
+   * `setNewRecord`'s in-memory foreign-key/inverse writes.
    *
-   * `protected` for the same reason as `buildDisplacementOwnedByCaller`: this is
-   * association-internal bookkeeping, not API surface. The writer lives outside
-   * the class hierarchy and reaches it through its duck-typed handle.
+   * `protected` because this is association-internal bookkeeping, not API
+   * surface. The writer lives outside the class hierarchy and reaches it
+   * through its duck-typed handle.
    *
    * The find deliberately goes through `doAsyncFindTarget` rather than
    * `loadTargetForBuild`: by the time it resolves, the build has already

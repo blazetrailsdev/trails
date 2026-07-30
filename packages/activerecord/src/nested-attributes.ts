@@ -675,8 +675,11 @@ function assertNestedAttributesAreKnown(
 interface OneToOneAssociation {
   target: Base | null;
   build(attrs: Record<string, unknown>): Base | null | Promise<Base | null>;
-  /** has_one only — see `HasOneAssociation#buildDisplacementOwnedByCaller`. */
-  buildDisplacementOwnedByCaller?: boolean;
+  // Rails' `build_record` / `set_new_record` — `build`'s two halves
+  // (singular_association.rb:29-31), which this writer runs separately so the
+  // displacement removal can sit between them, where Rails puts it.
+  buildRecord(attrs: Record<string, unknown>): Base | null;
+  setNewRecord(record: Base): void;
   initializeAttributes(record: Base): void;
   isLoaded?(): boolean;
   // Rails' `send(association_name)` — `SingularAssociation#reader`, which is
@@ -935,21 +938,21 @@ export function assignNestedAttributesForOneToOneAssociation(
         // to issue it has to be taken here, before the build, because `build`
         // marks the association loaded and so falsifies its `find_target?` gate.
         const startUnloadedRemoval = assoc.prepareDetachDisplacedForSyncBuild?.() ?? null;
-        // The loaded arm — started before the build, while the association
-        // still caches the displaced record. See `detachDisplacedAtAssignment`.
+        // Rails' `SingularAssociation#build` is `build_record` then
+        // `set_new_record` (singular_association.rb:29-31), and only the second
+        // reaches `remove_target!` (has_one_association.rb:59-69). `build`
+        // fuses the two, which would let a raising `build_record` (an invalid
+        // STI `type`, `SubclassNotFound`) detach a record Rails never touches,
+        // so run the two halves separately and keep the removal between them.
+        const built = assoc.buildRecord(assignable);
+        // `remove_target!` on the still-cached displaced record.
+        // `removeTargetBang` binds `this.target` on entry, before its first
+        // `await`, so `setNewRecord` below may swap in the replacement while
+        // the removal is in flight. See `detachDisplacedAtAssignment`.
         const loadedRemoval = detachDisplacedAtAssignment(assoc);
-        // `HasOneAssociation#build` runs the removal itself for direct callers
-        // (returning a promise they can await). This writer is synchronous and
-        // owns the removal, so suppress the association's own — two concurrent
-        // removals of the same row would double-destroy it under
-        // `dependent: :destroy`, and a returned promise would strand the write.
-        assoc.buildDisplacementOwnedByCaller = true;
-        try {
-          // Never a promise with the flag set — `void` states that statically.
-          void assoc.build(assignable);
-        } finally {
-          assoc.buildDisplacementOwnedByCaller = false;
-        }
+        // Rails' `self.target = record` (:84), in memory — the DB half is the
+        // two removals parked below.
+        if (built) assoc.setNewRecord(built);
         if (startUnloadedRemoval) parkDisplacedRemoval(record, startUnloadedRemoval());
         if (loadedRemoval) parkDisplacedRemoval(record, loadedRemoval);
       }
