@@ -1663,12 +1663,13 @@ export class Table {
     columnOrOptions: string | string[] | { column?: string | string[]; name?: string } = {},
     options: { column?: string | string[]; name?: string } = {},
   ): Promise<void> {
-    const optionHash =
-      typeof columnOrOptions === "string" || Array.isArray(columnOrOptions)
-        ? options
-        : columnOrOptions;
+    const isColumn = typeof columnOrOptions === "string" || Array.isArray(columnOrOptions);
+    // `remove_index(column_name = nil, **options)`: an options-only call leaves
+    // column_name nil rather than passing the hash as the column.
+    const columnName = isColumn ? columnOrOptions : undefined;
+    const optionHash = isColumn ? options : columnOrOptions;
     this.raiseOnIfExistOptions(optionHash as Record<string, unknown>);
-    await this._schema.removeIndex(this._tableName, columnOrOptions, options);
+    await this._schema.removeIndex(this._tableName, columnName, optionHash);
   }
   async references(...refNames: string[]): Promise<void>;
   async references(...args: [...refNames: string[], options: AddReferenceOptions]): Promise<void>;

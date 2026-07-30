@@ -473,6 +473,37 @@ describe("CommandRecorder", () => {
       expect(second.args[1]).toBe("name");
     });
 
+    it("removeIndex with an options hash records a nil column, not the hash", async () => {
+      const recorder = new CommandRecorder(abstractDelegate);
+      await recorder.changeTable("fruits", async (t) => {
+        await t.removeIndex({ name: "index_fruits_on_kind" });
+      });
+      expect(recorder.commands).toEqual([
+        { cmd: "removeIndex", args: ["fruits", undefined, { name: "index_fruits_on_kind" }] },
+      ]);
+    });
+
+    it("removeIndex with a column inverts back to addIndex", async () => {
+      const recorder = new CommandRecorder(abstractDelegate);
+      await recorder.revert(async () => {
+        await recorder.changeTable("fruits", async (t) => {
+          await t.removeIndex("kind");
+        });
+      });
+      expect(recorder.commands).toEqual([{ cmd: "addIndex", args: ["fruits", "kind"] }]);
+    });
+
+    it("raises IrreversibleMigration when removeIndex lacks a column", async () => {
+      const recorder = new CommandRecorder(abstractDelegate);
+      await expect(
+        recorder.revert(async () => {
+          await recorder.changeTable("fruits", async (t) => {
+            await t.removeIndex({ name: "index_fruits_on_kind" });
+          });
+        }),
+      ).rejects.toThrow(IrreversibleMigration);
+    });
+
     it("raises IrreversibleMigration when remove lacks type", async () => {
       const recorder = new CommandRecorder(abstractDelegate);
       await expect(
