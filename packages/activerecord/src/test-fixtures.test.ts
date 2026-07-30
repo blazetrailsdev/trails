@@ -9,13 +9,15 @@ import { fixtureId, defineFixtures, defineJoinTableFixtures, isFixtureRef } from
 import { fixtures } from "./test-fixtures.js";
 import { skipGlobalResetForFile } from "./support/skip-global-reset.js";
 import { withTransactionalFixtures } from "./test-fixtures/with-transactional-fixtures.js";
-import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 import { Author } from "./test-helpers/models/author.js";
 import { Post } from "./test-helpers/models/post.js";
 import { LiveParrot, DeadParrot } from "./test-helpers/models/parrot.js";
 import { Cucumber, Cabbage, RedCabbage } from "./test-helpers/models/vegetables.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { leaseFixtureConnection } from "./test-fixtures/fixture-connection.js";
+import {
+  leaseFixtureConnection,
+  leaseFixtureConnectionFor,
+} from "./test-fixtures/fixture-connection.js";
 
 /**
  * Resolves an entry's model thunk to its table-bearing class, registering the
@@ -772,14 +774,10 @@ describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
         } else {
           if ("addOn" in entry) await entry.addOn?.();
           const ModelClass = await resolvePrimaryModel(entry);
-          // Rails' `FixtureSet` seeds through `model_class.connection`; this
-          // loop uses `Base.adapter` because it runs under transactional
-          // fixtures pinned to that connection. arunit2 models hold their own
-          // pool, so seeding them on the primary is invisible to their reload.
-          const seedAdapter =
-            ModelClass.prototype instanceof ARUnit2Model
-              ? await ModelClass.leaseConnection()
-              : Base.adapter;
+          // Rails' `FixtureSet` seeds through the set's own
+          // `model_class.connection_pool` (`fixtures.rb:665`); a primary-database
+          // model resolves back to the pinned fixture connection.
+          const seedAdapter = await leaseFixtureConnectionFor(ModelClass, Base.adapter);
           await defineFixtures(seedAdapter, ModelClass, data);
         }
       } catch (e) {
