@@ -241,8 +241,9 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
  * Rails defaults the databases to `activerecord_unittest` /
  * `activerecord_unittest2` / `activerecord_unittest` (`config.rb:27-28`);
  * trails takes them from the sub-settings instead, so `arunit` is the worker
- * database the canonical schema is loaded into, `arunit2` its derived sibling,
- * and `arunit_without_prepared_statements` shares `arunit`'s database as it
+ * database the canonical schema is loaded into and `arunit2` its derived
+ * sibling — which at slot 1 is Rails' literal `activerecord_unittest2`
+ * ({@link arunitDatabaseNames}) — and `arunit_without_prepared_statements` shares `arunit`'s database as it
  * shares `activerecord_unittest` in Rails.
  */
 function expandConfig(
