@@ -69,6 +69,7 @@
  */
 
 import { getEnv } from "@blazetrails/activesupport";
+import { RUN_TOKEN_ENV, slotDatabaseName } from "./run-token.js";
 
 /** The public backend lane a named connection drives. */
 export type TestAdapterName = "sqlite" | "postgres" | "mysql";
@@ -131,12 +132,15 @@ export interface ServerSettings {
 
 /**
  * Per-worker database isolation slot, published by `test-setup-worker-db.ts`
- * after it wins an advisory lock. Slot 1 (or unset) is the shared base
- * database; higher slots get a `_N`-suffixed database of their own.
+ * after it wins an advisory lock. Every slot — slot 1 included — gets a
+ * database of its own.
  *
  * Applying the suffix here — rather than rewriting a URL env var in place —
  * means every consumer derives the same worker database from one signal,
- * instead of racing to read a mutated string.
+ * instead of racing to read a mutated string. `AR_TEST_RUN_TOKEN` is the
+ * second half of that signal: `globalSetup` stamps it before workers fork, and
+ * both the provisioning loops and the workers compute the identical name from
+ * the pair.
  */
 export const SLOT_ENV = "AR_DB_SLOT";
 
@@ -149,7 +153,12 @@ function applySlot(database: string, read: EnvReader): string {
     // eslint-disable-next-line blazetrails/rails-error-parity
     throw new Error(`${SLOT_ENV} must be >= 1, got ${slot}`);
   }
-  return slot > 1 ? `${database}_${slot}` : database;
+  const runToken = present(read, RUN_TOKEN_ENV);
+  // No run token means `globalSetup` provisioned nothing — a bare adapter
+  // script or a harness-less connection. There is no per-run database to point
+  // at, so the historical shared-base-plus-`_N` naming stands.
+  if (runToken === undefined) return slot > 1 ? `${database}_${slot}` : database;
+  return slotDatabaseName(database, runToken, slot);
 }
 
 /**
