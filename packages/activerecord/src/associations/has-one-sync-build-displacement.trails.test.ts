@@ -149,6 +149,37 @@ describe("has_one displacement via the synchronous build path", () => {
     expect(() => assoc.build({ bogus_attribute: 1 })).toThrow();
   });
 
+  it("issues no displacement query when the nested-attributes build raises", async () => {
+    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
+    const displaced = (await Ship.create({
+      name: "Nights Dirty Lightning",
+      pirate_id: (pirate as unknown as { id: number }).id,
+    })) as Base;
+
+    const refetched = (await Pirate.find((pirate as unknown as { id: number }).id)) as Base;
+    const assoc = refetched.association("ship") as unknown as { build(a: object): unknown };
+    assoc.build = () => {
+      throw new Error("build exploded");
+    };
+
+    expect(() => {
+      (refetched as unknown as { shipAttributes: unknown }).shipAttributes = {
+        name: "Davy Jones Gold Dagger",
+      };
+    }).toThrow("build exploded");
+
+    // Rails is `build_record(...)` then `set_new_record` → `load_target`, so a
+    // raising build leaves the row untouched and nothing parked to drain.
+    expect(
+      (refetched as unknown as { _pendingDisplacedRemovals?: unknown[] })
+        ._pendingDisplacedRemovals ?? [],
+    ).toHaveLength(0);
+    const reloaded = (await Ship.find((displaced as unknown as { id: number }).id)) as Base;
+    expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(
+      (pirate as unknown as { id: number }).id,
+    );
+  });
+
   it("leaves the displaced record cached when its removal fails", async () => {
     const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
     await Ship.create({
