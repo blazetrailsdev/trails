@@ -21,39 +21,17 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { ROOT_DIR } from "./config.js";
 import { TAG, parseJsdoc } from "./build.js";
+import { COMMITTED_TS_FILES, walkPackageTsFiles } from "./ts-file-walk.js";
 
 const PACKAGES_DIR = path.join(ROOT_DIR, "packages");
-const SKIP_DIRS = new Set(["node_modules", "dist"]);
 const JSDOC_BLOCK = /\/\*\*[\s\S]*?\*\//g;
 
 /** Every `.ts` file under `<packagesDir>/<pkg>/src`, sorted for stable output.
- *  Includes `*.test.ts` (unlike the extractor's `getAllTsFiles`): the contract
- *  is about what is committed, not about what api-compare measures. */
+ *  The committed population — `*.test.ts` counts, unlike the extractor's
+ *  compared population: the contract is about what is committed, not about
+ *  what api-compare measures. */
 export async function listSourceFiles(packagesDir: string): Promise<string[]> {
-  let pkgs: string[];
-  try {
-    pkgs = (await fs.readdir(packagesDir, { withFileTypes: true }))
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name);
-  } catch {
-    return [];
-  }
-  const perPackage = await Promise.all(
-    pkgs.map(async (pkg) => {
-      const srcDir = path.join(packagesDir, pkg, "src");
-      let names: string[];
-      try {
-        names = await fs.readdir(srcDir, { recursive: true });
-      } catch {
-        return [];
-      }
-      return names
-        .filter((name) => name.endsWith(".ts"))
-        .filter((name) => !name.split(path.sep).some((seg) => SKIP_DIRS.has(seg)))
-        .map((name) => path.join(srcDir, name));
-    }),
-  );
-  return perPackage.flat().sort();
+  return walkPackageTsFiles(packagesDir, COMMITTED_TS_FILES);
 }
 
 /** Run `parseJsdoc`'s empty-reason check over one file's JSDoc blocks, and
