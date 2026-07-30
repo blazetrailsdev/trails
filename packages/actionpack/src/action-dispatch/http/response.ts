@@ -344,7 +344,7 @@ export class Response {
   declare etag: string | undefined;
   declare readonly isLastModified: boolean;
   declare readonly isDate: boolean;
-  declare readonly isEtag: boolean;
+  declare readonly isEtag: string | undefined;
   declare weakEtag: (validators: unknown) => void;
   declare strongEtag: (validators: unknown) => void;
   declare isWeakEtag: () => boolean;

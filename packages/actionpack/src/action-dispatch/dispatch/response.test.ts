@@ -572,7 +572,7 @@ describe("Response Cache::Response wiring", () => {
     expect(e.startsWith('W/"')).toBe(true);
     expect(res.isWeakEtag()).toBe(true);
     expect(res.isStrongEtag()).toBe(false);
-    expect(res.isEtag).toBe(true);
+    expect(res.isEtag).toBe(e);
     // Case-insensitive read: same value via any casing.
     expect(res.getHeader("etag")).toBe(e);
     expect(res.getHeader("ETAG")).toBe(e);

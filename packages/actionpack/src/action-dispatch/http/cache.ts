@@ -217,14 +217,15 @@ export function weakEtag(this: R, v: unknown) {
 export function strongEtag(this: R, v: unknown) {
   this.setHeader(ETAG, generateStrongEtag(v));
 }
-export function isEtag(this: R) {
-  return !!this.getHeader(ETAG);
+export function isEtag(this: R): string | undefined {
+  return this.getHeader(ETAG);
 }
 export function isWeakEtag(this: R) {
-  return isEtag.call(this) && this.getHeader(ETAG)!.startsWith('W/"');
+  const etag = isEtag.call(this);
+  return etag !== undefined && etag.startsWith('W/"');
 }
 export function isStrongEtag(this: R) {
-  return isEtag.call(this) && !isWeakEtag.call(this);
+  return isEtag.call(this) !== undefined && !isWeakEtag.call(this);
 }
 
 /** @internal */
