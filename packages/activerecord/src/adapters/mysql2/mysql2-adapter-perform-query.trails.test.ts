@@ -16,11 +16,11 @@ import {
   leaseMysqlAdapter,
   Mysql2Adapter,
 } from "../abstract-mysql-adapter/test-helper.js";
+import { Base } from "../../base.js";
 import { ReadOnlyError } from "../../errors.js";
 
 describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
   let adapter: Mysql2Adapter;
-  let originalPool: unknown;
 
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();
@@ -32,24 +32,8 @@ describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    // The adapter is the shared leased connection, so the swapped-in
-    // prevent-writes pool has to come back off before anything else uses it.
-    if (originalPool !== undefined) {
-      (adapter as Mysql2Adapter & { pool: unknown }).pool = originalPool;
-      originalPool = undefined;
-    }
     await adapter.exec(`DROP TABLE IF EXISTS pq`);
   });
-
-  function preventWrites(a: Mysql2Adapter): void {
-    originalPool = (a as Mysql2Adapter & { pool: unknown }).pool;
-    (
-      a as Mysql2Adapter & { pool: { preventWrites?: boolean; connectionDescriptor?: unknown } }
-    ).pool = {
-      preventWrites: true,
-      connectionDescriptor: { name: "ActiveRecord::Base" },
-    };
-  }
 
   it("execute runs a non-row-returning statement and returns no rows", async () => {
     // mysql2 returns a ResultSetHeader (no rows array) for DDL and a bare
@@ -92,16 +76,16 @@ describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
   });
 
   it("errors when a write is routed through executeMutation while preventing writes", async () => {
-    // The guard lives in preprocess_query's check_if_write_query, so it reaches
-    // every write through the shared primitive.
-    preventWrites(adapter);
-    await expect(adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('a')`)).rejects.toThrow(
-      ReadOnlyError,
-    );
+    await Base.whilePreventingWrites(async () => {
+      await expect(adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('a')`)).rejects.toThrow(
+        ReadOnlyError,
+      );
+    });
   });
 
   it("does not prevent a read routed through execute while preventing writes", async () => {
-    preventWrites(adapter);
-    await expect(adapter.execute(`SELECT * FROM pq`)).resolves.toEqual([]);
+    await Base.whilePreventingWrites(async () => {
+      await expect(adapter.execute(`SELECT * FROM pq`)).resolves.toEqual([]);
+    });
   });
 });

@@ -10,15 +10,19 @@
  */
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { Base } from "../../base.js";
+import type { AbstractAdapter } from "../../connection-adapters/abstract-adapter.js";
 import { ReadOnlyError } from "../../errors.js";
 
 describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
   let adapter: PostgreSQLAdapter;
+  let connection: AbstractAdapter;
 
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
     await adapter.exec(`DROP TABLE IF EXISTS pq`);
     await adapter.exec(`CREATE TABLE pq (id serial primary key, nick character varying(255))`);
+    connection = await Base.leaseConnection();
   });
 
   afterEach(async () => {
@@ -26,15 +30,6 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
     await adapter.exec(`DROP TABLE IF EXISTS pq`);
     await adapter.close();
   });
-
-  function preventWrites(a: PostgreSQLAdapter): void {
-    (
-      a as PostgreSQLAdapter & { pool: { preventWrites?: boolean; connectionDescriptor?: unknown } }
-    ).pool = {
-      preventWrites: true,
-      connectionDescriptor: { name: "ActiveRecord::Base" },
-    };
-  }
 
   it("execute runs a non-row-returning statement and returns no rows", async () => {
     // node-pg does not throw on a statement with no result columns, so DDL and a
@@ -76,17 +71,17 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
   });
 
   it("errors when a write is routed through executeMutation while preventing writes", async () => {
-    // The guard lives in preprocess_query's check_if_write_query, so it reaches
-    // every write through the shared primitive.
-    preventWrites(adapter);
-    await expect(adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('a')`)).rejects.toThrow(
-      ReadOnlyError,
-    );
+    await Base.whilePreventingWrites(async () => {
+      await expect(
+        connection.executeMutation(`INSERT INTO pq (nick) VALUES ('a')`),
+      ).rejects.toThrow(ReadOnlyError);
+    });
   });
 
   it("does not prevent a read routed through execute while preventing writes", async () => {
-    preventWrites(adapter);
-    await expect(adapter.execute(`SELECT * FROM pq`)).resolves.toEqual([]);
+    await Base.whilePreventingWrites(async () => {
+      await expect(connection.execute(`SELECT * FROM pq`)).resolves.toEqual([]);
+    });
   });
 
   it("re-applies the session timezone on a reconnected session", async () => {
