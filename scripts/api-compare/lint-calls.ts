@@ -12,6 +12,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { COMPARED_TS_FILES, walkTsFilesSync } from "./ts-file-walk.js";
 import * as ts from "typescript";
 import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
 import { OUTPUT_DIR, packageSrcDir } from "./config.js";
@@ -77,7 +78,7 @@ type TsCallMap = Map<string, Map<string, Set<string>>>; // file -> method -> cal
 
 function analyzeTsCalls(pkgSrcDir: string): TsCallMap {
   const result: TsCallMap = new Map();
-  const allFiles = getAllTsFiles(pkgSrcDir);
+  const allFiles = walkTsFilesSync(pkgSrcDir, COMPARED_TS_FILES);
   if (allFiles.length === 0) return result;
 
   const program = ts.createProgram(allFiles, {
@@ -176,25 +177,6 @@ function getCalledMethodName(expr: ts.Expression): string | null {
     }
   }
   return null;
-}
-
-function getAllTsFiles(dir: string): string[] {
-  const results: string[] = [];
-  if (!fs.existsSync(dir)) return results;
-  const walk = (d: string) => {
-    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
-      const full = path.join(d, entry.name);
-      if (entry.isDirectory()) walk(full);
-      else if (
-        entry.name.endsWith(".ts") &&
-        !entry.name.endsWith(".test.ts") &&
-        !entry.name.endsWith(".d.ts")
-      )
-        results.push(full);
-    }
-  };
-  walk(dir);
-  return results;
 }
 
 // ---------------------------------------------------------------------------

@@ -29,6 +29,7 @@
 import * as ts from "typescript";
 import * as path from "path";
 import * as fs from "fs";
+import { COMPARED_TS_FILES, walkTsFilesSync } from "./ts-file-walk.js";
 import { createHash } from "node:crypto";
 import { Worker, isMainThread, parentPort, workerData } from "node:worker_threads";
 import { fileURLToPath } from "node:url";
@@ -2558,24 +2559,9 @@ function isExported(node: ts.Node): boolean {
   return hasModifier(node, ts.SyntaxKind.ExportKeyword);
 }
 
+/** The compared population: what api-compare measures against Rails. */
 export function getAllTsFiles(dir: string, excludeDirs: readonly string[] = []): string[] {
-  const results: string[] = [];
-  if (!fs.existsSync(dir)) return results;
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (excludeDirs.includes(fullPath)) continue;
-      results.push(...getAllTsFiles(fullPath, excludeDirs));
-    } else if (
-      entry.name.endsWith(".ts") &&
-      !entry.name.endsWith(".test.ts") &&
-      !entry.name.endsWith(".d.ts")
-    ) {
-      results.push(fullPath);
-    }
-  }
-  return results;
+  return walkTsFilesSync(dir, COMPARED_TS_FILES, excludeDirs);
 }
 
 // Run main() only on the main thread when invoked as a script.

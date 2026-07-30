@@ -547,7 +547,7 @@ export async function loadSchema(
  * alone is exactly how the two halves of `load_schema` drifted apart before —
  * go through {@link loadSchema}.
  */
-async function loadAdapterSpecificSchema(adapter: DatabaseAdapter): Promise<void> {
+export async function loadAdapterSpecificSchema(adapter: DatabaseAdapter): Promise<void> {
   const adapterSpecificSchema = ADAPTER_SPECIFIC_SCHEMAS[adapter.adapterName];
   if (adapterSpecificSchema) await adapterSpecificSchema(adapter);
 }
