@@ -1525,6 +1525,33 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     });
     this._maintenanceTail = prev.then(() => gate);
     await prev.catch(() => {});
+    // The claim sits HERE — after the tail await, so it names the query that is
+    // actually on the wire — rather than at `_runQuery` entry (#5660). That
+    // correction is untestable from outside the adapter and deliberately ships
+    // without a regression test (RFC 0061
+    // pg-in-flight-marker-regression-coverage, closed wontfix): two independent
+    // barriers keep any reachable construction from claiming the marker while a
+    // *foreign* query holds the wire, so both placements behave identically.
+    //
+    //  1. Every `_runQuery` call site (1079, 1733, 1862, 2372) sits inside a
+    //     `withRawConnection` block, and its pre-loop `awaitRawConnectionReady`
+    //     (see that override) already awaits `_maintenanceTail`. A query that
+    //     would queue behind another therefore blocks *before* `_runQuery`, so
+    //     the pre-fix claim site is unreachable while someone else is on the
+    //     wire.
+    //  2. Reaching `_runQuery` at all means holding the TransactionManager lock.
+    //     A same-chain query re-enters it and so shares the owner token (the
+    //     guard's verdict is the same either way); a different chain has to
+    //     acquire it, which serializes it end-to-end behind the query in flight.
+    //
+    // Constructions tried and rejected for passing on the pre-fix code as well:
+    // two public `execute` calls; the same with `_cancelAnyRunningQuery`
+    // instrumented; a same-chain `execute` launched un-awaited inside
+    // `transactionManager.synchronize` behind a foreign `pg_sleep`; and the
+    // two-lock-scope variant of that (chain A releases the lock with its query
+    // still in flight, chain B re-enters its own lock and queues behind it) —
+    // instrumentation showed B's query reaching `_runQuery` only after the
+    // rollback, by barrier 1.
     this._queryInFlight = true;
     this._queryInFlightOwner = this._transactionManager.currentLockToken;
     try {
