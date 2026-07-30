@@ -39,6 +39,7 @@ import {
   slotDatabaseName,
   staleRunDatabases,
 } from "./run-token.js";
+import { quoteMysqlDatabaseName, quotePgDatabaseName } from "./quote-database-name.js";
 import { slotPoolSize, workerForkCount } from "./ar-db-slots.js";
 import {
   driverConfig,
@@ -150,7 +151,7 @@ async function pgDropDatabases(admin: pg.Client, names: string[]): Promise<void>
   // catalogs, so concurrent drops serialize anyway and only add deadlock risk.
   for (const name of names) {
     await pgTerminateConnections(admin, name);
-    await admin.query(`DROP DATABASE IF EXISTS "${name}"`);
+    await admin.query(`DROP DATABASE IF EXISTS ${quotePgDatabaseName(name)}`);
   }
 }
 
@@ -177,7 +178,7 @@ const pgAdapter: DbTemplateAdapter = {
     // the cutoff, so a concurrent run's live databases are out of reach.
     await pgDropDatabases(admin, staleRunDatabases(base, runToken, await pgDatabaseNames(admin)));
 
-    await admin.query(`CREATE DATABASE "${templateDb}"`);
+    await admin.query(`CREATE DATABASE ${quotePgDatabaseName(templateDb)}`);
 
     const adapter = new PostgreSQLAdapter({
       connectionString: settingsUrl("postgres", withDatabase(settings, templateDb)),
@@ -210,7 +211,9 @@ const pgAdapter: DbTemplateAdapter = {
     // another run's live database.
     for (let slot = 1; slot <= slotCount(); slot++) {
       const slotDb = slotDatabaseName(base, runToken, slot);
-      await admin.query(`CREATE DATABASE "${slotDb}" TEMPLATE "${templateDb}"`);
+      await admin.query(
+        `CREATE DATABASE ${quotePgDatabaseName(slotDb)} TEMPLATE ${quotePgDatabaseName(templateDb)}`,
+      );
     }
 
     process.env[PG_TEMPLATE_ENV] = templateDb;
@@ -255,7 +258,7 @@ async function mysqlDatabaseNames(admin: mysql.Connection): Promise<string[]> {
 
 async function mysqlDropDatabases(admin: mysql.Connection, names: string[]): Promise<void> {
   for (const name of names) {
-    await admin.query(`DROP DATABASE IF EXISTS \`${name}\``);
+    await admin.query(`DROP DATABASE IF EXISTS ${quoteMysqlDatabaseName(name)}`);
   }
 }
 
@@ -291,7 +294,9 @@ const mysqlAdapter: DbTemplateAdapter = {
     );
     for (let slot = 1; slot <= n; slot++) {
       const slotDb = slotDatabaseName(baseDb, runToken, slot);
-      await admin.query(`CREATE DATABASE \`${slotDb}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_bin`);
+      await admin.query(
+        `CREATE DATABASE ${quoteMysqlDatabaseName(slotDb)} CHARACTER SET utf8mb4 COLLATE utf8mb4_bin`,
+      );
     }
     await admin.end();
 
