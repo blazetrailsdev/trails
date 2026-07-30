@@ -661,7 +661,14 @@ function walkTsFileSurface(
     if (c.file !== file) continue;
     const skipForeign = c.synthesizedMixin === true;
     if (!skipForeign && !c.name.startsWith("_")) {
-      out.push({ name: c.name, interfaceDeclaration: c.isInterface === true });
+      // `declaredAsNamespace` matters because declaration merging collapses an
+      // `interface` and a same-named `namespace` into one entry: the merged
+      // entry carries `isInterface`, but the namespace half is a real
+      // non-interface declaration of the name and must stay scored.
+      out.push({
+        name: c.name,
+        interfaceDeclaration: c.isInterface === true && c.declaredAsNamespace !== true,
+      });
     }
     for (const m of [...c.instanceMethods, ...c.classMethods]) {
       if (skipForeign && m.declaredIn !== undefined) continue;
@@ -697,7 +704,9 @@ function walkTsFileSurface(
  * anything — drop out.
  *
  * Names shared with a member or with a class/namespace declaration are NOT
- * exempt: the extra set is a flat Set of bare names (see `allowKeyOf`), so one
+ * exempt — including the `namespace` half of a declaration-merged
+ * `interface`+`namespace` pair, which the extractor collapses into one entry
+ * (`declaredAsNamespace`): the extra set is a flat Set of bare names (see `allowKeyOf`), so one
  * name carries one verdict, and exempting on the interface's behalf would
  * silently absolve the non-interface declaration sharing it.
  */

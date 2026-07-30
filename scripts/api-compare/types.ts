@@ -126,6 +126,15 @@ export interface ClassInfo {
    * `collectTaggedEntries` in extra-surface.ts.
    */
   isInterface?: boolean;
+  /**
+   * TS-side only: a `namespace` (or `export * as`) declaration of this name
+   * contributed to this entry. Declaration merging collapses an `interface`
+   * and a same-named `namespace` into ONE entry, so `isInterface` alone cannot
+   * say whether a non-interface declaration of the name also exists — and the
+   * interface-declaration kind exemption in extra-surface.ts must not absolve
+   * the namespace half.
+   */
+  declaredAsNamespace?: boolean;
   interfaceMembers?: string[];
   /**
    * Reason prose of an `@noRailsEquivalent` tag written on the class /

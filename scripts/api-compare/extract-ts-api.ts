@@ -529,6 +529,9 @@ export function extractFromProgram(
             if (!existingNames.has(m.name)) existing.instanceMethods.push(m);
           }
           existing.noRailsEquivalent ??= extracted.noRailsEquivalent;
+          // Merging into an `interface` half leaves `isInterface` true; record
+          // the namespace half so consumers can still see it (see ClassInfo).
+          existing.declaredAsNamespace = true;
         } else {
           info.modules[modKey] = extracted;
         }
@@ -547,6 +550,7 @@ export function extractFromProgram(
             extends: [],
             instanceMethods: [],
             classMethods: [],
+            declaredAsNamespace: true,
           };
           fileHasClassOrModule = true;
         } else if (
@@ -2080,6 +2084,7 @@ function extractNamespace(
     extends: [],
     instanceMethods,
     classMethods: [],
+    declaredAsNamespace: true,
     ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
   };
 }

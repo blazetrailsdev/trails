@@ -2249,4 +2249,10 @@ describe("extractFromProgram — interface merged with a namespace of the same n
     expect(merged.instanceMethods.map((m) => m.name).sort()).toEqual(["locate", "use"]);
     expect(merged.interfaceMembers).toEqual(["locate"]);
   });
+
+  it("records the namespace half, which the interface-only kind exemption must not absolve", () => {
+    expect(entry(`${IFACE}\n${NAMESPACE}`).declaredAsNamespace).toBe(true);
+    expect(entry(`${NAMESPACE}\n${IFACE}`).declaredAsNamespace).toBe(true);
+    expect(entry(IFACE).declaredAsNamespace).toBeUndefined();
+  });
 });

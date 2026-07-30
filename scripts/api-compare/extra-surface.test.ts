@@ -1585,6 +1585,17 @@ describe("buildReport — interface declaration names", () => {
     expect(report.packages[0].totalInterfaceExempt).toBe(1);
   });
 
+  it("still scores a name a merged interface+namespace declares, in either order", () => {
+    // Declaration merging collapses the pair into ONE entry carrying
+    // `isInterface`; `declaredAsNamespace` is what keeps the namespace half —
+    // a real non-interface declaration of the name — visible here.
+    const ts = tsWith([{ name: "Locator", isInterface: true }]);
+    ts.packages.activemodel.modules["foo.ts:Locator:0"].declaredAsNamespace = true;
+    const report = run(ruby, ts);
+    expect(report.packages[0].extraFiles[0].extras).toEqual([{ name: "Locator", kind: "novel" }]);
+    expect(report.packages[0].totalInterfaceExempt).toBe(0);
+  });
+
   it("keeps a tag on an exempt-by-kind interface matching, so the tag is not stale", () => {
     const ts = tsWith([{ name: "ConnectionHost", isInterface: true, members: ["tsOnlyHelper"] }]);
     ts.packages.activemodel.modules["foo.ts:ConnectionHost:0"].noRailsEquivalent =
