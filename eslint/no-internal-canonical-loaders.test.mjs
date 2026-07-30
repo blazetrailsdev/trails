@@ -3,7 +3,12 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { RuleTester } from "eslint";
 import { describe, it, expect } from "vitest";
-import rule, { BANNED, isCanonicalSchemaModule } from "./no-internal-canonical-loaders.mjs";
+import rule, {
+  BANNED,
+  isCanonicalSchemaModule,
+  moduleBasename,
+} from "./no-internal-canonical-loaders.mjs";
+import { canonicalLoaderModules } from "./test-infra-scope.mjs";
 
 const FILENAME = "packages/activerecord/src/dirty.test.ts";
 const OWN_TEST = "packages/activerecord/src/support/canonical-schema.test.ts";
@@ -96,11 +101,6 @@ tester.run("no-internal-canonical-loaders", rule, {
   ],
 });
 
-// Guard: the rule's module matcher is a literal basename list, and a banned
-// symbol imported from an unmatched module is simply not reported — so a file
-// move that relocates a loader would reopen the ban with no lint error and no
-// failing test. This reads the real support/ tree and fails when a module
-// exports a BANNED symbol the matcher does not match.
 const supportDir = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
@@ -110,7 +110,7 @@ const supportDir = path.join(
   "support",
 );
 
-/** Names exported by `source`, for the export forms used in support/. */
+/** Names exported by `source`, covering the export forms used in `support/`. */
 function exportedNames(source) {
   const names = new Set();
   for (const [, name] of source.matchAll(
@@ -121,28 +121,57 @@ function exportedNames(source) {
   for (const [, clause] of source.matchAll(/^export\s*\{([^}]*)\}/gm)) {
     for (const entry of clause.split(",")) {
       const parts = entry.trim().split(/\s+as\s+/);
-      const name = (parts[1] ?? parts[0] ?? "").trim();
+      const name = (parts.at(-1) ?? "").trim();
       if (name) names.add(name);
     }
   }
   return names;
 }
 
+/**
+ * Walks the whole `support/` tree, not just its top level: the rule matches on
+ * basename regardless of directory depth, so a loader moved into a
+ * `support/<subdir>/` module is exactly the silent-reopen case being guarded.
+ */
+async function* supportSources(dir = supportDir) {
+  for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name !== "node_modules" && entry.name !== "dist") yield* supportSources(full);
+    } else if (entry.name.endsWith(".ts") && !entry.name.endsWith(".test.ts")) {
+      yield full;
+    }
+  }
+}
+
+/** Repo-relative path → the BANNED symbols that module exports. */
+async function bannedExportsBySupportModule() {
+  const byModule = new Map();
+  for await (const file of supportSources()) {
+    const source = await fs.readFile(file, "utf8");
+    const banned = [...exportedNames(source)].filter((name) => BANNED.has(name)).sort();
+    if (banned.length > 0) byModule.set(path.relative(supportDir, file), banned);
+  }
+  return byModule;
+}
+
 describe("no-internal-canonical-loaders module matcher", () => {
   it("matches every support/ module that exports a banned loader", async () => {
     const unmatched = [];
-    for (const entry of await fs.readdir(supportDir, { withFileTypes: true })) {
-      if (!entry.isFile() || !entry.name.endsWith(".ts") || entry.name.endsWith(".test.ts")) {
-        continue;
-      }
-      const source = await fs.readFile(path.join(supportDir, entry.name), "utf8");
-      const exported = [...exportedNames(source)].filter((name) => BANNED.has(name));
-      if (exported.length === 0) continue;
-      const specifier = `./${entry.name.replace(/\.ts$/, ".js")}`;
-      if (!isCanonicalSchemaModule(specifier)) {
-        unmatched.push(`${entry.name} exports ${exported.sort().join(", ")}`);
+    for (const [file, banned] of await bannedExportsBySupportModule()) {
+      if (!isCanonicalSchemaModule(`./${file.replace(/\.ts$/, ".js")}`)) {
+        unmatched.push(`${file} exports ${banned.join(", ")}`);
       }
     }
     expect(unmatched).toEqual([]);
+  });
+
+  it("lists no module that has stopped exporting a banned loader", async () => {
+    const found = new Set(
+      [...(await bannedExportsBySupportModule()).keys()].map((file) =>
+        moduleBasename(file.replace(/\.ts$/, "")),
+      ),
+    );
+    expect(canonicalLoaderModules.filter((module) => !found.has(module))).toEqual([]);
   });
 });
