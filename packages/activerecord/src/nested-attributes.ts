@@ -679,6 +679,9 @@ interface OneToOneAssociation {
   buildDisplacementOwnedByCaller?: boolean;
   initializeAttributes(record: Base): void;
   isLoaded?(): boolean;
+  // Rails' `send(association_name)` — `SingularAssociation#reader`, which is
+  // where trails raises strict-loading violations (singular-association.ts:210).
+  readonly reader?: Base | null | Promise<Base | null>;
   detachDisplacedTarget?(displaced: Base | null): Promise<void>;
   prepareDetachDisplacedForSyncBuild?(): (() => Promise<void>) | null;
 }
@@ -850,11 +853,23 @@ export function assignNestedAttributesForOneToOneAssociation(
   const updateOnly = options.updateOnly ?? false;
   const hasId = hasNestedId(attributes);
 
-  // Rails: `existing_record = send(association_name)`. A synchronous writer can
-  // only observe an already-built / loaded in-memory target — trails performs
-  // no synchronous DB read — so a DB-backed existing record is reached via the
-  // async post-save flush (`processNestedAttributes`) instead.
+  // Rails: `existing_record = send(association_name)`. The reader loads an
+  // unloaded association; a synchronous writer cannot await that, so the whole
+  // body is re-entered once it lands (`assoc.isLoaded()` is true by then, so
+  // this resolves and falls through).
   const assoc = record.association(associationName) as unknown as OneToOneAssociation;
+  if ((hasId || updateOnly) && assoc.isLoaded?.() === false && "reader" in assoc) {
+    const read = assoc.reader;
+    if (read instanceof Promise) {
+      parkDisplacedRemoval(
+        record,
+        read.then(() =>
+          assignNestedAttributesForOneToOneAssociation(record, associationName, attributes),
+        ),
+      );
+      return;
+    }
+  }
   const existing = assoc.target ?? null;
 
   // Rails nested_attributes.rb:436 — update (or mark for destruction) the
@@ -871,12 +886,9 @@ export function assignNestedAttributesForOneToOneAssociation(
     return;
   }
 
-  // An `id`/`update_only` update whose target is not in memory: defer it to the
-  // async post-save flush (trails-specific — Rails loads `existing_record`
-  // synchronously here and assigns in place).
-  if (hasId || updateOnly) {
-    storePendingNestedAttributes(record, associationName, [attributes]);
-    return;
+  // Rails nested_attributes.rb:439-440.
+  if (hasId) {
+    raiseNestedAttributesRecordNotFoundBang(record, associationName, (attributes as any).id);
   }
 
   // Rails nested_attributes.rb:443 — build a new record (no matching id).
