@@ -3,30 +3,36 @@
 -- test/config.example.yml:4,24 connects with no password.
 --
 -- Rails' grant is on the literal test database. Widened here to the
--- `activerecord_unittest%` pattern, which is what lets the user CREATE its own
+-- `activerecord\_unittest%` pattern, which is what lets the user CREATE its own
 -- AR_DB_SLOT copies (activerecord_unittest_<token>_1, _2, …, and the arunit2
 -- database activerecord_unittest2) — Rails' single-database run never needs
 -- that. Deliberately not widened to *.*: `mysql` stays unreachable.
 --
--- Rails' second grant is reproduced literally: it is what makes a connection to
--- inexistent_activerecord_unittest fail with "Unknown database" instead of
--- "access denied", which abstract-mysql-adapter/connection.test.ts and
--- mysql2-adapter.test.ts assert on.
+-- The underscores are backslash-escaped because MySQL reads `_` and `%` in a
+-- database-level GRANT as LIKE wildcards (dev.mysql.com/doc/en/grant.html).
+-- Left bare, the pattern would also authorize names like activerecordXunittest_1
+-- — broader than this file means. Only the trailing % is a wildcard on purpose.
 --
--- ar_cli_e2e% is trails-only, with no Rails counterpart: the activerecord-cli
+-- Rails' second grant is reproduced literally, bare underscores and all, since
+-- it is a verbatim port of the Rakefile statement: it is what makes a
+-- connection to inexistent_activerecord_unittest fail with "Unknown database"
+-- instead of "access denied", which abstract-mysql-adapter/connection.test.ts
+-- and mysql2-adapter.test.ts assert on.
+--
+-- ar\_cli\_e2e% is trails-only, with no Rails counterpart: the activerecord-cli
 -- E2E suite drives `ar db:create` as this same user against a throwaway
 -- ar_cli_e2e_<hrtime> database (activerecord-cli/src/__e2e__/*-happy-path.test.ts).
 -- Postgres needs no equivalent — that role has CREATEDB, which is not
 -- per-database.
 CREATE USER IF NOT EXISTS 'rails'@'%';
-GRANT ALL PRIVILEGES ON `activerecord_unittest%`.* TO 'rails'@'%';
+GRANT ALL PRIVILEGES ON `activerecord\_unittest%`.* TO 'rails'@'%';
 GRANT ALL PRIVILEGES ON inexistent_activerecord_unittest.* TO 'rails'@'%';
-GRANT ALL PRIVILEGES ON `ar_cli_e2e%`.* TO 'rails'@'%';
+GRANT ALL PRIVILEGES ON `ar\_cli\_e2e%`.* TO 'rails'@'%';
 -- PERMANENT DEVIATION: Rails grants only '%' because its runs are over TCP.
 -- MYSQL_SOCK is a first-class sub-setting here (config.example.yml:18-19) and a
 -- socket connection authenticates as 'rails'@'localhost', which '%' misses.
 CREATE USER IF NOT EXISTS 'rails'@'localhost';
-GRANT ALL PRIVILEGES ON `activerecord_unittest%`.* TO 'rails'@'localhost';
+GRANT ALL PRIVILEGES ON `activerecord\_unittest%`.* TO 'rails'@'localhost';
 GRANT ALL PRIVILEGES ON inexistent_activerecord_unittest.* TO 'rails'@'localhost';
-GRANT ALL PRIVILEGES ON `ar_cli_e2e%`.* TO 'rails'@'localhost';
+GRANT ALL PRIVILEGES ON `ar\_cli\_e2e%`.* TO 'rails'@'localhost';
 FLUSH PRIVILEGES;
