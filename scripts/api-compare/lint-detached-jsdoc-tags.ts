@@ -36,8 +36,11 @@
  *     is inert there too, but JSDoc on statements is legitimate prose in this
  *     tree and flagging it would be noise.
  *
- * Population: every `.ts` file under `packages/<pkg>/src`, the same set
- * `api:reasons` checks — that is exactly where a tag has api-compare meaning.
+ * Population: every `.ts` file under `packages/<pkg>/src` — the set
+ * `api:reasons` checks, where a tag has api-compare meaning — plus every `.ts`
+ * under `scripts/`, where the motivating defect actually lived (PR 5654, in
+ * `extract-ts-api.ts`). The api-compare tooling tags its own helpers
+ * `@internal`, and a detached block there misleads a reader just the same.
  * `*.test.ts` is included (a detached tag misleads a reader wherever it sits),
  * so a block quoted inside a string or template literal has to be excluded
  * explicitly; see `isCommentPosition`.
@@ -54,10 +57,24 @@ import { fileURLToPath } from "url";
 import * as ts from "typescript";
 import { ROOT_DIR } from "./config.js";
 import { listSourceFiles } from "./lint-missing-rails-call-reasons.js";
+import { COMMITTED_TS_FILES, walkTsFiles } from "./ts-file-walk.js";
 
 const PACKAGES_DIR = path.join(ROOT_DIR, "packages");
+const SCRIPTS_DIR = path.join(ROOT_DIR, "scripts");
 const SIGNIFICANT_TAGS = new Set(["internal", "noRailsEquivalent"]);
 const JSDOC_BLOCK = /\/\*\*[\s\S]*?\*\//g;
+
+/** The files this lint reads: both trees, sorted for stable output. Both are
+ *  the committed population — `listSourceFiles` is packages-shaped
+ *  (`<packagesDir>/<pkg>/src`), so `scripts/`, which has no `<pkg>/src` layer,
+ *  is walked flat instead. */
+export async function listLintedFiles(packagesDir: string, scriptsDir: string): Promise<string[]> {
+  const [packageFiles, scriptFiles] = await Promise.all([
+    listSourceFiles(packagesDir),
+    walkTsFiles(scriptsDir, COMMITTED_TS_FILES),
+  ]);
+  return [...packageFiles, ...scriptFiles].sort();
+}
 
 export interface Detachment {
   file: string;
@@ -171,7 +188,7 @@ export function lintFileText(fileName: string, text: string): Detachment[] {
 }
 
 export async function main(): Promise<number> {
-  const files = await listSourceFiles(PACKAGES_DIR);
+  const files = await listLintedFiles(PACKAGES_DIR, SCRIPTS_DIR);
   const found: Detachment[] = [];
   for (const abs of files) {
     found.push(...lintFileText(path.relative(ROOT_DIR, abs), await fs.readFile(abs, "utf-8")));

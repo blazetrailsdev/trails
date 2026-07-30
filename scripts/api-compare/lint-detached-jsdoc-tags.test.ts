@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { lintFileText } from "./lint-detached-jsdoc-tags.js";
+import * as fs from "fs/promises";
+import * as os from "os";
+import * as path from "path";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { lintFileText, listLintedFiles, main } from "./lint-detached-jsdoc-tags.js";
 
 describe("lintFileText", () => {
   it("flags a line comment between an @internal block and its declaration", () => {
@@ -94,5 +97,59 @@ describe("lintFileText", () => {
       ].join("\n"),
     );
     expect(found.map((d) => d.line)).toEqual([1, 4]);
+  });
+});
+
+describe("listLintedFiles", () => {
+  let dir: string;
+
+  beforeAll(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), "api-detached-"));
+    const write = async (rel: string) => {
+      const abs = path.join(dir, rel);
+      await fs.mkdir(path.dirname(abs), { recursive: true });
+      await fs.writeFile(abs, "");
+    };
+    await write(path.join("packages", "activerecord", "src", "base.ts"));
+    await write(path.join("packages", "activerecord", "src", "base.test.ts"));
+    await write(path.join("packages", "activerecord", "src", "dist", "base.ts"));
+    await write(path.join("packages", "arel", "no-src-dir.ts"));
+    await write(path.join("scripts", "start-worktree.ts"));
+    await write(path.join("scripts", "api-compare", "extract-ts-api.ts"));
+    await write(path.join("scripts", "api-compare", "extract-ts-api.test.ts"));
+    await write(path.join("scripts", "api-compare", "conventions.rb"));
+    await write(path.join("scripts", "api-compare", "dist", "build.ts"));
+    await write(path.join("scripts", "node_modules", "dep", "index.ts"));
+  });
+
+  afterAll(async () => {
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  it("adds every nested .ts under scripts to the packages population", async () => {
+    const files = await listLintedFiles(path.join(dir, "packages"), path.join(dir, "scripts"));
+    expect(files.map((f) => path.relative(dir, f))).toEqual([
+      path.join("packages", "activerecord", "src", "base.test.ts"),
+      path.join("packages", "activerecord", "src", "base.ts"),
+      path.join("scripts", "api-compare", "extract-ts-api.test.ts"),
+      path.join("scripts", "api-compare", "extract-ts-api.ts"),
+      path.join("scripts", "start-worktree.ts"),
+    ]);
+  });
+
+  it("keeps the packages population when the scripts directory does not exist", async () => {
+    const files = await listLintedFiles(path.join(dir, "packages"), path.join(dir, "missing"));
+    expect(files.map((f) => path.relative(dir, f))).toEqual([
+      path.join("packages", "activerecord", "src", "base.test.ts"),
+      path.join("packages", "activerecord", "src", "base.ts"),
+    ]);
+  });
+});
+
+describe("main", () => {
+  // Parses ~3.6k files, which lands within a few hundred ms of vitest's 5s
+  // default — the generous timeout keeps a slow machine from failing it.
+  it("passes over the committed tree", { timeout: 60_000 }, async () => {
+    expect(await main()).toBe(0);
   });
 });
