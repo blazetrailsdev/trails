@@ -125,11 +125,22 @@ export class CommandRecorder {
       typeof delegate?.supportsBulkAlter === "function" && delegate.supportsBulkAlter() === true;
 
     if (options["bulk"] && supportsBulk) {
-      // Bulk path: sub-recorder captures commands, parent stores a single
-      // changeTable entry that invertChangeTable knows how to flip.
+      // Mirrors Rails: the sub-recorder inherits `reverting`, so the block's
+      // operations are inverted as they are recorded, and the parent entry is
+      // pushed onto @commands directly rather than through record() — pushing
+      // it raw is what keeps an enclosing revert() from inverting the already
+      // inverted sub-list a second time.
       const sub = new CommandRecorder(this._delegate);
+      sub.reverting = this._reverting;
       await callback(delegate.updateTableDefinition(tableName, sub));
-      this.record("changeTable", [tableName, sub.commands]);
+      // Deviation: Rails stores `[:change_table, [table_name], -> t {
+      // bulk_change_table(table_name, commands) }]` — a callable third element.
+      // Trails' command shape is `{ cmd, args }` with no block slot, so the
+      // captured sub-commands are stored as the second arg instead and
+      // replay() expands them. Converging on the callable form is a change to
+      // the command tuple and replay() across every recorded command, which is
+      // out of scope here.
+      this._commands.push({ cmd: "changeTable", args: [tableName, sub.commands] });
     } else {
       // Non-bulk: route operations directly through this recorder so the
       // enclosing revert() block can invert them individually.
@@ -451,23 +462,6 @@ export class CommandRecorder {
     throw new IrreversibleMigration(
       "change_column is not reversible. Use change_column_default or change_column_null instead.",
     );
-  }
-
-  /** @internal */
-  invertChangeTable(args: unknown[]): [string, unknown[]] {
-    const [tableName, subCommands] = args as [string, unknown];
-    if (!Array.isArray(subCommands)) {
-      throw new IrreversibleMigration(
-        "change_table is not reversible without captured sub-commands.",
-      );
-    }
-    const inverted = ([...subCommands] as Array<{ cmd: string; args: unknown[] }>)
-      .reverse()
-      .map(({ cmd, args: subArgs }) => {
-        const [iCmd, iArgs] = this._dispatchInvert(cmd, subArgs);
-        return { cmd: iCmd, args: iArgs };
-      });
-    return ["changeTable", [tableName, inverted]];
   }
 
   /** @internal */

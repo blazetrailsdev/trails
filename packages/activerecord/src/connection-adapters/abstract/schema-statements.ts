@@ -10,6 +10,7 @@
 
 import { NotImplementedError } from "../../errors.js";
 import { joinTableName as _joinTableName } from "../../migration/join-table.js";
+import { CommandRecorder } from "../../migration/command-recorder.js";
 import { ArgumentError, type Type } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter, AdapterName } from "../abstract-adapter.js";
 import {
@@ -31,7 +32,6 @@ import {
   type ColumnType,
   type ColumnOptions,
   type IdHashOptions,
-  type SchemaStatementsLike,
   type ForeignKeyLookupOptions,
   type RemoveForeignKeyOptions,
 } from "./schema-definitions.js";
@@ -1031,34 +1031,10 @@ export class SchemaStatements {
       (this.adapter as any).supportsBulkAlter() === true;
 
     if (options.bulk && supportsBulk) {
-      const ops: Array<[string, string, ...unknown[]]> = [];
-      // Mirrors Rails' CommandRecorder#method_missing: records any DDL method call into ops
-      // so bulkChangeTable can coalesce or fall back. Read-only predicates delegate to the
-      // real SchemaStatements so Table#isColumnExists / isIndexExists etc. work in bulk blocks.
-      // Using a Proxy handles adapter-specific methods (e.g. PgTable#addUniqueConstraint)
-      // without enumerating them statically.
-      const predicates = new Set([
-        "columnExists",
-        "indexExists",
-        "foreignKeyExists",
-        "isCheckConstraintExists",
-        "primaryKey",
-      ]);
-      const ss = this;
-      const recorder = new Proxy({} as SchemaStatementsLike, {
-        get(_target, prop: string) {
-          if (predicates.has(prop)) {
-            return (ss as any)[prop].bind(ss);
-          }
-          return (...args: unknown[]) => {
-            ops.push([prop, ...(args as [string, ...unknown[]])]);
-            return Promise.resolve();
-          };
-        },
-      });
-      const bulkTable = this.updateTableDefinition(tableName, recorder as any);
+      const recorder = new CommandRecorder(this);
+      const bulkTable = this.updateTableDefinition(tableName, recorder as unknown);
       if (callback) await callback(bulkTable);
-      await this.bulkChangeTable(tableName, ops);
+      await this.bulkChangeTable(tableName, recorder.commands);
     } else {
       const table = this.updateTableDefinition(tableName, this);
       if (callback) await callback(table);
@@ -2085,12 +2061,15 @@ export class SchemaStatements {
 
   async bulkChangeTable(
     tableName: string,
-    operations: Array<[string, string, ...unknown[]]>,
+    operations: Array<{ cmd: string; args: unknown[] }>,
   ): Promise<void> {
     const sqlFragments: string[] = [];
     const nonCombinable: Array<() => Promise<void>> = [];
 
-    for (const [command, table, ...arguments_] of operations) {
+    for (const { cmd: command, args } of operations) {
+      // Mirrors Rails' `table, arguments = args.shift, args` — the recorded
+      // command's first argument is always the table name.
+      const [table, ...arguments_] = args as [string, ...unknown[]];
       // Prefer adapter-specific *ForAlter over the generic SchemaStatements one — mirrors Rails
       // where bulk_change_table and all *_for_alter methods live on the same adapter object.
       const forAlterTarget =
