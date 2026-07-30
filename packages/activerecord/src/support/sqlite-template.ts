@@ -93,8 +93,7 @@ export async function registerDbFileCleanupOnExit(base: string): Promise<void> {
 
 /**
  * Shared filename prefix of every temp sqlite DB the AR test harness creates:
- * the template, the per-worker clones, the scratch databases
- * (`support/scratch-database.ts`) and their `_2` arunit2 siblings.
+ * the template, the per-worker clones and their `_2` arunit2 siblings.
  */
 export const TEMP_DB_PREFIX = "ar-test-";
 
@@ -130,8 +129,8 @@ async function unlinkQuietly(fs: FsAdapter, target: string): Promise<void> {
  * This is the cleanup that actually survives the run: the
  * `registerDbFileCleanupOnExit` listeners live in vitest's forked workers, and
  * tinypool tears those down with a signal rather than a clean shutdown, so
- * `"exit"` handlers never run and each run leaks its worker clones, scratch
- * DBs and WAL sidecars. Sweeping from globalSetup's teardown — the one place
+ * `"exit"` handlers never run and each run leaks its worker clones and WAL
+ * sidecars. Sweeping from globalSetup's teardown — the one place
  * that outlives every worker — collects them regardless of how the worker died.
  *
  * Matching is by run token, not by prefix alone, so a concurrent run's live
