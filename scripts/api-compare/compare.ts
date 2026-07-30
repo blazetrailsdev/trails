@@ -649,6 +649,11 @@ const TS_ROOT_INTERMEDIATE = new Map<string, string>([
   // side records no superclass. TS has no NameError, and trails uses
   // `ReferenceError` as the analogue throughout, so the port declares it.
   ["NameError", "ReferenceError"],
+  // `ActiveSupport::Messages::Codec` has no Ruby super; it `include Metadata`
+  // and then overrides `use_message_serializer_for_metadata?` with a body that
+  // calls `super`. Ruby's include puts the module in the ancestor chain, so TS
+  // `Codec extends Metadata` reproduces both the chain and that `super`.
+  ["Codec", "Metadata"],
 ]);
 
 // Per-class TS renames that don't fit the systematic alias patterns

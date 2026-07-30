@@ -1,25 +1,14 @@
-import { SerializerWithFallback, type Format } from "./serializer-with-fallback.js";
+import { Metadata } from "./metadata.js";
+import {
+  ArgumentError,
+  SerializerWithFallback,
+  Thrown,
+  type Format,
+} from "./serializer-with-fallback.js";
 
 export interface MessageSerializer {
   dump(value: unknown): string;
   load(dumped: string): unknown;
-}
-
-export class ArgumentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ArgumentError";
-  }
-}
-
-export class Thrown extends Error {
-  constructor(
-    readonly tag: string,
-    readonly value: unknown,
-  ) {
-    super(String(tag));
-    this.name = "Thrown";
-  }
 }
 
 export interface CodecOptions {
@@ -28,14 +17,15 @@ export interface CodecOptions {
   forceLegacyMetadataSerializer?: boolean;
 }
 
-export class Codec {
+export class Codec extends Metadata {
   static defaultSerializer: Format | MessageSerializer = "marshal";
 
-  protected readonly serializer: MessageSerializer;
+  protected override readonly serializer: MessageSerializer;
   protected readonly urlSafe: boolean;
   protected readonly forceLegacyMetadataSerializer: boolean;
 
   constructor(options: CodecOptions = {}) {
+    super();
     const ctor = this.constructor as typeof Codec;
     const serializer = options.serializer ?? ctor.defaultSerializer;
     this.serializer =
@@ -44,12 +34,12 @@ export class Codec {
     this.forceLegacyMetadataSerializer = options.forceLegacyMetadataSerializer ?? false;
   }
 
-  protected encode(data: string | Buffer, urlSafe: boolean = this.urlSafe): string {
+  protected override encode(data: string | Buffer, urlSafe: boolean = this.urlSafe): string {
     const buf = typeof data === "string" ? Buffer.from(data, "latin1") : data;
     return urlSafe ? buf.toString("base64url") : buf.toString("base64");
   }
 
-  protected decode(encoded: string, urlSafe: boolean = this.urlSafe): Buffer {
+  protected override decode(encoded: string, urlSafe: boolean = this.urlSafe): Buffer {
     try {
       let str = encoded;
       if (urlSafe && !str.endsWith("=") && str.length % 4 !== 0) {
@@ -66,11 +56,11 @@ export class Codec {
     }
   }
 
-  protected serialize(data: unknown): string {
+  protected override serialize(data: unknown): string {
     return this.serializer.dump(data);
   }
 
-  protected deserialize(serialized: string): unknown {
+  protected override deserialize(serialized: string): unknown {
     try {
       return this.serializer.load(serialized);
     } catch (error) {
@@ -103,5 +93,9 @@ export class Codec {
       }
       throw error;
     }
+  }
+
+  protected override useMessageSerializerForMetadata(): boolean {
+    return !this.forceLegacyMetadataSerializer && super.useMessageSerializerForMetadata();
   }
 }

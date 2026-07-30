@@ -1,8 +1,7 @@
 import { getCrypto } from "./crypto-adapter.js";
-import { Codec, Thrown, type MessageSerializer } from "./messages/codec.js";
-import type { Format } from "./messages/serializer-with-fallback.js";
-import { Temporal } from "./temporal.js";
-import { currentTimeInstant } from "./time-travel.js";
+import { Codec, type MessageSerializer } from "./messages/codec.js";
+import type { ExpectedMetadataOptions, MetadataOptions } from "./messages/metadata.js";
+import { Thrown, type Format } from "./messages/serializer-with-fallback.js";
 
 export class InvalidSignature extends Error {
   constructor(message = "Invalid signature") {
@@ -15,17 +14,14 @@ interface MessageVerifierOptions {
   digest?: string;
   serializer?: Format | MessageSerializer;
   url_safe?: boolean;
+  forceLegacyMetadataSerializer?: boolean;
 }
 
-interface GenerateOptions {
-  expiresIn?: number; // seconds
-  expiresAt?: Temporal.Instant;
-  purpose?: string | null;
-}
+type GenerateOptions = MetadataOptions;
 
-interface VerifyOptions {
-  purpose?: string | null;
-}
+type VerifyOptions = ExpectedMetadataOptions;
+
+const SEPARATOR = "--";
 
 export class MessageVerifier extends Codec {
   static override defaultSerializer: Format | MessageSerializer = "json";
@@ -34,31 +30,21 @@ export class MessageVerifier extends Codec {
   private digest: string;
 
   constructor(secret: string | Buffer, options: MessageVerifierOptions = {}) {
-    super({ serializer: options.serializer, urlSafe: options.url_safe });
+    super({
+      serializer: options.serializer,
+      urlSafe: options.url_safe,
+      forceLegacyMetadataSerializer: options.forceLegacyMetadataSerializer,
+    });
     this.secret = secret;
     this.digest = options.digest ?? "sha1";
   }
 
   generate(value: unknown, options: GenerateOptions = {}): string {
-    const payload: Record<string, unknown> = { value };
+    return this.createMessage(value, options);
+  }
 
-    if (options.expiresAt) {
-      payload._expiresAt = options.expiresAt.toString({ smallestUnit: "millisecond" });
-    } else if (options.expiresIn !== undefined) {
-      const milliseconds = Math.round(options.expiresIn * 1000);
-      payload._expiresAt = currentTimeInstant()
-        .add({ milliseconds })
-        .toString({ smallestUnit: "millisecond" });
-    }
-
-    if (options.purpose) {
-      payload._purpose = options.purpose;
-    }
-
-    const serialized = this.serialize(payload);
-    const encoded = this.encode(serialized);
-    const signature = this.sign(encoded);
-    return `${encoded}--${signature}`;
+  createMessage(value: unknown, options: GenerateOptions = {}): string {
+    return this.signEncoded(this.encode(this.serializeWithMetadata(value, options)));
   }
 
   verify(message: string, options: VerifyOptions = {}): unknown {
@@ -83,31 +69,15 @@ export class MessageVerifier extends Codec {
     return !!this.catchAndIgnore("invalid_message_format", () => this.extractEncoded(message));
   }
 
-  private readMessage(message: string, options: VerifyOptions): unknown {
-    const encoded = this.extractEncoded(message);
-    const parsed = this.deserialize(this.decode(encoded).toString("latin1"));
-    return this.verifyMetadata(parsed, options);
+  readMessage(message: string, options: VerifyOptions = {}): unknown {
+    return this.deserializeWithMetadata(
+      this.decode(this.extractEncoded(message)).toString("latin1"),
+      options,
+    );
   }
 
-  private verifyMetadata(parsed: unknown, options: VerifyOptions): unknown {
-    if (typeof parsed !== "object" || parsed === null || !("value" in parsed)) {
-      throw new Thrown("invalid_message_content", "missing value key");
-    }
-
-    const payload = parsed as Record<string, unknown>;
-
-    if (payload._expiresAt) {
-      const expiresAt = Temporal.Instant.from(payload._expiresAt as string);
-      if (Temporal.Instant.compare(expiresAt, currentTimeInstant()) <= 0) {
-        throw new Thrown("invalid_message_content", "expired message");
-      }
-    }
-
-    if (options.purpose && payload._purpose !== options.purpose) {
-      throw new Thrown("invalid_message_content", "mismatched purpose");
-    }
-
-    return payload.value;
+  private signEncoded(encoded: string): string {
+    return `${encoded}${SEPARATOR}${this.generateDigest(encoded)}`;
   }
 
   private extractEncoded(signed: string): string {
@@ -115,9 +85,9 @@ export class MessageVerifier extends Codec {
       throw new Thrown("invalid_message_format", "invalid message string");
     }
 
-    const parts = signed.split("--");
+    const parts = signed.split(SEPARATOR);
     const signature = parts.length < 2 ? undefined : parts[parts.length - 1];
-    const encoded = parts.slice(0, -1).join("--");
+    const encoded = parts.slice(0, -1).join(SEPARATOR);
 
     if (!encoded || !signature) {
       throw new Thrown("invalid_message_format", "missing message digest");
@@ -133,7 +103,7 @@ export class MessageVerifier extends Codec {
   private digestMatches(encoded: string, signature: string): boolean {
     try {
       const sigBuf = Buffer.from(signature, "hex");
-      const expectedBuf = Buffer.from(this.sign(encoded), "hex");
+      const expectedBuf = Buffer.from(this.generateDigest(encoded), "hex");
       if (sigBuf.length !== expectedBuf.length) return false;
       return getCrypto().timingSafeEqual(sigBuf, expectedBuf);
     } catch {
@@ -141,7 +111,7 @@ export class MessageVerifier extends Codec {
     }
   }
 
-  private sign(data: string): string {
+  private generateDigest(data: string): string {
     return getCrypto().createHmac(this.digest, this.secret).update(data).digest("hex");
   }
 

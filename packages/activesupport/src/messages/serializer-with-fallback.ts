@@ -48,6 +48,25 @@ export class KeyError extends Error {
   }
 }
 
+/** @internal */
+export class ArgumentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ArgumentError";
+  }
+}
+
+/** @internal */
+export class Thrown extends Error {
+  constructor(
+    readonly tag: string,
+    readonly value: unknown,
+  ) {
+    super(String(tag));
+    this.name = "Thrown";
+  }
+}
+
 /** The surface every serializer in {@link SERIALIZERS} exposes. @internal */
 export interface Serializer {
   /**
