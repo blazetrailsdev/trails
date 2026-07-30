@@ -215,7 +215,8 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * Returns true for raw SQLite driver errors that indicate a missing or unopenable database
    * file (SQLITE_CANTOPEN).
    *
-   * @noRailsEquivalent Rails recognizes the no-such-database condition inline at the connect site
+   * @noRailsEquivalent CONVERGEABLE (story: converge-no-database-error-to-connect-site).
+   * Rails recognizes the no-such-database condition inline at the connect site
    *   and raises
    *   `ActiveRecord::NoDatabaseError` there (postgresql_adapter.rb:63, sqlite3_adapter.rb:38,120) —
    *   there is no named predicate to mirror. trails needs the predicate separated from raising
@@ -349,7 +350,8 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * Mirrors: `database.yml`'s `statement_limit` — read by Rails as
    * `config[:statement_limit]` in `SQLite3Adapter#initialize`.
    *
-   * @noRailsEquivalent `statement_limit` is a `database.yml` config key Rails reads as
+   * @noRailsEquivalent CONVERGEABLE (story: retire-public-statement-limit-accessor).
+   * `statement_limit` is a `database.yml` config key Rails reads as
    *   `config[:statement_limit]` in
    *   each adapter's `initialize` (abstract_mysql_adapter.rb, postgresql_adapter.rb,
    *   sqlite3_adapter.rb) — a config option, never a Ruby `def`, so there is nothing for the

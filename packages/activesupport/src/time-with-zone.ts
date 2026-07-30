@@ -934,7 +934,10 @@ export class TimeWithZone {
   /**
    * valueOf for comparison operators to work
    *
-   * @noRailsEquivalent JS primitive-coercion protocol — Ruby coerces through
+   * @noRailsEquivalent PERMANENT
+   *   (`vendor/rails/activesupport/lib/active_support/time_with_zone.rb:200, :469` — `def to_s` and
+   *   `def to_i` are the Ruby coercion hooks).
+   * JS primitive-coercion protocol — Ruby coerces through
    * to_s/to_i instead
    */
   valueOf(): number {

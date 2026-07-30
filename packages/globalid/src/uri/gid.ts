@@ -201,7 +201,10 @@ export class GID {
   /**
    * Unlike `parse`, this skips the argument checks.
    *
-   * @noRailsEquivalent URI::GID's public initializer comes from URI::Generic,
+   * @noRailsEquivalent PERMANENT (`vendor/globalid/lib/global_id/uri/gid.rb:7` — `class GID <
+   *   Generic` inherits the initializer from Ruby's stdlib `URI::Generic`, which is out of scope to
+   *   port).
+   * URI::GID's public initializer comes from URI::Generic,
    * so gid.rb declares none. TS has no URI base class to inherit it from, and
    * the ported Rails test `new returns invalid gid when not checking`
    * (uri_gid_test.rb) constructs one directly to bypass parse validation, so

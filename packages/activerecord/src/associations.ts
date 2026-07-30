@@ -52,7 +52,8 @@ export async function eagerLoadBang(): Promise<void> {
  * dependency cycle (associations → CP → Relation → Base →
  * associations) that forced the late-binding in the first place.
  *
- * @noRailsEquivalent trails-only ESM module-cycle escape hatch with no Rails
+ * @noRailsEquivalent CONVERGEABLE (story: retire-initialize-associations-module-cycle-hook).
+ * trails-only ESM module-cycle escape hatch with no Rails
  * analogue: `initialize_associations` is defined nowhere in the Rails source
  * (verified by grep over vendor/rails). The associations -> CollectionProxy ->
  * Relation -> Base -> associations cycle forces CollectionProxy registration to
@@ -351,7 +352,10 @@ export function registerModelConstant(name: string, model: typeof Base): void {
  *   `_subclasses`. STI on the parent must still be enabled explicitly via
  *   `Parent.inheritanceColumn = ...` — the array form does not set it.
  *
- * @noRailsEquivalent trails-only model registry with no Rails analogue:
+ * @noRailsEquivalent PERMANENT (`vendor/rails/activerecord/lib/active_record/reflection.rb:434,
+ *   :490` — `compute_class` is `name.constantize`; ESM has no constant namespace to walk and no
+ *   autoload hook).
+ * trails-only model registry with no Rails analogue:
  * `register_model` is defined nowhere in the Rails source (verified by grep over
  * vendor/rails). Ruby resolves an association's class through constant lookup —
  * Reflection#compute_class (reflection.rb:434 and :490) into Object.const_get,

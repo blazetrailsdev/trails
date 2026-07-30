@@ -166,7 +166,8 @@ export class Version {
    * Comparable operators — the only ones any caller uses — over the same
    * dotted-part comparison `<=>` performs.
    *
-   * @noRailsEquivalent Rails' `AbstractAdapter::Version` does `include Comparable` and defines only
+   * @noRailsEquivalent CONVERGEABLE (story: port-version-compare-and-retire-gte-lt).
+   * Rails' `AbstractAdapter::Version` does `include Comparable` and defines only
    *   `<=>`
    *   (abstract_adapter.rb:243-259); `>=` and `<` come from Comparable, so there is no `def gte` for
    *   the extractor to match. `gte`/`lt` are the TS spelling of those two Comparable operators over
@@ -768,7 +769,8 @@ export class AbstractAdapter implements Quoting {
    * does not exist. Concrete adapters override this with driver-specific checks.
    * The base implementation always returns false (safe default for custom adapters).
    *
-   * @noRailsEquivalent Rails recognizes the no-such-database condition inline at the connect site
+   * @noRailsEquivalent CONVERGEABLE (story: converge-no-database-error-to-connect-site).
+   * Rails recognizes the no-such-database condition inline at the connect site
    *   and raises
    *   `ActiveRecord::NoDatabaseError` there (postgresql_adapter.rb:63, sqlite3_adapter.rb:38,120) —
    *   there is no named predicate to mirror. trails needs the predicate separated from raising
@@ -1362,7 +1364,12 @@ export class AbstractAdapter implements Quoting {
     return `#<${this.constructor.name}:${hex} env_name=${q(envName)}${nameField} role=${q(this.role)}${shardField}>`;
   }
 
-  /** @noRailsEquivalent Node inspection hook — a JS runtime protocol, not a Rails method */
+  /**
+   * @noRailsEquivalent PERMANENT
+   *   (`vendor/rails/activerecord/lib/active_record/connection_adapters/abstract_adapter.rb:174` —
+   *   Ruby's inspection hook is `def inspect`, a plain method name already matched).
+   * Node inspection hook — a JS runtime protocol, not a Rails method
+   */
   [Symbol.for("nodejs.util.inspect.custom")](): string {
     return this.inspect();
   }
@@ -1395,7 +1402,8 @@ export class AbstractAdapter implements Quoting {
    * Adapters whose `ColumnMethods` list adds more (MySQL, PostgreSQL) override
    * this and append their own names to `super.columnMethodNames()`.
    *
-   * @noRailsEquivalent Rails spells this list as the `ColumnMethods` modules'
+   * @noRailsEquivalent CONVERGEABLE (story: mark-column-method-names-internal).
+   * Rails spells this list as the `ColumnMethods` modules'
    *   `define_column_methods` metaprogramming
    *   (abstract/schema_definitions.rb:324 plus the per-adapter ColumnMethods modules), not as a
    *   `def`, so the Ruby extractor records no counterpart. TypeScript has no `define_method`, so
@@ -1504,7 +1512,8 @@ export class AbstractAdapter implements Quoting {
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#schema_cache
    *
-   * @noRailsEquivalent Rails' `AbstractAdapter#schema_cache` returns the pool's bound reflection
+   * @noRailsEquivalent CONVERGEABLE (story: converge-schema-cache-getter-onto-bound-reflection).
+   * Rails' `AbstractAdapter#schema_cache` returns the pool's bound reflection
    *   handle
    *   (abstract_adapter.rb:298 → connection_pool.rb:285). trails' `schemaCache` getter returns the
    *   raw `SchemaCache` the adapter memoizes incidental introspection into, so the Rails-shaped bound

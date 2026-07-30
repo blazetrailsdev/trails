@@ -298,7 +298,12 @@ export class AdditionalValue {
     return String(this.value);
   }
 
-  /** @noRailsEquivalent JS primitive-coercion protocol — Ruby coerces through to_s/to_i instead */
+  /**
+   * @noRailsEquivalent PERMANENT
+   *   (`vendor/rails/activerecord/lib/active_record/encryption/extended_deterministic_queries.rb:134`
+   *   — Ruby's `AdditionalValue` declares no coercion method and inherits `Object#to_s`).
+   * JS primitive-coercion protocol — Ruby coerces through to_s/to_i instead
+   */
   valueOf(): unknown {
     return this.value;
   }

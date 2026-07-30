@@ -207,7 +207,11 @@ export function setBaseClass(modelClass: typeof Base): void {
  * falling back to the JS `name`. Rails' `self.name` for such a model is
  * `"ClothingItem::Used"` — the value STI/polymorphic `type` columns store.
  *
- * @noRailsEquivalent Ruby resolves a model's namespace through the constant path (`Module#name`,
+ * @noRailsEquivalent PERMANENT
+ *   (`vendor/rails/activerecord/lib/active_record/model_schema.rb:302-307` —
+ *   `full_table_name_prefix`/`full_table_name_suffix` reach the namespace through `module_parents`,
+ *   i.e. Ruby's object model; JS classes carry no module path).
+ * Ruby resolves a model's namespace through the constant path (`Module#name`,
  *   `Module#module_parents`) and reads a module-level `table_name_prefix`/`table_name_suffix` off the
  *   enclosing module object — see `full_table_name_prefix` in model_schema.rb:302-307. JS classes
  *   carry no module path and there are no module objects to respond to those readers, so trails
@@ -259,7 +263,11 @@ const moduleTableNameSuffixes = new Map<string, string>();
 /**
  * Register a module-level `table_name_prefix` (Ruby `def self.table_name_prefix`).
  *
- * @noRailsEquivalent Ruby resolves a model's namespace through the constant path (`Module#name`,
+ * @noRailsEquivalent PERMANENT
+ *   (`vendor/rails/activerecord/lib/active_record/model_schema.rb:302-307` —
+ *   `full_table_name_prefix` reads `table_name_prefix` off the enclosing module object; ESM has no
+ *   module objects to respond to it).
+ * Ruby resolves a model's namespace through the constant path (`Module#name`,
  *   `Module#module_parents`) and reads a module-level `table_name_prefix`/`table_name_suffix` off the
  *   enclosing module object — see `full_table_name_prefix` in model_schema.rb:302-307. JS classes
  *   carry no module path and there are no module objects to respond to those readers, so trails
@@ -274,7 +282,11 @@ export function registerModuleTableNamePrefix(moduleName: string, prefix: string
 /**
  * Register a module-level `table_name_suffix` (Ruby `def self.table_name_suffix`).
  *
- * @noRailsEquivalent Ruby resolves a model's namespace through the constant path (`Module#name`,
+ * @noRailsEquivalent PERMANENT
+ *   (`vendor/rails/activerecord/lib/active_record/model_schema.rb:302-307` —
+ *   `full_table_name_suffix` reads `table_name_suffix` off the enclosing module object; ESM has no
+ *   module objects to respond to it).
+ * Ruby resolves a model's namespace through the constant path (`Module#name`,
  *   `Module#module_parents`) and reads a module-level `table_name_prefix`/`table_name_suffix` off the
  *   enclosing module object — see `full_table_name_prefix` in model_schema.rb:302-307. JS classes
  *   carry no module path and there are no module objects to respond to those readers, so trails
@@ -374,7 +386,9 @@ export function demodulize(name: string): string {
  * Mirrors the implicit subclass registration Rails does via Ruby's
  * inherited hook.
  *
- * @noRailsEquivalent Stands in for Ruby's `inherited` hook (inheritance.rb:287), which Rails uses
+ * @noRailsEquivalent PERMANENT (`vendor/rails/activerecord/lib/active_record/inheritance.rb:287` —
+ *   the `inherited` hook; JS has no class-definition hook).
+ * Stands in for Ruby's `inherited` hook (inheritance.rb:287), which Rails uses
  *   to register each subclass with the DescendantsTracker. TypeScript has no class-definition hook, so subclasses call
  *   `registerSubclass(Klass)` from a static initializer block instead. CLAUDE.md already routes Ruby
  *   lifecycle hooks to a no-TS-equivalent skip; SKIP_GROUPS is keyed by *Ruby* name and only

@@ -1131,7 +1131,12 @@ export class JoinDependency {
     this.nodes.forEach(callback);
   }
 
-  /** @noRailsEquivalent JS iteration protocol — Ruby reaches iteration through Enumerable#each */
+  /**
+   * @noRailsEquivalent PERMANENT
+   *   (`vendor/rails/activerecord/lib/active_record/associations/join_dependency.rb:158` — `def
+   *   each` forwarding to `join_root`).
+   * JS iteration protocol — Ruby reaches iteration through Enumerable#each
+   */
   [Symbol.iterator](): Iterator<JoinPart> {
     return this.nodes[Symbol.iterator]();
   }
