@@ -957,15 +957,14 @@ export class TableDefinition {
   readonly as?: string;
   readonly options?: string;
   readonly comment?: string;
-  readonly compositePrimaryKey?: string[];
-  private _id: boolean | PrimaryKeyType | IdHashOptions;
+  compositePrimaryKey?: string[];
   private _adapterName: "sqlite" | "postgres" | "mysql";
   protected _adapter: SchemaQuoter;
 
   constructor(
     tableName: string,
     tdOptions: {
-      id?: boolean | PrimaryKeyType | IdHashOptions;
+      id?: boolean | ColumnType | IdHashOptions;
       primaryKey?: string | string[] | false;
       adapterName?: "sqlite" | "postgres" | "mysql";
       adapter?: SchemaQuoter;
@@ -994,77 +993,61 @@ export class TableDefinition {
     const pkFalse = tdOptions.primaryKey === false;
     const pkNameOverride =
       typeof tdOptions.primaryKey === "string" ? tdOptions.primaryKey : undefined;
-    if (hasCompositePk || pkFalse) {
-      this._id = false;
-    } else {
-      this._id = tdOptions.id ?? true;
-    }
     this.temporary = tdOptions.temporary ?? false;
     this.ifNotExists = tdOptions.ifNotExists ?? false;
     this.as = tdOptions.as;
     this.options = tdOptions.options;
     this.comment = tdOptions.comment;
-    if (hasCompositePk) {
-      this.compositePrimaryKey = tdOptions.primaryKey as string[];
-    }
-
-    // Mirrors Rails TableDefinition#set_primary_key: `if id && !as` — when a
-    // CTAS (`as: "SELECT ..."`) is used the SELECT defines the columns, so no
-    // auto-generated PK column should be emitted. Rails relies on this to keep
-    // `o.columns` empty in visit_TableDefinition when `as:` is set.
-    if (this._id !== false && !this.as) {
-      let pkType: ColumnType;
-      let pkOpts: ColumnOptions;
-      if (typeof this._id === "object" && this._id !== null && !Array.isArray(this._id)) {
-        // Hash form: id: { type: "string", collation: "utf8mb4_bin" }
-        // Mirrors Rails set_primary_key: outer options (incl. default) merge first,
-        // then id.except(:type) merges on top, so hash wins on collision.
-        const { type: idType, ...idRest } = this._id;
-        // Use truthiness so any falsy value (empty string, null) falls back, matching
-        // Rails' `id.delete(:type) || :primary_key`.
-        pkType = (idType || "primary_key") as string as ColumnType;
-        pkOpts = { primaryKey: true };
-        if (tdOptions.default !== undefined) pkOpts.default = tdOptions.default;
-        if (tdOptions.autoIncrement !== undefined) pkOpts.autoIncrement = tdOptions.autoIncrement;
-        // Merge id hash options (charset, collation, limit, etc.) but keep primaryKey: true.
-        // Mirrors Rails set_primary_key: outer options merge first, id hash merges on top
-        // (options.merge!(id.except(:type))), so id hash wins on collision.
-        Object.assign(pkOpts, idRest as Partial<ColumnOptions>);
-        pkOpts.primaryKey = true;
-      } else {
-        pkType = (typeof this._id === "string" ? this._id : "primary_key") as ColumnType;
-        pkOpts = { primaryKey: true };
-        if (tdOptions.default !== undefined) pkOpts.default = tdOptions.default;
-        if (tdOptions.autoIncrement !== undefined) pkOpts.autoIncrement = tdOptions.autoIncrement;
-      }
-      const pkName = pkNameOverride ?? globalGetPrimaryKey(singularize(tableName));
-      this.columns.push(this.newColumnDefinition(pkName, pkType, pkOpts));
-    }
+    const pkOptions: Record<string, unknown> = {};
+    if (tdOptions.default !== undefined) pkOptions.default = tdOptions.default;
+    if (tdOptions.autoIncrement !== undefined) pkOptions.autoIncrement = tdOptions.autoIncrement;
+    this.setPrimaryKey(
+      tableName,
+      // A composite primaryKey overrides `id: false`: Rails' guard would skip it,
+      // but trails' callers spell a composite PK as `id: false, primaryKey: [...]`.
+      hasCompositePk ? true : pkFalse ? false : (tdOptions.id ?? true),
+      hasCompositePk ? (tdOptions.primaryKey as string[]) : pkNameOverride,
+      pkOptions,
+    );
   }
 
-  /**
-   * @todo id parameter doesn't accept the hash form `{ type, collation, ... }` that
-   *   the constructor now supports. createTable doesn't call setPrimaryKey; if a
-   *   caller uses it directly with a hash-form id it must pre-process the hash.
-   */
   setPrimaryKey(
     tableName: string,
-    id: ColumnType | false,
-    primaryKey?: string,
-    _options: Record<string, unknown> = {},
+    id: boolean | ColumnType | IdHashOptions,
+    primaryKey?: string | string[] | false,
+    options: Record<string, unknown> = {},
   ): void {
-    // Remove all existing PK columns
+    // Rails has no equivalent: its set_primary_key only ever runs on a fresh
+    // definition, while trails also re-runs it over a definition rebuilt from an
+    // existing table (SQLite's copy-table path), which already carries the old PK.
     for (let i = this.columns.length - 1; i >= 0; i--) {
       if (this.columns[i].options.primaryKey) this.columns.splice(i, 1);
     }
 
-    // Mirrors Rails set_primary_key's `if id && !as` guard: CTAS tables have
-    // their columns defined by the SELECT, so never add a PK column.
-    if (id === false || this.as) return;
+    if (!id || this.as) return;
 
-    const pkName = primaryKey ?? globalGetPrimaryKey(singularize(tableName));
-    const pkType = typeof id === "string" ? id : "primary_key";
-    this.columns.unshift(this.newColumnDefinition(pkName, pkType, { primaryKey: true }));
+    // Rails' `primary_key || Base.get_primary_key(...)` — `||`, not `??`, so an
+    // explicit `primaryKey: false` still falls back to the conventional name.
+    const pk = primaryKey || globalGetPrimaryKey(singularize(tableName));
+
+    let pkOptions: ColumnOptions = { ...(options as Partial<ColumnOptions>) };
+    let pkType: ColumnType = typeof id === "string" ? id : "primary_key";
+    if (typeof id === "object" && id !== null) {
+      const { type, ...rest } = id;
+      pkOptions = { ...pkOptions, ...(rest as Partial<ColumnOptions>) };
+      // Rails' `id.fetch(:type, :primary_key)` is key-presence, not truthiness:
+      // an explicitly supplied falsy type is passed through, not defaulted.
+      pkType = "type" in id ? (type as ColumnType) : "primary_key";
+    }
+
+    if (Array.isArray(pk)) {
+      // Rails stores this as `@primary_keys = PrimaryKeyDefinition.new(pk)`; trails
+      // carries a composite PK on the definition itself, and `primaryKeys` is a
+      // reader over the built columns rather than Rails' writer.
+      this.compositePrimaryKey = pk;
+    } else {
+      this.primaryKey(pk, pkType, pkOptions);
+    }
   }
 
   primaryKeys(name?: string): string[] {

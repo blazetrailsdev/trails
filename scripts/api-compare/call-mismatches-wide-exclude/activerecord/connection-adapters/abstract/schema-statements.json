@@ -72,20 +72,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/schema-statements.ts",
-    "rubyName": "build_create_table_definition",
-    "call": "create_table_definition",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-statements.ts",
-    "rubyName": "build_create_table_definition",
-    "call": "set_primary_key",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-statements.ts",
     "rubyName": "bulk_change_table",
     "call": "partition",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -172,13 +158,6 @@
     "tsFile": "connection-adapters/abstract/schema-statements.ts",
     "rubyName": "create_join_table",
     "call": "reverse_merge!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-statements.ts",
-    "rubyName": "create_table",
-    "call": "build_create_table_definition",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

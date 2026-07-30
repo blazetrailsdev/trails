@@ -11,7 +11,7 @@
     "tsFile": "encryption/key-generator.ts",
     "rubyName": "generate_random_hex_key",
     "call": "generate_random_key",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Deferred (RFC 0072 activerecord-unrouted-privates-remaining-inventory): routing `generateRandomHexKey`/`generateRandomSecret` through `generateRandomKey` sits on top of a pre-existing return-type deviation (trails returns base64, Rails returns raw bytes). That deviation has to be settled first."
   },
   {
     "package": "activerecord",

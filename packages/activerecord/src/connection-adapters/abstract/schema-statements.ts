@@ -17,7 +17,6 @@ import {
   Table,
   AlterTable,
   IndexDefinition,
-  ColumnDefinition,
   AddColumnDefinition,
   ChangeColumnDefaultDefinition,
   CreateIndexDefinition,
@@ -247,7 +246,7 @@ export class SchemaStatements {
     name: string,
     optionsOrFn?:
       | {
-          id?: boolean | "uuid" | IdHashOptions;
+          id?: boolean | ColumnType | IdHashOptions;
           primaryKey?: string | string[] | false;
           force?: boolean | "cascade";
           ifNotExists?: boolean;
@@ -259,12 +258,14 @@ export class SchemaStatements {
           temporary?: boolean;
           as?: string;
           autoIncrement?: boolean;
+          limit?: number;
+          precision?: number;
         }
       | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
     let options: {
-      id?: boolean | "uuid" | IdHashOptions;
+      id?: boolean | ColumnType | IdHashOptions;
       primaryKey?: string | string[] | false;
       force?: boolean | "cascade";
       ifNotExists?: boolean;
@@ -276,6 +277,8 @@ export class SchemaStatements {
       temporary?: boolean;
       as?: string;
       autoIncrement?: boolean;
+      limit?: number;
+      precision?: number;
     } = {};
     let definer: ((t: TableDefinition) => void) | undefined;
 
@@ -312,16 +315,7 @@ export class SchemaStatements {
       this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, name);
     }
 
-    // Rails: `td = create_table_definition(...)` — dispatches to the adapter's
-    // dialect-specific TableDefinition (e.g. PostgreSQL::TableDefinition with
-    // range/hstore/jsonb column methods). Every real adapter mixes in
-    // SchemaStatements, so the optional method is always present here.
-    const td = this.adapter.createTableDefinition!(name, {
-      ...options,
-      adapterName: this.adapterName,
-      adapter: this.adapter,
-    });
-    if (definer) definer(td);
+    const td = this.buildCreateTableDefinition(name, options, definer);
 
     // Prime the cached database version before the visitor emits DDL: inline
     // `t.index order:` runs through SchemaCreation's synchronous
@@ -1605,27 +1599,44 @@ export class SchemaStatements {
   buildCreateTableDefinition(
     tableName: string,
     options: {
-      id?: boolean | "uuid" | false;
-      primaryKey?: string;
-      force?: boolean;
+      id?: boolean | ColumnType | IdHashOptions;
+      primaryKey?: string | string[] | false;
+      force?: boolean | "cascade";
       [key: string]: unknown;
     } = {},
     fn?: (td: TableDefinition) => void,
   ): TableDefinition {
-    const hasCustomPk = !!options.primaryKey && options.id !== false;
-    const td = new TableDefinition(tableName, {
-      id: hasCustomPk ? false : options.id,
+    const { id = true, primaryKey, force: _force, ...rest } = options;
+    const tdOptions: Record<string, unknown> = {};
+    for (const key of this.validTableDefinitionOptions()) {
+      if (rest[key] !== undefined) tdOptions[key] = rest[key];
+    }
+    const pkOptions: Record<string, unknown> = {};
+    for (const key of [...this.validPrimaryKeyOptions(), "autoIncrement"]) {
+      if (rest[key] !== undefined) pkOptions[key] = rest[key];
+    }
+
+    const ctdOptions = {
+      ...tdOptions,
+      id: false,
       adapterName: this.adapterName,
       adapter: this.adapter,
-    });
-    if (hasCustomPk) {
-      const pkType = (typeof options.id === "string" ? options.id : "primary_key") as ColumnType;
-      td.columns.unshift(
-        new ColumnDefinition(options.primaryKey as string, pkType, { primaryKey: true }),
-      );
-    }
-    if (fn) fn(td);
-    return td;
+    };
+    const tableDefinition = this.adapter.createTableDefinition
+      ? this.adapter.createTableDefinition(tableName, ctdOptions)
+      : this.createTableDefinition(tableName, ctdOptions);
+    tableDefinition.setPrimaryKey(
+      tableName,
+      // A composite primaryKey overrides `id: false`: Rails' guard would skip it,
+      // but trails' callers spell a composite PK as `id: false, primaryKey: [...]`.
+      Array.isArray(primaryKey) ? true : id,
+      primaryKey,
+      pkOptions,
+    );
+
+    if (fn) fn(tableDefinition);
+
+    return tableDefinition;
   }
 
   buildCreateJoinTableDefinition(

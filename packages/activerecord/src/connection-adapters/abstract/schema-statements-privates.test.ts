@@ -4,7 +4,7 @@ import {
   canRemoveIndexByName,
   indexNameForRemoveFrom,
 } from "./schema-statements.js";
-import { ForeignKeyDefinition } from "./schema-definitions.js";
+import { ForeignKeyDefinition, TableDefinition, type ColumnType } from "./schema-definitions.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 
 function makeStatements(adapterOverrides: Record<string, unknown> = {}) {
@@ -606,5 +606,145 @@ describe("tableExists NotImplementedError fallback", () => {
     });
 
     await expect(ss.tableExists("posts")).rejects.toThrow("connection lost");
+  });
+});
+
+describe("buildCreateTableDefinition routing", () => {
+  function pkColumn(td: TableDefinition) {
+    return td.columns.find((c) => c.options.primaryKey);
+  }
+
+  it("carries valid_primary_key_options through to the primary key column", () => {
+    const ss = makeStatements();
+
+    const td = ss.buildCreateTableDefinition("users", {
+      id: "integer",
+      limit: 8,
+      default: 0,
+      precision: 3,
+    });
+
+    expect(pkColumn(td)?.options).toMatchObject({ limit: 8, default: 0, precision: 3 });
+  });
+
+  it("carries valid_table_definition_options through to the table definition", () => {
+    const ss = makeStatements();
+
+    const td = ss.buildCreateTableDefinition("users", {
+      temporary: true,
+      ifNotExists: true,
+      as: undefined,
+      comment: "a table",
+      options: "ENGINE=InnoDB",
+    });
+
+    expect(td.temporary).toBe(true);
+    expect(td.ifNotExists).toBe(true);
+    expect(td.comment).toBe("a table");
+    expect(td.options).toBe("ENGINE=InnoDB");
+  });
+
+  it("expands the hash form of id onto the primary key column", () => {
+    const ss = makeStatements();
+
+    const td = ss.buildCreateTableDefinition("users", {
+      id: { type: "string", limit: 36, collation: "utf8mb4_bin" },
+    });
+
+    const pk = pkColumn(td);
+    expect(pk?.type).toBe("string");
+    expect(pk?.options).toMatchObject({ limit: 36, collation: "utf8mb4_bin" });
+  });
+
+  it("names the primary key column from the primaryKey option", () => {
+    const ss = makeStatements();
+
+    const td = ss.buildCreateTableDefinition("users", { id: "uuid", primaryKey: "guid" });
+
+    expect(pkColumn(td)?.name).toBe("guid");
+    expect(pkColumn(td)?.type).toBe("uuid");
+  });
+
+  it("records a composite primaryKey array instead of a primary key column", () => {
+    const ss = makeStatements();
+
+    const td = ss.buildCreateTableDefinition("orders", { primaryKey: ["shopId", "id"] });
+
+    expect(td.compositePrimaryKey).toEqual(["shopId", "id"]);
+    expect(pkColumn(td)).toBeUndefined();
+  });
+
+  it("builds the definition through the adapter's createTableDefinition", () => {
+    const marker = Symbol("dialect-td");
+    const createTableDefinition = vi.fn((name: string, options: Record<string, unknown>) => {
+      const td: any = new TableDefinition(name, options as any);
+      td[marker] = true;
+      return td;
+    });
+    const ss = makeStatements({ createTableDefinition });
+
+    const td = ss.buildCreateTableDefinition("users", { id: "bigint" });
+
+    expect(createTableDefinition).toHaveBeenCalledTimes(1);
+    expect((td as any)[marker]).toBe(true);
+    expect(pkColumn(td)?.type).toBe("bigint");
+  });
+
+  it("is the path createTable takes to build its definition", async () => {
+    const ss = makeStatements();
+    const spy = vi.spyOn(ss, "buildCreateTableDefinition");
+
+    // No teardown: `makeStatements` has a mocked `execute`, so no table is ever created.
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await ss.createTable("users", { id: "bigint", primaryKey: "guid", limit: 8 }, (t) => {
+      t.column("name", "string");
+    });
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    const td = spy.mock.results[0].value as TableDefinition;
+    expect(pkColumn(td)?.name).toBe("guid");
+    expect(pkColumn(td)?.options).toMatchObject({ limit: 8 });
+  });
+});
+
+describe("buildCreateTableDefinition primaryKey: false", () => {
+  it("still builds the conventional primary key column", () => {
+    const ss = makeStatements();
+
+    const td = ss.buildCreateTableDefinition("users", { primaryKey: false });
+
+    const pk = td.columns.find((c) => c.options.primaryKey);
+    expect(pk?.name).toBe("id");
+    expect(pk?.type).toBe("primary_key");
+  });
+
+  it("emits no primary key column when id is false", () => {
+    const ss = makeStatements();
+
+    const td = ss.buildCreateTableDefinition("users", { id: false, primaryKey: false });
+
+    expect(td.columns.find((c) => c.options.primaryKey)).toBeUndefined();
+  });
+});
+
+describe("buildCreateTableDefinition hash-form id type fetch", () => {
+  it("passes an explicitly supplied falsy type through instead of defaulting", () => {
+    const ss = makeStatements();
+
+    const td = ss.buildCreateTableDefinition("users", {
+      id: { type: "" as unknown as ColumnType, limit: 4 },
+    });
+
+    const pk = td.columns.find((c) => c.options.primaryKey);
+    expect(pk?.type).toBe("");
+    expect(pk?.options).toMatchObject({ limit: 4 });
+  });
+
+  it("defaults to primary_key only when the type key is absent", () => {
+    const ss = makeStatements();
+
+    const td = ss.buildCreateTableDefinition("users", { id: { limit: 4 } });
+
+    expect(td.columns.find((c) => c.options.primaryKey)?.type).toBe("primary_key");
   });
 });

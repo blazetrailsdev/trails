@@ -456,7 +456,7 @@ export abstract class Migration {
     name: string,
     optionsOrFn?:
       | {
-          id?: boolean | "uuid" | IdHashOptions;
+          id?: boolean | ColumnType | IdHashOptions;
           primaryKey?: string | string[] | false;
           force?: boolean | "cascade";
           ifNotExists?: boolean;
@@ -1708,7 +1708,7 @@ export class MigrationContext {
       primaryKey?: string | string[] | false;
       force?: boolean | "cascade";
       ifNotExists?: boolean;
-      id?: boolean | "uuid" | IdHashOptions;
+      id?: boolean | ColumnType | IdHashOptions;
       default?: unknown;
       options?: string;
       comment?: string;
