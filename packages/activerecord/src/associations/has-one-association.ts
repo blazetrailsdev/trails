@@ -475,8 +475,8 @@ export class HasOneAssociation extends SingularAssociation {
    * already cached as `this.target`. A no-op unless a *different*,
    * non-destroyed record was displaced.
    *
-   * The removal names `displaced` explicitly instead of parking it on
-   * `this.target` for the duration: the nested-attributes property setter is
+   * The removal reaches `displaced` through `pendingRemovalTarget` instead of
+   * parking it on `this.target` for the duration: the nested-attributes property setter is
    * synchronous and returns to its caller mid-removal, so a parked target would
    * be briefly observable as `assoc.target` reverting to the displaced record
    * (Rails' own nested-attributes tests read the new target right after the
@@ -499,12 +499,33 @@ export class HasOneAssociation extends SingularAssociation {
     if (!displaced) return;
     if ((displaced as { isDestroyed?: () => boolean }).isDestroyed?.()) return;
     if (sameRecord(displaced, this.target)) return;
+    const previous = this.pendingRemovalTarget;
+    this.pendingRemovalTarget = displaced;
     try {
-      await this.removeTargetBang((this.reflection.options.dependent as string) ?? "", displaced);
+      await this.removeTargetBang((this.reflection.options.dependent as string) ?? "");
     } catch (error) {
       this.target = displaced;
       throw error;
+    } finally {
+      this.pendingRemovalTarget = previous;
     }
+  }
+
+  /**
+   * The record a deferred `remove_target!` acts on, when it is not the cached
+   * target. Rails' `remove_target!` reads `self.target` unconditionally, and
+   * inside `replace`'s transaction that IS the displaced record — the shape
+   * `persistImmediate` preserves, where this stays null. The deferred
+   * displacement paths run after the replacement is already cached, so parking
+   * the displaced record here is what lets `removeTargetBang` keep Rails' arity:
+   * assigning `this.target` instead would be observable to synchronous readers
+   * across the removal's awaits (the nested-attributes writer returns to its
+   * caller mid-removal).
+   */
+  private pendingRemovalTarget: Base | null = null;
+
+  private removalTarget(): Base | null {
+    return this.pendingRemovalTarget ?? this.target;
   }
 
   /**
@@ -646,16 +667,8 @@ export class HasOneAssociation extends SingularAssociation {
     }
   }
 
-  private async removeTargetBang(
-    method: string,
-    // Rails' `remove_target!` always acts on `self.target`, which is still the
-    // displaced record inside `replace`'s transaction (persistImmediate keeps
-    // that shape, so it takes the default). Every deferred displacement path
-    // instead removes a record while `this.target` is already the replacement —
-    // flipping the cached target back mid-await is observable to synchronous
-    // readers — so `detachDisplacedTarget` names the record explicitly.
-    target: Base | null = this.target,
-  ): Promise<void> {
+  private async removeTargetBang(method: string): Promise<void> {
+    const target = this.removalTarget();
     if (!target) return;
     if (method === "delete") {
       await ((target as any).delete?.() ?? Promise.resolve());
