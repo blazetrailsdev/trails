@@ -27,10 +27,18 @@ describe("MessageEqualityTrails", () => {
     expect(new Message("hello").equals(new Message(Buffer.from("hellO")))).toBe(false);
   });
 
-  it("is not equal to a non-Message", () => {
-    expect(new Message("x").equals(null)).toBe(false);
-    expect(new Message("x").equals("x")).toBe(false);
-    expect(new Message("x").equals({ payload: "x", headers: new Properties() })).toBe(false);
+  it("compares any message-like object, without a class guard", () => {
+    const message = new Message("x");
+    message.addHeader("iv", "some iv");
+    expect(message.equals({ payload: "x", headers: new Properties({ iv: "some iv" }) })).toBe(true);
+    expect(message.equals({ payload: "x", headers: { iv: "some iv" } })).toBe(true);
+    expect(message.equals({ payload: "y", headers: { iv: "some iv" } })).toBe(false);
+    expect(message.equals({ payload: "x", headers: {} })).toBe(false);
+  });
+
+  it("raises on a value that carries no payload, as Ruby's NoMethodError does", () => {
+    expect(() => new Message("x").equals(null as never)).toThrow();
+    expect(() => new Message("x").equals("x" as never)).toThrow();
   });
 
   it("compares nested Messages in headers by value", () => {
@@ -58,6 +66,22 @@ describe("MessageEqualityTrails", () => {
     expect(new Properties({ a: "1", b: "2" }).equals(new Properties({ a: "1" }))).toBe(false);
     expect(new Properties().equals(new Properties())).toBe(true);
     expect(new Properties().equals(null)).toBe(false);
+  });
+
+  it("Properties#equals compares against the backing hash, not just a wrapper", () => {
+    expect(new Properties({ a: "1" }).equals({ a: "1" })).toBe(true);
+    expect(new Properties({ a: "1" }).equals({ a: "2" })).toBe(false);
+    expect(new Properties({ a: "1" }).equals({ b: "1" })).toBe(false);
+    expect(new Properties({ a: "1" }).equals({ a: "1", b: "2" })).toBe(false);
+    expect(new Properties({ a: "1", b: "2" }).equals({ a: "1" })).toBe(false);
+    expect(new Properties().equals({})).toBe(true);
+    expect(new Properties({ a: "1" }).equals(new Map([["a", "1"]]))).toBe(true);
+  });
+
+  it("Properties#equals is false for a value Ruby's Hash#== rejects outright", () => {
+    expect(new Properties({ a: "1" }).equals("a")).toBe(false);
+    expect(new Properties({ a: "1" }).equals(5)).toBe(false);
+    expect(new Properties({ a: "1" }).equals(new Message("a"))).toBe(false);
   });
 
   it("Properties#equals compares raw header bytes on value", () => {

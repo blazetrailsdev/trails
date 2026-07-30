@@ -17,11 +17,10 @@ export class Message {
     this.headers = new Properties();
   }
 
-  equals(other: unknown): boolean {
-    if (!(other instanceof Message)) return false;
+  equals(otherMessage: { payload: string | Buffer; headers: Properties | object }): boolean {
     return (
-      Buffer.from(this.payload).equals(Buffer.from(other.payload)) &&
-      this.headers.equals(other.headers)
+      Buffer.from(this.payload).equals(Buffer.from(otherMessage.payload)) &&
+      this.headers.equals(otherMessage.headers)
     );
   }
 

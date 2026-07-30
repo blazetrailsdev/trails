@@ -21,11 +21,12 @@ export class Properties {
   }
 
   equals(other: unknown): boolean {
-    if (!(other instanceof Properties)) return false;
-    if (this._data.size !== other._data.size) return false;
-    for (const [key, value] of this._data) {
-      if (!other._data.has(key)) return false;
-      if (!valuesEqual(value, other._data.get(key))) return false;
+    const otherEntries = hashEntriesOf(other);
+    if (otherEntries === null) return false;
+    if (this._data.size !== otherEntries.length) return false;
+    for (const [key, value] of otherEntries) {
+      if (!this._data.has(key)) return false;
+      if (!valuesEqual(this._data.get(key), value)) return false;
     }
     return true;
   }
@@ -139,6 +140,16 @@ export class Properties {
   private get data(): Map<string, unknown> {
     return this._data;
   }
+}
+
+/** @internal */
+function hashEntriesOf(value: unknown): [string, unknown][] | null {
+  if (value instanceof Properties) return [...value.entries()];
+  if (value instanceof Map) return [...(value as Map<string, unknown>).entries()];
+  if (typeof value !== "object" || value === null) return null;
+  const proto = Object.getPrototypeOf(value) as object | null;
+  if (proto !== Object.prototype && proto !== null) return null;
+  return Object.entries(value);
 }
 
 /** @internal */
