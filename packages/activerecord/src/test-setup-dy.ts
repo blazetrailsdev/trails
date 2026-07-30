@@ -55,11 +55,9 @@ const mysqlExclusive = adapter === "mysql" && !!getEnv("AR_MYSQL_EXCLUSIVE_DB");
 const { recordBootLaidTables, resetTestTables } = await import("./support/drop-all-tables.js");
 const { loadSchema } = await import("./support/load-schema-helper.js");
 
-// `load_schema_helper.rb:4-21`, both arms, through the one entry point the
-// template build and the adapter clusters also use. Only the canonical arm
-// differs here: this worker's DB has to be purged/reconstructed first, which
-// Rails' single-process suite never does, so `DatabaseTasks` lays schema.rb's
-// mirror instead of `loadCanonicalSchema`.
+// `load_schema_helper.rb:4-21`, both arms. Only the canonical arm differs from
+// the template build's: this worker's DB has to be purged/reconstructed first,
+// which Rails' single-process suite never does.
 await loadSchema(async () => {
   if (
     (adapter === "sqlite" && envConfig.database !== ":memory:") ||
@@ -83,13 +81,11 @@ await loadSchema(async () => {
   return canonicalConn;
 });
 
-// Permanent worker-startup assertion: key canonical tables and at least one
-// `<adapter>_specific_schema.rb` table (`defaults`, the one table all three
-// adapter arms lay) must exist after the schema load. Failure here means an arm
-// of the load path is broken, not just the signature cache — and it surfaces at
-// worker startup instead of as a per-file "relation does not exist". Cast
-// because tableExists is on the concrete adapter class, not the DatabaseAdapter
-// interface.
+// Permanent worker-startup assertion: a broken arm of the load path fails here
+// rather than as a per-file "relation does not exist". `defaults` is the one
+// table all three `<adapter>_specific_schema.rb` arms lay, so it covers the
+// second arm. Cast because tableExists is on the concrete adapter class, not
+// the DatabaseAdapter interface.
 const _conn = (await Base.leaseConnection()) as unknown as {
   tableExists(n: string): Promise<boolean>;
 };

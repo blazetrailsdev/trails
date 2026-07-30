@@ -17,9 +17,7 @@ describe("boot-laid table snapshot", () => {
   it("survives the reset for every table the adapter-specific arm lays", async () => {
     const adapter = Base.connection;
 
-    // The canonical half is already on this worker's DB, so the arm passed here
-    // lays nothing and just hands `loadSchema` the connection to run the
-    // adapter-specific arm on.
+    // The canonical half is already on this worker's DB, so the arm lays nothing.
     await loadSchema(async () => adapter);
     const bookkeeping = new Set(["schema_migrations", "ar_internal_metadata"]);
     const laid = (await adapter.tables()).filter((name) => !bookkeeping.has(name));

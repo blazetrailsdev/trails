@@ -515,18 +515,14 @@ const ADAPTER_SPECIFIC_SCHEMAS: Record<string, (adapter: DatabaseAdapter) => Pro
  *   every migration line, whereas laying the schema through the adapter prints
  *   nothing.
  *
- * Deviation, and why it is a parameter rather than a second entry point: trails
- * lays the canonical half through two different mechanisms depending on the
- * lane — `loadCanonicalSchema` (the sqlite/PG template build, the adapter
- * clusters) and `DatabaseTasks.reconstructFromSchema`/`loadSchema` on a
- * generated schema file (`test-setup-dy.ts`, the per-worker DB every ordinary
- * AR test actually rides, which also has to purge). Rails has one mechanism and
- * so needs no such seam. Passing the canonical arm in keeps both lanes inside
- * this one function, so the two arms of `load_schema` cannot be applied to one
- * path and not the other — the bug PR #5523 found. The thunk returns the
- * connection the adapter-specific arm should run on because the
- * `DatabaseTasks` path swaps the pool underneath it (`withTemporaryPool`), so
- * the caller cannot lease it up front.
+ * Deviation — the optional canonical arm: trails lays schema.rb's mirror through
+ * two mechanisms, `loadCanonicalSchema` (template build, adapter clusters) and
+ * `DatabaseTasks` on a generated schema file (`test-setup-dy.ts`, which also has
+ * to purge). Rails has one mechanism and needs no such seam. Taking the arm as a
+ * parameter keeps both lanes inside this one function, so the two arms of
+ * `load_schema` cannot be applied to one path and not the other — the bug PR
+ * #5523 found. The thunk returns the connection because the `DatabaseTasks` path
+ * swaps the pool underneath it (`withTemporaryPool`).
  *
  * @internal Boot/template setup paths only. Test files wire the canonical schema
  * + fixtures through `fixtures({ ... })`; the
