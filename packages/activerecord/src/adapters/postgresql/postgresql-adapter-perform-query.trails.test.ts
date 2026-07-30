@@ -28,7 +28,12 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
   });
 
   function preventWrites(a: PostgreSQLAdapter): void {
-    (a as PostgreSQLAdapter & { pool: { preventWrites?: boolean } }).pool = { preventWrites: true };
+    (
+      a as PostgreSQLAdapter & { pool: { preventWrites?: boolean; connectionDescriptor?: unknown } }
+    ).pool = {
+      preventWrites: true,
+      connectionDescriptor: { name: "ActiveRecord::Base" },
+    };
   }
 
   it("execute runs a non-row-returning statement and returns no rows", async () => {

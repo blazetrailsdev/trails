@@ -20,12 +20,20 @@ describeIfPg("PostgreSQLAdapter", () => {
   // isPreventingWrites() checks pool.preventWrites before _config, and pool
   // is a public property — safer than reaching into protected _config.
   function preventWrites(a: PostgreSQLAdapter): void {
-    (a as PostgreSQLAdapter & { pool: { preventWrites?: boolean } }).pool = { preventWrites: true };
+    (
+      a as PostgreSQLAdapter & { pool: { preventWrites?: boolean; connectionDescriptor?: unknown } }
+    ).pool = {
+      preventWrites: true,
+      connectionDescriptor: { name: "ActiveRecord::Base" },
+    };
   }
 
   function allowWrites(a: PostgreSQLAdapter): void {
-    (a as PostgreSQLAdapter & { pool: { preventWrites?: boolean } }).pool = {
+    (
+      a as PostgreSQLAdapter & { pool: { preventWrites?: boolean; connectionDescriptor?: unknown } }
+    ).pool = {
       preventWrites: false,
+      connectionDescriptor: { name: "ActiveRecord::Base" },
     };
   }
 

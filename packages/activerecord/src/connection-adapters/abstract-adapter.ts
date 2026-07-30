@@ -1416,6 +1416,7 @@ export class AbstractAdapter implements Quoting {
 
   isPreventingWrites(): boolean {
     if (this.isReplica()) return true;
+    if (this.connectionDescriptor === null) return false;
     const pool = this.pool as any;
     if (pool?.preventWrites === true) return true;
     if (pool?.dbConfig?.preventWrites === true) return true;
