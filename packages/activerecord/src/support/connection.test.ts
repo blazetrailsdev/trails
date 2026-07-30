@@ -42,10 +42,12 @@ describe("connect", () => {
 
   it("gives arunit2 its own database and disables prepared statements on the third entry", async () => {
     vi.stubEnv("ARCONN", "postgresql");
+    vi.stubEnv("AR_TEST_RUN_TOKEN", "");
+    vi.stubEnv("AR_DB_SLOT", "1");
     const { configurationHashes } = await testConfigurationHashes();
     const [arunit, arunit2, withoutPrepared] = configurationHashes;
     expect(arunit2.database).not.toBe(arunit.database);
-    expect(arunit2.database).toMatch(/^activerecord_unittest2(_\d+)?$/);
+    expect(arunit2.database).toBe("activerecord_unittest2");
     expect(withoutPrepared.database).toBe(arunit.database);
     expect(withoutPrepared.configurationHash.preparedStatements).toBe(false);
   });
