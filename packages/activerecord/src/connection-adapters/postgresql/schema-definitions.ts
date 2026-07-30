@@ -792,8 +792,10 @@ export class Table extends AbstractTable {
   ): Promise<void>;
   async enum(...args: unknown[]): Promise<void> {
     const { names, options } = splitColumnNames(args, "enum");
-    const { enum_type: enumType, ...rest } = options as ColumnOptions & { enum_type: string };
-    for (const name of names) await this.column(name, enumType as ColumnType, rest);
+    const { enum_type: enumType, ...rest } = options as ColumnOptions & { enum_type?: string };
+    for (const name of names) {
+      await this.column(name, "enum" as ColumnType, { ...rest, enumType } as ColumnOptions);
+    }
   }
 
   /** @internal */

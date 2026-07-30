@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { PostgreSQLSchemaStatements } from "./schema-statements-class.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 
@@ -214,5 +215,21 @@ describe("PostgreSQLSchemaStatements sequenceNameFromParts identifier budget", (
     const { adapter } = makeAdapter({ maxIdentifierLength: 31 });
     const ss = new PostgreSQLSchemaStatements(adapter);
     expect(ss.sequenceNameFromParts("things", "id", "seq")).toBe("things_id_seq");
+  });
+});
+
+describe("PostgreSQLSchemaStatements#typeToSql enum validation", () => {
+  it("resolves an enum column to its enum type", () => {
+    const { adapter } = makeAdapter();
+    const ss = new PostgreSQLSchemaStatements(adapter);
+    expect(ss.typeToSql("enum", { enumType: "color" })).toBe("color");
+  });
+
+  it("raises ArgumentError when enum_type is absent", () => {
+    const { adapter } = makeAdapter();
+    const ss = new PostgreSQLSchemaStatements(adapter);
+    expect(() => ss.typeToSql("enum")).toThrow(
+      new ArgumentError("enum_type is required for enums"),
+    );
   });
 });
