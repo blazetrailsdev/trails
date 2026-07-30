@@ -1,5 +1,9 @@
+import * as fs from "fs/promises";
+import * as path from "path";
+import { fileURLToPath } from "url";
 import { RuleTester } from "eslint";
-import rule from "./no-internal-canonical-loaders.mjs";
+import { describe, it, expect } from "vitest";
+import rule, { BANNED, isCanonicalSchemaModule } from "./no-internal-canonical-loaders.mjs";
 
 const FILENAME = "packages/activerecord/src/dirty.test.ts";
 const OWN_TEST = "packages/activerecord/src/support/canonical-schema.test.ts";
@@ -90,4 +94,55 @@ tester.run("no-internal-canonical-loaders", rule, {
       ],
     },
   ],
+});
+
+// Guard: the rule's module matcher is a literal basename list, and a banned
+// symbol imported from an unmatched module is simply not reported — so a file
+// move that relocates a loader would reopen the ban with no lint error and no
+// failing test. This reads the real support/ tree and fails when a module
+// exports a BANNED symbol the matcher does not match.
+const supportDir = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "packages",
+  "activerecord",
+  "src",
+  "support",
+);
+
+/** Names exported by `source`, for the export forms used in support/. */
+function exportedNames(source) {
+  const names = new Set();
+  for (const [, name] of source.matchAll(
+    /^export\s+(?:declare\s+)?(?:async\s+)?(?:function\*?|const|let|var|class)\s+([A-Za-z_$][\w$]*)/gm,
+  )) {
+    names.add(name);
+  }
+  for (const [, clause] of source.matchAll(/^export\s*\{([^}]*)\}/gm)) {
+    for (const entry of clause.split(",")) {
+      const parts = entry.trim().split(/\s+as\s+/);
+      const name = (parts[1] ?? parts[0] ?? "").trim();
+      if (name) names.add(name);
+    }
+  }
+  return names;
+}
+
+describe("no-internal-canonical-loaders module matcher", () => {
+  it("matches every support/ module that exports a banned loader", async () => {
+    const unmatched = [];
+    for (const entry of await fs.readdir(supportDir, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith(".ts") || entry.name.endsWith(".test.ts")) {
+        continue;
+      }
+      const source = await fs.readFile(path.join(supportDir, entry.name), "utf8");
+      const exported = [...exportedNames(source)].filter((name) => BANNED.has(name));
+      if (exported.length === 0) continue;
+      const specifier = `./${entry.name.replace(/\.ts$/, ".js")}`;
+      if (!isCanonicalSchemaModule(specifier)) {
+        unmatched.push(`${entry.name} exports ${exported.sort().join(", ")}`);
+      }
+    }
+    expect(unmatched).toEqual([]);
+  });
 });
