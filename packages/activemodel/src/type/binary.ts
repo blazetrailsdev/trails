@@ -97,4 +97,33 @@ export class Data {
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
   }
+
+  /**
+   * Mirrors: Data#== (binary.rb:56) — `other == to_s || super`.
+   *
+   * Ruby's left arm compares `other` against the raw binary String, so it is a
+   * BYTE comparison; another `Data` recurses one level and lands on
+   * `String#==`, again on bytes. Our `toString()` UTF-8-decodes and is lossy
+   * (`de ad be ef` → U+FFFD replacements), so the port must walk `bytes`
+   * rather than route through it. `Uint8Array` is our stand-in for a
+   * binary-encoded Ruby String (see the constructor), and a `string` is
+   * encoded to compare on the same footing.
+   *
+   * The `|| super` arm — `Object#==`, identity — needs no separate case: an
+   * identical `Data` already matches byte-for-byte, and anything that is
+   * neither a byte source nor a string can never be identical to a `Data`.
+   */
+  equals(other: unknown): boolean {
+    let otherBytes: Uint8Array;
+    if (other instanceof Data) otherBytes = other.bytes;
+    else if (other instanceof Uint8Array) otherBytes = other;
+    else if (typeof other === "string") otherBytes = textEncoder.encode(other);
+    else return false;
+
+    if (this.bytes.length !== otherBytes.length) return false;
+    for (let i = 0; i < this.bytes.length; i++) {
+      if (this.bytes[i] !== otherBytes[i]) return false;
+    }
+    return true;
+  }
 }

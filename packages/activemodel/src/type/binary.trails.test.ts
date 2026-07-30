@@ -25,4 +25,33 @@ describe("BinaryTypeTrails", () => {
     expect(result).toBeInstanceOf(BinaryData);
     expect(result!.bytes).toEqual(bytes);
   });
+
+  it("Data#equals compares bytes, not the decoded string", () => {
+    // binary.rb:56 `other == to_s || super` compares against the raw binary
+    // String, so it is a byte comparison. Routing through our `toString()`
+    // instead would UTF-8-decode: both of these byte strings decode to a pair
+    // of U+FFFD replacements and would wrongly compare equal.
+    const a = new BinaryData(new Uint8Array([0x80, 0x81]));
+    const b = new BinaryData(new Uint8Array([0x82, 0x83]));
+    expect(a.equals(b)).toBe(false);
+    expect(a.equals(new BinaryData(new Uint8Array([0x80, 0x81])))).toBe(true);
+  });
+
+  it("Data#equals accepts the byte sources that stand in for a Ruby String", () => {
+    const data = new BinaryData("hello");
+    expect(data.equals("hello")).toBe(true);
+    expect(data.equals(new Uint8Array([0x68, 0x65, 0x6c, 0x6c, 0x6f]))).toBe(true);
+    expect(data.equals("hell")).toBe(false);
+    expect(data.equals("hellO")).toBe(false);
+  });
+
+  it("Data#equals is false for values Ruby would fall through to identity on", () => {
+    // The `|| super` arm is Object#== — identity — so a non-string, non-byte
+    // `other` can never match.
+    const data = new BinaryData("1");
+    expect(data.equals(1)).toBe(false);
+    expect(data.equals(null)).toBe(false);
+    expect(data.equals(undefined)).toBe(false);
+    expect(data.equals(data)).toBe(true);
+  });
 });

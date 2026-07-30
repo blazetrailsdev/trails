@@ -17,6 +17,26 @@ export class Message {
     this.headers = new Properties();
   }
 
+  /**
+   * Mirrors: Message#== (message.rb:21) —
+   * `payload == other_message.payload && headers == other_message.headers`.
+   *
+   * Rails takes `other_message` untyped and would `NoMethodError` on anything
+   * else; a `false` for a non-Message is the closer analogue of the `==` a
+   * caller like `assert_equal` expects here.
+   *
+   * The payload is Ruby's one binary String, which trails splits into
+   * `string` (text) and `Buffer` (raw cipher bytes) — both stand in for the
+   * same Ruby value, so they compare on bytes rather than by JS type.
+   */
+  equals(other: unknown): boolean {
+    if (!(other instanceof Message)) return false;
+    return (
+      Buffer.from(this.payload).equals(Buffer.from(other.payload)) &&
+      this.headers.equals(other.headers)
+    );
+  }
+
   addHeader(key: string, value: unknown): void {
     this.headers.set(key, value);
   }

@@ -109,6 +109,39 @@ export class Column {
   }
 
   /**
+   * Value equality over the attributes Rails compares.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::Column#== (column.rb:75)
+   *
+   * The guard is `other.is_a?(Column)`, NOT `self.class == other.class`, so a
+   * subclass instance can equal a base one from the base receiver's side —
+   * subclass `==` narrows the guard to its own class and calls `super`.
+   *
+   * `primaryKey` is deliberately absent: Rails' Column has no such attribute
+   * (it is a trails-side flag), so comparing it would diverge.
+   *
+   * Ruby aliases `eql?` to this and pairs it with `hash` (column.rb:87); both
+   * are in api-compare's `SKIP_GROUPS` as Ruby value-protocol methods with no
+   * meaningful TS surface, so `equals` is the whole port.
+   */
+  equals(other: unknown): boolean {
+    return (
+      other instanceof Column &&
+      this.name === other.name &&
+      // Reflected defaults are primitives or null in trails (the adapters
+      // stringify before constructing the Column), so `===` stands in for
+      // Ruby's `==`; `?? null` keeps an absent default from splitting into
+      // distinct null/undefined values the way Ruby's single nil cannot.
+      (this.default ?? null) === (other.default ?? null) &&
+      metadataEquals(this.sqlTypeMetadata, other.sqlTypeMetadata) &&
+      this.null === other.null &&
+      this.defaultFunction === other.defaultFunction &&
+      this.collation === other.collation &&
+      this.comment === other.comment
+    );
+  }
+
+  /**
    * Whether this is a virtual/generated column.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::Column#virtual?
@@ -160,6 +193,17 @@ export class Column {
   toString(): string {
     return this.name;
   }
+}
+
+/**
+ * Ruby's `sql_type_metadata == other.sql_type_metadata` (column.rb:79) works on
+ * nil too, where a TS `null` has no `equals` to call.
+ *
+ * @internal
+ */
+function metadataEquals(a: SqlTypeMetadata | null, b: SqlTypeMetadata | null): boolean {
+  if (a === null || b === null) return a === b;
+  return a.equals(b);
 }
 
 export interface ColumnJSON {
