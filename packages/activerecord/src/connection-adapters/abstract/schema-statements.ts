@@ -17,7 +17,6 @@ import {
   Table,
   AlterTable,
   IndexDefinition,
-  ColumnDefinition,
   AddColumnDefinition,
   ChangeColumnDefaultDefinition,
   CreateIndexDefinition,
@@ -247,7 +246,7 @@ export class SchemaStatements {
     name: string,
     optionsOrFn?:
       | {
-          id?: boolean | "uuid" | IdHashOptions;
+          id?: boolean | ColumnType | IdHashOptions;
           primaryKey?: string | string[] | false;
           force?: boolean | "cascade";
           ifNotExists?: boolean;
@@ -259,12 +258,14 @@ export class SchemaStatements {
           temporary?: boolean;
           as?: string;
           autoIncrement?: boolean;
+          limit?: number;
+          precision?: number;
         }
       | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
     let options: {
-      id?: boolean | "uuid" | IdHashOptions;
+      id?: boolean | ColumnType | IdHashOptions;
       primaryKey?: string | string[] | false;
       force?: boolean | "cascade";
       ifNotExists?: boolean;
@@ -276,6 +277,8 @@ export class SchemaStatements {
       temporary?: boolean;
       as?: string;
       autoIncrement?: boolean;
+      limit?: number;
+      precision?: number;
     } = {};
     let definer: ((t: TableDefinition) => void) | undefined;
 
@@ -312,16 +315,11 @@ export class SchemaStatements {
       this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, name);
     }
 
-    // Rails: `td = create_table_definition(...)` — dispatches to the adapter's
-    // dialect-specific TableDefinition (e.g. PostgreSQL::TableDefinition with
-    // range/hstore/jsonb column methods). Every real adapter mixes in
-    // SchemaStatements, so the optional method is always present here.
-    const td = this.adapter.createTableDefinition!(name, {
-      ...options,
-      adapterName: this.adapterName,
-      adapter: this.adapter,
-    });
-    if (definer) definer(td);
+    // Rails: `td = build_create_table_definition(table_name, id:, primary_key:, **options, &block)`
+    // — which in turn dispatches to the adapter's dialect-specific
+    // TableDefinition (e.g. PostgreSQL::TableDefinition with range/hstore/jsonb
+    // column methods) and routes the primary key through `set_primary_key`.
+    const td = this.buildCreateTableDefinition(name, options, definer);
 
     // Prime the cached database version before the visitor emits DDL: inline
     // `t.index order:` runs through SchemaCreation's synchronous
@@ -1602,28 +1600,53 @@ export class SchemaStatements {
     return this.viewExists(name);
   }
 
+  /**
+   * Mirrors Rails `abstract/schema_statements.rb:333`. The two `options.extract!`
+   * calls are what split the hash: `valid_table_definition_options` reach the
+   * TableDefinition constructor, `valid_primary_key_options` reach
+   * `set_primary_key` and land on the PK column. Building the definition through
+   * `createTableDefinition` (rather than `new TableDefinition`) is what makes the
+   * adapter's own TableDefinition subclass — and therefore its dialect column
+   * methods — available inside the block.
+   */
   buildCreateTableDefinition(
     tableName: string,
     options: {
-      id?: boolean | "uuid" | false;
-      primaryKey?: string;
-      force?: boolean;
+      id?: boolean | ColumnType | IdHashOptions;
+      primaryKey?: string | string[] | false;
+      force?: boolean | "cascade";
       [key: string]: unknown;
     } = {},
     fn?: (td: TableDefinition) => void,
   ): TableDefinition {
-    const hasCustomPk = !!options.primaryKey && options.id !== false;
-    const td = new TableDefinition(tableName, {
-      id: hasCustomPk ? false : options.id,
+    const { id = true, primaryKey, force: _force, ...rest } = options;
+    const tdOptions: Record<string, unknown> = {};
+    for (const key of this.validTableDefinitionOptions()) {
+      if (rest[key] !== undefined) tdOptions[key] = rest[key];
+    }
+    const pkOptions: Record<string, unknown> = {};
+    // `autoIncrement` is not in Rails' valid_primary_key_options (it is MySQL's
+    // addition), but createTable has always accepted it dialect-agnostically.
+    for (const key of [...this.validPrimaryKeyOptions(), "autoIncrement"]) {
+      if (rest[key] !== undefined) pkOptions[key] = rest[key];
+    }
+
+    // `id: false` because Rails' create_table_definition never sees `:id` — the
+    // primary key is added afterwards by set_primary_key. Trails' constructor
+    // would otherwise build (and we would immediately discard) a default PK.
+    const ctdOptions = {
+      ...tdOptions,
+      id: false,
       adapterName: this.adapterName,
       adapter: this.adapter,
-    });
-    if (hasCustomPk) {
-      const pkType = (typeof options.id === "string" ? options.id : "primary_key") as ColumnType;
-      td.columns.unshift(
-        new ColumnDefinition(options.primaryKey as string, pkType, { primaryKey: true }),
-      );
-    }
+    };
+    const td = this.adapter.createTableDefinition
+      ? this.adapter.createTableDefinition(tableName, ctdOptions)
+      : this.createTableDefinition(tableName, ctdOptions);
+    // `primaryKey: false` is Rails' `id: false` spelling; a composite array PK is
+    // passed as both arguments so set_primary_key's `if id` guard stays satisfied.
+    const pkArg = primaryKey === false ? false : Array.isArray(primaryKey) ? primaryKey : id;
+    td.setPrimaryKey(tableName, pkArg, primaryKey === false ? undefined : primaryKey, pkOptions);
     if (fn) fn(td);
     return td;
   }

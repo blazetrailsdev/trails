@@ -1817,7 +1817,7 @@
     "tsFile": "relation.ts",
     "rubyName": "order",
     "call": "sanitize_order_arguments",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Deferred (RFC 0072 activerecord-unrouted-privates-remaining-inventory): `orderBang`/`reorderBang` inline `disallowRawSqlBang` in a restructured body, leaving `sanitizeOrderArguments` and `checkIfMethodHasArgumentsBang` dead. Routing them is a real convergence but a whole-body restructure of the order/reorder path — its own story, not part of this sweep."
   },
   {
     "package": "activerecord",
@@ -2006,7 +2006,7 @@
     "tsFile": "relation.ts",
     "rubyName": "reorder",
     "call": "sanitize_order_arguments",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Deferred (RFC 0072 activerecord-unrouted-privates-remaining-inventory): `orderBang`/`reorderBang` inline `disallowRawSqlBang` in a restructured body, leaving `sanitizeOrderArguments` and `checkIfMethodHasArgumentsBang` dead. Routing them is a real convergence but a whole-body restructure of the order/reorder path — its own story, not part of this sweep."
   },
   {
     "package": "activerecord",
