@@ -108,6 +108,19 @@ export class Column {
     return this.isAutoIncrementedByDb() || this.defaultFunction !== null;
   }
 
+  equals(other: unknown): boolean {
+    return (
+      other instanceof Column &&
+      this.name === other.name &&
+      (this.default ?? null) === (other.default ?? null) &&
+      metadataEquals(this.sqlTypeMetadata, other.sqlTypeMetadata) &&
+      this.null === other.null &&
+      this.defaultFunction === other.defaultFunction &&
+      this.collation === other.collation &&
+      this.comment === other.comment
+    );
+  }
+
   /**
    * Whether this is a virtual/generated column.
    *
@@ -160,6 +173,12 @@ export class Column {
   toString(): string {
     return this.name;
   }
+}
+
+/** @internal */
+function metadataEquals(a: SqlTypeMetadata | null, b: SqlTypeMetadata | null): boolean {
+  if (a === null || b === null) return a === b;
+  return a.equals(b);
 }
 
 export interface ColumnJSON {

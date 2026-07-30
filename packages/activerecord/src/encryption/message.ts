@@ -17,6 +17,13 @@ export class Message {
     this.headers = new Properties();
   }
 
+  equals(otherMessage: { payload: string | Buffer; headers: Properties | object }): boolean {
+    return (
+      Buffer.from(this.payload).equals(Buffer.from(otherMessage.payload)) &&
+      this.headers.equals(otherMessage.headers)
+    );
+  }
+
   addHeader(key: string, value: unknown): void {
     this.headers.set(key, value);
   }

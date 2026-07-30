@@ -97,4 +97,18 @@ export class Data {
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
   }
+
+  equals(other: unknown): boolean {
+    let otherBytes: Uint8Array;
+    if (other instanceof Data) otherBytes = other.bytes;
+    else if (other instanceof Uint8Array) otherBytes = other;
+    else if (typeof other === "string") otherBytes = textEncoder.encode(other);
+    else return false;
+
+    if (this.bytes.length !== otherBytes.length) return false;
+    for (let i = 0; i < this.bytes.length; i++) {
+      if (this.bytes[i] !== otherBytes[i]) return false;
+    }
+    return true;
+  }
 }

@@ -119,4 +119,13 @@ export class Column extends BaseColumn {
   get isEnum(): boolean {
     return this.sqlTypeMetadata?.type === "enum";
   }
+
+  override equals(other: unknown): boolean {
+    return (
+      other instanceof Column &&
+      super.equals(other) &&
+      this.isIdentity === other.isIdentity &&
+      this.isSerial === other.isSerial
+    );
+  }
 }

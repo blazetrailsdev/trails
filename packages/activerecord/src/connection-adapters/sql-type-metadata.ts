@@ -37,6 +37,17 @@ export class SqlTypeMetadata implements Deduplicable {
     this.scale = options.scale ?? null;
   }
 
+  equals(other: unknown): boolean {
+    return (
+      other instanceof SqlTypeMetadata &&
+      this.sqlType === other.sqlType &&
+      this.type === other.type &&
+      this.limit === other.limit &&
+      this.precision === other.precision &&
+      this.scale === other.scale
+    );
+  }
+
   deduplicateKey(): string {
     return JSON.stringify([this.sqlType, this.type, this.limit, this.precision, this.scale]);
   }

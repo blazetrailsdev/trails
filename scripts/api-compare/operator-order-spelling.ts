@@ -64,15 +64,39 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // connection_adapters/postgresql/type_metadata.rb:20 `def ==(other)` →
   // connection-adapters/postgresql/type-metadata.ts `equals`.
   "ActiveRecord::ConnectionAdapters::PostgreSQL::TypeMetadata": { "==": ["equals"] },
+  // connection_adapters/column.rb:75 `def ==(other)` →
+  // connection-adapters/column.ts `Column#equals`. The aliased `eql?` and the
+  // paired `hash` (:87) are SKIP_GROUPS members, so `==` is the only mapped
+  // member of the trio.
+  "ActiveRecord::ConnectionAdapters::Column": { "==": ["equals"] },
+  // connection_adapters/sql_type_metadata.rb:19 `def ==(other)` →
+  // connection-adapters/sql-type-metadata.ts `equals`.
+  "ActiveRecord::ConnectionAdapters::SqlTypeMetadata": { "==": ["equals"] },
+  // connection_adapters/postgresql/column.rb:64 `def ==(other)` →
+  // connection-adapters/postgresql/column.ts `Column#equals`.
+  "ActiveRecord::ConnectionAdapters::PostgreSQL::Column": { "==": ["equals"] },
+  // connection_adapters/sqlite3/column.rb:46 `def ==(other)` →
+  // connection-adapters/sqlite3/column.ts `Column#equals`.
+  "ActiveRecord::ConnectionAdapters::SQLite3::Column": { "==": ["equals"] },
+  // encryption/message.rb:21 `def ==(other_message)` →
+  // encryption/message.ts `equals`.
+  "ActiveRecord::Encryption::Message": { "==": ["equals"] },
+  // active_model/type/binary.rb:56 `def ==(other)` →
+  // activemodel/src/type/binary.ts `Data#equals`.
+  "ActiveModel::Type::Binary::Data": { "==": ["equals"] },
   // connection_adapters/postgresql/utils.rb:30 `def ==(o)` →
   // connection-adapters/postgresql/utils.ts `Name#equals`.
   "ActiveRecord::ConnectionAdapters::PostgreSQL::Name": { "==": ["equals"] },
   // connection_adapters/statement_pool.rb:23 `def [](key)` / :31 `def []=(sql, stmt)`
   // → connection-adapters/statement-pool.ts `get` / `set`.
   "ActiveRecord::ConnectionAdapters::StatementPool": { "[]": ["get"], "[]=": ["set"] },
-  // encryption/properties.rb:20 `delegate :[], to: :data` / :50 `def []=(key, value)`
-  // → encryption/properties.ts `get` / `set`.
-  "ActiveRecord::Encryption::Properties": { "[]": ["get"], "[]=": ["set"] },
+  // encryption/properties.rb:20 `delegate :==, :[], to: :data` / :50
+  // `def []=(key, value)` → encryption/properties.ts `equals` / `get` / `set`.
+  "ActiveRecord::Encryption::Properties": {
+    "==": ["equals"],
+    "[]": ["get"],
+    "[]=": ["set"],
+  },
   // abstract/schema_definitions.rb:421 `def [](name)` →
   // connection-adapters/abstract/schema-definitions.ts `TableDefinition#get`.
   "ActiveRecord::ConnectionAdapters::TableDefinition": { "[]": ["get"] },

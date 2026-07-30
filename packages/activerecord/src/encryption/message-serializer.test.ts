@@ -14,6 +14,7 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
     // strings; the consumer interprets them.
     expect(loaded.payload.toString()).toBe("hello");
     expect((loaded.headers.get("iv") as Buffer).toString()).toBe("test-iv");
+    expect(message.equals(loaded)).toBe(true);
   });
 
   it("serializes messages with nested messages in their headers", () => {
@@ -30,6 +31,7 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
     const nested = loaded.headers.get("nested") as Message;
     expect(nested).toBeInstanceOf(Message);
     expect(nested.payload.toString()).toBe("inner-payload");
+    expect(outer.equals(loaded)).toBe(true);
   });
 
   it("won't load classes from JSON", () => {

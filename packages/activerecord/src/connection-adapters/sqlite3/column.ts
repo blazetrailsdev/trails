@@ -64,4 +64,10 @@ export class Column extends BaseColumn {
   override get hasDefault(): boolean {
     return super.hasDefault && !this.isVirtual();
   }
+
+  override equals(other: unknown): boolean {
+    return (
+      other instanceof Column && super.equals(other) && this.autoIncrement === other.autoIncrement
+    );
+  }
 }

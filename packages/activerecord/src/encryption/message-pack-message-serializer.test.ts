@@ -23,7 +23,7 @@ describe("ActiveRecord::Encryption::MessagePackMessageSerializerTest", () => {
     message.headers.set("key_1", "1");
 
     const deserialized = serializer.load(serializer.dump(message));
-    expect(deserialized).toEqual(message);
+    expect(message.equals(deserialized)).toBe(true);
   });
 
   it("serializes messages with nested messages in their headers", () => {
@@ -34,7 +34,7 @@ describe("ActiveRecord::Encryption::MessagePackMessageSerializerTest", () => {
     message.headers.set("other_message", nested);
 
     const deserialized = serializer.load(serializer.dump(message));
-    expect(deserialized).toEqual(message);
+    expect(message.equals(deserialized)).toBe(true);
   });
 
   it("detects random data and raises a decryption error", () => {

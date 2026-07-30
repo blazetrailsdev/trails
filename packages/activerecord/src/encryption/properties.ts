@@ -20,6 +20,17 @@ export class Properties {
     }
   }
 
+  equals(other: unknown): boolean {
+    const otherEntries = hashEntriesOf(other);
+    if (otherEntries === null) return false;
+    if (this._data.size !== otherEntries.length) return false;
+    for (const [key, value] of otherEntries) {
+      if (!this._data.has(key)) return false;
+      if (!valuesEqual(this._data.get(key), value)) return false;
+    }
+    return true;
+  }
+
   get(key: string): unknown {
     return this._data.get(key);
   }
@@ -129,6 +140,38 @@ export class Properties {
   private get data(): Map<string, unknown> {
     return this._data;
   }
+}
+
+/** @internal */
+function hashEntriesOf(value: unknown): [string, unknown][] | null {
+  if (value instanceof Properties) return [...value.entries()];
+  if (value instanceof Map) return [...(value as Map<string, unknown>).entries()];
+  if (typeof value !== "object" || value === null) return null;
+  const proto = Object.getPrototypeOf(value) as object | null;
+  if (proto !== Object.prototype && proto !== null) return null;
+  return Object.entries(value);
+}
+
+/** @internal */
+function valuesEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (Buffer.isBuffer(a) || Buffer.isBuffer(b)) {
+    if (!isBinaryish(a) || !isBinaryish(b)) return false;
+    return Buffer.from(a as string | Buffer).equals(Buffer.from(b as string | Buffer));
+  }
+  if (typeof a === "object" && a !== null && typeof (a as Equatable).equals === "function") {
+    return (a as Equatable).equals(b);
+  }
+  return false;
+}
+
+interface Equatable {
+  equals(other: unknown): boolean;
+}
+
+/** @internal */
+function isBinaryish(value: unknown): boolean {
+  return typeof value === "string" || Buffer.isBuffer(value);
 }
 
 function _typeNameFor(value: unknown): string {
