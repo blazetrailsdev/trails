@@ -4,9 +4,8 @@
  * Mirrors: ActiveRecord::Migration::CommandRecorder
  */
 
-import { ArgumentError } from "@blazetrails/activemodel";
-import { underscore } from "@blazetrails/activesupport";
 import { IrreversibleMigration } from "../migration.js";
+import type { Table } from "../connection-adapters/abstract/schema-definitions.js";
 import {
   findJoinTableName as _findJoinTableName,
   joinTableName as _joinTableName,
@@ -108,8 +107,8 @@ export class CommandRecorder {
    */
   async changeTable(
     tableName: string,
-    fnOrOptions: ((t: RecorderTableProxy) => Promise<void> | void) | Record<string, unknown>,
-    fn?: (t: RecorderTableProxy) => Promise<void> | void,
+    fnOrOptions: ((t: Table) => Promise<void> | void) | Record<string, unknown>,
+    fn?: (t: Table) => Promise<void> | void,
   ): Promise<void> {
     const options: Record<string, unknown> = typeof fnOrOptions === "function" ? {} : fnOrOptions;
     const callback = typeof fnOrOptions === "function" ? fnOrOptions : fn;
@@ -118,33 +117,23 @@ export class CommandRecorder {
         "changeTable requires a callback. Rails change_table always takes a block.",
       );
     }
-    const supportsBulk =
-      typeof (this._delegate as any)?.supportsBulkAlter === "function" &&
-      (this._delegate as any).supportsBulkAlter() === true;
-
-    // Mirrors Rails: the adapter mixes its `ColumnMethods` module into the
-    // change_table proxy. `columnMethodNames()` exposes that explicit
-    // `define_column_methods` list (adapter-agnostic) — e.g. PG adds
-    // `serial`/`bigserial` beyond its native types.
     const delegate = this._delegate as {
-      columnMethodNames?(): string[];
-      nativeDatabaseTypes?(): Record<string, unknown>;
+      supportsBulkAlter?(): boolean;
+      updateTableDefinition(tableName: string, base: unknown): Table;
     };
-    const columnTypes =
-      delegate?.columnMethodNames?.() ?? Object.keys(delegate?.nativeDatabaseTypes?.() ?? {});
+    const supportsBulk =
+      typeof delegate?.supportsBulkAlter === "function" && delegate.supportsBulkAlter() === true;
 
     if (options["bulk"] && supportsBulk) {
       // Bulk path: sub-recorder captures commands, parent stores a single
       // changeTable entry that invertChangeTable knows how to flip.
       const sub = new CommandRecorder(this._delegate);
-      const proxy = withAdapterColumnMethods(new RecorderTableProxy(tableName, sub), columnTypes);
-      await callback(proxy);
+      await callback(delegate.updateTableDefinition(tableName, sub));
       this.record("changeTable", [tableName, sub.commands]);
     } else {
       // Non-bulk: route operations directly through this recorder so the
       // enclosing revert() block can invert them individually.
-      const proxy = withAdapterColumnMethods(new RecorderTableProxy(tableName, this), columnTypes);
-      await callback(proxy);
+      await callback(delegate.updateTableDefinition(tableName, this));
     }
   }
 
@@ -682,214 +671,59 @@ export class CommandRecorder {
   }
 }
 
-/**
- * Table proxy used inside CommandRecorder#changeTable blocks. Routes each
- * Table-style method call to recorder.record() so the parent recorder (or
- * revert block) can capture and optionally invert the individual operations.
- *
- * Mirrors: the Table object yielded by CommandRecorder#change_table in Rails
- * (non-bulk path: `yield delegate.update_table_definition(table_name, self)`).
- */
-export class RecorderTableProxy {
-  constructor(
-    private _tableName: string,
-    private _recorder: CommandRecorder,
-  ) {}
+/** Mirrors: ActiveRecord::Migration::CommandRecorder::ReversibleAndIrreversibleMethods */
+const REVERSIBLE_AND_IRREVERSIBLE_METHODS = [
+  "createTable",
+  "createJoinTable",
+  "renameTable",
+  "addColumn",
+  "removeColumn",
+  "renameIndex",
+  "renameColumn",
+  "addIndex",
+  "removeIndex",
+  "addTimestamps",
+  "removeTimestamps",
+  "changeColumnDefault",
+  "addReference",
+  "removeReference",
+  "transaction",
+  "dropJoinTable",
+  "dropTable",
+  "executeBlock",
+  "enableExtension",
+  "disableExtension",
+  "changeColumn",
+  "execute",
+  "removeColumns",
+  "changeColumnNull",
+  "addForeignKey",
+  "removeForeignKey",
+  "changeColumnComment",
+  "changeTableComment",
+  "addCheckConstraint",
+  "removeCheckConstraint",
+  "addExclusionConstraint",
+  "removeExclusionConstraint",
+  "addUniqueConstraint",
+  "removeUniqueConstraint",
+  "createEnum",
+  "dropEnum",
+  "renameEnum",
+  "addEnumValue",
+  "renameEnumValue",
+  "createSchema",
+  "dropSchema",
+  "createVirtualTable",
+  "dropVirtualTable",
+] as const;
 
-  private _col(name: string, type: string, options: Record<string, unknown>): void {
-    this._recorder.record("addColumn", [this._tableName, name, type, options]);
-  }
-
-  // Mirrors Rails Table#column: the target every ColumnMethods shorthand
-  // (t.hstore, t.jsonb, ...) delegates to. withAdapterColumnMethods routes
-  // adapter-specific column-type calls here.
-  column(name: string, type: string, options: Record<string, unknown> = {}): void {
-    this._col(name, type, options);
-  }
-
-  string(name: string, options: Record<string, unknown> = {}): void {
-    this._col(name, "string", options);
-  }
-  text(name: string, options: Record<string, unknown> = {}): void {
-    this._col(name, "text", options);
-  }
-  integer(name: string, options: Record<string, unknown> = {}): void {
-    this._col(name, "integer", options);
-  }
-  float(name: string, options: Record<string, unknown> = {}): void {
-    this._col(name, "float", options);
-  }
-  decimal(name: string, options: Record<string, unknown> = {}): void {
-    this._col(name, "decimal", options);
-  }
-  boolean(name: string, options: Record<string, unknown> = {}): void {
-    this._col(name, "boolean", options);
-  }
-  date(name: string, options: Record<string, unknown> = {}): void {
-    this._col(name, "date", options);
-  }
-  datetime(name: string, options: Record<string, unknown> = {}): void {
-    this._col(name, "datetime", options);
-  }
-  bigint(name: string, options: Record<string, unknown> = {}): void {
-    this._col(name, "bigint", options);
-  }
-
-  rename(oldName: string, newName: string): void {
-    this._recorder.record("renameColumn", [this._tableName, oldName, newName]);
-  }
-
-  remove(...args: [...string[], Record<string, unknown>] | string[]): void {
-    const last = args[args.length - 1];
-    const hasOpts = typeof last === "object" && last !== null;
-    const options = hasOpts ? (args.pop() as Record<string, unknown>) : {};
-    const names = args as string[];
-    // Emit one removeColumn per name (mirrors Rails Table#remove -> remove_columns
-    // iterating remove_column). This avoids the removeColumns arg-shape mismatch
-    // with Migration.removeColumns (strings only, no trailing options).
-    for (const name of names) {
-      const colArgs: unknown[] = [this._tableName, name];
-      if (options["type"]) {
-        colArgs.push(options["type"]);
-        const rest = Object.fromEntries(Object.entries(options).filter(([k]) => k !== "type"));
-        if (Object.keys(rest).length > 0) colArgs.push(rest);
-      } else if (Object.keys(options).length > 0) {
-        // Forward options (e.g. ifExists) even without type so replay semantics
-        // are preserved. Inversion still raises IrreversibleMigration (no type).
-        colArgs.push(options);
-      }
-      this._recorder.record("removeColumn", colArgs);
-    }
-  }
-
-  change(name: string, type: string, options: Record<string, unknown> = {}): void {
-    this._recorder.record("changeColumn", [this._tableName, name, type, options]);
-  }
-
-  changeDefault(name: string, value: unknown): void {
-    this._recorder.record("changeColumnDefault", [this._tableName, name, value]);
-  }
-
-  changeNull(name: string, nullable: boolean, defaultValue?: unknown): void {
-    const args: unknown[] = [this._tableName, name, nullable];
-    if (defaultValue !== undefined) args.push(defaultValue);
-    this._recorder.record("changeColumnNull", args);
-  }
-
-  index(columns: string | string[], options: Record<string, unknown> = {}): void {
-    this._recorder.record("addIndex", [this._tableName, columns, options]);
-  }
-
-  // Mirrors Rails Table#remove_index(column_name = nil, **options) ->
-  // @base.remove_index(name, column_name, **options). Recording the column is
-  // what lets invert_remove_index reconstruct the add_index.
-  removeIndex(
-    columnOrOptions?: string | string[] | Record<string, unknown>,
-    options: Record<string, unknown> = {},
+for (const method of REVERSIBLE_AND_IRREVERSIBLE_METHODS) {
+  if (method in CommandRecorder.prototype) continue;
+  (CommandRecorder.prototype as unknown as Record<string, unknown>)[method] = function (
+    this: CommandRecorder,
+    ...args: unknown[]
   ): void {
-    const isColumn = typeof columnOrOptions === "string" || Array.isArray(columnOrOptions);
-    const column = isColumn ? columnOrOptions : undefined;
-    const opts = isColumn ? options : (columnOrOptions ?? {});
-    const args: unknown[] = [this._tableName, column];
-    if (Object.keys(opts).length > 0) args.push(opts);
-    this._recorder.record("removeIndex", args);
-  }
-
-  // Mirrors Rails Table#references / #belongs_to -> @base.add_reference per name.
-  references(...args: [...string[], Record<string, unknown>] | string[]): void {
-    const last = args[args.length - 1];
-    const hasOpts = typeof last === "object" && last !== null && !Array.isArray(last);
-    const options = hasOpts ? (args.pop() as Record<string, unknown>) : {};
-    for (const refName of args as string[]) {
-      this._recorder.record("addReference", [this._tableName, refName, options]);
-    }
-  }
-
-  belongsTo(...args: [...string[], Record<string, unknown>] | string[]): void {
-    this.references(...args);
-  }
-
-  timestamps(options: Record<string, unknown> = {}): void {
-    this._recorder.record("addTimestamps", [this._tableName, options]);
-  }
-
-  removeTimestamps(options: Record<string, unknown> = {}): void {
-    this._recorder.record("removeTimestamps", [this._tableName, options]);
-  }
-}
-
-// nativeDatabaseTypes keys that Rails does NOT expose as plain column-type
-// shorthands via `define_column_methods`. `primary_key` is a dedicated method
-// (`abstract/schema_definitions.rb:308` — `primary_key(name, type = :primary_key,
-// **options)` merges `primary_key: true` and takes the second argument as the
-// column type), so routing it to a bare `column(name, "primary_key")` would
-// diverge. Both spellings are excluded: the native-type hashes key it
-// `primary_key`, the trails DSL method is `primaryKey`.
-const NON_COLUMN_METHOD_TYPES = new Set(["primaryKey", "primary_key"]);
-
-/**
- * Wrap a change_table proxy so adapter-specific column-type shorthands
- * (`t.hstore`, `t.jsonb`, `t.uuid`, ...) resolve to `column(name, type,
- * options)`.
- *
- * Mirrors Rails: the connection adapter mixes its `ColumnMethods` module into
- * the Table object yielded by `change_table`, where each shorthand generated by
- * `define_column_methods` (`abstract/schema_definitions.rb:332`) is
- * `def type(*names, **options); raise ArgumentError if names.empty?; names.each
- * { column(name, :type, **options) }`. We reproduce that arity (multi-name,
- * raise-on-empty) and delegate to `#column`.
- *
- * The shorthand set is the adapter's `columnMethodNames()` — its explicit
- * `define_column_methods` list (`postgresql/schema_definitions.rb:185`), which
- * for PG adds `serial`/`bigserial` (SERIAL/BIGSERIAL pseudo-types absent from
- * `NATIVE_DATABASE_TYPES`) on top of the native types. This keeps the proxy
- * adapter-agnostic while matching Rails' `ColumnMethods` mixin exactly.
- */
-export function withAdapterColumnMethods<T extends object>(
-  proxy: T,
-  columnTypes: Iterable<string>,
-): T {
-  const types = new Set(columnTypes);
-  return new Proxy(proxy, {
-    get(target, prop, receiver) {
-      if (
-        typeof prop === "string" &&
-        !(prop in target) &&
-        types.has(prop) &&
-        !NON_COLUMN_METHOD_TYPES.has(prop)
-      ) {
-        const col = target as {
-          column(name: string, type: string, options: Record<string, unknown>): unknown;
-        };
-        return (...args: unknown[]): unknown => {
-          const last = args[args.length - 1];
-          const options =
-            last !== null && typeof last === "object" && !Array.isArray(last)
-              ? (args.pop() as Record<string, unknown>)
-              : {};
-          const names = args as string[];
-          if (names.length === 0) {
-            throw new ArgumentError(`Missing column name(s) for ${prop}`);
-          }
-          // Rails' `define_column_methods` generates `def type(...);
-          // column(name, :type, ...)` where `:type` is the snake_case native
-          // type name. trails uses camelCase JS method names, so normalize
-          // multi-word shorthands (`unsignedInteger` -> `unsigned_integer`,
-          // `bitVarying` -> `bit_varying`) back to the snake symbol Rails would
-          // record. Single-token shorthands (serial, jsonb, ...) are unchanged.
-          const type = underscore(prop);
-          const results = names.map((name) => col.column(name, type, options));
-          // Table#column is async (non-recording path); RecorderTableProxy#column
-          // is sync. Return a Promise when any call is thenable so callers can
-          // await, mirroring Rails' synchronous per-name iteration.
-          return results.some(
-            (r) => r != null && typeof (r as { then?: unknown }).then === "function",
-          )
-            ? Promise.all(results)
-            : results[results.length - 1];
-        };
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-  });
+    this.record(method, args);
+  };
 }

@@ -323,23 +323,51 @@ export class Table extends AbstractTable {
   // TableDefinition and Table. The `unsigned_<type>` type is normalized to its
   // base type + `unsigned: true` by MySQL::TableDefinition#newColumnDefinition
   // along the addColumn/alter path.
-  async unsignedInteger(name: string, options: ColumnOptions = {}): Promise<void> {
-    await this.column(name, "unsigned_integer" as ColumnType, options);
+  async blob(...args: unknown[]): Promise<void> {
+    await this.definedColumn("blob" as ColumnType, args);
   }
 
-  async unsignedBigint(name: string, options: ColumnOptions = {}): Promise<void> {
-    await this.column(name, "unsigned_bigint" as ColumnType, options);
+  async tinyblob(...args: unknown[]): Promise<void> {
+    await this.definedColumn("tinyblob" as ColumnType, args);
+  }
+
+  async mediumblob(...args: unknown[]): Promise<void> {
+    await this.definedColumn("mediumblob" as ColumnType, args);
+  }
+
+  async longblob(...args: unknown[]): Promise<void> {
+    await this.definedColumn("longblob" as ColumnType, args);
+  }
+
+  async tinytext(...args: unknown[]): Promise<void> {
+    await this.definedColumn("tinytext" as ColumnType, args);
+  }
+
+  async mediumtext(...args: unknown[]): Promise<void> {
+    await this.definedColumn("mediumtext" as ColumnType, args);
+  }
+
+  async longtext(...args: unknown[]): Promise<void> {
+    await this.definedColumn("longtext" as ColumnType, args);
+  }
+
+  async unsignedInteger(...args: unknown[]): Promise<void> {
+    await this.definedColumn("unsigned_integer" as ColumnType, args);
+  }
+
+  async unsignedBigint(...args: unknown[]): Promise<void> {
+    await this.definedColumn("unsigned_bigint" as ColumnType, args);
   }
 
   /** @deprecated */
-  async unsignedFloat(name: string, options: ColumnOptions = {}): Promise<void> {
+  async unsignedFloat(...args: unknown[]): Promise<void> {
     deprecator().warn(UNSIGNED_FLOAT_DEPRECATION);
-    await this.column(name, "unsigned_float" as ColumnType, options);
+    await this.definedColumn("unsigned_float" as ColumnType, args);
   }
 
   /** @deprecated */
-  async unsignedDecimal(name: string, options: ColumnOptions = {}): Promise<void> {
+  async unsignedDecimal(...args: unknown[]): Promise<void> {
     deprecator().warn(UNSIGNED_DECIMAL_DEPRECATION);
-    await this.column(name, "unsigned_decimal" as ColumnType, options);
+    await this.definedColumn("unsigned_decimal" as ColumnType, args);
   }
 }

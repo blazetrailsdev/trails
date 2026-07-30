@@ -22,6 +22,8 @@ import { unquoteIdentifier, splitQuotedIdentifier, Name, Utils } from "./utils.j
 import type { CreateDatabaseOptions, PgIndexDefinition } from "./schema-statements.js";
 import {
   type AlterTable as PgAlterTable,
+  Table as PgTable,
+  type SchemaStatementsConstraintLike,
   ExclusionConstraintDefinition,
   type ExclusionConstraintOptions,
   UniqueConstraintDefinition,
@@ -97,6 +99,11 @@ interface PgSchemaAdapter {
 export class PostgreSQLSchemaStatements extends SchemaStatements {
   private get pg(): PgSchemaAdapter {
     return this.adapter as unknown as PgSchemaAdapter;
+  }
+
+  /** Mirrors: PostgreSQL::SchemaStatements#update_table_definition */
+  override updateTableDefinition(tableName: string, base?: unknown): PgTable {
+    return new PgTable(tableName, (base ?? this) as SchemaStatementsConstraintLike);
   }
 
   override async dropTable(...args: Parameters<SchemaStatements["dropTable"]>): Promise<void> {

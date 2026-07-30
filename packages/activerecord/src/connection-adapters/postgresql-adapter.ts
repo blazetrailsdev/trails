@@ -109,10 +109,9 @@ import {
   UniqueConstraintDefinition,
   TableDefinition as PgTableDefinition,
   AlterTable as PgAlterTable,
-  Table as PgTable,
+  type Table as PgTable,
   type ExclusionConstraintOptions,
   type UniqueConstraintOptions,
-  type SchemaStatementsConstraintLike,
 } from "./postgresql/schema-definitions.js";
 import { TypeMetadata as PgTypeMetadata } from "./postgresql/type-metadata.js";
 import {
@@ -4728,8 +4727,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return new PgSchemaCreation(this);
   }
 
-  updateTableDefinition(tableName: string, base: unknown): PgTable {
-    return new PgTable(tableName, base as SchemaStatementsConstraintLike);
+  updateTableDefinition(tableName: string, base?: unknown): PgTable {
+    return this.pgSchemaStatements().updateTableDefinition(tableName, base ?? this);
   }
 
   createSchemaDumper(source: SchemaSource, options: Record<string, unknown> = {}): PgSchemaDumper {

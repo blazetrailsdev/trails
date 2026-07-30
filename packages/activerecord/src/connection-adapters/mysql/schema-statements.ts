@@ -9,13 +9,13 @@ import { presence } from "@blazetrails/activesupport";
 import { Version } from "../abstract-adapter.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { TypeMetadata } from "./type-metadata.js";
-import { TableDefinition } from "./schema-definitions.js";
+import { TableDefinition, Table as MysqlTable } from "./schema-definitions.js";
 import { Column } from "./column.js";
 import { SchemaStatements as BaseSchemaStatements } from "../abstract/schema-statements.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./schema-creation.js";
 import { CreateIndexDefinition, ForeignKeyDefinition } from "../abstract/schema-definitions.js";
 import { quoteColumnName, unquoteIdentifier } from "./quoting.js";
-import type { AddIndexOptions } from "../abstract/schema-definitions.js";
+import type { AddIndexOptions, SchemaStatementsLike } from "../abstract/schema-definitions.js";
 
 /**
  * MySQL-specific SchemaStatements subclass. Extends the base `dropTable` to support
@@ -30,6 +30,11 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
   private _mysqlSchemaCreation?: MysqlSchemaCreation;
   override get schemaCreation(): MysqlSchemaCreation {
     return (this._mysqlSchemaCreation ??= new MysqlSchemaCreation(this.adapter));
+  }
+
+  /** Mirrors: MySQL::SchemaStatements#update_table_definition */
+  override updateTableDefinition(tableName: string, base?: unknown): MysqlTable {
+    return new MysqlTable(tableName, (base ?? this) as SchemaStatementsLike);
   }
 
   /**

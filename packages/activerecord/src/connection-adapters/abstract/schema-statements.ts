@@ -508,7 +508,9 @@ export class SchemaStatements {
       opts = options;
     } else {
       columnName = undefined;
-      opts = columnOrOptions;
+      // Ruby's `**options` collects the hash whether it arrived as the sole
+      // argument or behind an explicit nil column.
+      opts = { ...columnOrOptions, ...options };
     }
 
     // Rails: `return if options[:if_exists] && !index_exists?(...)` — only an
