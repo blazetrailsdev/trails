@@ -20,18 +20,11 @@ import { Temporal } from "../temporal.js";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 
-/**
- * Stand-in for Ruby's `Rational`, which has no JS analogue: the temporal packers
- * write `sec_fraction` and `offset` through `write_rational`, so the numerator /
- * denominator pair has to survive as a value even though extension type 3
- * (Rational itself) is not registered.
- */
 export interface Rational {
   numerator: number;
   denominator: number;
 }
 
-/** Julian Day Number of 1970-01-01, the anchor for Ruby's `Date#jd`. */
 const JD_UNIX_EPOCH = 2440588;
 
 const UNIX_EPOCH_DATE = Temporal.PlainDate.from("1970-01-01");
@@ -42,7 +35,6 @@ function gcd(a: number, b: number): number {
   return b === 0 ? a : gcd(b, a % b);
 }
 
-/** Ruby's `Rational(n, d)`, which reduces on construction. */
 function rational(numerator: number, denominator: number): Rational {
   if (numerator === 0) return { numerator: 0, denominator: 1 };
   const divisor = gcd(Math.abs(numerator), Math.abs(denominator));
@@ -57,7 +49,6 @@ function dateFromJulianDay(jd: number): Temporal.PlainDate {
   return UNIX_EPOCH_DATE.add({ days: jd - JD_UNIX_EPOCH });
 }
 
-/** Nanosecond-of-second, the numerator Ruby's `Time#tv_nsec` reports. */
 function nanosecondOfSecond(time: {
   millisecond: number;
   microsecond: number;
@@ -246,8 +237,6 @@ export const Extensions = {
     packer.write(datetime.minute);
     packer.write(datetime.second);
     Extensions.writeRational(rational(nanosecondOfSecond(datetime), NANOS_PER_SECOND), packer);
-    // Ruby writes DateTime#offset (a fraction of a day); a PlainDateTime is bare
-    // wall-clock time with no offset to carry, so the slot is always zero.
     Extensions.writeRational(rational(0, 1), packer);
   },
 
@@ -257,8 +246,6 @@ export const Extensions = {
     const minute = unpacker.read() as number;
     const second = unpacker.read() as number;
     const secFraction = Extensions.readRational(unpacker);
-    // The offset slot is consumed to keep the stream aligned, then dropped:
-    // PlainDateTime has nowhere to put it.
     Extensions.readRational(unpacker);
     const nanos = Math.round((secFraction.numerator / secFraction.denominator) * NANOS_PER_SECOND);
     return dateFromJulianDay(jd).toPlainDateTime({
@@ -283,20 +270,15 @@ export const Extensions = {
     const nanos = time.epochNanoseconds;
     const seconds = nanos / BigInt(NANOS_PER_SECOND);
     const remainder = nanos % BigInt(NANOS_PER_SECOND);
-    // Ruby's tv_sec/tv_nsec pair floors: tv_nsec is never negative, so a
-    // pre-epoch instant borrows a second. BigInt division truncates instead.
     const borrow = remainder < 0n ? 1n : 0n;
     packer.write(seconds - borrow);
     packer.write(remainder + borrow * BigInt(NANOS_PER_SECOND));
-    // Ruby writes Time#utc_offset; an Instant is absolute, so it is always UTC.
     packer.write(0);
   },
 
   readTime(unpacker: Unpacker): Temporal.Instant {
     const seconds = BigInt(unpacker.read() as number | bigint);
     const nanos = BigInt(unpacker.read() as number | bigint);
-    // The utc_offset slot is consumed and dropped: it labels the wall-clock zone
-    // Ruby reconstructs, not the instant, which is already absolute.
     unpacker.read();
     return Temporal.Instant.fromEpochNanoseconds(seconds * BigInt(NANOS_PER_SECOND) + nanos);
   },
@@ -314,11 +296,6 @@ export const Extensions = {
     return timeZone.name;
   },
 
-  /**
-   * Ruby's `ActiveSupport::TimeZone[name]` rescues an invalid identifier to
-   * `nil` (time_zone.rb:236-241) rather than raising; `TimeZone.find` throws on
-   * an unknown name, so the rescue happens here.
-   */
   loadTimeZone(name: string): TimeZone | null {
     try {
       return TimeZone.find(name);

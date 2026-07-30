@@ -105,7 +105,6 @@ describe("MessagePackSerializerTest", () => {
     expect(roundtrip(time)).toEqual(time);
     const now = Temporal.Now.instant();
     expect(roundtrip(now)).toEqual(now);
-    // Pre-epoch instants borrow a second so tv_nsec stays non-negative.
     const preEpoch = Temporal.Instant.from("1969-07-20T20:17:40.123456789Z");
     expect(roundtrip(preEpoch)).toEqual(preEpoch);
   });
