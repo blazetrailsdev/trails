@@ -16,8 +16,9 @@ describe("SelectManagerTest", () => {
   const posts = new Table("posts");
   const visitor = new Visitors.ToSql(testConnection);
   it("join sources", () => {
-    const mgr = users.project(star);
-    expect(mgr.joinSources()).toEqual([]);
+    const manager = new SelectManager();
+    manager.joinSources().push(new Nodes.StringJoin(new Nodes.Quoted("foo")));
+    expect(manager.toSql()).toBe("SELECT FROM 'foo'");
   });
 
   describe("backwards compatibility", () => {

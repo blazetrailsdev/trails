@@ -454,7 +454,7 @@ export class ToSql extends Visitor {
 
     this.collectNodesFor(node.projections, " ", ", ", collector);
 
-    if (node.source.left) {
+    if (node.source && !node.source.isEmpty()) {
       collector.append(" FROM ");
       this.visit(node.source, collector);
     }
@@ -1051,9 +1051,9 @@ export class ToSql extends Visitor {
 
   private visitArelNodesJoinSource(node: Nodes.JoinSource, collector: SQLString): SQLString {
     if (node.left) this.visit(node.left, collector);
-    for (const join of node.right) {
-      collector.append(" ");
-      this.visit(join, collector);
+    if (node.right.length > 0) {
+      if (node.left) collector.append(" ");
+      this.injectJoin(node.right, " ", collector);
     }
     return collector;
   }
