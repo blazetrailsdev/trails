@@ -1203,7 +1203,10 @@ export class TransactionManager {
    * @internal
    */
   get currentLockToken(): symbol | null {
-    return this._lockStorage().getStore() ?? null;
+    // Reads `_lockOwner` directly rather than through `_lockStorage()`: this
+    // runs on every pinned query and must not install a storage (nor swap one
+    // out from under a live holder) as a side effect of merely asking.
+    return this._lockOwner?.getStore() ?? null;
   }
 
   /**

@@ -292,6 +292,29 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
+    // The other half of the invariant: a query the rolling-back chain itself
+    // abandoned is still cancelled, so the guard above is a narrowing and not
+    // a removal of Rails' cancel_any_running_query.
+    it("rollback cancels an in-flight query the same chain abandoned", async () => {
+      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      try {
+        let slowError: unknown;
+        let slow!: Promise<unknown>;
+        await other.transactionManager.synchronize(async () => {
+          await other.beginDbTransaction();
+          slow = other.execute("SELECT pg_sleep(5) AS slept").catch((e) => {
+            slowError = e;
+          });
+          await new Promise<void>((r) => setTimeout(r, 100));
+          await other.rollbackDbTransaction();
+        });
+        await slow;
+        expect(slowError).toBeInstanceOf(QueryCanceled);
+      } finally {
+        await other.close();
+      }
+    });
+
     it("translate exception serialization failure", async () => {
       await adapter.exec(`CREATE TABLE "ex_ser" ("id" SERIAL PRIMARY KEY, "val" INTEGER)`);
       await adapter.executeMutation(`INSERT INTO "ex_ser" (val) VALUES (0)`);

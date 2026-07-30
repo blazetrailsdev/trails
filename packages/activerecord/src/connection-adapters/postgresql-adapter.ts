@@ -2217,6 +2217,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // (RFC 0061 pg-query-canceled-unhandled-rejection). Skipping the cancel is
   // safe: `_serializePinnedQuery` already sequences our ROLLBACK behind whatever
   // is on the wire, so we wait instead of corrupting someone else's query.
+  //
+  // A null token means the caller holds no lock at all (`resetBang` on pool
+  // checkin, or a direct `beginDbTransaction`/`rollbackDbTransaction` pair on a
+  // bare adapter): ownership is unprovable, so those paths also wait on the
+  // serializer rather than cancel.
   private _cancelAnyRunningQuery(): void {
     type PgClientWithPid = pg.Client & {
       processID?: number | null;
