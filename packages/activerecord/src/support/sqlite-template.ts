@@ -93,8 +93,7 @@ export async function registerDbFileCleanupOnExit(base: string): Promise<void> {
 
 /**
  * Shared filename prefix of every temp sqlite DB the AR test harness creates:
- * the template, the per-worker clones, the scratch databases
- * (`support/scratch-database.ts`) and their `_2` arunit2 siblings.
+ * the template, the per-worker clones and their `_2` arunit2 siblings.
  */
 export const TEMP_DB_PREFIX = "ar-test-";
 
