@@ -19,7 +19,7 @@ import {
  * survives across tests in the file. When the describe scope exits,
  * `resetTestAdapterState` runs exactly once to clean up for the next file.
  *
- * **When to use this vs `setupHandlerSuite + withTransactionalFixtures`:**
+ * **When to use this vs `skipGlobalResetForFile + withTransactionalFixtures`:**
  * Both ride the worker's own pool, which `test-setup-dy.ts` establishes once
  * and leaves up for the whole worker, as `ARTest.connect` does for the whole
  * Rails process (`support/connection.rb:31-32`). Neither opens or closes it.
@@ -28,7 +28,7 @@ import {
  * `resetTestAdapterState` once when the scope exits (depth reaches zero) —
  * Rails' `teardown_fixtures` shape, which rolls the transaction back and
  * clears active connections without removing the pool
- * (`test_fixtures.rb:125-158`). `setupHandlerSuite()` +
+ * (`test_fixtures.rb:125-158`). `skipGlobalResetForFile()` +
  * `withTransactionalFixtures(leaseFixtureConnection)` instead holds the
  * global-reset shield for the whole file, for suites whose describes share
  * state that the between-test reset would otherwise clear.
