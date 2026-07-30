@@ -284,14 +284,11 @@ const mysqlAdapter: DbTemplateAdapter = {
     // CREATE DATABASE for all slots first (sequential — DDL against the same
     // server, CREATE must not race with itself).
     const admin = await mysql.createConnection(adminOptions);
-    // Reclaim what killed runs left behind — the MySQL analogue of
-    // `sweepStaleDbFiles`; foreign tokens past the cutoff only.
+    // Stale sweep, as on the PG path above.
     await mysqlDropDatabases(
       admin,
       staleRunDatabases(baseDb, runToken, await mysqlDatabaseNames(admin)),
     );
-    // No DROP in front of the CREATE: the names carry this run's token, so
-    // nothing can be occupying them.
     for (let slot = 1; slot <= n; slot++) {
       const slotDb = slotDatabaseName(baseDb, runToken, slot);
       await admin.query(`CREATE DATABASE \`${slotDb}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_bin`);
@@ -320,8 +317,6 @@ const mysqlAdapter: DbTemplateAdapter = {
 
     return async () => {
       const cleanup = await mysql.createConnection(adminOptions);
-      // Slot DBs plus the `_arunit2` siblings suites create off a slot name —
-      // all share this run's prefix, so one filtered sweep reclaims the lot.
       await mysqlDropDatabases(
         cleanup,
         ownRunDatabases(baseDb, runToken, await mysqlDatabaseNames(cleanup)),
