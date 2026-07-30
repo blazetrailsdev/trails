@@ -217,9 +217,6 @@ describe("MigrationTest", () => {
     const seen: unknown[] = [];
     class M extends Migration {}
     const m = new M();
-    // Rails reaches update_table_definition through the SchemaStatements module the
-    // adapter includes; trails models that module as the companion `schemaStatements()`
-    // returns, so an adapter-specific Table must come from there.
     const companion = {
       updateTableDefinition(tableName: string, base: unknown) {
         seen.push([tableName, base]);
