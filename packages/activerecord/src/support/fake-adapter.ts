@@ -3,55 +3,32 @@ import { Column } from "../connection-adapters/column.js";
 import type { SqlTypeMetadata } from "../connection-adapters/sql-type-metadata.js";
 import { register } from "../connection-adapters.js";
 
-/**
- * Rails' fake adapter redefines inherited members with incompatible shapes:
- * `attr_accessor :data_sources` turns the `data_sources` method into a plain
- * attribute, and `primary_key` / `columns` / `active?` become synchronous
- * in-memory lookups where AbstractAdapter's reach the database. TS forbids
- * narrowing an inherited member that way, so the base is widened with those
- * members dropped — the alternative is renaming them, which would lose the
- * Rails names this port exists to preserve.
- */
-const FakeAdapterBase = AbstractAdapter as unknown as new () => Omit<
-  AbstractAdapter,
-  "dataSources" | "primaryKey" | "columns" | "active"
->;
-
 export interface MergeColumnOptions {
   default?: unknown;
   null?: boolean;
 }
 
-/** Mirrors: FakeActiveRecordAdapter */
-export class FakeActiveRecordAdapter extends FakeAdapterBase {
+export class FakeActiveRecordAdapter extends AbstractAdapter {
   static readonly columns = new Map<string, Column[]>();
 
+  // @ts-expect-error -- attr_accessor :data_sources reshapes the inherited method into an attribute
   dataSources: string[];
   primaryKeys: Record<string, string>;
 
-  private readonly _fakeColumns: Map<string, Column[]>;
+  readonly #columns: Map<string, Column[]>;
 
-  /**
-   * Mirrors: FakeActiveRecordAdapter#initialize, minus the forwarding. Rails is
-   * `def initialize(...)` + bare `super`, passing the adapter's whole argument
-   * list up; trails' AbstractAdapter constructor takes none
-   * (abstract-adapter.ts:706), so there is nothing to forward and the signature
-   * is zero-arg. Behaviourally identical to the field initializers this
-   * replaced — it exists to put the three assignments in Rails' order.
-   */
   constructor() {
     super();
     this.dataSources = [];
     this.primaryKeys = {};
-    this._fakeColumns = FakeActiveRecordAdapter.columns;
+    this.#columns = (this.constructor as typeof FakeActiveRecordAdapter).columns;
   }
 
-  /** Mirrors: FakeActiveRecordAdapter#primary_key */
+  // @ts-expect-error -- synchronous in-memory lookup where the inherited one returns a promise
   primaryKey(table: string): string {
     return this.primaryKeys[table] ?? "id";
   }
 
-  /** Mirrors: FakeActiveRecordAdapter#merge_column */
   mergeColumn(
     tableName: string,
     name: string,
@@ -59,35 +36,32 @@ export class FakeActiveRecordAdapter extends FakeAdapterBase {
     options: MergeColumnOptions = {},
   ): void {
     this.columns(tableName).push(
-      new Column(String(name), options.default, this.fetchTypeMetadata(sqlType), options.null),
+      new Column(name, options.default, this.fetchTypeMetadata(sqlType), options.null),
     );
   }
 
-  /** Mirrors: FakeActiveRecordAdapter#columns */
+  // @ts-expect-error -- synchronous in-memory lookup where the inherited one returns a promise
   columns(tableName: string): Column[] {
-    const existing = this._fakeColumns.get(tableName);
+    const existing = this.#columns.get(tableName);
     if (existing) return existing;
     const created: Column[] = [];
-    this._fakeColumns.set(tableName, created);
+    this.#columns.set(tableName, created);
     return created;
   }
 
-  /** Mirrors: FakeActiveRecordAdapter#data_source_exists? */
   dataSourceExists(): boolean {
     return true;
   }
 
-  /** Mirrors: FakeActiveRecordAdapter#active? */
   get active(): boolean {
     return true;
   }
 
   private fetchTypeMetadata(sqlType: string | null): SqlTypeMetadata {
-    return (this as unknown as AbstractAdapter).schemaStatements().fetchTypeMetadata(sqlType);
+    return this.schemaStatements().fetchTypeMetadata(sqlType);
   }
 }
 
-/** Mirrors: activerecord/test/cases/helper.rb:46 */
 export function registerFakeAdapter(): void {
   register("fake", async () => FakeActiveRecordAdapter as unknown as new () => AbstractAdapter);
 }
