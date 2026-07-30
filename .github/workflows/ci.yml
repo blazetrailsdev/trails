@@ -1403,6 +1403,14 @@ jobs:
         # tag would sit undetected. See the empty-reason bullet in
         # docs/infrastructure/api-build-stub-generation-plan.md.
         run: pnpm exec tsx scripts/api-compare/lint-missing-rails-call-reasons.ts
+      - name: Detached JSDoc tag blocks gate
+        # Flags `@internal` / `@noRailsEquivalent` blocks separated from the
+        # declaration they document (a `//` comment between the block and the
+        # signature is the usual shape). The tag then stops applying to that
+        # declaration — the member reads as unjustified public surface, or the
+        # tag excuses a neighbour it was never written for, and both look
+        # exactly like "no tag was written". Read-only; no Ruby needed.
+        run: pnpm exec tsx scripts/api-compare/lint-detached-jsdoc-tags.ts
       - name: Body-pins gate
         # Source-hash pinning (RFC 0025). Fails when a pinned pair's normalized
         # Rails body digest drifts from the current vendored source

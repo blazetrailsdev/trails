@@ -332,6 +332,17 @@ report). They therefore share:
     `packages/*/src` through the same `parseJsdoc` check — read-only, no
     second parser, and with no dependency on the wide call-mismatch artifact.
 
+  Both checks read whatever TypeScript **bound** to a declaration, so a block
+  that has drifted away from its declaration passes them vacuously.
+  `pnpm api:detached` (`lint-detached-jsdoc-tags.ts`, same CI job) covers that
+  from the text side: it fails when anything other than whitespace or another
+  JSDoc block sits between an `@internal` / `@noRailsEquivalent` block and the
+  declaration it was bound to, and when such a block is bound to nothing at
+  all. It deliberately does **not** flag the insertion case — a new declaration
+  slid in between a block and the one it documented — because the result is
+  textually identical to an ordinary doc comment on the inserted declaration;
+  only the diff distinguishes them, so that one stays a review-time concern.
+
   The placeholder path is unaffected: a generator-authored placeholder is a
   non-empty reason, so it parses, round-trips byte-for-byte via `rawLines`,
   and still drops without a harvest report when the call converges. Reason
