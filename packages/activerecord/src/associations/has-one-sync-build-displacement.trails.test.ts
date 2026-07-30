@@ -25,13 +25,15 @@ import { registerModel, RecordNotSaved, type Base } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { Pirate } from "../test-helpers/models/pirate.js";
 import { Ship } from "../test-helpers/models/ship.js";
+import { ExclusivelyDependentFirm } from "../test-helpers/models/company.js";
 
 describe("has_one displacement via the synchronous build path", () => {
-  fixtures(["pirates", "ships"]);
+  fixtures(["pirates", "ships", "companies", "accounts"]);
 
   beforeAll(() => {
     registerModel(Pirate);
     registerModel(Ship);
+    registerModel(ExclusivelyDependentFirm);
   });
 
   it("nullifies the displaced row when nested attributes replace a loaded child", async () => {
@@ -222,5 +224,23 @@ describe("has_one displacement via the synchronous build path", () => {
 
     expect(built).not.toBeInstanceOf(Promise);
     expect((built as { name: string }).name).toBe("Black Pearl");
+  });
+
+  it("runs remove_target!'s delete arm over an unsaved displaced record", async () => {
+    // Rails' `remove_target!` calls `target.delete` unconditionally for
+    // `dependent: :delete` (has_one_association.rb:97); only the `:destroy` and
+    // nullify arms gate on `target.persisted?`. So a second build over an
+    // unsaved in-memory target still runs the delete branch — and
+    // `Persistence#delete` marks the record destroyed even with no row
+    // (persistence.rb:439-444).
+    const firm = new (ExclusivelyDependentFirm as unknown as new () => Base)();
+    const assoc = (
+      firm as unknown as { association(n: string): { build(a: object): unknown } }
+    ).association("account");
+
+    const displaced = assoc.build({ credit_limit: 10 }) as Base;
+    await assoc.build({ credit_limit: 20 });
+
+    expect((displaced as unknown as { isDestroyed(): boolean }).isDestroyed()).toBe(true);
   });
 });

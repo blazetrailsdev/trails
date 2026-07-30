@@ -325,12 +325,21 @@ export class HasOneAssociation extends SingularAssociation {
     if (this.buildDisplacementOwnedByCaller) return null;
     const displaced = this.loaded ? this.target : null;
     if (!displaced || sameRecord(displaced, record)) return null;
-    // A displaced record that was never persisted keys no row: `remove_target!`'s
-    // in-memory half already ran in `setNewRecord`, and its `target.save` is
-    // gated on `target.persisted?` (has_one_association.rb:108). Returning null
-    // keeps repeated `build`s (the common `assoc.build()` twice shape)
-    // synchronous.
-    if ((displaced as { isPersisted?: () => boolean }).isPersisted?.() !== true) return null;
+    // Only the nullify arm may skip an unpersisted displaced record. Rails gates
+    // on `target.persisted?` inside that arm's `target.save`
+    // (has_one_association.rb:108) and inside `:destroy`'s `target.destroy`
+    // (:100) — but `:delete` calls `target.delete` unconditionally (:97), and
+    // `:destroy` still writes `destroyed_by_association` (:99) before its gate.
+    // The nullify arm's remaining work is in-memory and `setNewRecord` already
+    // ran it, so skipping there is a true no-op — and it is what keeps repeated
+    // `build`s (the common `assoc.build()` twice shape) synchronous.
+    const dependent = (this.reflection.options.dependent as string) ?? "";
+    if (
+      dependent !== "delete" &&
+      dependent !== "destroy" &&
+      (displaced as { isPersisted?: () => boolean }).isPersisted?.() !== true
+    )
+      return null;
     return this.detachDisplacedTarget();
   }
 
