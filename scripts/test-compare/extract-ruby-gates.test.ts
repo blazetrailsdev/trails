@@ -182,6 +182,55 @@ describe("Ruby extractor gate detection", () => {
     });
   });
 
+  it("inverts a negated feature predicate in a pure `if` conjunction", () => {
+    const g = rubyGates({
+      "cases/bar_test.rb": `
+        def test_pg_and_not_feature; end if current_adapter?(:PostgreSQLAdapter) && !supports_insert_returning?
+        def test_pg_or_not_feature; end if current_adapter?(:PostgreSQLAdapter) || !supports_insert_returning?
+        def test_unless_pg_and_not_feature; end unless current_adapter?(:PostgreSQLAdapter) && !supports_insert_returning?
+      `,
+    });
+    // The adapter set survives the pure conjunction, so a polarity-blind
+    // `features: [insert_returning]` would claim "runs on PostgreSQL WHERE
+    // insert_returning IS supported" — the opposite of the truth. The negated
+    // predicate becomes a `no_` guard, the same vocabulary the `unless` path uses.
+    expect(g["pg and not feature"]).toEqual({
+      adapters: ["postgresql"],
+      guards: ["no_insert_returning"],
+      source: ["class"],
+    });
+    // `||` → run-on set is a union; the adapter set is dropped and the feature
+    // stays polarity-blind (the conservative "this capability is involved" claim).
+    expect(g["pg or not feature"]).toEqual({ features: ["insert_returning"], source: ["class"] });
+    // `unless` keeps its own handling: the whole conjunction is negated, so the
+    // feature list is inverted wholesale as before.
+    expect(g["unless pg and not feature"]).toEqual({
+      guards: ["no_insert_returning"],
+      source: ["class"],
+    });
+  });
+
+  it("separates the polarities of two conjoined feature predicates", () => {
+    const g = rubyGates({
+      // Mirrors insert_all_test.rb:282/403 — the only sites in the vendored suite
+      // that conjoin a positive and a negated feature. `skip unless X` runs when X
+      // holds, so this runs on adapters that DO skip-on-duplicate and do NOT
+      // support a conflict target.
+      "cases/insert_all_test.rb": `
+        class InsertAllTest < ActiveRecord::TestCase
+          def test_insert_all_and_upsert_all_with_composite_pk
+            skip unless supports_insert_on_duplicate_skip? && !supports_insert_conflict_target?
+          end
+        end
+      `,
+    });
+    expect(g["insert all and upsert all with composite pk"]).toEqual({
+      features: ["insert_on_duplicate_skip"],
+      guards: ["no_insert_conflict_target"],
+      source: ["body-skip"],
+    });
+  });
+
   it("reads a supports_X? predicate reached through send", () => {
     const g = rubyGates({
       // Mirrors migration/foreign_key_test.rb:96 — `supports_rename_index?` is

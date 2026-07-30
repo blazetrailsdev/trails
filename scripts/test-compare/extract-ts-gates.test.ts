@@ -116,19 +116,23 @@ describe("gates.ts pure helpers", () => {
     });
   });
 
-  it("extracts adapterSupports() feature predicates polarity-blind", () => {
-    // skipIf(!adapterSupports("insert_returning")) → feature gate
+  it("extracts adapterSupports() feature predicates at run-condition polarity", () => {
+    // skipIf(!adapterSupports("insert_returning")) → runs where the feature IS
+    // supported → feature gate.
     expect(gateFromGuardExpr('!adapterSupports("insert_returning")', false)).toEqual({
       features: ["insert_returning"],
       source: ["test"],
     });
     // Positive form, no `!` (skipIf(adapterSupports("x")) — runs where the
-    // feature is absent) collects the same feature: polarity is not inspected.
+    // feature is ABSENT). The run condition is `!adapterSupports("x")`, so this
+    // is a `no_` guard, exactly what Ruby's `skip if supports_x?` emits. (It used
+    // to collect `features: [x]`, inverting the claim against the Rails side.)
     expect(gateFromGuardExpr('adapterSupports("insert_conflict_target")', false)).toEqual({
-      features: ["insert_conflict_target"],
+      guards: ["no_insert_conflict_target"],
       source: ["test"],
     });
-    // Negation is ignored (mirrors Ruby `skip unless a? && !b?` listing both):
+    // Both terms run-positive (mirrors Ruby `skip unless a? && !b?` — under
+    // `skipIf` the `||` De-Morgans into a conjunction, so each `!` cancels):
     // multiple calls in one compound expression union into the feature set.
     expect(
       gateFromGuardExpr(
@@ -138,6 +142,65 @@ describe("gates.ts pure helpers", () => {
     ).toEqual({
       features: ["insert_conflict_target", "partial_index"],
       source: ["test"],
+    });
+  });
+
+  it("inverts a negated feature predicate in a pure run-when-true conjunction", () => {
+    // `runIf(adapterType === "postgresql" && !adapterSupports("insert_returning"))`
+    // is the TS twin of Rails' `if current_adapter?(:PostgreSQLAdapter) &&
+    // !supports_insert_returning?`. The adapter set survives (the conjunction is
+    // pure), so lumping the feature in polarity-blind would emit "runs on
+    // postgresql WHERE insert_returning is supported" — the exact opposite claim.
+    // It becomes a `no_` guard instead, matching the Ruby extractor.
+    expect(
+      gateFromGuardExpr(
+        'adapterType === "postgresql" && !adapterSupports("insert_returning")',
+        true,
+      ),
+    ).toEqual({
+      adapters: ["postgresql"],
+      guards: ["no_insert_returning"],
+      source: ["test"],
+    });
+    // A POSITIVE feature in the same shape is unchanged — the intersection
+    // `postgresql ∩ insert_returning?` is exactly what the two dimensions state.
+    expect(
+      gateFromGuardExpr(
+        'adapterType === "postgresql" && adapterSupports("insert_returning")',
+        true,
+      ),
+    ).toEqual({
+      adapters: ["postgresql"],
+      features: ["insert_returning"],
+      source: ["test"],
+    });
+    // Disjunctive run condition → polarity-blind lumping stays (the run-on set is
+    // a union no adapter/feature pair captures; the adapter set is dropped).
+    expect(
+      gateFromGuardExpr(
+        'adapterType === "postgresql" || !adapterSupports("insert_returning")',
+        true,
+      ),
+    ).toEqual({
+      features: ["insert_returning"],
+      source: ["test"],
+    });
+  });
+
+  it("separates the polarities of two conjoined feature predicates", () => {
+    // The TS twin of insert_all_test.rb:282 (`skip unless
+    // supports_insert_on_duplicate_skip? && !supports_insert_conflict_target?`),
+    // as insert-all.test.ts writes it: an `itIfSupports` wrapper carrying the
+    // positive feature plus a `.skipIf` carrying the negated one. Under `skipIf`
+    // the run condition is the negation, so the conflict target is run-NEGATED.
+    expect(
+      mergeGate(gateFromWrapper("itIfSupports", "insert_on_duplicate_skip") ?? undefined, {
+        ...gateFromGuardExpr('adapterSupports("insert_conflict_target")', false),
+      }),
+    ).toEqual({
+      features: ["insert_on_duplicate_skip"],
+      guards: ["no_insert_conflict_target"],
+      source: ["test", "wrapper"],
     });
   });
 

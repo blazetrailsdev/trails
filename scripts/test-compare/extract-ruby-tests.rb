@@ -606,8 +606,20 @@ class TestExtractor
   # Derive a gate from a condition under which the test RUNS. `positive` is
   # whether the body runs when the condition is true (`if` → true, `unless` → false).
   def gate_from_run_condition(cond, positive)
-    acc = { adapter_syms: [], neg_adapter_syms: [], features: [], guards: [], has_or: false }
+    acc = { adapter_syms: [], neg_adapter_syms: [], features: [], neg_features: [], guards: [],
+            has_or: false }
     scan_run_condition(cond, acc)
+
+    # A NEGATED feature predicate only decomposes on the run-when-true path of a
+    # pure conjunction (`if current_adapter?(:X) && !supports_y?`): there the test
+    # runs on `X ∩ ¬y`, which a surviving adapter set plus a `no_y` guard states
+    # exactly — while lumping `y` into `:features` would claim the OPPOSITE
+    # capability alongside that adapter set. Elsewhere the run-on set isn't that
+    # intersection, so the polarity-blind lumping stays.
+    split = positive && !acc[:has_or]
+    features = split ? acc[:features] : acc[:features] + acc[:neg_features]
+    inverted_features = split ? acc[:neg_features] : []
+    any_feature = !features.empty? || !inverted_features.empty?
 
     adapters = acc[:adapter_syms].map { |s| ADAPTER_SYMBOL_MAP[s] }.compact.uniq
     neg_adapters = acc[:neg_adapter_syms].map { |s| ADAPTER_SYMBOL_MAP[s] }.compact.uniq
@@ -624,7 +636,7 @@ class TestExtractor
     # Restricted to pure adapter conditions: a compound like `if Trilogy &&
     # supports_x?` keeps its feature/guard gate instead — conservative, but
     # comparable, and no such compound exists in the Rails suite today.
-    if trilogy_only && positive && acc[:features].empty? && acc[:guards].empty?
+    if trilogy_only && positive && !any_feature && acc[:guards].empty?
       gate[:adapters] = []
     end
     # A POSITIVE adapter set isn't sound — and must be dropped — when the
@@ -643,7 +655,7 @@ class TestExtractor
     # negated-adapter branch below uses.
     mixed = !adapters.empty? &&
             (!acc[:guards].empty? ||
-             (!acc[:features].empty? && (acc[:has_or] || !positive)) ||
+             (any_feature && (acc[:has_or] || !positive)) ||
              (acc[:has_or] && !neg_adapters.empty?))
     if !adapters.empty? && !mixed
       gate[:adapters] = positive ? adapters : (ALL_ADAPTERS - adapters)
@@ -658,12 +670,15 @@ class TestExtractor
       base = gate[:adapters] || ALL_ADAPTERS
       gate[:adapters] = base - neg_adapters
     end
-    unless acc[:features].empty?
+    unless features.empty?
       if positive
-        gate[:features] = acc[:features].uniq
+        gate[:features] = features.uniq
       else
-        gate[:guards] = (gate[:guards] || []) + acc[:features].map { |f| "no_#{f}" }
+        gate[:guards] = (gate[:guards] || []) + features.map { |f| "no_#{f}" }
       end
+    end
+    unless inverted_features.empty?
+      gate[:guards] = (gate[:guards] || []) + inverted_features.uniq.map { |f| "no_#{f}" }
     end
     unless acc[:guards].empty?
       gate[:guards] = ((gate[:guards] || []) + acc[:guards]).uniq
@@ -673,7 +688,8 @@ class TestExtractor
 
   # Scan a condition sexp for adapter / feature / guard predicates. `negated`
   # tracks the boolean parity of `!`/`not` wrappers so a `!current_adapter?(...)`
-  # is recorded as an adapter EXCLUSION rather than an inclusion.
+  # is recorded as an adapter EXCLUSION rather than an inclusion, and a
+  # `!supports_X?` lands in `neg_features` rather than claiming the capability.
   def scan_run_condition(node, acc, negated = false)
     return unless node.is_a?(Array)
     if node[0] == :unary && (node[1] == :! || node[1] == :not)
@@ -692,7 +708,8 @@ class TestExtractor
         (negated ? acc[:neg_adapter_syms] : acc[:adapter_syms]).concat(extract_symbol_args(node))
         return
       elsif name =~ /\Asupports_.+\?\z/
-        acc[:features] << name.sub(/\Asupports_/, "").sub(/\?\z/, "")
+        bucket = negated ? acc[:neg_features] : acc[:features]
+        bucket << name.sub(/\Asupports_/, "").sub(/\?\z/, "")
         return
       elsif name == "send" || name == "public_send"
         # `@connection.send(:supports_rename_index?)` (foreign_key_test.rb) — a
@@ -702,7 +719,8 @@ class TestExtractor
         # `mysql? && !send(:supports_rename_index?)` emits an unsound adapter set.
         syms = extract_symbol_args(node).grep(/\Asupports_.+\?\z/)
         unless syms.empty?
-          syms.each { |s| acc[:features] << s.sub(/\Asupports_/, "").sub(/\?\z/, "") }
+          bucket = negated ? acc[:neg_features] : acc[:features]
+          syms.each { |s| bucket << s.sub(/\Asupports_/, "").sub(/\?\z/, "") }
           return
         end
       elsif name == "prepared_statements" || name == "prepared_statements?"
