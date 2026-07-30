@@ -1525,9 +1525,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     });
     this._maintenanceTail = prev.then(() => gate);
     await prev.catch(() => {});
+    this._queryInFlight = true;
+    this._queryInFlightOwner = this._transactionManager.currentLockToken;
     try {
       return await fn();
     } finally {
+      this._queryInFlight = false;
+      this._queryInFlightOwner = null;
       release();
     }
   }
@@ -1605,41 +1609,29 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       }
       return this._serializePinnedQuery(client, () => client.query(sql, binds) as Promise<R>);
     };
-    const isTxConn = client === this._rawConnection;
-    if (isTxConn) {
-      this._queryInFlight = true;
-      this._queryInFlightOwner = this._transactionManager.currentLockToken;
-    }
     try {
-      try {
-        return await attempt();
-      } catch (e) {
-        if (prepare && this._isInvalidCachedPlan(e)) {
-          // Mirrors Rails' `perform_query` rescue
-          // (postgresql/database_statements.rb:143-151): inside a transaction we
-          // can't recover (all commands would raise InFailedSQLTransaction), so
-          // raise `PreparedStatementCacheExpired` and let the transaction machinery
-          // clear the whole cache on rollback; otherwise drop just this entry and
-          // retry. `in_transaction?` is `open_transactions > 0`
-          // (postgresql_adapter.rb:908-910), so an open *lazy* (un-materialized)
-          // frame still counts — a read-only block (`transaction { record.reload }`)
-          // never emits a physical `BEGIN` because reads don't materialize.
-          if (this.openTransactions > 0) {
-            throw new PreparedStatementCacheExpired(
-              (e as { message?: string })?.message ?? "cached plan expired",
-              { sql, binds, cause: e },
-            );
-          }
-          this._poolFor(client).delete(this.sqlKey(sql));
-          return await attempt();
+      return await attempt();
+    } catch (e) {
+      if (prepare && this._isInvalidCachedPlan(e)) {
+        // Mirrors Rails' `perform_query` rescue
+        // (postgresql/database_statements.rb:143-151): inside a transaction we
+        // can't recover (all commands would raise InFailedSQLTransaction), so
+        // raise `PreparedStatementCacheExpired` and let the transaction machinery
+        // clear the whole cache on rollback; otherwise drop just this entry and
+        // retry. `in_transaction?` is `open_transactions > 0`
+        // (postgresql_adapter.rb:908-910), so an open *lazy* (un-materialized)
+        // frame still counts — a read-only block (`transaction { record.reload }`)
+        // never emits a physical `BEGIN` because reads don't materialize.
+        if (this.openTransactions > 0) {
+          throw new PreparedStatementCacheExpired(
+            (e as { message?: string })?.message ?? "cached plan expired",
+            { sql, binds, cause: e },
+          );
         }
-        throw e;
+        this._poolFor(client).delete(this.sqlKey(sql));
+        return await attempt();
       }
-    } finally {
-      if (isTxConn) {
-        this._queryInFlight = false;
-        this._queryInFlightOwner = null;
-      }
+      throw e;
     }
   }
 
