@@ -14,11 +14,10 @@
  * database is laid from the same registry, so "stamped by this run" *is* the
  * up-to-date test, and across runs the token differs.
  *
- * The stamp is single-use by construction: `resetTestTables` drops
- * `ar_internal_metadata` between test files, so a slot database handed to a
- * later worker no longer reports up-to-date and takes the full purge+load path.
- * That is what makes the fast path safe to leave the schema untouched — a
- * database that reports up-to-date is exactly one that no test has run against.
+ * The stamp says the canonical tables are laid and shape-current; it says
+ * nothing about what tests have since done to the rest of the database, so the
+ * fast path still clears the rows and re-runs the adapter-specific arm (see
+ * `test-setup-dy.ts`).
  *
  * @internal Boot/template setup paths only.
  */

@@ -13,11 +13,9 @@
  * What Rails has no counterpart for is the step *before* the load: this
  * database is not freshly created, so it has to be emptied first. Which form
  * that takes is the driver gate (RFC 0002 §Design):
- *   - already laid by this run (`canonicalSchemaUpToDate`) → TRUNCATE only, no
- *     DDL. This is the PG template-clone fast path: a slot DB cloned from the
- *     stamped template carries both arms of the load already, and the stamp is
- *     gone the moment a test file's reset runs, so a database that still
- *     reports up-to-date is one no test has touched.
+ *   - already laid by this run (`canonicalSchemaUpToDate`) → TRUNCATE, skipping
+ *     the canonical DDL only. This is the PG template-clone fast path: a slot DB
+ *     cloned from the stamped template already carries the canonical half.
  *   - sqlite file → purge (per-worker isolated file; drop+create is safe — no
  *     other worker shares this file path).
  *   - PG/MySQL slot >1 (AR_PG_EXCLUSIVE_DB / AR_MYSQL_EXCLUSIVE_DB set by
@@ -45,8 +43,9 @@ const mysqlExclusive = adapter === "mysql" && !!getEnv("AR_MYSQL_EXCLUSIVE_DB");
 const ownsDatabase =
   (adapter === "sqlite" && envConfig.database !== ":memory:") || pgExclusive || mysqlExclusive;
 
-const { recordBootLaidTables, dropAllTables } = await import("./support/drop-all-tables.js");
-const { loadSchema } = await import("./support/load-schema-helper.js");
+const { recordBootLaidTables, dropAllTables, resetTestTables } =
+  await import("./support/drop-all-tables.js");
+const { loadSchema, loadAdapterSpecificSchema } = await import("./support/load-schema-helper.js");
 const { canonicalSchemaUpToDate, stampCanonicalSchema } =
   await import("./support/canonical-schema-stamp.js");
 
@@ -54,6 +53,14 @@ if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
   if (getEnv("SKIP_TEST_DATABASE_TRUNCATE") === undefined) {
     await DatabaseTasks.truncateTables(envConfig);
   }
+  // Only the canonical arm is skipped here — those tables are already laid, and
+  // now empty. The adapter-specific arm is re-run as on the full path: its
+  // tables are `force: true` throughout, and a worker recycled onto a database
+  // an earlier worker's tests ran against finds them dropped — `resetTestTables`
+  // drops every table it did not snapshot as boot-laid.
+  const conn = await Base.leaseConnection();
+  await resetTestTables(conn);
+  await loadAdapterSpecificSchema(conn);
 } else {
   // `DatabaseTasks.purge` re-establishes Base's pool on the recreated database,
   // so the connection has to be leased after it, not before.
