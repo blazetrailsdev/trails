@@ -164,9 +164,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       //        end
       class HstoreMigration extends Migration {
         async change() {
-          // Migration#changeTable yields an abstract Table behind
-          // withAdapterColumnMethods (not PostgreSQL::Table), so `hstore` here is
-          // the synthesized shorthand, not PgTable#hstore.
           await this.changeTable("hstores", async (t) => {
             await (t as any).hstore("keys");
           });

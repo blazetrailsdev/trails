@@ -791,11 +791,6 @@ export class Table extends AbstractTable {
     ...args: [...names: string[], options: ColumnOptions & { enum_type: string }]
   ): Promise<void>;
   async enum(...args: unknown[]): Promise<void> {
-    // Rails passes `:enum` plus the `enum_type:` option down to `type_to_sql`,
-    // which resolves it to the enum's name. trails' DSL has no `enum_type`
-    // plumbing through `addColumn`, so — as in abstract TableDefinition#enum
-    // (abstract/schema-definitions.ts) — the enum name is substituted for the
-    // column type up front, which produces the same DDL.
     const { names, options } = splitColumnNames(args, "enum");
     const { enum_type: enumType, ...rest } = options as ColumnOptions & { enum_type: string };
     for (const name of names) await this.column(name, enumType as ColumnType, rest);
