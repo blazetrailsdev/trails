@@ -1572,6 +1572,19 @@ describe("buildReport — interface declaration names", () => {
     expect(report.packages[0].extraFiles[0].extras).toEqual([{ name: "Adapter", kind: "novel" }]);
   });
 
+  it("exempts a name shared only with surface the report does not count", () => {
+    // `@internal` and `_`-prefixed members are not surface, so the interface is
+    // still the file's only contributor of the name. Both collectors read one
+    // walk, so they cannot disagree about that.
+    const ts = tsWith([{ name: "Adapter", isInterface: true }, { name: "Other" }]);
+    ts.packages.activemodel.modules["foo.ts:Other:1"].instanceMethods = [
+      { ...method("Adapter"), internal: true },
+    ];
+    const report = run(ruby, ts);
+    expect(report.packages[0].extraFiles[0].extras).toEqual([{ name: "Other", kind: "novel" }]);
+    expect(report.packages[0].totalInterfaceExempt).toBe(1);
+  });
+
   it("keeps a tag on an exempt-by-kind interface matching, so the tag is not stale", () => {
     const ts = tsWith([{ name: "ConnectionHost", isInterface: true, members: ["tsOnlyHelper"] }]);
     ts.packages.activemodel.modules["foo.ts:ConnectionHost:0"].noRailsEquivalent =

@@ -631,36 +631,44 @@ export function collectTsFileNames(
   fileFunctions: MethodInfo[] | undefined,
 ): Set<string> {
   const out = new Set<string>();
-  const push = (m: MethodInfo): void => {
+  for (const { name } of walkTsFileSurface(file, classes, modules, fileFunctions)) out.add(name);
+  return out;
+}
+
+/** One public name a file contributes, and whether an `interface` declared it. */
+interface SurfaceName {
+  name: string;
+  interfaceDeclaration: boolean;
+}
+
+/**
+ * The single walk both collectors read, so what counts as surface and what
+ * counts as an interface-only name can never disagree about a file.
+ */
+function walkTsFileSurface(
+  file: string,
+  classes: ClassInfo[],
+  modules: ClassInfo[],
+  fileFunctions: MethodInfo[] | undefined,
+): SurfaceName[] {
+  const out: SurfaceName[] = [];
+  const pushMember = (m: MethodInfo): void => {
     if (m.internal === true) return;
     if (m.name.startsWith("_")) return;
-    out.add(m.name);
+    out.push({ name: m.name, interfaceDeclaration: false });
   };
-  const pushDeclaration = (c: ClassInfo): void => {
-    if (c.synthesizedMixin === true) return;
-    if (c.name.startsWith("_")) return;
-    out.add(c.name);
-  };
-  for (const c of classes) {
+  for (const c of [...classes, ...modules]) {
     if (c.file !== file) continue;
-    pushDeclaration(c);
-    for (const m of c.instanceMethods) push(m);
-    for (const m of c.classMethods) push(m);
-  }
-  for (const m of modules) {
-    if (m.file !== file) continue;
-    pushDeclaration(m);
-    const skipForeign = m.synthesizedMixin === true;
-    for (const im of m.instanceMethods) {
-      if (skipForeign && im.declaredIn !== undefined) continue;
-      push(im);
+    const skipForeign = c.synthesizedMixin === true;
+    if (!skipForeign && !c.name.startsWith("_")) {
+      out.push({ name: c.name, interfaceDeclaration: c.isInterface === true });
     }
-    for (const cm of m.classMethods) {
-      if (skipForeign && cm.declaredIn !== undefined) continue;
-      push(cm);
+    for (const m of [...c.instanceMethods, ...c.classMethods]) {
+      if (skipForeign && m.declaredIn !== undefined) continue;
+      pushMember(m);
     }
   }
-  for (const fn of fileFunctions ?? []) push(fn);
+  for (const fn of fileFunctions ?? []) pushMember(fn);
   return out;
 }
 
@@ -701,18 +709,14 @@ export function collectInterfaceOnlyNames(
 ): Set<string> {
   const interfaces = new Set<string>();
   const others = new Set<string>();
-  for (const c of [...classes, ...modules]) {
-    if (c.file !== file) continue;
-    if (c.synthesizedMixin === true) {
-      for (const m of [...c.instanceMethods, ...c.classMethods]) {
-        if (m.declaredIn === undefined) others.add(m.name);
-      }
-      continue;
-    }
-    (c.isInterface === true ? interfaces : others).add(c.name);
-    for (const m of [...c.instanceMethods, ...c.classMethods]) others.add(m.name);
+  for (const { name, interfaceDeclaration } of walkTsFileSurface(
+    file,
+    classes,
+    modules,
+    fileFunctions,
+  )) {
+    (interfaceDeclaration ? interfaces : others).add(name);
   }
-  for (const fn of fileFunctions ?? []) others.add(fn.name);
   for (const name of others) interfaces.delete(name);
   return interfaces;
 }
