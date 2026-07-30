@@ -182,6 +182,34 @@ describe("Ruby extractor gate detection", () => {
     });
   });
 
+  it("inverts a negated feature predicate in a pure `if` conjunction", () => {
+    const g = rubyGates({
+      "cases/bar_test.rb": `
+        def test_pg_and_not_feature; end if current_adapter?(:PostgreSQLAdapter) && !supports_insert_returning?
+        def test_pg_or_not_feature; end if current_adapter?(:PostgreSQLAdapter) || !supports_insert_returning?
+        def test_unless_pg_and_not_feature; end unless current_adapter?(:PostgreSQLAdapter) && !supports_insert_returning?
+      `,
+    });
+    // The adapter set survives the pure conjunction, so a polarity-blind
+    // `features: [insert_returning]` would claim "runs on PostgreSQL WHERE
+    // insert_returning IS supported" — the opposite of the truth. The negated
+    // predicate becomes a `no_` guard, the same vocabulary the `unless` path uses.
+    expect(g["pg and not feature"]).toEqual({
+      adapters: ["postgresql"],
+      guards: ["no_insert_returning"],
+      source: ["class"],
+    });
+    // `||` → run-on set is a union; the adapter set is dropped and the feature
+    // stays polarity-blind (the conservative "this capability is involved" claim).
+    expect(g["pg or not feature"]).toEqual({ features: ["insert_returning"], source: ["class"] });
+    // `unless` keeps its own handling: the whole conjunction is negated, so the
+    // feature list is inverted wholesale as before.
+    expect(g["unless pg and not feature"]).toEqual({
+      guards: ["no_insert_returning"],
+      source: ["class"],
+    });
+  });
+
   it("reads a supports_X? predicate reached through send", () => {
     const g = rubyGates({
       // Mirrors migration/foreign_key_test.rb:96 — `supports_rename_index?` is

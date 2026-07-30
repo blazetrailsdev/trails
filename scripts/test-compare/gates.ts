@@ -183,14 +183,37 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
   }
 
   // `adapterSupports("feature")` calls — the TS analog of Rails' `supports_X?`
-  // feature predicates. Collected polarity-blind (any `!`/`||` negation is
-  // ignored), exactly as the Ruby extractor's `scan_run_condition` lists every
-  // `supports_X?` it finds in the run condition regardless of negation. This
-  // lets `it.skipIf(!adapterSupports("a") || adapterSupports("b"))(...)` carry
-  // the same feature set Rails derives from `skip unless a? && !b?`.
-  const featureMatches = [...text.matchAll(/adapterSupports\(\s*["']([a-z0-9_]+)["']\s*\)/g)].map(
-    (m) => m[1],
-  );
+  // feature predicates.
+  //
+  // Polarity is read at RUN-CONDITION level: the run condition is `expr` under
+  // `runIf` and `!expr` under `skipIf`, so a term's effective negation is its
+  // textual `!` flipped by the form. While the run condition is a pure
+  // CONJUNCTION each term's polarity stands on its own, and a run-negated
+  // feature becomes a `no_<feature>` guard — Rails' own vocabulary from the
+  // `unless` path, which `gate_from_run_condition` emits for the same shapes.
+  // That is what keeps the two extractors in lockstep on
+  // `if current_adapter?(:X) && !supports_y?` (and its De-Morgan'd skip twin):
+  // the adapter set survives the pure conjunction, so lumping the negated
+  // predicate into `features` would state the exact OPPOSITE capability
+  // alongside it.
+  //
+  // When the run condition is a DISJUNCTION the terms no longer decompose, and
+  // the collection stays polarity-blind — the conservative "this capability is
+  // involved" claim the comparison has always relied on, matching the Ruby
+  // extractor listing every `supports_X?` it finds regardless of negation.
+  const runIsDisjunctive = runsWhenTrue ? text.includes("||") : text.includes("&&");
+  const featureTerms = [
+    ...text.matchAll(/(!\s*)?adapterSupports\(\s*["']([a-z0-9_]+)["']\s*\)/g),
+  ].map((m) => {
+    const negatedInText = Boolean(m[1]);
+    return { negated: runsWhenTrue ? negatedInText : !negatedInText, name: m[2] };
+  });
+  const featureMatches = featureTerms
+    .filter((t) => !(!runIsDisjunctive && t.negated))
+    .map((t) => t.name);
+  const invertedFeatures = runIsDisjunctive
+    ? []
+    : featureTerms.filter((t) => t.negated).map((t) => `no_${t.name}`);
 
   // `isMariaDb` (test-helper boolean) / `isMariadb()` (adapter method) — the
   // TS analogs of Rails' `mariadb?` predicate, which the Ruby extractor records
@@ -204,7 +227,8 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
   // `&&` under `skipIf`. Deliberately coarse and textual, like
   // `scan_run_condition`, which sets `has_or` for a `||` anywhere in the
   // condition sexp rather than only at the top level.
-  const runIsDisjunctive = runsWhenTrue ? text.includes("||") : text.includes("&&");
+  //
+  // (`runIsDisjunctive` is computed above, next to the feature terms that need it.)
 
   // The `mixed` rule (see the docstring): a POSITIVE adapter set is dropped when
   // the compound carries a non-comparable guard, and — since the set is only
@@ -222,7 +246,12 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
   const gate: TestGate = { source: ["test"] };
   if (adapters && !mixed) gate.adapters = adapters;
   if (featureMatches.length) gate.features = sortedUnique(featureMatches);
-  if (guards.length) gate.guards = guards;
+  // `invertedFeatures` is deliberately kept out of `guards` above: `guards` is the
+  // non-comparable-runtime-predicate bucket that DROPS a positive adapter set via
+  // `mixed`, and a `no_<feature>` term must not do that — the adapter set is sound
+  // precisely because the conjunction is pure.
+  const allGuards = [...guards, ...invertedFeatures];
+  if (allGuards.length) gate.guards = sortedUnique(allGuards);
   if (!gate.adapters && !gate.features && !gate.guards) gate.guards = ["unknown"];
   return gate;
 }
