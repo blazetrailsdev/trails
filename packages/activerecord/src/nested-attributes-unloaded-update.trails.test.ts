@@ -1,18 +1,8 @@
 /**
- * Trails-only surface: an `id` / `update_only` one-to-one nested-attributes
- * update whose target is **not in memory**.
- *
- * Rails has no separate test for this because it has no separate case: the
- * writer opens with `existing_record = send(association_name)`
- * (vendor/rails/activerecord/lib/active_record/nested_attributes.rb:436), and
- * the reader loads the association, so a DB-backed record is updated (or marked
- * for destruction) in place at the assignment expression whether or not it was
- * loaded first. A synchronous JS property setter cannot await that load, so
- * trails issues it at assignment and settles it in the same drain the build arm
- * uses — the awaitable `set#{Name}Attributes` writer, or `save()`.
- *
- * These guard the observability Rails gets for free: the update is on the
- * in-memory graph *before* any save.
+ * Trails-only: an `id` / `update_only` one-to-one nested-attributes update whose
+ * target is not in memory. Rails has no separate test because it has no separate
+ * case — `existing_record = send(association_name)` (nested_attributes.rb:436)
+ * loads the association, so the update lands in place at the assignment.
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel, type Base } from "./index.js";
@@ -29,7 +19,6 @@ interface PirateHandle {
   save(): Promise<boolean>;
 }
 
-/** A persisted pirate + ship pair with the `ship` association never loaded. */
 async function pirateWithUnloadedShip(): Promise<[PirateHandle, Base]> {
   const pirate = (await Pirate.createBang({ catchphrase: "Aye" })) as unknown as PirateHandle;
   const ship = (await Ship.createBang({

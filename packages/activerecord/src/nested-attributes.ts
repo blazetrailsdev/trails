@@ -679,7 +679,6 @@ interface OneToOneAssociation {
   buildDisplacementOwnedByCaller?: boolean;
   initializeAttributes(record: Base): void;
   isLoaded?(): boolean;
-  /** Rails' `send(association_name)` — the reader's `load_target`. */
   loadTarget?(): Promise<Base | Base[] | null>;
   detachDisplacedTarget?(displaced: Base | null): Promise<void>;
   detachDisplacedForSyncBuild?(): Promise<void> | null;
@@ -795,26 +794,7 @@ async function awaitPendingDisplacedRemovals(record: Base): Promise<void> {
   if (host._displacedRemovalFailure !== undefined) throw host._displacedRemovalFailure;
 }
 
-/**
- * The unloaded half of Rails' `existing_record = send(association_name)`
- * (nested_attributes.rb:436) for the `id` / `update_only` update arm.
- *
- * Rails' reader loads the association, so the update lands on the DB-backed
- * record *at assignment* and is observable on the in-memory graph before any
- * `save` — `_destroy` in particular participates in validations against the
- * post-destroy graph. The synchronous setter (`pirate.shipAttributes = {...}`)
- * cannot await the SELECT, so it is issued here (Rails' timing for issuing the
- * query) and its completion is parked on the owner and drained by the same
- * mechanism the build arm uses: `awaitPendingDisplacedRemovals`, which the
- * `save` wrapper and the awaitable `set#{Name}Attributes` writer both run.
- *
- * Returns null when there is nothing to load — an already-loaded association,
- * or one whose runtime has no `loadTarget` — leaving the writer synchronous and
- * the caller on its existing post-save-flush path. It also falls back to that
- * flush when the load finds no record, or one whose id does not match: Rails
- * raises `RecordNotFound` there, which trails does not yet do on this arm.
- * @internal
- */
+/** @internal */
 function loadExistingThenAssignInPlace(
   record: Base,
   assoc: OneToOneAssociation,
@@ -897,11 +877,7 @@ export function assignNestedAttributesForOneToOneAssociation(
   const updateOnly = options.updateOnly ?? false;
   const hasId = hasNestedId(attributes);
 
-  // Rails: `existing_record = send(association_name)`. The reader *loads* the
-  // association, so an unloaded one still reaches its DB-backed record here; a
-  // synchronous writer cannot await that load, so the load is issued at
-  // assignment (Rails' timing) and only its completion is deferred to the drain
-  // — see `loadExistingThenAssignInPlace`.
+  // Rails: `existing_record = send(association_name)`.
   const assoc = record.association(associationName) as unknown as OneToOneAssociation;
   const existing = assoc.target ?? null;
 
@@ -919,12 +895,6 @@ export function assignNestedAttributesForOneToOneAssociation(
     return;
   }
 
-  // An `id`/`update_only` update whose target is not in memory. Rails' reader
-  // has already loaded it by this point, so start that load here and assign in
-  // place when it lands (`loadExistingThenAssignInPlace`). Only an association
-  // that is already loaded — where Rails' reader would have issued no query and
-  // genuinely has no existing record — still falls through to the post-save
-  // flush.
   if (hasId || updateOnly) {
     const pendingUpdate = loadExistingThenAssignInPlace(
       record,
