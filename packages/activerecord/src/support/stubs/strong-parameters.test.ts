@@ -21,6 +21,31 @@ describe("ProtectedParams", () => {
     expect(params.toH()).toEqual({ first_name: "Guille" });
   });
 
+  it("a parameter named after a method does not shadow the method", () => {
+    const params = new ProtectedParams({
+      keys: ["shadow"],
+      permitted: true,
+      toH: "not a method",
+      first_name: "Guille",
+    });
+
+    expect(params.keys()).toEqual(["keys", "permitted", "toH", "first_name"]);
+    expect(params.permitted()).toBe(false);
+    expect(params.isEmpty()).toBe(false);
+    expect(params.toH()).toEqual({
+      keys: ["shadow"],
+      permitted: true,
+      toH: "not a method",
+      first_name: "Guille",
+    });
+    // The method wins over the same-named parameter on property access (and so
+    // on spread, which reads through the same path); `toH()` is how a colliding
+    // parameter is read back.
+    expect(typeof params["keys"]).toBe("function");
+    expect(params["first_name"]).toBe("Guille");
+    expect({ ...params }.first_name).toBe("Guille");
+  });
+
   it("permit! flips permitted? and returns self", () => {
     const params = new ProtectedParams({ first_name: "Guille" });
 
