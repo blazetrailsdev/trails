@@ -36,7 +36,7 @@ case "$GIT_COMMON_DIR" in
   *)  MAIN_GIT_DIR="$WORKTREE_ROOT/$GIT_COMMON_DIR" ;;
 esac
 MAIN_REPO="$(cd "$MAIN_GIT_DIR/.." && pwd)"
-WORKTREES_ROOT="$HOME/github/blazetrailsdev/worktrees"
+WORKTREES_ROOT="${WORKTREES_ROOT:-$HOME/github/blazetrailsdev/worktrees}"
 TARGET="$WORKTREES_ROOT/$NAME"
 
 if [[ -e "$TARGET" ]]; then
@@ -220,7 +220,7 @@ WORKTREE_CREATED=0  # success — disable EXIT-trap cleanup
 # Best-effort: failures below are warned but do not abort — the agent falls
 # back to the canonical ~/github/blazetrailsdev/tasks path via cli.ts.
 TASKS_CANONICAL="$HOME/github/blazetrailsdev/tasks"
-TASKS_WORKTREES_ROOT="$HOME/github/blazetrailsdev/tasks-worktrees"
+TASKS_WORKTREES_ROOT="${TASKS_WORKTREES_ROOT:-$(dirname "$WORKTREES_ROOT")/tasks-worktrees}"
 TASKS_WT="$TASKS_WORKTREES_ROOT/$NAME"
 
 # Run in a subshell so any unexpected failure (set -euo pipefail inside)
