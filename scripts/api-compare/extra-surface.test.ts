@@ -1489,6 +1489,127 @@ describe("buildReport — declaration names", () => {
   });
 });
 
+describe("buildReport — interface declaration names", () => {
+  const run = (ruby: ApiManifest, ts: ApiManifest) =>
+    buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+
+  const ruby: ApiManifest = {
+    source: "ruby",
+    generatedAt: "",
+    packages: {
+      activemodel: {
+        classes: {
+          "ActiveModel::Foo": rubyClass({ name: "Foo", file: "foo.rb" }),
+          // Declared in a DIFFERENT Rails file: a TS interface of this name in
+          // foo.ts is misplaced surface, not an impossible-by-construction shape.
+          "ActiveModel::Quoting": rubyClass({ name: "Quoting", file: "quoting.rb" }),
+        },
+        modules: {},
+      },
+    },
+  };
+
+  const tsWith = (decls: { name: string; isInterface?: boolean; members?: string[] }[]) => ({
+    source: "typescript" as const,
+    generatedAt: "",
+    packages: {
+      activemodel: {
+        classes: {},
+        modules: Object.fromEntries(
+          decls.map((d, i) => [
+            `foo.ts:${d.name}:${i}`,
+            {
+              name: d.name,
+              file: "foo.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: (d.members ?? []).map((m) => method(m)),
+              classMethods: [],
+              ...(d.isInterface === true ? { isInterface: true } : {}),
+            },
+          ]),
+        ),
+      },
+    },
+  });
+
+  it("exempts a novel interface declaration name by kind, with no tag", () => {
+    const report = run(ruby, tsWith([{ name: "ConnectionHost", isInterface: true }]));
+    expect(report.packages[0].extraFiles).toEqual([]);
+    expect(report.packages[0].totalInterfaceExempt).toBe(1);
+  });
+
+  it("still scores an interface declaration name Rails uses elsewhere", () => {
+    const report = run(ruby, tsWith([{ name: "Quoting", isInterface: true }]));
+    expect(report.packages[0].extraFiles[0].extras).toEqual([{ name: "Quoting", kind: "moved" }]);
+    expect(report.packages[0].totalInterfaceExempt).toBe(0);
+  });
+
+  it("still scores a novel class or namespace declaration name", () => {
+    const report = run(ruby, tsWith([{ name: "QueryLogger" }]));
+    expect(report.packages[0].extraFiles[0].extras).toEqual([
+      { name: "QueryLogger", kind: "novel" },
+    ]);
+  });
+
+  it("still scores an interface's members, which the exemption does not reach", () => {
+    const report = run(
+      ruby,
+      tsWith([{ name: "ConnectionHost", isInterface: true, members: ["tsOnlyHelper"] }]),
+    );
+    expect(report.packages[0].extraFiles[0].extras).toEqual([
+      { name: "tsOnlyHelper", kind: "novel" },
+    ]);
+  });
+
+  it("does not exempt a name a class in the same file also declares", () => {
+    const report = run(ruby, tsWith([{ name: "Adapter", isInterface: true }, { name: "Adapter" }]));
+    expect(report.packages[0].extraFiles[0].extras).toEqual([{ name: "Adapter", kind: "novel" }]);
+  });
+
+  it("exempts a name shared only with surface the report does not count", () => {
+    // `@internal` and `_`-prefixed members are not surface, so the interface is
+    // still the file's only contributor of the name. Both collectors read one
+    // walk, so they cannot disagree about that.
+    const ts = tsWith([{ name: "Adapter", isInterface: true }, { name: "Other" }]);
+    ts.packages.activemodel.modules["foo.ts:Other:1"].instanceMethods = [
+      { ...method("Adapter"), internal: true },
+    ];
+    const report = run(ruby, ts);
+    expect(report.packages[0].extraFiles[0].extras).toEqual([{ name: "Other", kind: "novel" }]);
+    expect(report.packages[0].totalInterfaceExempt).toBe(1);
+  });
+
+  it("still scores a name a merged interface+namespace declares, in either order", () => {
+    // Declaration merging collapses the pair into ONE entry carrying
+    // `isInterface`; `declaredAsNamespace` is what keeps the namespace half —
+    // a real non-interface declaration of the name — visible here.
+    const ts = tsWith([{ name: "Locator", isInterface: true }]);
+    ts.packages.activemodel.modules["foo.ts:Locator:0"].declaredAsNamespace = true;
+    const report = run(ruby, ts);
+    expect(report.packages[0].extraFiles[0].extras).toEqual([{ name: "Locator", kind: "novel" }]);
+    expect(report.packages[0].totalInterfaceExempt).toBe(0);
+  });
+
+  it("keeps a tag on an exempt-by-kind interface matching, so the tag is not stale", () => {
+    const ts = tsWith([{ name: "ConnectionHost", isInterface: true, members: ["tsOnlyHelper"] }]);
+    ts.packages.activemodel.modules["foo.ts:ConnectionHost:0"].noRailsEquivalent =
+      "PERMANENT duck-typed collaborator shape";
+    const report = run(ruby, ts);
+    expect(report.tagged.stale).toEqual([]);
+    expect(report.tagged.matched).toBe(1);
+    // The tag check runs first, so the name lands in Allowed rather than in
+    // the by-kind exemption — and its members keep inheriting the reason.
+    expect(report.packages[0].totalInterfaceExempt).toBe(0);
+    expect(report.packages[0].totalAllowlisted).toBe(2);
+  });
+});
+
 describe("buildReport — re-export clones", () => {
   it("charges a barrel only with the classes it declares itself", () => {
     const ruby: ApiManifest = {

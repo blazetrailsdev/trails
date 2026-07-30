@@ -529,6 +529,9 @@ export function extractFromProgram(
             if (!existingNames.has(m.name)) existing.instanceMethods.push(m);
           }
           existing.noRailsEquivalent ??= extracted.noRailsEquivalent;
+          // Merging into an `interface` half leaves `isInterface` true; record
+          // the namespace half so consumers can still see it (see ClassInfo).
+          existing.declaredAsNamespace = true;
         } else {
           info.modules[modKey] = extracted;
         }
@@ -539,7 +542,14 @@ export function extractFromProgram(
         if (node.exportClause && ts.isNamespaceExport(node.exportClause)) {
           const name = node.exportClause.name.text;
           const modKey = `${relPath}:${name}`;
-          if (info.modules[modKey]) return;
+          const existing = info.modules[modKey];
+          if (existing) {
+            // An interface/namespace declaration already owns the entry; keep
+            // its members, but still record this namespace binding of the name
+            // (same reason as the `export namespace` merge branch above).
+            existing.declaredAsNamespace = true;
+            return;
+          }
           info.modules[modKey] = {
             name,
             file: relPath,
@@ -547,6 +557,7 @@ export function extractFromProgram(
             extends: [],
             instanceMethods: [],
             classMethods: [],
+            declaredAsNamespace: true,
           };
           fileHasClassOrModule = true;
         } else if (
@@ -2080,6 +2091,7 @@ function extractNamespace(
     extends: [],
     instanceMethods,
     classMethods: [],
+    declaredAsNamespace: true,
     ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
   };
 }

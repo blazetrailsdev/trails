@@ -2249,4 +2249,23 @@ describe("extractFromProgram — interface merged with a namespace of the same n
     expect(merged.instanceMethods.map((m) => m.name).sort()).toEqual(["locate", "use"]);
     expect(merged.interfaceMembers).toEqual(["locate"]);
   });
+
+  it("records the namespace half, which the interface-only kind exemption must not absolve", () => {
+    expect(entry(`${IFACE}\n${NAMESPACE}`).declaredAsNamespace).toBe(true);
+    expect(entry(`${NAMESPACE}\n${IFACE}`).declaredAsNamespace).toBe(true);
+    expect(entry(IFACE).declaredAsNamespace).toBeUndefined();
+  });
+
+  it("records an `export * as` binding of the name over an existing entry", () => {
+    const info = extractFromFiles("/p", {
+      "other.ts": `export function use(name: string): void {}`,
+      "locator.ts": `${IFACE}\nexport * as Locator from "./other.js";`,
+    });
+    const merged = info.modules["locator.ts:Locator"];
+    expect(merged.declaredAsNamespace).toBe(true);
+    // The existing entry's members survive — the re-export only adds the
+    // namespace binding, it does not replace the interface.
+    expect(merged.instanceMethods.map((m) => m.name)).toEqual(["locate"]);
+    expect(merged.isInterface).toBe(true);
+  });
 });
