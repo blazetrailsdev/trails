@@ -20,6 +20,9 @@ import { Temporal } from "../temporal.js";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 
+/** Ruby's core `ZeroDivisionError`, raised by `Rational(n, 0)`. */
+export class ZeroDivisionError extends Error {}
+
 export interface Rational {
   numerator: number;
   denominator: number;
@@ -36,9 +39,14 @@ function gcd(a: number, b: number): number {
 }
 
 function rational(numerator: number, denominator: number): Rational {
+  if (denominator === 0) throw new ZeroDivisionError("divided by 0");
+  const sign = denominator < 0 ? -1 : 1;
   if (numerator === 0) return { numerator: 0, denominator: 1 };
   const divisor = gcd(Math.abs(numerator), Math.abs(denominator));
-  return { numerator: numerator / divisor, denominator: denominator / divisor };
+  return {
+    numerator: (sign * numerator) / divisor,
+    denominator: (sign * denominator) / divisor,
+  };
 }
 
 function julianDay(date: Temporal.PlainDate): number {
