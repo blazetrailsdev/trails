@@ -193,7 +193,7 @@ export interface QueryCacheHost extends DatabaseStatementsHost {
     sql: string,
     name: string | null | undefined,
     binds: unknown[],
-    execute: () => Promise<Record<string, unknown>[]>,
+    block: () => Promise<Record<string, unknown>[]>,
   ): Promise<Record<string, unknown>[]>;
 }
 
@@ -701,12 +701,12 @@ function cacheSql(
   sql: string,
   name: string | null | undefined,
   binds: unknown[],
-  execute: () => Promise<Record<string, unknown>[]>,
+  block: () => Promise<Record<string, unknown>[]>,
 ): Promise<Record<string, unknown>[]> {
   const qc = this._queryCache;
-  if (!qc) return execute();
+  if (!qc) return block();
   const key = sqlCacheKey(sql, binds);
-  return qc.computeIfAbsent(key, execute);
+  return qc.computeIfAbsent(key, block);
 }
 
 /**
