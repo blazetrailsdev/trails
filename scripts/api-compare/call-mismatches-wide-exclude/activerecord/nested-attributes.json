@@ -107,13 +107,6 @@
   {
     "package": "activerecord",
     "tsFile": "nested-attributes.ts",
-    "rubyName": "assign_nested_attributes_for_one_to_one_association",
-    "call": "raise_nested_attributes_record_not_found!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "nested-attributes.ts",
     "rubyName": "assign_to_or_mark_for_destruction",
     "call": "except",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

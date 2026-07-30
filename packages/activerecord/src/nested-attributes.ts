@@ -797,55 +797,6 @@ async function awaitPendingDisplacedRemovals(record: Base): Promise<void> {
 }
 
 /** @internal */
-function assignExistingOrBuild(
-  record: Base,
-  assoc: OneToOneAssociation,
-  associationName: string,
-  attributes: Record<string, unknown>,
-  options: NestedAttributeOptions,
-  existing: Base | null,
-): void {
-  const id = (attributes as any).id;
-
-  // Rails nested_attributes.rb:436.
-  if (existing && (options.updateOnly || String(existing.id) === String(id))) {
-    if (!callRejectIf(record, associationName, attributes)) {
-      assignToOrMarkForDestruction(existing, attributes, options.allowDestroy ?? false);
-    }
-    return;
-  }
-
-  // Rails nested_attributes.rb:439-440.
-  if (hasNestedId(attributes)) {
-    raiseNestedAttributesRecordNotFoundBang(record, associationName, id);
-  }
-
-  // Rails nested_attributes.rb:442-452.
-  buildNestedRecord(record, assoc, associationName, attributes, existing);
-}
-
-/** @internal */
-function readExistingThenAssign(
-  record: Base,
-  assoc: OneToOneAssociation,
-  associationName: string,
-  attributes: Record<string, unknown>,
-  options: NestedAttributeOptions,
-): boolean {
-  if (assoc.isLoaded?.() !== false) return false;
-  if (!("reader" in assoc)) return false;
-  const read = assoc.reader;
-  const assign = (existing: Base | null): void =>
-    assignExistingOrBuild(record, assoc, associationName, attributes, options, existing);
-  if (read instanceof Promise) {
-    parkDisplacedRemoval(record, read.then(assign));
-  } else {
-    assign(read ?? null);
-  }
-  return true;
-}
-
-/** @internal */
 function hasNestedId(attributes: Record<string, unknown>): boolean {
   const id = (attributes as any).id;
   return id !== undefined && id !== null && id !== "";
@@ -902,8 +853,23 @@ export function assignNestedAttributesForOneToOneAssociation(
   const updateOnly = options.updateOnly ?? false;
   const hasId = hasNestedId(attributes);
 
-  // Rails: `existing_record = send(association_name)`.
+  // Rails: `existing_record = send(association_name)`. The reader loads an
+  // unloaded association; a synchronous writer cannot await that, so the whole
+  // body is re-entered once it lands (`assoc.isLoaded()` is true by then, so
+  // this resolves and falls through).
   const assoc = record.association(associationName) as unknown as OneToOneAssociation;
+  if ((hasId || updateOnly) && assoc.isLoaded?.() === false && "reader" in assoc) {
+    const read = assoc.reader;
+    if (read instanceof Promise) {
+      parkDisplacedRemoval(
+        record,
+        read.then(() =>
+          assignNestedAttributesForOneToOneAssociation(record, associationName, attributes),
+        ),
+      );
+      return;
+    }
+  }
   const existing = assoc.target ?? null;
 
   // Rails nested_attributes.rb:436 — update (or mark for destruction) the
@@ -920,24 +886,11 @@ export function assignNestedAttributesForOneToOneAssociation(
     return;
   }
 
-  if (hasId || updateOnly) {
-    if (!readExistingThenAssign(record, assoc, associationName, attributes, options)) {
-      assignExistingOrBuild(record, assoc, associationName, attributes, options, existing);
-    }
-    return;
+  // Rails nested_attributes.rb:439-440.
+  if (hasId) {
+    raiseNestedAttributesRecordNotFoundBang(record, associationName, (attributes as any).id);
   }
 
-  buildNestedRecord(record, assoc, associationName, attributes, existing);
-}
-
-/** @internal */
-function buildNestedRecord(
-  record: Base,
-  assoc: OneToOneAssociation,
-  associationName: string,
-  attributes: Record<string, unknown>,
-  existing: Base | null,
-): void {
   // Rails nested_attributes.rb:443 — build a new record (no matching id).
   if (!isRejectNewRecord(record, associationName, attributes)) {
     const assignable = assignableNestedAttributes(attributes);
