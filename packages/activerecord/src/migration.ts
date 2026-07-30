@@ -995,12 +995,7 @@ export abstract class Migration {
       await this.schema.changeTable(tname, options, callback);
       return;
     }
-    const delegate = this.connection as unknown as {
-      updateTableDefinition?(tableName: string, base: unknown): Table;
-    };
-    const table = delegate.updateTableDefinition
-      ? delegate.updateTableDefinition(tableName, this)
-      : this.schema.updateTableDefinition(tableName, this);
+    const table = this.schema.updateTableDefinition(tableName, this);
     if (callback) await callback(table);
   }
 

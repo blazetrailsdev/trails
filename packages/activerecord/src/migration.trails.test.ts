@@ -217,11 +217,17 @@ describe("MigrationTest", () => {
     const seen: unknown[] = [];
     class M extends Migration {}
     const m = new M();
-    (m as unknown as { _connectionOverride: unknown })._connectionOverride = {
+    const companion = {
       updateTableDefinition(tableName: string, base: unknown) {
         seen.push([tableName, base]);
         return new AdapterTable(tableName, base as never);
       },
+    };
+    (m as unknown as { _connectionOverride: unknown })._connectionOverride = {
+      quoteIdentifier: (n: string) => n,
+      quoteTableName: (n: string) => n,
+      quoteDefaultExpression: (v: unknown) => String(v),
+      schemaStatements: () => companion,
     };
 
     let yielded: unknown;
