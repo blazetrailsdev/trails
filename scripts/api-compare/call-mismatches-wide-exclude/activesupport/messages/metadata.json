@@ -25,6 +25,6 @@
     "tsFile": "messages/metadata.ts",
     "rubyName": "parse_expiry",
     "call": "parse",
-    "reason": "`Time.parse` is Rails' non-ISO branch, reached only when `ActiveSupport.use_standard_json_time_format` is false; trails has no such setting, so only the ISO branch exists (story `activesupport-message-metadata-shared-suite`)."
+    "reason": "Both branches are ported; Ruby's lenient `Time.parse` has no Temporal equivalent, so the non-standard-format branch parses with `new Date(...)` and converts to a `Temporal.Instant`, which is the same parse under a different call name."
   }
 ]

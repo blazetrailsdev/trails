@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { InvalidSignature, MessageVerifier } from "../message-verifier.js";
 import { Temporal } from "../temporal.js";
+import { Encoding } from "../json/encoding.js";
 import { currentTimeInstant } from "../time-travel.js";
 import {
   eachScenario as eachSerializerScenario,
@@ -64,6 +65,21 @@ describe("MessageVerifierMetadataTest", () => {
         expect(() => verifier.verify(message)).toThrow(InvalidSignature);
       });
     });
+  });
+
+  it("expiration works with ActiveSupport.use_standard_json_time_format = false", () => {
+    const original = Encoding.useStandardJsonTimeFormat;
+    Encoding.useStandardJsonTimeFormat = false;
+    try {
+      eachScenario((data, verifier) => {
+        const message = verifier.generate(data, {
+          expiresAt: currentTimeInstant().add({ hours: 1 }),
+        });
+        expect(verifier.verified(message)).toEqual(data);
+      });
+    } finally {
+      Encoding.useStandardJsonTimeFormat = original;
+    }
   });
 
   it("messages are readable by legacy versions when use_message_serializer_for_metadata = false", () => {

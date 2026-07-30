@@ -1,16 +1,14 @@
 import { Metadata } from "./metadata.js";
-import { SerializerWithFallback, Thrown, type Format } from "./serializer-with-fallback.js";
+import {
+  ArgumentError,
+  SerializerWithFallback,
+  Thrown,
+  type Format,
+} from "./serializer-with-fallback.js";
 
 export interface MessageSerializer {
   dump(value: unknown): string;
   load(dumped: string): unknown;
-}
-
-export class ArgumentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ArgumentError";
-  }
 }
 
 export interface CodecOptions {

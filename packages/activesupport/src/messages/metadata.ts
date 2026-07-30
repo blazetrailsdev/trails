@@ -1,10 +1,11 @@
 import { coder } from "../cache/coder.js";
 import { ActiveSupportJSON } from "../json.js";
+import { Encoding } from "../json/encoding.js";
 import { MessagePack } from "../message-pack/index.js";
 import { Temporal } from "../temporal.js";
 import { currentTimeInstant } from "../time-travel.js";
 import type { MessageSerializer } from "./codec.js";
-import { SERIALIZERS, Thrown } from "./serializer-with-fallback.js";
+import { ArgumentError, SERIALIZERS, Thrown } from "./serializer-with-fallback.js";
 
 export interface MetadataOptions {
   expiresAt?: Temporal.Instant | null;
@@ -155,8 +156,15 @@ export abstract class Metadata {
   protected parseExpiry(expiresAt: string | Temporal.Instant): Temporal.Instant {
     if (typeof expiresAt !== "string") {
       return expiresAt;
-    } else {
+    } else if (Encoding.useStandardJsonTimeFormat) {
       return Temporal.Instant.from(expiresAt);
+    } else {
+      // boundary: Ruby's lenient `Time.parse` has no Temporal equivalent; `Date` parses
+      // the non-ISO string and the result is handed straight back as an `Instant`.
+      const parsed = new Date(expiresAt).getTime();
+      if (Number.isNaN(parsed))
+        throw new ArgumentError(`no time information in ${JSON.stringify(expiresAt)}`);
+      return Temporal.Instant.fromEpochMilliseconds(parsed);
     }
   }
 
