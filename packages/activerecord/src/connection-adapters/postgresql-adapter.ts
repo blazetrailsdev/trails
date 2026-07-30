@@ -404,6 +404,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   private _client: pg.Client | null = null;
   private _inTransaction = false;
   private _queryInFlight = false;
+  // The TransactionManager lock token of the chain that issued the query
+  // `_queryInFlight` refers to — see `_cancelAnyRunningQuery`.
+  private _queryInFlightOwner: symbol | null = null;
   private _databaseVersion: number | null = null;
   private _typeMap: HashLookupTypeMap | null = null;
   private _maxIdentifierLength: number | null = null;
@@ -1602,7 +1605,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       return this._serializePinnedQuery(client, () => client.query(sql, binds) as Promise<R>);
     };
     const isTxConn = client === this._rawConnection;
-    if (isTxConn) this._queryInFlight = true;
+    if (isTxConn) {
+      this._queryInFlight = true;
+      this._queryInFlightOwner = this._transactionManager.currentLockToken;
+    }
     try {
       try {
         return await attempt();
@@ -1629,7 +1635,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         throw e;
       }
     } finally {
-      if (isTxConn) this._queryInFlight = false;
+      if (isTxConn) {
+        this._queryInFlight = false;
+        this._queryInFlightOwner = null;
+      }
     }
   }
 
@@ -2194,6 +2203,20 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // Sends a CancelRequest to abort any in-flight query on the transaction connection
   // before issuing ROLLBACK / ROLLBACK AND CHAIN, so the rollback isn't blocked
   // waiting for a long-running query to finish. Best-effort: errors are swallowed.
+  //
+  // INVARIANT: only ever cancels a query *this* unit of work issued. Rails gets
+  // that for free — `@connection.lock` is a thread mutex, so the only query that
+  // can be on the wire when a rollback reaches here is one the rolling-back
+  // thread itself started and abandoned (Timeout/Interrupt). trails' lock is per
+  // async chain and a chain can release it with work still awaiting, so a
+  // *foreign* chain's query is routinely mid-flight here. Cancelling that one
+  // rejects a promise this rollback does not own, and when the foreign chain has
+  // been dropped (an aborted save cascade, a connection heading back to the
+  // pool) nobody observes the rejection — it surfaces at run end as an
+  // unattributed `QueryCanceled: canceling statement due to user request`
+  // (RFC 0061 pg-query-canceled-unhandled-rejection). Skipping the cancel is
+  // safe: `_serializePinnedQuery` already sequences our ROLLBACK behind whatever
+  // is on the wire, so we wait instead of corrupting someone else's query.
   private _cancelAnyRunningQuery(): void {
     type PgClientWithPid = pg.Client & {
       processID?: number | null;
@@ -2206,6 +2229,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     };
     const txClient = this._client as PgClientWithPid | null;
     if (!this._queryInFlight || txClient?.processID == null) return;
+    const owner = this._transactionManager.currentLockToken;
+    if (owner === null || owner !== this._queryInFlightOwner) return;
     try {
       // Open a FRESH TCP connection to send a CancelRequest — mirrors
       // libpq PQcancel / Ruby PG::Connection#cancel: new socket, send

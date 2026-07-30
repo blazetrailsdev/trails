@@ -1191,6 +1191,22 @@ export class TransactionManager {
   }
 
   /**
+   * The lock token of the async chain currently executing inside
+   * {@link synchronize}, or `null` when the caller holds no lock. Rails needs
+   * no such accessor — its `@connection.lock` is a mutex over *threads*, so a
+   * connection can only ever have one unit of work touching it. trails' lock
+   * is per async chain, and a chain that returns while work it started is
+   * still awaiting releases the lock with a query still on the wire; this
+   * token is how a later holder tells "a query I issued" from "a query some
+   * other live chain issued" (see PostgreSQLAdapter#_cancelAnyRunningQuery).
+   *
+   * @internal
+   */
+  get currentLockToken(): symbol | null {
+    return this._lockStorage().getStore() ?? null;
+  }
+
+  /**
    * Run `fn` under the per-connection lock that serializes
    * {@link withinNewTransaction}. Mirrors Rails'
    * `@connection.lock.synchronize do … end` so callers can extend the lock

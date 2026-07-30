@@ -270,6 +270,28 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.rollback().catch(() => {});
       }
     });
+    // Regression for RFC 0061 pg-query-canceled-unhandled-rejection: rolling
+    // back must not fire a CancelRequest at a query some *other* async chain
+    // put on the wire. `_cancelAnyRunningQuery` used to cancel whatever was
+    // in flight, which rejected a promise the rollback didn't own — and when
+    // that chain had been dropped (an aborted save cascade), nobody observed
+    // the rejection and vitest reported an unattributed run-end
+    // `QueryCanceled`. The rollback waits behind the query instead.
+    it("rollback does not cancel a query issued by another chain", async () => {
+      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      try {
+        await other.beginDbTransaction();
+        // Issued outside the TransactionManager lock the rollback below takes,
+        // standing in for the foreign chain.
+        const foreign = other.execute("SELECT pg_sleep(0.5) AS slept");
+        await new Promise<void>((r) => setTimeout(r, 100));
+        await other.rollbackDbTransaction();
+        await expect(foreign).resolves.toHaveLength(1);
+      } finally {
+        await other.close();
+      }
+    });
+
     it("translate exception serialization failure", async () => {
       await adapter.exec(`CREATE TABLE "ex_ser" ("id" SERIAL PRIMARY KEY, "val" INTEGER)`);
       await adapter.executeMutation(`INSERT INTO "ex_ser" (val) VALUES (0)`);
