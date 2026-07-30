@@ -1,6 +1,7 @@
 import { getCrypto } from "./crypto-adapter.js";
-import { Codec, Thrown, type MessageSerializer } from "./messages/codec.js";
-import type { Format } from "./messages/serializer-with-fallback.js";
+import { Codec, type MessageSerializer } from "./messages/codec.js";
+import type { ExpectedMetadataOptions, MetadataOptions } from "./messages/metadata.js";
+import { Thrown, type Format } from "./messages/serializer-with-fallback.js";
 
 export class InvalidMessage extends Error {
   constructor(message = "Invalid message") {
@@ -13,6 +14,7 @@ interface MessageEncryptorOptions {
   cipher?: string;
   digest?: string;
   serializer?: Format | MessageSerializer;
+  forceLegacyMetadataSerializer?: boolean;
 }
 
 export class MessageEncryptor extends Codec {
@@ -42,7 +44,10 @@ export class MessageEncryptor extends Codec {
       opts = options ?? {};
     }
 
-    super({ serializer: opts.serializer });
+    super({
+      serializer: opts.serializer,
+      forceLegacyMetadataSerializer: opts.forceLegacyMetadataSerializer,
+    });
 
     this.cipher = opts.cipher ?? "aes-256-cbc";
     this.digest = opts.digest ?? "sha1";
@@ -56,22 +61,24 @@ export class MessageEncryptor extends Codec {
     }
   }
 
-  encryptAndSign(value: unknown): string {
-    const serialized = this.serialize(value);
-    const encrypted = this.encrypt(serialized);
-    const signature = this.sign(encrypted);
-    return `${encrypted}--${signature}`;
+  encryptAndSign(value: unknown, options: MetadataOptions = {}): string {
+    return this.createMessage(value, options);
   }
 
-  decryptAndVerify(message: string): unknown {
+  decryptAndVerify(message: string, options: ExpectedMetadataOptions = {}): unknown {
     return this.catchAndRaise("invalid_message_format", { as: InvalidMessage }, () =>
       this.catchAndRaise("invalid_message_serialization", { as: InvalidMessage }, () =>
-        this.catchAndIgnore("invalid_message_content", () => this.readMessage(message)),
+        this.catchAndIgnore("invalid_message_content", () => this.readMessage(message, options)),
       ),
     );
   }
 
-  private readMessage(message: string): unknown {
+  createMessage(value: unknown, options: MetadataOptions = {}): string {
+    const encrypted = this.encrypt(this.serializeWithMetadata(value, options));
+    return `${encrypted}--${this.sign(encrypted)}`;
+  }
+
+  readMessage(message: string, options: ExpectedMetadataOptions = {}): unknown {
     if (!message || typeof message !== "string") {
       throw new Thrown("invalid_message_format", "invalid message string");
     }
@@ -88,7 +95,7 @@ export class MessageEncryptor extends Codec {
       throw new Thrown("invalid_message_format", "mismatched digest");
     }
 
-    return this.deserialize(this.decrypt(encrypted));
+    return this.deserializeWithMetadata(this.decrypt(encrypted), options);
   }
 
   private encrypt(plaintext: string): string {
