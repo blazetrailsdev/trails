@@ -212,47 +212,31 @@ function sortKeys<T extends CallMismatchKey>(entries: T[]): T[] {
   return [...entries].sort(compareKeys);
 }
 
-// ── --report: grouping the wide population (RFC 0083) ──────────────────────
-
 const TS_API_PATH = path.join(OUTPUT_DIR, "ts-api.json");
 
-/**
- * Why an entry flags, derived from the TS manifest — never hand-maintained.
- *
- * The question each bucket answers is "where does the call's TS counterpart
- * live, relative to the file that was supposed to make it?":
- *   - both same-file buckets mean the port has the member and simply does not
- *     call it from this method (a real omission, or a call folded into a
- *     zero-arg accessor);
- *   - `candidate elsewhere in package` is usually a layout divergence;
- *   - `candidate not in package` is usually an unported call or tooling noise.
- */
 export type CauseBucket =
   | "same-file candidate takes args"
   | "same-file zero-arg member"
   | "candidate elsewhere in package"
   | "candidate not in package";
 
-/** One declaration site of a TS member: the file it is declared in, and
- *  whether it accepts any parameters. */
 export interface MemberSite {
   file: string;
   takesArgs: boolean;
 }
 
-/** package → TS member name → its declaration sites. */
 export type TsMemberIndex = Map<string, Map<string, MemberSite[]>>;
 
 function addSite(index: Map<string, MemberSite[]>, m: MethodInfo, fallbackFile: string): void {
-  // `declaredIn` wins: on synthesized mixin pseudo-modules the member usually
-  // belongs to a different file than the one the pseudo-module is keyed under.
+  // On a synthesized mixin pseudo-module the member is usually declared in a
+  // different file than the one the pseudo-module is keyed under, so
+  // `declaredIn` — when present — is the only correct attribution.
   const file = m.declaredIn ?? m.file ?? fallbackFile;
   if (!file) return;
   const sites = index.get(m.name) ?? index.set(m.name, []).get(m.name)!;
   sites.push({ file, takesArgs: m.params.length > 0 });
 }
 
-/** Index every TS member declaration in the manifest by package and name. */
 export function indexTsMembers(manifest: ApiManifest): TsMemberIndex {
   const out: TsMemberIndex = new Map();
   for (const [pkg, info] of Object.entries(manifest.packages)) {
@@ -272,13 +256,10 @@ export function indexTsMembers(manifest: ApiManifest): TsMemberIndex {
   return out;
 }
 
-/** The TS names a Ruby call could faithfully port to (convention candidates
- *  plus the plain camelCase spelling). */
 export function tsCandidatesFor(call: string): string[] {
   return [...new Set([...(rubyMethodToTsIgnoringSkip(call) ?? []), snakeToCamel(call)])];
 }
 
-/** Assign an entry to its cause bucket using the TS manifest index. */
 export function bucketFor(key: CallMismatchKey, index: TsMemberIndex): CauseBucket {
   const byName = index.get(key.package);
   const sites = byName ? tsCandidatesFor(key.call).flatMap((n) => byName.get(n) ?? []) : [];
@@ -296,14 +277,13 @@ function tally<T>(items: T[], keyFn: (item: T) => string): [string, number][] {
     const k = keyFn(item);
     counts.set(k, (counts.get(k) ?? 0) + 1);
   }
-  // Descending count, then key, so the listing is stable across runs.
   return [...counts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
 }
 
 function section(title: string, rows: [string, number][], top?: number): string {
   const shown = top === undefined ? rows : rows.slice(0, top);
   const head =
-    top !== undefined && rows.length > shown.length
+    rows.length > shown.length
       ? `${title} (top ${shown.length} of ${rows.length})`
       : `${title} (${rows.length})`;
   const width = Math.max(0, ...shown.map(([k]) => k.length));
@@ -313,23 +293,19 @@ function section(title: string, rows: [string, number][], top?: number): string 
   ].join("\n");
 }
 
-/** Count entries still carrying the seeded reason — i.e. never reviewed. */
 export function unreviewedCount(entries: ExcludeEntry[]): number {
   return entries.filter((e) => e.reason === DEFAULT_REASON).length;
 }
 
-/** Render the whole `--report` body. `index` is undefined when the TS manifest
- *  has not been built, in which case the cause-bucket section is skipped. */
 export function renderReport(
   entries: ExcludeEntry[],
   index: TsMemberIndex | undefined,
   top: number,
 ): string {
-  const unreviewed = unreviewedCount(entries);
+  const files = new Set(entries.map((e) => `${e.package} ${e.tsFile}`)).size;
   const parts = [
-    `wide call-mismatches report: ${entries.length} baselined entr(ies) across ` +
-      `${new Set(entries.map((e) => `${e.package} ${e.tsFile}`)).size} file(s)`,
-    `  unreviewed (reason still the seeded default): ${unreviewed} of ${entries.length}`,
+    `wide call-mismatches report: ${entries.length} entr(ies) across ${files} file(s)`,
+    `  unreviewed (reason still the seeded default): ${unreviewedCount(entries)} of ${entries.length}`,
     section(
       "By package",
       tally(entries, (e) => e.package),
@@ -357,9 +333,9 @@ export function renderReport(
   return parts.join("\n");
 }
 
-async function loadTsMemberIndex(): Promise<TsMemberIndex | undefined> {
+async function readJsonIfPresent<T>(file: string): Promise<T | undefined> {
   try {
-    return indexTsMembers(await readJson<ApiManifest>(TS_API_PATH));
+    return await readJson<T>(file);
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === "ENOENT") return undefined;
     throw e;
@@ -446,10 +422,6 @@ async function main(write: boolean): Promise<number> {
   return 1;
 }
 
-// Read-only sibling of `main`: never writes the baseline, always returns 0.
-// Population is the baseline plus anything the current artifact flags that the
-// baseline has not seen yet (those carry no reason, so they never count as
-// unreviewed-but-seeded).
 async function reportMain(top: number, unreviewedOnly: boolean): Promise<number> {
   const baseline = await loadBaseline();
   if (unreviewedOnly) {
@@ -461,18 +433,32 @@ async function reportMain(top: number, unreviewedOnly: boolean): Promise<number>
   }
 
   const entries = [...baseline];
-  try {
-    const { added } = diffAgainstBaseline(flattenArtifact(await loadArtifact()), baseline);
-    entries.push(...added.map((k) => ({ ...k, reason: "" })));
-    if (added.length > 0) console.log(`(including ${added.length} not-yet-baselined mismatch(es))`);
-  } catch {
+  const artifact = await readJsonIfPresent<Artifact>(ARTIFACT_PATH);
+  if (artifact === undefined) {
     console.log(
       "(baseline only — the wide artifact is missing; run `pnpm api:compare --wide-calls`)",
     );
+  } else {
+    // Not-yet-baselined mismatches carry no reason, so they are reported in the
+    // groupings without inflating the unreviewed-but-seeded count.
+    const { added } = diffAgainstBaseline(flattenArtifact(artifact), baseline);
+    entries.push(...added.map((k) => ({ ...k, reason: "" })));
+    if (added.length > 0) console.log(`(including ${added.length} not-yet-baselined mismatch(es))`);
   }
 
-  console.log(renderReport(sortKeys(entries), await loadTsMemberIndex(), top));
+  const manifest = await readJsonIfPresent<ApiManifest>(TS_API_PATH);
+  console.log(renderReport(sortKeys(entries), manifest && indexTsMembers(manifest), top));
   return 0;
+}
+
+export function parseTop(argv: string[], fallback: number): number {
+  const raw = argv.find((a) => a.startsWith("--top="))?.slice("--top=".length);
+  if (raw === undefined) return fallback;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1) {
+    throw new Error(`--top expects a positive integer, got ${JSON.stringify(raw)}`);
+  }
+  return n;
 }
 
 async function runAsScript(): Promise<void> {
@@ -481,14 +467,17 @@ async function runAsScript(): Promise<void> {
   if (path.resolve(self) !== invoked) return;
   const argv = process.argv.slice(2);
   const unreviewed = argv.includes("--unreviewed");
-  const code =
-    argv.includes("--report") || unreviewed
-      ? await reportMain(
-          Number(argv.find((a) => a.startsWith("--top="))?.slice(6)) || 20,
-          unreviewed,
-        )
-      : await main(argv.includes("--write"));
-  process.exit(code);
+  if (!argv.includes("--report") && !unreviewed) {
+    process.exit(await main(argv.includes("--write")));
+  }
+  let top: number;
+  try {
+    top = parseTop(argv, 20);
+  } catch (e) {
+    console.error(`wide call-mismatches report: ${(e as Error).message}`);
+    process.exit(2);
+  }
+  process.exit(await reportMain(top, unreviewed));
 }
 
 void runAsScript();

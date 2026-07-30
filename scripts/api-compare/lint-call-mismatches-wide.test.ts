@@ -8,6 +8,7 @@ import {
   bucketFor,
   indexTsMembers,
   loadSplitBaseline,
+  parseTop,
   relPathFor,
   renderReport,
   unreviewedCount,
@@ -294,7 +295,7 @@ describe("renderReport", () => {
 
   it("reports totals by package, file, call name, and unreviewed count", () => {
     const out = renderReport(entries, undefined, 20);
-    expect(out).toContain("3 baselined entr(ies) across 2 file(s)");
+    expect(out).toContain("3 entr(ies) across 2 file(s)");
     expect(out).toContain("unreviewed (reason still the seeded default): 1 of 3");
     expect(out).toMatch(/activerecord\s+2/);
     expect(out).toMatch(/activerecord\/relation\.ts\s+2/);
@@ -305,5 +306,18 @@ describe("renderReport", () => {
     const out = renderReport(entries, undefined, 1);
     expect(out).toContain("By file (top 1 of 2)");
     expect(out).not.toContain("nodes/node.ts");
+  });
+});
+
+describe("parseTop", () => {
+  it("falls back when --top is absent and parses a positive integer", () => {
+    expect(parseTop([], 20)).toBe(20);
+    expect(parseTop(["--report", "--top=5"], 20)).toBe(5);
+  });
+
+  it("rejects a non-positive or non-integer --top instead of silently defaulting", () => {
+    expect(() => parseTop(["--top=x"], 20)).toThrow(/positive integer/);
+    expect(() => parseTop(["--top=0"], 20)).toThrow(/positive integer/);
+    expect(() => parseTop(["--top=2.5"], 20)).toThrow(/positive integer/);
   });
 });
