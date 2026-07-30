@@ -545,10 +545,7 @@ export async function loadSchema(
  * The `load adapter_specific_schema_file if File.exist?(...)` arm of
  * `load_schema_helper.rb:15`, on its own. Reaching for this arm alone is
  * exactly how the two halves of `load_schema` drifted apart before — go
- * through {@link loadSchema}. The only caller outside this file is the
- * trails-only cover for the non-pgcrypto `uuid_default` branch, which has to
- * drive the adapter-specific arm against a stubbed adapter without laying the
- * canonical schema.
+ * through {@link loadSchema}.
  */
 export async function loadAdapterSpecificSchema(adapter: DatabaseAdapter): Promise<void> {
   const adapterSpecificSchema = ADAPTER_SPECIFIC_SCHEMAS[adapter.adapterName];
