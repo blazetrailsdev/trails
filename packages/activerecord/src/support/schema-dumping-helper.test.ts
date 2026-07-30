@@ -2,7 +2,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { Base } from "../base.js";
 import { SchemaDumper } from "../schema-dumper.js";
 import type { SchemaSource } from "../schema-dumper.js";
-import { setupHandlerSuite } from "./setup-handler-suite.js";
+import { skipGlobalResetForFile } from "./skip-global-reset.js";
 import {
   dumpAllTableSchema,
   dumpTableSchema,
@@ -12,15 +12,15 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 
 let adapter: DatabaseAdapter;
 
-setupHandlerSuite();
+skipGlobalResetForFile();
 
 beforeAll(() => {
   adapter = Base.adapter;
 });
 
 // Track the bespoke `sdh_*` tables each test creates so afterEach can drop
-// exactly those. This suite runs under setupHandlerSuite(), which opts out of the
-// global truncation reset, so nothing clears these between tests in-file — one
+// exactly those. This suite runs under skipGlobalResetForFile(), so nothing
+// clears these between tests in-file — one
 // test reuses `sdh_kept` and would hit "table already exists" if left. Dropping
 // only the created tables (RFC 0060) replaces the old afterAll/afterEach
 // dropAllTables' ~330-table canonical DROP fan-out; any leak past the file is

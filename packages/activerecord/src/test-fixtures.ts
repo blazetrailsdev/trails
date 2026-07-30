@@ -32,7 +32,7 @@ export type { FixtureName } from "./test-helpers/fixtures-registry.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
 import { registerModel } from "./associations.js";
-import { setupHandlerSuite } from "./support/setup-handler-suite.js";
+import { skipGlobalResetForFile } from "./support/skip-global-reset.js";
 import {
   withTransactionalFixtures,
   type WithTransactionalFixturesOptions,
@@ -566,7 +566,7 @@ type FixturesOptions = WithTransactionalFixturesOptions & FixturesConnectionOpts
  * Rails-faithful public surface for declaring fixtures in a test file — the sole
  * fixture entry point.
  *
- * One-call wiring that combines {@link setupHandlerSuite} +
+ * One-call wiring that combines {@link skipGlobalResetForFile} +
  * {@link withTransactionalFixtures} + the module-private `useFixtures` engine,
  * eliminating the three-line boilerplate every fixture-backed describe block
  * previously required. The engine lives here (unexported) so no test file can
@@ -625,7 +625,7 @@ export function fixtures(
   // `*.connection`, and adapter-owning suites seed through their own adapter.
   const getConnection = connection ?? leaseFixtureConnection;
 
-  setupHandlerSuite();
+  skipGlobalResetForFile();
   // Rails' `use_transactional_tests = false` (default is true): skip the
   // savepoint-pinned wrapper so the engine's per-test delete/reseed commits
   // real DML, visible across pooled connections. Mirrors the direct-adapter

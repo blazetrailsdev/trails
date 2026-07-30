@@ -1,5 +1,13 @@
 # Audit: AR test-teardown DROP TABLE churn (~86k DROP TABLE / run)
 
+> **Historical snapshot — some helper paths below are stale.** Notably
+> `test-helpers/setup-handler-suite.ts` and `use-handler-transactional-fixtures.ts`
+> no longer exist; the reset shield they wrapped is now
+> `skipGlobalResetForFile()` in
+> `packages/activerecord/src/support/skip-global-reset.ts`, and the
+> transactional wrapper is `test-fixtures/with-transactional-fixtures.ts`. The
+> measured breakdown and reset strategy still stand.
+
 Spike for story `ar-test-reset-drop-table-churn` (RFC 0028-ci-cost-optimization).
 Fact-finding only — no production code change. Decomposes the dominant DROP
 TABLE cost surfaced by the `ddl-timing-profile` audit (PR #3904) into a measured

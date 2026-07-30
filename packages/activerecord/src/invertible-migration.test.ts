@@ -3,8 +3,8 @@
  *   activerecord/test/cases/invertible_migration_test.rb
  *
  * Test names mirror the Rails `test_*` methods so `test:compare` can map them.
- * Migrations and the `Horse` model both lease the shared worker connection via
- * `setupHandlerSuite()`, exactly as Rails routes everything through
+ * Migrations and the `Horse` model both lease the shared worker connection,
+ * exactly as Rails routes everything through
  * `ActiveRecord::Base.lease_connection`. The scratch tables (`horses`,
  * `new_horses`) are Rails' own — created and dropped per test, never canonical.
  */
@@ -12,7 +12,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "./base.js";
 import { Migration, IrreversibleMigration } from "./migration.js";
 import { CommandRecorder } from "./migration/command-recorder.js";
-import { setupHandlerSuite } from "./support/setup-handler-suite.js";
+import { skipGlobalResetForFile } from "./support/skip-global-reset.js";
 import { itIfSupports } from "./support/supports.js";
 import { adapterType } from "./test-adapter.js";
 import { registerModel } from "./associations.js";
@@ -286,7 +286,7 @@ async function resetHorse(): Promise<void> {
 }
 
 describe("InvertibleMigrationTest", () => {
-  setupHandlerSuite();
+  skipGlobalResetForFile();
 
   afterEach(async () => {
     const connection = await Base.leaseConnection();

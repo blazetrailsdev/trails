@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect, beforeAll, vi } from "vitest";
 import { Base } from "../base.js";
-import { setupHandlerSuite } from "./setup-handler-suite.js";
+import { skipGlobalResetForFile } from "./skip-global-reset.js";
 import { dropAllTables, resetTestTables } from "./drop-all-tables.js";
 import { provisionSecondDatabase } from "./setup-second-pool.js";
 import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
@@ -34,7 +34,7 @@ async function tableCount(a: DatabaseAdapter): Promise<number> {
   return (await listTables(a)).length;
 }
 
-setupHandlerSuite();
+skipGlobalResetForFile();
 
 beforeAll(() => {
   adapter = Base.adapter;
