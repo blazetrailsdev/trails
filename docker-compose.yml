@@ -9,8 +9,11 @@ services:
       # Rails' postgresql: entries carry no credential (config.example.yml:74-81),
       # so the `rails` role created by the init script below has no password.
       POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_INITDB_ARGS: "--no-sync"
     volumes:
       - ./scripts/db-init/postgres:/docker-entrypoint-initdb.d:ro
+    tmpfs:
+      - /var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 2s
@@ -26,6 +29,8 @@ services:
       MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
     volumes:
       - ./scripts/db-init/mysql:/docker-entrypoint-initdb.d:ro
+    tmpfs:
+      - /var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "--silent"]
       interval: 2s
