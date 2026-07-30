@@ -1540,35 +1540,68 @@ export class Table {
     return name === "timestamp" ? "datetime" : fallback;
   }
 
-  async string(name: string, options: ColumnOptions = {}): Promise<void> {
-    await this.column(name, "string", options);
+  /** @internal */
+  protected async definedColumn(type: ColumnType, args: unknown[]): Promise<void> {
+    const { names, options } = splitColumnNames(args, type);
+    for (const name of names) {
+      await this.column(name, type, options);
+    }
   }
-  async text(name: string, options: ColumnOptions = {}): Promise<void> {
-    await this.column(name, "text", options);
+
+  async string(...names: string[]): Promise<void>;
+  async string(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
+  async string(...args: unknown[]): Promise<void> {
+    await this.definedColumn("string", args);
   }
-  async integer(name: string, options: ColumnOptions = {}): Promise<void> {
-    await this.column(name, "integer", options);
+  async text(...names: string[]): Promise<void>;
+  async text(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
+  async text(...args: unknown[]): Promise<void> {
+    await this.definedColumn("text", args);
   }
-  async float(name: string, options: ColumnOptions = {}): Promise<void> {
-    await this.column(name, "float", options);
+  async integer(...names: string[]): Promise<void>;
+  async integer(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
+  async integer(...args: unknown[]): Promise<void> {
+    await this.definedColumn("integer", args);
   }
-  async decimal(name: string, options: ColumnOptions = {}): Promise<void> {
-    await this.column(name, "decimal", options);
+  async float(...names: string[]): Promise<void>;
+  async float(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
+  async float(...args: unknown[]): Promise<void> {
+    await this.definedColumn("float", args);
   }
-  async boolean(name: string, options: ColumnOptions = {}): Promise<void> {
-    await this.column(name, "boolean", options);
+  async decimal(...names: string[]): Promise<void>;
+  async decimal(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
+  async decimal(...args: unknown[]): Promise<void> {
+    await this.definedColumn("decimal", args);
   }
-  async date(name: string, options: ColumnOptions = {}): Promise<void> {
-    await this.column(name, "date", options);
+  async boolean(...names: string[]): Promise<void>;
+  async boolean(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
+  async boolean(...args: unknown[]): Promise<void> {
+    await this.definedColumn("boolean", args);
   }
-  async datetime(name: string, options: ColumnOptions = {}): Promise<void> {
-    await this.column(name, "datetime", options);
+  async date(...names: string[]): Promise<void>;
+  async date(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
+  async date(...args: unknown[]): Promise<void> {
+    await this.definedColumn("date", args);
   }
-  async bigint(name: string, options: ColumnOptions = {}): Promise<void> {
-    await this.column(name, "bigint", options);
+  async datetime(...names: string[]): Promise<void>;
+  async datetime(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
+  async datetime(...args: unknown[]): Promise<void> {
+    await this.definedColumn("datetime", args);
   }
-  async char(name: string, options: ColumnOptions = {}): Promise<void> {
-    await this.column(name, "char", options);
+  async bigint(...names: string[]): Promise<void>;
+  async bigint(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
+  async bigint(...args: unknown[]): Promise<void> {
+    await this.definedColumn("bigint", args);
+  }
+  async json(...names: string[]): Promise<void>;
+  async json(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
+  async json(...args: unknown[]): Promise<void> {
+    await this.definedColumn("json", args);
+  }
+  async char(...names: string[]): Promise<void>;
+  async char(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
+  async char(...args: unknown[]): Promise<void> {
+    await this.definedColumn("char", args);
   }
   async virtual(
     name: string,
@@ -1579,9 +1612,18 @@ export class Table {
   async array(name: string, type: ColumnType, options: ColumnOptions = {}): Promise<void> {
     await this.column(name, type, { ...options, array: true });
   }
-  async remove(name: string, options: { type?: string; ifExists?: boolean } = {}): Promise<void> {
-    const { type, ...rest } = options;
-    await this._schema.removeColumn(this._tableName, name, type as ColumnType | undefined, rest);
+  async remove(...columnNames: string[]): Promise<void>;
+  async remove(...args: [...columnNames: string[], options: ColumnOptions]): Promise<void>;
+  async remove(...args: unknown[]): Promise<void> {
+    const rest = [...args];
+    const last = rest[rest.length - 1];
+    const options = (typeof last === "object" && last !== null ? rest.pop() : {}) as ColumnOptions;
+    this.raiseOnIfExistOptions(options as Record<string, unknown>);
+    await this._schema.removeColumns(
+      this._tableName,
+      ...(rest as string[]),
+      ...(Object.keys(options).length > 0 ? [options] : []),
+    );
   }
   async rename(oldName: string, newName: string): Promise<void> {
     await this._schema.renameColumn(this._tableName, oldName, newName);
@@ -1603,13 +1645,19 @@ export class Table {
     this.raiseOnIfExistOptions(optionHash as Record<string, unknown>);
     await this._schema.removeIndex(this._tableName, columnOrOptions, options);
   }
-  async references(name: string, options: AddReferenceOptions = {}): Promise<void> {
+  async references(...refNames: string[]): Promise<void>;
+  async references(...args: [...refNames: string[], options: AddReferenceOptions]): Promise<void>;
+  async references(...args: unknown[]): Promise<void> {
+    const { names, options } = this._splitRefNames(args);
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    await this._schema.addReference(this._tableName, name, options);
+    for (const refName of names) {
+      await this._schema.addReference(this._tableName, refName, options);
+    }
   }
-  /** Alias of references (Rails: `alias :belongs_to :references`). */
-  async belongsTo(name: string, options: AddReferenceOptions = {}): Promise<void> {
-    return this.references(name, options);
+  async belongsTo(...refNames: string[]): Promise<void>;
+  async belongsTo(...args: [...refNames: string[], options: AddReferenceOptions]): Promise<void>;
+  async belongsTo(...args: unknown[]): Promise<void> {
+    return (this.references as (...a: unknown[]) => Promise<void>)(...args);
   }
   async timestamps(options: ColumnOptions = {}): Promise<void> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
@@ -1634,8 +1682,8 @@ export class Table {
     }
   }
 
-  async isColumnExists(columnName: string): Promise<boolean> {
-    return this._require("columnExists").call(this._schema, this._tableName, columnName);
+  async isColumnExists(columnName: string, type?: ColumnType): Promise<boolean> {
+    return this._require("columnExists").call(this._schema, this._tableName, columnName, type);
   }
 
   private _require<K extends keyof SchemaStatementsLike>(
@@ -1648,7 +1696,7 @@ export class Table {
 
   async isIndexExists(
     columnName: string | string[],
-    options?: Record<string, unknown>,
+    options: Record<string, unknown> = {},
   ): Promise<boolean> {
     return this._require("indexExists").call(this._schema, this._tableName, columnName, options);
   }
@@ -1691,13 +1739,32 @@ export class Table {
     return this._require("removeTimestamps").call(this._schema, this._tableName, options);
   }
 
-  async removeReferences(name: string, options: AddReferenceOptions = {}): Promise<void> {
+  async removeReferences(...refNames: string[]): Promise<void>;
+  async removeReferences(
+    ...args: [...refNames: string[], options: AddReferenceOptions]
+  ): Promise<void>;
+  async removeReferences(...args: unknown[]): Promise<void> {
+    const { names, options } = this._splitRefNames(args);
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    return this._require("removeReference").call(this._schema, this._tableName, name, options);
+    for (const refName of names) {
+      await this._require("removeReference").call(this._schema, this._tableName, refName, options);
+    }
   }
-  /** Alias of removeReferences (Rails: `alias :remove_belongs_to :remove_references`). */
-  async removeBelongsTo(name: string, options: AddReferenceOptions = {}): Promise<void> {
-    return this.removeReferences(name, options);
+  async removeBelongsTo(...refNames: string[]): Promise<void>;
+  async removeBelongsTo(
+    ...args: [...refNames: string[], options: AddReferenceOptions]
+  ): Promise<void>;
+  async removeBelongsTo(...args: unknown[]): Promise<void> {
+    return (this.removeReferences as (...a: unknown[]) => Promise<void>)(...args);
+  }
+
+  private _splitRefNames(args: unknown[]): { names: string[]; options: AddReferenceOptions } {
+    const rest = [...args];
+    const last = rest[rest.length - 1];
+    const options = (
+      typeof last === "object" && last !== null ? rest.pop() : {}
+    ) as AddReferenceOptions;
+    return { names: rest as string[], options };
   }
 
   async foreignKey(toTable: string, options: Partial<AddForeignKeyOptions> = {}): Promise<void> {
@@ -1770,7 +1837,7 @@ export class Table {
     if (key) {
       const conditional = key === "ifExists" ? "if" : "unless";
       const railsKey = key === "ifExists" ? "if_exists" : "if_not_exists";
-      throw new Error(
+      throw new ArgumentError(
         `Option ${railsKey} will be ignored. If you are calling an expression like\n` +
           `\`t.column(.., ${railsKey}: true)\` from inside a change_table block, try a\n` +
           `conditional clause instead, as in \`t.column(..) ${conditional} t.column_exists?(..)\``,
@@ -1795,6 +1862,10 @@ export interface SchemaStatementsLike {
     columnName: string,
     type?: string,
     options?: { ifExists?: boolean },
+  ): Promise<void>;
+  removeColumns(
+    tableName: string,
+    ...columnsOrOptions: Array<string | ColumnOptions>
   ): Promise<void>;
   renameColumn(tableName: string, oldName: string, newName: string): Promise<void>;
   addIndex(tableName: string, columns: string | string[], options?: AddIndexOptions): Promise<void>;

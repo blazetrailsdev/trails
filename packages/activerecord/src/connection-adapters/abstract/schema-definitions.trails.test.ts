@@ -4,7 +4,6 @@ import {
   CheckConstraintDefinition,
   ReferenceDefinition,
   TableDefinition,
-  Table,
   type ReferenceDefinitionConnection,
 } from "./schema-definitions.js";
 import { SchemaDumper } from "../../schema-dumper.js";
@@ -228,22 +227,5 @@ describe("ColumnMethods#primary_key", () => {
 
     expect(td.columns[0].type).toBe("primary_key");
     expect(td.columns[0].options.primaryKey).toBe(true);
-  });
-
-  it("adds a primary key column through change_table", async () => {
-    const calls: unknown[][] = [];
-    const schema = {
-      addColumn: (...args: unknown[]) => {
-        calls.push(args);
-        return Promise.resolve();
-      },
-    } as unknown as ConstructorParameters<typeof Table>[1];
-    const t = new Table("delete_me", schema);
-
-    await t.primaryKey("id", "primary_key", { comment: "Primary key comment" });
-
-    expect(calls).toEqual([
-      ["delete_me", "id", "primary_key", { comment: "Primary key comment", primaryKey: true }],
-    ]);
   });
 });

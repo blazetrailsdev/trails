@@ -1095,20 +1095,14 @@ export class SchemaStatements {
   }
 
   async removeColumns(tableName: string, ...columns: string[]): Promise<void>;
+  async removeColumns(tableName: string, ...args: [...string[], ColumnOptions]): Promise<void>;
   async removeColumns(
     tableName: string,
-    ...args: [...string[], { type?: ColumnType; ifExists?: boolean }]
-  ): Promise<void>;
-  async removeColumns(
-    tableName: string,
-    ...columnsOrOptions: Array<string | ({ type?: ColumnType } & Record<string, unknown>)>
+    ...columnsOrOptions: Array<string | ColumnOptions>
   ): Promise<void> {
     const last = columnsOrOptions[columnsOrOptions.length - 1];
     const hasOpts = typeof last === "object" && last !== null;
-    const opts = (hasOpts ? (columnsOrOptions.pop() as Record<string, unknown>) : {}) as {
-      type?: ColumnType;
-      ifExists?: boolean;
-    };
+    const opts = (hasOpts ? columnsOrOptions.pop() : {}) as ColumnOptions;
     const columns = columnsOrOptions as string[];
     if (columns.length === 0) {
       throw new ArgumentError(
@@ -1124,7 +1118,10 @@ export class SchemaStatements {
       return adapter.removeColumns(tableName, ...columns);
     }
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
-    const fragments = this.removeColumnsForAlter(tableName, columns, opts);
+    const fragments = this.removeColumnsForAlter(tableName, columns, { ...opts } as Record<
+      string,
+      unknown
+    >);
     await this.adapter.execute(`ALTER TABLE ${this._qt(tableName)} ${fragments.join(", ")}`);
   }
 
