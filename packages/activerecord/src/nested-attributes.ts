@@ -523,9 +523,11 @@ export function raiseNestedAttributesRecordNotFoundBang(
   );
 }
 
-/** @internal */
-// Resolve a `limit:` option to a number. A string names a method/attribute on
-// the owner (Rails `limit: :parrots_limit`); a function is invoked.
+/**
+ * Resolve a `limit:` option to a number. A string names a method/attribute on
+ * the owner (Rails `limit: :parrots_limit`); a function is invoked.
+ * @internal
+ */
 function resolveNestedLimit(
   limit: number | string | ((...args: unknown[]) => number) | undefined,
   record: Base,

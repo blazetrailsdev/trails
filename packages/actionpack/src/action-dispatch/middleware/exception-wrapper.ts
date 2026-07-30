@@ -319,11 +319,13 @@ export class ExceptionWrapper {
     return out;
   }
 
-  /** @internal */
-  // Rails passes `kind` straight into BacktraceCleaner#clean (which supports
-  // :silent/:noise/:all via its silencer chain). Our cleaner doesn't yet take
-  // a kind, so we always apply the local node_modules partition so the three
-  // trace getters stay distinct, then let the cleaner post-process the slice.
+  /**
+   * Rails passes `kind` straight into BacktraceCleaner#clean (which supports
+   * :silent/:noise/:all via its silencer chain). Our cleaner doesn't yet take
+   * a kind, so we always apply the local node_modules partition so the three
+   * trace getters stay distinct, then let the cleaner post-process the slice.
+   * @internal
+   */
   cleanBacktrace(kind: "silent" | "noise" | "all"): string[] {
     const lines = this.backtrace();
     const partitioned =

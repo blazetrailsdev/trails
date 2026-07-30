@@ -15,12 +15,15 @@ export type { GlobalIDModel };
 
 const DEFAULT_PURPOSE = "default";
 
-/** Option keys that are NOT forwarded as GID URI params. @internal */
-// Mirrors GlobalID.create's `options.except(:app, :verifier, :for)` plus
-// the SGID-specific expiration options. Any other key — including
-// `purpose` — flows through to URI params, matching Rails: SGID does
-// not reserve `purpose` as an option, only as the internal @purpose
-// attr set via pick_purpose(:for).
+/**
+ * Option keys that are NOT forwarded as GID URI params.
+ * Mirrors GlobalID.create's `options.except(:app, :verifier, :for)` plus
+ * the SGID-specific expiration options. Any other key — including
+ * `purpose` — flows through to URI params, matching Rails: SGID does
+ * not reserve `purpose` as an option, only as the internal `purpose`
+ * attr set via pick_purpose(:for).
+ * @internal
+ */
 const KNOWN_SGID_KEYS = new Set(["app", "for", "expiresIn", "expiresAt", "verifier"]);
 
 /** Monotonic counter for stable inspect() ids; mirrors Ruby's object_id. @internal */

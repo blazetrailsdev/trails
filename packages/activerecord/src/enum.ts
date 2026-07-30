@@ -901,8 +901,8 @@ export function _enum(
 }
 
 /** Cache of per-class EnumMethods modules.
+ * JS-idiomatic equivalent of Rails' per-class `@_enum_methods_module` ivar.
  * @internal */
-// JS-idiomatic equivalent of Rails' per-class `@_enum_methods_module` ivar.
 const _enumMethodsModuleRegistry = new WeakMap<typeof import("./base.js").Base, EnumMethods>();
 
 /**
