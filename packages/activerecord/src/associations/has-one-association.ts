@@ -417,17 +417,14 @@ export class HasOneAssociation extends SingularAssociation {
     // key) must raise before any removal runs, exactly as Rails' `build_record`
     // raises before `set_new_record`. An UNLOADED target is surfaced by
     // `replace`'s leading `load_target`, ported through
-    // `loadDisplacedTargetForCreate`, which caches the row as `this.target` —
-    // `super._createRecord` then removes it (via `detachDisplacedOnBuild`)
-    // before `setNewRecord` promotes the freshly created record, exactly where
-    // Rails' `remove_target!` sits inside `replace`.
+    // `loadDisplacedTargetForCreate`, which caches the row as `this.target`;
+    // `super._createRecord` removes it via `detachDisplacedOnBuild`.
     const loadError = await this.loadDisplacedTargetForCreate();
-    // A failed load leaves nothing cached, so `super._createRecord` detaches
-    // nothing: the build succeeded, so Rails would have reached `load_target`
-    // — and every exception but `RecordNotFound` propagates out of it
-    // (association.rb:189-195). Re-raise here, at the point Rails raises:
-    // after `build_record` and `record.save`.
     const record = await super._createRecord(attributes, shouldRaise, block);
+    // Every exception but `RecordNotFound` propagates out of `load_target`
+    // (association.rb:189-195). Re-raise at the point Rails raises: after
+    // `build_record` and `record.save`. A failed load cached nothing, so the
+    // removal above was already a no-op.
     if (loadError) throw loadError;
     return record;
   }
@@ -476,17 +473,17 @@ export class HasOneAssociation extends SingularAssociation {
    * association is currently caching. A no-op unless a non-destroyed record is
    * cached.
    *
-   * It takes no argument and removes `this.target`, exactly as Rails'
-   * `remove_target!` does. The awaited callers (`build`, `_createRecord`, the
-   * `build#{name}` accessor) run it *before* installing the replacement, so
-   * Rails' target-on-failure semantics fall out for free: `self.target = record`
-   * (:84) is never reached when `remove_target!` raises (e.g. a failed nullify
-   * save, has_one_association.rb:102-108). The one synchronous caller — the
-   * nested-attributes property setter, which cannot await — starts the removal
-   * here and *then* builds: `removeTargetBang` reads `this.target` on entry,
-   * before its first `await`, so the swap that follows in the same synchronous
-   * slice cannot disturb the in-flight removal and the setter's caller never
-   * sees the target revert.
+   * It takes no argument and removes `this.target`, as Rails' `remove_target!`
+   * does. The awaited callers run it *before* installing the replacement, so
+   * Rails' target-on-failure semantics fall out of the ordering: `self.target =
+   * record` (:84) is never reached when `remove_target!` raises (e.g. a failed
+   * nullify save, has_one_association.rb:102-108).
+   *
+   * The one synchronous caller — the nested-attributes property setter, which
+   * cannot await — starts the removal here and *then* builds. That is safe
+   * because `removeTargetBang` reads `this.target` on entry, before its first
+   * `await`: the build's swap lands in the same synchronous slice and cannot
+   * disturb the in-flight removal.
    *
    * No `isPersisted` pre-screen: Rails' `remove_target!` gates on persistence
    * only inside its `:destroy` and nullify arms; the `:delete` arm calls
@@ -551,11 +548,11 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   private async findThenDetachDisplaced(): Promise<void> {
-    // The synchronous build has already installed the replacement by the time
-    // the find resolves, so run Rails' `replace` tail in its own order now:
-    // `load_target` (just awaited) → `remove_target!` → `self.target = record`.
-    // Both writes below sit in one synchronous slice — `removeTargetBang` reads
-    // `this.target` before its first `await` — so no caller can observe the
+    // The synchronous build installed the replacement while the find was in
+    // flight, so run Rails' `replace` tail in order only now: `load_target`
+    // (just awaited) → `remove_target!` → `self.target = record`. Both writes
+    // below sit in one synchronous slice — `removeTargetBang` reads
+    // `this.target` before its first `await` — so nothing can observe the
     // association caching the displaced record.
     const replacement = this.target;
     const displaced = await this.doAsyncFindTarget();

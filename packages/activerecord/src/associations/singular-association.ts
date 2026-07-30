@@ -90,11 +90,10 @@ export class SingularAssociation extends Association {
     // discovers (and displaces) the row in the DB. The load has to precede
     // `setNewRecord`, which overwrites the target and marks it loaded.
     const setNewRecord = (): Base | null | Promise<Base | null> => {
-      // Rails' `replace` order is `remove_target!` (has_one_association.rb:69)
-      // and only then `self.target = record` (:84), so the displaced record is
-      // still the cached target while it is removed — and a raising removal
-      // leaves it cached. Keep that order: `setNewRecord` runs after the removal
-      // resolves, never before.
+      // Rails removes before promoting: `remove_target!`
+      // (has_one_association.rb:69), then `self.target = record` (:84). That
+      // order is what leaves the displaced record cached when the removal
+      // raises.
       const removal = this.detachDisplacedOnBuild(record);
       if (removal) {
         return removal.then(() => {
@@ -125,12 +124,11 @@ export class SingularAssociation extends Association {
 
   /**
    * The DB half of the `remove_target!` Rails' has_one `set_new_record` runs
-   * inline. The record it removes is the association's own cached `target` —
-   * this runs before `setNewRecord`, exactly where Rails' `remove_target!` sits
-   * relative to `self.target = record`. Null when there is nothing to remove,
-   * which is always the case for
-   * belongs_to (`BelongsToAssociation#replace` only writes the owner's foreign
-   * key in memory). Overridden by has_one, where the returned promise both
+   * inline. It removes the association's own cached `target`, and callers run
+   * it before `setNewRecord`. Null when there is nothing to remove, which is
+   * always the case for belongs_to (`BelongsToAssociation#replace` only writes
+   * the owner's foreign key in memory). Overridden by has_one, where the
+   * returned promise both
    * performs the removal and is what widens `build`'s return so a direct
    * `record.association(name).build(...)` caller can `await` the write.
    *
@@ -287,9 +285,7 @@ export class SingularAssociation extends Association {
       saved = await (record as any).save();
     }
     // `set_new_record` → `replace` runs `remove_target!` before
-    // `self.target = record` (has_one_association.rb:69, 84), so the displaced
-    // record is removed while it is still the cached target. Null for
-    // belongs_to and for a has_one with nothing to displace.
+    // `self.target = record` (has_one_association.rb:69, 84).
     const removal = this.detachDisplacedOnBuild(record);
     if (removal) await removal;
     this.setNewRecord(record);

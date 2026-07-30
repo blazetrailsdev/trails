@@ -68,23 +68,19 @@ export class HasOne extends SingularAssociation {
           typeof assoc.needsTargetLoadForBuild === "function" &&
           assoc.needsTargetLoadForBuild()
         ) {
-          // `loadTargetForBuild` caches the direct-FK target for a plain has_one
-          // (the record `remove_target!` will detach), but a has_one_through
-          // overrides it to load the *through* proxy — Rails' has_one_through
-          // `replace` runs no `load_target`/`remove_target!` on the target; its
+          // `loadTargetForBuild` caches the direct-FK target for a plain
+          // has_one, but a has_one_through overrides it to load the *through*
+          // proxy — Rails' has_one_through `replace` runs no
+          // `load_target`/`remove_target!` on the target; its
           // `create_through_record` loads the through instead, and the through's
-          // `detachDisplacedOnBuild` is a no-op. With the load done, `build`
-          // itself owns the removal: it runs `remove_target!` on the now-cached
-          // displaced target before `setNewRecord` promotes the new record, and
-          // returns a promise for the caller to `await`.
+          // `detachDisplacedOnBuild` is a no-op. With the target cached, `build`
+          // owns the removal and returns the promise to `await`.
           return assoc.loadTargetForBuild().then(() => assoc.build(...args));
         }
-        // The target may already be loaded (so `needsTargetLoadForBuild` is
-        // false): Rails' `set_new_record` → `replace` still runs `remove_target!`
-        // on it, detaching the prior record (FK nullified / destroyed per
-        // `:dependent`). `build` returns a Promise for that case only — a
-        // new-record / no-target build keeps its synchronous return (the shape
-        // the STI-build tests assert).
+        // An already-loaded target still gets `remove_target!` (FK nullified /
+        // destroyed per `:dependent`), so `build` returns a Promise for that
+        // case only — a new-record / no-target build keeps its synchronous
+        // return, the shape the STI-build tests assert.
         return assoc.build(...args);
       },
       writable: true,
