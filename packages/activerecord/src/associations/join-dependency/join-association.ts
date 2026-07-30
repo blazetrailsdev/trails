@@ -195,9 +195,7 @@ export class JoinAssociation extends JoinPart {
         // of emitting a duplicate `posts` that yields ambiguous columns — Rails'
         // `join_scope.arel(alias_tracker.aliases)` (join_dependency.rb:56).
         const sources: Nodes.Node[] = scope?.arel
-          ? // Copied: `joinSources()` returns Arel's live `source.right`, and the
-            // constraint rewrite below replaces its last element in place.
-            ([...scope.arel(aliasTracker).joinSources()] as Nodes.Node[])
+          ? ([...scope.arel(aliasTracker).joinSources()] as Nodes.Node[])
           : [];
         // `this.joinSources` accumulates flat across the chain (consumed by the
         // single-step `has_one`/`has_many` path, whose chain is length 1). The

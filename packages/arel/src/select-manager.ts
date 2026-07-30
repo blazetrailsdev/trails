@@ -434,7 +434,6 @@ export class SelectManager extends TreeManager {
    * Mirrors: Arel::SelectManager#join_sources
    */
   joinSources(): Join[] {
-    // Rails returns the live `@ctx.source.right` array, not a copy.
     return this.core.source.right as Join[];
   }
 
