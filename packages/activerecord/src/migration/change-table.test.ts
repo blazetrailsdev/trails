@@ -312,7 +312,7 @@ describe("Migration", () => {
     it("remove drops multiple columns when column options are given", async () => {
       await withChangeTable(async (t, expect) => {
         expect("removeColumns", null, ["delete_me", "bar", "baz", { type: "string", null: false }]);
-        await t.remove("bar", "baz", { type: "string", null: false } as never);
+        await t.remove("bar", "baz", { type: "string", null: false });
       });
     });
 
@@ -364,7 +364,7 @@ describe("Migration", () => {
     it("remove column with if exists raises error", async () => {
       await vitestExpect(
         withChangeTable(async (t) => {
-          await t.remove("name", { ifExists: true } as never);
+          await t.remove("name", { ifExists: true });
         }),
       ).rejects.toThrow(ArgumentError);
     });

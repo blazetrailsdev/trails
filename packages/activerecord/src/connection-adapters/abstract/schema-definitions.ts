@@ -1613,16 +1613,11 @@ export class Table {
     await this.column(name, type, { ...options, array: true });
   }
   async remove(...columnNames: string[]): Promise<void>;
-  async remove(
-    ...args: [...columnNames: string[], options: { type?: ColumnType; ifExists?: boolean }]
-  ): Promise<void>;
+  async remove(...args: [...columnNames: string[], options: ColumnOptions]): Promise<void>;
   async remove(...args: unknown[]): Promise<void> {
     const rest = [...args];
     const last = rest[rest.length - 1];
-    const options = (typeof last === "object" && last !== null ? rest.pop() : {}) as {
-      type?: ColumnType;
-      ifExists?: boolean;
-    };
+    const options = (typeof last === "object" && last !== null ? rest.pop() : {}) as ColumnOptions;
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
     await this._schema.removeColumns(
       this._tableName,
@@ -1870,7 +1865,7 @@ export interface SchemaStatementsLike {
   ): Promise<void>;
   removeColumns(
     tableName: string,
-    ...columnsOrOptions: Array<string | { type?: ColumnType; ifExists?: boolean }>
+    ...columnsOrOptions: Array<string | ColumnOptions>
   ): Promise<void>;
   renameColumn(tableName: string, oldName: string, newName: string): Promise<void>;
   addIndex(tableName: string, columns: string | string[], options?: AddIndexOptions): Promise<void>;
