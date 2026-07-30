@@ -45,7 +45,7 @@ describe("compareLiteral", () => {
 
   it("matches Ruby raw source escapes against TS resolved control chars", () => {
     expect(
-      compareLiteral({ kind: "string", value: "\\e[31m" }, { kind: "string", value: "[31m" }),
+      compareLiteral({ kind: "string", value: "\\e[31m" }, { kind: "string", value: "\x1b[31m" }),
     ).toBe("match");
     expect(
       compareLiteral({ kind: "string", value: "\\r\\n" }, { kind: "string", value: "\r\n" }),
