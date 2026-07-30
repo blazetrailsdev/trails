@@ -38,8 +38,15 @@
  * baseline changes.
  *
  * Usage:
- *   pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts          # gate (CI)
- *   pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts --write  # reseed baseline
+ *   pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts           # gate (CI)
+ *   pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts --write   # reseed baseline
+ *   pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts --report  # read-only grouping
+ *
+ * `--report` (RFC 0083) groups the baselined population by package, source
+ * file, Ruby call name, and derived cause bucket, so a burndown story can be
+ * scoped off a coherent slice instead of a 4794-line flat list. It never writes
+ * the baseline and always exits 0. `--unreviewed` prints just the count of
+ * entries whose `reason` is still the seeded {@link DEFAULT_REASON}.
  *
  * `--write` regenerates the baseline from the current wide artifact, preserving
  * the `reason` of entries that still flag and dropping stale rows, then
@@ -65,6 +72,8 @@ import {
   reseed,
 } from "./lint-call-mismatches.js";
 import { reportNonCanonicalBaselines, serializeBaseline } from "./baseline-json.js";
+import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "./conventions.js";
+import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
 
 // The baseline is a directory of per-source-file JSON arrays (see header),
 // not a single file. Each entry lives at <BASELINE_DIR>/<package>/<tsFile
@@ -93,7 +102,7 @@ export function relPathFor(k: CallMismatchKey): string {
 // throughout the compare tooling (mirrors lint-call-mismatches.ts).
 const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-mismatches-wide.json");
 
-const DEFAULT_REASON =
+export const DEFAULT_REASON =
   "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; " +
   "bucket (b) equivalent or (c) noise pending per-cluster burndown review.";
 
@@ -203,6 +212,136 @@ function sortKeys<T extends CallMismatchKey>(entries: T[]): T[] {
   return [...entries].sort(compareKeys);
 }
 
+const TS_API_PATH = path.join(OUTPUT_DIR, "ts-api.json");
+
+export type CauseBucket =
+  | "same-file candidate takes args"
+  | "same-file zero-arg member"
+  | "candidate elsewhere in package"
+  | "candidate not in package";
+
+export interface MemberSite {
+  file: string;
+  takesArgs: boolean;
+}
+
+export type TsMemberIndex = Map<string, Map<string, MemberSite[]>>;
+
+function addSite(index: Map<string, MemberSite[]>, m: MethodInfo, fallbackFile: string): void {
+  // On a synthesized mixin pseudo-module the member is usually declared in a
+  // different file than the one the pseudo-module is keyed under, so
+  // `declaredIn` — when present — is the only correct attribution.
+  const file = m.declaredIn ?? m.file ?? fallbackFile;
+  if (!file) return;
+  const sites = index.get(m.name) ?? index.set(m.name, []).get(m.name)!;
+  sites.push({ file, takesArgs: m.params.length > 0 });
+}
+
+export function indexTsMembers(manifest: ApiManifest): TsMemberIndex {
+  const out: TsMemberIndex = new Map();
+  for (const [pkg, info] of Object.entries(manifest.packages)) {
+    const byName = new Map<string, MemberSite[]>();
+    const containers: ClassInfo[] = [
+      ...Object.values(info.classes ?? {}),
+      ...Object.values(info.modules ?? {}),
+    ];
+    for (const c of containers) {
+      for (const m of [...c.instanceMethods, ...c.classMethods]) addSite(byName, m, c.file ?? "");
+    }
+    for (const [file, fns] of Object.entries(info.fileFunctions ?? {})) {
+      for (const m of fns) addSite(byName, m, file);
+    }
+    out.set(pkg, byName);
+  }
+  return out;
+}
+
+export function tsCandidatesFor(call: string): string[] {
+  return [...new Set([...(rubyMethodToTsIgnoringSkip(call) ?? []), snakeToCamel(call)])];
+}
+
+export function bucketFor(key: CallMismatchKey, index: TsMemberIndex): CauseBucket {
+  const byName = index.get(key.package);
+  const sites = byName ? tsCandidatesFor(key.call).flatMap((n) => byName.get(n) ?? []) : [];
+  if (sites.length === 0) return "candidate not in package";
+  const sameFile = sites.filter((s) => s.file === key.tsFile);
+  if (sameFile.length === 0) return "candidate elsewhere in package";
+  return sameFile.some((s) => s.takesArgs)
+    ? "same-file candidate takes args"
+    : "same-file zero-arg member";
+}
+
+function tally<T>(items: T[], keyFn: (item: T) => string): [string, number][] {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    const k = keyFn(item);
+    counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  return [...counts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+}
+
+function section(title: string, rows: [string, number][], top?: number): string {
+  const shown = top === undefined ? rows : rows.slice(0, top);
+  const head =
+    rows.length > shown.length
+      ? `${title} (top ${shown.length} of ${rows.length})`
+      : `${title} (${rows.length})`;
+  const width = Math.max(0, ...shown.map(([k]) => k.length));
+  return [
+    `\n${head}`,
+    ...shown.map(([k, n]) => `  ${k.padEnd(width)}  ${String(n).padStart(5)}`),
+  ].join("\n");
+}
+
+export function unreviewedCount(entries: ExcludeEntry[]): number {
+  return entries.filter((e) => e.reason === DEFAULT_REASON).length;
+}
+
+export function renderReport(
+  entries: ExcludeEntry[],
+  index: TsMemberIndex | undefined,
+  top: number,
+): string {
+  const files = new Set(entries.map((e) => `${e.package} ${e.tsFile}`)).size;
+  const parts = [
+    `wide call-mismatches report: ${entries.length} entr(ies) across ${files} file(s)`,
+    `  unreviewed (reason still the seeded default): ${unreviewedCount(entries)} of ${entries.length}`,
+    section(
+      "By package",
+      tally(entries, (e) => e.package),
+    ),
+    section(
+      "By file",
+      tally(entries, (e) => `${e.package}/${e.tsFile}`),
+      top,
+    ),
+    section(
+      "By Ruby call name",
+      tally(entries, (e) => e.call),
+      top,
+    ),
+  ];
+  parts.push(
+    index === undefined
+      ? `\nBy cause bucket: SKIPPED — ${path.relative(ROOT_DIR, TS_API_PATH)} is missing ` +
+          "(run `pnpm api:compare` first)."
+      : section(
+          "By cause bucket",
+          tally(entries, (e) => bucketFor(e, index)),
+        ),
+  );
+  return parts.join("\n");
+}
+
+async function readJsonIfPresent<T>(file: string): Promise<T | undefined> {
+  try {
+    return await readJson<T>(file);
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw e;
+  }
+}
+
 async function main(write: boolean): Promise<number> {
   const baseline = await loadBaseline();
   const artifact = await loadArtifact();
@@ -283,12 +422,62 @@ async function main(write: boolean): Promise<number> {
   return 1;
 }
 
+async function reportMain(top: number, unreviewedOnly: boolean): Promise<number> {
+  const baseline = await loadBaseline();
+  if (unreviewedOnly) {
+    console.log(
+      `wide call-mismatches: ${unreviewedCount(baseline)} of ${baseline.length} baselined ` +
+        "entr(ies) still carry the seeded default reason (unreviewed).",
+    );
+    return 0;
+  }
+
+  const entries = [...baseline];
+  const artifact = await readJsonIfPresent<Artifact>(ARTIFACT_PATH);
+  if (artifact === undefined) {
+    console.log(
+      "(baseline only — the wide artifact is missing; run `pnpm api:compare --wide-calls`)",
+    );
+  } else {
+    // Not-yet-baselined mismatches carry no reason, so they are reported in the
+    // groupings without inflating the unreviewed-but-seeded count.
+    const { added } = diffAgainstBaseline(flattenArtifact(artifact), baseline);
+    entries.push(...added.map((k) => ({ ...k, reason: "" })));
+    if (added.length > 0) console.log(`(including ${added.length} not-yet-baselined mismatch(es))`);
+  }
+
+  const manifest = await readJsonIfPresent<ApiManifest>(TS_API_PATH);
+  console.log(renderReport(sortKeys(entries), manifest && indexTsMembers(manifest), top));
+  return 0;
+}
+
+export function parseTop(argv: string[], fallback: number): number {
+  const raw = argv.find((a) => a.startsWith("--top="))?.slice("--top=".length);
+  if (raw === undefined) return fallback;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1) {
+    throw new Error(`--top expects a positive integer, got ${JSON.stringify(raw)}`);
+  }
+  return n;
+}
+
 async function runAsScript(): Promise<void> {
   const self = fileURLToPath(import.meta.url);
   const invoked = process.argv[1] ? path.resolve(process.argv[1]) : "";
   if (path.resolve(self) !== invoked) return;
-  const code = await main(process.argv.includes("--write"));
-  process.exit(code);
+  const argv = process.argv.slice(2);
+  const unreviewed = argv.includes("--unreviewed");
+  if (!argv.includes("--report") && !unreviewed) {
+    process.exit(await main(argv.includes("--write")));
+  }
+  let top: number;
+  try {
+    top = parseTop(argv, 20);
+  } catch (e) {
+    console.error(`wide call-mismatches report: ${(e as Error).message}`);
+    process.exit(2);
+  }
+  process.exit(await reportMain(top, unreviewed));
 }
 
 void runAsScript();

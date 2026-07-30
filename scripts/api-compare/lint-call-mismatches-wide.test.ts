@@ -3,7 +3,18 @@ import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
 import { findDuplicateKeys, keyOf, type ExcludeEntry } from "./lint-call-mismatches.js";
-import { loadSplitBaseline, relPathFor, writeSplitBaseline } from "./lint-call-mismatches-wide.js";
+import {
+  DEFAULT_REASON,
+  bucketFor,
+  indexTsMembers,
+  loadSplitBaseline,
+  parseTop,
+  relPathFor,
+  renderReport,
+  unreviewedCount,
+  writeSplitBaseline,
+} from "./lint-call-mismatches-wide.js";
+import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
 
 const entry = (
   pkg: string,
@@ -175,5 +186,138 @@ describe("emission order", () => {
     await writeSplitBaseline([...entries].reverse(), dir);
     const second = await fs.readFile(path.join(dir, "activerecord", "relation.json"), "utf-8");
     expect(second).toBe(first);
+  });
+});
+
+describe("cause buckets", () => {
+  const method = (name: string, params: number, extra: Partial<MethodInfo> = {}): MethodInfo => ({
+    name,
+    visibility: "public",
+    params: Array.from({ length: params }, (_, i) => ({ name: `a${i}`, kind: "required" })),
+    ...extra,
+  });
+
+  const container = (file: string, methods: MethodInfo[]): ClassInfo => ({
+    name: "C",
+    file,
+    includes: [],
+    extends: [],
+    instanceMethods: methods,
+    classMethods: [],
+  });
+
+  const manifest = (classes: Record<string, ClassInfo>): ApiManifest => ({
+    source: "typescript",
+    generatedAt: "now",
+    packages: { activerecord: { classes, modules: {} } },
+  });
+
+  it("buckets a same-file candidate that takes arguments", () => {
+    const index = indexTsMembers(
+      manifest({ "relation.ts:Relation": container("relation.ts", [method("buildArel", 1)]) }),
+    );
+    expect(bucketFor(entry("activerecord", "relation.ts", "to_sql", "build_arel"), index)).toBe(
+      "same-file candidate takes args",
+    );
+  });
+
+  it("buckets a same-file zero-arg member separately", () => {
+    const index = indexTsMembers(
+      manifest({ "relation.ts:Relation": container("relation.ts", [method("buildArel", 0)]) }),
+    );
+    expect(bucketFor(entry("activerecord", "relation.ts", "to_sql", "build_arel"), index)).toBe(
+      "same-file zero-arg member",
+    );
+  });
+
+  it("buckets a candidate declared in another file of the package", () => {
+    const index = indexTsMembers(
+      manifest({ "model.ts:Model": container("model.ts", [method("buildArel", 1)]) }),
+    );
+    expect(bucketFor(entry("activerecord", "relation.ts", "to_sql", "build_arel"), index)).toBe(
+      "candidate elsewhere in package",
+    );
+  });
+
+  it("buckets a call with no TS counterpart anywhere in the package", () => {
+    const index = indexTsMembers(
+      manifest({ "relation.ts:Relation": container("relation.ts", [method("toSql", 0)]) }),
+    );
+    expect(bucketFor(entry("activerecord", "relation.ts", "to_sql", "build_arel"), index)).toBe(
+      "candidate not in package",
+    );
+  });
+
+  it("matches predicate calls through their convention candidates", () => {
+    const index = indexTsMembers(
+      manifest({ "relation.ts:Relation": container("relation.ts", [method("isLoaded", 0)]) }),
+    );
+    expect(bucketFor(entry("activerecord", "relation.ts", "to_sql", "loaded?"), index)).toBe(
+      "same-file zero-arg member",
+    );
+  });
+
+  it("attributes a mixin member to its declaring file, not the pseudo-module's", () => {
+    const index = indexTsMembers(
+      manifest({
+        "relation.ts:mixin": container("relation.ts", [
+          method("buildArel", 1, { declaredIn: "model.ts" }),
+        ]),
+      }),
+    );
+    expect(bucketFor(entry("activerecord", "relation.ts", "to_sql", "build_arel"), index)).toBe(
+      "candidate elsewhere in package",
+    );
+  });
+
+  it("buckets a package the manifest does not cover at all", () => {
+    expect(
+      bucketFor(entry("arel", "nodes/node.ts", "to_sql", "visit"), indexTsMembers(manifest({}))),
+    ).toBe("candidate not in package");
+  });
+});
+
+describe("unreviewedCount", () => {
+  it("counts only entries still carrying the seeded default reason", () => {
+    const seeded = { ...entry("activerecord", "relation.ts", "a", "b"), reason: DEFAULT_REASON };
+    expect(
+      unreviewedCount([seeded, entry("activerecord", "relation.ts", "c", "d", "reviewed")]),
+    ).toBe(1);
+  });
+});
+
+describe("renderReport", () => {
+  const entries = [
+    { ...entry("activerecord", "relation.ts", "a", "b"), reason: DEFAULT_REASON },
+    entry("activerecord", "relation.ts", "c", "d", "reviewed"),
+    entry("arel", "nodes/node.ts", "e", "f", "reviewed"),
+  ];
+
+  it("reports totals by package, file, call name, and unreviewed count", () => {
+    const out = renderReport(entries, undefined, 20);
+    expect(out).toContain("3 entr(ies) across 2 file(s)");
+    expect(out).toContain("unreviewed (reason still the seeded default): 1 of 3");
+    expect(out).toMatch(/activerecord\s+2/);
+    expect(out).toMatch(/activerecord\/relation\.ts\s+2/);
+    expect(out).toContain("By cause bucket: SKIPPED");
+  });
+
+  it("truncates the per-file listing to the requested top N", () => {
+    const out = renderReport(entries, undefined, 1);
+    expect(out).toContain("By file (top 1 of 2)");
+    expect(out).not.toContain("nodes/node.ts");
+  });
+});
+
+describe("parseTop", () => {
+  it("falls back when --top is absent and parses a positive integer", () => {
+    expect(parseTop([], 20)).toBe(20);
+    expect(parseTop(["--report", "--top=5"], 20)).toBe(5);
+  });
+
+  it("rejects a non-positive or non-integer --top instead of silently defaulting", () => {
+    expect(() => parseTop(["--top=x"], 20)).toThrow(/positive integer/);
+    expect(() => parseTop(["--top=0"], 20)).toThrow(/positive integer/);
+    expect(() => parseTop(["--top=2.5"], 20)).toThrow(/positive integer/);
   });
 });
