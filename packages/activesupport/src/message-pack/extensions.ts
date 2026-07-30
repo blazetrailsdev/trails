@@ -3,8 +3,8 @@
  *
  * Mirrors: ActiveSupport::MessagePack::Extensions
  *
- * `install` registers the extension types (Symbol today — the remaining
- * Ruby-native types are tracked as follow-up). `installUnregisteredTypeError`
+ * `install` registers the extension types (the remaining Ruby-native types are
+ * tracked as follow-up). `installUnregisteredTypeError`
  * and `installUnregisteredTypeFallback` register the catch-all type 127 used by
  * the plain serializer (raise) and the cache serializer (object fallback via
  * `toMsgpackExt`/`fromMsgpackExt` or `asJson`/`jsonCreate`).
@@ -16,7 +16,55 @@
 import { MessagePackError } from "./factory.js";
 import type { Factory, Packer, Unpacker } from "./factory.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
+import { Temporal } from "../temporal.js";
+import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
+
+/**
+ * Stand-in for Ruby's `Rational`, which has no JS analogue: the temporal packers
+ * write `sec_fraction` and `offset` through `write_rational`, so the numerator /
+ * denominator pair has to survive as a value even though extension type 3
+ * (Rational itself) is not registered.
+ */
+export interface Rational {
+  numerator: number;
+  denominator: number;
+}
+
+/** Julian Day Number of 1970-01-01, the anchor for Ruby's `Date#jd`. */
+const JD_UNIX_EPOCH = 2440588;
+
+const UNIX_EPOCH_DATE = Temporal.PlainDate.from("1970-01-01");
+
+const NANOS_PER_SECOND = 1_000_000_000;
+
+function gcd(a: number, b: number): number {
+  return b === 0 ? a : gcd(b, a % b);
+}
+
+/** Ruby's `Rational(n, d)`, which reduces on construction. */
+function rational(numerator: number, denominator: number): Rational {
+  if (numerator === 0) return { numerator: 0, denominator: 1 };
+  const divisor = gcd(Math.abs(numerator), Math.abs(denominator));
+  return { numerator: numerator / divisor, denominator: denominator / divisor };
+}
+
+function julianDay(date: Temporal.PlainDate): number {
+  return JD_UNIX_EPOCH + date.since(UNIX_EPOCH_DATE, { largestUnit: "day" }).days;
+}
+
+function dateFromJulianDay(jd: number): Temporal.PlainDate {
+  return UNIX_EPOCH_DATE.add({ days: jd - JD_UNIX_EPOCH });
+}
+
+/** Nanosecond-of-second, the numerator Ruby's `Time#tv_nsec` reports. */
+function nanosecondOfSecond(time: {
+  millisecond: number;
+  microsecond: number;
+  nanosecond: number;
+}): number {
+  return time.millisecond * 1_000_000 + time.microsecond * 1_000 + time.nanosecond;
+}
 
 /**
  * Encodes a bigint as MessagePack::Bigint's `CL>*` ext payload: a sign byte (0
@@ -33,19 +81,6 @@ function bigIntToMsgpackExt(value: bigint): Buffer {
     n >>= 32n;
   }
   return Buffer.from(bytes);
-}
-
-/**
- * Mirrors Ruby's `load_time_zone` → `ActiveSupport::TimeZone[name]`, which
- * rescues an invalid identifier to `null` (time_zone.rb:236-241) rather than
- * raising. `TimeZone.find` throws on an unknown name, so we catch it here.
- */
-function loadTimeZone(name: string): TimeZone | null {
-  try {
-    return TimeZone.find(name);
-  } catch {
-    return null;
-  }
 }
 
 function bigIntFromMsgpackExt(payload: Buffer): bigint {
@@ -109,12 +144,48 @@ export const Extensions = {
     });
 
     registry.registerType({
+      type: 5,
+      klass: "DateTime",
+      recursive: true,
+      match: (v) => v instanceof Temporal.PlainDateTime,
+      packer: (v, packer) => Extensions.writeDatetime(v as Temporal.PlainDateTime, packer),
+      unpacker: (unpacker) => Extensions.readDatetime(unpacker as Unpacker),
+    });
+
+    registry.registerType({
+      type: 6,
+      klass: "Date",
+      recursive: true,
+      match: (v) => v instanceof Temporal.PlainDate,
+      packer: (v, packer) => Extensions.writeDate(v as Temporal.PlainDate, packer),
+      unpacker: (unpacker) => Extensions.readDate(unpacker as Unpacker),
+    });
+
+    registry.registerType({
+      type: 7,
+      klass: "Time",
+      recursive: true,
+      match: (v) => v instanceof Temporal.Instant,
+      packer: (v, packer) => Extensions.writeTime(v as Temporal.Instant, packer),
+      unpacker: (unpacker) => Extensions.readTime(unpacker as Unpacker),
+    });
+
+    registry.registerType({
+      type: 8,
+      klass: "ActiveSupport::TimeWithZone",
+      recursive: true,
+      match: (v) => v instanceof TimeWithZone,
+      packer: (v, packer) => Extensions.writeTimeWithZone(v as TimeWithZone, packer),
+      unpacker: (unpacker) => Extensions.readTimeWithZone(unpacker as Unpacker),
+    });
+
+    registry.registerType({
       type: 9,
       klass: "ActiveSupport::TimeZone",
       recursive: false,
       match: (v) => v instanceof TimeZone,
-      packer: (v) => Buffer.from((v as TimeZone).name, "utf-8"),
-      unpacker: (payload) => loadTimeZone((payload as Buffer).toString("utf-8")),
+      packer: (v) => Buffer.from(Extensions.dumpTimeZone(v as TimeZone), "utf-8"),
+      unpacker: (payload) => Extensions.loadTimeZone((payload as Buffer).toString("utf-8")),
     });
 
     registry.registerType({
@@ -157,6 +228,111 @@ export const Extensions = {
       packer: (v, packer) => Extensions.writeObject(v as object, packer),
       unpacker: (unpacker) => Extensions.readObject(unpacker as Unpacker),
     });
+  },
+
+  writeRational(value: Rational, packer: Packer): void {
+    packer.write(value.numerator);
+    if (value.numerator !== 0) packer.write(value.denominator);
+  },
+
+  readRational(unpacker: Unpacker): Rational {
+    const numerator = unpacker.read() as number;
+    return rational(numerator, numerator === 0 ? 1 : (unpacker.read() as number));
+  },
+
+  writeDatetime(datetime: Temporal.PlainDateTime, packer: Packer): void {
+    packer.write(julianDay(datetime.toPlainDate()));
+    packer.write(datetime.hour);
+    packer.write(datetime.minute);
+    packer.write(datetime.second);
+    Extensions.writeRational(rational(nanosecondOfSecond(datetime), NANOS_PER_SECOND), packer);
+    // Ruby writes DateTime#offset (a fraction of a day); a PlainDateTime is bare
+    // wall-clock time with no offset to carry, so the slot is always zero.
+    Extensions.writeRational(rational(0, 1), packer);
+  },
+
+  readDatetime(unpacker: Unpacker): Temporal.PlainDateTime {
+    const jd = unpacker.read() as number;
+    const hour = unpacker.read() as number;
+    const minute = unpacker.read() as number;
+    const second = unpacker.read() as number;
+    const secFraction = Extensions.readRational(unpacker);
+    // The offset slot is consumed to keep the stream aligned, then dropped:
+    // PlainDateTime has nowhere to put it.
+    Extensions.readRational(unpacker);
+    const nanos = Math.round((secFraction.numerator / secFraction.denominator) * NANOS_PER_SECOND);
+    return dateFromJulianDay(jd).toPlainDateTime({
+      hour,
+      minute,
+      second,
+      millisecond: Math.floor(nanos / 1_000_000),
+      microsecond: Math.floor(nanos / 1_000) % 1_000,
+      nanosecond: nanos % 1_000,
+    });
+  },
+
+  writeDate(date: Temporal.PlainDate, packer: Packer): void {
+    packer.write(julianDay(date));
+  },
+
+  readDate(unpacker: Unpacker): Temporal.PlainDate {
+    return dateFromJulianDay(unpacker.read() as number);
+  },
+
+  writeTime(time: Temporal.Instant, packer: Packer): void {
+    const nanos = time.epochNanoseconds;
+    const seconds = nanos / BigInt(NANOS_PER_SECOND);
+    const remainder = nanos % BigInt(NANOS_PER_SECOND);
+    // Ruby's tv_sec/tv_nsec pair floors: tv_nsec is never negative, so a
+    // pre-epoch instant borrows a second. BigInt division truncates instead.
+    const borrow = remainder < 0n ? 1n : 0n;
+    packer.write(seconds - borrow);
+    packer.write(remainder + borrow * BigInt(NANOS_PER_SECOND));
+    // Ruby writes Time#utc_offset; an Instant is absolute, so it is always UTC.
+    packer.write(0);
+  },
+
+  readTime(unpacker: Unpacker): Temporal.Instant {
+    const seconds = BigInt(unpacker.read() as number | bigint);
+    const nanos = BigInt(unpacker.read() as number | bigint);
+    // The utc_offset slot is consumed and dropped: it labels the wall-clock zone
+    // Ruby reconstructs, not the instant, which is already absolute.
+    unpacker.read();
+    return Temporal.Instant.fromEpochNanoseconds(seconds * BigInt(NANOS_PER_SECOND) + nanos);
+  },
+
+  writeTimeWithZone(twz: TimeWithZone, packer: Packer): void {
+    Extensions.writeTime(twz.utc(), packer);
+    Extensions.writeTimeZone(twz.timeZone, packer);
+  },
+
+  readTimeWithZone(unpacker: Unpacker): TimeWithZone {
+    return new TimeWithZone(Extensions.readTime(unpacker), Extensions.readTimeZone(unpacker)!);
+  },
+
+  dumpTimeZone(timeZone: TimeZone): string {
+    return timeZone.name;
+  },
+
+  /**
+   * Ruby's `ActiveSupport::TimeZone[name]` rescues an invalid identifier to
+   * `nil` (time_zone.rb:236-241) rather than raising; `TimeZone.find` throws on
+   * an unknown name, so the rescue happens here.
+   */
+  loadTimeZone(name: string): TimeZone | null {
+    try {
+      return TimeZone.find(name);
+    } catch {
+      return null;
+    }
+  },
+
+  writeTimeZone(timeZone: TimeZone, packer: Packer): void {
+    packer.write(Extensions.dumpTimeZone(timeZone));
+  },
+
+  readTimeZone(unpacker: Unpacker): TimeZone | null {
+    return Extensions.loadTimeZone(unpacker.read() as string);
   },
 
   dumpClass(klass: ObjectClass): string {

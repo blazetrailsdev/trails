@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { MessagePack, UnserializableObjectError } from "./index.js";
+import { Temporal } from "../temporal.js";
+import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
 
@@ -43,9 +45,8 @@ describe("MessagePackSerializerTest", () => {
   // The remaining native extension types are registered by
   // activesupport-messagepack-native-extension-types. Type IDs without a
   // faithful, non-lossy JS representation are intentionally descoped (see PR):
-  //   2 BigDecimal, 3 Rational, 4 Complex, 5 DateTime, 6 Date, 7 Time,
-  //   8 TimeWithZone, 10 Duration, 11 Range, 13 URI, 14 IPAddr, 15 Pathname,
-  //   16 Regexp.
+  //   2 BigDecimal, 3 Rational, 4 Complex, 10 Duration, 11 Range, 13 URI,
+  //   14 IPAddr, 15 Pathname, 16 Regexp.
   it("enshrines type IDs", () => {
     MessagePack.warmup();
     const actual = Object.fromEntries(
@@ -54,6 +55,10 @@ describe("MessagePackSerializerTest", () => {
     expect(actual).toEqual({
       0: "Symbol",
       1: "Integer",
+      5: "DateTime",
+      6: "Date",
+      7: "Time",
+      8: "ActiveSupport::TimeWithZone",
       9: "ActiveSupport::TimeZone",
       12: "Set",
       17: "ActiveSupport::HashWithIndifferentAccess",
@@ -79,6 +84,41 @@ describe("MessagePackSerializerTest", () => {
 
   it("roundtrips Set", () => {
     expect(roundtrip(new Set([null, true, 2, "three"]))).toEqual(new Set([null, true, 2, "three"]));
+  });
+
+  it("roundtrips DateTime", () => {
+    const datetime = Temporal.PlainDateTime.from("1999-12-31T12:34:56.789");
+    expect(roundtrip(datetime)).toEqual(datetime);
+    const now = Temporal.Now.plainDateTimeISO();
+    expect(roundtrip(now)).toEqual(now);
+  });
+
+  it("roundtrips Date", () => {
+    const date = Temporal.PlainDate.from("1999-12-31");
+    expect(roundtrip(date)).toEqual(date);
+    const today = Temporal.Now.plainDateISO();
+    expect(roundtrip(today)).toEqual(today);
+  });
+
+  it("roundtrips Time", () => {
+    const time = Temporal.Instant.from("1999-12-31T12:34:56.789-12:00");
+    expect(roundtrip(time)).toEqual(time);
+    const now = Temporal.Now.instant();
+    expect(roundtrip(now)).toEqual(now);
+    // Pre-epoch instants borrow a second so tv_nsec stays non-negative.
+    const preEpoch = Temporal.Instant.from("1969-07-20T20:17:40.123456789Z");
+    expect(roundtrip(preEpoch)).toEqual(preEpoch);
+  });
+
+  it("roundtrips ActiveSupport::TimeWithZone", () => {
+    const twz = new TimeWithZone(
+      Temporal.Instant.from("1999-12-31T12:34:56.789Z"),
+      TimeZone.find("Australia/Lord_Howe"),
+    );
+    const result = roundtrip(twz) as TimeWithZone;
+    expect(result).toBeInstanceOf(TimeWithZone);
+    expect(result.utc()).toEqual(twz.utc());
+    expect(result.timeZone.name).toBe(twz.timeZone.name);
   });
 
   it("roundtrips ActiveSupport::TimeZone", () => {
