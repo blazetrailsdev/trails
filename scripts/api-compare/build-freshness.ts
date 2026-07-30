@@ -1,6 +1,7 @@
 /**
- * Guard against measuring `api:compare` / `api:extra` against a BUILD that
- * belongs to a different commit than the checked-out sources.
+ * Guard against measuring `api:compare` / `api:extra` against a BUILD that does
+ * not correspond to the checked-out sources — one belonging to a different
+ * commit, or (see `staleBuilds`) no build at all.
  *
  * The TS extractor compiles each package with the real module resolver, so an
  * `import … from "@blazetrails/activesupport"` resolves through pnpm's
@@ -42,11 +43,18 @@ import * as path from "path";
 import ts from "typescript";
 import type { PackageRoots } from "./config.js";
 
+/**
+ * Reported for a project that has no `dist` at all. Not one of tsc's statuses —
+ * tsc calls such a project up to date whenever its `tsconfig.tsbuildinfo`
+ * survived — so the guard mints it itself. See `staleBuilds`.
+ */
+export const NOT_BUILT = "NotBuilt";
+
 /** One package whose build does not correspond to its checked-out sources. */
 export interface StaleBuild {
   /** Directory name under `packages/` (not the api-compare package key). */
   dir: string;
-  /** `tsc`'s own verdict, e.g. `OutOfDateWithSelf` — quoted in the message. */
+  /** `tsc`'s own verdict, e.g. `OutOfDateWithSelf`, or `NotBuilt`. */
   status: string;
 }
 
@@ -157,11 +165,23 @@ async function hasDeclarations(dir: string): Promise<boolean> {
  * the manifest and must not be able to block a run. Roots sharing a directory
  * (the four actionpack packages) share one tsconfig and collapse to one report.
  *
- * A root with no `dist` is NOT stale: nothing was built, so nothing can be out
- * of date and cross-package imports fail to resolve uniformly at every commit.
- * That check is ours rather than tsc's on purpose — tsc reports a project whose
+ * A root with no `dist` is reported as `NotBuilt`. It was once treated as
+ * benign ("resolves to nothing at every commit, so it's consistent"), and that
+ * is measurably false: on an UNBUILT worktree the extractor cannot resolve a
+ * type an importer pulls from a sibling package's declarations, so the method
+ * carrying it silently leaves whichever population needed that type.
+ * `serializableHash` (activerecord/serialization.ts) takes its options type
+ * from activemodel, and the option-key summary prints 103 pairs on an unbuilt
+ * tree against 104 on the same tree after `pnpm build`. (Only the option-key
+ * total moved on that tree — arity, literals and calls were identical — but
+ * nothing confines the mechanism to option keys; any total read off a
+ * cross-package type can move the same way.) A run-order-dependent total is
+ * exactly the fabricated ±1 this guard exists to prevent, so an unbuilt package
+ * has to fail the same way a stale one does.
+ *
+ * `NotBuilt` is ours rather than tsc's on purpose — tsc reports a project whose
  * `dist` was deleted but whose `tsconfig.tsbuildinfo` survives as up to date,
- * so deferring to it would let a half-removed build through.
+ * so deferring to it would let a removed build through.
  */
 export async function staleBuilds(roots: readonly PackageRoots[]): Promise<StaleBuild[]> {
   const seeds = new Map<string, Project>();
@@ -173,22 +193,23 @@ export async function staleBuilds(roots: readonly PackageRoots[]): Promise<Stale
     });
   }
   const candidates = referenceClosure([...seeds.values()]);
-  const checked = await Promise.all(
-    candidates.map(async (project) => ((await hasDeclarations(project.distDir)) ? project : null)),
-  );
-  const built = checked.filter((project): project is Project => project !== null);
-  if (built.length === 0) return [];
+  const hasDist = await Promise.all(candidates.map((project) => hasDeclarations(project.distDir)));
+  const built = candidates.filter((_, i) => hasDist[i]);
+  const stale: StaleBuild[] = candidates
+    .filter((_, i) => !hasDist[i])
+    .map((project) => ({ dir: project.dir, status: NOT_BUILT }));
 
-  const builder = ts.createSolutionBuilder(
-    ts.createSolutionBuilderHost(ts.sys),
-    built.map((project) => project.configPath),
-    {},
-  );
-  const stale: StaleBuild[] = [];
-  for (const project of built) {
-    const status = builder.getUpToDateStatusOfProject(project.configPath);
-    if (STALE_STATUSES.has(status.type)) {
-      stale.push({ dir: project.dir, status: ts.UpToDateStatusType[status.type] });
+  if (built.length > 0) {
+    const builder = ts.createSolutionBuilder(
+      ts.createSolutionBuilderHost(ts.sys),
+      built.map((project) => project.configPath),
+      {},
+    );
+    for (const project of built) {
+      const status = builder.getUpToDateStatusOfProject(project.configPath);
+      if (STALE_STATUSES.has(status.type)) {
+        stale.push({ dir: project.dir, status: ts.UpToDateStatusType[status.type] });
+      }
     }
   }
   return stale.sort((a, b) => (a.dir < b.dir ? -1 : a.dir > b.dir ? 1 : 0));
@@ -254,14 +275,37 @@ async function newestSourceMtime(dir: string): Promise<number> {
 
 /** The operator-facing failure text for a non-empty `staleBuilds` result. */
 export function staleBuildMessage(stale: StaleBuild[]): string {
+  const missing = stale.filter((entry) => entry.status === NOT_BUILT).length;
+  const noun = missing === stale.length ? "a missing build" : "a stale build";
   return [
-    `api:compare would measure ${stale.length} package(s) against a stale build:`,
+    `api:compare would measure ${stale.length} package(s) against ${noun}:`,
     ...stale.map((entry) => `  packages/${entry.dir} — ${entry.status}`),
     "",
-    "Cross-package imports resolve through packages/<pkg>/dist/*.d.ts, which git",
-    "does not update on checkout, so these totals would mix one commit's sources",
-    "with another commit's build output. Run `pnpm build` and re-run.",
-    "Set API_COMPARE_ALLOW_STALE_BUILD=1 to measure anyway (totals are not a",
-    "trustworthy baseline).",
+    "Cross-package imports resolve through packages/<pkg>/dist/*.d.ts, so what",
+    "the extractor sees depends on those declarations. Run `pnpm build` and",
+    "re-run.",
+    ...(missing < stale.length
+      ? [
+          "",
+          "git does not update dist on checkout, so a stale one makes these totals",
+          "mix one commit's sources with another commit's build output.",
+        ]
+      : []),
+    ...(missing > 0
+      ? [
+          "",
+          `${missing} of those have no dist at all. An unbuilt package does not`,
+          "resolve to nothing harmlessly: a type an importer pulls from it goes",
+          "unresolved, and the method carrying it drops out of the advisory",
+          "populations — the option-key summary alone moves by a pair — so the",
+          "totals change on the next run purely because a build happened in",
+          "between.",
+        ]
+      : []),
+    "",
+    "API_COMPARE_FORCE=1 does NOT fix this — it clears the extractor caches",
+    "(local mtime-keyed and shared content-keyed) and nothing else; build state",
+    "is not a cache. Set API_COMPARE_ALLOW_STALE_BUILD=1 to measure anyway",
+    "(totals are not a trustworthy baseline).",
   ].join("\n");
 }
