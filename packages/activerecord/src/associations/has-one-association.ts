@@ -511,22 +511,7 @@ export class HasOneAssociation extends SingularAssociation {
     }
   }
 
-  /**
-   * The record a deferred `remove_target!` acts on, when it is not the cached
-   * target. Rails' `remove_target!` reads `self.target` unconditionally, and
-   * inside `replace`'s transaction that IS the displaced record — the shape
-   * `persistImmediate` preserves, where this stays null. The deferred
-   * displacement paths run after the replacement is already cached, so parking
-   * the displaced record here is what lets `removeTargetBang` keep Rails' arity:
-   * assigning `this.target` instead would be observable to synchronous readers
-   * across the removal's awaits (the nested-attributes writer returns to its
-   * caller mid-removal).
-   */
   private pendingRemovalTarget: Base | null = null;
-
-  private removalTarget(): Base | null {
-    return this.pendingRemovalTarget ?? this.target;
-  }
 
   /**
    * The unloaded half of the nested-attributes writer's `remove_target!`.
@@ -668,7 +653,7 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   private async removeTargetBang(method: string): Promise<void> {
-    const target = this.removalTarget();
+    const target = this.pendingRemovalTarget ?? this.target;
     if (!target) return;
     if (method === "delete") {
       await ((target as any).delete?.() ?? Promise.resolve());
