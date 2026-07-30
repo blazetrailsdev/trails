@@ -17,6 +17,7 @@ import { SchemaMigration } from "./schema-migration.js";
 import { newRawTestAdapter } from "./test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
+import { Table } from "./connection-adapters/abstract/schema-definitions.js";
 import { fixtures } from "./test-fixtures.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 
@@ -210,5 +211,25 @@ describe("MigrationTest", () => {
     } finally {
       Migration.verbose = verboseWas;
     }
+  });
+  it("changeTable yields the adapter's updateTableDefinition result", async () => {
+    class AdapterTable extends Table {}
+    const seen: unknown[] = [];
+    class M extends Migration {}
+    const m = new M();
+    (m as unknown as { _connectionOverride: unknown })._connectionOverride = {
+      updateTableDefinition(tableName: string, base: unknown) {
+        seen.push([tableName, base]);
+        return new AdapterTable(tableName, base as never);
+      },
+    };
+
+    let yielded: unknown;
+    await m.changeTable("people", (t) => {
+      yielded = t;
+    });
+
+    expect(yielded).toBeInstanceOf(AdapterTable);
+    expect(seen).toEqual([["people", m]]);
   });
 });
