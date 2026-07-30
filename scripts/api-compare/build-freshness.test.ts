@@ -153,16 +153,50 @@ describe("staleBuilds", () => {
     expect(await staleBuilds([rootFor(packagesDir, "activerecord")])).toEqual([]);
   });
 
-  it("ignores a package that was never built", async () => {
+  it("reports a package that was never built", async () => {
     const root = mkTmp();
     const packagesDir = path.join(root, "packages");
     const pkg = buildPackage(packagesDir, "arel");
-    // A dist-less package resolves to nothing at every commit — consistent,
-    // so not a mixed tree. tsc alone would call this up to date (the surviving
-    // tsbuildinfo vouches for it), which is why the check is ours.
+    // A dist-less package is NOT harmlessly consistent: importers can't resolve
+    // the types it declares, so advisory totals shift the moment a build lands
+    // (option keys printed 103 unbuilt vs 104 built on the same tree). tsc alone
+    // calls this up to date — the surviving tsbuildinfo vouches for it — which
+    // is why the check is ours.
     fs.rmSync(path.join(pkg, "dist"), { recursive: true });
 
-    expect(await staleBuilds([rootFor(packagesDir, "arel")])).toEqual([]);
+    expect(await staleBuilds([rootFor(packagesDir, "arel")])).toEqual([
+      { dir: "arel", status: "NotBuilt" },
+    ]);
+  });
+
+  it("reports every package of a wholly unbuilt tree", async () => {
+    const root = mkTmp();
+    const packagesDir = path.join(root, "packages");
+    for (const name of ["activesupport", "arel"]) {
+      fs.rmSync(path.join(buildPackage(packagesDir, name), "dist"), { recursive: true });
+    }
+    // The state a freshly created worktree is in before its first `pnpm build`,
+    // and the one the guard used to wave through entirely.
+    expect(await staleBuilds([...rootsOf(packagesDir, "activesupport", "arel")])).toEqual([
+      { dir: "activesupport", status: "NotBuilt" },
+      { dir: "arel", status: "NotBuilt" },
+    ]);
+  });
+
+  it("reports a REFERENCED workspace that was never built", async () => {
+    const root = mkTmp();
+    const packagesDir = path.join(root, "packages");
+    const tse = buildPackage(packagesDir, "tse-compiler", {
+      "index.ts": "export const compileJs = 1;\n",
+    });
+    buildPackage(packagesDir, "actionview", { "index.ts": "export const a = 1;\n" }, [
+      "tse-compiler",
+    ]);
+    fs.rmSync(path.join(tse, "dist"), { recursive: true });
+
+    expect(await staleBuilds([rootFor(packagesDir, "actionview")])).toEqual([
+      { dir: "tse-compiler", status: "NotBuilt" },
+    ]);
   });
 
   it("returns an empty list when there are no roots", async () => {
@@ -347,5 +381,24 @@ describe("staleBuildMessage", () => {
     expect(message).toContain("packages/actionview — OutOfDateRoots");
     expect(message).toContain("pnpm build");
     expect(message).toContain("API_COMPARE_ALLOW_STALE_BUILD=1");
+  });
+
+  it("explains that FORCE does not cover build state", () => {
+    const message = staleBuildMessage([{ dir: "arel", status: "OutOfDateWithSelf" }]);
+    expect(message).toContain("API_COMPARE_FORCE=1 does NOT fix this");
+  });
+
+  it("calls out unbuilt packages separately from stale ones", () => {
+    const message = staleBuildMessage([
+      { dir: "activemodel", status: "NotBuilt" },
+      { dir: "arel", status: "OutOfDateWithSelf" },
+    ]);
+    expect(message).toContain("packages/activemodel — NotBuilt");
+    expect(message).toContain("1 of those have no dist at all");
+  });
+
+  it("omits the unbuilt paragraph when every package merely went stale", () => {
+    const message = staleBuildMessage([{ dir: "arel", status: "OutOfDateWithSelf" }]);
+    expect(message).not.toContain("no dist at all");
   });
 });

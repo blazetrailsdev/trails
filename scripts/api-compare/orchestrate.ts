@@ -30,6 +30,14 @@
  * `API_COMPARE_FORCE=1` forces full regeneration end-to-end (ts-extract and
  * ruby-extract honor it via their own gates; fetch drops its offline
  * fast-path). `API_COMPARE_REFRESH=1` re-clones sources via fetch --refresh.
+ *
+ * What FORCE does NOT cover: `packages/*\/dist`. It clears exactly the caches
+ * this pipeline owns — the local mtime-keyed ts cache, the shared content-keyed
+ * cache, and the ruby manifest's mtime gate. The compiled declarations siblings
+ * resolve imports through are BUILD OUTPUT, not a cache, and nothing here
+ * rebuilds them; a run against an unbuilt or stale `dist` reports different
+ * totals no matter how forced it is. That is build-freshness.ts's job, which
+ * aborts the run before any extraction.
  */
 import { execFile } from "node:child_process";
 import { readFile, stat, writeFile } from "node:fs/promises";
