@@ -151,6 +151,8 @@ interface WorkerOutput {
   /** Absolute file names of every source file the program read. */
   inputs: string[];
 }
+const fileHasMissingRailsCallTag = new WeakMap<ts.SourceFile, boolean>();
+
 if (!isMainThread && parentPort) {
   const { package: pkgName, srcDir } = workerData as WorkerInput;
   const out: WorkerOutput = extractPackage(pkgName, srcDir);
@@ -1480,9 +1482,12 @@ export function paramsOfCallableRef(
  * the mixin pseudo-module's constructor) need no wiring: `checkCalls` skips a
  * pair with no TS call-set, so a call there is never flagged, never tagged by
  * api:build, and has nothing to suppress.
+ *
+ * `fileHasMissingRailsCallTag` is declared with the imports, not next to this
+ * function: a worker thread runs the whole extraction from the
+ * `!isMainThread` block during module evaluation, so a `const` declared
+ * further down the file is still in its temporal dead zone when this runs.
  */
-const fileHasMissingRailsCallTag = new WeakMap<ts.SourceFile, boolean>();
-
 export function missingRailsCallTags(node: ts.Node): string[] | undefined {
   const sf = node.getSourceFile();
   let present = fileHasMissingRailsCallTag.get(sf);
