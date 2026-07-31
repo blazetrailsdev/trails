@@ -67,7 +67,16 @@ export class Thrown extends Error {
   }
 }
 
-/** The surface every serializer in {@link SERIALIZERS} exposes. @internal */
+/**
+ * The surface every serializer in {@link SERIALIZERS} exposes. In Ruby they
+ * are anonymous modules inside `SERIALIZERS`, so the shared shape has no
+ * constant.
+ *
+ * @internal
+ * @noRailsEquivalent PERMANENT — name collision only. Ruby's `Serializer`
+ * (`ActiveSupport::MessagePack::Serializer`) is one concrete MessagePack
+ * serializer, not the shape the fallback table's members share.
+ */
 export interface Serializer {
   /**
    * The serializer's own key in {@link SERIALIZERS}. Rails recovers this with

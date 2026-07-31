@@ -40,7 +40,7 @@ import {
   formatPlainDateTimeForSqlPostgres,
   formatPlainDateForSqlPostgres,
 } from "./sql-datetime.js";
-import type { Quoting } from "./quoting-interface.js";
+import type { Quoting } from "./quoting.js";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import { TransactionManager } from "./transaction.js";
 import { exceedsBindParamsLimit } from "./database-limits.js";

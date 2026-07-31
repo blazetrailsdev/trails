@@ -42,7 +42,7 @@ import {
 import { Result } from "../../result.js";
 import { ActiveRecord } from "../../ar-config.js";
 import type { QueryTransformer } from "../../query-transformers.js";
-import type { Quoting } from "./quoting-interface.js";
+import type { Quoting } from "./quoting.js";
 import { fixtures } from "../../test-fixtures.js";
 
 describe("DatabaseStatements", () => {

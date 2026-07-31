@@ -13,6 +13,15 @@ export interface CacheOptions {
   [key: string]: unknown; // open hash (Rails); flows into the Store base's StoreOptions
 }
 
+/**
+ * The public surface every store in this package satisfies — the TS spelling
+ * of "responds to the `ActiveSupport::Cache::Store` protocol", which Ruby
+ * expresses by subclassing `Store` rather than by a named shape.
+ *
+ * @noRailsEquivalent PERMANENT — name collision only. Ruby's `CacheStore`
+ * (`ActionDispatch::Session::CacheStore`) is a session middleware that stores
+ * sessions *in* a cache; it is not the cache protocol.
+ */
 export interface CacheStore {
   read(key: string, options?: CacheOptions): unknown;
   write(key: string, value: unknown, options?: CacheOptions): boolean;

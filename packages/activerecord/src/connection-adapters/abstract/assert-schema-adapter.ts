@@ -1,5 +1,5 @@
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
-import type { Quoting } from "./quoting-interface.js";
+import type { Quoting } from "./quoting.js";
 
 /**
  * Minimal subset of {@link Quoting} that `SchemaStatements` depends

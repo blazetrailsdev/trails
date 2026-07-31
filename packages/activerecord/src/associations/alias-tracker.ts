@@ -5,7 +5,7 @@
  */
 import { Table, Nodes, type TableRef } from "@blazetrails/arel";
 import { maxIdentifierLength } from "../connection-adapters/abstract/database-limits.js";
-import type { Quoting } from "../connection-adapters/abstract/quoting-interface.js";
+import type { Quoting } from "../connection-adapters/abstract/quoting.js";
 
 // DatabaseLimits' table_alias_length defaults to max_identifier_length; use the
 // abstract default directly (the free tableAliasLength now dispatches via `this`).

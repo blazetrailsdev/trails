@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { Quoting } from "./abstract/quoting-interface.js";
+import type { Quoting } from "./abstract/quoting.js";
 import { AbstractAdapter } from "./abstract-adapter.js";
 import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 

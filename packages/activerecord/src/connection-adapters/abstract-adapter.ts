@@ -69,7 +69,7 @@ import {
   lookupCastType as abstractLookupCastType,
   Quoting as QuotingMixin,
 } from "./abstract/quoting.js";
-import type { Quoting } from "./abstract/quoting-interface.js";
+import type { Quoting } from "./abstract/quoting.js";
 import { include } from "@blazetrails/activesupport";
 import { SchemaStatements, type JoinTableOptions } from "./abstract/schema-statements.js";
 import { Savepoints as SavepointsMixin } from "./abstract/savepoints.js";

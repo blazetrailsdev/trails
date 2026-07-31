@@ -6,6 +6,16 @@
  *   accepts any `<=>`-comparable value. Temporal-typed ranges live elsewhere.
  */
 
+/**
+ * The value shape these helpers operate on. Ruby's `Range` is a core class
+ * these core-ext files reopen; JS has no such class, so trails carries the
+ * begin/end/exclusive triple as data instead.
+ *
+ * @noRailsEquivalent PERMANENT — the Ruby `Range` constant it collides with
+ * is the core class itself, which cannot be "ported" to a TS declaration; the
+ * Rails-declared `Range` classes (`Arel::Nodes::Range`, PG `OID::Range`) are
+ * unrelated node/type classes.
+ */
 export interface Range<T> {
   begin: T | null; // null = beginless
   end: T | null; // null = endless

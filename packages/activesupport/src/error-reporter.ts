@@ -17,6 +17,14 @@ export interface ReportedError {
   source: string;
 }
 
+/**
+ * The duck type `ErrorReporter#subscribe` requires — Rails asserts
+ * `subscriber.respond_to?(:report)` and names no constant for the shape.
+ *
+ * @noRailsEquivalent PERMANENT — name collision only. Ruby's
+ * `ErrorSubscriber` (`error_reporter/test_helper.rb`) is a concrete
+ * recording subscriber for tests, not the protocol itself.
+ */
 export interface ErrorSubscriber {
   report(reportedError: ReportedError): void;
 }

@@ -15,6 +15,15 @@ const IP_HOST_REGEXP = /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
 const HOST_REGEXP = /(^[^:]+:\/\/)?(\[[^\]]+\]|[^:]+)(?::(\d+$))?/;
 const PROTOCOL_REGEXP = /^([^:]+)(:)?(\/\/)?$/;
 
+/**
+ * The options hash `urlFor` / `pathFor` accept. In Ruby this is a bare `Hash`
+ * with no constant of its own.
+ *
+ * @noRailsEquivalent PERMANENT — name collision only. The Ruby
+ * `ActionDispatch::Integration::UrlOptions` (`testing/integration.rb`) is an
+ * integration-test mixin that supplies `url_options`; it has nothing to do
+ * with this option-hash shape.
+ */
 export interface UrlOptions {
   host?: string;
   protocol?: string | false | null;

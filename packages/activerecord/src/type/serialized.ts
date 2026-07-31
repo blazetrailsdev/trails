@@ -224,6 +224,14 @@ function collectionsEqual(aRaw: unknown, bRaw: unknown): boolean {
   return valuesEqual(a, b);
 }
 
+/**
+ * The duck type `Serialized` requires of its coder — Rails' `coder` is any
+ * object answering `dump`/`load` (`ActiveRecord::Coders::YAMLColumn`,
+ * `Coders::JSON`, or a user object); the `Coders` module names no such shape.
+ *
+ * @noRailsEquivalent PERMANENT — name collision only. Ruby's `Coder`
+ * (`ActiveSupport::Cache::Coder`) serializes cache entries, not column values.
+ */
 export interface Coder {
   dump(value: unknown): string | null;
   load(value: unknown): unknown;

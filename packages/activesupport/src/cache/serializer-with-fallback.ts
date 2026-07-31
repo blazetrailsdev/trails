@@ -41,7 +41,15 @@ export class KeyError extends Error {
   }
 }
 
-/** Interface shared by all four serializers. @internal */
+/**
+ * Interface shared by all four serializers. In Ruby they are anonymous
+ * modules inside `SERIALIZERS`, so the shared shape has no constant.
+ *
+ * @internal
+ * @noRailsEquivalent PERMANENT — name collision only. Ruby's `Serializer`
+ * (`ActiveSupport::MessagePack::Serializer`) is one concrete MessagePack
+ * serializer, not the shape the fallback table's members share.
+ */
 export interface Serializer {
   dump(entryOrValue: Entry | unknown): string | Entry;
   dumpCompressed?(entry: Entry, threshold: number): string | Entry;

@@ -5,6 +5,14 @@
  * Supports lazy loading, destruction, and tracking of the original session id.
  */
 
+/**
+ * The duck type `Session` requires of the store it wraps (Rails' `@by`,
+ * a Rack session middleware). Ruby names no constant for it.
+ *
+ * @noRailsEquivalent PERMANENT — name collision only. Ruby's `SessionStore`
+ * (`ActionController::RequestForgeryProtection::SessionStore`) is the CSRF
+ * token store strategy, unrelated to this Rack-store shape.
+ */
 export interface SessionStore {
   loadSession(env: Record<string, unknown>): [unknown, Record<string, unknown>];
   sessionExists(env: Record<string, unknown>): boolean;

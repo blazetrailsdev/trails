@@ -2,6 +2,14 @@ import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
 import { env } from "@blazetrails/activesupport/process-adapter";
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
 
+/**
+ * One environment's entry as it is written in `database.yml` — the raw hash,
+ * before `DatabaseConfigurations` resolves it into config objects.
+ *
+ * @noRailsEquivalent PERMANENT — name collision only. Ruby's
+ * `ActiveRecord::DatabaseConfigurations::DatabaseConfig` is the *resolved*
+ * config object built from a hash like this one, not the hash.
+ */
 export interface DatabaseConfig {
   adapter?: string;
   database?: string;

@@ -36,7 +36,15 @@ export interface Rendering {
   _normalizeRender(options: RenderOptions): RenderOptions;
 }
 
-/** @internal stub - real impl in Phase 4 */
+/**
+ * Stub for `ActionView::Layouts` (`action_view/layouts.rb:205`) — real impl
+ * in Phase 4, as the sibling stubs above say.
+ *
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE (story:
+ * port-action-view-layouts-behind-rendering-stubs). Deleted once the module
+ * is ported to `actionview/src/layouts.ts`.
+ */
 export interface Layouts {
   _layoutForRendering(formats: string[]): string | false | undefined;
   _layoutFor(name?: string | symbol): string;

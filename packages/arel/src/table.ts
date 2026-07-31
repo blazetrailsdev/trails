@@ -18,7 +18,14 @@ export interface TableKlass {
 /** Delegation target of `Table`'s type-cast methods (Rails' `TypeCaster::Map` /
  *  `TypeCaster::Connection`). Rails' `type_caster` is duck-typed and the
  *  delegators are bare, so the constructor still accepts anything and a caster
- *  missing a member throws on call, as `NoMethodError` does in Ruby. */
+ *  missing a member throws on call, as `NoMethodError` does in Ruby.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby's `ActiveRecord::TypeCaster` is an
+ * empty namespace module holding `Map` / `Connection`; arel never names it
+ * (`type_caster` is duck-typed) and cannot import activerecord, so the
+ * contract has to be spelled here. Porting `TypeCaster::Map` — which trails
+ * already has at `activerecord/src/type-caster/` — does not remove it.
+ */
 export interface TypeCaster {
   typeCastForDatabase(attrName: string, value: unknown): unknown;
   typeForAttribute(name: string): unknown;

@@ -31,7 +31,15 @@ export { SchemaDumper } from "../../schema-dumper.js";
  */
 export const DEFAULT_DATETIME_PRECISION = 6;
 
-/** Column-shaped interface these helpers depend on. */
+/**
+ * Column-shaped interface these helpers depend on.
+ *
+ * @noRailsEquivalent CONVERGEABLE (story:
+ * converge-abstract-schema-dumper-column-onto-column-class). Rails' dumper
+ * reads real `ConnectionAdapters::Column` objects, which trails ports as a
+ * class in `connection-adapters/column.ts`; this weaker shape exists because
+ * schema reflection hands the dumper plain records instead.
+ */
 export interface Column extends ColumnInfo {
   bigint?: boolean;
   virtual?: boolean;
