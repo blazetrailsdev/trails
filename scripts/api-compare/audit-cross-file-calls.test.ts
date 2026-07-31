@@ -7,6 +7,7 @@ import {
   classify,
   classifyRow,
   includeGraphFiles,
+  edgeKindOf,
   isCrossFile,
   looseOnlyRows,
   reachableFiles,
@@ -103,11 +104,51 @@ describe("looseOnlyRows", () => {
     expect(looseOnlyRows(rows, indexes, true)).toEqual([
       {
         ...rows[0],
-        resolvedIn: "pg/schema-statements-class.ts",
-        edgeKind: "delegation",
-        resolvingMethods: ["unrelated"],
+        resolutions: [
+          {
+            file: "pg/schema-statements-class.ts",
+            edgeKind: "delegation",
+            methods: ["unrelated"],
+          },
+        ],
       },
     ]);
+  });
+
+  it("reports every resolving file, in name order", () => {
+    const many = buildPackageIndex([
+      entity("Adapter", "pg-adapter.ts", [{ name: "indexes", calls: [] }], {
+        delegatesTo: ["Zeta", "Alpha"],
+      }),
+      entity("Zeta", "zeta.ts", [{ name: "unrelated", calls: ["quotedScope"] }]),
+      entity("Alpha", "alpha.ts", [{ name: "unrelated", calls: ["quotedScope"] }]),
+    ]);
+    const manyIndexes = new Map([["activerecord", many]]);
+    const manyRows = classify(
+      [{ ...mismatch("pg-adapter.ts", "indexes"), missing: ["quoted_scope → quotedScope"] }],
+      manyIndexes,
+    );
+    expect(looseOnlyRows(manyRows, manyIndexes, true)[0].resolutions.map((r) => r.file)).toEqual([
+      "alpha.ts",
+      "zeta.ts",
+    ]);
+  });
+
+  it("calls a row include-resolved when any reachable include edge also makes the call", () => {
+    const both = buildPackageIndex([
+      entity("Adapter", "pg-adapter.ts", [{ name: "indexes", calls: [] }], {
+        includes: ["Quoting"],
+        delegatesTo: ["Stmts"],
+      }),
+      entity("Quoting", "quoting.ts", [{ name: "other", calls: ["quotedScope"] }]),
+      entity("Stmts", "stmts.ts", [{ name: "unrelated", calls: ["quotedScope"] }]),
+    ]);
+    const bothIndexes = new Map([["activerecord", both]]);
+    const bothRows = classify(
+      [{ ...mismatch("pg-adapter.ts", "indexes"), missing: ["quoted_scope → quotedScope"] }],
+      bothIndexes,
+    );
+    expect(edgeKindOf(looseOnlyRows(bothRows, bothIndexes, true)[0])).toBe("include");
   });
 
   it("resolves nothing without the delegation edge", () => {
