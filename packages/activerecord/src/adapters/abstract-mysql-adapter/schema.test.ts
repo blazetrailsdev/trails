@@ -162,6 +162,10 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         await adapter.createTable("temp_table", { temporary: true });
         // if it doesn't properly say DROP TEMPORARY TABLE, the transaction commit
         // will complain that no transaction is active
+        //
+        // So the drop IS the assertion and stays here; the table is
+        // session-scoped either way and cannot strand.
+        // eslint-disable-next-line blazetrails/require-table-teardown
         await adapter.dropTable("temp_table", { temporary: true });
       });
     });

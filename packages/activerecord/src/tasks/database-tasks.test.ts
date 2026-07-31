@@ -45,6 +45,8 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
         "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY NOT NULL)",
       );
       await adapter.executeMutation("INSERT INTO schema_migrations (version) VALUES ('1')");
+      // dbFile lives under a per-test tmpdir, not the shared worker database.
+      // eslint-disable-next-line blazetrails/require-table-teardown
       await adapter.executeMutation("DROP TABLE IF EXISTS ar_internal_metadata");
     } finally {
       await adapter.close();

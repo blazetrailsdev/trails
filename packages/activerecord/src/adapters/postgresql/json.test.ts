@@ -50,10 +50,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(
         `CREATE TABLE "json_default_test" ("id" SERIAL PRIMARY KEY, "config" JSON DEFAULT '{}')`,
       );
-      await adapter.executeMutation(`INSERT INTO "json_default_test" DEFAULT VALUES`);
-      const rows = await adapter.execute(`SELECT "config" FROM "json_default_test"`);
-      expect(JSON.parse(rows[0].config as string)).toEqual({});
-      await adapter.exec(`DROP TABLE IF EXISTS "json_default_test"`);
+      try {
+        await adapter.executeMutation(`INSERT INTO "json_default_test" DEFAULT VALUES`);
+        const rows = await adapter.execute(`SELECT "config" FROM "json_default_test"`);
+        expect(JSON.parse(rows[0].config as string)).toEqual({});
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS "json_default_test"`);
+      }
     });
 
     it("json type cast", async () => {
@@ -122,9 +125,12 @@ describeIfPg("PostgreSQLAdapter", () => {
     await adapter.exec(
       `CREATE TABLE "jsonb_default_test" ("id" SERIAL PRIMARY KEY, "data" JSONB DEFAULT '[]')`,
     );
-    await adapter.executeMutation(`INSERT INTO "jsonb_default_test" DEFAULT VALUES`);
-    const rows = await adapter.execute(`SELECT "data" FROM "jsonb_default_test"`);
-    expect(JSON.parse(rows[0].data as string)).toEqual([]);
-    await adapter.exec(`DROP TABLE IF EXISTS "jsonb_default_test"`);
+    try {
+      await adapter.executeMutation(`INSERT INTO "jsonb_default_test" DEFAULT VALUES`);
+      const rows = await adapter.execute(`SELECT "data" FROM "jsonb_default_test"`);
+      expect(JSON.parse(rows[0].data as string)).toEqual([]);
+    } finally {
+      await adapter.exec(`DROP TABLE IF EXISTS "jsonb_default_test"`);
+    }
   });
 });

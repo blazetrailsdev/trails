@@ -110,6 +110,8 @@ describeIfPg("PostgreSQLAdapter", () => {
           t.virtual("invalid", { type: "string", as: "LOWER(name)" });
         }),
       ).rejects.toThrow(/does not support VIRTUAL.*Specify 'stored: true'/s);
+      // The createTable above rejects, so `bad_virtual` is never created.
+      // eslint-disable-next-line blazetrails/require-table-teardown
       await adapter.dropTable("bad_virtual", { ifExists: true }).catch(() => {});
     });
 

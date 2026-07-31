@@ -49,6 +49,44 @@
  * The `test-helpers/**` infra tests are exempt (configured in eslint.config.mjs)
  * — they exercise createTable/dropTable/dropAllTables as the subject under test.
  *
+ * ── Failure-safe teardown ──────────────────────────────────────────────────
+ * Being dropped *somewhere* in the file is not enough: a `dropTable` at the end
+ * of an `it` body only runs when every assertion above it passed, so a failing
+ * test strands the table in the shared per-worker database. Rails gets this for
+ * free from `teardown` — `vendor/rails/activerecord/test/cases/migration_test.rb:53-67`,
+ * and the swallowing form at `:1231-1233`
+ * (`teardown { drop_table(:delete_me) rescue nil }`).
+ *
+ * So with the `failureSafe` option on (the default), a created table needs at
+ * least one drop a thrown assertion still reaches: in an `afterEach`/`afterAll`
+ * callback, or in a `finally`. One such drop settles the name.
+ *
+ *   ✗  it("…", async () => {
+ *        await conn.createTable("widgets", t => …);
+ *        expect(await conn.tableExistsQ("widgets")).toBe(true);  // throws…
+ *        await conn.dropTable("widgets");                        // …never runs
+ *      });
+ *
+ *   ✓  it("…", async () => {
+ *        await conn.createTable("widgets", t => …);
+ *        try { … } finally { await conn.dropTable("widgets"); }
+ *      });
+ *
+ * It runs on the same per-name bookkeeping as the missing-teardown half, so a
+ * raw `exec("DROP TABLE …")` in an `afterAll` guards a helper-created table and
+ * vice versa, and reports at the unguarded drop — the line that has to move.
+ * Only drops the file itself creates a table for, and only drops *inside a test
+ * body*, are judged: one at file scope, in a `beforeAll`, or in a shared helper
+ * has no assertion positioned to skip it, and a helper's callers are not
+ * knowable lexically. A prefix sweep names no table, so it contributes no drop
+ * here either way — but a name a sweep does cover is exempt, since the sweep
+ * tears it down whatever the test did, so an explicit happy-path drop beside it
+ * is belt-and-braces. A table created against a throwaway SQLite `:memory:`
+ * database is exempt — it dies with its adapter, so its drop is an assertion
+ * about `dropTable`, not cleanup. Bookkeeping is per name, file-wide, like the rest of the
+ * rule: a name created both in a `:memory:` test and against the shared
+ * database in the same file reads as exempt.
+ *
  * ── Raw-SQL leaks ──────────────────────────────────────────────────────────
  * The schema-statement `createTable`/`dropTable` helpers are not the only way a
  * test seeds a bespoke table: many tests hand a raw `CREATE TABLE …` string to
@@ -875,13 +913,79 @@ function analyzeDropCall(stmt, sourceCode) {
   return { stmt, awaited, receiverText, calleeNode: callee, nameNodes, optionsNode, optionsSig };
 }
 
+const AFTER_HOOKS = new Set(["afterEach", "afterAll"]);
+/**
+ * A call whose callback is a test body. Includes this suite's `it`-prefixed
+ * wrappers (`itIfSupports`, `itBlocked`), which are `it` with a gate in front;
+ * a `test`-prefixed *helper* (`testCopyTable`) is a plain function, not a test,
+ * so only the bare `test` counts on that side.
+ */
+function isTestBody(name) {
+  return name === "it" || name === "test" || /^it[A-Z]/.test(name ?? "");
+}
+
+/**
+ * The base name a call is made through, with the modifier chain peeled off, so
+ * `it.skip(…)` and `it.each([…])(…)` both read as `it`.
+ */
+function enclosingCallName(call) {
+  let callee = call.callee;
+  while (callee.type === "CallExpression") callee = callee.callee;
+  while (callee.type === "MemberExpression") callee = callee.object;
+  return callee.type === "Identifier" ? callee.name : null;
+}
+
+const FUNCTION_TYPES = new Set([
+  "ArrowFunctionExpression",
+  "FunctionExpression",
+  "FunctionDeclaration",
+]);
+
+/**
+ * Whether the table created at `node` lives in a throwaway SQLite `:memory:`
+ * database rather than the shared per-worker one — it dies with its adapter, so
+ * failure-safety does not apply. Every enclosing function scope is read, since
+ * the adapter is often built in a `beforeAll` a describe up, but not the module
+ * scope, whose text is the whole file and would exempt suites that only mention
+ * `:memory:` in passing.
+ */
+function inMemoryDatabase(node, sourceCode) {
+  for (let n = node.parent; n && n.type !== "Program"; n = n.parent) {
+    if (FUNCTION_TYPES.has(n.type) && sourceCode.getText(n).includes(":memory:")) return true;
+  }
+  return false;
+}
+
+/**
+ * Whether a drop at `node` still runs when an assertion above it throws. The
+ * lexical walk outward stops at the first construct that settles it: a
+ * `finally` or an `afterEach`/`afterAll` callback (safe), or an `it`/`test`
+ * callback reached with neither in between (the happy path). Reaching no test
+ * body at all is safe — nothing is positioned to skip the drop.
+ */
+function inFailureSafeTeardown(node) {
+  let child = node;
+  let parent = node.parent;
+  while (parent) {
+    if (parent.type === "TryStatement" && parent.finalizer === child) return true;
+    if (parent.type === "CallExpression" && parent.arguments.includes(child)) {
+      const name = enclosingCallName(parent);
+      if (AFTER_HOOKS.has(name)) return true;
+      if (isTestBody(name)) return false;
+    }
+    child = parent;
+    parent = parent.parent;
+  }
+  return true;
+}
+
 const rule = {
   meta: {
     type: "problem",
     fixable: "code",
     docs: {
       description:
-        'Require each createTable("name") in an activerecord test to be torn down by an explicit dropTable("name") in the same file, and forbid the carpet-bomb dropAllTables().',
+        'Require each createTable("name") in an activerecord test to be torn down by an explicit dropTable("name") in the same file, from a place a failed assertion still reaches, and forbid the carpet-bomb dropAllTables().',
     },
     schema: [
       {
@@ -890,15 +994,20 @@ const rule = {
           // Also balance raw `CREATE TABLE`/`DROP TABLE` SQL strings (default).
           // Set false to grandfather a file with a raw-create backlog.
           rawSql: { type: "boolean" },
+          // Also require each drop to sit where a failed assertion still runs
+          // it — an afterEach/afterAll hook or a finally block (default).
+          failureSafe: { type: "boolean" },
         },
         additionalProperties: false,
       },
     ],
     messages: {
       missingTeardown:
-        'Table `{{table}}` is created with createTable() but never torn down. Add a matching `dropTable("{{table}}")` (in afterEach/afterAll or the test body). Leaked tables collide with sibling files under parallel forks. If this is intentional, add `// eslint-disable-next-line blazetrails/require-table-teardown`.',
+        'Table `{{table}}` is created with createTable() but never torn down. Add a matching `dropTable("{{table}}")` in an afterEach/afterAll hook (or a finally block, so a failed assertion still runs it). Leaked tables collide with sibling files under parallel forks. If this is intentional, add `// eslint-disable-next-line blazetrails/require-table-teardown`.',
       noDropAllTables:
         'Avoid `dropAllTables()` — drop the specific tables this file created with `dropTable("…")` instead. The carpet-bomb teardown also wipes tables other code seeded, and hides which tables a test actually owns. If this is genuinely necessary, add `// eslint-disable-next-line blazetrails/require-table-teardown`.',
+      unguardedTeardown:
+        "Table `{{table}}` is only dropped on the happy path — a failing assertion above this drop skips it and strands the table in the shared per-worker database. Move the drop into an `afterEach`/`afterAll` hook or a `finally` block, as Rails does with `teardown` (vendor/rails/activerecord/test/cases/migration_test.rb:53-67). If the drop is itself the subject under test, add `// eslint-disable-next-line blazetrails/require-table-teardown` with the reason.",
       preferTableList:
         'Merge adjacent dropTable() calls into a single dropTable("a", "b") list call — shorter teardown code, one call instead of N.',
     },
@@ -908,6 +1017,9 @@ const rule = {
     // Raw-SQL scanning is on by default; `rawSql: false` grandfathers a file
     // with an un-torn-down raw-create backlog (it still gets the helper check).
     const checkRawSql = context.options[0]?.rawSql !== false;
+    // Where the drop sits is checked by default; `failureSafe: false` keeps
+    // only the "is it dropped at all" half.
+    const checkFailureSafe = context.options[0]?.failureSafe !== false;
 
     const sourceCode = context.sourceCode ?? context.getSourceCode();
     // Arming SUPPRESSES reports here, so a loop binding counts only when the
@@ -920,6 +1032,11 @@ const rule = {
     // table name → first create node seen (for the report location).
     const created = new Map();
     const dropped = new Set();
+    // `dropped` split by where the drop sits; unguardedDrops holds the first
+    // happy-path-only drop node, for the report location.
+    const safelyDropped = new Set();
+    const unguardedDrops = new Map();
+    const memoryLocal = new Set();
     const sweptPrefixes = [];
     let sawSweepDrop = false;
 
@@ -974,14 +1091,25 @@ const rule = {
       });
     }
 
+    function recordCreate(table, node) {
+      if (!created.has(table)) created.set(table, node);
+      if (checkFailureSafe && inMemoryDatabase(node, sourceCode)) memoryLocal.add(table);
+    }
+
+    // A single safe drop settles the name; only a name with no safe drop at
+    // all can be reported.
+    function recordDrop(table, node) {
+      dropped.add(table);
+      if (inFailureSafeTeardown(node)) safelyDropped.add(table);
+      else if (!unguardedDrops.has(table)) unguardedDrops.set(table, node);
+    }
+
     // Scan an execution sink's string/template arguments for raw CREATE/DROP
     // TABLE statements, folding their names into the same create/drop balance.
     function recordText(text, node, nextTexts) {
       const endIsDynamic = nextTexts !== null;
-      for (const table of rawCreateNames(text, endIsDynamic)) {
-        if (!created.has(table)) created.set(table, node);
-      }
-      for (const table of rawDropNames(text, endIsDynamic)) dropped.add(table);
+      for (const table of rawCreateNames(text, endIsDynamic)) recordCreate(table, node);
+      for (const table of rawDropNames(text, endIsDynamic)) recordDrop(table, node);
       sweptPrefixes.push(...sweepPrefixMatchers(text));
       if (hasDynamicDropName(text, nextTexts)) sawSweepDrop = true;
     }
@@ -1018,9 +1146,9 @@ const rule = {
           context.report({ node, messageId: "noDropAllTables" });
         } else if (name === "createTable") {
           const table = createdTableName(node);
-          if (table !== null && !created.has(table)) created.set(table, node);
+          if (table !== null) recordCreate(table, node);
         } else if (name === "dropTable") {
-          for (const table of droppedTableNames(node)) dropped.add(table);
+          for (const table of droppedTableNames(node)) recordDrop(table, node);
           // The helper spelling of a sweep's drop half: `dropTable(row.name)`
           // names no table itself, so it arms only when its argument traces
           // back to a sink-derived row binding. A fixed name arms nothing.
@@ -1054,6 +1182,21 @@ const rule = {
           context.report({
             node,
             messageId: "missingTeardown",
+            data: { table: name },
+          });
+        }
+        if (!checkFailureSafe) return;
+        // A drop of a table this file never created is somebody else's cleanup.
+        for (const [name, node] of unguardedDrops) {
+          if (!created.has(name) || safelyDropped.has(name)) continue;
+          if (memoryLocal.has(name)) continue;
+          // A sweep tears the name down whatever the test did, so an explicit
+          // happy-path drop alongside it is belt-and-braces, not a leak — the
+          // same exemption the missing-teardown half grants these names.
+          if (prefixes.some((p) => p.test(name))) continue;
+          context.report({
+            node,
+            messageId: "unguardedTeardown",
             data: { table: name },
           });
         }

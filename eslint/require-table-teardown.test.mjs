@@ -11,6 +11,70 @@ const tester = new RuleTester({
 
 tester.run("require-table-teardown", rule, {
   valid: [
+    // ── failureSafe ──
+    // A drop in an afterAll/afterEach hook survives a failing assertion.
+    'it("x", async () => { await ctx.createTable("widgets", () => {}); });\n' +
+      'afterAll(async () => { await ctx.dropTable("widgets"); });',
+    'it("x", async () => { await ctx.createTable("widgets", () => {}); });\n' +
+      'afterEach(async () => { await ctx.dropTable("widgets"); });',
+    // A finally block inside the test body is the in-test equivalent.
+    'it("x", async () => {\n  await ctx.createTable("widgets", () => {});\n' +
+      '  try { expect(1).toBe(1); } finally { await ctx.dropTable("widgets"); }\n});',
+    // Raw-SQL drop in a hook guards a helper-created table (cross-mechanism).
+    'it("x", async () => { await ctx.createTable("widgets", () => {}); });\n' +
+      'afterAll(async () => { await adapter.exec("DROP TABLE widgets"); });',
+    // One safe drop settles the name even alongside a happy-path drop.
+    'it("x", async () => {\n  await ctx.createTable("widgets", () => {});\n' +
+      '  await ctx.dropTable("widgets");\n});\n' +
+      'afterAll(async () => { await ctx.dropTable("widgets"); });',
+    // A modifier chain still reads as a test body — and this one is guarded.
+    'it.skip("x", async () => { await ctx.createTable("widgets", () => {}); });\n' +
+      'afterAll(async () => { await ctx.dropTable("widgets"); });',
+    // A `test`-prefixed helper is a plain function, not a test body.
+    'function testCopyTable() {\n  ctx.createTable("widgets", () => {});\n' +
+      '  ctx.dropTable("widgets");\n}',
+    // Drops outside any test body are not the modelled pattern.
+    'beforeAll(async () => { await ctx.createTable("widgets", () => {}); });\n' +
+      'beforeAll(async () => { await ctx.dropTable("widgets"); });',
+    // A table the file drops but never creates is somebody else's cleanup.
+    'it("x", async () => { await ctx.dropTable("widgets"); });',
+    // A table in a throwaway `:memory:` database dies with its adapter, so a
+    // happy-path drop strands nothing — whether the adapter is built in the
+    // test body or a describe up, in a beforeAll.
+    'it("x", async () => {\n  const a = new BetterSQLite3Adapter(":memory:");\n' +
+      '  await a.exec("CREATE TABLE t (id int)");\n  await a.exec("DROP TABLE t");\n});',
+    'describe("s", () => {\n  beforeAll(() => { driver = open(":memory:"); });\n' +
+      '  it("x", async () => {\n    await driver.exec("CREATE TABLE t (id int)");\n' +
+      '    await driver.exec("DROP TABLE t");\n  });\n});',
+    // A prefix sweep names no table, so it satisfies the missing-teardown half
+    // without leaving an unguarded drop behind to report.
+    'it("x", async () => {\n' +
+      '  await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+      "  const rows = await adapter.execute(\n" +
+      "    `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+      "  );\n" +
+      "  for (const t of rows) {\n" +
+      '    await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "  }\n});",
+    // …and a name the sweep covers stays exempt even with a belt-and-braces
+    // happy-path drop beside it: the sweep runs whatever the test did.
+    "afterAll(async () => {\n" +
+      "  const rows = await adapter.execute(\n" +
+      "    `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+      "  );\n" +
+      "  for (const t of rows) {\n" +
+      '    await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "  }\n});\n" +
+      'it("x", async () => {\n' +
+      '  await ctx.createTable("ex_int", () => {});\n' +
+      '  await ctx.dropTable("ex_int");\n});',
+    // failureSafe: false keeps only the "is it dropped at all" half.
+    {
+      code:
+        'it("x", async () => {\n  await ctx.createTable("widgets", () => {});\n' +
+        '  await ctx.dropTable("widgets");\n});',
+      options: [{ failureSafe: false }],
+    },
     // Create + drop in the same test body.
     'await adapter.createTable("widgets", () => {});\nawait adapter.dropTable("widgets");',
     // Create in beforeAll, drop in afterAll — different hooks, same name.
@@ -502,6 +566,78 @@ tester.run("require-table-teardown", rule, {
       "}",
   ],
   invalid: [
+    // ── failureSafe ──
+    // The drop trails the assertions in the test body: a failure above it
+    // strands `widgets` in the shared per-worker database.
+    {
+      code:
+        'it("x", async () => {\n' +
+        '  await ctx.createTable("widgets", () => {});\n' +
+        '  expect(await ctx.tableExistsQ("widgets")).toBe(true);\n' +
+        '  await ctx.dropTable("widgets");\n' +
+        "});",
+      errors: [{ messageId: "unguardedTeardown", data: { table: "widgets" } }],
+    },
+    // Same for a raw-SQL drop on the happy path.
+    {
+      code:
+        'it("x", async () => {\n' +
+        '  await adapter.exec("CREATE TABLE widgets (id int)");\n' +
+        '  await adapter.exec("DROP TABLE widgets");\n' +
+        "});",
+      errors: [{ messageId: "unguardedTeardown", data: { table: "widgets" } }],
+    },
+    // A `try` whose drop sits in the `try` half, not the `finally`, is not
+    // guarded — only the finalizer runs after a throw.
+    {
+      code:
+        'it("x", async () => {\n' +
+        '  await ctx.createTable("widgets", () => {});\n' +
+        '  try { await ctx.dropTable("widgets"); } catch (e) {}\n' +
+        "});",
+      errors: [{ messageId: "unguardedTeardown", data: { table: "widgets" } }],
+    },
+    // An `it`-prefixed wrapper (itIfSupports, itBlocked) is `it` with a gate in
+    // front, so its body is a test body too.
+    {
+      code:
+        'itIfSupports("virtual", "x", async () => {\n' +
+        '  await ctx.createTable("widgets", () => {});\n' +
+        '  await ctx.dropTable("widgets");\n' +
+        "});",
+      errors: [{ messageId: "unguardedTeardown", data: { table: "widgets" } }],
+    },
+    // A modifier chain (it.each) is still a test body.
+    {
+      code:
+        'it.each([1])("x", async () => {\n' +
+        '  await ctx.createTable("widgets", () => {});\n' +
+        '  await ctx.dropTable("widgets");\n' +
+        "});",
+      errors: [{ messageId: "unguardedTeardown", data: { table: "widgets" } }],
+    },
+    // A `:memory:` mention outside every enclosing function scope does not
+    // exempt: the module-scope constant may belong to another suite entirely.
+    {
+      code:
+        'const MEM = ":memory:";\n' +
+        'it("x", async () => {\n' +
+        '  await ctx.createTable("widgets", () => {});\n' +
+        '  await ctx.dropTable("widgets");\n' +
+        "});",
+      errors: [{ messageId: "unguardedTeardown", data: { table: "widgets" } }],
+    },
+    // Each table is judged on its own drops: `a` is guarded, `b` is not.
+    {
+      code:
+        'it("x", async () => {\n' +
+        '  await ctx.createTable("a", () => {});\n' +
+        '  await ctx.createTable("b", () => {});\n' +
+        '  await ctx.dropTable("b");\n' +
+        "});\n" +
+        'afterAll(async () => { await ctx.dropTable("a"); });',
+      errors: [{ messageId: "unguardedTeardown", data: { table: "b" } }],
+    },
     // Dropping the truncated prefix of a spaced quoted name is not a teardown
     // of the real table — the create is still reported by its full name.
     {

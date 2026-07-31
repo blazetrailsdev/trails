@@ -474,7 +474,9 @@ export default defineConfig(
   //    carpet-bomb dropAllTables() is forbidden. Leaked tables collide with
   //    sibling files under parallel forks. test-helpers/** is exempt — those
   //    tests exercise createTable/dropTable/dropAllTables as the subject under
-  //    test. See eslint/require-table-teardown.mjs. ──
+  //    test. Each drop must also sit where a failed assertion still reaches it
+  //    — an afterEach/afterAll or a finally (`failureSafe`, on by default), as
+  //    Rails' `teardown` does. See eslint/require-table-teardown.mjs. ──
   {
     files: ["packages/activerecord/src/**/*.test.ts"],
     ignores: testInfraExemptIgnores,

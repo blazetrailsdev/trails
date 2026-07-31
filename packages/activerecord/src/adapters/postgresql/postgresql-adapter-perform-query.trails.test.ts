@@ -21,6 +21,7 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
     await adapter.exec(`DROP TABLE IF EXISTS pq`);
+    await adapter.exec(`DROP TABLE IF EXISTS pq_ddl`);
     await adapter.exec(`CREATE TABLE pq (id serial primary key, nick character varying(255))`);
     connection = await Base.leaseConnection();
   });
