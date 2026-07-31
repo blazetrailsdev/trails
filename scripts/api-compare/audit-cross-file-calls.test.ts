@@ -86,6 +86,26 @@ describe("classifyRow", () => {
     ).toBe("divergence");
   });
 
+  it("resolves a body ported as a mixed-in file function", () => {
+    const withFunctions = buildPackageIndex(
+      [entity("Model", "model.ts", [{ name: "aliasAttribute", calls: [] }])],
+      { "attribute-methods.ts": [{ name: "aliasAttribute", calls: ["attributeAliases"] }] },
+    );
+    expect(
+      classifyRow(
+        mismatch("model.ts", "aliasAttribute"),
+        "attribute_aliases → attributeAliases",
+        withFunctions,
+      ),
+    ).toEqual({ bucket: "collaborator", resolvedIn: "attribute-methods.ts" });
+  });
+
+  it("does not call a row unported when the name is defined outside the paired file", () => {
+    expect(
+      classifyRow(mismatch("quoting.ts", "indexes"), "presence → presence", index).bucket,
+    ).toBe("divergence");
+  });
+
   it("reports a sole definition with no call-set as unported", () => {
     expect(classifyRow(mismatch("shell.ts", "onlyHere"), "presence → presence", index).bucket).toBe(
       "unported",

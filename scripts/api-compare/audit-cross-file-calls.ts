@@ -4,6 +4,10 @@ import * as path from "path";
 import { OUTPUT_DIR } from "./config.js";
 import { jsEnumerableAliases } from "./enumerable-idioms.js";
 
+// Mirrors the gate's own, unexported DELEGATION_MAX_CALLS (compare.ts:295) —
+// keep in step if that threshold ever moves.
+const DELEGATION_MAX_CALLS = 3;
+
 export type Method = { name: string; file?: string; calls?: string[] };
 export type Entity = {
   name: string;
@@ -14,7 +18,14 @@ export type Entity = {
   classMethods: Method[];
 };
 type TsApi = {
-  packages: Record<string, { classes: Record<string, Entity>; modules: Record<string, Entity> }>;
+  packages: Record<
+    string,
+    {
+      classes: Record<string, Entity>;
+      modules: Record<string, Entity>;
+      fileFunctions: Record<string, Method[]>;
+    }
+  >;
 };
 export type Mismatch = {
   package: string;
@@ -45,7 +56,10 @@ export type PackageIndex = {
   definitionsByName: Map<string, Definition[]>;
 };
 
-export function buildPackageIndex(entities: Entity[]): PackageIndex {
+export function buildPackageIndex(
+  entities: Entity[],
+  fileFunctions: Record<string, Method[]> = {},
+): PackageIndex {
   const index: PackageIndex = {
     entitiesByFile: new Map(),
     entitiesByName: new Map(),
@@ -58,6 +72,15 @@ export function buildPackageIndex(entities: Entity[]): PackageIndex {
       push(index.definitionsByName, method.name, {
         entity: entity.name,
         file: method.file ?? entity.file,
+        calls: new Set(method.calls ?? []),
+      });
+    }
+  }
+  for (const [file, methods] of Object.entries(fileFunctions)) {
+    for (const method of methods) {
+      push(index.definitionsByName, method.name, {
+        entity: file,
+        file: method.file ?? file,
         calls: new Set(method.calls ?? []),
       });
     }
@@ -98,8 +121,9 @@ export function classifyRow(
   const definitions = index.definitionsByName.get(mismatch.tsName) ?? [];
   const makesCall = definitions.filter((d) => candidates.some((c) => d.calls.has(c)));
   if (makesCall.length === 0) {
-    const ownIsEmpty = definitions.every((d) => d.file !== mismatch.tsFile || d.calls.size === 0);
-    return { bucket: definitions.length <= 1 && ownIsEmpty ? "unported" : "divergence" };
+    const own = definitions.filter((d) => d.file === mismatch.tsFile);
+    const hollow = own.length === definitions.length && own.every((d) => d.calls.size === 0);
+    return { bucket: own.length > 0 && hollow ? "unported" : "divergence" };
   }
   const reachable = includeGraphFiles(mismatch.tsFile, index);
   const viaGraph = makesCall.find((d) => reachable.has(d.file));
@@ -198,7 +222,10 @@ async function main(): Promise<void> {
   for (const [pkg, entry] of Object.entries(api.packages)) {
     indexes.set(
       pkg,
-      buildPackageIndex([...Object.values(entry.classes), ...Object.values(entry.modules)]),
+      buildPackageIndex(
+        [...Object.values(entry.classes), ...Object.values(entry.modules)],
+        entry.fileFunctions,
+      ),
     );
   }
 
@@ -211,13 +238,16 @@ async function main(): Promise<void> {
     crossFileRows: crossFile.length,
     anyMethodInIncludeGraph: countAnyMethodInGraph(rows, indexes),
     resolvableAnywhereByName: resolvable.length,
-    resolvableWrapperShaped: resolvable.filter((r) =>
+    resolvableForwardersAboveDelegationCap: resolvable.filter((r) =>
       (indexes.get(r.package)!.definitionsByName.get(r.tsName) ?? [])
         .filter((d) => d.file === r.tsFile)
-        .some((d) => d.calls.has(r.tsName) && d.calls.size > 3),
+        .some((d) => d.calls.has(r.tsName) && d.calls.size > DELEGATION_MAX_CALLS),
     ).length,
     rowsWithNoGraphEdge: rows.filter(
       (r) => includeGraphFiles(r.tsFile, indexes.get(r.package)!).size === 0,
+    ).length,
+    rowsWithNoDefinition: rows.filter(
+      (r) => (indexes.get(r.package)!.definitionsByName.get(r.tsName) ?? []).length === 0,
     ).length,
     byBucket: Object.fromEntries(tally(crossFile, (r) => r.bucket)),
     allRowsByBucket: Object.fromEntries(tally(rows, (r) => r.bucket)),
