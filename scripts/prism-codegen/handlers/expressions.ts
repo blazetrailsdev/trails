@@ -200,6 +200,18 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
     );
   }
   if (name === "raise" && !hasRecv && argNodes.length > 0 && !n.block) {
+    const headKind = argNodes[0].constructor.name;
+    if (argNodes.length > 1 && headKind !== "ConstantReadNode" && headKind !== "ConstantPathNode") {
+      return null;
+    }
+    const thrown =
+      argNodes.length === 1
+        ? e.expr(argNodes[0])
+        : f.createNewExpression(
+            e.expr(argNodes[0]),
+            undefined,
+            argNodes.slice(1).map((a) => e.expr(a)),
+          );
     return f.createCallExpression(
       f.createParenthesizedExpression(
         f.createArrowFunction(
@@ -208,7 +220,7 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
           [],
           undefined,
           undefined,
-          f.createBlock([f.createThrowStatement(e.expr(argNodes[0]))], false),
+          f.createBlock([f.createThrowStatement(thrown)], false),
         ),
       ),
       undefined,

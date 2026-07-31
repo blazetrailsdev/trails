@@ -160,6 +160,21 @@ describe("prism-codegen", () => {
     expect(code).toContain("throw ActiveRecord.RecordNotFound");
   });
 
+  it("instantiates multi-arg expression-position raise, declining non-constant heads", async () => {
+    const twoArg = await generateFromSource(
+      `def check(x); x || raise(ArgumentError, "bad input"); end`,
+    );
+    expect(twoArg.parseErrorCount).toBe(0);
+    expect(twoArg.code).toContain('throw new ArgumentError("bad input")');
+
+    const dynamicHead = await generateFromSource(
+      `def check2(x, klass); x || raise(klass, "bad"); end`,
+    );
+    expect(dynamicHead.parseErrorCount).toBe(0);
+    expect(dynamicHead.code).not.toContain("throw klass");
+    expect(dynamicHead.code).toContain("__PRISM_TODO(");
+  });
+
   it("routes yield/block_given? through an explicitly named block param", async () => {
     const { code, parseErrorCount } = await generateFromSource(`
       def with_handler(&callback)
