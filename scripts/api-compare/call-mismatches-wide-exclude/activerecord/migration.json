@@ -52,6 +52,13 @@
     "package": "activerecord",
     "tsFile": "migration.ts",
     "rubyName": "copy",
+    "call": "call",
+    "reason": "Ruby's `options[:on_skip].call(scope, migration)` is a Proc invocation; TS calls the callback directly as `options.onSkip(scope, source)`, which has no `.call` token."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "migration.ts",
+    "rubyName": "copy",
     "call": "exist?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
