@@ -1421,11 +1421,6 @@ function main() {
     let fileApplied = 0;
 
     for (const [oldDesc, newDesc] of renames) {
-      // Match it("...", it.skip("...", or it.todo("...
-      // Escape special regex chars in oldDesc
-      const escaped = oldDesc.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const pattern = new RegExp(`(it(?:\\.skip|\\.todo)?\\()("[^"]*"|'[^']*')`, "g");
-
       // Find and replace the exact description
       const oldQuoted1 = `"${oldDesc}"`;
       const oldQuoted2 = `'${oldDesc}'`;

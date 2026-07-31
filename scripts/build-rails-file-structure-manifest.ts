@@ -78,6 +78,10 @@ interface RubyEntity {
   instanceMethods?: RubyMethod[];
   classMethods?: RubyMethod[];
 }
+interface RubyPackage {
+  classes?: Record<string, RubyEntity>;
+  modules?: Record<string, RubyEntity>;
+}
 type TaggedMethod = RubyMethod & { isStatic: boolean };
 // Attach staticness to each method so it survives the source-line merge — the
 // manifest needs to know whether the interleaved entry was a class method.
@@ -167,7 +171,7 @@ interface Bucket {
   seen: Set<string>;
 }
 
-for (const [pkg, rubyPkg] of Object.entries<any>(railsApi.packages)) {
+for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
   const pkgDir = PACKAGE_DIRS[pkg];
   if (!pkgDir) continue;
 

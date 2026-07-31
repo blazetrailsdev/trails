@@ -38,7 +38,6 @@ const execFileAsync = promisify(execFile);
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(SCRIPT_DIR, "..");
 const TSC_BIN = resolve(ROOT, "node_modules", ".bin", "tsc");
-const ROOT_TSCONFIG = resolve(ROOT, "tsconfig.json");
 
 /** A removable `as any` cast, expressed as a single text-span replacement. */
 export interface CastSpan {

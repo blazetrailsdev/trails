@@ -74,7 +74,13 @@ function findTestRange(sourceFile: typescript.SourceFile, targetLine: number): T
   return result;
 }
 
-const manifest = JSON.parse(fs.readFileSync("scripts/test-compare/output/ts-tests.json", "utf-8"));
+interface ManifestPackage {
+  files: { file: string; testCases: TestCase[] }[];
+}
+
+const manifest: { packages: Record<string, ManifestPackage> } = JSON.parse(
+  fs.readFileSync("scripts/test-compare/output/ts-tests.json", "utf-8"),
+);
 const dryRun = process.argv.includes("--dry-run");
 let totalRemoved = 0;
 let totalFiles = 0;
@@ -83,10 +89,9 @@ let totalFiles = 0;
 // (some files appear in multiple packages in the manifest)
 const byFile = new Map<string, TestCase[]>();
 const seenFilePackage = new Set<string>();
-for (const [pkg, pkgInfo] of Object.entries(manifest.packages) as any) {
+for (const pkgInfo of Object.values(manifest.packages)) {
   for (const f of pkgInfo.files) {
     const absFile = path.resolve(f.file);
-    const key = `${absFile}::${pkg}`;
     if (seenFilePackage.has(absFile)) continue; // skip if already seen from another package
     seenFilePackage.add(absFile);
     if (!byFile.has(absFile)) byFile.set(absFile, []);
@@ -105,7 +110,7 @@ for (const [absFile, tests] of byFile) {
   // Find which tests to remove
   const toRemoveLines: number[] = [];
 
-  for (const [testPath, group] of byPath) {
+  for (const group of byPath.values()) {
     if (group.length <= 1) continue;
 
     let best = group[0];

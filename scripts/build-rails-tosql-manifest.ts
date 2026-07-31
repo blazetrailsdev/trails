@@ -31,7 +31,6 @@ const ROOT = path.resolve(__dirname, "..");
 // `to_sql` (managers/visitors), so it must come from the manifest allow-set
 // rather than being hardcoded.
 const PACKAGES = ["activerecord", "activemodel", "arel"] as const;
-type Pkg = (typeof PACKAGES)[number];
 
 // The Ruby method names that gate the allow-set, paired with the TS names
 // `rubyMethodToTs` maps them to. We store the TS names in the snapshot so the

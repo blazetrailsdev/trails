@@ -31,6 +31,12 @@ import { macroOfCall, siteKey, repoRel } from "../eslint/no-standalone-associati
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const OUT_PATH = path.join(ROOT, "eslint/no-standalone-associations-exclude.json");
 
+/** Structural view of an ESTree node — enough to walk it generically. */
+type AstNode = { type: string; [key: string]: unknown };
+
+const asNode = (value: unknown): AstNode | null =>
+  value && typeof (value as AstNode).type === "string" ? (value as AstNode) : null;
+
 function collectTsFiles(dir: string, out: string[]): void {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
@@ -65,7 +71,7 @@ async function main(): Promise<void> {
     } catch {
       continue; // skip unparseable files
     }
-    walk(ast, (node: any) => {
+    walk(ast as unknown as AstNode, (node) => {
       if (node.type !== "CallExpression") return;
       const macro = macroOfCall(node.callee);
       if (macro === null) return;
@@ -78,16 +84,14 @@ async function main(): Promise<void> {
   console.log(`Wrote ${OUT_PATH}: ${arr.length} grandfathered sites`);
 }
 
-function walk(node: any, visit: (n: any) => void): void {
-  if (!node || typeof node.type !== "string") return;
+function walk(node: AstNode, visit: (n: AstNode) => void): void {
   visit(node);
   for (const key of Object.keys(node)) {
     if (key === "parent") continue;
     const child = node[key];
-    if (Array.isArray(child)) {
-      for (const c of child) if (c && typeof c.type === "string") walk(c, visit);
-    } else if (child && typeof child.type === "string") {
-      walk(child, visit);
+    for (const candidate of Array.isArray(child) ? child : [child]) {
+      const childNode = asNode(candidate);
+      if (childNode) walk(childNode, visit);
     }
   }
 }

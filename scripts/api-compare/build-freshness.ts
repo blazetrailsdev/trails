@@ -251,7 +251,7 @@ export async function manifestIsStale(
  */
 async function newestSourceMtime(dir: string): Promise<number> {
   let entries;
-  let newest = 0;
+  let newest: number;
   try {
     entries = await fs.readdir(dir, { withFileTypes: true });
     newest = (await fs.stat(dir)).mtimeMs;

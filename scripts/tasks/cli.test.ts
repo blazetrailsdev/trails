@@ -3976,7 +3976,7 @@ describe("RFC-level priority", () => {
       expect(readFileSync(readme, "utf8")).toBe(REAL_README);
     });
 
-    it("leaves the RFC\'s other frontmatter keys untouched by a priority set", () => {
+    it("leaves the RFC's other frontmatter keys untouched by a priority set", () => {
       const dir = rfcDir(REAL_README);
       const readme = join(dir, "rfcs", "0005-gaps", "README.md");
       editFrontmatter(readme, { priority: "0" });

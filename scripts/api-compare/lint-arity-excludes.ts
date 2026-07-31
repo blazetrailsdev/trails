@@ -103,7 +103,7 @@ async function runAsScript(): Promise<void> {
   const self = fileURLToPath(import.meta.url);
   const invoked = process.argv[1] ? path.resolve(process.argv[1]) : "";
   if (path.resolve(self) !== invoked) return;
-  let code = 0;
+  let code: number;
   try {
     code = await main();
   } catch (e) {

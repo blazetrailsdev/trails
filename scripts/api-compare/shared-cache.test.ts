@@ -21,7 +21,6 @@ import {
   hashReadSet,
   readSetMatches,
   resolutionShape,
-  dependencyKey,
   CACHE_VERSION,
 } from "./shared-cache.js";
 
