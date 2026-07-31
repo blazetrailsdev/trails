@@ -708,6 +708,40 @@ describe("against the canonical registry", () => {
     expect(compareTranscriptions(TEST_SCHEMA, await canonicalRegistrySchema())).toEqual([]);
   });
 
+  it("keeps every serialPk column in the form the replay can read", async () => {
+    // The serialPk path discards declared options, so the replay's generic
+    // branch is only a faithful reading while every such column is a plain
+    // integer; canonicalRegistrySchema throws rather than report a shape the
+    // DDL never had.
+    const registry = await canonicalRegistrySchema();
+    expect(describeSpec(columnsOfRegistry(registry, "fk_test_has_pk", "pk_id"))).toBe(
+      "integer null=false",
+    );
+    expect(describeSpec(columnsOfRegistry(registry, "bulbs", "ID"))).toBe("integer");
+  });
+
+  it("counts a baseline entry stale only when neither transcription invents it", async () => {
+    const { tables, sources, ambiguous } = await loadRailsTables();
+    const registryFindings = compareSchemas(
+      await canonicalRegistrySchema(),
+      tables,
+      sources,
+      ambiguous,
+    );
+    const baseline = await readBaseline();
+    // Union: an entry either side still invents is NOT prunable, so staleness
+    // over both findings can only be a subset of staleness over one of them.
+    const union = applyBaseline(
+      [...compareSchemas(TEST_SCHEMA, tables, sources, ambiguous), ...registryFindings],
+      baseline,
+    ).stale;
+    const testSchemaOnly = applyBaseline(
+      compareSchemas(TEST_SCHEMA, tables, sources, ambiguous),
+      baseline,
+    ).stale;
+    expect(union.every((key) => testSchemaOnly.includes(key))).toBe(true);
+  });
+
   it("carries no divergence allowance the transcriptions have outgrown", async () => {
     expect(staleDivergenceAllowances(TEST_SCHEMA, await canonicalRegistrySchema())).toEqual([]);
   });

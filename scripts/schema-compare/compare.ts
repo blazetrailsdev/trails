@@ -619,30 +619,40 @@ export async function main(): Promise<void> {
   }
 
   const findings = compareSchemas(TEST_SCHEMA, railsTables, sources, ambiguous);
+  const registry = await canonicalRegistrySchema();
+  const registryFindings = compareSchemas(
+    registry,
+    railsTables,
+    sources,
+    ambiguous,
+    REGISTRY_LABEL,
+  );
+  const divergences = compareTranscriptions(TEST_SCHEMA, registry);
+  // One baseline covers both transcriptions, so every read of it — reseed,
+  // regression check, staleness — works off the union of their findings. Scoping
+  // any of the three to TEST_SCHEMA alone would prune an entry the registry side
+  // still needs and turn its baselined debt into a regression on the next run.
+  const allFindings = [...findings, ...registryFindings];
 
   if (process.argv.includes("--write")) {
-    const invented = findings.filter(isFatal);
+    const invented = allFindings.filter(isFatal);
+    const keysFor = (verdict: Verdict): string[] =>
+      [...new Set(invented.filter((f) => f.verdict === verdict).map(baselineKey))].sort();
     const next: Baseline = {
-      tables: invented
-        .filter((f) => f.verdict === "INVENTED-TABLE")
-        .map(baselineKey)
-        .sort(),
-      columns: invented
-        .filter((f) => f.verdict === "INVENTED-COLUMN")
-        .map(baselineKey)
-        .sort(),
+      tables: keysFor("INVENTED-TABLE"),
+      columns: keysFor("INVENTED-COLUMN"),
     };
     // A reseed exists to record that debt SHRANK. Letting it grow would let a
     // red gate be "fixed" by blessing the very invention it caught — which
     // silently retires the guard-rail this whole tool exists to be.
-    const { regressions } = applyBaseline(findings, await readBaseline());
+    const { regressions } = applyBaseline(allFindings, await readBaseline());
     if (regressions.length > 0 && !process.argv.includes("--allow-growth")) {
       console.error(
         `refusing to grow the baseline by ${regressions.length} new invention(s):\n` +
           regressions.map((f) => `  ${baselineKey(f)}`).join("\n") +
           "\n\nThe baseline records pre-existing debt only. Remove the table/column from " +
-          "TEST_SCHEMA, or add it to schema.rb upstream. Pass --allow-growth only when a " +
-          "vendored-Rails bump legitimately removed canonical schema.",
+          "TEST_SCHEMA or the canonical registry, or add it to schema.rb upstream. Pass " +
+          "--allow-growth only when a vendored-Rails bump legitimately removed canonical schema.",
       );
       process.exit(1);
     }
@@ -653,18 +663,9 @@ export async function main(): Promise<void> {
     return;
   }
 
-  const registry = await canonicalRegistrySchema();
-  const registryFindings = compareSchemas(
-    registry,
-    railsTables,
-    sources,
-    ambiguous,
-    REGISTRY_LABEL,
-  );
-  const divergences = compareTranscriptions(TEST_SCHEMA, registry);
-
   const baseline = await readBaseline();
-  const { regressions, known, stale } = applyBaseline(findings, baseline);
+  const { regressions, known } = applyBaseline(findings, baseline);
+  const { stale } = applyBaseline(allFindings, baseline);
   const { shape, option, optionFatal } = partitionFindings(findings);
   const optionCount = findings.filter((f) => f.verdict === "OPTION").length;
 
@@ -697,7 +698,8 @@ export async function main(): Promise<void> {
   }
   for (const key of stale) {
     console.log(
-      `note  BASELINE-STALE  ${key} — no longer invented; drop it with pnpm schema:compare:reseed`,
+      `note  BASELINE-STALE  ${key} — invented by neither transcription; drop it with ` +
+        `pnpm schema:compare:reseed`,
     );
   }
 

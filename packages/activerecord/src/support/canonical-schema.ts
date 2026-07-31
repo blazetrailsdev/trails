@@ -20,6 +20,7 @@
  */
 
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
+import { ActiveRecordError } from "../errors.js";
 import type {
   TableDefinition,
   AddIndexOptions,
@@ -2164,10 +2165,16 @@ export async function canonicalForeignKeyDependents(): Promise<Map<string, strin
  * The replay pins the SQLite adapter deliberately: it is the one adapter whose
  * type map is a near-identity and whose column path applies no adapter munging
  * (no MySQL `DATETIME(6)` upgrade, no `serial` PK rewrite), so what comes back
- * is the *declared* shape rather than one adapter's rendering of it. For the
- * same reason the probe is built with no `serialPk` and no composite-PK set —
- * both only add adapter-side spellings (`serial`, an implied `null: false`)
- * that `schema.rb` does not state.
+ * is the *declared* shape rather than one adapter's rendering of it. The probe
+ * is likewise built with no `serialPk` and no composite-PK set, so `col`'s
+ * generic branch runs for every column: the composite-PK branch only forces the
+ * `null: false` a PK carries anyway, and the `serialPk` branch *discards* the
+ * declared options wholesale in favour of `serialIdType` + `{primaryKey: true}`
+ * — a rendering, not a declaration. Taking the generic branch is therefore the
+ * right reading, but only while no `serialPk` column declares something that
+ * branch would have thrown away; {@link assertSerialPkIsPlainInteger} fails loudly
+ * the moment one does, rather than letting the replay report a shape the real
+ * DDL never had.
  *
  * @internal Read by `scripts/schema-compare/compare.ts`. Lives here, next to the
  * registry it replays, for the same reason as
@@ -2184,9 +2191,43 @@ export async function canonicalRegistrySchema(): Promise<Schema> {
       foreignKey: () => {},
     } as unknown as TableDefinition;
     def.fn(new TableBuilder(probe, "sqlite", COLUMN_TYPE_MAP_SQLITE, null, null));
+    if (def.meta.serialPk !== undefined) {
+      assertSerialPkIsPlainInteger(def.name, def.meta.serialPk, columns[def.meta.serialPk]);
+    }
     schema[def.name] = columns;
   }
   return schema;
+}
+
+/**
+ * Guard the one place the replay's generic branch and the real `serialPk` branch
+ * can disagree. `TableBuilder.col` renders a `serialPk` column as
+ * `serialIdType(primitive, adapter)` with `{primaryKey: true}` and nothing else,
+ * so a declared `limit`/`default`/`precision`/`scale` never reaches the DDL, and
+ * a `big_integer` declaration becomes `bigserial`/`bigint`/`integer` by adapter.
+ * A plain `t.integer(pk)` (optionally spelling out the `null: false` a primary
+ * key has regardless) is the only form where "declared" and "rendered" agree,
+ * which is every live `serialPk` column today. Anything else must teach
+ * {@link canonicalRegistrySchema} how to compare the rendered form instead of
+ * being silently mis-reported.
+ */
+function assertSerialPkIsPlainInteger(
+  table: string,
+  column: string,
+  spec: ColumnSpec | undefined,
+): void {
+  if (spec === undefined || typeof spec === "string") return;
+  const { type, null: nullable, ...rest } = spec;
+  const extras = Object.keys(rest);
+  if (type === "integer" && extras.length === 0 && (nullable === undefined || nullable === false)) {
+    return;
+  }
+  throw new ActiveRecordError(
+    `canonical registry: serialPk column ${table}.${column} is declared as ` +
+      `${JSON.stringify(spec)}, but the serialPk path emits only serialIdType(...) with ` +
+      `primaryKey: true — the declared type/options would never reach the DDL. Teach ` +
+      `canonicalRegistrySchema to model the rendered form before declaring it this way.`,
+  );
 }
 
 /** Rebuilds a `ColumnSpec` from the `t.column(name, type, options)` call the
