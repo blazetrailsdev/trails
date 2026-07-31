@@ -85,10 +85,6 @@ describe("Migrator trails extensions", () => {
   });
 
   it("migrate to the current version runs an unapplied lower migration", async () => {
-    // Rails' `migrate` else-arm sends target == current_version to `up(target)`,
-    // whose runnable is `migrations[start..finish].reject { ran? }`
-    // (migration.rb:1233-1244) — an unapplied migration below an already-applied
-    // target still runs.
     const ran: string[] = [];
     const m1 = (): MigrationProxy =>
       makeMigration("1", "M1", async () => {

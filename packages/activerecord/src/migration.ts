@@ -2208,6 +2208,12 @@ export class Migrator {
    * Run all pending migrations up, or migrate to a specific version.
    *
    * Mirrors: ActiveRecord::Migrator#migrate
+   *
+   * Dispatches to {@link up} / {@link down}, which each build the per-run
+   * Migrator. A target equal to the current version goes to `up`, so an
+   * unapplied migration below an already-applied target still runs. The target
+   * is rejected up front because Ruby compares it against `current_version`
+   * directly, while it may reach us as a string.
    */
   async migrate(
     targetVersion?: number | string | null,
@@ -2215,12 +2221,9 @@ export class Migrator {
   ): Promise<MigrationProxy[]> {
     if (targetVersion === undefined || targetVersion === null) return this.up(null, block);
 
-    // Ruby compares `current_version > target_version` directly; the target may
-    // reach us as a string, so reject a non-version target before widening it.
     if (this._invalidTarget(targetVersion)) {
       throw new UnknownMigrationVersionError(targetVersion);
     }
-    this._validateTargetVersion(targetVersion);
 
     const target = BigInt(targetVersion);
     const current = BigInt(await this.currentVersion());
