@@ -476,6 +476,7 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
       },
       test: {
         primary: { adapter: "abstract", database: "test-db" },
+        secondary: { adapter: "abstract", database: "secondary-test-db" },
       },
       production: {
         primary: { url: "abstract://prod-db-host/prod-db" },
@@ -493,8 +494,9 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
   it("creates current environment database", async () => {
     DatabaseTasks.env = "test";
     await DatabaseTasks.createCurrent("test");
-    expect(created).toHaveLength(1);
-    expect(created[0]).toContain("test");
+    expect(created).toHaveLength(2);
+    expect(created).toContain("test:primary:test-db");
+    expect(created).toContain("test:secondary:secondary-test-db");
   });
 
   it("creates current environment database with url", async () => {
@@ -507,7 +509,7 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
   it("creates test and development databases when env was not specified", async () => {
     DatabaseTasks.env = "development";
     await DatabaseTasks.createCurrent();
-    expect(created.length).toBe(3);
+    expect(created.length).toBe(4);
   });
 
   it("creates test and development databases when rails env is development", async () => {
@@ -676,6 +678,7 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
       },
       test: {
         primary: { adapter: "abstract", database: "test-db" },
+        secondary: { adapter: "abstract", database: "secondary-test-db" },
       },
       production: {
         primary: { url: "abstract://prod-db-host/prod-db" },
@@ -692,7 +695,7 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
   it("drops current environment database", async () => {
     DatabaseTasks.env = "test";
     await DatabaseTasks.dropCurrent("test");
-    expect(dropped).toHaveLength(1);
+    expect(dropped).toHaveLength(2);
   });
 
   it("drops current environment database with url", async () => {
@@ -712,7 +715,7 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
   it("drops test and development databases when env was not specified", async () => {
     DatabaseTasks.env = "development";
     await DatabaseTasks.dropCurrent();
-    expect(dropped.length).toBe(3);
+    expect(dropped.length).toBe(4);
   });
 
   it("drops testand development databases when rails env is development", async () => {
