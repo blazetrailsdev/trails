@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseTestCompareFromLogs } from "./parse-test-compare.js";
 
-// Current format (post-#3825): the details parenthetical can nest parens.
 const currentFormatLog = `
 ==========================================================================================
   globalid  —  131/131 tests (100%) (48 extra (TS only))  |  6/6 files  |  0 misplaced
@@ -14,7 +13,6 @@ const currentFormatLog = `
   Overall: 141/151 tests (93.4%) (53 extra (TS only))  |  7/8 files  |  4 misplaced
 `;
 
-// Pre-#3825 format: details parenthetical, if any, had no nested parens.
 const legacyFormatLog = `
   globalid  —  131/131 tests (100%)  |  6/6 files  |  0 misplaced
   activerecord  —  900/1000 tests (90%) (12 skipped)  |  40/50 files  |  7 misplaced
@@ -71,5 +69,14 @@ describe("parseTestCompareFromLogs", () => {
 
   it("returns no packages when the summary lines are absent", () => {
     expect(parseTestCompareFromLogs("nothing to see here").size).toBe(0);
+  });
+
+  it("does not stitch a truncated summary line to the columns of the next line", () => {
+    const truncated = [
+      "  globalid  —  131/131 tests (100%)",
+      "  |  6/6 files  |  0 misplaced",
+    ].join("\n");
+
+    expect(parseTestCompareFromLogs(truncated).size).toBe(0);
   });
 });

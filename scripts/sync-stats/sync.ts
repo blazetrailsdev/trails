@@ -2008,8 +2008,6 @@ async function syncCompareStats(mode: "latest" | "refresh" | "backfill"): Promis
 
     const testStats = parseTestCompareFromLogs(logs);
     if (testStats.size === 0 && stepLogs.has("test_compare")) {
-      // Format drift in the test:compare summary line silently emptied this
-      // feed for six weeks once nested parens appeared (#3825). Shout instead.
       zeroParseTestCompare++;
       console.warn(
         `  WARNING: PR #${prNumber} has a test_compare step log but 0 packages parsed — summary-line format drift?`,
