@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { run } from "./cli.js";
-import { DatabaseTasks, DatabaseConfigurations, Migrator } from "@blazetrails/activerecord";
+import { Base, DatabaseTasks, DatabaseConfigurations, Migrator } from "@blazetrails/activerecord";
 
 const FAKE_CONFIG = `
 const config = { development: { adapter: "sqlite3", database: ":memory:", pool: 1 } };
@@ -117,6 +117,17 @@ describe("DbMigrateTest", () => {
     DatabaseConfigurations.defaultEnv = "development";
     expect(await run(["db:rollback"], await makeFakeProject())).toBe(0);
     expect(rollbackSpy).toHaveBeenCalledWith(1);
+  });
+
+  it("db:rollback runs with the environment connection established", async () => {
+    DatabaseConfigurations.defaultEnv = "development";
+    let connected = false;
+    rollbackSpy.mockImplementationOnce(() => {
+      connected = Base.connectionPool() != null;
+      return Promise.resolve();
+    });
+    expect(await run(["db:rollback"], await makeFakeProject())).toBe(0);
+    expect(connected).toBe(true);
   });
 
   it("db:rollback --step 2 passes 2", async () => {
