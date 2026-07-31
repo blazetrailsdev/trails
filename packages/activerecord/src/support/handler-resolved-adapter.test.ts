@@ -8,7 +8,7 @@
  *      declarations loads its schema via lazy reflection without deadlocking
  *      on SQLite :memory: + pool size 1.
  */
-import { describe, it, beforeAll, expect } from "vitest";
+import { describe, it, afterAll, beforeAll, expect } from "vitest";
 import { Base } from "../base.js";
 import { skipGlobalResetForFile } from "./skip-global-reset.js";
 
@@ -41,10 +41,14 @@ describe("handler-resolved adapter (Phase D-0)", () => {
     await HandlerResolvedComment.loadSchema();
   });
 
-  // No afterAll(dropAllTables): the lone bespoke `handler_resolved_comments`
-  // table is non-canonical, so the next non-skip file's global truncation reset
-  // (`resetTestTables`, which DROPs every non-canonical table) clears it — no
-  // ~330-table canonical DROP fan-out needed here. (RFC 0060)
+  // Per-file teardown of the one bespoke table, the way Rails' own suite does
+  // it (`vendor/rails/activerecord/test/cases/migration_test.rb:1231-1233` —
+  // `teardown { drop_table(:delete_me) rescue nil }`), rather than leaning on
+  // the global `resetTestTables` sweep. Not `dropAllTables`: no ~330-table
+  // canonical DROP fan-out is needed here.
+  afterAll(async () => {
+    await Base.connection.dropTable("handler_resolved_comments", { ifExists: true });
+  });
 
   it("isConnectedQ() is true after setupHandlerSuite()", () => {
     expect(Base.isConnectedQ()).toBe(true);

@@ -530,9 +530,15 @@ describe("PrimaryKeyAnyTypeTest", () => {
       precision: 6,
       force: true,
     });
-    const schema = await SchemaDumper.dumpTableSchema(Base.connection as any, "scheduled_logs");
-    expect(schema).toMatch(/createTable\("scheduled_logs", \{ id: "timestamp"/);
-    await (Base.connection as any).dropTable("scheduled_logs", { ifExists: true });
+    // Rails leaves the table behind (no teardown on this test); trails drops it
+    // from a `finally` so a failed assertion cannot leak it into the shared
+    // per-worker database — the Ruby `teardown` guarantee, applied locally.
+    try {
+      const schema = await SchemaDumper.dumpTableSchema(Base.connection as any, "scheduled_logs");
+      expect(schema).toMatch(/createTable\("scheduled_logs", \{ id: "timestamp"/);
+    } finally {
+      await (Base.connection as any).dropTable("scheduled_logs", { ifExists: true });
+    }
   });
 });
 

@@ -87,6 +87,7 @@ describe("withTransactionalFixtures (schema-cache invalidation)", () => {
   });
 
   afterAll(async () => {
+    await adapter.dropTable("cache_inval_users", { ifExists: true });
     await adapter.close();
   });
 
@@ -129,6 +130,7 @@ describe("withTransactionalFixtures (raw adapter)", () => {
   });
 
   afterAll(async () => {
+    await adapter.dropTable("raw_fixture_users", { ifExists: true });
     await adapter.close();
   });
 
@@ -159,6 +161,8 @@ describe("withTransactionalFixtures (per-table re-reflection preserves untouched
   });
 
   afterAll(async () => {
+    await adapter.dropTable("pertable_touched", { ifExists: true });
+    await adapter.dropTable("pertable_untouched", { ifExists: true });
     await adapter.close();
   });
 
@@ -194,6 +198,7 @@ describe("withTransactionalFixtures (invalidateSchemaCache: false)", () => {
   });
 
   afterAll(async () => {
+    await adapter.dropTable("opt_out_cache_users", { ifExists: true });
     await adapter.close();
   });
 
