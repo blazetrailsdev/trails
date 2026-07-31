@@ -429,12 +429,6 @@ export class Relation<T extends Base> {
   // `_joinsValues` by this rule — the same rule `joins` uses at insert time. A
   // raw Symbol misrouted to `_joinValues` would reach the arel visitor and raise
   // "Unknown node type: Symbol", so Symbols must land in `_namedInnerJoins`.
-  //
-  // A `JoinDependency` (pushed by a cross-klass `merge`, Rails
-  // `joins!(join_dependency, *others)`) counts as named: Rails' build_join_buckets
-  // shifts only `Arel::Nodes::Join` values out of `joins_values` and hands the
-  // whole remainder — JoinDependency included — to `select_named_joins`, which
-  // stashes it (query_methods.rb:1856-1873, 1810-1822).
   private _isNamedJoinValue(v: unknown): boolean {
     return (
       _isPlainObject(v) ||
@@ -3360,10 +3354,6 @@ export class Relation<T extends Base> {
     // it is a pure bucket-builder with neither an eager-JD parameter nor a live
     // manager — and are needed here because the short-circuit does NOT fold `eagerJd`
     // into the stash (it is pushed in the non-short-circuit branch below). Cross-klass
-    // merged JDs live in `joinsValues` / `leftOuterJoinsValues` like any other join
-    // value, so `_namedInnerJoins` below already accounts for the inner ones — an
-    // inner merged JD blocks the short-circuit exactly as Rails' non-empty
-    // `joins_values` does.
     const pureLeftOuter =
       eagerJd === undefined &&
       manager.joinSourceCount === 0 &&
@@ -3679,8 +3669,6 @@ export class Relation<T extends Base> {
           ...this._leftOuterJoinsValues,
           ...joinableSpecs,
         ]) {
-          // A cross-klass merged JoinDependency is a stash, not a spec — it
-          // resolves against the merged-from model, not this one.
           if (spec instanceof JoinDependency) continue;
           joinedJd.addAssociationSpec(spec);
         }
@@ -4936,9 +4924,6 @@ export class Relation<T extends Base> {
    * eager-spec resolver, which rejects every non-string spec.
    */
   private _joinsReflectionsAreLimitable(): boolean {
-    // A cross-klass merged JoinDependency carries its own (already-built)
-    // reflections against another model; fold those in rather than re-resolving
-    // it as a spec on this relation's model.
     const specs = [...this._namedInnerJoins, ...this._leftOuterJoinsValues];
     if (specs.length === 0) return true;
     const jd = new JoinDependency(this._modelClass);

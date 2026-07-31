@@ -289,9 +289,6 @@ describe("RelationMergingTest", () => {
     // into the receiver's joins_values (which would resolve them on the wrong
     // model). `merge` and `mergeBang` must agree here.
     const source = Post.joins("author");
-    // Rails pushes the built JoinDependency straight into the receiver's
-    // joins_values (`joins!(join_dependency, *others)`, merger.rb:131), where
-    // build_join_buckets' select_named_joins stashes it.
     const merged = Comment.all().merge(source);
     expect(merged.joinsValues.length).toBe(1);
     expect(merged.joinsValues[0]).toBeInstanceOf(JoinDependency);
@@ -309,8 +306,6 @@ describe("RelationMergingTest", () => {
     // than folding into the receiver's left_outer_joins_values. `merge` and
     // `mergeBang` must agree — mergeBang's old inline block skipped this split.
     const source = Post.leftOuterJoins("author");
-    // Rails pushes the built JoinDependency into left_outer_joins_values
-    // (`left_outer_joins!(join_dependency, *others)`, merger.rb:150).
     const merged = Comment.all().merge(source);
     expect(merged.leftOuterJoinsValues.length).toBe(1);
     expect(merged.leftOuterJoinsValues[0]).toBeInstanceOf(JoinDependency);

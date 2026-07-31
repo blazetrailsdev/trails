@@ -1031,10 +1031,6 @@ export class AssociationScope {
     // cross-klass JoinDependencies (Merger#merge_joins / #merge_outer_joins).
     for (const jc of item._joinClauses ?? []) target._joinClauses.push(jc);
     for (const jv of item._joinValues ?? []) target._joinsValues.push(jv);
-    // Rails' Merger partitions Hash/Symbol/Array off as `associations`;
-    // everything else — notably a JoinDependency the item already accumulated
-    // from an earlier `.merge()` (a nested through-scope-of-a-through-scope) —
-    // is `others`, forwarded verbatim by `joins!(join_dependency, *others)`.
     const namedInner = (item._namedInnerJoins ?? []).filter((v) => !(v instanceof JoinDependency));
     const innerDeps = (item._namedInnerJoins ?? []).filter((v) => v instanceof JoinDependency);
     if (namedInner.length > 0) {

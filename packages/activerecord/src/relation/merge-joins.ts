@@ -4,16 +4,6 @@ import { JoinDependency } from "../associations/join-dependency.js";
 import type { AssociationSpec } from "./query-methods.js";
 import { constructJoinDependency, structuralUnionEq } from "./query-methods.js";
 
-// Join-folding passes for the single merge path (Merger#merge). Both `merge` and
-// `merge!` now funnel through Merger — `merge` is `spawn.merge!` and `merge!`
-// runs Merger#merge in place (spawn-methods.ts) — so there is one caller. Kept as
-// dedicated functions here (rather than inlined) so the dedup/branching logic
-// stays isolated and reviewable; Merger keeps thin mergeJoins/mergeOuterJoins
-// wrappers so api:compare still maps merger.rb's merge_joins/merge_outer_joins.
-
-// Minimal structural view of the join-related fields these helpers touch on a
-// Relation. Kept local (rather than `any`) so the shared module stays off the
-// no-explicit-any burndown allowlist (RFC 0037).
 interface JoinFoldRelation {
   model: unknown;
   _joinClauses: unknown[];
@@ -26,8 +16,12 @@ interface JoinFoldRelation {
   _isNamedJoinValue(v: unknown): boolean;
 }
 
-// Structural dedup for raw joins: an Arel node exposes `eql` and dedups by value
-// when same-constructor; everything else falls back to reference identity.
+function joinsUnionEq(v: unknown, existing: unknown): boolean {
+  return v instanceof JoinDependency || existing instanceof JoinDependency
+    ? v === existing
+    : rawJoinDup(v, existing) || structuralUnionEq(v, existing);
+}
+
 function rawJoinDup(v: unknown, existing: unknown): boolean {
   const node = v as { eql?: (o: unknown) => boolean; constructor?: unknown };
   if (
@@ -39,93 +33,71 @@ function rawJoinDup(v: unknown, existing: unknown): boolean {
   return v === existing;
 }
 
-// Rails merge_joins (merger.rb): joins_values and left_outer_joins_values are
-// separate arrays, so each merge helper unions its own array independently (no
-// interleaving in Rails). trails keeps explicit SQL joins in _joinClauses and
-// every `.joins` argument in the unified _joinsValues store; the source's
-// `joinsValues` is partitioned into raw join values vs named association joins
-// (the same split `build_joins` derives) and each is merged independently below,
-// writing back into _joinsValues.
-//
-// Rails `relation.joins_values |= other.joins_values` (merger.rb) is a single
-// ordered array union preserving `other`'s exact insertion order across the
-// named/raw boundary, so a source whose joins interleave (e.g.
-// `joins(:a, "RAW", :b)`) folds in as `[a, RAW, b]`, not `[RAW, a, b]`. We walk
-// `source.joinsValues` once, unioning each entry per its category:
-//   - raw joins union structurally (Arel node `eql`, else reference);
-//   - same-klass named specs dedup by `structuralUnionEq`.
-// Cross-klass named (Hash | Symbol/String | Array — every shape Rails treats as
-// an association) can't resolve on the receiver, so they're collected and built
-// into a single InnerJoin JoinDependency on `source` (whose AliasTracker handles
-// nested-through / HABTM) and pushed into _joinsValues, exactly as Rails'
-// `else` branch does with `joins!(join_dependency, *others)` — the `others`
-// (raw joins, and any JoinDependency the source already carries, which Rails'
-// `partition` also routes to `others`) still append in order. Arel::Nodes::InnerJoin is the type used for
-// same-model inner joins in Rails' cross-model merge path.
 export function foldMergeJoins(target: JoinFoldRelation, source: JoinFoldRelation): void {
   const clauses = source._joinClauses ?? [];
   if (clauses.length > 0) target._joinClauses.push(...clauses);
 
-  const sameKlass = source.model === target.model;
-  const crossKlassNamed: unknown[] = [];
-  for (const v of source.joinsValues ?? []) {
-    if (v instanceof JoinDependency) {
-      // Rails' `partition` matches only Hash/Symbol/Array, so a JoinDependency
-      // already in `other.joins_values` lands in `others` and rides through
-      // `joins!(join_dependency, *others)` untouched.
-      target._joinsValues.push(v);
-    } else if (!source._isNamedJoinValue(v)) {
-      if (!target._joinValues.some((existing) => rawJoinDup(v, existing)))
+  const joinsValues = source.joinsValues ?? [];
+  if (joinsValues.length === 0) return;
+  if (source.model === target.model) {
+    for (const v of joinsValues) {
+      if (!source._isNamedJoinValue(v)) {
+        if (!target._joinValues.some((existing) => rawJoinDup(v, existing)))
+          target._joinsValues.push(v);
+      } else if (!target._namedInnerJoins.some((seen) => structuralUnionEq(seen, v))) {
         target._joinsValues.push(v);
-    } else if (sameKlass) {
-      // joins_values |= dedups structurally-equal Hash specs (eql?/hash), so a
-      // same-klass merge folds an equal spec — not by JS reference identity.
-      if (!target._namedInnerJoins.some((seen) => structuralUnionEq(seen, v)))
-        target._joinsValues.push(v);
+      }
+    }
+    return;
+  }
+
+  const associations: unknown[] = [];
+  const others: unknown[] = [];
+  for (const v of joinsValues) {
+    if (!(v instanceof JoinDependency) && source._isNamedJoinValue(v)) {
+      associations.push(v);
     } else {
-      crossKlassNamed.push(v);
+      others.push(v);
     }
   }
-  if (crossKlassNamed.length > 0) {
-    target._joinsValues.push(
-      constructJoinDependency.call(
-        source as never,
-        crossKlassNamed as AssociationSpec[],
-        Nodes.InnerJoin,
-      ),
-    );
+  const joinDependency = constructJoinDependency.call(
+    source as never,
+    associations as AssociationSpec[],
+    Nodes.InnerJoin,
+  );
+  for (const v of [joinDependency, ...others]) {
+    if (!target._joinsValues.some((existing) => joinsUnionEq(v, existing)))
+      target._joinsValues.push(v);
   }
 }
 
-// Rails merge_outer_joins (merger.rb): when other.klass == relation.klass the
-// left_outer_joins association names union directly; otherwise Merger builds a
-// single OuterJoin JoinDependency against other.klass (the names can't resolve on
-// the receiver's model) and stashes it via left_outer_joins!.
 export function foldMergeOuterJoins(target: JoinFoldRelation, source: JoinFoldRelation): void {
-  // Read via the public leftOuterJoinsValues accessor (PR #4675 convergence),
-  // symmetric with foldMergeJoins reading source.joinsValues.
   const otherLeft = source.leftOuterJoinsValues ?? [];
-  const sameKlass = source.model === target.model;
-  if (sameKlass) {
+  if (otherLeft.length === 0) return;
+  if (source.model === target.model) {
     for (const v of otherLeft) {
       if (!target._leftOuterJoinsValues.some((seen) => structuralUnionEq(seen, v)))
         target._leftOuterJoinsValues.push(v);
     }
     return;
   }
-  // Rails partitions Hash/Symbol/Array off as `associations`; everything else —
-  // including a JoinDependency the source already carries — is `others`, forwarded
-  // verbatim by `left_outer_joins!(join_dependency, *others)`.
-  const associations = otherLeft.filter((v) => !(v instanceof JoinDependency));
-  const others = otherLeft.filter((v) => v instanceof JoinDependency);
-  if (associations.length > 0) {
-    target._leftOuterJoinsValues.push(
-      constructJoinDependency.call(
-        source as never,
-        associations as AssociationSpec[],
-        Nodes.OuterJoin,
-      ) as never,
-    );
+
+  const associations: unknown[] = [];
+  const others: unknown[] = [];
+  for (const v of otherLeft) {
+    if (!(v instanceof JoinDependency)) {
+      associations.push(v);
+    } else {
+      others.push(v);
+    }
   }
-  target._leftOuterJoinsValues.push(...(others as never[]));
+  const joinDependency = constructJoinDependency.call(
+    source as never,
+    associations as AssociationSpec[],
+    Nodes.OuterJoin,
+  );
+  for (const v of [joinDependency, ...others]) {
+    if (!target._leftOuterJoinsValues.some((seen) => joinsUnionEq(v, seen)))
+      target._leftOuterJoinsValues.push(v as never);
+  }
 }

@@ -206,8 +206,6 @@ interface QueryMethodsHost {
   // Public `left_outer_joins_values` value method (relation.ts getter); reads it
   // over the backing field so extractCalls credits the Rails value-method read.
   leftOuterJoinsValues: AssociationSpec[];
-  // Includes any cross-klass merged JoinDependency sitting in `joins_values`
-  // (Rails `joins!(join_dependency, *others)`), which `selectNamedJoins` stashes.
   readonly _namedInnerJoins: AssociationSpec[];
   _includesAssociations: AssociationSpec[];
   _preloadAssociations: AssociationSpec[];
@@ -1130,10 +1128,6 @@ function uniqArray(arr: unknown[]): unknown[] {
  * @internal
  */
 export function structuralUnionEq(a: unknown, b: unknown): boolean {
-  // A JoinDependency in joins_values / left_outer_joins_values is a stash, not a
-  // value spec: Ruby's `|=` dedups it through the default `eql?`/`hash`, i.e. by
-  // object identity. Walking its node graph structurally would be both wrong and
-  // unbounded (nodes reference their base klass and each other).
   if (a instanceof JoinDependency || b instanceof JoinDependency) return a === b;
   return deepEqual(a, b);
 }
@@ -2872,11 +2866,6 @@ export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown
       // `_eagerLoadAssociations`, so both must be empty too — otherwise the
       // left-outer JD belongs in `stashed_join` (folded below), not `named_join`,
       // and the inner names would be dropped / double-emitted downstream.
-      //
-      // A cross-klass merged JoinDependency (from a `.merge` against a
-      // different-model relation) is an ordinary `joins_values` entry, so
-      // `namedInner` above already counts it — it blocks the short-circuit
-      // exactly as Rails' non-empty `joins_values` does.
       buckets.named_join.push(...namedLeft);
       buckets.stashed_join.push(...stashedLeft);
       return buckets;
