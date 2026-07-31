@@ -414,10 +414,6 @@ export async function connect(): Promise<TestDatabaseConfig> {
   return { configs, adapter, envConfig };
 }
 
-/**
- * The table every canonical schema load lays first; its absence is what tells
- * {@link restoreWorkerConnection} the worker database came back empty.
- */
 const CANONICAL_PROBE_TABLE = "posts";
 
 /**
@@ -434,11 +430,6 @@ const CANONICAL_PROBE_TABLE = "posts";
  */
 export async function restoreWorkerConnection(): Promise<void> {
   await Base.establishConnection("arunit");
-  // Leased, not `withConnection`-scoped, as the per-worker boot leases
-  // (`test-setup-dy.ts`): on `:memory:` the connection *is* the database, so
-  // handing it back to the pool risks taking the freshly laid schema with it.
-  // Cast because `tableExists` is on the concrete adapter class, not the
-  // `DatabaseAdapter` interface.
   const connection = (await Base.leaseConnection()) as unknown as {
     tableExists(name: string): Promise<boolean>;
   };

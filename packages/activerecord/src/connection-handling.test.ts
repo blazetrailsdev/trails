@@ -316,8 +316,6 @@ describe("ConnectionHandlingTest", () => {
   // UrlConfig, so configuration_hash carries the parsed discrete fields and
   // never the verbatim URL string. establish_connection({ adapter, url })
   // must mirror that shape, matching the resolver's "url removed from hash".
-  // Only the primary pool exercises this path, so `Base`'s is swapped and
-  // restored.
   it("establish_connection with a url stores a UrlConfig with discrete fields", async () => {
     await Base.establishConnection({ adapter: "sqlite3", url: "sqlite3:db/discrete.sqlite3" });
     const config = Base.connectionDbConfig();
@@ -378,9 +376,6 @@ describe("ConnectionHandlingTest", () => {
     expect(() => Base.clearCacheBang()).not.toThrow();
   });
 
-  // Both cases below remove `Base`'s pool: only the primary pool can be
-  // observed going away (a subclass falls back to `Base`'s). Same restore as
-  // above.
   it("remove_connection removes the pool", async () => {
     const ambientDbConfig = Base.connectionDbConfig();
     expect(Base.connectionPool()).toBeTruthy();
