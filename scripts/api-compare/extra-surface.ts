@@ -473,10 +473,11 @@ export interface TaggedSummary {
   inheritedMatched: number;
   stale: TaggedEntry[];
   /**
-   * Permanence claims across the WRITTEN tags (`total`) — advisory, never part
-   * of the exit code. An inherited entry repeats its interface declaration's
-   * reason, so counting it would multiply one claim by the interface's member
-   * count.
+   * Permanence claims across the WRITTEN tags (`total`). An inherited entry
+   * repeats its interface declaration's reason, so counting it would multiply
+   * one claim by the interface's member count. A non-zero `unclassified` fails
+   * the run — the whole population is classified, so the gate is a hard 0, not
+   * a ratchet that would re-admit the debt it exists to stop.
    */
   classification: {
     permanent: number;
@@ -527,8 +528,7 @@ Reasoned exceptions: an extra is allowed by tagging its TS declaration
 \`@noRailsEquivalent <reason>\` in JSDoc. Allowed extras are subtracted from the
 novel/moved counts and reported as an "Allowed" total; a tag on a name that no
 longer flags is STALE and fails the run. A reason opening with PERMANENT or
-CONVERGEABLE states its permanence claim; the count of tags stating neither is
-reported (advisory — it never affects the exit code).
+CONVERGEABLE states its permanence claim; a tag stating neither fails the run.
 
 Requires: pnpm api:compare must have run first to produce
   scripts/api-compare/output/{rails-api.json,ts-api.json}.
@@ -1268,9 +1268,9 @@ function padNumCell(n: number, colored: string, width: number): string {
 }
 
 /**
- * Advisory-only: prints the permanence split and names the unclassified tags.
- * Deliberately NOT a gate — most of the population predates the convention, so
- * failing on it would block every unrelated PR. See `classifyReason`.
+ * Prints the permanence split and names the unclassified tags. Non-zero
+ * unclassified fails the run (see `gateUnclassified`); this block is the
+ * detail listing that says which tags to open. See `classifyReason`.
  */
 export function printClassificationBlock(
   tagged: TaggedSummary,
@@ -1527,6 +1527,32 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     );
     process.exit(1);
   }
+
+  const unclassifiedMessage = gateUnclassified(report.tagged);
+  if (unclassifiedMessage) {
+    console.error(unclassifiedMessage);
+    process.exit(1);
+  }
+}
+
+/**
+ * The permanence gate: every written `@noRailsEquivalent` reason must open with
+ * PERMANENT or CONVERGEABLE. Hard 0 rather than a ratchet on the count — the
+ * population was brought to 0 by RFC 0080, and a ratchet re-admits exactly the
+ * unclassified debt the gate exists to stop. Returns the failure message, or
+ * `null` when the run passes.
+ */
+export function gateUnclassified(tagged: TaggedSummary): string | null {
+  const { unclassified, unclassifiedEntries } = tagged.classification;
+  if (unclassified === 0) return null;
+  return (
+    `\nextra-surface: ${unclassified} @noRailsEquivalent tag(s) state no permanence ` +
+    "claim. Open each reason with PERMANENT (a language- or runtime-level fact no " +
+    "port can remove) or CONVERGEABLE (unfinished porting, a fixable collision, a " +
+    "comparator gap — name the story):\n" +
+    unclassifiedEntries.map((e) => `  - ${e.package}  ${e.tsFile}  ${e.name}`).join("\n") +
+    "\n"
+  );
 }
 
 const invokedAsScript =

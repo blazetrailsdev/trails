@@ -10,6 +10,7 @@ import {
   collectTaggedEntries,
   classifyReason,
   printClassificationBlock,
+  gateUnclassified,
 } from "./extra-surface.js";
 import type { TaggedEntry, TaggedSummary } from "./extra-surface.js";
 import { extractFromProgram } from "./extract-ts-api.js";
@@ -2383,7 +2384,7 @@ describe("buildReport — permanence classification", () => {
     expect(run("Rails has no such accessor").tagged.classification.unclassified).toBe(1);
   });
 
-  it("keeps an unclassified tag allowed and non-stale — the signal is advisory", () => {
+  it("keeps an unclassified tag allowed and non-stale — it fails on its own gate", () => {
     const report = run("Rails has no such accessor");
     expect(report.tagged.stale).toEqual([]);
     expect(report.packages[0].totalAllowlisted).toBe(1);
@@ -2456,5 +2457,24 @@ describe("printClassificationBlock", () => {
     expect(out).toContain("arel  aa.ts  aa");
     expect(out).not.toContain("bb.ts");
     expect(out).toContain("… +1 more");
+  });
+
+  describe("gateUnclassified", () => {
+    it("passes when every tag states a claim", () => {
+      expect(gateUnclassified(summary([]))).toBeNull();
+    });
+
+    it("fails and names every unclassified tag — no ratchet, the gate is a hard 0", () => {
+      const message = gateUnclassified(summary([entry("activerecord", "aa"), entry("arel", "bb")]));
+      expect(message).toContain("2 @noRailsEquivalent tag(s) state no permanence claim");
+      expect(message).toContain("activerecord  aa.ts  aa");
+      expect(message).toContain("arel  bb.ts  bb");
+    });
+
+    it("names both tokens so the message says how to fix the tag", () => {
+      const message = gateUnclassified(summary([entry("arel", "aa")]));
+      expect(message).toContain("PERMANENT");
+      expect(message).toContain("CONVERGEABLE");
+    });
   });
 });
