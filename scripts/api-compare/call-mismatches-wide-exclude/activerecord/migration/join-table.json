@@ -4,6 +4,6 @@
     "tsFile": "migration/join-table.ts",
     "rubyName": "join_table_name",
     "call": "derive_join_table_name",
-    "reason": "Verified (RFC 0072 arity sweep): Rails delegates to ModelSchema.derive_join_table_name; this module must stay import-leaf — the model-schema.js edge reorders module init and trips scripts/test-deps/adapter-graph-import-tdz.test.ts — so it inlines the identical three lines. See the comment on joinTableName."
+    "reason": "Ratified permanent deviation (re-measured 2026-07-31, story migration-join-table-delegate-to-derive-join-table-name). Rails delegates to ModelSchema.derive_join_table_name; migration/join-table.ts must stay import-leaf because it is imported from deep inside the model graph (reflection.ts, associations.ts, connection-adapters/abstract/schema-statements.ts). Adding the model-schema.js edge pulls connection-handling.js in ahead of base.ts, so entering the graph via SchemaStatements crashes at base.ts's top-level `extend(Base, ConnectionHandling.ClassMethods)` with `TypeError: Cannot convert undefined or null to object` — caught only by scripts/test-deps/adapter-graph-import-tdz.test.ts. The blocker is base.ts's eager module-level extend() wiring; the delegation cannot land until that stops running at module-evaluation time. The inlined copy is pinned to deriveJoinTableName by a drift guard in migration/join-table.test.ts."
   }
 ]
