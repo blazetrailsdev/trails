@@ -60,6 +60,15 @@ tester.run("no-load-schema-with-stubbed-ddl", rule, {
         await BigNumber.loadSchema();
       `,
     },
+    // Naming the method without intercepting it is not a stub.
+    {
+      filename: "packages/activerecord/src/migration.test.ts",
+      code: `
+        import { loadSchema } from "./support/load-schema-helper.js";
+        expect(migration.methodMissing("createTable")).toBe("hi mom!");
+        await loadSchema(adapter);
+      `,
+    },
   ],
   invalid: [
     // The #5676 shape: Proxy trap on createTable + loadSchema.
@@ -86,6 +95,32 @@ tester.run("no-load-schema-with-stubbed-ddl", rule, {
       `,
       errors: [{ messageId: "misrouted" }],
     },
+    // The other two interception dispatch shapes.
+    {
+      filename: FILENAME,
+      code: `
+        const probe = new Proxy(adapter, {
+          get(target, prop) {
+            switch (prop) {
+              case "createTable":
+                return async () => {};
+            }
+            return Reflect.get(target, prop, target);
+          },
+        });
+        await loadSchema(probe);
+      `,
+      errors: [{ messageId: "misrouted" }],
+    },
+    {
+      filename: FILENAME,
+      code: `
+        const intercepted = ["createTable", "dropTable"];
+        if (intercepted.includes(prop)) return async () => {};
+        await loadSchema(probe);
+      `,
+      errors: [{ messageId: "misrouted" }],
+    },
   ],
 });
 
@@ -109,6 +144,6 @@ describe("the real arm-content cover", () => {
     expect(messages).toEqual([]);
     // Guards the fixture itself: if the cover stops stubbing createTable the
     // rule would pass vacuously here.
-    expect(code).toContain('"createTable"');
+    expect(code).toContain('prop === "createTable"');
   });
 });

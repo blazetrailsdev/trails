@@ -27,15 +27,35 @@ export const STUBBED_DDL_METHODS = new Set(["createTable"]);
 export const BANNED_LOADER = "loadSchema";
 
 /**
- * True when `node` names a stubbed DDL emitter: either a string literal
- * (`prop === "createTable"`, the Proxy-trap form) or a non-computed object
- * property key (`{ createTable: async () => {} }`, the spy/stub-object form).
+ * True when `node` names a stubbed DDL emitter: a string literal or a
+ * non-computed object property key.
  */
 export function namesStubbedDdlMethod(node) {
   if (node.type === "Literal") return STUBBED_DDL_METHODS.has(node.value);
   if (node.type === "Identifier") return STUBBED_DDL_METHODS.has(node.name);
   return false;
 }
+
+/**
+ * True when a `"createTable"` literal sits in an *interception* position — the
+ * Proxy-trap dispatch shapes `prop === "createTable"`, `case "createTable":`,
+ * and `["createTable"].includes(prop)`.
+ *
+ * Merely mentioning the name (`migration.methodMissing("createTable")`, a test
+ * title, an SQL assertion) does not arm the rule: it would make an unrelated
+ * `loadSchema` in the same file a spurious error, and the detection here is
+ * file-scoped, so a loose match is expensive.
+ */
+export function isInterceptionPosition(node) {
+  const parent = node.parent;
+  if (!parent) return false;
+  if (parent.type === "BinaryExpression") return COMPARISONS.has(parent.operator);
+  if (parent.type === "SwitchCase") return parent.test === node;
+  if (parent.type === "ArrayExpression") return true;
+  return false;
+}
+
+const COMPARISONS = new Set(["===", "==", "!==", "!="]);
 
 /** @type {import("eslint").Rule.RuleModule} */
 const rule = {
@@ -59,7 +79,7 @@ const rule = {
 
     return {
       Literal(node) {
-        if (stubbedMethod === null && namesStubbedDdlMethod(node)) {
+        if (stubbedMethod === null && namesStubbedDdlMethod(node) && isInterceptionPosition(node)) {
           stubbedMethod = node.value;
         }
       },
