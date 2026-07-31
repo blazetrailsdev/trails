@@ -1,41 +1,27 @@
 /**
- * Default migration execution strategy — runs migrations directly.
+ * The default strategy for executing migrations. Delegates method calls
+ * to the connection adapter.
  *
  * Mirrors: ActiveRecord::Migration::DefaultStrategy
- *
- * Simply calls the migration's up/down method. A custom strategy could
- * wrap this with advisory locks to prevent concurrent migrations.
  */
 
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import type { Migration } from "../migration.js";
 import { ExecutionStrategy } from "./execution-strategy.js";
 
 export class DefaultStrategy extends ExecutionStrategy {
-  private _adapter: DatabaseAdapter | null = null;
-
-  async exec(
-    direction: "up" | "down",
-    migration: Migration,
-    adapter: DatabaseAdapter,
-  ): Promise<void> {
-    this.migration = migration;
-    this._adapter = adapter;
-    migration.connection = adapter;
-    if (direction === "up") {
-      await migration.up();
-    } else {
-      await migration.down();
-    }
+  /** @internal JS has no implicit method_missing, so Migration calls this explicitly. */
+  methodMissing(method: string, ...args: unknown[]): unknown {
+    const conn = this.connection as unknown as Record<string, unknown>;
+    return (conn[method] as (...a: unknown[]) => unknown).apply(conn, args);
   }
 
   /** @internal */
-  connection(): DatabaseAdapter {
-    // Mirrors Rails: DefaultStrategy#connection → migration.connection.
-    // _adapter is our exec()-time fallback; per-migration connection wins.
-    const conn = (this.migration as Migration | null)?.connection ?? this._adapter;
-    if (!conn)
-      throw new Error("DefaultStrategy: no adapter available (exec() has not been called)");
-    return conn;
+  respondToMissing(method: string): boolean {
+    const conn = this.connection as unknown as Record<string, unknown>;
+    return typeof conn[method] === "function";
+  }
+
+  protected get connection(): DatabaseAdapter {
+    return this.migration.connection;
   }
 }

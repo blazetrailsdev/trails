@@ -32,7 +32,6 @@ import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { migrationArConfig } from "./migration/ar-config-source.js";
-import { DefaultStrategy } from "./migration/default-strategy.js";
 import type { ExecutionStrategy } from "./migration/execution-strategy.js";
 import type { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 import { registerVersion, findVersion, CURRENT_VERSION } from "./migration/compatibility.js";
@@ -279,6 +278,8 @@ export abstract class Migration {
   protected _connectionOverride?: DatabaseAdapter;
   /** @internal Per-migration pool override — mirrors Rails' @pool ivar. */
   protected _poolOverride?: ConnectionPool;
+  /** @internal Memoized strategy — mirrors Rails' @execution_strategy ivar. */
+  private _executionStrategy?: ExecutionStrategy;
   private _recording = false;
   private _recorder = new CommandRecorder();
   private _name?: string;
@@ -1346,11 +1347,15 @@ export abstract class Migration {
       }
     } finally {
       this._connectionOverride = undefined;
+      this._executionStrategy = undefined;
     }
   }
 
   get executionStrategy(): ExecutionStrategy {
-    return new DefaultStrategy();
+    this._executionStrategy ??= new (ActiveRecord.migrationStrategy as new (
+      migration: Migration,
+    ) => ExecutionStrategy)(this);
+    return this._executionStrategy;
   }
 
   get disableDdlTransaction(): boolean {
@@ -1570,12 +1575,16 @@ export abstract class Migration {
 
   /** @internal */
   methodMissing(name: string, ...args: unknown[]): unknown {
-    const conn = this.connection as unknown as Record<string, unknown>;
-    if (typeof conn[name] !== "function") {
-      // JS has no NoMethodError; TypeError is the closest stdlib equivalent.
+    const strategy = this.executionStrategy as {
+      respondToMissing?: (name: string) => boolean;
+      methodMissing?: (name: string, ...args: unknown[]) => unknown;
+    };
+    if (strategy.respondToMissing?.(name) !== true) {
+      // Rails falls through to `super`, which raises NoMethodError. JS has no
+      // NoMethodError; TypeError is the closest stdlib equivalent.
       throw new TypeError(`undefined method '${name}' for ${this.connection.constructor.name}`);
     }
-    return (conn[name] as (...a: unknown[]) => unknown).apply(conn, args);
+    return strategy.methodMissing?.(name, ...args);
   }
 
   /** @internal */

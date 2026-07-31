@@ -12,6 +12,7 @@ import { describe, it, expect } from "vitest";
 import { MigrationContext, Migrator } from "./index.js";
 import type { MigrationProxy } from "./migration.js";
 import { Migration, IllegalMigrationNameError } from "./migration.js";
+import { DefaultStrategy } from "./migration/default-strategy.js";
 import { Base } from "./base.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { newRawTestAdapter } from "./test-adapter.js";
@@ -259,5 +260,33 @@ describe("Migration#createTable id option type", () => {
       "uuid",
       { type: "string", limit: 36 },
     ]);
+  });
+
+  // Rails routes Migration#method_missing through execution_strategy, whose
+  // method_missing forwards to migration.connection. JS has no implicit
+  // method_missing, so the forwarding pair is called explicitly.
+  describe("execution strategy", () => {
+    class StrategyMigration extends Migration {
+      override get connection(): DatabaseAdapter {
+        return { createTable: () => "hi mom!" } as unknown as DatabaseAdapter;
+      }
+      async up(): Promise<void> {}
+      async down(): Promise<void> {}
+    }
+
+    it("memoizes the configured strategy, constructed with the migration", () => {
+      const migration = new StrategyMigration();
+      expect(migration.executionStrategy).toBeInstanceOf(DefaultStrategy);
+      expect(migration.executionStrategy).toBe(migration.executionStrategy);
+    });
+
+    it("forwards unknown calls through the strategy to the connection", () => {
+      const migration = new StrategyMigration();
+      const strategy = migration.executionStrategy as DefaultStrategy;
+      expect(strategy.respondToMissing("createTable")).toBe(true);
+      expect(strategy.respondToMissing("nopeNotHere")).toBe(false);
+      expect(strategy.methodMissing("createTable")).toBe("hi mom!");
+      expect(() => migration.methodMissing("nopeNotHere")).toThrow(TypeError);
+    });
   });
 });
