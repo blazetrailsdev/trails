@@ -58,4 +58,34 @@ describe("DatabaseTasksRollbackTest", () => {
     expect(reverted).toEqual(["PrimaryOnly"]);
     expect(await schemaMigration.versions()).toEqual([]);
   });
+
+  it("rolls back off the ambient pool when no configurations are loaded", async () => {
+    const reverted: string[] = [];
+    DatabaseTasks.registerMigrations([
+      {
+        version: "1",
+        name: "Ambient",
+        migration: () =>
+          anonymousMigration(
+            "Ambient",
+            "1",
+            async () => {},
+            async () => {
+              reverted.push("Ambient");
+            },
+          ),
+      },
+    ]);
+
+    DatabaseTasks.databaseConfiguration = null;
+    await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
+    const schemaMigration = new SchemaMigration(await Base.connectionPool().leaseConnection());
+    await schemaMigration.createTable();
+    await schemaMigration.createVersion("1");
+
+    await DatabaseTasks.rollback();
+
+    expect(reverted).toEqual(["Ambient"]);
+    expect(await schemaMigration.versions()).toEqual([]);
+  });
 });
