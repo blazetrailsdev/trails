@@ -14,6 +14,19 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();
+    // MariaDB, unlike MySQL, leaves the previous statement's diagnostics area
+    // in place when the next statement reads no table: after the note-level
+    // case's `DROP TABLE IF EXISTS`, its Note 1051 is still what `SHOW
+    // WARNINGS` returns for a following `SELECT 'x'`. That breaks the
+    // warning_count-mismatch case, whose precondition (Rails states it as
+    // "SHOW WARNINGS will return []", warnings_test.rb:98) is an empty
+    // diagnostics area. Measured on mariadb:11: a bare `SELECT 'x'` does NOT
+    // clear it, while any statement with a non-degenerate FROM does — a derived
+    // table is enough, so no real-table read (and no I/O) is needed here.
+    // Rails gets this for free on MySQL and never runs the MariaDB lane;
+    // trails does, and used to get it incidentally from the global
+    // between-test reset's DDL.
+    await adapter.execute(`SELECT 1 FROM (SELECT 1) AS clear_warnings`);
   });
   afterEach(() => {
     vi.restoreAllMocks();

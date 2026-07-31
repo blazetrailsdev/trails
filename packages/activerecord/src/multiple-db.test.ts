@@ -12,7 +12,7 @@ import { Bird } from "./test-helpers/models/bird.js";
 
 describe("MultipleDbTest", () => {
   // Rails sets `self.use_transactional_tests = false`; fixtures() pins
-  // the schema/fixtures across the file (skips the global per-test reset).
+  // the schema/fixtures across the file.
   fixtures({}, { useTransactionalTests: false });
   withSecondPool();
 

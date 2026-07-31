@@ -95,10 +95,10 @@ async function personColumnNames(adp: DatabaseAdapter): Promise<string[]> {
 
 // Rails runs every migration test on `ActiveRecord::Base.connection`; ride the
 // schema-loaded primary pool established by `fixtures()` rather than a
-// sidecar `_pool` lease (RFC 0059). `fixtures()` shields the shared worker
-// DB from the global `resetTestAdapterState()`, so this file owns the per-test
-// cleanup of the bespoke tables its `MigrationContext` sub-describes create —
-// see the afterEach/afterAll below and each test's own `finally`.
+// sidecar `_pool` lease (RFC 0059). Nothing clears tables between tests, so
+// this file owns the per-test cleanup of the bespoke tables its
+// `MigrationContext` sub-describes create — see the afterEach/afterAll below
+// and each test's own `finally`.
 fixtures({}, { useTransactionalTests: false });
 
 // Mirrors migration_test.rb's teardown, which strips the scratch columns the
@@ -137,8 +137,8 @@ afterEach(async () => {
 });
 
 // Migration tests legitimately create ad-hoc tables (Rails' migration_test.rb
-// does too); with the global reset shielded they leak into the shared per-worker
-// DB, so drop each BESPOKE table by name — mirroring Rails' teardown — to avoid
+// does too); nothing clears them between tests, so they leak into the shared
+// per-worker DB. Drop each BESPOKE table by name — mirroring Rails' teardown — to avoid
 // collisions with sibling files. Canonical tables (`people`, `books`,
 // `memberships`, `values`, …) are deliberately NOT in this list: dropping a
 // canonical table would corrupt siblings that ride it.
@@ -224,8 +224,8 @@ describe("MigrationTest", () => {
     const { adapter, ctx } = await freshContext();
     ctx.tableNamePrefix = "pre_";
     ctx.tableNameSuffix = "_suf";
-    // Own the scratch tables for the whole test: with the global reset shielded
-    // by fixtures(), a leaked `pre_old_suf`/`pre_new_suf` would break the
+    // Own the scratch tables for the whole test: nothing clears tables between
+    // tests, so a leaked `pre_old_suf`/`pre_new_suf` would break the
     // create/rename below, so clear any leak up front and drop in the finally.
     await ctx.dropTable("pre_old_suf", "pre_new_suf", { ifExists: true });
     try {
@@ -310,10 +310,7 @@ async function freshAdapter(): Promise<DatabaseAdapter> {
 // ==========================================================================
 // D-1 partial conversion: columnsHash()-only tests drop their adapter assignment
 // (adapter-independent). The 3 DB-operation tests and the DDL sub-describes retain
-// freshAdapterWithPeople()/await freshContext() isolation — adding fixtures() here
-// would call pushSkipGlobalReset() and prevent the per-test DDL cleanup that the
-// MigrationContext-based tests (ReservedWordsMigrationTest, BulkAlterTable, etc.)
-// depend on. Same structural reason as transaction-instrumentation.test.ts.
+// freshAdapterWithPeople()/await freshContext() isolation.
 describe("MigrationTest", () => {
   let adapter: DatabaseAdapter;
 
@@ -770,7 +767,7 @@ describe("MigrationTest", () => {
 
   it("create table with if not exists true", async () => {
     const { ctx } = await freshContext();
-    // With the global reset shielded by fixtures(), a leaked `things` from
+    // Nothing clears tables between tests, so a leaked `things` from
     // a sibling file would make the first, non-ifNotExists create raise; clear
     // any leak up front and drop in the finally so DDL stays confined here.
     await ctx.dropTable("things", { ifExists: true });
@@ -802,8 +799,8 @@ describe("MigrationTest", () => {
 
   it("create table with indexes and if not exists true", async () => {
     const { ctx } = await freshContext();
-    // Own the scratch table for the whole test: under AR_ONE_SCHEMA the shared
-    // schema is truncated (not dropped) between tests, so a leaked `things`
+    // Own the scratch table for the whole test: nothing clears tables between
+    // tests, so a leaked `things`
     // would make the first, non-ifNotExists create raise. Clear any leak up
     // front and drop in the finally so DDL stays confined to this test.
     await ctx.dropTable("things", { ifExists: true });

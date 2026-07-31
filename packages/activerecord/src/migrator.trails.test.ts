@@ -46,8 +46,8 @@ function makeMigration(
 // resolves `Base.connection` regardless of declaration/run order.
 fixtures({}, { useTransactionalTests: false });
 
-// `fixtures({})` shields the schema_migrations / ar_internal_metadata tables
-// from the global reset, so clear them before every test to keep each case's
+// Nothing drops the schema_migrations / ar_internal_metadata tables between
+// tests, so clear them before every test to keep each case's
 // version + environment state fresh (mirrors Rails' setup/teardown, which
 // deletes all versions around every test). File-scoped because the advisory-lock
 // describe runs `migrate()` too and needs the same fresh version table.

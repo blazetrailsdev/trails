@@ -15,21 +15,21 @@ import {
 } from "./support/schema-dumping-helper.js";
 import { withPostgresqlDatetimeType } from "./support/with-postgresql-datetime-type.js";
 
-// The first describe uses `fixtures({})` (canonical schema + reset shield);
-// the later bespoke-table describes deliberately keep the global per-test reset,
-// so they only need `Base.connection` *established* — which the worker setup
-// file already did, as Rails' `cases/helper.rb` does for the whole process.
+// The first describe uses `fixtures({})` (canonical schema); the later
+// bespoke-table describes only need `Base.connection` *established* — which the
+// worker setup file already did, as Rails' `cases/helper.rb` does for the whole
+// process.
 
 // Faithful port of the Rails cases that dump the *standard loaded schema*
 // (`standard_dump` / `dump_table_schema "companies"`). Rails loads `schema.rb`;
 // we ride the canonical `TEST_SCHEMA` — the trails mirror of `schema.rb` —
-// which `fixtures({})` materializes on the shared worker DB and shields from
-// the per-test reset, so `Base.adapter` already carries every canonical table.
+// which `fixtures({})` materializes on the shared worker DB, so `Base.adapter`
+// already carries every canonical table.
 // No per-test ad-hoc tables. Split into its own describe (no bespoke
 // table-building cases) so nothing `force`-recreates a canonical table out from
 // under the dump.
-// Each full `standard_dump` introspects all ~330 canonical tables (the
-// truncate-based global reset in PR #4504 leaves them in place), running
+// Each full `standard_dump` introspects all ~330 canonical tables (boot-laid
+// once per worker and never dropped between tests), running
 // ~4.1–4.8s on a single local PG worker — already near the 5s per-test vitest
 // default. Under CI's 6-worker PG fork load one contention spike tips them over.
 // Give only the genuine full-dump cases explicit headroom via the options form
@@ -361,10 +361,12 @@ describe("SchemaDumperTest", () => {
 // (adapter-specific `defaults`/`bigint_array`/`binary_fields`/`key_tests`/… not
 // in `schema.rb`, decimal precision/integer limit that SQLite reflection can't
 // recover, table-name prefix/suffix migrations, etc.). Kept on the plain
-// per-test reset (no `fixtures({})`) so their bespoke tables are dropped
-// between tests. The `companies` index-dump cases have moved to the canonical
+// per-test reset (no `fixtures({})`). The `companies` index-dump cases have moved to the canonical
 // block above (RFC 0048 IndexSpec extension); the rest await the missing
 // adapter tables / reflection fixes — tracked as follow-up stories under RFC 0048.
+// Nothing drops their bespoke tables between tests, so each case that would
+// collide clears its own up front and the file-level `afterAll` below drops the
+// rest.
 describe("SchemaDumperTest", () => {
   let ctx: MigrationContext;
   beforeEach(() => {
@@ -669,8 +671,8 @@ describe("SchemaDumperTest", () => {
         const output = await SchemaDumper.dumpTableSchema(adapter, "schema_dump_probe");
         expect(output).toContain('createEnum("enum_with_comma", ["value1","value,2","value3"])');
       } finally {
-        // drop-all-tables (per-test reset) does not drop enum types — clean up
-        // explicitly so the type does not leak onto the shared worker DB.
+        // Nothing drops enum types between tests — clean up explicitly so the
+        // type does not leak onto the shared worker DB.
         await (adapter as any).dropEnum("enum_with_comma", { ifExists: true });
       }
     },

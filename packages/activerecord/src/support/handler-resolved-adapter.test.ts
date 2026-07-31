@@ -10,7 +10,6 @@
  */
 import { describe, it, afterAll, beforeAll, expect } from "vitest";
 import { Base } from "../base.js";
-import { skipGlobalResetForFile } from "./skip-global-reset.js";
 
 class HandlerResolvedPost extends Base {
   static {
@@ -29,8 +28,6 @@ class HandlerResolvedComment extends Base {
 }
 
 describe("handler-resolved adapter (Phase D-0)", () => {
-  skipGlobalResetForFile();
-
   // Table laid via Base.connection — the connection itself resolves through
   // Base.connectionHandler, the Rails-shape resolution path D-1..N files use.
   beforeAll(async () => {

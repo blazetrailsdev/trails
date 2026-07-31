@@ -4,12 +4,10 @@
  * (`activerecord/lib/active_record/test_fixtures.rb:113` and `:146`). Split into its own
  * module for size only; see the header of `../test-fixtures.ts`.
  */
-import { beforeAll, beforeEach, afterEach, afterAll, type TaskContext } from "vitest";
+import { beforeEach, afterEach, type TaskContext } from "vitest";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import { resetTestAdapterState } from "../test-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { realPool } from "../connection-adapters/abstract/connection-pool.js";
-import { popSkipGlobalReset, pushSkipGlobalReset } from "../support/skip-global-reset.js";
 
 interface TxnHost {
   transactionManager: {
@@ -125,11 +123,9 @@ function pooledAdapterPool(adapter: TransactionalFixturesAdapter): ConnectionPoo
  * Mirrors Rails' transactional fixtures (`ActiveRecord::TestFixtures`:
  * `setup_fixtures` opens a transaction; `teardown_fixtures` rolls back).
  *
- * Files calling this helper opt out of the global `resetTestAdapterState`
- * beforeEach (in `cases/helper.ts`) for their duration, so a one-time
- * schema set up in `beforeAll` survives across tests. The helper runs
- * `resetTestAdapterState` in its own `afterAll` so other files are
- * unaffected.
+ * Schema set up once in `beforeAll` survives across the file's tests: nothing
+ * clears tables between them, exactly as in Rails, where every suite rides the
+ * single schema `db:test:prepare` laid down.
  *
  * Caller contract:
  *   - Set up schema in `beforeAll` *before* calling this helper, or inside
@@ -240,17 +236,6 @@ export function withTransactionalFixtures(
   // test body are not pinned. Closing this gap requires adding a notification
   // hook to ConnectionPool#newConnection (production code change).
   let _txnOpenedForTest = false;
-
-  beforeAll(() => {
-    pushSkipGlobalReset();
-  });
-
-  afterAll(async () => {
-    // Only reset when the outermost scope exits, mirroring Rails
-    // ConnectionPool#unpin_connection! finalizing at depth zero
-    // (connection_pool.rb:347).
-    if (popSkipGlobalReset() === 0) await resetTestAdapterState();
-  });
 
   beforeEach(async (ctx: TaskContext) => {
     const adapter = getAdapter();

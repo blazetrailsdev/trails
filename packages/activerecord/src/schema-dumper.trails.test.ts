@@ -363,8 +363,8 @@ describe("SchemaDumperAdapterTest", () => {
 
   // Drop the real tables these adapter-backed tests create on the shared
   // per-worker DB so they don't collide with sibling files under parallel forks.
-  // `fixtures({})` disables the global per-test reset, so drop them per test
-  // (not just in afterAll) to keep the shared-DB exposure window one test wide.
+  // Nothing drops them between tests, so drop them per test (not just in
+  // afterAll) to keep the shared-DB exposure window one test wide.
   afterEach(async () => {
     const cleanupCtx = new MigrationContext(Base.connection);
     const o = { ifExists: true } as const;

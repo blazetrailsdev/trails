@@ -431,7 +431,7 @@ describe("ConnectionPool schema cache", () => {
   // schema-cache tests then reflect the canonical `posts` table. `fixtures`
   // opts into the canonical TEST_SCHEMA and — non-transactionally, so the DDL
   // commits and is visible across the separate pool-under-test connections —
-  // materializes `posts` once per worker, shielded from the global reset. This
+  // materializes `posts` once per worker. This
   // is trails' stand-in for Rails' ambiently-loaded schema.rb (Rails only
   // hand-stubs `posts` in the `in_memory_db?` branch, where no schema exists).
   fixtures(["posts"], { useTransactionalTests: false });

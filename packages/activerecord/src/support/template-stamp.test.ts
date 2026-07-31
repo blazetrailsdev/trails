@@ -54,7 +54,7 @@ describe.skipIf(!runToken)("boot fast path stamp", () => {
     // drops `ar_internal_metadata` along with the other bookkeeping tables, so
     // without the re-stamp that arm ends with, the stamp is single-use per
     // database and every recycled worker pays the full purge+reload. Running
-    // the arm here is safe: it is the same reset the suite runs between tests,
+    // the arm here is safe: it is the same reset the suite runs at worker boot,
     // and it re-lays the adapter-specific tables it drops.
     const connection = await Base.leaseConnection();
     await resetTestTables(connection);
