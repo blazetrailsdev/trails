@@ -457,11 +457,6 @@ function _relationCtorFor(this: void, model: typeof Base): new (m: typeof Base, 
  *
  * The string sentinel is `":all"` (with leading colon) — a bare `"all"`
  * would collide with a legitimate string/slug primary-key value.
- *
- * Raises the real `ArgumentError` class rather than the `argumentError()`
- * name-stamped `Error` used elsewhere in this file: `Relation#update` routes
- * its by-id form here (relation.rb:620-636), and the ported relation tests
- * assert `instanceof ArgumentError`.
  */
 async function performClassUpdate(
   this: typeof Base,

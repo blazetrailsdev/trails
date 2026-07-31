@@ -6002,10 +6002,6 @@ export class Relation<T extends Base> {
       }
       return records;
     }
-    // Rails' by-id form is `model.update(id, attributes)` — the class entry
-    // point owns the id-shape handling (arrays, CPK tuples, the
-    // "you passed a Base instance" ArgumentError), so it must not be
-    // reimplemented here as find + record.update.
     return (await (this.model as any).update(id, attrs ?? {})) as T;
   }
 
@@ -6023,7 +6019,6 @@ export class Relation<T extends Base> {
       }
       return records;
     }
-    // See update(): the by-id form dispatches to `model.update!`.
     return (await (this.model as any).updateBang(id, attrs ?? {})) as T;
   }
 
