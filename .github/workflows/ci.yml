@@ -23,7 +23,7 @@ on:
     # `ready_for_review` is what starts the draft-deferred PG/MariaDB suites;
     # without it a PR can reach ready with no adapter coverage and no event
     # left to trigger it.
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened, labeled, ready_for_review]
   schedule:
     # Weekly post-merge sweep so slow regressions can't hide between
     # parity-relevant PRs. Monday 06:00 UTC is off-peak on an Ubuntu runner.
