@@ -17,6 +17,7 @@
 import { describe, it, expect } from "vitest";
 import "../sqlite/better-sqlite3.js";
 import { Base } from "../base.js";
+import { bootOutcome } from "./boot-outcome.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import { InternalMetadata } from "../internal-metadata.js";
 import {
@@ -64,5 +65,20 @@ describe.skipIf(!runToken)("boot fast path stamp", () => {
     await loadAdapterSpecificSchema(connection);
     await stampCanonicalSchema(connection);
     expect(await canonicalSchemaUpToDate(await Base.leaseConnection())).toBe(true);
+  });
+});
+
+describe.skipIf(!runToken)("boot outcome", () => {
+  it("a boot that took the fast path leaves the database stamped", () => {
+    // The production call site, which the probe above can only replay: this is
+    // the boot's own record of what it left behind (`support/boot-outcome.ts`),
+    // taken before any test file's reset could clear the stamp. Deleting the
+    // `stampCanonicalSchema` call at the end of `test-setup-dy.ts`'s fast-path
+    // arm turns this red on every lane — with globalSetup stamping the sqlite
+    // template, the PG slots and the MySQL slot DBs, a worker's first boot
+    // takes the fast path.
+    const outcome = bootOutcome();
+    expect(outcome, "boot must record which arm it took").not.toBeNull();
+    expect(outcome?.stamped, `boot arm ${outcome?.arm} must leave the database stamped`).toBe(true);
   });
 });
