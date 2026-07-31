@@ -5990,16 +5990,6 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#update
    */
   async update(id?: unknown, attrs?: Record<string, unknown>): Promise<T | T[]> {
-    if (
-      id !== null &&
-      typeof id === "object" &&
-      attrs !== undefined &&
-      "_isActiveRecordBase" in ((id as any).constructor ?? {})
-    ) {
-      throw new ArgumentError(
-        `You are passing an instance of ActiveRecord::Base to \`update\`. Please pass the id of the object by calling \`.id\`.`,
-      );
-    }
     if (id === undefined || (typeof id === "object" && id !== null && attrs === undefined)) {
       // update(attrs) form — update all matching records
       const updates = (id ?? {}) as Record<string, unknown>;
@@ -6009,9 +5999,7 @@ export class Relation<T extends Base> {
       }
       return records;
     }
-    const record = await this.find(id);
-    await record.update(attrs ?? {});
-    return record;
+    return (await this.model.update(id, attrs ?? {})) as T;
   }
 
   /**
@@ -6028,9 +6016,7 @@ export class Relation<T extends Base> {
       }
       return records;
     }
-    const record = await this.find(id);
-    await record.updateBang(attrs ?? {});
-    return record;
+    return (await this.model.updateBang(id, attrs ?? {})) as T;
   }
 
   /**
@@ -6580,7 +6566,7 @@ export class Relation<T extends Base> {
       typeof optionsOrCallback === "function" ? null : (optionsOrCallback.allQueries ?? null);
 
     const modelClass = this.model as any;
-    const registry = ScopeRegistry.instance();
+    const registry = this.model.scopeRegistry();
 
     // Rails: global_scope? && all_queries == false → raise.
     if (this.isGlobalScope(registry) && allQueries === false) {
@@ -7014,7 +7000,7 @@ export class Relation<T extends Base> {
    */
   _execScope(fn: (rel: Relation<T>, ...args: unknown[]) => unknown, ...args: unknown[]): unknown {
     this._delegateToModel = true;
-    const registry = ScopeRegistry.instance();
+    const registry = this.model.scopeRegistry();
     try {
       return this._scoping(null, registry, () => fn(this, ...args) || this);
     } finally {

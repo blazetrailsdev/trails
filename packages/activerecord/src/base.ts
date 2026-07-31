@@ -28,6 +28,7 @@ import type {
   SignedGlobalID as SignedGlobalIDType,
 } from "@blazetrails/globalid/signed-global-id";
 import {
+  ArgumentError,
   Model,
   Type,
   pushPendingDecorator,
@@ -492,7 +493,7 @@ async function performClassUpdate(
     // update(attrs) — apply to every record in the current scope.
     const candidate = attrs ?? idOrAttrs;
     if (!isPlainObject(candidate)) {
-      throw argumentError(
+      throw new ArgumentError(
         "update: attributes must be a plain object (missing or invalid attrs for the :all / nil form)",
       );
     }
@@ -505,7 +506,7 @@ async function performClassUpdate(
     if (idOrAttrs.some((i) => i instanceof Base)) {
       // Rails raises the *array*-specific message here (distinct from the
       // single-instance message below), pointing at `pluck(:id)`/`map(&:id)`.
-      throw argumentError(
+      throw new ArgumentError(
         `You are passing an array of ActiveRecord::Base instances to \`${
           bang ? "update!" : "update"
         }\`. Please pass the ids of the objects by calling \`pluck(:id)\` or \`map(&:id)\`.`,
@@ -521,12 +522,12 @@ async function performClassUpdate(
       // user gets a readable error instead of UnknownAttributeError on
       // numeric-keyed forwarding.
       if (Array.isArray(attrs)) {
-        throw argumentError(
+        throw new ArgumentError(
           `${this.name}.update: parallel updates for composite PKs require an array-of-tuples first arg, e.g. update([[k1a,k2a],[k1b,k2b]], [attrsA, attrsB])`,
         );
       }
       if (!isPlainObject(attrs)) {
-        throw argumentError(`${this.name}.update: attributes must be a plain object`);
+        throw new ArgumentError(`${this.name}.update: attributes must be a plain object`);
       }
       const record = await this.find(idOrAttrs);
       await run(record, attrs);
@@ -537,11 +538,13 @@ async function performClassUpdate(
     if (idOrAttrs.length === 0) return [];
     const attrsArr = attrs as Record<string, unknown>[];
     if (!Array.isArray(attrsArr) || attrsArr.length !== idOrAttrs.length) {
-      throw argumentError("update(ids, attrs): ids and attrs must be arrays of the same length");
+      throw new ArgumentError(
+        "update(ids, attrs): ids and attrs must be arrays of the same length",
+      );
     }
     for (const a of attrsArr) {
       if (!isPlainObject(a)) {
-        throw argumentError(`${this.name}.update: every attrs entry must be a plain object`);
+        throw new ArgumentError(`${this.name}.update: every attrs entry must be a plain object`);
       }
     }
     // Mirror Rails' `id.map { |one_id| find(one_id) }.each_with_index { … }`:
@@ -560,7 +563,7 @@ async function performClassUpdate(
   }
 
   if (idOrAttrs instanceof Base) {
-    throw argumentError(
+    throw new ArgumentError(
       `You are passing an instance of ActiveRecord::Base to \`${
         bang ? "update!" : "update"
       }\`. Please pass the id of the object by calling \`.id\`.`,
@@ -568,7 +571,7 @@ async function performClassUpdate(
   }
 
   if (!isPlainObject(attrs)) {
-    throw argumentError(`${this.name}.update: attributes must be a plain object`);
+    throw new ArgumentError(`${this.name}.update: attributes must be a plain object`);
   }
   const record = await this.find(idOrAttrs);
   await run(record, attrs);
