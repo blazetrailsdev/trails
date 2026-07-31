@@ -73,7 +73,7 @@ interface ReferentialIntegrityHost extends ReferentialIntegritySqlHost {
 //
 // Rails toggles over the full `tables` set because its fixture load is a single
 // bulk `insert_fixtures_set` per run. trails fires this wrapper per fixture-load
-// and per truncate event (~84k times under RFC 0060's per-test reset), so an
+// and per truncate event (~84k times across a suite run), so an
 // ALTER over every canonical table dominates PG DDL cost. Callers that know the
 // exact tables they touch pass `scopedTables`; disabling triggers on just those
 // tables is sufficient because a table's FK-check triggers only fire when that

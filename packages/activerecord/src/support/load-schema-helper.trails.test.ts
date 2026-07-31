@@ -1,12 +1,12 @@
 /**
  * trails-only guard on the boot-laid table snapshot `support/drop-all-tables.ts`
- * takes: the set its between-test reset TRUNCATEs rather than DROPs.
+ * takes: the set its boot reset TRUNCATEs rather than DROPs.
  *
  * Rails needs no such set — `load_schema_helper.rb` runs the `.rb` schema file
- * and nothing between tests drops schema tables. trails' reset does, so a table
- * the `<adapter>_specific_schema.rb` arm lays but the snapshot misses is
- * silently dropped before the first test of every file. That direction is what
- * this file catches, on whichever lane is running.
+ * and nothing drops schema tables afterwards. trails' boot reset does, so a
+ * table the `<adapter>_specific_schema.rb` arm lays but the snapshot misses is
+ * silently dropped on a worker recycled onto an already-loaded database. That
+ * direction is what this file catches, on whichever lane is running.
  */
 import { describe, expect, it } from "vitest";
 import { Base } from "../base.js";

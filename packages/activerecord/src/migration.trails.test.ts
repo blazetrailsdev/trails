@@ -78,8 +78,8 @@ describe("MigrationTest", () => {
 
   it("migration context with async migration() proxy", async () => {
     const adapter = Base.connection;
-    // schema_migrations is shielded from the global reset by `fixtures({})`,
-    // so start from a clean versions table to assert currentVersion === 1.
+    // Nothing drops schema_migrations between tests, so start from a clean
+    // versions table to assert currentVersion === 1.
     await new SchemaMigration(adapter).dropTable();
     const migrations: MigrationProxy[] = [
       {
