@@ -27,6 +27,7 @@ import {
   SchemaStatements,
   assertSchemaAdapter,
   type JoinTableOptions,
+  type ValidateConstraintStatements,
 } from "./connection-adapters/abstract/schema-statements.js";
 import { CommandRecorder } from "./migration/command-recorder.js";
 import { SchemaMigration } from "./schema-migration.js";
@@ -773,11 +774,13 @@ export abstract class Migration {
     tableName = this._pt(tableName);
     await this.schema.removeCheckConstraint(tableName, expressionOrOptions, options);
   }
+
   async validateCheckConstraint(
     tableName: string,
     nameOrOptions: string | { name: string },
   ): Promise<void> {
-    await (this.connection as any).validateCheckConstraint(this._pt(tableName), nameOrOptions);
+    const connection = this.connection as DatabaseAdapter & ValidateConstraintStatements;
+    await connection.validateCheckConstraint(this._pt(tableName), nameOrOptions);
   }
 
   async validateForeignKey(
@@ -787,7 +790,8 @@ export abstract class Migration {
   ): Promise<void> {
     const toTable = typeof toTableOrOptions === "string" ? toTableOrOptions : undefined;
     const opts = typeof toTableOrOptions === "object" ? toTableOrOptions : (options ?? undefined);
-    await (this.connection as any).validateForeignKey(this._pt(fromTable), toTable, opts);
+    const connection = this.connection as DatabaseAdapter & ValidateConstraintStatements;
+    await connection.validateForeignKey(this._pt(fromTable), toTable, opts);
   }
 
   async changeColumnComment(

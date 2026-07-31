@@ -191,6 +191,26 @@ export type JoinTableOptions = {
   as?: string;
 };
 
+/**
+ * Constraint-validation statements that only adapters supporting
+ * `supportsValidateConstraints` (PostgreSQL) implement. Rails' `Migration`
+ * reaches them through `method_missing`, which is untyped in Ruby; declaring
+ * them here lets our delegations narrow to a real type instead of `any`, so
+ * signature drift on the adapter fails typecheck at the call site.
+ */
+export interface ValidateConstraintStatements {
+  validateConstraint(tableName: string, constraintName: string): Promise<void>;
+  validateCheckConstraint(
+    tableName: string,
+    nameOrOptions: string | { name: string },
+  ): Promise<void>;
+  validateForeignKey(
+    fromTable: string,
+    toTable?: string,
+    options?: Omit<ForeignKeyLookupOptions, "toTable">,
+  ): Promise<void>;
+}
+
 /** @internal */
 function expandIndexOption<T>(opt: Record<string, T> | T, columns: string[]): Record<string, T> {
   if (typeof opt === "object" && opt !== null) return opt as Record<string, T>;
