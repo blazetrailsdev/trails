@@ -334,6 +334,11 @@ const DELEGATION_MAX_CALLS = 3;
  * also match, which is harmless — unioning its own calls into its own call-set
  * is a no-op.
  */
+const NO_GRAPH_CALLS: ReturnType<typeof partitionNegatedCalls> = {
+  calls: new Set(),
+  negated: new Set(),
+};
+
 export function isDelegatingWrapper(tsName: string, tsCalls: Set<string>): boolean {
   return tsCalls.has(tsName) && tsCalls.size <= DELEGATION_MAX_CALLS;
 }
@@ -1774,9 +1779,7 @@ export function main() {
           sameFileCalls,
           reached,
         );
-        const graphCalls = wideCalls
-          ? includeGraphCalls(tsFile, tsName)
-          : { calls: new Set<string>(), negated: new Set<string>() };
+        const graphCalls = wideCalls ? includeGraphCalls(tsFile, tsName) : NO_GRAPH_CALLS;
         const tsCalls =
           graphCalls.calls.size === 0 ? effective : new Set([...effective, ...graphCalls.calls]);
         // A body compared against a helper's calls inherits its negated ones
