@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { mkdtemp, mkdir, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { Base, DatabaseConfigurations, DatabaseTasks } from "@blazetrails/activerecord";
+import { Base, DatabaseConfigurations, DatabaseTasks, UrlConfig } from "@blazetrails/activerecord";
 import { loadDatabaseConfig } from "./db-helpers.js";
 import {
   environmentDbConfig,
@@ -47,6 +47,17 @@ describe("ArEnvironmentTest", () => {
     );
     await loadDatabaseConfig(root);
     expect(environmentDbConfig("test")?.database).toBe(join(root, "db", "test.sqlite3"));
+  });
+
+  it("expands a url-style sqlite config without flattening it to a HashConfig", () => {
+    DatabaseTasks.databaseConfiguration = normalizeSqlitePaths(
+      DatabaseConfigurations.fromEnv({ test: { adapter: "sqlite3", url: "db/test.sqlite3" } }),
+      "/project",
+    );
+    const config = environmentDbConfig("test");
+    expect(config).toBeInstanceOf(UrlConfig);
+    expect((config as UrlConfig).url).toBe("db/test.sqlite3");
+    expect(config?.database).toBe(join("/project", "db", "test.sqlite3"));
   });
 
   it("leaves absolute and in-memory sqlite databases untouched", async () => {
