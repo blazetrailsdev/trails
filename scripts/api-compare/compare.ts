@@ -106,6 +106,7 @@ import {
   displayLiteral,
 } from "./literals.js";
 import { isSourceUnported } from "./unported-files.js";
+import { buildIncludeGraph, includeGraphCallSets, includeGraphEntities } from "./include-graph.js";
 import {
   JS_ENUMERABLE_ALIASES,
   jsEnumerableAliases,
@@ -334,6 +335,11 @@ const DELEGATION_MAX_CALLS = 3;
  * also match, which is harmless — unioning its own calls into its own call-set
  * is a no-op.
  */
+const NO_GRAPH_CALLS: ReturnType<typeof partitionNegatedCalls> = {
+  calls: new Set(),
+  negated: new Set(),
+};
+
 export function isDelegatingWrapper(tsName: string, tsCalls: Set<string>): boolean {
   return tsCalls.has(tsName) && tsCalls.size <= DELEGATION_MAX_CALLS;
 }
@@ -1386,6 +1392,19 @@ export function main() {
       sameFilePartitions.set(file, byName);
       return byName;
     };
+    const includeGraph = buildIncludeGraph(
+      tsPkg ? [...Object.values(tsPkg.classes), ...Object.values(tsPkg.modules)] : [],
+      tsPkg?.fileFunctions ?? {},
+    );
+    const graphEntities = new Map<string, ClassInfo[]>();
+    const includeGraphCalls = (tsFile: string, tsName: string): PartitionedCalls => {
+      let entities = graphEntities.get(tsFile);
+      if (!entities) {
+        entities = includeGraphEntities(tsFile, includeGraph);
+        graphEntities.set(tsFile, entities);
+      }
+      return includeGraphCallSets(entities, tsName, includeGraph);
+    };
     const recordTsParams = (m: MethodInfo, file = m.file ?? "") => {
       const sigs = tsParamsByName.get(m.name) ?? [];
       sigs.push(m.params);
@@ -1855,13 +1874,16 @@ export function main() {
         const sameFile = sameFilePartition(tsFile);
         const sameFileCalls = (n: string) => sameFile.get(n)?.calls;
         const reached = reachedSameFileMethods(tsName, own.calls, sameFileCalls);
-        const tsCalls = effectiveTsCalls(
+        const effective = effectiveTsCalls(
           tsName,
           own.calls,
           (n) => tsCallsByName.get(n),
           sameFileCalls,
           reached,
         );
+        const graphCalls = wideCalls ? includeGraphCalls(tsFile, tsName) : NO_GRAPH_CALLS;
+        const tsCalls =
+          graphCalls.calls.size === 0 ? effective : new Set([...effective, ...graphCalls.calls]);
         // A body compared against a helper's calls inherits its negated ones
         // too, or the helper's `!xs.includes(y)` would not count — same for a
         // wrapper and its delegate.
@@ -1872,6 +1894,7 @@ export function main() {
         if (isDelegatingWrapper(tsName, own.calls)) {
           for (const c of tsNegatedCallsByName.get(tsName) ?? []) negatedTsCalls.add(c);
         }
+        for (const c of graphCalls.negated) negatedTsCalls.add(c);
         callsCompared++;
         const missing = significantMissingCalls(
           rubyName,
