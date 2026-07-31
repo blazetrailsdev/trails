@@ -6,7 +6,7 @@ import { join } from "path";
 export const MIGRATION_BODY = `\
 import { Migration } from "@blazetrails/activerecord";
 
-export default class CreateUsers extends Migration {
+export class AddUsersTable extends Migration {
   async up() {
     await this.connection.createTable("users", (t) => {
       t.string("name");
