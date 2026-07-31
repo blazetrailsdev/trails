@@ -84,6 +84,54 @@ describe("Migrator trails extensions", () => {
     await expect(new Migrator(adapter, list()).down(0)).resolves.toEqual([]);
   });
 
+  it("migrate to the current version runs an unapplied lower migration", async () => {
+    // Rails' `migrate` else-arm sends target == current_version to `up(target)`,
+    // whose runnable is `migrations[start..finish].reject { ran? }`
+    // (migration.rb:1233-1244) — an unapplied migration below an already-applied
+    // target still runs.
+    const ran: string[] = [];
+    const m1 = (): MigrationProxy =>
+      makeMigration("1", "M1", async () => {
+        ran.push("1");
+      });
+    const m2 = (): MigrationProxy =>
+      makeMigration("2", "M2", async () => {
+        ran.push("2");
+      });
+
+    await new Migrator(adapter, [m2()]).up();
+    expect(ran).toEqual(["2"]);
+
+    ran.length = 0;
+    await new Migrator(adapter, [m1(), m2()]).migrate(2);
+    expect(ran).toEqual(["1"]);
+  });
+
+  it("migrate returns [] when both the current and target version are 0", async () => {
+    const ran: string[] = [];
+    const migrator = new Migrator(adapter, [
+      makeMigration("0", "M0", async () => {
+        ran.push("0");
+      }),
+    ]);
+    await expect(migrator.migrate(0)).resolves.toEqual([]);
+    expect(ran).toEqual([]);
+  });
+
+  it("migrate applies its block by selecting the migrations handed to the per-run Migrator", async () => {
+    const ran: string[] = [];
+    const migrator = new Migrator(adapter, [
+      makeMigration("1", "M1", async () => {
+        ran.push("1");
+      }),
+      makeMigration("2", "M2", async () => {
+        ran.push("2");
+      }),
+    ]);
+    await migrator.migrate(null, (m) => m.version === "2");
+    expect(ran).toEqual(["2"]);
+  });
+
   it("down does not stamp the environment", async () => {
     // Rails' record_environment returns early when down? (migration.rb:1511).
     const migrator = new Migrator(adapter, [makeMigration("1", "M1")], { environment: "test" });

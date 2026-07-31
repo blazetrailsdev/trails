@@ -2211,29 +2211,30 @@ export class Migrator {
    */
   async migrate(
     targetVersion?: number | string | null,
-    filter?: (m: MigrationProxy) => boolean,
+    block?: (m: MigrationProxy) => boolean,
   ): Promise<MigrationProxy[]> {
-    let ran: MigrationProxy[] = [];
-    await this._withAdvisoryLock(async () => {
-      await this._ensureSchemaTable();
+    if (targetVersion === undefined || targetVersion === null) return this.up(null, block);
 
-      if (targetVersion !== undefined && targetVersion !== null) {
-        if (this._invalidTarget(targetVersion)) {
-          throw new UnknownMigrationVersionError(targetVersion);
-        }
-        this._validateTargetVersion(targetVersion);
-        const target = BigInt(targetVersion);
-        const current = BigInt(await this.currentVersion());
-        if (target > current) {
-          ran = await this._migrateUp(targetVersion, filter);
-        } else if (target < current) {
-          ran = await this._migrateDown(targetVersion, filter);
-        }
-      } else {
-        ran = await this._migrateUp(null, filter);
-      }
-    });
-    return ran;
+    // Ruby compares `current_version > target_version` directly; the target may
+    // reach us as a string, so reject a non-version target before widening it.
+    if (this._invalidTarget(targetVersion)) {
+      throw new UnknownMigrationVersionError(targetVersion);
+    }
+    this._validateTargetVersion(targetVersion);
+
+    const target = BigInt(targetVersion);
+    const current = BigInt(await this.currentVersion());
+    if (current === BigInt(0) && target === BigInt(0)) return [];
+    if (current > target) return this.down(targetVersion, block);
+    return this.up(targetVersion, block);
+  }
+
+  /**
+   * The migration list handed to the per-run Migrator: Rails' `migrations` when
+   * no block is given, `migrations.select(&block)` when one is.
+   */
+  private _selectedMigrations(block?: (m: MigrationProxy) => boolean): MigrationProxy[] {
+    return block ? this._migrations.filter(block) : this._migrations;
   }
 
   /**
@@ -2243,10 +2244,13 @@ export class Migrator {
    *
    * @internal
    */
-  async up(targetVersion?: number | string | null): Promise<MigrationProxy[]> {
+  async up(
+    targetVersion?: number | string | null,
+    block?: (m: MigrationProxy) => boolean,
+  ): Promise<MigrationProxy[]> {
     const migrator = new Migrator(
       this._adapter,
-      this._migrations,
+      this._selectedMigrations(block),
       this._runOptions("up", targetVersion ?? null),
     );
     return migrator._withAdvisoryLock(() => migrator.migrateWithoutLock());
@@ -2259,10 +2263,13 @@ export class Migrator {
    *
    * @internal
    */
-  async down(targetVersion?: number | string | null): Promise<MigrationProxy[]> {
+  async down(
+    targetVersion?: number | string | null,
+    block?: (m: MigrationProxy) => boolean,
+  ): Promise<MigrationProxy[]> {
     const migrator = new Migrator(
       this._adapter,
-      this._migrations,
+      this._selectedMigrations(block),
       this._runOptions("down", targetVersion ?? null),
     );
     return migrator._withAdvisoryLock(() => migrator.migrateWithoutLock());
@@ -2837,10 +2844,7 @@ export class Migrator {
     return migrator._withAdvisoryLock(() => migrator.runWithoutLock());
   }
 
-  private async _migrateUp(
-    targetVersion: number | string | null,
-    filter?: (m: MigrationProxy) => boolean,
-  ): Promise<MigrationProxy[]> {
+  private async _migrateUp(targetVersion: number | string | null): Promise<MigrationProxy[]> {
     if (targetVersion !== null) this._validateTargetVersion(targetVersion);
     const target = targetVersion !== null ? BigInt(targetVersion) : null;
     const applied = await this._appliedVersions();
@@ -2849,17 +2853,13 @@ export class Migrator {
     for (const proxy of this._migrations) {
       if (applied.has(proxy.version)) continue;
       if (target !== null && BigInt(proxy.version) > target) break;
-      if (filter && !filter(proxy)) continue;
       await this._runMigration(proxy, "up");
       ran.push(proxy);
     }
     return ran;
   }
 
-  private async _migrateDown(
-    targetVersion: number | string | null,
-    filter?: (m: MigrationProxy) => boolean,
-  ): Promise<MigrationProxy[]> {
+  private async _migrateDown(targetVersion: number | string | null): Promise<MigrationProxy[]> {
     // A null target means "revert everything" (Rails: a `:down` Migrator with no
     // target_version), which — unlike `down(0)` — also reverts a version-0
     // migration.
@@ -2868,7 +2868,6 @@ export class Migrator {
     const applied = await this._appliedVersions();
     const toRevert = this._migrations
       .filter((m) => applied.has(m.version) && (target === null || BigInt(m.version) > target))
-      .filter((m) => !filter || filter(m))
       .reverse();
 
     for (const proxy of toRevert) {
