@@ -159,3 +159,27 @@ describe("SQLite3Adapter pragmas option", () => {
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("unsafe characters"));
   });
 });
+
+describe("SQLite3 databaseExists", () => {
+  it("answers true for an in-memory adapter without connecting", async () => {
+    const a = new BetterSQLite3Adapter(":memory:");
+    expect(await a.databaseExists()).toBe(true);
+    await a.close();
+  });
+
+  it("answers from the file the driver opens, not a cached handle", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const os = await import("os");
+    const dbPath = path.join(os.tmpdir(), `sqlite-exists-instance-${Date.now()}.db`);
+    const a = new BetterSQLite3Adapter(dbPath);
+    try {
+      expect(await a.databaseExists()).toBe(true);
+      fs.rmSync(dbPath, { force: true });
+      expect(await a.databaseExists()).toBe(false);
+    } finally {
+      await a.close();
+      fs.rmSync(dbPath, { force: true });
+    }
+  });
+});

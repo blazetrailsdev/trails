@@ -73,7 +73,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const a = new BetterSQLite3Adapter(dbPath);
     try {
       expect(await BetterSQLite3Adapter.databaseExists({ database: dbPath })).toBe(true);
-      expect(await a.databaseExists()).toBe(true);
     } finally {
       await a.close();
       fs.rmSync(dbPath, { force: true });
@@ -82,9 +81,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
 
   it("database exists returns true for an in memory db", async () => {
     expect(await BetterSQLite3Adapter.databaseExists({ database: ":memory:" })).toBe(true);
-    const memAdapter = new BetterSQLite3Adapter(":memory:");
-    expect(await memAdapter.databaseExists()).toBe(true);
-    await memAdapter.close();
   });
 
   it("connect with url", async () => {

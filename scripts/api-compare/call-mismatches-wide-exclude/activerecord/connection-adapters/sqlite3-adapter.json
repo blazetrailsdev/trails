@@ -149,6 +149,13 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
+    "rubyName": "database_exists?",
+    "call": "exist?",
+    "reason": "Rails' File.exist? is spelled getFs().exists() in trails — same call, different name."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "dbconsole",
     "call": "database_cli",
     "reason": "Rails reads the cli name only to pass it to `find_cmd_and_exec` (sqlite3_adapter.rb:51); that PTY exec is Ruby-only and unported, so our `dbconsole` returns the arg list and never needs the lookup."
