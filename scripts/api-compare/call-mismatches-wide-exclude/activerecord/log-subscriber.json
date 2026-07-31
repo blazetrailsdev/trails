@@ -24,21 +24,7 @@
     "package": "activerecord",
     "tsFile": "log-subscriber.ts",
     "rubyName": "sql",
-    "call": "debug",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "log-subscriber.ts",
-    "rubyName": "sql",
     "call": "round",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "log-subscriber.ts",
-    "rubyName": "strict_loading_violation",
-    "call": "debug",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

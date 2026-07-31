@@ -2,13 +2,6 @@
   {
     "package": "trailties",
     "tsFile": "engine.ts",
-    "rubyName": "find",
-    "call": "subclasses",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "trailties",
-    "tsFile": "engine.ts",
     "rubyName": "find_root_with_flag",
     "call": "exist?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

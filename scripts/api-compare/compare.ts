@@ -338,10 +338,57 @@ export function isDelegatingWrapper(tsName: string, tsCalls: Set<string>): boole
 }
 
 /**
+ * How many hops of same-file helper extraction the TS call-set follows
+ * (`indexes` → `buildIndexRows` → `indexRowToDefinition`). Three covers the
+ * extraction depth ports actually use — a body, the helper it factors out, and
+ * that helper's own leaf helper — without letting a whole file's call graph
+ * collapse into one call-set, which would silence real omissions in large files.
+ */
+export const SAME_FILE_CLOSURE_DEPTH = 3;
+
+/**
+ * The same-file methods a TS body reaches transitively, up to `depth` hops.
+ *
+ * `sameFileCalls` resolves a method name to its call-set ONLY when that method
+ * is defined in the same TS file as the body under comparison — that scoping is
+ * what makes the closure sound (unlike the package-wide `delegateCalls` map,
+ * which an unrelated same-named method can satisfy). `tsName` seeds the visited
+ * set, so self-recursion and longer cycles terminate.
+ */
+export function reachedSameFileMethods(
+  tsName: string,
+  tsCalls: Iterable<string>,
+  sameFileCalls: (name: string) => Iterable<string> | undefined,
+  depth = SAME_FILE_CLOSURE_DEPTH,
+): Set<string> {
+  const reached = new Set<string>();
+  const visited = new Set<string>([tsName]);
+  let frontier = [...tsCalls];
+  for (let hop = 0; hop < depth && frontier.length > 0; hop++) {
+    const next: string[] = [];
+    for (const name of frontier) {
+      if (visited.has(name)) continue;
+      visited.add(name);
+      const calls = sameFileCalls(name);
+      if (calls === undefined) continue; // not defined in this file
+      reached.add(name);
+      next.push(...calls);
+    }
+    frontier = next;
+  }
+  return reached;
+}
+
+/**
  * The call-set `checkCalls` should actually hold a matched TS body to: its own,
- * unless the body is a delegating wrapper (see isDelegatingWrapper), in which case
- * the same-named DELEGATE's calls are unioned in so the port gets compared instead
- * of the forwarder.
+ * plus the calls of every same-file helper it reaches (see
+ * reachedSameFileMethods) — extracting a helper moves calls out of the body but
+ * not out of the port, and charging the body for them is the most common false
+ * positive the gate produces.
+ *
+ * On top of that, a delegating wrapper (see isDelegatingWrapper) also gets the
+ * same-named DELEGATE's calls unioned in so the port gets compared instead of
+ * the forwarder.
  *
  * `delegateCalls` resolves a method name to every call made by that name anywhere
  * in the package (and its deps) — deliberately coarser than the per-(file, name)
@@ -356,10 +403,14 @@ export function effectiveTsCalls(
   tsName: string,
   tsCalls: Set<string>,
   delegateCalls: (name: string) => Iterable<string> | undefined,
+  sameFileCalls: (name: string) => Iterable<string> | undefined = () => undefined,
 ): Set<string> {
-  if (!isDelegatingWrapper(tsName, tsCalls)) return tsCalls;
+  const reached = reachedSameFileMethods(tsName, tsCalls, sameFileCalls);
+  const wrapper = isDelegatingWrapper(tsName, tsCalls);
+  if (reached.size === 0 && !wrapper) return tsCalls;
   const merged = new Set(tsCalls);
-  for (const c of delegateCalls(tsName) ?? []) merged.add(c);
+  for (const name of reached) for (const c of sameFileCalls(name) ?? []) merged.add(c);
+  if (wrapper) for (const c of delegateCalls(tsName) ?? []) merged.add(c);
   return merged;
 }
 
@@ -1210,6 +1261,20 @@ export function main() {
     // Same population as tsCallsByName, but the calls the extractor saw NEGATED
     // (`!xs.includes(y)`), with the marker prefix stripped.
     const tsNegatedCallsByName = new Map<string, Set<string>>();
+    // Per-file name → partitioned call-set, memoized: the same-file closure
+    // (see effectiveTsCalls) walks it once per matched pair.
+    type PartitionedCalls = ReturnType<typeof partitionNegatedCalls>;
+    const sameFilePartitions = new Map<string, Map<string, PartitionedCalls>>();
+    const sameFilePartition = (file: string) => {
+      const cached = sameFilePartitions.get(file);
+      if (cached) return cached;
+      const byName = new Map<string, PartitionedCalls>();
+      for (const [name, sets] of tsCallsByFileName.get(file) ?? []) {
+        byName.set(name, partitionNegatedCalls(sets.flat()));
+      }
+      sameFilePartitions.set(file, byName);
+      return byName;
+    };
     const recordTsParams = (m: MethodInfo, file = m.file ?? "") => {
       const sigs = tsParamsByName.get(m.name) ?? [];
       sigs.push(m.params);
@@ -1663,13 +1728,25 @@ export function main() {
         if (rubyCalls.length === 0) return;
         const tsCandidateSets = tsCallsByFileName.get(tsFile)?.get(tsName);
         if (!tsCandidateSets || tsCandidateSets.length === 0) return;
-        // Delegation transparency: a one-line forwarder is compared against the
-        // call-set of the method it forwards to (see effectiveTsCalls).
+        // Helper extraction / delegation transparency: the body is compared
+        // against the calls of the same-file helpers it reaches, and a one-line
+        // forwarder against the method it forwards to (see effectiveTsCalls).
         const own = partitionNegatedCalls(tsCandidateSets.flat());
-        const tsCalls = effectiveTsCalls(tsName, own.calls, (n) => tsCallsByName.get(n));
-        // A wrapper compared against its delegate's calls inherits its negated
-        // ones too, or the delegate's `!xs.includes(y)` would not count.
+        const sameFile = sameFilePartition(tsFile);
+        const sameFileCalls = (n: string) => sameFile.get(n)?.calls;
+        const tsCalls = effectiveTsCalls(
+          tsName,
+          own.calls,
+          (n) => tsCallsByName.get(n),
+          sameFileCalls,
+        );
+        // A body compared against a helper's calls inherits its negated ones
+        // too, or the helper's `!xs.includes(y)` would not count — same for a
+        // wrapper and its delegate.
         const negatedTsCalls = new Set(own.negated);
+        for (const n of reachedSameFileMethods(tsName, own.calls, sameFileCalls)) {
+          for (const c of sameFile.get(n)?.negated ?? []) negatedTsCalls.add(c);
+        }
         if (isDelegatingWrapper(tsName, own.calls)) {
           for (const c of tsNegatedCallsByName.get(tsName) ?? []) negatedTsCalls.add(c);
         }

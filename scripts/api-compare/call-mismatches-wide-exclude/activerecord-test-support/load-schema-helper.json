@@ -3,13 +3,6 @@
     "package": "activerecord-test-support",
     "tsFile": "load-schema-helper.ts",
     "rubyName": "load_schema",
-    "call": "adapter_name",
-    "reason": "The `adapter_name` read that selects the adapter-specific schema still happens, one frame down: loadSchema delegates that arm to loadAdapterSpecificSchema, which trails must also call on its own from test-setup-dy.ts (the per-worker schema load runs through DatabaseTasks, not through loadSchema). The wide ratchet is lexical per method, so the extraction reads as an omitted call."
-  },
-  {
-    "package": "activerecord-test-support",
-    "tsFile": "load-schema-helper.ts",
-    "rubyName": "load_schema",
     "call": "exist?",
     "reason": "`File.exist?(adapter_specific_schema_file)` asks whether a Ruby schema file is on disk. trails resolves adapter-specific schemas through the ADAPTER_SPECIFIC_SCHEMAS lookup instead of the filesystem, so the presence check is a key lookup, not a stat."
   },

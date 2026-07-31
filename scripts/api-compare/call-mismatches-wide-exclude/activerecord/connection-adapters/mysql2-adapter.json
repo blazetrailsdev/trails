@@ -2,20 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/mysql2-adapter.ts",
-    "rubyName": "configure_connection",
-    "call": "default_timezone",
-    "reason": "Rails sets query_options[:database_timezone] = default_timezone inline (mysql2_adapter.rb:160); trails keeps databaseTimezone current via _syncDatabaseTimezone(), which assigns ActiveRecord.defaultTimezone on every perform-query entry point instead."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/mysql2-adapter.ts",
-    "rubyName": "connect",
-    "call": "new_client",
-    "reason": "Rails' private connect (mysql2_adapter.rb:144) is `@raw_connection = new_client(...)`; trails' connect() delegates to _ensureClient(), which calls Mysql2Adapter.newClient() (the new_client analog) — so the call is satisfied one frame down, not inlined here."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/mysql2-adapter.ts",
     "rubyName": "discard!",
     "call": "synchronize",
     "reason": "Rails wraps discard! in @lock.synchronize (Ruby Mutex); trails' single-threaded async model has no lock to acquire, matching the existing disconnect!/reconnect! synchronize exclusions in this file."

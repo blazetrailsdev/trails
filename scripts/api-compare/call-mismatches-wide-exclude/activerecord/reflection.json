@@ -44,20 +44,6 @@
   {
     "package": "activerecord",
     "tsFile": "reflection.ts",
-    "rubyName": "counter_cache_column",
-    "call": "demodulize",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "reflection.ts",
-    "rubyName": "counter_cache_column",
-    "call": "pluralize",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "reflection.ts",
     "rubyName": "derive_join_table",
     "call": "derive_join_table_name",
     "reason": "Equivalent (RFC 0072 activerecord-unrouted-privates-remaining-inventory): `migration/join-table.ts#joinTableName` deliberately duplicates `model-schema.ts#deriveJoinTableName` rather than importing it — the import edge is a TDZ cycle, guarded by `scripts/test-deps/adapter-graph-import-tdz.test.ts`. Documented deviation; do not route."
@@ -74,20 +60,6 @@
     "tsFile": "reflection.ts",
     "rubyName": "join_scope",
     "call": "with",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "reflection.ts",
-    "rubyName": "reflect_on_all_autosave_associations",
-    "call": "normalized_reflections",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "reflection.ts",
-    "rubyName": "reflect_on_all_autosave_associations",
-    "call": "values",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
