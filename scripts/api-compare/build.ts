@@ -41,7 +41,13 @@ import {
   missingScope,
 } from "./lint-call-mismatches.js";
 import { loadSplitBaseline, writeSplitBaseline } from "./lint-call-mismatches-wide.js";
-import { TAG, type TagEntry, parseJsdoc } from "./missing-rails-call-tags.js";
+import {
+  DEFAULT_REASON,
+  TAG,
+  type TagEntry,
+  justifies,
+  parseJsdoc,
+} from "./missing-rails-call-tags.js";
 
 const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-mismatches-wide.json");
 const WIDE_BASELINE_DIR = path.join(
@@ -52,14 +58,12 @@ const WIDE_BASELINE_DIR = path.join(
 export { TAG, parseJsdoc } from "./missing-rails-call-tags.js";
 export type { JsdocOrigin, TagEntry } from "./missing-rails-call-tags.js";
 
-export const DEFAULT_TAG_REASON =
-  "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; " +
-  "bucket (b) equivalent or (c) noise pending per-cluster burndown review.";
+export const DEFAULT_TAG_REASON = DEFAULT_REASON;
 // Reasons treated as placeholders: dropping them on convergence needs no
 // harvest report.
 const PLACEHOLDER_REASONS = new Set([DEFAULT_TAG_REASON, "unported (api:build stub)"]);
 
-interface ArtifactMismatch {
+export interface ArtifactMismatch {
   package: string;
   tsFile: string;
   rubyName: string;
@@ -67,9 +71,21 @@ interface ArtifactMismatch {
   missing: string[];
 }
 
-interface WideArtifact {
+export interface SuppressedCall {
+  package: string;
+  tsFile: string;
+  rubyName: string;
+  tsName: string;
+  call: string;
+}
+
+export interface WideArtifact {
   packages?: string[];
   mismatches: ArtifactMismatch[];
+  /** Flags a `@missingRailsCall` tag already suppressed (compare.ts). They are
+   *  absent from `mismatches`, so reconciling against that list alone would
+   *  drop the very tags that suppressed them. */
+  suppressed?: SuppressedCall[];
 }
 
 export interface ReconcileResult {
@@ -154,7 +170,7 @@ interface Edit {
   text: string;
 }
 
-interface MethodExpectation {
+export interface MethodExpectation {
   rubyName: string;
   calls: Set<string>;
 }
@@ -169,9 +185,11 @@ export function reconcileFileText(
 ): {
   text: string | null;
   harvested: { tsName: string; entry: TagEntry }[];
-  /** Every (rubyName, call) the file now tags — kept and newly-added alike.
-   *  These are the baseline rows the tag supersedes, so `main` drops them from
-   *  the split baseline in the same operation (RFC 0083). */
+  /** Every (rubyName, call) the file now tags with a real justification — kept
+   *  and newly-added alike. These are the baseline rows the tag supersedes, so
+   *  `main` drops them from the split baseline in the same operation (RFC
+   *  0083). A tag still carrying the seeded placeholder justifies nothing and
+   *  keeps its row: it does not suppress either (see `justifies`). */
   tagged: { rubyName: string; call: string }[];
   /** Expectation names never seen on a body-bearing declaration (mixin
    *  host-class duplicates, prototype-patched methods, …) — reported, never
@@ -234,7 +252,7 @@ export function reconcileFileText(
         );
         if (exp) {
           for (const e of [...r.kept, ...r.added]) {
-            tagged.push({ rubyName: exp.rubyName, call: e.call });
+            if (justifies(e.reason)) tagged.push({ rubyName: exp.rubyName, call: e.call });
           }
         }
         for (const d of r.dropped) {
@@ -270,6 +288,35 @@ export function reconcileFileText(
   return { text: out, harvested, tagged, unmatched };
 }
 
+/** (tsFile → tsName → expectation) for one package: every call the artifact
+ *  still flags, PLUS every call a tag already suppressed. The second half is
+ *  what keeps this reconcile idempotent — a suppressed call is absent from
+ *  `mismatches`, so without it the tag that earned the suppression would be
+ *  dropped as satisfied and the flag would return to the ratchet. */
+export function buildExpectations(
+  artifact: WideArtifact,
+  pkg: string,
+  onlyFile?: string,
+): Map<string, Map<string, MethodExpectation>> {
+  const byFile = new Map<string, Map<string, MethodExpectation>>();
+  const expectationFor = (tsFile: string, tsName: string, rubyName: string) => {
+    const fileMap = byFile.get(tsFile) ?? byFile.set(tsFile, new Map()).get(tsFile)!;
+    return fileMap.get(tsName) ?? fileMap.set(tsName, { rubyName, calls: new Set() }).get(tsName)!;
+  };
+  for (const m of artifact.mismatches) {
+    if (m.package !== pkg) continue;
+    if (onlyFile && m.tsFile !== onlyFile) continue;
+    const exp = expectationFor(m.tsFile, m.tsName, m.rubyName);
+    for (const missing of m.missing) exp.calls.add(callOf(missing));
+  }
+  for (const c of artifact.suppressed ?? []) {
+    if (c.package !== pkg) continue;
+    if (onlyFile && c.tsFile !== onlyFile) continue;
+    expectationFor(c.tsFile, c.tsName, c.rubyName).calls.add(c.call);
+  }
+  return byFile;
+}
+
 async function main(argv: string[]): Promise<number> {
   const pkgIdx = argv.indexOf("--package");
   const pkg = pkgIdx !== -1 ? argv[pkgIdx + 1] : undefined;
@@ -299,21 +346,9 @@ async function main(argv: string[]): Promise<number> {
     reasons.set(keyOf(e), e.reason);
   }
 
-  // (package, tsFile) → tsName → expectation.
-  const byFile = new Map<string, Map<string, MethodExpectation>>();
-  for (const m of artifact.mismatches) {
-    if (m.package !== pkg) continue;
-    if (onlyFile && m.tsFile !== onlyFile) continue;
-    const fileMap = byFile.get(m.tsFile) ?? byFile.set(m.tsFile, new Map()).get(m.tsFile)!;
-    const exp =
-      fileMap.get(m.tsName) ??
-      fileMap.set(m.tsName, { rubyName: m.rubyName, calls: new Set() }).get(m.tsName)!;
-    for (const missing of m.missing) exp.calls.add(callOf(missing));
-  }
+  const byFile = buildExpectations(artifact, pkg, onlyFile);
 
   let changed = 0;
-  // Baseline keys now justified by a tag at the call site; dropped from the
-  // split baseline below so a deviation is recorded in exactly one place.
   const migrated = new Set<string>();
   const srcDir = packageSrcDir(pkg);
   for (const [tsFile, expectations] of [...byFile.entries()].sort()) {

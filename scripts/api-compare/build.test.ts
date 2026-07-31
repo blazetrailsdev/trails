@@ -5,6 +5,7 @@ import {
   reconcile,
   reconcileFileText,
   renderJsdoc,
+  buildExpectations,
 } from "./build.js";
 
 const reasonFor = () => DEFAULT_TAG_REASON;
@@ -204,7 +205,7 @@ describe("reconcileFileText", () => {
 });
 
 describe("reconcileFileText baseline migration", () => {
-  it("reports every tagged (rubyName, call) so the baseline row can be dropped", () => {
+  it("reports every justified (rubyName, call) so the baseline row can be dropped", () => {
     const expectations = new Map([
       ["bar", { rubyName: "bar", calls: new Set(["save"]) }],
       ["baz", { rubyName: "baz", calls: new Set(["reload"]) }],
@@ -221,5 +222,48 @@ describe("reconcileFileText baseline migration", () => {
     const first = reconcileFileText("foo.ts", FILE, expectations, () => "why").text!;
     const { tagged } = reconcileFileText("foo.ts", first, expectations, () => "why");
     expect(tagged).toEqual([{ rubyName: "bar", call: "save" }]);
+  });
+});
+
+describe("buildExpectations", () => {
+  const artifact = {
+    packages: ["arel"],
+    mismatches: [
+      {
+        package: "arel",
+        tsFile: "insert-manager.ts",
+        rubyName: "insert",
+        tsName: "insert",
+        missing: ["each → forEach"],
+      },
+      { package: "other", tsFile: "x.ts", rubyName: "x", tsName: "x", missing: ["save → save"] },
+    ],
+    suppressed: [
+      {
+        package: "arel",
+        tsFile: "insert-manager.ts",
+        rubyName: "insert",
+        tsName: "insert",
+        call: "first",
+      },
+    ],
+  };
+
+  it("keeps a suppressed call expected, so the tag that earned it survives", () => {
+    const calls = buildExpectations(artifact, "arel")
+      .get("insert-manager.ts")!
+      .get("insert")!.calls;
+    expect([...calls].sort()).toEqual(["each", "first"]);
+  });
+
+  it("ignores other packages and honours the --file filter", () => {
+    expect(buildExpectations(artifact, "other").has("insert-manager.ts")).toBe(false);
+    expect(buildExpectations(artifact, "arel", "elsewhere.ts").size).toBe(0);
+  });
+
+  it("leaves a placeholder-reasoned row in the baseline — it justifies nothing", () => {
+    const expectations = new Map([["bar", { rubyName: "bar", calls: new Set(["save"]) }]]);
+    const { tagged } = reconcileFileText("foo.ts", FILE, expectations, () => DEFAULT_TAG_REASON);
+    expect(tagged).toEqual([]);
   });
 });

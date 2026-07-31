@@ -15,6 +15,22 @@
 
 export const TAG = "@missingRailsCall";
 
+/**
+ * The reason `api:build` stamps on a tag it mints with nothing curated to
+ * migrate — the RFC 0047 seed prose, shared with the wide baseline's
+ * `DEFAULT_REASON` (an entry carrying it is what the unreviewed high-water
+ * mark counts).
+ *
+ * A tag carrying it is deliberately NOT a justification: `api:build` mints one
+ * per still-missing call, so if the placeholder suppressed, a single
+ * `api:build --package <pkg>` run would move the whole baseline into inert
+ * tags and zero the wide gate. It has to be replaced with real per-entry prose
+ * before the call leaves the population.
+ */
+export const DEFAULT_REASON =
+  "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; " +
+  "bucket (b) equivalent or (c) noise pending per-cluster burndown review.";
+
 /** One parsed `@missingRailsCall` tag: the Ruby call name plus its raw lines
  *  (kept verbatim for idempotency) and the flattened reason text. */
 export interface TagEntry {
@@ -93,13 +109,23 @@ export function parseJsdoc(
   return { rest, entries };
 }
 
-/** The Ruby call names one JSDoc comment tags as deliberately not made, sorted
- *  and deduplicated. Throws on a bare or whitespace-only tag (the empty-reason
- *  contract): a call is only suppressed when its deviation is justified in
- *  prose at the call site. A line-leading prose `@tag` inside a reason ends
- *  that reason at `parseJsdoc`'s boundary rule, so it can never mint a
- *  suppression for a call nobody tagged. */
+/** True when a tag's reason argues the deviation, rather than standing in for
+ *  one: real per-entry prose, not the {@link DEFAULT_REASON} seed. The single
+ *  predicate behind both halves of the contract — a tag suppresses its flag if
+ *  and only if its baseline row may be dropped. */
+export function justifies(reason: string): boolean {
+  return reason !== "" && reason !== DEFAULT_REASON;
+}
+
+/** The Ruby call names one JSDoc comment JUSTIFIES as deliberately not made,
+ *  sorted and deduplicated. Throws on a bare or whitespace-only tag (the
+ *  empty-reason contract), and skips a tag still carrying
+ *  {@link DEFAULT_REASON}: a call only leaves the population when its deviation
+ *  is argued in prose at the call site. A line-leading prose `@tag` inside a
+ *  reason ends that reason at `parseJsdoc`'s boundary rule, so it can never
+ *  mint a suppression for a call nobody tagged. */
 export function suppressedCallsIn(comment: string, origin?: JsdocOrigin): string[] {
   const { entries } = parseJsdoc(comment, origin);
-  return [...new Set(entries.filter((e) => e.reason !== "").map((e) => e.call))].sort();
+  const justified = entries.filter((e) => justifies(e.reason));
+  return [...new Set(justified.map((e) => e.call))].sort();
 }

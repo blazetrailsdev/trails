@@ -1463,8 +1463,16 @@ export function paramsOfCallableRef(
  * tag throws here too) and the continuation rules that keep a Ruby ivar in the
  * reason prose from re-parsing as a tag boundary.
  */
+const fileHasMissingRailsCallTag = new WeakMap<ts.SourceFile, boolean>();
+
 export function missingRailsCallTags(node: ts.Node): string[] | undefined {
   const sf = node.getSourceFile();
+  let present = fileHasMissingRailsCallTag.get(sf);
+  if (present === undefined) {
+    present = sf.text.includes(MISSING_RAILS_CALL_TAG);
+    fileHasMissingRailsCallTag.set(sf, present);
+  }
+  if (!present) return undefined;
   const ranges = ts.getLeadingCommentRanges(sf.text, node.getFullStart()) ?? [];
   const range = ranges.filter((r) => sf.text.slice(r.pos, r.pos + 3) === "/**").at(-1);
   if (!range) return undefined;

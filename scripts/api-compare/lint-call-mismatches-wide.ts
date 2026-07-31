@@ -111,7 +111,7 @@ import {
   writeMark,
 } from "./unreviewed-ratchet.js";
 import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "./conventions.js";
-import { TAG } from "./missing-rails-call-tags.js";
+import { DEFAULT_REASON, TAG } from "./missing-rails-call-tags.js";
 import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
 
 // The baseline is a directory of per-source-file JSON arrays (see header),
@@ -148,9 +148,7 @@ const MARK_PATH = path.join(
   "call-mismatches-wide-unreviewed.json",
 );
 
-export const DEFAULT_REASON =
-  "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; " +
-  "bucket (b) equivalent or (c) noise pending per-cluster burndown review.";
+export { DEFAULT_REASON } from "./missing-rails-call-tags.js";
 
 async function readJson<T>(file: string): Promise<T> {
   return JSON.parse(await fs.readFile(file, "utf-8")) as T;

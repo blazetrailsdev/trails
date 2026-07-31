@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { suppressedCallsIn } from "./missing-rails-call-tags.js";
+import { DEFAULT_REASON, suppressedCallsIn } from "./missing-rails-call-tags.js";
 
 const block = (...lines: string[]): string =>
   ["/**", ...lines.map((l) => ` * ${l}`), " */"].join("\n");
@@ -56,5 +56,22 @@ describe("suppressedCallsIn", () => {
       "@primary_key is what the reader memoizes through.",
     );
     expect(suppressedCallsIn(comment)).toEqual(["reset"]);
+  });
+
+  it("does not treat the seeded placeholder as a justification", () => {
+    expect(suppressedCallsIn(block(`@missingRailsCall synchronize — ${DEFAULT_REASON}`))).toEqual(
+      [],
+    );
+  });
+
+  it("treats the placeholder as unjustified even when api:build wrapped it", () => {
+    const wrapped = [
+      "/**",
+      " * @missingRailsCall first — Baseline (RFC 0047): wide call-set flag seeded",
+      " *   when the wide ratchet landed; bucket (b) equivalent or (c) noise pending",
+      " *   per-cluster burndown review.",
+      " */",
+    ].join("\n");
+    expect(suppressedCallsIn(wrapped)).toEqual([]);
   });
 });

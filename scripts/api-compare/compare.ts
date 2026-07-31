@@ -531,6 +531,19 @@ interface CallResult {
   mismatched: number;
   mismatches: CallMismatch[];
   staleTags: StaleCallTag[];
+  suppressed: SuppressedCall[];
+}
+
+/** A flag a `@missingRailsCall` tag suppressed. Reported in the artifact
+ *  because the mismatch list no longer carries it and `api:build` reconciles
+ *  tags against that list: without this, the next api:build run would read the
+ *  call as satisfied, drop the tag it just honoured, and hand the flag straight
+ *  back to the ratchet. */
+export interface SuppressedCall {
+  tsFile: string;
+  rubyName: string;
+  tsName: string;
+  call: string;
 }
 
 /** Identity of the declaration a `@missingRailsCall` tag is written on. Keyed
@@ -578,11 +591,11 @@ export function staleCallTags(
   );
 }
 
-// A `@missingRailsCall` tag (RFC 0083) on a COMPARED method whose call is no
-// longer flagged — the tag's only-shrink half, mirroring the baseline dir's
-// STALE entries: once the TS body makes the call, the justification must go.
-// Tags on methods no pair matched are NOT reported: nothing compared them, so
-// "no longer flagged" would be unknowable rather than true.
+/** A `@missingRailsCall` tag (RFC 0083) on a COMPARED method whose call is no
+ *  longer flagged — the tag's only-shrink half, mirroring the baseline dir's
+ *  STALE entries: once the TS body makes the call, the justification must go.
+ *  Tags on methods no pair matched are NOT reported: nothing compared them, so
+ *  "no longer flagged" would be unknowable rather than true. */
 export interface StaleCallTag {
   tsFile: string;
   tsName: string;
@@ -1328,11 +1341,6 @@ export function main() {
     const tsParamsByFileName = new Map<string, Map<string, ParamInfo[][]>>();
     // Body call-sets scoped per (file, name) for the advisory calls-parity check.
     const tsCallsByFileName = new Map<string, Map<string, string[][]>>();
-    // Calls suppressed by a `@missingRailsCall <call> — <reason>` tag on the TS
-    // declaration, scoped per (file, name) so a tag justifies the deviation for
-    // exactly the method that carries it (RFC 0083). This is what makes the tag
-    // load-bearing: a permanent, reasoned deviation leaves the wide baseline
-    // entirely and lives at the call site instead.
     const tsMissingCallTagsByFileName = new Map<string, Map<string, Set<string>>>();
     // Same call-sets unioned by NAME across this package and its deps (the same
     // scope tsParamsByName uses). Consulted ONLY by the delegation-transparency
@@ -1688,10 +1696,8 @@ export function main() {
     const literalMismatches: LiteralMismatch[] = [];
     let callsCompared = 0;
     const callMismatches: CallMismatch[] = [];
-    // (tsFile, tsName) → the tagged calls that actually suppressed a flag on a
-    // compared pair. A key's presence means the pair WAS compared, which is the
-    // precondition for calling any of its unused tags stale.
     const callTagsUsed = new Map<string, Set<string>>();
+    const suppressedCalls: SuppressedCall[] = [];
     const bodyHashRecords: BodyHashRecord[] = [];
     const fileResults: FileResult[] = [];
 
@@ -1865,6 +1871,10 @@ export function main() {
           const tagKey = callTagKey(tsFile, tsName);
           const used = callTagsUsed.get(tagKey) ?? callTagsUsed.set(tagKey, new Set()).get(tagKey)!;
           kept = suppressTaggedCalls(missing, tags, used);
+          for (const m of missing) {
+            const call = callOf(m);
+            if (tags.has(call)) suppressedCalls.push({ tsFile, rubyName, tsName, call });
+          }
         }
         if (kept.length === 0) return;
         callMismatches.push({ rubyFile, tsFile, rubyName, tsName, missing: kept });
@@ -2267,6 +2277,7 @@ export function main() {
         mismatched: callMismatches.length,
         mismatches: callMismatches,
         staleTags: staleCallTags(tsMissingCallTagsByFileName, callTagsUsed),
+        suppressed: suppressedCalls,
       },
       bodyHashes: bodyHashRecords,
     });
@@ -2377,6 +2388,9 @@ export function main() {
   const staleTagsFlat = results.flatMap((r) =>
     r.calls.staleTags.map((t) => ({ package: r.package, ...t })),
   );
+  const suppressedFlat = results.flatMap((r) =>
+    r.calls.suppressed.map((c) => ({ package: r.package, ...c })),
+  );
   fs.writeFileSync(
     callsPath,
     JSON.stringify(
@@ -2392,10 +2406,8 @@ export function main() {
         compared: results.reduce((n, r) => n + r.calls.compared, 0),
         mismatched: callsFlat.length,
         mismatches: callsFlat,
-        // `@missingRailsCall` tags whose call no longer flags (RFC 0083). The
-        // wide ratchet fails on these exactly as it does on a stale baseline
-        // entry — a justification only shrinks.
         staleTags: staleTagsFlat,
+        suppressed: suppressedFlat,
       },
       null,
       2,
