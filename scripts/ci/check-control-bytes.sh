@@ -2,7 +2,7 @@
 set -euo pipefail
 
 CONTROL_RE='[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]|\xC2[\x80-\x9F]'
-BINARY_RE='\.(png|jpe?g|gif|webp|ico|pdf|zip|gz|tgz|woff2?|ttf|otf|eot|mp3|mp4|wasm|tsbuildinfo)$|(^|/)packages/rack/test/multipart/'
+BINARY_RE='\.(png|jpe?g)$|(^|/)packages/rack/test/multipart/'
 
 usage() {
   cat <<'MSG'
@@ -56,7 +56,7 @@ selfTest() {
   trap 'rm -rf "$selfTestDir"' EXIT
 
   selfTestCase 'a raw NUL' flagged 'SENTINEL = "\x00"\n'
-  selfTestCase 'the same NUL written as an escape' clean 'SENTINEL = "\\\\0"\n'
+  selfTestCase 'the same NUL written as an escape' clean 'SENTINEL = "\\0"\n'
   selfTestCase 'a raw ESC' flagged 'colour = "\x1becho"\n'
   selfTestCase 'a raw DEL' flagged 'del = "\x7f"\n'
   selfTestCase 'a raw C1 NEL (U+0085)' flagged 'nel = "\xc2\x85"\n'
