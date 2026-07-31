@@ -3,6 +3,7 @@ import * as path from "path";
 
 import { OUTPUT_DIR } from "./config.js";
 import { jsEnumerableAliases } from "./enumerable-idioms.js";
+import { buildIncludeGraph, includeGraphEntities, type IncludeGraph } from "./include-graph.js";
 
 // Mirrors the gate's own, unexported DELEGATION_MAX_CALLS (compare.ts:295) —
 // keep in step if that threshold ever moves.
@@ -12,6 +13,7 @@ export type Method = { name: string; file?: string; calls?: string[] };
 export type Entity = {
   name: string;
   file: string;
+  reExportedFrom?: string;
   includes: string[];
   extends: string[];
   delegatesTo?: string[];
@@ -49,42 +51,56 @@ export type Row = {
   resolvedIn?: string;
 };
 
-type Definition = { name: string; entity: string; file: string; calls: Set<string> };
+type Definition = { name: string; owner: string; file: string; calls: Set<string> };
 
 export type PackageIndex = {
-  entitiesByFile: Map<string, Entity[]>;
-  entitiesByName: Map<string, Entity[]>;
+  graph: IncludeGraph;
   definitionsByName: Map<string, Definition[]>;
-  methodsByFile: Map<string, Definition[]>;
+  definitionsByOwner: Map<string, Definition[]>;
 };
 
 export type EdgeKind = "include" | "delegation";
 
-export type Resolution = { file: string; edgeKind: EdgeKind; methods: string[] };
+export type Resolution = {
+  entity: string;
+  file: string;
+  edgeKind: EdgeKind;
+  methods: string[];
+};
 
 export type LooseRow = Row & { resolutions: Resolution[] };
+
+/**
+ * An entity's own methods sit under `<file>:<name>`; a file's mixed-in
+ * `this`-typed functions sit under `fn:<file>` and are credited to every entity
+ * declared in that file — the same two sources `includeGraphCallSets` unions,
+ * and no wider. Keying by ENTITY rather than by file is what keeps a barrel
+ * (`cache/index.ts`, which holds a re-exported entry for every store) from
+ * letting `MemoryStore#deleteMatched` discharge a call missing from
+ * `FileStore#deleteMatched`.
+ */
+function ownersOf(entity: Entity): string[] {
+  return [`${entity.file}:${entity.name}`, `fn:${entity.file}`];
+}
 
 export function buildPackageIndex(
   entities: Entity[],
   fileFunctions: Record<string, Method[]> = {},
 ): PackageIndex {
   const index: PackageIndex = {
-    entitiesByFile: new Map(),
-    entitiesByName: new Map(),
+    graph: buildIncludeGraph(entities, fileFunctions),
     definitionsByName: new Map(),
-    methodsByFile: new Map(),
+    definitionsByOwner: new Map(),
   };
   const record = (definition: Definition): void => {
     push(index.definitionsByName, definition.name, definition);
-    push(index.methodsByFile, definition.file, definition);
+    push(index.definitionsByOwner, definition.owner, definition);
   };
   for (const entity of entities) {
-    push(index.entitiesByFile, entity.file, entity);
-    push(index.entitiesByName, entity.name, entity);
     for (const method of [...entity.instanceMethods, ...entity.classMethods]) {
       record({
         name: method.name,
-        entity: entity.name,
+        owner: `${entity.file}:${entity.name}`,
         file: method.file ?? entity.file,
         calls: new Set(method.calls ?? []),
       });
@@ -94,7 +110,7 @@ export function buildPackageIndex(
     for (const method of methods) {
       record({
         name: method.name,
-        entity: file,
+        owner: `fn:${file}`,
         file: method.file ?? file,
         calls: new Set(method.calls ?? []),
       });
@@ -109,45 +125,34 @@ function push<K, V>(map: Map<K, V[]>, key: K, value: V): void {
   else map.set(key, [value]);
 }
 
-export function includeGraphFiles(tsFile: string, index: PackageIndex): Set<string> {
-  return new Set(reachableFiles(tsFile, index, false).keys());
+export function includeGraphOwners(tsFile: string, index: PackageIndex): Set<string> {
+  return new Set(reachableEntities(tsFile, index, false).flatMap(([e]) => ownersOf(e)));
 }
 
-export function reachableFiles(
+/**
+ * The entities `tsFile` reaches, through the SHIPPED gate walk
+ * (`includeGraphEntities`): per-entity, and dropping an edge name that resolves
+ * to more than one entity. The audit measured a file-level, ambiguity-blind
+ * variant of this walk first; PR #5755 showed both readings over-resolve, so the
+ * audit now reports what the gate actually credits.
+ */
+export function reachableEntities(
   tsFile: string,
   index: PackageIndex,
   delegation: boolean,
-): Map<string, EdgeKind> {
-  const includeOnly = delegation ? walk(tsFile, index, false) : new Set<string>();
-  return new Map(
-    [...walk(tsFile, index, delegation)].map((file) => [
-      file,
-      delegation && !includeOnly.has(file) ? "delegation" : "include",
-    ]),
-  );
+): [Entity, EdgeKind][] {
+  const key = (entity: Entity): string => `${entity.file}:${entity.name}`;
+  const includeOnly = delegation
+    ? new Set(includeGraphEntities(tsFile, index.graph).map((e) => key(e as Entity)))
+    : new Set<string>();
+  return includeGraphEntities(tsFile, index.graph, { delegation }).map((reached) => {
+    const entity = reached as Entity;
+    return [entity, delegation && !includeOnly.has(key(entity)) ? "delegation" : "include"];
+  });
 }
 
-function walk(tsFile: string, index: PackageIndex, delegation: boolean): Set<string> {
-  const files = new Set<string>();
-  const seen = new Set<string>();
-  const queue = [...(index.entitiesByFile.get(tsFile) ?? [])];
-  while (queue.length > 0) {
-    const entity = queue.pop()!;
-    const edges = [
-      ...entity.includes,
-      ...entity.extends,
-      ...(delegation ? (entity.delegatesTo ?? []) : []),
-    ];
-    for (const name of edges) {
-      if (seen.has(name)) continue;
-      seen.add(name);
-      for (const target of index.entitiesByName.get(name) ?? []) {
-        files.add(target.file);
-        queue.push(target);
-      }
-    }
-  }
-  return files;
+function definitionsOf(entity: Entity, index: PackageIndex): Definition[] {
+  return ownersOf(entity).flatMap((owner) => index.definitionsByOwner.get(owner) ?? []);
 }
 
 export function looseOnlyRows(
@@ -162,15 +167,20 @@ export function looseOnlyRows(
     if (!index) continue;
     const candidates = candidateNames(row.call);
     const resolutions: Resolution[] = [];
-    for (const [file, edgeKind] of reachableFiles(row.tsFile, index, delegation)) {
-      const makers = (index.methodsByFile.get(file) ?? []).filter((d) =>
+    for (const [entity, edgeKind] of reachableEntities(row.tsFile, index, delegation)) {
+      const makers = definitionsOf(entity, index).filter((d) =>
         candidates.some((c) => d.calls.has(c)),
       );
       if (makers.length === 0) continue;
-      resolutions.push({ file, edgeKind, methods: [...new Set(makers.map((d) => d.name))].sort() });
+      resolutions.push({
+        entity: entity.name,
+        file: entity.file,
+        edgeKind,
+        methods: [...new Set(makers.map((d) => d.name))].sort(),
+      });
     }
     if (resolutions.length === 0) continue;
-    resolutions.sort((a, b) => a.file.localeCompare(b.file));
+    resolutions.sort((a, b) => a.file.localeCompare(b.file) || a.entity.localeCompare(b.entity));
     loose.push({ ...row, resolutions });
   }
   return loose;
@@ -204,9 +214,11 @@ export function sameNameGraphRows(
     const index = indexes.get(row.package);
     if (!index) return false;
     const candidates = candidateNames(row.call);
-    const reachable = reachableFiles(row.tsFile, index, delegation);
+    const owners = new Set(
+      reachableEntities(row.tsFile, index, delegation).flatMap(([e]) => ownersOf(e)),
+    );
     return (index.definitionsByName.get(row.tsName) ?? []).some(
-      (d) => reachable.has(d.file) && candidates.some((c) => d.calls.has(c)),
+      (d) => owners.has(d.owner) && candidates.some((c) => d.calls.has(c)),
     );
   });
 }
@@ -224,8 +236,8 @@ export function classifyRow(
     const hollow = own.length === definitions.length && own.every((d) => d.calls.size === 0);
     return { bucket: own.length > 0 && hollow ? "unported" : "divergence" };
   }
-  const reachable = includeGraphFiles(mismatch.tsFile, index);
-  const viaGraph = makesCall.find((d) => reachable.has(d.file));
+  const owners = includeGraphOwners(mismatch.tsFile, index);
+  const viaGraph = makesCall.find((d) => owners.has(d.owner));
   if (viaGraph) return { bucket: "include-graph", resolvedIn: viaGraph.file };
   return { bucket: "collaborator", resolvedIn: makesCall[0].file };
 }
@@ -315,9 +327,6 @@ async function main(): Promise<void> {
     sameNameInIncludeGraph: sameNameGraphRows(rows, indexes, false).length,
     sameNameInDelegationGraph: sameNameGraphRows(rows, indexes, true).length,
     anyMethodByEdgeKind: Object.fromEntries(tally(looseWithDelegation, edgeKindOf)),
-    anyMethodResolvedOnlyInOwnFile: looseWithDelegation.filter((r) =>
-      r.resolutions.every((res) => res.file === r.tsFile),
-    ).length,
     anyMethodCrossingAdapterFamilies: looseWithDelegation.filter(crossesAdapterFamilies).length,
     anyMethodWithSameNamedResolver: looseWithDelegation.filter((r) =>
       r.resolutions.some((res) => res.methods.includes(r.tsName)),
@@ -329,7 +338,7 @@ async function main(): Promise<void> {
         .some((d) => d.calls.has(r.tsName) && d.calls.size > DELEGATION_MAX_CALLS),
     ).length,
     rowsWithNoGraphEdge: rows.filter(
-      (r) => includeGraphFiles(r.tsFile, indexes.get(r.package)!).size === 0,
+      (r) => includeGraphOwners(r.tsFile, indexes.get(r.package)!).size === 0,
     ).length,
     rowsWithNoDefinition: rows.filter(
       (r) => (indexes.get(r.package)!.definitionsByName.get(r.tsName) ?? []).length === 0,

@@ -7,22 +7,28 @@ import {
   classify,
   crossesAdapterFamilies,
   classifyRow,
-  includeGraphFiles,
+  includeGraphOwners,
   edgeKindOf,
   isCrossFile,
   looseOnlyRows,
-  reachableFiles,
+  reachableEntities,
 } from "./audit-cross-file-calls.js";
 
 function entity(
   name: string,
   file: string,
   methods: { name: string; calls?: string[] }[],
-  edges: { includes?: string[]; extends?: string[]; delegatesTo?: string[] } = {},
+  edges: {
+    includes?: string[];
+    extends?: string[];
+    delegatesTo?: string[];
+    reExportedFrom?: string;
+  } = {},
 ): Entity {
   return {
     name,
     file,
+    ...(edges.reExportedFrom ? { reExportedFrom: edges.reExportedFrom } : {}),
     includes: edges.includes ?? [],
     extends: edges.extends ?? [],
     ...(edges.delegatesTo ? { delegatesTo: edges.delegatesTo } : {}),
@@ -45,14 +51,19 @@ describe("candidateNames", () => {
   });
 });
 
-describe("includeGraphFiles", () => {
+describe("includeGraphOwners", () => {
   it("walks includes and extends transitively", () => {
     const index = buildPackageIndex([
       entity("Adapter", "adapter.ts", [], { includes: ["Quoting"] }),
       entity("Quoting", "quoting.ts", [], { extends: ["Base"] }),
       entity("Base", "base.ts", []),
     ]);
-    expect([...includeGraphFiles("adapter.ts", index)].sort()).toEqual(["base.ts", "quoting.ts"]);
+    expect([...includeGraphOwners("adapter.ts", index)].sort()).toEqual([
+      "base.ts:Base",
+      "fn:base.ts",
+      "fn:quoting.ts",
+      "quoting.ts:Quoting",
+    ]);
   });
 
   it("does not reach a collaborator that no recorded edge names", () => {
@@ -60,11 +71,36 @@ describe("includeGraphFiles", () => {
       entity("Adapter", "pg-adapter.ts", []),
       entity("PgSchemaStatements", "pg/schema-statements-class.ts", []),
     ]);
-    expect(includeGraphFiles("pg-adapter.ts", index).size).toBe(0);
+    expect(includeGraphOwners("pg-adapter.ts", index).size).toBe(0);
+  });
+
+  it("drops an edge name more than one entity answers to", () => {
+    const index = buildPackageIndex([
+      entity("Sqlite3Adapter", "sqlite3-adapter.ts", [], { includes: ["DatabaseStatements"] }),
+      entity("DatabaseStatements", "sqlite3/database-statements.ts", []),
+      entity("DatabaseStatements", "mysql/database-statements.ts", []),
+    ]);
+    expect(includeGraphOwners("sqlite3-adapter.ts", index).size).toBe(0);
+  });
+
+  it("credits only the reached entity, not every entity a barrel re-exports", () => {
+    const index = buildPackageIndex([
+      entity("FileStore", "cache/file-store.ts", [], { extends: ["Store"] }),
+      entity("Store", "cache/store.ts", []),
+      entity("MemoryStore", "cache/memory-store.ts", []),
+      entity("Store", "cache/index.ts", [], { reExportedFrom: "cache/store.ts:Store" }),
+      entity("MemoryStore", "cache/index.ts", [], {
+        reExportedFrom: "cache/memory-store.ts:MemoryStore",
+      }),
+    ]);
+    expect([...includeGraphOwners("cache/file-store.ts", index)].sort()).toEqual([
+      "cache/store.ts:Store",
+      "fn:cache/store.ts",
+    ]);
   });
 });
 
-describe("reachableFiles", () => {
+describe("reachableEntities", () => {
   const index = buildPackageIndex([
     entity("Adapter", "pg-adapter.ts", [], {
       includes: ["Quoting"],
@@ -75,11 +111,17 @@ describe("reachableFiles", () => {
   ]);
 
   it("ignores delegation edges unless asked to follow them", () => {
-    expect([...reachableFiles("pg-adapter.ts", index, false).keys()]).toEqual(["quoting.ts"]);
+    expect(reachableEntities("pg-adapter.ts", index, false).map(([e]) => e.file)).toEqual([
+      "quoting.ts",
+    ]);
   });
 
-  it("tags a file the delegation edge reaches", () => {
-    expect(Object.fromEntries(reachableFiles("pg-adapter.ts", index, true))).toEqual({
+  it("tags an entity the delegation edge reaches", () => {
+    expect(
+      Object.fromEntries(
+        reachableEntities("pg-adapter.ts", index, true).map(([e, k]) => [e.file, k]),
+      ),
+    ).toEqual({
       "quoting.ts": "include",
       "pg/schema-statements-class.ts": "delegation",
     });
@@ -107,6 +149,7 @@ describe("looseOnlyRows", () => {
         ...rows[0],
         resolutions: [
           {
+            entity: "PgSchemaStatements",
             file: "pg/schema-statements-class.ts",
             edgeKind: "delegation",
             methods: ["unrelated"],
@@ -257,6 +300,7 @@ describe("crossesAdapterFamilies", () => {
         ...row,
         resolutions: [
           {
+            entity: "DatabaseStatements",
             file: "connection-adapters/mysql/database-statements.ts",
             edgeKind: "include",
             methods: ["explain"],
@@ -272,11 +316,13 @@ describe("crossesAdapterFamilies", () => {
         ...row,
         resolutions: [
           {
+            entity: "PostgreSQLSchemaStatements",
             file: "connection-adapters/postgresql/schema-statements-class.ts",
             edgeKind: "delegation",
             methods: ["foreignKeys"],
           },
           {
+            entity: "AbstractAdapter",
             file: "connection-adapters/abstract-adapter.ts",
             edgeKind: "include",
             methods: ["log"],

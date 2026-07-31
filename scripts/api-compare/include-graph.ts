@@ -1,5 +1,26 @@
 import { partitionNegatedCalls } from "./enumerable-idioms.js";
-import type { ClassInfo, MethodInfo } from "./types.js";
+
+/**
+ * The structural minimum this walk reads off an entity. Stated structurally
+ * rather than as `ClassInfo` so the cross-file audit
+ * (`audit-cross-file-calls.ts`) can resolve through the very same walk the gate
+ * uses, instead of keeping a second, looser copy of it.
+ */
+export interface GraphMethod {
+  name: string;
+  calls?: string[];
+}
+
+export interface GraphEntity {
+  name: string;
+  file?: string;
+  reExportedFrom?: string;
+  includes: string[];
+  extends: string[];
+  delegatesTo?: string[];
+  instanceMethods: GraphMethod[];
+  classMethods: GraphMethod[];
+}
 
 /**
  * The include/extends graph the wide calls-parity gate resolves candidates
@@ -25,9 +46,9 @@ import type { ClassInfo, MethodInfo } from "./types.js";
  * match.
  */
 export interface IncludeGraph {
-  entitiesByFile: Map<string, ClassInfo[]>;
-  entitiesByName: Map<string, ClassInfo[]>;
-  fileFunctions: Record<string, MethodInfo[]>;
+  entitiesByFile: Map<string, GraphEntity[]>;
+  entitiesByName: Map<string, GraphEntity[]>;
+  fileFunctions: Record<string, GraphMethod[]>;
 }
 
 /**
@@ -41,13 +62,13 @@ export interface IncludeGraph {
  * still resolves the alias it re-exports.
  */
 export function buildIncludeGraph(
-  entities: Iterable<ClassInfo>,
-  fileFunctions: Record<string, MethodInfo[]> = {},
+  entities: Iterable<GraphEntity>,
+  fileFunctions: Record<string, GraphMethod[]> = {},
 ): IncludeGraph {
   const all = [...entities].filter((e) => (e.file ?? "") !== "");
-  const byKey = new Map<string, ClassInfo>();
+  const byKey = new Map<string, GraphEntity>();
   for (const entity of all) byKey.set(`${entity.file}:${entity.name}`, entity);
-  const origin = (entity: ClassInfo): ClassInfo => {
+  const origin = (entity: GraphEntity): GraphEntity => {
     const seen = new Set<string>();
     let current = entity;
     while (current.reExportedFrom !== undefined && !seen.has(current.reExportedFrom)) {
@@ -59,8 +80,8 @@ export function buildIncludeGraph(
     return current;
   };
 
-  const entitiesByFile = new Map<string, ClassInfo[]>();
-  const entitiesByName = new Map<string, ClassInfo[]>();
+  const entitiesByFile = new Map<string, GraphEntity[]>();
+  const entitiesByName = new Map<string, GraphEntity[]>();
   const namedKeys = new Map<string, Set<string>>();
   for (const entity of all) {
     push(entitiesByFile, entity.file!, entity);
@@ -92,14 +113,27 @@ function push<V>(map: Map<string, V[]>, key: string, value: V): void {
  * `mysql/`, `postgresql/` and `sqlite3/`, so following every candidate credits
  * one adapter with another adapter's calls, and picking one by path proximity is
  * the filename heuristic this resolution must not use.
+ *
+ * `delegation` additionally follows recorded `delegatesTo` edges. The gate never
+ * passes it — it exists so the cross-file audit can measure what a
+ * delegation-following rule WOULD resolve without re-implementing the walk.
  */
-export function includeGraphEntities(tsFile: string, graph: IncludeGraph): ClassInfo[] {
-  const reached: ClassInfo[] = [];
+export function includeGraphEntities(
+  tsFile: string,
+  graph: IncludeGraph,
+  { delegation = false }: { delegation?: boolean } = {},
+): GraphEntity[] {
+  const reached: GraphEntity[] = [];
   const seenEdges = new Set<string>();
   const queue = [...(graph.entitiesByFile.get(tsFile) ?? [])];
   while (queue.length > 0) {
     const entity = queue.pop()!;
-    for (const name of [...entity.includes, ...entity.extends]) {
+    const edges = [
+      ...entity.includes,
+      ...entity.extends,
+      ...(delegation ? (entity.delegatesTo ?? []) : []),
+    ];
+    for (const name of edges) {
       if (seenEdges.has(name)) continue;
       seenEdges.add(name);
       const targets = graph.entitiesByName.get(name) ?? [];
@@ -126,7 +160,7 @@ export function includeGraphEntities(tsFile: string, graph: IncludeGraph): Class
  * the real body lives there and nowhere else.
  */
 export function includeGraphCallSets(
-  entities: readonly ClassInfo[],
+  entities: readonly GraphEntity[],
   tsName: string,
   graph: IncludeGraph,
 ): { calls: Set<string>; negated: Set<string> } {

@@ -106,7 +106,12 @@ import {
   displayLiteral,
 } from "./literals.js";
 import { isSourceUnported } from "./unported-files.js";
-import { buildIncludeGraph, includeGraphCallSets, includeGraphEntities } from "./include-graph.js";
+import {
+  buildIncludeGraph,
+  includeGraphCallSets,
+  includeGraphEntities,
+  type GraphEntity,
+} from "./include-graph.js";
 import {
   JS_ENUMERABLE_ALIASES,
   jsEnumerableAliases,
@@ -1396,7 +1401,7 @@ export function main() {
       tsPkg ? [...Object.values(tsPkg.classes), ...Object.values(tsPkg.modules)] : [],
       tsPkg?.fileFunctions ?? {},
     );
-    const graphEntities = new Map<string, ClassInfo[]>();
+    const graphEntities = new Map<string, GraphEntity[]>();
     const includeGraphCalls = (tsFile: string, tsName: string): PartitionedCalls => {
       let entities = graphEntities.get(tsFile);
       if (!entities) {
