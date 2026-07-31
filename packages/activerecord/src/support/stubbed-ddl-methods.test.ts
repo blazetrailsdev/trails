@@ -49,6 +49,16 @@ const NON_EMITTING: ReadonlyMap<string, string> = new Map([
  * Every other member is handed back bound to the *real* adapter, so calls the
  * adapter makes to itself internally stay unrecorded — the boundary being
  * pinned is the one a cover can intercept.
+ *
+ * That boundary is the whole scope, and the `schemaCreation` hop shows where it
+ * stops: the getter hands back the *real* adapter's SchemaCreation instance, so
+ * every quoting/type call it makes while rendering DDL (`quoteColumnName`,
+ * `quoteDefaultExpression`, `lookupCastType`, …) resolves against the real
+ * adapter and is invisible here. The `schemaCreation` access is recorded; what
+ * happens downstream of it is not. That is deliberate — a cover intercepts an
+ * adapter member, and nothing downstream of `schemaCreation` is reachable that
+ * way — but it means the floor assertions below pin the boundary, not the full
+ * DDL-rendering call graph.
  */
 async function recordLayPath(): Promise<Set<string>> {
   const real = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
@@ -84,9 +94,13 @@ async function recordLayPath(): Promise<Set<string>> {
  * touches.
  *
  * SQLite is the lane here because it needs no server, and the lay path it walks
- * is the shared abstract one: the adapter-specific companions override only
- * `addIndex`/`dropTable` (MySQL), and those overrides reach the database through
- * the same `adapter.execute` this records.
+ * is the shared abstract one. The companions do override members (MySQL:
+ * `addIndex`, `dropTable`; PostgreSQL: `dropTable`, `createTableDefinition` —
+ * not an exhaustive list, check the class before relying on it), but none of
+ * those overrides changes what this pins: `dropTable` is off the lay path for
+ * every adapter (the canonical loader passes no `force:`), `createTableDefinition`
+ * is exempt whichever adapter's override runs, and MySQL's `addIndex` reaches the
+ * database through the same `adapter.execute` this records.
  */
 describe("STUBBED_DDL_METHODS", () => {
   test("covers every adapter member the canonical lay path touches", async () => {
