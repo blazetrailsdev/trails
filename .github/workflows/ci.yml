@@ -390,7 +390,7 @@ jobs:
                     fi
                   }
                   set_gate activerecord_affected "$AR_PKGS_RE"
-                  set_gate db_adapter_affected  "$DB_ADAPTER_RE"
+                  set_gate db_adapter_affected   "$DB_ADAPTER_RE"
                   set_gate actionpack_affected   "$AP_PKGS_RE"
                   set_gate actionview_affected   "$AV_PKGS_RE"
                   set_gate rack_affected         "$RACK_PKGS_RE"
