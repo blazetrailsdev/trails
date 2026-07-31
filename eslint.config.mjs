@@ -831,7 +831,13 @@ export default defineConfig(
   //  - no-floating-promises: catches a dropped Promise statement — a bare
   //    `record.save()` whose result nobody awaits.
   {
-    files: ["packages/activemodel/src/**/*.ts", "packages/activerecord/src/**/*.ts"],
+    files: [
+      "packages/activemodel/src/**/*.ts",
+      "packages/activerecord/src/**/*.ts",
+      // `scripts/**` is full of async fs and `execFile` work, and now has a
+      // program (scripts/tsconfig.json) for these rules to read types from.
+      "scripts/**/*.ts",
+    ],
     rules: {
       "@typescript-eslint/no-misused-promises": [
         "error",

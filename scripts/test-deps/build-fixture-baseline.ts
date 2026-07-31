@@ -82,4 +82,4 @@ async function main(): Promise<void> {
   console.log(`Wrote ${path.relative(ROOT, OUT_PATH)}`);
 }
 
-main();
+void main();

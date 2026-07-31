@@ -96,4 +96,4 @@ function walk(node: AstNode, visit: (n: AstNode) => void): void {
   }
 }
 
-main();
+void main();

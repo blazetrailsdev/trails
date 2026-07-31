@@ -44,4 +44,4 @@ async function main(): Promise<void> {
   console.log(`Wrote ${OUT_PATH}: ${arr.length} excluded files`);
 }
 
-main();
+void main();

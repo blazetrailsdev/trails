@@ -75,6 +75,9 @@ importers:
       prettier:
         specifier: 3.8.1
         version: 3.8.1
+      tinyglobby:
+        specifier: 0.2.16
+        version: 0.2.16
       ts-morph:
         specifier: ^28.0.0
         version: 28.0.0

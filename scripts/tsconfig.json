@@ -1,14 +1,3 @@
-// The `scripts/` tree is run by tsx and had no tsconfig, so it belonged to no
-// program and the ESLint project service could not type-check any of it. This
-// project exists for that: `noEmit`, so `tsc --build` at the root (which does
-// not reference it) is unaffected.
-//
-// - `module`/`moduleResolution` are overridden because the repo root has no
-//   `"type": "module"`, so Node16 resolution would treat every script as CJS
-//   and reject its `import.meta` use.
-// - `references` mirror the root's: several scripts import package *sources*
-//   by relative path, and without the references those files would be pulled
-//   into this program instead of resolving to the packages' declarations.
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
@@ -18,7 +7,7 @@
     "noEmit": true,
     "rootDir": ".."
   },
-  "include": ["**/*.ts"],
+  "include": ["**/*.ts", "../vendor/*.ts"],
   "references": [
     {
       "path": "../packages/activesupport"
