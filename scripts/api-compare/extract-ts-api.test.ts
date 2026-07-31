@@ -28,11 +28,6 @@ import type { ClassInfo, MethodInfo, PackageInfo } from "./types.js";
 
 const VIRTUAL = "virtual.ts";
 
-/**
- * `PackageInfo.fileFunctions` is optional because the Ruby extractor never
- * emits it; this extractor always does, and a test asking for a file's
- * functions wants the absence to fail loudly rather than read as an empty set.
- */
 function fileFunctionsOf(info: PackageInfo, file: string): MethodInfo[] {
   const fns = info.fileFunctions?.[file];
   if (fns === undefined) throw new Error(`extractor emitted no fileFunctions for ${file}`);

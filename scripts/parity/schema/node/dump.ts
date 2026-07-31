@@ -105,9 +105,6 @@ async function main(): Promise<void> {
         }
         return {
           name: idx.name,
-          // An expression index reflects its columns as a single SQL string
-          // rather than a list (Rails' `IndexDefinition#columns` does the
-          // same); the dump shape is a list either way.
           columns: typeof idx.columns === "string" ? [idx.columns] : idx.columns,
           unique: idx.unique,
           where: idx.where ?? null,

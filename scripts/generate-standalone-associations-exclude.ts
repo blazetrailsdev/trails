@@ -50,12 +50,6 @@ function collectTsFiles(dir: string, out: string[]): void {
 }
 
 async function main(): Promise<void> {
-  // `typescript-eslint` re-exports the parser under ESLint's minimal
-  // `CompatibleParser` type, whose `parseForESLint` is declared with the text
-  // argument only. The underlying `@typescript-eslint/parser` takes parser
-  // options as a second argument, and we need them: parsed without
-  // `sourceType: "module"` every `import` in a package source is a syntax
-  // error and the whole file is skipped as unparseable.
   const { parser } = (await import("typescript-eslint")) as unknown as {
     parser: {
       parseForESLint(

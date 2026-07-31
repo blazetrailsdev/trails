@@ -455,9 +455,6 @@ export function extractFromProgram(
   // files reach it through the container's own imports even though the entry
   // list already skipped them — filter here too or the de-overlap is a no-op.
   const excludePrefixes = excludeDirs.map((dir) => dir.replace(/\\/g, "/") + "/");
-  // `fileFunctions` / `fileConstants` are optional on `PackageInfo` because the
-  // Ruby extractor never emits them; this extractor always does, so pin them as
-  // present here rather than asserting non-null at each write below.
   const info: PackageInfo & Required<Pick<PackageInfo, "fileFunctions" | "fileConstants">> = {
     classes: {},
     modules: {},

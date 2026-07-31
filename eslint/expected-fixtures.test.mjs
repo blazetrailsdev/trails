@@ -20,12 +20,8 @@ process.env.EXPECTED_FIXTURES_EXCLUDE_PATH = TMP_EXCLUDE;
 
 // Imported AFTER env vars are set so the rule's module-level path
 // constants pick them up.
-const {
-  default: rule,
-  trailsToRailsRel,
-  collectUseFixturesKeys,
-  requiredFixtureSets,
-} = await import("./expected-fixtures.mjs");
+const mod = await import("./expected-fixtures.mjs");
+const { default: rule, trailsToRailsRel, collectUseFixturesKeys, requiredFixtureSets } = mod;
 
 beforeAll(() => {
   fs.writeFileSync(
@@ -280,3 +276,15 @@ function runCases(tester) {
     ],
   });
 }
+
+describe("expected-fixtures.d.mts", () => {
+  it("declares exactly the exports the module provides", () => {
+    const source = fs.readFileSync(path.join(__dirname, "expected-fixtures.d.mts"), "utf8");
+    const declared = [...source.matchAll(/^export function (\w+)/gm)].map((m) => m[1]).sort();
+    const actual = Object.keys(mod)
+      .filter((k) => k !== "default")
+      .sort();
+    expect(declared).toEqual(actual);
+    expect(source).toMatch(/^export default rule;$/m);
+  });
+});

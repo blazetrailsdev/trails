@@ -25,13 +25,6 @@ const DEPS_PATH = path.join(ROOT, "scripts/test-deps/output/activerecord-test-de
 const OUT_PATH = path.join(ROOT, "eslint/expected-fixtures-exclude.json");
 const AR_SRC = path.join(ROOT, "packages/activerecord/src");
 
-/**
- * `typescript-eslint` re-exports the parser under ESLint's minimal
- * `CompatibleParser` type, whose `parseForESLint` is declared with the text
- * argument only. The underlying `@typescript-eslint/parser` takes parser
- * options as a second argument, and `collectUseFixturesKeys` needs the
- * `loc`/`range` data they turn on.
- */
 const parseForESLint = parser.parseForESLint as unknown as (
   code: string,
   options: { loc: boolean; range: boolean },
