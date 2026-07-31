@@ -50,6 +50,19 @@
  *   pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts           # gate (CI)
  *   pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts --write   # reseed baseline
  *   pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts --report  # read-only grouping
+ *   pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts --no-regen # gate the artifact on disk
+ *
+ * A plain gating run first regenerates output/call-mismatches-wide.json itself
+ * by shelling out to `pnpm api:compare --wide-calls` (RFC 0083). Gating a stale
+ * artifact is what makes a sibling PR's deleted TS method surface here as
+ * `STALE baseline entr(ies)` on a branch that never touched it, and the fix was
+ * always "re-extract, then re-run". It goes through run.sh rather than
+ * compare.ts so the extraction manifests compare.ts reads are refreshed first.
+ * `--write` regenerates first too, unless API_COMPARE_FORCE is set, which is
+ * how api:calls:wide:reseed signals it already ran the forced regeneration.
+ * Opt out with `--no-regen`, API_COMPARE_SKIP_WIDE_REGEN=1, or any CI value —
+ * CI runs the extraction step separately and must not pay for it twice. The
+ * partial-scope determinism guard runs unchanged either way.
  *
  * `--report` (RFC 0083) groups the baselined population by package, source
  * file, Ruby call name, and derived cause bucket, so a burndown story can be
@@ -65,6 +78,7 @@
  * entry guard is the sole exception, matching lint-call-mismatches.ts), async fs.
  */
 
+import { spawn } from "child_process";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
@@ -217,6 +231,38 @@ async function pruneEmptyDirs(dir: string): Promise<boolean> {
     }
   }
   return empty;
+}
+
+export const NO_REGEN_FLAG = "--no-regen";
+
+export const REGEN_SKIP_ARGS = [NO_REGEN_FLAG, "--report", "--unreviewed"];
+
+export const REGEN_SKIP_ENV = "API_COMPARE_SKIP_WIDE_REGEN";
+
+// A reseed regenerating a stale artifact is the same bug this PR fixes, one
+// severity worse: `--write` commits the stale population as the new baseline.
+// So `--write` regenerates too — except under API_COMPARE_FORCE, which is the
+// api:calls:wide:reseed script's own marker that it just ran the (forced)
+// regeneration itself.
+export function shouldRegenerate(argv: string[], env: Record<string, string | undefined>): boolean {
+  if (argv.some((a) => REGEN_SKIP_ARGS.includes(a))) return false;
+  if (argv.includes("--write") && env.API_COMPARE_FORCE) return false;
+  return !env.CI && env[REGEN_SKIP_ENV] !== "1";
+}
+
+export function regenerateArtifact(env: Record<string, string | undefined>): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("pnpm", ["api:compare", "--wide-calls"], {
+      cwd: ROOT_DIR,
+      env,
+      stdio: "inherit",
+    });
+    child.on("error", reject);
+    child.on("close", (code, signal) => {
+      if (code === 0) resolve();
+      else reject(new Error(`\`pnpm api:compare --wide-calls\` exited with ${signal ?? code}`));
+    });
+  });
 }
 
 async function loadArtifact(): Promise<Artifact> {
@@ -526,6 +572,19 @@ async function runAsScript(): Promise<void> {
   const argv = process.argv.slice(2);
   const unreviewed = argv.includes("--unreviewed");
   if (!argv.includes("--report") && !unreviewed) {
+    if (shouldRegenerate(argv, process.env)) {
+      console.log("Regenerating output/call-mismatches-wide.json (compare.ts --wide-calls)…");
+      try {
+        await regenerateArtifact(process.env);
+      } catch (e) {
+        console.error(
+          `\nwide call-mismatches ratchet: could not regenerate the wide artifact: ${
+            (e as Error).message
+          }\n` + `Re-run with ${NO_REGEN_FLAG} to gate against the artifact already on disk.\n`,
+        );
+        process.exit(2);
+      }
+    }
     process.exit(await main(argv.includes("--write")));
   }
   let top: number;
