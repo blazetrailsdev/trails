@@ -773,23 +773,13 @@ export abstract class Migration {
     tableName = this._pt(tableName);
     await this.schema.removeCheckConstraint(tableName, expressionOrOptions, options);
   }
-  // Rails forwards these to the connection through Migration#method_missing, which is
-  // untyped in Ruby. They only exist on adapters that support validating constraints
-  // (PostgreSQL), so the abstract adapter type genuinely lacks them — narrow to the
-  // interface that declares them rather than casting the call away.
-  /** @internal */
-  private _validateConstraintStatements(): DatabaseAdapter & ValidateConstraintStatements {
-    return this.connection as DatabaseAdapter & ValidateConstraintStatements;
-  }
 
   async validateCheckConstraint(
     tableName: string,
     nameOrOptions: string | { name: string },
   ): Promise<void> {
-    await this._validateConstraintStatements().validateCheckConstraint(
-      this._pt(tableName),
-      nameOrOptions,
-    );
+    const connection = this.connection as DatabaseAdapter & ValidateConstraintStatements;
+    await connection.validateCheckConstraint(this._pt(tableName), nameOrOptions);
   }
 
   async validateForeignKey(
@@ -799,11 +789,8 @@ export abstract class Migration {
   ): Promise<void> {
     const toTable = typeof toTableOrOptions === "string" ? toTableOrOptions : undefined;
     const opts = typeof toTableOrOptions === "object" ? toTableOrOptions : (options ?? undefined);
-    await this._validateConstraintStatements().validateForeignKey(
-      this._pt(fromTable),
-      toTable,
-      opts,
-    );
+    const connection = this.connection as DatabaseAdapter & ValidateConstraintStatements;
+    await connection.validateForeignKey(this._pt(fromTable), toTable, opts);
   }
 
   async changeColumnComment(

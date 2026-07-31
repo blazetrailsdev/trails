@@ -199,19 +199,16 @@ export type JoinTableOptions = {
  * signature drift on the adapter fails typecheck at the call site.
  */
 export interface ValidateConstraintStatements {
-  // Declared as function-typed properties, not methods: method syntax is checked
-  // bivariantly, which would let an adapter narrow a parameter (the `{ name?: string }`
-  // regression #5501 fixed) without failing `implements`.
-  validateConstraint: (tableName: string, constraintName: string) => Promise<void>;
-  validateCheckConstraint: (
+  validateConstraint(tableName: string, constraintName: string): Promise<void>;
+  validateCheckConstraint(
     tableName: string,
     nameOrOptions: string | { name: string },
-  ) => Promise<void>;
-  validateForeignKey: (
+  ): Promise<void>;
+  validateForeignKey(
     fromTable: string,
     toTable?: string,
     options?: Omit<ForeignKeyLookupOptions, "toTable">,
-  ) => Promise<void>;
+  ): Promise<void>;
 }
 
 /** @internal */
