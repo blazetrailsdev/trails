@@ -2167,14 +2167,23 @@ export async function canonicalForeignKeyDependents(): Promise<Map<string, strin
  * (no MySQL `DATETIME(6)` upgrade, no `serial` PK rewrite), so what comes back
  * is the *declared* shape rather than one adapter's rendering of it. The probe
  * is likewise built with no `serialPk` and no composite-PK set, so `col`'s
- * generic branch runs for every column: the composite-PK branch only forces the
- * `null: false` a PK carries anyway, and the `serialPk` branch *discards* the
- * declared options wholesale in favour of `serialIdType` + `{primaryKey: true}`
- * — a rendering, not a declaration. Taking the generic branch is therefore the
- * right reading, but only while no `serialPk` column declares something that
- * branch would have thrown away; {@link assertSerialPkIsPlainInteger} fails loudly
- * the moment one does, rather than letting the replay report a shape the real
- * DDL never had.
+ * generic branch runs for every column — both of the branches it skips rewrite
+ * what was declared:
+ *   - `serialPk` *discards* the declared options wholesale in favour of
+ *     `serialIdType` + `{primaryKey: true}`;
+ *   - the composite-PK branch forces `null: false`, which is a trails addition,
+ *     not something `schema.rb` states. Rails' `visit_PrimaryKeyDefinition`
+ *     (schema_creation.rb:79-81) emits nothing but `PRIMARY KEY (a, b)`, and
+ *     schema.rb:243-250 declares `cpk_books.author_id` as a bare `t.integer`.
+ *     Our NOT NULL exists so SQLite (which admits NULLs in a non-INTEGER PK)
+ *     matches the other adapters; whether that is faithful is a live question,
+ *     tracked separately — reporting the *declared* shape keeps this comparator
+ *     honest about schema.rb either way, which is what it exists to check.
+ * Taking the generic branch is therefore the right reading, but only while no
+ * PK column declares something those branches would have rewritten;
+ * {@link assertSerialPkIsPlainInteger} and {@link assertCompositePkDeclaresNoNull}
+ * fail loudly the moment one does, rather than letting the replay report a shape
+ * the real DDL never had.
  *
  * @internal Read by `scripts/schema-compare/compare.ts`. Lives here, next to the
  * registry it replays, for the same reason as
@@ -2193,6 +2202,11 @@ export async function canonicalRegistrySchema(): Promise<Schema> {
     def.fn(new TableBuilder(probe, "sqlite", COLUMN_TYPE_MAP_SQLITE, null, null));
     if (def.meta.serialPk !== undefined) {
       assertSerialPkIsPlainInteger(def.name, def.meta.serialPk, columns[def.meta.serialPk]);
+    }
+    if (def.meta.primaryKey !== undefined && def.meta.serialPk === undefined) {
+      for (const column of def.meta.primaryKey) {
+        assertCompositePkDeclaresNoNull(def.name, column, columns[column]);
+      }
     }
     schema[def.name] = columns;
   }
@@ -2216,8 +2230,7 @@ function assertSerialPkIsPlainInteger(
   column: string,
   spec: ColumnSpec | undefined,
 ): void {
-  if (spec === undefined || typeof spec === "string") return;
-  const { type, null: nullable, ...rest } = spec;
+  const { type, null: nullable, ...rest } = declaredSpec(table, column, spec);
   const extras = Object.keys(rest);
   if (type === "integer" && extras.length === 0 && (nullable === undefined || nullable === false)) {
     return;
@@ -2228,6 +2241,57 @@ function assertSerialPkIsPlainInteger(
       `primaryKey: true — the declared type/options would never reach the DDL. Teach ` +
       `canonicalRegistrySchema to model the rendered form before declaring it this way.`,
   );
+}
+
+/**
+ * Guard the composite-PK branch the replay likewise skips. That branch overrides
+ * whatever the column declared with `null: false`, so "declared" and "rendered"
+ * agree only where the declaration says nothing about nullability (every live
+ * composite-PK column today) or already says `null: false`. A column declared
+ * `null: true` would be reported nullable here while the DDL made it NOT NULL —
+ * precisely the silent mis-report {@link assertSerialPkIsPlainInteger} exists to
+ * prevent.
+ */
+function assertCompositePkDeclaresNoNull(
+  table: string,
+  column: string,
+  spec: ColumnSpec | undefined,
+): void {
+  if (declaredSpec(table, column, spec).null !== true) return;
+  throw new ActiveRecordError(
+    `canonical registry: composite-PK column ${table}.${column} declares null: true, but the ` +
+      `composite-PK path overrides it to null: false — the declared shape would never reach ` +
+      `the DDL. Teach canonicalRegistrySchema to model the rendered form before declaring it ` +
+      `this way.`,
+  );
+}
+
+/**
+ * The object form of a column the replay recorded. A missing entry means `meta`
+ * names a primary-key column no `t.<type>()` call in the block declares — a
+ * typo'd name that would otherwise sail past both guards — and the shorthand
+ * string form is unreachable because {@link specFromColumnCall} always builds the
+ * object form; both are raised rather than skipped, so neither can rot into a
+ * silent no-op.
+ */
+function declaredSpec(
+  table: string,
+  column: string,
+  spec: ColumnSpec | undefined,
+): Exclude<ColumnSpec, string> {
+  if (spec === undefined) {
+    throw new ActiveRecordError(
+      `canonical registry: ${table} names ${column} as a primary key, but its create_table ` +
+        `block declares no such column.`,
+    );
+  }
+  if (typeof spec === "string") {
+    throw new ActiveRecordError(
+      `canonical registry: ${table}.${column} was recorded as the shorthand "${spec}"; the ` +
+        `replay probe is expected to build the object form.`,
+    );
+  }
+  return spec;
 }
 
 /** Rebuilds a `ColumnSpec` from the `t.column(name, type, options)` call the
