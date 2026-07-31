@@ -49,9 +49,6 @@ const { recordBootLaidTables, dropAllTables, resetTestTables } =
 const { loadSchema, loadAdapterSpecificSchema } = await import("./support/load-schema-helper.js");
 const { canonicalSchemaUpToDate, stampCanonicalSchema } =
   await import("./support/canonical-schema-stamp.js");
-// Boot runs once per worker and later files' resets clear the stamp, so the
-// only deterministic view a test file has of post-boot state is the one the
-// boot records here (`support/boot-outcome.ts`, read by template-stamp.test.ts).
 const { recordBootOutcome } = await import("./support/boot-outcome.js");
 
 if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
