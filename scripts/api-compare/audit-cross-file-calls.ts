@@ -14,6 +14,7 @@ export type Entity = {
   file: string;
   includes: string[];
   extends: string[];
+  delegatesTo?: string[];
   instanceMethods: Method[];
   classMethods: Method[];
 };
@@ -48,12 +49,22 @@ export type Row = {
   resolvedIn?: string;
 };
 
-type Definition = { entity: string; file: string; calls: Set<string> };
+type Definition = { entity: string; file: string; calls: Set<string>; name?: string };
 
 export type PackageIndex = {
   entitiesByFile: Map<string, Entity[]>;
   entitiesByName: Map<string, Entity[]>;
   definitionsByName: Map<string, Definition[]>;
+  methodsByFile: Map<string, Definition[]>;
+};
+
+/** Which recorded edge kind carried the walk to a file. */
+export type EdgeKind = "include" | "delegation";
+
+export type LooseRow = Row & {
+  resolvedIn: string;
+  edgeKind: EdgeKind;
+  resolvingMethods: string[];
 };
 
 export function buildPackageIndex(
@@ -64,12 +75,17 @@ export function buildPackageIndex(
     entitiesByFile: new Map(),
     entitiesByName: new Map(),
     definitionsByName: new Map(),
+    methodsByFile: new Map(),
+  };
+  const record = (name: string, definition: Definition): void => {
+    push(index.definitionsByName, name, definition);
+    push(index.methodsByFile, definition.file, { ...definition, name });
   };
   for (const entity of entities) {
     push(index.entitiesByFile, entity.file, entity);
     push(index.entitiesByName, entity.name, entity);
     for (const method of [...entity.instanceMethods, ...entity.classMethods]) {
-      push(index.definitionsByName, method.name, {
+      record(method.name, {
         entity: entity.name,
         file: method.file ?? entity.file,
         calls: new Set(method.calls ?? []),
@@ -78,7 +94,7 @@ export function buildPackageIndex(
   }
   for (const [file, methods] of Object.entries(fileFunctions)) {
     for (const method of methods) {
-      push(index.definitionsByName, method.name, {
+      record(method.name, {
         entity: file,
         file: method.file ?? file,
         calls: new Set(method.calls ?? []),
@@ -95,21 +111,95 @@ function push<K, V>(map: Map<K, V[]>, key: K, value: V): void {
 }
 
 export function includeGraphFiles(tsFile: string, index: PackageIndex): Set<string> {
-  const files = new Set<string>();
+  return new Set(reachableFiles(tsFile, index, false).keys());
+}
+
+/**
+ * Files reachable from `tsFile`, each tagged with the edge kind that first
+ * reached it. `delegation` follows the `delegatesTo` edges recorded by
+ * `extract-ts-api.ts` (RFC 0083) in addition to `includes` / `extends`; a file
+ * reached both ways is tagged `include`, the narrower kind.
+ */
+export function reachableFiles(
+  tsFile: string,
+  index: PackageIndex,
+  delegation: boolean,
+): Map<string, EdgeKind> {
+  const files = new Map<string, EdgeKind>();
   const seen = new Set<string>();
-  const queue = [...(index.entitiesByFile.get(tsFile) ?? [])];
+  const queue = [...(index.entitiesByFile.get(tsFile) ?? [])].map(
+    (entity) => [entity, "include" as EdgeKind] as const,
+  );
   while (queue.length > 0) {
-    const entity = queue.pop()!;
-    for (const name of [...entity.includes, ...entity.extends]) {
-      if (seen.has(name)) continue;
-      seen.add(name);
+    const [entity, inherited] = queue.pop()!;
+    const edges: [string, EdgeKind][] = [
+      ...[...entity.includes, ...entity.extends].map(
+        (name) => [name, inherited] as [string, EdgeKind],
+      ),
+      ...(delegation ? (entity.delegatesTo ?? []) : []).map(
+        (name) => [name, "delegation"] as [string, EdgeKind],
+      ),
+    ];
+    for (const [name, kind] of edges) {
+      if (seen.has(`${kind}:${name}`)) continue;
+      seen.add(`${kind}:${name}`);
       for (const target of index.entitiesByName.get(name) ?? []) {
-        files.add(target.file);
-        queue.push(target);
+        if (files.get(target.file) !== "include") files.set(target.file, kind);
+        queue.push([target, kind]);
       }
     }
   }
   return files;
+}
+
+/**
+ * Rows the loose rule ("ANY method in a reachable file makes the call")
+ * resolves and the strict same-name rule does not — the population this
+ * story exists to classify.
+ */
+export function looseOnlyRows(
+  rows: Row[],
+  indexes: Map<string, PackageIndex>,
+  delegation: boolean,
+): LooseRow[] {
+  const loose: LooseRow[] = [];
+  for (const row of rows) {
+    if (row.bucket !== "divergence" && row.bucket !== "unported") continue;
+    const index = indexes.get(row.package);
+    if (!index) continue;
+    const candidates = candidateNames(row.call);
+    for (const [file, edgeKind] of reachableFiles(row.tsFile, index, delegation)) {
+      const makers = (index.methodsByFile.get(file) ?? []).filter((d) =>
+        candidates.some((c) => d.calls.has(c)),
+      );
+      if (makers.length === 0) continue;
+      loose.push({
+        ...row,
+        resolvedIn: file,
+        edgeKind,
+        resolvingMethods: [...new Set(makers.map((d) => d.name ?? "?"))].sort(),
+      });
+      break;
+    }
+  }
+  return loose;
+}
+
+/** Rows the strict same-name rule resolves through the graph, per edge policy. */
+export function sameNameGraphRows(
+  rows: Row[],
+  indexes: Map<string, PackageIndex>,
+  delegation: boolean,
+): Row[] {
+  return rows.filter((row) => {
+    const index = indexes.get(row.package);
+    if (!index) return false;
+    const candidates = candidateNames(row.call);
+    const reachable = reachableFiles(row.tsFile, index, delegation);
+    return (index.definitionsByName.get(row.tsName) ?? []).some(
+      (d) => reachable.has(d.file) && candidates.some((c) => d.calls.has(c)),
+    );
+  });
 }
 
 export function classifyRow(
@@ -175,37 +265,6 @@ function tsStem(tsFile: string): string {
   return tsFile.replace(/\.ts$/, "");
 }
 
-function countAnyMethodInGraph(rows: Row[], indexes: Map<string, PackageIndex>): number {
-  const callsByFile = new Map<string, Map<string, Set<string>>>();
-  for (const [pkg, index] of indexes) {
-    const perFile = new Map<string, Set<string>>();
-    for (const definitions of index.definitionsByName.values()) {
-      for (const definition of definitions) {
-        let set = perFile.get(definition.file);
-        if (!set) perFile.set(definition.file, (set = new Set()));
-        for (const call of definition.calls) set.add(call);
-      }
-    }
-    callsByFile.set(pkg, perFile);
-  }
-  let count = 0;
-  for (const row of rows) {
-    if (row.bucket !== "divergence" && row.bucket !== "unported") continue;
-    const index = indexes.get(row.package);
-    if (!index) continue;
-    const candidates = candidateNames(row.call);
-    const perFile = callsByFile.get(row.package)!;
-    for (const file of includeGraphFiles(row.tsFile, index)) {
-      const calls = perFile.get(file);
-      if (calls && candidates.some((c) => calls.has(c))) {
-        count++;
-        break;
-      }
-    }
-  }
-  return count;
-}
-
 function tally<T>(values: T[], key: (value: T) => string): [string, number][] {
   const counts = new Map<string, number>();
   for (const value of values) counts.set(key(value), (counts.get(key(value)) ?? 0) + 1);
@@ -232,11 +291,21 @@ async function main(): Promise<void> {
   const rows = classify(artifact.mismatches, indexes);
   const crossFile = rows.filter((r) => isCrossFile(r));
   const resolvable = rows.filter((r) => r.bucket !== "divergence" && r.bucket !== "unported");
+  const looseWithDelegation = looseOnlyRows(rows, indexes, true);
+
+  if (process.argv.includes("--loose-sample")) {
+    for (const row of looseWithDelegation) console.log(JSON.stringify(row));
+    return;
+  }
 
   const report = {
     totalRows: rows.length,
     crossFileRows: crossFile.length,
-    anyMethodInIncludeGraph: countAnyMethodInGraph(rows, indexes),
+    anyMethodInIncludeGraph: looseOnlyRows(rows, indexes, false).length,
+    anyMethodInDelegationGraph: looseWithDelegation.length,
+    sameNameInIncludeGraph: sameNameGraphRows(rows, indexes, false).length,
+    sameNameInDelegationGraph: sameNameGraphRows(rows, indexes, true).length,
+    anyMethodByEdgeKind: Object.fromEntries(tally(looseWithDelegation, (r) => r.edgeKind)),
     resolvableAnywhereByName: resolvable.length,
     resolvableForwardersAboveDelegationCap: resolvable.filter((r) =>
       (indexes.get(r.package)!.definitionsByName.get(r.tsName) ?? [])

@@ -4,22 +4,26 @@ import type { Entity, Mismatch } from "./audit-cross-file-calls.js";
 import {
   buildPackageIndex,
   candidateNames,
+  classify,
   classifyRow,
   includeGraphFiles,
   isCrossFile,
+  looseOnlyRows,
+  reachableFiles,
 } from "./audit-cross-file-calls.js";
 
 function entity(
   name: string,
   file: string,
   methods: { name: string; calls?: string[] }[],
-  edges: { includes?: string[]; extends?: string[] } = {},
+  edges: { includes?: string[]; extends?: string[]; delegatesTo?: string[] } = {},
 ): Entity {
   return {
     name,
     file,
     includes: edges.includes ?? [],
     extends: edges.extends ?? [],
+    ...(edges.delegatesTo ? { delegatesTo: edges.delegatesTo } : {}),
     instanceMethods: methods,
     classMethods: [],
   };
@@ -55,6 +59,59 @@ describe("includeGraphFiles", () => {
       entity("PgSchemaStatements", "pg/schema-statements-class.ts", []),
     ]);
     expect(includeGraphFiles("pg-adapter.ts", index).size).toBe(0);
+  });
+});
+
+describe("reachableFiles", () => {
+  const index = buildPackageIndex([
+    entity("Adapter", "pg-adapter.ts", [], {
+      includes: ["Quoting"],
+      delegatesTo: ["PgSchemaStatements"],
+    }),
+    entity("Quoting", "quoting.ts", []),
+    entity("PgSchemaStatements", "pg/schema-statements-class.ts", []),
+  ]);
+
+  it("ignores delegation edges unless asked to follow them", () => {
+    expect([...reachableFiles("pg-adapter.ts", index, false).keys()]).toEqual(["quoting.ts"]);
+  });
+
+  it("tags a file the delegation edge reaches", () => {
+    expect(Object.fromEntries(reachableFiles("pg-adapter.ts", index, true))).toEqual({
+      "quoting.ts": "include",
+      "pg/schema-statements-class.ts": "delegation",
+    });
+  });
+});
+
+describe("looseOnlyRows", () => {
+  const index = buildPackageIndex([
+    entity("Adapter", "pg-adapter.ts", [{ name: "indexes", calls: [] }], {
+      delegatesTo: ["PgSchemaStatements"],
+    }),
+    entity("PgSchemaStatements", "pg/schema-statements-class.ts", [
+      { name: "unrelated", calls: ["quotedScope"] },
+    ]),
+  ]);
+  const indexes = new Map([["activerecord", index]]);
+  const rows = classify(
+    [{ ...mismatch("pg-adapter.ts", "indexes"), missing: ["quoted_scope → quotedScope"] }],
+    indexes,
+  );
+
+  it("credits a row to an unrelated method in the delegation target's file", () => {
+    expect(looseOnlyRows(rows, indexes, true)).toEqual([
+      {
+        ...rows[0],
+        resolvedIn: "pg/schema-statements-class.ts",
+        edgeKind: "delegation",
+        resolvingMethods: ["unrelated"],
+      },
+    ]);
+  });
+
+  it("resolves nothing without the delegation edge", () => {
+    expect(looseOnlyRows(rows, indexes, false)).toEqual([]);
   });
 });
 
