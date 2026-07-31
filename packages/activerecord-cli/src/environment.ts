@@ -7,7 +7,7 @@ import {
   type DatabaseConfig,
 } from "@blazetrails/activerecord";
 
-function isInMemory(database: string): boolean {
+function isMemoryOrUri(database: string): boolean {
   return database === ":memory:" || database.startsWith("file:");
 }
 
@@ -18,7 +18,7 @@ export function normalizeSqlitePaths(
   const normalized = configs.configurations.map((config) => {
     const database = config.database;
     if (!database || !config.adapter?.startsWith("sqlite")) return config;
-    if (isInMemory(database) || isAbsolute(database)) return config;
+    if (isMemoryOrUri(database) || isAbsolute(database)) return config;
     return new HashConfig(config.envName, config.name, {
       ...config.configurationHash,
       database: resolve(root, database),
