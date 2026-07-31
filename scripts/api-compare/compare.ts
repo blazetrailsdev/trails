@@ -343,6 +343,12 @@ export function isDelegatingWrapper(tsName: string, tsCalls: Set<string>): boole
  * extraction depth ports actually use — a body, the helper it factors out, and
  * that helper's own leaf helper — without letting a whole file's call graph
  * collapse into one call-set, which would silence real omissions in large files.
+ *
+ * It counts hops of RESOLVABLE same-file names, so the call-set reaches one
+ * level further than the name count suggests: the third helper's own calls are
+ * unioned in (they are its call-set), they are just not walked through. Depth 3
+ * therefore admits `indexRowToDefinition`'s `columnNamesFromColumnNumbers`, and
+ * stops before that leaf's callees.
  */
 export const SAME_FILE_CLOSURE_DEPTH = 3;
 
@@ -389,6 +395,15 @@ export function reachedSameFileMethods(
  * On top of that, a delegating wrapper (see isDelegatingWrapper) also gets the
  * same-named DELEGATE's calls unioned in so the port gets compared instead of
  * the forwarder.
+ *
+ * The closure is name-based, not purpose-based: it holds a body to "some helper
+ * I reach also calls X", so a helper that calls X for an UNRELATED reason
+ * discharges the flag. That is the same imprecision `delegateCalls` carries,
+ * at a smaller radius — bounded to one file and to calls the body actually
+ * makes, which is what makes it worth trading for the extraction false
+ * positives. The cost lands on rows a human had already investigated, so a
+ * reseed prints every hand-reviewed row it drops (see droppedReviewed) instead
+ * of letting one vanish into a 400-row diff.
  *
  * `delegateCalls` resolves a method name to every call made by that name anywhere
  * in the package (and its deps) — deliberately coarser than the per-(file, name)

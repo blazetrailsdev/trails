@@ -4,8 +4,10 @@ import * as os from "os";
 import * as path from "path";
 import type { ExcludeEntry } from "./lint-call-mismatches.js";
 import {
+  droppedReviewed,
   loadMark,
   newlySeeded,
+  renderDroppedReviewed,
   nextMark,
   parseMark,
   renderExcess,
@@ -141,5 +143,31 @@ describe("renderWriteSummary", () => {
 
   it("says nothing about newly-seeded rows when there are none", () => {
     expect(renderWriteSummary(10, [], 10, "mark.json")).not.toContain("THIS reseed");
+  });
+});
+
+describe("droppedReviewed", () => {
+  it("reports a hand-reviewed row that stopped flagging", () => {
+    const prior = [entry("a", "verified: real divergence"), entry("b")];
+    expect(droppedReviewed([entry("b")], prior, SEED).map((e) => e.call)).toEqual(["a"]);
+  });
+
+  it("ignores dropped rows that were never reviewed", () => {
+    expect(droppedReviewed([], [entry("a")], SEED)).toEqual([]);
+  });
+
+  it("ignores reviewed rows that still flag", () => {
+    const reviewed = entry("a", "verified: real divergence");
+    expect(droppedReviewed([reviewed], [reviewed], SEED)).toEqual([]);
+  });
+
+  it("says nothing when no reviewed row was dropped", () => {
+    expect(renderDroppedReviewed([])).toBe("");
+  });
+
+  it("names each dropped reviewed row so the author can spot-check it", () => {
+    const msg = renderDroppedReviewed([entry("a", "verified: real divergence")]);
+    expect(msg).toContain("1 reviewed entr(ies)");
+    expect(msg).toContain("activerecord  relation.ts  load  a");
   });
 });

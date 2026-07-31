@@ -63,6 +63,34 @@ export function newlySeeded(
   return unreviewedEntries(next, defaultReason).filter((e) => !before.has(keyOf(e)));
 }
 
+/**
+ * Baseline rows this reseed DROPPED that carried a human-written reason (i.e.
+ * not the seed string). A drop means the row stopped flagging — usually a real
+ * convergence, but a widened gate (RFC 0083's same-file closure, the delegate
+ * union) can also resolve a call for a reason unrelated to the divergence a
+ * reviewer recorded. Those rows are the ones whose loss actually costs
+ * information, so `--write` lists them for the PR author to spot-check instead
+ * of trusting the diff wholesale. Reporting only: it never fails the gate.
+ */
+export function droppedReviewed(
+  next: ExcludeEntry[],
+  prior: ExcludeEntry[],
+  defaultReason: string,
+): ExcludeEntry[] {
+  const kept = new Set(next.map(keyOf));
+  return prior.filter((e) => e.reason !== defaultReason && !kept.has(keyOf(e)));
+}
+
+export function renderDroppedReviewed(dropped: ExcludeEntry[]): string {
+  if (dropped.length === 0) return "";
+  return [
+    ``,
+    `${dropped.length} reviewed entr(ies) (reason written by hand) no longer flag and were dropped.`,
+    `Spot-check each: a gate that widened — not a port that converged — can also clear a row.`,
+    ...dropped.map((e) => `  - ${e.package}  ${e.tsFile}  ${e.rubyName}  ${e.call}`),
+  ].join("\n");
+}
+
 export function parseMark(text: string): number {
   const parsed = JSON.parse(text) as unknown;
   const max = (parsed as UnreviewedMark | null)?.max;
