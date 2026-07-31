@@ -1833,11 +1833,8 @@ export class SchemaStatements {
   }
 
   async assumeMigratedUptoVersion(version: number | string): Promise<void> {
-    const ver = String(version);
-    if (!/^\d+$/.test(ver)) {
-      throw new Error(`Invalid migration version: ${version}`);
-    }
-    const verNum = parseInt(ver, 10);
+    const leading = /^\s*([+-]?\d+(?:_\d+)*)/.exec(String(version));
+    const verNum = leading ? parseInt(leading[1].replace(/_/g, ""), 10) : 0;
 
     const pool = (this.adapter as any).pool;
     const smTableName = pool?.schemaMigration?.tableName ?? "schema_migrations";

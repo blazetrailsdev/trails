@@ -795,3 +795,64 @@ describe("buildCreateTableDefinition hash-form id type fetch", () => {
     expect(td.columns.find((c) => c.options.primaryKey)?.type).toBe("primary_key");
   });
 });
+
+describe("assumeMigratedUptoVersion", () => {
+  function makeStatementsWithMigrations(migrations: number[], migrated: number[] = []) {
+    const execute = vi.fn().mockResolvedValue([]);
+    const ss = makeStatements({
+      execute,
+      quote: (v: unknown) => String(v),
+      pool: {
+        schemaMigration: { tableName: "schema_migrations" },
+        migrationContext: {
+          getAllVersions: async () => migrated,
+          migrations: migrations.map((version) => ({ version })),
+        },
+      },
+    });
+    return { ss, execute };
+  }
+
+  it("inserts the target version and every earlier known migration", async () => {
+    const { ss, execute } = makeStatementsWithMigrations([1, 2, 20], [1]);
+
+    await ss.assumeMigratedUptoVersion(10);
+
+    expect(execute.mock.calls.map((c) => c[0])).toEqual([
+      'INSERT INTO "schema_migrations" (version) VALUES (10)',
+      'INSERT INTO "schema_migrations" (version) VALUES\n(2);',
+    ]);
+  });
+
+  it("coerces a non-numeric version to 0 rather than raising", async () => {
+    const { ss, execute } = makeStatementsWithMigrations([1, 2]);
+
+    await ss.assumeMigratedUptoVersion("not_a_version");
+
+    expect(execute.mock.calls.map((c) => c[0])).toEqual([
+      'INSERT INTO "schema_migrations" (version) VALUES (0)',
+    ]);
+  });
+
+  it("strips digit-separating underscores like String#to_i", async () => {
+    const { ss, execute } = makeStatementsWithMigrations([1, 2]);
+
+    await ss.assumeMigratedUptoVersion("1_000");
+
+    expect(execute.mock.calls.map((c) => c[0])).toEqual([
+      'INSERT INTO "schema_migrations" (version) VALUES (1000)',
+      'INSERT INTO "schema_migrations" (version) VALUES\n(2),\n(1);',
+    ]);
+  });
+
+  it("takes the leading integer prefix of a partially numeric version", async () => {
+    const { ss, execute } = makeStatementsWithMigrations([1, 2, 20]);
+
+    await ss.assumeMigratedUptoVersion("10abc");
+
+    expect(execute.mock.calls.map((c) => c[0])).toEqual([
+      'INSERT INTO "schema_migrations" (version) VALUES (10)',
+      'INSERT INTO "schema_migrations" (version) VALUES\n(2),\n(1);',
+    ]);
+  });
+});
