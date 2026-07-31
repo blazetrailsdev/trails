@@ -5,6 +5,7 @@ import type { AbstractMysqlAdapter } from "../connection-adapters/abstract-mysql
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { ActiveRecordError } from "../errors.js";
 import { loadCanonicalSchema } from "./canonical-schema.js";
+import { STUBBED_DDL_METHODS } from "./stubbed-ddl-methods.js";
 
 /**
  * The ported slice of
@@ -541,35 +542,58 @@ export async function loadSchema(adapter: DatabaseAdapter): Promise<void> {
 }
 
 /**
- * Fail fast when a caller that has stubbed `createTable` — the shape every
+ * Fail fast when a caller that has stubbed a DDL emitter — the shape every
  * arm-content cover uses to capture DDL without laying it — reaches for the
  * full load. Such a caller wants {@link loadAdapterSpecificSchema}; the
  * canonical half {@link loadSchema} runs first would go on to query tables that
  * were never really laid, which surfaces as `relation "..." does not exist` on
  * the PG lane only (PR #5676, reverted by #5688).
  *
+ * The set is {@link STUBBED_DDL_METHODS}, which spells out why it reaches past
+ * `createTable` to the members `runTable` really goes through.
+ *
  * `blazetrails/no-load-schema-with-stubbed-ddl` catches the same mistake
  * lexically, inside an activerecord test file. This catches it from anywhere —
  * a stub installed through a helper, a non-test caller, a proxy the rule cannot
  * see — and at the moment it would do damage rather than at lint time.
- *
- * Only an *overridden* `createTable` counts: the prototype's own method is
- * looked up through the chain, so a transparent proxy (which returns that same
- * function) passes, and an adapter with no prototype `createTable` at all — a
- * hand-rolled fake — is left alone rather than guessed at.
  */
 function assertNotArmProbe(adapter: DatabaseAdapter): void {
-  const seen = (adapter as unknown as { createTable?: unknown }).createTable;
+  for (const method of STUBBED_DDL_METHODS) assertNotStubbed(adapter, method);
+}
+
+/**
+ * What an accessor-backed member yields cannot be compared by identity —
+ * PostgreSQLAdapter's `schemaCreation` builds a fresh visitor on every read — so
+ * the real one and the one the caller sees are compared by prototype: a stub
+ * standing in for it is some other object, however it is shaped.
+ */
+function sameKind(seen: unknown, real: unknown): boolean {
+  if (seen == null || real == null) return seen === real;
+  return Object.getPrototypeOf(seen) === Object.getPrototypeOf(real);
+}
+
+/**
+ * Only an *overridden* member counts: the prototype's own is looked up through
+ * the chain, so a transparent proxy (which returns that same function) passes,
+ * and an adapter carrying no prototype member at all — a hand-rolled fake — is
+ * left alone rather than guessed at.
+ */
+function assertNotStubbed(adapter: DatabaseAdapter, method: string): void {
+  const seen = (adapter as unknown as Record<string, unknown>)[method];
   for (
     let proto: object | null = Object.getPrototypeOf(adapter);
     proto !== null;
     proto = Object.getPrototypeOf(proto)
   ) {
-    const descriptor = Object.getOwnPropertyDescriptor(proto, "createTable");
+    const descriptor = Object.getOwnPropertyDescriptor(proto, method);
     if (!descriptor) continue;
-    if (descriptor.value === seen) return;
+    if (descriptor.get) {
+      if (sameKind(seen, descriptor.get.call(adapter))) return;
+    } else if (descriptor.value === seen) {
+      return;
+    }
     throw new ActiveRecordError(
-      "loadSchema was handed an adapter whose createTable is stubbed. The canonical " +
+      `loadSchema was handed an adapter whose ${method} is stubbed. The canonical ` +
         "half of the load would not really lay its tables; call " +
         "loadAdapterSpecificSchema directly to cover the adapter-specific arm.",
     );
