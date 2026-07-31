@@ -10,5 +10,3 @@ export class AddPeopleNumberOfLegs extends Migration {
     await this.removeColumn("people", "number_of_legs");
   }
 }
-
-export default new AddPeopleNumberOfLegs();

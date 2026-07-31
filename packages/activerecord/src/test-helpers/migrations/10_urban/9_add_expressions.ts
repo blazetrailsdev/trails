@@ -12,5 +12,3 @@ export class AddExpressions extends Migration {
     await this.dropTable("expressions");
   }
 }
-
-export default new AddExpressions();

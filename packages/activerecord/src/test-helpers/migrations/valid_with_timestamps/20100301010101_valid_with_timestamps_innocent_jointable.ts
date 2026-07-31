@@ -13,5 +13,3 @@ export class ValidWithTimestampsInnocentJointable extends Migration {
     await this.dropTable("people_reminders");
   }
 }
-
-export default new ValidWithTimestampsInnocentJointable();

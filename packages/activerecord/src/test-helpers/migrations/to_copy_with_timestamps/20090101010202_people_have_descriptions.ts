@@ -10,5 +10,3 @@ export class PeopleHaveDescriptions extends Migration {
     await this.removeColumn("people", "description");
   }
 }
-
-export default new PeopleHaveDescriptions();
