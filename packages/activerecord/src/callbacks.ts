@@ -165,6 +165,9 @@ export function afterDestroy<T extends ModelCtor>(
   registerCallback(modelClass, "after", "destroy", fn, options);
 }
 
+/** @internal */
+type SyncOnly<R> = R extends PromiseLike<unknown> ? never : R;
+
 /**
  * Register an after_find callback. Fires on every record loaded from the DB.
  *
@@ -172,9 +175,9 @@ export function afterDestroy<T extends ModelCtor>(
  *
  * Mirrors: ActiveRecord::Callbacks.after_find
  */
-export function afterFind<T extends ModelCtor>(
+export function afterFind<T extends ModelCtor, R>(
   modelClass: T,
-  fn: (record: InstanceType<T>) => void | Promise<void>,
+  fn: (record: InstanceType<T>) => SyncOnly<R>,
   options?: CallbackOptions<InstanceType<T>>,
 ): void {
   registerCallback(modelClass, "after", "find", fn, options);
@@ -187,9 +190,9 @@ export function afterFind<T extends ModelCtor>(
  *
  * Mirrors: ActiveRecord::Callbacks.after_initialize
  */
-export function afterInitialize<T extends ModelCtor>(
+export function afterInitialize<T extends ModelCtor, R>(
   modelClass: T,
-  fn: (record: InstanceType<T>) => void | Promise<void>,
+  fn: (record: InstanceType<T>) => SyncOnly<R>,
   options?: CallbackOptions<InstanceType<T>>,
 ): void {
   registerCallback(modelClass, "after", "initialize", fn, options);
