@@ -2355,6 +2355,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * `_create_record` — `add_to_target(record) { insert_record(record, true,
    * true) }` (collection_association.rb:363-371) — rather than going through
    * `concat`, which would fire the callbacks a second time.
+   *
+   * `throughScope` is Rails' `@through_scope`
+   * (has_many_through_association.rb:93), which `construct_join_attributes`
+   * reads back; a scoped create (`AssociationRelation#create`) captured it
+   * before this call, so it is lent to the association for this write only.
    */
   private async _pushThrough(
     records: T[],
@@ -2366,10 +2371,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       concat(...records: Base[]): Promise<Base[] | undefined>;
       insertRecord(record: Base, validate?: boolean, raise?: boolean): Promise<boolean>;
     };
-    // Rails sets `@through_scope` around `build_record`
-    // (has_many_through_association.rb:93) and `construct_join_attributes` reads
-    // it back. A scoped create (`AssociationRelation#create`) captured the scope
-    // before we got here, so lend it to the association for this write only.
     const previousThroughScope = assoc._throughScope;
     if (throughScope != null) assoc._throughScope = throughScope;
     try {
@@ -2378,12 +2379,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           await this._addToTarget(
             record,
             { skipCallbacks: true, replace: this.distinctValue },
-            () =>
-              // Rails' `concat_records` only inserts `unless owner.new_record?`;
-              // an unsaved owner defers the join row to after_create autosave.
-              this._record.isNewRecord()
-                ? Promise.resolve(true)
-                : assoc.insertRecord(record, true, true),
+            () => assoc.insertRecord(record, true, true),
           );
         }
       } else {
