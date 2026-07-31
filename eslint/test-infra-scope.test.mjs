@@ -32,6 +32,7 @@ describe("test-infra lint scope", () => {
       `${SRC}/support/load-schema-helper.test.ts`,
       `${SRC}/support/load-schema-helper.trails.test.ts`,
       `${SRC}/support/load-schema-helper-uuid-default.trails.test.ts`,
+      `${SRC}/support/load-schema-helper-arm-guard.trails.test.ts`,
     ]);
     expect([...ALLOW]).toEqual(canonicalLoaderSelfTests);
     expect(canonicalLoaderModules).toEqual([

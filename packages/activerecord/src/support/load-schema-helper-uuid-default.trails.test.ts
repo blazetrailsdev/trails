@@ -19,6 +19,11 @@
  * statement referencing one fails with `StatementInvalid: relation ... does not
  * exist`. It only shows up on the PG lane, so do not "fix" this to `loadSchema`
  * on the strength of a green unit run (PR #5676, reverted by #5688).
+ *
+ * Gating: `describeIfPg` probes a PostgreSQL server directly rather than
+ * reading `ARCONN`, so this file runs on the sqlite lane too whenever a server
+ * is reachable — including the local run a contributor makes before pushing. It
+ * is skipped, never silently passed, when none is.
  */
 import { expect, it } from "vitest";
 import { describeIfPg, PG_TEST_URL } from "./describe-if-pg.js";
