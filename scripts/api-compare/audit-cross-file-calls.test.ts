@@ -5,6 +5,7 @@ import {
   buildPackageIndex,
   candidateNames,
   classify,
+  crossesAdapterFamilies,
   classifyRow,
   includeGraphFiles,
   edgeKindOf,
@@ -235,6 +236,52 @@ describe("isCrossFile", () => {
         ...row,
         tsFile: "connection-adapters/postgresql-adapter.ts",
         rubyFile: "connection_adapters/postgresql_adapter.rb",
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("crossesAdapterFamilies", () => {
+  const row = {
+    package: "activerecord",
+    tsName: "enableExtension",
+    rubyFile: "postgresql_adapter.rb",
+    call: "internal_exec_query → internalExecQuery",
+    bucket: "divergence" as const,
+    tsFile: "connection-adapters/postgresql-adapter.ts",
+  };
+
+  it("flags a PostgreSQL row credited to a MySQL body", () => {
+    expect(
+      crossesAdapterFamilies({
+        ...row,
+        resolutions: [
+          {
+            file: "connection-adapters/mysql/database-statements.ts",
+            edgeKind: "include",
+            methods: ["explain"],
+          },
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  it("does not flag a row credited within its own family", () => {
+    expect(
+      crossesAdapterFamilies({
+        ...row,
+        resolutions: [
+          {
+            file: "connection-adapters/postgresql/schema-statements-class.ts",
+            edgeKind: "delegation",
+            methods: ["foreignKeys"],
+          },
+          {
+            file: "connection-adapters/abstract-adapter.ts",
+            edgeKind: "include",
+            methods: ["log"],
+          },
+        ],
       }),
     ).toBe(false);
   });

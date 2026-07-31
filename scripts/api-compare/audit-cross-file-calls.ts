@@ -118,27 +118,32 @@ export function reachableFiles(
   index: PackageIndex,
   delegation: boolean,
 ): Map<string, EdgeKind> {
-  const files = new Map<string, EdgeKind>();
-  const seen = new Set<string>();
-  const queue = [...(index.entitiesByFile.get(tsFile) ?? [])].map(
-    (entity) => [entity, "include" as EdgeKind] as const,
+  const includeOnly = delegation ? walk(tsFile, index, false) : new Set<string>();
+  return new Map(
+    [...walk(tsFile, index, delegation)].map((file) => [
+      file,
+      delegation && !includeOnly.has(file) ? "delegation" : "include",
+    ]),
   );
+}
+
+function walk(tsFile: string, index: PackageIndex, delegation: boolean): Set<string> {
+  const files = new Set<string>();
+  const seen = new Set<string>();
+  const queue = [...(index.entitiesByFile.get(tsFile) ?? [])];
   while (queue.length > 0) {
-    const [entity, inherited] = queue.pop()!;
-    const edges: [string, EdgeKind][] = [
-      ...[...entity.includes, ...entity.extends].map(
-        (name) => [name, inherited] as [string, EdgeKind],
-      ),
-      ...(delegation ? (entity.delegatesTo ?? []) : []).map(
-        (name) => [name, "delegation"] as [string, EdgeKind],
-      ),
+    const entity = queue.pop()!;
+    const edges = [
+      ...entity.includes,
+      ...entity.extends,
+      ...(delegation ? (entity.delegatesTo ?? []) : []),
     ];
-    for (const [name, kind] of edges) {
-      if (seen.has(`${kind}:${name}`)) continue;
-      seen.add(`${kind}:${name}`);
+    for (const name of edges) {
+      if (seen.has(name)) continue;
+      seen.add(name);
       for (const target of index.entitiesByName.get(name) ?? []) {
-        if (files.get(target.file) !== "include") files.set(target.file, kind);
-        queue.push([target, kind]);
+        files.add(target.file);
+        queue.push(target);
       }
     }
   }
@@ -169,6 +174,21 @@ export function looseOnlyRows(
     loose.push({ ...row, resolutions });
   }
   return loose;
+}
+
+export function adapterFamily(file: string): string | undefined {
+  return [/postgresql/, /mysql|mariadb/, /sqlite/].find((re) => re.test(file))?.source;
+}
+
+export function crossesAdapterFamilies(row: LooseRow): boolean {
+  const own = adapterFamily(row.tsFile);
+  return (
+    own !== undefined &&
+    row.resolutions.some((r) => {
+      const other = adapterFamily(r.file);
+      return other !== undefined && other !== own;
+    })
+  );
 }
 
 export function edgeKindOf(row: LooseRow): EdgeKind {
@@ -298,6 +318,7 @@ async function main(): Promise<void> {
     anyMethodResolvedOnlyInOwnFile: looseWithDelegation.filter((r) =>
       r.resolutions.every((res) => res.file === r.tsFile),
     ).length,
+    anyMethodCrossingAdapterFamilies: looseWithDelegation.filter(crossesAdapterFamilies).length,
     anyMethodWithSameNamedResolver: looseWithDelegation.filter((r) =>
       r.resolutions.some((res) => res.methods.includes(r.tsName)),
     ).length,
