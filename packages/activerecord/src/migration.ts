@@ -1606,11 +1606,17 @@ export abstract class Migration {
     return fn();
   }
 
-  /** @internal */
+  /**
+   * Render a dispatched statement's arguments the way Ruby's
+   * `format_arguments` does: every argument through `inspect`, with a
+   * trailing options Hash stripped of internal (`_`-prefixed) keys and
+   * omitted when nothing survives. An empty argument list still yields
+   * `"nil"`, matching Ruby's `arguments.last` on an empty array.
+   *
+   * @internal
+   */
   formatArguments(args: unknown[]): string {
     const argList = args.slice(0, -1).map((a) => rubyInspect(a));
-    // Ruby's `arguments.last` on an empty argument list is `nil`, so the
-    // else branch still pushes `"nil"` — `create_table(nil)`, not `create_table()`.
     const last = args[args.length - 1];
     if (isPlainObject(last)) {
       const filtered = Object.fromEntries(

@@ -357,8 +357,6 @@ describe("Migration#createTable id option type", () => {
     });
 
     it("announces a non-Hash object last argument through inspect", async () => {
-      // A Temporal value is an object but not a Hash, so Ruby takes the
-      // `inspect` branch; the options-filtering branch would drop it entirely.
       expect(await announce("execute", "SELECT 1", Temporal.PlainDate.from("2024-01-01"))).toBe(
         '-- execute("SELECT 1", 2024-01-01)',
       );
