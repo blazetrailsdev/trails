@@ -277,13 +277,112 @@ describe("Migration#createTable id option type", () => {
       expect(migration.executionStrategy).toBe(migration.executionStrategy);
     });
 
-    it("forwards unknown calls through the strategy to the connection", () => {
+    it("forwards unknown calls through the strategy to the connection", async () => {
       const migration = new StrategyMigration();
       const strategy = migration.executionStrategy as DefaultStrategy;
       expect(strategy.respondToMissing("createTable")).toBe(true);
       expect(strategy.respondToMissing("nopeNotHere")).toBe(false);
       expect(strategy.methodMissing("createTable")).toBe("hi mom!");
-      expect(() => migration.methodMissing("nopeNotHere")).toThrow(TypeError);
+      await expect(migration.methodMissing("nopeNotHere")).rejects.toThrow(TypeError);
+    });
+
+    // `Migration#methodMissing` mirrors `migration.rb:1044-1058`: the dispatch
+    // is wrapped in `sayWithTime` and the leading table-name arguments are
+    // rewritten through `properTableName`.
+    class RecordingMigration extends Migration {
+      calls: [string, unknown[]][] = [];
+      lines: string[] = [];
+      revertable = false;
+      override get connection(): DatabaseAdapter {
+        const record =
+          (name: string) =>
+          (...args: unknown[]) => {
+            this.calls.push([name, args]);
+            return name;
+          };
+        const conn: Record<string, unknown> = {
+          createTable: record("createTable"),
+          renameTable: record("renameTable"),
+          removeForeignKey: record("removeForeignKey"),
+          execute: record("execute"),
+        };
+        if (this.revertable) conn["revert"] = () => undefined;
+        return conn as unknown as DatabaseAdapter;
+      }
+      override write(text = ""): void {
+        this.lines.push(text);
+      }
+      async up(): Promise<void> {}
+      async down(): Promise<void> {}
+    }
+
+    const withTableNameAffixes = async (fn: () => Promise<void>): Promise<void> => {
+      const savedPrefix = Base.tableNamePrefix;
+      const savedSuffix = Base.tableNameSuffix;
+      Base.tableNamePrefix = "p_";
+      Base.tableNameSuffix = "_s";
+      try {
+        await fn();
+      } finally {
+        Base.tableNamePrefix = savedPrefix;
+        Base.tableNameSuffix = savedSuffix;
+      }
+    };
+
+    it("announces and times the dispatched statement", async () => {
+      const migration = new RecordingMigration();
+      const verboseWas = Migration.verbose;
+      Migration.verbose = true;
+      try {
+        await migration.methodMissing("createTable", "widgets", { id: false });
+      } finally {
+        Migration.verbose = verboseWas;
+      }
+      expect(migration.lines[0]).toBe('-- createTable("widgets", {"id":false})');
+      expect(migration.lines[1]).toMatch(/^ {3}-> \d+\.\d{4}s$/);
+    });
+
+    it("rewrites the first argument through properTableName", async () => {
+      await withTableNameAffixes(async () => {
+        const migration = new RecordingMigration();
+        await migration.methodMissing("createTable", "widgets", { id: false });
+        expect(migration.calls).toEqual([["createTable", ["p_widgets_s", { id: false }]]]);
+      });
+    });
+
+    it("rewrites the second argument for renameTable and non-Hash removeForeignKey", async () => {
+      await withTableNameAffixes(async () => {
+        const migration = new RecordingMigration();
+        await migration.methodMissing("renameTable", "widgets", "gadgets");
+        await migration.methodMissing("removeForeignKey", "widgets", "gadgets");
+        await migration.methodMissing("removeForeignKey", "widgets", { column: "gadget_id" });
+        expect(migration.calls).toEqual([
+          ["renameTable", ["p_widgets_s", "p_gadgets_s"]],
+          ["removeForeignKey", ["p_widgets_s", "p_gadgets_s"]],
+          ["removeForeignKey", ["p_widgets_s", { column: "gadget_id" }]],
+        ]);
+      });
+    });
+
+    it("leaves execute and no-argument calls untouched", async () => {
+      await withTableNameAffixes(async () => {
+        const migration = new RecordingMigration();
+        await migration.methodMissing("execute", "SELECT 1");
+        await migration.methodMissing("createTable");
+        expect(migration.calls).toEqual([
+          ["execute", ["SELECT 1"]],
+          ["createTable", []],
+        ]);
+      });
+    });
+
+    it("skips the rewriting when the connection responds to revert", async () => {
+      await withTableNameAffixes(async () => {
+        const migration = new RecordingMigration();
+        migration.revertable = true;
+        await migration.methodMissing("createTable", "widgets");
+        expect(migration.calls).toEqual([["createTable", ["widgets"]]]);
+      });
     });
   });
 });

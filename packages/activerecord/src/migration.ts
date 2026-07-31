@@ -5,6 +5,7 @@ import {
   camelize,
   underscore,
   humanize,
+  isPlainObject,
   stdout,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -1573,15 +1574,32 @@ export abstract class Migration {
   }
 
   /** @internal */
-  methodMissing(name: string, ...args: unknown[]): unknown {
-    const strategy = this.executionStrategy as {
-      respondToMissing?: (name: string) => boolean;
-      methodMissing?: (name: string, ...args: unknown[]) => unknown;
-    };
-    if (strategy.respondToMissing?.(name) !== true) {
-      throw new TypeError(`undefined method '${name}' for ${this.connection.constructor.name}`);
-    }
-    return strategy.methodMissing?.(name, ...args);
+  async methodMissing(name: string, ...args: unknown[]): Promise<unknown> {
+    return await this.sayWithTime(`${name}(${this.formatArguments(args)})`, async () => {
+      const conn = this.connection as unknown as Record<string, unknown>;
+      if (typeof conn["revert"] !== "function") {
+        if (args.length > 0 && !["execute", "enableExtension", "disableExtension"].includes(name)) {
+          args[0] = Migration.properTableName(
+            args[0] as string | { tableName?: unknown },
+            Migration.tableNameOptions(),
+          );
+          if (name === "renameTable" || (name === "removeForeignKey" && !isPlainObject(args[1]))) {
+            args[1] = Migration.properTableName(
+              args[1] as string | { tableName?: unknown },
+              Migration.tableNameOptions(),
+            );
+          }
+        }
+      }
+      const strategy = this.executionStrategy as {
+        respondToMissing?: (name: string) => boolean;
+        methodMissing?: (name: string, ...args: unknown[]) => unknown;
+      };
+      if (strategy.respondToMissing?.(name) !== true) {
+        throw new TypeError(`undefined method '${name}' for ${this.connection.constructor.name}`);
+      }
+      return await strategy.methodMissing?.(name, ...args);
+    });
   }
 
   /** @internal */
