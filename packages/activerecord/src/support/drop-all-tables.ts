@@ -210,9 +210,6 @@ async function resetMysqlTables(
   mode: ResetMode,
   bootLaid: ReadonlySet<string>,
 ): Promise<void> {
-  // Works with both the legacy pool model (_driverPool) and the current
-  // single-connection model (_client). Falls back to adapter.execute /
-  // adapter.executeMutation so both paths share one implementation.
   const toTruncate: string[] = [];
   await adapter.disableReferentialIntegrity(async () => {
     const tableRows = await adapter.execute(
