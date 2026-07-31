@@ -38,7 +38,6 @@ import { PublisherArticle, PublisherMagazine } from "../test-helpers/models/publ
 import { Professor } from "../test-helpers/models/professor.js";
 import { Course } from "../test-helpers/models/course.js";
 import { withSecondPool } from "../support/setup-second-pool.js";
-import { isSqliteRun } from "../support/sqlite-template.js";
 
 // Test-file-local models mirroring the Rails fixture file's inline class
 // definitions (has_and_belongs_to_many_associations_test.rb:63-90).
@@ -1184,9 +1183,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     }).not.toThrow();
   });
 
-  // `Professor`/`Course` live in the `arunit2` second database. Gated to SQLite
-  // like `MultipleDbTest`; un-gating both is its own story.
-  it.skipIf(!isSqliteRun())("alternate database", async () => {
+  it("alternate database", async () => {
     const professor = await Professor.create({ name: "Plum" });
     const course = await Course.create({ name: "Forensics" });
     expect(await (professor as any).courses.count()).toBe(0);

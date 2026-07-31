@@ -3,7 +3,6 @@ import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 import { ReadOnlyError } from "./errors.js";
 import { fixtures } from "./test-fixtures.js";
-import { isSqliteRun } from "./support/sqlite-template.js";
 import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 import { Professor } from "./test-helpers/models/professor.js";
@@ -73,7 +72,7 @@ describe("BasePreventWritesTest", () => {
     });
   });
 
-  it.skipIf(!isSqliteRun())("preventing writes applies to all connections in block", async () => {
+  it("preventing writes applies to all connections in block", async () => {
     await rebuildCanonicalTables(ARUnit2Model.connection, ["professors"]);
 
     const conn1Error = await Base.whilePreventingWrites(async () => {
