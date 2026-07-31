@@ -41,11 +41,6 @@ describe("handler-resolved adapter (Phase D-0)", () => {
     await HandlerResolvedComment.loadSchema();
   });
 
-  // Per-file teardown of the one bespoke table, the way Rails' own suite does
-  // it (`vendor/rails/activerecord/test/cases/migration_test.rb:1231-1233` —
-  // `teardown { drop_table(:delete_me) rescue nil }`), rather than leaning on
-  // the global `resetTestTables` sweep. Not `dropAllTables`: no ~330-table
-  // canonical DROP fan-out is needed here.
   afterAll(async () => {
     await Base.connection.dropTable("handler_resolved_comments", { ifExists: true });
   });
