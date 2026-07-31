@@ -533,11 +533,23 @@ export async function loadSchema(adapter: DatabaseAdapter): Promise<void> {
 
 /**
  * The `load adapter_specific_schema_file if File.exist?(...)` arm of
- * `load_schema_helper.rb:15`, on its own. Go through {@link loadSchema} for a
- * schema load: reaching for this arm alone is exactly how the two halves of
- * `load_schema` drifted apart before. It is exported for the trails-only tests
- * that pin the arm's own content, and for the per-worker boot's fast path,
- * which replays it against a database whose canonical half is already laid.
+ * `load_schema_helper.rb:15`, on its own.
+ *
+ * Which entry point a caller wants turns on whether it really lays schema:
+ *
+ * - **Call this arm** when the canonical half is already on the database, or
+ *   when it must never reach the database at all — the per-worker boot's fast
+ *   path (`test-setup-dy.ts`) is the former; a trails-only cover that stubs or
+ *   proxies `createTable` to capture the emitted DDL is the latter. Routing
+ *   such a cover through {@link loadSchema} makes `loadCanonicalSchema` run
+ *   first against the same stub, so the canonical tables are never actually
+ *   created and the first statement referencing one dies with
+ *   `StatementInvalid: relation ... does not exist`. That is PG-lane-only, so
+ *   the unit lane stays green and only CI catches it (PR #5676, reverted by
+ *   #5688).
+ * - **Call {@link loadSchema}** for anything that performs a real schema load.
+ *   Splitting a real load into its halves is how the two arms drifted apart
+ *   before, so do not reach for this one to hand-roll `load_schema`.
  *
  * @internal
  */
