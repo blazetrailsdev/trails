@@ -259,7 +259,7 @@ export { JS_ENUMERABLE_ALIASES, jsEnumerableAliases, NEGATED_ALIASES, partitionN
  */
 export function significantMissingCalls(
   rubyName: string,
-  rubyCalls: string[],
+  rubyCalls: readonly string[],
   tsCalls: Set<string>,
   isPortedWithArgs: (tsName: string) => boolean,
   mapCall: (rubyCall: string) => string[] | null = rubyMethodToTs,
