@@ -604,9 +604,6 @@ export class DatabaseTasks {
       try {
         await this.withTemporaryConnection(config, async (adapter) => {
           const migrator = await this._migratorFor(adapter, config);
-          // Rails compares against `migration_context.current_environment`
-          // (the pool's config env), not the method's `environment`
-          // argument.
           const current = migrator.currentEnvironment;
           const stored = await migrator.lastStoredEnvironment();
           if (await migrator.protectedEnvironment()) {
