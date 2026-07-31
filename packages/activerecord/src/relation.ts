@@ -2756,7 +2756,7 @@ export class Relation<T extends Base> {
     // Populate the JoinDependency tree only. Alias resolution and `references`
     // re-aliasing (`authors AS author`) are deferred to emit-time: the eager JD
     // is folded into the single `build_joins` `emitJoinPlan` call (via
-    // `_applyJoinsToManager(manager, jd)`), whose one shared `AliasTracker` and
+    // `_applyJoinsToManager`), whose one shared `AliasTracker` and
     // `walk` fold handle collisions against the manual joins — there is no
     // separate construction tracker to seed and no skip filter to compute.
     const fallbackAssocs: AssociationSpec[] = [];
@@ -3253,32 +3253,41 @@ export class Relation<T extends Base> {
     for (const spec of specs) jd.validateEagerLoadSpec(spec);
   }
 
-  private _applyJoinsToManager(
-    manager: SelectManager,
-    eagerJd?: JoinDependency,
-    aliases?: AliasTracker,
-  ): void {
+  /**
+   * Rails `apply_join_dependency` hands the eager JoinDependency to the query
+   * builder by pushing it into `joins_values`
+   * (`joins!(construct_join_dependency(...))`, finder_methods.rb:457-461) — not
+   * as a side-channel argument. Mirror that for the eager SELECT/calculation
+   * paths, which construct their JoinDependency locally: spawn a relation whose
+   * `joins_values` carries the JD, so `build_joins` picks it up through the same
+   * `select_named_joins` partition that stashes any other JoinDependency in
+   * `joins_values`.
+   * @internal
+   */
+  _withEagerJoinDependency(jd?: JoinDependency): Relation<T> {
+    if (jd === undefined) return this;
+    const rel = this._clone();
+    QueryMethodBangs.joinsBang.call(rel as any, jd as any);
+    return rel;
+  }
+
+  private _applyJoinsToManager(manager: SelectManager, aliases?: AliasTracker): void {
     // Live SQL path: assemble a JoinEmissionPlan and hand it to the shared
     // `build_joins` port (`emitJoinPlan`), which `buildJoins` (the
-    // `from(relation)` subquery path) also delegates to. When `eagerJd` is
-    // supplied (the eager SELECT path, `_buildEagerJoinManager` /
-    // `_buildEagerIdSubquery`) it is folded into `stashedJoins` exactly as Rails
-    // `apply_join_dependency` folds the eager JoinDependency into `joins_values`,
-    // so the manual joins AND the eager JD emit through ONE `build_joins` call
-    // with ONE shared `AliasTracker` and dedup via the JD `walk` fold — no
-    // separate eager tracker, no table-name skip filter. The shared emitter
-    // handles raw join clauses, the shared AliasTracker, and the
-    // left_outer/joins/eager dedup fold.
+    // `from(relation)` subquery path) also delegates to. An eager JoinDependency
+    // rides in `joins_values` (see `_withEagerJoinDependency`) exactly as Rails
+    // `apply_join_dependency` puts it there, so `emitJoinPlan`'s
+    // `select_named_joins` partition folds it into `stashedJoins`: the manual
+    // joins AND the eager JD emit through ONE `build_joins` call with ONE shared
+    // `AliasTracker` and dedup via the JD `walk` fold — no separate eager
+    // tracker, no table-name skip filter. The shared emitter handles raw join
+    // clauses, the shared AliasTracker, and the left_outer/joins/eager dedup fold.
     //
     // Mirror Rails build_join_buckets routing (query_methods.rb:1856-1863):
     // when stashed joins exist, non-LeadingJoin nodes go to join_node (appended
     // after), LeadingJoin goes to leading_join (prepended before). Without
-    // stashed joins all nodes go to leading_join (Rails' else branch). A passed
-    // `eagerJd` IS Rails' `stashed_eager_load`, so it counts toward the
-    // `stashed_eager_load || stashed_left_joins` guard even when the eager load
-    // came from promoted `includes(...).references(...)` (no `_eagerLoadAssociations`).
+    // stashed joins all nodes go to leading_join (Rails' else branch).
     const hasStashed =
-      eagerJd !== undefined ||
       manager.joinSourceCount > 0 ||
       this._eagerLoadAssociations.length > 0 ||
       this._leftOuterJoinsValues.length > 0 ||
@@ -3350,12 +3359,9 @@ export class Relation<T extends Base> {
     // to the subquery `from(relation)` path.
     //
     // The four emptiness checks below mirror buildJoinBuckets exactly. The extra
-    // `eagerJd`/`manager.joinSourceCount` guards have no buildJoinBuckets analog —
-    // it is a pure bucket-builder with neither an eager-JD parameter nor a live
-    // manager — and are needed here because the short-circuit does NOT fold `eagerJd`
-    // into the stash (it is pushed in the non-short-circuit branch below). Cross-klass
+    // `manager.joinSourceCount` guard has no buildJoinBuckets analog — it is a
+    // pure bucket-builder with no live manager.
     const pureLeftOuter =
-      eagerJd === undefined &&
       manager.joinSourceCount === 0 &&
       this._eagerLoadAssociations.length === 0 &&
       this._namedInnerJoins.length === 0 &&
@@ -3405,11 +3411,6 @@ export class Relation<T extends Base> {
         : null;
     if (leftOuterJd) leftStashed.unshift(leftOuterJd);
     const stashedJoins: JoinDependency[] = [...leftStashed];
-    // Fold the eager JoinDependency in last, mirroring Rails' `joins_values`
-    // ordering (left-outer stash unshifted ahead of the eager stash in
-    // `build_join_buckets`). `walk` dedups any eager node coinciding with a
-    // manual INNER / left-outer join against the single shared tracker.
-    if (eagerJd) stashedJoins.push(eagerJd);
     _qm.emitJoinPlan.call(this as any, manager, {
       leadingJoins,
       joinNodes,
@@ -5215,7 +5216,7 @@ export class Relation<T extends Base> {
     // in place, so the column-alias projection below reads their resolved tables
     // (a deduped node now points at the manual join's un-aliased table).
     const manager = table.project();
-    this._applyJoinsToManager(manager, jd);
+    this._withEagerJoinDependency(jd)._applyJoinsToManager(manager);
 
     // Mirrors Rails' apply_column_aliases + `_select!(-> { aliases.columns })`:
     // an explicit `select` keeps its own projection and the JoinDependency only
@@ -5296,7 +5297,7 @@ export class Relation<T extends Base> {
     // shared `AliasTracker` spanning the eager JoinDependency and the manual
     // joins, deduping coinciding nodes via `walk` — same threading as
     // `_buildEagerJoinManager`.
-    this._applyJoinsToManager(idSubquery, jd);
+    this._withEagerJoinDependency(jd)._applyJoinsToManager(idSubquery);
     this._applyWheresToManager(idSubquery, table);
     this._applyOrderToManager(idSubquery, table);
     if (this._limitValue !== null) idSubquery.take(this._limitValue);
@@ -5436,7 +5437,7 @@ export class Relation<T extends Base> {
             return m;
           })(new SelectManager(table as any));
 
-    this._applyJoinsToManager(manager, undefined, aliases);
+    this._applyJoinsToManager(manager, aliases);
 
     this._applyWheresToManager(manager, table);
     this._applyOrderToManager(manager, table);
