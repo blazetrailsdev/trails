@@ -1790,8 +1790,6 @@ export function extractClass(
   // `Class.helper(...)` call site and must not be merged in.
   const delegations: { method: MethodInfo; helper: string }[] = [];
   const instanceCallsByName = new Map<string, string[]>();
-  // Accessor-forwarding edges (RFC 0083), unioned onto the class alongside
-  // includes/extends. See delegationTargetName.
   const delegationTargets = new Set<string>();
 
   if (node.heritageClauses) {
@@ -2350,6 +2348,26 @@ function extractCalls(node: ts.Node | undefined): string[] | undefined {
  * extracted into a one-line private helper reads as equivalent to inlining it.
  * Concrete repro: `buildStatementPool() { return this.makeStatementPool(c); }`.
  */
+function delegatedHelper(body: ts.Node | undefined): string | undefined {
+  if (!body || !ts.isBlock(body) || body.statements.length !== 1) return undefined;
+  const stmt = body.statements[0];
+  const expr = ts.isReturnStatement(stmt)
+    ? stmt.expression
+    : ts.isExpressionStatement(stmt)
+      ? stmt.expression
+      : undefined;
+  if (!expr || !ts.isCallExpression(expr)) return undefined;
+  const callee = expr.expression;
+  if (
+    ts.isPropertyAccessExpression(callee) &&
+    callee.expression.kind === ts.SyntaxKind.ThisKeyword &&
+    ts.isIdentifier(callee.name)
+  ) {
+    return callee.name.text;
+  }
+  return undefined;
+}
+
 /**
  * If `body` is a whole-body forward to the SAME-NAMED method of another object
  * reached off `this` — `return this.acc().name(...)`, its `await` form, or the
@@ -2409,26 +2427,6 @@ function delegationTargetName(
   // declaring module a consumer could resolve.
   if (targetName.startsWith("__")) return undefined;
   return targetName;
-}
-
-function delegatedHelper(body: ts.Node | undefined): string | undefined {
-  if (!body || !ts.isBlock(body) || body.statements.length !== 1) return undefined;
-  const stmt = body.statements[0];
-  const expr = ts.isReturnStatement(stmt)
-    ? stmt.expression
-    : ts.isExpressionStatement(stmt)
-      ? stmt.expression
-      : undefined;
-  if (!expr || !ts.isCallExpression(expr)) return undefined;
-  const callee = expr.expression;
-  if (
-    ts.isPropertyAccessExpression(callee) &&
-    callee.expression.kind === ts.SyntaxKind.ThisKeyword &&
-    ts.isIdentifier(callee.name)
-  ) {
-    return callee.name.text;
-  }
-  return undefined;
 }
 
 /**

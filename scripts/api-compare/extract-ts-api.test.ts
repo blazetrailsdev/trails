@@ -442,6 +442,32 @@ describe("body call capture", () => {
     expect(cls.delegatesTo).toBeUndefined();
   });
 
+  it("records the delegation edge of a property-accessor forward and a static forward", () => {
+    const cls = extractFromSource(
+      `class Stmts { indexes(t) { return []; } static reset() {} }
+       class Foo {
+         private readonly stmts: Stmts;
+         indexes(t) { return this.stmts.indexes(t); }
+         static reset() { return this.stmts.reset(); }
+       }`,
+    );
+    expect(cls.instanceMethods.find((m) => m.name === "indexes")!.delegatesTo).toBe("Stmts");
+    expect(cls.delegatesTo).toEqual(["Stmts"]);
+  });
+
+  it("records no delegation edge when the target type lacks the forwarded member", () => {
+    // The forward must land on a declaration of the same name; a receiver typed
+    // as something that does not declare it names no port to credit.
+    const cls = extractFromSource(
+      `class Stmts { columns(t) { return []; } }
+       class Foo {
+         private stmts(): Stmts { return this.s; }
+         indexes(t) { return this.stmts().indexes(t); }
+       }`,
+    );
+    expect(cls.instanceMethods.find((m) => m.name === "indexes")!.delegatesTo).toBeUndefined();
+  });
+
   it("records no delegation edge when the accessor's type is unresolved", () => {
     // Resolution is checker-only: an accessor with no resolvable declaring type
     // records nothing rather than falling back to a name- or path-based guess,
