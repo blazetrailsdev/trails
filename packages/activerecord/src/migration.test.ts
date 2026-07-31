@@ -95,10 +95,10 @@ async function personColumnNames(adp: DatabaseAdapter): Promise<string[]> {
 
 // Rails runs every migration test on `ActiveRecord::Base.connection`; ride the
 // schema-loaded primary pool established by `fixtures()` rather than a
-// sidecar `_pool` lease (RFC 0059). `fixtures()` shields the shared worker
-// DB from the global `resetTestAdapterState()`, so this file owns the per-test
-// cleanup of the bespoke tables its `MigrationContext` sub-describes create —
-// see the afterEach/afterAll below and each test's own `finally`.
+// sidecar `_pool` lease (RFC 0059). Nothing clears tables between tests, so
+// this file owns the per-test cleanup of the bespoke tables its
+// `MigrationContext` sub-describes create — see the afterEach/afterAll below
+// and each test's own `finally`.
 fixtures({}, { useTransactionalTests: false });
 
 // Mirrors migration_test.rb's teardown, which strips the scratch columns the
@@ -310,10 +310,7 @@ async function freshAdapter(): Promise<DatabaseAdapter> {
 // ==========================================================================
 // D-1 partial conversion: columnsHash()-only tests drop their adapter assignment
 // (adapter-independent). The 3 DB-operation tests and the DDL sub-describes retain
-// freshAdapterWithPeople()/await freshContext() isolation — adding fixtures() here
-// would call pushSkipGlobalReset() and prevent the per-test DDL cleanup that the
-// MigrationContext-based tests (ReservedWordsMigrationTest, BulkAlterTable, etc.)
-// depend on. Same structural reason as transaction-instrumentation.test.ts.
+// freshAdapterWithPeople()/await freshContext() isolation.
 describe("MigrationTest", () => {
   let adapter: DatabaseAdapter;
 

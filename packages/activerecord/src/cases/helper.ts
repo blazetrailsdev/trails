@@ -10,13 +10,10 @@
 // in activerecord/index.ts) to keep better-sqlite3 a true optional peer for
 // non-test consumers.
 import "../sqlite/better-sqlite3.js";
-import { beforeEach } from "vitest";
 import { Base } from "../base.js";
 import { getZone, setZone, resetZone, isZoneExplicit } from "@blazetrails/activesupport";
 import { DelegateCache } from "../relation/delegation.js";
 import { ActiveRecord } from "../ar-config.js";
-import { resetTestAdapterState } from "../test-adapter.js";
-import { shouldSkipGlobalReset } from "../support/skip-global-reset.js";
 import { registerFakeAdapter } from "../support/fake-adapter.js";
 import { Configurable as EncryptionConfigurable } from "../encryption/configurable.js";
 import { installExtendedQueriesIfConfigured } from "../encryption/install.js";
@@ -70,11 +67,6 @@ EncryptionConfigurable.configure({
 // railtie does in a real app (railtie.rb:349-355).
 EncryptionConfigurable.config.extendQueries = true;
 installExtendedQueriesIfConfigured();
-
-beforeEach(async () => {
-  if (shouldSkipGlobalReset()) return;
-  await resetTestAdapterState();
-});
 
 /**
  * Rails declares `module InTimeZone` inside this very file —

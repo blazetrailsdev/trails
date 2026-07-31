@@ -799,7 +799,7 @@ describe("DDL cache-invalidation safety-net", () => {
 
   it("createTable clears schema cache entry (non-force branch)", async () => {
     const cache = new SchemaCache();
-    // Stale entry from a prior create (e.g. after resetTestAdapterState dropped the table)
+    // Stale entry from a prior create (e.g. after a test dropped the table)
     cache.setColumns("posts", [makeColumn("id", "integer")]);
 
     const ss = new SchemaStatements(makeMockAdapter(cache) as any);

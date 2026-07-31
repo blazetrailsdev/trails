@@ -3,7 +3,6 @@
 import { describe, it, expect } from "vitest";
 import { defineJoinTableFixtures } from "./fixtures.js";
 import { fixtures } from "./test-fixtures.js";
-import { skipGlobalResetForFile } from "./support/skip-global-reset.js";
 import { Tree } from "./test-helpers/models/tree.js";
 import { Base } from "./base.js";
 import "./relation.js";
@@ -15,8 +14,6 @@ import { nakedYmlTreesFixtureData } from "./test-helpers/fixtures/naked/yml/tree
 // accounts, companies, parrots, and trees are canonical schema.rb tables laid
 // by the boot schema — the tableless tests ride them rather than recreating.
 describe("tableless useFixtures (naked/yml)", () => {
-  skipGlobalResetForFile();
-
   // test_empty_yaml_fixture — accounts.yml is an empty file; seeding 0 rows succeeds.
   describe("test_empty_yaml_fixture", () => {
     const { accounts } = fixtures([{ table: "accounts", data: nakedYmlAccountsFixtureData }]);

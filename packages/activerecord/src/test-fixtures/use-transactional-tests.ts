@@ -16,22 +16,18 @@ import {
  * on MySQL.
  *
  * Schema set up in `beforeAll` (before the per-test transaction opens)
- * survives across tests in the file. When the describe scope exits,
- * `resetTestAdapterState` runs exactly once to clean up for the next file.
+ * survives across tests in the file — nothing truncates or drops tables
+ * between tests, matching Rails' `teardown_fixtures`, which only rolls the
+ * transaction back and clears active connections without removing the pool
+ * (`test_fixtures.rb:125-158`).
  *
- * **When to use this vs `skipGlobalResetForFile + withTransactionalFixtures`:**
- * Both ride the worker's own pool, which `test-setup-dy.ts` establishes once
- * and leaves up for the whole worker, as `ARTest.connect` does for the whole
- * Rails process (`support/connection.rb:31-32`). Neither opens or closes it.
- * The difference is only what happens between tests: `useTransactionalTests()`
- * wraps each test in a transaction that rolls back, then runs
- * `resetTestAdapterState` once when the scope exits (depth reaches zero) —
- * Rails' `teardown_fixtures` shape, which rolls the transaction back and
- * clears active connections without removing the pool
- * (`test_fixtures.rb:125-158`). `skipGlobalResetForFile()` +
- * `withTransactionalFixtures(leaseFixtureConnection)` instead holds the
- * global-reset shield for the whole file, for suites whose describes share
- * state that the between-test reset would otherwise clear.
+ * **When to use this vs `withTransactionalFixtures`:** both ride the worker's
+ * own pool, which `test-setup-dy.ts` establishes once and leaves up for the
+ * whole worker, as `ARTest.connect` does for the whole Rails process
+ * (`support/connection.rb:31-32`). Neither opens or closes it.
+ * `useTransactionalTests()` wraps the `Base.connection` path;
+ * `withTransactionalFixtures(leaseFixtureConnection)` takes an explicit
+ * adapter thunk and is what `fixtures()` wires.
  *
  * Call once at file/describe scope to opt in:
  *

@@ -12,7 +12,6 @@ import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "./base.js";
 import { Migration, IrreversibleMigration } from "./migration.js";
 import { CommandRecorder } from "./migration/command-recorder.js";
-import { skipGlobalResetForFile } from "./support/skip-global-reset.js";
 import { itIfSupports } from "./support/supports.js";
 import { adapterType } from "./test-adapter.js";
 import { registerModel } from "./associations.js";
@@ -286,8 +285,6 @@ async function resetHorse(): Promise<void> {
 }
 
 describe("InvertibleMigrationTest", () => {
-  skipGlobalResetForFile();
-
   afterEach(async () => {
     const connection = await Base.leaseConnection();
     for (const table of ["horses", "new_horses"]) {

@@ -1352,11 +1352,8 @@ describe("PreloaderTest", () => {
 });
 
 describe("OverridingAssociationsTest", () => {
-  // Tests are synchronous reflection checks — no DB queries. fixtures([]) keeps
-  // _skipGlobalResetDepth > 0 so the global beforeEach does not call
-  // resetTestAdapterState() (dropAllTables) between tests, which would silently
-  // drop canonical tables (cpk_order_agreements, cpk_cars, etc.) needed by the
-  // later AssociationsTest describe block.
+  // Tests are synchronous reflection checks — no DB queries; fixtures([])
+  // wires the canonical schema without declaring any fixture set.
   fixtures([]);
 
   // Mirrors Rails' nested DifferentPerson / PeopleList / DifferentPeopleList classes.

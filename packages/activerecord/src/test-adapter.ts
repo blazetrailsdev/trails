@@ -15,8 +15,8 @@
  * its own pool builds one IN-TEST from the primary config
  * (`vendor/rails/activerecord/test/cases/connection_pool_test.rb:16-30`). So
  * the standing sidecar pool and its divergent
- * `file:trails_test_N?mode=memory&cache=shared` handle are gone: the global
- * reset rides the primary `Base.connection` pool, `newRawTestAdapter` /
+ * `file:trails_test_N?mode=memory&cache=shared` handle are gone:
+ * `newRawTestAdapter` /
  * `ambientPoolConfiguration` describe the primary lane config, and
  * `createPooledTestAdapter` builds its duplicate pool from that same config.
  *
@@ -28,7 +28,6 @@ import type { ConnectionPool } from "./connection-adapters/abstract/connection-p
 import type { TransactionManager } from "./connection-adapters/abstract/transaction.js";
 import type { SQLite3AdapterOptions, SQLite3Config } from "./connection-adapters/pool-config.js";
 import { buildAdapterArg } from "./connection-adapters/adapter-args.js";
-import { resetTestTables } from "./support/drop-all-tables.js";
 import { Base } from "./base.js";
 import { activeLane, testConfigurationHashes } from "./support/connection.js";
 
@@ -222,49 +221,4 @@ export function _resetPooledTestAdapterForTests(): void {
   }
   _inTestPool = null;
   _inTestPoolPromise = null;
-}
-
-/**
- * Reset every piece of module-level test-adapter state so the next test
- * starts from a clean slate. Called from a global `beforeEach` hook in
- * cases/helper.ts.
- *
- * Row state is cleared by **truncating** the boot-laid canonical tables (RFC
- * 0059 lays the canonical schema once at boot and keeps it shape-stable, so
- * dropping the tables between tests is pure redundancy — only the rows need
- * clearing); every non-canonical table (bespoke `defineSchema` leftovers plus
- * the `schema_migrations` / `ar_internal_metadata` bookkeeping tables) is
- * dropped. See {@link resetTestTables}.
- *
- * The DDL runs on the primary `Base.connection` pool — the schema-loaded
- * database every test rides. Worker boot (`test-setup-dy.ts`) connects once
- * and stays connected for the whole worker, mirroring `ARTest.connect`
- * (`vendor/rails/activerecord/test/support/connection.rb:31-32`), so that pool
- * is normally live for every test. The `isConnectedQ` guard remains for the
- * window where a suite has removed the pool and not yet re-established it; the
- * global JS caches below are cleared unconditionally either way.
- *
- *   - PG: `resetTestTables` enumerates every user schema via
- *     `current_schemas(false)`, not just `public`.
- *   - MySQL: runs on a single dedicated pool connection with
- *     FOREIGN_KEY_CHECKS=0 for the whole sequence.
- *   - SQLite: queries `sqlite_master` (excluding internal `sqlite_*` tables).
- *
- * Idempotent and safe to call when no tables exist.
- *
- * @internal
- */
-export async function resetTestAdapterState(): Promise<void> {
-  if (Base.isConnectedQ()) {
-    const pool = Base.connectionPool();
-    await pool.withConnection(
-      async (adapter) => {
-        await resetTestTables(adapter, { measure: true });
-        // Clear schema cache on all live pool connections (mirrors Rails'
-        // ConnectionPool#clear_cache!).
-        pool.connections.forEach((a) => a.schemaCache?.clear());
-      },
-      { preventPermanentCheckout: true },
-    );
-  }
 }

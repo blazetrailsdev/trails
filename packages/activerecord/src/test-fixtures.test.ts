@@ -7,7 +7,6 @@ import { Base } from "./base.js";
 import "./relation.js"; // registers the Relation ctor so Model.findBy/.all/.count work
 import { fixtureId, defineFixtures, defineJoinTableFixtures, isFixtureRef } from "./fixtures.js";
 import { fixtures } from "./test-fixtures.js";
-import { skipGlobalResetForFile } from "./support/skip-global-reset.js";
 import { withTransactionalFixtures } from "./test-fixtures/with-transactional-fixtures.js";
 import { Author } from "./test-helpers/models/author.js";
 import { Post } from "./test-helpers/models/post.js";
@@ -77,18 +76,6 @@ async function setupScopedEncryption(): Promise<() => void> {
   configureEncryption();
   return () => restoreEncryptionConfig(snapshot);
 }
-
-// Shield the WHOLE file from the global `resetTestAdapterState()` beforeEach
-// (cases/helper.ts), which drops every table on `Base.connection` — the
-// boot-laid canonical worker DB. The real-seeding describes below each shield
-// themselves (their `withTransactionalFixtures` push/pops the skip), but
-// the mock-adapter describes above them do NOT: their tests trigger the reset
-// and wipe the canonical tables before any seeding describe's `beforeAll` runs.
-// The removed `defineSchema(TEST_SCHEMA)` beforeAll blocks used to paper over
-// this by recreating the tables after the wipe; a single file-level shield
-// keeps the boot-laid schema intact instead, so every seeding describe rides it
-// directly (transactional fixtures roll back their per-test writes).
-skipGlobalResetForFile();
 
 // --- useFixtures ---
 
@@ -259,7 +246,6 @@ describe("useFixtures type contract", () => {
 // --- useFixtures by registry name (string[] overload, real seeding) ---
 
 describe("useFixtures by registry name", () => {
-  skipGlobalResetForFile();
   withTransactionalFixtures(leaseFixtureConnection);
 
   // author_addresses listed first: authors.author_address_id ref() resolves to its
@@ -317,7 +303,6 @@ describe("useFixtures by registry name", () => {
 });
 
 describe("useFixtures seeds HABTM join tables (no model class)", () => {
-  skipGlobalResetForFile();
   withTransactionalFixtures(leaseFixtureConnection);
 
   // categories + posts declare explicit ids, so they load BEFORE the join set —
@@ -357,7 +342,6 @@ describe("useFixtures seeds HABTM join tables (no model class)", () => {
 });
 
 describe("useFixtures seeds a single-row HABTM join table", () => {
-  skipGlobalResetForFile();
   withTransactionalFixtures(leaseFixtureConnection);
 
   const { people, treasures, peoplesTreasures } = fixtures(
@@ -375,7 +359,6 @@ describe("useFixtures seeds a single-row HABTM join table", () => {
 // --- vertices + edges cross-fixture ref() ---
 
 describe("useFixtures vertices and edges", () => {
-  skipGlobalResetForFile();
   withTransactionalFixtures(leaseFixtureConnection);
 
   // vertices must load before edges so edge ref()s resolve to declared vertex ids.
@@ -401,7 +384,6 @@ describe("useFixtures vertices and edges", () => {
 // --- timestamp auto-stamp (Rails' fill_timestamps) ---
 
 describe("useFixtures auto-stamps NOT NULL timestamps", () => {
-  skipGlobalResetForFile();
   withTransactionalFixtures(leaseFixtureConnection);
 
   // people.michael declares neither created_at nor updated_at, but both columns
@@ -427,7 +409,6 @@ describe("useFixtures auto-stamps NOT NULL timestamps", () => {
 // --- string / non-integer declared primary keys ---
 
 describe("useFixtures with a string primary key", () => {
-  skipGlobalResetForFile();
   withTransactionalFixtures(leaseFixtureConnection);
 
   // Subscriber sets `self.primary_key = "nick"` (a string column). The fixture
@@ -456,7 +437,6 @@ describe("useFixtures with a string primary key", () => {
 // --- custom / absent PK column names (model defaults to `id`, schema differs) ---
 
 describe("useFixtures reconciles the PK column against the schema", () => {
-  skipGlobalResetForFile();
   withTransactionalFixtures(leaseFixtureConnection);
 
   // Bulb declares no `primary_key`, so the model defaults to `id`, but the
@@ -507,7 +487,6 @@ describe("useFixtures reconciles the PK column against the schema", () => {
 // --- composite primary keys ---
 
 describe("useFixtures seeds composite-primary-key tables", () => {
-  skipGlobalResetForFile();
   withTransactionalFixtures(leaseFixtureConnection);
 
   // CpkOrder declares a composite model PK (`["shop_id", "id"]`) while the test
@@ -557,7 +536,6 @@ describe("useFixtures seeds composite-primary-key tables", () => {
 // --- STI subclass standalone load ---
 
 describe("useFixtures resolves STI subclasses on standalone load", () => {
-  skipGlobalResetForFile();
   withTransactionalFixtures(leaseFixtureConnection);
 
   // parrots.yml rows carry a custom inheritance column (`parrot_sti_class`)
@@ -750,7 +728,6 @@ describe("fixtures() loads multiple same-table fixture sets in one call", () => 
 // seedable on the strictest engine. An entry that can't seed must move to the
 // registry's gap list, not stay exposed.
 describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
-  skipGlobalResetForFile();
   withTransactionalFixtures(leaseFixtureConnection);
   // Encrypted entries (encryptedBooks…) reload through the encrypted attribute
   // type, which needs keys + the cleartext fallback. Configure (scoped) so the
@@ -791,7 +768,6 @@ describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
 // --- encryption add-on bootstrap (opt-in addOn hook) ---
 
 describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", () => {
-  skipGlobalResetForFile();
   withTransactionalFixtures(leaseFixtureConnection);
 
   // Reading encrypted fixtures back needs keys + the cleartext fallback. Configure

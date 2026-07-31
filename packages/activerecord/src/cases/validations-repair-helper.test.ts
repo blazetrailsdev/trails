@@ -1,13 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
-import { skipGlobalResetForFile } from "../support/skip-global-reset.js";
 import { withTransactionalFixtures } from "../test-fixtures/with-transactional-fixtures.js";
 import { repairValidations } from "./validations-repair-helper.js";
 import { leaseFixtureConnection } from "../test-fixtures/fixture-connection.js";
 
 // interests and zines are canonical schema.rb tables laid by the boot schema;
 // the inline models ride them rather than recreating a bespoke shape.
-skipGlobalResetForFile();
 withTransactionalFixtures(leaseFixtureConnection);
 
 describe("repairValidations", () => {
