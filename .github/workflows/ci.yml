@@ -13,11 +13,17 @@ on:
     #                         main / the weekly sweep / workflow_dispatch).
     #                         Opting in also gates the merge on it: the job is
     #                         in the `ci` aggregator's `needs:`.
+    #   run-db-adapters     — force the PostgreSQL + MariaDB AR suites on a
+    #                         draft PR that doesn't touch adapter paths; they
+    #                         run unconditionally once it is ready for review.
     #   website             — force the Website build on a PR that doesn't
     #                         touch packages/website/
     #   release             — implies `website` (release PRs need the site
     #                         built); reserve other release-only suites here
-    types: [opened, synchronize, reopened, labeled]
+    # `ready_for_review` is what starts the draft-deferred PG/MariaDB suites;
+    # without it a PR can reach ready with no adapter coverage and no event
+    # left to trigger it.
+    types: [opened, synchronize, reopened, labeled, ready_for_review]
   schedule:
     # Weekly post-merge sweep so slow regressions can't hide between
     # parity-relevant PRs. Monday 06:00 UTC is off-peak on an Ubuntu runner.
@@ -45,6 +51,7 @@ jobs:
     outputs:
       docs_only: ${{ steps.filter.outputs.docs_only }}
       activerecord_affected: ${{ steps.filter.outputs.activerecord_affected }}
+      db_adapter_affected: ${{ steps.filter.outputs.db_adapter_affected }}
       actionpack_affected: ${{ steps.filter.outputs.actionpack_affected }}
       actionview_affected: ${{ steps.filter.outputs.actionview_affected }}
       rack_affected: ${{ steps.filter.outputs.rack_affected }}
@@ -94,52 +101,12 @@ jobs:
           # Cross-cutting paths force every per-package gate true. Anything
           # here affects all packages: workspace topology, root tooling
           # config, shared scripts, this workflow, composite actions.
-          # NOTE: the blanket `scripts/` here also matches subtrees that are
-          # NOT cross-cutting; they are carved back out of the infra sweep
-          # below (see `INFRA_CARVEOUT_RE` / `infra_files`). Keep that
-          # exclusion in sync if this pattern changes.
+          # The blanket `scripts/` below also sweeps up subtrees that are NOT
+          # cross-cutting; INFRA_CARVEOUT_RE strips them back out — keep the
+          # two in sync. Every carved subtree must still be named in the gate
+          # of whichever job runs its tests, or a change confined to it runs
+          # nothing; scripts/ci-suite-coverage.test.ts enforces that pairing.
           INFRA_RE='^(pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig[^/]*\.json$|vitest[^/]*\.config\.ts$|scripts/|\.github/workflows/ci\.yml$|\.github/actions/)'
-          # Paths that INFRA_RE's blanket `scripts/` sweeps up but which are
-          # single-consumer (or consumed by no CI job at all). Each is stripped
-          # from `infra_files` so a change confined to it does NOT force every
-          # per-package gate true. Classification (verify before adding more):
-          #   tasks/            - tests ride unit-tests only (UNIT_TESTS_PKGS_RE)
-          #   guides-typecheck/ - guides-typecheck job + unit-tests self-test;
-          #                       listed in GUIDES_PKGS_RE and UNIT_TESTS_PKGS_RE
-          #   {api,test,fixtures,schema}-compare/, and the manifest builders
-          #                     - rails-comparison only; listed in COMPARISON_RE
-          #   parity/           - parity jobs, which gate on labels/schedule
-          #                       only and consult no path regex
-          #   ci/               - gh-api-retry.sh runs in preflight;
-          #                       coverage-summary.mjs only in the `if: false`
-          #                       coverage jobs
-          #   test-deps/        - rails-test-deps.ts runs in `prelint`, i.e.
-          #                       inside the lint job
-          #   rails-find/, sync-stats/, phase-g-hunt/, fixtures-inventory/,
-          #   __fixtures__/, strip-asany*
-          #                     - local-dev tooling; no CI job runs the tools
-          #                       themselves.
-          #   ci-suite-coverage.test.ts
-          #                     - guards this file's own wiring; its only
-          #                       consumer is unit-tests, which names it in
-          #                       UNIT_TESTS_PKGS_RE.
-          # IMPORTANT: carving a subtree out of the infra sweep does NOT mean
-          # its own tests can go unnamed. unit-tests runs the compare/parity
-          # tooling's vitest suites — api-compare, test-compare,
-          # fixtures-compare, test-deps, rails-find, parity and the top-level
-          # scripts/*.test.ts files — so every one of those is also listed in
-          # UNIT_TESTS_PKGS_RE, while schema-compare's suite is a step of
-          # rails-comparison (COMPARISON_RE).
-          # scripts/ci-suite-coverage.test.ts enforces that pairing: it fails
-          # if a tooling test file is neither named in a ci.yml vitest
-          # invocation nor on its KNOWN_UNRUN list.
-          # The preflight/lint groups above need no regex addition because
-          # those jobs have no path gate at all — they run on every
-          # non-docs-only change, so carving cannot skip them. `pnpm lint` is
-          # `eslint .`, so it also still lints every carved subtree.
-          # Deliberately NOT carved (genuinely cross-cutting): typecheck.mjs
-          # (root `pnpm typecheck`), start-worktree.sh, and the remaining
-          # top-level scripts/*.ts one-offs.
           INFRA_CARVEOUT_RE='^scripts/((tasks|ci|guides-typecheck|rails-find|sync-stats|phase-g-hunt|fixtures-inventory|test-deps|__fixtures__|api-compare|test-compare|fixtures-compare|schema-compare|parity)/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|strip-asany|ci-suite-coverage|deprecated-manifest-diff)(\.test)?\.ts$)'
           # AR workspace deps: arel/activemodel/activesupport/globalid/
           # did-you-mean (per packages/activerecord/package.json). Also
@@ -151,6 +118,13 @@ jobs:
           # exercise the CLI against real DBs), so cli source changes must also
           # flip activerecord_affected.
           AR_PKGS_RE='^packages/(activerecord|activerecord-cli|arel|activemodel|activesupport|globalid|did-you-mean|trails-tsc)/'
+          # db_adapter_affected gates nothing on its own: it is the opt-in that
+          # runs the PG/MariaDB suites while a PR is still a draft, so a false
+          # negative costs a later signal, never coverage. `abstract/` and
+          # sql-classification.ts are in scope because that substrate breaks
+          # one backend without naming it (the latter carries the PG cursor
+          # statements in its read-only allowlist).
+          DB_ADAPTER_RE='^(packages/activerecord/src/(adapters/(postgresql|abstract-mysql-adapter)|connection-adapters/(postgresql|mysql|mysql2|abstract-mysql-adapter|abstract/|abstract-adapter\.ts|column\.ts|adapter-args\.ts|sql-classification\.ts|pool))|packages/arel/src/visitors/(postgres|mysql)|packages/activerecord-cli/src/__e2e__/(postgres|mysql))'
           # actionpack_affected gates actionpack-tests. True for actionpack +
           # its runtime deps (actionview/activemodel/activesupport/rack/did-you-mean).
           AP_PKGS_RE='^packages/(actionpack|actionview|activemodel|activesupport|rack|did-you-mean)/'
@@ -268,6 +242,7 @@ jobs:
           COMPARISON_RE='^(packages/|scripts/((api|test|fixtures|schema)-compare/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|deprecated-manifest-diff)\.ts$)|vendor/|docs/ruby-ts-conventions\.md$|eslint/rails-deprecated-methods\.json$)'
           force_all_affected() {
             echo "activerecord_affected=true" >> "$GITHUB_OUTPUT"
+            echo "db_adapter_affected=true"   >> "$GITHUB_OUTPUT"
             echo "actionpack_affected=true"   >> "$GITHUB_OUTPUT"
             echo "actionview_affected=true"   >> "$GITHUB_OUTPUT"
             echo "rack_affected=true"         >> "$GITHUB_OUTPUT"
@@ -347,6 +322,7 @@ jobs:
               *)
                 if [ -z "$files" ]; then
                   echo "activerecord_affected=false" >> "$GITHUB_OUTPUT"
+                  echo "db_adapter_affected=false"   >> "$GITHUB_OUTPUT"
                   echo "actionpack_affected=false"   >> "$GITHUB_OUTPUT"
                   echo "actionview_affected=false"   >> "$GITHUB_OUTPUT"
                   echo "rack_affected=false"         >> "$GITHUB_OUTPUT"
@@ -376,6 +352,7 @@ jobs:
                     fi
                   }
                   set_gate activerecord_affected "$AR_PKGS_RE"
+                  set_gate db_adapter_affected   "$DB_ADAPTER_RE"
                   set_gate actionpack_affected   "$AP_PKGS_RE"
                   set_gate actionview_affected   "$AV_PKGS_RE"
                   set_gate rack_affected         "$RACK_PKGS_RE"
@@ -1090,7 +1067,11 @@ jobs:
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
-      needs.changes.outputs.activerecord_affected == 'true'
+      needs.changes.outputs.activerecord_affected == 'true' &&
+      (github.event_name != 'pull_request' ||
+      github.event.pull_request.draft == false ||
+      needs.changes.outputs.db_adapter_affected == 'true' ||
+      contains(github.event.pull_request.labels.*.name, 'run-db-adapters'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # 2-way file-level shard (RFC 0028 shard-ar-adapter-suites). This suite is
@@ -1260,12 +1241,19 @@ jobs:
   # The DB is throwaway per-run, so losing it on container stop is fine.
   # --mount is a `docker create` flag, so it goes in options (service
   # containers can't override the image command to pass server args directly).
+  # Draft-deferred with postgres-tests. Both stay in the `ci` aggregator's
+  # `needs:` and `ci` is the branch-protection target, so this moves adapter
+  # coverage in time, not extent.
   maria-tests:
     name: Active Record MariaDB Tests
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
-      needs.changes.outputs.activerecord_affected == 'true'
+      needs.changes.outputs.activerecord_affected == 'true' &&
+      (github.event_name != 'pull_request' ||
+      github.event.pull_request.draft == false ||
+      needs.changes.outputs.db_adapter_affected == 'true' ||
+      contains(github.event.pull_request.labels.*.name, 'run-db-adapters'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # 2-way file-level shard (RFC 0028 shard-ar-adapter-suites) — see the
@@ -1761,6 +1749,7 @@ jobs:
           PARITY_POSTGRES: ${{ needs.changes.outputs.parity_postgres }}
           PARITY_MYSQL: ${{ needs.changes.outputs.parity_mysql }}
           SQLITE_MEM_UNLABELLED: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'run-sqlite-mem') }}
+          DB_ADAPTERS_DRAFT_DEFERRED: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft && needs.changes.outputs.db_adapter_affected != 'true' && !contains(github.event.pull_request.labels.*.name, 'run-db-adapters') }}
         run: |
           set -euo pipefail
           echo "$NEEDS_JSON"
@@ -1800,13 +1789,21 @@ jobs:
                   # legitimate until the job is re-enabled.
                   continue
                   ;;
-                sqlite-tests|postgres-tests|maria-tests)
+                sqlite-tests)
                   # AR test skip is legitimate when no AR-affecting paths changed.
-                  # postgres-tests and maria-tests are 2-way `--shard` matrices;
-                  # GitHub collapses both legs into a single result under the job
-                  # id here, so this one case covers all four legs — do NOT add
-                  # per-leg names (they don't exist in the `needs` context).
-                  [ "$AR_AFFECTED" = "false" ] && continue
+                  if [ "$AR_AFFECTED" = "false" ]; then
+                    continue
+                  fi
+                  ;;
+                postgres-tests|maria-tests)
+                  # Both are 2-way `--shard` matrices; GitHub collapses the
+                  # legs into a single result under the job id here, so these
+                  # two names cover all four legs — do NOT add per-leg names
+                  # (they don't exist in the `needs` context).
+                  if [ "$AR_AFFECTED" = "false" ] || \
+                     [ "$DB_ADAPTERS_DRAFT_DEFERRED" = "true" ]; then
+                    continue
+                  fi
                   ;;
                 sqlite-mem-tests)
                   if [ "$AR_AFFECTED" = "false" ] || \
@@ -1871,7 +1868,7 @@ jobs:
                   [ "$any_parity" = "false" ] && continue
                   ;;
               esac
-              echo "Unexpectedly skipped job: $job (docs_only=$DOCS_ONLY ar_affected=$AR_AFFECTED ap_affected=$AP_AFFECTED av_affected=$AV_AFFECTED rack_affected=$RACK_AFFECTED trailties_affected=$TRAILTIES_AFFECTED trails_tsc_affected=$TRAILS_TSC_AFFECTED tse_compiler_affected=$TSE_COMPILER_AFFECTED unit_tests_affected=$UNIT_TESTS_AFFECTED guides_affected=$GUIDES_AFFECTED website_affected=$WEBSITE_AFFECTED comparison_affected=$COMPARISON_AFFECTED website_label=$WEBSITE_LABEL parity_sqlite=$PARITY_SQLITE parity_postgres=$PARITY_POSTGRES parity_mysql=$PARITY_MYSQL)"
+              echo "Unexpectedly skipped job: $job (docs_only=$DOCS_ONLY ar_affected=$AR_AFFECTED ap_affected=$AP_AFFECTED av_affected=$AV_AFFECTED rack_affected=$RACK_AFFECTED trailties_affected=$TRAILTIES_AFFECTED trails_tsc_affected=$TRAILS_TSC_AFFECTED tse_compiler_affected=$TSE_COMPILER_AFFECTED unit_tests_affected=$UNIT_TESTS_AFFECTED guides_affected=$GUIDES_AFFECTED website_affected=$WEBSITE_AFFECTED comparison_affected=$COMPARISON_AFFECTED website_label=$WEBSITE_LABEL parity_sqlite=$PARITY_SQLITE parity_postgres=$PARITY_POSTGRES parity_mysql=$PARITY_MYSQL db_adapters_draft_deferred=$DB_ADAPTERS_DRAFT_DEFERRED)"
               unexpected=1
             done < <(echo "$NEEDS_JSON" | jq -r 'to_entries[] | "\(.key) \(.value.result)"')
           fi

@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { parse as parseYaml } from "yaml";
 
 const execFileAsync = promisify(execFile);
 
@@ -236,6 +237,101 @@ describe("CI runs every tooling test suite", () => {
     expect(runs.filter((f) => outcome[f] !== "true")).toEqual([]);
     expect(skips.filter((f) => outcome[f] !== "false")).toEqual([]);
     expect(skips.filter((f) => !gate.test(f))).toEqual([]);
+  });
+
+  // db_adapter_affected is the draft opt-IN for postgres-tests/maria-tests.
+  // Under-firing only delays the PG/MySQL signal to the ready-for-review run,
+  // but over-firing hands back the saving the deferral exists to capture, so
+  // both directions are pinned.
+  it("fires db_adapter_affected for PG/MySQL adapter paths and not for backend-neutral ones", async () => {
+    const yml = await readFile(CI_YML, "utf8");
+    const runGate = await gateRunner(yml);
+
+    const runs = [
+      "packages/activerecord/src/connection-adapters/postgresql-adapter.ts",
+      "packages/activerecord/src/connection-adapters/postgresql/column.ts",
+      "packages/activerecord/src/connection-adapters/mysql2-adapter.ts",
+      "packages/activerecord/src/connection-adapters/mysql/quoting.ts",
+      "packages/activerecord/src/connection-adapters/abstract-mysql-adapter.ts",
+      "packages/activerecord/src/adapters/postgresql/pg-range.ts",
+      // Shared substrate: breaks one backend without naming it.
+      "packages/activerecord/src/connection-adapters/abstract/quoting.ts",
+      "packages/activerecord/src/connection-adapters/abstract-adapter.ts",
+      "packages/activerecord/src/connection-adapters/sql-classification.ts",
+      "packages/arel/src/visitors/postgresql.ts",
+      "packages/arel/src/visitors/mysql.ts",
+      "packages/activerecord-cli/src/__e2e__/postgres-happy-path.test.ts",
+    ];
+    const skips = [
+      "packages/activerecord/src/relation.ts",
+      "packages/activerecord/src/associations.ts",
+      "packages/activerecord/src/base.test.ts",
+      "packages/activerecord/src/connection-adapters/better-sqlite3-adapter.ts",
+      "packages/activerecord/src/adapters/sqlite3/test-helper.ts",
+      "packages/arel/src/visitors/to-sql.ts",
+    ];
+    const fired = await Promise.all([...runs, ...skips].map(runGate));
+    const outcome = Object.fromEntries(
+      [...runs, ...skips].map((f, i) => [f, fired[i].db_adapter_affected]),
+    );
+    expect(runs.filter((f) => outcome[f] !== "true")).toEqual([]);
+    expect(skips.filter((f) => outcome[f] !== "false")).toEqual([]);
+
+    // Anchor probe. Every path above starts at position 0, so none of them can
+    // catch an alternation whose `^` covers only its first branch — the shape
+    // a later edit to this regex is most likely to introduce.
+    const gate = gateRegex(yml, "DB_ADAPTER_RE");
+    expect(runs.filter((f) => gate.test(`vendor/${f}`))).toEqual([]);
+  });
+
+  // GitHub compiles each `run:` block as one template expression and rejects
+  // anything over 21,000 characters. Crossing it fails the WHOLE workflow at
+  // startup: zero jobs, no checks on the PR, and — because the `on:` filters
+  // can't be read either — a stray push-event run on a feature branch. The
+  // YAML stays valid, so nothing local catches it. Comments cost the same as
+  // code here, so keep prose out of that step.
+  it("keeps the changes-job filter script clear of the Actions expression limit", async () => {
+    const wf = parseYaml(await readFile(CI_YML, "utf8"));
+    const filter = wf.jobs.changes.steps.find((s: { id?: string }) => s.id === "filter");
+    expect(filter.run.length).toBeLessThan(20_500);
+  });
+
+  it("keeps the draft deferral, its two jobs and the ci aggregate in agreement", async () => {
+    const wf = parseYaml(await readFile(CI_YML, "utf8"));
+    const gateOf = (job: string): string => wf.jobs[job].if.replace(/\s+/g, " ").trim();
+
+    // Drift between the pair would leave one adapter deferred and the other
+    // not, which no single-job assertion would catch.
+    expect(gateOf("postgres-tests")).toBe(gateOf("maria-tests"));
+
+    // A draft-deferred job that never sees the ready flip would let a PR reach
+    // ready with no adapter coverage and no event left to start it.
+    expect(gateOf("postgres-tests")).toContain("github.event.pull_request.draft");
+    expect(wf.on.pull_request.types).toContain("ready_for_review");
+
+    // The aggregate's skip allow-list has to recognise exactly the conditions
+    // the jobs skip under; a narrower one wedges every draft PR on
+    // "unexpectedly skipped", a wider one passes a genuinely missing suite.
+    // The two are written at opposite polarity — the job lists what opts a
+    // draft back IN, the aggregate states when the suites were deferred — so
+    // each clause is pinned on both sides rather than compared textually.
+    const deferred = wf.jobs.ci.steps[0].env.DB_ADAPTERS_DRAFT_DEFERRED.replace(/\s+/g, " ");
+    const optIn = gateOf("postgres-tests");
+    for (const [jobClause, aggregateClause] of [
+      ["github.event_name != 'pull_request'", "github.event_name == 'pull_request'"],
+      ["github.event.pull_request.draft == false", "github.event.pull_request.draft &&"],
+      [
+        "needs.changes.outputs.db_adapter_affected == 'true'",
+        "needs.changes.outputs.db_adapter_affected != 'true'",
+      ],
+      [
+        "contains(github.event.pull_request.labels.*.name, 'run-db-adapters')",
+        "!contains(github.event.pull_request.labels.*.name, 'run-db-adapters')",
+      ],
+    ]) {
+      expect(optIn).toContain(jobClause);
+      expect(deferred).toContain(aggregateClause);
+    }
   });
 
   it("keeps comparison_affected off for website-only changes", async () => {
