@@ -534,7 +534,7 @@ describe("DatabaseTasksDropAllTest", () => {
   let dropped: string[];
   beforeEach(() => {
     dropped = [];
-    DatabaseTasks.registerTask("sqlite", {
+    DatabaseTasks.registerTask("abstract", {
       drop: async (config) => {
         dropped.push(config.database ?? "unknown");
       },
@@ -548,7 +548,7 @@ describe("DatabaseTasksDropAllTest", () => {
 
   it("ignores configurations without databases", async () => {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "sqlite3" },
+      development: { adapter: "abstract" },
     });
     await DatabaseTasks.dropAll();
     expect(dropped).toHaveLength(0);
@@ -556,7 +556,7 @@ describe("DatabaseTasksDropAllTest", () => {
 
   it("ignores remote databases", async () => {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "sqlite3", database: "dev.db", host: "my.server.tld" },
+      development: { adapter: "abstract", database: "my-db", host: "my.server.tld" },
     });
     vi.spyOn(stderr, "write").mockImplementation(() => true);
     await DatabaseTasks.dropAll();
@@ -564,7 +564,7 @@ describe("DatabaseTasksDropAllTest", () => {
   });
   it("warning for remote databases", async () => {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "sqlite3", database: "dev.db", host: "my.server.tld" },
+      development: { adapter: "abstract", database: "my-db", host: "my.server.tld" },
     });
     const writes: string[] = [];
     vi.spyOn(stderr, "write").mockImplementation((chunk) => {
@@ -573,32 +573,32 @@ describe("DatabaseTasksDropAllTest", () => {
     });
     await DatabaseTasks.dropAll();
     expect(writes.join("")).toMatch(
-      /This task only modifies local databases\. dev\.db is on a remote host\./,
+      /This task only modifies local databases\. my-db is on a remote host\./,
     );
   });
 
   it("drops configurations with local ip", async () => {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "sqlite3", database: "dev.db", host: "127.0.0.1" },
+      development: { adapter: "abstract", database: "my-db", host: "127.0.0.1" },
     });
     await DatabaseTasks.dropAll();
-    expect(dropped).toContain("dev.db");
+    expect(dropped).toContain("my-db");
   });
 
   it("drops configurations with local host", async () => {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "sqlite3", database: "dev.db", host: "localhost" },
+      development: { adapter: "abstract", database: "my-db", host: "localhost" },
     });
     await DatabaseTasks.dropAll();
-    expect(dropped).toContain("dev.db");
+    expect(dropped).toContain("my-db");
   });
 
   it("drops configurations with blank hosts", async () => {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "sqlite3", database: "dev.db", host: "" },
+      development: { adapter: "abstract", database: "my-db", host: "" },
     });
     await DatabaseTasks.dropAll();
-    expect(dropped).toContain("dev.db");
+    expect(dropped).toContain("my-db");
   });
 });
 

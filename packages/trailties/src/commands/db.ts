@@ -836,13 +836,11 @@ export function dbCommand(): Command {
     .command("seed:replant")
     .description("Truncate all tables in the current environment and re-run seeds")
     .action(async () => {
-      // Run the truncate path first (no connection in the CLI — the
-      // DatabaseTasks.truncateAll handler opens/closes its own per-
-      // config connection). Open the seed adapter only after the
-      // protected-env guard has passed and the truncate has completed,
-      // so we don't double-connect.
+      // Open the seed adapter only after the protected-env guard has
+      // passed and the truncate has completed, so we don't double-connect.
       const raw = normalizeRawConfig(await loadDatabaseConfig());
       const config = toDbConfig(raw);
+      await runProtectedEnvCheck(config, config.envName);
       await withRegisteredConfiguration(config, async () => {
         await DatabaseTasks.truncateAll(config.envName);
       });
@@ -865,6 +863,7 @@ export function dbCommand(): Command {
       // can abort.
       const raw = normalizeRawConfig(await loadDatabaseConfig());
       const config = toDbConfig(raw);
+      await runProtectedEnvCheck(config, config.envName);
       await withRegisteredConfiguration(config, async () => {
         await DatabaseTasks.truncateAll(config.envName);
       });

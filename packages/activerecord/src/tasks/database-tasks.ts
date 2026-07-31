@@ -270,11 +270,7 @@ export class DatabaseTasks {
 
   static async dropAll(): Promise<void> {
     if (!this.databaseConfiguration) return;
-    const configs = this.eachLocalConfiguration();
-    for (const config of configs) {
-      await this.checkProtectedEnvironmentsBang(config.envName);
-    }
-    for (const config of configs) {
+    for (const config of this.eachLocalConfiguration()) {
       await this.drop(config);
     }
   }
@@ -282,7 +278,6 @@ export class DatabaseTasks {
   static async dropCurrent(environment?: string): Promise<void> {
     const envs = this._environmentsFor(environment);
     for (const env of envs) {
-      await this.checkProtectedEnvironmentsBang(env);
       const configs = this.configsFor(env);
       for (const config of configs) {
         await this.drop(config);
@@ -442,7 +437,6 @@ export class DatabaseTasks {
   }
 
   static async purgeCurrent(environment?: string): Promise<void> {
-    await this.checkProtectedEnvironmentsBang(environment);
     const env = this._normalizeEnv(environment);
     const configs = this.configsFor(env);
     for (const config of configs) {
@@ -452,17 +446,12 @@ export class DatabaseTasks {
 
   static async purgeAll(): Promise<void> {
     if (!this.databaseConfiguration) return;
-    const configs = this.eachLocalConfiguration();
-    for (const config of configs) {
-      await this.checkProtectedEnvironmentsBang(config.envName);
-    }
-    for (const config of configs) {
+    for (const config of this.eachLocalConfiguration()) {
       await this.purge(config);
     }
   }
 
   static async truncateAll(environment?: string): Promise<void> {
-    await this.checkProtectedEnvironmentsBang(environment);
     const env = this._normalizeEnv(environment);
     const configs = this.configsFor(env);
     for (const config of configs) {
@@ -574,8 +563,8 @@ export class DatabaseTasks {
     const protectedEnvs = Base.protectedEnvironments ?? ["production"];
 
     // Include hidden / `databaseTasks: false` / replica configs so the
-    // guard is a superset of everything destructive callers like dropAll
-    // might touch — a hidden config stamped as production should still
+    // guard is a superset of everything a destructive task might touch —
+    // a hidden config stamped as production should still
     // block the operation even though the regular configsFor filter
     // would have hidden it.
     const configs = this.databaseConfiguration
