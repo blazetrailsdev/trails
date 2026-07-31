@@ -1,6 +1,14 @@
-// schema:compare — structural parity check of TEST_SCHEMA
-// (packages/activerecord/src/test-helpers/test-schema.ts) against the vendored
-// vendor/rails/activerecord/test/schema/schema.rb it is documented to mirror.
+// schema:compare — structural parity check of the two hand transcriptions of
+// vendor/rails/activerecord/test/schema/schema.rb against the vendored source
+// they are documented to mirror, and against each other:
+//   * TEST_SCHEMA (packages/activerecord/src/test-helpers/test-schema.ts) — the
+//     declarative map, read by the canonical-table ESLint rule and
+//     fixtures:compare;
+//   * the canonical registry (packages/activerecord/src/support/
+//     canonical-schema.ts) — the `create_table` sequence that actually lays
+//     every table at boot.
+// Checking only the first left the one that builds the database unverified, so
+// both are diffed against schema.rb and a third check fails when they disagree.
 //
 // Two verdicts:
 //   INVENTED (fatal)    — a table or column present in TEST_SCHEMA that
@@ -16,6 +24,7 @@ import { fileURLToPath } from "node:url";
 import { TEST_SCHEMA } from "../../packages/activerecord/src/test-helpers/test-schema.js";
 import type { ColumnSpec, Schema } from "../../packages/activerecord/src/support/schema-types.js";
 import { columnsOf } from "../../packages/activerecord/src/support/schema-types.js";
+import { canonicalRegistrySchema } from "../../packages/activerecord/src/support/canonical-schema.js";
 import type { RailsColumnOptions, RailsTable } from "./parse-schema-rb.js";
 import { parseSchemaRbWithCoverage } from "./parse-schema-rb.js";
 import { writeJsonManifest } from "../api-compare/write-json-manifest.js";
@@ -93,6 +102,26 @@ export const TABLE_ALLOW_LIST: ReadonlyMap<string, string> = new Map([
  * schema.rb block, keyed `table.column`. Same rules as TABLE_ALLOW_LIST.
  */
 export const COLUMN_ALLOW_LIST: ReadonlyMap<string, string> = new Map([]);
+
+/** How each transcription is named in finding details and report lines. */
+export const TEST_SCHEMA_LABEL = "TEST_SCHEMA";
+export const REGISTRY_LABEL = "canonical-registry";
+
+/**
+ * Tables the canonical registry lays that TEST_SCHEMA does not declare (or vice
+ * versa). Both transcribe the same `schema.rb`, so a divergence is a bug by
+ * default — an entry here is a documented exception with a reason, and the list
+ * is expected to shrink, not grow.
+ */
+export const TRANSCRIPTION_DIVERGENCE_ALLOW_LIST: ReadonlyMap<string, string> = new Map([
+  [
+    "courses",
+    "arunit2-only: schema.rb:1444-1460 creates it through the second connection, so only the registry (which can skip it per-database) carries it.",
+  ],
+  ["colleges", "arunit2-only, same as courses."],
+  ["professors", "arunit2-only, same as courses."],
+  ["courses_professors", "arunit2-only, same as courses."],
+]);
 
 /** Rails column type → the `ColumnSpec` type TEST_SCHEMA would spell it with. */
 const RAILS_TYPE_TO_SPEC: Readonly<Record<string, string>> = {
@@ -214,18 +243,22 @@ function displayPrecision(precision: number | null | undefined): string {
  *     the documented bare-DATETIME request that suppresses MySQL's
  *     auto-precision upgrade for `DEFAULT CURRENT_TIMESTAMP`.
  */
-export function optionMismatches(rails: RailsColumnOptions, spec: ColumnSpec): string[] {
+export function optionMismatches(
+  rails: RailsColumnOptions,
+  spec: ColumnSpec,
+  label: string = TEST_SCHEMA_LABEL,
+): string[] {
   if (rails.dynamicOptions) return [];
   const opts = specOptions(spec);
   const specDefault = normalizeSpecDefault(opts);
   const detail: string[] = [];
 
   if (railsNullable(rails) !== specNullable(opts)) {
-    detail.push(`null: schema.rb ${railsNullable(rails)}, TEST_SCHEMA ${specNullable(opts)}`);
+    detail.push(`null: schema.rb ${railsNullable(rails)}, ${label} ${specNullable(opts)}`);
   }
   for (const key of ["limit", "scale"] as const) {
     if (rails[key] !== opts[key]) {
-      detail.push(`${key}: schema.rb ${rails[key] ?? "—"}, TEST_SCHEMA ${opts[key] ?? "—"}`);
+      detail.push(`${key}: schema.rb ${rails[key] ?? "—"}, ${label} ${opts[key] ?? "—"}`);
     }
   }
   const precisionIsAdapterDriven = opts.precision === null && specDefault === "fn";
@@ -233,12 +266,12 @@ export function optionMismatches(rails: RailsColumnOptions, spec: ColumnSpec): s
   if (!precisionIsAdapterDriven && railsPrecision !== opts.precision) {
     detail.push(
       `precision: schema.rb ${displayPrecision(railsPrecision)}, ` +
-        `TEST_SCHEMA ${displayPrecision(opts.precision)}`,
+        `${label} ${displayPrecision(opts.precision)}`,
     );
   }
   const railsDefault = normalizeRailsDefault(rails.default);
   if (railsDefault !== specDefault) {
-    detail.push(`default: schema.rb ${railsDefault}, TEST_SCHEMA ${specDefault}`);
+    detail.push(`default: schema.rb ${railsDefault}, ${label} ${specDefault}`);
   }
   return detail;
 }
@@ -252,6 +285,7 @@ export function compareSchemas(
   railsTables: ReadonlyMap<string, RailsTable>,
   sources?: ReadonlyMap<string, string[]>,
   ambiguous?: ReadonlySet<string>,
+  label: string = TEST_SCHEMA_LABEL,
 ): Finding[] {
   const findings: Finding[] = [];
 
@@ -302,14 +336,14 @@ export function compareSchemas(
           verdict: "SHAPE",
           table: tableName,
           column: columnName,
-          detail: `${source ?? "schema.rb"} says ${railsColumn.type}, TEST_SCHEMA says ${tsType}`,
+          detail: `${source ?? "schema.rb"} says ${railsColumn.type}, ${label} says ${tsType}`,
           source,
         });
         // A type divergence makes the options incomparable (a limit on a
         // string means nothing against an integer), so stop at the type.
         continue;
       }
-      const mismatches = optionMismatches(railsColumn.options, spec);
+      const mismatches = optionMismatches(railsColumn.options, spec, label);
       if (mismatches.length > 0) {
         findings.push({
           verdict: "OPTION",
@@ -329,13 +363,83 @@ export function compareSchemas(
         verdict: "UNPORTED-COLUMN",
         table: tableName,
         column: columnName,
-        detail: `declared in ${source ?? "schema.rb"}, absent from TEST_SCHEMA`,
+        detail: `declared in ${source ?? "schema.rb"}, absent from ${label}`,
         source,
       });
     }
   }
 
   return findings;
+}
+
+/** The column options both transcriptions must agree on, in report order. */
+const COMPARED_SPEC_KEYS = ["limit", "precision", "scale", "null"] as const;
+
+/**
+ * The comparable shape of a `ColumnSpec`: its type plus the options that reach
+ * the DDL. A `defaultFunction` collapses to the `fn` tag {@link
+ * normalizeSpecDefault} already uses, so the two spellings of "SQL default" are
+ * compared as one thing.
+ */
+export function describeSpec(spec: ColumnSpec): string {
+  const opts = specOptions(spec);
+  const parts = [specType(spec)];
+  for (const key of COMPARED_SPEC_KEYS) {
+    if (opts[key] !== undefined) parts.push(`${key}=${JSON.stringify(opts[key])}`);
+  }
+  const defaultValue = normalizeSpecDefault(opts);
+  if (defaultValue !== "none") parts.push(`default=${defaultValue}`);
+  return parts.join(" ");
+}
+
+/**
+ * Divergences between the two hand transcriptions: tables one declares and the
+ * other does not, columns present on only one side, and columns whose declared
+ * type or options differ. Both are meant to be the same `schema.rb` written
+ * twice, so any divergence is fatal unless
+ * {@link TRANSCRIPTION_DIVERGENCE_ALLOW_LIST} documents it — this is what makes
+ * the hand-sync requirement enforced rather than merely written down.
+ *
+ * Pure: the caller supplies both sides.
+ */
+export function compareTranscriptions(testSchema: Schema, registry: Schema): string[] {
+  const divergences: string[] = [];
+  const tableNames = [...new Set([...Object.keys(testSchema), ...Object.keys(registry)])].sort();
+
+  for (const table of tableNames) {
+    if (TRANSCRIPTION_DIVERGENCE_ALLOW_LIST.has(table)) continue;
+    const inTestSchema = testSchema[table];
+    const inRegistry = registry[table];
+    if (!inRegistry) {
+      divergences.push(`${table} — declared by ${TEST_SCHEMA_LABEL}, not laid by the registry`);
+      continue;
+    }
+    if (!inTestSchema) {
+      divergences.push(`${table} — laid by the registry, absent from ${TEST_SCHEMA_LABEL}`);
+      continue;
+    }
+    const tsColumns = columnsOf(inTestSchema);
+    const registryColumns = columnsOf(inRegistry);
+    for (const column of [
+      ...new Set([...Object.keys(tsColumns), ...Object.keys(registryColumns)]),
+    ].sort()) {
+      const tsSpec = tsColumns[column];
+      const registrySpec = registryColumns[column];
+      if (tsSpec === undefined || registrySpec === undefined) {
+        const side = tsSpec === undefined ? REGISTRY_LABEL : TEST_SCHEMA_LABEL;
+        divergences.push(`${table}.${column} — declared only by ${side}`);
+        continue;
+      }
+      const ts = describeSpec(tsSpec);
+      const registryDescription = describeSpec(registrySpec);
+      if (ts !== registryDescription) {
+        divergences.push(
+          `${table}.${column} — ${TEST_SCHEMA_LABEL} ${ts}, ${REGISTRY_LABEL} ${registryDescription}`,
+        );
+      }
+    }
+  }
+  return divergences;
 }
 
 function formatFinding(finding: Finding): string {
@@ -523,6 +627,16 @@ export async function main(): Promise<void> {
     return;
   }
 
+  const registry = await canonicalRegistrySchema();
+  const registryFindings = compareSchemas(
+    registry,
+    railsTables,
+    sources,
+    ambiguous,
+    REGISTRY_LABEL,
+  );
+  const divergences = compareTranscriptions(TEST_SCHEMA, registry);
+
   const { regressions, known, stale } = applyBaseline(findings, await readBaseline());
   const { shape, option, optionFatal } = partitionFindings(findings);
   const optionCount = findings.filter((f) => f.verdict === "OPTION").length;
@@ -560,11 +674,31 @@ export async function main(): Promise<void> {
     );
   }
 
+  // The registry is the transcription that actually lays the tables, so its
+  // inventions are gated exactly like TEST_SCHEMA's — against the same baseline,
+  // which the two share because they transcribe the same schema.rb. `reseed`
+  // only ever writes TEST_SCHEMA's debt, so a registry-only invention cannot be
+  // blessed into the baseline: it has to be removed.
+  const registryBaseline = applyBaseline(registryFindings, await readBaseline());
+  const registryOptionFatal = optionRegressions(registryFindings);
+  for (const finding of [...registryBaseline.regressions, ...registryOptionFatal]) {
+    console.log(formatFinding(finding));
+  }
+  for (const divergence of divergences) {
+    console.log(`FAIL  TRANSCRIPTION-DRIFT ${divergence}`);
+  }
+
   console.log(
     `\n${Object.keys(TEST_SCHEMA).length} TEST_SCHEMA tables vs ${railsTables.size} canonical-schema tables — ` +
       `new-inventions=${regressions.length} baselined=${known.length} ` +
       `option-divergences=${optionCount} (ceiling ${OPTION_DEBT_CEILING}) shape-warnings=${shape.length}` +
       (process.argv.includes("--verbose") ? "" : " (--verbose to list shape warnings)"),
+  );
+  console.log(
+    `${Object.keys(registry).length} canonical-registry tables — ` +
+      `new-inventions=${registryBaseline.regressions.length} baselined=${registryBaseline.known.length} ` +
+      `option-divergences=${registryFindings.filter((f) => f.verdict === "OPTION").length} ` +
+      `transcription-drift=${divergences.length}`,
   );
 
   if (regressions.length > 0) {
@@ -581,7 +715,29 @@ export async function main(): Promise<void> {
         "the ceiling in scripts/schema-compare/compare.ts down to the new (lower) count.",
     );
   }
-  if (regressions.length > 0 || optionFatal.length > 0) process.exit(1);
+  if (registryBaseline.regressions.length > 0 || registryOptionFatal.length > 0) {
+    console.log(
+      "\nThe canonical registry (packages/activerecord/src/support/canonical-schema.ts) is the " +
+        "transcription that lays every table at boot; it mirrors the same schema.rb. Fix the " +
+        "create_table block — the baseline records TEST_SCHEMA debt only and will not absorb it.",
+    );
+  }
+  if (divergences.length > 0) {
+    console.log(
+      `\n${divergences.length} divergence(s) between the two transcriptions of schema.rb. They are ` +
+        "hand-synced: edit TEST_SCHEMA and the canonical registry together, or document the " +
+        "exception in TRANSCRIPTION_DIVERGENCE_ALLOW_LIST.",
+    );
+  }
+  if (
+    regressions.length > 0 ||
+    optionFatal.length > 0 ||
+    registryBaseline.regressions.length > 0 ||
+    registryOptionFatal.length > 0 ||
+    divergences.length > 0
+  ) {
+    process.exit(1);
+  }
 }
 
 // Run as a script when invoked directly, but stay importable from tests.

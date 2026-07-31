@@ -12,11 +12,15 @@ import {
   partitionFindings,
   readBaseline,
   SCHEMA_FILES,
+  TRANSCRIPTION_DIVERGENCE_ALLOW_LIST,
+  compareTranscriptions,
+  describeSpec,
   unresolvedCallSites,
 } from "./compare.js";
+import { canonicalRegistrySchema } from "../../packages/activerecord/src/support/canonical-schema.js";
 import { TEST_SCHEMA } from "../../packages/activerecord/src/test-helpers/test-schema.js";
 import type { Finding } from "./compare.js";
-import type { Schema } from "../../packages/activerecord/src/support/schema-types.js";
+import type { ColumnSpec, Schema } from "../../packages/activerecord/src/support/schema-types.js";
 
 const parse = (rb: string) => parseSchemaRb(`ActiveRecord::Schema.define do\n${rb}\nend\n`);
 const columnsOfTable = (rb: string, table: string) => [...parse(rb).get(table)!.columns.keys()];
@@ -626,3 +630,87 @@ describe("against the adapter-specific companion schemas", () => {
     expect(columns.has("char2_concatenated")).toBe(true); // MySQL only, not in PG
   });
 });
+
+describe("compareTranscriptions", () => {
+  it("reports a table only one transcription declares", () => {
+    expect(compareTranscriptions({ posts: { title: "string" } }, {})).toEqual([
+      "posts — declared by TEST_SCHEMA, not laid by the registry",
+    ]);
+    expect(compareTranscriptions({}, { posts: { title: "string" } })).toEqual([
+      "posts — laid by the registry, absent from TEST_SCHEMA",
+    ]);
+  });
+
+  it("reports a column only one transcription declares", () => {
+    expect(
+      compareTranscriptions(
+        { posts: { title: "string" } },
+        { posts: { title: "string", body: "text" } },
+      ),
+    ).toEqual(["posts.body — declared only by canonical-registry"]);
+  });
+
+  it("reports a column whose type or options differ", () => {
+    expect(
+      compareTranscriptions({ posts: { title: "string" } }, { posts: { title: "text" } }),
+    ).toEqual(["posts.title — TEST_SCHEMA string, canonical-registry text"]);
+    expect(
+      compareTranscriptions(
+        { posts: { title: { type: "string", null: false } } },
+        { posts: { title: "string" } },
+      ),
+    ).toEqual(["posts.title — TEST_SCHEMA string null=false, canonical-registry string"]);
+  });
+
+  it("says nothing about a documented divergence", () => {
+    const table = [...TRANSCRIPTION_DIVERGENCE_ALLOW_LIST.keys()][0]!;
+    expect(compareTranscriptions({}, { [table]: { name: "string" } })).toEqual([]);
+  });
+
+  it("treats the two spellings of a SQL default as one thing", () => {
+    expect(describeSpec({ type: "datetime", defaultFunction: "CURRENT_TIMESTAMP" })).toBe(
+      "datetime default=fn",
+    );
+    // precision: null is a declared value, not an omission (the bare-DATETIME request).
+    expect(describeSpec({ type: "datetime", precision: null })).toBe("datetime precision=null");
+  });
+});
+
+// The registry — not TEST_SCHEMA — is what lays every table at boot, so the same
+// invention gate has to hold over it, and the two must not drift apart.
+describe("against the canonical registry", () => {
+  it("keeps the registry free of inventions outside the committed baseline", async () => {
+    const { tables, sources, ambiguous } = await loadRailsTables();
+    const findings = compareSchemas(await canonicalRegistrySchema(), tables, sources, ambiguous);
+    const { regressions } = applyBaseline(findings, await readBaseline());
+    expect(verdicts(regressions)).toEqual([]);
+  });
+
+  it("keeps the registry's column-option divergences at or below the committed ceiling", async () => {
+    const { tables, sources, ambiguous } = await loadRailsTables();
+    expect(
+      optionRegressions(
+        compareSchemas(await canonicalRegistrySchema(), tables, sources, ambiguous),
+      ),
+    ).toEqual([]);
+  });
+
+  it("keeps the two transcriptions of schema.rb in sync", async () => {
+    expect(compareTranscriptions(TEST_SCHEMA, await canonicalRegistrySchema())).toEqual([]);
+  });
+
+  it("recovers the declared column shape rather than one adapter's rendering", async () => {
+    const registry = await canonicalRegistrySchema();
+    // big_integer, not SQLite's `bigint` spelling; a declared limit survives.
+    expect(describeSpec(columnsOfRegistry(registry, "admin_users", "settings"))).toBe(
+      "string limit=1024 null=true",
+    );
+    expect(describeSpec(columnsOfRegistry(registry, "aircraft", "manufactured_at"))).toBe(
+      "datetime precision=null default=fn",
+    );
+  });
+});
+
+function columnsOfRegistry(registry: Schema, table: string, column: string) {
+  return (registry[table] as Record<string, ColumnSpec>)[column]!;
+}

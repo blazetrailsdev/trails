@@ -26,7 +26,7 @@ import type {
   AddForeignKeyOptions,
 } from "../connection-adapters/abstract/schema-definitions.js";
 import type { SchemaStatements } from "../connection-adapters/abstract/schema-statements.js";
-import type { ColumnSpec } from "./schema-types.js";
+import type { AnyPrimitiveColumnSpec, ColumnSpec, Schema } from "./schema-types.js";
 import {
   COLUMN_TYPE_MAP_MYSQL,
   COLUMN_TYPE_MAP_PG,
@@ -2152,4 +2152,58 @@ export async function canonicalForeignKeyDependents(): Promise<Map<string, strin
   }
   _dependents = dependents;
   return dependents;
+}
+
+/**
+ * Declarative view of the registry: table -> column -> `ColumnSpec`, derived by
+ * replaying every `create_table` block against a probe that records columns
+ * instead of emitting DDL. This is what lets `schema:compare` diff the
+ * transcription that actually lays the tables against `schema.rb`, rather than
+ * only the parallel `TEST_SCHEMA` map (which lays nothing).
+ *
+ * The replay pins the SQLite adapter deliberately: it is the one adapter whose
+ * type map is a near-identity and whose column path applies no adapter munging
+ * (no MySQL `DATETIME(6)` upgrade, no `serial` PK rewrite), so what comes back
+ * is the *declared* shape rather than one adapter's rendering of it. For the
+ * same reason the probe is built with no `serialPk` and no composite-PK set —
+ * both only add adapter-side spellings (`serial`, an implied `null: false`)
+ * that `schema.rb` does not state.
+ *
+ * @internal Read by `scripts/schema-compare/compare.ts`. Lives here, next to the
+ * registry it replays, for the same reason as
+ * {@link canonicalForeignKeyDependents}: `TableBuilder` stays file-local.
+ */
+export async function canonicalRegistrySchema(): Promise<Schema> {
+  const schema: Schema = {};
+  for (const def of await buildCanonicalRegistry()) {
+    const columns: Record<string, ColumnSpec> = {};
+    const probe = {
+      column: (name: string, type: string, options: Record<string, unknown> = {}) => {
+        columns[name] = specFromColumnCall(type, options);
+      },
+      foreignKey: () => {},
+    } as unknown as TableDefinition;
+    def.fn(new TableBuilder(probe, "sqlite", COLUMN_TYPE_MAP_SQLITE, null, null));
+    schema[def.name] = columns;
+  }
+  return schema;
+}
+
+/** Rebuilds a `ColumnSpec` from the `t.column(name, type, options)` call the
+ *  replay observed, undoing the one type-map rename SQLite applies. */
+function specFromColumnCall(type: string, options: Record<string, unknown>): ColumnSpec {
+  const spec: Exclude<ColumnSpec, string> = {
+    type: (type === "bigint" ? "big_integer" : type) as AnyPrimitiveColumnSpec,
+  };
+  if (typeof options["limit"] === "number") spec.limit = options["limit"];
+  if ("precision" in options) spec.precision = options["precision"] as number | null;
+  if (typeof options["scale"] === "number") spec.scale = options["scale"];
+  if (typeof options["null"] === "boolean") spec.null = options["null"];
+  const defaultValue = options["default"];
+  if (typeof defaultValue === "function") {
+    spec.defaultFunction = (defaultValue as () => string)();
+  } else if (defaultValue !== undefined) {
+    spec.default = defaultValue;
+  }
+  return spec;
 }
