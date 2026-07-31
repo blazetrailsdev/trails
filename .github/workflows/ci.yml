@@ -1108,9 +1108,9 @@ jobs:
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.activerecord_affected == 'true' &&
       (github.event_name != 'pull_request' ||
-       github.event.pull_request.draft == false ||
-       needs.changes.outputs.db_adapter_affected == 'true' ||
-       contains(github.event.pull_request.labels.*.name, 'run-db-adapters'))
+      github.event.pull_request.draft == false ||
+      needs.changes.outputs.db_adapter_affected == 'true' ||
+      contains(github.event.pull_request.labels.*.name, 'run-db-adapters'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # 2-way file-level shard (RFC 0028 shard-ar-adapter-suites). This suite is
@@ -1290,9 +1290,9 @@ jobs:
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.activerecord_affected == 'true' &&
       (github.event_name != 'pull_request' ||
-       github.event.pull_request.draft == false ||
-       needs.changes.outputs.db_adapter_affected == 'true' ||
-       contains(github.event.pull_request.labels.*.name, 'run-db-adapters'))
+      github.event.pull_request.draft == false ||
+      needs.changes.outputs.db_adapter_affected == 'true' ||
+      contains(github.event.pull_request.labels.*.name, 'run-db-adapters'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # 2-way file-level shard (RFC 0028 shard-ar-adapter-suites) — see the
