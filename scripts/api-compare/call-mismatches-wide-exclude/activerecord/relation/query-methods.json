@@ -79,6 +79,27 @@
   {
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
+    "rubyName": "associated",
+    "call": "joins_values",
+    "reason": "Satisfied in `Relation#whereAssociated`, which is where Rails' `associations.each` body lives in this port: the already-joined guard (`query_methods.rb:91`) reads `joinsValues` / `leftOuterJoinsValues` and `includes` there, per-iteration, exactly as Rails does. Same split as the existing `joins!` / `not` entries for this method."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-methods.ts",
+    "rubyName": "associated",
+    "call": "left_outer_joins_values",
+    "reason": "Satisfied in `Relation#whereAssociated`, which is where Rails' `associations.each` body lives in this port: the already-joined guard (`query_methods.rb:91`) reads `joinsValues` / `leftOuterJoinsValues` and `includes` there, per-iteration, exactly as Rails does. Same split as the existing `joins!` / `not` entries for this method."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-methods.ts",
+    "rubyName": "associated",
+    "call": "include?",
+    "reason": "Satisfied in `Relation#whereAssociated`, which is where Rails' `associations.each` body lives in this port: the already-joined guard (`query_methods.rb:91`) reads `joinsValues` / `leftOuterJoinsValues` and `includes` there, per-iteration, exactly as Rails does. Same split as the existing `joins!` / `not` entries for this method."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-methods.ts",
     "rubyName": "build_arel",
     "call": "annotate_values",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
