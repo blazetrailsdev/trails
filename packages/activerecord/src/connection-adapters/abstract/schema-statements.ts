@@ -1833,11 +1833,12 @@ export class SchemaStatements {
   }
 
   async assumeMigratedUptoVersion(version: number | string): Promise<void> {
-    const ver = String(version);
-    if (!/^\d+$/.test(ver)) {
-      throw new Error(`Invalid migration version: ${version}`);
-    }
-    const verNum = parseInt(ver, 10);
+    // Rails does `version = version.to_i` with no validation, so a non-numeric
+    // argument coerces to 0 rather than raising.
+    // Mirror Ruby String#to_i: leading signed-integer prefix, 0 when there is
+    // none ("abc" -> 0, "123abc" -> 123).
+    const leading = /^\s*([+-]?\d+)/.exec(String(version));
+    const verNum = leading ? parseInt(leading[1], 10) : 0;
 
     const pool = (this.adapter as any).pool;
     const smTableName = pool?.schemaMigration?.tableName ?? "schema_migrations";
