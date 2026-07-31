@@ -54,6 +54,7 @@ export const canonicalLoaderEnforcedGlobs = [
  * real ignore list, so re-ignoring a scan root fails until enforcement narrows
  * with it. Empty since `scripts/` came out of the global ignores.
  */
+/** @type {string[]} */
 export const canonicalLoaderUnenforceableRoots = [];
 
 /**
