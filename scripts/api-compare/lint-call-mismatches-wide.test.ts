@@ -17,6 +17,7 @@ import {
   REGEN_SKIP_ENV,
   unreviewedCount,
   writeSplitBaseline,
+  renderStaleTags,
 } from "./lint-call-mismatches-wide.js";
 import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
 
@@ -365,5 +366,19 @@ describe("regenerateArtifact", () => {
     await expect(regenerateArtifact({ PATH: "" })).rejects.toThrow(
       /pnpm api:compare --wide-calls|spawn/,
     );
+  });
+});
+
+describe("renderStaleTags", () => {
+  it("returns null when no tag is stale", () => {
+    expect(renderStaleTags([])).toBeNull();
+  });
+
+  it("lists each stale tag with its package, file, method and call", () => {
+    const out = renderStaleTags([
+      { package: "activerecord", tsFile: "relation.ts", tsName: "load", call: "synchronize" },
+    ])!;
+    expect(out).toContain("1 STALE @missingRailsCall tag(s)");
+    expect(out).toContain("  - activerecord  relation.ts  load  synchronize");
   });
 });

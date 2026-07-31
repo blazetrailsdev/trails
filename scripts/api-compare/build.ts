@@ -40,7 +40,8 @@ import {
   loadBaseline as loadNarrowBaseline,
   missingScope,
 } from "./lint-call-mismatches.js";
-import { loadSplitBaseline } from "./lint-call-mismatches-wide.js";
+import { loadSplitBaseline, writeSplitBaseline } from "./lint-call-mismatches-wide.js";
+import { TAG, type TagEntry, parseJsdoc } from "./missing-rails-call-tags.js";
 
 const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-mismatches-wide.json");
 const WIDE_BASELINE_DIR = path.join(
@@ -48,7 +49,9 @@ const WIDE_BASELINE_DIR = path.join(
   "call-mismatches-wide-exclude",
 );
 
-export const TAG = "@missingRailsCall";
+export { TAG, parseJsdoc } from "./missing-rails-call-tags.js";
+export type { JsdocOrigin, TagEntry } from "./missing-rails-call-tags.js";
+
 export const DEFAULT_TAG_REASON =
   "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; " +
   "bucket (b) equivalent or (c) noise pending per-cluster burndown review.";
@@ -67,84 +70,6 @@ interface ArtifactMismatch {
 interface WideArtifact {
   packages?: string[];
   mismatches: ArtifactMismatch[];
-}
-
-/** One parsed `@missingRailsCall` tag: the Ruby call name plus its raw lines
- *  (kept verbatim for idempotency) and the flattened reason text. */
-export interface TagEntry {
-  call: string;
-  reason: string;
-  rawLines: string[];
-}
-
-const TAG_LINE = /^\s*\*?\s*@missingRailsCall\s+(\S+)(?:\s+—\s?(.*))?$/;
-// A line opening a NEW JSDoc tag: at most one space after the `*`. Curated
-// reasons can contain Ruby ivar names (`@primary_key`), and the wrapper's
-// hang indent (`*   `) can place one at line start — deeper-indented `@`
-// lines are continuations, not tag boundaries (found by the activerecord-wide
-// run: core.ts initInternals).
-const ANY_TAG_LINE = /^\s*\*?\s?@\S/;
-
-/** Where a JSDoc comment starts, so an empty-reason error can name a
- *  `file:line` the way `noRailsEquivalentReason` does. */
-export interface JsdocOrigin {
-  fileName: string;
-  /** 1-based line of the comment's first line in `fileName`. */
-  startLine: number;
-}
-
-/** Parse a JSDoc comment's text (including delimiters) into its non-tag lines
- *  and its `@missingRailsCall` entries. Continuation lines (not starting a new
- *  `@` tag) attach to the preceding entry.
- *
- *  An empty reason is a hard error, matching `@noRailsEquivalent` (RFC 0080):
- *  every tag in the tree is written with a reason — the generator always emits
- *  the curated baseline row's prose or a placeholder — so a bare tag is
- *  necessarily hand-authored, and backfilling it with a placeholder would turn
- *  an unjustified allowlist entry into a silently blessed one. The family's
- *  empty-reason contract is stated in
- *  docs/infrastructure/api-build-stub-generation-plan.md. */
-export function parseJsdoc(
-  comment: string,
-  origin?: JsdocOrigin,
-): { rest: string[]; entries: TagEntry[] } {
-  const lines = comment.split("\n");
-  const rest: string[] = [];
-  const entries: TagEntry[] = [];
-  const tagLineOf = new Map<TagEntry, number>();
-  let open: TagEntry | null = null;
-  for (const [index, line] of lines.entries()) {
-    const m = line.match(TAG_LINE);
-    if (m) {
-      // Trimmed at capture: `TAG_LINE` absorbs only one space after the
-      // em-dash, so trailing whitespace would otherwise read as a non-empty
-      // reason and slide past the empty-reason gate below. `rawLines` keeps
-      // the line verbatim, so idempotency is unaffected.
-      open = { call: m[1], reason: (m[2] ?? "").trim(), rawLines: [line] };
-      entries.push(open);
-      tagLineOf.set(open, index);
-      continue;
-    }
-    const closes = line.trim() === "*/" || line.trim().endsWith("*/");
-    if (open && !ANY_TAG_LINE.test(line) && !closes && line.trim() !== "*") {
-      open.rawLines.push(line);
-      open.reason = (open.reason + " " + line.replace(/^\s*\*\s?/, "").trim()).trim();
-      continue;
-    }
-    open = null;
-    rest.push(line);
-  }
-  for (const entry of entries) {
-    if (entry.reason !== "") continue;
-    const at = origin
-      ? ` ${origin.fileName}:${origin.startLine + (tagLineOf.get(entry) ?? 0)}`
-      : "";
-    throw new Error(
-      `${TAG} needs a reason:${at} — state why the Rails call ` +
-        `\`${entry.call}\` is not made here.`,
-    );
-  }
-  return { rest, entries };
 }
 
 export interface ReconcileResult {
@@ -244,6 +169,10 @@ export function reconcileFileText(
 ): {
   text: string | null;
   harvested: { tsName: string; entry: TagEntry }[];
+  /** Every (rubyName, call) the file now tags — kept and newly-added alike.
+   *  These are the baseline rows the tag supersedes, so `main` drops them from
+   *  the split baseline in the same operation (RFC 0083). */
+  tagged: { rubyName: string; call: string }[];
   /** Expectation names never seen on a body-bearing declaration (mixin
    *  host-class duplicates, prototype-patched methods, …) — reported, never
    *  silently dropped. */
@@ -252,6 +181,7 @@ export function reconcileFileText(
   const sf = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true);
   const edits: Edit[] = [];
   const harvested: { tsName: string; entry: TagEntry }[] = [];
+  const tagged: { rubyName: string; call: string }[] = [];
   const seen = new Set<string>();
 
   const visit = (node: ts.Node): void => {
@@ -302,6 +232,11 @@ export function reconcileFileText(
         const r = reconcile(entries, expected, (c) =>
           exp ? reasonFor(exp.rubyName, c) : DEFAULT_TAG_REASON,
         );
+        if (exp) {
+          for (const e of [...r.kept, ...r.added]) {
+            tagged.push({ rubyName: exp.rubyName, call: e.call });
+          }
+        }
         for (const d of r.dropped) {
           if (!PLACEHOLDER_REASONS.has(d.reason)) harvested.push({ tsName: name, entry: d });
         }
@@ -327,12 +262,12 @@ export function reconcileFileText(
   visit(sf);
 
   const unmatched = [...expectations.keys()].filter((n) => !seen.has(n)).sort();
-  if (edits.length === 0) return { text: null, harvested, unmatched };
+  if (edits.length === 0) return { text: null, harvested, tagged, unmatched };
   let out = text;
   for (const e of edits.sort((a, b) => b.start - a.start)) {
     out = out.slice(0, e.start) + e.text + out.slice(e.end);
   }
-  return { text: out, harvested, unmatched };
+  return { text: out, harvested, tagged, unmatched };
 }
 
 async function main(argv: string[]): Promise<number> {
@@ -377,6 +312,9 @@ async function main(argv: string[]): Promise<number> {
   }
 
   let changed = 0;
+  // Baseline keys now justified by a tag at the call site; dropped from the
+  // split baseline below so a deviation is recorded in exactly one place.
+  const migrated = new Set<string>();
   const srcDir = packageSrcDir(pkg);
   for (const [tsFile, expectations] of [...byFile.entries()].sort()) {
     const abs = path.join(srcDir, tsFile);
@@ -401,7 +339,8 @@ async function main(argv: string[]): Promise<number> {
       console.error(`api:build: ${err instanceof Error ? err.message : String(err)}`);
       return 1;
     }
-    const { text: next, harvested, unmatched } = reconciled;
+    const { text: next, harvested, tagged, unmatched } = reconciled;
+    for (const t of tagged) migrated.add(keyOf({ package: pkg, tsFile, ...t }));
     for (const h of harvested) {
       console.log(`harvested (${tsFile} ${h.tsName} ${h.entry.call}): ${h.entry.reason}`);
     }
@@ -414,6 +353,14 @@ async function main(argv: string[]): Promise<number> {
       else await fs.writeFile(abs, next);
     }
   }
+  const remaining = wideBaseline.filter((e) => !migrated.has(keyOf(e)));
+  const dropped = wideBaseline.length - remaining.length;
+  if (dropped > 0 && !dryRun) await writeSplitBaseline(remaining, WIDE_BASELINE_DIR);
+  console.log(
+    `api:build: ${dropped} baseline entr(ies) ${dryRun ? "would migrate" : "migrated"} to ` +
+      `@missingRailsCall tags and ${dryRun ? "would be" : "were"} dropped from ` +
+      `${path.relative(ROOT_DIR, WIDE_BASELINE_DIR)}/.`,
+  );
   console.log(`api:build: ${changed} file(s) ${dryRun ? "would change" : "updated"} (${pkg}).`);
   return 0;
 }

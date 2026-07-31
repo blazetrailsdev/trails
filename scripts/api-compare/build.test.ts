@@ -202,3 +202,24 @@ describe("reconcileFileText", () => {
     );
   });
 });
+
+describe("reconcileFileText baseline migration", () => {
+  it("reports every tagged (rubyName, call) so the baseline row can be dropped", () => {
+    const expectations = new Map([
+      ["bar", { rubyName: "bar", calls: new Set(["save"]) }],
+      ["baz", { rubyName: "baz", calls: new Set(["reload"]) }],
+    ]);
+    const { tagged } = reconcileFileText("foo.ts", FILE, expectations, () => "why");
+    expect(tagged).toEqual([
+      { rubyName: "bar", call: "save" },
+      { rubyName: "baz", call: "reload" },
+    ]);
+  });
+
+  it("reports a KEPT tag too — an already-tagged call owes no baseline row", () => {
+    const expectations = new Map([["bar", { rubyName: "bar", calls: new Set(["save"]) }]]);
+    const first = reconcileFileText("foo.ts", FILE, expectations, () => "why").text!;
+    const { tagged } = reconcileFileText("foo.ts", first, expectations, () => "why");
+    expect(tagged).toEqual([{ rubyName: "bar", call: "save" }]);
+  });
+});

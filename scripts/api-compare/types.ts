@@ -46,6 +46,14 @@ export interface MethodInfo {
    */
   weakCalls?: string[];
   /**
+   * TS-side only (RFC 0083): the Ruby call names this declaration's JSDoc tags
+   * as deliberately not made, via `@missingRailsCall <call> — <reason>`.
+   * compare.ts's `checkCalls` drops these from the wide call-mismatch
+   * population, which is what makes the tag load-bearing instead of
+   * documentation — see missing-rails-call-tags.ts.
+   */
+  missingRailsCalls?: string[];
+  /**
    * Normalized digest of the Ruby method BODY (source-hash pinning, RFC 0025).
    * Whitespace/comment-insensitive, body-only; changes when the ported code
    * changes upstream. Ruby-side only (the TS extractor does not emit it); used

@@ -67,9 +67,6 @@ export class InsertManager extends TreeManager {
    * - values pass through raw — no `Quoted` wrap (Rails preserves them
    *   for the dialect-specific value visitor to quote)
    *
-   * @missingRailsCall each — Baseline (RFC 0047): wide call-set flag seeded when
-   *   the wide ratchet landed; bucket (b) equivalent or (c) noise pending
-   *   per-cluster burndown review.
    * @missingRailsCall first — Baseline (RFC 0047): wide call-set flag seeded
    *   when the wide ratchet landed; bucket (b) equivalent or (c) noise pending
    *   per-cluster burndown review.
