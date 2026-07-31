@@ -6002,7 +6002,7 @@ export class Relation<T extends Base> {
       }
       return records;
     }
-    return (await (this.model as any).update(id, attrs ?? {})) as T;
+    return (await this.model.update(id, attrs ?? {})) as T;
   }
 
   /**
@@ -6019,7 +6019,7 @@ export class Relation<T extends Base> {
       }
       return records;
     }
-    return (await (this.model as any).updateBang(id, attrs ?? {})) as T;
+    return (await this.model.updateBang(id, attrs ?? {})) as T;
   }
 
   /**
@@ -6569,7 +6569,7 @@ export class Relation<T extends Base> {
       typeof optionsOrCallback === "function" ? null : (optionsOrCallback.allQueries ?? null);
 
     const modelClass = this.model as any;
-    const registry = modelClass.scopeRegistry();
+    const registry = this.model.scopeRegistry();
 
     // Rails: global_scope? && all_queries == false → raise.
     if (this.isGlobalScope(registry) && allQueries === false) {
@@ -7005,7 +7005,7 @@ export class Relation<T extends Base> {
    */
   _execScope(fn: (rel: Relation<T>, ...args: unknown[]) => unknown, ...args: unknown[]): unknown {
     this._delegateToModel = true;
-    const registry = (this.model as any).scopeRegistry();
+    const registry = this.model.scopeRegistry();
     try {
       return this._scoping(null, registry, () => fn(this, ...args) || this);
     } finally {
