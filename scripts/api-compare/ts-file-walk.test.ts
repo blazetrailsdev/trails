@@ -6,6 +6,7 @@ import {
   COMMITTED_TS_FILES,
   COMPARED_TS_FILES,
   walkPackageTsFiles,
+  walkTsFiles,
   walkTsFilesSync,
 } from "./ts-file-walk.js";
 
@@ -63,6 +64,30 @@ describe("walkTsFilesSync", () => {
 
   it("returns no files for a missing directory", () => {
     expect(walkTsFilesSync(path.join(root, "missing"), COMPARED_TS_FILES)).toEqual([]);
+  });
+});
+
+describe("walkTsFiles", () => {
+  it("lists the committed population under a flat root, pruning skipDirs", async () => {
+    expect(rel(await walkTsFiles(srcDir, COMMITTED_TS_FILES))).toEqual([
+      "model.test.ts",
+      "model.ts",
+      path.join("nested", "helper.ts"),
+      "types.d.ts",
+    ]);
+  });
+
+  it("drops tests and declarations for the compared population", async () => {
+    expect(rel(await walkTsFiles(srcDir, COMPARED_TS_FILES))).toEqual([
+      path.join("dist", "model.ts"),
+      "model.ts",
+      path.join("nested", "helper.ts"),
+      path.join("node_modules", "dep.ts"),
+    ]);
+  });
+
+  it("returns no files for a missing directory", async () => {
+    expect(await walkTsFiles(path.join(root, "missing"), COMMITTED_TS_FILES)).toEqual([]);
   });
 });
 

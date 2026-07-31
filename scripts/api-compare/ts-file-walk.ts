@@ -61,6 +61,23 @@ export function walkTsFilesSync(
   return results;
 }
 
+/** Every file of `population` under `dir`, recursively, in `readdir` order.
+ *  The flat async counterpart to `walkTsFilesSync`, for roots with no
+ *  `<pkg>/src` layer (`api:detached` walks `scripts/` with it). A missing
+ *  directory yields no files rather than throwing. */
+export async function walkTsFiles(dir: string, population: TsFilePopulation): Promise<string[]> {
+  let names: string[];
+  try {
+    names = await fsPromises.readdir(dir, { recursive: true });
+  } catch {
+    return [];
+  }
+  return names
+    .filter((name) => population.includeFile(path.basename(name)))
+    .filter((name) => !name.split(path.sep).some((seg) => population.skipDirs.has(seg)))
+    .map((name) => path.join(dir, name));
+}
+
 /** Every file of `population` under `<packagesDir>/<pkg>/src`, sorted for
  *  stable output. Missing directories yield no files rather than throwing. */
 export async function walkPackageTsFiles(
@@ -76,19 +93,7 @@ export async function walkPackageTsFiles(
     return [];
   }
   const perPackage = await Promise.all(
-    pkgs.map(async (pkg) => {
-      const srcDir = path.join(packagesDir, pkg, "src");
-      let names: string[];
-      try {
-        names = await fsPromises.readdir(srcDir, { recursive: true });
-      } catch {
-        return [];
-      }
-      return names
-        .filter((name) => population.includeFile(path.basename(name)))
-        .filter((name) => !name.split(path.sep).some((seg) => population.skipDirs.has(seg)))
-        .map((name) => path.join(srcDir, name));
-    }),
+    pkgs.map((pkg) => walkTsFiles(path.join(packagesDir, pkg, "src"), population)),
   );
   return perPackage.flat().sort();
 }
