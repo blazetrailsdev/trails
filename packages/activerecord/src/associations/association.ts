@@ -412,6 +412,13 @@ export class Association {
     const inverse = this.inverseAssociationFor(record);
     if (inverse) {
       inverse.inversedFrom(this.owner);
+      // `_explicitTarget` is the trails flag `_loadedSingularTarget` consults
+      // before the inner belongs_to/has_one loaders query (RFC 0022). Rails has
+      // no analog — `inversed_from` alone is the whole of `set_inverse_instance`
+      // — so it has to be raised here, as `_cacheSingularTarget` does on the
+      // other seeding path, or an inverse wired through this method reads back
+      // as an unset target and re-queries.
+      if (!inverse.isCollection()) inverse._explicitTarget = true;
     }
     return record;
   }

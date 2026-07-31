@@ -3,7 +3,6 @@ import { Relation } from "../relation.js";
 import {
   CollectionAssociation,
   callback as assocCallback,
-  concatRecordsLoop,
   type CallbackHost,
 } from "./collection-association.js";
 import type { PrettyPrinter } from "../pretty-print.js";
@@ -2097,115 +2096,21 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       return stripThenable(this._proxySelf ?? this);
     }
 
-    // Mirror Rails CollectionAssociation#concat: a new-record owner loads the
-    // target up front. Rails' `load_target` skips the query entirely for a
-    // new-record owner (`find_target?` is false) and just runs `loaded!`, so we
-    // mark the association loaded over its current in-memory target rather than
-    // routing through the full load path — which would also raise the
-    // strict-loading check that Rails never reaches for a new record.
-    if (this._record.isNewRecord() && !this._targetLoaded) {
-      this._targetLoaded = true;
-    }
-
-    const ctor = this._record.constructor as typeof Base;
-    const asName = this._assocDef.options.as;
-    let primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
-    const foreignKey = asName
-      ? (this._assocDef.options.foreignKey ??
-        this._reflectionForeignKey() ??
-        `${underscore(asName)}_id`)
-      : (this._assocDef.options.foreignKey ??
-        this._reflectionForeignKey() ??
-        this._assocDef.options.queryConstraints ??
-        (Array.isArray(primaryKey)
-          ? primaryKey.map((col: string) => `${underscore(ctor.name)}_${col}`)
-          : `${underscore(ctor.name)}_id`));
-    // A composite FK derived from the owner's query_constraints (e.g.
-    // Sharded::BlogPost `[blog_id, id]`) pairs each FK column with the owner's
-    // query-constraint key, not its scalar `id`. Defer to the reflection's
-    // `activeRecordPrimaryKey` — the single resolver the join/preload paths
-    // already use (Rails `reflection.active_record_primary_key`).
-    if (!asName && Array.isArray(foreignKey) && !Array.isArray(primaryKey)) {
-      const reflection = (ctor as any)._reflectOnAssociation?.(this._assocName);
-      if (Array.isArray(reflection?.activeRecordPrimaryKey)) {
-        primaryKey = reflection.activeRecordPrimaryKey;
-      }
-    }
-    const typeCol = asName
-      ? (this._assocDef.options.foreignType ?? `${underscore(asName)}_type`)
-      : null;
-    // insert_record: assign the owner's FK/type onto the record, then save.
-    // Mirrors Rails' `CollectionAssociation#insert_record` →
-    // `set_owner_attributes` + `record.save`.
-    const insertRecord = (record: T): Promise<boolean | undefined> => {
-      if (Array.isArray(foreignKey)) {
-        if (!Array.isArray(primaryKey) || primaryKey.length !== foreignKey.length) {
-          throw new Error(
-            `Composite foreignKey on "${this._assocName}" requires primaryKey to be an array of the same length`,
-          );
-        }
-        for (let i = 0; i < foreignKey.length; i++) {
-          record._writeAttribute(foreignKey[i], this._record._readAttribute(primaryKey[i]));
-        }
-      } else {
-        if (Array.isArray(primaryKey)) {
-          throw new Error(
-            `Association "${this._assocName}" with composite primaryKey requires a composite foreignKey array`,
-          );
-        }
-        const pkValue = this._record._readAttribute(primaryKey);
-        record._writeAttribute(foreignKey, pkValue);
-      }
-      if (typeCol) record._writeAttribute(typeCol, polymorphicName(ctor));
-
-      return record.save();
+    // Rails has no proxy-local insert: `CollectionProxy#<<` is
+    // `proxy_association.concat(records)` (collection_proxy.rb:1053), and the
+    // owner FK / composite PK pairing / polymorphic `<as>_type` derivation lives
+    // on `CollectionAssociation#insert_record` → `set_owner_attributes`
+    // (collection_association.rb:439-446). The proxy and the association object
+    // share ONE in-memory target (`_sharedTarget`), so the appended records,
+    // loaded-ness, `@replaced_or_added_targets` dedup, and before/after_add
+    // callbacks all land on this proxy too. `concat` owns both halves Rails puts
+    // there: the new-record-owner `load_target` and the persisted-owner
+    // `transaction { concat_records }` whose swallowed `Rollback` yields the
+    // `nil` that makes `<<` falsy.
+    const assoc = this._record.association(this._assocName) as unknown as {
+      concat: (...records: Base[]) => Promise<Base[] | undefined>;
     };
-    // Shared `concatRecordsLoop` owns the `result &&= insert_record(...)` /
-    // `raise ActiveRecord::Rollback unless result` accumulation
-    // (collection_association.rb:438-452) so this runtime path and the OO
-    // `CollectionAssociation#concatRecords` parity surface stay in lock-step.
-    // A record whose `save` merely *returns false* (a validation/callback abort
-    // that doesn't raise) still rolls back the records already inserted.
-    const concatRecords = async (): Promise<T[]> => {
-      await concatRecordsLoop(records, async (record, resultStillTrue) => {
-        // Route through replace_on_target (via _addToTarget) so set_inverse_instance
-        // and @replaced_or_added_targets dedup tracking run on push/<<, mirroring
-        // Rails' concat_records → add_to_target(record) { insert_record }. A record
-        // already wired into the loaded target by inverse-of setting is replaced in
-        // place rather than appended twice.
-        // Rails' add_to_target computes `replace: replace || association_scope.distinct_value`
-        // so a `distinct` association scope dedups in place on append rather than appending twice.
-        //
-        // Rails' `concat_records` runs `insert_record` inside the per-record
-        // `add_to_target` block, guarded by `unless owner.new_record?`
-        // (collection_association.rb:444). For a new-record owner the child is
-        // added to the in-memory target and saved later via autosave; skipping
-        // the insert also avoids writing a child row with a null owner FK. The
-        // check is evaluated per record at save time (after `before_add` fires),
-        // so a callback that persists the owner mid-loop flips the remaining
-        // records onto the insert path — matching Rails' control flow.
-        let saved = true;
-        await this._addToTarget(record as T, { replace: this.distinctValue }, async () => {
-          // Skip the insert for a new-record owner (deferred to autosave) or once
-          // a prior record failed — Rails' `result &&= insert_record` short-circuits
-          // but still buffers this record into the target above.
-          if (this._record.isNewRecord() || !resultStillTrue) return true;
-          saved = (await insertRecord(record as T)) ?? false;
-          return saved;
-        });
-        return saved;
-      });
-      return records;
-    };
-    // Rails' `CollectionAssociation#concat` wraps the inserts in a transaction
-    // for a persisted owner (`transaction { concat_records(records) }`,
-    // collection_association.rb:133) so a mid-batch save failure rolls back the
-    // records already inserted. A new-record owner skips the transaction — the
-    // inserts are deferred to autosave, so no DB write happens here (and a
-    // BEGIN would violate the "push does not query" invariant).
-    const concatResult = this._record.isNewRecord()
-      ? await concatRecords()
-      : await this.transaction(concatRecords);
+    const concatResult = await assoc.concat(...(records as unknown as Base[]));
     if (!concatResult) return false;
     return stripThenable(this._proxySelf ?? this);
   }
