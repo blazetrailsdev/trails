@@ -244,7 +244,8 @@ describe("CI runs every tooling test suite", () => {
   // but over-firing hands back the saving the deferral exists to capture, so
   // both directions are pinned.
   it("fires db_adapter_affected for PG/MySQL adapter paths and not for backend-neutral ones", async () => {
-    const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
+    const yml = await readFile(CI_YML, "utf8");
+    const runGate = await gateRunner(yml);
 
     const runs = [
       "packages/activerecord/src/connection-adapters/postgresql-adapter.ts",
@@ -256,6 +257,7 @@ describe("CI runs every tooling test suite", () => {
       // Shared substrate: breaks one backend without naming it.
       "packages/activerecord/src/connection-adapters/abstract/quoting.ts",
       "packages/activerecord/src/connection-adapters/abstract-adapter.ts",
+      "packages/activerecord/src/connection-adapters/sql-classification.ts",
       "packages/arel/src/visitors/postgresql.ts",
       "packages/arel/src/visitors/mysql.ts",
       "packages/activerecord-cli/src/__e2e__/postgres-happy-path.test.ts",
@@ -274,6 +276,12 @@ describe("CI runs every tooling test suite", () => {
     );
     expect(runs.filter((f) => outcome[f] !== "true")).toEqual([]);
     expect(skips.filter((f) => outcome[f] !== "false")).toEqual([]);
+
+    // Anchor probe. Every path above starts at position 0, so none of them can
+    // catch an alternation whose `^` covers only its first branch — the shape
+    // a later edit to this regex is most likely to introduce.
+    const gate = gateRegex(yml, "DB_ADAPTER_RE");
+    expect(runs.filter((f) => gate.test(`vendor/${f}`))).toEqual([]);
   });
 
   it("keeps the draft deferral, its two jobs and the ci aggregate in agreement", async () => {

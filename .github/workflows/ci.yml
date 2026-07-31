@@ -160,9 +160,11 @@ jobs:
           AR_PKGS_RE='^packages/(activerecord|activerecord-cli|arel|activemodel|activesupport|globalid|did-you-mean|trails-tsc)/'
           # db_adapter_affected gates nothing on its own: it is the opt-in that
           # runs the PG/MariaDB suites while a PR is still a draft, so a false
-          # negative costs a later signal, never coverage. `abstract/` is in
-          # scope because that substrate breaks one backend without naming it.
-          DB_ADAPTER_RE='^(packages/activerecord/src/(adapters/(postgresql|abstract-mysql-adapter)|connection-adapters/(postgresql|mysql|mysql2|abstract-mysql-adapter|abstract/|abstract-adapter\.ts|column\.ts|adapter-args\.ts|pool))|packages/arel/src/visitors/(postgres|mysql)|packages/activerecord-cli/src/__e2e__/(postgres|mysql))'
+          # negative costs a later signal, never coverage. `abstract/` and
+          # sql-classification.ts are in scope because that substrate breaks
+          # one backend without naming it (the latter carries the PG cursor
+          # statements in its read-only allowlist).
+          DB_ADAPTER_RE='^(packages/activerecord/src/(adapters/(postgresql|abstract-mysql-adapter)|connection-adapters/(postgresql|mysql|mysql2|abstract-mysql-adapter|abstract/|abstract-adapter\.ts|column\.ts|adapter-args\.ts|sql-classification\.ts|pool))|packages/arel/src/visitors/(postgres|mysql)|packages/activerecord-cli/src/__e2e__/(postgres|mysql))'
           # actionpack_affected gates actionpack-tests. True for actionpack +
           # its runtime deps (actionview/activemodel/activesupport/rack/did-you-mean).
           AP_PKGS_RE='^packages/(actionpack|actionview|activemodel|activesupport|rack|did-you-mean)/'
