@@ -152,12 +152,12 @@ export function displayImage(
 
   const mode = screenshotOutput ?? outputType();
   if (mode === "artifact") {
-    message += `]1338;url=artifact://${imgPath}\n`;
+    message += `\x1b]1338;url=artifact://${imgPath}\x07\n`;
   } else if (mode === "inline") {
     const { basename } = getPath();
     const name = inlineBase64(basename(imgPath));
     const image = imageData ? imageData.toString("base64") : "";
-    message += `]1337;File=name=${name};height=400px;inline=1:${image}\n`;
+    message += `\x1b]1337;File=name=${name};height=400px;inline=1:${image}\x07\n`;
   }
   return message;
 }

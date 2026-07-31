@@ -31,6 +31,7 @@ import { testInfraExemptIgnores } from "./eslint/test-infra-scope.mjs";
 import noStandaloneAssociations from "./eslint/no-standalone-associations.mjs";
 import noInternalCanonicalLoaders from "./eslint/no-internal-canonical-loaders.mjs";
 import noExplicitAnyDisable from "./eslint/no-explicit-any-disable.mjs";
+import noRawControlBytes from "./eslint/no-raw-control-bytes.mjs";
 import { readFileSync } from "node:fs";
 
 // See the rails-file-structure-method-order block below: without real order
@@ -235,6 +236,7 @@ export default defineConfig(
           "no-standalone-associations": noStandaloneAssociations,
           "no-internal-canonical-loaders": noInternalCanonicalLoaders,
           "no-explicit-any-disable": noExplicitAnyDisable,
+          "no-raw-control-bytes": noRawControlBytes,
           // Off by default — opt in per project (see eslint/manifest-complete.mjs).
           "manifest-complete": manifestComplete,
         },
@@ -648,6 +650,17 @@ export default defineConfig(
     files: ["packages/activerecord/src/**/*.ts"],
     rules: {
       "blazetrails/no-explicit-any-disable": "error",
+    },
+  },
+
+  // ── no-raw-control-bytes: keep every source greppable. A raw NUL makes
+  //    grep/ripgrep classify the file as binary and skip it silently, so an
+  //    audit for a symbol gets a wrong answer (this happened to
+  //    canonical-table-rebuild.ts). Write control characters as escapes. ──
+  {
+    files: ["**/*.ts", "**/*.mts", "**/*.mjs", "**/*.js"],
+    rules: {
+      "blazetrails/no-raw-control-bytes": "error",
     },
   },
 

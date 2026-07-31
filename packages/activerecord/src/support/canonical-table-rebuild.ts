@@ -245,7 +245,7 @@ export function bulkInboundFkHost(
         toTable: String(row.to_table),
         name: String(row.name),
       };
-      const key = `${blocker.fromTable} ${blocker.name}`;
+      const key = `${blocker.fromTable}\0${blocker.name}`;
       if (seen.has(key)) continue;
       seen.add(key);
       blockers.push(blocker);

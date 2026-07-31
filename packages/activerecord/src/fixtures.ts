@@ -240,9 +240,9 @@ async function ensureStaticDeclaredIds(): Promise<void> {
       if (!((typeof id === "number" && Number.isInteger(id)) || typeof id === "string")) continue;
       const prior = labelIds.get(label);
       if (prior !== undefined && prior !== id) {
-        ambiguous.add(`${table} ${label}`);
+        ambiguous.add(`${table}\0${label}`);
         labelIds.delete(label);
-      } else if (!ambiguous.has(`${table} ${label}`)) {
+      } else if (!ambiguous.has(`${table}\0${label}`)) {
         labelIds.set(label, id);
       }
     }

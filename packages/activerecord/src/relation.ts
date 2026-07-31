@@ -3635,7 +3635,7 @@ export class Relation<T extends Base> {
     // reflection we also materialize the limited DISTINCT primary keys
     // (distinct_relation_for_primary_key) before recursing.
     const firstColumnName =
-      columns.length === 0 ? null : typeof columns[0] === "string" ? columns[0] : " arel";
+      columns.length === 0 ? null : typeof columns[0] === "string" ? columns[0] : "\0arel";
     if (_hasInclude(this as unknown as Parameters<typeof _hasInclude>[0], firstColumnName)) {
       // _hasInclude is true only when _eagerLoadAssociations or
       // _includesAssociations is non-empty, so the union is always non-empty here.
