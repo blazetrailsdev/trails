@@ -103,6 +103,25 @@ describe("load_schema arm-probe guard", () => {
     });
   });
 
+  // The gap this guard cannot close, pinned so it is not mistaken for a bug:
+  // a class-body override is found by the walk as that class's own member and
+  // matches what the lookup returned, exactly as PostgreSQLAdapter's override
+  // of AbstractAdapter's does. `assertNotStubbed`'s docstring carries the
+  // reasoning; `blazetrails/no-load-schema-with-stubbed-ddl` catches the shape
+  // lexically instead, which is what makes this acceptable.
+  it("does not see a subclass that overrides createTable on its own prototype", async () => {
+    class Probe extends BetterSQLite3Adapter {
+      override async createTable(): Promise<void> {}
+    }
+
+    const probe = new Probe(":memory:");
+    try {
+      await expect(loadSchema(probe as unknown as AbstractAdapter)).resolves.toBeUndefined();
+    } finally {
+      await probe.close();
+    }
+  });
+
   // The counterpart direction: a proxy that only observes must still load, or
   // the guard would break the pooling/logging wrappers that hand `loadSchema` a
   // wrapped connection.

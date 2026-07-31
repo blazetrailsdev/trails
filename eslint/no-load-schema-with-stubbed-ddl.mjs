@@ -20,6 +20,14 @@
  * This rule closes that hole lexically, in the unit lane: in a test file that
  * stubs any of `STUBBED_DDL_METHODS`, any reference to `loadSchema` is an
  * error.
+ *
+ * It also carries the one interception shape the runtime guard cannot see at
+ * all — a cover that defines the emitter in a *class body*, either as a
+ * subclass override (`class Probe extends BetterSQLite3Adapter { override async
+ * createTable() {} }`) or as a standalone fake. The guard walks the prototype
+ * chain and finds that definition as the class's own, indistinguishable from
+ * PostgreSQLAdapter overriding AbstractAdapter's; see `assertNotStubbed`'s
+ * docstring. Lexically the shape is plain, so it is caught here instead.
  */
 
 import { readFileSync } from "fs";
@@ -93,6 +101,42 @@ export function isInterceptionPosition(node) {
 
 const COMPARISONS = new Set(["===", "==", "!==", "!="]);
 
+/**
+ * True when `node` is a class-body definition of a stubbed DDL emitter — the
+ * `class Probe extends BetterSQLite3Adapter { override async createTable() {} }`
+ * cover, its `createTable = async () => {}` field form, and the `get
+ * schemaCreation()` accessor form. A standalone fake adapter class counts too:
+ * it lays nothing either.
+ *
+ * Unlike the literal shapes above there is no "interception position" to
+ * qualify — a class body that defines `createTable` at all is defining the
+ * emitter `runTable` will call.
+ *
+ * **Accepted false-positive surface:** a *delegating* override — a spy that
+ * records its argument and returns `super.execute(...)` — really does lay DDL,
+ * and is reported anyway. `execute` is the generic name here and the one most
+ * likely to be overridden for such a reason. Class bodies defining these
+ * members are not rare in the enforced files (the fake adapters in
+ * `connection-adapters/abstract/schema-statements-on-adapter.test.ts`, the
+ * database-tasks covers), but none of them so much as names `loadSchema`, and
+ * the rule reports only where the two meet — so the surface is empty today
+ * rather than merely tolerable.
+ *
+ * Exempting a body that calls `super.<method>` was considered and declined: the
+ * call can be conditional, wrapped, or dead, so the exemption reads as a
+ * guarantee it cannot make, and a probe would only have to write one to escape
+ * the rule entirely. Inspecting a body for what it really does is the
+ * shape-heuristic detector RFC 0025 abandoned (PR #5204), and this rule exists
+ * precisely because the runtime guard — which sees the real function — cannot
+ * make that call either. A delegating spy that trips this should move its
+ * `loadSchema` call to `loadAdapterSpecificSchema` or, if it genuinely performs
+ * a real load, carry a scoped disable naming the reason.
+ */
+export function definesStubbedDdlMember(node) {
+  if (node.computed) return false;
+  return namesStubbedDdlMethod(node.key);
+}
+
 /** @type {import("eslint").Rule.RuleModule} */
 const rule = {
   meta: {
@@ -122,6 +166,11 @@ const rule = {
       Property(node) {
         if (node.computed) return;
         if (stubbedMethod === null && namesStubbedDdlMethod(node.key)) {
+          stubbedMethod = node.key.name ?? node.key.value;
+        }
+      },
+      "MethodDefinition, PropertyDefinition"(node) {
+        if (stubbedMethod === null && definesStubbedDdlMember(node)) {
           stubbedMethod = node.key.name ?? node.key.value;
         }
       },

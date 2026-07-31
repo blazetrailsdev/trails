@@ -69,6 +69,31 @@ tester.run("no-load-schema-with-stubbed-ddl", rule, {
         await loadSchema(adapter);
       `,
     },
+    // A class body defining an emitter is only a problem paired with the
+    // helper: a migration class laying tables through `createTable`, or an
+    // adapter cover that never routes through the full load, stays valid.
+    {
+      filename: "packages/activerecord/src/migration.test.ts",
+      code: `
+        class Probe extends BetterSQLite3Adapter {
+          override async createTable() {}
+        }
+        await loadAdapterSpecificSchema(new Probe(":memory:"));
+      `,
+    },
+    // An abstract declaration defines no emitter — whichever concrete class
+    // implements it is the one that would lay nothing, and that class body arms
+    // the rule on its own.
+    {
+      filename: "packages/activerecord/src/migration.test.ts",
+      code: `
+        import { loadSchema } from "./support/load-schema-helper.js";
+        abstract class Base {
+          abstract createTable(name: string): Promise<void>;
+        }
+        await loadSchema(adapter);
+      `,
+    },
   ],
   invalid: [
     // The #5676 shape: Proxy trap on createTable + loadSchema.
@@ -142,6 +167,70 @@ tester.run("no-load-schema-with-stubbed-ddl", rule, {
         const intercepted = ["createTable", "dropTable"];
         if (intercepted.includes(prop)) return async () => {};
         await loadSchema(probe);
+      `,
+      errors: [{ messageId: "misrouted" }],
+    },
+    // The subclass-override shape, which the runtime guard cannot see: the walk
+    // finds `Probe.prototype`'s own `createTable` and it is exactly what the
+    // lookup returned, so `assertNotStubbed` returns clean. Only the class body
+    // distinguishes it from PostgreSQLAdapter overriding AbstractAdapter's, and
+    // that is lexical.
+    {
+      filename: FILENAME,
+      code: `
+        class Probe extends BetterSQLite3Adapter {
+          override async createTable() {}
+        }
+        await loadSchema(new Probe(":memory:"));
+      `,
+      errors: [{ messageId: "misrouted" }],
+    },
+    // Same gap, one member per guarded emitter, in the field and accessor forms
+    // a class body can also take.
+    {
+      filename: FILENAME,
+      code: `
+        class Probe extends BetterSQLite3Adapter {
+          override async dropTable() {}
+          override async addIndex() {}
+          override async execute() { return []; }
+        }
+        await loadSchema(new Probe(":memory:"));
+      `,
+      errors: [{ messageId: "misrouted" }],
+    },
+    {
+      filename: FILENAME,
+      code: `
+        class Probe extends BetterSQLite3Adapter {
+          override get schemaCreation() {
+            return { accept: async () => "" };
+          }
+        }
+        await loadSchema(new Probe(":memory:"));
+      `,
+      errors: [{ messageId: "misrouted" }],
+    },
+    {
+      filename: FILENAME,
+      code: `
+        class Probe extends BetterSQLite3Adapter {
+          schemaStatements = () => fakeSchemaStatements;
+        }
+        await loadSchema(new Probe(":memory:"));
+      `,
+      errors: [{ messageId: "misrouted" }],
+    },
+    // A standalone fake adapter class lays nothing either, and the runtime
+    // guard leaves it alone by design (it compares against the prototype's own
+    // member, which here *is* the fake's).
+    {
+      filename: FILENAME,
+      code: `
+        class FakeAdapter {
+          async createTable() {}
+        }
+        await loadSchema(new FakeAdapter());
       `,
       errors: [{ messageId: "misrouted" }],
     },
