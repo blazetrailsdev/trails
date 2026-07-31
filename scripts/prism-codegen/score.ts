@@ -138,12 +138,30 @@ export function skeletonTokens(fn: ts.FunctionLikeDeclaration): string[] {
         }
         break;
       }
+      case ts.SyntaxKind.ElementAccessExpression: {
+        // `records[0]` and Ruby's `records.first` are the same reach; token
+        // literal indexes as the ordinal word so neither side reads as noise.
+        const idx = (node as ts.ElementAccessExpression).argumentExpression;
+        if (ts.isNumericLiteral(idx)) {
+          const ordinal = ORDINALS[Number(idx.text)];
+          tokens.push(ordinal ? `ref:${ordinal}` : `ref:at`);
+        }
+        break;
+      }
     }
     ts.forEachChild(node, walk);
   };
   if (fn.body) walk(fn.body);
   return tokens;
 }
+
+const ORDINALS: Record<number, string> = {
+  0: "first",
+  1: "second",
+  2: "third",
+  3: "fourth",
+  4: "fifth",
+};
 
 const TOKEN_CANON: Record<string, string> = {
   forEach: "each",

@@ -167,6 +167,20 @@ describe("prism-codegen scorer", () => {
     ]);
   });
 
+  it("tokens literal element access as the ordinal word (records[0] vs records.first)", async () => {
+    const score = await scoreRuby(
+      `def head_and_next(rows)
+         [rows.first, rows.second]
+       end`,
+      `export function headAndNext(this: R, rows: unknown[]): unknown[] {
+         return [rows[0], rows[1]];
+       }`,
+    );
+    expect(score.entries).toEqual([
+      expect.objectContaining({ name: "headAndNext", status: "matched" }),
+    ]);
+  });
+
   it("only scores clean defs — tainted ones stay out of the denominator", async () => {
     const score = await scoreRuby(
       `def tainted(a); a <=> 1; end`,
