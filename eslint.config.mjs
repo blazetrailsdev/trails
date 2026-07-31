@@ -577,6 +577,11 @@ export default defineConfig(
   //    See eslint/no-load-schema-with-stubbed-ddl.mjs. ──
   {
     files: ["packages/activerecord/src/**/*.test.ts"],
+    // The guard cover is the one file that must do exactly what the rule
+    // forbids: it stubs `createTable` to assert `loadSchema` *refuses* such an
+    // adapter (support/load-schema-helper.ts, assertNotArmProbe) instead of
+    // running its canonical half.
+    ignores: ["packages/activerecord/src/support/load-schema-helper-arm-guard.trails.test.ts"],
     rules: {
       "blazetrails/no-load-schema-with-stubbed-ddl": "error",
     },

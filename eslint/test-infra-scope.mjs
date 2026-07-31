@@ -91,4 +91,7 @@ export const canonicalLoaderSelfTests = [
   // boot-laid table snapshot the adapter-specific arm feeds.
   `${activerecordSrcRoot}/support/load-schema-helper.trails.test.ts`,
   `${activerecordSrcRoot}/support/load-schema-helper-uuid-default.trails.test.ts`,
+  // …and a third: the cover for `loadSchema`'s own arm-probe guard, which has
+  // to call `loadSchema` to assert it refuses a stubbed `createTable`.
+  `${activerecordSrcRoot}/support/load-schema-helper-arm-guard.trails.test.ts`,
 ];

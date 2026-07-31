@@ -3,6 +3,7 @@ import type { TableDefinition as MysqlTableDefinition } from "../connection-adap
 import type { TableDefinition as PgTableDefinition } from "../connection-adapters/postgresql/schema-definitions.js";
 import type { AbstractMysqlAdapter } from "../connection-adapters/abstract-mysql-adapter.js";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
+import { ActiveRecordError } from "../errors.js";
 import { loadCanonicalSchema } from "./canonical-schema.js";
 
 /**
@@ -525,10 +526,54 @@ const ADAPTER_SPECIFIC_SCHEMAS: Record<string, (adapter: DatabaseAdapter) => Pro
  * @internal Boot/template setup paths only. Test files wire the canonical schema
  * + fixtures through `fixtures({ ... })`; the
  * `blazetrails/no-internal-canonical-loaders` ESLint rule enforces that.
+ *
+ * This seam — `loadSchema`, `loadCanonicalSchema`, `loadAdapterSpecificSchema`,
+ * `canonical-schema-stamp.ts` and the per-worker boot in `test-setup-dy.ts` —
+ * is reshaped by one story at a time. Five PRs touched it in one evening and
+ * three broke only in the merge, each having been green on its own base: a
+ * signature change here carries semantics its callers depend on, and no run of
+ * CI sees the combination until it lands.
  */
 export async function loadSchema(adapter: DatabaseAdapter): Promise<void> {
+  assertNotArmProbe(adapter);
   await loadCanonicalSchema(adapter);
   await loadAdapterSpecificSchema(adapter);
+}
+
+/**
+ * Fail fast when a caller that has stubbed `createTable` — the shape every
+ * arm-content cover uses to capture DDL without laying it — reaches for the
+ * full load. Such a caller wants {@link loadAdapterSpecificSchema}; the
+ * canonical half {@link loadSchema} runs first would go on to query tables that
+ * were never really laid, which surfaces as `relation "..." does not exist` on
+ * the PG lane only (PR #5676, reverted by #5688).
+ *
+ * `blazetrails/no-load-schema-with-stubbed-ddl` catches the same mistake
+ * lexically, inside an activerecord test file. This catches it from anywhere —
+ * a stub installed through a helper, a non-test caller, a proxy the rule cannot
+ * see — and at the moment it would do damage rather than at lint time.
+ *
+ * Only an *overridden* `createTable` counts: the prototype's own method is
+ * looked up through the chain, so a transparent proxy (which returns that same
+ * function) passes, and an adapter with no prototype `createTable` at all — a
+ * hand-rolled fake — is left alone rather than guessed at.
+ */
+function assertNotArmProbe(adapter: DatabaseAdapter): void {
+  const seen = (adapter as unknown as { createTable?: unknown }).createTable;
+  for (
+    let proto: object | null = Object.getPrototypeOf(adapter);
+    proto !== null;
+    proto = Object.getPrototypeOf(proto)
+  ) {
+    const descriptor = Object.getOwnPropertyDescriptor(proto, "createTable");
+    if (!descriptor) continue;
+    if (descriptor.value === seen) return;
+    throw new ActiveRecordError(
+      "loadSchema was handed an adapter whose createTable is stubbed. The canonical " +
+        "half of the load would not really lay its tables; call " +
+        "loadAdapterSpecificSchema directly to cover the adapter-specific arm.",
+    );
+  }
 }
 
 /**
