@@ -41,4 +41,4 @@ async function main(): Promise<void> {
   console.log(`no-explicit-any allowlist: ${src.length} src + ${test.length} test files`);
 }
 
-main();
+void main();

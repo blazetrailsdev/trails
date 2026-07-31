@@ -45,4 +45,4 @@ async function main(): Promise<void> {
   console.log(`Wrote ${rel}`);
 }
 
-main();
+void main();

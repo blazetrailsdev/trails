@@ -116,7 +116,7 @@ function parseName(token: string): string | null {
     /^"([^"]+)"$/.exec(trimmed) ??
     /^'([^']+)'$/.exec(trimmed) ??
     /^:([A-Za-z_][A-Za-z0-9_]*)$/.exec(trimmed);
-  return match ? match[1]! : null;
+  return match ? match[1] : null;
 }
 
 /**
@@ -130,7 +130,7 @@ function splitArgs(args: string): string[] {
   let inDouble = false;
   let current = "";
   for (let i = 0; i < args.length; i++) {
-    const ch = args[i]!;
+    const ch = args[i];
     if (ch === "\\") {
       current += ch + (args[i + 1] ?? "");
       i++;
@@ -202,10 +202,10 @@ function parseTablePrimaryKey(args: string[]): string[] | false | null {
   for (const arg of args) {
     const idMatch = /^\s*id:\s*(.+)$/.exec(arg);
     // `id: :integer` narrows the implicit PK's type but keeps the name `id`.
-    if (idMatch && idMatch[1]!.trim() === "false") return false;
+    if (idMatch && idMatch[1].trim() === "false") return false;
     const pkMatch = /^\s*primary_key:\s*(.+)$/.exec(arg);
     if (!pkMatch) continue;
-    const value = pkMatch[1]!.trim();
+    const value = pkMatch[1].trim();
     if (value.startsWith("[")) {
       const inner = value.slice(1, -1);
       const names = splitArgs(inner)
@@ -235,7 +235,7 @@ function applyColumnLine(table: RailsTable, body: string): void {
     table.dynamic = true;
     return;
   }
-  const macro = macroMatch[1]!;
+  const macro = macroMatch[1];
   const args = splitArgs(macroMatch[2] ?? "");
 
   if (IGNORED_MACROS.has(macro)) return;
@@ -300,7 +300,7 @@ function applyColumnLine(table: RailsTable, body: string): void {
   }
   const options = parseOptions(args.slice(declared));
   for (let i = 0; i < declared; i++) {
-    addColumn(table, parseName(args[i]!)!, macro, options);
+    addColumn(table, parseName(args[i])!, macro, options);
   }
 }
 
@@ -335,7 +335,7 @@ export function parseSchemaRbWithCoverage(source: string): ParseResult {
   let pendingEach: { variable: string; names: string[] } | null = null;
 
   for (let li = 0; li < lines.length; li++) {
-    const line = stripComment(lines[li]!).trim();
+    const line = stripComment(lines[li]).trim();
     if (line === "") continue;
 
     if (table === null) {
@@ -343,10 +343,10 @@ export function parseSchemaRbWithCoverage(source: string): ParseResult {
       // inside it can resolve its block variable to the literal names.
       const eachMatch = /^\[(.+)\]\.each\s+do\s*\|(\w+)\|\s*$/.exec(line);
       if (eachMatch) {
-        const names = splitArgs(eachMatch[1]!)
+        const names = splitArgs(eachMatch[1])
           .map((token) => parseName(token))
           .filter((n): n is string => n !== null);
-        pendingEach = names.length > 0 ? { variable: eachMatch[2]!, names } : null;
+        pendingEach = names.length > 0 ? { variable: eachMatch[2], names } : null;
         continue;
       }
       if (pendingEach && /^end\b/.test(line)) {
@@ -361,7 +361,7 @@ export function parseSchemaRbWithCoverage(source: string): ParseResult {
       // table in a SECOND database; it is not a redefinition of the primary
       // `dogs` and must not clobber that one's columns.
       const onOtherConnection = !/^create_table\b/.test(line);
-      let rest = createMatch[1]!;
+      let rest = createMatch[1];
       // `create_table(t, force: true) { }` — parenthesised args, brace block.
       const parenthesised = rest.startsWith("(");
       let braceBlock = false;
@@ -372,7 +372,7 @@ export function parseSchemaRbWithCoverage(source: string): ParseResult {
         // the table (the PG companion schema declares two tables this way).
         let close = matchingParen(rest);
         while (close === -1 && li + 1 < lines.length) {
-          rest += " " + stripComment(lines[++li]!).trim();
+          rest += " " + stripComment(lines[++li]).trim();
           close = matchingParen(rest);
         }
         if (close === -1) {
@@ -412,8 +412,8 @@ export function parseSchemaRbWithCoverage(source: string): ParseResult {
         }
         continue;
       }
-      if (onOtherConnection && tables.has(names[0]!)) continue;
-      table = build(names[0]!);
+      if (onOtherConnection && tables.has(names[0])) continue;
+      table = build(names[0]);
       depth = 1;
       continue;
     }
@@ -432,7 +432,7 @@ export function parseSchemaRbWithCoverage(source: string): ParseResult {
     }
 
     const tMatch = /^t\.(.+)$/s.exec(line);
-    if (tMatch) applyColumnLine(table, tMatch[1]!);
+    if (tMatch) applyColumnLine(table, tMatch[1]);
   }
 
   // A block left open at EOF means the nesting tracker lost sync — report the

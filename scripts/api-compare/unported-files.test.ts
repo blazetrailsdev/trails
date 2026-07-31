@@ -1,11 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import {
-  isSourceUnported,
-  isTestFileUnported,
-  UNPORTED_FILES,
-  type UnportedFile,
-} from "./unported-files.js";
+import { isSourceUnported, isTestFileUnported, UNPORTED_FILES } from "./unported-files.js";
 
 describe("isSourceUnported package scoping", () => {
   it("matches an unscoped pattern across every package", () => {
@@ -35,7 +30,7 @@ describe("UNPORTED_FILES schema", () => {
     // `package` scopes a source-path (`pattern`) or a whole-file test-path
     // (`testFile` without `tests`) exclusion to one package. Per-test entries
     // (`tests:`) match on the test description, so scoping there is pointless.
-    for (const entry of UNPORTED_FILES as UnportedFile[]) {
+    for (const entry of UNPORTED_FILES) {
       if (entry.package !== undefined) {
         expect(
           entry.pattern || (entry.testFile && !entry.tests),

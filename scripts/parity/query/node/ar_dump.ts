@@ -55,7 +55,7 @@ function parseArgs(argv: string[]): {
       }
       frozenAt = val;
       i += 2;
-    } else if (argv[i]!.startsWith("--")) {
+    } else if (argv[i].startsWith("--")) {
       process.stderr.write(`unknown flag: ${argv[i]}\n`);
       usage();
     } else if (fixtureDir === null) {
@@ -218,7 +218,7 @@ async function main(): Promise<void> {
             visitor as unknown as { compileWithBinds(node: unknown): [string, unknown[]] }
           ).compileWithBinds((manager as { ast: unknown }).ast);
           // Resolve QueryAttribute/BindParam wrappers to their DB value first.
-          const resolvedBinds = (bs as unknown[]).map((b) => {
+          const resolvedBinds = bs.map((b) => {
             if (b != null && typeof b === "object" && "valueForDatabase" in b) {
               const vfd = (b as { valueForDatabase?: unknown }).valueForDatabase;
               return typeof vfd === "function" ? (vfd as () => unknown).call(b) : vfd;

@@ -102,7 +102,7 @@ function canonicalizeTable(name: string, native: NativeTable): CanonicalTable {
     pkCols.length === 0
       ? null
       : pkCols.length === 1
-        ? pkCols[0]!
+        ? pkCols[0]
         : (pkCols as [string, string, ...string[]]);
 
   // Columns in declaration order (D1)
@@ -148,7 +148,7 @@ export function canonicalize(native: NativeDump): CanonicalSchema {
   const tables: CanonicalTable[] = Object.keys(native)
     .filter((name) => !FILTERED_TABLES.has(name))
     .sort()
-    .map((name) => canonicalizeTable(name, native[name]!));
+    .map((name) => canonicalizeTable(name, native[name]));
 
   return { version: 1, tables };
 }

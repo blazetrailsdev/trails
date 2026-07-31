@@ -120,7 +120,7 @@ export function parseJsdoc(
       // em-dash, so trailing whitespace would otherwise read as a non-empty
       // reason and slide past the empty-reason gate below. `rawLines` keeps
       // the line verbatim, so idempotency is unaffected.
-      open = { call: m[1]!, reason: (m[2] ?? "").trim(), rawLines: [line] };
+      open = { call: m[1], reason: (m[2] ?? "").trim(), rawLines: [line] };
       entries.push(open);
       tagLineOf.set(open, index);
       continue;
@@ -198,12 +198,12 @@ export function renderJsdoc(rest: string[], entries: TagEntry[], indent: string)
   // Order entries by call name (code-unit order, matching the ratchet).
   const ordered = [...entries].sort((a, b) => (a.call < b.call ? -1 : a.call > b.call ? 1 : 0));
   let body = rest.slice();
-  if (body.length === 0 || !body[0]!.trimStart().startsWith("/**")) {
+  if (body.length === 0 || !body[0].trimStart().startsWith("/**")) {
     body = [`${indent}/**`, `${indent} */`];
   }
   // Normalize a one-line `/** ... */` comment to block form when tags exist.
   if (ordered.length > 0 && body.length === 1) {
-    const one = body[0]!;
+    const one = body[0];
     const inner = one.replace(/^\s*\/\*\*\s?/, "").replace(/\s*\*\/\s*$/, "");
     body = [`${indent}/**`, ...(inner ? [`${indent} * ${inner}`] : []), `${indent} */`];
   }

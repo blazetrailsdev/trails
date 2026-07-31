@@ -51,7 +51,7 @@ export function parseArityExcludes(text: string): ArityExcludeEntry[] {
     }
     const e = row as Partial<ArityExcludeEntry>;
     for (const field of ["package", "rubyFile", "rubyName"] as const) {
-      if (typeof e[field] !== "string" || e[field]!.length === 0) {
+      if (typeof e[field] !== "string" || e[field].length === 0) {
         throw new Error(`arity-exclude.json[${i}]: "${field}" must be a non-empty string`);
       }
     }

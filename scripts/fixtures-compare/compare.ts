@@ -177,7 +177,7 @@ const CRC32_TABLE = (() => {
 })();
 function fixtureIdValue(label: string): number {
   let crc = 0xffffffff;
-  for (let i = 0; i < label.length; i++) crc = CRC32_TABLE[(crc ^ label.charCodeAt(i)) & 0xff]! ^ (crc >>> 8); // prettier-ignore
+  for (let i = 0; i < label.length; i++) crc = CRC32_TABLE[(crc ^ label.charCodeAt(i)) & 0xff] ^ (crc >>> 8); // prettier-ignore
   return ((crc ^ 0xffffffff) >>> 0) % FIXTURE_MAX_ID;
 }
 
@@ -286,7 +286,7 @@ function loadRailsYaml(file: string, basename: string): { ok: true; data: Fixtur
     parsed.forEach((e, i) => {
       if (!e || typeof e !== "object") return;
       const ks = Object.keys(e);
-      if (isOmap && ks.length === 1) flat.push(...(Object.entries(e) as [string, unknown][]));
+      if (isOmap && ks.length === 1) flat.push(...(Object.entries(e)));
       else flat.push([`${basename}_${i}`, e]);
     });
     entries = flat;
@@ -630,7 +630,7 @@ export function canonicalizeRailsRow(railsRow: Row, tsRow: Row, columns: Set<str
         const m = /^(.*?)\s*\(([^)]+)\)\s*$/.exec(v);
         if (m) { out[fkCol] = m[1]; out[`${assocKey}_type`] = m[2]; }
         else out[fkCol] = v;
-      } else out[fkCol] = v as Row[string];
+      } else out[fkCol] = v;
     };
     // FK_OVERRIDES lets a fixture declare `assoc → column` when the shorthand
     // doesn't follow the `<assoc>_id` convention (e.g. `creator → captain_id`).

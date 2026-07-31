@@ -1,0 +1,58 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "composite": true,
+    "noEmit": true,
+    "rootDir": ".."
+  },
+  "include": ["**/*.ts", "../vendor/*.ts"],
+  "references": [
+    {
+      "path": "../packages/activesupport"
+    },
+    {
+      "path": "../packages/tse-compiler"
+    },
+    {
+      "path": "../packages/arel"
+    },
+    {
+      "path": "../packages/activemodel"
+    },
+    {
+      "path": "../packages/trails-tsc"
+    },
+    {
+      "path": "../packages/activerecord"
+    },
+    {
+      "path": "../packages/rack"
+    },
+    {
+      "path": "../packages/actionview"
+    },
+    {
+      "path": "../packages/actionpack"
+    },
+    {
+      "path": "../packages/trailties"
+    },
+    {
+      "path": "../packages/globalid"
+    },
+    {
+      "path": "../packages/did-you-mean"
+    },
+    {
+      "path": "../packages/html-sanitizer"
+    },
+    {
+      "path": "../packages/nokogiri"
+    },
+    {
+      "path": "../packages/activerecord-cli"
+    }
+  ]
+}

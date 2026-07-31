@@ -1020,8 +1020,8 @@ export function blazetrailsDepKeys(pkg: string): string[] {
       Record<string, string>
     >;
     const allDeps = {
-      ...((pkgJson["dependencies"] as Record<string, string>) ?? {}),
-      ...((pkgJson["peerDependencies"] as Record<string, string>) ?? {}),
+      ...(pkgJson["dependencies"] ?? {}),
+      ...(pkgJson["peerDependencies"] ?? {}),
     };
     const keys: string[] = [];
     for (const dep of Object.keys(allDeps)) {

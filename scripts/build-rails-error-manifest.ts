@@ -172,4 +172,4 @@ async function main() {
   console.log(`Wrote ${OUT} — ${counts}`);
 }
 
-main();
+void main();

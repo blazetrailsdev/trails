@@ -88,9 +88,9 @@ describe("canonicalize", () => {
     expect(result.version).toBe(1);
     expect(result.tables).toHaveLength(1);
     const [table] = result.tables;
-    expect(table!.name).toBe("users");
-    expect(table!.primaryKey).toBe("id");
-    expect(table!.columns.map((c) => c.name)).toEqual([
+    expect(table.name).toBe("users");
+    expect(table.primaryKey).toBe("id");
+    expect(table.columns.map((c) => c.name)).toEqual([
       "id",
       "email",
       "name",
@@ -99,12 +99,12 @@ describe("canonicalize", () => {
       "created_at",
       "active",
     ]);
-    expect(table!.columns.find((c) => c.name === "id")!.type).toBe("integer");
-    expect(table!.columns.find((c) => c.name === "score")!.type).toBe("float");
-    expect(table!.columns.find((c) => c.name === "avatar")!.type).toBe("binary");
-    expect(table!.columns.find((c) => c.name === "created_at")!.type).toBe("datetime");
-    expect(table!.columns.find((c) => c.name === "active")!.default).toBe("1");
-    expect(table!.indexes).toHaveLength(0);
+    expect(table.columns.find((c) => c.name === "id")!.type).toBe("integer");
+    expect(table.columns.find((c) => c.name === "score")!.type).toBe("float");
+    expect(table.columns.find((c) => c.name === "avatar")!.type).toBe("binary");
+    expect(table.columns.find((c) => c.name === "created_at")!.type).toBe("datetime");
+    expect(table.columns.find((c) => c.name === "active")!.default).toBe("1");
+    expect(table.indexes).toHaveLength(0);
   });
 
   it("preserves column declaration order", () => {
@@ -147,7 +147,7 @@ describe("canonicalize", () => {
       },
     };
     const [table] = canonicalize(native).tables;
-    expect(table!.columns.map((c) => c.name)).toEqual(["z", "a", "m"]);
+    expect(table.columns.map((c) => c.name)).toEqual(["z", "a", "m"]);
   });
 
   it("sorts tables by name", () => {
@@ -268,7 +268,7 @@ describe("canonicalize", () => {
       },
     };
     const [table] = canonicalize(native).tables;
-    expect(table!.indexes.map((i) => i.name)).toEqual(["idx_posts_a", "idx_posts_z"]);
+    expect(table.indexes.map((i) => i.name)).toEqual(["idx_posts_a", "idx_posts_z"]);
   });
 
   it("represents composite PK as tuple", () => {
@@ -301,7 +301,7 @@ describe("canonicalize", () => {
       },
     };
     const [table] = canonicalize(native).tables;
-    expect(table!.primaryKey).toEqual(["tag_id", "taggable_id"]);
+    expect(table.primaryKey).toEqual(["tag_id", "taggable_id"]);
   });
 
   it("uses primaryKeyColumns order, not column declaration order, for composite PK", () => {
@@ -336,7 +336,7 @@ describe("canonicalize", () => {
       },
     };
     const [table] = canonicalize(native).tables;
-    expect(table!.primaryKey).toEqual(["b", "a"]);
+    expect(table.primaryKey).toEqual(["b", "a"]);
   });
 
   it("represents no-PK table", () => {
@@ -359,7 +359,7 @@ describe("canonicalize", () => {
       },
     };
     const [table] = canonicalize(native).tables;
-    expect(table!.primaryKey).toBeNull();
+    expect(table.primaryKey).toBeNull();
   });
 
   it("passes numeric string defaults through unchanged", () => {
@@ -392,8 +392,8 @@ describe("canonicalize", () => {
       },
     };
     const [table] = canonicalize(native).tables;
-    expect(table!.columns[0]!.default).toBe("0");
-    expect(table!.columns[1]!.default).toBe("1.5");
+    expect(table.columns[0].default).toBe("0");
+    expect(table.columns[1].default).toBe("1.5");
   });
 
   it("passes quoted string defaults through unchanged", () => {
@@ -416,7 +416,7 @@ describe("canonicalize", () => {
       },
     };
     const [table] = canonicalize(native).tables;
-    expect(table!.columns[0]!.default).toBe("'active'");
+    expect(table.columns[0].default).toBe("'active'");
   });
 
   it("throws on unknown SQL type", () => {

@@ -664,12 +664,12 @@ describe("compareTranscriptions", () => {
   });
 
   it("says nothing about a documented divergence", () => {
-    const table = [...TRANSCRIPTION_DIVERGENCE_ALLOW_LIST.keys()][0]!;
+    const table = [...TRANSCRIPTION_DIVERGENCE_ALLOW_LIST.keys()][0];
     expect(compareTranscriptions({}, { [table]: { name: "string" } })).toEqual([]);
   });
 
   it("flags an allow-list entry the transcriptions have converged on", () => {
-    const table = [...TRANSCRIPTION_DIVERGENCE_ALLOW_LIST.keys()][0]!;
+    const table = [...TRANSCRIPTION_DIVERGENCE_ALLOW_LIST.keys()][0];
     const converged = { [table]: { name: "string" } };
     expect(staleDivergenceAllowances(converged, converged)).toContain(table);
     // Still divergent (registry-only) — the allowance is doing its job.
@@ -770,5 +770,5 @@ describe("against the canonical registry", () => {
 });
 
 function columnsOfRegistry(registry: Schema, table: string, column: string) {
-  return (registry[table] as Record<string, ColumnSpec>)[column]!;
+  return (registry[table] as Record<string, ColumnSpec>)[column];
 }

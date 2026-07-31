@@ -417,7 +417,7 @@ function crossReferenceCalls(
       if (!callCandidates) continue;
 
       significantRubyCalls.push(rubyCall);
-      const found = callCandidates.some((c) => tsCalls!.has(c));
+      const found = callCandidates.some((c) => tsCalls.has(c));
       if (!found) {
         missingCalls.push(`${callCandidates[0]} (${rubyCall})`);
       }

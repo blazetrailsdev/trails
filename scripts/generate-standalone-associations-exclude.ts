@@ -71,7 +71,7 @@ async function main(): Promise<void> {
     } catch {
       continue; // skip unparseable files
     }
-    walk(ast as unknown as AstNode, (node) => {
+    walk(ast as AstNode, (node) => {
       if (node.type !== "CallExpression") return;
       const macro = macroOfCall(node.callee);
       if (macro === null) return;
@@ -96,4 +96,4 @@ function walk(node: AstNode, visit: (n: AstNode) => void): void {
   }
 }
 
-main();
+void main();
