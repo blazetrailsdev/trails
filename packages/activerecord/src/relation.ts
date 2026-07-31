@@ -3353,7 +3353,7 @@ export class Relation<T extends Base> {
     // `eagerJd`/`manager.joinSourceCount` guards have no buildJoinBuckets analog —
     // it is a pure bucket-builder with neither an eager-JD parameter nor a live
     // manager — and are needed here because the short-circuit does NOT fold `eagerJd`
-    // into the stash (it is pushed in the non-short-circuit branch below).
+    // into the stash (it is pushed in the non-short-circuit branch below). Cross-klass
     const pureLeftOuter =
       eagerJd === undefined &&
       manager.joinSourceCount === 0 &&
