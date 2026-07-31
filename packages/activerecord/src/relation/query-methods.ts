@@ -2854,10 +2854,7 @@ export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown
     });
 
     if (namedInner.length === 0 && rawJoinValues.length === 0 && this._joinClauses.length === 0) {
-      // Only left outer joins, no inner/explicit joins — short-circuit
-      // (query_methods.rb:1838-1842: `if joins_values.empty?`). The eager
-      // JoinDependency arrives in `joins_values` via `applyJoinDependency`'s
-      // `joins!` (finder_methods.rb:461), so `namedInner` already covers it.
+      // query_methods.rb:1838-1842: `if joins_values.empty?`.
       buckets.named_join.push(...namedLeft);
       buckets.stashed_join.push(...stashedLeft);
       return buckets;
@@ -2872,11 +2869,7 @@ export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown
     buckets.stashed_join.push(...stashedLeft);
   }
 
-  // Rails routes raw join nodes on `stashed_eager_load || stashed_left_joins`
-  // (query_methods.rb:1857). `stashed_left_joins` is `buckets.stashed_join` here;
-  // the eager JoinDependency `applyJoinDependency` pushed into `joins_values` is
-  // still in `namedInner` (the `joins.pop` discriminator is a separate story), so
-  // detect it there rather than in the stash.
+  // Rails' `stashed_eager_load || stashed_left_joins` (query_methods.rb:1857).
   const hasStashed =
     buckets.stashed_join.length > 0 || namedInner.some((v) => v instanceof JoinDependency);
 

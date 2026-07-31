@@ -4865,7 +4865,10 @@ export class Relation<T extends Base> {
     // claim parity we reject this combination explicitly. Tracked by the
     // `relation-handler-distinct-pk-materialization` continuation story.
     const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
-    if (eagerLoading && hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(eagerSpecs)) {
+    const isLimitable =
+      this.usingLimitableReflections(joinDependency.reflections as never) &&
+      this._joinsReflectionsAreLimitable();
+    if (eagerLoading && hasLimitOrOffset && !isLimitable) {
       // @nie disposition=TODO
       throw new NotImplementedError(
         "Using an eager-loaded relation with a limit/offset over a collection " +
