@@ -1,8 +1,14 @@
 import { Nodes } from "@blazetrails/arel";
 import { assertValidKeys } from "@blazetrails/activesupport";
 
-import { arelColumns } from "./query-methods.js";
-import { foldMergeJoins, foldMergeOuterJoins } from "./merge-joins.js";
+import { JoinDependency } from "../associations/join-dependency.js";
+import type { AssociationSpec } from "./query-methods.js";
+import {
+  arelColumns,
+  constructJoinDependency,
+  QueryMethodBangs,
+  structuralUnionEq,
+} from "./query-methods.js";
 import { foldMergeEagerLoad, foldMergePreloads } from "./merge-preloads.js";
 
 /**
@@ -91,14 +97,71 @@ export class Merger {
     foldMergePreloads(rel, this.other);
   }
 
-  // Thin wrappers over the folders (merge-joins.ts); api:compare still maps
-  // merger.rb's merge_joins / merge_outer_joins to this file.
   private mergeJoins(rel: any): void {
-    foldMergeJoins(rel, this.other);
+    const other = this.other;
+    // trails-only: raw Arel join clauses live outside joins_values, so they are
+    // copied alongside them.
+    const clauses = other._joinClauses ?? [];
+    if (clauses.length > 0) rel._joinClauses.push(...clauses);
+
+    const joinsValues = other.joinsValues ?? [];
+    if (joinsValues.length === 0) return;
+    if (other.model === rel.model) {
+      for (const v of joinsValues) {
+        if (!other._isNamedJoinValue(v)) {
+          if (!rel._joinValues.some((existing: unknown) => structuralUnionEq(existing, v)))
+            rel._joinsValues.push(v);
+        } else if (!rel._namedInnerJoins.some((seen: unknown) => structuralUnionEq(seen, v))) {
+          rel._joinsValues.push(v);
+        }
+      }
+      return;
+    }
+
+    const associations: unknown[] = [];
+    const others: unknown[] = [];
+    for (const v of joinsValues) {
+      if (!(v instanceof JoinDependency) && other._isNamedJoinValue(v)) {
+        associations.push(v);
+      } else {
+        others.push(v);
+      }
+    }
+    const joinDependency = constructJoinDependency.call(
+      other,
+      associations as AssociationSpec[],
+      Nodes.InnerJoin,
+    );
+    QueryMethodBangs.joinsBang.call(rel, joinDependency as any, ...(others as any[]));
   }
 
   private mergeOuterJoins(rel: any): void {
-    foldMergeOuterJoins(rel, this.other);
+    const other = this.other;
+    const otherLeft = other.leftOuterJoinsValues ?? [];
+    if (otherLeft.length === 0) return;
+    if (other.model === rel.model) {
+      for (const v of otherLeft) {
+        if (!rel._leftOuterJoinsValues.some((seen: unknown) => structuralUnionEq(seen, v)))
+          rel._leftOuterJoinsValues.push(v);
+      }
+      return;
+    }
+
+    const associations: unknown[] = [];
+    const others: unknown[] = [];
+    for (const v of otherLeft) {
+      if (!(v instanceof JoinDependency)) {
+        associations.push(v);
+      } else {
+        others.push(v);
+      }
+    }
+    const joinDependency = constructJoinDependency.call(
+      other,
+      associations as AssociationSpec[],
+      Nodes.OuterJoin,
+    );
+    QueryMethodBangs.leftOuterJoinsBang.call(rel, joinDependency as any, ...(others as any[]));
   }
 
   // Rails stores order_values as Arel nodes already qualified against the
