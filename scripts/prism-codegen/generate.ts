@@ -1,14 +1,3 @@
-/**
- * CLI: generate JS for all 10 target files into a gitignored out dir and print
- * per-file + rollup coverage. Run via `pnpm codegen:generate`.
- *
- * Two honesty gauges beyond the node tally:
- *   - parse errors of the printed output (must be 0 — the AST emitter cannot
- *     produce unparseable text; a nonzero count fails the run), and
- *   - methods fully handled: defs whose body had zero passthrough nodes. This
- *     is the trustworthy denominator for comparing generated output against
- *     the hand-written port.
- */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import * as path from "node:path";
 import { generateFromSource } from "./index.js";
@@ -18,9 +7,7 @@ import { TOPLEVEL } from "./codegen.js";
 import { TARGET_FILES, rubyAbsPath } from "./files.js";
 import { rubyFileToTs } from "./naming.js";
 import type { Coverage } from "./types.js";
-
 const OUT_DIR = "scripts/prism-codegen/out";
-
 async function main() {
   mkdirSync(OUT_DIR, { recursive: true });
   const covs: Coverage[] = [];
@@ -29,7 +16,6 @@ async function main() {
   let totalParseErrors = 0;
   let defsTotal = 0;
   let defsClean = 0;
-
   for (const f of TARGET_FILES) {
     const src = readFileSync(rubyAbsPath(f), "utf8");
     const { code, coverage, perDef, parseErrorCount } = await generateFromSource(
@@ -43,18 +29,15 @@ async function main() {
     covs.push(coverage);
     if (f.deepDrill) deepCovs.push(coverage);
     totalParseErrors += parseErrorCount;
-
     const defs = [...perDef].filter(([name]) => name !== TOPLEVEL);
     const clean = defs.filter(([, d]) => d.passthrough === 0);
     defsTotal += defs.length;
     defsClean += clean.length;
-
     const s = summarizeCoverage(coverage);
     const top = s.topPassthrough
       .slice(0, 3)
       .map((p) => `${p.kind}:${p.count}`)
       .join(", ");
-    // Tag: [t]/[p] tractability, with `*` marking a deepest-drill target.
     const tag = `${f.tractability[0]}${f.deepDrill ? "*" : " "}`;
     rows.push(
       `  ${f.ruby.replace(/^active_record\//, "").padEnd(34)} ` +
@@ -63,7 +46,6 @@ async function main() {
         `[${tag}] top-todo: ${top}`,
     );
   }
-
   const rollup = mergeCoverages(covs);
   const deep = mergeCoverages(deepCovs);
   console.log(`\nPrism → JS codegen coverage (handled = node instances with a real handler)\n`);
@@ -79,9 +61,6 @@ async function main() {
   for (const p of rollup.topPassthrough.slice(0, 12)) {
     console.log(`    ${p.kind.padEnd(30)} ${p.count}`);
   }
-
-  // Verdict line — cites the numbers, not vibes (the [t*] deep-drill targets are
-  // the honest ceiling of what deterministic codegen reaches on tractable input).
   console.log(
     `\n  VERDICT: ${rollup.handledPct.toFixed(1)}% of ${rollup.total} AST node ` +
       `instances handled (${rollup.passthrough} passthrough); ` +
@@ -93,17 +72,14 @@ async function main() {
       `docs/infrastructure/prism-codegen-spike.md (Honest limits).`,
   );
   console.log(`\n  Output written to ${OUT_DIR}/ (gitignored).\n`);
-
   if (totalParseErrors > 0) {
     console.error(`FAIL: generated output has ${totalParseErrors} parse errors.`);
     process.exit(1);
   }
 }
-
 function pct(n: number): string {
   return (n.toFixed(1) + "%").padStart(6);
 }
-
 main().catch((err) => {
   console.error(err);
   process.exit(1);

@@ -1,11 +1,3 @@
-/**
- * CLI: given a trails `.ts` file path, resolve it to its Rails `.rb` source via
- * the EXISTING `rubyFileToTs` mapping (inverted — we enumerate the Rails tree
- * and match), then print the tool's generated JS for that Rails file on stdout.
- *
- * No new mapping is built: we reuse `rubyFileToTs` from api-compare. Run via
- * `pnpm codegen:from-ts <path/to/trails/file.ts>`.
- */
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import * as path from "node:path";
 import { generateFromSource } from "./index.js";
@@ -14,13 +6,8 @@ import { summarizeCoverage } from "./coverage.js";
 import { TOPLEVEL } from "./codegen.js";
 import { tsToRubyFile } from "./naming.js";
 import { resolvePath } from "../../vendor/sources.js";
-
-// Vendored-source location via the single source of truth (vendor/sources.ts),
-// not a parallel hard-coded path — same contract api-compare uses.
-const AR_ROOT = resolvePath("activerecord"); // .../active_record
-const AR_LIB = path.dirname(AR_ROOT); // .../lib
-
-/** Every Rails .rb under active_record/, as paths relative to the lib root. */
+const AR_ROOT = resolvePath("activerecord");
+const AR_LIB = path.dirname(AR_ROOT);
 function railsCandidates(): string[] {
   const out: string[] = [];
   const walk = (dir: string) => {
@@ -33,7 +20,6 @@ function railsCandidates(): string[] {
   walk(AR_ROOT);
   return out;
 }
-
 async function main() {
   const tsPath = process.argv[2];
   if (!tsPath) {
@@ -60,7 +46,6 @@ async function main() {
   );
   process.stdout.write(code);
 }
-
 main().catch((err) => {
   console.error(err);
   process.exit(1);

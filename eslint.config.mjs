@@ -133,6 +133,9 @@ export default defineConfig(
       // part hand-edited, and its whole job is to stay shaped like the Ruby it
       // mirrors. Linting the TS half would pull it away from its twin.
       "scripts/parity/fixtures/**",
+      // Prism-codegen output: generated JS scaffolding (gitignored), full of
+      // free identifiers by design — not a lint population.
+      "scripts/prism-codegen/out/**",
       "packages/activerecord-cli/src/tsc-wrapper/__fixtures__/**",
     ],
   },

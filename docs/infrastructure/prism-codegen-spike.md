@@ -21,9 +21,9 @@ and (3) what does the coverage evidence say about productionizing this.
 oracle_. `@ruby/prism` works in Node. The AST-building registry (handlers emit
 `ts.factory` nodes, printed by the TypeScript printer — see the re-baseline
 note under [Coverage metric](#coverage-metric-the-feasibility-evidence))
-translates **89.7% of AST node instances** across the 10 most-central AR files
+translates **86.8% of AST node instances** across the 10 most-central AR files
 with a real handler, with **parse-clean output by construction** (0 parse
-errors) and **382/469 defs (81.4%) fully handled** end-to-end. But
+errors) and **363/469 defs (77.4%) fully handled** end-to-end. But
 node-instance coverage measures _handler presence, not semantic correctness_ —
 the generated JS reproduces control-flow and call shape faithfully while
 systematically mistranslating Ruby's metaprogramming and implicit-receiver
@@ -114,18 +114,18 @@ real handler; "passthrough" = instances that fell to the counted
 ```text
 file                               handled   nodes   defs=clean/all   tag
 base.rb                             17.1%      187        0/0         pathological
-relation.rb                         85.0%     1981       75/84        pathological
-persistence.rb                      93.0%     1195       45/56        tractable*
+relation.rb                         83.2%     2007       71/84        pathological
+persistence.rb                      89.0%     1227       42/56        tractable*
 associations.rb                     98.6%      285        8/11        pathological
-relation/query_methods.rb           92.8%     3063       97/127       pathological
-core.rb                             91.6%     1295       45/56        pathological
-relation/finder_methods.rb          90.4%      994       37/43        tractable*
-relation/calculations.rb            94.5%     1244       32/36        tractable*
-inheritance.rb                      89.1%      477       14/23        pathological
-model_schema.rb                     87.4%      613       29/33        pathological
+relation/query_methods.rb           92.3%     3067       95/127       pathological
+core.rb                             81.7%     1326       45/56        pathological
+relation/finder_methods.rb          89.6%      999       35/43        tractable*
+relation/calculations.rb            89.6%     1277       30/36        tractable*
+inheritance.rb                      87.2%      485       13/23        pathological
+model_schema.rb                     83.6%      629       24/33        pathological
 --------------------------------------------------------------------------
-ROLLUP (all 10)                     89.7%    11334    handled=10170 passthrough=1164
-DEEP-DRILL (tractable*, 3 files)    92.8%     3433    defs 382/469 clean overall
+ROLLUP (all 10)                     86.8%    11489    handled=9977 passthrough=1512
+DEEP-DRILL (tractable*, 3 files)    89.4%     3503    defs 363/469 clean overall
 ```
 
 `tractable*` marks the three deepest-drill targets (chosen by tractability): the
@@ -137,14 +137,15 @@ image — the old emitter printed it as statements inside a class body, which
 was a parse error.
 
 **`defs=clean/all`** is the new per-method attribution: defs whose body
-emitted with ZERO passthrough nodes. 382/469 (81.4%) of defs are fully
+emitted with ZERO passthrough nodes. 363/469 (77.4%) of defs are fully
 handled — this set is the trustworthy denominator for any structural
 comparison of generated output against the hand-written port (a diff inside a
 tainted method can blame the generator; a diff inside a clean one cannot).
 
 Dominant passthrough kinds (rollup, self-prioritizing the next handlers to
-build): `CallNode` (281 — operator methods with no JS image like `<<`/`<=>`,
-and reserved-word bare calls), `ForwardingSuperNode` (34, module-level `super`
+build): `CallNode` (operator methods with no JS image like `<<`/`<=>`,
+reserved-word bare calls, and lossy shapes the emitter now declines — multi-arg
+indexes, `&:sym` blocks, splat multi-assign), `ForwardingSuperNode` (module-level `super`
 has no image in free functions), plus the argument/statement subtrees under
 those declined parents.
 
