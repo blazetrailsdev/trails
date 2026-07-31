@@ -752,8 +752,7 @@ describe("DDL cache-invalidation safety-net", () => {
     });
 
     const ss = new SchemaStatements(adapter as any);
-    // The adapter is a mock whose execute() only records; no DDL reaches a
-    // database, so there is nothing to tear down.
+    // The adapter is a mock: no DDL reaches a database.
     // eslint-disable-next-line blazetrails/require-table-teardown
     await ss.dropTable("posts");
 

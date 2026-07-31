@@ -132,7 +132,7 @@ describe("SqliteDriver — libsql local-file round-trip", () => {
       await probe.prepare("SELECT label FROM gadgets WHERE id = ?")
     ).get([1])) as { label: string };
     expect(row.label).toBe("alpha");
-    // dbPath is a per-test temporary file, so a stranded table dies with it.
+    // dbPath is a per-test temporary file; a stranded table dies with it.
     // eslint-disable-next-line blazetrails/require-table-teardown
     await probe.exec("DROP TABLE IF EXISTS gadgets");
     await probe.close();
@@ -149,7 +149,7 @@ describe("SqliteDriver — libsql local-file round-trip", () => {
     try {
       const conn = await libsqlDriver.open({ database: `file:${relName}` });
       await conn.exec("CREATE TABLE t (x INTEGER)");
-      // Same: a throwaway cwd-relative database the finally below unlinks.
+      // Same: a throwaway database the finally below unlinks.
       // eslint-disable-next-line blazetrails/require-table-teardown
       await conn.exec("DROP TABLE IF EXISTS t");
       await conn.close();

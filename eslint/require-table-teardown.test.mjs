@@ -30,6 +30,9 @@ tester.run("require-table-teardown", rule, {
     // A modifier chain still reads as a test body — and this one is guarded.
     'it.skip("x", async () => { await ctx.createTable("widgets", () => {}); });\n' +
       'afterAll(async () => { await ctx.dropTable("widgets"); });',
+    // A `test`-prefixed helper is a plain function, not a test body.
+    'function testCopyTable() {\n  ctx.createTable("widgets", () => {});\n' +
+      '  ctx.dropTable("widgets");\n}',
     // Drops outside any test body are not the modelled pattern.
     'beforeAll(async () => { await ctx.createTable("widgets", () => {}); });\n' +
       'beforeAll(async () => { await ctx.dropTable("widgets"); });',
@@ -43,6 +46,16 @@ tester.run("require-table-teardown", rule, {
     'describe("s", () => {\n  beforeAll(() => { driver = open(":memory:"); });\n' +
       '  it("x", async () => {\n    await driver.exec("CREATE TABLE t (id int)");\n' +
       '    await driver.exec("DROP TABLE t");\n  });\n});',
+    // A prefix sweep names no table, so it satisfies the missing-teardown half
+    // without leaving an unguarded drop behind to report.
+    'it("x", async () => {\n' +
+      '  await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
+      "  const rows = await adapter.execute(\n" +
+      "    `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+      "  );\n" +
+      "  for (const t of rows) {\n" +
+      '    await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "  }\n});",
     // failureSafe: false keeps only the "is it dropped at all" half.
     {
       code:
@@ -569,6 +582,16 @@ tester.run("require-table-teardown", rule, {
         'it("x", async () => {\n' +
         '  await ctx.createTable("widgets", () => {});\n' +
         '  try { await ctx.dropTable("widgets"); } catch (e) {}\n' +
+        "});",
+      errors: [{ messageId: "unguardedTeardown", data: { table: "widgets" } }],
+    },
+    // An `it`-prefixed wrapper (itIfSupports, itBlocked) is `it` with a gate in
+    // front, so its body is a test body too.
+    {
+      code:
+        'itIfSupports("virtual", "x", async () => {\n' +
+        '  await ctx.createTable("widgets", () => {});\n' +
+        '  await ctx.dropTable("widgets");\n' +
         "});",
       errors: [{ messageId: "unguardedTeardown", data: { table: "widgets" } }],
     },

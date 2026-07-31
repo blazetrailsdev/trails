@@ -565,8 +565,7 @@ describe("Migration", () => {
       await connection.createTable("sobrinho");
       expect(await connection.tableExists("testings")).toBeTruthy();
       expect(await connection.tableExists("sobrinho")).toBeTruthy();
-      // Dropping both names in one call is the assertion, so it stays in the
-      // test body.
+      // Dropping both names in one call is the assertion.
       // eslint-disable-next-line blazetrails/require-table-teardown
       await connection.dropTable("testings", "sobrinho", { ifExists: true });
       expect(await connection.tableExists("testings")).toBeFalsy();

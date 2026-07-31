@@ -91,8 +91,7 @@ describeIfSqlite("SQLite3TransactionTest", () => {
     await conn2.rollbackDbTransaction();
 
     await conn1.rollbackDbTransaction();
-    // Permanently skipped, and SHARED_CACHE_DB is an in-memory database that
-    // dies with the connection — nothing can strand.
+    // SHARED_CACHE_DB is in-memory and dies with the connection.
     // eslint-disable-next-line blazetrails/require-table-teardown
     await conn1.exec(`DROP TABLE IF EXISTS "zines"`);
   });

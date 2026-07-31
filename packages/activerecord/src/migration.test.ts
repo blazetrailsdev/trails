@@ -1235,8 +1235,8 @@ describe("MigrationTest", () => {
           });
         }
         async down() {
-          // Reverting the migration is the behaviour under test; the suite's
-          // own teardown drops the table again if this never runs.
+          // Reverting is the behaviour under test; the suite's own teardown
+          // drops the table again if this never runs.
           // eslint-disable-next-line blazetrails/require-table-teardown
           await this.dropTable("reminders");
         }
