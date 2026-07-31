@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "./base.js";
-import { HashConfig } from "./database-configurations/hash-config.js";
 import {
   ConnectionManagement,
   BodyProxy,
@@ -29,16 +28,6 @@ describe("ConnectionManagementTest", () => {
   let management: ConnectionManagement;
 
   beforeEach(async () => {
-    Base.connectionHandler.establishConnection(
-      new HashConfig("test", "primary", {
-        adapter: "sqlite3",
-        database: "test.db",
-        pool: 5,
-        reapingFrequency: null,
-      }),
-      { owner: "Base" },
-    );
-
     env = {};
     app = new App();
     management = middleware(app);

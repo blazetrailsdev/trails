@@ -231,12 +231,14 @@ describe("ConnectionHandlerTest", () => {
     expect(pool).toBeTruthy();
   });
 
+  // Rails' setup establishes the handler against the real :arunit primary
+  // config (connection_handler_test.rb:14), so the tests that actually lease a
+  // connection ride the ambient lane database. Tests below that only assert on
+  // config values keep their literal paths (Rails does the same) — but a leased
+  // literal path would materialize a SQLite file in the working tree.
   it("active connections?", async () => {
     expect(handler.activeConnections).toBe(false);
-    const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: "dev.db",
-    });
+    const config = new HashConfig("development", "primary", ambientPoolConfiguration());
     handler.establishConnection(config, { owner: "primary" });
     const pool = handler.retrieveConnectionPool("primary")!;
     await pool.leaseConnection();
@@ -486,10 +488,7 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it("clear active connections bang", async () => {
-    const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: "dev.db",
-    });
+    const config = new HashConfig("development", "primary", ambientPoolConfiguration());
     handler.establishConnection(config, { owner: "primary" });
     const pool = handler.retrieveConnectionPool("primary")!;
     await pool.leaseConnection();
@@ -499,10 +498,7 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it("clear all connections bang", async () => {
-    const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: "dev.db",
-    });
+    const config = new HashConfig("development", "primary", ambientPoolConfiguration());
     handler.establishConnection(config, { owner: "primary" });
     const pool = handler.retrieveConnectionPool("primary")!;
     await pool.leaseConnection();
@@ -518,10 +514,7 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it("retrieve connection returns a connection", async () => {
-    const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: "dev.db",
-    });
+    const config = new HashConfig("development", "primary", ambientPoolConfiguration());
     handler.establishConnection(config, { owner: "primary" });
     const conn = await handler.retrieveConnection("primary");
     expect(conn).toBeTruthy();
@@ -535,10 +528,7 @@ describe("ConnectionHandlerTest", () => {
 
   it("is connected", async () => {
     expect(handler.isConnected("primary")).toBe(false);
-    const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: "dev.db",
-    });
+    const config = new HashConfig("development", "primary", ambientPoolConfiguration());
     handler.establishConnection(config, { owner: "primary" });
     const pool = handler.retrieveConnectionPool("primary")!;
     await pool.leaseConnection();
@@ -558,10 +548,7 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it("flush idle connections bang", async () => {
-    const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: "dev.db",
-    });
+    const config = new HashConfig("development", "primary", ambientPoolConfiguration());
     handler.establishConnection(config, { owner: "primary" });
     const pool = handler.retrieveConnectionPool("primary")!;
     await pool.leaseConnection();
@@ -595,10 +582,7 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it("active connections filtered by role", async () => {
-    const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: "dev.db",
-    });
+    const config = new HashConfig("development", "primary", ambientPoolConfiguration());
     handler.establishConnection(config, {
       owner: "primary",
       role: "writing",
