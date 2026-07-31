@@ -407,17 +407,18 @@ export class Association {
   /**
    * Set the inverse association on the given record, so that
    * `record.association(inverse_name).target` points back to owner.
+   *
+   * `_explicitTarget` has no Rails analog — `inversed_from` alone is the whole
+   * of `set_inverse_instance` there. It is the trails flag (RFC 0022) that
+   * `_loadedSingularTarget` consults before the inner belongs_to/has_one
+   * loaders query, so it is raised here exactly as `_cacheSingularTarget` does
+   * on the other seeding path; without it an inverse wired through this method
+   * reads back as an unset target and re-queries.
    */
   setInverseInstance(record: Base): Base {
     const inverse = this.inverseAssociationFor(record);
     if (inverse) {
       inverse.inversedFrom(this.owner);
-      // `_explicitTarget` is the trails flag `_loadedSingularTarget` consults
-      // before the inner belongs_to/has_one loaders query (RFC 0022). Rails has
-      // no analog — `inversed_from` alone is the whole of `set_inverse_instance`
-      // — so it has to be raised here, as `_cacheSingularTarget` does on the
-      // other seeding path, or an inverse wired through this method reads back
-      // as an unset target and re-queries.
       if (!inverse.isCollection()) inverse._explicitTarget = true;
     }
     return record;

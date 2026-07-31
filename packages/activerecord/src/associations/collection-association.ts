@@ -760,6 +760,12 @@ export class CollectionAssociation extends Association {
    * relies on the surrounding `raise Rollback` to undo a failed insert), keeping
    * the OO path's membership behavior unchanged. Sync callers (build/replace,
    * no `save`) get the synchronous return.
+   *
+   * Rails passes `replace: replace || association_scope.distinct_value`, so a
+   * `distinct` association scope dedups in place on append rather than
+   * appending the same record twice. The scope build is guarded because
+   * `add_to_target` is not where trails surfaces an unresolvable target class
+   * or foreign key — those are deferred to the load chokepoint.
    */
   addToTarget(record: Base, options?: { skipCallbacks?: boolean; replace?: boolean }): Base | null;
   addToTarget(
@@ -773,27 +779,16 @@ export class CollectionAssociation extends Association {
     save?: () => Promise<void>,
   ): Base | null | Promise<Base | null> {
     const { skipCallbacks = false, replace = false } = options;
-    // Rails: `replace: replace || association_scope.distinct_value`
-    // (collection_association.rb:283) — a `distinct` association scope dedups
-    // in place on append rather than appending the same record twice.
-    const shouldReplace = replace || this.associationScopeDistinctValue();
+    let distinctValue = false;
+    try {
+      distinctValue = !!(this.associationScope() as { distinctValue?: boolean } | undefined)
+        ?.distinctValue;
+    } catch {
+      distinctValue = false;
+    }
+    const shouldReplace = replace || distinctValue;
     if (save) return replaceOnTargetAsync(this, record, skipCallbacks, shouldReplace, save);
     return replaceOnTarget(this, record, skipCallbacks, shouldReplace);
-  }
-
-  /**
-   * `association_scope.distinct_value`, resolved defensively: the memoized
-   * association scope is unavailable for an owner whose target class or FK
-   * cannot be resolved yet, and Rails' `add_to_target` is not the place that
-   * surfaces such a failure.
-   * @internal
-   */
-  private associationScopeDistinctValue(): boolean {
-    try {
-      return !!(this.associationScope() as { distinctValue?: boolean } | undefined)?.distinctValue;
-    } catch {
-      return false;
-    }
   }
 
   /**
@@ -930,17 +925,20 @@ export class CollectionAssociation extends Association {
 
   // --- Protected helpers ---
 
+  /**
+   * Mirrors `ForeignAssociation#set_owner_attributes` (foreign_association.rb:22),
+   * which zips `Array(reflection.join_primary_key)` — the child FK columns —
+   * against `Array(reflection.join_foreign_key)`. For a has_many the latter is
+   * `active_record_primary_key`, not the owner's bare `primary_key`: a composite
+   * FK derived from the owner's `query_constraints` (`Sharded::BlogPost`
+   * `[blog_id, id]`) only pairs correctly through that resolver, and
+   * `ctor.primaryKey` would collapse both FK columns onto `id`.
+   */
   protected setOwnerAttributes(record: Base): void {
     if (this.reflection.options.through) return;
 
     const ctor = this.owner.constructor as any;
     const fks = this.foreignKeyColumns();
-    // Rails zips `Array(reflection.join_primary_key)` (the child FK columns)
-    // against `Array(reflection.join_foreign_key)` — for a has_many the latter
-    // is `active_record_primary_key`, NOT the owner's bare `primary_key`. A
-    // composite FK derived from the owner's `query_constraints` (Sharded::BlogPost
-    // `[blog_id, id]`) only pairs correctly through that resolver; falling back
-    // to `ctor.primaryKey` collapses both FK columns onto `id`.
     const richPk = (
       ctor._reflectOnAssociation?.(this.reflection.name) as
         | { activeRecordPrimaryKey?: string | string[] }

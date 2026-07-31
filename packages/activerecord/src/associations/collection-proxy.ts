@@ -2086,6 +2086,16 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * unwrapped by promise adoption — otherwise `return this` would call the
    * proxy's `then` and load the target, breaking Rails' "push does not load
    * target" invariant.
+   *
+   * The non-through branch is that one delegation: the owner FK / composite
+   * primary-key pairing / polymorphic `<as>_type` derivation lives on
+   * `CollectionAssociation#insert_record` → `set_owner_attributes`
+   * (collection_association.rb:439-446), and `concat` owns both halves Rails
+   * puts there — the new-record-owner `load_target` and the persisted-owner
+   * `transaction { concat_records }`. The proxy and the association object
+   * share ONE in-memory target (`_sharedTarget`), so the appended records,
+   * loaded-ness, `@replaced_or_added_targets` dedup and before/after_add
+   * callbacks all land on this proxy too.
    */
   async push(...records: T[]): Promise<Omit<this, "then"> | false> {
     this._ensureThroughWritable();
@@ -2096,17 +2106,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       return stripThenable(this._proxySelf ?? this);
     }
 
-    // Rails has no proxy-local insert: `CollectionProxy#<<` is
-    // `proxy_association.concat(records)` (collection_proxy.rb:1053), and the
-    // owner FK / composite PK pairing / polymorphic `<as>_type` derivation lives
-    // on `CollectionAssociation#insert_record` → `set_owner_attributes`
-    // (collection_association.rb:439-446). The proxy and the association object
-    // share ONE in-memory target (`_sharedTarget`), so the appended records,
-    // loaded-ness, `@replaced_or_added_targets` dedup, and before/after_add
-    // callbacks all land on this proxy too. `concat` owns both halves Rails puts
-    // there: the new-record-owner `load_target` and the persisted-owner
-    // `transaction { concat_records }` whose swallowed `Rollback` yields the
-    // `nil` that makes `<<` falsy.
     const assoc = this._record.association(this._assocName) as unknown as {
       concat: (...records: Base[]) => Promise<Base[] | undefined>;
     };
