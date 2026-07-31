@@ -1833,10 +1833,6 @@ export class SchemaStatements {
   }
 
   async assumeMigratedUptoVersion(version: number | string): Promise<void> {
-    // Rails does `version = version.to_i` with no validation, so a non-numeric
-    // argument coerces to 0 rather than raising.
-    // Mirror Ruby String#to_i: leading signed-integer prefix, 0 when there is
-    // none ("abc" -> 0, "123abc" -> 123).
     const leading = /^\s*([+-]?\d+)/.exec(String(version));
     const verNum = leading ? parseInt(leading[1], 10) : 0;
 

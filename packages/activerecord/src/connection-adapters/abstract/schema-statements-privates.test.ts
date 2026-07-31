@@ -824,9 +824,6 @@ describe("assumeMigratedUptoVersion", () => {
     ]);
   });
 
-  // Rails' assume_migrated_upto_version does `version.to_i` with no validation
-  // (abstract/schema_statements.rb:1365), so a non-numeric version becomes 0:
-  // version 0 is inserted and nothing sorts below it.
   it("coerces a non-numeric version to 0 rather than raising", async () => {
     const { ss, execute } = makeStatementsWithMigrations([1, 2]);
 
