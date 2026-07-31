@@ -120,7 +120,7 @@ export function prependViewPath(this: ViewPaths, path: ViewPathsInput): void {
     .prependViewPaths(ClassMethods._buildViewPaths.call(this.constructor, path).toArray());
 }
 
-export function isTemplateExists(
+export function templateExists(
   this: ViewPaths,
   name: string,
   prefixes: ReadonlyArray<string> = [],

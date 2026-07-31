@@ -9,9 +9,9 @@ import {
   detailsForLookup,
   formats,
   isAnyTemplates,
-  isTemplateExists,
   locale,
   lookupContext,
+  templateExists,
   type ViewPaths,
   type ViewPathsClass,
 } from "./view-paths.js";
@@ -35,7 +35,7 @@ class BaseController implements ViewPaths {
   detailsForLookup = detailsForLookup;
   formats = formats;
   locale = locale;
-  isTemplateExists = isTemplateExists;
+  templateExists = templateExists;
   appendViewPath = appendViewPath;
   isAnyTemplates = isAnyTemplates;
 }
@@ -91,7 +91,7 @@ describe("ViewPaths", () => {
     PostsController.viewPaths([]);
     const controller = new PostsController();
 
-    expect(controller.isTemplateExists("index", ["posts"])).toBe(false);
+    expect(controller.templateExists("index", ["posts"])).toBe(false);
     expect(controller.isAnyTemplates("index", ["posts"])).toBe(false);
   });
 
@@ -107,7 +107,7 @@ describe("ViewPaths", () => {
 
     controller.appendViewPath(resolver);
 
-    expect(controller.isTemplateExists("index", ["posts"])).toBe(true);
-    expect(controller.isTemplateExists("missing", ["posts"])).toBe(false);
+    expect(controller.templateExists("index", ["posts"])).toBe(true);
+    expect(controller.templateExists("missing", ["posts"])).toBe(false);
   });
 });
