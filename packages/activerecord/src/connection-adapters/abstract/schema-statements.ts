@@ -1567,9 +1567,19 @@ export class SchemaStatements {
   }
 
   async dataSourceExists(name: string): Promise<boolean> {
-    if (!name) return false;
-    if (await this.tableExists(name)) return true;
-    return this.viewExists(name);
+    // Rails passes no `type:`, so one untyped data_source_sql query matches any
+    // relation kind (table or view) in a single round trip. dataSourceSql
+    // dispatches through this.adapter so each adapter's override fires; an
+    // adapter without one raises NotImplementedError → dataSources() fallback.
+    if (!isPresent(name)) return false;
+    try {
+      const sql = (this.adapter as unknown as SchemaStatements).dataSourceSql(name);
+      const rows = await this.adapter.execute(sql);
+      return rows.length > 0;
+    } catch (error) {
+      if (!(error instanceof NotImplementedError)) throw error;
+      return (await this.dataSources()).includes(String(name));
+    }
   }
 
   buildCreateTableDefinition(
