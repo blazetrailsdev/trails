@@ -17,9 +17,9 @@
  *      `eager_load(:x).group(:composite_fk_belongs_to).count/.sum` never folded
  *      its eager JD through the shared emitter.
  *
- * Both now build the eager JD via `collectEagerSpecs` and fold it through
- * `_applyJoinsToManager(manager, eagerJd)`, so one `AliasTracker` spans the
- * manual joins and the eager JD (a coinciding association dedups via `walk`).
+ * Both now take their relation from `apply_join_dependency` and emit through
+ * `_applyJoinsToManager(manager)`, so one `AliasTracker` spans the manual joins
+ * and the eager JD (a coinciding association dedups via `walk`).
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../associations.js";
