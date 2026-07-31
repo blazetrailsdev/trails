@@ -105,7 +105,7 @@ import {
   displayLiteral,
 } from "./literals.js";
 import { isSourceUnported } from "./unported-files.js";
-import { buildIncludeGraph, includeGraphCallSets } from "./include-graph.js";
+import { buildIncludeGraph, includeGraphCallSets, includeGraphEntities } from "./include-graph.js";
 import {
   JS_ENUMERABLE_ALIASES,
   jsEnumerableAliases,
@@ -1294,23 +1294,18 @@ export function main() {
       sameFilePartitions.set(file, byName);
       return byName;
     };
-    // Wide-gate candidate resolution through the recorded include/extends graph
-    // (RFC 0083): the call-sets of same-named bodies on classes the paired class
-    // reaches by that graph. See include-graph.ts for the rule and for the
-    // looser rules it deliberately excludes. Package-scoped; entities from dep
-    // packages are not walked.
     const includeGraph = buildIncludeGraph(
       tsPkg ? [...Object.values(tsPkg.classes), ...Object.values(tsPkg.modules)] : [],
       tsPkg?.fileFunctions ?? {},
     );
-    const graphCallCache = new Map<string, PartitionedCalls>();
+    const graphEntities = new Map<string, ClassInfo[]>();
     const includeGraphCalls = (tsFile: string, tsName: string): PartitionedCalls => {
-      const key = `${tsFile}:${tsName}`;
-      const cached = graphCallCache.get(key);
-      if (cached) return cached;
-      const sets = includeGraphCallSets(tsFile, tsName, includeGraph);
-      graphCallCache.set(key, sets);
-      return sets;
+      let entities = graphEntities.get(tsFile);
+      if (!entities) {
+        entities = includeGraphEntities(tsFile, includeGraph);
+        graphEntities.set(tsFile, entities);
+      }
+      return includeGraphCallSets(entities, tsName, includeGraph);
     };
     const recordTsParams = (m: MethodInfo, file = m.file ?? "") => {
       const sigs = tsParamsByName.get(m.name) ?? [];
@@ -1779,17 +1774,11 @@ export function main() {
           sameFileCalls,
           reached,
         );
-        // Mixin-attribution artifact (RFC 0083): Rails attributes a mixed-in
-        // module's methods to the INCLUDING class's file, so the pair is
-        // (mixin body, including class's TS file). When the port of that body
-        // sits on a class the paired class reaches through the recorded
-        // include/extends graph, its calls are this method's calls. Wide gate
-        // only — the narrow AR gate keeps its per-(file, name) population.
-        const graph = wideCalls
+        const graphCalls = wideCalls
           ? includeGraphCalls(tsFile, tsName)
           : { calls: new Set<string>(), negated: new Set<string>() };
         const tsCalls =
-          graph.calls.size === 0 ? effective : new Set([...effective, ...graph.calls]);
+          graphCalls.calls.size === 0 ? effective : new Set([...effective, ...graphCalls.calls]);
         // A body compared against a helper's calls inherits its negated ones
         // too, or the helper's `!xs.includes(y)` would not count — same for a
         // wrapper and its delegate.
@@ -1800,7 +1789,7 @@ export function main() {
         if (isDelegatingWrapper(tsName, own.calls)) {
           for (const c of tsNegatedCallsByName.get(tsName) ?? []) negatedTsCalls.add(c);
         }
-        for (const c of graph.negated) negatedTsCalls.add(c);
+        for (const c of graphCalls.negated) negatedTsCalls.add(c);
         callsCompared++;
         const missing = significantMissingCalls(
           rubyName,

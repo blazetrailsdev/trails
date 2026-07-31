@@ -86,6 +86,12 @@ function push<V>(map: Map<string, V[]>, key: string, value: V): void {
  * Entities reachable from `tsFile` by the transitive closure of recorded
  * `includes` / `extends` names. Entities declared in `tsFile` itself are never
  * returned — the caller already holds its own file's call-sets.
+ *
+ * An edge name that resolves to more than one entity is DROPPED, not
+ * disambiguated: `DatabaseStatements` names a module under `abstract/`,
+ * `mysql/`, `postgresql/` and `sqlite3/`, so following every candidate credits
+ * one adapter with another adapter's calls, and picking one by path proximity is
+ * the filename heuristic this resolution must not use.
  */
 export function includeGraphEntities(tsFile: string, graph: IncludeGraph): ClassInfo[] {
   const reached: ClassInfo[] = [];
@@ -97,10 +103,6 @@ export function includeGraphEntities(tsFile: string, graph: IncludeGraph): Class
       if (seenEdges.has(name)) continue;
       seenEdges.add(name);
       const targets = graph.entitiesByName.get(name) ?? [];
-      // An ambiguous edge name is dropped, not disambiguated: `DatabaseStatements`
-      // names a module under abstract/, mysql/ AND sqlite3/, so following all of
-      // them credits one adapter with another's calls, and picking one by path
-      // proximity is exactly the filename heuristic this resolution must not use.
       if (targets.length !== 1) continue;
       const target = targets[0];
       if ((target.file ?? "") !== tsFile) reached.push(target);
@@ -111,7 +113,8 @@ export function includeGraphEntities(tsFile: string, graph: IncludeGraph): Class
 }
 
 /**
- * The call-sets of same-named bodies on entities reachable from `tsFile`.
+ * The call-sets of `tsName` bodies on `entities` (the output of
+ * `includeGraphEntities`), partitioned into plain and negated calls.
  *
  * Resolution is per-ENTITY, not per-file: a barrel (`cache/index.ts`) holds a
  * re-exported entry for every store in the package, so unioning a reached
@@ -123,13 +126,13 @@ export function includeGraphEntities(tsFile: string, graph: IncludeGraph): Class
  * the real body lives there and nowhere else.
  */
 export function includeGraphCallSets(
-  tsFile: string,
+  entities: readonly ClassInfo[],
   tsName: string,
   graph: IncludeGraph,
 ): { calls: Set<string>; negated: Set<string> } {
   const raw: string[] = [];
   const seenFileFunctionFiles = new Set<string>();
-  for (const entity of includeGraphEntities(tsFile, graph)) {
+  for (const entity of entities) {
     for (const method of [...entity.instanceMethods, ...entity.classMethods]) {
       if (method.name === tsName) raw.push(...(method.calls ?? []));
     }

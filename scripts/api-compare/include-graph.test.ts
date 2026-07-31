@@ -132,7 +132,13 @@ describe("includeGraphCallSets", () => {
       }),
     ]);
     expect(
-      [...includeGraphCallSets("postgresql-adapter.ts", "indexes", graph).calls].sort(),
+      [
+        ...includeGraphCallSets(
+          includeGraphEntities("postgresql-adapter.ts", graph),
+          "indexes",
+          graph,
+        ).calls,
+      ].sort(),
     ).toEqual(["indexNameFor", "query"]);
   });
 
@@ -141,7 +147,9 @@ describe("includeGraphCallSets", () => {
       entity("A", "a.ts", { includes: ["B"] }),
       entity("B", "b.ts", { methods: [method("other", ["instrument"])] }),
     ]);
-    expect(includeGraphCallSets("a.ts", "indexes", graph).calls.size).toBe(0);
+    expect(
+      includeGraphCallSets(includeGraphEntities("a.ts", graph), "indexes", graph).calls.size,
+    ).toBe(0);
   });
 
   it("does not credit a sibling entity that shares a barrel file with a reachable one", () => {
@@ -152,7 +160,13 @@ describe("includeGraphCallSets", () => {
         methods: [method("deleteMatched", ["instrument", "mergedOptions"])],
       }),
     ]);
-    expect(includeGraphCallSets("cache/file-store.ts", "deleteMatched", graph).calls.size).toBe(0);
+    expect(
+      includeGraphCallSets(
+        includeGraphEntities("cache/file-store.ts", graph),
+        "deleteMatched",
+        graph,
+      ).calls.size,
+    ).toBe(0);
   });
 
   it("reads the mixin body ported as a file function on the reachable entity's file", () => {
@@ -163,10 +177,11 @@ describe("includeGraphCallSets", () => {
       ],
       { "relation/query-methods.ts": [method("where", ["spawn", "whereClauseFactory"])] },
     );
-    expect([...includeGraphCallSets("relation.ts", "where", graph).calls].sort()).toEqual([
-      "spawn",
-      "whereClauseFactory",
-    ]);
+    expect(
+      [
+        ...includeGraphCallSets(includeGraphEntities("relation.ts", graph), "where", graph).calls,
+      ].sort(),
+    ).toEqual(["spawn", "whereClauseFactory"]);
   });
 
   it("partitions negated calls out of the resolved set", () => {
@@ -174,7 +189,7 @@ describe("includeGraphCallSets", () => {
       entity("A", "a.ts", { includes: ["B"] }),
       entity("B", "b.ts", { methods: [method("run", ["!includes", "map"])] }),
     ]);
-    const sets = includeGraphCallSets("a.ts", "run", graph);
+    const sets = includeGraphCallSets(includeGraphEntities("a.ts", graph), "run", graph);
     expect([...sets.calls]).toEqual(["map"]);
     expect([...sets.negated]).toEqual(["includes"]);
   });
