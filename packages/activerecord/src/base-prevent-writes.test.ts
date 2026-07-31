@@ -62,7 +62,9 @@ describe("BasePreventWritesTest", () => {
 
   it("an empty transaction does not raise if preventing writes", async () => {
     await Base.whilePreventingWrites(async () => {
-      await Bird.transaction(async () => {});
+      await Bird.transaction(async () => {
+        await (await Base.leaseConnection()).materializeTransactions();
+      });
     });
   });
 
