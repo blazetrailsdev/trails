@@ -3,13 +3,6 @@
     "package": "activerecord",
     "tsFile": "persistence.ts",
     "rubyName": "_delete_record",
-    "call": "global_current_scope",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "persistence.ts",
-    "rubyName": "_delete_record",
     "call": "with_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -88,13 +81,6 @@
     "tsFile": "persistence.ts",
     "rubyName": "reload",
     "call": "merge",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "persistence.ts",
-    "rubyName": "save!",
-    "call": "create_or_update",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

@@ -37,20 +37,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/schema-creation.ts",
-    "rubyName": "visit_AlterTable",
-    "call": "accept",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-creation.ts",
-    "rubyName": "visit_AlterTable",
-    "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-creation.ts",
     "rubyName": "visit_ColumnDefinition",
     "call": "quote_column_name",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

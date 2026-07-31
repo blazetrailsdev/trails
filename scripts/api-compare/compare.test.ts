@@ -23,6 +23,7 @@ import {
   WIDE_NO_JS_CALL_FORM,
   isDelegatingWrapper,
   effectiveTsCalls,
+  reachedSameFileMethods,
   narrowCallsApplies,
 } from "./compare.js";
 import { rubyMethodToTs } from "./conventions.js";
@@ -242,6 +243,79 @@ describe("significantMissingCalls", () => {
       WIDE_SIGNIFICANT_CALLS,
     );
     expect(missing).toEqual([]);
+  });
+
+  describe("same-file helper extraction", () => {
+    // `indexes` factors its work into helpers that live in the same TS file.
+    const file = new Map<string, string[]>([
+      ["indexes", ["schemaQuery", "buildIndexRows"]],
+      ["buildIndexRows", ["map", "indexRowToDefinition"]],
+      ["indexRowToDefinition", ["columnNamesFromColumnNumbers"]],
+    ]);
+    const sameFileCalls = (n: string) => file.get(n);
+
+    it("compares a body against the calls of the helpers it extracted", () => {
+      const own = new Set(file.get("indexes"));
+      const merged = effectiveTsCalls("indexes", own, () => undefined, sameFileCalls);
+      expect(merged).toEqual(
+        new Set([
+          "schemaQuery",
+          "buildIndexRows",
+          "map",
+          "indexRowToDefinition",
+          "columnNamesFromColumnNumbers",
+        ]),
+      );
+    });
+
+    it("does not follow a callee defined in another file", () => {
+      const own = new Set(["pgSchemaStatements", "split"]);
+      expect(effectiveTsCalls("indexes", own, () => ["neverReached"], sameFileCalls)).toBe(own);
+    });
+
+    it("never reaches the package-wide delegate map for a non-wrapper body", () => {
+      // The delegate map is unioned by NAME across the whole package, so an
+      // unrelated same-named method can satisfy a call. That imprecision is
+      // only sound for the forwarder case; a body doing its own work must be
+      // held to its own file.
+      const own = new Set(file.get("indexes"));
+      const merged = effectiveTsCalls("indexes", own, () => ["fromAnotherClass"], sameFileCalls);
+      expect(merged.has("fromAnotherClass")).toBe(false);
+    });
+
+    it("stops at the closure depth limit", () => {
+      const chain = new Map<string, string[]>([
+        ["a", ["b"]],
+        ["b", ["c"]],
+        ["c", ["d"]],
+        ["d", ["e"]],
+      ]);
+      const reached = reachedSameFileMethods("a", ["b"], (n) => chain.get(n));
+      expect(reached).toEqual(new Set(["b", "c", "d"]));
+    });
+
+    it("terminates on a cycle", () => {
+      const cycle = new Map<string, string[]>([
+        ["a", ["b"]],
+        ["b", ["a", "c"]],
+        ["c", ["b"]],
+      ]);
+      expect(reachedSameFileMethods("a", ["b"], (n) => cycle.get(n))).toEqual(new Set(["b", "c"]));
+    });
+
+    it("still flags a call no helper in the chain makes", () => {
+      const own = new Set(file.get("indexes"));
+      const tsCalls = effectiveTsCalls("indexes", own, () => undefined, sameFileCalls);
+      const missing = significantMissingCalls(
+        "indexes",
+        ["unquote_identifier"],
+        tsCalls,
+        () => true,
+        map,
+        WIDE_SIGNIFICANT_CALLS,
+      );
+      expect(missing).toEqual(["unquote_identifier → unquoteIdentifier"]);
+    });
   });
 
   describe("delegation transparency", () => {

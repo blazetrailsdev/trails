@@ -86,6 +86,8 @@ import {
   newlySeeded,
   nextMark,
   renderExcess,
+  droppedReviewed,
+  renderDroppedReviewed,
   renderWriteSummary,
   unreviewedEntries,
   writeMark,
@@ -413,6 +415,8 @@ async function main(write: boolean): Promise<number> {
     const mark = nextMark(count - newly.length, await loadMark(MARK_PATH));
     await writeMark(MARK_PATH, mark);
     console.log(renderWriteSummary(count, newly, mark, path.relative(ROOT_DIR, MARK_PATH)));
+    const dropped = renderDroppedReviewed(droppedReviewed(next, baseline, DEFAULT_REASON));
+    if (dropped) console.log(dropped);
     return 0;
   }
 

@@ -16,13 +16,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "http/content-security-policy.ts",
-    "rubyName": "build_directives",
-    "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/content-security-policy.ts",
     "rubyName": "generate_content_security_policy_nonce",
     "call": "call",
     "reason": "Ruby Proc#call has no JS counterpart: the generator is invoked as a plain call, `generator(this)`, since JS `Function#call` would bind the argument as the receiver instead of passing it."

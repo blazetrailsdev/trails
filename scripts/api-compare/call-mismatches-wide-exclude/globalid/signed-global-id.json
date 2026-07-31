@@ -5,12 +5,5 @@
     "rubyName": "raise_if_expired",
     "call": "iso8601",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "globalid",
-    "tsFile": "signed-global-id.ts",
-    "rubyName": "verify_with_verifier_validated_metadata",
-    "call": "verify",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

@@ -3,13 +3,6 @@
     "package": "activerecord",
     "tsFile": "migration/pending-migration-connection.ts",
     "rubyName": "with_temporary_pool",
-    "call": "connection_handler",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration/pending-migration-connection.ts",
-    "rubyName": "with_temporary_pool",
     "call": "establish_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

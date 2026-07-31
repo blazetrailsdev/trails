@@ -38,27 +38,6 @@
     "package": "activerecord",
     "tsFile": "tasks/mysql-database-tasks.ts",
     "rubyName": "purge",
-    "call": "connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/mysql-database-tasks.ts",
-    "rubyName": "purge",
-    "call": "creation_options",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/mysql-database-tasks.ts",
-    "rubyName": "purge",
-    "call": "establish_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/mysql-database-tasks.ts",
-    "rubyName": "purge",
     "call": "recreate_database",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

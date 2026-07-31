@@ -23,13 +23,6 @@
   {
     "package": "activesupport",
     "tsFile": "cache/file-store.ts",
-    "rubyName": "clear",
-    "call": "join",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/file-store.ts",
     "rubyName": "delete_empty_directories",
     "call": "delete",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

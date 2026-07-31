@@ -52,13 +52,6 @@
     "package": "activerecord",
     "tsFile": "schema-migration.ts",
     "rubyName": "table_exists?",
-    "call": "table_name",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "schema-migration.ts",
-    "rubyName": "table_exists?",
     "call": "with_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

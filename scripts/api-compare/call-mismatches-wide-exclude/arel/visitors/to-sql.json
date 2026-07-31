@@ -30,27 +30,6 @@
   {
     "package": "arel",
     "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_BoundSqlLiteral",
-    "call": "cast_bound_value",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_BoundSqlLiteral",
-    "call": "quote",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_BoundSqlLiteral",
-    "call": "visit",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
     "rubyName": "visit_Arel_Nodes_DeleteStatement",
     "call": "collect_nodes_for",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -65,48 +44,6 @@
   {
     "package": "arel",
     "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_Equality",
-    "call": "unboundable?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_GreaterThan",
-    "call": "unboundable?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_GreaterThan",
-    "call": "visit",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_GreaterThanOrEqual",
-    "call": "unboundable?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_GreaterThanOrEqual",
-    "call": "visit",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_In",
-    "call": "unboundable?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
     "rubyName": "visit_Arel_Nodes_InsertStatement",
     "call": "maybe_visit",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -116,48 +53,6 @@
     "tsFile": "visitors/to-sql.ts",
     "rubyName": "visit_Arel_Nodes_JoinSource",
     "call": "any?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_LessThan",
-    "call": "unboundable?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_LessThan",
-    "call": "visit",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_LessThanOrEqual",
-    "call": "unboundable?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_LessThanOrEqual",
-    "call": "visit",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_NotEqual",
-    "call": "unboundable?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_NotIn",
-    "call": "unboundable?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

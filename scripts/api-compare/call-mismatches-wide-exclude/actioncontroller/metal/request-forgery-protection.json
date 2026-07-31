@@ -23,13 +23,6 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/request-forgery-protection.ts",
-    "rubyName": "csrf_token_hmac",
-    "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/request-forgery-protection.ts",
     "rubyName": "handle_unverified_request",
     "call": "build",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

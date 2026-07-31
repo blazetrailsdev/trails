@@ -31,13 +31,6 @@
     "package": "actiondispatch",
     "tsFile": "middleware/cookies.ts",
     "rubyName": "parse",
-    "call": "load",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/cookies.ts",
-    "rubyName": "parse",
     "call": "reserialize?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }

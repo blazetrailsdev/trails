@@ -16,20 +16,6 @@
   {
     "package": "activerecord",
     "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "check_current_protected_environment!",
-    "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "check_current_protected_environment!",
-    "call": "with_temporary_pool",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
     "rubyName": "check_protected_environments!",
     "call": "check_current_protected_environment!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -149,13 +135,6 @@
   {
     "package": "activerecord",
     "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "dump_schema",
-    "call": "table_exists?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
     "rubyName": "each_local_configuration",
     "call": "local_database?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -172,20 +151,6 @@
     "tsFile": "tasks/database-tasks.ts",
     "rubyName": "initialize_database",
     "call": "exist?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "initialize_database",
-    "call": "with_temporary_pool",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "load_schema",
-    "call": "create_table_and_set_flags",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -233,13 +198,6 @@
   {
     "package": "activerecord",
     "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "migrate_all",
-    "call": "env",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
     "rubyName": "migrate_status",
     "call": "table_exists?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -249,13 +207,6 @@
     "tsFile": "tasks/database-tasks.ts",
     "rubyName": "prepare_all",
     "call": "each_current_configuration",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "prepare_all",
-    "call": "env",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

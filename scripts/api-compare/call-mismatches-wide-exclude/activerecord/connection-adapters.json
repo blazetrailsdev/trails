@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters.ts",
-    "rubyName": "resolve",
-    "call": "join",
-    "reason": "Bucket (b): the available-adapters join moved into the adapterNotFoundError helper that resolve throws through, so the lexical per-method scan no longer sees it."
-  }
-]

@@ -2,13 +2,6 @@
   {
     "package": "activesupport",
     "tsFile": "cache/entry.ts",
-    "rubyName": "compressed",
-    "call": "compressed?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/entry.ts",
     "rubyName": "dup_value!",
     "call": "compressed?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

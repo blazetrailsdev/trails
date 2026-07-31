@@ -2,57 +2,8 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/quoting.ts",
-    "rubyName": "quote",
-    "call": "quoted_binary",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/quoting.ts",
-    "rubyName": "quote",
-    "call": "quoted_date",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/quoting.ts",
-    "rubyName": "quote",
-    "call": "quoted_time",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/quoting.ts",
-    "rubyName": "quote_default_expression",
-    "call": "quote",
-    "reason": "Satisfied via dispatchQuote, mirroring rb:162's bare `quote(value)` self-dispatch (host override, else the module helper) — same shape as the existing quote/quoted_date and quote/quoted_binary entries."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/quoting.ts",
     "rubyName": "quoted_date",
     "call": "default_timezone",
     "reason": "Rails' quoted_date branches on default_timezone inline (abstract/quoting.rb:186); trails' quotedDate formats through formatInstantForSql / formatPlainDateTimeForSql in abstract/sql-datetime.ts, whose defaultSqlTimezone() reads ActiveRecord.defaultTimezone."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/quoting.ts",
-    "rubyName": "quoted_time",
-    "call": "quoted_date",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/quoting.ts",
-    "rubyName": "type_cast",
-    "call": "quoted_date",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/quoting.ts",
-    "rubyName": "type_cast",
-    "call": "quoted_time",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

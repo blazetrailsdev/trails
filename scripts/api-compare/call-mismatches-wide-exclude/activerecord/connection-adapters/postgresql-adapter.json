@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "add_column_for_alter",
-    "call": "new",
-    "reason": "Equivalent (RFC 0072 converge-pg-ddl-exec-primitive-and-quoting-routing): Rails' `super` is AbstractAdapter#add_column_for_alter, whose `new` is the ColumnDefinition instantiation; trails calls the same constructor via createTableDefinition(...).newColumnDefinition(...), so the `new` is one frame deeper than the extractor looks."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "add_enum_value",
     "call": "execute",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -65,23 +58,9 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "change_column_for_alter",
-    "call": "new",
-    "reason": "Equivalent (RFC 0072 converge-pg-ddl-exec-primitive-and-quoting-routing): the ChangeColumnDefinition instantiation lives inside build_change_column_definition, which trails calls as buildChangeColumnDefinition — the `new` is one frame deeper than the extractor looks."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "change_column_null",
     "call": "column_for",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "change_column_null_for_alter",
-    "call": "new",
-    "reason": "Equivalent (RFC 0072 converge-pg-ddl-exec-primitive-and-quoting-routing): Rails' `Proc.new { ... }` is a bare arrow function in TS; the deferred change_column_null call it wraps IS threaded."
   },
   {
     "package": "activerecord",
@@ -136,13 +115,6 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "configure_connection",
-    "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "configure_connection",
     "call": "quote",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -151,13 +123,6 @@
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "configure_connection",
     "call": "stringify_keys",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "connect",
-    "call": "new_client",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -479,13 +444,6 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "pk_and_sequence_for",
-    "call": "new",
-    "reason": "Deviation, justified at the call site (RFC 0072 converge-pg-remove-index-and-new-column-from-field-call-sets): Rails returns `[pk, PostgreSQL::Name.new(*result)]`; trails returns a plain `{ schema, name }` pair. Converging the return type to Name ripples into setPkSequenceBang / resetPkSequenceBang / renameTable and is tracked separately. See PostgreSQLSchemaStatements#pkAndSequenceFor."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "pk_and_sequence_for",
     "call": "query",
     "reason": "Deviation, justified at the call site (RFC 0072 converge-pg-remove-index-and-new-column-from-field-call-sets): trails issues the single rewritten lookup through `schemaQuery` (query(sql, \"SCHEMA\")) rather than Rails' two `query` calls. See PostgreSQLSchemaStatements#pkAndSequenceFor."
   },
@@ -502,13 +460,6 @@
     "rubyName": "quote",
     "call": "check_int_in_range",
     "reason": "Equivalent (RFC 0072 activerecord-unrouted-privates-remaining-inventory): `checkIntInRange` is a bare alias — `export const checkIntInRange = checkIntegerRange` — so the routed call is the alias target and the extractor never sees the alias name. Nothing to converge."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "quote_default_expression",
-    "call": "quote",
-    "reason": "Equivalent (RFC 0072 converge-pg-ddl-exec-primitive-and-quoting-routing): the adapter method is a thin wrapper that forwards to the ported body in postgresql/quoting.ts#quoteDefaultExpression, where the quote/serialize/include? calls live."
   },
   {
     "package": "activerecord",
@@ -571,13 +522,6 @@
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "reload_type_map",
     "call": "initialize_type_map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "reload_type_map",
-    "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
