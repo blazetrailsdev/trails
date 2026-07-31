@@ -24,6 +24,11 @@
  * TypeScript pipeline, so it cannot import this one. Keep the array a flat list
  * of double-quoted names; the rule throws rather than silently guarding nothing
  * if it parses none.
+ *
+ * The list is a trace of the lay path, so `stubbed-ddl-methods.test.ts` pins it
+ * against that path: it drives `loadCanonicalSchema` through a recording proxy
+ * and fails when the loader touches an adapter member that is neither in this
+ * array nor in the test's justified non-emitting exempt list.
  */
 export const STUBBED_DDL_METHODS: readonly string[] = [
   "createTable",
