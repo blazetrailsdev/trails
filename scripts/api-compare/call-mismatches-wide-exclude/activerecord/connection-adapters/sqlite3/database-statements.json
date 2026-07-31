@@ -66,22 +66,8 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3/database-statements.ts",
     "rubyName": "perform_query",
-    "call": "columns",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3/database-statements.ts",
-    "rubyName": "perform_query",
     "call": "new",
     "reason": "Deliberate deviation (documented in performQuery): reads return raw row hashes and writes source the affected-rows / insert-rowid atomically from the RunResult, so no `ActiveRecord::Result.new(columns, to_a)` is constructed here."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3/database-statements.ts",
-    "rubyName": "perform_query",
-    "call": "prepare",
-    "reason": "Satisfied by a different path: the async driver abstraction prepares through the statement pool via `this._cachedStatement(sql)` (which caches / falls back to a fresh prepare) rather than calling `raw_connection.prepare` directly."
   },
   {
     "package": "activerecord",

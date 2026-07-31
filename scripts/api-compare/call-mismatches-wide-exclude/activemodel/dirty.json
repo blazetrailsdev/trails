@@ -73,21 +73,7 @@
     "package": "activemodel",
     "tsFile": "dirty.ts",
     "rubyName": "init_attributes",
-    "call": "fetch_value",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "dirty.ts",
-    "rubyName": "init_attributes",
     "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "dirty.ts",
-    "rubyName": "init_attributes",
-    "call": "with_value_from_user",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

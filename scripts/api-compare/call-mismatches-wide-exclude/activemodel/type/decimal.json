@@ -2,13 +2,6 @@
   {
     "package": "activemodel",
     "tsFile": "type/decimal.ts",
-    "rubyName": "apply_scale",
-    "call": "round",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "type/decimal.ts",
     "rubyName": "cast_value",
     "call": "convert_float_to_big_decimal",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

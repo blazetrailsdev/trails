@@ -30,13 +30,6 @@
   {
     "package": "activesupport",
     "tsFile": "encrypted-file.ts",
-    "rubyName": "initialize",
-    "call": "realpath",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "encrypted-file.ts",
     "rubyName": "read",
     "call": "exist?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

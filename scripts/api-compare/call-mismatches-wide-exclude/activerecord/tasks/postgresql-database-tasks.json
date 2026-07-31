@@ -51,22 +51,8 @@
   {
     "package": "activerecord",
     "tsFile": "tasks/postgresql-database-tasks.ts",
-    "rubyName": "remove_sql_header_comments",
-    "call": "path",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/postgresql-database-tasks.ts",
     "rubyName": "run_cmd",
     "call": "run_cmd_error",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/postgresql-database-tasks.ts",
-    "rubyName": "structure_dump",
-    "call": "any?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -81,13 +67,6 @@
     "tsFile": "tasks/postgresql-database-tasks.ts",
     "rubyName": "structure_dump",
     "call": "data_sources",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/postgresql-database-tasks.ts",
-    "rubyName": "structure_dump",
-    "call": "flat_map",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -110,12 +89,5 @@
     "rubyName": "structure_dump",
     "call": "select",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/postgresql-database-tasks.ts",
-    "rubyName": "structure_dump",
-    "call": "split",
-    "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
   }
 ]

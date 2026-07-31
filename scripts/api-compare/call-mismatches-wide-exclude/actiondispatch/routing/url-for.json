@@ -3,13 +3,6 @@
     "package": "actiondispatch",
     "tsFile": "routing/url-for.ts",
     "rubyName": "full_url_for",
-    "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/url-for.ts",
-    "rubyName": "full_url_for",
     "call": "reverse_merge!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

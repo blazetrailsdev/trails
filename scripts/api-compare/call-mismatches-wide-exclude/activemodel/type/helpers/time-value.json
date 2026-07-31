@@ -2,13 +2,6 @@
   {
     "package": "activemodel",
     "tsFile": "type/helpers/time-value.ts",
-    "rubyName": "apply_seconds_precision",
-    "call": "change",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "type/helpers/time-value.ts",
     "rubyName": "fast_string_to_time",
     "call": "at",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -24,21 +17,7 @@
     "package": "activemodel",
     "tsFile": "type/helpers/time-value.ts",
     "rubyName": "new_time",
-    "call": "getlocal",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "type/helpers/time-value.ts",
-    "rubyName": "new_time",
     "call": "local",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "type/helpers/time-value.ts",
-    "rubyName": "user_input_in_time_zone",
-    "call": "in_time_zone",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

@@ -59,13 +59,6 @@
     "package": "actionview",
     "tsFile": "renderer/template-renderer.ts",
     "rubyName": "resolve_layout",
-    "call": "call",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actionview",
-    "tsFile": "renderer/template-renderer.ts",
-    "rubyName": "resolve_layout",
     "call": "find_template",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "validations.ts",
-    "rubyName": "custom_validation_context?",
-    "call": "exclude?",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails validations.rb:77-79 uses `[:create, :update].exclude?(validation_context)`; trails validations.ts:168-171 inlines the two !== comparisons."
-  }
-]

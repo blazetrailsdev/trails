@@ -3,13 +3,6 @@
     "package": "activesupport",
     "tsFile": "cache/memory-store.ts",
     "rubyName": "cleanup",
-    "call": "expired?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/memory-store.ts",
-    "rubyName": "cleanup",
     "call": "synchronize",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

@@ -30,27 +30,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "build_change_column_definition",
-    "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "build_explain_clause",
-    "call": "include?",
-    "reason": "Deliberate: `AbstractMysqlAdapter#buildExplainClause` builds the printed EXPLAIN *header* (`\"... for:\"`) and routes option rendering through `_validateExplainOptions`, which rejects unknown flags/formats instead of blindly `join`ing them; the faithful `join` + `include?(\"ANALYZE\")` body lives in the Rails-layout file `connection-adapters/mysql/database-statements.ts` (`buildExplainClause`)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "build_explain_clause",
-    "call": "join",
-    "reason": "Deliberate: `AbstractMysqlAdapter#buildExplainClause` builds the printed EXPLAIN *header* (`\"... for:\"`) and routes option rendering through `_validateExplainOptions`, which rejects unknown flags/formats instead of blindly `join`ing them; the faithful `join` + `include?(\"ANALYZE\")` body lives in the Rails-layout file `connection-adapters/mysql/database-statements.ts` (`buildExplainClause`)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "build_insert_sql",
     "call": "first",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -60,13 +39,6 @@
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "build_insert_sql",
     "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "build_insert_sql",
-    "call": "model",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -185,8 +157,8 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "dbconsole",
-    "call": "filter_map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "call": "database_cli",
+    "reason": "Rails reads the cli name only to pass it to `find_cmd_and_exec` (abstract_mysql_adapter.rb); that PTY exec is Ruby-only and unported, so our `dbconsole` returns the arg list and never needs the lookup."
   },
   {
     "package": "activerecord",
@@ -227,13 +199,6 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "handle_warnings",
-    "call": "count",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "handle_warnings",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -257,13 +222,6 @@
     "rubyName": "mariadb?",
     "call": "match?",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails abstract_mysql_adapter.rb:92-94 runs `/mariadb/i.match?(full_version)` live; trails isMariadb (abstract-mysql-adapter.ts:422-424) returns the `_mariadb` flag computed once at connect by the same regex (mysql2-adapter.ts:1864)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "mismatched_foreign_key",
-    "call": "update",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -317,13 +275,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "remove_foreign_key",
-    "call": "delete",
-    "reason": "Ruby's `options.delete(:on_delete)` is the JS `delete opts.onDelete` operator, which is syntax rather than a call the extractor can see."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "remove_index_for_alter",
     "call": "index_name_for_remove",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -354,13 +305,6 @@
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "rename_column_for_alter",
     "call": "internal_exec_query",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "rename_column_for_alter",
-    "call": "new_column_definition",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -458,13 +402,6 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "translate_exception",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "translate_exception",
     "call": "match?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -486,15 +423,8 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "type_cast",
-    "call": "getlocal",
-    "reason": "Include stand-in plus Temporal semantics: `MySQL::Quoting#type_cast` is ported in `connection-adapters/mysql/quoting.ts` and the adapter method only delegates. Ruby's `getlocal`/`utc?` re-attach a zone to a Time; a Temporal.Instant is absolute and a PlainDateTime zoneless, so the `default_timezone` branch is resolved by `quotedDate` instead."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "type_cast",
-    "call": "utc?",
-    "reason": "Include stand-in plus Temporal semantics: `MySQL::Quoting#type_cast` is ported in `connection-adapters/mysql/quoting.ts` and the adapter method only delegates. Ruby's `getlocal`/`utc?` re-attach a zone to a Time; a Temporal.Instant is absolute and a PlainDateTime zoneless, so the `default_timezone` branch is resolved by `quotedDate` instead."
+    "call": "default_timezone",
+    "reason": "Rails' MySQL type_cast branches on default_timezone inline (mysql/quoting.rb:100,106); trails' override delegates to mysql/quoting.ts typeCast, which reaches ActiveRecord.defaultTimezone via dispatchQuotedDate to quotedDate to defaultSqlTimezone()."
   },
   {
     "package": "activerecord",
@@ -502,19 +432,5 @@
     "rubyName": "write_query?",
     "call": "match?",
     "reason": "Include stand-in: `MySQL::DatabaseStatements#write_query?` is ported in the Rails-layout file `connection-adapters/mysql/database-statements.ts` (`isWriteQuery`, which does run `READ_QUERY.test(sql)`); the adapter method is the `include` resolution point and only delegates."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "dbconsole",
-    "call": "database_cli",
-    "reason": "Rails reads the cli name only to pass it to `find_cmd_and_exec` (abstract_mysql_adapter.rb); that PTY exec is Ruby-only and unported, so our `dbconsole` returns the arg list and never needs the lookup."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "type_cast",
-    "call": "default_timezone",
-    "reason": "Rails' MySQL type_cast branches on default_timezone inline (mysql/quoting.rb:100,106); trails' override delegates to mysql/quoting.ts typeCast, which reaches ActiveRecord.defaultTimezone via dispatchQuotedDate to quotedDate to defaultSqlTimezone()."
   }
 ]

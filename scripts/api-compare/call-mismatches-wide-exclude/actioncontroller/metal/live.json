@@ -23,13 +23,6 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/live.ts",
-    "rubyName": "before_committed",
-    "call": "write",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/live.ts",
     "rubyName": "call_on_error",
     "call": "call",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

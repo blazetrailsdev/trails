@@ -81,6 +81,99 @@ describe("Ruby extractor body call capture", () => {
   });
 });
 
+describe("Ruby extractor inert-receiver call suppression", () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+  // Returns a map of "<fqn>#<method>" -> { calls, weakCalls }.
+  function rubyWeakCalls(
+    fixtures: Record<string, string>,
+  ): Record<string, { calls?: string[]; weakCalls?: string[] }> {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "weak-rb-"));
+    try {
+      for (const [rel, src] of Object.entries(fixtures)) {
+        const p = path.join(dir, rel);
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, src);
+      }
+      const rels = JSON.stringify(Object.keys(fixtures));
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        JSON.parse(${JSON.stringify(rels)}).each do |rel|
+          ex.process_file(File.join(${JSON.stringify(dir)}, rel), ${JSON.stringify(dir)})
+        end
+        out = {}
+        ex.classes.each do |fqn, info|
+          (info[:instanceMethods] + info[:classMethods]).each do |m|
+            out["#{fqn}##{m[:name]}"] = { calls: m[:calls], weakCalls: m[:weakCalls] }
+          end
+        end
+        puts JSON.generate(out)
+      `;
+      const stdout = execFileSync("ruby", ["-e", driver], { encoding: "utf-8" });
+      return JSON.parse(stdout);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it("marks local-variable and literal receivers weak", () => {
+    const c = rubyWeakCalls({
+      "foo.rb": `
+        class Foo
+          def a(opts)
+            xs = [1]
+            xs.first
+            opts.fetch(:k)
+            {}.merge(other)
+            "s".upcase
+            :sym.to_proc
+            1.to_s
+          end
+        end
+      `,
+    });
+    expect(c["Foo#a"].weakCalls?.sort()).toEqual(
+      ["fetch", "first", "merge", "to_proc", "to_s", "upcase"].sort(),
+    );
+  });
+
+  it("still records self, ivar, constant and method-chain receivers", () => {
+    const c = rubyWeakCalls({
+      "bar.rb": `
+        class Bar
+          def b
+            self.save
+            @association.reader
+            Baz.build
+            owner.target.destroy
+          end
+        end
+      `,
+    });
+    expect(c["Bar#b"].calls).toEqual(
+      expect.arrayContaining(["save", "reader", "build", "destroy"]),
+    );
+    expect(c["Bar#b"].weakCalls ?? []).toEqual([]);
+  });
+
+  it("keeps a name significant when any occurrence has a live receiver", () => {
+    const c = rubyWeakCalls({
+      "baz.rb": `
+        class Baz
+          def c(list)
+            list.save
+            owner.save
+          end
+        end
+      `,
+    });
+    expect(c["Baz#c"].calls).toContain("save");
+    expect(c["Baz#c"].weakCalls ?? []).not.toContain("save");
+  });
+});
+
 describe("Ruby extractor alias arity resolution", () => {
   const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
 

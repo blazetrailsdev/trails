@@ -38,13 +38,6 @@
     "package": "abstractcontroller",
     "tsFile": "helpers.ts",
     "rubyName": "define_helpers_module",
-    "call": "include",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "abstractcontroller",
-    "tsFile": "helpers.ts",
-    "rubyName": "define_helpers_module",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -89,26 +82,5 @@
     "rubyName": "helper_method",
     "call": "map",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "abstractcontroller",
-    "tsFile": "helpers.ts",
-    "rubyName": "modules_for_helpers",
-    "call": "camelize",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "abstractcontroller",
-    "tsFile": "helpers.ts",
-    "rubyName": "modules_for_helpers",
-    "call": "flatten",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "abstractcontroller",
-    "tsFile": "helpers.ts",
-    "rubyName": "modules_for_helpers",
-    "call": "constantize",
-    "reason": "Equivalent (different path): modulesForHelpers resolves a helper name through the injected ResolutionOptions resolver (an explicit host-supplied lookup), not a global constant table, and raises the same `uninitialized constant <Name>` NameError shape Rails' constantize does."
   }
 ]

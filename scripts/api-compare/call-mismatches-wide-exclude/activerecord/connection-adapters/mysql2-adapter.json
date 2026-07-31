@@ -2,16 +2,16 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/mysql2-adapter.ts",
-    "rubyName": "connect",
-    "call": "new_client",
-    "reason": "Rails' private connect (mysql2_adapter.rb:144) is `@raw_connection = new_client(...)`; trails' connect() delegates to _ensureClient(), which calls Mysql2Adapter.newClient() (the new_client analog) — so the call is satisfied one frame down, not inlined here."
+    "rubyName": "configure_connection",
+    "call": "default_timezone",
+    "reason": "Rails sets query_options[:database_timezone] = default_timezone inline (mysql2_adapter.rb:160); trails keeps databaseTimezone current via _syncDatabaseTimezone(), which assigns ActiveRecord.defaultTimezone on every perform-query entry point instead."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/mysql2-adapter.ts",
     "rubyName": "connect",
-    "call": "set_pool",
-    "reason": "Rails' connect rescues ConnectionNotEstablished and re-raises `ex.set_pool(@pool)` (mysql2_adapter.rb:146-147); trails' connect() delegates to _ensureClient(), whose catch attaches the pool via translated.setPool(this.pool) — same set_pool behavior, one frame down."
+    "call": "new_client",
+    "reason": "Rails' private connect (mysql2_adapter.rb:144) is `@raw_connection = new_client(...)`; trails' connect() delegates to _ensureClient(), which calls Mysql2Adapter.newClient() (the new_client analog) — so the call is satisfied one frame down, not inlined here."
   },
   {
     "package": "activerecord",
@@ -45,13 +45,6 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/mysql2-adapter.ts",
     "rubyName": "new_client",
-    "call": "error_number",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/mysql2-adapter.ts",
-    "rubyName": "new_client",
     "call": "hostname_error",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -75,12 +68,5 @@
     "rubyName": "reconnect",
     "call": "synchronize",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/mysql2-adapter.ts",
-    "rubyName": "configure_connection",
-    "call": "default_timezone",
-    "reason": "Rails sets query_options[:database_timezone] = default_timezone inline (mysql2_adapter.rb:160); trails keeps databaseTimezone current via _syncDatabaseTimezone(), which assigns ActiveRecord.defaultTimezone on every perform-query entry point instead."
   }
 ]

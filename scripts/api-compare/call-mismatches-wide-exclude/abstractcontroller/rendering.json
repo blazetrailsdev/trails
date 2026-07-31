@@ -1,9 +1,0 @@
-[
-  {
-    "package": "abstractcontroller",
-    "tsFile": "rendering.ts",
-    "rubyName": "view_assigns",
-    "call": "slice",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  }
-]

@@ -51,13 +51,6 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/request-forgery-protection.ts",
-    "rubyName": "masked_authenticity_token",
-    "call": "values_at",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/request-forgery-protection.ts",
     "rubyName": "non_xhr_javascript_response?",
     "call": "match?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -74,13 +67,6 @@
     "tsFile": "metal/request-forgery-protection.ts",
     "rubyName": "normalize_action_path",
     "call": "parse",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/request-forgery-protection.ts",
-    "rubyName": "normalize_action_path",
-    "call": "relative?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -107,13 +93,6 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/request-forgery-protection.ts",
-    "rubyName": "per_form_csrf_token",
-    "call": "join",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/request-forgery-protection.ts",
     "rubyName": "reset",
     "call": "delete",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails request_forgery_protection.rb:328-330/361-363 call `session.delete`/`cookie_jar.delete`; trails request-forgery-protection.ts:138-140/160-162 use the JS `delete obj[key]` operator, which records no call."
@@ -123,20 +102,6 @@
     "tsFile": "metal/request-forgery-protection.ts",
     "rubyName": "reset_csrf_token",
     "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/request-forgery-protection.ts",
-    "rubyName": "skip_forgery_protection",
-    "call": "reverse_merge",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/request-forgery-protection.ts",
-    "rubyName": "valid_authenticity_token?",
-    "call": "empty?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

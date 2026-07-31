@@ -3,13 +3,6 @@
     "package": "activerecord",
     "tsFile": "querying.ts",
     "rubyName": "_load_from_sql",
-    "call": "includes_column?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "querying.ts",
-    "rubyName": "_load_from_sql",
     "call": "inheritance_column",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -30,22 +23,8 @@
   {
     "package": "activerecord",
     "tsFile": "querying.ts",
-    "rubyName": "_load_from_sql",
-    "call": "reject",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "querying.ts",
     "rubyName": "async_count_by_sql",
     "call": "sanitize_sql",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "querying.ts",
-    "rubyName": "async_count_by_sql",
-    "call": "select_value",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -60,13 +39,6 @@
     "tsFile": "querying.ts",
     "rubyName": "async_find_by_sql",
     "call": "with_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "querying.ts",
-    "rubyName": "count_by_sql",
-    "call": "select_value",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord-test-support",
-    "tsFile": "schema-dumping-helper.ts",
-    "rubyName": "dump_table_schema",
-    "call": "with_connection",
-    "reason": "Rails checks a connection out of the pool solely to read `connection.data_sources`. The trails helper takes the `SchemaSource` itself — the object that both enumerates data sources and is dumped — so there is no pool to check out of; the enumeration happens directly on `source`."
-  }
-]

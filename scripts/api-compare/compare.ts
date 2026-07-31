@@ -219,6 +219,24 @@ export const WIDE_SIGNIFICANT_CALLS: { has(value: string): boolean } = {
   has: (value) => value !== "super" && !WIDE_NO_JS_CALL_FORM.has(value),
 };
 
+/**
+ * Drop the extractor's inert-receiver call names (RFC 0083) from a Ruby
+ * call-set. WIDE runs only: the narrow RFC 0044 gate's population must not
+ * move, so a narrow run gets the raw set back unchanged. A name only reaches
+ * `weakCalls` when EVERY occurrence in the body sat on a local variable or a
+ * literal (`xs.first`, `opts.fetch`) — a single `owner.save` keeps `save`.
+ */
+export function dropWeakCalls(
+  calls: readonly string[] | undefined,
+  weakCalls: readonly string[] | undefined,
+  wideCalls: boolean,
+): string[] {
+  if (!calls) return [];
+  if (!wideCalls || !weakCalls || weakCalls.length === 0) return [...calls];
+  const weak = new Set(weakCalls);
+  return calls.filter((c) => !weak.has(c));
+}
+
 // Re-exported from the shared idiom table so existing importers (compare.test.ts,
 // the redundancy guard) keep resolving these names from compare.ts.
 export { JS_ENUMERABLE_ALIASES, jsEnumerableAliases, NEGATED_ALIASES, partitionNegatedCalls };
@@ -1562,6 +1580,9 @@ export function main() {
       const rubyOptionKeysByName = new Map<string, string[]>();
       // First-sighting Ruby body call-set per name (advisory calls-parity check).
       const rubyCallsByName = new Map<string, string[]>();
+      // Same first-sighting keying: the inert-receiver subset of that call-set
+      // (RFC 0083), subtracted in wide runs only.
+      const rubyWeakCallsByName = new Map<string, string[]>();
       // First-sighting Ruby body digest per name (source-hash pinning, RFC 0025).
       const rubyBodyDigestByName = new Map<string, string>();
       for (const item of items) {
@@ -1579,6 +1600,7 @@ export function main() {
           }
           if (rm.calls && !rubyCallsByName.has(rm.name)) {
             rubyCallsByName.set(rm.name, rm.calls);
+            rubyWeakCallsByName.set(rm.name, rm.weakCalls ?? []);
           }
           if (rm.bodyDigest && !rubyBodyDigestByName.has(rm.name)) {
             rubyBodyDigestByName.set(rm.name, rm.bodyDigest);
@@ -1633,8 +1655,12 @@ export function main() {
         // Narrow SIGNIFICANT_CALLS (RFC 0044) is activerecord-scoped; outside it
         // the same names collide as false positives (see narrowCallsApplies).
         if (!narrowCallsApplies(pkg, wideCalls)) return;
-        const rubyCalls = rubyCallsByName.get(rubyName);
-        if (!rubyCalls || rubyCalls.length === 0) return;
+        const rubyCalls = dropWeakCalls(
+          rubyCallsByName.get(rubyName),
+          rubyWeakCallsByName.get(rubyName),
+          wideCalls,
+        );
+        if (rubyCalls.length === 0) return;
         const tsCandidateSets = tsCallsByFileName.get(tsFile)?.get(tsName);
         if (!tsCandidateSets || tsCandidateSets.length === 0) return;
         // Delegation transparency: a one-line forwarder is compared against the

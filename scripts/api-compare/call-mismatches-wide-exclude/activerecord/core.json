@@ -2,9 +2,9 @@
   {
     "package": "activerecord",
     "tsFile": "core.ts",
-    "rubyName": "cached_find_by_statement",
-    "call": "compute_if_absent",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "rubyName": "application_record_class?",
+    "call": "application_record_class",
+    "reason": "`applicationRecordClassQ` is ported in inheritance.ts, not core.ts, and does read `ActiveRecord.applicationRecordClass` there; the omission is the file placement, not a missing call."
   },
   {
     "package": "activerecord",
@@ -26,13 +26,6 @@
     "rubyName": "connection_class?",
     "call": "connection_class",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails core.rb:234-236 delegates to the connection_class reader (core.rb:230-232); trails core.ts:535-539 is a combined accessor reading the `_connectionClass` field directly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
-    "rubyName": "connection_class_for_self",
-    "call": "connection_class?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -66,20 +59,6 @@
     "package": "activerecord",
     "tsFile": "core.ts",
     "rubyName": "find_by",
-    "call": "all?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
-    "rubyName": "find_by",
-    "call": "belongs_to?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
-    "rubyName": "find_by",
     "call": "cached_find_by",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -94,27 +73,6 @@
     "package": "activerecord",
     "tsFile": "core.ts",
     "rubyName": "find_by",
-    "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
-    "rubyName": "find_by",
-    "call": "id",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
-    "rubyName": "find_by",
-    "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
-    "rubyName": "find_by",
     "call": "reflect_on_aggregation",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -123,13 +81,6 @@
     "tsFile": "core.ts",
     "rubyName": "find_by",
     "call": "unsupported_value?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
-    "rubyName": "find_by",
-    "call": "values",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -163,29 +114,15 @@
   {
     "package": "activerecord",
     "tsFile": "core.ts",
+    "rubyName": "generated_association_methods",
+    "call": "private_constant",
+    "reason": "Rails hides the GeneratedAssociationMethods module constant; trails has no such constant to hide."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "core.ts",
     "rubyName": "init_attributes",
     "call": "deep_dup",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
-    "rubyName": "init_internals",
-    "call": "define_attribute_methods",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails core.rb:834-849 caches `klass.primary_key` into @primary_key and calls `klass.define_attribute_methods`; trails core.ts:753-771 initializes the same flags but reads primaryKey lazily from the class and defines attribute methods at declare() time — neither call appears in initInternals."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
-    "rubyName": "init_internals",
-    "call": "primary_key",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails core.rb:834-849 caches `klass.primary_key` into @primary_key and calls `klass.define_attribute_methods`; trails core.ts:753-771 initializes the same flags but reads primaryKey lazily from the class and defines attribute methods at declare() time — neither call appears in initInternals."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
-    "rubyName": "inspect_with_attributes",
-    "call": "filter_map",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -205,29 +142,8 @@
   {
     "package": "activerecord",
     "tsFile": "core.ts",
-    "rubyName": "strict_loading!",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
     "rubyName": "type_caster",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
-    "rubyName": "generated_association_methods",
-    "call": "private_constant",
-    "reason": "Rails hides the GeneratedAssociationMethods module constant; trails has no such constant to hide."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
-    "rubyName": "application_record_class?",
-    "call": "application_record_class",
-    "reason": "`applicationRecordClassQ` is ported in inheritance.ts, not core.ts, and does read `ActiveRecord.applicationRecordClass` there; the omission is the file placement, not a missing call."
   }
 ]

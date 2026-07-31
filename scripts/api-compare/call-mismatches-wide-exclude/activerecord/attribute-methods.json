@@ -52,21 +52,7 @@
     "package": "activerecord",
     "tsFile": "attribute-methods.ts",
     "rubyName": "attributes_for_create",
-    "call": "delete_if",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "attributes_for_create",
     "call": "id",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "attributes_for_update",
-    "call": "delete_if",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -109,13 +95,6 @@
     "tsFile": "attribute-methods.ts",
     "rubyName": "define_attribute_methods",
     "call": "synchronize",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "format_for_inspect",
-    "call": "to_fs",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -170,6 +149,13 @@
   {
     "package": "activerecord",
     "tsFile": "attribute-methods.ts",
+    "rubyName": "initialize_generated_modules",
+    "call": "private_constant",
+    "reason": "Rails hides the GeneratedAttributeMethods module constant; trails' generated attribute methods are not bound as a constant, so there is no visibility to set."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-methods.ts",
     "rubyName": "instance_method_already_implemented?",
     "call": "dangerous_attribute_method?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -207,13 +193,6 @@
     "tsFile": "attribute-methods.ts",
     "rubyName": "query_cast_attribute",
     "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "query_cast_attribute",
-    "call": "match?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -271,12 +250,5 @@
     "rubyName": "write_attribute",
     "call": "write_from_user",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "initialize_generated_modules",
-    "call": "private_constant",
-    "reason": "Rails hides the GeneratedAttributeMethods module constant; trails' generated attribute methods are not bound as a constant, so there is no visibility to set."
   }
 ]
