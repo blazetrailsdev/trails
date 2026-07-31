@@ -95,12 +95,8 @@ async function acquireAdvisorySlotPg(): Promise<number> {
     return g.__arAdvisorySlotPg;
   }
 
-  // Maintenance database, not the worker's own: advisory locks are server-wide,
-  // and a bootstrap session sitting inside the slot database would block the
-  // purge (DROP DATABASE fails with 55006 while a session is connected). Before
-  // the run token was stamped, slot 1 named the shared base database, so this
-  // connection landed in it — which is why slot 1 was excluded from the
-  // exclusive-database flag at all.
+  // A session inside the slot database would block that database's purge with
+  // PG error 55006, so hold the lock from the maintenance database instead.
   const { host, port, user, password } = postgresSettings();
   const client = new pg.Client({ host, port, user, password, database: "postgres" });
   await client.connect();
@@ -136,9 +132,7 @@ async function acquireAdvisorySlotMysql(): Promise<number> {
     return g.__arAdvisorySlotMysql;
   }
 
-  // No database selected, for the same reason as the PG path above: GET_LOCK is
-  // server-wide, and this session must not sit inside the database the worker
-  // purges.
+  // No database selected, for the same reason as the PG path above.
   const { host, port, user, password, socket } = mysqlSettings();
   const conn = await mysql.createConnection({
     host,
@@ -173,9 +167,8 @@ const lane = activeLane();
 if (lane === "postgres") {
   const slot = await acquireAdvisorySlotPg();
   process.env[SLOT_ENV] = String(slot);
-  // Owning the database — every stamped slot does, and only slots above 1 do
-  // when nothing was stamped — lets test-setup-dy.ts purge it before the schema
-  // load instead of dropping the tables in place.
+  // Owning the database lets test-setup-dy.ts purge it before the schema load
+  // instead of dropping the tables in place.
   if (ownsSlotDatabase()) process.env.AR_PG_EXCLUSIVE_DB = "1";
 }
 if (lane === "mysql") {

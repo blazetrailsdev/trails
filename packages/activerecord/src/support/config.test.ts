@@ -137,8 +137,6 @@ describe("config", () => {
   });
 
   it("owns the slot database on every stamped slot, slot 1 included", () => {
-    // The complement of applySlot: a stamped slot names a per-run, per-worker
-    // database, so no sibling worker and no other run shares it.
     const token = "aaax1";
     expect(ownsSlotDatabase(reader({ AR_DB_SLOT: "1", AR_TEST_RUN_TOKEN: token }))).toBe(true);
     expect(ownsSlotDatabase(reader({ AR_DB_SLOT: "4", AR_TEST_RUN_TOKEN: token }))).toBe(true);
@@ -146,12 +144,11 @@ describe("config", () => {
   });
 
   it("does not own the slot database on an unstamped slot 1", () => {
-    // Without a run token applySlot leaves slot 1 pointing at the shared base
-    // database, which other consumers point at too — purging it is not safe.
     expect(ownsSlotDatabase(reader({ AR_DB_SLOT: "1" }))).toBe(false);
     expect(ownsSlotDatabase(reader({}))).toBe(false);
     expect(ownsSlotDatabase(reader({ AR_DB_SLOT: "1", AR_TEST_RUN_TOKEN: "" }))).toBe(false);
     expect(ownsSlotDatabase(reader({ AR_DB_SLOT: "2" }))).toBe(true);
+    expect(() => ownsSlotDatabase(reader({ AR_DB_SLOT: "0" }))).toThrow(/must be >= 1/);
   });
 
   it("stamps the run token into the database name, slot 1 included", () => {

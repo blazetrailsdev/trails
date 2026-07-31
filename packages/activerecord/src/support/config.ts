@@ -144,15 +144,20 @@ export interface ServerSettings {
  */
 export const SLOT_ENV = "AR_DB_SLOT";
 
-function applySlot(database: string, read: EnvReader): string {
-  // A malformed slot must never silently degrade to the shared base database —
-  // that is precisely the cross-worker collision slots exist to prevent, and it
-  // would surface later as an unrelated DDL or fixture failure.
+// A malformed slot must never silently degrade to the shared base database —
+// that is precisely the cross-worker collision slots exist to prevent, and it
+// would surface later as an unrelated DDL or fixture failure.
+function slotNumber(read: EnvReader): number {
   const slot = intSetting(read, SLOT_ENV, 1);
   if (slot < 1) {
     // eslint-disable-next-line blazetrails/rails-error-parity
     throw new Error(`${SLOT_ENV} must be >= 1, got ${slot}`);
   }
+  return slot;
+}
+
+function applySlot(database: string, read: EnvReader): string {
+  const slot = slotNumber(read);
   const runToken = present(read, RUN_TOKEN_ENV);
   // No run token means `globalSetup` provisioned nothing — a bare adapter
   // script or a harness-less connection. There is no per-run database to point
@@ -162,19 +167,11 @@ function applySlot(database: string, read: EnvReader): string {
 }
 
 /**
- * Whether this worker's database is its own — no sibling worker and no other
- * run shares it — which is what licenses the purge-and-reload setup path in
- * `test-setup-dy.ts` instead of dropping the tables in place.
- *
- * This is the exact complement of {@link applySlot}: with a run token stamped,
- * every slot (slot 1 included) gets a `<base>_<runToken>_<slot>` database of
- * its own; without one, `applySlot` falls back to the shared base database for
- * slot 1, which the bootstrap connection and any harness-less consumer also
- * point at. Reading the same two env vars keeps the two answers from drifting.
+ * Whether {@link applySlot} named a database this worker alone owns: every slot
+ * once a run token is stamped, only slots above 1 without one.
  */
 export function ownsSlotDatabase(read: EnvReader = getEnv): boolean {
-  const slot = intSetting(read, SLOT_ENV, 1);
-  return slot > 1 || present(read, RUN_TOKEN_ENV) !== undefined;
+  return slotNumber(read) > 1 || present(read, RUN_TOKEN_ENV) !== undefined;
 }
 
 /**
