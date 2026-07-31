@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { parse as parseYaml } from "yaml";
 
 const execFileAsync = promisify(execFile);
 
@@ -273,6 +274,44 @@ describe("CI runs every tooling test suite", () => {
     );
     expect(runs.filter((f) => outcome[f] !== "true")).toEqual([]);
     expect(skips.filter((f) => outcome[f] !== "false")).toEqual([]);
+  });
+
+  it("keeps the draft deferral, its two jobs and the ci aggregate in agreement", async () => {
+    const wf = parseYaml(await readFile(CI_YML, "utf8"));
+    const gateOf = (job: string): string => wf.jobs[job].if.replace(/\s+/g, " ").trim();
+
+    // Drift between the pair would leave one adapter deferred and the other
+    // not, which no single-job assertion would catch.
+    expect(gateOf("postgres-tests")).toBe(gateOf("maria-tests"));
+
+    // A draft-deferred job that never sees the ready flip would let a PR reach
+    // ready with no adapter coverage and no event left to start it.
+    expect(gateOf("postgres-tests")).toContain("github.event.pull_request.draft");
+    expect(wf.on.pull_request.types).toContain("ready_for_review");
+
+    // The aggregate's skip allow-list has to recognise exactly the conditions
+    // the jobs skip under; a narrower one wedges every draft PR on
+    // "unexpectedly skipped", a wider one passes a genuinely missing suite.
+    // The two are written at opposite polarity — the job lists what opts a
+    // draft back IN, the aggregate states when the suites were deferred — so
+    // each clause is pinned on both sides rather than compared textually.
+    const deferred = wf.jobs.ci.steps[0].env.DB_ADAPTERS_DRAFT_DEFERRED.replace(/\s+/g, " ");
+    const optIn = gateOf("postgres-tests");
+    for (const [jobClause, aggregateClause] of [
+      ["github.event_name != 'pull_request'", "github.event_name == 'pull_request'"],
+      ["github.event.pull_request.draft == false", "github.event.pull_request.draft &&"],
+      [
+        "needs.changes.outputs.db_adapter_affected == 'true'",
+        "needs.changes.outputs.db_adapter_affected != 'true'",
+      ],
+      [
+        "contains(github.event.pull_request.labels.*.name, 'run-db-adapters')",
+        "!contains(github.event.pull_request.labels.*.name, 'run-db-adapters')",
+      ],
+    ]) {
+      expect(optIn).toContain(jobClause);
+      expect(deferred).toContain(aggregateClause);
+    }
   });
 
   it("keeps comparison_affected off for website-only changes", async () => {
