@@ -144,21 +144,34 @@ export interface ServerSettings {
  */
 export const SLOT_ENV = "AR_DB_SLOT";
 
-function applySlot(database: string, read: EnvReader): string {
-  // A malformed slot must never silently degrade to the shared base database —
-  // that is precisely the cross-worker collision slots exist to prevent, and it
-  // would surface later as an unrelated DDL or fixture failure.
+// A malformed slot must never silently degrade to the shared base database —
+// that is precisely the cross-worker collision slots exist to prevent, and it
+// would surface later as an unrelated DDL or fixture failure.
+function slotNumber(read: EnvReader): number {
   const slot = intSetting(read, SLOT_ENV, 1);
   if (slot < 1) {
     // eslint-disable-next-line blazetrails/rails-error-parity
     throw new Error(`${SLOT_ENV} must be >= 1, got ${slot}`);
   }
+  return slot;
+}
+
+function applySlot(database: string, read: EnvReader): string {
+  const slot = slotNumber(read);
   const runToken = present(read, RUN_TOKEN_ENV);
   // No run token means `globalSetup` provisioned nothing — a bare adapter
   // script or a harness-less connection. There is no per-run database to point
   // at, so the historical shared-base-plus-`_N` naming stands.
   if (runToken === undefined) return slot > 1 ? `${database}_${slot}` : database;
   return slotDatabaseName(database, runToken, slot);
+}
+
+/**
+ * Whether {@link applySlot} named a database this worker alone owns: every slot
+ * once a run token is stamped, only slots above 1 without one.
+ */
+export function ownsSlotDatabase(read: EnvReader = getEnv): boolean {
+  return slotNumber(read) > 1 || present(read, RUN_TOKEN_ENV) !== undefined;
 }
 
 /**

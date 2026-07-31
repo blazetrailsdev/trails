@@ -5,6 +5,7 @@ import {
   mysqlPreparedStatements,
   mysqlSettings,
   mysqlUrl,
+  ownsSlotDatabase,
   postgresSettings,
   postgresUrl,
   sqliteSiblingDatabase,
@@ -133,6 +134,21 @@ describe("config", () => {
     expect(postgresSettings(reader({ AR_DB_SLOT: "1" })).database).toBe("activerecord_unittest");
     expect(postgresSettings(reader({ AR_DB_SLOT: "4" })).database).toBe("activerecord_unittest_4");
     expect(mysqlSettings(reader({ AR_DB_SLOT: "2" })).database).toBe("activerecord_unittest_2");
+  });
+
+  it("owns the slot database on every stamped slot, slot 1 included", () => {
+    const token = "aaax1";
+    expect(ownsSlotDatabase(reader({ AR_DB_SLOT: "1", AR_TEST_RUN_TOKEN: token }))).toBe(true);
+    expect(ownsSlotDatabase(reader({ AR_DB_SLOT: "4", AR_TEST_RUN_TOKEN: token }))).toBe(true);
+    expect(ownsSlotDatabase(reader({ AR_TEST_RUN_TOKEN: token }))).toBe(true);
+  });
+
+  it("does not own the slot database on an unstamped slot 1", () => {
+    expect(ownsSlotDatabase(reader({ AR_DB_SLOT: "1" }))).toBe(false);
+    expect(ownsSlotDatabase(reader({}))).toBe(false);
+    expect(ownsSlotDatabase(reader({ AR_DB_SLOT: "1", AR_TEST_RUN_TOKEN: "" }))).toBe(false);
+    expect(ownsSlotDatabase(reader({ AR_DB_SLOT: "2" }))).toBe(true);
+    expect(() => ownsSlotDatabase(reader({ AR_DB_SLOT: "0" }))).toThrow(/must be >= 1/);
   });
 
   it("stamps the run token into the database name, slot 1 included", () => {
