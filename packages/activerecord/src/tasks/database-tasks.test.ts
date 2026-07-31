@@ -311,7 +311,7 @@ describe("DatabaseTasksCreateAllTest", () => {
   let created: string[];
   beforeEach(() => {
     created = [];
-    DatabaseTasks.registerTask("sqlite", {
+    DatabaseTasks.registerTask("abstract", {
       create: async (config) => {
         created.push(config.database ?? "unknown");
       },
@@ -325,7 +325,7 @@ describe("DatabaseTasksCreateAllTest", () => {
 
   it("ignores configurations without databases", async () => {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "sqlite3" },
+      development: { adapter: "abstract" },
     });
     await DatabaseTasks.createAll();
     expect(created).toHaveLength(0);
@@ -333,7 +333,7 @@ describe("DatabaseTasksCreateAllTest", () => {
 
   it("ignores remote databases", async () => {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "sqlite3", database: "dev.db", host: "my.server.tld" },
+      development: { adapter: "abstract", database: "my-db", host: "my.server.tld" },
     });
     vi.spyOn(stderr, "write").mockImplementation(() => true);
     await DatabaseTasks.createAll();
@@ -341,7 +341,7 @@ describe("DatabaseTasksCreateAllTest", () => {
   });
   it("warning for remote databases", async () => {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "sqlite3", database: "dev.db", host: "my.server.tld" },
+      development: { adapter: "abstract", database: "my-db", host: "my.server.tld" },
     });
     const writes: string[] = [];
     vi.spyOn(stderr, "write").mockImplementation((chunk) => {
@@ -350,32 +350,32 @@ describe("DatabaseTasksCreateAllTest", () => {
     });
     await DatabaseTasks.createAll();
     expect(writes.join("")).toMatch(
-      /This task only modifies local databases\. dev\.db is on a remote host\./,
+      /This task only modifies local databases\. my-db is on a remote host\./,
     );
   });
 
   it("creates configurations with local ip", async () => {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "sqlite3", database: "dev.db", host: "127.0.0.1" },
+      development: { adapter: "abstract", database: "my-db", host: "127.0.0.1" },
     });
     await DatabaseTasks.createAll();
-    expect(created).toContain("dev.db");
+    expect(created).toContain("my-db");
   });
 
   it("creates configurations with local host", async () => {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "sqlite3", database: "dev.db", host: "localhost" },
+      development: { adapter: "abstract", database: "my-db", host: "localhost" },
     });
     await DatabaseTasks.createAll();
-    expect(created).toContain("dev.db");
+    expect(created).toContain("my-db");
   });
 
   it("creates configurations with blank hosts", async () => {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "sqlite3", database: "dev.db", host: "" },
+      development: { adapter: "abstract", database: "my-db", host: "" },
     });
     await DatabaseTasks.createAll();
-    expect(created).toContain("dev.db");
+    expect(created).toContain("my-db");
   });
 });
 
@@ -388,15 +388,15 @@ describe("DatabaseTasksCreateCurrentTest", () => {
   beforeEach(() => {
     created = [];
     establishSpy = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined);
-    DatabaseTasks.registerTask("sqlite", {
+    DatabaseTasks.registerTask("abstract", {
       create: async (config) => {
         created.push(`${config.envName}:${config.database}`);
       },
     });
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "sqlite3", database: "dev.db" },
-      test: { adapter: "sqlite3", database: "test.db" },
-      production: { url: "sqlite3://prod-db-host/prod-db" },
+      development: { adapter: "abstract", database: "dev-db" },
+      test: { adapter: "abstract", database: "test-db" },
+      production: { url: "abstract://prod-db-host/prod-db" },
     });
   });
   afterEach(() => {
@@ -409,20 +409,20 @@ describe("DatabaseTasksCreateCurrentTest", () => {
   it("creates current environment database", async () => {
     DatabaseTasks.env = "test";
     await DatabaseTasks.createCurrent("test");
-    expect(created).toContain("test:test.db");
+    expect(created).toContain("test:test-db");
   });
 
   it("creates current environment database with url", async () => {
     DatabaseTasks.env = "production";
     await DatabaseTasks.createCurrent("production");
-    expect(created).toContain("production:/prod-db");
+    expect(created).toContain("production:prod-db");
   });
 
   it("creates test and development databases when env was not specified", async () => {
     DatabaseTasks.env = "development";
     await DatabaseTasks.createCurrent();
-    expect(created).toContain("development:dev.db");
-    expect(created).toContain("test:test.db");
+    expect(created).toContain("development:dev-db");
+    expect(created).toContain("test:test-db");
   });
 
   it("creates test and development databases when rails env is development", async () => {
@@ -437,7 +437,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
     try {
       DatabaseTasks.env = "development";
       await DatabaseTasks.createCurrent();
-      expect(created).toContain("development:dev.db");
+      expect(created).toContain("development:dev-db");
       expect(created.some((c) => c.startsWith("test:"))).toBe(false);
     } finally {
       if (prev === undefined) delete process.env.SKIP_TEST_DATABASE;
@@ -448,8 +448,8 @@ describe("DatabaseTasksCreateCurrentTest", () => {
     await DatabaseTasks.createCurrent("development");
     expect(establishSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        adapter: "sqlite3",
-        database: "dev.db",
+        adapter: "abstract",
+        database: "dev-db",
       }),
     );
   });
@@ -464,22 +464,23 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
   beforeEach(() => {
     created = [];
     establishSpy = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined);
-    DatabaseTasks.registerTask("sqlite", {
+    DatabaseTasks.registerTask("abstract", {
       create: async (config) => {
         created.push(`${config.envName}:${config.name}:${config.database}`);
       },
     });
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       development: {
-        primary: { adapter: "sqlite3", database: "dev_primary.db" },
-        animals: { adapter: "sqlite3", database: "dev_animals.db" },
+        primary: { adapter: "abstract", database: "dev-db" },
+        secondary: { adapter: "abstract", database: "secondary-dev-db" },
       },
       test: {
-        primary: { adapter: "sqlite3", database: "test_primary.db" },
+        primary: { adapter: "abstract", database: "test-db" },
+        secondary: { adapter: "abstract", database: "secondary-test-db" },
       },
       production: {
-        primary: { url: "sqlite3://prod-db-host/prod-db" },
-        secondary: { url: "sqlite3://secondary-prod-db-host/secondary-prod-db" },
+        primary: { url: "abstract://prod-db-host/prod-db" },
+        secondary: { url: "abstract://secondary-prod-db-host/secondary-prod-db" },
       },
     });
   });
@@ -493,21 +494,22 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
   it("creates current environment database", async () => {
     DatabaseTasks.env = "test";
     await DatabaseTasks.createCurrent("test");
-    expect(created).toHaveLength(1);
-    expect(created[0]).toContain("test");
+    expect(created).toHaveLength(2);
+    expect(created).toContain("test:primary:test-db");
+    expect(created).toContain("test:secondary:secondary-test-db");
   });
 
   it("creates current environment database with url", async () => {
     DatabaseTasks.env = "production";
     await DatabaseTasks.createCurrent("production");
-    expect(created).toContain("production:primary:/prod-db");
-    expect(created).toContain("production:secondary:/secondary-prod-db");
+    expect(created).toContain("production:primary:prod-db");
+    expect(created).toContain("production:secondary:secondary-prod-db");
   });
 
   it("creates test and development databases when env was not specified", async () => {
     DatabaseTasks.env = "development";
     await DatabaseTasks.createCurrent();
-    expect(created.length).toBe(3);
+    expect(created.length).toBe(4);
   });
 
   it("creates test and development databases when rails env is development", async () => {
@@ -521,8 +523,8 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
     await DatabaseTasks.createCurrent("development");
     expect(establishSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        adapter: "sqlite3",
-        database: "dev_primary.db",
+        adapter: "abstract",
+        database: "dev-db",
       }),
     );
   });
@@ -608,15 +610,15 @@ describe("DatabaseTasksDropCurrentTest", () => {
   let dropped: string[];
   beforeEach(() => {
     dropped = [];
-    DatabaseTasks.registerTask("sqlite", {
+    DatabaseTasks.registerTask("abstract", {
       drop: async (config) => {
         dropped.push(`${config.envName}:${config.database}`);
       },
     });
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "sqlite3", database: "dev.db" },
-      test: { adapter: "sqlite3", database: "test.db" },
-      production: { url: "sqlite3://prod-db-host/prod-db" },
+      development: { adapter: "abstract", database: "dev-db" },
+      test: { adapter: "abstract", database: "test-db" },
+      production: { url: "abstract://prod-db-host/prod-db" },
     });
   });
   afterEach(() => {
@@ -628,7 +630,7 @@ describe("DatabaseTasksDropCurrentTest", () => {
   it("drops current environment database", async () => {
     DatabaseTasks.env = "test";
     await DatabaseTasks.dropCurrent("test");
-    expect(dropped).toContain("test:test.db");
+    expect(dropped).toContain("test:test-db");
   });
 
   it("drops current environment database with url", async () => {
@@ -637,7 +639,7 @@ describe("DatabaseTasksDropCurrentTest", () => {
     try {
       DatabaseTasks.env = "production";
       await DatabaseTasks.dropCurrent("production");
-      expect(dropped).toContain("production:/prod-db");
+      expect(dropped).toContain("production:prod-db");
     } finally {
       if (prev === undefined) delete process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK;
       else process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK = prev;
@@ -664,22 +666,23 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
   let dropped: string[];
   beforeEach(() => {
     dropped = [];
-    DatabaseTasks.registerTask("sqlite", {
+    DatabaseTasks.registerTask("abstract", {
       drop: async (config) => {
         dropped.push(`${config.envName}:${config.name}`);
       },
     });
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       development: {
-        primary: { adapter: "sqlite3", database: "dev.db" },
-        animals: { adapter: "sqlite3", database: "dev_animals.db" },
+        primary: { adapter: "abstract", database: "dev-db" },
+        secondary: { adapter: "abstract", database: "secondary-dev-db" },
       },
       test: {
-        primary: { adapter: "sqlite3", database: "test.db" },
+        primary: { adapter: "abstract", database: "test-db" },
+        secondary: { adapter: "abstract", database: "secondary-test-db" },
       },
       production: {
-        primary: { url: "sqlite3://prod-db-host/prod-db" },
-        secondary: { url: "sqlite3://secondary-prod-db-host/secondary-prod-db" },
+        primary: { url: "abstract://prod-db-host/prod-db" },
+        secondary: { url: "abstract://secondary-prod-db-host/secondary-prod-db" },
       },
     });
   });
@@ -692,7 +695,7 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
   it("drops current environment database", async () => {
     DatabaseTasks.env = "test";
     await DatabaseTasks.dropCurrent("test");
-    expect(dropped).toHaveLength(1);
+    expect(dropped).toHaveLength(2);
   });
 
   it("drops current environment database with url", async () => {
@@ -712,7 +715,7 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
   it("drops test and development databases when env was not specified", async () => {
     DatabaseTasks.env = "development";
     await DatabaseTasks.dropCurrent();
-    expect(dropped.length).toBe(3);
+    expect(dropped.length).toBe(4);
   });
 
   it("drops testand development databases when rails env is development", async () => {
@@ -1056,13 +1059,13 @@ describe("DatabaseTasksPurgeCurrentTest", () => {
 
   it("purges current environment database", async () => {
     let purged = false;
-    DatabaseTasks.registerTask("sqlite", {
+    DatabaseTasks.registerTask("abstract", {
       purge: async () => {
         purged = true;
       },
     });
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      test: { adapter: "sqlite3", database: "test.db" },
+      test: { adapter: "abstract", database: "test-db" },
     });
     DatabaseTasks.env = "test";
     await DatabaseTasks.purgeCurrent("test");
@@ -1078,14 +1081,14 @@ describe("DatabaseTasksPurgeAllTest", () => {
 
   it("purge all local configurations", async () => {
     const purged: string[] = [];
-    DatabaseTasks.registerTask("sqlite", {
+    DatabaseTasks.registerTask("abstract", {
       purge: async (config) => {
         purged.push(config.database ?? "");
       },
     });
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "sqlite3", database: "dev.db", host: "localhost" },
-      test: { adapter: "sqlite3", database: "test.db", host: "localhost" },
+      development: { adapter: "abstract", database: "dev-db", host: "localhost" },
+      test: { adapter: "abstract", database: "test-db", host: "localhost" },
     });
     await DatabaseTasks.purgeAll();
     expect(purged.length).toBe(2);
@@ -1101,13 +1104,13 @@ describe("DatabaseTasksTruncateAllTest", () => {
 
   it("truncate tables", async () => {
     let truncated = false;
-    DatabaseTasks.registerTask("sqlite", {
+    DatabaseTasks.registerTask("abstract", {
       truncateAll: async () => {
         truncated = true;
       },
     });
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      test: { adapter: "sqlite3", database: "test.db" },
+      test: { adapter: "abstract", database: "test-db" },
     });
     DatabaseTasks.env = "test";
     await DatabaseTasks.truncateAll("test");
@@ -1119,7 +1122,7 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
   let truncated: string[];
   beforeEach(() => {
     truncated = [];
-    DatabaseTasks.registerTask("sqlite", {
+    DatabaseTasks.registerTask("abstract", {
       truncateAll: async (config) => {
         truncated.push(`${config.envName}:${config.database}`);
       },
@@ -1134,8 +1137,8 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
   it("truncate all databases for environment", async () => {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       test: {
-        primary: { adapter: "sqlite3", database: "test.db" },
-        animals: { adapter: "sqlite3", database: "test_animals.db" },
+        primary: { adapter: "abstract", database: "test-db" },
+        secondary: { adapter: "abstract", database: "secondary-test-db" },
       },
     });
     await DatabaseTasks.truncateAll("test");
@@ -1145,16 +1148,16 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
   it("truncate all databases with url for environment", async () => {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       production: {
-        primary: { url: "sqlite3://prod-db-host/prod-db" },
-        secondary: { url: "sqlite3://secondary-prod-db-host/secondary-prod-db" },
+        primary: { url: "abstract://prod-db-host/prod-db" },
+        secondary: { url: "abstract://secondary-prod-db-host/secondary-prod-db" },
       },
     });
     const prev = process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK;
     process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK = "1";
     try {
       await DatabaseTasks.truncateAll("production");
-      expect(truncated).toContain("production:/prod-db");
-      expect(truncated).toContain("production:/secondary-prod-db");
+      expect(truncated).toContain("production:prod-db");
+      expect(truncated).toContain("production:secondary-prod-db");
     } finally {
       if (prev === undefined) delete process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK;
       else process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK = prev;
@@ -1163,7 +1166,7 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
 
   it("truncate all development databases when env is not specified", async () => {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "sqlite3", database: "dev.db" },
+      development: { adapter: "abstract", database: "dev-db" },
     });
     DatabaseTasks.env = "development";
     await DatabaseTasks.truncateAll();
@@ -1172,7 +1175,7 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
 
   it("truncate all development databases when env is development", async () => {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      development: { adapter: "sqlite3", database: "dev.db" },
+      development: { adapter: "abstract", database: "dev-db" },
     });
     DatabaseTasks.env = "development";
     await DatabaseTasks.truncateAll();
@@ -1188,11 +1191,11 @@ describe("DatabaseTasksCharsetTest", () => {
   });
 
   it("charset current", async () => {
-    DatabaseTasks.registerTask("sqlite", {
+    DatabaseTasks.registerTask("abstract", {
       charset: async () => "utf8",
     });
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      test: { adapter: "sqlite3", database: "test.db" },
+      test: { adapter: "abstract", database: "test-db" },
     });
     DatabaseTasks.env = "test";
     const result = await DatabaseTasks.charsetCurrent("test");
@@ -1208,11 +1211,11 @@ describe("DatabaseTasksCollationTest", () => {
   });
 
   it("collation current", async () => {
-    DatabaseTasks.registerTask("sqlite", {
+    DatabaseTasks.registerTask("abstract", {
       collation: async () => "utf8_general_ci",
     });
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      test: { adapter: "sqlite3", database: "test.db" },
+      test: { adapter: "abstract", database: "test-db" },
     });
     DatabaseTasks.env = "test";
     const result = await DatabaseTasks.collationCurrent("test");
