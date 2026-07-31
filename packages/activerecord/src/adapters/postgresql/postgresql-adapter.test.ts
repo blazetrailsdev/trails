@@ -213,9 +213,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("database exists returns false when the database does not exist", async () => {
-      // Rails: `{ database: "non_extant_database", adapter: "postgresql" }`.
-      // trails has no configuration registry to inherit host/user from, so the
-      // suite URL carries them and only the database name is swapped.
       const url = new URL(PG_TEST_URL);
       url.pathname = "/non_extant_database";
       expect(await PostgreSQLAdapter.databaseExists(url.toString())).toBe(false);

@@ -1519,12 +1519,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * existence check has to ask about.
    */
   override async databaseExists(): Promise<boolean> {
-    if (this._memoryDatabase) return true;
-    try {
-      return await getFs().exists(this._filename);
-    } catch {
-      return false;
-    }
+    return this._memoryDatabase || (await getFs().exists(this._filename));
   }
 
   static newClient(

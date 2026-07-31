@@ -90,8 +90,6 @@ describe("AbstractAdapter connection lifecycle privates", () => {
 describe("AbstractAdapter#databaseExists", () => {
   it("proves the database by connecting, not by a cached handle", async () => {
     const a = new AbstractAdapter();
-    // Never connected: Rails' `connect!` succeeds against a live database, so
-    // the answer is true even though `_connection` is still null.
     expect((a as any)._connection).toBe(null);
     expect(await a.databaseExists()).toBe(true);
   });
@@ -101,7 +99,6 @@ describe("AbstractAdapter#databaseExists", () => {
     a.connectBang = async () => {
       throw new NoDatabaseError("no such database");
     };
-    // A stale cached handle must not make this answer true.
     (a as any)._connection = {};
     expect(await a.databaseExists()).toBe(false);
   });
