@@ -56,10 +56,10 @@ describe("build_joins from(subquery) dedup", () => {
 
   // Exercise the conditions the `pureLeftOuter` guard adds beyond a naive
   // "left-outer only" check: a cross-klass `.merge` pushes an OuterJoin
-  // JoinDependency into `_leftOuterJoinDeps` (merger.ts mergeOuterJoins). The
-  // guard does NOT gate on that array — emitJoinPlan emits merged deps directly
-  // from `this` regardless of branch — so the short-circuit must still emit BOTH
-  // the base left-outer join AND the merged one, identically to the subquery path.
+  // JoinDependency into `leftOuterJoinsValues` (merger.rb merge_outer_joins),
+  // where `selectNamedJoins` stashes it like any other. The short-circuit must
+  // still emit BOTH the base left-outer join AND the merged one, identically to
+  // the subquery path.
   it("emits cross-klass merged left_outer_joins on the live path like the from-subquery path", () => {
     const build = () => Post.leftOuterJoins("comments").merge(Comment.leftOuterJoins("post"));
     const liveSql = (build() as unknown as { toSql(): string }).toSql();

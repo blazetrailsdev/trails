@@ -7,6 +7,7 @@ import { AliasTracker, aliasedArelTableForReflection } from "./alias-tracker.js"
 import { polymorphicName } from "../inheritance.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { routeThroughCheckValidity } from "./validate-through-reflection.js";
+import { JoinDependency } from "./join-dependency.js";
 import { constructJoinDependency, structuralUnionEq } from "../relation/query-methods.js";
 
 /**
@@ -1010,8 +1011,6 @@ export class AssociationScope {
       _joinClauses?: unknown[];
       _namedInnerJoins?: unknown[];
       _leftOuterJoinsValues?: unknown[];
-      _namedInnerJoinDeps?: unknown[];
-      _leftOuterJoinDeps?: unknown[];
       _includesAssociations?: unknown[];
       _eagerLoadAssociations?: unknown[];
       _modelClass?: typeof Base;
@@ -1024,8 +1023,6 @@ export class AssociationScope {
       _joinClauses: unknown[];
       _namedInnerJoins: unknown[];
       _leftOuterJoinsValues: unknown[];
-      _namedInnerJoinDeps: unknown[];
-      _leftOuterJoinDeps: unknown[];
       _modelClass?: typeof Base;
     };
     const sameKlass = item._modelClass !== undefined && item._modelClass === target._modelClass;
@@ -1034,36 +1031,35 @@ export class AssociationScope {
     // cross-klass JoinDependencies (Merger#merge_joins / #merge_outer_joins).
     for (const jc of item._joinClauses ?? []) target._joinClauses.push(jc);
     for (const jv of item._joinValues ?? []) target._joinsValues.push(jv);
-    const namedInner = item._namedInnerJoins ?? [];
+    const namedInner = (item._namedInnerJoins ?? []).filter((v) => !(v instanceof JoinDependency));
+    const innerDeps = (item._namedInnerJoins ?? []).filter((v) => v instanceof JoinDependency);
     if (namedInner.length > 0) {
       if (sameKlass) {
         for (const v of namedInner)
           if (!target._namedInnerJoins.includes(v)) target._joinsValues.push(v);
       } else {
-        target._namedInnerJoinDeps.push(
+        target._joinsValues.push(
           constructJoinDependency.call(item as never, namedInner as never, Nodes.InnerJoin),
         );
       }
     }
-    const namedLeft = item._leftOuterJoinsValues ?? [];
+    target._joinsValues.push(...innerDeps);
+    const namedLeft = (item._leftOuterJoinsValues ?? []).filter(
+      (v) => !(v instanceof JoinDependency),
+    );
+    const leftDeps = (item._leftOuterJoinsValues ?? []).filter((v) => v instanceof JoinDependency);
     if (namedLeft.length > 0) {
       if (sameKlass) {
         for (const v of namedLeft)
           if (!target._leftOuterJoinsValues.some((seen: unknown) => structuralUnionEq(seen, v)))
             target._leftOuterJoinsValues.push(v);
       } else {
-        target._leftOuterJoinDeps.push(
+        target._leftOuterJoinsValues.push(
           constructJoinDependency.call(item as never, namedLeft as never, Nodes.OuterJoin),
         );
       }
     }
-    // Carry forward any cross-klass JoinDependencies the item already
-    // accumulated from an earlier `.merge()` (e.g. a nested through-scope-of-a-
-    // through-scope). Rails routes `merge! item.only(:joins, :left_outer_joins)`
-    // through the same Merger, whose merge_joins / merge_outer_joins forward
-    // `other._namedInnerJoinDeps` / `other._leftOuterJoinDeps` (merger.ts:127,149).
-    target._namedInnerJoinDeps.push(...(item._namedInnerJoinDeps ?? []));
-    target._leftOuterJoinDeps.push(...(item._leftOuterJoinDeps ?? []));
+    target._leftOuterJoinsValues.push(...leftDeps);
     // associations = eager_load_values | includes_values → OuterJoin. Rails'
     // `|` unions with dedup, so an association named in BOTH eager_load and
     // includes yields a single JoinDependency entry (not a double join).
@@ -1071,7 +1067,7 @@ export class AssociationScope {
       ...new Set([...(item._eagerLoadAssociations ?? []), ...(item._includesAssociations ?? [])]),
     ];
     if (associations.length > 0) {
-      target._leftOuterJoinDeps.push(
+      target._leftOuterJoinsValues.push(
         constructJoinDependency.call(item as never, associations as never, Nodes.OuterJoin),
       );
     }

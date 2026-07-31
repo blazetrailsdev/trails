@@ -433,6 +433,7 @@ export class Relation<T extends Base> {
     return (
       _isPlainObject(v) ||
       typeof v === "symbol" ||
+      v instanceof JoinDependency ||
       (typeof v === "string" && this._isAssociationName(v))
     );
   }
@@ -449,14 +450,6 @@ export class Relation<T extends Base> {
   get _joinValues(): (string | Nodes.Join)[] {
     return this._joinsValues.filter((v) => !this._isNamedJoinValue(v)) as (string | Nodes.Join)[];
   }
-  // Pre-built InnerJoin JoinDependencies from a cross-klass `merge` (Rails
-  // merge_joins builds these against `other.klass` since the association names
-  // can't resolve on the receiver's model).
-  private _namedInnerJoinDeps: JoinDependency[] = [];
-  // Pre-built OuterJoin JoinDependencies from a cross-klass `merge` (Rails
-  // merge_outer_joins builds these against `other.klass` since the left-outer
-  // association names can't resolve on the receiver's model).
-  private _leftOuterJoinDeps: JoinDependency[] = [];
   private _includesAssociations: AssociationSpec[] = [];
   private _preloadAssociations: AssociationSpec[] = [];
   private _eagerLoadAssociations: AssociationSpec[] = [];
@@ -3289,9 +3282,7 @@ export class Relation<T extends Base> {
       manager.joinSourceCount > 0 ||
       this._eagerLoadAssociations.length > 0 ||
       this._leftOuterJoinsValues.length > 0 ||
-      this._namedInnerJoins.length > 0 ||
-      this._namedInnerJoinDeps.length > 0 ||
-      this._leftOuterJoinDeps.length > 0;
+      this._namedInnerJoins.length > 0;
     const leadingJoins: Nodes.Join[] = [];
     const joinNodes: Nodes.Join[] = [];
     for (const v of this._joinValues) {
@@ -3363,11 +3354,6 @@ export class Relation<T extends Base> {
     // it is a pure bucket-builder with neither an eager-JD parameter nor a live
     // manager — and are needed here because the short-circuit does NOT fold `eagerJd`
     // into the stash (it is pushed in the non-short-circuit branch below). Cross-klass
-    // merged JDs (`_namedInnerJoinDeps`/`_leftOuterJoinDeps`) are deliberately NOT
-    // checked: like Rails, they ride the SAME emission regardless of branch —
-    // emitJoinPlan emits them directly from `this`, not from the plan — so
-    // short-circuiting with them present yields identical SQL (verified against the
-    // subquery path for a cross-klass `.merge`).
     const pureLeftOuter =
       eagerJd === undefined &&
       manager.joinSourceCount === 0 &&
@@ -3683,6 +3669,10 @@ export class Relation<T extends Base> {
           ...this._leftOuterJoinsValues,
           ...joinableSpecs,
         ]) {
+          if (spec instanceof JoinDependency) {
+            for (const node of spec.nodes) safeTables.add(node.tableName.toLowerCase());
+            continue;
+          }
           joinedJd.addAssociationSpec(spec);
         }
         for (const node of joinedJd.nodes) safeTables.add(node.tableName.toLowerCase());
@@ -4940,8 +4930,15 @@ export class Relation<T extends Base> {
     const specs = [...this._namedInnerJoins, ...this._leftOuterJoinsValues];
     if (specs.length === 0) return true;
     const jd = new JoinDependency(this._modelClass);
-    for (const spec of specs) jd.addAssociationSpec(spec);
-    return this.usingLimitableReflections(jd.reflections);
+    const mergedReflections: unknown[] = [];
+    for (const spec of specs) {
+      if (spec instanceof JoinDependency) {
+        mergedReflections.push(...spec.reflections);
+        continue;
+      }
+      jd.addAssociationSpec(spec);
+    }
+    return this.usingLimitableReflections([...jd.reflections, ...mergedReflections] as never);
   }
 
   /**
@@ -6960,8 +6957,6 @@ export class Relation<T extends Base> {
     this._joinClauses = [...source._joinClauses];
     this._joinsValues = [...source._joinsValues];
     this._leftOuterJoinsValues = [...source._leftOuterJoinsValues];
-    this._namedInnerJoinDeps = [...source._namedInnerJoinDeps];
-    this._leftOuterJoinDeps = [...source._leftOuterJoinDeps];
     this._includesAssociations = [...source._includesAssociations];
     this._preloadAssociations = [...source._preloadAssociations];
     this._eagerLoadAssociations = [...source._eagerLoadAssociations];

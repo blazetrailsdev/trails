@@ -207,14 +207,6 @@ interface QueryMethodsHost {
   // over the backing field so extractCalls credits the Rails value-method read.
   leftOuterJoinsValues: AssociationSpec[];
   readonly _namedInnerJoins: AssociationSpec[];
-  // Pre-built InnerJoin JoinDependencies from a cross-klass merge (Rails
-  // merge_joins builds these against `other.klass`); emitted via joinConstraints
-  // and walked for klass lookups alongside _namedInnerJoins.
-  _namedInnerJoinDeps: JoinDependency[];
-  // Pre-built OuterJoin JoinDependencies from a cross-klass merge (Rails
-  // merge_outer_joins builds these against `other.klass`); emitted via
-  // joinConstraints with OuterJoin type.
-  _leftOuterJoinDeps: JoinDependency[];
   _includesAssociations: AssociationSpec[];
   _preloadAssociations: AssociationSpec[];
   _eagerLoadAssociations: AssociationSpec[];
@@ -1136,6 +1128,7 @@ function uniqArray(arr: unknown[]): unknown[] {
  * @internal
  */
 export function structuralUnionEq(a: unknown, b: unknown): boolean {
+  if (a instanceof JoinDependency || b instanceof JoinDependency) return a === b;
   return deepEqual(a, b);
 }
 
@@ -2694,10 +2687,6 @@ export function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] 
   const named = selectNamedJoins.call(this, joinNames, stashedJoins);
   const jd = constructJoinDependency.call(this, named as AssociationSpec[], null);
   stashedJoins.unshift(jd);
-  // Cross-klass merged dependencies carry their own nodes (built on the source
-  // relation's klass); include them so table-klass / cast-type lookups see them.
-  if (this._namedInnerJoinDeps.length > 0) stashedJoins.push(...this._namedInnerJoinDeps);
-  if (this._leftOuterJoinDeps.length > 0) stashedJoins.push(...this._leftOuterJoinDeps);
   return stashedJoins;
 }
 
@@ -2877,13 +2866,6 @@ export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown
       // `_eagerLoadAssociations`, so both must be empty too — otherwise the
       // left-outer JD belongs in `stashed_join` (folded below), not `named_join`,
       // and the inner names would be dropped / double-emitted downstream.
-      //
-      // Cross-klass merged JDs (`_namedInnerJoinDeps`/`_leftOuterJoinDeps`, from a
-      // `.merge` against a different-model relation) are intentionally NOT part of
-      // this guard: emitJoinPlan emits them directly from `this` (not via any
-      // bucket), so they are appended regardless of which branch runs here. A
-      // pure-left-outer `.merge` therefore still emits its merged joins after the
-      // short-circuit — none are dropped.
       buckets.named_join.push(...namedLeft);
       buckets.stashed_join.push(...stashedLeft);
       return buckets;
@@ -3078,19 +3060,6 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
       manager.appendJoinNode(node);
   }
 
-  // Cross-klass merged JoinDependencies (Rails merge_joins): emitted against the
-  // same shared tracker, so a join onto an already-joined table aliases at
-  // emit-time in makeConstraints (`authors_categorizations`).
-  for (const jd of this._namedInnerJoinDeps) {
-    for (const node of jd.joinConstraints([], sharedTracker())) manager.appendJoinNode(node);
-  }
-
-  // Cross-klass merged left-outer JoinDependencies (Rails merge_outer_joins):
-  // emitted against the same shared tracker.
-  for (const jd of this._leftOuterJoinDeps) {
-    for (const node of jd.joinConstraints([], sharedTracker())) manager.appendJoinNode(node);
-  }
-
   // Rails' single `buckets[:join_node]` array is populated raw joins_values Join
   // nodes FIRST (the `while joins.first.is_a?(Arel::Nodes::Join)` loop,
   // query_methods.rb:1856-1863), THEN CTE nodes appended by the select_named_joins
@@ -3128,11 +3097,7 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
   const hasNamedInner = joinsValues.some((v) => this._isNamedJoinValue(v));
   const hasRawJoins = joinsValues.some((v) => !this._isNamedJoinValue(v));
   const hasEagerAssocs =
-    this._eagerLoadAssociations.length > 0 ||
-    this.leftOuterJoinsValues.length > 0 ||
-    hasNamedInner ||
-    this._namedInnerJoinDeps.length > 0 ||
-    this._leftOuterJoinDeps.length > 0;
+    this._eagerLoadAssociations.length > 0 || this.leftOuterJoinsValues.length > 0 || hasNamedInner;
   if (this._joinClauses.length === 0 && !hasRawJoins && !hasEagerAssocs) return;
 
   // Subquery path: buckets fold eager into stashed_join. Delegate emission to
