@@ -1788,6 +1788,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("courses_professors", { id: false, arunit2: true }, (t) => {
     t.integer("course_id");
     t.integer("professor_id");
+    t.index("course_id");
+    t.index("professor_id");
   });
 
   await define("to_be_linked_accounts", {}, (t) => {
