@@ -38,7 +38,11 @@ export function registerControl(r: Registry): void {
     const v = returnValue(n.arguments_ as PrismNode | undefined, e);
     return [f.createReturnStatement(v)];
   });
-  r.onStmt("BreakNode", (n, e) => (e.inLoop ? [f.createBreakStatement()] : null));
+  r.onStmt("BreakNode", (n, e) => {
+    const argCount = ((n.arguments_ as PrismNode | null)?.arguments_ as PrismNode[])?.length ?? 0;
+    if (!e.inLoop || argCount > 0) return null;
+    return [f.createBreakStatement()];
+  });
   r.onStmt("BeginNode", (n, e, isLast) => {
     const rescue = n.rescueClause as PrismNode | undefined;
     if (rescue?.subsequent) return null;

@@ -158,6 +158,18 @@ describe("prism-codegen", () => {
     expect(lossyNext.parseErrorCount).toBe(0);
     expect(lossyNext.code).toContain("__PRISM_TODO(");
 
+    const lossyBreak = await generateFromSource(`
+      def scan3(xs)
+        while more?
+          break compute if done?
+          advance
+        end
+      end
+    `);
+    expect(lossyBreak.parseErrorCount).toBe(0);
+    expect(lossyBreak.code).not.toContain("break;");
+    expect(lossyBreak.code).toContain("__PRISM_TODO(");
+
     const blockNext = await generateFromSource(`
       def pluck_all(xs)
         xs.map { |x| next 0 if x.nil?; x }
