@@ -66,6 +66,11 @@ export class WhereChain<R = any> {
   }
 
   associated(...associationNames: string[]): R {
+    // The reflection is discarded on purpose: this call is here for Rails'
+    // fail-fast on an unknown association (`scope_association_reflection`
+    // raises, query_methods.rb:90), which happens before any join is built.
+    // `whereAssociated` re-derives it because it needs the *scope's* reflection
+    // as the scope advances. `missing` below has the same shape.
     for (const name of associationNames) this.scopeAssociationReflection(name);
     return this._scope.whereAssociated(...associationNames);
   }
