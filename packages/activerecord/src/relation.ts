@@ -3669,7 +3669,10 @@ export class Relation<T extends Base> {
           ...this._leftOuterJoinsValues,
           ...joinableSpecs,
         ]) {
-          if (spec instanceof JoinDependency) continue;
+          if (spec instanceof JoinDependency) {
+            for (const node of spec.nodes) safeTables.add(node.tableName.toLowerCase());
+            continue;
+          }
           joinedJd.addAssociationSpec(spec);
         }
         for (const node of joinedJd.nodes) safeTables.add(node.tableName.toLowerCase());
