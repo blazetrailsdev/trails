@@ -133,6 +133,14 @@ function exportedNames(source) {
 const SKIPPED_DIRS = new Set(["node_modules", "dist", "vendor", ".git", "coverage"]);
 
 /**
+ * Every JS/TS spelling a module could use, not just `.ts`: a loader moved into
+ * `scripts/` would be `.mjs`, and pinning the extension set to the one the
+ * activerecord tree happens to use would leave a fresh hole of the same shape.
+ */
+const SOURCE_EXTENSION = /\.[cm]?[jt]sx?$/;
+const TEST_MODULE = /\.test\.[cm]?[jt]sx?$/;
+
+/**
  * Walks every workspace package and the top-level `scripts/` tree, not just
  * `packages/activerecord/src`: the rule matches on module basename with no
  * package anchoring, so a loader relocated into another package (a new
@@ -145,7 +153,7 @@ async function* workspaceSources(dir) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       if (!SKIPPED_DIRS.has(entry.name)) yield* workspaceSources(full);
-    } else if (/\.(m?ts|mjs)$/.test(entry.name) && !/\.test\.(m?ts|mjs)$/.test(entry.name)) {
+    } else if (SOURCE_EXTENSION.test(entry.name) && !TEST_MODULE.test(entry.name)) {
       yield full;
     }
   }
@@ -156,32 +164,38 @@ async function* workspaceSources(dir) {
  * in the workspace including the non-loader exporters. Walked once and shared:
  * the scan covers ~2100 files, so each extra walk costs real time.
  */
-const bannedExportsBySrcModule = (async () => {
+const scan = (async () => {
   const byModule = new Map();
+  const trees = new Set();
   for (const root of canonicalLoaderScanRoots) {
     for await (const file of workspaceSources(path.join(repoRoot, root))) {
+      const rel = path.relative(repoRoot, file).replace(/\\/g, "/");
+      trees.add(
+        rel
+          .split("/")
+          .slice(0, root === "packages" ? 2 : 1)
+          .join("/"),
+      );
       const source = await fs.readFile(file, "utf8");
       const banned = [...exportedNames(source)].filter((name) => BANNED.has(name)).sort();
-      if (banned.length > 0) {
-        byModule.set(path.relative(repoRoot, file).replace(/\\/g, "/"), banned);
-      }
+      if (banned.length > 0) byModule.set(rel, banned);
     }
   }
-  return byModule;
+  return { byModule, trees };
 })();
+
+const bannedExportsByModule = scan.then(({ byModule }) => byModule);
 
 /** The same map with the sanctioned non-loader exporters dropped. */
 async function loaderCandidates() {
-  return [...(await bannedExportsBySrcModule)].filter(
-    ([file]) => !nonLoaderBannedExporters.has(file),
-  );
+  return [...(await bannedExportsByModule)].filter(([file]) => !nonLoaderBannedExporters.has(file));
 }
 
 describe("no-internal-canonical-loaders module matcher", () => {
   it("matches every workspace module that exports a banned loader", async () => {
     const unmatched = [];
     for (const [file, banned] of await loaderCandidates()) {
-      if (!isCanonicalSchemaModule(`./${file.replace(/\.m?ts$/, ".js")}`)) {
+      if (!isCanonicalSchemaModule(`./${file.replace(SOURCE_EXTENSION, "")}`)) {
         unmatched.push(`${file} exports ${banned.join(", ")}`);
       }
     }
@@ -190,16 +204,29 @@ describe("no-internal-canonical-loaders module matcher", () => {
 
   it("lists no module that has stopped exporting a banned loader", async () => {
     const found = new Set(
-      (await loaderCandidates()).map(([file]) => moduleBasename(file.replace(/\.m?ts$/, ""))),
+      (await loaderCandidates()).map(([file]) =>
+        moduleBasename(file.replace(SOURCE_EXTENSION, "")),
+      ),
     );
     expect(canonicalLoaderModules.filter((module) => !found.has(module))).toEqual([]);
+  });
+
+  // The walk is what makes the two tests above guards rather than vacuous
+  // truths: if it silently stopped covering a tree, nothing else here would
+  // notice. Pin that it reaches past activerecord into a sibling package and
+  // into scripts/.
+  it("scans every workspace package and the scripts tree", async () => {
+    const { trees } = await scan;
+    expect([...trees]).toEqual(
+      expect.arrayContaining(["packages/activerecord", "packages/activesupport", "scripts"]),
+    );
   });
 
   // Without this the allowlist is a silent hole of its own: if model-schema.ts
   // moves or stops exporting `loadSchema`, the stale entry would keep excusing
   // a path nobody is checking.
   it("allowlists only non-loader modules that still export a banned name", async () => {
-    const exporters = await bannedExportsBySrcModule;
+    const exporters = await bannedExportsByModule;
     expect([...nonLoaderBannedExporters].filter((file) => !exporters.has(file))).toEqual([]);
   });
 });
