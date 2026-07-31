@@ -1458,7 +1458,7 @@ export class SchemaStatements {
     // MySQL/SQLite don't override → NotImplementedError → views() fallback.
     if (!viewName || viewName.trim().length === 0) return false;
     try {
-      const sql = (this.adapter as any).dataSourceSql(viewName, { type: "VIEW" });
+      const sql = this.adapter.dataSourceSql(viewName, { type: "VIEW" });
       const rows = await this.adapter.execute(sql);
       return rows.length > 0;
     } catch (e) {
@@ -1567,9 +1567,15 @@ export class SchemaStatements {
   }
 
   async dataSourceExists(name: string): Promise<boolean> {
-    if (!name) return false;
-    if (await this.tableExists(name)) return true;
-    return this.viewExists(name);
+    if (!isPresent(name)) return false;
+    try {
+      const sql = this.adapter.dataSourceSql(name);
+      const rows = await this.adapter.execute(sql);
+      return rows.length > 0;
+    } catch (error) {
+      if (!(error instanceof NotImplementedError)) throw error;
+      return (await this.dataSources()).includes(String(name));
+    }
   }
 
   buildCreateTableDefinition(

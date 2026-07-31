@@ -6,6 +6,7 @@ import {
 } from "./schema-statements.js";
 import { ForeignKeyDefinition, TableDefinition, type ColumnType } from "./schema-definitions.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
+import { NotImplementedError } from "../../errors.js";
 
 function makeStatements(adapterOverrides: Record<string, unknown> = {}) {
   return new SchemaStatements({
@@ -606,6 +607,52 @@ describe("tableExists NotImplementedError fallback", () => {
     });
 
     await expect(ss.tableExists("posts")).rejects.toThrow("connection lost");
+  });
+});
+
+describe("dataSourceExists NotImplementedError fallback", () => {
+  it("returns false for a blank data source name without querying", async () => {
+    const execute = vi.fn().mockResolvedValue([]);
+    const ss = makeStatements({
+      execute,
+      dataSourceSql: (n: string) => `SELECT 1 WHERE name = '${n}'`,
+    });
+
+    expect(await ss.dataSourceExists("")).toBe(false);
+    expect(await ss.dataSourceExists("   ")).toBe(false);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("issues one untyped data_source_sql query for tables and views alike", async () => {
+    const execute = vi.fn().mockResolvedValue([{ one: 1 }]);
+    const dataSourceSql = vi.fn((n: string) => `SELECT 1 WHERE name = '${n}'`);
+    const ss = makeStatements({ execute, dataSourceSql });
+
+    expect(await ss.dataSourceExists("posts")).toBe(true);
+    expect(dataSourceSql).toHaveBeenCalledTimes(1);
+    expect(dataSourceSql).toHaveBeenCalledWith("posts");
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to data_sources.include? when the data-source path is not implemented", async () => {
+    const ss = makeStatements({
+      dataSourceSql: () => {
+        throw new NotImplementedError("#data_source_sql is not implemented");
+      },
+    });
+    vi.spyOn(ss, "dataSources").mockResolvedValue(["posts", "comments"]);
+
+    expect(await ss.dataSourceExists("posts")).toBe(true);
+    expect(await ss.dataSourceExists("widgets")).toBe(false);
+  });
+
+  it("propagates errors other than NotImplementedError", async () => {
+    const ss = makeStatements({
+      dataSourceSql: (n: string) => `SELECT 1 WHERE name = '${n}'`,
+      execute: vi.fn().mockRejectedValue(new Error("connection lost")),
+    });
+
+    await expect(ss.dataSourceExists("posts")).rejects.toThrow("connection lost");
   });
 });
 

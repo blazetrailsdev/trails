@@ -358,6 +358,8 @@ export interface AbstractAdapter {
   tables(): Promise<string[]>;
   views(): Promise<string[]>;
   viewExists(viewName: string): Promise<boolean>;
+  /** @internal */
+  dataSourceSql(name?: string | null, options?: { type?: string }): string;
   columns(tableName: string): Promise<Column[]>;
   primaryKey(tableName: string): Promise<string | string[] | null>;
   indexes(tableName: string): Promise<unknown[]>;
