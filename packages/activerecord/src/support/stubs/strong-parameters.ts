@@ -30,6 +30,16 @@
  * marks that the caller is bypassing the permitted check. `eachPair` returns
  * `@parameters` rather than `self` in Ruby — here that store IS the object
  * seen through its Proxy, so the same value comes back either way.
+ *
+ * `dup` is Ruby's `super.dup` plus the explicit `@permitted` carry-over. The
+ * copy has to be a fresh `ProtectedParams` so it gets its own Proxy, and it
+ * takes the flag through `permitBang` because the private field is unreachable
+ * through the copy's Proxy receiver. Ruby's `Object#dup` copies the ivar
+ * reference, so its two objects share one parameter hash; here the copy gets
+ * its own, because the Proxy traps close over the store handed to the
+ * constructor and a shared store cannot be installed after the fact. Nothing
+ * in the AR suite mutates a dup, so the two semantics are indistinguishable
+ * to callers.
  */
 export class ProtectedParams {
   [key: string]: unknown;
@@ -114,14 +124,6 @@ export class ProtectedParams {
     return this.#self;
   }
 
-  /**
-   * Ruby's `super.dup` shallow-copies the ivars and the override then re-sets
-   * `@permitted`. Here the copy has to be a fresh `ProtectedParams` so it gets
-   * its own Proxy — a structural clone of the wrapper would share this one.
-   * The constructor already copies the parameter store, and `permitBang` is
-   * how the permitted flag is reachable on the copy: the private field is
-   * unreachable through the copy's Proxy receiver.
-   */
   dup(): this {
     const duplicate = new ProtectedParams(this.#parameters);
     if (this.#permitted) duplicate.permitBang();

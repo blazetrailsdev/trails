@@ -70,7 +70,7 @@ describe("ProtectedParams", () => {
     ]);
   });
 
-  it("dup preserves permitted? and copies the parameters", () => {
+  it("dup preserves permitted? and gives the copy its own parameters", () => {
     const params = new ProtectedParams({ first_name: "Guille" });
     params.permitBang();
 
