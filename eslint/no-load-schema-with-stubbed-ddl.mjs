@@ -2,9 +2,10 @@
  * ESLint rule: no-load-schema-with-stubbed-ddl
  *
  * `loadSchema` (support/load-schema-helper.ts) runs the canonical half first
- * and then the adapter-specific arm. A cover that intercepts `createTable` to
- * capture emitted DDL never lays anything on the shared per-worker database, so
- * the canonical half queries tables that were never created and dies with
+ * and then the adapter-specific arm. A cover that intercepts a DDL emitter to
+ * capture the SQL it would have run never lays anything on the shared per-worker
+ * database, so the canonical half queries tables that were never created and
+ * dies with
  * `StatementInvalid: relation "…" does not exist`. Such covers must call
  * `loadAdapterSpecificSchema` directly — the carve-out its docstring already
  * describes in prose.
@@ -21,23 +22,42 @@
  * error.
  */
 
+import { readFileSync } from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+/** The one declaration site of the guarded set, read below. */
+const DECLARATION_SITE = "packages/activerecord/src/support/stubbed-ddl-methods.ts";
+
 /**
- * The adapter members whose interception makes the canonical half unsafe.
+ * The adapter members whose interception makes the canonical half unsafe, read
+ * out of {@link DECLARATION_SITE} — the module the runtime guard in
+ * `load-schema-helper.ts` imports, and where the reasoning for reaching past
+ * `createTable` lives.
  *
- * The declaration site is
- * `packages/activerecord/src/support/stubbed-ddl-methods.ts`, which explains why
- * the set reaches past `createTable`; this rule is a plain-Node module outside
- * that package's `rootDir` and cannot import it, so the copy here is pinned
- * against it by this rule's own test.
+ * It is read rather than imported because this is a plain-Node module that
+ * ESLint loads without a TypeScript pipeline, and the declaration site sits
+ * inside `packages/activerecord`'s `rootDir` where it must stay to be importable
+ * by the guard. A second hand-maintained copy here is what the widening was
+ * supposed to end, so the file is parsed instead — a shape it is kept trivial
+ * for, and a parse that yields nothing is a hard failure rather than a rule that
+ * silently stops firing.
  */
-export const STUBBED_DDL_METHODS = new Set([
-  "createTable",
-  "dropTable",
-  "addIndex",
-  "execute",
-  "schemaCreation",
-  "schemaStatements",
-]);
+function readStubbedDdlMethods() {
+  const file = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", DECLARATION_SITE);
+  const source = readFileSync(file, "utf8");
+  const array = /STUBBED_DDL_METHODS[^=]*=\s*\[([^\]]*)\]/.exec(source);
+  const methods = array ? [...array[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]) : [];
+  if (methods.length === 0) {
+    throw new Error(
+      `no-load-schema-with-stubbed-ddl: found no STUBBED_DDL_METHODS in ${DECLARATION_SITE}. ` +
+        "The rule is derived from that array; keep it a flat list of double-quoted names.",
+    );
+  }
+  return new Set(methods);
+}
+
+export const STUBBED_DDL_METHODS = readStubbedDdlMethods();
 
 /** The loader that must not be reached for once a DDL emitter is stubbed. */
 export const BANNED_LOADER = "loadSchema";

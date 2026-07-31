@@ -18,11 +18,12 @@
  * arm calls directly, and they are the shape every existing cover stubs.
  *
  * This list is the single source of truth for both mechanisms that key on it:
- * the runtime guard in `load-schema-helper.ts` and the
- * `blazetrails/no-load-schema-with-stubbed-ddl` ESLint rule. The rule is a
- * plain-Node `.mjs` module outside this package's `rootDir`, so it cannot
- * import this one; `eslint/no-load-schema-with-stubbed-ddl.test.mjs` pins its
- * copy against this one instead, which is what keeps the two in step.
+ * the runtime guard in `load-schema-helper.ts`, which imports it, and the
+ * `blazetrails/no-load-schema-with-stubbed-ddl` ESLint rule, which reads the
+ * array out of this file's text — it is a plain-Node module ESLint loads with no
+ * TypeScript pipeline, so it cannot import this one. Keep the array a flat list
+ * of double-quoted names; the rule throws rather than silently guarding nothing
+ * if it parses none.
  */
 export const STUBBED_DDL_METHODS: readonly string[] = [
   "createTable",

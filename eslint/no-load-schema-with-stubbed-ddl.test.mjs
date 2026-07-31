@@ -95,6 +95,30 @@ tester.run("no-load-schema-with-stubbed-ddl", rule, {
       `,
       errors: [{ messageId: "misrouted" }],
     },
+    // A member past `createTable`: `runTable` lays canonical tables through the
+    // SchemaStatements companion, which reaches the database via
+    // `adapter.execute`, so intercepting that lays nothing either.
+    {
+      filename: FILENAME,
+      code: `
+        const probe = new Proxy(adapter, {
+          get(target, prop) {
+            if (prop === "execute") return async () => [];
+            return Reflect.get(target, prop, target);
+          },
+        });
+        await loadSchema(probe);
+      `,
+      errors: [{ messageId: "misrouted" }],
+    },
+    {
+      filename: FILENAME,
+      code: `
+        const stub = { schemaStatements: () => ({ createTable: async () => {} }) };
+        await loadSchema(stub);
+      `,
+      errors: [{ messageId: "misrouted" }],
+    },
     // The other two interception dispatch shapes.
     {
       filename: FILENAME,
@@ -148,13 +172,15 @@ describe("the real arm-content cover", () => {
   });
 });
 
-// The rule cannot import the TS declaration site (it is a plain-Node module,
-// and `packages/activerecord`'s rootDir is `src`), so this is what makes the
-// two sets one list: widening either without the other fails here.
+// The rule reads its set out of the TS declaration site's text rather than
+// importing it. This pins that the parse really landed: a regex that stopped
+// matching the array would otherwise leave the rule guarding a stale set, and
+// the throw only covers parsing *nothing*.
 describe("the guarded method set", () => {
-  it("matches the runtime guard's", async () => {
+  it("is the runtime guard's, parsed out of its declaration site", async () => {
     const { STUBBED_DDL_METHODS: runtimeMethods } =
       await import("../packages/activerecord/src/support/stubbed-ddl-methods.ts");
     expect([...STUBBED_DDL_METHODS].sort()).toEqual([...runtimeMethods].sort());
+    expect(STUBBED_DDL_METHODS.has("createTable")).toBe(true);
   });
 });
