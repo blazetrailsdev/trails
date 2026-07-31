@@ -324,6 +324,10 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   }
 
   async dataSourceExists(name: string): Promise<boolean> {
+    // Rails answers `data_source_exists?` through the base implementation,
+    // which is gated on `if name.present?`; this adapter-local override has to
+    // carry the same gate or a blank name reaches the catalog query.
+    if (!name) return false;
     const [schema, table] = this.pg.extractSchemaQualifiedName(name);
     if (schema) {
       const rows = await this.pg.schemaQuery(

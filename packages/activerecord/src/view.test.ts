@@ -16,7 +16,7 @@ import { describeIfSupports, itIfSupports } from "./support/supports.js";
 import { dumpTableSchema } from "./support/schema-dumping-helper.js";
 
 // In Rails, AbstractAdapter includes SchemaStatements, so introspection
-// methods (views, viewExists, tableExists, isDataSourceExists) live directly
+// methods (views, viewExists, tableExists, dataSourceExists) live directly
 // on the connection object. Cast once here; all helpers pass through.
 function conn(): AbstractAdapter {
   return Base.connection as unknown as AbstractAdapter;
@@ -94,7 +94,7 @@ describeIfSupports("views", "ViewWithPrimaryKeyTest", () => {
   });
 
   itIfSupports("views", "views ara valid data sources", async () => {
-    expect(await conn().isDataSourceExists(Ebook._tableName)).toBe(true);
+    expect(await conn().dataSourceExists(Ebook._tableName)).toBe(true);
   });
 
   itIfSupports("views", "column definitions", async () => {

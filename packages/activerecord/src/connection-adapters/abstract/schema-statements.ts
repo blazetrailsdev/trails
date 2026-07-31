@@ -907,7 +907,7 @@ export class SchemaStatements {
       name?: string;
       validate?: boolean;
     };
-    if (options.ifNotExists && (await this.isCheckConstraintExists(tableName, resolved))) return;
+    if (options.ifNotExists && (await this.checkConstraintExists(tableName, resolved))) return;
 
     const at = this.createAlterTable(tableName);
     at.addCheckConstraint(expression, resolved);
@@ -1566,7 +1566,7 @@ export class SchemaStatements {
     return [...new Set([...t, ...v])];
   }
 
-  async isDataSourceExists(name: string): Promise<boolean> {
+  async dataSourceExists(name: string): Promise<boolean> {
     if (!name) return false;
     if (await this.tableExists(name)) return true;
     return this.viewExists(name);
@@ -1773,7 +1773,7 @@ export class SchemaStatements {
     return dup;
   }
 
-  async isCheckConstraintExists(
+  async checkConstraintExists(
     tableName: string,
     options: { name?: string; expression?: string },
   ): Promise<boolean> {

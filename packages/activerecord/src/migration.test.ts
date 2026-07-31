@@ -1546,7 +1546,7 @@ describe("MigrationTest", () => {
 
   describe("IndexTest", () => {
     // Mirrors ActiveRecord::Migration::IndexTest — drives the Migration-class
-    // index twins (isIndexExists/removeIndex) so the `valid`/`ifExists` option
+    // index twins (indexExists/removeIndex) so the `valid`/`ifExists` option
     // widenings forward to the adapter. Rails' bespoke `testings(foo, bar)`
     // table is dropped in `finally` (Rails' `teardown`) so nothing leaks.
     async function withTestings(body: () => Promise<void>): Promise<void> {
@@ -1578,11 +1578,11 @@ describe("MigrationTest", () => {
         const mig = new (class extends Migration {})();
         await mig.addIndex("testings", ["foo"], { name: "foo" });
 
-        expect(await mig.isIndexExists("testings", "foo", { name: "foo" })).toBe(true);
+        expect(await mig.indexExists("testings", "foo", { name: "foo" })).toBe(true);
 
         await mig.removeIndex("testings", { name: "foo", ifExists: true });
 
-        expect(await mig.isIndexExists("testings", "foo", { name: "foo" })).toBe(false);
+        expect(await mig.indexExists("testings", "foo", { name: "foo" })).toBe(false);
       });
     });
 
@@ -1591,19 +1591,19 @@ describe("MigrationTest", () => {
         const mig = new (class extends Migration {})();
         await mig.addIndex("testings", ["foo"], { name: "foo" });
 
-        expect(await mig.isIndexExists("testings", "foo", { name: "foo" })).toBe(true);
+        expect(await mig.indexExists("testings", "foo", { name: "foo" })).toBe(true);
 
         await mig.removeIndex("testings", { column: ["foo", "bar"], ifExists: true });
 
-        expect(await mig.isIndexExists("testings", "foo", { name: "foo" })).toBe(true);
-        expect(await mig.isIndexExists("testings", ["foo", "bar"], { name: "foo" })).toBe(false);
+        expect(await mig.indexExists("testings", "foo", { name: "foo" })).toBe(true);
+        expect(await mig.indexExists("testings", ["foo", "bar"], { name: "foo" })).toBe(false);
       });
     });
   });
 
   describeIfPg("PostgresqlIndexTest", () => {
     // Mirrors PostgreSQLAdapterTest#test_invalid_index — a failed CONCURRENTLY
-    // unique index is left behind marked invalid; Migration#isIndexExists must
+    // unique index is left behind marked invalid; Migration#indexExists must
     // forward `valid` to distinguish it, matching the adapter twin.
     it("test_invalid_index", async () => {
       const conn = Base.connection;
@@ -1627,13 +1627,13 @@ describe("MigrationTest", () => {
         }
         expect(error).toBeInstanceOf(RecordNotUnique);
 
-        expect(await mig.isIndexExists("ex", "number", { name: "invalid_index" })).toBe(true);
-        expect(
-          await mig.isIndexExists("ex", "number", { name: "invalid_index", valid: true }),
-        ).toBe(false);
-        expect(
-          await mig.isIndexExists("ex", "number", { name: "invalid_index", valid: false }),
-        ).toBe(true);
+        expect(await mig.indexExists("ex", "number", { name: "invalid_index" })).toBe(true);
+        expect(await mig.indexExists("ex", "number", { name: "invalid_index", valid: true })).toBe(
+          false,
+        );
+        expect(await mig.indexExists("ex", "number", { name: "invalid_index", valid: false })).toBe(
+          true,
+        );
       } finally {
         await conn.dropTable("ex", { ifExists: true });
       }

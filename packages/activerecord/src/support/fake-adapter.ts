@@ -49,7 +49,7 @@ export class FakeActiveRecordAdapter extends AbstractAdapter {
     return created;
   }
 
-  dataSourceExists(): boolean {
+  async dataSourceExists(): Promise<boolean> {
     return true;
   }
 

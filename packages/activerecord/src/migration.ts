@@ -1229,11 +1229,11 @@ export abstract class Migration {
     return this._recording && this._recorder.reverting;
   }
 
-  async isViewExists(viewName: string): Promise<boolean> {
+  async viewExists(viewName: string): Promise<boolean> {
     return this.schema.viewExists(viewName);
   }
 
-  async isIndexExists(
+  async indexExists(
     tableName: string,
     columnName: string | string[],
     options?: { unique?: boolean; name?: string; valid?: boolean },

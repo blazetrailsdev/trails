@@ -40,9 +40,9 @@ describe("FakeActiveRecordAdapter", () => {
     expect(adapter.columns("fake_nothing")).toEqual([]);
   });
 
-  it("data_source_exists? and active? are always true", () => {
+  it("data_source_exists? and active? are always true", async () => {
     const adapter = new FakeActiveRecordAdapter();
-    expect(adapter.dataSourceExists()).toBe(true);
+    expect(await adapter.dataSourceExists()).toBe(true);
     expect(adapter.active).toBe(true);
   });
 

@@ -402,7 +402,7 @@ export interface AbstractAdapter {
     expression: string,
     options?: Record<string, unknown>,
   ): Promise<void>;
-  isCheckConstraintExists(
+  checkConstraintExists(
     tableName: string,
     options: { name?: string; expression?: string },
   ): Promise<boolean>;
@@ -426,7 +426,7 @@ export interface AbstractAdapter {
   nativeDatabaseTypes(): Record<string, unknown>;
   typeToSql(type: ColumnType, options?: ColumnOptions): string;
   dataSources(): Promise<string[]>;
-  isDataSourceExists(name: string): Promise<boolean>;
+  dataSourceExists(name: string): Promise<boolean>;
   // --- DatabaseStatements ---
   /**
    * Reset the transaction manager, discarding any open transactions. With a

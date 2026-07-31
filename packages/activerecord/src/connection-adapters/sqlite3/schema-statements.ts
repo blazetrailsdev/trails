@@ -187,7 +187,7 @@ function resolveMasterTable(
   return { masterTable: `${adapter.quoteColumnName(schema)}.sqlite_master`, name };
 }
 
-export async function isVirtualTableExists(
+export async function virtualTableExists(
   adapter: DatabaseAdapter,
   tableName: string,
 ): Promise<boolean> {

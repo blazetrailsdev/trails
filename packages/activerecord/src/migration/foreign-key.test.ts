@@ -369,12 +369,12 @@ describeIfSupports("foreign_keys", "Migration", () => {
         await conn.changeTable("astronauts", async (t) => {
           await t.foreignKey("rockets", { column: "rocket_id", name: "fancy_named_fk" });
 
-          expect(await t.isForeignKeyExists({ column: "rocket_id" })).toBe(true);
-          expect(await t.isForeignKeyExists({ column: "star_id" })).toBe(false);
+          expect(await t.foreignKeyExists({ column: "rocket_id" })).toBe(true);
+          expect(await t.foreignKeyExists({ column: "star_id" })).toBe(false);
 
           if (unlessSqlite3Adapter) {
-            expect(await t.isForeignKeyExists({ name: "fancy_named_fk" })).toBe(true);
-            expect(await t.isForeignKeyExists({ name: "other_fancy_named_fk" })).toBe(false);
+            expect(await t.foreignKeyExists({ name: "fancy_named_fk" })).toBe(true);
+            expect(await t.foreignKeyExists({ name: "other_fancy_named_fk" })).toBe(false);
           }
         });
       });
