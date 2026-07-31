@@ -67,6 +67,7 @@ import {
 import { extractorSchemaToken } from "./extractor-schema.js";
 import { staleBuilds, staleBuildMessage } from "./build-freshness.js";
 import { NEGATED_CALL_PREFIX } from "./enumerable-idioms.js";
+import { TAG as MISSING_RAILS_CALL_TAG, suppressedCallsIn } from "./missing-rails-call-tags.js";
 
 // Per-package cache: extracting all packages with the TS Compiler API
 // takes ~16s; only a handful of packages typically change between
@@ -150,6 +151,8 @@ interface WorkerOutput {
   /** Absolute file names of every source file the program read. */
   inputs: string[];
 }
+const fileHasMissingRailsCallTag = new WeakMap<ts.SourceFile, boolean>();
+
 if (!isMainThread && parentPort) {
   const { package: pkgName, srcDir } = workerData as WorkerInput;
   const out: WorkerOutput = extractPackage(pkgName, srcDir);
@@ -633,6 +636,7 @@ export function extractFromProgram(
         const fnCalls = extractCalls(node.body);
         const internal = hasInternalJsDocTag(node);
         const noRailsEquivalent = noRailsEquivalentReason(node);
+        const fnMissingRailsCalls = missingRailsCallTags(node);
         fileFunctions.push({
           name: node.name.text,
           visibility: "public",
@@ -644,6 +648,7 @@ export function extractFromProgram(
           ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
           ...(fnOptionKeys !== undefined ? { optionKeys: fnOptionKeys } : {}),
           ...(fnCalls !== undefined ? { calls: fnCalls } : {}),
+          ...(fnMissingRailsCalls !== undefined ? { missingRailsCalls: fnMissingRailsCalls } : {}),
         });
       } else if (ts.isVariableStatement(node) && isExported(node)) {
         // Capture `export const X = { method() {...}, foo, bar: ... }`
@@ -846,6 +851,11 @@ export function extractFromProgram(
                 ? noRailsEquivalentReason(decl)
                 : (noRailsEquivalentReason(renamedSpecifier) ??
                   noRailsEquivalentReason(renamedSpecifier.parent.parent));
+            const exportedMissingRailsCalls =
+              renamedSpecifier === undefined
+                ? missingRailsCallTags(decl)
+                : (missingRailsCallTags(renamedSpecifier) ??
+                  missingRailsCallTags(renamedSpecifier.parent.parent));
             fileFunctions.push({
               name: sym.name,
               visibility: "public",
@@ -856,6 +866,9 @@ export function extractFromProgram(
               ...(internal ? { internal: true } : {}),
               ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
               ...(calls !== undefined ? { calls } : {}),
+              ...(exportedMissingRailsCalls !== undefined
+                ? { missingRailsCalls: exportedMissingRailsCalls }
+                : {}),
             });
           }
         }
@@ -1451,6 +1464,51 @@ export function paramsOfCallableRef(
 }
 
 /**
+ * The Ruby calls a declaration's leading JSDoc tags as deliberately not made
+ * (`@missingRailsCall <call> — <reason>`), or undefined when it carries none.
+ *
+ * Read from the RAW comment text through the shared `suppressedCallsIn` parser
+ * rather than `ts.getJSDocTags`, so the tag means exactly what api:build and
+ * api:reasons already mean by it — including the empty-reason contract (a bare
+ * tag throws here too) and the continuation rules that keep a Ruby ivar in the
+ * reason prose from re-parsing as a tag boundary.
+ *
+ * Called from every extraction path that records a `calls` array: class
+ * members (methods, constructor, accessors), object-literal members, top-level
+ * `export function` declarations, and the named-export-list path — where a
+ * RENAMED alias (`export { foo as bar }`) is its own surface entry and so
+ * reads a tag written on the specifier, exactly as `noRailsEquivalentReason`
+ * does. The paths that record no call-set (namespace and interface members,
+ * the mixin pseudo-module's constructor) need no wiring: `checkCalls` skips a
+ * pair with no TS call-set, so a call there is never flagged, never tagged by
+ * api:build, and has nothing to suppress.
+ *
+ * `fileHasMissingRailsCallTag` is declared with the imports, not next to this
+ * function: a worker thread runs the whole extraction from the
+ * `!isMainThread` block during module evaluation, so a `const` declared
+ * further down the file is still in its temporal dead zone when this runs.
+ */
+export function missingRailsCallTags(node: ts.Node): string[] | undefined {
+  const sf = node.getSourceFile();
+  let present = fileHasMissingRailsCallTag.get(sf);
+  if (present === undefined) {
+    present = sf.text.includes(MISSING_RAILS_CALL_TAG);
+    fileHasMissingRailsCallTag.set(sf, present);
+  }
+  if (!present) return undefined;
+  const ranges = ts.getLeadingCommentRanges(sf.text, node.getFullStart()) ?? [];
+  const range = ranges.filter((r) => sf.text.slice(r.pos, r.pos + 3) === "/**").at(-1);
+  if (!range) return undefined;
+  const comment = sf.text.slice(range.pos, range.end);
+  if (!comment.includes(MISSING_RAILS_CALL_TAG)) return undefined;
+  const calls = suppressedCallsIn(comment, {
+    fileName: sf.fileName,
+    startLine: sf.getLineAndCharacterOfPosition(range.pos).line + 1,
+  });
+  return calls.length > 0 ? calls : undefined;
+}
+
+/**
  * True when a declaration's leading JSDoc carries an `@internal` tag. An
  * exported top-level function has no `private`/`protected` modifier to carry
  * the "wiring seam, not Rails-facing surface" signal (CONTRIBUTING.md), so
@@ -1642,6 +1700,7 @@ export function harvestObjectLiteralMethods(
     let calls: string[] | undefined;
     let internal = hasInternalJsDocTag(prop);
     let noRailsEquivalent = noRailsEquivalentReason(prop);
+    const propMissingRailsCalls = missingRailsCallTags(prop);
     if (ts.isMethodDeclaration(prop) && prop.name && ts.isIdentifier(prop.name)) {
       mname = prop.name.text;
       params = extractParameters(prop.parameters);
@@ -1695,6 +1754,7 @@ export function harvestObjectLiteralMethods(
       ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
       ...(optionKeys !== undefined ? { optionKeys } : {}),
       ...(calls !== undefined ? { calls } : {}),
+      ...(propMissingRailsCalls !== undefined ? { missingRailsCalls: propMissingRailsCalls } : {}),
     });
   }
   return out;
@@ -1807,7 +1867,13 @@ export function extractClass(
     const visibility = memberVisibility(member);
     const internal = visibility !== "public";
     const noRailsEquivalent = noRailsEquivalentReason(member);
-    const tagged = noRailsEquivalent !== undefined ? { noRailsEquivalent } : {};
+    const memberMissingRailsCalls = missingRailsCallTags(member);
+    const tagged = {
+      ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
+      ...(memberMissingRailsCalls !== undefined
+        ? { missingRailsCalls: memberMissingRailsCalls }
+        : {}),
+    };
     const isStatic = hasModifier(member, ts.SyntaxKind.StaticKeyword);
     const line = member.getSourceFile().getLineAndCharacterOfPosition(member.getStart()).line + 1;
 

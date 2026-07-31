@@ -2351,3 +2351,72 @@ describe("extractFromProgram — interface merged with a namespace of the same n
     expect(merged.isInterface).toBe(true);
   });
 });
+
+describe("@missingRailsCall extraction", () => {
+  it("records the tagged calls on a class method", () => {
+    const cls = extractFromSource(`
+      export class Foo {
+        /**
+         * Prose.
+         * @missingRailsCall synchronize — Ruby guards with Mutex#synchronize; trails is single-threaded.
+         */
+        bar(): void {}
+      }
+    `);
+    expect(cls.instanceMethods[0].missingRailsCalls).toEqual(["synchronize"]);
+  });
+
+  it("leaves an untagged method's missingRailsCalls undefined", () => {
+    const cls = extractFromSource(`
+      export class Foo {
+        /** Prose. */
+        bar(): void {}
+      }
+    `);
+    expect(cls.instanceMethods[0].missingRailsCalls).toBeUndefined();
+  });
+
+  it("does not leak a tag from the preceding method", () => {
+    const cls = extractFromSource(`
+      export class Foo {
+        /**
+         * @missingRailsCall synchronize — single-threaded.
+         */
+        bar(): void {}
+        baz(): void {}
+      }
+    `);
+    expect(cls.instanceMethods[1].missingRailsCalls).toBeUndefined();
+  });
+
+  it("throws on a bare tag (the empty-reason contract)", () => {
+    expect(() =>
+      extractFromSource(`
+      export class Foo {
+        /**
+         * @missingRailsCall synchronize
+         */
+        bar(): void {}
+      }
+    `),
+    ).toThrow(/needs a reason/);
+  });
+
+  it("reads a renamed export's own tags instead of the declaration's", () => {
+    const info = extractFromFiles("/p", {
+      "registry.ts": `
+        /**
+         * @missingRailsCall each — declared spelling iterates with for-of.
+         */
+        function registerModelClass(): void {}
+
+        /**
+         * @missingRailsCall first — the alias indexes instead.
+         */
+        export { registerModelClass as registerModel };
+      `,
+    });
+    const fns = fileFunctionsOf(info, "registry.ts");
+    expect(fns.find((f) => f.name === "registerModel")!.missingRailsCalls).toEqual(["first"]);
+  });
+});

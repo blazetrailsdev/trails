@@ -25,6 +25,9 @@ import {
   effectiveTsCalls,
   reachedSameFileMethods,
   narrowCallsApplies,
+  callTagKey,
+  staleCallTags,
+  suppressTaggedCalls,
 } from "./compare.js";
 import { rubyMethodToTs } from "./conventions.js";
 import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo } from "./types.js";
@@ -1388,5 +1391,57 @@ describe("blazetrailsDepKeys", () => {
     // in package.json — without this, FakeAdapter's superclass resolves to
     // nothing.
     expect(blazetrailsDepKeys("activerecord-test-support")).toContain("activerecord");
+  });
+});
+
+describe("suppressTaggedCalls", () => {
+  it("drops a flagged call the declaration tags and records it as used", () => {
+    const used = new Set<string>();
+    const kept = suppressTaggedCalls(
+      ["synchronize → synchronize", "reload → reload"],
+      new Set(["synchronize"]),
+      used,
+    );
+    expect(kept).toEqual(["reload → reload"]);
+    expect([...used]).toEqual(["synchronize"]);
+  });
+
+  it("does not silence a call the tag does not name", () => {
+    const used = new Set<string>();
+    expect(suppressTaggedCalls(["reload → reload"], new Set(["synchronize"]), used)).toEqual([
+      "reload → reload",
+    ]);
+    expect([...used]).toEqual([]);
+  });
+});
+
+describe("staleCallTags", () => {
+  const tags = new Map([["relation.ts", new Map([["load", new Set(["synchronize", "reload"])]])]]);
+
+  it("reports a tag whose call no longer flags on a compared method", () => {
+    const used = new Map([[callTagKey("relation.ts", "load"), new Set(["synchronize"])]]);
+    expect(staleCallTags(tags, used)).toEqual([
+      { tsFile: "relation.ts", tsName: "load", call: "reload" },
+    ]);
+  });
+
+  it("reports nothing while every tag still suppresses", () => {
+    const used = new Map([[callTagKey("relation.ts", "load"), new Set(["synchronize", "reload"])]]);
+    expect(staleCallTags(tags, used)).toEqual([]);
+  });
+
+  it("stays silent about a method no matched pair compared", () => {
+    expect(staleCallTags(tags, new Map())).toEqual([]);
+  });
+
+  it("keys tags to their own file, so a same-named method elsewhere is untouched", () => {
+    const twoFiles = new Map([
+      ["relation.ts", new Map([["load", new Set(["synchronize"])]])],
+      ["core.ts", new Map([["load", new Set(["synchronize"])]])],
+    ]);
+    const used = new Map([[callTagKey("core.ts", "load"), new Set<string>()]]);
+    expect(staleCallTags(twoFiles, used)).toEqual([
+      { tsFile: "core.ts", tsName: "load", call: "synchronize" },
+    ]);
   });
 });

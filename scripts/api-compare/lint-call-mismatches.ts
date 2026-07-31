@@ -112,6 +112,17 @@ export interface Artifact {
   // missingScope): a current compare.ts always emits it.
   packages?: string[];
   mismatches: ArtifactMismatch[];
+  /** `@missingRailsCall` tags on a compared method whose call no longer flags
+   *  (RFC 0083). Optional so an artifact predating the field still loads; the
+   *  wide gate fails on a non-empty list, the tag's only-shrink half. */
+  staleTags?: StaleTag[];
+}
+
+export interface StaleTag {
+  package: string;
+  tsFile: string;
+  tsName: string;
+  call: string;
 }
 
 // Packages that SHOULD have been compared but are absent from the artifact's

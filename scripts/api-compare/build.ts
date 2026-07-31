@@ -40,7 +40,14 @@ import {
   loadBaseline as loadNarrowBaseline,
   missingScope,
 } from "./lint-call-mismatches.js";
-import { loadSplitBaseline } from "./lint-call-mismatches-wide.js";
+import { loadSplitBaseline, writeSplitBaseline } from "./lint-call-mismatches-wide.js";
+import {
+  DEFAULT_REASON,
+  TAG,
+  type TagEntry,
+  justifies,
+  parseJsdoc,
+} from "./missing-rails-call-tags.js";
 
 const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-mismatches-wide.json");
 const WIDE_BASELINE_DIR = path.join(
@@ -48,15 +55,15 @@ const WIDE_BASELINE_DIR = path.join(
   "call-mismatches-wide-exclude",
 );
 
-export const TAG = "@missingRailsCall";
-export const DEFAULT_TAG_REASON =
-  "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; " +
-  "bucket (b) equivalent or (c) noise pending per-cluster burndown review.";
+export { TAG, parseJsdoc } from "./missing-rails-call-tags.js";
+export type { JsdocOrigin, TagEntry } from "./missing-rails-call-tags.js";
+
+export const DEFAULT_TAG_REASON = DEFAULT_REASON;
 // Reasons treated as placeholders: dropping them on convergence needs no
 // harvest report.
 const PLACEHOLDER_REASONS = new Set([DEFAULT_TAG_REASON, "unported (api:build stub)"]);
 
-interface ArtifactMismatch {
+export interface ArtifactMismatch {
   package: string;
   tsFile: string;
   rubyName: string;
@@ -64,87 +71,21 @@ interface ArtifactMismatch {
   missing: string[];
 }
 
-interface WideArtifact {
+export interface SuppressedCall {
+  package: string;
+  tsFile: string;
+  rubyName: string;
+  tsName: string;
+  call: string;
+}
+
+export interface WideArtifact {
   packages?: string[];
   mismatches: ArtifactMismatch[];
-}
-
-/** One parsed `@missingRailsCall` tag: the Ruby call name plus its raw lines
- *  (kept verbatim for idempotency) and the flattened reason text. */
-export interface TagEntry {
-  call: string;
-  reason: string;
-  rawLines: string[];
-}
-
-const TAG_LINE = /^\s*\*?\s*@missingRailsCall\s+(\S+)(?:\s+—\s?(.*))?$/;
-// A line opening a NEW JSDoc tag: at most one space after the `*`. Curated
-// reasons can contain Ruby ivar names (`@primary_key`), and the wrapper's
-// hang indent (`*   `) can place one at line start — deeper-indented `@`
-// lines are continuations, not tag boundaries (found by the activerecord-wide
-// run: core.ts initInternals).
-const ANY_TAG_LINE = /^\s*\*?\s?@\S/;
-
-/** Where a JSDoc comment starts, so an empty-reason error can name a
- *  `file:line` the way `noRailsEquivalentReason` does. */
-export interface JsdocOrigin {
-  fileName: string;
-  /** 1-based line of the comment's first line in `fileName`. */
-  startLine: number;
-}
-
-/** Parse a JSDoc comment's text (including delimiters) into its non-tag lines
- *  and its `@missingRailsCall` entries. Continuation lines (not starting a new
- *  `@` tag) attach to the preceding entry.
- *
- *  An empty reason is a hard error, matching `@noRailsEquivalent` (RFC 0080):
- *  every tag in the tree is written with a reason — the generator always emits
- *  the curated baseline row's prose or a placeholder — so a bare tag is
- *  necessarily hand-authored, and backfilling it with a placeholder would turn
- *  an unjustified allowlist entry into a silently blessed one. The family's
- *  empty-reason contract is stated in
- *  docs/infrastructure/api-build-stub-generation-plan.md. */
-export function parseJsdoc(
-  comment: string,
-  origin?: JsdocOrigin,
-): { rest: string[]; entries: TagEntry[] } {
-  const lines = comment.split("\n");
-  const rest: string[] = [];
-  const entries: TagEntry[] = [];
-  const tagLineOf = new Map<TagEntry, number>();
-  let open: TagEntry | null = null;
-  for (const [index, line] of lines.entries()) {
-    const m = line.match(TAG_LINE);
-    if (m) {
-      // Trimmed at capture: `TAG_LINE` absorbs only one space after the
-      // em-dash, so trailing whitespace would otherwise read as a non-empty
-      // reason and slide past the empty-reason gate below. `rawLines` keeps
-      // the line verbatim, so idempotency is unaffected.
-      open = { call: m[1], reason: (m[2] ?? "").trim(), rawLines: [line] };
-      entries.push(open);
-      tagLineOf.set(open, index);
-      continue;
-    }
-    const closes = line.trim() === "*/" || line.trim().endsWith("*/");
-    if (open && !ANY_TAG_LINE.test(line) && !closes && line.trim() !== "*") {
-      open.rawLines.push(line);
-      open.reason = (open.reason + " " + line.replace(/^\s*\*\s?/, "").trim()).trim();
-      continue;
-    }
-    open = null;
-    rest.push(line);
-  }
-  for (const entry of entries) {
-    if (entry.reason !== "") continue;
-    const at = origin
-      ? ` ${origin.fileName}:${origin.startLine + (tagLineOf.get(entry) ?? 0)}`
-      : "";
-    throw new Error(
-      `${TAG} needs a reason:${at} — state why the Rails call ` +
-        `\`${entry.call}\` is not made here.`,
-    );
-  }
-  return { rest, entries };
+  /** Flags a `@missingRailsCall` tag already suppressed (compare.ts). They are
+   *  absent from `mismatches`, so reconciling against that list alone would
+   *  drop the very tags that suppressed them. */
+  suppressed?: SuppressedCall[];
 }
 
 export interface ReconcileResult {
@@ -229,9 +170,28 @@ interface Edit {
   text: string;
 }
 
-interface MethodExpectation {
-  rubyName: string;
+export interface MethodExpectation {
+  /** Every Ruby method name matched onto this TS name, in artifact order. Two
+   *  Ruby names can land on one TS method, and each keys its own baseline rows
+   *  — reasons are looked up under all of them, and a justified tag drops the
+   *  row of each, so a second Ruby name's deviation is not attributed to the
+   *  first. */
+  rubyNames: string[];
   calls: Set<string>;
+}
+
+// The first curated reason any of `rubyNames` has for `call`, else the
+// placeholder. Only used to seed a NEW tag's prose.
+function firstCuratedReason(
+  rubyNames: string[],
+  call: string,
+  reasonFor: (rubyName: string, call: string) => string,
+): string {
+  for (const rubyName of rubyNames) {
+    const reason = reasonFor(rubyName, call);
+    if (reason !== DEFAULT_TAG_REASON) return reason;
+  }
+  return DEFAULT_TAG_REASON;
 }
 
 /** Reconcile every named function/method in one source file's text. Returns
@@ -244,6 +204,12 @@ export function reconcileFileText(
 ): {
   text: string | null;
   harvested: { tsName: string; entry: TagEntry }[];
+  /** Every (rubyName, call) the file now tags with a real justification — kept
+   *  and newly-added alike. These are the baseline rows the tag supersedes, so
+   *  `main` drops them from the split baseline in the same operation (RFC
+   *  0083). A tag still carrying the seeded placeholder justifies nothing and
+   *  keeps its row: it does not suppress either (see `justifies`). */
+  tagged: { rubyName: string; call: string }[];
   /** Expectation names never seen on a body-bearing declaration (mixin
    *  host-class duplicates, prototype-patched methods, …) — reported, never
    *  silently dropped. */
@@ -252,6 +218,7 @@ export function reconcileFileText(
   const sf = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true);
   const edits: Edit[] = [];
   const harvested: { tsName: string; entry: TagEntry }[] = [];
+  const tagged: { rubyName: string; call: string }[] = [];
   const seen = new Set<string>();
 
   const visit = (node: ts.Node): void => {
@@ -300,8 +267,14 @@ export function reconcileFileText(
         );
         const expected = exp?.calls ?? new Set<string>();
         const r = reconcile(entries, expected, (c) =>
-          exp ? reasonFor(exp.rubyName, c) : DEFAULT_TAG_REASON,
+          exp ? firstCuratedReason(exp.rubyNames, c, reasonFor) : DEFAULT_TAG_REASON,
         );
+        if (exp) {
+          for (const e of [...r.kept, ...r.added]) {
+            if (!justifies(e.reason)) continue;
+            for (const rubyName of exp.rubyNames) tagged.push({ rubyName, call: e.call });
+          }
+        }
         for (const d of r.dropped) {
           if (!PLACEHOLDER_REASONS.has(d.reason)) harvested.push({ tsName: name, entry: d });
         }
@@ -327,12 +300,44 @@ export function reconcileFileText(
   visit(sf);
 
   const unmatched = [...expectations.keys()].filter((n) => !seen.has(n)).sort();
-  if (edits.length === 0) return { text: null, harvested, unmatched };
+  if (edits.length === 0) return { text: null, harvested, tagged, unmatched };
   let out = text;
   for (const e of edits.sort((a, b) => b.start - a.start)) {
     out = out.slice(0, e.start) + e.text + out.slice(e.end);
   }
-  return { text: out, harvested, unmatched };
+  return { text: out, harvested, tagged, unmatched };
+}
+
+/** (tsFile → tsName → expectation) for one package: every call the artifact
+ *  still flags, PLUS every call a tag already suppressed. The second half is
+ *  what keeps this reconcile idempotent — a suppressed call is absent from
+ *  `mismatches`, so without it the tag that earned the suppression would be
+ *  dropped as satisfied and the flag would return to the ratchet. */
+export function buildExpectations(
+  artifact: WideArtifact,
+  pkg: string,
+  onlyFile?: string,
+): Map<string, Map<string, MethodExpectation>> {
+  const byFile = new Map<string, Map<string, MethodExpectation>>();
+  const expectationFor = (tsFile: string, tsName: string, rubyName: string) => {
+    const fileMap = byFile.get(tsFile) ?? byFile.set(tsFile, new Map()).get(tsFile)!;
+    const exp =
+      fileMap.get(tsName) ?? fileMap.set(tsName, { rubyNames: [], calls: new Set() }).get(tsName)!;
+    if (!exp.rubyNames.includes(rubyName)) exp.rubyNames.push(rubyName);
+    return exp;
+  };
+  for (const m of artifact.mismatches) {
+    if (m.package !== pkg) continue;
+    if (onlyFile && m.tsFile !== onlyFile) continue;
+    const exp = expectationFor(m.tsFile, m.tsName, m.rubyName);
+    for (const missing of m.missing) exp.calls.add(callOf(missing));
+  }
+  for (const c of artifact.suppressed ?? []) {
+    if (c.package !== pkg) continue;
+    if (onlyFile && c.tsFile !== onlyFile) continue;
+    expectationFor(c.tsFile, c.tsName, c.rubyName).calls.add(c.call);
+  }
+  return byFile;
 }
 
 async function main(argv: string[]): Promise<number> {
@@ -364,19 +369,10 @@ async function main(argv: string[]): Promise<number> {
     reasons.set(keyOf(e), e.reason);
   }
 
-  // (package, tsFile) → tsName → expectation.
-  const byFile = new Map<string, Map<string, MethodExpectation>>();
-  for (const m of artifact.mismatches) {
-    if (m.package !== pkg) continue;
-    if (onlyFile && m.tsFile !== onlyFile) continue;
-    const fileMap = byFile.get(m.tsFile) ?? byFile.set(m.tsFile, new Map()).get(m.tsFile)!;
-    const exp =
-      fileMap.get(m.tsName) ??
-      fileMap.set(m.tsName, { rubyName: m.rubyName, calls: new Set() }).get(m.tsName)!;
-    for (const missing of m.missing) exp.calls.add(callOf(missing));
-  }
+  const byFile = buildExpectations(artifact, pkg, onlyFile);
 
   let changed = 0;
+  const migrated = new Set<string>();
   const srcDir = packageSrcDir(pkg);
   for (const [tsFile, expectations] of [...byFile.entries()].sort()) {
     const abs = path.join(srcDir, tsFile);
@@ -401,7 +397,8 @@ async function main(argv: string[]): Promise<number> {
       console.error(`api:build: ${err instanceof Error ? err.message : String(err)}`);
       return 1;
     }
-    const { text: next, harvested, unmatched } = reconciled;
+    const { text: next, harvested, tagged, unmatched } = reconciled;
+    for (const t of tagged) migrated.add(keyOf({ package: pkg, tsFile, ...t }));
     for (const h of harvested) {
       console.log(`harvested (${tsFile} ${h.tsName} ${h.entry.call}): ${h.entry.reason}`);
     }
@@ -414,6 +411,14 @@ async function main(argv: string[]): Promise<number> {
       else await fs.writeFile(abs, next);
     }
   }
+  const remaining = wideBaseline.filter((e) => !migrated.has(keyOf(e)));
+  const dropped = wideBaseline.length - remaining.length;
+  if (dropped > 0 && !dryRun) await writeSplitBaseline(remaining, WIDE_BASELINE_DIR);
+  console.log(
+    `api:build: ${dropped} baseline entr(ies) ${dryRun ? "would migrate" : "migrated"} to ` +
+      `@missingRailsCall tags and ${dryRun ? "would be" : "were"} dropped from ` +
+      `${path.relative(ROOT_DIR, WIDE_BASELINE_DIR)}/.`,
+  );
   console.log(`api:build: ${changed} file(s) ${dryRun ? "would change" : "updated"} (${pkg}).`);
   return 0;
 }

@@ -16,6 +16,9 @@
  *
  *   - any NEW wide mismatch absent from the baseline (the ratchet);
  *   - any STALE baseline entry that no longer flags (only-shrink);
+ *   - any STALE `@missingRailsCall` tag whose call no longer flags (RFC 0083 —
+ *     the tag is the OTHER place a wide deviation can be justified, and it
+ *     shrinks by the same rule; see missing-rails-call-tags.ts);
  *   - more entries still carrying the seeded {@link DEFAULT_REASON} than the
  *     committed high-water mark in call-mismatches-wide-unreviewed.json
  *     (RFC 0083 — see unreviewed-ratchet.ts for why that is a second ratchet).
@@ -93,6 +96,7 @@ import {
   flattenArtifact,
   missingScope,
   reseed,
+  type StaleTag,
 } from "./lint-call-mismatches.js";
 import { reportNonCanonicalBaselines, serializeBaseline } from "./baseline-json.js";
 import {
@@ -107,6 +111,7 @@ import {
   writeMark,
 } from "./unreviewed-ratchet.js";
 import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "./conventions.js";
+import { DEFAULT_REASON, TAG } from "./missing-rails-call-tags.js";
 import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
 
 // The baseline is a directory of per-source-file JSON arrays (see header),
@@ -143,9 +148,7 @@ const MARK_PATH = path.join(
   "call-mismatches-wide-unreviewed.json",
 );
 
-export const DEFAULT_REASON =
-  "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; " +
-  "bucket (b) equivalent or (c) noise pending per-cluster burndown review.";
+export { DEFAULT_REASON } from "./missing-rails-call-tags.js";
 
 async function readJson<T>(file: string): Promise<T> {
   return JSON.parse(await fs.readFile(file, "utf-8")) as T;
@@ -366,6 +369,20 @@ function section(title: string, rows: [string, number][], top?: number): string 
   ].join("\n");
 }
 
+/** The STALE-tag half of the only-shrink contract, rendered for the console;
+ *  null when every `@missingRailsCall` tag still suppresses a live flag. */
+export function renderStaleTags(staleTags: StaleTag[]): string | null {
+  if (staleTags.length === 0) return null;
+  return [
+    `\nwide call-mismatches ratchet: ${staleTags.length} STALE ${TAG} tag(s) whose call is ` +
+      "no longer flagged.",
+    "A justification only shrinks, exactly like a baseline entry: the TS body now makes " +
+      "the call, so delete the tag from its JSDoc block (or run `pnpm api:build --package " +
+      "<pkg>`, which drops it for you).\n",
+    ...staleTags.map((t) => `  - ${t.package}  ${t.tsFile}  ${t.tsName}  ${t.call}`),
+  ].join("\n");
+}
+
 export function unreviewedCount(entries: ExcludeEntry[]): number {
   return unreviewedEntries(entries, DEFAULT_REASON).length;
 }
@@ -472,13 +489,16 @@ async function main(write: boolean): Promise<number> {
   if (await reportNonCanonicalBaselines(files, "wide call-mismatches ratchet")) return 1;
 
   const { added, stale } = diffAgainstBaseline(current, baseline);
+  const staleTags = artifact.staleTags ?? [];
+  const staleTagReport = renderStaleTags(staleTags);
+  if (staleTagReport) console.error(staleTagReport);
 
   const unreviewed = unreviewedCount(baseline);
   const mark = await loadMark(MARK_PATH);
   const overMark = unreviewed > mark;
   if (overMark) console.error(renderExcess(unreviewed, mark, path.relative(ROOT_DIR, MARK_PATH)));
 
-  if (added.length === 0 && stale.length === 0) {
+  if (added.length === 0 && stale.length === 0 && staleTags.length === 0) {
     if (overMark) return 1;
     console.log(
       `wide call-mismatches ratchet: OK (${baseline.length} baselined, ` +

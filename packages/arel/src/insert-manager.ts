@@ -67,12 +67,10 @@ export class InsertManager extends TreeManager {
    * - values pass through raw — no `Quoted` wrap (Rails preserves them
    *   for the dialect-specific value visitor to quote)
    *
-   * @missingRailsCall each — Baseline (RFC 0047): wide call-set flag seeded when
-   *   the wide ratchet landed; bucket (b) equivalent or (c) noise pending
-   *   per-cluster burndown review.
-   * @missingRailsCall first — Baseline (RFC 0047): wide call-set flag seeded
-   *   when the wide ratchet landed; bucket (b) equivalent or (c) noise pending
-   *   per-cluster burndown review.
+   * @missingRailsCall first — Rails reaches the first column with
+   *   `fields.first.first.relation`; JS indexes instead (`fields[0]?.[0]`),
+   *   which is the analogue of `Array#first` and the form the rest of arel
+   *   uses. There is no `first` to call.
    */
   insert(fields: string | [Attribute | Node, unknown][] | null | undefined): this {
     if (fields == null) return this;

@@ -98,6 +98,7 @@ import {
   parseArityExcludes,
 } from "./arity-exclude.js";
 import { matchOptionKeysAgainst } from "./options-keys.js";
+import { callOf } from "./lint-call-mismatches.js";
 import {
   compareDefaults,
   compareLiteral,
@@ -550,6 +551,76 @@ interface CallResult {
   compared: number;
   mismatched: number;
   mismatches: CallMismatch[];
+  staleTags: StaleCallTag[];
+  suppressed: SuppressedCall[];
+}
+
+/** A flag a `@missingRailsCall` tag suppressed. Reported in the artifact
+ *  because the mismatch list no longer carries it and `api:build` reconciles
+ *  tags against that list: without this, the next api:build run would read the
+ *  call as satisfied, drop the tag it just honoured, and hand the flag straight
+ *  back to the ratchet. */
+export interface SuppressedCall {
+  tsFile: string;
+  rubyName: string;
+  tsName: string;
+  call: string;
+}
+
+/** Identity of the declaration a `@missingRailsCall` tag is written on. Keyed
+ *  by (tsFile, tsName), so a tag justifies the deviation for exactly the method
+ *  that carries it and never for a same-named method in another file. */
+export function callTagKey(tsFile: string, tsName: string): string {
+  return `${tsFile}\u0000${tsName}`;
+}
+
+/** Drop the flagged calls a tag on this declaration justifies, recording each
+ *  one in `used` (a suppression is what makes a tag non-stale). A tag for one
+ *  call never silences another: `tags` is matched against each flag's own call
+ *  name. */
+export function suppressTaggedCalls(
+  missing: string[],
+  tags: ReadonlySet<string>,
+  used: Set<string>,
+): string[] {
+  return missing.filter((m) => {
+    const call = callOf(m);
+    if (!tags.has(call)) return true;
+    used.add(call);
+    return false;
+  });
+}
+
+/** Every tagged call on a COMPARED (tsFile, tsName) that never suppressed a
+ *  flag — the tag's stale half. Sorted for a deterministic artifact. */
+export function staleCallTags(
+  tagsByFileName: Map<string, Map<string, Set<string>>>,
+  used: Map<string, Set<string>>,
+): StaleCallTag[] {
+  const out: StaleCallTag[] = [];
+  for (const [tsFile, byName] of tagsByFileName) {
+    for (const [tsName, calls] of byName) {
+      const hit = used.get(callTagKey(tsFile, tsName));
+      if (hit === undefined) continue;
+      for (const call of calls) {
+        if (!hit.has(call)) out.push({ tsFile, tsName, call });
+      }
+    }
+  }
+  return out.sort((a, b) =>
+    `${a.tsFile} ${a.tsName} ${a.call}` < `${b.tsFile} ${b.tsName} ${b.call}` ? -1 : 1,
+  );
+}
+
+/** A `@missingRailsCall` tag (RFC 0083) on a COMPARED method whose call is no
+ *  longer flagged — the tag's only-shrink half, mirroring the baseline dir's
+ *  STALE entries: once the TS body makes the call, the justification must go.
+ *  Tags on methods no pair matched are NOT reported: nothing compared them, so
+ *  "no longer flagged" would be unknowable rather than true. */
+export interface StaleCallTag {
+  tsFile: string;
+  tsName: string;
+  call: string;
 }
 
 // Advisory signature comparison: for a name-matched (ruby, ts) pair whose
@@ -1291,6 +1362,7 @@ export function main() {
     const tsParamsByFileName = new Map<string, Map<string, ParamInfo[][]>>();
     // Body call-sets scoped per (file, name) for the advisory calls-parity check.
     const tsCallsByFileName = new Map<string, Map<string, string[][]>>();
+    const tsMissingCallTagsByFileName = new Map<string, Map<string, Set<string>>>();
     // Same call-sets unioned by NAME across this package and its deps (the same
     // scope tsParamsByName uses). Consulted ONLY by the delegation-transparency
     // gate (see effectiveTsCalls), never as the primary population — the
@@ -1325,6 +1397,13 @@ export function main() {
         const byName = tsOptionKeysByFileName.get(file) ?? new Map<string, (string[] | null)[]>();
         byName.set(m.name, [...(byName.get(m.name) ?? []), m.optionKeys]);
         tsOptionKeysByFileName.set(file, byName);
+      }
+      if (m.missingRailsCalls !== undefined) {
+        const byName = tsMissingCallTagsByFileName.get(file) ?? new Map<string, Set<string>>();
+        const tagged = byName.get(m.name) ?? new Set<string>();
+        for (const c of m.missingRailsCalls) tagged.add(c);
+        byName.set(m.name, tagged);
+        tsMissingCallTagsByFileName.set(file, byName);
       }
       if (m.calls !== undefined) {
         const byName = tsCallsByFileName.get(file) ?? new Map<string, string[][]>();
@@ -1638,6 +1717,8 @@ export function main() {
     const literalMismatches: LiteralMismatch[] = [];
     let callsCompared = 0;
     const callMismatches: CallMismatch[] = [];
+    const callTagsUsed = new Map<string, Set<string>>();
+    const suppressedCalls: SuppressedCall[] = [];
     const bodyHashRecords: BodyHashRecord[] = [];
     const fileResults: FileResult[] = [];
 
@@ -1805,8 +1886,19 @@ export function main() {
           jsEnumerableAliases,
           negatedTsCalls,
         );
-        if (missing.length === 0) return;
-        callMismatches.push({ rubyFile, tsFile, rubyName, tsName, missing });
+        const tags = tsMissingCallTagsByFileName.get(tsFile)?.get(tsName);
+        let kept = missing;
+        if (tags !== undefined && tags.size > 0) {
+          const tagKey = callTagKey(tsFile, tsName);
+          const used = callTagsUsed.get(tagKey) ?? callTagsUsed.set(tagKey, new Set()).get(tagKey)!;
+          kept = suppressTaggedCalls(missing, tags, used);
+          for (const m of missing) {
+            const call = callOf(m);
+            if (tags.has(call)) suppressedCalls.push({ tsFile, rubyName, tsName, call });
+          }
+        }
+        if (kept.length === 0) return;
+        callMismatches.push({ rubyFile, tsFile, rubyName, tsName, missing: kept });
       };
 
       // Advisory arity check for one name-matched pair: flag when the Ruby and
@@ -2205,6 +2297,8 @@ export function main() {
         compared: callsCompared,
         mismatched: callMismatches.length,
         mismatches: callMismatches,
+        staleTags: staleCallTags(tsMissingCallTagsByFileName, callTagsUsed),
+        suppressed: suppressedCalls,
       },
       bodyHashes: bodyHashRecords,
     });
@@ -2312,6 +2406,12 @@ export function main() {
   const callsFlat = results.flatMap((r) =>
     r.calls.mismatches.map((m) => ({ package: r.package, ...m })),
   );
+  const staleTagsFlat = results.flatMap((r) =>
+    r.calls.staleTags.map((t) => ({ package: r.package, ...t })),
+  );
+  const suppressedFlat = results.flatMap((r) =>
+    r.calls.suppressed.map((c) => ({ package: r.package, ...c })),
+  );
   fs.writeFileSync(
     callsPath,
     JSON.stringify(
@@ -2327,6 +2427,8 @@ export function main() {
         compared: results.reduce((n, r) => n + r.calls.compared, 0),
         mismatched: callsFlat.length,
         mismatches: callsFlat,
+        staleTags: staleTagsFlat,
+        suppressed: suppressedFlat,
       },
       null,
       2,
