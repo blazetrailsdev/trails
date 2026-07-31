@@ -8,7 +8,12 @@ import rule, {
   isCanonicalSchemaModule,
   moduleBasename,
 } from "./no-internal-canonical-loaders.mjs";
-import { canonicalLoaderModules, canonicalLoaderScanRoots } from "./test-infra-scope.mjs";
+import {
+  canonicalLoaderEnforcedGlobs,
+  canonicalLoaderModules,
+  canonicalLoaderScanRoots,
+  canonicalLoaderUnenforceableRoots,
+} from "./test-infra-scope.mjs";
 
 const FILENAME = "packages/activerecord/src/dirty.test.ts";
 const OWN_TEST = "packages/activerecord/src/support/canonical-schema.test.ts";
@@ -87,6 +92,13 @@ tester.run("no-internal-canonical-loaders", rule, {
     {
       filename: "packages/activerecord/src/support/schema-file-generator.test.ts",
       code: 'import { loadCanonicalSchema } from "./canonical-schema.js";',
+      errors: [{ messageId: "banned", data: { name: "loadCanonicalSchema" } }],
+    },
+    // A test file in another workspace package is linted too — the rule is
+    // wired to every scan root, not just activerecord.
+    {
+      filename: "packages/activesupport/src/schema-wiring.test.ts",
+      code: 'import { loadCanonicalSchema } from "../../activerecord/src/support/canonical-schema.js";',
       errors: [{ messageId: "banned", data: { name: "loadCanonicalSchema" } }],
     },
     // Both banned symbols in one import → one report each.
@@ -220,6 +232,29 @@ describe("no-internal-canonical-loaders module matcher", () => {
     expect([...trees]).toEqual(
       expect.arrayContaining(["packages/activerecord", "packages/activesupport", "scripts"]),
     );
+  });
+
+  // Discovery is not enforcement: widening the scan roots above keeps the
+  // pinned module list honest, but the rule only runs against files matching
+  // its `files` glob in eslint.config.mjs. A config still scoped to
+  // packages/activerecord would leave a test file in another package importing
+  // a banned loader completely unlinted — the hole this story is about.
+  it("wires the rule to every scan root eslint can lint", async () => {
+    const config = (await import("../eslint.config.mjs")).default;
+    const blocks = config.filter(
+      (block) => block.rules?.["blazetrails/no-internal-canonical-loaders"],
+    );
+    expect(blocks.flatMap((block) => block.files ?? [])).toEqual(canonicalLoaderEnforcedGlobs);
+
+    const globallyIgnored = config.flatMap((block) => (block.files ? [] : (block.ignores ?? [])));
+    const unlintable = canonicalLoaderScanRoots.filter((root) =>
+      globallyIgnored.includes(`${root}/**`),
+    );
+    expect(unlintable).toEqual(canonicalLoaderUnenforceableRoots);
+    for (const root of canonicalLoaderScanRoots) {
+      const enforced = canonicalLoaderEnforcedGlobs.some((glob) => glob.startsWith(`${root}/`));
+      expect([root, enforced]).toEqual([root, !unlintable.includes(root)]);
+    }
   });
 
   // Without this the allowlist is a silent hole of its own: if model-schema.ts

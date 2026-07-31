@@ -30,10 +30,15 @@
 import path from "path";
 import { canonicalLoaderModules, canonicalLoaderSelfTests } from "./test-infra-scope.mjs";
 
-/** Repo-relative path under packages/; null if outside the repo tree. */
+/**
+ * Repo-relative path under one of the enforced roots; null if outside them.
+ * `scripts/` counts as well as `packages/`: the rule is wired to both, so a
+ * self-test living outside `packages/` still has to key its allowlist entry the
+ * same way.
+ */
 export function repoRel(filename) {
   const norm = filename.replace(/\\/g, "/");
-  const m = norm.match(/(?:^|\/)(packages\/.+)$/);
+  const m = norm.match(/(?:^|\/)((?:packages|scripts)\/.+)$/);
   return m ? m[1] : null;
 }
 

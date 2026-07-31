@@ -27,7 +27,10 @@ import requireTableTeardown from "./eslint/require-table-teardown.mjs";
 import requireCanonicalRebuild from "./eslint/require-canonical-rebuild.mjs";
 import noRawSql from "./eslint/no-raw-sql.mjs";
 import { noRawSqlFiles, noRawSqlIgnores } from "./eslint/no-raw-sql-scope.mjs";
-import { testInfraExemptIgnores } from "./eslint/test-infra-scope.mjs";
+import {
+  canonicalLoaderEnforcedGlobs,
+  testInfraExemptIgnores,
+} from "./eslint/test-infra-scope.mjs";
 import noStandaloneAssociations from "./eslint/no-standalone-associations.mjs";
 import noInternalCanonicalLoaders from "./eslint/no-internal-canonical-loaders.mjs";
 import noExplicitAnyDisable from "./eslint/no-explicit-any-disable.mjs";
@@ -550,9 +553,14 @@ export default defineConfig(
   //    rebuildCanonicalTables is intentionally allowed (documented shared shield).
   //    Only canonical-schema.test.ts / canonical-table-rebuild.test.ts may
   //    import them, to test them directly (allowlisted in the rule).
+  //    Enforced across every workspace package, not just activerecord: the
+  //    loaders are matched by module basename, so a test file in another
+  //    package reaching for one would otherwise never be linted at all.
+  //    (scripts/ is in this config's top-level `ignores`, so no rule reaches
+  //    it — see canonicalLoaderUnenforceableRoots.)
   //    See eslint/no-internal-canonical-loaders.mjs. ──
   {
-    files: ["packages/activerecord/src/**/*.test.ts"],
+    files: canonicalLoaderEnforcedGlobs,
     rules: {
       "blazetrails/no-internal-canonical-loaders": "error",
     },

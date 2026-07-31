@@ -31,6 +31,29 @@ export const activerecordSrcRoot = "packages/activerecord/src";
 export const canonicalLoaderScanRoots = ["packages", "scripts"];
 
 /**
+ * `files` globs the `no-internal-canonical-loaders` rule is wired to.
+ *
+ * Discovery and enforcement are two surfaces: the scan above keeps the rule's
+ * pinned module list honest, but the rule only ever runs against files matching
+ * these globs, so a test file outside them could import a banned loader and
+ * never be linted at all. Both are derived from the same roots so widening one
+ * widens the other; the pin in `no-internal-canonical-loaders.test.mjs` fails if
+ * `eslint.config.mjs` drifts from this list.
+ */
+export const canonicalLoaderEnforcedGlobs = ["packages/**/*.test.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"];
+
+/**
+ * Scan roots ESLint cannot enforce in, because `eslint.config.mjs` puts them in
+ * its top-level `ignores` — no rule runs there at all, so a glob for them would
+ * be a lie. They stay in the discovery scan: a loader *module* relocated into
+ * one is still caught and forced into `canonicalLoaderModules`. The pin in
+ * `no-internal-canonical-loaders.test.mjs` re-derives this from the config's
+ * real ignore list, so un-ignoring `scripts/` fails until enforcement widens
+ * with it.
+ */
+export const canonicalLoaderUnenforceableRoots = ["scripts"];
+
+/**
  * Test-infra paths exempt from the table-lifecycle rules, relative to
  * `activerecordSrcRoot`. `fixtures.ts` / `test-fixtures.ts` are anchored as
  * exact ported files rather than by basename — see no-raw-sql-scope.mjs.
