@@ -49,6 +49,7 @@ const { recordBootLaidTables, dropAllTables, resetTestTables } =
 const { loadSchema, loadAdapterSpecificSchema } = await import("./support/load-schema-helper.js");
 const { canonicalSchemaUpToDate, stampCanonicalSchema } =
   await import("./support/canonical-schema-stamp.js");
+const { recordBootOutcome } = await import("./support/boot-outcome.js");
 
 if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
   if (getEnv("SKIP_TEST_DATABASE_TRUNCATE") === undefined) {
@@ -69,6 +70,7 @@ if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
   // this database is entitled to the same fast path. Without this the stamp is
   // single-use per database and every recycle pays the full purge+reload.
   await stampCanonicalSchema(conn);
+  await recordBootOutcome("fastPath", await canonicalSchemaUpToDate(conn));
 } else {
   // `DatabaseTasks.purge` re-establishes Base's pool on the recreated database,
   // so the connection has to be leased after it, not before.
@@ -80,6 +82,7 @@ if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
   const canonicalConn = await Base.leaseConnection();
   await loadSchema(canonicalConn);
   await stampCanonicalSchema(canonicalConn);
+  await recordBootOutcome("fullLoad", await canonicalSchemaUpToDate(canonicalConn));
 }
 
 // Permanent worker-startup assertion: a broken arm of the load path fails here

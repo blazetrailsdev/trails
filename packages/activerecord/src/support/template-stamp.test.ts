@@ -17,6 +17,7 @@
 import { describe, it, expect } from "vitest";
 import "../sqlite/better-sqlite3.js";
 import { Base } from "../base.js";
+import { bootOutcome } from "./boot-outcome.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import { InternalMetadata } from "../internal-metadata.js";
 import {
@@ -64,5 +65,13 @@ describe.skipIf(!runToken)("boot fast path stamp", () => {
     await loadAdapterSpecificSchema(connection);
     await stampCanonicalSchema(connection);
     expect(await canonicalSchemaUpToDate(await Base.leaseConnection())).toBe(true);
+  });
+});
+
+describe.skipIf(!runToken)("boot outcome", () => {
+  it("a boot that took the fast path leaves the database stamped", () => {
+    const outcome = bootOutcome();
+    expect(outcome, "boot must record which arm it took").not.toBeNull();
+    expect(outcome?.stamped, `boot arm ${outcome?.arm} must leave the database stamped`).toBe(true);
   });
 });
