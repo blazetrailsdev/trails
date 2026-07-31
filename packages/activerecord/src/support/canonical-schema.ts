@@ -174,6 +174,14 @@ interface TableMeta {
   primaryKey?: string[];
   /** Single-column integer PK emitted inline as a serial (Rails `t.primary_key`). */
   serialPk?: string;
+  /**
+   * `schema.rb:1444-1460` creates this table through the *second* connection
+   * (`Course`/`College`/`Professor.lease_connection`), so it belongs to
+   * `arunit2` and never to the primary `arunit` database.
+   * {@link loadCanonicalSchema} skips it; `setup-second-pool.ts` lays it in
+   * arunit2 by name through `rebuildCanonicalTables`.
+   */
+  arunit2?: true;
 }
 
 /**
@@ -1761,7 +1769,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.bigInteger("toooooooo_long_b_id", { null: false });
   });
 
-  await define("courses", {}, (t) => {
+  await define("courses", { arunit2: true }, (t) => {
     t.string("name", { null: false });
     t.integer("college_id");
     // `t.column :college_id, :integer, index: true` (schema.rb:1446); `column`
@@ -1769,15 +1777,15 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.index("college_id");
   });
 
-  await define("colleges", {}, (t) => {
+  await define("colleges", { arunit2: true }, (t) => {
     t.string("name", { null: false });
   });
 
-  await define("professors", {}, (t) => {
+  await define("professors", { arunit2: true }, (t) => {
     t.string("name", { null: false });
   });
 
-  await define("courses_professors", { id: false }, (t) => {
+  await define("courses_professors", { id: false, arunit2: true }, (t) => {
     t.integer("course_id");
     t.integer("professor_id");
   });
@@ -2093,6 +2101,9 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
  * The template DB is built once at boot, so — unlike `defineSchema` — this issues
  * no drops, no signature-cache bookkeeping, and no schema-cache warming.
  *
+ * `arunit2`-only tables are skipped: `schema.rb:1444-1460` creates them through
+ * the second connection, so Rails' primary `arunit` database never carries them.
+ *
  * @internal Plumbing for the boot/template setup paths only. Do NOT call this
  * from a `*.test.ts` file — wire the canonical schema + fixtures through the
  * `fixtures({ ... })` helper, which is the sanctioned public test surface. The
@@ -2101,6 +2112,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 export async function loadCanonicalSchema(adapter: DatabaseAdapter): Promise<void> {
   const { ss, typeMap } = await prepareSchema(adapter);
   for (const def of await buildCanonicalRegistry()) {
+    if (def.meta.arunit2) continue;
     await runTable(adapter, ss, typeMap, def);
   }
   // create_table/drop_table clear the connection's prepared statements in Rails;
