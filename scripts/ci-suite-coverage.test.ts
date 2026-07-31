@@ -284,6 +284,18 @@ describe("CI runs every tooling test suite", () => {
     expect(runs.filter((f) => gate.test(`vendor/${f}`))).toEqual([]);
   });
 
+  // GitHub compiles each `run:` block as one template expression and rejects
+  // anything over 21,000 characters. Crossing it fails the WHOLE workflow at
+  // startup: zero jobs, no checks on the PR, and — because the `on:` filters
+  // can't be read either — a stray push-event run on a feature branch. The
+  // YAML stays valid, so nothing local catches it. Comments cost the same as
+  // code here, so keep prose out of that step.
+  it("keeps the changes-job filter script clear of the Actions expression limit", async () => {
+    const wf = parseYaml(await readFile(CI_YML, "utf8"));
+    const filter = wf.jobs.changes.steps.find((s: { id?: string }) => s.id === "filter");
+    expect(filter.run.length).toBeLessThan(20_500);
+  });
+
   it("keeps the draft deferral, its two jobs and the ci aggregate in agreement", async () => {
     const wf = parseYaml(await readFile(CI_YML, "utf8"));
     const gateOf = (job: string): string => wf.jobs[job].if.replace(/\s+/g, " ").trim();

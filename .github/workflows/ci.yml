@@ -101,52 +101,12 @@ jobs:
           # Cross-cutting paths force every per-package gate true. Anything
           # here affects all packages: workspace topology, root tooling
           # config, shared scripts, this workflow, composite actions.
-          # NOTE: the blanket `scripts/` here also matches subtrees that are
-          # NOT cross-cutting; they are carved back out of the infra sweep
-          # below (see `INFRA_CARVEOUT_RE` / `infra_files`). Keep that
-          # exclusion in sync if this pattern changes.
+          # The blanket `scripts/` below also sweeps up subtrees that are NOT
+          # cross-cutting; INFRA_CARVEOUT_RE strips them back out — keep the
+          # two in sync. Every carved subtree must still be named in the gate
+          # of whichever job runs its tests, or a change confined to it runs
+          # nothing; scripts/ci-suite-coverage.test.ts enforces that pairing.
           INFRA_RE='^(pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig[^/]*\.json$|vitest[^/]*\.config\.ts$|scripts/|\.github/workflows/ci\.yml$|\.github/actions/)'
-          # Paths that INFRA_RE's blanket `scripts/` sweeps up but which are
-          # single-consumer (or consumed by no CI job at all). Each is stripped
-          # from `infra_files` so a change confined to it does NOT force every
-          # per-package gate true. Classification (verify before adding more):
-          #   tasks/            - tests ride unit-tests only (UNIT_TESTS_PKGS_RE)
-          #   guides-typecheck/ - guides-typecheck job + unit-tests self-test;
-          #                       listed in GUIDES_PKGS_RE and UNIT_TESTS_PKGS_RE
-          #   {api,test,fixtures,schema}-compare/, and the manifest builders
-          #                     - rails-comparison only; listed in COMPARISON_RE
-          #   parity/           - parity jobs, which gate on labels/schedule
-          #                       only and consult no path regex
-          #   ci/               - gh-api-retry.sh runs in preflight;
-          #                       coverage-summary.mjs only in the `if: false`
-          #                       coverage jobs
-          #   test-deps/        - rails-test-deps.ts runs in `prelint`, i.e.
-          #                       inside the lint job
-          #   rails-find/, sync-stats/, phase-g-hunt/, fixtures-inventory/,
-          #   __fixtures__/, strip-asany*
-          #                     - local-dev tooling; no CI job runs the tools
-          #                       themselves.
-          #   ci-suite-coverage.test.ts
-          #                     - guards this file's own wiring; its only
-          #                       consumer is unit-tests, which names it in
-          #                       UNIT_TESTS_PKGS_RE.
-          # IMPORTANT: carving a subtree out of the infra sweep does NOT mean
-          # its own tests can go unnamed. unit-tests runs the compare/parity
-          # tooling's vitest suites — api-compare, test-compare,
-          # fixtures-compare, test-deps, rails-find, parity and the top-level
-          # scripts/*.test.ts files — so every one of those is also listed in
-          # UNIT_TESTS_PKGS_RE, while schema-compare's suite is a step of
-          # rails-comparison (COMPARISON_RE).
-          # scripts/ci-suite-coverage.test.ts enforces that pairing: it fails
-          # if a tooling test file is neither named in a ci.yml vitest
-          # invocation nor on its KNOWN_UNRUN list.
-          # The preflight/lint groups above need no regex addition because
-          # those jobs have no path gate at all — they run on every
-          # non-docs-only change, so carving cannot skip them. `pnpm lint` is
-          # `eslint .`, so it also still lints every carved subtree.
-          # Deliberately NOT carved (genuinely cross-cutting): typecheck.mjs
-          # (root `pnpm typecheck`), start-worktree.sh, and the remaining
-          # top-level scripts/*.ts one-offs.
           INFRA_CARVEOUT_RE='^scripts/((tasks|ci|guides-typecheck|rails-find|sync-stats|phase-g-hunt|fixtures-inventory|test-deps|__fixtures__|api-compare|test-compare|fixtures-compare|schema-compare|parity)/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|strip-asany|ci-suite-coverage|deprecated-manifest-diff)(\.test)?\.ts$)'
           # AR workspace deps: arel/activemodel/activesupport/globalid/
           # did-you-mean (per packages/activerecord/package.json). Also
