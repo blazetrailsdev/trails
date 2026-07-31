@@ -1579,15 +1579,10 @@ export abstract class Migration {
       const conn = this.connection as unknown as Record<string, unknown>;
       if (typeof conn["revert"] !== "function") {
         if (args.length > 0 && !["execute", "enableExtension", "disableExtension"].includes(name)) {
-          args[0] = Migration.properTableName(
-            args[0] as string | { tableName?: unknown },
-            Migration.tableNameOptions(),
-          );
+          const options = Migration.tableNameOptions();
+          args[0] = Migration.properTableName(args[0] as string, options);
           if (name === "renameTable" || (name === "removeForeignKey" && !isPlainObject(args[1]))) {
-            args[1] = Migration.properTableName(
-              args[1] as string | { tableName?: unknown },
-              Migration.tableNameOptions(),
-            );
+            args[1] = Migration.properTableName(args[1] as string, options);
           }
         }
       }

@@ -286,9 +286,6 @@ describe("Migration#createTable id option type", () => {
       await expect(migration.methodMissing("nopeNotHere")).rejects.toThrow(TypeError);
     });
 
-    // `Migration#methodMissing` mirrors `migration.rb:1044-1058`: the dispatch
-    // is wrapped in `sayWithTime` and the leading table-name arguments are
-    // rewritten through `properTableName`.
     class RecordingMigration extends Migration {
       calls: [string, unknown[]][] = [];
       lines: string[] = [];
