@@ -20,16 +20,24 @@ export function normalizeSqlitePaths(
     const database = config.database;
     if (!database || !config.adapter?.startsWith("sqlite")) return config;
     if (isMemoryOrUri(database) || isAbsolute(database)) return config;
-    const expanded = { ...config.configurationHash, database: resolve(root, database) };
+    const absolute = resolve(root, database);
     // Rebuild through the config's own class: a UrlConfig flattened into a
-    // HashConfig would lose its `url` reader. UrlConfig re-derives the hash
-    // from the URL and so wins over `expanded.database` for scheme-style
-    // URLs (`sqlite3://...`) — those already parse to an absolute path and
-    // are filtered out above, so the expansion is never silently dropped.
+    // HashConfig would lose its `url` reader. Its constructor re-derives the
+    // hash from the URL and spreads it last, so an expanded `database` in the
+    // configuration would be overwritten by the URL's relative one — the URL
+    // itself has to carry the expansion. That is only a safe rewrite when the
+    // database is the URL's tail (`sqlite3:db/dev.sqlite3`, `db/dev.sqlite3`);
+    // anything else (query parameters, say) is left alone rather than
+    // rewritten by guesswork.
     if (config instanceof UrlConfig) {
-      return new UrlConfig(config.envName, config.name, config.url, expanded);
+      if (!config.url.endsWith(database)) return config;
+      const expandedUrl = config.url.slice(0, -database.length) + absolute;
+      return new UrlConfig(config.envName, config.name, expandedUrl, config.configurationHash);
     }
-    return new HashConfig(config.envName, config.name, expanded);
+    return new HashConfig(config.envName, config.name, {
+      ...config.configurationHash,
+      database: absolute,
+    });
   });
   return new DatabaseConfigurations(normalized);
 }
