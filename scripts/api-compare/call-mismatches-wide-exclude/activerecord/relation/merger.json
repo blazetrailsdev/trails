@@ -25,7 +25,7 @@
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_joins",
     "call": "joins!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-entry verified (RFC 0083 audit, re-bucketing an RFC 0047 baseline seed): NOT bucket (b) equivalent or (c) noise — this is a real unported call. Rails merger.rb:117-134 pushes the cross-klass JoinDependency into the receiver's `joins_values` via `relation.joins!(join_dependency, *others)` at :132, so `build_join_buckets` routes it through `select_named_joins` → `select_association_list` (query_methods.rb:1810-1822), which stashes it into `buckets[:stashed_join]`. trails' `mergeJoins` (relation/merger.ts:96-98) delegates to `foldMergeJoins` (relation/merge-joins.ts:84-93), which parks the JD in the side store `_namedInnerJoinDeps` instead; `emitJoinPlan` (relation/query-methods.ts:3084-3087) then appends its constraints straight to the manager, bypassing bucket routing entirely. Tracked by RFC 0083 stories converge-merged-join-deps-into-joins-values, converge-apply-join-dependency-joins-bang and port-build-join-buckets-eager-stash-pop."
   },
   {
     "package": "activerecord",
@@ -102,7 +102,7 @@
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_outer_joins",
     "call": "left_outer_joins!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-entry verified (RFC 0083 audit, re-bucketing an RFC 0047 baseline seed): NOT bucket (b) equivalent or (c) noise — this is a real unported call. Rails merger.rb:136-153 pushes the cross-klass JoinDependency into the receiver's `left_outer_joins_values` via `relation.left_outer_joins!(join_dependency, *others)` at :151, so `build_join_buckets` stashes it through `select_association_list` like any other stash. trails' `mergeOuterJoins` (relation/merger.ts:100-102) delegates to `foldMergeOuterJoins` (relation/merge-joins.ts:112-121), which parks the JD in the side store `_leftOuterJoinDeps` instead; `emitJoinPlan` (relation/query-methods.ts:3089-3092) appends its constraints straight to the manager, bypassing bucket routing. Tracked by RFC 0083 stories converge-merged-join-deps-into-joins-values, converge-apply-join-dependency-joins-bang and port-build-join-buckets-eager-stash-pop."
   },
   {
     "package": "activerecord",

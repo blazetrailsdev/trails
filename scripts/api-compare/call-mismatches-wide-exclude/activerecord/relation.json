@@ -88,7 +88,7 @@
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "joins!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-entry verified (RFC 0083 audit, re-bucketing an RFC 0047 baseline seed): NOT bucket (b) equivalent or (c) noise — this is a real unported call. Rails finder_methods.rb:457-461 stashes the eager JoinDependency into `joins_values` with `except(:includes, :eager_load, :preload).joins!(join_dependency)`, which is the ONLY reason `build_join_buckets` needs the `joins.last.base_klass == model` discriminator (query_methods.rb:1847-1850). trails' `applyJoinDependency` (relation.ts:4856-4892) instead clears the eager stores and returns `rel.leftOuterJoins(eagerSpecs)`, so no JoinDependency ever reaches `joinsValues` and `joinsBang` is never called; `buildJoinBuckets` compensates by rebuilding the eager JD inline from `_eagerLoadAssociations` (relation/query-methods.ts:2901-2916). Note `_eagerLoadAssociations` IS the faithful port of Rails' `eager_load_values` — the gap is the missing `joins!` step, not the store. Tracked by RFC 0083 stories converge-merged-join-deps-into-joins-values, converge-apply-join-dependency-joins-bang and port-build-join-buckets-eager-stash-pop."
   },
   {
     "package": "activerecord",
