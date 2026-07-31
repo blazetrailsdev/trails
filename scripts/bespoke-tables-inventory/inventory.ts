@@ -156,7 +156,7 @@ function teardownBodies(src: string): string {
 function memoryLocalTables(src: string, consts: Map<string, string>): Set<string> {
   const out = new Set<string>();
   for (const body of bracketedBodies(src, /\b(?:it|test)(?:\.\w+)*\s*\(/g)) {
-    if (!/":memory:"|'"'"':memory:'"'"'/.test(body)) continue;
+    if (!/["'`]:memory:["'`]/.test(body)) continue;
     for (const name of literalNames(body, "createTable", consts)) out.add(name);
   }
   return out;
