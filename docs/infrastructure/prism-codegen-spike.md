@@ -173,26 +173,50 @@ Owner-decided semantics (previously declines or known-wrong output):
 ## Conformance scorer (`pnpm codegen:score`)
 
 The convergence-guard v1: for every **clean** generated def (zero
-passthrough), find its port counterpart (chasing exported functions, the
+passthrough), find its port counterpart and compare normalized body
+skeletons — control-flow tokens plus callee/property reference names, with
+`perform` prefixes, `is` predicate prefixes, `_` private prefixes, and
+stdlib idiom tokens (`forEach`→`each`, `size`→`length`, `toA`→`toArray`, …)
+canonicalized on both sides. Resolution chases exported functions, the
 `perform*` mixin-map indirection, wrapper calls, and both predicate name
-candidates) and compare normalized body skeletons — control-flow tokens plus
-callee/property reference names, with `perform` prefixes, `is` predicate
-prefixes, and `_` private prefixes stripped on both sides.
+candidates — with an arity guard on fallback candidates (Rails `readonly?`
+must not match the port of Rails `readonly(value)`) — and falls back to a
+global index over `packages/activerecord/src` for methods ported into a
+different file than the Rails twin (unambiguous hits only). Between exact
+match and divergent sits a `reordered` tier (identical token multiset,
+different order); on the current corpus it is empty — reordered-looking
+bodies also differ by a token or two, so strict multiset equality
+correctly refuses them.
 
 Current baseline:
 
 ```text
-file                        matched divergent missing  conformance
-relation.rb                      12        58      10      17.1%
-persistence.rb                    7        37       3      15.9%
-query_methods.rb                  4        59      37       6.3%
-core.rb                           7        36       5      16.3%
-inheritance.rb                    2        12       5      14.3%
-finder_methods.rb                 0        12      26       0.0%
-calculations.rb                   0        14      17       0.0%
-(others)                          0        39       1       0.0%
-TOTAL                            32       267     104      10.7%
+file                        matched reordered divergent missing  conformance
+relation.rb                      12         0        60       8      16.7%
+persistence.rb                    7         0        37       3      15.9%
+query_methods.rb                  4         0        62      34       6.1%
+core.rb                           7         0        37       4      15.9%
+inheritance.rb                    2         0        12       5      14.3%
+finder_methods.rb                 0         0        31       7       0.0%
+calculations.rb                   0         0        14      17       0.0%
+(others)                          0         0        39       1       0.0%
+TOTAL                            32         0       292      79       9.9%
 ```
+
+27 defs resolve in a different port file than the Rails twin (missing
+dropped from 104 with the global index; finder_methods alone went 26 → 7).
+Conformance reads lower than the pre-index 10.7% because those cross-file
+defs joined the denominator as mostly-divergent — more honest, not worse.
+
+A stratified 33-def hand triage of the divergent set (verified against
+vendor/rails and the port for the alarming cases) split roughly:
+~48% port-deliberate restructure, ~21% tooling artifacts (now partially
+fixed by the arity guard and token canon), ~9% already catalogued, and
+~21% candidate untracked deviations — including three source-verified
+finds (update_attribute! missing its readonly verification; a
+verify_readonly_attribute error-class mismatch; column_for_attribute
+returning a bare shape instead of NullColumn). The guard is mostly
+signal, not cleanup.
 
 (The first scorer run, before receiver resolution, measured 17/282/104 =
 5.7% — resolving receiverless calls to `self` nearly doubled the match rate

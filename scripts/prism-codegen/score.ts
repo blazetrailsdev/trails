@@ -2,17 +2,23 @@ import ts from "typescript";
 
 export interface ScoreEntry {
   name: string;
-  status: "matched" | "divergent" | "missing";
+  status: "matched" | "reordered" | "divergent" | "missing";
   generatedSkeleton?: string;
   portSkeleton?: string;
+  portFile?: string;
 }
 
 export interface FileScore {
   entries: ScoreEntry[];
   matched: number;
+  reordered: number;
   divergent: number;
   missing: number;
   conformancePct: number;
+}
+
+export interface GlobalPortIndex {
+  byName: Map<string, { fn: ts.FunctionLikeDeclaration; file: string }[]>;
 }
 
 interface PortIndex {
@@ -72,6 +78,10 @@ export function indexPortFile(source: string): PortIndex {
 }
 
 export function skeleton(fn: ts.FunctionLikeDeclaration): string {
+  return skeletonTokens(fn).join(" ");
+}
+
+export function skeletonTokens(fn: ts.FunctionLikeDeclaration): string[] {
   const tokens: string[] = [];
   const calleeNodes = new Set<ts.Node>();
   const calleeName = (expr: ts.Expression): string | undefined => {
@@ -132,8 +142,19 @@ export function skeleton(fn: ts.FunctionLikeDeclaration): string {
     ts.forEachChild(node, walk);
   };
   if (fn.body) walk(fn.body);
-  return tokens.join(" ");
+  return tokens;
 }
+
+const TOKEN_CANON: Record<string, string> = {
+  forEach: "each",
+  eachWithIndex: "each",
+  withIndex: "each",
+  collect: "map",
+  detect: "find",
+  inject: "reduce",
+  toA: "toArray",
+  size: "length",
+};
 
 function normalizeName(name: string): string {
   let n = name.replace(/^_+/, "");
@@ -141,7 +162,16 @@ function normalizeName(name: string): string {
   if (perform) n = perform[1].toLowerCase() + perform[2];
   const pred = /^is([A-Z])(.*)$/.exec(n);
   if (pred) n = pred[1].toLowerCase() + pred[2];
-  return n;
+  return TOKEN_CANON[n] ?? n;
+}
+
+function paramCount(fn: ts.FunctionLikeDeclaration): number {
+  return fn.parameters.filter((p) => !(ts.isIdentifier(p.name) && p.name.text === "this")).length;
+}
+
+function multisetEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  return [...a].sort().join("\u0000") === [...b].sort().join("\u0000");
 }
 
 export function nameCandidates(generatedName: string): string[] {
@@ -151,10 +181,24 @@ export function nameCandidates(generatedName: string): string[] {
   return out;
 }
 
+export function indexPortTree(files: { path: string; source: string }[]): GlobalPortIndex {
+  const byName = new Map<string, { fn: ts.FunctionLikeDeclaration; file: string }[]>();
+  for (const { path: file, source } of files) {
+    const idx = indexPortFile(source);
+    for (const [name, fn] of idx.byName) {
+      const list = byName.get(name) ?? [];
+      list.push({ fn, file });
+      byName.set(name, list);
+    }
+  }
+  return { byName };
+}
+
 export function scoreFile(
   generatedCode: string,
   portSource: string,
   cleanDefs: ReadonlySet<string>,
+  globalIndex?: GlobalPortIndex,
 ): FileScore {
   const genSf = ts.createSourceFile(
     "gen.js",
@@ -179,32 +223,67 @@ export function scoreFile(
   const entries: ScoreEntry[] = [];
   for (const [name, fn] of genFns) {
     if (!cleanDefs.has(name)) continue;
-    const portFn = nameCandidates(name)
-      .map((c) => port.byName.get(c))
-      .find((p) => p !== undefined);
-    if (!portFn) {
+    const resolved = resolvePortFn(name, fn, port, globalIndex);
+    if (!resolved) {
       entries.push({ name, status: "missing" });
       continue;
     }
-    const genSkel = skeleton(fn);
-    const portSkel = skeleton(portFn);
+    const genTokens = skeletonTokens(fn);
+    const portTokens = skeletonTokens(resolved.fn);
+    const status =
+      genTokens.join(" ") === portTokens.join(" ")
+        ? "matched"
+        : multisetEqual(genTokens, portTokens)
+          ? "reordered"
+          : "divergent";
     entries.push({
       name,
-      status: genSkel === portSkel ? "matched" : "divergent",
-      generatedSkeleton: genSkel,
-      portSkeleton: portSkel,
+      status,
+      generatedSkeleton: genTokens.join(" "),
+      portSkeleton: portTokens.join(" "),
+      portFile: resolved.file,
     });
   }
 
   const matched = entries.filter((s) => s.status === "matched").length;
+  const reordered = entries.filter((s) => s.status === "reordered").length;
   const divergent = entries.filter((s) => s.status === "divergent").length;
   const missing = entries.filter((s) => s.status === "missing").length;
-  const present = matched + divergent;
+  const present = matched + reordered + divergent;
   return {
     entries,
     matched,
+    reordered,
     divergent,
     missing,
-    conformancePct: present === 0 ? 0 : (matched / present) * 100,
+    conformancePct: present === 0 ? 0 : ((matched + reordered) / present) * 100,
   };
+}
+
+function resolvePortFn(
+  name: string,
+  genFn: ts.FunctionLikeDeclaration,
+  port: PortIndex,
+  globalIndex?: GlobalPortIndex,
+): { fn: ts.FunctionLikeDeclaration; file?: string } | undefined {
+  const candidates = nameCandidates(name);
+  for (let i = 0; i < candidates.length; i++) {
+    const found = port.byName.get(candidates[i]);
+    // A fallback candidate (predicate `isX` falling back to `x`) can collide
+    // with a DIFFERENT Rails method whose primary name is `x` (readonly? vs
+    // readonly(value)) — require arity agreement before accepting one.
+    if (found && (i === 0 || paramCount(found) === paramCount(genFn))) {
+      return { fn: found };
+    }
+  }
+  if (globalIndex) {
+    for (let i = 0; i < candidates.length; i++) {
+      const hits = globalIndex.byName.get(candidates[i]) ?? [];
+      // Only an unambiguous cross-file hit counts; collisions stay missing.
+      if (hits.length === 1 && (i === 0 || paramCount(hits[0].fn) === paramCount(genFn))) {
+        return hits[0];
+      }
+    }
+  }
+  return undefined;
 }

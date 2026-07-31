@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { indexPortFile, scoreFile, nameCandidates } from "./score.js";
+import { indexPortFile, indexPortTree, scoreFile, nameCandidates } from "./score.js";
 import { generateFromSource } from "./index.js";
 import { TOPLEVEL } from "./codegen.js";
 
@@ -91,6 +91,80 @@ describe("prism-codegen scorer", () => {
        }`,
     );
     expect(score.entries).toEqual([expect.objectContaining({ name: "sole", status: "matched" })]);
+  });
+
+  it("classifies reordered-but-equivalent bodies separately from divergence", async () => {
+    const score = await scoreRuby(
+      `def cache_me
+         if cache_version
+           combine(cache_key, cache_version)
+         end
+       end`,
+      `export function cacheMe(this: R): string {
+         const key = this.combine(this.cacheKey, this.cacheVersion);
+         if (this.cacheVersion) {
+           return key;
+         }
+       }`,
+    );
+    expect(score.entries).toEqual([
+      expect.objectContaining({ name: "cacheMe", status: "reordered" }),
+    ]);
+    expect(score.conformancePct).toBe(100);
+  });
+
+  it("canonicalizes stdlib idiom tokens on both sides (each/forEach, size/length)", async () => {
+    const score = await scoreRuby(
+      `def tally(rows)
+         rows.each { |r| record(r) }
+         rows.size
+       end`,
+      `export function tally(this: R, rows: unknown[]): number {
+         rows.forEach((r) => this.record(r));
+         return rows.length;
+       }`,
+    );
+    expect(score.entries).toEqual([expect.objectContaining({ name: "tally", status: "matched" })]);
+  });
+
+  it("rejects a predicate fallback candidate that collides with a different-arity method", async () => {
+    // Rails readonly? (0 args) must NOT match the port of Rails readonly(value).
+    const score = await scoreRuby(
+      `def readonly?; readonly_value; end`,
+      `export function readonly(this: R, value = true): R {
+         const rel = this.clone();
+         rel.readonlyBang(value);
+         return rel;
+       }`,
+    );
+    expect(score.entries).toEqual([
+      expect.objectContaining({ name: "isReadonly", status: "missing" }),
+    ]);
+  });
+
+  it("resolves a def ported into a different file via the global index", async () => {
+    const { code, perDef } = await generateFromSource(
+      `def create_record(attrs); persist(attrs); end`,
+    );
+    const clean = new Set(
+      [...perDef].filter(([n, d]) => n !== TOPLEVEL && d.passthrough === 0).map(([n]) => n),
+    );
+    const globalIndex = indexPortTree([
+      {
+        path: "callbacks.ts",
+        source: `export function createRecord(this: R, attrs: unknown): unknown {
+          return this.persist(attrs);
+        }`,
+      },
+    ]);
+    const score = scoreFile(code, `export function unrelated() {}`, clean, globalIndex);
+    expect(score.entries).toEqual([
+      expect.objectContaining({
+        name: "createRecord",
+        status: "matched",
+        portFile: "callbacks.ts",
+      }),
+    ]);
   });
 
   it("only scores clean defs — tainted ones stay out of the denominator", async () => {
