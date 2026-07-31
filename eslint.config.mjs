@@ -30,6 +30,7 @@ import { noRawSqlFiles, noRawSqlIgnores } from "./eslint/no-raw-sql-scope.mjs";
 import { testInfraExemptIgnores } from "./eslint/test-infra-scope.mjs";
 import noStandaloneAssociations from "./eslint/no-standalone-associations.mjs";
 import noInternalCanonicalLoaders from "./eslint/no-internal-canonical-loaders.mjs";
+import noLoadSchemaWithStubbedDdl from "./eslint/no-load-schema-with-stubbed-ddl.mjs";
 import noExplicitAnyDisable from "./eslint/no-explicit-any-disable.mjs";
 import noRawControlBytes from "./eslint/no-raw-control-bytes.mjs";
 import { readFileSync } from "node:fs";
@@ -235,6 +236,7 @@ export default defineConfig(
           "no-raw-sql": noRawSql,
           "no-standalone-associations": noStandaloneAssociations,
           "no-internal-canonical-loaders": noInternalCanonicalLoaders,
+          "no-load-schema-with-stubbed-ddl": noLoadSchemaWithStubbedDdl,
           "no-explicit-any-disable": noExplicitAnyDisable,
           "no-raw-control-bytes": noRawControlBytes,
           // Off by default — opt in per project (see eslint/manifest-complete.mjs).
@@ -555,6 +557,20 @@ export default defineConfig(
     files: ["packages/activerecord/src/**/*.test.ts"],
     rules: {
       "blazetrails/no-internal-canonical-loaders": "error",
+    },
+  },
+
+  // ── no-load-schema-with-stubbed-ddl: a test that stubs `createTable` lays
+  //    nothing on the database, so `loadSchema`'s canonical half would query
+  //    tables that were never created (PR #5676). Those arm-content covers must
+  //    call `loadAdapterSpecificSchema` directly. The self-test allowlist in
+  //    no-internal-canonical-loaders lets `loadSchema` into exactly these
+  //    files, so this rule is what closes the hole.
+  //    See eslint/no-load-schema-with-stubbed-ddl.mjs. ──
+  {
+    files: ["packages/activerecord/src/**/*.test.ts"],
+    rules: {
+      "blazetrails/no-load-schema-with-stubbed-ddl": "error",
     },
   },
 
