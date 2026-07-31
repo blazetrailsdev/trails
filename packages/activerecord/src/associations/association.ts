@@ -116,6 +116,9 @@ export class Association {
    */
   _loaderWritebackSuppressed = 0;
 
+  /** @internal Rails' `@skip_strict_loading`, raised by `skipStrictLoading`. */
+  protected _skipStrictLoading = false;
+
   private _staleState: unknown = undefined;
   private _staleStateSnapshotted = false;
   /**
@@ -864,19 +867,36 @@ export class Association {
     return this.doAsyncFindTarget();
   }
 
-  private skipStrictLoading<T>(block: () => T): T {
-    const prev = (this as any)._skipStrictLoading;
-    (this as any)._skipStrictLoading = true;
+  /**
+   * Rails' `Association#skip_strict_loading` (association.rb). A
+   * promise-returning block keeps the flag raised until it settles — Ruby's
+   * `ensure` fires after the block has fully run, and restoring at the first
+   * `await` would let the query it guards raise `StrictLoadingViolationError`.
+   * @internal
+   */
+  protected skipStrictLoading<T>(block: () => T): T {
+    const prev = this._skipStrictLoading;
+    this._skipStrictLoading = true;
+    const restore = (): void => {
+      this._skipStrictLoading = prev;
+    };
+    let result: T;
     try {
-      return block();
-    } finally {
-      (this as any)._skipStrictLoading = prev;
+      result = block();
+    } catch (error) {
+      restore();
+      throw error;
     }
+    if (result instanceof Promise) {
+      return result.finally(restore) as T;
+    }
+    restore();
+    return result;
   }
 
   private isViolatesStrictLoading(): boolean {
     const ownerAny = this.owner as any;
-    if ((this as any)._skipStrictLoading) return false;
+    if (this._skipStrictLoading) return false;
     return !!(
       ownerAny._strictLoading && !ownerAny._strictLoadingWhitelist?.includes(this.reflection.name)
     );

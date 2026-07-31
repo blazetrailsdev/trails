@@ -166,7 +166,13 @@ export class HasManyAssociation extends CollectionAssociation {
     // flight. See `_loaderWritebackSuppressed`.
     this._loaderWritebackSuppressed++;
     try {
-      return await findTarget(this.owner, this.reflection.name, this.reflection.options);
+      return await findTarget(
+        this.owner,
+        this.reflection.name,
+        this.reflection.options,
+        undefined,
+        this._skipStrictLoading,
+      );
     } finally {
       this._loaderWritebackSuppressed--;
     }
@@ -501,6 +507,10 @@ export function setIntersection(a: Base[], b: Base[]): Base[] {
  * through-association loaders reach the loader without one; that triple shape
  * is a trails-only calling convention, not Rails surface.
  *
+ * `skipStrictLoading` carries the association's `@skip_strict_loading`
+ * (association.rb) into this loader, since the strict-loading check Rails runs
+ * inside `find_target` lives here rather than on the association instance.
+ *
  * @internal
  */
 export async function findTarget(
@@ -508,6 +518,7 @@ export async function findTarget(
   assocName: string,
   options: AssociationOptions,
   queryExecutor?: () => Promise<Base[]>,
+  skipStrictLoading = false,
 ): Promise<Base[]> {
   if (options.through) {
     validateThroughReflection(record.constructor as typeof Base, assocName);
@@ -539,6 +550,7 @@ export async function findTarget(
   // Strict loading check. Gated by `find_target?`: a new-record owner without
   // the FK present never reaches `find_target` and so never raises.
   if (
+    !skipStrictLoading &&
     _violatesStrictLoading(record, options) &&
     _findTargetReachable(record, assocName, options, "foreign")
   ) {

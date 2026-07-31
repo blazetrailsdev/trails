@@ -396,7 +396,7 @@ export class CollectionAssociation extends Association {
   async concat(...records: Base[]): Promise<Base[] | undefined> {
     const flattened = records.flat();
     if (this.owner.isNewRecord()) {
-      await this.loadTarget();
+      await this.skipStrictLoading(() => this.loadTarget());
       return this.concatRecords(flattened);
     }
     return this.transaction(() => this.concatRecords(flattened));
