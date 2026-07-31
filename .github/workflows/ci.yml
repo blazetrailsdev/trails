@@ -209,7 +209,7 @@ jobs:
           # eslint/no-raw-control-bytes.drift.test.mjs is a drift guard between
           # its byte set and the ESLint rule's, and scripts/ci/ is carved out
           # of the infra sweep (INFRA_CARVEOUT_RE).
-          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport)/|eslint/|scripts/(tasks|guides-typecheck|parity|api-compare|test-compare|fixtures-compare|test-deps|rails-find|sync-stats)/|scripts/ci/check-control-bytes\.sh$|scripts/(strip-asany|rails-file-structure-mixins|ci-suite-coverage|deprecated-manifest-diff)(\.test)?\.ts$|eslint\.config\.mjs$|vendor/(sources\.ts|sources\.lock\.json|sources\.test\.ts|fetch\.ts)$)'
+          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport)/|eslint/|scripts/(tasks|guides-typecheck|parity|api-compare|test-compare|fixtures-compare|test-deps|rails-find|sync-stats|prism-codegen)/|scripts/ci/check-control-bytes\.sh$|scripts/(strip-asany|rails-file-structure-mixins|ci-suite-coverage|deprecated-manifest-diff)(\.test)?\.ts$|eslint\.config\.mjs$|vendor/(sources\.ts|sources\.lock\.json|sources\.test\.ts|fetch\.ts)$)'
           # guides_affected gates the Guides Code Type Check job, which
           # compiles fenced TS blocks in packages/website/docs/guides/**.
           # Today guides only import @blazetrails/activerecord,
@@ -712,6 +712,7 @@ jobs:
           scripts/test-deps
           scripts/rails-find
           scripts/sync-stats
+          scripts/prism-codegen
           scripts/parity
           eslint/
           scripts/strip-asany.test.ts

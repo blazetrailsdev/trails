@@ -419,6 +419,7 @@ export default defineConfig({
             "scripts/test-compare/*.test.ts",
             "scripts/rails-find/*.test.ts",
             "scripts/sync-stats/*.test.ts",
+            "scripts/prism-codegen/*.test.ts",
             "eslint/*.test.mjs",
             "vendor/*.test.ts",
           ],
