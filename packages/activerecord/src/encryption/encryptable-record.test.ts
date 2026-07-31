@@ -27,6 +27,7 @@ import {
 import { Configurable } from "./configurable.js";
 import { itIfSupports } from "../support/supports.js";
 import { fixtures } from "../test-fixtures.js";
+import { withTransactionalFixtures } from "../test-fixtures/with-transactional-fixtures.js";
 import { EncryptableRecord } from "./encryptable-record.js";
 import {
   EncryptedBook,
@@ -41,6 +42,18 @@ import { RecordInvalid } from "../index.js";
 
 describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
+
+  // Rails' `EncryptionTestCase < ActiveRecord::TestCase` runs with
+  // `use_transactional_tests` on, so every record these cases create is rolled
+  // back before the next one. trails leaned on the global between-test reset's
+  // TRUNCATE instead; with that gone, take the Rails shape — otherwise a book
+  // written by the `downcase: true` case survives into the `ignore_case: true`
+  // case, whose `findBy({ name: "dune" })` then reads the downcased row.
+  let txnAdapter: Awaited<ReturnType<typeof freshAdapter>>;
+  beforeAll(async () => {
+    txnAdapter = await freshAdapter();
+  });
+  withTransactionalFixtures(() => txnAdapter);
 
   beforeEach(() => {
     configSnapshot = snapshotEncryptionConfig();
