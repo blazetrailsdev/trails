@@ -834,6 +834,17 @@ describe("assumeMigratedUptoVersion", () => {
     ]);
   });
 
+  it("strips digit-separating underscores like String#to_i", async () => {
+    const { ss, execute } = makeStatementsWithMigrations([1, 2]);
+
+    await ss.assumeMigratedUptoVersion("1_000");
+
+    expect(execute.mock.calls.map((c) => c[0])).toEqual([
+      'INSERT INTO "schema_migrations" (version) VALUES (1000)',
+      'INSERT INTO "schema_migrations" (version) VALUES\n(2),\n(1);',
+    ]);
+  });
+
   it("takes the leading integer prefix of a partially numeric version", async () => {
     const { ss, execute } = makeStatementsWithMigrations([1, 2, 20]);
 
