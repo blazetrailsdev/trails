@@ -514,7 +514,7 @@ export class SchemaStatements {
       const present =
         colSpec != null
           ? await this.indexExists(tableName, colSpec, opts)
-          : opts.name != null && (await this.isIndexNameExists(tableName, opts.name));
+          : opts.name != null && (await this.indexNameExists(tableName, opts.name));
       if (!present) return;
     }
 
@@ -1708,7 +1708,7 @@ export class SchemaStatements {
     return new CreateIndexDefinition(idx, ifNotExists, algorithm);
   }
 
-  async isIndexNameExists(tableName: string, indexName: string): Promise<boolean> {
+  async indexNameExists(tableName: string, indexName: string): Promise<boolean> {
     const idxs = await this.indexes(tableName);
     return idxs.some((idx) => idx.name === indexName);
   }
