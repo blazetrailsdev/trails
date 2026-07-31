@@ -793,6 +793,12 @@ export async function performCount(
   // prevent fan-out. Without this, the INNER JOIN alone would fan-out multiple rows
   // per record when a record has multiple associated records.
   if (hasInclude(this, column ?? null)) {
+    // `eagerLoading: false` rather than the `group_values.empty?` formula the
+    // other arms use (which is `true` here): these arms materialize the limited
+    // primary keys themselves below, so `applyJoinDependency`'s own
+    // limit/offset guard for that same case must not fire. No path in this file
+    // reaches that guard, since `performCount` never passes `true`.
+    //
     // Re-derived per manager: `joinConstraints` aliases the join dependency's
     // nodes in place, so the id and count queries cannot share one instance.
     const eagerJoined = (): CalculationRelation => eagerJoinedRelation(this, false);
