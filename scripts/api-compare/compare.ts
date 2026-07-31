@@ -349,6 +349,24 @@ export function isDelegatingWrapper(tsName: string, tsCalls: Set<string>): boole
  * unioned in (they are its call-set), they are just not walked through. Depth 3
  * therefore admits `indexRowToDefinition`'s `columnNamesFromColumnNumbers`, and
  * stops before that leaf's callees.
+ *
+ * Three is deliberate, not the largest defensible value. Sweeping this constant
+ * over the whole wide artifact (RFC 0083) shows the closure saturating at depth
+ * 8 — 0 → 3693 rows, 1 → 3332, 2 → 3276, 3 → 3251, 4 → 3243, 5 → 3236, 6 → 3236,
+ * 8 → 3230, and 12 and 40 identical to 8. The mean effective call-set per body
+ * follows the same schedule: 2.35 (depth 0) → 6.77 (depth 3) → 9.00 (depth 8) →
+ * 9.05 (depth 12 = depth 40).
+ *
+ * Moving 3 → 8 was evaluated and REJECTED. It is sound in the way the
+ * DELEGATION_MAX_CALLS cap is not (the closure never leaves the file, so it
+ * cannot credit a sibling adapter), but it buys only ~0.6% fewer rows, and
+ * every row it silences is one worth keeping: all of the ~15 dropped keys are
+ * genuine omissions in the 420-row `relation.ts`, discharged by a helper
+ * several hops away — `#toSql` and `#execMainQuery` missing
+ * `apply_join_dependency`, `#updateAll` / `#deleteAll` / `#ids` missing
+ * `arel_columns`, `#execQueries` missing `preload_associations`. Depth 3 is the
+ * point where extraction-shaped false positives are gone but a body is still
+ * held to the calls it actually makes.
  */
 export const SAME_FILE_CLOSURE_DEPTH = 3;
 
