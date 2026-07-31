@@ -5,6 +5,7 @@ import { dirname, join } from "path";
 import { Base, MigrationContext } from "@blazetrails/activerecord";
 import type { AbstractSQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js";
+import { parseTestCompareFromLogs } from "./parse-test-compare.js";
 
 const REPO = "blazetrailsdev/trails";
 const [REPO_OWNER, REPO_NAME] = REPO.split("/");
@@ -1744,40 +1745,6 @@ function extractStepLogs(rawLog: string): Map<string, string> {
   return steps;
 }
 
-function parseTestCompareFromLogs(logs: string) {
-  const results = new Map<
-    string,
-    {
-      matched: number;
-      total: number;
-      percent: number;
-      skipped: number;
-      filesMapped: number;
-      filesTotal: number;
-      misplaced: number;
-    }
-  >();
-
-  const re =
-    /\s{2}(\w+)\s+—\s+(\d+)\/(\d+) tests \(([\d.]+)%\)(?:\s+\(([^)]*)\))?\s+\|\s+(\d+)\/(\d+) files\s+\|\s+(\d+) misplaced/g;
-  let m;
-  while ((m = re.exec(logs)) !== null) {
-    if (m[1] === "Overall") continue;
-    const details = m[5] ?? "";
-    const skippedMatch = /(\d+)\s+skipped/.exec(details);
-    results.set(m[1], {
-      matched: parseInt(m[2]),
-      total: parseInt(m[3]),
-      percent: parseFloat(m[4]),
-      skipped: skippedMatch ? parseInt(skippedMatch[1]) : 0,
-      filesMapped: parseInt(m[6]),
-      filesTotal: parseInt(m[7]),
-      misplaced: parseInt(m[8]),
-    });
-  }
-  return results;
-}
-
 function parseApiCompareFromLogs(logs: string) {
   const results = new Map<
     string,
@@ -1951,24 +1918,7 @@ async function syncJobLogs(mode: "latest" | "refresh" | "backfill"): Promise<num
   return fetched;
 }
 
-async function syncCompareStats(mode: "latest" | "refresh" | "backfill"): Promise<number> {
-  const limitClause = mode === "latest" ? "LIMIT 50" : "";
-  const runsToProcess = await Base.adapter.execute(`
-    SELECT rjl.job_id, rjl.merge_commit_sha, rjl.pr_number
-    FROM raw_job_logs rjl
-    JOIN workflow_jobs wj ON wj.id = rjl.job_id
-    WHERE wj.name = 'Rails API/Test Comparison'
-    AND wj.conclusion = 'success'
-    AND rjl.job_id = (
-      SELECT rjl2.job_id FROM raw_job_logs rjl2
-      JOIN workflow_jobs wj2 ON wj2.id = rjl2.job_id
-      WHERE rjl2.merge_commit_sha = rjl.merge_commit_sha
-      AND wj2.name = 'Rails API/Test Comparison'
-      AND wj2.conclusion = 'success'
-      ORDER BY wj2.completed_at DESC
-      LIMIT 1
-    )
-    AND (
+const MISSING_STATS_PREDICATE = `
       NOT EXISTS (
         SELECT 1 FROM test_compare_stats tcs
         WHERE tcs.merge_commit_sha = rjl.merge_commit_sha
@@ -2000,7 +1950,29 @@ async function syncCompareStats(mode: "latest" | "refresh" | "backfill"): Promis
           ON cl.merge_commit_sha = rjl.merge_commit_sha AND cl.step_name = e.step_name
         WHERE e.required = 1 AND cl.step_name IS NULL
       )
+`;
+
+async function syncCompareStats(
+  mode: "latest" | "refresh" | "backfill" | "reparse",
+): Promise<number> {
+  const limitClause = mode === "latest" ? "LIMIT 50" : "";
+  const missingStatsClause = mode === "reparse" ? "" : `AND (${MISSING_STATS_PREDICATE})`;
+  const runsToProcess = await Base.adapter.execute(`
+    SELECT rjl.job_id, rjl.merge_commit_sha, rjl.pr_number
+    FROM raw_job_logs rjl
+    JOIN workflow_jobs wj ON wj.id = rjl.job_id
+    WHERE wj.name = 'Rails API/Test Comparison'
+    AND wj.conclusion = 'success'
+    AND rjl.job_id = (
+      SELECT rjl2.job_id FROM raw_job_logs rjl2
+      JOIN workflow_jobs wj2 ON wj2.id = rjl2.job_id
+      WHERE rjl2.merge_commit_sha = rjl.merge_commit_sha
+      AND wj2.name = 'Rails API/Test Comparison'
+      AND wj2.conclusion = 'success'
+      ORDER BY wj2.completed_at DESC
+      LIMIT 1
     )
+    ${missingStatsClause}
     ORDER BY rjl.pr_number DESC
     ${limitClause}
   `);
@@ -2012,6 +1984,7 @@ async function syncCompareStats(mode: "latest" | "refresh" | "backfill"): Promis
 
   console.log(`Parsing compare stats from ${runsToProcess.length} job logs...`);
   let parsed = 0;
+  let zeroParseTestCompare = 0;
 
   for (const row of runsToProcess) {
     const jobId = row.job_id as number;
@@ -2039,6 +2012,12 @@ async function syncCompareStats(mode: "latest" | "refresh" | "backfill"): Promis
     }
 
     const testStats = parseTestCompareFromLogs(logs);
+    if (testStats.size === 0 && stepLogs.has("test_compare")) {
+      zeroParseTestCompare++;
+      console.warn(
+        `  WARNING: PR #${prNumber} has a test_compare step log but 0 packages parsed — summary-line format drift?`,
+      );
+    }
     if (testStats.size > 0) {
       await TestCompareStat.upsertAll(
         [...testStats.entries()].map(([pkg, s]) => ({
@@ -2111,6 +2090,13 @@ async function syncCompareStats(mode: "latest" | "refresh" | "backfill"): Promis
         `  PR #${prNumber}: ${testStats.size} test packages (${totalTests} matched), ${apiStats.size} api packages (${totalApi} matched), ${apiPrivatesStats.size} api-privates packages (${totalApiPrivates} matched), logs: [${logSteps}]`,
       );
     }
+  }
+
+  if (zeroParseTestCompare > 0) {
+    console.warn(
+      `\n  WARNING: ${zeroParseTestCompare} job log(s) had a test_compare step but produced no package rows. ` +
+        `The test_compare_stats feed is going stale — check parseTestCompareFromLogs against the current summary format.`,
+    );
   }
 
   return parsed;
@@ -2282,6 +2268,7 @@ async function main() {
     "--missing",
     "--prs",
     "--local-reviews-only",
+    "--reparse-logs",
   ];
   const unknownFlags = args.filter(
     (a) => a.startsWith("--") && !knownFlags.includes(a.split("=")[0]),
@@ -2289,7 +2276,7 @@ async function main() {
   if (unknownFlags.length > 0) {
     console.error(`Unknown flag(s): ${unknownFlags.join(", ")}`);
     console.error(
-      "Usage: stats:sync [--latest | --refresh | --compare-only | --missing | --prs <spec> | --local-reviews-only]",
+      "Usage: stats:sync [--latest | --refresh | --compare-only | --missing | --prs <spec> | --local-reviews-only | --reparse-logs]",
     );
     process.exit(1);
   }
@@ -2310,6 +2297,7 @@ async function main() {
     }
   }
   const localReviewsOnly = args.includes("--local-reviews-only");
+  const reparseLogs = args.includes("--reparse-logs");
   const backfillMissing = args.includes("--missing");
   const isBackfill = prsSpec !== null || backfillMissing;
 
@@ -2321,7 +2309,11 @@ async function main() {
         ? "compare-only"
         : "latest";
 
-  if (localReviewsOnly) {
+  if (reparseLogs) {
+    console.log(
+      "Running reparse-logs mode: re-parsing compare stats from already-stored job logs (no GitHub API calls).\n",
+    );
+  } else if (localReviewsOnly) {
     console.log("Running local-reviews-only mode: ingesting /review-pr reviews from disk.\n");
   } else if (mode === "latest") {
     console.log(
@@ -2342,6 +2334,14 @@ async function main() {
 
   try {
     await migrateDb(adapter);
+
+    if (reparseLogs) {
+      console.log("=== Re-parsing compare stats from stored CI logs ===");
+      const logsParsed = await syncCompareStats("reparse");
+      console.log(`\nRe-parsed ${logsParsed} job logs.`);
+      await printSummary();
+      return;
+    }
 
     if (localReviewsOnly) {
       console.log("=== Ingesting local /review-pr reviews ===");

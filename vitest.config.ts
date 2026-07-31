@@ -418,6 +418,7 @@ export default defineConfig({
             "scripts/tasks/*.test.ts",
             "scripts/test-compare/*.test.ts",
             "scripts/rails-find/*.test.ts",
+            "scripts/sync-stats/*.test.ts",
             "eslint/*.test.mjs",
             "vendor/*.test.ts",
           ],
