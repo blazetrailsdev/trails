@@ -98,4 +98,8 @@ export const canonicalLoaderSelfTests = [
   // …and a third: the cover for `loadSchema`'s own arm-probe guard, which has
   // to call `loadSchema` to assert it refuses a stubbed `createTable`.
   `${activerecordSrcRoot}/support/load-schema-helper-arm-guard.trails.test.ts`,
+  // …and the pin on `STUBBED_DDL_METHODS`, which drives `loadCanonicalSchema`
+  // through a recording proxy to assert the guarded set still covers every
+  // adapter member the lay path touches.
+  `${activerecordSrcRoot}/support/stubbed-ddl-methods.test.ts`,
 ];
