@@ -69,4 +69,25 @@ describe("ProtectedParams", () => {
       ["gender", "m"],
     ]);
   });
+
+  it("dup preserves permitted? and copies the parameters", () => {
+    const params = new ProtectedParams({ first_name: "Guille" });
+    params.permitBang();
+
+    const duplicate = params.dup();
+
+    expect(duplicate).not.toBe(params);
+    expect(duplicate.permitted()).toBe(true);
+    expect(duplicate.toH()).toEqual({ first_name: "Guille" });
+
+    duplicate["gender"] = "m";
+    expect(params.toH()).toEqual({ first_name: "Guille" });
+    expect(duplicate.toH()).toEqual({ first_name: "Guille", gender: "m" });
+  });
+
+  it("dup of an unpermitted params object stays unpermitted", () => {
+    const duplicate = new ProtectedParams({ first_name: "Guille" }).dup();
+
+    expect(duplicate.permitted()).toBe(false);
+  });
 });

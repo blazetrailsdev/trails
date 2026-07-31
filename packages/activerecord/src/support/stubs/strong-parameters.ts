@@ -113,4 +113,18 @@ export class ProtectedParams {
     for (const [key, value] of Object.entries(this.#parameters)) block(key, value);
     return this.#self;
   }
+
+  /**
+   * Ruby's `super.dup` shallow-copies the ivars and the override then re-sets
+   * `@permitted`. Here the copy has to be a fresh `ProtectedParams` so it gets
+   * its own Proxy — a structural clone of the wrapper would share this one.
+   * The constructor already copies the parameter store, and `permitBang` is
+   * how the permitted flag is reachable on the copy: the private field is
+   * unreachable through the copy's Proxy receiver.
+   */
+  dup(): this {
+    const duplicate = new ProtectedParams(this.#parameters);
+    if (this.#permitted) duplicate.permitBang();
+    return duplicate as this;
+  }
 }
