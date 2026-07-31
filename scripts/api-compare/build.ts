@@ -171,8 +171,27 @@ interface Edit {
 }
 
 export interface MethodExpectation {
-  rubyName: string;
+  /** Every Ruby method name matched onto this TS name, in artifact order. Two
+   *  Ruby names can land on one TS method, and each keys its own baseline rows
+   *  — reasons are looked up under all of them, and a justified tag drops the
+   *  row of each, so a second Ruby name's deviation is not attributed to the
+   *  first. */
+  rubyNames: string[];
   calls: Set<string>;
+}
+
+// The first curated reason any of `rubyNames` has for `call`, else the
+// placeholder. Only used to seed a NEW tag's prose.
+function firstCuratedReason(
+  rubyNames: string[],
+  call: string,
+  reasonFor: (rubyName: string, call: string) => string,
+): string {
+  for (const rubyName of rubyNames) {
+    const reason = reasonFor(rubyName, call);
+    if (reason !== DEFAULT_TAG_REASON) return reason;
+  }
+  return DEFAULT_TAG_REASON;
 }
 
 /** Reconcile every named function/method in one source file's text. Returns
@@ -248,11 +267,12 @@ export function reconcileFileText(
         );
         const expected = exp?.calls ?? new Set<string>();
         const r = reconcile(entries, expected, (c) =>
-          exp ? reasonFor(exp.rubyName, c) : DEFAULT_TAG_REASON,
+          exp ? firstCuratedReason(exp.rubyNames, c, reasonFor) : DEFAULT_TAG_REASON,
         );
         if (exp) {
           for (const e of [...r.kept, ...r.added]) {
-            if (justifies(e.reason)) tagged.push({ rubyName: exp.rubyName, call: e.call });
+            if (!justifies(e.reason)) continue;
+            for (const rubyName of exp.rubyNames) tagged.push({ rubyName, call: e.call });
           }
         }
         for (const d of r.dropped) {
@@ -301,7 +321,10 @@ export function buildExpectations(
   const byFile = new Map<string, Map<string, MethodExpectation>>();
   const expectationFor = (tsFile: string, tsName: string, rubyName: string) => {
     const fileMap = byFile.get(tsFile) ?? byFile.set(tsFile, new Map()).get(tsFile)!;
-    return fileMap.get(tsName) ?? fileMap.set(tsName, { rubyName, calls: new Set() }).get(tsName)!;
+    const exp =
+      fileMap.get(tsName) ?? fileMap.set(tsName, { rubyNames: [], calls: new Set() }).get(tsName)!;
+    if (!exp.rubyNames.includes(rubyName)) exp.rubyNames.push(rubyName);
+    return exp;
   };
   for (const m of artifact.mismatches) {
     if (m.package !== pkg) continue;

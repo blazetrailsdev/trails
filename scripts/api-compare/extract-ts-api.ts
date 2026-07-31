@@ -849,6 +849,11 @@ export function extractFromProgram(
                 ? noRailsEquivalentReason(decl)
                 : (noRailsEquivalentReason(renamedSpecifier) ??
                   noRailsEquivalentReason(renamedSpecifier.parent.parent));
+            const exportedMissingRailsCalls =
+              renamedSpecifier === undefined
+                ? missingRailsCallTags(decl)
+                : (missingRailsCallTags(renamedSpecifier) ??
+                  missingRailsCallTags(renamedSpecifier.parent.parent));
             fileFunctions.push({
               name: sym.name,
               visibility: "public",
@@ -859,6 +864,9 @@ export function extractFromProgram(
               ...(internal ? { internal: true } : {}),
               ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
               ...(calls !== undefined ? { calls } : {}),
+              ...(exportedMissingRailsCalls !== undefined
+                ? { missingRailsCalls: exportedMissingRailsCalls }
+                : {}),
             });
           }
         }
@@ -1462,6 +1470,16 @@ export function paramsOfCallableRef(
  * api:reasons already mean by it — including the empty-reason contract (a bare
  * tag throws here too) and the continuation rules that keep a Ruby ivar in the
  * reason prose from re-parsing as a tag boundary.
+ *
+ * Called from every extraction path that records a `calls` array: class
+ * members (methods, constructor, accessors), object-literal members, top-level
+ * `export function` declarations, and the named-export-list path — where a
+ * RENAMED alias (`export { foo as bar }`) is its own surface entry and so
+ * reads a tag written on the specifier, exactly as `noRailsEquivalentReason`
+ * does. The paths that record no call-set (namespace and interface members,
+ * the mixin pseudo-module's constructor) need no wiring: `checkCalls` skips a
+ * pair with no TS call-set, so a call there is never flagged, never tagged by
+ * api:build, and has nothing to suppress.
  */
 const fileHasMissingRailsCallTag = new WeakMap<ts.SourceFile, boolean>();
 

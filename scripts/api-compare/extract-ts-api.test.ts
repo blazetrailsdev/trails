@@ -2401,4 +2401,22 @@ describe("@missingRailsCall extraction", () => {
     `),
     ).toThrow(/needs a reason/);
   });
+
+  it("reads a renamed export's own tags instead of the declaration's", () => {
+    const info = extractFromFiles("/p", {
+      "registry.ts": `
+        /**
+         * @missingRailsCall each — declared spelling iterates with for-of.
+         */
+        function registerModelClass(): void {}
+
+        /**
+         * @missingRailsCall first — the alias indexes instead.
+         */
+        export { registerModelClass as registerModel };
+      `,
+    });
+    const fns = fileFunctionsOf(info, "registry.ts");
+    expect(fns.find((f) => f.name === "registerModel")!.missingRailsCalls).toEqual(["first"]);
+  });
 });
