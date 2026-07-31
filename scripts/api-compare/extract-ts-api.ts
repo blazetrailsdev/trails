@@ -455,7 +455,12 @@ export function extractFromProgram(
   // files reach it through the container's own imports even though the entry
   // list already skipped them — filter here too or the de-overlap is a no-op.
   const excludePrefixes = excludeDirs.map((dir) => dir.replace(/\\/g, "/") + "/");
-  const info: PackageInfo = { classes: {}, modules: {}, fileFunctions: {}, fileConstants: {} };
+  const info: PackageInfo & Required<Pick<PackageInfo, "fileFunctions" | "fileConstants">> = {
+    classes: {},
+    modules: {},
+    fileFunctions: {},
+    fileConstants: {},
+  };
   const pendingReExports: PendingReExport[] = [];
   const checker = program.getTypeChecker();
 
@@ -864,7 +869,7 @@ export function extractFromProgram(
     }
 
     const fileConstants = extractFileConstants(sourceFile);
-    if (Object.keys(fileConstants).length > 0) info.fileConstants![relPath] = fileConstants;
+    if (Object.keys(fileConstants).length > 0) info.fileConstants[relPath] = fileConstants;
 
     // If a file has exported functions but no class/interface/namespace,
     // also create a module entry from the file name for backward compat.

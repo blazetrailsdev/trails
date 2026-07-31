@@ -159,7 +159,7 @@ export function normalizeRailsKind(name: string): CanonicalKind | null {
 export function normalizeTrailsKind(token: string): CanonicalKind | null {
   const neg = token.startsWith("not:");
   const bare = neg ? token.slice("not:".length) : token;
-  let kind = TRAILS_MAP[bare] ?? null;
+  let kind: CanonicalKind | null = TRAILS_MAP[bare] ?? null;
   // A helper callee that mirrors a Rails assertion name (refuteEqual, mustEqual,
   // assertNoQueries, …) — snake-case it and reuse the Rails normalizer.
   if (!kind && /^(assert|refute|must|wont|expect)/.test(bare)) {

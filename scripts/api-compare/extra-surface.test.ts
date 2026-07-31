@@ -1516,7 +1516,9 @@ describe("buildReport — interface declaration names", () => {
     },
   };
 
-  const tsWith = (decls: { name: string; isInterface?: boolean; members?: string[] }[]) => ({
+  const tsWith = (
+    decls: { name: string; isInterface?: boolean; members?: string[] }[],
+  ): ApiManifest => ({
     source: "typescript" as const,
     generatedAt: "",
     packages: {

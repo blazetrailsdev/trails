@@ -50,7 +50,14 @@ function collectTsFiles(dir: string, out: string[]): void {
 }
 
 async function main(): Promise<void> {
-  const { parser } = await import("typescript-eslint");
+  const { parser } = (await import("typescript-eslint")) as unknown as {
+    parser: {
+      parseForESLint(
+        code: string,
+        options: { ecmaVersion: number; sourceType: string },
+      ): { ast: unknown };
+    };
+  };
   const parse = (code: string) =>
     parser.parseForESLint(code, { ecmaVersion: 2022, sourceType: "module" }).ast;
 

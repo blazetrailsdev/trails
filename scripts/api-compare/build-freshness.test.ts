@@ -410,3 +410,24 @@ describe("staleBuildMessage", () => {
     expect(message).not.toContain("no dist at all");
   });
 });
+
+describe("typescript-internal.d.ts", () => {
+  const declaredStatusNames = (): string[] => {
+    const source = fs.readFileSync(path.join(__dirname, "typescript-internal.d.ts"), "utf8");
+    const body = /export enum UpToDateStatusType \{([^}]*)\}/.exec(source);
+    expect(body).not.toBeNull();
+    return [...body![1].matchAll(/(\w+),/g)].map((m) => m[1]);
+  };
+
+  it("declares every status the installed TypeScript reports", () => {
+    const runtimeNames = Object.values(ts.UpToDateStatusType).filter(
+      (v): v is string => typeof v === "string",
+    );
+    expect(declaredStatusNames()).toEqual(runtimeNames);
+  });
+
+  it("declares a getUpToDateStatusOfProject the installed TypeScript still implements", () => {
+    const builder = ts.createSolutionBuilder(ts.createSolutionBuilderHost(ts.sys), [], {});
+    expect(builder.getUpToDateStatusOfProject).toBeTypeOf("function");
+  });
+});

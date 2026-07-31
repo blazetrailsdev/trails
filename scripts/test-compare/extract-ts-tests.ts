@@ -70,7 +70,7 @@ function main() {
 
   for (const [pkg, files] of Object.entries(packageTestFiles)) {
     const absoluteFiles = files.map((f) => path.join(ROOT_DIR, f));
-    manifest.packages[pkg] = extractPackageTests(pkg, absoluteFiles);
+    manifest.packages[pkg] = extractPackageTests(absoluteFiles);
   }
 
   // Print summary
@@ -90,9 +90,8 @@ function main() {
   console.log(`\nWritten to ${outputPath}`);
 }
 
-function extractPackageTests(pkgName: string, files: string[]): TestPackageInfo {
+function extractPackageTests(files: string[]): TestPackageInfo {
   const pkgInfo: TestPackageInfo = {
-    name: pkgName,
     files: [],
     totalTests: 0,
   };

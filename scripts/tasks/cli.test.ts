@@ -108,7 +108,7 @@ import {
   readRfcPriority,
   rfcPriorityFlag,
   rfcPriorityMap,
-} from "./cli.ts";
+} from "./cli.js";
 
 function story(over: Partial<StoryEntry>): StoryEntry {
   return {
@@ -2795,7 +2795,7 @@ describe("newStory cluster validation", () => {
     const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
     makeRfcDir(dir, "0005-gaps", ["scaffold", "conversion"]);
     expect(() => newStory("0005-gaps", "my-story", { cluster: "tooling" }, dir)).toThrow(/exit 1/);
-    const msg = (console.error as ReturnType<typeof vi.spyOn>).mock.calls[0]?.[0] as string;
+    const msg = vi.mocked(console.error).mock.calls[0]?.[0] as string;
     expect(msg).toMatch(/tooling/);
     expect(msg).toMatch(/scaffold/);
     expect(msg).toMatch(/conversion/);
@@ -2813,7 +2813,7 @@ describe("newStory cluster validation", () => {
       `---\nrfc: "0005-gaps"\ntitle: "test"\nstatus: active\nclusters: [scaffold, conversion]\n---\n`,
     );
     expect(() => newStory("0005-gaps", "my-story", { cluster: "tooling" }, dir)).toThrow(/exit 1/);
-    const msg = (console.error as ReturnType<typeof vi.spyOn>).mock.calls[0]?.[0] as string;
+    const msg = vi.mocked(console.error).mock.calls[0]?.[0] as string;
     expect(msg).toMatch(/scaffold/);
     expect(msg).toMatch(/conversion/);
   });

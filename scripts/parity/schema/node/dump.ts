@@ -105,7 +105,7 @@ async function main(): Promise<void> {
         }
         return {
           name: idx.name,
-          columns: idx.columns,
+          columns: typeof idx.columns === "string" ? [idx.columns] : idx.columns,
           unique: idx.unique,
           where: idx.where ?? null,
         };

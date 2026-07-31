@@ -37,7 +37,7 @@ export type UnportedFile = { reason: string } &
     // `className` narrows a per-test exclusion to one Ruby *Test class within
     // the file, so a GVL-only subclass can be dropped while a portable sibling
     // sharing a test name stays counted. Per-test entries never touch api:compare.
-    | { pattern?: never; testFile: string; className?: string; tests: string[] }
+    | { pattern?: never; testFile: string; className?: string; tests: string[]; package?: never }
   );
 
 export const UNPORTED_FILES: UnportedFile[] = [

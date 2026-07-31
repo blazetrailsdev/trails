@@ -25,6 +25,11 @@ const DEPS_PATH = path.join(ROOT, "scripts/test-deps/output/activerecord-test-de
 const OUT_PATH = path.join(ROOT, "eslint/expected-fixtures-exclude.json");
 const AR_SRC = path.join(ROOT, "packages/activerecord/src");
 
+const parseForESLint = parser.parseForESLint as unknown as (
+  code: string,
+  options: { loc: boolean; range: boolean },
+) => { ast: unknown };
+
 async function main(): Promise<void> {
   // Dynamic import avoids the CJS-style top-level / static-`.mjs`-import
   // interop fragility that tsx exposes under module: Node16.
@@ -56,7 +61,7 @@ async function main(): Promise<void> {
     let foundCall = false;
     let keys = new Set<string>();
     try {
-      const ast = parser.parseForESLint(src, { loc: true, range: true }).ast;
+      const ast = parseForESLint(src, { loc: true, range: true }).ast;
       const r = collectUseFixturesKeys(ast);
       foundCall = r.found;
       keys = r.keys;
