@@ -31,7 +31,11 @@ function mismatch(tsFile: string, tsName: string, rubyFile = "adapter.rb"): Mism
 
 describe("candidateNames", () => {
   it("reads every TS candidate off a missing-call row", () => {
-    expect(candidateNames("any? → isAny|any")).toEqual(["isAny", "any"]);
+    expect(candidateNames("quoted_scope → quotedScope")).toEqual(["quotedScope"]);
+  });
+
+  it("admits the JS-native alias the gate itself accepts", () => {
+    expect(candidateNames("any? → isAny|any")).toEqual(["isAny", "any", "some"]);
   });
 });
 

@@ -1,30 +1,8 @@
-/**
- * One-off audit for RFC 0083 story `audit-wide-cross-file-mixin-attribution`.
- *
- * Classifies every (row, call) pair in output/call-mismatches-wide.json by
- * WHERE — if anywhere — the Rails call the paired TS body omits is actually
- * made in the port, so `resolve-wide-candidates-through-include-graph` can
- * widen candidate resolution without suppressing real fidelity gaps.
- *
- * Buckets (see rfcs/0083-.../cross-file-audit.md in the tasks repo):
- *   include-graph   the same-named TS method on a class reachable from the
- *                   paired class through the RECORDED includes/extends graph
- *                   makes the call — resolvable, and the only safe widening;
- *   collaborator    a same-named method elsewhere in the package makes the
- *                   call, but no include/extends edge reaches it (the trails
- *                   `this.pgSchemaStatements()` delegation shape);
- *   divergence      the call is made by no definition of that name anywhere in
- *                   the package — a real gap the gate must keep flagging;
- *   unported        the paired body is the only definition and has no call-set
- *                   at all (nothing was ported to compare against).
- *
- * Reproduce:  pnpm api:compare --wide-calls && pnpm tsx
- *             scripts/api-compare/audit-cross-file-calls.ts
- */
 import { promises as fs } from "fs";
 import * as path from "path";
 
 import { OUTPUT_DIR } from "./config.js";
+import { jsEnumerableAliases } from "./enumerable-idioms.js";
 
 export type Method = { name: string; file?: string; calls?: string[] };
 export type Entity = {
@@ -56,19 +34,14 @@ export type Row = {
   rubyFile: string;
   call: string;
   bucket: Bucket;
-  /** File whose same-named body makes the call, for the resolvable buckets. */
   resolvedIn?: string;
 };
 
-/** Definitions of one TS method name across a package, with their call-sets. */
 type Definition = { entity: string; file: string; calls: Set<string> };
 
 export type PackageIndex = {
-  /** Every entity declared in a file, by file path. */
   entitiesByFile: Map<string, Entity[]>;
-  /** Entities by bare declaration name — how `includes`/`extends` spell them. */
   entitiesByName: Map<string, Entity[]>;
-  /** Every definition of a method name, anywhere in the package. */
   definitionsByName: Map<string, Definition[]>;
 };
 
@@ -98,12 +71,6 @@ function push<K, V>(map: Map<K, V[]>, key: K, value: V): void {
   else map.set(key, [value]);
 }
 
-/**
- * Files reachable from the entities declared in `tsFile` by walking ONLY the
- * recorded `includes`/`extends` names, transitively. Names that resolve to no
- * entity in the package (a cross-package mixin, an inline object literal) drop
- * out — this walk never falls back to filename or directory proximity.
- */
 export function includeGraphFiles(tsFile: string, index: PackageIndex): Set<string> {
   const files = new Set<string>();
   const seen = new Set<string>();
@@ -140,15 +107,15 @@ export function classifyRow(
   return { bucket: "collaborator", resolvedIn: makesCall[0].file };
 }
 
-/** `belongs_to → belongsTo|belongsToMany` → the TS candidate names. */
 export function candidateNames(call: string): string[] {
   const arrow = call.indexOf("→");
   if (arrow < 0) return [];
-  return call
+  const mapped = call
     .slice(arrow + 1)
     .split("|")
     .map((c) => c.trim())
     .filter((c) => c.length > 0);
+  return [...new Set([...mapped, ...jsEnumerableAliases(call.slice(0, arrow).trim())])];
 }
 
 export function classify(mismatches: Mismatch[], indexes: Map<string, PackageIndex>): Row[] {
@@ -172,12 +139,6 @@ export function classify(mismatches: Mismatch[], indexes: Map<string, PackageInd
   return rows;
 }
 
-/**
- * A row is CROSS-FILE (the RFC 0083 mixin-attribution split) when the Ruby file
- * the method was extracted from does not correspond to the TS file it was
- * name-matched against — `postgresql/schema_statements.rb` charged against
- * `postgresql-adapter.ts`. Same-stem pairs are ordinary same-file rows.
- */
 export function isCrossFile(row: Row): boolean {
   return tsStem(row.tsFile) !== rubyStem(row.rubyFile);
 }
@@ -190,12 +151,6 @@ function tsStem(tsFile: string): string {
   return tsFile.replace(/\.ts$/, "");
 }
 
-/**
- * Rows a maximally permissive include-graph rule would silence: the candidate
- * is called by ANY method on ANY class reachable through includes/extends,
- * regardless of name. Measured to bound the sibling story's ceiling; NOT a
- * recommendation — see the report's resolution rule.
- */
 function countAnyMethodInGraph(rows: Row[], indexes: Map<string, PackageIndex>): number {
   const callsByFile = new Map<string, Map<string, Set<string>>>();
   for (const [pkg, index] of indexes) {
@@ -254,20 +209,13 @@ async function main(): Promise<void> {
   const report = {
     totalRows: rows.length,
     crossFileRows: crossFile.length,
-    /** Widest rule the sibling story could implement — see the report. */
     anyMethodInIncludeGraph: countAnyMethodInGraph(rows, indexes),
     resolvableAnywhereByName: resolvable.length,
-    /**
-     * Resolvable rows whose paired body forwards to its own name (the
-     * `isDelegatingWrapper` shape) but is larger than DELEGATION_MAX_CALLS —
-     * the population a threshold raise, rather than a graph walk, would reach.
-     */
     resolvableWrapperShaped: resolvable.filter((r) =>
       (indexes.get(r.package)!.definitionsByName.get(r.tsName) ?? [])
         .filter((d) => d.file === r.tsFile)
         .some((d) => d.calls.has(r.tsName) && d.calls.size > 3),
     ).length,
-    /** Rows whose paired TS file declares no includes/extends edge at all. */
     rowsWithNoGraphEdge: rows.filter(
       (r) => includeGraphFiles(r.tsFile, indexes.get(r.package)!).size === 0,
     ).length,
