@@ -2805,6 +2805,33 @@ export function assertValidLeftOuterJoinsBang(values: unknown[]): void {
   }
 }
 
+/**
+ * Rails' inner `select_named_joins` block (query_methods.rb:1865-1873): a
+ * CTEJoin — a `joins()` symbol matching a `with(...)` CTE name — becomes an
+ * InnerJoin join_node, and anything else raises a plain RuntimeError
+ * `"unknown class: <ClassName>"` (NOT the left-outer bucket's ArgumentError,
+ * query_methods.rb:1834). Shared by `buildJoinBuckets` and the live path's
+ * `emitJoinPlan`, which partition the same joins_values the same way.
+ *
+ * @internal
+ */
+function selectInnerNamedJoins(
+  this: QueryMethodsHost,
+  values: unknown[],
+  stashedJoins: unknown[],
+  cteJoinNodes: Nodes.Join[],
+): AssociationSpec[] {
+  return selectNamedJoins.call(this, values, stashedJoins, (join) => {
+    if (join instanceof CTEJoin) {
+      cteJoinNodes.push(buildWithJoinNode.call(this, join.name, Nodes.InnerJoin) as Nodes.Join);
+    } else {
+      throw new Error(
+        `unknown class: ${(join as { constructor?: { name?: string } })?.constructor?.name}`,
+      );
+    }
+  }) as AssociationSpec[];
+}
+
 /** @internal */
 export function buildJoinBuckets(
   this: QueryMethodsHost,
@@ -2816,15 +2843,7 @@ export function buildJoinBuckets(
     named_join: [],
   };
 
-  // Named association joins vs raw join values, both derived from the unified
-  // `joins_values` store (Rails reads `joins_values` here and partitions with
-  // `select_named_joins`).
   const joinsValues = this.joinsValues;
-  const namedInner = joinsValues.filter((v) => this._isNamedJoinValue(v)) as AssociationSpec[];
-  const rawJoinValues = joinsValues.filter((v) => !this._isNamedJoinValue(v)) as (
-    | string
-    | Nodes.Join
-  )[];
 
   // Mirror Rails build_join_buckets (query_methods.rb:1828–1876):
   // When left_outer_joins_values is non-empty, Rails runs select_named_joins on
@@ -2845,7 +2864,7 @@ export function buildJoinBuckets(
       }
     });
 
-    if (namedInner.length === 0 && rawJoinValues.length === 0 && this._joinClauses.length === 0) {
+    if (joinsValues.length === 0 && this._joinClauses.length === 0) {
       // query_methods.rb:1838-1842: `if joins_values.empty?`.
       buckets.named_join.push(...namedLeft);
       buckets.stashed_join.push(...stashedLeft);
@@ -2860,9 +2879,8 @@ export function buildJoinBuckets(
     stashedLeft.unshift(leftJd);
   }
 
-  // query_methods.rb:1847-1850: dup `joins_values` and pop a TRAILING
-  // JoinDependency built on this relation's own model — the eager stash pushed
-  // in by `apply_join_dependency`. A cross-klass merged JoinDependency fails
+  // query_methods.rb:1847-1850. The popped JoinDependency is the eager stash
+  // `apply_join_dependency` pushed in; a cross-klass merged one fails
   // `base_klass == model` and stays in the stream for `select_named_joins`.
   const joins = [...joinsValues];
   const lastJoinValue = joins[joins.length - 1];
@@ -2887,31 +2905,19 @@ export function buildJoinBuckets(
     }
   }
 
-  // query_methods.rb:1865-1873: the remaining (post-pop) joins_values run
-  // through `select_named_joins`, which stashes merged JoinDependencies into
-  // `stashed_join` and routes a CTE name to an InnerJoin join_node.
+  // query_methods.rb:1865-1873.
+  const cteInnerJoinNodes: Nodes.Join[] = [];
   buckets.named_join.push(
-    ...selectNamedJoins.call(
+    ...selectInnerNamedJoins.call(
       this,
       joins.filter((j) => this._isNamedJoinValue(j)),
       buckets.stashed_join,
-      (join) => {
-        if (join instanceof CTEJoin) {
-          buckets.join_node.push(buildWithJoinNode.call(this, join.name, Nodes.InnerJoin));
-        } else {
-          // Rails' inner joins_values fallback raises a plain RuntimeError
-          // `"unknown class: <ClassName>"` (query_methods.rb:1870-1872) — NOT the
-          // left-outer bucket's ArgumentError (query_methods.rb:1834).
-          throw new Error(
-            `unknown class: ${(join as { constructor?: { name?: string } })?.constructor?.name}`,
-          );
-        }
-      },
+      cteInnerJoinNodes,
     ),
   );
+  buckets.join_node.push(...cteInnerJoinNodes);
 
-  // query_methods.rb:1875-1876 — the eager stash goes in LAST, after the
-  // left-outer stash.
+  // query_methods.rb:1875-1876 — the eager stash goes in LAST.
   buckets.stashed_join.push(...stashedLeft);
   if (stashedEagerLoad) buckets.stashed_join.push(stashedEagerLoad);
 
@@ -3047,22 +3053,12 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
   const cteInnerJoinNodes: Nodes.Join[] = [];
   const innerNamed =
     plan.joinType === undefined && this._namedInnerJoins.length > 0
-      ? (selectNamedJoins.call(this, this._namedInnerJoins, plan.stashedJoins, (join) => {
-          if (join instanceof CTEJoin) {
-            cteInnerJoinNodes.push(
-              buildWithJoinNode.call(this, join.name, Nodes.InnerJoin) as Nodes.Join,
-            );
-          } else {
-            // Rails' inner joins_values fallback raises a plain RuntimeError
-            // `"unknown class: <ClassName>"` (query_methods.rb:1870-1872) — NOT
-            // the left-outer bucket's `ArgumentError` "only Hash, Symbol and
-            // Array are allowed" (query_methods.rb:1834). The two buckets diverge
-            // here, so mirror that divergence.
-            throw new Error(
-              `unknown class: ${(join as { constructor?: { name?: string } })?.constructor?.name}`,
-            );
-          }
-        }) as AssociationSpec[])
+      ? selectInnerNamedJoins.call(
+          this,
+          this._namedInnerJoins,
+          plan.stashedJoins,
+          cteInnerJoinNodes,
+        )
       : ([] as AssociationSpec[]);
   const [namedJoins, joinType] =
     plan.joinType !== undefined
