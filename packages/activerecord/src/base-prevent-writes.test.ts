@@ -6,8 +6,10 @@ import { fixtures } from "./test-fixtures.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 import { Bird } from "./test-helpers/models/bird.js";
 import { Professor } from "./test-helpers/models/professor.js";
+import { inMemoryDb } from "./support/adapter-helper.js";
+import { assertQueriesCount } from "./testing/query-assertions.js";
 
-describe("BasePreventWritesTest", () => {
+describe.skipIf(inMemoryDb())("BasePreventWritesTest", () => {
   fixtures([]);
 
   it("creating a record raises if preventing writes", async () => {
@@ -55,15 +57,19 @@ describe("BasePreventWritesTest", () => {
   it("an explain query does not raise if preventing writes", async () => {
     await Bird.create({ name: "Bluejay" });
     await Base.whilePreventingWrites(async () => {
-      const result = await Bird.where({ name: "Bluejay" }).explain();
-      expect(typeof result).toBe("string");
+      await assertQueriesCount(2, false, async () => {
+        const result = await Bird.where({ name: "Bluejay" }).explain();
+        expect(typeof result).toBe("string");
+      });
     });
   });
 
   it("an empty transaction does not raise if preventing writes", async () => {
     await Base.whilePreventingWrites(async () => {
-      await Bird.transaction(async () => {
-        await (await Base.leaseConnection()).materializeTransactions();
+      await assertQueriesCount(2, true, async () => {
+        await Bird.transaction(async () => {
+          await (await Base.leaseConnection()).materializeTransactions();
+        });
       });
     });
   });

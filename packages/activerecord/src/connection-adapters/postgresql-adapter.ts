@@ -2422,22 +2422,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     binds: unknown[] = [],
     options: ExplainOption[] = [],
   ): Promise<string> {
-    return this.withRawConnection({}, async (conn) => {
-      const client = conn as unknown as pg.Client;
-      const clause = this._explainStatementClause(options);
-      // Rewrite `?` → `$1` the same way execute/execQuery do, so a
-      // collected query with driver-neutral placeholders (`?`) can be
-      // re-EXPLAIN'd. Bind values pass through to pg as the values
-      // array so `EXPLAIN` with parameters doesn't error with
-      // "there is no parameter $1".
-      const pgBinds = binds.map((v) => this._bindForPg(v));
-      const rewritten = this.rewriteBinds(sql, pgBinds);
-      const result = await this._serializePinnedQuery(client, () =>
-        client.query(`${clause} ${rewritten}`, pgBinds),
-      );
-      const printer = new ExplainPrettyPrinter();
-      return printer.pp(result.rows);
-    });
+    const clause = this._explainStatementClause(options);
+    // `internalExecQuery` handles the `?` → `$1` rewrite and bind
+    // normalization, and instruments the EXPLAIN as its own
+    // `sql.active_record` query — mirroring Rails, whose PG `explain`
+    // goes through `internal_exec_query(sql, "EXPLAIN", binds)`.
+    const result = await this.internalExecQuery(`${clause} ${sql}`, "EXPLAIN", binds);
+    const printer = new ExplainPrettyPrinter();
+    return printer.pp(result.toArray());
   }
 
   /**

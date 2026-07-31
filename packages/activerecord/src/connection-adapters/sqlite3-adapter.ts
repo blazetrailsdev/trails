@@ -939,10 +939,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   /**
    * Return the query execution plan.
    *
-   * Binds are forwarded to the prepared `EXPLAIN QUERY PLAN`
-   * statement (`.all(...binds)`) so a collected prepared-statement
-   * query with `?` placeholders EXPLAINs without SQLite complaining
-   * about missing parameter values. Options are accepted for
+   * Runs through `internalExecQuery` (as Rails does) so the EXPLAIN
+   * itself is instrumented as a `sql.active_record` query. Binds are
+   * forwarded so a collected prepared-statement query with `?`
+   * placeholders EXPLAINs without SQLite complaining about missing
+   * parameter values. Options are accepted for
    * signature parity with `Relation#explain` but ignored — SQLite
    * has no equivalent to PG's `:analyze` / `:verbose` toggles.
    */
@@ -951,11 +952,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     binds: unknown[] = [],
     _options: ExplainOption[] = [],
   ): Promise<string> {
-    await this.ensureConnected();
-    const explainStmt = await this.driver.prepare(`EXPLAIN QUERY PLAN ${sql}`);
-    const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
-    const rows = (await explainStmt.all(driverBinds)) as Record<string, unknown>[];
-    return rows.map((r) => `${r.id}|${r.parent}|${r.notused}|${r.detail}`).join("\n");
+    const result = await this.internalExecQuery(`EXPLAIN QUERY PLAN ${sql}`, "EXPLAIN", binds);
+    return result
+      .toArray()
+      .map((r) => `${r.id}|${r.parent}|${r.notused}|${r.detail}`)
+      .join("\n");
   }
 
   /**
