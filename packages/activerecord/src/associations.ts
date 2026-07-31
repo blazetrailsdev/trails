@@ -138,7 +138,13 @@ export interface AssociationOptions {
   className?: string;
   primaryKey?: string | string[];
   queryConstraints?: string[];
-  dependent?: "destroy" | "nullify" | "delete" | "restrictWithException" | "restrictWithError";
+  dependent?:
+    | "destroy"
+    | "destroyAsync"
+    | "nullify"
+    | "delete"
+    | "restrictWithException"
+    | "restrictWithError";
   inverseOf?: string | false;
   through?: string;
   source?: string;

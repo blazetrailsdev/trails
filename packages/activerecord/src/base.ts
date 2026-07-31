@@ -4375,6 +4375,14 @@ export class Base extends Model {
   // Mirrors: ActiveRecord::Core.shard_selector (core.rb:104).
   static shardSelector: unknown = null;
 
+  // Mirrors: ActiveRecord::Core._destroy_association_async_job (core.rb:24),
+  // minus Rails' "ActiveRecord::DestroyAssociationAsyncJob" default: that
+  // ActiveJob::Base subclass is unported (scripts/api-compare/unported-files.ts),
+  // so adopting the default would make every read raise NameError.
+  static _destroyAssociationAsyncJob: unknown = null;
+
+  static destroyAssociationAsyncJob = _Core.destroyAssociationAsyncJob;
+
   // Maximum records destroyed per background job by `dependent: :destroy_async`.
   // nil (single job) by default, matching Rails and trails' behavior.
   // Mirrors: ActiveRecord::Core.destroy_association_async_batch_size (core.rb:47).
