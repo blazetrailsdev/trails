@@ -33,6 +33,7 @@ import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { UrlConfig } from "../database-configurations/url-config.js";
 import { arunitDatabaseNames } from "./arunit2-config.js";
+import { loadSchema } from "./load-schema-helper.js";
 import {
   CONNECTION_LANES,
   DEFAULT_CONNECTION,
@@ -411,4 +412,36 @@ export async function connect(): Promise<TestDatabaseConfig> {
   await ARUnit2Model.establishConnection("arunit2");
 
   return { configs, adapter, envConfig };
+}
+
+/**
+ * The table every canonical schema load lays first; its absence is what tells
+ * {@link restoreWorkerConnection} the worker database came back empty.
+ */
+const CANONICAL_PROBE_TABLE = "posts";
+
+/**
+ * Give the worker back its `arunit` pool after a test displaced `Base`'s,
+ * re-running `connect`'s `establish_connection :arunit` (`connection.rb:32`).
+ *
+ * Rails has no counterpart: its suite is one process against one file-backed
+ * database, so re-establishing always lands on a database that still holds the
+ * schema. Under `ARCONN=sqlite3_mem` the displaced connection *was* the
+ * database — re-establishing opens a brand-new, EMPTY `:memory:` one — so the
+ * schema has to be laid again. The probe, not the lane, decides: a pool that
+ * was merely disconnected and reopened on a file lane still has its tables, and
+ * `loadSchema` issues no drops, so it must only run against an empty database.
+ */
+export async function restoreWorkerConnection(): Promise<void> {
+  await Base.establishConnection("arunit");
+  // Leased, not `withConnection`-scoped, as the per-worker boot leases
+  // (`test-setup-dy.ts`): on `:memory:` the connection *is* the database, so
+  // handing it back to the pool risks taking the freshly laid schema with it.
+  // Cast because `tableExists` is on the concrete adapter class, not the
+  // `DatabaseAdapter` interface.
+  const connection = (await Base.leaseConnection()) as unknown as {
+    tableExists(name: string): Promise<boolean>;
+  };
+  if (await connection.tableExists(CANONICAL_PROBE_TABLE)) return;
+  await loadSchema(await Base.leaseConnection());
 }

@@ -19,13 +19,10 @@ import {
 import { setTrailsRoot } from "@blazetrails/activesupport";
 import { adapterType } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
+import { restoreWorkerConnection } from "./support/connection.js";
 import * as nodeFs from "node:fs";
 import * as nodeOs from "node:os";
 import * as nodePath from "node:path";
-
-async function restoreWorkerConnection(): Promise<void> {
-  await Base.establishConnection("arunit");
-}
 
 describe("ConnectionHandlingTest", () => {
   // The opted-out cases assert the pool releases its connection, which
@@ -320,19 +317,15 @@ describe("ConnectionHandlingTest", () => {
   // never the verbatim URL string. establish_connection({ adapter, url })
   // must mirror that shape, matching the resolver's "url removed from hash".
   // Only the primary pool exercises this path, so `Base`'s is swapped and
-  // restored; under ARCONN=sqlite3_mem the restore would hand the worker a
-  // fresh, EMPTY database, hence the skip.
-  it.skipIf(inMemoryDb())(
-    "establish_connection with a url stores a UrlConfig with discrete fields",
-    async () => {
-      await Base.establishConnection({ adapter: "sqlite3", url: "sqlite3:db/discrete.sqlite3" });
-      const config = Base.connectionDbConfig();
-      expect(config.adapter).toBe("sqlite3");
-      expect(config.database).toBe("db/discrete.sqlite3");
-      expect(config.configurationHash).not.toHaveProperty("url");
-      await restoreWorkerConnection();
-    },
-  );
+  // restored.
+  it("establish_connection with a url stores a UrlConfig with discrete fields", async () => {
+    await Base.establishConnection({ adapter: "sqlite3", url: "sqlite3:db/discrete.sqlite3" });
+    const config = Base.connectionDbConfig();
+    expect(config.adapter).toBe("sqlite3");
+    expect(config.database).toBe("db/discrete.sqlite3");
+    expect(config.configurationHash).not.toHaveProperty("url");
+    await restoreWorkerConnection();
+  });
 
   it("is_connected?", async () => {
     const pool = Base.connectionPool();
@@ -386,9 +379,9 @@ describe("ConnectionHandlingTest", () => {
   });
 
   // Both cases below remove `Base`'s pool: only the primary pool can be
-  // observed going away (a subclass falls back to `Base`'s). Same restore and
-  // in-memory skip as above.
-  it.skipIf(inMemoryDb())("remove_connection removes the pool", async () => {
+  // observed going away (a subclass falls back to `Base`'s). Same restore as
+  // above.
+  it("remove_connection removes the pool", async () => {
     const ambientDbConfig = Base.connectionDbConfig();
     expect(Base.connectionPool()).toBeTruthy();
     // Mirrors Rails `remove_connection`: returns the removed pool's db_config.
@@ -398,7 +391,7 @@ describe("ConnectionHandlingTest", () => {
     await restoreWorkerConnection();
   });
 
-  it.skipIf(inMemoryDb())("remove_connection returns undefined when no pool exists", async () => {
+  it("remove_connection returns undefined when no pool exists", async () => {
     Base.removeConnection();
     expect(Base.removeConnection()).toBeUndefined();
     await restoreWorkerConnection();
