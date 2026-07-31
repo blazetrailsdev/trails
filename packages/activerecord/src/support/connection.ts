@@ -33,6 +33,8 @@ import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { UrlConfig } from "../database-configurations/url-config.js";
 import { arunitDatabaseNames } from "./arunit2-config.js";
+import { loadAdapterSpecificSchema, loadSchema } from "./load-schema-helper.js";
+import { stampCanonicalSchema } from "./canonical-schema-stamp.js";
 import {
   CONNECTION_LANES,
   DEFAULT_CONNECTION,
@@ -411,4 +413,47 @@ export async function connect(): Promise<TestDatabaseConfig> {
   await ARUnit2Model.establishConnection("arunit2");
 
   return { configs, adapter, envConfig };
+}
+
+const CANONICAL_PROBE_TABLE = "posts";
+
+const ADAPTER_SPECIFIC_PROBE_TABLE = "defaults";
+
+/**
+ * Give the worker back its `arunit` pool after a test displaced `Base`'s,
+ * re-running `connect`'s `establish_connection :arunit` (`connection.rb:32`).
+ *
+ * Rails has no counterpart: its suite is one process against one file-backed
+ * database, so re-establishing always lands on a database that still holds the
+ * schema. Under `ARCONN=sqlite3_mem` the displaced connection *was* the
+ * database — re-establishing opens a brand-new, EMPTY `:memory:` one — so the
+ * schema has to be laid again. The probe, not the lane, decides: a pool that
+ * was merely disconnected and reopened on a file lane still has its tables, and
+ * `loadSchema` issues no drops, so it must only run against an empty database.
+ *
+ * Both halves of `load_schema` are probed separately, as the per-worker boot
+ * treats them (`test-setup-dy.ts`): canonical tables being present does not
+ * imply the adapter-specific ones are, so a database that kept `posts` but lost
+ * `defaults` re-runs the adapter-specific arm alone. Running the canonical arm
+ * there instead would fail on the surviving tables, since it issues no drops.
+ *
+ * The reload stamps as the boot's full-load arm does, so a database laid here
+ * is indistinguishable from one laid at boot: `canonicalSchemaUpToDate` is read
+ * by a *starting* worker, and an unstamped in-memory database would be a state
+ * boot never produces.
+ */
+export async function restoreWorkerConnection(): Promise<void> {
+  await Base.establishConnection("arunit");
+  const connection = (await Base.leaseConnection()) as unknown as {
+    tableExists(name: string): Promise<boolean>;
+  };
+  if (!(await connection.tableExists(CANONICAL_PROBE_TABLE))) {
+    const adapter = await Base.leaseConnection();
+    await loadSchema(adapter);
+    await stampCanonicalSchema(adapter);
+    return;
+  }
+  if (!(await connection.tableExists(ADAPTER_SPECIFIC_PROBE_TABLE))) {
+    await loadAdapterSpecificSchema(await Base.leaseConnection());
+  }
 }
