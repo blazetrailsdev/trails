@@ -413,15 +413,10 @@ describe("staleBuildMessage", () => {
 
 describe("typescript-internal.d.ts", () => {
   const declaredStatusNames = (): string[] => {
-    const source = fs.readFileSync(
-      path.join(import.meta.dirname, "typescript-internal.d.ts"),
-      "utf8",
-    );
-    const body = source.slice(
-      source.indexOf("export enum UpToDateStatusType {"),
-      source.indexOf("}", source.indexOf("export enum UpToDateStatusType {")),
-    );
-    return [...body.matchAll(/^\s{4}(\w+),$/gm)].map((m) => m[1]);
+    const source = fs.readFileSync(path.join(__dirname, "typescript-internal.d.ts"), "utf8");
+    const body = /export enum UpToDateStatusType \{([^}]*)\}/.exec(source);
+    expect(body).not.toBeNull();
+    return [...body![1].matchAll(/(\w+),/g)].map((m) => m[1]);
   };
 
   it("declares every status the installed TypeScript reports", () => {
