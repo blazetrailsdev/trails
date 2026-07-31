@@ -139,6 +139,27 @@ describe("Ruby extractor inert-receiver call suppression", () => {
     );
   });
 
+  it("suppresses a paren-less qualified call on a local variable", () => {
+    // `opts.assert_valid_keys :a` parses as :command_call, not :call — the
+    // receiver check has to cover both or half the noise survives.
+    const c = rubyWeakCalls({
+      "cmd.rb": `
+        class Cmd
+          def d(opts)
+            opts.assert_valid_keys :a
+          end
+
+          def e
+            @config.assert_valid_keys :b
+          end
+        end
+      `,
+    });
+    expect(c["Cmd#d"].weakCalls).toEqual(["assert_valid_keys"]);
+    expect(c["Cmd#e"].calls).toContain("assert_valid_keys");
+    expect(c["Cmd#e"].weakCalls ?? []).toEqual([]);
+  });
+
   it("still records self, ivar, constant and method-chain receivers", () => {
     const c = rubyWeakCalls({
       "bar.rb": `

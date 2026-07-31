@@ -230,9 +230,9 @@ export function dropWeakCalls(
   calls: readonly string[] | undefined,
   weakCalls: readonly string[] | undefined,
   wideCalls: boolean,
-): string[] {
+): readonly string[] {
   if (!calls) return [];
-  if (!wideCalls || !weakCalls || weakCalls.length === 0) return [...calls];
+  if (!wideCalls || !weakCalls || weakCalls.length === 0) return calls;
   const weak = new Set(weakCalls);
   return calls.filter((c) => !weak.has(c));
 }

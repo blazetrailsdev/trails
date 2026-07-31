@@ -1979,7 +1979,8 @@ class ApiExtractor
     calls = []
     weak = []
     walk_for_calls(body_node, calls, weak)
-    weak_calls = weak.uniq.select { |name| weak.count(name) == calls.count(name) }
+    total = calls.tally
+    weak_calls = weak.tally.select { |name, n| total[name] == n }.keys
     [calls.uniq, weak_calls]
   end
 
@@ -2133,10 +2134,8 @@ class ApiExtractor
     inner.is_a?(Array) && inner[0] == :@ident
   end
 
-  # `calls` collects every recorded name; `weak` collects the ones recorded from
-  # an inert receiver. A name lands in the emitted `weakCalls` only if it was
-  # NEVER seen in a non-inert position (see collect_method_calls), so one real
-  # `owner.save` keeps `save` significant even beside a local `list.save`.
+  # `weak` collects the occurrences whose receiver was inert; a name only
+  # becomes a weak CALL when no non-inert occurrence exists (collect_method_calls).
   def walk_for_calls(node, calls, weak)
     return unless node.is_a?(Array)
 
