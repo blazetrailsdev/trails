@@ -763,9 +763,9 @@ export class CollectionAssociation extends Association {
    *
    * Rails passes `replace: replace || association_scope.distinct_value`, so a
    * `distinct` association scope dedups in place on append rather than
-   * appending the same record twice. The scope build is guarded because
-   * `add_to_target` is not where trails surfaces an unresolvable target class
-   * or foreign key — those are deferred to the load chokepoint.
+   * appending the same record twice. As in Rails the scope build is unguarded:
+   * `association_scope` raising here is a real failure, not something
+   * `add_to_target` absorbs into a `false`.
    */
   addToTarget(record: Base, options?: { skipCallbacks?: boolean; replace?: boolean }): Base | null;
   addToTarget(
@@ -779,13 +779,8 @@ export class CollectionAssociation extends Association {
     save?: () => Promise<void>,
   ): Base | null | Promise<Base | null> {
     const { skipCallbacks = false, replace = false } = options;
-    let distinctValue = false;
-    try {
-      distinctValue = !!(this.associationScope() as { distinctValue?: boolean } | undefined)
-        ?.distinctValue;
-    } catch {
-      distinctValue = false;
-    }
+    const distinctValue = !!(this.associationScope() as { distinctValue?: boolean } | undefined)
+      ?.distinctValue;
     const shouldReplace = replace || distinctValue;
     if (save) return replaceOnTargetAsync(this, record, skipCallbacks, shouldReplace, save);
     return replaceOnTarget(this, record, skipCallbacks, shouldReplace);
