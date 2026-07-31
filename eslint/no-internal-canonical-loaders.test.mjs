@@ -8,7 +8,7 @@ import rule, {
   isCanonicalSchemaModule,
   moduleBasename,
 } from "./no-internal-canonical-loaders.mjs";
-import { canonicalLoaderModules } from "./test-infra-scope.mjs";
+import { activerecordSrcRoot, canonicalLoaderModules } from "./test-infra-scope.mjs";
 
 const FILENAME = "packages/activerecord/src/dirty.test.ts";
 const OWN_TEST = "packages/activerecord/src/support/canonical-schema.test.ts";
@@ -101,16 +101,21 @@ tester.run("no-internal-canonical-loaders", rule, {
   ],
 });
 
-const supportDir = path.join(
+const srcDir = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
-  "packages",
-  "activerecord",
-  "src",
-  "support",
+  ...activerecordSrcRoot.split("/"),
 );
 
-/** Names exported by `source`, covering the export forms used in `support/`. */
+/**
+ * Modules outside the loader set that legitimately export a BANNED name.
+ * `model-schema.ts` is Rails' own `ActiveRecord::ModelSchema#load_schema` —
+ * unrelated to `support/load-schema-helper.ts`, and the rule already lets it
+ * through because it matches on module basename as well as symbol.
+ */
+const nonLoaderBannedExporters = new Set(["model-schema.ts"]);
+
+/** Names exported by `source`, covering the export forms used in activerecord. */
 function exportedNames(source) {
   const names = new Set();
   for (const [, name] of source.matchAll(
@@ -129,36 +134,48 @@ function exportedNames(source) {
 }
 
 /**
- * Walks the whole `support/` tree, not just its top level: the rule matches on
- * basename regardless of directory depth, so a loader moved into a
- * `support/<subdir>/` module is exactly the silent-reopen case being guarded.
+ * Walks the whole activerecord `src/` tree, not just `support/`: the rule
+ * matches on basename regardless of directory, so a loader relocated out of
+ * `support/` (into `test-helpers/`, say) is exactly the silent-reopen case
+ * being guarded — the same hole as `support/<subdir>/`, one level up.
  */
-async function* supportSources(dir = supportDir) {
+async function* srcSources(dir = srcDir) {
   for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name !== "node_modules" && entry.name !== "dist") yield* supportSources(full);
+      if (entry.name !== "node_modules" && entry.name !== "dist") yield* srcSources(full);
     } else if (entry.name.endsWith(".ts") && !entry.name.endsWith(".test.ts")) {
       yield full;
     }
   }
 }
 
-/** Repo-relative path → the BANNED symbols that module exports. */
-async function bannedExportsBySupportModule() {
+/**
+ * src-relative path → the BANNED symbols that module exports, for every module
+ * in the tree including the non-loader exporters. Walked once and shared: the
+ * tree is ~1550 files, so each extra walk costs real time.
+ */
+const bannedExportsBySrcModule = (async () => {
   const byModule = new Map();
-  for await (const file of supportSources()) {
+  for await (const file of srcSources()) {
     const source = await fs.readFile(file, "utf8");
     const banned = [...exportedNames(source)].filter((name) => BANNED.has(name)).sort();
-    if (banned.length > 0) byModule.set(path.relative(supportDir, file), banned);
+    if (banned.length > 0) byModule.set(path.relative(srcDir, file), banned);
   }
   return byModule;
+})();
+
+/** The same map with the sanctioned non-loader exporters dropped. */
+async function loaderCandidates() {
+  return [...(await bannedExportsBySrcModule)].filter(
+    ([file]) => !nonLoaderBannedExporters.has(file),
+  );
 }
 
 describe("no-internal-canonical-loaders module matcher", () => {
-  it("matches every support/ module that exports a banned loader", async () => {
+  it("matches every activerecord module that exports a banned loader", async () => {
     const unmatched = [];
-    for (const [file, banned] of await bannedExportsBySupportModule()) {
+    for (const [file, banned] of await loaderCandidates()) {
       if (!isCanonicalSchemaModule(`./${file.replace(/\.ts$/, ".js")}`)) {
         unmatched.push(`${file} exports ${banned.join(", ")}`);
       }
@@ -168,10 +185,16 @@ describe("no-internal-canonical-loaders module matcher", () => {
 
   it("lists no module that has stopped exporting a banned loader", async () => {
     const found = new Set(
-      [...(await bannedExportsBySupportModule()).keys()].map((file) =>
-        moduleBasename(file.replace(/\.ts$/, "")),
-      ),
+      (await loaderCandidates()).map(([file]) => moduleBasename(file.replace(/\.ts$/, ""))),
     );
     expect(canonicalLoaderModules.filter((module) => !found.has(module))).toEqual([]);
+  });
+
+  // Without this the allowlist is a silent hole of its own: if model-schema.ts
+  // moves or stops exporting `loadSchema`, the stale entry would keep excusing
+  // a path nobody is checking.
+  it("allowlists only non-loader modules that still export a banned name", async () => {
+    const exporters = await bannedExportsBySrcModule;
+    expect([...nonLoaderBannedExporters].filter((file) => !exporters.has(file))).toEqual([]);
   });
 });

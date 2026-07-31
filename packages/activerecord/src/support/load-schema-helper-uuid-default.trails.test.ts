@@ -59,6 +59,9 @@ describeIfPg("load_schema_helper: uuid_default without pgcrypto", () => {
         },
       });
 
+      // Must call the arm directly, not loadSchema: this cover stubs
+      // createTable, so the canonical half loadSchema runs first would query
+      // tables that were never really laid (#5676 regressed exactly that).
       await expect(
         loadAdapterSpecificSchema(probe as unknown as AbstractAdapter),
       ).rejects.toBeInstanceOf(StopLoad);
