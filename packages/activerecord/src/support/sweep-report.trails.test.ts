@@ -61,6 +61,20 @@ describe("sweep report", () => {
     }
   });
 
+  it("names the report file after the injected worker id", async () => {
+    const dir = await tempReportDir();
+    try {
+      const read = (name: string) =>
+        name === "AR_SWEEP_REPORT" ? dir : name === "VITEST_POOL_ID" ? "7" : undefined;
+      await recordSweptTables("sqlite", ["octopi"], read);
+
+      const fs = await getFsAsync();
+      expect(await fs.readdir!(dir)).toEqual(["sweep-sqlite-7.json"]);
+    } finally {
+      await removeReportDir(dir);
+    }
+  });
+
   it("keeps the lanes apart", async () => {
     const dir = await tempReportDir();
     try {

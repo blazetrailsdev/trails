@@ -18,6 +18,7 @@ import { getEnv, getFsAsync } from "@blazetrails/activesupport";
 type EnvReader = (name: string) => string | undefined;
 
 const REPORT_DIR_ENV = "AR_SWEEP_REPORT";
+const WORKER_ID_ENV = "VITEST_POOL_ID";
 
 /** Names swept so far in this worker, keyed by adapter lane. */
 const sweptByLane = new Map<string, Set<string>>();
@@ -38,11 +39,11 @@ export function sweepReportDir(read: EnvReader = getEnv): string | undefined {
  */
 export async function recordSweptTables(
   lane: string,
-  tables: readonly string[],
+  tables: Iterable<string>,
   read: EnvReader = getEnv,
 ): Promise<void> {
   const dir = sweepReportDir(read);
-  if (dir === undefined || tables.length === 0) return;
+  if (dir === undefined) return;
 
   let swept = sweptByLane.get(lane);
   if (!swept) {
@@ -54,17 +55,22 @@ export async function recordSweptTables(
   if (swept.size === before) return;
 
   const names = [...swept].sort();
-  flushChain = flushChain.then(() => writeReport(dir, lane, names));
+  flushChain = flushChain.then(() => writeReport(dir, lane, names, read));
   await flushChain;
 }
 
 /** Never throws: instrumentation must not be able to fail a test run. */
-async function writeReport(dir: string, lane: string, names: readonly string[]): Promise<void> {
+async function writeReport(
+  dir: string,
+  lane: string,
+  names: readonly string[],
+  read: EnvReader,
+): Promise<void> {
   try {
     const fs = await getFsAsync();
     if (!fs.mkdir || !fs.writeFile) return;
     await fs.mkdir(dir, { recursive: true });
-    const worker = getEnv("VITEST_POOL_ID") ?? "0";
+    const worker = read(WORKER_ID_ENV) ?? "0";
     await fs.writeFile(
       `${dir}/sweep-${lane}-${worker}.json`,
       `${JSON.stringify({ lane, worker, tables: names }, null, 2)}\n`,

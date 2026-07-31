@@ -89,10 +89,15 @@ type ResetMode = "drop-all" | "reset";
  * The array {@link resetTables} records dropped names into, or `null` when the
  * sweep is not being measured — the default, and the only state CI ever runs
  * in. See {@link recordSweptTables}.
+ *
+ * A `Set` rather than an array because the pg path shares one collector across
+ * `_resetPgTablesOnce`'s connection-error retry: the retry re-queries
+ * `pg_tables`/`pg_views`, so names dropped before the error are normally gone
+ * from the second pass, but the collector must not depend on that.
  */
-function sweepCollector(measure: boolean): string[] | null {
+function sweepCollector(measure: boolean): Set<string> | null {
   if (!measure) return null;
-  return sweepReportDir() === undefined ? null : [];
+  return sweepReportDir() === undefined ? null : new Set();
 }
 
 async function resetTables(
@@ -168,7 +173,7 @@ async function resetPgTables(
   adapter: DatabaseAdapter,
   mode: ResetMode,
   bootLaid: ReadonlySet<string>,
-  swept: string[] | null,
+  swept: Set<string> | null,
 ): Promise<void> {
   try {
     await _resetPgTablesOnce(adapter, mode, bootLaid, swept);
@@ -189,7 +194,7 @@ async function _resetPgTablesOnce(
   adapter: DatabaseAdapter,
   mode: ResetMode,
   bootLaid: ReadonlySet<string>,
-  swept: string[] | null,
+  swept: Set<string> | null,
 ): Promise<void> {
   const schema = `ANY(current_schemas(false))`;
   // Views/matviews are never canonical — always drop them.
@@ -198,7 +203,7 @@ async function _resetPgTablesOnce(
   )) as { schemaname: string; name: string }[]) {
     try {
       await adapter.executeMutation(`DROP MATERIALIZED VIEW IF EXISTS "${s}"."${n}" CASCADE`);
-      swept?.push(`matview:${n}`);
+      swept?.add(`matview:${n}`);
     } catch (e) {
       if (_isPgConnectionError(e)) throw e;
     }
@@ -208,7 +213,7 @@ async function _resetPgTablesOnce(
   )) as { schemaname: string; name: string }[]) {
     try {
       await adapter.executeMutation(`DROP VIEW IF EXISTS "${s}"."${n}" CASCADE`);
-      swept?.push(`view:${n}`);
+      swept?.add(`view:${n}`);
     } catch (e) {
       if (_isPgConnectionError(e)) throw e;
     }
@@ -228,7 +233,7 @@ async function _resetPgTablesOnce(
     }
     try {
       await adapter.executeMutation(`DROP TABLE IF EXISTS "${s}"."${t}" CASCADE`);
-      swept?.push(s === "public" ? t : `${s}.${t}`);
+      swept?.add(s === "public" ? t : `${s}.${t}`);
     } catch (e) {
       if (_isPgConnectionError(e)) throw e;
     }
@@ -240,7 +245,7 @@ async function resetMysqlTables(
   adapter: DatabaseAdapter,
   mode: ResetMode,
   bootLaid: ReadonlySet<string>,
-  swept: string[] | null,
+  swept: Set<string> | null,
 ): Promise<void> {
   const toTruncate: string[] = [];
   await adapter.disableReferentialIntegrity(async () => {
@@ -255,7 +260,7 @@ async function resetMysqlTables(
       if (name)
         try {
           await adapter.executeMutation(`DROP VIEW IF EXISTS \`${name}\``);
-          swept?.push(`view:${name}`);
+          swept?.add(`view:${name}`);
         } catch {}
     }
     for (const r of tableRows as Array<{ table_name?: string; TABLE_NAME?: string }>) {
@@ -267,7 +272,7 @@ async function resetMysqlTables(
       }
       try {
         await adapter.executeMutation(`DROP TABLE IF EXISTS \`${name}\``);
-        swept?.push(name);
+        swept?.add(name);
       } catch {}
     }
   });
@@ -278,7 +283,7 @@ async function resetSqliteTables(
   adapter: DatabaseAdapter,
   mode: ResetMode,
   bootLaid: ReadonlySet<string>,
-  swept: string[] | null,
+  swept: Set<string> | null,
 ): Promise<void> {
   const toTruncate: string[] = [];
   await adapter.disableReferentialIntegrity(async () => {
@@ -287,7 +292,7 @@ async function resetSqliteTables(
     )) as { name: string }[]) {
       try {
         await adapter.executeMutation(`DROP VIEW IF EXISTS "${name}"`);
-        swept?.push(`view:${name}`);
+        swept?.add(`view:${name}`);
       } catch {}
     }
     for (const { name } of (await adapter.execute(
@@ -299,7 +304,7 @@ async function resetSqliteTables(
       }
       try {
         await adapter.executeMutation(`DROP TABLE IF EXISTS "${name}"`);
-        swept?.push(name);
+        swept?.add(name);
       } catch {}
     }
   });
