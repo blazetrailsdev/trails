@@ -249,14 +249,14 @@ describe("Migration", () => {
     it("index exists", async () => {
       await withChangeTable(async (t, expect) => {
         expect("indexExists", null, ["delete_me", "bar"]);
-        await t.isIndexExists("bar");
+        await t.indexExists("bar");
       });
     });
 
     it("index exists with options", async () => {
       await withChangeTable(async (t, expect) => {
         expect("indexExists", null, ["delete_me", "bar", { unique: true }]);
-        await t.isIndexExists("bar", { unique: true });
+        await t.indexExists("bar", { unique: true });
       });
     });
 
@@ -349,8 +349,8 @@ describe("Migration", () => {
 
     it("check constraint exists", async () => {
       await withChangeTable(async (t, expect) => {
-        expect("isCheckConstraintExists", null, ["delete_me", { name: "price_check" }]);
-        vitestExpect(await t.isCheckConstraintExists({ name: "price_check" })).toBeFalsy();
+        expect("checkConstraintExists", null, ["delete_me", { name: "price_check" }]);
+        vitestExpect(await t.checkConstraintExists({ name: "price_check" })).toBeFalsy();
       });
     });
 

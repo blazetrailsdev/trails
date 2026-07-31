@@ -402,7 +402,7 @@ export interface AbstractAdapter {
     expression: string,
     options?: Record<string, unknown>,
   ): Promise<void>;
-  isCheckConstraintExists(
+  checkConstraintExists(
     tableName: string,
     options: { name?: string; expression?: string },
   ): Promise<boolean>;

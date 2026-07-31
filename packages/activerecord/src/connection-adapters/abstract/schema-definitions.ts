@@ -1693,7 +1693,7 @@ export class Table {
     }
   }
 
-  async isColumnExists(columnName: string, type?: ColumnType): Promise<boolean> {
+  async columnExists(columnName: string, type?: ColumnType): Promise<boolean> {
     return this._require("columnExists").call(this._schema, this._tableName, columnName, type);
   }
 
@@ -1705,7 +1705,7 @@ export class Table {
     return fn;
   }
 
-  async isIndexExists(
+  async indexExists(
     columnName: string | string[],
     options: Record<string, unknown> = {},
   ): Promise<boolean> {
@@ -1792,7 +1792,7 @@ export class Table {
     return this._require("removeForeignKey").call(this._schema, this._tableName, toTableOrOptions);
   }
 
-  async isForeignKeyExists(toTableOrOptions?: string | Record<string, unknown>): Promise<boolean> {
+  async foreignKeyExists(toTableOrOptions?: string | Record<string, unknown>): Promise<boolean> {
     return this._require("foreignKeyExists").call(this._schema, this._tableName, toTableOrOptions);
   }
 
@@ -1823,10 +1823,10 @@ export class Table {
     );
   }
 
-  async isCheckConstraintExists(
+  async checkConstraintExists(
     options: { name?: string; expression?: string } = {},
   ): Promise<boolean> {
-    return this._require("isCheckConstraintExists").call(this._schema, this._tableName, options);
+    return this._require("checkConstraintExists").call(this._schema, this._tableName, options);
   }
 
   async primaryKey(
@@ -1941,6 +1941,6 @@ export interface SchemaStatementsLike {
     expressionOrOptions?: string | Record<string, unknown>,
     options?: Record<string, unknown>,
   ): Promise<void>;
-  isCheckConstraintExists?(tableName: string, options?: Record<string, unknown>): Promise<boolean>;
+  checkConstraintExists?(tableName: string, options?: Record<string, unknown>): Promise<boolean>;
   primaryKey?(tableName: string): Promise<string | string[] | null>;
 }
