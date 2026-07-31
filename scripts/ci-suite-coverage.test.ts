@@ -238,6 +238,43 @@ describe("CI runs every tooling test suite", () => {
     expect(skips.filter((f) => !gate.test(f))).toEqual([]);
   });
 
+  // db_adapter_affected is the draft opt-IN for postgres-tests/maria-tests.
+  // Under-firing only delays the PG/MySQL signal to the ready-for-review run,
+  // but over-firing hands back the saving the deferral exists to capture, so
+  // both directions are pinned.
+  it("fires db_adapter_affected for PG/MySQL adapter paths and not for backend-neutral ones", async () => {
+    const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
+
+    const runs = [
+      "packages/activerecord/src/connection-adapters/postgresql-adapter.ts",
+      "packages/activerecord/src/connection-adapters/postgresql/column.ts",
+      "packages/activerecord/src/connection-adapters/mysql2-adapter.ts",
+      "packages/activerecord/src/connection-adapters/mysql/quoting.ts",
+      "packages/activerecord/src/connection-adapters/abstract-mysql-adapter.ts",
+      "packages/activerecord/src/adapters/postgresql/pg-range.ts",
+      // Shared substrate: breaks one backend without naming it.
+      "packages/activerecord/src/connection-adapters/abstract/quoting.ts",
+      "packages/activerecord/src/connection-adapters/abstract-adapter.ts",
+      "packages/arel/src/visitors/postgresql.ts",
+      "packages/arel/src/visitors/mysql.ts",
+      "packages/activerecord-cli/src/__e2e__/postgres-happy-path.test.ts",
+    ];
+    const skips = [
+      "packages/activerecord/src/relation.ts",
+      "packages/activerecord/src/associations.ts",
+      "packages/activerecord/src/base.test.ts",
+      "packages/activerecord/src/connection-adapters/better-sqlite3-adapter.ts",
+      "packages/activerecord/src/adapters/sqlite3/test-helper.ts",
+      "packages/arel/src/visitors/to-sql.ts",
+    ];
+    const fired = await Promise.all([...runs, ...skips].map(runGate));
+    const outcome = Object.fromEntries(
+      [...runs, ...skips].map((f, i) => [f, fired[i].db_adapter_affected]),
+    );
+    expect(runs.filter((f) => outcome[f] !== "true")).toEqual([]);
+    expect(skips.filter((f) => outcome[f] !== "false")).toEqual([]);
+  });
+
   it("keeps comparison_affected off for website-only changes", async () => {
     const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
     expect((await runGate("packages/website/src/app.ts")).comparison_affected).toBe("false");
