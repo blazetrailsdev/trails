@@ -492,11 +492,16 @@ So the reason states its claim as a leading token:
 `classifyReason` (`extra-surface.ts`) reads the first word; anything else is
 **unclassified**, and `api:extra` reports the unclassified count, a
 per-package breakdown, and the names, alongside the existing tag totals
-(`tagged.classification` in the JSON report). This is **advisory** — the exit
-code still fails on stale entries and on empty reasons only. Most of the
-population predates the convention, so failing on unclassified tags would
-block unrelated work; the signal lands first, and a ratchet or gate is a
-follow-up once the population is classified.
+(`tagged.classification` in the JSON report), and **fails the run** when the
+count is non-zero, alongside the existing stale-entry and empty-reason
+failures.
+
+The signal landed advisory first, because 74 of the 76 tags then in the tree
+predated the convention and a gate would have blocked every unrelated PR.
+`classify-existing-no-rails-equivalent-tag-reasons` (PR #5652) brought the
+population to 0, so the gate is a **hard 0, not a ratchet on the count**: a
+ratchet re-admits exactly the unclassified debt the gate exists to stop. The
+JSON report shape is unchanged — only the exit code moved.
 
 A `CONVERGEABLE` tag is a documented exception to "not for deferred work"
 above, not a licence for it: it is written only alongside a registered story

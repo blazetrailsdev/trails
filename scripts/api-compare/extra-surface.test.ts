@@ -10,6 +10,8 @@ import {
   collectTaggedEntries,
   classifyReason,
   printClassificationBlock,
+  gateUnclassified,
+  gateStale,
 } from "./extra-surface.js";
 import type { TaggedEntry, TaggedSummary } from "./extra-surface.js";
 import { extractFromProgram } from "./extract-ts-api.js";
@@ -2383,7 +2385,7 @@ describe("buildReport — permanence classification", () => {
     expect(run("Rails has no such accessor").tagged.classification.unclassified).toBe(1);
   });
 
-  it("keeps an unclassified tag allowed and non-stale — the signal is advisory", () => {
+  it("keeps an unclassified tag allowed and non-stale — it fails on its own gate", () => {
     const report = run("Rails has no such accessor");
     expect(report.tagged.stale).toEqual([]);
     expect(report.packages[0].totalAllowlisted).toBe(1);
@@ -2456,5 +2458,92 @@ describe("printClassificationBlock", () => {
     expect(out).toContain("arel  aa.ts  aa");
     expect(out).not.toContain("bb.ts");
     expect(out).toContain("… +1 more");
+  });
+});
+
+describe("gateUnclassified", () => {
+  const entry = (pkg: string, name: string): TaggedEntry => ({
+    package: pkg,
+    tsFile: `${name}.ts`,
+    name,
+    reason: "no claim",
+  });
+
+  const summary = (
+    unclassifiedEntries: TaggedEntry[],
+    stale: TaggedEntry[] = [],
+  ): TaggedSummary => ({
+    total: unclassifiedEntries.length + 3,
+    matched: unclassifiedEntries.length + 3,
+    inheritedMatched: 0,
+    stale,
+    classification: {
+      permanent: 2,
+      convergeable: 1,
+      unclassified: unclassifiedEntries.length,
+      unclassifiedByPackage: {},
+      unclassifiedEntries,
+    },
+  });
+
+  it("passes when every tag states a claim", () => {
+    expect(gateUnclassified(summary([]))).toBeNull();
+  });
+
+  it("fails and names every unclassified tag — no ratchet, the gate is a hard 0", () => {
+    const message = gateUnclassified(summary([entry("activerecord", "aa"), entry("arel", "bb")]));
+    expect(message).toContain("2 @noRailsEquivalent tag(s) state no permanence claim");
+    expect(message).toContain("activerecord  aa.ts  aa");
+    expect(message).toContain("arel  bb.ts  bb");
+  });
+
+  it("names both tokens so the message says how to fix the tag", () => {
+    const message = gateUnclassified(summary([entry("arel", "aa")]));
+    expect(message).toContain("PERMANENT");
+    expect(message).toContain("CONVERGEABLE");
+  });
+
+  it("is independent of the stale gate — a tree failing both reports both", () => {
+    const tagged = summary([entry("arel", "aa")], [entry("activerecord", "bb")]);
+    expect(gateUnclassified(tagged)).toContain("arel  aa.ts  aa");
+    expect(gateStale(tagged)).toContain("activerecord  bb.ts  bb");
+  });
+});
+
+describe("gateStale", () => {
+  const entry = (pkg: string, name: string): TaggedEntry => ({
+    package: pkg,
+    tsFile: `${name}.ts`,
+    name,
+    reason: "PERMANENT. JS-only.",
+  });
+
+  const summary = (stale: TaggedEntry[]): TaggedSummary => ({
+    total: stale.length + 3,
+    matched: 3,
+    inheritedMatched: 0,
+    stale,
+    classification: {
+      permanent: 3,
+      convergeable: 0,
+      unclassified: 0,
+      unclassifiedByPackage: {},
+      unclassifiedEntries: [],
+    },
+  });
+
+  it("passes when no tag is stale", () => {
+    expect(gateStale(summary([]))).toBeNull();
+  });
+
+  it("fails and names every stale tag", () => {
+    const message = gateStale(summary([entry("activerecord", "aa"), entry("arel", "bb")]));
+    expect(message).toContain("2 STALE @noRailsEquivalent tag(s)");
+    expect(message).toContain("activerecord  aa.ts  aa");
+    expect(message).toContain("arel  bb.ts  bb");
+  });
+
+  it("says to delete the tag — a stale tag is never fixed by rewording its reason", () => {
+    expect(gateStale(summary([entry("arel", "aa")]))).toContain("Delete the tag");
   });
 });
