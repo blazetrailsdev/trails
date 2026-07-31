@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { diffDeprecatedManifest } from "./deprecated-manifest-diff.js";
+import type { DeprecatedManifest } from "./deprecated-manifest-diff.js";
 
-const expected = {
+const expected: DeprecatedManifest = {
   files: {
     "packages/activerecord/src/connection-adapters/mysql/schema-definitions.ts": [
       "unsignedDecimal",

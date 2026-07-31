@@ -28,6 +28,17 @@ import type { ClassInfo, MethodInfo, PackageInfo } from "./types.js";
 
 const VIRTUAL = "virtual.ts";
 
+/**
+ * `PackageInfo.fileFunctions` is optional because the Ruby extractor never
+ * emits it; this extractor always does, and a test asking for a file's
+ * functions wants the absence to fail loudly rather than read as an empty set.
+ */
+function fileFunctionsOf(info: PackageInfo, file: string): MethodInfo[] {
+  const fns = info.fileFunctions?.[file];
+  if (fns === undefined) throw new Error(`extractor emitted no fileFunctions for ${file}`);
+  return fns;
+}
+
 /** Compile an in-memory source file with no lib/resolution; return its AST + checker. */
 function compile(source: string): { sourceFile: ts.SourceFile; checker: ts.TypeChecker } {
   const sourceFile = ts.createSourceFile(VIRTUAL, source, ts.ScriptTarget.Latest, true);
@@ -1301,7 +1312,7 @@ describe("extractFromProgram — @internal JSDoc on top-level functions", () => 
         export function quote(value: unknown): string { return ""; }
       `,
     });
-    const fns = info.fileFunctions["quoting.ts"];
+    const fns = fileFunctionsOf(info, "quoting.ts");
     expect(fns.find((f) => f.name === "dispatchQuote")!.internal).toBe(true);
     expect(fns.find((f) => f.name === "quote")!.internal).toBeUndefined();
   });
@@ -1316,7 +1327,7 @@ describe("extractFromProgram — @internal JSDoc on top-level functions", () => 
       `,
     });
     expect(info.modules["key-normalization.ts:KeyNormalization"]).toBeUndefined();
-    expect(info.fileFunctions["key-normalization.ts"].every((f) => f.internal)).toBe(true);
+    expect(fileFunctionsOf(info, "key-normalization.ts").every((f) => f.internal)).toBe(true);
   });
 
   it("tags an @internal-tagged exported function-valued const and leaves its sibling public", () => {
@@ -1331,7 +1342,7 @@ describe("extractFromProgram — @internal JSDoc on top-level functions", () => 
         export const secondBang = bangFinder(base);
       `,
     });
-    const fns = info.fileFunctions["finder-methods.ts"];
+    const fns = fileFunctionsOf(info, "finder-methods.ts");
     expect(fns.find((f) => f.name === "performSecondBang")!.internal).toBe(true);
     expect(fns.find((f) => f.name === "secondBang")!.internal).toBeUndefined();
   });
@@ -1409,7 +1420,7 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
         export function hasMany(): void {}
       `,
     });
-    const fns = info.fileFunctions["associations.ts"];
+    const fns = fileFunctionsOf(info, "associations.ts");
     expect(fns.find((f) => f.name === "registerModel")!.noRailsEquivalent).toBe(
       "public registration surface, no Rails counterpart",
     );
@@ -1425,7 +1436,7 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
         export { withRoutesHelpers as with };
       `,
     });
-    const fns = info.fileFunctions["routes-helpers.ts"];
+    const fns = fileFunctionsOf(info, "routes-helpers.ts");
     expect(fns.find((f) => f.name === "withRoutesHelpers")!.noRailsEquivalent).toBe(
       "`with` is an ES strict-mode reserved word",
     );
@@ -1442,7 +1453,7 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
         export { registerModelClass as registerModel };
       `,
     });
-    const fns = info.fileFunctions["registry.ts"];
+    const fns = fileFunctionsOf(info, "registry.ts");
     expect(fns.find((f) => f.name === "registerModelClass")!.noRailsEquivalent).toBe(
       "declared spelling, no Rails counterpart",
     );
@@ -2119,7 +2130,7 @@ function emitInventory(info: PackageInfo, file: string): EmitEntry[] {
     for (const m of c.instanceMethods) push(key, m, skipForeign);
     for (const m of c.classMethods) push(key, m, skipForeign);
   }
-  for (const m of info.fileFunctions[file] ?? []) push("<fileFunctions>", m, false);
+  for (const m of info.fileFunctions?.[file] ?? []) push("<fileFunctions>", m, false);
   // Code-unit ordering, not localeCompare: the hand-written table below must
   // not shift with the host's collation.
   return out.sort((a, b) => {
@@ -2205,7 +2216,7 @@ describe("extract-ts-api — MethodInfo emit-site inventory", () => {
       file,
       Object.values(info.classes),
       Object.values(info.modules),
-      info.fileFunctions[file],
+      info.fileFunctions?.[file],
     );
     expect(new Set([...names].filter((n) => !counted.has(n)))).toEqual(
       new Set(["Locator", "Quoting", "Registry", "Widget"]),

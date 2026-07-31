@@ -670,7 +670,7 @@ describe("compareTranscriptions", () => {
 
   it("flags an allow-list entry the transcriptions have converged on", () => {
     const table = [...TRANSCRIPTION_DIVERGENCE_ALLOW_LIST.keys()][0];
-    const converged = { [table]: { name: "string" } };
+    const converged: Schema = { [table]: { name: "string" } };
     expect(staleDivergenceAllowances(converged, converged)).toContain(table);
     // Still divergent (registry-only) — the allowance is doing its job.
     expect(staleDivergenceAllowances({}, converged)).not.toContain(table);

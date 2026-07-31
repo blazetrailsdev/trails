@@ -7,7 +7,7 @@ import {
   isForwardingRubyEntry,
   renderSig,
 } from "./arity.js";
-import type { ParamInfo } from "./types.js";
+import type { MethodInfo, ParamInfo } from "./types.js";
 
 const req = (name: string, type?: string): ParamInfo => ({ name, kind: "required", type });
 const opt = (name: string): ParamInfo => ({ name, kind: "optional", default: "…" });
@@ -312,7 +312,12 @@ describe("isForwardingRubyEntry", () => {
     // Resolution is read from the flag, not from a non-empty param list: this
     // entry is shape-identical to the unresolved case above, but its arity IS
     // known, so a TS side that grew a spurious param must still be flagged.
-    expect(isForwardingRubyEntry({ params: [], notes: "alias", aliasResolved: true })).toBe(false);
+    const entry: Pick<MethodInfo, "params" | "notes" | "aliasResolved"> = {
+      params: [],
+      notes: "alias",
+      aliasResolved: true,
+    };
+    expect(isForwardingRubyEntry(entry)).toBe(false);
   });
 
   it("checks a plain method and other extractor notes", () => {
