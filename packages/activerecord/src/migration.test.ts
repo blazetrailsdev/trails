@@ -1227,22 +1227,28 @@ describe("MigrationTest", () => {
     const savedSuffix = Base.tableNameSuffix;
     Base.tableNamePrefix = "prefix_";
     Base.tableNameSuffix = "_suffix";
-    try {
-      class WeNeedReminders extends Migration {
-        async up() {
-          await this.createTable("reminders", (t) => {
-            t.text("content");
-          });
-        }
-        async down() {
-          // Reverting is the behaviour under test; the suite's own teardown
-          // drops the table again if this never runs.
-          // eslint-disable-next-line blazetrails/require-table-teardown
-          await this.dropTable("reminders");
-        }
+    class WeNeedReminders extends Migration {
+      async up() {
+        await this.createTable("reminders", (t) => {
+          t.text("content");
+        });
       }
-
-      const m = new WeNeedReminders();
+      async down() {
+        await this.dropTable("reminders");
+      }
+    }
+    // Exercises addColumn + renameTable (both args prefixed per Rails method_missing)
+    // and change()-based reversal without double-applying prefix/suffix.
+    class ChangeBased extends Migration {
+      async change() {
+        await this.createTable("widgets", (t) => t.string("name"));
+        await this.addColumn("widgets", "price", "integer");
+        await this.renameTable("widgets", "gadgets");
+      }
+    }
+    const m = new WeNeedReminders();
+    const cb = new ChangeBased();
+    try {
       await m.run(adapter, "up");
       // Use adapter quoting so MySQL (no ANSI_QUOTES) works alongside PG/SQLite.
       const qt = adapter.quoteTableName("prefix_reminders_suffix");
@@ -1254,16 +1260,6 @@ describe("MigrationTest", () => {
       await m.run(adapter, "down");
       expect(await m.tableExists("reminders")).toBe(false);
 
-      // Exercises addColumn + renameTable (both args prefixed per Rails method_missing)
-      // and change()-based reversal without double-applying prefix/suffix.
-      class ChangeBased extends Migration {
-        async change() {
-          await this.createTable("widgets", (t) => t.string("name"));
-          await this.addColumn("widgets", "price", "integer");
-          await this.renameTable("widgets", "gadgets");
-        }
-      }
-      const cb = new ChangeBased();
       await cb.run(adapter, "up");
       expect(await cb.tableExists("gadgets")).toBe(true);
       expect(await cb.columnExists("gadgets", "price")).toBe(true);
@@ -1271,6 +1267,13 @@ describe("MigrationTest", () => {
       expect(await cb.tableExists("gadgets")).toBe(false);
       expect(await cb.tableExists("widgets")).toBe(false);
     } finally {
+      // An assertion above skips the migrations' own `down`, and the file's
+      // afterAll drops the UNPREFIXED names — nothing there would reach
+      // `prefix_reminders_suffix` / `prefix_widgets_suffix`. Migration#dropTable
+      // applies the prefix and suffix (still set at this point) exactly as the
+      // migrations did, so these drops name the physical tables.
+      await m.dropTable("reminders", { ifExists: true });
+      await cb.dropTable("widgets", "gadgets", { ifExists: true });
       Base.tableNamePrefix = savedPrefix;
       Base.tableNameSuffix = savedSuffix;
     }

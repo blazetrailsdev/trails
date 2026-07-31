@@ -79,7 +79,9 @@
  * body*, are judged: one at file scope, in a `beforeAll`, or in a shared helper
  * has no assertion positioned to skip it, and a helper's callers are not
  * knowable lexically. A prefix sweep names no table, so it contributes no drop
- * here either way. A table created against a throwaway SQLite `:memory:`
+ * here either way — but a name a sweep does cover is exempt, since the sweep
+ * tears it down whatever the test did, so an explicit happy-path drop beside it
+ * is belt-and-braces. A table created against a throwaway SQLite `:memory:`
  * database is exempt — it dies with its adapter, so its drop is an assertion
  * about `dropTable`, not cleanup. Bookkeeping is per name, file-wide, like the rest of the
  * rule: a name created both in a `:memory:` test and against the shared
@@ -1188,6 +1190,10 @@ const rule = {
         for (const [name, node] of unguardedDrops) {
           if (!created.has(name) || safelyDropped.has(name)) continue;
           if (memoryLocal.has(name)) continue;
+          // A sweep tears the name down whatever the test did, so an explicit
+          // happy-path drop alongside it is belt-and-braces, not a leak — the
+          // same exemption the missing-teardown half grants these names.
+          if (prefixes.some((p) => p.test(name))) continue;
           context.report({
             node,
             messageId: "unguardedTeardown",

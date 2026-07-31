@@ -56,6 +56,18 @@ tester.run("require-table-teardown", rule, {
       "  for (const t of rows) {\n" +
       '    await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
       "  }\n});",
+    // …and a name the sweep covers stays exempt even with a belt-and-braces
+    // happy-path drop beside it: the sweep runs whatever the test did.
+    "afterAll(async () => {\n" +
+      "  const rows = await adapter.execute(\n" +
+      "    `SELECT tablename FROM pg_tables WHERE tablename LIKE 'ex_%'`,\n" +
+      "  );\n" +
+      "  for (const t of rows) {\n" +
+      '    await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`);\n' +
+      "  }\n});\n" +
+      'it("x", async () => {\n' +
+      '  await ctx.createTable("ex_int", () => {});\n' +
+      '  await ctx.dropTable("ex_int");\n});',
     // failureSafe: false keeps only the "is it dropped at all" half.
     {
       code:
