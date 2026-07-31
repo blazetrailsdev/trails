@@ -58,6 +58,8 @@
  * `STALE baseline entr(ies)` on a branch that never touched it, and the fix was
  * always "re-extract, then re-run". It goes through run.sh rather than
  * compare.ts so the extraction manifests compare.ts reads are refreshed first.
+ * `--write` regenerates first too, unless API_COMPARE_FORCE is set, which is
+ * how api:calls:wide:reseed signals it already ran the forced regeneration.
  * Opt out with `--no-regen`, API_COMPARE_SKIP_WIDE_REGEN=1, or any CI value —
  * CI runs the extraction step separately and must not pay for it twice. The
  * partial-scope determinism guard runs unchanged either way.
@@ -231,12 +233,18 @@ async function pruneEmptyDirs(dir: string): Promise<boolean> {
 
 export const NO_REGEN_FLAG = "--no-regen";
 
-export const REGEN_SKIP_ARGS = [NO_REGEN_FLAG, "--report", "--unreviewed", "--write"];
+export const REGEN_SKIP_ARGS = [NO_REGEN_FLAG, "--report", "--unreviewed"];
 
 export const REGEN_SKIP_ENV = "API_COMPARE_SKIP_WIDE_REGEN";
 
+// A reseed regenerating a stale artifact is the same bug this PR fixes, one
+// severity worse: `--write` commits the stale population as the new baseline.
+// So `--write` regenerates too — except under API_COMPARE_FORCE, which is the
+// api:calls:wide:reseed script's own marker that it just ran the (forced)
+// regeneration itself.
 export function shouldRegenerate(argv: string[], env: Record<string, string | undefined>): boolean {
   if (argv.some((a) => REGEN_SKIP_ARGS.includes(a))) return false;
+  if (argv.includes("--write") && env.API_COMPARE_FORCE) return false;
   return !env.CI && env[REGEN_SKIP_ENV] !== "1";
 }
 

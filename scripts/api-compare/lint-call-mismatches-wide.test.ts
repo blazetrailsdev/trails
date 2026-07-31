@@ -346,10 +346,17 @@ describe("shouldRegenerate", () => {
     expect(shouldRegenerate([], { [REGEN_SKIP_ENV]: "1" })).toBe(false);
   });
 
-  it("leaves the read-only views and the reseed path alone", () => {
+  it("leaves the read-only views alone", () => {
     expect(shouldRegenerate(["--report"], {})).toBe(false);
     expect(shouldRegenerate(["--unreviewed"], {})).toBe(false);
-    expect(shouldRegenerate(["--write"], {})).toBe(false);
+  });
+
+  it("regenerates for a bare --write, so a reseed never baselines a stale artifact", () => {
+    expect(shouldRegenerate(["--write"], {})).toBe(true);
+  });
+
+  it("skips the --write regeneration only when the reseed script already forced one", () => {
+    expect(shouldRegenerate(["--write"], { API_COMPARE_FORCE: "1" })).toBe(false);
   });
 });
 
