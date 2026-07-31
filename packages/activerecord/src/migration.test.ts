@@ -886,7 +886,7 @@ describe("MigrationTest", () => {
     expect(await personColumnNames(adapter)).toContain("last_name");
   });
 
-  it("method missing delegates to connection", () => {
+  it("method missing delegates to connection", async () => {
     class M extends Migration {
       override get connection(): DatabaseAdapter {
         return { createTable: () => "hi mom!" } as unknown as DatabaseAdapter;
@@ -895,7 +895,7 @@ describe("MigrationTest", () => {
       async down() {}
     }
     const migration = new M();
-    expect(migration.methodMissing("createTable")).toBe("hi mom!");
+    expect(await migration.methodMissing("createTable")).toBe("hi mom!");
   });
 
   it("filtering migrations", async () => {
