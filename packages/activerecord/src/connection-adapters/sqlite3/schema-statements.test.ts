@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
   schemaCreation,
   createSchemaDumper,
-  isVirtualTableExists,
+  virtualTableExists,
   _extractValueFromDefault,
   isColumnTheRowid,
   dataSourceSql,
@@ -30,24 +30,24 @@ describe("SQLite3::SchemaStatements", () => {
     });
   });
 
-  describe("isVirtualTableExists", () => {
+  describe("virtualTableExists", () => {
     it("returns true when a matching virtual table row is found", async () => {
       const fakeAdapter = {
         execute: vi.fn().mockResolvedValue([{ name: "virtual_tab" }]),
       } as any;
-      expect(await isVirtualTableExists(fakeAdapter, "virtual_tab")).toBe(true);
+      expect(await virtualTableExists(fakeAdapter, "virtual_tab")).toBe(true);
     });
 
     it("returns false when no matching row is found", async () => {
       const fakeAdapter = {
         execute: vi.fn().mockResolvedValue([]),
       } as any;
-      expect(await isVirtualTableExists(fakeAdapter, "no_such_table")).toBe(false);
+      expect(await virtualTableExists(fakeAdapter, "no_such_table")).toBe(false);
     });
 
     it("queries sqlite_temp_master for temp schema tables", async () => {
       const fakeAdapter = { execute: vi.fn().mockResolvedValue([]) } as any;
-      await isVirtualTableExists(fakeAdapter, "temp.my_vtab");
+      await virtualTableExists(fakeAdapter, "temp.my_vtab");
       expect(fakeAdapter.execute).toHaveBeenCalledWith(
         expect.stringContaining("sqlite_temp_master"),
         expect.anything(),

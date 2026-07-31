@@ -1566,7 +1566,7 @@ export class SchemaStatements {
     return [...new Set([...t, ...v])];
   }
 
-  async isDataSourceExists(name: string): Promise<boolean> {
+  async dataSourceExists(name: string): Promise<boolean> {
     if (!name) return false;
     if (await this.tableExists(name)) return true;
     return this.viewExists(name);

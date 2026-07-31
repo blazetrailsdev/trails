@@ -306,10 +306,10 @@ describe("AdapterTest", () => {
 
   it("data source exists?", async () => {
     const conn = Base.connection;
-    expect(await conn.isDataSourceExists("accounts")).toBe(true);
-    expect(await conn.isDataSourceExists("nonexistingtable")).toBe(false);
-    expect(await conn.isDataSourceExists("'")).toBe(false);
-    expect(await conn.isDataSourceExists(null as unknown as string)).toBe(false);
+    expect(await conn.dataSourceExists("accounts")).toBe(true);
+    expect(await conn.dataSourceExists("nonexistingtable")).toBe(false);
+    expect(await conn.dataSourceExists("'")).toBe(false);
+    expect(await conn.dataSourceExists(null as unknown as string)).toBe(false);
   });
 
   it("indexes", async () => {

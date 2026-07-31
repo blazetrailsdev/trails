@@ -1492,7 +1492,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     }
   }
 
-  static isDatabaseExists(config: { database?: string }): boolean {
+  static databaseExists(config: { database?: string }): boolean {
     if (!config.database || config.database === ":memory:") return true;
     try {
       return getFs().existsSync(config.database);
@@ -2096,6 +2096,10 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   async dataSourceExists(name: string): Promise<boolean> {
+    // Rails answers `data_source_exists?` through the base implementation,
+    // which is gated on `if name.present?`; this adapter-local override has to
+    // carry the same gate or a blank name reaches the catalog query.
+    if (!name) return false;
     if (name.includes(".")) {
       // Schema-qualified name (e.g. "aux.widgets"). pragma_table_list returns
       // rows for every attached schema and exposes the schema name as a
