@@ -12,6 +12,13 @@
  * The predicate is stubbed false on a real adapter and `createTable` is
  * intercepted, so the DDL is emitted and asserted without laying anything on
  * the shared per-worker database.
+ *
+ * That interception is why this calls `loadAdapterSpecificSchema` rather than
+ * `loadSchema`: `loadSchema` would run `loadCanonicalSchema` through the same
+ * proxy, so the canonical tables are never created and the first canonical
+ * statement referencing one fails with `StatementInvalid: relation ... does not
+ * exist`. It only shows up on the PG lane, so do not "fix" this to `loadSchema`
+ * on the strength of a green unit run (PR #5676, reverted by #5688).
  */
 import { expect, it } from "vitest";
 import { describeIfPg, PG_TEST_URL } from "./describe-if-pg.js";
