@@ -2062,16 +2062,16 @@ export interface MigrationProxy {
 
 /**
  * Mirrors: ActiveRecord::MigrationProxy#load_migration (`migration.rb:1195`) —
- * `name.constantize.new(name, version)`. The module's named export is the
- * migration class; the legacy `default` export is a pre-built instance that
- * cannot carry the proxy's identity, so it is only the fallback.
+ * `name.constantize.new(name, version)`. The module's export named after the
+ * migration is the class; the instance is always constructed here so it
+ * carries the proxy's name and version.
  */
 async function loadMigrationFrom(
   mod: Record<string, unknown>,
   name: string,
   version: string,
 ): Promise<Migration> {
-  const exported = mod[name] ?? mod.default;
+  const exported = mod[name];
   if (typeof exported === "function") {
     return new (exported as new (name?: string, version?: string) => Migration)(name, version);
   }
