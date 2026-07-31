@@ -214,12 +214,12 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
     expect(DatabaseTasks.dumpSchemaFilename()).toBe("alt_schema.rb");
   });
   it("cache dump filename with path from db config", () => {
-    const config = new HashConfig("development", "alternate", { adapter: "abstract" });
+    const config = new HashConfig("development", "alternate", {});
     expect(DatabaseTasks.dumpSchemaFilename(config)).toBe("db/alternate_schema.ts");
   });
   it("cache dump filename with path from the argument has precedence", () => {
     process.env.SCHEMA = "override.rb";
-    const config = new HashConfig("development", "primary", { adapter: "abstract" });
+    const config = new HashConfig("development", "primary", {});
     expect(DatabaseTasks.dumpSchemaFilename(config)).toBe("override.rb");
   });
 });
