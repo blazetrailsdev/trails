@@ -11,6 +11,11 @@ import {
 } from "./index.js";
 import { testConnection, fakeRecordConnection } from "./test-helpers/connection.js";
 
+/** Minitest's `must_be_like`: compare SQL with runs of whitespace collapsed. */
+function mustBeLike(sql: string): string {
+  return sql.trim().replace(/\s+/g, " ");
+}
+
 describe("SelectManagerTest", () => {
   const users = new Table("users");
   const posts = new Table("posts");
@@ -350,25 +355,62 @@ describe("SelectManagerTest", () => {
 
   describe("with", () => {
     it("should support basic WITH", () => {
-      const cte = users.project(users.get("name")).where(users.get("age").gt(21));
-      const alias = new Nodes.TableAlias(cte.ast, "adults");
-      const cteAs = new Nodes.As(alias, cte.ast);
-      const main = new SelectManager();
-      main.with(cteAs);
-      main.from("adults");
-      main.project(sql("*"));
-      expect(main.toSql()).toContain("WITH");
+      const users = new Table("users");
+      const usersTop = new Table("users_top");
+      const comments = new Table("comments");
+
+      const top = users.project(users.get("id")).where(users.get("karma").gt(100));
+      const usersAs = new Nodes.As(usersTop, top);
+      const selectManager = comments
+        .project(star)
+        .with(usersAs)
+        .where(comments.get("author_id").in(usersTop.project(usersTop.get("id"))));
+
+      expect(mustBeLike(visitor.compile(selectManager.ast))).toBe(
+        mustBeLike(
+          `WITH "users_top" AS (SELECT "users"."id" FROM "users" WHERE "users"."karma" > 100) SELECT * FROM "comments" WHERE "comments"."author_id" IN (SELECT "users_top"."id" FROM "users_top")`,
+        ),
+      );
     });
 
     it("should support WITH RECURSIVE", () => {
-      const cte = users.project(star);
-      const alias = new Nodes.TableAlias(cte.ast, "tree");
-      const cteAs = new Nodes.As(alias, cte.ast);
-      const main = new SelectManager();
-      main.withRecursive(cteAs);
-      main.from("tree");
-      main.project(sql("*"));
-      expect(main.toSql()).toContain("WITH RECURSIVE");
+      const comments = new Table("comments");
+      const commentsId = comments.get("id");
+      const commentsParentId = comments.get("parent_id");
+
+      const replies = new Table("replies");
+      const repliesId = replies.get("id");
+
+      const nonRecursiveTerm = new SelectManager();
+      nonRecursiveTerm
+        .from(comments)
+        .project(commentsId, commentsParentId)
+        .where(commentsId.eq(42));
+
+      const recursiveTerm = new SelectManager();
+      recursiveTerm
+        .from(comments)
+        .project(commentsId, commentsParentId)
+        .join(replies)
+        .on(commentsParentId.eq(repliesId));
+
+      const union = nonRecursiveTerm.union(recursiveTerm);
+
+      const asStatement = new Nodes.As(replies, union);
+
+      const manager = new SelectManager();
+      manager.withRecursive(asStatement).from(replies).project(star);
+
+      expect(mustBeLike(visitor.compile(manager.ast))).toBe(
+        mustBeLike(`
+          WITH RECURSIVE "replies" AS (
+              SELECT "comments"."id", "comments"."parent_id" FROM "comments" WHERE "comments"."id" = 42
+            UNION
+              SELECT "comments"."id", "comments"."parent_id" FROM "comments" INNER JOIN "replies" ON "comments"."parent_id" = "replies"."id"
+          )
+          SELECT * FROM "replies"
+        `),
+      );
     });
   });
 
