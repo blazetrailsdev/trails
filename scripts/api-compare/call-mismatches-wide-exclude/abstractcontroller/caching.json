@@ -16,13 +16,6 @@
   {
     "package": "abstractcontroller",
     "tsFile": "caching.ts",
-    "rubyName": "read_fragment",
-    "call": "html_safe",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "abstractcontroller",
-    "tsFile": "caching.ts",
     "rubyName": "view_cache_dependencies",
     "call": "filter_map",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

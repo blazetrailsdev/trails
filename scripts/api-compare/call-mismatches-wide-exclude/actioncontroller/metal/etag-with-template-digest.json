@@ -2,13 +2,6 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/etag-with-template-digest.ts",
-    "rubyName": "combine_etags",
-    "call": "compact",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/etag-with-template-digest.ts",
     "rubyName": "http_cache_forever",
     "call": "expires_in",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -32,13 +25,6 @@
     "tsFile": "metal/etag-with-template-digest.ts",
     "rubyName": "http_cache_forever",
     "call": "stale?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/etag-with-template-digest.ts",
-    "rubyName": "http_cache_forever",
-    "call": "years",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

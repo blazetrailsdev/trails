@@ -3,13 +3,6 @@
     "package": "abstractcontroller",
     "tsFile": "translation.ts",
     "rubyName": "translate",
-    "call": "flatten",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "abstractcontroller",
-    "tsFile": "translation.ts",
-    "rubyName": "translate",
     "call": "html_escape",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }

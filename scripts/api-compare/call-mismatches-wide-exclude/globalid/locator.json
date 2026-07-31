@@ -3,20 +3,6 @@
     "package": "globalid",
     "tsFile": "locator.ts",
     "rubyName": "locate_many",
-    "call": "filter_map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "globalid",
-    "tsFile": "locator.ts",
-    "rubyName": "locate_many",
-    "call": "index_by",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "globalid",
-    "tsFile": "locator.ts",
-    "rubyName": "locate_many",
     "call": "map",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -25,13 +11,6 @@
     "tsFile": "locator.ts",
     "rubyName": "locate_many_signed",
     "call": "compact",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "globalid",
-    "tsFile": "locator.ts",
-    "rubyName": "locate_many_signed",
-    "call": "slice",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

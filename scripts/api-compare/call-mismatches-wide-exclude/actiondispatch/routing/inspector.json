@@ -2,13 +2,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "routing/inspector.ts",
-    "rubyName": "draw_expanded_section",
-    "call": "chomp",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/inspector.ts",
     "rubyName": "draw_section",
     "call": "widths",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

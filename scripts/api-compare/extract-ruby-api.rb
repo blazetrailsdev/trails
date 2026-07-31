@@ -591,7 +591,7 @@ class ApiExtractor
 
     body = node[3]
     dep_info = detect_deps(body)
-    calls = collect_method_calls(body)
+    calls, weak_calls = collect_method_calls(body)
 
     method_info = {
       name: name,
@@ -603,6 +603,7 @@ class ApiExtractor
     method_info[:deps] = dep_info[:deps] unless dep_info[:deps].empty?
     method_info[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
     method_info[:calls] = calls unless calls.empty?
+    method_info[:weakCalls] = weak_calls unless weak_calls.empty?
     opt_keys = collect_option_keys(body, params, fqn)
     method_info[:option_keys] = opt_keys unless opt_keys.empty?
     digest = body_digest(body)
@@ -643,7 +644,7 @@ class ApiExtractor
 
     body = node[5]
     dep_info = detect_deps(body)
-    calls = collect_method_calls(body)
+    calls, weak_calls = collect_method_calls(body)
 
     method_info = {
       name: name,
@@ -655,6 +656,7 @@ class ApiExtractor
     method_info[:deps] = dep_info[:deps] unless dep_info[:deps].empty?
     method_info[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
     method_info[:calls] = calls unless calls.empty?
+    method_info[:weakCalls] = weak_calls unless weak_calls.empty?
     opt_keys = collect_option_keys(body, params, fqn)
     method_info[:option_keys] = opt_keys unless opt_keys.empty?
     digest = body_digest(body)
@@ -1971,10 +1973,15 @@ class ApiExtractor
     { deps: deps, depRefs: dep_refs }
   end
 
+  # Returns [calls, weak_calls]: the de-duplicated call names, and the subset
+  # whose EVERY occurrence had an inert receiver (see walk_for_calls).
   def collect_method_calls(body_node)
     calls = []
-    walk_for_calls(body_node, calls)
-    calls.uniq
+    weak = []
+    walk_for_calls(body_node, calls, weak)
+    total = calls.tally
+    weak_calls = weak.tally.select { |name, n| total[name] == n }.keys
+    [calls.uniq, weak_calls]
   end
 
   # Record a `VALID_OPTIONS`-named symbol array so a later
@@ -2108,7 +2115,28 @@ class ApiExtractor
     !id.nil? && vars.include?(id)
   end
 
-  def walk_for_calls(node, calls)
+  # Receiver shapes whose method call says nothing about our port (RFC 0083):
+  # a plain-Ruby `xs.first` / `opts.fetch` / `[].merge` collides by NAME with an
+  # unrelated ported method and makes the wide gate demand the port call it.
+  # Only PROVABLY inert receivers qualify — Ripper emits `:var_ref` with an
+  # `:@ident` only for an in-scope LOCAL VARIABLE (a bare method call on self is
+  # `:vcall`), and a literal receiver is inert by construction. Everything else
+  # (`self.x`, ivars, constants, method chains) stays recorded: those are the
+  # genuine calls to ported collaborators the gate exists to see.
+  INERT_RECEIVER_LITERALS = %i[array hash string_literal symbol_literal dyna_symbol @int].freeze
+
+  def inert_receiver?(recv)
+    return false unless recv.is_a?(Array)
+    return true if INERT_RECEIVER_LITERALS.include?(recv[0])
+    return false unless recv[0] == :var_ref
+
+    inner = recv[1]
+    inner.is_a?(Array) && inner[0] == :@ident
+  end
+
+  # `weak` collects the occurrences whose receiver was inert; a name only
+  # becomes a weak CALL when no non-inert occurrence exists (collect_method_calls).
+  def walk_for_calls(node, calls, weak)
     return unless node.is_a?(Array)
 
     case node[0]
@@ -2119,13 +2147,19 @@ class ApiExtractor
     when :call
       # Qualified method call: obj.foo
       name = ident_name(node[3]) if node[3]
-      calls << name if name && !name.start_with?("_") && name =~ /\A[a-z]/
+      if name && !name.start_with?("_") && name =~ /\A[a-z]/
+        calls << name
+        weak << name if inert_receiver?(node[1])
+      end
     when :command
       name = ident_name(node[1])
       calls << name if name && !name.start_with?("_") && name =~ /\A[a-z]/
     when :command_call
       name = ident_name(node[3]) if node[3]
-      calls << name if name && !name.start_with?("_") && name =~ /\A[a-z]/
+      if name && !name.start_with?("_") && name =~ /\A[a-z]/
+        calls << name
+        weak << name if inert_receiver?(node[1])
+      end
     when :super, :zsuper
       # super(args) is [:super, ...]; bare super is [:zsuper]. Both chain to
       # the parent method; record as "super" so calls-parity can flag a ported
@@ -2133,7 +2167,7 @@ class ApiExtractor
       calls << "super"
     end
 
-    node.each { |child| walk_for_calls(child, calls) if child.is_a?(Array) }
+    node.each { |child| walk_for_calls(child, calls, weak) if child.is_a?(Array) }
   end
 
   def collect_dep_refs(node, constants, identifiers, refs)

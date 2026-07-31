@@ -10,13 +10,6 @@
     "package": "activemodel",
     "tsFile": "attribute-registration.ts",
     "rubyName": "decorate_attributes",
-    "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-registration.ts",
-    "rubyName": "decorate_attributes",
     "call": "resolve_attribute_name",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

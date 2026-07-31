@@ -3,13 +3,6 @@
     "package": "actiondispatch",
     "tsFile": "middleware/host-authorization.ts",
     "rubyName": "blocked_hosts",
-    "call": "get_header",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/host-authorization.ts",
-    "rubyName": "blocked_hosts",
     "call": "last",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -18,20 +11,6 @@
     "tsFile": "middleware/host-authorization.ts",
     "rubyName": "excluded?",
     "call": "call",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/host-authorization.ts",
-    "rubyName": "mark_as_authorized",
-    "call": "host",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/host-authorization.ts",
-    "rubyName": "mark_as_authorized",
-    "call": "set_header",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

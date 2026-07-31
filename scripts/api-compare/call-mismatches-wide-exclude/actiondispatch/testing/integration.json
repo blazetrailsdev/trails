@@ -37,13 +37,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "testing/integration.ts",
-    "rubyName": "build_expanded_path",
-    "call": "path",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/integration.ts",
     "rubyName": "create_session",
     "call": "include",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -60,13 +53,6 @@
     "tsFile": "testing/integration.ts",
     "rubyName": "file_fixture_upload",
     "call": "exist?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/integration.ts",
-    "rubyName": "follow_redirect!",
-    "call": "include?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -101,28 +87,7 @@
     "package": "actiondispatch",
     "tsFile": "testing/integration.ts",
     "rubyName": "process",
-    "call": "content_type",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/integration.ts",
-    "rubyName": "process",
     "call": "controller_instance",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/integration.ts",
-    "rubyName": "process",
-    "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/integration.ts",
-    "rubyName": "process",
-    "call": "encode_params",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -157,20 +122,6 @@
     "package": "actiondispatch",
     "tsFile": "testing/integration.ts",
     "rubyName": "process",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/integration.ts",
-    "rubyName": "process",
-    "call": "join",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/integration.ts",
-    "rubyName": "process",
     "call": "merge!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -185,21 +136,7 @@
     "package": "actiondispatch",
     "tsFile": "testing/integration.ts",
     "rubyName": "process",
-    "call": "port",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/integration.ts",
-    "rubyName": "process",
     "call": "remote_addr",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/integration.ts",
-    "rubyName": "process",
-    "call": "request",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -228,13 +165,6 @@
     "tsFile": "testing/integration.ts",
     "rubyName": "url_options",
     "call": "default_url_options",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails integration.rb:140-150 reverse-merges controller.url_options and @app.routes.default_url_options into the memo; trails integration.ts:186-195 merges only defaults + host/protocol — the controller and app-routes merges are unported. Omission tracked in story actionpack-omissions-from-wide-verify."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/integration.ts",
-    "rubyName": "url_options",
-    "call": "reverse_merge!",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails integration.rb:140-150 reverse-merges controller.url_options and @app.routes.default_url_options into the memo; trails integration.ts:186-195 merges only defaults + host/protocol — the controller and app-routes merges are unported. Omission tracked in story actionpack-omissions-from-wide-verify."
   },
   {

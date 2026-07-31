@@ -52,13 +52,6 @@
     "package": "actiondispatch",
     "tsFile": "system-testing/driver.ts",
     "rubyName": "register_playwright",
-    "call": "compact",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "system-testing/driver.ts",
-    "rubyName": "register_playwright",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

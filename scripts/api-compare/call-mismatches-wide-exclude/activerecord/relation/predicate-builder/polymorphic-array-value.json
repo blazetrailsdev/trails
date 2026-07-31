@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "relation/predicate-builder/polymorphic-array-value.ts",
-    "rubyName": "klass",
-    "call": "model",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails polymorphic_array_value.rb:36-42 reads `value.model` for Relation inputs; trails polymorphic-array-value.ts:77-81 reads the `_modelClass` field after duck-checking for a relation."
-  }
-]

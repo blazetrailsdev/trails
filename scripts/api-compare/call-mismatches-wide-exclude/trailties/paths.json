@@ -2,13 +2,6 @@
   {
     "package": "trailties",
     "tsFile": "paths.ts",
-    "rubyName": "add",
-    "call": "fetch",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "trailties",
-    "tsFile": "paths.ts",
     "rubyName": "children",
     "call": "values_at",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -46,13 +39,6 @@
     "tsFile": "paths.ts",
     "rubyName": "expanded",
     "call": "directory?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "trailties",
-    "tsFile": "paths.ts",
-    "rubyName": "expanded",
-    "call": "uniq!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

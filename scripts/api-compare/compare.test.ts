@@ -19,6 +19,7 @@ import {
   NEGATED_ALIASES,
   partitionNegatedCalls,
   WIDE_SIGNIFICANT_CALLS,
+  dropWeakCalls,
   WIDE_NO_JS_CALL_FORM,
   isDelegatingWrapper,
   effectiveTsCalls,
@@ -215,6 +216,17 @@ describe("significantMissingCalls", () => {
     ]) {
       expect(WIDE_SIGNIFICANT_CALLS.has(call)).toBe(true);
     }
+  });
+
+  it("drops inert-receiver call names in wide runs only", () => {
+    // RFC 0083: `xs.first` / `opts.fetch` say nothing about the port, so the
+    // wide gate drops them; the narrow 0044 population must not move.
+    const calls = ["first", "fetch", "save"];
+    const weak = ["first", "fetch"];
+    expect(dropWeakCalls(calls, weak, true)).toEqual(["save"]);
+    expect(dropWeakCalls(calls, weak, false)).toEqual(calls);
+    expect(dropWeakCalls(calls, undefined, true)).toEqual(calls);
+    expect(dropWeakCalls(undefined, weak, true)).toEqual([]);
   });
 
   it("suppresses key?/has_key? — an options-hash port tests membership with `in`", () => {

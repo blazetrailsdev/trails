@@ -30,27 +30,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "add_enum_value",
-    "call": "values_at",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "affected_rows",
-    "call": "clear",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "assert_valid_deferrable",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "begin_isolated_db_transaction",
     "call": "fetch",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -60,13 +39,6 @@
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "build_insert_sql",
     "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "build_insert_sql",
-    "call": "model",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -164,13 +136,6 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "configure_connection",
-    "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "configure_connection",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -193,34 +158,6 @@
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "connect",
     "call": "new_client",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "connect",
-    "call": "set_pool",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "construct_coder",
-    "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "create_database",
-    "call": "merge!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "create_database",
-    "call": "symbolize_keys",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -257,6 +194,13 @@
     "rubyName": "create_schema_dumper",
     "call": "create",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql-adapter.ts",
+    "rubyName": "dbconsole",
+    "call": "database_cli",
+    "reason": "Rails reads the cli name only to pass it to `find_cmd_and_exec` (postgresql_adapter.rb); that PTY exec is Ruby-only and unported, so our `dbconsole` returns the arg list and never needs the lookup."
   },
   {
     "package": "activerecord",
@@ -332,21 +276,7 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "enum_types",
-    "call": "compact",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "enum_types",
     "call": "internal_exec_query",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "enum_types",
-    "call": "last",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -367,13 +297,6 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "exclusion_constraint_name",
-    "call": "fetch",
-    "reason": "Syntax-only (RFC 0072 converge-pg-remove-index-and-new-column-from-field-call-sets): Ruby `options.fetch(:name)`; JS property access on an object literal has no method equivalent."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "exclusion_constraint_name",
     "call": "first",
     "reason": "Syntax-only (RFC 0072 converge-pg-remove-index-and-new-column-from-field-call-sets): Ruby `Enumerable#first(n)` on the digest; JS uses `String#slice(0, n)`."
   },
@@ -383,13 +306,6 @@
     "rubyName": "exclusion_constraint_name",
     "call": "hexdigest",
     "reason": "Syntax-only (RFC 0072 converge-pg-remove-index-and-new-column-from-field-call-sets): Ruby `Digest::SHA256.hexdigest`; JS uses the WebCrypto/`createHash` hex digest. The derivation is byte-identical — schema-statements-class.trails.test.ts pins `excl_rails_74c9160f55` against Rails' own literal."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "exclusion_constraints",
-    "call": "from",
-    "reason": "Ruby-ism: `predicate.from(2)` (String#from) is `predicate.slice(1, -1)` in TS, applied on the same paren-stripping line."
   },
   {
     "package": "activerecord",
@@ -451,22 +367,8 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "extensions",
-    "call": "compact",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "extensions",
     "call": "internal_exec_query",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "foreign_keys",
-    "call": "size",
-    "reason": "Ruby-ism: `conkey.size > 1` is `conkey.length > 1` in TS; `length` is a property access, not a call the extractor can see."
   },
   {
     "package": "activerecord",
@@ -481,13 +383,6 @@
     "rubyName": "get_advisory_lock",
     "call": "query_value",
     "reason": "Deliberate deviation (RFC 0072 converge-pg-session-and-transaction-exec-primitive-routing): PG advisory locks are session-scoped, so the lock must be taken on the pinned raw client and serialized against in-flight maintenance queries (_acquireFreshClient + _serializePinnedQuery). Routing through query_value would run it on whatever connection selectAll materializes and could hand the lock to a connection the caller does not hold. trails also accepts string lock ids (hashtext) that Rails rejects outright."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "get_database_version",
-    "call": "server_version",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -521,20 +416,6 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "indexes",
-    "call": "compact",
-    "reason": "Ruby-ism: Rails' `[desc, nulls].compact.join(\" \")` drops a nil `desc`; trails writes `[desc, nulls].filter(Boolean).join(\" \")` on the same line."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "indexes",
-    "call": "presence",
-    "reason": "Ruby-ism: `include_columns.presence` / `comment.presence` map to trails' explicit blank checks on the same lines (`includeStr ? ... : undefined`, `comment?.trim() ? comment : undefined`)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "indexes",
     "call": "query",
     "reason": "SQL-side equivalent: trails' `indexes` runs its introspection SELECT through `schemaQuery` (postgresql/schema-statements-class.ts) because the body needs hash-keyed rows plus bind params for the `to_regclass` fast path; Rails' positional `query` has no bind-carrying form. Deliberately left for the separate `indexes` shape-convergence story."
   },
@@ -562,13 +443,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "initialize",
-    "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "initialize_type_map",
     "call": "load_additional_types",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -583,6 +457,13 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
+    "rubyName": "lookup_cast_type",
+    "call": "query_value",
+    "reason": "PG resolves the regtype OID through `schemaQuery` rather than `query_value`; the async signature that forces it is tracked by the `pg-lookup-cast-type-async-divergence` story."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "lookup_cast_type_from_column",
     "call": "lookup",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -593,20 +474,6 @@
     "rubyName": "max_identifier_length",
     "call": "query_value",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "new_column_from_field",
-    "call": "presence",
-    "reason": "Syntax-only (RFC 0072 converge-pg-remove-index-and-new-column-from-field-call-sets): Ruby `comment.presence` / `identity.presence` normalising \"\" to nil; JS uses `||` on the already-nullable string, which yields the same nil-or-non-empty value."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "pk_and_sequence_for",
-    "call": "last",
-    "reason": "Deviation, justified at the call site (RFC 0072 converge-pg-remove-index-and-new-column-from-field-call-sets): Rails runs two `query` calls (pg_depend, then a pg_attrdef fallback) and reads `result.last` off the row array. trails runs a single pg_index query whose LEFT JOIN on pg_attrdef folds Rails' fallback into the same result set, so there is no second result to take the last of. See PostgreSQLSchemaStatements#pkAndSequenceFor."
   },
   {
     "package": "activerecord",
@@ -626,13 +493,6 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "prepare_statement",
-    "call": "prepare",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "prepare_statement",
     "call": "translate_exception_class",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -647,21 +507,7 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "quote_default_expression",
-    "call": "include?",
-    "reason": "Equivalent (RFC 0072 converge-pg-ddl-exec-primitive-and-quoting-routing): the adapter method is a thin wrapper that forwards to the ported body in postgresql/quoting.ts#quoteDefaultExpression, where the quote/serialize/include? calls live."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "quote_default_expression",
     "call": "quote",
-    "reason": "Equivalent (RFC 0072 converge-pg-ddl-exec-primitive-and-quoting-routing): the adapter method is a thin wrapper that forwards to the ported body in postgresql/quoting.ts#quoteDefaultExpression, where the quote/serialize/include? calls live."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "quote_default_expression",
-    "call": "serialize",
     "reason": "Equivalent (RFC 0072 converge-pg-ddl-exec-primitive-and-quoting-routing): the adapter method is a thin wrapper that forwards to the ported body in postgresql/quoting.ts#quoteDefaultExpression, where the quote/serialize/include? calls live."
   },
   {
@@ -759,13 +605,6 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "rename_enum",
-    "call": "fetch",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "rename_enum",
     "call": "quote_table_name",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -780,13 +619,6 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "rename_enum_value",
-    "call": "fetch",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "rename_enum_value",
     "call": "quote",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -795,13 +627,6 @@
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "rename_enum_value",
     "call": "quote_table_name",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "rename_table",
-    "call": "size",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -828,22 +653,8 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "sequence_name_from_parts",
-    "call": "sum",
-    "reason": "Syntax-only (RFC 0072 converge-pg-remove-index-and-new-column-from-field-call-sets): Ruby `Array#sum(&:length)`; JS has no Array#sum, so the three lengths are added directly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "session_auth=",
     "call": "internal_execute",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "set_constraints",
-    "call": "include?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -885,13 +696,6 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "unique_constraint_name",
-    "call": "fetch",
-    "reason": "Syntax-only (RFC 0072 converge-pg-remove-index-and-new-column-from-field-call-sets): Ruby `options.fetch(:name)`; JS property access on an object literal has no method equivalent."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "unique_constraint_name",
     "call": "first",
     "reason": "Syntax-only (RFC 0072 converge-pg-remove-index-and-new-column-from-field-call-sets): Ruby `Enumerable#first(n)` on the digest; JS uses `String#slice(0, n)`."
   },
@@ -919,29 +723,8 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "update_typemap_for_default_timezone",
-    "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "write_query?",
     "call": "match?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "lookup_cast_type",
-    "call": "query_value",
-    "reason": "PG resolves the regtype OID through `schemaQuery` rather than `query_value`; the async signature that forces it is tracked by the `pg-lookup-cast-type-async-divergence` story."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "dbconsole",
-    "call": "database_cli",
-    "reason": "Rails reads the cli name only to pass it to `find_cmd_and_exec` (postgresql_adapter.rb); that PTY exec is Ruby-only and unported, so our `dbconsole` returns the arg list and never needs the lookup."
   }
 ]

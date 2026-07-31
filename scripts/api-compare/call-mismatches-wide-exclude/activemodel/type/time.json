@@ -2,13 +2,6 @@
   {
     "package": "activemodel",
     "tsFile": "type/time.ts",
-    "rubyName": "apply_seconds_precision",
-    "call": "change",
-    "reason": "Converged: `applySecondsPrecision` truncates the sub-second components directly via `Temporal.PlainTime#with` / `Temporal.Instant.fromEpochNanoseconds`, which is this port's analogue of Ruby's `Time#change(nsec:)` — Temporal has no `change` method."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "type/time.ts",
     "rubyName": "cast_value",
     "call": "fast_string_to_time",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -18,27 +11,6 @@
     "tsFile": "type/time.ts",
     "rubyName": "cast_value",
     "call": "new_time",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "type/time.ts",
-    "rubyName": "cast_value",
-    "call": "values_at",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "type/time.ts",
-    "rubyName": "serialize_cast_value",
-    "call": "getlocal",
-    "reason": "Not applicable: Rails' `serialize_cast_value` calls `getutc`/`getlocal` to re-attach a zone to a Ruby Time. The cast value here is a zoneless Temporal.PlainTime / absolute Temporal.Instant, so both branches are identity; trails resolves `default_timezone` at parse time (the `is_utc?` branch) and again at quote time in the adapter's `quotedDate`."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "type/time.ts",
-    "rubyName": "user_input_in_time_zone",
-    "call": "change",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

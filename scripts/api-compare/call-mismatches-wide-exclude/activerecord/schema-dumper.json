@@ -10,13 +10,6 @@
     "package": "activerecord",
     "tsFile": "schema-dumper.ts",
     "rubyName": "check_constraints_in_create",
-    "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "schema-dumper.ts",
-    "rubyName": "check_constraints_in_create",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -24,21 +17,7 @@
     "package": "activerecord",
     "tsFile": "schema-dumper.ts",
     "rubyName": "check_constraints_in_create",
-    "call": "partition",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "schema-dumper.ts",
-    "rubyName": "check_constraints_in_create",
     "call": "remove_prefix_and_suffix",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "schema-dumper.ts",
-    "rubyName": "check_constraints_in_create",
-    "call": "validate?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -67,13 +46,6 @@
     "tsFile": "schema-dumper.ts",
     "rubyName": "foreign_keys",
     "call": "any?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "schema-dumper.ts",
-    "rubyName": "foreign_keys",
-    "call": "map",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -108,13 +80,6 @@
     "package": "activerecord",
     "tsFile": "schema-dumper.ts",
     "rubyName": "indexes_in_create",
-    "call": "collect",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "schema-dumper.ts",
-    "rubyName": "indexes_in_create",
     "call": "exclusion_constraints",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -122,28 +87,7 @@
     "package": "activerecord",
     "tsFile": "schema-dumper.ts",
     "rubyName": "indexes_in_create",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "schema-dumper.ts",
-    "rubyName": "indexes_in_create",
     "call": "indexes",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "schema-dumper.ts",
-    "rubyName": "indexes_in_create",
-    "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "schema-dumper.ts",
-    "rubyName": "indexes_in_create",
-    "call": "reject",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -172,27 +116,6 @@
     "tsFile": "schema-dumper.ts",
     "rubyName": "table",
     "call": "column_spec_for_primary_key",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "schema-dumper.ts",
-    "rubyName": "table",
-    "call": "compact",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "schema-dumper.ts",
-    "rubyName": "table",
-    "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "schema-dumper.ts",
-    "rubyName": "table",
-    "call": "detect",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -248,28 +171,7 @@
     "package": "activerecord",
     "tsFile": "schema-dumper.ts",
     "rubyName": "table",
-    "call": "slice",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "schema-dumper.ts",
-    "rubyName": "table",
-    "call": "string",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "schema-dumper.ts",
-    "rubyName": "table",
     "call": "table_options",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "schema-dumper.ts",
-    "rubyName": "table",
-    "call": "type",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -285,26 +187,5 @@
     "rubyName": "table",
     "call": "valid_type?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "schema-dumper.ts",
-    "rubyName": "tables",
-    "call": "count",
-    "reason": "Newly comparable (RFC 0072 arity sweep): Rails uses `count` only for the `index < count - 1` blank-line separator; the port pushes a trailing blank line per table instead. Equivalent output, no count needed."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "schema-dumper.ts",
-    "rubyName": "tables",
-    "call": "reject",
-    "reason": "Newly comparable (RFC 0072 arity sweep): Rails builds `not_ignored_tables` with `reject { ignored?(...) }`; the port applies the same `isIgnored` predicate as a `continue` inside the emit loop. Equivalent."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "schema-dumper.ts",
-    "rubyName": "tables",
-    "call": "string",
-    "reason": "Newly comparable (RFC 0072 arity sweep): Rails buffers foreign keys in a `StringIO` and appends `.string`; the port accumulates into the same `lines` array it already threads, so there is no second buffer to stringify. Equivalent."
   }
 ]

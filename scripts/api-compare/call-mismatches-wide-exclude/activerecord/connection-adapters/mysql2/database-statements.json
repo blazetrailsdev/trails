@@ -10,15 +10,8 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/mysql2/database-statements.ts",
     "rubyName": "perform_query",
-    "call": "prepare",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/mysql2/database-statements.ts",
-    "rubyName": "perform_query",
-    "call": "size",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "call": "default_timezone",
+    "reason": "Rails re-reads default_timezone into query_options inside perform_query (mysql2/database_statements.rb:49); trails' callers (execute, executeMutation, internalExecute, internalExecQuery, explain) call _syncDatabaseTimezone() one frame up, so performQuery itself never reads it."
   },
   {
     "package": "activerecord",
@@ -40,12 +33,5 @@
     "rubyName": "select_all",
     "call": "unprepared_statement",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/mysql2/database-statements.ts",
-    "rubyName": "perform_query",
-    "call": "default_timezone",
-    "reason": "Rails re-reads default_timezone into query_options inside perform_query (mysql2/database_statements.rb:49); trails' callers (execute, executeMutation, internalExecute, internalExecQuery, explain) call _syncDatabaseTimezone() one frame up, so performQuery itself never reads it."
   }
 ]

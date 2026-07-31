@@ -37,34 +37,6 @@
   {
     "package": "actioncontroller",
     "tsFile": "test-case.ts",
-    "rubyName": "assign_parameters",
-    "call": "to_param",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "test-case.ts",
-    "rubyName": "assign_parameters",
-    "call": "to_query",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "test-case.ts",
-    "rubyName": "assign_parameters",
-    "call": "to_xml",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "test-case.ts",
-    "rubyName": "build_response",
-    "call": "create",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "test-case.ts",
     "rubyName": "controller_class_name",
     "call": "anonymous?",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails test_case.rb:552-554 branches on `@controller.class.anonymous?`; trails test-case.ts:132-134 returns `controllerClass?.name ?? \"\"` with no anonymous-controller handling. Omission tracked in story actionpack-omissions-from-wide-verify."
@@ -74,13 +46,6 @@
     "tsFile": "test-case.ts",
     "rubyName": "create",
     "call": "merge",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "test-case.ts",
-    "rubyName": "dig",
-    "call": "map",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -164,28 +129,7 @@
     "package": "actioncontroller",
     "tsFile": "test-case.ts",
     "rubyName": "process_controller_response",
-    "call": "update",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "test-case.ts",
-    "rubyName": "process_controller_response",
     "call": "write",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "test-case.ts",
-    "rubyName": "scrub_env!",
-    "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "test-case.ts",
-    "rubyName": "scrub_env!",
-    "call": "delete_if",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -201,12 +145,5 @@
     "rubyName": "wrap_execution",
     "call": "wrap",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "test-case.ts",
-    "rubyName": "tests",
-    "call": "constantize",
-    "reason": "Equivalent (different path): `tests` resolves the camelized `<Name>Controller` off `globalThis` and raises the same `uninitialized constant <Name>` NameError shape — controllers are not registered in the Inflector constant table, so constantize would not find them."
   }
 ]

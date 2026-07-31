@@ -10,13 +10,6 @@
     "package": "activerecord",
     "tsFile": "internal-metadata.ts",
     "rubyName": "count",
-    "call": "select_values",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "internal-metadata.ts",
-    "rubyName": "count",
     "call": "with_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -32,13 +25,6 @@
     "tsFile": "internal-metadata.ts",
     "rubyName": "create_table_and_set_flags",
     "call": "with_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "internal-metadata.ts",
-    "rubyName": "delete_all_entries",
-    "call": "delete",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -65,13 +51,6 @@
   {
     "package": "activerecord",
     "tsFile": "internal-metadata.ts",
-    "rubyName": "select_entry",
-    "call": "select_all",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "internal-metadata.ts",
     "rubyName": "table_exists?",
     "call": "data_source_exists?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -88,13 +67,6 @@
     "tsFile": "internal-metadata.ts",
     "rubyName": "table_exists?",
     "call": "table_name",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "internal-metadata.ts",
-    "rubyName": "update_entry",
-    "call": "update",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

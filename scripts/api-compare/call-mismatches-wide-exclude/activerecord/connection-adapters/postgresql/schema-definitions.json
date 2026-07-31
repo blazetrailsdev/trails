@@ -2,20 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql/schema-definitions.ts",
-    "rubyName": "defined_for?",
-    "call": "all?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql/schema-definitions.ts",
-    "rubyName": "defined_for?",
-    "call": "slice",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql/schema-definitions.ts",
     "rubyName": "export_name_on_schema_dump?",
     "call": "match?",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails postgresql/schema_definitions.rb:209-211/231-233 filter via SchemaDumper.excl_ignore_pattern/unique_ignore_pattern.match?; trails schema-definitions.ts:98-100/134-136 return `this.name != null` only — the ignore-pattern filtering (patterns exist at schema-dumper.ts:346-348) is unported. Omission tracked in story pg-export-name-ignores-dumper-patterns."

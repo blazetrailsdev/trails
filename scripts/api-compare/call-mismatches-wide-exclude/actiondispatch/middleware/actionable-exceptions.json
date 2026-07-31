@@ -2,9 +2,9 @@
   {
     "package": "actiondispatch",
     "tsFile": "middleware/actionable-exceptions.ts",
-    "rubyName": "actionable_request?",
-    "call": "get_header",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "rubyName": "call",
+    "call": "safe_constantize",
+    "reason": "Equivalent (different path): the actionable error class is resolved through ActionableError's own subclass registry rather than a constant lookup."
   },
   {
     "package": "actiondispatch",
@@ -19,19 +19,5 @@
     "rubyName": "redirect_to",
     "call": "parse",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/actionable-exceptions.ts",
-    "rubyName": "redirect_to",
-    "call": "relative?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/actionable-exceptions.ts",
-    "rubyName": "call",
-    "call": "safe_constantize",
-    "reason": "Equivalent (different path): the actionable error class is resolved through ActionableError's own subclass registry rather than a constant lookup."
   }
 ]

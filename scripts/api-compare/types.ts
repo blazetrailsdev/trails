@@ -37,6 +37,15 @@ export interface MethodInfo {
   depRefs?: Record<string, string[]>;
   calls?: string[];
   /**
+   * Ruby-side only (RFC 0083): the subset of `calls` whose every occurrence in
+   * the body had a provably inert receiver — a local variable or a literal
+   * (`xs.first`, `opts.fetch`, `{}.merge`). Those say nothing about the port,
+   * so the WIDE calls gate drops them; the narrow RFC 0044 gate ignores this
+   * field and keeps its population unchanged. See
+   * extract-ruby-api.rb#walk_for_calls.
+   */
+  weakCalls?: string[];
+  /**
    * Normalized digest of the Ruby method BODY (source-hash pinning, RFC 0025).
    * Whitespace/comment-insensitive, body-only; changes when the ported code
    * changes upstream. Ruby-side only (the TS extractor does not emit it); used

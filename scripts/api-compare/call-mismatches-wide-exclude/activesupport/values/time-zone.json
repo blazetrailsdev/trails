@@ -10,13 +10,6 @@
     "package": "activesupport",
     "tsFile": "values/time-zone.ts",
     "rubyName": "iso8601",
-    "call": "fetch",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "values/time-zone.ts",
-    "rubyName": "iso8601",
     "call": "ordinal",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -25,13 +18,6 @@
     "tsFile": "values/time-zone.ts",
     "rubyName": "now",
     "call": "in_time_zone",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "values/time-zone.ts",
-    "rubyName": "rfc3339",
-    "call": "fetch",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

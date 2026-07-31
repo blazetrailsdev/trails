@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/mysql/schema-dumper.ts",
-    "rubyName": "column_spec_for_primary_key",
-    "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/mysql/schema-dumper.ts",
     "rubyName": "extract_expression_for_virtual_column",
     "call": "query_value",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails mysql/schema_dumper.rb:74-93 queries information_schema (query_value/quote/quote_column_name) per column; trails schema-dumper.ts:275-280 reads `virtualExpressionCache` which the adapter pre-populates with the same information_schema query before column iteration."
@@ -32,13 +25,6 @@
     "tsFile": "connection-adapters/mysql/schema-dumper.ts",
     "rubyName": "prepare_column_options",
     "call": "match?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/mysql/schema-dumper.ts",
-    "rubyName": "prepare_column_options",
-    "call": "merge!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

@@ -16,13 +16,6 @@
   {
     "package": "activerecord",
     "tsFile": "database-configurations/hash-config.ts",
-    "rubyName": "initialize",
-    "call": "symbolize_keys",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "database-configurations/hash-config.ts",
     "rubyName": "primary?",
     "call": "configurations",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

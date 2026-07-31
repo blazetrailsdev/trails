@@ -24,13 +24,6 @@
     "package": "activerecord",
     "tsFile": "delegated-type.ts",
     "rubyName": "define_delegated_type_methods",
-    "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "delegated-type.ts",
-    "rubyName": "define_delegated_type_methods",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -52,20 +45,6 @@
     "package": "activerecord",
     "tsFile": "delegated-type.ts",
     "rubyName": "define_delegated_type_methods",
-    "call": "singularize",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "delegated-type.ts",
-    "rubyName": "define_delegated_type_methods",
-    "call": "tableize",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "delegated-type.ts",
-    "rubyName": "define_delegated_type_methods",
     "call": "where",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -74,20 +53,6 @@
     "tsFile": "delegated-type.ts",
     "rubyName": "delegated_type",
     "call": "define_delegated_type_methods",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "delegated-type.ts",
-    "rubyName": "delegated_type",
-    "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "delegated-type.ts",
-    "rubyName": "delegated_type",
-    "call": "merge",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

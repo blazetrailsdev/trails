@@ -5,19 +5,5 @@
     "rubyName": "resolve",
     "call": "join",
     "reason": "Bucket (b): the available-adapters join moved into the adapterNotFoundError helper that resolve throws through, so the lexical per-method scan no longer sees it."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters.ts",
-    "rubyName": "resolve",
-    "call": "path",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters.ts",
-    "rubyName": "resolve",
-    "call": "squish",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

@@ -20,6 +20,12 @@
  *     committed high-water mark in call-mismatches-wide-unreviewed.json
  *     (RFC 0083 — see unreviewed-ratchet.ts for why that is a second ratchet).
  *
+ * The population excludes calls the extractor marked `weakCalls` — a qualified
+ * call whose receiver was, at every occurrence, a local variable or a literal
+ * (`xs.first`, `opts.fetch`). Those collide by NAME with an unrelated ported
+ * method and say nothing about the port (RFC 0083; see
+ * extract-ruby-api.rb#walk_for_calls and compare.ts#dropWeakCalls).
+ *
  * The wide population is large and dominated by bucket-(b) confirmed
  * equivalents and bucket-(c) tooling noise (see RFC 0047 README). The baseline
  * seeds with the whole current population and shrinks as the per-cluster

@@ -3,13 +3,6 @@
     "package": "actionview",
     "tsFile": "path-registry.ts",
     "rubyName": "all_resolvers",
-    "call": "flatten",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actionview",
-    "tsFile": "path-registry.ts",
-    "rubyName": "all_resolvers",
     "call": "map",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

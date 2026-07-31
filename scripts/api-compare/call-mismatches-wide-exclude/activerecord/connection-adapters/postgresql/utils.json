@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql/utils.ts",
-    "rubyName": "parts",
-    "call": "compact",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql/utils.ts",
     "rubyName": "to_s",
     "call": "join",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails postgresql/utils.rb:18-20 is `parts.join(SEPARATOR)`; trails utils.ts:17-22 toString template-joins schema and identifier explicitly."

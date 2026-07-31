@@ -52,15 +52,15 @@
     "package": "activerecord",
     "tsFile": "associations.ts",
     "rubyName": "has_and_belongs_to_many",
-    "call": "middle_reflection",
+    "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "associations.ts",
     "rubyName": "has_and_belongs_to_many",
-    "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "call": "private_constant",
+    "reason": "Called from the HABTM builder (associations/builder/has-and-belongs-to-many.ts), which is where trails performs the const_set half (modelRegistry.set) this call guards; Rails inlines both in ClassMethods#has_and_belongs_to_many."
   },
   {
     "package": "activerecord",
@@ -75,12 +75,5 @@
     "rubyName": "has_one",
     "call": "add_reflection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations.ts",
-    "rubyName": "has_and_belongs_to_many",
-    "call": "private_constant",
-    "reason": "Called from the HABTM builder (associations/builder/has-and-belongs-to-many.ts), which is where trails performs the const_set half (modelRegistry.set) this call guards; Rails inlines both in ClassMethods#has_and_belongs_to_many."
   }
 ]
