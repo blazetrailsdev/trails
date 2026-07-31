@@ -20,13 +20,14 @@
  */
 
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
+import { ActiveRecordError } from "../errors.js";
 import type {
   TableDefinition,
   AddIndexOptions,
   AddForeignKeyOptions,
 } from "../connection-adapters/abstract/schema-definitions.js";
 import type { SchemaStatements } from "../connection-adapters/abstract/schema-statements.js";
-import type { ColumnSpec } from "./schema-types.js";
+import type { AnyPrimitiveColumnSpec, ColumnSpec, Schema } from "./schema-types.js";
 import {
   COLUMN_TYPE_MAP_MYSQL,
   COLUMN_TYPE_MAP_PG,
@@ -2152,4 +2153,162 @@ export async function canonicalForeignKeyDependents(): Promise<Map<string, strin
   }
   _dependents = dependents;
   return dependents;
+}
+
+/**
+ * Declarative view of the registry: table -> column -> `ColumnSpec`, derived by
+ * replaying every `create_table` block against a probe that records columns
+ * instead of emitting DDL. This is what lets `schema:compare` diff the
+ * transcription that actually lays the tables against `schema.rb`, rather than
+ * only the parallel `TEST_SCHEMA` map (which lays nothing).
+ *
+ * The replay pins the SQLite adapter deliberately: it is the one adapter whose
+ * type map is a near-identity and whose column path applies no adapter munging
+ * (no MySQL `DATETIME(6)` upgrade, no `serial` PK rewrite), so what comes back
+ * is the *declared* shape rather than one adapter's rendering of it. The probe
+ * is likewise built with no `serialPk` and no composite-PK set, so `col`'s
+ * generic branch runs for every column — both of the branches it skips rewrite
+ * what was declared:
+ *   - `serialPk` *discards* the declared options wholesale in favour of
+ *     `serialIdType` + `{primaryKey: true}`;
+ *   - the composite-PK branch forces `null: false`, which is a trails addition,
+ *     not something `schema.rb` states. Rails' `visit_PrimaryKeyDefinition`
+ *     (schema_creation.rb:79-81) emits nothing but `PRIMARY KEY (a, b)`, and
+ *     schema.rb:243-250 declares `cpk_books.author_id` as a bare `t.integer`.
+ *     Our NOT NULL exists so SQLite (which admits NULLs in a non-INTEGER PK)
+ *     matches the other adapters; whether that is faithful is a live question,
+ *     tracked separately — reporting the *declared* shape keeps this comparator
+ *     honest about schema.rb either way, which is what it exists to check.
+ * Taking the generic branch is therefore the right reading, but only while no
+ * PK column declares something those branches would have rewritten;
+ * {@link assertSerialPkIsPlainInteger} and {@link assertCompositePkDeclaresNoNull}
+ * fail loudly the moment one does, rather than letting the replay report a shape
+ * the real DDL never had.
+ *
+ * @internal Read by `scripts/schema-compare/compare.ts`. Lives here, next to the
+ * registry it replays, for the same reason as
+ * {@link canonicalForeignKeyDependents}: `TableBuilder` stays file-local.
+ */
+export async function canonicalRegistrySchema(): Promise<Schema> {
+  const schema: Schema = {};
+  for (const def of await buildCanonicalRegistry()) {
+    const columns: Record<string, ColumnSpec> = {};
+    const probe = {
+      column: (name: string, type: string, options: Record<string, unknown> = {}) => {
+        columns[name] = specFromColumnCall(type, options);
+      },
+      foreignKey: () => {},
+    } as unknown as TableDefinition;
+    def.fn(new TableBuilder(probe, "sqlite", COLUMN_TYPE_MAP_SQLITE, null, null));
+    if (def.meta.serialPk !== undefined) {
+      assertSerialPkIsPlainInteger(def.name, def.meta.serialPk, columns[def.meta.serialPk]);
+    }
+    if (def.meta.primaryKey !== undefined && def.meta.serialPk === undefined) {
+      for (const column of def.meta.primaryKey) {
+        assertCompositePkDeclaresNoNull(def.name, column, columns[column]);
+      }
+    }
+    schema[def.name] = columns;
+  }
+  return schema;
+}
+
+/**
+ * Guard the one place the replay's generic branch and the real `serialPk` branch
+ * can disagree. `TableBuilder.col` renders a `serialPk` column as
+ * `serialIdType(primitive, adapter)` with `{primaryKey: true}` and nothing else,
+ * so a declared `limit`/`default`/`precision`/`scale` never reaches the DDL, and
+ * a `big_integer` declaration becomes `bigserial`/`bigint`/`integer` by adapter.
+ * A plain `t.integer(pk)` (optionally spelling out the `null: false` a primary
+ * key has regardless) is the only form where "declared" and "rendered" agree,
+ * which is every live `serialPk` column today. Anything else must teach
+ * {@link canonicalRegistrySchema} how to compare the rendered form instead of
+ * being silently mis-reported.
+ */
+function assertSerialPkIsPlainInteger(
+  table: string,
+  column: string,
+  spec: ColumnSpec | undefined,
+): void {
+  const { type, null: nullable, ...rest } = declaredSpec(table, column, spec);
+  const extras = Object.keys(rest);
+  if (type === "integer" && extras.length === 0 && (nullable === undefined || nullable === false)) {
+    return;
+  }
+  throw new ActiveRecordError(
+    `canonical registry: serialPk column ${table}.${column} is declared as ` +
+      `${JSON.stringify(spec)}, but the serialPk path emits only serialIdType(...) with ` +
+      `primaryKey: true — the declared type/options would never reach the DDL. Teach ` +
+      `canonicalRegistrySchema to model the rendered form before declaring it this way.`,
+  );
+}
+
+/**
+ * Guard the composite-PK branch the replay likewise skips. That branch overrides
+ * whatever the column declared with `null: false`, so "declared" and "rendered"
+ * agree only where the declaration says nothing about nullability (every live
+ * composite-PK column today) or already says `null: false`. A column declared
+ * `null: true` would be reported nullable here while the DDL made it NOT NULL —
+ * precisely the silent mis-report {@link assertSerialPkIsPlainInteger} exists to
+ * prevent.
+ */
+function assertCompositePkDeclaresNoNull(
+  table: string,
+  column: string,
+  spec: ColumnSpec | undefined,
+): void {
+  if (declaredSpec(table, column, spec).null !== true) return;
+  throw new ActiveRecordError(
+    `canonical registry: composite-PK column ${table}.${column} declares null: true, but the ` +
+      `composite-PK path overrides it to null: false — the declared shape would never reach ` +
+      `the DDL. Teach canonicalRegistrySchema to model the rendered form before declaring it ` +
+      `this way.`,
+  );
+}
+
+/**
+ * The object form of a column the replay recorded. A missing entry means `meta`
+ * names a primary-key column no `t.<type>()` call in the block declares — a
+ * typo'd name that would otherwise sail past both guards — and the shorthand
+ * string form is unreachable because {@link specFromColumnCall} always builds the
+ * object form; both are raised rather than skipped, so neither can rot into a
+ * silent no-op.
+ */
+function declaredSpec(
+  table: string,
+  column: string,
+  spec: ColumnSpec | undefined,
+): Exclude<ColumnSpec, string> {
+  if (spec === undefined) {
+    throw new ActiveRecordError(
+      `canonical registry: ${table} names ${column} as a primary key, but its create_table ` +
+        `block declares no such column.`,
+    );
+  }
+  if (typeof spec === "string") {
+    throw new ActiveRecordError(
+      `canonical registry: ${table}.${column} was recorded as the shorthand "${spec}"; the ` +
+        `replay probe is expected to build the object form.`,
+    );
+  }
+  return spec;
+}
+
+/** Rebuilds a `ColumnSpec` from the `t.column(name, type, options)` call the
+ *  replay observed, undoing the one type-map rename SQLite applies. */
+function specFromColumnCall(type: string, options: Record<string, unknown>): ColumnSpec {
+  const spec: Exclude<ColumnSpec, string> = {
+    type: (type === "bigint" ? "big_integer" : type) as AnyPrimitiveColumnSpec,
+  };
+  if (typeof options["limit"] === "number") spec.limit = options["limit"];
+  if ("precision" in options) spec.precision = options["precision"] as number | null;
+  if (typeof options["scale"] === "number") spec.scale = options["scale"];
+  if (typeof options["null"] === "boolean") spec.null = options["null"];
+  const defaultValue = options["default"];
+  if (typeof defaultValue === "function") {
+    spec.defaultFunction = (defaultValue as () => string)();
+  } else if (defaultValue !== undefined) {
+    spec.default = defaultValue;
+  }
+  return spec;
 }
