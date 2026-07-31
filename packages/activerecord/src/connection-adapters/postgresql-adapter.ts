@@ -74,7 +74,10 @@ import { AbstractAdapter, RAW_CONNECTION_DEPRECATION_MESSAGE } from "./abstract-
 import { deprecator } from "../deprecator.js";
 import { captureUnwrappedExecute, dirtiesQueryCache } from "./abstract/query-cache.js";
 import { PostgreSQLSchemaStatements } from "./postgresql/schema-statements-class.js";
-import type { JoinTableOptions } from "./abstract/schema-statements.js";
+import type {
+  JoinTableOptions,
+  ValidateConstraintStatements,
+} from "./abstract/schema-statements.js";
 import { SchemaStatements } from "./abstract/schema-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
@@ -171,7 +174,10 @@ function toError(value: unknown): Error {
  * shape where driver params and adapter knobs share one hash.
  * Uses a connection pool internally for concurrent access.
  */
-export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapter {
+export class PostgreSQLAdapter
+  extends AbstractAdapter
+  implements DatabaseAdapter, ValidateConstraintStatements
+{
   override get adapterName(): AdapterName {
     return "postgres";
   }
