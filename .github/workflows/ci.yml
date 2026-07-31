@@ -540,14 +540,6 @@ jobs:
               | xargs -r -d '\n' npx --yes prettier@3.8.1 --check --ignore-unknown
           fi
 
-      # Raw-control-byte guard for everything ESLint does not parse (.json, .rb,
-      # .md, .yml, .sql, ...). A control byte makes grep/ripgrep skip the file
-      # silently, so audits get a wrong answer rather than an error; the ESLint
-      # rule blazetrails/no-raw-control-bytes covers only JS/TS. Unconditional
-      # like Prettier above: it scans the whole tracked tree in well under a
-      # second, so there is nothing to gain from a diff gate. `--self-test` is
-      # the regression cover (a raw-NUL fixture must fail, its escaped form must
-      # pass) and runs here so it cannot be skipped.
       - name: Raw control bytes
         if: ${{ !cancelled() }}
         run: |
