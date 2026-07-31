@@ -11,6 +11,8 @@ import {
   parseTop,
   relPathFor,
   renderReport,
+  shouldRegenerate,
+  NO_REGEN_FLAG,
   unreviewedCount,
   writeSplitBaseline,
 } from "./lint-call-mismatches-wide.js";
@@ -325,5 +327,26 @@ describe("parseTop", () => {
     expect(() => parseTop(["--top=x"], 20)).toThrow(/positive integer/);
     expect(() => parseTop(["--top=0"], 20)).toThrow(/positive integer/);
     expect(() => parseTop(["--top=2.5"], 20)).toThrow(/positive integer/);
+  });
+});
+
+describe("shouldRegenerate", () => {
+  it("regenerates on a plain local gating run", () => {
+    expect(shouldRegenerate([], {})).toBe(true);
+  });
+
+  it("opts out under CI, which runs compare.ts --wide-calls as its own step", () => {
+    expect(shouldRegenerate([], { CI: "true" })).toBe(false);
+  });
+
+  it("opts out on the explicit flag or env escape hatch", () => {
+    expect(shouldRegenerate([NO_REGEN_FLAG], {})).toBe(false);
+    expect(shouldRegenerate([], { API_COMPARE_SKIP_WIDE_REGEN: "1" })).toBe(false);
+  });
+
+  it("leaves the read-only views and the reseed path alone", () => {
+    expect(shouldRegenerate(["--report"], {})).toBe(false);
+    expect(shouldRegenerate(["--unreviewed"], {})).toBe(false);
+    expect(shouldRegenerate(["--write"], {})).toBe(false);
   });
 });

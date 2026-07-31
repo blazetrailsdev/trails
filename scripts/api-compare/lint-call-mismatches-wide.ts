@@ -51,6 +51,11 @@
  *   pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts --write   # reseed baseline
  *   pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts --report  # read-only grouping
  *
+ * A plain gating run first regenerates output/call-mismatches-wide.json itself
+ * (see {@link shouldRegenerate}); pass `--no-regen`, set
+ * API_COMPARE_SKIP_WIDE_REGEN=1, or run under CI= to gate the artifact already
+ * on disk. The partial-scope determinism guard still runs either way.
+ *
  * `--report` (RFC 0083) groups the baselined population by package, source
  * file, Ruby call name, and derived cause bucket, so a burndown story can be
  * scoped off a coherent slice instead of a 4794-line flat list. It never writes
@@ -65,8 +70,10 @@
  * entry guard is the sole exception, matching lint-call-mismatches.ts), async fs.
  */
 
+import { execFile } from "child_process";
 import * as fs from "fs/promises";
 import * as path from "path";
+import { promisify } from "util";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
 import {
@@ -215,6 +222,42 @@ async function pruneEmptyDirs(dir: string): Promise<boolean> {
     }
   }
   return empty;
+}
+
+// ── Self-regeneration (RFC 0083) ────────────────────────────────────────────
+// The gate reads a pre-existing output/call-mismatches-wide.json. A stale one
+// desyncs the ratchet from the working tree: a sibling PR that deletes a TS
+// method makes every baseline entry for it stop flagging, and the gate reports
+// `STALE baseline entr(ies)` for a change the current PR never made. The fix
+// was always "re-extract, then re-run", so a plain local gate run does it
+// itself. CI already runs `compare.ts --wide-calls` as its own step before this
+// one, so it opts out via CI= (any value) and never pays for the second pass.
+export const NO_REGEN_FLAG = "--no-regen";
+
+// Regeneration applies to the gating run only. `--report` / `--unreviewed` are
+// read-only views that tolerate a missing artifact, and `--write` is reached
+// through `pnpm api:calls:wide:reseed`, which regenerates (with
+// API_COMPARE_FORCE=1) ahead of it already — re-running compare here would just
+// double the cost.
+export function shouldRegenerate(argv: string[], env: Record<string, string | undefined>): boolean {
+  if (argv.some((a) => [NO_REGEN_FLAG, "--report", "--unreviewed", "--write"].includes(a))) {
+    return false;
+  }
+  return !env.CI && env.API_COMPARE_SKIP_WIDE_REGEN !== "1";
+}
+
+// Rebuild output/call-mismatches-wide.json over the full package surface. Goes
+// through `pnpm api:compare` (run.sh) rather than compare.ts directly so the
+// Ruby/TS extraction manifests compare.ts reads are produced/refreshed first —
+// invoking compare.ts alone in a fresh worktree just fails on a missing
+// rails-api.json. Out-of-process because compare.ts's main() reads process.argv
+// directly, so there is no in-process way to ask it for a wide run.
+export async function regenerateArtifact(env: Record<string, string | undefined>): Promise<void> {
+  await promisify(execFile)("pnpm", ["api:compare", "--wide-calls"], {
+    cwd: ROOT_DIR,
+    env,
+    maxBuffer: 64 * 1024 * 1024,
+  });
 }
 
 async function loadArtifact(): Promise<Artifact> {
@@ -522,6 +565,19 @@ async function runAsScript(): Promise<void> {
   const argv = process.argv.slice(2);
   const unreviewed = argv.includes("--unreviewed");
   if (!argv.includes("--report") && !unreviewed) {
+    if (shouldRegenerate(argv, process.env)) {
+      console.log("Regenerating output/call-mismatches-wide.json (compare.ts --wide-calls)…");
+      try {
+        await regenerateArtifact(process.env);
+      } catch (e) {
+        console.error(
+          `\nwide call-mismatches ratchet: could not regenerate the wide artifact: ${
+            (e as Error).message
+          }\n` + `Re-run with ${NO_REGEN_FLAG} to gate against the artifact already on disk.\n`,
+        );
+        process.exit(2);
+      }
+    }
     process.exit(await main(argv.includes("--write")));
   }
   let top: number;
