@@ -12,7 +12,9 @@ import {
   relPathFor,
   renderReport,
   shouldRegenerate,
+  regenerateArtifact,
   NO_REGEN_FLAG,
+  REGEN_SKIP_ENV,
   unreviewedCount,
   writeSplitBaseline,
 } from "./lint-call-mismatches-wide.js";
@@ -341,12 +343,20 @@ describe("shouldRegenerate", () => {
 
   it("opts out on the explicit flag or env escape hatch", () => {
     expect(shouldRegenerate([NO_REGEN_FLAG], {})).toBe(false);
-    expect(shouldRegenerate([], { API_COMPARE_SKIP_WIDE_REGEN: "1" })).toBe(false);
+    expect(shouldRegenerate([], { [REGEN_SKIP_ENV]: "1" })).toBe(false);
   });
 
   it("leaves the read-only views and the reseed path alone", () => {
     expect(shouldRegenerate(["--report"], {})).toBe(false);
     expect(shouldRegenerate(["--unreviewed"], {})).toBe(false);
     expect(shouldRegenerate(["--write"], {})).toBe(false);
+  });
+});
+
+describe("regenerateArtifact", () => {
+  it("rejects with the failing command when the regeneration exits non-zero", async () => {
+    await expect(regenerateArtifact({ PATH: "" })).rejects.toThrow(
+      /pnpm api:compare --wide-calls|spawn/,
+    );
   });
 });

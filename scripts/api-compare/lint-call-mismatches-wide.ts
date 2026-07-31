@@ -50,11 +50,17 @@
  *   pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts           # gate (CI)
  *   pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts --write   # reseed baseline
  *   pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts --report  # read-only grouping
+ *   pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts --no-regen # gate the artifact on disk
  *
  * A plain gating run first regenerates output/call-mismatches-wide.json itself
- * (see {@link shouldRegenerate}); pass `--no-regen`, set
- * API_COMPARE_SKIP_WIDE_REGEN=1, or run under CI= to gate the artifact already
- * on disk. The partial-scope determinism guard still runs either way.
+ * by shelling out to `pnpm api:compare --wide-calls` (RFC 0083). Gating a stale
+ * artifact is what makes a sibling PR's deleted TS method surface here as
+ * `STALE baseline entr(ies)` on a branch that never touched it, and the fix was
+ * always "re-extract, then re-run". It goes through run.sh rather than
+ * compare.ts so the extraction manifests compare.ts reads are refreshed first.
+ * Opt out with `--no-regen`, API_COMPARE_SKIP_WIDE_REGEN=1, or any CI value —
+ * CI runs the extraction step separately and must not pay for it twice. The
+ * partial-scope determinism guard runs unchanged either way.
  *
  * `--report` (RFC 0083) groups the baselined population by package, source
  * file, Ruby call name, and derived cause bucket, so a burndown story can be
@@ -70,10 +76,9 @@
  * entry guard is the sole exception, matching lint-call-mismatches.ts), async fs.
  */
 
-import { execFile } from "child_process";
+import { spawn } from "child_process";
 import * as fs from "fs/promises";
 import * as path from "path";
-import { promisify } from "util";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
 import {
@@ -224,39 +229,29 @@ async function pruneEmptyDirs(dir: string): Promise<boolean> {
   return empty;
 }
 
-// ── Self-regeneration (RFC 0083) ────────────────────────────────────────────
-// The gate reads a pre-existing output/call-mismatches-wide.json. A stale one
-// desyncs the ratchet from the working tree: a sibling PR that deletes a TS
-// method makes every baseline entry for it stop flagging, and the gate reports
-// `STALE baseline entr(ies)` for a change the current PR never made. The fix
-// was always "re-extract, then re-run", so a plain local gate run does it
-// itself. CI already runs `compare.ts --wide-calls` as its own step before this
-// one, so it opts out via CI= (any value) and never pays for the second pass.
 export const NO_REGEN_FLAG = "--no-regen";
 
-// Regeneration applies to the gating run only. `--report` / `--unreviewed` are
-// read-only views that tolerate a missing artifact, and `--write` is reached
-// through `pnpm api:calls:wide:reseed`, which regenerates (with
-// API_COMPARE_FORCE=1) ahead of it already — re-running compare here would just
-// double the cost.
+export const REGEN_SKIP_ARGS = [NO_REGEN_FLAG, "--report", "--unreviewed", "--write"];
+
+export const REGEN_SKIP_ENV = "API_COMPARE_SKIP_WIDE_REGEN";
+
 export function shouldRegenerate(argv: string[], env: Record<string, string | undefined>): boolean {
-  if (argv.some((a) => [NO_REGEN_FLAG, "--report", "--unreviewed", "--write"].includes(a))) {
-    return false;
-  }
-  return !env.CI && env.API_COMPARE_SKIP_WIDE_REGEN !== "1";
+  if (argv.some((a) => REGEN_SKIP_ARGS.includes(a))) return false;
+  return !env.CI && env[REGEN_SKIP_ENV] !== "1";
 }
 
-// Rebuild output/call-mismatches-wide.json over the full package surface. Goes
-// through `pnpm api:compare` (run.sh) rather than compare.ts directly so the
-// Ruby/TS extraction manifests compare.ts reads are produced/refreshed first —
-// invoking compare.ts alone in a fresh worktree just fails on a missing
-// rails-api.json. Out-of-process because compare.ts's main() reads process.argv
-// directly, so there is no in-process way to ask it for a wide run.
-export async function regenerateArtifact(env: Record<string, string | undefined>): Promise<void> {
-  await promisify(execFile)("pnpm", ["api:compare", "--wide-calls"], {
-    cwd: ROOT_DIR,
-    env,
-    maxBuffer: 64 * 1024 * 1024,
+export function regenerateArtifact(env: Record<string, string | undefined>): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("pnpm", ["api:compare", "--wide-calls"], {
+      cwd: ROOT_DIR,
+      env,
+      stdio: "inherit",
+    });
+    child.on("error", reject);
+    child.on("close", (code, signal) => {
+      if (code === 0) resolve();
+      else reject(new Error(`\`pnpm api:compare --wide-calls\` exited with ${signal ?? code}`));
+    });
   });
 }
 
