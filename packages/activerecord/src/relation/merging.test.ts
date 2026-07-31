@@ -9,6 +9,7 @@ import { sql as arelSql } from "@blazetrails/arel";
 
 import { registerModel, Range } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
+import { JoinDependency } from "../associations/join-dependency.js";
 import { itIfSupports } from "../support/supports.js";
 import { assertQueriesCount, assertQueriesMatch } from "../testing/query-assertions.js";
 import { quoteTableName, escapeRegExp } from "../support/quote-regex.js";
@@ -288,14 +289,17 @@ describe("RelationMergingTest", () => {
     // into the receiver's joins_values (which would resolve them on the wrong
     // model). `merge` and `mergeBang` must agree here.
     const source = Post.joins("author");
+    // Rails pushes the built JoinDependency straight into the receiver's
+    // joins_values (`joins!(join_dependency, *others)`, merger.rb:131), where
+    // build_join_buckets' select_named_joins stashes it.
     const merged = Comment.all().merge(source);
-    expect(merged.joinsValues).toEqual([]);
-    expect((merged as any)._namedInnerJoinDeps.length).toBe(1);
+    expect(merged.joinsValues.length).toBe(1);
+    expect(merged.joinsValues[0]).toBeInstanceOf(JoinDependency);
 
     const banged = Comment.all();
     (banged as any).mergeBang(source);
-    expect(banged.joinsValues).toEqual([]);
-    expect((banged as any)._namedInnerJoinDeps.length).toBe(1);
+    expect(banged.joinsValues.length).toBe(1);
+    expect(banged.joinsValues[0]).toBeInstanceOf(JoinDependency);
   });
 
   it("relation merging with cross-klass left outer joins builds a join dependency", () => {
@@ -305,14 +309,16 @@ describe("RelationMergingTest", () => {
     // than folding into the receiver's left_outer_joins_values. `merge` and
     // `mergeBang` must agree — mergeBang's old inline block skipped this split.
     const source = Post.leftOuterJoins("author");
+    // Rails pushes the built JoinDependency into left_outer_joins_values
+    // (`left_outer_joins!(join_dependency, *others)`, merger.rb:150).
     const merged = Comment.all().merge(source);
-    expect((merged as any)._leftOuterJoinsValues).toEqual([]);
-    expect((merged as any)._leftOuterJoinDeps.length).toBe(1);
+    expect(merged.leftOuterJoinsValues.length).toBe(1);
+    expect(merged.leftOuterJoinsValues[0]).toBeInstanceOf(JoinDependency);
 
     const banged = Comment.all();
     (banged as any).mergeBang(source);
-    expect((banged as any)._leftOuterJoinsValues).toEqual([]);
-    expect((banged as any)._leftOuterJoinDeps.length).toBe(1);
+    expect(banged.leftOuterJoinsValues.length).toBe(1);
+    expect(banged.leftOuterJoinsValues[0]).toBeInstanceOf(JoinDependency);
   });
 
   it("relation merging with skip query cache", () => {

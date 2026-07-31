@@ -1,5 +1,6 @@
 import { Nodes } from "@blazetrails/arel";
 
+import { JoinDependency } from "../associations/join-dependency.js";
 import type { AssociationSpec } from "./query-methods.js";
 import { constructJoinDependency, structuralUnionEq } from "./query-methods.js";
 
@@ -19,9 +20,7 @@ interface JoinFoldRelation {
   _joinValues: unknown[];
   _joinsValues: unknown[];
   _namedInnerJoins: unknown[];
-  _namedInnerJoinDeps: unknown[];
   _leftOuterJoinsValues: unknown[];
-  _leftOuterJoinDeps: unknown[];
   joinsValues?: unknown[];
   leftOuterJoinsValues?: unknown[];
   _isNamedJoinValue(v: unknown): boolean;
@@ -58,9 +57,10 @@ function rawJoinDup(v: unknown, existing: unknown): boolean {
 // Cross-klass named (Hash | Symbol/String | Array — every shape Rails treats as
 // an association) can't resolve on the receiver, so they're collected and built
 // into a single InnerJoin JoinDependency on `source` (whose AliasTracker handles
-// nested-through / HABTM) rather than folded into _joinsValues; this mirrors
-// Rails' `else` branch where `others` (the raw joins) still append in order via
-// `joins!(join_dependency, *others)`. Arel::Nodes::InnerJoin is the type used for
+// nested-through / HABTM) and pushed into _joinsValues, exactly as Rails'
+// `else` branch does with `joins!(join_dependency, *others)` — the `others`
+// (raw joins, and any JoinDependency the source already carries, which Rails'
+// `partition` also routes to `others`) still append in order. Arel::Nodes::InnerJoin is the type used for
 // same-model inner joins in Rails' cross-model merge path.
 export function foldMergeJoins(target: JoinFoldRelation, source: JoinFoldRelation): void {
   const clauses = source._joinClauses ?? [];
@@ -69,7 +69,12 @@ export function foldMergeJoins(target: JoinFoldRelation, source: JoinFoldRelatio
   const sameKlass = source.model === target.model;
   const crossKlassNamed: unknown[] = [];
   for (const v of source.joinsValues ?? []) {
-    if (!source._isNamedJoinValue(v)) {
+    if (v instanceof JoinDependency) {
+      // Rails' `partition` matches only Hash/Symbol/Array, so a JoinDependency
+      // already in `other.joins_values` lands in `others` and rides through
+      // `joins!(join_dependency, *others)` untouched.
+      target._joinsValues.push(v);
+    } else if (!source._isNamedJoinValue(v)) {
       if (!target._joinValues.some((existing) => rawJoinDup(v, existing)))
         target._joinsValues.push(v);
     } else if (sameKlass) {
@@ -82,7 +87,7 @@ export function foldMergeJoins(target: JoinFoldRelation, source: JoinFoldRelatio
     }
   }
   if (crossKlassNamed.length > 0) {
-    target._namedInnerJoinDeps.push(
+    target._joinsValues.push(
       constructJoinDependency.call(
         source as never,
         crossKlassNamed as AssociationSpec[],
@@ -90,8 +95,6 @@ export function foldMergeJoins(target: JoinFoldRelation, source: JoinFoldRelatio
       ),
     );
   }
-  // Carry forward any cross-klass dependencies the source already accumulated.
-  target._namedInnerJoinDeps.push(...(source._namedInnerJoinDeps ?? []));
 }
 
 // Rails merge_outer_joins (merger.rb): when other.klass == relation.klass the
@@ -108,15 +111,21 @@ export function foldMergeOuterJoins(target: JoinFoldRelation, source: JoinFoldRe
       if (!target._leftOuterJoinsValues.some((seen) => structuralUnionEq(seen, v)))
         target._leftOuterJoinsValues.push(v);
     }
-  } else if (otherLeft.length > 0) {
-    target._leftOuterJoinDeps.push(
+    return;
+  }
+  // Rails partitions Hash/Symbol/Array off as `associations`; everything else —
+  // including a JoinDependency the source already carries — is `others`, forwarded
+  // verbatim by `left_outer_joins!(join_dependency, *others)`.
+  const associations = otherLeft.filter((v) => !(v instanceof JoinDependency));
+  const others = otherLeft.filter((v) => v instanceof JoinDependency);
+  if (associations.length > 0) {
+    target._leftOuterJoinsValues.push(
       constructJoinDependency.call(
         source as never,
-        otherLeft as AssociationSpec[],
+        associations as AssociationSpec[],
         Nodes.OuterJoin,
-      ),
+      ) as never,
     );
   }
-  // Carry forward any cross-klass dependencies the source already accumulated.
-  target._leftOuterJoinDeps.push(...(source._leftOuterJoinDeps ?? []));
+  target._leftOuterJoinsValues.push(...(others as never[]));
 }

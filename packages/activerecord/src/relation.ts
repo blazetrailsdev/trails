@@ -429,10 +429,17 @@ export class Relation<T extends Base> {
   // `_joinsValues` by this rule — the same rule `joins` uses at insert time. A
   // raw Symbol misrouted to `_joinValues` would reach the arel visitor and raise
   // "Unknown node type: Symbol", so Symbols must land in `_namedInnerJoins`.
+  //
+  // A `JoinDependency` (pushed by a cross-klass `merge`, Rails
+  // `joins!(join_dependency, *others)`) counts as named: Rails' build_join_buckets
+  // shifts only `Arel::Nodes::Join` values out of `joins_values` and hands the
+  // whole remainder — JoinDependency included — to `select_named_joins`, which
+  // stashes it (query_methods.rb:1856-1873, 1810-1822).
   private _isNamedJoinValue(v: unknown): boolean {
     return (
       _isPlainObject(v) ||
       typeof v === "symbol" ||
+      v instanceof JoinDependency ||
       (typeof v === "string" && this._isAssociationName(v))
     );
   }
@@ -449,14 +456,6 @@ export class Relation<T extends Base> {
   get _joinValues(): (string | Nodes.Join)[] {
     return this._joinsValues.filter((v) => !this._isNamedJoinValue(v)) as (string | Nodes.Join)[];
   }
-  // Pre-built InnerJoin JoinDependencies from a cross-klass `merge` (Rails
-  // merge_joins builds these against `other.klass` since the association names
-  // can't resolve on the receiver's model).
-  private _namedInnerJoinDeps: JoinDependency[] = [];
-  // Pre-built OuterJoin JoinDependencies from a cross-klass `merge` (Rails
-  // merge_outer_joins builds these against `other.klass` since the left-outer
-  // association names can't resolve on the receiver's model).
-  private _leftOuterJoinDeps: JoinDependency[] = [];
   private _includesAssociations: AssociationSpec[] = [];
   private _preloadAssociations: AssociationSpec[] = [];
   private _eagerLoadAssociations: AssociationSpec[] = [];
@@ -3289,9 +3288,7 @@ export class Relation<T extends Base> {
       manager.joinSourceCount > 0 ||
       this._eagerLoadAssociations.length > 0 ||
       this._leftOuterJoinsValues.length > 0 ||
-      this._namedInnerJoins.length > 0 ||
-      this._namedInnerJoinDeps.length > 0 ||
-      this._leftOuterJoinDeps.length > 0;
+      this._namedInnerJoins.length > 0;
     const leadingJoins: Nodes.Join[] = [];
     const joinNodes: Nodes.Join[] = [];
     for (const v of this._joinValues) {
@@ -3363,11 +3360,10 @@ export class Relation<T extends Base> {
     // it is a pure bucket-builder with neither an eager-JD parameter nor a live
     // manager — and are needed here because the short-circuit does NOT fold `eagerJd`
     // into the stash (it is pushed in the non-short-circuit branch below). Cross-klass
-    // merged JDs (`_namedInnerJoinDeps`/`_leftOuterJoinDeps`) are deliberately NOT
-    // checked: like Rails, they ride the SAME emission regardless of branch —
-    // emitJoinPlan emits them directly from `this`, not from the plan — so
-    // short-circuiting with them present yields identical SQL (verified against the
-    // subquery path for a cross-klass `.merge`).
+    // merged JDs live in `joinsValues` / `leftOuterJoinsValues` like any other join
+    // value, so `_namedInnerJoins` below already accounts for the inner ones — an
+    // inner merged JD blocks the short-circuit exactly as Rails' non-empty
+    // `joins_values` does.
     const pureLeftOuter =
       eagerJd === undefined &&
       manager.joinSourceCount === 0 &&
@@ -3683,6 +3679,9 @@ export class Relation<T extends Base> {
           ...this._leftOuterJoinsValues,
           ...joinableSpecs,
         ]) {
+          // A cross-klass merged JoinDependency is a stash, not a spec — it
+          // resolves against the merged-from model, not this one.
+          if (spec instanceof JoinDependency) continue;
           joinedJd.addAssociationSpec(spec);
         }
         for (const node of joinedJd.nodes) safeTables.add(node.tableName.toLowerCase());
@@ -4937,11 +4936,21 @@ export class Relation<T extends Base> {
    * eager-spec resolver, which rejects every non-string spec.
    */
   private _joinsReflectionsAreLimitable(): boolean {
+    // A cross-klass merged JoinDependency carries its own (already-built)
+    // reflections against another model; fold those in rather than re-resolving
+    // it as a spec on this relation's model.
     const specs = [...this._namedInnerJoins, ...this._leftOuterJoinsValues];
     if (specs.length === 0) return true;
     const jd = new JoinDependency(this._modelClass);
-    for (const spec of specs) jd.addAssociationSpec(spec);
-    return this.usingLimitableReflections(jd.reflections);
+    const mergedReflections: unknown[] = [];
+    for (const spec of specs) {
+      if (spec instanceof JoinDependency) {
+        mergedReflections.push(...spec.reflections);
+        continue;
+      }
+      jd.addAssociationSpec(spec);
+    }
+    return this.usingLimitableReflections([...jd.reflections, ...mergedReflections] as never);
   }
 
   /**
@@ -6960,8 +6969,6 @@ export class Relation<T extends Base> {
     this._joinClauses = [...source._joinClauses];
     this._joinsValues = [...source._joinsValues];
     this._leftOuterJoinsValues = [...source._leftOuterJoinsValues];
-    this._namedInnerJoinDeps = [...source._namedInnerJoinDeps];
-    this._leftOuterJoinDeps = [...source._leftOuterJoinDeps];
     this._includesAssociations = [...source._includesAssociations];
     this._preloadAssociations = [...source._preloadAssociations];
     this._eagerLoadAssociations = [...source._eagerLoadAssociations];
