@@ -9,6 +9,7 @@ import {
   stdout,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { rubyInspect } from "./relation/ruby-inspect.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
@@ -1607,17 +1608,17 @@ export abstract class Migration {
 
   /** @internal */
   formatArguments(args: unknown[]): string {
-    const safeJson = (v: unknown) =>
-      JSON.stringify(v, (_k, val) => (typeof val === "bigint" ? `${val}n` : val));
-    const argList = args.slice(0, -1).map((a) => safeJson(a));
+    const argList = args.slice(0, -1).map((a) => rubyInspect(a));
+    // Ruby's `arguments.last` on an empty argument list is `nil`, so the
+    // else branch still pushes `"nil"` — `create_table(nil)`, not `create_table()`.
     const last = args[args.length - 1];
-    if (last !== null && typeof last === "object" && !Array.isArray(last)) {
+    if (isPlainObject(last)) {
       const filtered = Object.fromEntries(
-        Object.entries(last as Record<string, unknown>).filter(([k]) => !this.isInternalOption(k)),
+        Object.entries(last).filter(([k]) => !this.isInternalOption(k)),
       );
-      if (Object.keys(filtered).length > 0) argList.push(safeJson(filtered));
-    } else if (last !== undefined) {
-      argList.push(safeJson(last));
+      if (Object.keys(filtered).length > 0) argList.push(rubyInspect(filtered));
+    } else {
+      argList.push(rubyInspect(last));
     }
     return argList.join(", ");
   }
