@@ -22,6 +22,7 @@ import { fixtures } from "../test-fixtures.js";
 import "../support/canonical-model-index.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
+import { quoteTableName, escapeRegExp } from "../support/quote-regex.js";
 
 describe("build_joins from(subquery) dedup", () => {
   fixtures([]);
@@ -80,6 +81,9 @@ describe("build_joins from(subquery) dedup", () => {
   it("keeps a raw join leading when the only joins_values JoinDependency is cross-klass", () => {
     const rel = Post.joins("CROSS JOIN categories").joins("comments").merge(Comment.joins("post"));
     const sql = (Post.from(rel, "posts") as unknown as { toSql(): string }).toSql();
-    expect(sql).toContain('FROM "posts" CROSS JOIN categories INNER JOIN "comments"');
+    const q = (name: string) => escapeRegExp(quoteTableName(name));
+    expect(sql).toMatch(
+      new RegExp(`FROM ${q("posts")} CROSS JOIN categories INNER JOIN ${q("comments")}`),
+    );
   });
 });
