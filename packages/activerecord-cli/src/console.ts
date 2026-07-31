@@ -1,5 +1,6 @@
-import { Base, DatabaseConfigurations, DatabaseTasks } from "@blazetrails/activerecord";
+import { Base, DatabaseConfigurations } from "@blazetrails/activerecord";
 import { loadDatabaseConfig, tryLoadModels } from "./db-helpers.js";
+import { environmentDbConfig, establishEnvironmentConnection } from "./environment.js";
 
 export interface StartOptions {
   /** Override of repl.start — injected by tests to avoid opening a real REPL. */
@@ -27,13 +28,12 @@ export async function arConsole(
   }
 
   const env = DatabaseConfigurations.currentEnv();
-  const dbConfig = DatabaseTasks.databaseConfiguration?.findDbConfig(env);
-  if (!dbConfig) {
+  if (!environmentDbConfig(env)) {
     console.error(`ar: no database configuration found for environment "${env}"`);
     return 1;
   }
   try {
-    await Base.establishConnection(dbConfig.configurationHash as { [key: string]: unknown });
+    await establishEnvironmentConnection(env);
   } catch (err) {
     console.error(`ar: failed to establish connection — ${String(err)}`);
     return 1;

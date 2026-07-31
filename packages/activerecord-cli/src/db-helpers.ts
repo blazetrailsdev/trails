@@ -1,6 +1,7 @@
 import { join, resolve } from "path";
 import { getFsAsync } from "@blazetrails/activesupport";
 import { DatabaseTasks, DatabaseConfigurations, Migrator } from "@blazetrails/activerecord";
+import { normalizeSqlitePaths } from "./environment.js";
 
 /**
  * Load `config/database.ts` from `cwd` and install it into `DatabaseTasks`.
@@ -15,7 +16,7 @@ export async function loadDatabaseConfig(cwd: string): Promise<DatabaseConfigura
   const { pathToFileURL } = await import("node:url");
   const mod = await import(pathToFileURL(configPath).href);
   const raw = mod.default ?? mod;
-  const configs = DatabaseConfigurations.fromEnv(raw);
+  const configs = normalizeSqlitePaths(DatabaseConfigurations.fromEnv(raw), cwd);
   DatabaseTasks.databaseConfiguration = configs;
   DatabaseTasks.root = cwd;
   return configs;

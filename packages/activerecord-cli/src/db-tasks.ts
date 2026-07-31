@@ -2,6 +2,7 @@ import { join, resolve } from "path";
 import { getEnv, getFsAsync, setEnv } from "@blazetrails/activesupport";
 import { DatabaseTasks, DatabaseConfigurations } from "@blazetrails/activerecord";
 import { loadDatabaseConfig, loadMigrations, tryLoadModels } from "./db-helpers.js";
+import { withEnvironmentConnection } from "./environment.js";
 
 async function runCreate(
   config: import("@blazetrails/activerecord").DatabaseConfig,
@@ -110,15 +111,9 @@ export async function dbMigrate(cwd: string, args: string[]): Promise<number> {
   if (version !== undefined) setEnv("TRAILS_MIGRATION_VERSION", version);
   // `db:migrate` depends on `load_config: :environment` (databases.rake:22, :89),
   // so app boot has already established Base's connection by the time
-  // `migrate_all` reaches its single-primary fast path. The CLI has no boot
-  // step, so open that ambient connection here.
-  const dbConfig = DatabaseTasks.databaseConfiguration?.findDbConfig(DatabaseTasks.env);
+  // `migrate_all` reaches its single-primary fast path.
   try {
-    if (dbConfig) {
-      await DatabaseTasks.withTemporaryPool(dbConfig, () => DatabaseTasks.migrateAll());
-    } else {
-      await DatabaseTasks.migrateAll();
-    }
+    await withEnvironmentConnection(() => DatabaseTasks.migrateAll(), DatabaseTasks.env);
     return 0;
   } catch (err) {
     console.error(`ar: db:migrate failed — ${String(err)}`);
@@ -140,7 +135,10 @@ export async function dbRollback(cwd: string, args: string[]): Promise<number> {
   const step = parseStep(args, 1);
 
   try {
-    await DatabaseTasks.rollback(step);
+    // `db:rollback` (databases.rake:263) rolls back through
+    // `migration_connection_pool`, i.e. the pool `load_config: :environment`
+    // established at boot.
+    await withEnvironmentConnection(() => DatabaseTasks.rollback(step));
     return 0;
   } catch (err) {
     console.error(`ar: db:rollback failed — ${String(err)}`);
