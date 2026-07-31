@@ -326,6 +326,17 @@ export class DatabaseTasks {
     return this._migrationsByConfig.get(this._migrationsKey(dbConfig)) ?? this._migrations;
   }
 
+  private static async _migratorFor(
+    adapter: import("../connection-adapters/abstract-adapter.js").AbstractAdapter,
+    dbConfig: DatabaseConfig,
+  ): Promise<import("../migration.js").Migrator> {
+    const { Migrator } = await import("../migration.js");
+    return new Migrator(adapter, this._migrationsFor(dbConfig), {
+      environment: dbConfig.envName,
+      internalMetadataEnabled: dbConfig.useMetadataTable,
+    });
+  }
+
   static async migrate(
     version?: number | string,
     { skipInitialize = false }: { skipInitialize?: boolean } = {},
@@ -334,7 +345,7 @@ export class DatabaseTasks {
     const effectiveVersion = typeof raw === "string" ? raw.trim() || null : raw;
     this.checkTargetVersion(effectiveVersion ?? undefined);
 
-    const { Migration, Migrator } = await import("../migration.js");
+    const { Migration } = await import("../migration.js");
     const scope = getEnv("SCOPE");
     // Rails: `verbose_was, Migration.verbose = Migration.verbose, verbose?`
     // (`database_tasks.rb:264`), restored in the ensure block at `:282`.
@@ -348,10 +359,7 @@ export class DatabaseTasks {
       // Rails builds the migrator from `migration_connection_pool.migration_context`
       // (`connection_pool.rb:294-299`), i.e. from the pool's own
       // `db_config.migrations_paths` — not from a process-global list.
-      const migrator = new Migrator(adapter, this._migrationsFor(dbConfig), {
-        environment: dbConfig.envName,
-        internalMetadataEnabled: dbConfig.useMetadataTable,
-      });
+      const migrator = await this._migratorFor(adapter, dbConfig);
       // Rails block: `version.blank? ? (scope.blank? || scope == m.scope) : m.version == version`
       // `version` is the *method parameter* (explicit arg), NOT ENV["VERSION"].
       // The rake task always calls migrate() with no arg, so version is nil → scope filter only.
@@ -411,14 +419,10 @@ export class DatabaseTasks {
     direction: "rollback" | "forward",
     steps: number,
   ): Promise<void> {
-    const { Migrator } = await import("../migration.js");
     const pool = await this.migrationConnectionPool();
     const adapter = await pool.leaseConnection();
     const dbConfig = pool.dbConfig;
-    const migrator = new Migrator(adapter, this._migrationsFor(dbConfig), {
-      environment: dbConfig.envName,
-      internalMetadataEnabled: dbConfig.useMetadataTable,
-    });
+    const migrator = await this._migratorFor(adapter, dbConfig);
     await migrator[direction](steps);
     adapter.schemaCache?.clear();
   }
@@ -1013,8 +1017,7 @@ export class DatabaseTasks {
     this._baseClass = Base;
     const pool = Base.connectionPool();
     const adapter = await pool.leaseConnection();
-    const { Migrator } = await import("../migration.js");
-    const migrator = new Migrator(adapter, this._migrationsFor(pool.dbConfig));
+    const migrator = await this._migratorFor(adapter, pool.dbConfig);
     // Mirrors database_tasks.rb:302-305: abort unless schema_migrations exists.
     if (!(await migrator.schemaMigrationTableExists())) {
       throw new Error("Schema migrations table does not exist yet.");
@@ -1046,8 +1049,7 @@ export class DatabaseTasks {
   static async currentVersion(): Promise<number> {
     const pool = await this.migrationConnectionPool();
     const adapter = await pool.leaseConnection();
-    const { Migrator } = await import("../migration.js");
-    const migrator = new Migrator(adapter, this._migrationsFor(pool.dbConfig));
+    const migrator = await this._migratorFor(adapter, pool.dbConfig);
     return migrator.currentVersionReadOnly();
   }
 
@@ -1077,8 +1079,7 @@ export class DatabaseTasks {
     for (const [version, dbConfigs] of sorted) {
       for (const dbConfig of dbConfigs) {
         await this.withTemporaryConnection(dbConfig, async (adapter) => {
-          const { Migrator } = await import("../migration.js");
-          const migrator = new Migrator(adapter, this._migrationsFor(dbConfig));
+          const migrator = await this._migratorFor(adapter, dbConfig);
           await migrator.migrate(version ?? null);
           adapter.schemaCache?.clear();
         });
@@ -1109,11 +1110,7 @@ export class DatabaseTasks {
         for (const dbConfig of dbConfigs) {
           if (!dumpDbConfigs.includes(dbConfig)) dumpDbConfigs.push(dbConfig);
           await this.withTemporaryPool(dbConfig, async (pool) => {
-            const { Migrator } = await import("../migration.js");
-            const migrator = new Migrator(
-              await pool.leaseConnection(),
-              this._migrationsFor(dbConfig),
-            );
+            const migrator = await this._migratorFor(await pool.leaseConnection(), dbConfig);
             await migrator.migrate(version ?? null);
           });
         }
@@ -1137,10 +1134,9 @@ export class DatabaseTasks {
     const dbConfigsWithVersions = new Map<string | number, DatabaseConfig[]>();
     const env = this._normalizeEnv(environment);
     const targetVersion = this.targetVersion();
-    const { Migrator } = await import("../migration.js");
     for (const config of this.configsFor(env)) {
       await this.withTemporaryPool(config, async (pool) => {
-        const migrator = new Migrator(await pool.leaseConnection(), this._migrationsFor(config));
+        const migrator = await this._migratorFor(await pool.leaseConnection(), config);
         const versionsToRun = await migrator.pendingMigrationVersions();
         for (const version of versionsToRun) {
           if (targetVersion !== null && targetVersion !== Number(version)) continue;
