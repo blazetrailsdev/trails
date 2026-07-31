@@ -13,6 +13,10 @@
  * string, `\x1b`) so the source stays plain text. Tab and the line
  * terminators are allowed as literal bytes — they are ordinary whitespace and
  * do not trip binary detection.
+ *
+ * This rule only reaches files ESLint parses. `scripts/ci/check-control-bytes.sh`
+ * enforces the same byte set over every other tracked source (.json, .rb, .md,
+ * .yml, .sql, ...); keep the two byte sets in step.
  */
 
 // C0 controls (except \t \n \r) plus DEL and the C1 range. Matching control
