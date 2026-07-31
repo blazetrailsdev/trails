@@ -1469,6 +1469,45 @@ export function buildReport(
   };
 }
 
+/**
+ * The staleness gate: a tag on a name that no longer flags as extra surface.
+ * Returns the failure message, or `null` when the run passes.
+ */
+export function gateStale(tagged: TaggedSummary): string | null {
+  if (tagged.stale.length === 0) return null;
+  return (
+    `\nextra-surface: ${tagged.stale.length} STALE @noRailsEquivalent tag(s) on ` +
+    "methods that no longer flag as extra surface — Rails gained the method, " +
+    "the file mapping changed, the declaration is internal or `_`-prefixed " +
+    "(never counted), a bare `@tag` word inside the reason prose truncated " +
+    "the reason and was parsed as a real JSDoc tag, or the tag covers a moved " +
+    "(misplaced) port that belongs in its Rails-layout file. Delete the tag " +
+    "next to the code:\n" +
+    tagged.stale.map((e) => `  - ${e.package}  ${e.tsFile}  ${e.name}`).join("\n") +
+    "\n"
+  );
+}
+
+/**
+ * The permanence gate: every written `@noRailsEquivalent` reason must open with
+ * PERMANENT or CONVERGEABLE. Hard 0 rather than a ratchet on the count — the
+ * population was brought to 0 by RFC 0080, and a ratchet re-admits exactly the
+ * unclassified debt the gate exists to stop. Returns the failure message, or
+ * `null` when the run passes.
+ */
+export function gateUnclassified(tagged: TaggedSummary): string | null {
+  const { unclassified, unclassifiedEntries } = tagged.classification;
+  if (unclassified === 0) return null;
+  return (
+    `\nextra-surface: ${unclassified} @noRailsEquivalent tag(s) state no permanence ` +
+    "claim. Open each reason with PERMANENT (a language- or runtime-level fact no " +
+    "port can remove) or CONVERGEABLE (unfinished porting, a fixable collision, a " +
+    "comparator gap — name the story):\n" +
+    unclassifiedEntries.map((e) => `  - ${e.package}  ${e.tsFile}  ${e.name}`).join("\n") +
+    "\n"
+  );
+}
+
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   const args = parseArgs(argv);
 
@@ -1510,49 +1549,23 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     printHumanReport(report, args.topN, args.maxDetail);
   }
 
-  // Stale tags can't be judged when --exclude-glob hides whole TS files.
-  if (args.excludeGlobs.length > 0) return;
-  const staleTagged = report.tagged.stale;
-  if (staleTagged.length > 0) {
-    console.error(
-      `\nextra-surface: ${staleTagged.length} STALE @noRailsEquivalent tag(s) on ` +
-        "methods that no longer flag as extra surface — Rails gained the method, " +
-        "the file mapping changed, the declaration is internal or `_`-prefixed " +
-        "(never counted), a bare `@tag` word inside the reason prose truncated " +
-        "the reason and was parsed as a real JSDoc tag, or the tag covers a moved " +
-        "(misplaced) port that belongs in its Rails-layout file. Delete the tag " +
-        "next to the code:\n" +
-        staleTagged.map((e) => `  - ${e.package}  ${e.tsFile}  ${e.name}`).join("\n") +
-        "\n",
-    );
-    process.exit(1);
+  // Both gates are collected before exiting: a tree that is both stale and
+  // unclassified should report both in one run, not one CI round trip each.
+  const failures = [];
+  // Stale tags can't be judged when --exclude-glob hides whole TS files: a
+  // hidden file drops out of the extras too, so a tag that still flags there
+  // reads as stale. Classification is per-tag, and an exclusion can only hide
+  // a tag, never invent one, so that gate stays armed either way.
+  if (args.excludeGlobs.length === 0) {
+    const staleMessage = gateStale(report.tagged);
+    if (staleMessage) failures.push(staleMessage);
   }
-
   const unclassifiedMessage = gateUnclassified(report.tagged);
-  if (unclassifiedMessage) {
-    console.error(unclassifiedMessage);
-    process.exit(1);
-  }
-}
+  if (unclassifiedMessage) failures.push(unclassifiedMessage);
 
-/**
- * The permanence gate: every written `@noRailsEquivalent` reason must open with
- * PERMANENT or CONVERGEABLE. Hard 0 rather than a ratchet on the count — the
- * population was brought to 0 by RFC 0080, and a ratchet re-admits exactly the
- * unclassified debt the gate exists to stop. Returns the failure message, or
- * `null` when the run passes.
- */
-export function gateUnclassified(tagged: TaggedSummary): string | null {
-  const { unclassified, unclassifiedEntries } = tagged.classification;
-  if (unclassified === 0) return null;
-  return (
-    `\nextra-surface: ${unclassified} @noRailsEquivalent tag(s) state no permanence ` +
-    "claim. Open each reason with PERMANENT (a language- or runtime-level fact no " +
-    "port can remove) or CONVERGEABLE (unfinished porting, a fixable collision, a " +
-    "comparator gap — name the story):\n" +
-    unclassifiedEntries.map((e) => `  - ${e.package}  ${e.tsFile}  ${e.name}`).join("\n") +
-    "\n"
-  );
+  if (failures.length === 0) return;
+  for (const failure of failures) console.error(failure);
+  process.exit(1);
 }
 
 const invokedAsScript =
