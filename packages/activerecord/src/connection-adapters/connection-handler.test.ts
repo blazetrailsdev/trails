@@ -231,11 +231,6 @@ describe("ConnectionHandlerTest", () => {
     expect(pool).toBeTruthy();
   });
 
-  // Rails' setup establishes the handler against the real :arunit primary
-  // config (connection_handler_test.rb:14), so the tests that actually lease a
-  // connection ride the ambient lane database. Tests below that only assert on
-  // config values keep their literal paths (Rails does the same) — but a leased
-  // literal path would materialize a SQLite file in the working tree.
   it("active connections?", async () => {
     expect(handler.activeConnections).toBe(false);
     const config = new HashConfig("development", "primary", ambientPoolConfiguration());
