@@ -389,11 +389,20 @@ export class DatabaseTasks {
     }
   }
 
-  /** Roll back the last N migrations (default 1). Mirrors `db:rollback`. */
+  /**
+   * @internal Rails has no `DatabaseTasks.rollback`; `rake db:rollback`
+   * (`railties/databases.rake:269`) inlines
+   * `DatabaseTasks.migration_connection_pool.migration_context.rollback(step)`.
+   * The body lives here rather than in the CLI because `MigrationContext` is
+   * not ported, so the migrator is built from the pool directly — otherwise
+   * this is the rake task: the pool it is handed, no `configurations` lookup
+   * and no early return.
+   */
   static async rollback(steps: number = 1): Promise<void> {
     await this._stepMigrations("rollback", steps);
   }
 
+  /** @internal Same deviation as {@link rollback}, for `db:forward` (`databases.rake:279`). */
   static async forward(steps: number = 1): Promise<void> {
     await this._stepMigrations("forward", steps);
   }
@@ -402,8 +411,6 @@ export class DatabaseTasks {
     direction: "rollback" | "forward",
     steps: number,
   ): Promise<void> {
-    if (!this.databaseConfiguration) return;
-    if (this.configsFor(this._normalizeEnv()).length === 0) return;
     const { Migrator } = await import("../migration.js");
     const pool = await this.migrationConnectionPool();
     const adapter = await pool.leaseConnection();
