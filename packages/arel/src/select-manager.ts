@@ -369,7 +369,7 @@ export class SelectManager extends TreeManager {
   /**
    * UNION with another manager.
    */
-  union(other: SelectManager | SelectStatement): Node {
+  union(other: SelectManager | SelectStatement): Union {
     const otherAst = other instanceof SelectManager ? other.ast : other;
     return new Union(this.ast, otherAst);
   }
@@ -377,7 +377,7 @@ export class SelectManager extends TreeManager {
   /**
    * INTERSECT with another manager.
    */
-  intersect(other: SelectManager | SelectStatement): Node {
+  intersect(other: SelectManager | SelectStatement): Intersect {
     const otherAst = other instanceof SelectManager ? other.ast : other;
     return new Intersect(this.ast, otherAst);
   }
@@ -385,13 +385,13 @@ export class SelectManager extends TreeManager {
   /**
    * EXCEPT with another manager.
    */
-  except(other: SelectManager | SelectStatement): Node {
+  except(other: SelectManager | SelectStatement): Except {
     const otherAst = other instanceof SelectManager ? other.ast : other;
     return new Except(this.ast, otherAst);
   }
 
   /** @internal */
-  minus(other: SelectManager | SelectStatement): Node {
+  minus(other: SelectManager | SelectStatement): Except {
     return this.except(other);
   }
 
@@ -512,7 +512,7 @@ export class SelectManager extends TreeManager {
   /**
    * UNION ALL with another manager.
    */
-  unionAll(other: SelectManager | SelectStatement): Node {
+  unionAll(other: SelectManager | SelectStatement): UnionAll {
     const otherAst = other instanceof SelectManager ? other.ast : other;
     return new UnionAll(this.ast, otherAst);
   }

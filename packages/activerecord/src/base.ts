@@ -2458,9 +2458,10 @@ export class Base extends Model {
     cols: string[],
     tuples: unknown[][],
   ): Relation<InstanceType<T>>;
+  static where<T extends typeof Base>(this: T, node: Nodes.Node): Relation<InstanceType<T>>;
   static where<T extends typeof Base>(
     this: T,
-    conditionsOrSql: Record<string, unknown> | string | string[] | unknown[],
+    conditionsOrSql: Record<string, unknown> | string | string[] | unknown[] | Nodes.Node,
     ...rest: unknown[]
   ): Relation<InstanceType<T>> {
     if (typeof conditionsOrSql === "string") {
@@ -2491,6 +2492,10 @@ export class Base extends Model {
       // (query_methods.rb:1616-1618).
       return this.all().where(conditionsOrSql as unknown[]);
     }
+    // Arel nodes and hash conditions take the same runtime path; the split is
+    // only so each reaches its own `Relation#where` overload (a union argument
+    // matches neither).
+    if (conditionsOrSql instanceof Nodes.Node) return this.all().where(conditionsOrSql);
     return this.all().where(conditionsOrSql);
   }
 

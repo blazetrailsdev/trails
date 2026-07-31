@@ -657,9 +657,9 @@ export class Relation<T extends Base> {
    * (query_methods.rb:88-92) — `@scope.joins!(association)` (unless the
    * association is already joined) then `self.not(pk => nil)`. Building the
    * join through JoinDependency means through / HABTM / composite-key shapes
-   * work for free; `skipJoinFor` carries WhereChain's already-joined guard.
+   * work for free.
    */
-  whereAssociated(assocNames: string[], skipJoinFor?: ReadonlySet<string>): Relation<T> {
+  whereAssociated(...assocNames: string[]): Relation<T> {
     let rel: Relation<T> = this;
     for (const assocName of assocNames) {
       const reflection = rel._whereChainReflection(assocName);
@@ -668,7 +668,11 @@ export class Relation<T extends Base> {
       // already present in joins_values / left_outer_joins_values. Routing the
       // join through JoinDependency (joins!) rather than a bespoke resolver is
       // what makes through / HABTM / composite-key shapes work for free.
-      if (!skipJoinFor?.has(assocName)) {
+      const reflectionName = reflection.name ?? assocName;
+      if (
+        !rel.joinsValues.includes(reflectionName) &&
+        !rel.leftOuterJoinsValues.includes(reflectionName)
+      ) {
         QueryMethodBangs.joinsBang.call(scope as any, assocName);
       }
       // Rails: `self.not(reflection.table_name => Array(pk).index_with(nil))`,

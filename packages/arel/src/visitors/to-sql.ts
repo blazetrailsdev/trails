@@ -77,12 +77,17 @@ const DEFAULT_BIND_BLOCK: (index: number) => string = () => "?";
 
 /**
  * True when a CTE body node renders its own surrounding parentheses (a
- * `Grouping` or a set-operation node), so `visit_Arel_Nodes_Cte` must not add
- * another pair. A bare `SelectStatement` / `SqlLiteral` returns false — those
- * need the explicit `AS (...)` wrap.
+ * `Grouping`, a set-operation node, or a `SelectManager`), so
+ * `visit_Arel_Nodes_Cte` must not add another pair. A bare `SelectStatement` /
+ * `SqlLiteral` returns false — those need the explicit `AS (...)` wrap.
  */
 export function cteRelationSelfWraps(relation: Node): boolean {
   return (
+    // `Arel::Nodes::As.new(cte_table, select_manager)` is Rails' own CTE idiom,
+    // and `visit_Arel_SelectManager` (to_sql.rb:358-361) already emits the
+    // parens. Duck-typed rather than `instanceof`: select-manager.ts sits
+    // upstream of the visitors and importing it here would close a cycle.
+    (!(relation instanceof Node) && (relation as { ast?: unknown })?.ast instanceof Node) ||
     relation instanceof Nodes.Grouping ||
     relation instanceof Nodes.Union ||
     relation instanceof Nodes.UnionAll ||
