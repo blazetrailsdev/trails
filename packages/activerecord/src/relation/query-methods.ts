@@ -2870,8 +2870,13 @@ export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown
   }
 
   // Rails' `stashed_eager_load || stashed_left_joins` (query_methods.rb:1857).
-  const hasStashed =
-    buckets.stashed_join.length > 0 || namedInner.some((v) => v instanceof JoinDependency);
+  // `stashed_eager_load` is the trailing `joins_values` JoinDependency built on
+  // this relation's own model (query_methods.rb:1843-1845) — a cross-klass
+  // merged JoinDependency is NOT it and does not arm this guard.
+  const lastJoinValue = joinsValues[joinsValues.length - 1];
+  const stashedEagerLoad =
+    lastJoinValue instanceof JoinDependency && lastJoinValue.baseKlass === this.model;
+  const hasStashed = buckets.stashed_join.length > 0 || stashedEagerLoad;
 
   for (const v of rawJoinValues) {
     const node: Nodes.Join =
