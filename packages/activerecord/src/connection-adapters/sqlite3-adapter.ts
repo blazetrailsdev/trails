@@ -1493,13 +1493,33 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     }
   }
 
-  static databaseExists(config: { database?: string }): boolean {
+  /**
+   * Rails has no SQLite3-level `self.database_exists?` — the base's
+   * `new(config).database_exists?` suffices there because
+   * `SQLite3Adapter#initialize` does not open the file. trails' constructor
+   * connects eagerly (`this.connect()` above), which would CREATE the database
+   * it was asked about, so the class-level probe has to answer from the config
+   * instead of instantiating. The instance method below is the faithful port.
+   */
+  static override async databaseExists(config: { database?: string }): Promise<boolean> {
     if (!config.database || config.database === ":memory:") return true;
     try {
-      return getFs().existsSync(config.database);
+      return await getFs().exists(config.database);
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Mirrors Rails' `SQLite3Adapter#database_exists?` (sqlite3_adapter.rb:135):
+   * `@config[:database] == ":memory:" || File.exist?(@config[:database].to_s)`.
+   * SQLite needs no connection to answer — the file either is there or isn't —
+   * so this overrides the base's `connect!` probe. `_filename` is the path the
+   * driver actually opens (the constructor expands it), which is what the
+   * existence check has to ask about.
+   */
+  override async databaseExists(): Promise<boolean> {
+    return this._memoryDatabase || (await getFs().exists(this._filename));
   }
 
   static newClient(

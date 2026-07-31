@@ -15,6 +15,7 @@ import {
   ConnectionNotEstablished,
   ConnectionNotDefined,
   ConnectionFailed,
+  NoDatabaseError,
   TransactionRollbackError,
   Deadlocked,
   LockWaitTimeout,
@@ -1969,8 +1970,41 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  isDatabaseExists(): boolean {
-    return this._connection !== null;
+  /**
+   * Does the database for this adapter exist? Mirrors Rails'
+   * `AbstractAdapter.database_exists?(config)` (abstract_adapter.rb:358):
+   * `new(config).database_exists?`.
+   *
+   * Deviation: the instance is disconnected before returning. Ruby lets the
+   * throw-away adapter's socket close when it is collected; JS has no such
+   * finalizer, so a probe that connected would leak the handle (and keep the
+   * event loop alive) forever. Mysql2Adapter's static already does this.
+   */
+  static async databaseExists(config: unknown): Promise<boolean> {
+    const ctor = this as unknown as new (config: unknown) => AbstractAdapter;
+    const adapter = new ctor(config);
+    try {
+      return await adapter.databaseExists();
+    } finally {
+      adapter.disconnectBang();
+    }
+  }
+
+  /**
+   * Mirrors Rails' `AbstractAdapter#database_exists?` (abstract_adapter.rb:362):
+   * prove the database is there by connecting to it, and read only
+   * `NoDatabaseError` as "it isn't". Reachability, not a cached handle — a
+   * never-connected adapter on a live database answers true, and a stale
+   * handle to a dropped database answers false.
+   */
+  async databaseExists(): Promise<boolean> {
+    try {
+      await this.connectBang();
+      return true;
+    } catch (error) {
+      if (error instanceof NoDatabaseError) return false;
+      throw error;
+    }
   }
 
   lockThread: boolean = false;
