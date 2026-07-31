@@ -1525,25 +1525,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     });
     this._maintenanceTail = prev.then(() => gate);
     await prev.catch(() => {});
-    // DEVIATION (converging, RFC 0085): this marker pair has no Rails
-    // counterpart. Rails' `cancel_any_running_query`
-    // (postgresql/database_statements.rb:127) tracks nothing — it reads the
-    // connection's own protocol state, `IDLE_TRANSACTION_STATUSES.include?
-    // (@raw_connection.transaction_status)` — and needs no owner at all,
-    // because `@lock.synchronize` wraps the whole `with_raw_connection` body
-    // (abstract_adapter.rb:984), so the only query on the wire belongs to the
-    // thread rolling back. `_queryInFlight` stands in for `transaction_status`;
-    // `_queryInFlightOwner` stands in for the lock trails releases early.
-    // Both go away once those are ported — do not build on them.
-    //
-    // Claimed here, after the tail await, so it names the query actually on the
-    // wire rather than one still queued (#5660). That correction has no
-    // regression test and can have none while the inventions stand (RFC 0061
-    // pg-in-flight-marker-regression-coverage, wontfix): every `_runQuery` call
-    // site runs inside a `withRawConnection` block whose pre-loop
-    // `awaitRawConnectionReady` already awaits `_maintenanceTail`, and reaching
-    // `_runQuery` means holding the TransactionManager lock — two barriers that
-    // are the lock doing this serializer's job twice, which is the tell.
+    // DEVIATION (converging, RFC 0085): both fields are inventions.
+    // `_queryInFlight` stands in for `@raw_connection.transaction_status`,
+    // `_queryInFlightOwner` for the lock trails releases early — Rails'
+    // `cancel_any_running_query` (postgresql/database_statements.rb:127) needs
+    // neither. Scheduled for deletion; do not build on them. Claimed after the
+    // tail await so the marker names the query actually on the wire rather than
+    // one still queued (#5660) — a placement no test can pin down while these
+    // stand (RFC 0061 pg-in-flight-marker-regression-coverage, wontfix).
     this._queryInFlight = true;
     this._queryInFlightOwner = this._transactionManager.currentLockToken;
     try {
