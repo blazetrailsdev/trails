@@ -562,15 +562,21 @@ function assertNotArmProbe(adapter: DatabaseAdapter): void {
 }
 
 /**
+ * What an accessor-backed member yields cannot be compared by identity —
+ * PostgreSQLAdapter's `schemaCreation` builds a fresh visitor on every read — so
+ * the real one and the one the caller sees are compared by prototype: a stub
+ * standing in for it is some other object, however it is shaped.
+ */
+function sameKind(seen: unknown, real: unknown): boolean {
+  if (seen == null || real == null) return seen === real;
+  return Object.getPrototypeOf(seen) === Object.getPrototypeOf(real);
+}
+
+/**
  * Only an *overridden* member counts: the prototype's own is looked up through
  * the chain, so a transparent proxy (which returns that same function) passes,
  * and an adapter carrying no prototype member at all — a hand-rolled fake — is
  * left alone rather than guessed at.
- *
- * `schemaCreation` is an accessor rather than a method, and PostgreSQLAdapter's
- * builds a fresh visitor on every read, so identity comparison is meaningless
- * there. What the real accessor yields is compared by prototype instead: a stub
- * standing in for it is some other object, however it is shaped.
  */
 function assertNotStubbed(adapter: DatabaseAdapter, method: string): void {
   const seen = (adapter as unknown as Record<string, unknown>)[method];
@@ -582,13 +588,7 @@ function assertNotStubbed(adapter: DatabaseAdapter, method: string): void {
     const descriptor = Object.getOwnPropertyDescriptor(proto, method);
     if (!descriptor) continue;
     if (descriptor.get) {
-      const real = descriptor.get.call(adapter) as unknown;
-      if (
-        seen != null &&
-        real != null &&
-        Object.getPrototypeOf(seen) === Object.getPrototypeOf(real)
-      )
-        return;
+      if (sameKind(seen, descriptor.get.call(adapter))) return;
     } else if (descriptor.value === seen) {
       return;
     }
