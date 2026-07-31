@@ -4,22 +4,28 @@ import type { Entity, Mismatch } from "./audit-cross-file-calls.js";
 import {
   buildPackageIndex,
   candidateNames,
+  classify,
+  crossesAdapterFamilies,
   classifyRow,
   includeGraphFiles,
+  edgeKindOf,
   isCrossFile,
+  looseOnlyRows,
+  reachableFiles,
 } from "./audit-cross-file-calls.js";
 
 function entity(
   name: string,
   file: string,
   methods: { name: string; calls?: string[] }[],
-  edges: { includes?: string[]; extends?: string[] } = {},
+  edges: { includes?: string[]; extends?: string[]; delegatesTo?: string[] } = {},
 ): Entity {
   return {
     name,
     file,
     includes: edges.includes ?? [],
     extends: edges.extends ?? [],
+    ...(edges.delegatesTo ? { delegatesTo: edges.delegatesTo } : {}),
     instanceMethods: methods,
     classMethods: [],
   };
@@ -55,6 +61,99 @@ describe("includeGraphFiles", () => {
       entity("PgSchemaStatements", "pg/schema-statements-class.ts", []),
     ]);
     expect(includeGraphFiles("pg-adapter.ts", index).size).toBe(0);
+  });
+});
+
+describe("reachableFiles", () => {
+  const index = buildPackageIndex([
+    entity("Adapter", "pg-adapter.ts", [], {
+      includes: ["Quoting"],
+      delegatesTo: ["PgSchemaStatements"],
+    }),
+    entity("Quoting", "quoting.ts", []),
+    entity("PgSchemaStatements", "pg/schema-statements-class.ts", []),
+  ]);
+
+  it("ignores delegation edges unless asked to follow them", () => {
+    expect([...reachableFiles("pg-adapter.ts", index, false).keys()]).toEqual(["quoting.ts"]);
+  });
+
+  it("tags a file the delegation edge reaches", () => {
+    expect(Object.fromEntries(reachableFiles("pg-adapter.ts", index, true))).toEqual({
+      "quoting.ts": "include",
+      "pg/schema-statements-class.ts": "delegation",
+    });
+  });
+});
+
+describe("looseOnlyRows", () => {
+  const index = buildPackageIndex([
+    entity("Adapter", "pg-adapter.ts", [{ name: "indexes", calls: [] }], {
+      delegatesTo: ["PgSchemaStatements"],
+    }),
+    entity("PgSchemaStatements", "pg/schema-statements-class.ts", [
+      { name: "unrelated", calls: ["quotedScope"] },
+    ]),
+  ]);
+  const indexes = new Map([["activerecord", index]]);
+  const rows = classify(
+    [{ ...mismatch("pg-adapter.ts", "indexes"), missing: ["quoted_scope → quotedScope"] }],
+    indexes,
+  );
+
+  it("credits a row to an unrelated method in the delegation target's file", () => {
+    expect(looseOnlyRows(rows, indexes, true)).toEqual([
+      {
+        ...rows[0],
+        resolutions: [
+          {
+            file: "pg/schema-statements-class.ts",
+            edgeKind: "delegation",
+            methods: ["unrelated"],
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("reports every resolving file, in name order", () => {
+    const many = buildPackageIndex([
+      entity("Adapter", "pg-adapter.ts", [{ name: "indexes", calls: [] }], {
+        delegatesTo: ["Zeta", "Alpha"],
+      }),
+      entity("Zeta", "zeta.ts", [{ name: "unrelated", calls: ["quotedScope"] }]),
+      entity("Alpha", "alpha.ts", [{ name: "unrelated", calls: ["quotedScope"] }]),
+    ]);
+    const manyIndexes = new Map([["activerecord", many]]);
+    const manyRows = classify(
+      [{ ...mismatch("pg-adapter.ts", "indexes"), missing: ["quoted_scope → quotedScope"] }],
+      manyIndexes,
+    );
+    expect(looseOnlyRows(manyRows, manyIndexes, true)[0].resolutions.map((r) => r.file)).toEqual([
+      "alpha.ts",
+      "zeta.ts",
+    ]);
+  });
+
+  it("calls a row include-resolved when any reachable include edge also makes the call", () => {
+    const both = buildPackageIndex([
+      entity("Adapter", "pg-adapter.ts", [{ name: "indexes", calls: [] }], {
+        includes: ["Quoting"],
+        delegatesTo: ["Stmts"],
+      }),
+      entity("Quoting", "quoting.ts", [{ name: "other", calls: ["quotedScope"] }]),
+      entity("Stmts", "stmts.ts", [{ name: "unrelated", calls: ["quotedScope"] }]),
+    ]);
+    const bothIndexes = new Map([["activerecord", both]]);
+    const bothRows = classify(
+      [{ ...mismatch("pg-adapter.ts", "indexes"), missing: ["quoted_scope → quotedScope"] }],
+      bothIndexes,
+    );
+    expect(edgeKindOf(looseOnlyRows(bothRows, bothIndexes, true)[0])).toBe("include");
+  });
+
+  it("resolves nothing without the delegation edge", () => {
+    expect(looseOnlyRows(rows, indexes, false)).toEqual([]);
   });
 });
 
@@ -137,6 +236,52 @@ describe("isCrossFile", () => {
         ...row,
         tsFile: "connection-adapters/postgresql-adapter.ts",
         rubyFile: "connection_adapters/postgresql_adapter.rb",
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("crossesAdapterFamilies", () => {
+  const row = {
+    package: "activerecord",
+    tsName: "enableExtension",
+    rubyFile: "postgresql_adapter.rb",
+    call: "internal_exec_query → internalExecQuery",
+    bucket: "divergence" as const,
+    tsFile: "connection-adapters/postgresql-adapter.ts",
+  };
+
+  it("flags a PostgreSQL row credited to a MySQL body", () => {
+    expect(
+      crossesAdapterFamilies({
+        ...row,
+        resolutions: [
+          {
+            file: "connection-adapters/mysql/database-statements.ts",
+            edgeKind: "include",
+            methods: ["explain"],
+          },
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  it("does not flag a row credited within its own family", () => {
+    expect(
+      crossesAdapterFamilies({
+        ...row,
+        resolutions: [
+          {
+            file: "connection-adapters/postgresql/schema-statements-class.ts",
+            edgeKind: "delegation",
+            methods: ["foreignKeys"],
+          },
+          {
+            file: "connection-adapters/abstract-adapter.ts",
+            edgeKind: "include",
+            methods: ["log"],
+          },
+        ],
       }),
     ).toBe(false);
   });

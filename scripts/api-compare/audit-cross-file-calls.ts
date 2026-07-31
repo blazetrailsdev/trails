@@ -14,6 +14,7 @@ export type Entity = {
   file: string;
   includes: string[];
   extends: string[];
+  delegatesTo?: string[];
   instanceMethods: Method[];
   classMethods: Method[];
 };
@@ -48,13 +49,20 @@ export type Row = {
   resolvedIn?: string;
 };
 
-type Definition = { entity: string; file: string; calls: Set<string> };
+type Definition = { name: string; entity: string; file: string; calls: Set<string> };
 
 export type PackageIndex = {
   entitiesByFile: Map<string, Entity[]>;
   entitiesByName: Map<string, Entity[]>;
   definitionsByName: Map<string, Definition[]>;
+  methodsByFile: Map<string, Definition[]>;
 };
+
+export type EdgeKind = "include" | "delegation";
+
+export type Resolution = { file: string; edgeKind: EdgeKind; methods: string[] };
+
+export type LooseRow = Row & { resolutions: Resolution[] };
 
 export function buildPackageIndex(
   entities: Entity[],
@@ -64,12 +72,18 @@ export function buildPackageIndex(
     entitiesByFile: new Map(),
     entitiesByName: new Map(),
     definitionsByName: new Map(),
+    methodsByFile: new Map(),
+  };
+  const record = (definition: Definition): void => {
+    push(index.definitionsByName, definition.name, definition);
+    push(index.methodsByFile, definition.file, definition);
   };
   for (const entity of entities) {
     push(index.entitiesByFile, entity.file, entity);
     push(index.entitiesByName, entity.name, entity);
     for (const method of [...entity.instanceMethods, ...entity.classMethods]) {
-      push(index.definitionsByName, method.name, {
+      record({
+        name: method.name,
         entity: entity.name,
         file: method.file ?? entity.file,
         calls: new Set(method.calls ?? []),
@@ -78,7 +92,8 @@ export function buildPackageIndex(
   }
   for (const [file, methods] of Object.entries(fileFunctions)) {
     for (const method of methods) {
-      push(index.definitionsByName, method.name, {
+      record({
+        name: method.name,
         entity: file,
         file: method.file ?? file,
         calls: new Set(method.calls ?? []),
@@ -95,12 +110,35 @@ function push<K, V>(map: Map<K, V[]>, key: K, value: V): void {
 }
 
 export function includeGraphFiles(tsFile: string, index: PackageIndex): Set<string> {
+  return new Set(reachableFiles(tsFile, index, false).keys());
+}
+
+export function reachableFiles(
+  tsFile: string,
+  index: PackageIndex,
+  delegation: boolean,
+): Map<string, EdgeKind> {
+  const includeOnly = delegation ? walk(tsFile, index, false) : new Set<string>();
+  return new Map(
+    [...walk(tsFile, index, delegation)].map((file) => [
+      file,
+      delegation && !includeOnly.has(file) ? "delegation" : "include",
+    ]),
+  );
+}
+
+function walk(tsFile: string, index: PackageIndex, delegation: boolean): Set<string> {
   const files = new Set<string>();
   const seen = new Set<string>();
   const queue = [...(index.entitiesByFile.get(tsFile) ?? [])];
   while (queue.length > 0) {
     const entity = queue.pop()!;
-    for (const name of [...entity.includes, ...entity.extends]) {
+    const edges = [
+      ...entity.includes,
+      ...entity.extends,
+      ...(delegation ? (entity.delegatesTo ?? []) : []),
+    ];
+    for (const name of edges) {
       if (seen.has(name)) continue;
       seen.add(name);
       for (const target of index.entitiesByName.get(name) ?? []) {
@@ -110,6 +148,67 @@ export function includeGraphFiles(tsFile: string, index: PackageIndex): Set<stri
     }
   }
   return files;
+}
+
+export function looseOnlyRows(
+  rows: Row[],
+  indexes: Map<string, PackageIndex>,
+  delegation: boolean,
+): LooseRow[] {
+  const loose: LooseRow[] = [];
+  for (const row of rows) {
+    if (row.bucket !== "divergence" && row.bucket !== "unported") continue;
+    const index = indexes.get(row.package);
+    if (!index) continue;
+    const candidates = candidateNames(row.call);
+    const resolutions: Resolution[] = [];
+    for (const [file, edgeKind] of reachableFiles(row.tsFile, index, delegation)) {
+      const makers = (index.methodsByFile.get(file) ?? []).filter((d) =>
+        candidates.some((c) => d.calls.has(c)),
+      );
+      if (makers.length === 0) continue;
+      resolutions.push({ file, edgeKind, methods: [...new Set(makers.map((d) => d.name))].sort() });
+    }
+    if (resolutions.length === 0) continue;
+    resolutions.sort((a, b) => a.file.localeCompare(b.file));
+    loose.push({ ...row, resolutions });
+  }
+  return loose;
+}
+
+export function adapterFamily(file: string): string | undefined {
+  return [/postgresql/, /mysql|mariadb/, /sqlite/].find((re) => re.test(file))?.source;
+}
+
+export function crossesAdapterFamilies(row: LooseRow): boolean {
+  const own = adapterFamily(row.tsFile);
+  return (
+    own !== undefined &&
+    row.resolutions.some((r) => {
+      const other = adapterFamily(r.file);
+      return other !== undefined && other !== own;
+    })
+  );
+}
+
+export function edgeKindOf(row: LooseRow): EdgeKind {
+  return row.resolutions.some((r) => r.edgeKind === "include") ? "include" : "delegation";
+}
+
+export function sameNameGraphRows(
+  rows: Row[],
+  indexes: Map<string, PackageIndex>,
+  delegation: boolean,
+): Row[] {
+  return rows.filter((row) => {
+    const index = indexes.get(row.package);
+    if (!index) return false;
+    const candidates = candidateNames(row.call);
+    const reachable = reachableFiles(row.tsFile, index, delegation);
+    return (index.definitionsByName.get(row.tsName) ?? []).some(
+      (d) => reachable.has(d.file) && candidates.some((c) => d.calls.has(c)),
+    );
+  });
 }
 
 export function classifyRow(
@@ -175,37 +274,6 @@ function tsStem(tsFile: string): string {
   return tsFile.replace(/\.ts$/, "");
 }
 
-function countAnyMethodInGraph(rows: Row[], indexes: Map<string, PackageIndex>): number {
-  const callsByFile = new Map<string, Map<string, Set<string>>>();
-  for (const [pkg, index] of indexes) {
-    const perFile = new Map<string, Set<string>>();
-    for (const definitions of index.definitionsByName.values()) {
-      for (const definition of definitions) {
-        let set = perFile.get(definition.file);
-        if (!set) perFile.set(definition.file, (set = new Set()));
-        for (const call of definition.calls) set.add(call);
-      }
-    }
-    callsByFile.set(pkg, perFile);
-  }
-  let count = 0;
-  for (const row of rows) {
-    if (row.bucket !== "divergence" && row.bucket !== "unported") continue;
-    const index = indexes.get(row.package);
-    if (!index) continue;
-    const candidates = candidateNames(row.call);
-    const perFile = callsByFile.get(row.package)!;
-    for (const file of includeGraphFiles(row.tsFile, index)) {
-      const calls = perFile.get(file);
-      if (calls && candidates.some((c) => calls.has(c))) {
-        count++;
-        break;
-      }
-    }
-  }
-  return count;
-}
-
 function tally<T>(values: T[], key: (value: T) => string): [string, number][] {
   const counts = new Map<string, number>();
   for (const value of values) counts.set(key(value), (counts.get(key(value)) ?? 0) + 1);
@@ -232,11 +300,28 @@ async function main(): Promise<void> {
   const rows = classify(artifact.mismatches, indexes);
   const crossFile = rows.filter((r) => isCrossFile(r));
   const resolvable = rows.filter((r) => r.bucket !== "divergence" && r.bucket !== "unported");
+  const looseWithDelegation = looseOnlyRows(rows, indexes, true);
+
+  if (process.argv.includes("--loose-sample")) {
+    for (const row of looseWithDelegation) console.log(JSON.stringify(row));
+    return;
+  }
 
   const report = {
     totalRows: rows.length,
     crossFileRows: crossFile.length,
-    anyMethodInIncludeGraph: countAnyMethodInGraph(rows, indexes),
+    anyMethodInIncludeGraph: looseOnlyRows(rows, indexes, false).length,
+    anyMethodInDelegationGraph: looseWithDelegation.length,
+    sameNameInIncludeGraph: sameNameGraphRows(rows, indexes, false).length,
+    sameNameInDelegationGraph: sameNameGraphRows(rows, indexes, true).length,
+    anyMethodByEdgeKind: Object.fromEntries(tally(looseWithDelegation, edgeKindOf)),
+    anyMethodResolvedOnlyInOwnFile: looseWithDelegation.filter((r) =>
+      r.resolutions.every((res) => res.file === r.tsFile),
+    ).length,
+    anyMethodCrossingAdapterFamilies: looseWithDelegation.filter(crossesAdapterFamilies).length,
+    anyMethodWithSameNamedResolver: looseWithDelegation.filter((r) =>
+      r.resolutions.some((res) => res.methods.includes(r.tsName)),
+    ).length,
     resolvableAnywhereByName: resolvable.length,
     resolvableForwardersAboveDelegationCap: resolvable.filter((r) =>
       (indexes.get(r.package)!.definitionsByName.get(r.tsName) ?? [])
