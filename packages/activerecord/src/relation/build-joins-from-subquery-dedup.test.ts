@@ -86,4 +86,17 @@ describe("build_joins from(subquery) dedup", () => {
       new RegExp(`FROM ${q("posts")} CROSS JOIN categories INNER JOIN ${q("comments")}`),
     );
   });
+
+  // Rails only shifts the LEADING run of Arel Join nodes out of `joins`
+  // (query_methods.rb:1855-1862); a Join node sitting BEHIND a named join falls
+  // through to the `select_named_joins` block, which buckets it as a join_node
+  // unconditionally (query_methods.rb:1866-1867) — so it is appended after the
+  // association joins even when the leading-loop guard is off.
+  it("appends a raw join that trails a named join instead of leading with it", () => {
+    const rel = Post.joins("comments").joins("CROSS JOIN categories");
+    const sql = (Post.from(rel, "posts") as unknown as { toSql(): string }).toSql();
+    const q = (name: string) => escapeRegExp(quoteTableName(name));
+    expect(sql).toMatch(new RegExp(`FROM ${q("posts")} INNER JOIN ${q("comments")}`));
+    expect(sql).toMatch(new RegExp(`INNER JOIN ${q("comments")}[^)]*CROSS JOIN categories`));
+  });
 });

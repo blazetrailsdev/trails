@@ -2805,8 +2805,41 @@ export function assertValidLeftOuterJoinsBang(values: unknown[]): void {
   }
 }
 
+/**
+ * Rails' inner `select_named_joins` block (query_methods.rb:1865-1873): an Arel
+ * Join node that survived the leading-join loop becomes a join_node
+ * unconditionally, a CTEJoin — a `joins()` symbol matching a `with(...)` CTE
+ * name — becomes an InnerJoin join_node, and anything else raises a plain
+ * RuntimeError `"unknown class: <ClassName>"` (NOT the left-outer bucket's
+ * ArgumentError, query_methods.rb:1834). Shared by `buildJoinBuckets` and the
+ * live path's `emitJoinPlan`, which partition the same joins_values the same
+ * way.
+ *
+ * @internal
+ */
+function selectInnerNamedJoins(
+  this: QueryMethodsHost,
+  values: unknown[],
+  stashedJoins: unknown[],
+  joinNodes: Nodes.Join[],
+): AssociationSpec[] {
+  return selectNamedJoins.call(this, values, stashedJoins, (join) => {
+    if (join instanceof Nodes.Join) {
+      joinNodes.push(join);
+    } else if (join instanceof CTEJoin) {
+      joinNodes.push(buildWithJoinNode.call(this, join.name, Nodes.InnerJoin) as Nodes.Join);
+    } else {
+      throw new Error(
+        `unknown class: ${(join as { constructor?: { name?: string } })?.constructor?.name}`,
+      );
+    }
+  }) as AssociationSpec[];
+}
+
 /** @internal */
-export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown[]> {
+export function buildJoinBuckets(
+  this: QueryMethodsHost,
+): [Record<string, unknown[]>, typeof Nodes.InnerJoin | typeof Nodes.OuterJoin] {
   const buckets: Record<string, unknown[]> = {
     leading_join: [],
     join_node: [],
@@ -2814,15 +2847,7 @@ export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown
     named_join: [],
   };
 
-  // Named association joins vs raw join values, both derived from the unified
-  // `joins_values` store (Rails reads `joins_values` here and partitions with
-  // `select_named_joins`).
   const joinsValues = this.joinsValues;
-  const namedInner = joinsValues.filter((v) => this._isNamedJoinValue(v)) as AssociationSpec[];
-  const rawJoinValues = joinsValues.filter((v) => !this._isNamedJoinValue(v)) as (
-    | string
-    | Nodes.Join
-  )[];
 
   // Mirror Rails build_join_buckets (query_methods.rb:1828–1876):
   // When left_outer_joins_values is non-empty, Rails runs select_named_joins on
@@ -2830,8 +2855,8 @@ export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown
   // early with OuterJoin type and named_join populated. Otherwise the left-outer
   // JoinDependency is prepended to stashed_left_joins.
   const leftOuterJoinsValues = this.leftOuterJoinsValues;
+  const stashedLeft: JoinDependency[] = [];
   if (leftOuterJoinsValues.length > 0) {
-    const stashedLeft: JoinDependency[] = [];
     assertValidLeftOuterJoinsBang(leftOuterJoinsValues);
     // Mirror Rails' block (query_methods.rb:1830-1836): a CTEJoin becomes an
     // OuterJoin join_node; any other non-association value raises.
@@ -2843,11 +2868,11 @@ export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown
       }
     });
 
-    if (namedInner.length === 0 && rawJoinValues.length === 0 && this._joinClauses.length === 0) {
+    if (joinsValues.length === 0 && this._joinClauses.length === 0) {
       // query_methods.rb:1838-1842: `if joins_values.empty?`.
       buckets.named_join.push(...namedLeft);
       buckets.stashed_join.push(...stashedLeft);
-      return buckets;
+      return [buckets, Nodes.OuterJoin];
     }
 
     const leftJd = constructJoinDependency.call(
@@ -2856,29 +2881,58 @@ export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown
       Nodes.OuterJoin,
     );
     stashedLeft.unshift(leftJd);
-    buckets.stashed_join.push(...stashedLeft);
   }
 
-  // Rails' `stashed_eager_load || stashed_left_joins` (query_methods.rb:1857).
-  // `stashed_eager_load` is the trailing `joins_values` JoinDependency built on
-  // this relation's own model (query_methods.rb:1843-1845) — a cross-klass
-  // merged JoinDependency is NOT it and does not arm this guard.
-  const lastJoinValue = joinsValues[joinsValues.length - 1];
-  const stashedEagerLoad =
-    lastJoinValue instanceof JoinDependency && lastJoinValue.baseKlass === this.model;
-  const hasStashed = buckets.stashed_join.length > 0 || stashedEagerLoad;
-
-  for (const v of rawJoinValues) {
-    const node: Nodes.Join =
-      typeof v === "string" ? (new Nodes.StringJoin(arelSql(v.trim()) as any) as Nodes.Join) : v;
-    if (!(node instanceof Nodes.LeadingJoin) && hasStashed) {
-      buckets.join_node.push(node);
-    } else {
-      buckets.leading_join.push(node);
+  // query_methods.rb:1847-1850. The popped JoinDependency is the eager stash
+  // `apply_join_dependency` pushed in; a cross-klass merged one fails
+  // `base_klass == model` and stays in the stream for `select_named_joins`.
+  const joins = [...joinsValues];
+  const lastJoinValue = joins[joins.length - 1];
+  let stashedEagerLoad: JoinDependency | undefined;
+  if (lastJoinValue instanceof JoinDependency) {
+    if (lastJoinValue.baseKlass === this.model) {
+      joins.pop();
+      stashedEagerLoad = lastJoinValue;
     }
   }
 
-  return buckets;
+  // query_methods.rb:1856-1862: `stashed_eager_load || stashed_left_joins`.
+  const hasStashed = Boolean(stashedEagerLoad) || stashedLeft.length > 0;
+
+  // query_methods.rb:1851-1853. Rails wraps every String; trails collapses
+  // Ruby's Symbol and String into one type, so an association-name string
+  // stays a named join value instead of becoming a raw SQL fragment.
+  for (const [i, v] of joins.entries()) {
+    if (typeof v === "string" && !this._isNamedJoinValue(v)) {
+      joins[i] = new Nodes.StringJoin(arelSql(v.trim()) as any) as Nodes.Join;
+    }
+  }
+
+  // query_methods.rb:1855-1862: only the LEADING run of Join nodes is shifted
+  // off and routed by `hasStashed`; a Join node sitting behind a named join
+  // falls through to the `select_named_joins` block below, which buckets it as
+  // a join_node unconditionally.
+  while (joins[0] instanceof Nodes.Join) {
+    const joinNode = joins.shift() as Nodes.Join;
+    if (!(joinNode instanceof Nodes.LeadingJoin) && hasStashed) {
+      buckets.join_node.push(joinNode);
+    } else {
+      buckets.leading_join.push(joinNode);
+    }
+  }
+
+  // query_methods.rb:1864-1873.
+  const innerJoinNodes: Nodes.Join[] = [];
+  buckets.named_join.push(
+    ...selectInnerNamedJoins.call(this, joins, buckets.stashed_join, innerJoinNodes),
+  );
+  buckets.join_node.push(...innerJoinNodes);
+
+  // query_methods.rb:1875-1876 — the eager stash goes in LAST.
+  buckets.stashed_join.push(...stashedLeft);
+  if (stashedEagerLoad) buckets.stashed_join.push(stashedEagerLoad);
+
+  return [buckets, Nodes.InnerJoin];
 }
 
 /**
@@ -2905,8 +2959,20 @@ export interface JoinEmissionPlan {
    * When no named/left-outer association join exists, the first is the primary.
    */
   stashedJoins: JoinDependency[];
-  /** Pure left-outer-only association names (no joins_values): emitted as OuterJoin. */
+  /**
+   * `buckets[:named_join]`. On the live path (which does not go through
+   * `buildJoinBuckets`) this carries only the pure left-outer-only association
+   * names and `joinType` is absent, so the named inner joins are partitioned
+   * out of `_namedInnerJoins` here instead.
+   */
   namedJoins: AssociationSpec[];
+  /**
+   * The join type `build_join_buckets` returned alongside the buckets
+   * (query_methods.rb:1841/1878). Present only when the caller ran
+   * `buildJoinBuckets`, in which case `namedJoins` is already the partitioned
+   * `buckets[:named_join]` and must not be re-derived.
+   */
+  joinType?: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
   /** Tracker threaded in from `build_from`; absent on the live path. */
   aliases?: AliasTracker;
   /**
@@ -2997,30 +3063,22 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
   // "Unknown node type: Symbol".
   const cteInnerJoinNodes: Nodes.Join[] = [];
   const innerNamed =
-    this._namedInnerJoins.length > 0
-      ? (selectNamedJoins.call(this, this._namedInnerJoins, plan.stashedJoins, (join) => {
-          if (join instanceof CTEJoin) {
-            cteInnerJoinNodes.push(
-              buildWithJoinNode.call(this, join.name, Nodes.InnerJoin) as Nodes.Join,
-            );
-          } else {
-            // Rails' inner joins_values fallback raises a plain RuntimeError
-            // `"unknown class: <ClassName>"` (query_methods.rb:1870-1872) — NOT
-            // the left-outer bucket's `ArgumentError` "only Hash, Symbol and
-            // Array are allowed" (query_methods.rb:1834). The two buckets diverge
-            // here, so mirror that divergence.
-            throw new Error(
-              `unknown class: ${(join as { constructor?: { name?: string } })?.constructor?.name}`,
-            );
-          }
-        }) as AssociationSpec[])
+    plan.joinType === undefined && this._namedInnerJoins.length > 0
+      ? selectInnerNamedJoins.call(
+          this,
+          this._namedInnerJoins,
+          plan.stashedJoins,
+          cteInnerJoinNodes,
+        )
       : ([] as AssociationSpec[]);
   const [namedJoins, joinType] =
-    innerNamed.length > 0
-      ? ([innerNamed, Nodes.InnerJoin] as const)
-      : plan.namedJoins.length > 0
-        ? ([plan.namedJoins, Nodes.OuterJoin] as const)
-        : ([[] as AssociationSpec[], Nodes.InnerJoin] as const);
+    plan.joinType !== undefined
+      ? ([plan.namedJoins, plan.joinType] as const)
+      : innerNamed.length > 0
+        ? ([innerNamed, Nodes.InnerJoin] as const)
+        : plan.namedJoins.length > 0
+          ? ([plan.namedJoins, Nodes.OuterJoin] as const)
+          : ([[] as AssociationSpec[], Nodes.InnerJoin] as const);
   if (namedJoins.length > 0 || plan.stashedJoins.length > 0) {
     const jd = constructJoinDependency.call(this, namedJoins, joinType);
     for (const node of jd.joinConstraints(plan.stashedJoins, sharedTracker(), references))
@@ -3069,7 +3127,7 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
 
   // Subquery path: buckets fold eager into stashed_join. Delegate emission to
   // the shared `build_joins` port.
-  const buckets = buildJoinBuckets.call(this);
+  const [buckets, joinType] = buildJoinBuckets.call(this);
   const leadingJoins = buckets.leading_join as Nodes.Join[];
   const joinNodes = buckets.join_node as Nodes.Join[];
   // Rails: `alias_tracker = alias_tracker(leading_joins + join_nodes, aliases)`
@@ -3091,6 +3149,7 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
     joinNodes,
     stashedJoins: buckets.stashed_join as JoinDependency[],
     namedJoins: buckets.named_join as AssociationSpec[],
+    joinType,
     aliases,
     tracker,
   });

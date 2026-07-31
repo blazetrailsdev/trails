@@ -25,7 +25,7 @@
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_joins",
     "call": "joins!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-entry verified (RFC 0083 step 3): Rails merger.rb:117-134/136-152 ends the cross-model branch with `relation.joins!(join_dependency, *others)` / `relation.left_outer_joins!(...)`; trails merger.ts#mergeJoins/#mergeOuterJoins are thin wrappers over foldMergeJoins/foldMergeOuterJoins (relation/merge-joins.ts), which append to `_joinsValues` / `_leftOuterJoinsValues` with the same structural union `joins!` performs. The wide gate does not follow into the helper, so the entry stays until the helper split itself is converged (`converge-merge-joins-helper-onto-joins-bang`)."
   },
   {
     "package": "activerecord",
@@ -102,7 +102,7 @@
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_outer_joins",
     "call": "left_outer_joins!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-entry verified (RFC 0083 step 3): Rails merger.rb:117-134/136-152 ends the cross-model branch with `relation.joins!(join_dependency, *others)` / `relation.left_outer_joins!(...)`; trails merger.ts#mergeJoins/#mergeOuterJoins are thin wrappers over foldMergeJoins/foldMergeOuterJoins (relation/merge-joins.ts), which append to `_joinsValues` / `_leftOuterJoinsValues` with the same structural union `joins!` performs. The wide gate does not follow into the helper, so the entry stays until the helper split itself is converged (`converge-merge-joins-helper-onto-joins-bang`)."
   },
   {
     "package": "activerecord",

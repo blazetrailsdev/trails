@@ -7304,7 +7304,10 @@ export class Relation<T extends Base> {
   }
 
   /** @internal */
-  private buildJoinBuckets(): Record<string, unknown[]> {
+  private buildJoinBuckets(): [
+    Record<string, unknown[]>,
+    typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
+  ] {
     return _qm.buildJoinBuckets.call(this as any);
   }
 
