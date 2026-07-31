@@ -186,7 +186,9 @@ different file than the Rails twin (unambiguous hits only). Between exact
 match and divergent sits a `reordered` tier (identical token multiset,
 different order); on the current corpus it is empty — reordered-looking
 bodies also differ by a token or two, so strict multiset equality
-correctly refuses them.
+correctly refuses them. When this tier does start catching entries, its
+rows still need per-entry review: swapped side-effecting calls are not
+behavior-preserving, so `reordered` means "same operations" — not "safe".
 
 Current baseline:
 
