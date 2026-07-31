@@ -54,7 +54,7 @@ function bootLaidTableNames(): ReadonlySet<string> {
  * MySQL and sqlite both go through `disableReferentialIntegrity`.
  */
 export async function dropAllTables(adapter: DatabaseAdapter): Promise<void> {
-  await resetTables(adapter, "drop-all");
+  await resetTables(adapter, "drop-all", false);
 }
 
 /**
@@ -69,32 +69,39 @@ export async function dropAllTables(adapter: DatabaseAdapter): Promise<void> {
  * `schema_migrations` / `ar_internal_metadata` bookkeeping tables (migrator
  * tests manage those per-test and rely on the reset clearing them).
  * Views/matviews are never canonical, so they are always dropped.
+ *
+ * `measure` opts a call into the RFC 0064 sweep report (which still does
+ * nothing unless `AR_SWEEP_REPORT` is set). Only the global between-test reset
+ * in `resetTestAdapterState` passes it: the boot reset in `test-setup-dy.ts`
+ * drops boot bookkeeping rather than test leaks, and this function's own unit
+ * tests drop tables they created a line earlier, so neither is a measurement.
  */
-export async function resetTestTables(adapter: DatabaseAdapter): Promise<void> {
-  await resetTables(adapter, "reset");
+export async function resetTestTables(
+  adapter: DatabaseAdapter,
+  { measure = false }: { measure?: boolean } = {},
+): Promise<void> {
+  await resetTables(adapter, "reset", measure);
 }
 
 type ResetMode = "drop-all" | "reset";
 
 /**
  * The array {@link resetTables} records dropped names into, or `null` when the
- * sweep is not being measured — which is the default, and the only state CI
- * ever runs in. See {@link recordSweptTables}.
- *
- * Recording waits for the boot snapshot: `test-setup-dy.ts` runs a reset of its
- * own between the canonical load and the adapter-specific arm, and what that
- * one drops (`defaults`, on a worker recycled onto an already-used database) is
- * boot bookkeeping rather than a test leak. Only between-test sweeps are the
- * measurement.
+ * sweep is not being measured — the default, and the only state CI ever runs
+ * in. See {@link recordSweptTables}.
  */
-function sweepCollector(mode: ResetMode): string[] | null {
-  if (mode !== "reset" || _bootLaidTableNames === null) return null;
+function sweepCollector(measure: boolean): string[] | null {
+  if (!measure) return null;
   return sweepReportDir() === undefined ? null : [];
 }
 
-async function resetTables(adapter: DatabaseAdapter, mode: ResetMode): Promise<void> {
+async function resetTables(
+  adapter: DatabaseAdapter,
+  mode: ResetMode,
+  measure: boolean,
+): Promise<void> {
   const bootLaid = bootLaidTableNames();
-  const swept = sweepCollector(mode);
+  const swept = sweepCollector(measure);
   switch (adapter.adapterName) {
     case "postgres":
       await resetPgTables(adapter, mode, bootLaid, swept);

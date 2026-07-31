@@ -259,7 +259,7 @@ export async function resetTestAdapterState(): Promise<void> {
     const pool = Base.connectionPool();
     await pool.withConnection(
       async (adapter) => {
-        await resetTestTables(adapter);
+        await resetTestTables(adapter, { measure: true });
         // Clear schema cache on all live pool connections (mirrors Rails'
         // ConnectionPool#clear_cache!).
         pool.connections.forEach((a) => a.schemaCache?.clear());
