@@ -577,6 +577,21 @@ function sameKind(seen: unknown, real: unknown): boolean {
  * the chain, so a transparent proxy (which returns that same function) passes,
  * and an adapter carrying no prototype member at all — a hand-rolled fake — is
  * left alone rather than guessed at.
+ *
+ * **A class-body definition is out of reach here, permanently.** A cover shaped
+ * as `class Probe extends BetterSQLite3Adapter { override async createTable()
+ * {} }` — or as a standalone fake class defining the member — is found by the
+ * walk as that class's own, matching what the lookup returned, so it passes.
+ * That is not an oversight to be closed: PostgreSQLAdapter overriding
+ * AbstractAdapter's `createTable`, and Mysql2Adapter overriding
+ * AbstractMysqlAdapter's, are the *same* shape, and a real adapter is defined
+ * by nothing else at runtime — trails keeps no registry of adapter classes, and
+ * inspecting the override's body for hollowness is the shape-heuristic detector
+ * RFC 0025 built and abandoned (PR #5204). Rejecting prototype-level overrides
+ * would reject every real adapter; accepting them lets a probe through. The
+ * distinguishing signal is lexical, not runtime — which class body a `.test.ts`
+ * file wrote — so `blazetrails/no-load-schema-with-stubbed-ddl` carries that
+ * direction instead.
  */
 function assertNotStubbed(adapter: DatabaseAdapter, method: string): void {
   const seen = (adapter as unknown as Record<string, unknown>)[method];
