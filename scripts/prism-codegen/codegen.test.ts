@@ -21,7 +21,7 @@ describe("prism-codegen", () => {
     expect(code).toContain("saveBang(force = false)");
     expect(code).toContain("isName(");
     expect(code).toContain("this.saved = true");
-    expect(code).toContain("if (!isValid)");
+    expect(code).toContain("if (!this.isValid)");
   });
   it("records handled vs. passthrough coverage per node kind", async () => {
     const { coverage } = await generateFromSource(`def f(a); a + 1; end`);
@@ -131,6 +131,46 @@ describe("prism-codegen", () => {
     expect(code).toContain("block(n)");
     expect(code).toContain("x => x.name()");
     expect(code).toContain("names.push(1)");
+  });
+
+  it("resolves receiverless calls to self: this.method, locals stay bare", async () => {
+    const { code, parseErrorCount } = await generateFromSource(`
+      def ordered(list)
+        oc = build_columns(list)
+        oc.concat(default_columns) if order_values.empty?
+        oc
+      end
+    `);
+    expect(parseErrorCount).toBe(0);
+    expect(code).toContain("this.buildColumns(list)"); // receiverless w/ args → self-call
+    expect(code).toContain("oc.concat(this.defaultColumns)"); // local stays bare; parenless → getter
+    expect(code).toContain("this.orderValues.isEmpty()"); // parenless chain roots on this
+    expect(code).toContain("return oc;"); // local read, never this-ified
+  });
+
+  it("translates attr-writer calls and expression-position raise", async () => {
+    const { code, parseErrorCount } = await generateFromSource(`
+      def rename(other)
+        other.name = compute_name
+        found || raise(ActiveRecord::RecordNotFound)
+      end
+    `);
+    expect(parseErrorCount).toBe(0);
+    expect(code).toContain("other.name = this.computeName");
+    expect(code).toContain("throw ActiveRecord.RecordNotFound");
+  });
+
+  it("routes yield/block_given? through an explicitly named block param", async () => {
+    const { code, parseErrorCount } = await generateFromSource(`
+      def with_handler(&callback)
+        yield(1) if block_given?
+      end
+    `);
+    expect(parseErrorCount).toBe(0);
+    expect(code).toContain("withHandler(callback)");
+    expect(code).not.toContain("callback, block");
+    expect(code).toContain("callback !== undefined");
+    expect(code).toContain("callback(1)");
   });
 
   it("flattens statement-position module super per the composition-point convention", async () => {
@@ -243,7 +283,7 @@ describe("prism-codegen", () => {
       end
     `);
     expect(code).toContain("return a;");
-    expect(code).toContain("return fallback;");
+    expect(code).toContain("return this.fallback;");
   });
   it("attributes passthrough to the enclosing def for a trustworthy denominator", async () => {
     const { perDef } = await generateFromSource(`

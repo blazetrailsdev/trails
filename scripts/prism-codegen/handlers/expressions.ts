@@ -3,6 +3,7 @@ import type { Emitter, PrismNode } from "../types.js";
 import type { Registry } from "../registry.js";
 import { methodName, isJsIdentName, isBindableIdent } from "../naming.js";
 import { rubyStr } from "../types.js";
+import { TOPLEVEL } from "../codegen.js";
 const f = ts.factory;
 const INFIX: Record<string, ts.BinaryOperator> = {
   "==": ts.SyntaxKind.EqualsEqualsEqualsToken,
@@ -183,14 +184,40 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
   }
 
   if (name === "block_given?" && !hasRecv && argNodes.length === 0 && !n.block) {
+    if (!e.blockParamName) return null;
     return f.createBinaryExpression(
-      f.createIdentifier("block"),
+      f.createIdentifier(e.blockParamName),
       ts.SyntaxKind.ExclamationEqualsEqualsToken,
       f.createIdentifier("undefined"),
     );
   }
+  if (name.endsWith("=") && !INFIX[name] && name !== "[]=" && hasRecv && argNodes.length === 1) {
+    const prop = methodName(name.slice(0, -1));
+    if (!isJsIdentName(prop)) return null;
+    return f.createAssignment(
+      f.createPropertyAccessExpression(e.expr(n.receiver as PrismNode), prop),
+      e.expr(argNodes[0]),
+    );
+  }
+  if (name === "raise" && !hasRecv && argNodes.length > 0 && !n.block) {
+    return f.createCallExpression(
+      f.createParenthesizedExpression(
+        f.createArrowFunction(
+          undefined,
+          undefined,
+          [],
+          undefined,
+          undefined,
+          f.createBlock([f.createThrowStatement(e.expr(argNodes[0]))], false),
+        ),
+      ),
+      undefined,
+      [],
+    );
+  }
   const jsName = methodName(name);
-  if (hasRecv ? !isJsIdentName(jsName) : !isBindableIdent(jsName)) return null;
+  const selfCall = !hasRecv && e.currentDef !== TOPLEVEL;
+  if (hasRecv || selfCall ? !isJsIdentName(jsName) : !isBindableIdent(jsName)) return null;
   let blockParams: string[] | null = null;
   let symToProc: string | null = null;
   if (block) {
@@ -223,7 +250,9 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
   }
   const target: ts.Expression = recv
     ? f.createPropertyAccessExpression(recv, jsName)
-    : f.createIdentifier(jsName);
+    : selfCall
+      ? f.createPropertyAccessExpression(f.createThis(), jsName)
+      : f.createIdentifier(jsName);
   if (!recv && callArgs.length === 0 && !block && !hasParens(n)) return target;
   const call = f.createCallExpression(target, undefined, callArgs);
   return e.inAsyncMethod && e.asyncMethods.has(jsName) ? f.createAwaitExpression(call) : call;

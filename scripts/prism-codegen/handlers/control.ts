@@ -39,10 +39,11 @@ export function registerControl(r: Registry): void {
     return [f.createReturnStatement(v)];
   });
   r.on("YieldNode", (n, e) => {
+    if (!e.blockParamName) return null;
     const args = (((n.arguments_ as PrismNode | null)?.arguments_ as PrismNode[]) ?? []).map((x) =>
       e.expr(x),
     );
-    return f.createCallExpression(f.createIdentifier("block"), undefined, args);
+    return f.createCallExpression(f.createIdentifier(e.blockParamName), undefined, args);
   });
   r.onStmt("BreakNode", (n, e) => {
     const argCount = ((n.arguments_ as PrismNode | null)?.arguments_ as PrismNode[])?.length ?? 0;

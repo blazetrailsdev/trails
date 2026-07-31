@@ -143,6 +143,8 @@ function defParts(
   const prevDef = e.currentDef;
   const prevDeclared = e.declared;
   const prevAsync = e.inAsyncMethod;
+  const prevLoop = e.inLoop;
+  const prevBlockName = e.blockParamName;
   e.currentDef = defName;
   (
     e as {
@@ -150,14 +152,17 @@ function defParts(
     }
   ).declared = new Set();
   e.inAsyncMethod = isAsync;
+  e.inLoop = false;
   const params = emitParams(n.parameters as PrismNode | undefined, e);
-  if (
-    params !== null &&
-    usesImplicitBlock(n.body as PrismNode | null) &&
-    !e.declared.has("block")
-  ) {
+  const explicitBlock = (n.parameters as PrismNode | null)?.block as PrismNode | null;
+  if (explicitBlock) {
+    e.blockParamName = explicitBlock.name ? String(explicitBlock.name) : "block";
+  } else if (params !== null && usesImplicitBlock(n.body as PrismNode | null)) {
     params.push(f.createParameterDeclaration(undefined, undefined, "block"));
     e.declared.add("block");
+    e.blockParamName = "block";
+  } else {
+    e.blockParamName = null;
   }
   const paramNames = new Set(e.declared);
   const bodyStmts =
@@ -171,6 +176,8 @@ function defParts(
     }
   ).declared = prevDeclared;
   e.inAsyncMethod = prevAsync;
+  e.inLoop = prevLoop;
+  e.blockParamName = prevBlockName;
   return { params, body, isAsync };
 }
 function emitParams(params: PrismNode | undefined, e: Emitter): ts.ParameterDeclaration[] | null {

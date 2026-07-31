@@ -33,6 +33,7 @@ export class Codegen implements Emitter {
   inAsyncMethod = false;
   inLoop = false;
   readonly helpers = new Set<string>();
+  blockParamName: string | null = null;
   declared = new Set<string>();
   constructor(
     private readonly registry: Registry,

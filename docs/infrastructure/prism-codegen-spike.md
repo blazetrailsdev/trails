@@ -144,7 +144,7 @@ tainted method can blame the generator; a diff inside a clean one cannot).
 
 ## Decided conventions (round 2)
 
-Four previously-declined constructs now have owner-decided semantics:
+Owner-decided semantics (previously declines or known-wrong output):
 
 1. **Runtime shims are allowed.** `scripts/prism-codegen/runtime.ts` hosts
    `caseEq` (Ruby `#===` dispatch) and `range`; a generated file imports only
@@ -154,7 +154,15 @@ Four previously-declined constructs now have owner-decided semantics:
    parameter (added automatically to any def that yields or checks
    `block_given?`); `yield(args)` → `block(args)`; `block_given?` →
    `block !== undefined`; `&:sym` → `x => x.sym()`.
-4. **Statement-position `super` in a module-level def is omitted** — the
+4. **Receiverless calls resolve to `self`.** Prism already distinguishes
+   locals from method calls at parse time (a name with a local in scope is a
+   `LocalVariableReadNode`; anything else receiverless is a `CallNode`), so a
+   receiverless call is ALWAYS a self-call: `this.name(args)` inside a def
+   (parens/args → call, parenless-zero-arg → property access, matching the
+   port's getter convention). Attr-writer calls (`other.name = v`) become
+   assignments; expression-position `raise` becomes an immediately-invoked
+   throw. Module top-level macros (`require`, `include`) stay bare.
+5. **Statement-position `super` in a module-level def is omitted** — the
    port flattens super chains at the composition point (e.g. Rails'
    `Associations#init_internals` body `super; @association_cache = {}`
    is ported as an `initInternals` free function holding ONLY the module's
@@ -171,26 +179,33 @@ candidates) and compare normalized body skeletons — control-flow tokens plus
 callee/property reference names, with `perform` prefixes, `is` predicate
 prefixes, and `_` private prefixes stripped on both sides.
 
-Baseline (first run):
+Current baseline:
 
 ```text
 file                        matched divergent missing  conformance
-relation.rb                       5        65      10       7.1%
-persistence.rb                    5        39       3      11.4%
-query_methods.rb                  3        60      37       4.8%
-core.rb                           4        39       5       9.3%
+relation.rb                      12        58      10      17.1%
+persistence.rb                    7        37       3      15.9%
+query_methods.rb                  4        59      37       6.3%
+core.rb                           7        36       5      16.3%
+inheritance.rb                    2        12       5      14.3%
 finder_methods.rb                 0        12      26       0.0%
 calculations.rb                   0        14      17       0.0%
-(others)                          0        53       6       0.0%
-TOTAL                            17       282     104       5.7%
+(others)                          0        39       1       0.0%
+TOTAL                            32       267     104      10.7%
 ```
+
+(The first scorer run, before receiver resolution, measured 17/282/104 =
+5.7% — resolving receiverless calls to `self` nearly doubled the match rate
+with zero coverage change, confirming the scorer can attribute generator
+improvements.)
 
 Read this as the guard's review queue, not a failure grade: `divergent`
 means the port's body structure differs from the Rails-faithful skeleton —
 overwhelmingly the port realizing helpers inline (`take` inlining
 `find_take`), reaching internals (`_records`/`_loaded`) the Rails source
-reaches via methods, or receiver-resolution gaps in the generator (roadmap
-item 1). `missing` covers methods ported into a _different_ file plus naming
+reaches via methods, or remaining generator gaps (delegation
+macros: Rails `Relation#name` delegates to `model.name` via `delegate`,
+which the generator renders as `this.name`). `missing` covers methods ported into a _different_ file plus naming
 paths the resolver does not chase yet. The 17 exact matches are the floor;
 every generator improvement (receiver resolution, stdlib idioms) converts
 divergent-for-generator-reasons rows into genuine signal about the port.

@@ -41,6 +41,8 @@ export interface Emitter {
   inLoop: boolean;
 
   readonly helpers: Set<string>;
+
+  blockParamName: string | null;
   readonly declared: Set<string>;
 }
 export interface Coverage {
