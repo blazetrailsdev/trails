@@ -4,16 +4,11 @@ import { Base } from "./index.js";
 import { ReadOnlyError } from "./errors.js";
 import { fixtures } from "./test-fixtures.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
+import { Bird } from "./test-helpers/models/bird.js";
 import { Professor } from "./test-helpers/models/professor.js";
 
 describe("BasePreventWritesTest", () => {
   fixtures([]);
-
-  class Bird extends Base {
-    static {
-      this.attribute("name", "string");
-    }
-  }
 
   it("creating a record raises if preventing writes", async () => {
     const error = await Base.whilePreventingWrites(async () => {
