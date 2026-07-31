@@ -569,14 +569,6 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   // Database management
   // ---------------------------------------------------------------------------
 
-  async databaseExists(name: string): Promise<boolean> {
-    const rows = await this.pg.schemaQuery(
-      `SELECT COUNT(*) AS count FROM pg_database WHERE datname = $1`,
-      [name],
-    );
-    return Number(rows[0].count) > 0;
-  }
-
   async createDatabase(name: string, options: CreateDatabaseOptions = {}): Promise<void> {
     const encoding = options.encoding ?? "utf8";
     let optionString = ` ENCODING = ${this.pg.quoteLiteral(encoding)}`;
