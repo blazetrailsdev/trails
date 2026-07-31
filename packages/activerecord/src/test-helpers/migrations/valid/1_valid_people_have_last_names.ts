@@ -10,5 +10,3 @@ export class ValidPeopleHaveLastNames extends Migration {
     await this.removeColumn("people", "last_name");
   }
 }
-
-export default new ValidPeopleHaveLastNames();

@@ -5,5 +5,3 @@ export class FutureTimestampMigration extends Migration {
 
   async down(): Promise<void> {}
 }
-
-export default new FutureTimestampMigration();

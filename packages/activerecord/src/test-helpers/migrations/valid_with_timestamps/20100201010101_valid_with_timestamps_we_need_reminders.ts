@@ -13,5 +13,3 @@ export class ValidWithTimestampsWeNeedReminders extends Migration {
     await this.dropTable("reminders");
   }
 }
-
-export default new ValidWithTimestampsWeNeedReminders();

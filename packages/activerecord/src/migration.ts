@@ -2075,11 +2075,7 @@ async function loadMigrationFrom(
   if (typeof exported === "function") {
     return new (exported as new (name?: string, version?: string) => Migration)(name, version);
   }
-  if (exported instanceof Migration) return exported;
-  throw new Error(
-    `Migration ${name} must export a Migration class named "${name}" ` +
-      `(or a Migration instance as the default export)`,
-  );
+  throw new Error(`Migration ${name} must export a Migration class named "${name}"`);
 }
 
 /**

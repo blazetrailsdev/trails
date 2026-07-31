@@ -13,5 +13,3 @@ export class WeNeedReminders extends Migration {
     await this.dropTable("reminders");
   }
 }
-
-export default new WeNeedReminders();
