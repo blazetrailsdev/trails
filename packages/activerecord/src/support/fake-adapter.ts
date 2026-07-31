@@ -49,8 +49,7 @@ export class FakeActiveRecordAdapter extends AbstractAdapter {
     return created;
   }
 
-  // @ts-expect-error -- synchronous in-memory lookup where the inherited one returns a promise
-  dataSourceExists(): boolean {
+  async dataSourceExists(): Promise<boolean> {
     return true;
   }
 
