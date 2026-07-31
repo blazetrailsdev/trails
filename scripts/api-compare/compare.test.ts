@@ -273,6 +273,16 @@ describe("significantMissingCalls", () => {
       expect(effectiveTsCalls("indexes", own, () => ["neverReached"], sameFileCalls)).toBe(own);
     });
 
+    it("never reaches the package-wide delegate map for a non-wrapper body", () => {
+      // The delegate map is unioned by NAME across the whole package, so an
+      // unrelated same-named method can satisfy a call. That imprecision is
+      // only sound for the forwarder case; a body doing its own work must be
+      // held to its own file.
+      const own = new Set(file.get("indexes"));
+      const merged = effectiveTsCalls("indexes", own, () => ["fromAnotherClass"], sameFileCalls);
+      expect(merged.has("fromAnotherClass")).toBe(false);
+    });
+
     it("stops at the closure depth limit", () => {
       const chain = new Map<string, string[]>([
         ["a", ["b"]],

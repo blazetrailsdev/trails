@@ -404,8 +404,11 @@ export function effectiveTsCalls(
   tsCalls: Set<string>,
   delegateCalls: (name: string) => Iterable<string> | undefined,
   sameFileCalls: (name: string) => Iterable<string> | undefined = () => undefined,
+  // Pass the closure in when the caller already computed it (checkCalls also
+  // needs the reached names to union their NEGATED calls) — walking it twice
+  // per matched pair is pure waste.
+  reached: Set<string> = reachedSameFileMethods(tsName, tsCalls, sameFileCalls),
 ): Set<string> {
-  const reached = reachedSameFileMethods(tsName, tsCalls, sameFileCalls);
   const wrapper = isDelegatingWrapper(tsName, tsCalls);
   if (reached.size === 0 && !wrapper) return tsCalls;
   const merged = new Set(tsCalls);
@@ -1734,17 +1737,19 @@ export function main() {
         const own = partitionNegatedCalls(tsCandidateSets.flat());
         const sameFile = sameFilePartition(tsFile);
         const sameFileCalls = (n: string) => sameFile.get(n)?.calls;
+        const reached = reachedSameFileMethods(tsName, own.calls, sameFileCalls);
         const tsCalls = effectiveTsCalls(
           tsName,
           own.calls,
           (n) => tsCallsByName.get(n),
           sameFileCalls,
+          reached,
         );
         // A body compared against a helper's calls inherits its negated ones
         // too, or the helper's `!xs.includes(y)` would not count — same for a
         // wrapper and its delegate.
         const negatedTsCalls = new Set(own.negated);
-        for (const n of reachedSameFileMethods(tsName, own.calls, sameFileCalls)) {
+        for (const n of reached) {
           for (const c of sameFile.get(n)?.negated ?? []) negatedTsCalls.add(c);
         }
         if (isDelegatingWrapper(tsName, own.calls)) {
