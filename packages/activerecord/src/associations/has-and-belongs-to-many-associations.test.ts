@@ -1183,8 +1183,6 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     }).not.toThrow();
   });
 
-  // `Professor`/`Course` live in the `arunit2` second database, which
-  // `withSecondPool` provisions on every lane.
   it("alternate database", async () => {
     const professor = await Professor.create({ name: "Plum" });
     const course = await Course.create({ name: "Forensics" });
