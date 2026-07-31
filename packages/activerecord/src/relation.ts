@@ -3292,7 +3292,6 @@ export class Relation<T extends Base> {
     // after), LeadingJoin goes to leading_join (prepended before). Without
     // stashed joins all nodes go to leading_join (Rails' else branch).
     const hasStashed =
-      manager.joinSourceCount > 0 ||
       this._eagerLoadAssociations.length > 0 ||
       this._leftOuterJoinsValues.length > 0 ||
       this._namedInnerJoins.length > 0;
@@ -3362,11 +3361,8 @@ export class Relation<T extends Base> {
     // left-outer JD and folding it into the stash. This keeps the shape identical
     // to the subquery `from(relation)` path.
     //
-    // The four emptiness checks below mirror buildJoinBuckets exactly. The extra
-    // `manager.joinSourceCount` guard has no buildJoinBuckets analog — it is a
-    // pure bucket-builder with no live manager.
+    // The four emptiness checks below mirror buildJoinBuckets exactly.
     const pureLeftOuter =
-      manager.joinSourceCount === 0 &&
       this._eagerLoadAssociations.length === 0 &&
       this._namedInnerJoins.length === 0 &&
       this._joinValues.length === 0 &&

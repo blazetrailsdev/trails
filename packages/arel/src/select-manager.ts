@@ -517,10 +517,6 @@ export class SelectManager extends TreeManager {
     return new UnionAll(this.ast, otherAst);
   }
 
-  get joinSourceCount(): number {
-    return this.core.source.right.length;
-  }
-
   /**
    * Create an InsertManager from a SELECT.
    *
