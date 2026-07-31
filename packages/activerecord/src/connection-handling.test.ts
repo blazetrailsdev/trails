@@ -64,7 +64,6 @@ describe("ConnectionHandlingTest", () => {
       const leased = await Base.leaseConnection();
       expect(leased).toBeTruthy();
     });
-    // leaseConnection makes sticky=true, so connection persists
     expect(Base.connectionPool().activeConnection).toBeTruthy();
     Base.releaseConnection();
   });
