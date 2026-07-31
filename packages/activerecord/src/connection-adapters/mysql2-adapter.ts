@@ -1382,19 +1382,16 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /**
    * Return the query execution plan. Accepts Rails-style options (e.g.
-   * `["analyze"]` → `EXPLAIN ANALYZE <sql>` on MySQL 8.0.18+). Binds
-   * flow through in the same driver form `execute()` uses
-   * (`mysqlBinds(binds)` — booleans → 1/0), so a collected
-   * prepared-statement SQL with `?` placeholders re-EXPLAINs
-   * correctly.
+   * `["analyze"]` → `EXPLAIN ANALYZE <sql>` on MySQL 8.0.18+). Runs
+   * through `internalExecQuery` as Rails' MySQL `explain` does, so the
+   * EXPLAIN is instrumented and a collected prepared-statement SQL with
+   * `?` placeholders re-EXPLAINs with its binds.
    */
   async explain(
     sql: string,
     binds: unknown[] = [],
     options: ExplainOption[] = [],
   ): Promise<string> {
-    // Rails' MySQL::DatabaseStatements#explain runs through internal_exec_query,
-    // so the EXPLAIN is instrumented as its own `sql.active_record` query.
     const clause = this._explainStatementClause(options);
     const start = Date.now();
     const result = await this.internalExecQuery(`${clause} ${sql}`, "EXPLAIN", binds);

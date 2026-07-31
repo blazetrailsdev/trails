@@ -2411,11 +2411,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    *
    * Accepts Rails-style options (`["analyze", "verbose"]`) which get
    * composed into the EXPLAIN clause via `buildExplainClause` — e.g.
-   * `EXPLAIN (ANALYZE, VERBOSE) <sql>`. Binds pass through in the
-   * same rewritten form `execute()`/`execQuery()` use (`?` → `$1`
-   * placeholders + the values array) so a collected
-   * prepared-statement query re-EXPLAINs cleanly without pg
-   * rejecting it for "no parameter $1".
+   * `EXPLAIN (ANALYZE, VERBOSE) <sql>`. Runs through
+   * `internalExecQuery` as Rails' PG `explain` does, so the EXPLAIN is
+   * instrumented and binds pass through in the same rewritten form
+   * (`?` → `$1` placeholders + the values array) that
+   * `execute()`/`execQuery()` use.
    */
   async explain(
     sql: string,
@@ -2423,10 +2423,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     options: ExplainOption[] = [],
   ): Promise<string> {
     const clause = this._explainStatementClause(options);
-    // `internalExecQuery` handles the `?` → `$1` rewrite and bind
-    // normalization, and instruments the EXPLAIN as its own
-    // `sql.active_record` query — mirroring Rails, whose PG `explain`
-    // goes through `internal_exec_query(sql, "EXPLAIN", binds)`.
     const result = await this.internalExecQuery(`${clause} ${sql}`, "EXPLAIN", binds);
     const printer = new ExplainPrettyPrinter();
     return printer.pp(result.toArray());
