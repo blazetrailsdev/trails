@@ -623,6 +623,16 @@ function throughScopeAttributes(assoc: HasManyThroughAssociation): Record<string
 
 /** @internal */
 async function saveThroughRecord(assoc: HasManyThroughAssociation, record: Base): Promise<boolean> {
+  // `build_through_record` constructs the join row synchronously, so the join
+  // model's attribute definitions have to be in place first. Ruby reflects
+  // columns lazily on first access; trails' reflection is async, and a join
+  // model on a secondary connection (HABTM "alternate database") has not been
+  // reflected by the time we get here — assigning its FK would raise
+  // UnknownAttributeError. No Rails counterpart; purely the async-schema seam.
+  const throughKlass = safeKlass(throughReflection(assoc) as { klass?: unknown } | null);
+  if (typeof throughKlass?.ensureSchemaLoaded === "function") {
+    await throughKlass.ensureSchemaLoaded();
+  }
   try {
     const joinRecord = buildThroughRecord(assoc, record);
     if (!joinRecord) return true;

@@ -2340,221 +2340,59 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return attrs;
   }
 
+  /**
+   * Rails has no `_pushThrough`: `CollectionProxy#<<` is
+   * `proxy_association.concat(records)` (collection_proxy.rb:1053), and every
+   * join-row decision lives on `HasManyThroughAssociation#concat_records` /
+   * `#insert_record` (has_many_through_association.rb:24-49). This is that
+   * delegation. The proxy and the association object share ONE in-memory target
+   * (`_sharedTarget`, `collection-association.ts:96`), so routing the write onto
+   * the association keeps membership, loaded-ness, `@replaced_or_added_targets`
+   * dedup, and the before/after_add callbacks coherent across both handles.
+   *
+   * `skipCallbacks` is the `create!` path, whose caller already fires
+   * before/after_add around the whole build+save; it mirrors Rails'
+   * `_create_record` — `add_to_target(record) { insert_record(record, true,
+   * true) }` (collection_association.rb:363-371) — rather than going through
+   * `concat`, which would fire the callbacks a second time.
+   */
   private async _pushThrough(
     records: T[],
     skipCallbacks = false,
     throughScope?: unknown,
   ): Promise<void> {
-    const ctor = this._record.constructor as typeof Base;
-    const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
-    const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
-    if (!throughAssoc) {
-      throw new Error(
-        `Through association "${this._assocDef.options.through}" not found on ${ctor.name}`,
-      );
+    const assoc = this._record.association(this._assocName) as unknown as {
+      _throughScope?: unknown;
+      concat(...records: Base[]): Promise<Base[] | undefined>;
+      insertRecord(record: Base, validate?: boolean, raise?: boolean): Promise<boolean>;
+    };
+    // Rails sets `@through_scope` around `build_record`
+    // (has_many_through_association.rb:93) and `construct_join_attributes` reads
+    // it back. A scoped create (`AssociationRelation#create`) captured the scope
+    // before we got here, so lend it to the association for this write only.
+    const previousThroughScope = assoc._throughScope;
+    if (throughScope != null) assoc._throughScope = throughScope;
+    try {
+      if (skipCallbacks) {
+        for (const record of records) {
+          await this._addToTarget(
+            record,
+            { skipCallbacks: true, replace: this.distinctValue },
+            () =>
+              // Rails' `concat_records` only inserts `unless owner.new_record?`;
+              // an unsaved owner defers the join row to after_create autosave.
+              this._record.isNewRecord()
+                ? Promise.resolve(true)
+                : assoc.insertRecord(record, true, true),
+          );
+        }
+      } else {
+        await assoc.concat(...records);
+      }
+    } finally {
+      assoc._throughScope = previousThroughScope;
     }
-
-    const throughClassName =
-      throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
-    const throughModel = resolveAssocClass(this._record, throughAssoc.name, throughClassName);
-    // Polymorphic-through uses a single `<as>_id`/`<as>_type` pair; the
-    // composite-aware helper does not apply. Writes and reads share
-    // _throughOwnerPolymorphic so they target the same column.
-    const ownerJoinAttrs: Record<string, unknown> = throughAssoc.options.as
-      ? (() => {
-          const poly = this._throughOwnerPolymorphic(throughAssoc, ctor, throughAssoc.options.as);
-          return { [poly.idCol]: poly.idValue };
-        })()
-      : this._throughOwnerAttrs(throughAssoc, ctor);
-    const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
-    // Resolve the join-table FK from the source reflection's own
-    // `foreignKey` (Rails' `source_reflection.foreign_key`), not by deriving
-    // `<source>_id` from the association name. A self-referential or
-    // nonstandard-FK source belongsTo — e.g. `belongs_to :reference_of,
-    // foreign_key: "book2_id"` — has a name-derived FK (`reference_of_id`)
-    // that doesn't match the real column, so the convention path writes the
-    // wrong column and leaves the actual FK null (join row never matches).
-    const sourceRefl = (
-      ctor as unknown as {
-        _reflectOnAssociation?: (n: string) => {
-          sourceReflection?: {
-            foreignKey?: string | string[];
-            associationPrimaryKey?: string | string[];
-            associationPrimaryKeyFor?: (klass?: typeof Base) => string | string[];
-            isPolymorphic?: () => boolean;
-            foreignType?: string;
-          };
-        } | null;
-      }
-    )._reflectOnAssociation?.(this._assocName)?.sourceReflection;
-    const sourceFk = sourceRefl?.foreignKey ?? `${underscore(sourceName)}_id`;
-
-    // Mirrors Rails' `CollectionProxy#transaction` delegating to the through
-    // model's transaction — concat_records wraps inserts in the join model's
-    // transaction so join-row writes and any associated saves are atomic.
-    await throughModel.transaction(async () => {
-      for (const record of records) {
-        // Route the in-memory mutation through `_addToTarget` (Rails'
-        // `replace_on_target`) so the through/HABTM branch shares the same
-        // set_inverse_instance + `@replaced_or_added_targets` dedup tracking +
-        // before/after_add callback handling as the non-through `push`/`<<`
-        // path. The `save` callback carries the through-specific join-row work
-        // (Rails' `HasManyThroughAssociation#insert_record`); when it resolves
-        // false (`record.save` failed, or the join row didn't persist) the
-        // record is left out of the target, matching the prior gating.
-        const insertJoinRecord = async (): Promise<boolean> => {
-          // Owner not yet persisted: defer the join insert. Mirrors Rails'
-          // CollectionAssociation#concat_records, which only calls insert_record
-          // when `!owner.new_record?` — otherwise it just adds the target to the
-          // in-memory collection and lets the owner's after_create autosave
-          // create the join row with the resolved owner FK. Inserting now would
-          // write a null owner FK (the owner has no id yet) and double-insert
-          // once the autosave runs.
-          if (this._record.isNewRecord()) return true;
-          // Mirrors HasManyThroughAssociation#insert_record's
-          // `if record.new_record? || record.has_changes_to_save?; return unless super`
-          // (has_many_through_association.rb:26-29): a new *or* persisted-but-dirty
-          // target is saved before the join row is written. The save always raises:
-          // HMT's concat_records hard-codes `super(records, true)`
-          // (has_many_through_association.rb:40) for every alias of `<<`, so `raise`
-          // reaches CollectionAssociation#insert_record as true and the non-raising
-          // `record.save` branch is unreachable for a through reflection.
-          if (record.isNewRecord() || record.hasChangesToSave) {
-            await record.saveBang();
-          }
-          // Create the join record. A composite source FK arises when the join's
-          // source belongs_to resolves a multi-column key — e.g. `belongs_to :tag`
-          // where Sharded::Tag declares `query_constraints [blog_id, id]`, so the
-          // source FK is `[blog_id, tag_id]`. Pair each source-FK column with the
-          // source reflection's association_primary_key column read off the target
-          // (mirroring the composite-owner branch); the single-column write would
-          // otherwise stringify the array into one bogus key and leave tag_id null.
-          // Mirrors Rails' `source_reflection.association_primary_key(reflection.klass)`
-          // (through_association.rb:60). The no-arg `associationPrimaryKey` getter
-          // resolves `this.klass`, which THROWS for a polymorphic belongs_to source
-          // ("cannot compute class"), so a polymorphic source must pass an explicit
-          // klass. That klass is the through reflection's own resolved target
-          // (`this.model` — the `sourceType`-pinned class, e.g. `Post` for
-          // `Tag#taggedPosts`), NOT the concrete (possibly STI-subclass) instance.
-          const resolveSourcePk = (): string | string[] | undefined =>
-            sourceRefl?.isPolymorphic?.()
-              ? sourceRefl.associationPrimaryKeyFor?.(this.model)
-              : sourceRefl?.associationPrimaryKey;
-          // Mirrors Rails' ThroughAssociation#construct_join_attributes
-          // (through_association.rb:57-66): fill the join FK columns from the
-          // source reflection's `association_primary_key`, read off the pushed
-          // record, pairing columns positionally. `association_primary_key`
-          // (BelongsToReflection#association_primary_key, reflection.rb:927-938 —
-          // ported at reflection.ts:1375) already resolves the shape correctly:
-          // an explicit array `primaryKey` or query-constraint key stays
-          // composite, and only a plain composite PK collapses to its "id"
-          // component. So this reads that value verbatim — no extra scalar-FK
-          // collapse, which would wrongly flatten an explicit composite key.
-          // A composite belongsTo source therefore writes every FK component
-          // (matching Rails' `{ source_reflection.name => records }` belongs_to
-          // assignment); the composite-PK target no longer trips a trails-only
-          // ConfigurationError. The remaining throw is a genuine arity mismatch
-          // (a scalar FK against a still-composite key is a malformed source).
-          const sourceFkCols = Array.isArray(sourceFk) ? sourceFk : [sourceFk];
-          const rawSourcePk = resolveSourcePk() ?? (record.constructor as typeof Base).primaryKey;
-          const sourcePkCols = Array.isArray(rawSourcePk) ? rawSourcePk : [rawSourcePk];
-          if (sourceFkCols.length !== sourcePkCols.length) {
-            throw new ConfigurationError(
-              `Through association "${this._assocName}" has a source foreign key ` +
-                `(${sourceFkCols.join(", ")}) whose length does not match the source ` +
-                `association_primary_key (${sourcePkCols.join(", ")}).`,
-            );
-          }
-          const sourceJoinAttrs: Record<string, unknown> = {};
-          for (let i = 0; i < sourceFkCols.length; i++) {
-            sourceJoinAttrs[sourceFkCols[i]] = record._readAttribute(sourcePkCols[i]);
-          }
-          // Polymorphic source (e.g. `source: :taggable, source_type: "Post"`):
-          // set the join's `<source>_type` column so the belongs_to resolves to
-          // the pushed record's class. Mirrors Rails' construct_join_attributes /
-          // build_through_record source_type handling.
-          if (sourceRefl?.isPolymorphic?.() || this._assocDef.options.sourceType) {
-            const sourceTypeCol = sourceRefl?.foreignType ?? `${underscore(sourceName)}_type`;
-            sourceJoinAttrs[sourceTypeCol] =
-              this._assocDef.options.sourceType ??
-              polymorphicName(record.constructor as typeof Base);
-          }
-          // Extract WHERE conditions that belong to the through model's table.
-          // Use the explicit `throughScope` (passed from AssociationRelation#create
-          // for scoped creates like `.where(favorite: true).create(...)`) when
-          // available.  Fall back to the CollectionProxy's own _whereClause for
-          // the non-scoped push path (e.g. `favorites.push(member)` where the
-          // default scope bakes in `favorite: true`).  Accessing `_whereClause`
-          // directly avoids going through the JS Proxy wrapper, which would
-          // trigger a strict-loading violation for unset/unknown properties.
-          const scopeSource: { whereValuesHash?: (t: string) => Record<string, unknown> } =
-            throughScope != null
-              ? (throughScope as { whereValuesHash?: (t: string) => Record<string, unknown> })
-              : (
-                    this as unknown as {
-                      _whereClause?: { toH: (t: string) => Record<string, unknown> };
-                    }
-                  )._whereClause != null
-                ? {
-                    whereValuesHash: (t: string) =>
-                      (
-                        this as unknown as {
-                          _whereClause: { toH: (t: string) => Record<string, unknown> };
-                        }
-                      )._whereClause.toH(t),
-                  }
-                : {};
-          const throughScopeAttrs: Record<string, unknown> = {};
-          if (typeof scopeSource.whereValuesHash === "function") {
-            const raw = scopeSource.whereValuesHash(throughModel.tableName);
-            const ownerFk = String(throughAssoc.options.foreignKey ?? "");
-            const inheritanceCol = String((throughModel as any).inheritanceColumn ?? "type");
-            for (const [k, v] of Object.entries(raw)) {
-              if (k !== ownerFk && k !== inheritanceCol) {
-                throughScopeAttrs[k] = v;
-              }
-            }
-          }
-          const joinAttrs: Record<string, unknown> = {
-            ...throughScopeAttrs,
-            ...ownerJoinAttrs,
-            ...sourceJoinAttrs,
-          };
-          // Polymorphic through: ownerJoinAttrs already has the polymorphic
-          // _id column from _throughOwnerPolymorphic; just add the _type.
-          if (throughAssoc.options.as) {
-            // reflection.type = options[:foreign_type] || "#{options[:as]}_type".
-            const typeCol =
-              throughAssoc.options.foreignType ?? `${underscore(throughAssoc.options.as)}_type`;
-            // A scope that rewrites the polymorphic type (e.g. TaggedPost's
-            // `taggings` scope `rewhere(taggable_type: "TaggedPost")`) wins over
-            // the owner's own polymorphicName — Rails builds the join record
-            // through the scoped association, so its type value is authoritative.
-            if (!(typeCol in throughScopeAttrs)) joinAttrs[typeCol] = polymorphicName(ctor);
-          }
-          // Mirrors Rails' save_through_record: skip insert if the through record
-          // was already persisted (e.g. via autosave triggered by record.save in
-          // _createThrough). Without this guard, _createThrough's record.save
-          // (which fires autosave on the inverse has_many :readers) + the
-          // throughModel.create below would both create a join row.
-          const throughCache = (this._record as any)._throughRecordsCaches?.get(this._assocName);
-          const prebuiltThrough = throughCache?.get(record);
-          if (prebuiltThrough?.isPersisted?.()) return true;
-          // Always use createBang: Rails' save_through_record calls save! on
-          // the join row, so validation failures raise in both bang and non-bang
-          // push paths. Using createBang (class method) avoids enrolling an
-          // unsaved `new` instance for owner autosave, which produced a spurious
-          // empty DEFAULT-VALUES INSERT alongside the correct keyed INSERT.
-          const joinRecord: Base = await (throughModel as any).createBang(joinAttrs);
-          return joinRecord.isPersisted();
-        };
-        await this._addToTarget(
-          record,
-          { skipCallbacks, replace: this.distinctValue },
-          insertJoinRecord,
-        );
-      }
-    }); // end throughModel.transaction
+    this._invalidateAssociationIds();
   }
 
   private _invalidateAssociationIds(): void {
