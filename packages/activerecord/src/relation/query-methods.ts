@@ -2806,12 +2806,14 @@ export function assertValidLeftOuterJoinsBang(values: unknown[]): void {
 }
 
 /**
- * Rails' inner `select_named_joins` block (query_methods.rb:1865-1873): a
- * CTEJoin — a `joins()` symbol matching a `with(...)` CTE name — becomes an
- * InnerJoin join_node, and anything else raises a plain RuntimeError
- * `"unknown class: <ClassName>"` (NOT the left-outer bucket's ArgumentError,
- * query_methods.rb:1834). Shared by `buildJoinBuckets` and the live path's
- * `emitJoinPlan`, which partition the same joins_values the same way.
+ * Rails' inner `select_named_joins` block (query_methods.rb:1865-1873): an Arel
+ * Join node that survived the leading-join loop becomes a join_node
+ * unconditionally, a CTEJoin — a `joins()` symbol matching a `with(...)` CTE
+ * name — becomes an InnerJoin join_node, and anything else raises a plain
+ * RuntimeError `"unknown class: <ClassName>"` (NOT the left-outer bucket's
+ * ArgumentError, query_methods.rb:1834). Shared by `buildJoinBuckets` and the
+ * live path's `emitJoinPlan`, which partition the same joins_values the same
+ * way.
  *
  * @internal
  */
@@ -2819,11 +2821,13 @@ function selectInnerNamedJoins(
   this: QueryMethodsHost,
   values: unknown[],
   stashedJoins: unknown[],
-  cteJoinNodes: Nodes.Join[],
+  joinNodes: Nodes.Join[],
 ): AssociationSpec[] {
   return selectNamedJoins.call(this, values, stashedJoins, (join) => {
-    if (join instanceof CTEJoin) {
-      cteJoinNodes.push(buildWithJoinNode.call(this, join.name, Nodes.InnerJoin) as Nodes.Join);
+    if (join instanceof Nodes.Join) {
+      joinNodes.push(join);
+    } else if (join instanceof CTEJoin) {
+      joinNodes.push(buildWithJoinNode.call(this, join.name, Nodes.InnerJoin) as Nodes.Join);
     } else {
       throw new Error(
         `unknown class: ${(join as { constructor?: { name?: string } })?.constructor?.name}`,
@@ -2895,27 +2899,34 @@ export function buildJoinBuckets(
   // query_methods.rb:1856-1862: `stashed_eager_load || stashed_left_joins`.
   const hasStashed = Boolean(stashedEagerLoad) || stashedLeft.length > 0;
 
-  for (const v of joins.filter((j) => !this._isNamedJoinValue(j)) as (string | Nodes.Join)[]) {
-    const node: Nodes.Join =
-      typeof v === "string" ? (new Nodes.StringJoin(arelSql(v.trim()) as any) as Nodes.Join) : v;
-    if (!(node instanceof Nodes.LeadingJoin) && hasStashed) {
-      buckets.join_node.push(node);
-    } else {
-      buckets.leading_join.push(node);
+  // query_methods.rb:1851-1853. Rails wraps every String; trails collapses
+  // Ruby's Symbol and String into one type, so an association-name string
+  // stays a named join value instead of becoming a raw SQL fragment.
+  for (const [i, v] of joins.entries()) {
+    if (typeof v === "string" && !this._isNamedJoinValue(v)) {
+      joins[i] = new Nodes.StringJoin(arelSql(v.trim()) as any) as Nodes.Join;
     }
   }
 
-  // query_methods.rb:1865-1873.
-  const cteInnerJoinNodes: Nodes.Join[] = [];
+  // query_methods.rb:1855-1862: only the LEADING run of Join nodes is shifted
+  // off and routed by `hasStashed`; a Join node sitting behind a named join
+  // falls through to the `select_named_joins` block below, which buckets it as
+  // a join_node unconditionally.
+  while (joins[0] instanceof Nodes.Join) {
+    const joinNode = joins.shift() as Nodes.Join;
+    if (!(joinNode instanceof Nodes.LeadingJoin) && hasStashed) {
+      buckets.join_node.push(joinNode);
+    } else {
+      buckets.leading_join.push(joinNode);
+    }
+  }
+
+  // query_methods.rb:1864-1873.
+  const innerJoinNodes: Nodes.Join[] = [];
   buckets.named_join.push(
-    ...selectInnerNamedJoins.call(
-      this,
-      joins.filter((j) => this._isNamedJoinValue(j)),
-      buckets.stashed_join,
-      cteInnerJoinNodes,
-    ),
+    ...selectInnerNamedJoins.call(this, joins, buckets.stashed_join, innerJoinNodes),
   );
-  buckets.join_node.push(...cteInnerJoinNodes);
+  buckets.join_node.push(...innerJoinNodes);
 
   // query_methods.rb:1875-1876 — the eager stash goes in LAST.
   buckets.stashed_join.push(...stashedLeft);
