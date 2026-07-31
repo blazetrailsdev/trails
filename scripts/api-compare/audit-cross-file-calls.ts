@@ -3,7 +3,12 @@ import * as path from "path";
 
 import { OUTPUT_DIR } from "./config.js";
 import { jsEnumerableAliases } from "./enumerable-idioms.js";
-import { buildIncludeGraph, includeGraphEntities, type IncludeGraph } from "./include-graph.js";
+import {
+  buildIncludeGraph,
+  includeGraphEntities,
+  type GraphEntity,
+  type IncludeGraph,
+} from "./include-graph.js";
 
 // Mirrors the gate's own, unexported DELEGATION_MAX_CALLS (compare.ts:295) —
 // keep in step if that threshold ever moves.
@@ -79,8 +84,12 @@ export type LooseRow = Row & { resolutions: Resolution[] };
  * letting `MemoryStore#deleteMatched` discharge a call missing from
  * `FileStore#deleteMatched`.
  */
-function ownersOf(entity: Entity): string[] {
-  return [`${entity.file}:${entity.name}`, `fn:${entity.file}`];
+function ownersOf(entity: GraphEntity): string[] {
+  return [entityKey(entity), `fn:${entity.file}`];
+}
+
+function entityKey(entity: GraphEntity): string {
+  return `${entity.file}:${entity.name}`;
 }
 
 export function buildPackageIndex(
@@ -140,18 +149,17 @@ export function reachableEntities(
   tsFile: string,
   index: PackageIndex,
   delegation: boolean,
-): [Entity, EdgeKind][] {
-  const key = (entity: Entity): string => `${entity.file}:${entity.name}`;
+): [GraphEntity, EdgeKind][] {
   const includeOnly = delegation
-    ? new Set(includeGraphEntities(tsFile, index.graph).map((e) => key(e as Entity)))
+    ? new Set(includeGraphEntities(tsFile, index.graph).map(entityKey))
     : new Set<string>();
-  return includeGraphEntities(tsFile, index.graph, { delegation }).map((reached) => {
-    const entity = reached as Entity;
-    return [entity, delegation && !includeOnly.has(key(entity)) ? "delegation" : "include"];
-  });
+  return includeGraphEntities(tsFile, index.graph, { delegation }).map((entity) => [
+    entity,
+    delegation && !includeOnly.has(entityKey(entity)) ? "delegation" : "include",
+  ]);
 }
 
-function definitionsOf(entity: Entity, index: PackageIndex): Definition[] {
+function definitionsOf(entity: GraphEntity, index: PackageIndex): Definition[] {
   return ownersOf(entity).flatMap((owner) => index.definitionsByOwner.get(owner) ?? []);
 }
 
@@ -174,7 +182,7 @@ export function looseOnlyRows(
       if (makers.length === 0) continue;
       resolutions.push({
         entity: entity.name,
-        file: entity.file,
+        file: entity.file ?? "",
         edgeKind,
         methods: [...new Set(makers.map((d) => d.name))].sort(),
       });

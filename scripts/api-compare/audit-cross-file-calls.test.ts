@@ -222,6 +222,29 @@ describe("classifyRow", () => {
     ).toEqual({ bucket: "collaborator", resolvedIn: "other.ts" });
   });
 
+  it("keeps a sibling reached only through a barrel out of the include graph", () => {
+    const stores = buildPackageIndex([
+      entity("FileStore", "cache/file-store.ts", [{ name: "deleteMatched", calls: [] }], {
+        extends: ["Store"],
+      }),
+      entity("Store", "cache/store.ts", []),
+      entity("MemoryStore", "cache/memory-store.ts", [
+        { name: "deleteMatched", calls: ["quotedScope"] },
+      ]),
+      entity("Store", "cache/index.ts", [], { reExportedFrom: "cache/store.ts:Store" }),
+      entity("MemoryStore", "cache/index.ts", [{ name: "deleteMatched", calls: ["quotedScope"] }], {
+        reExportedFrom: "cache/memory-store.ts:MemoryStore",
+      }),
+    ]);
+    expect(
+      classifyRow(
+        mismatch("cache/file-store.ts", "deleteMatched"),
+        "quoted_scope → quotedScope",
+        stores,
+      ),
+    ).toEqual({ bucket: "collaborator", resolvedIn: "cache/memory-store.ts" });
+  });
+
   it("keeps a call no definition makes as a real divergence", () => {
     expect(
       classifyRow(mismatch("adapter.ts", "indexes"), "presence → presence", index).bucket,
