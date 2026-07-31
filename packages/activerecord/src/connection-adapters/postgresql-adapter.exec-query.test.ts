@@ -94,7 +94,9 @@ describe("PostgreSQLAdapter#execQuery", () => {
     const result = await adapter.execQuery("CREATE TABLE x (id int)");
     expect(result).toBeInstanceOf(Result);
     expect(result.length).toBe(0);
-    // Balances require-table-teardown; the mock driver makes this a no-op.
+    // Balances require-table-teardown; the mock driver makes this a no-op, so
+    // no teardown can be needed either.
+    // eslint-disable-next-line blazetrails/require-table-teardown
     await adapter.execQuery("DROP TABLE IF EXISTS x");
   });
 

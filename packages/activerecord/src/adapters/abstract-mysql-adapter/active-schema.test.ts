@@ -189,7 +189,9 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       // Stub mode: the DROP is instrumented and returned, never executed, so
       // the canonical `people` survives and needs no rebuild. The disable also
       // covers the "drop tables" case below — the rule reports a table once.
-      // eslint-disable-next-line blazetrails/require-canonical-rebuild
+      // No DDL reaches the database either, so there is nothing for a
+      // failure-safe teardown to clean up.
+      // eslint-disable-next-line blazetrails/require-canonical-rebuild, blazetrails/require-table-teardown
       const sqls = await captureSql(() => adapter.dropTable("people"), { stub: adapter });
       expect(sqls[0]).toBe("DROP TABLE `people`");
     });

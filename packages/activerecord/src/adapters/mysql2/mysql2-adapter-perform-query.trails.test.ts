@@ -25,6 +25,7 @@ describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();
     await adapter.exec(`DROP TABLE IF EXISTS pq`);
+    await adapter.exec(`DROP TABLE IF EXISTS pq_ddl`);
     await adapter.exec(
       `CREATE TABLE pq (id bigint NOT NULL AUTO_INCREMENT PRIMARY KEY, nick varchar(255))`,
     );
