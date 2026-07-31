@@ -4,7 +4,7 @@ import { fileURLToPath } from "url";
 import { RuleTester } from "eslint";
 import { describe, it, expect } from "vitest";
 import { Linter } from "eslint";
-import rule from "./no-load-schema-with-stubbed-ddl.mjs";
+import rule, { STUBBED_DDL_METHODS } from "./no-load-schema-with-stubbed-ddl.mjs";
 
 const FILENAME = "packages/activerecord/src/support/load-schema-helper-uuid-default.trails.test.ts";
 
@@ -145,5 +145,16 @@ describe("the real arm-content cover", () => {
     // Guards the fixture itself: if the cover stops stubbing createTable the
     // rule would pass vacuously here.
     expect(code).toContain('prop === "createTable"');
+  });
+});
+
+// The rule cannot import the TS declaration site (it is a plain-Node module,
+// and `packages/activerecord`'s rootDir is `src`), so this is what makes the
+// two sets one list: widening either without the other fails here.
+describe("the guarded method set", () => {
+  it("matches the runtime guard's", async () => {
+    const { STUBBED_DDL_METHODS: runtimeMethods } =
+      await import("../packages/activerecord/src/support/stubbed-ddl-methods.ts");
+    expect([...STUBBED_DDL_METHODS].sort()).toEqual([...runtimeMethods].sort());
   });
 });

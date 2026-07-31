@@ -17,11 +17,27 @@
  * self-tests, so importing `loadSchema` there is not banned outright).
  *
  * This rule closes that hole lexically, in the unit lane: in a test file that
- * stubs `createTable`, any reference to `loadSchema` is an error.
+ * stubs any of `STUBBED_DDL_METHODS`, any reference to `loadSchema` is an
+ * error.
  */
 
-/** The DDL emitter whose interception makes the canonical half unsafe. */
-export const STUBBED_DDL_METHODS = new Set(["createTable"]);
+/**
+ * The adapter members whose interception makes the canonical half unsafe.
+ *
+ * The declaration site is
+ * `packages/activerecord/src/support/stubbed-ddl-methods.ts`, which explains why
+ * the set reaches past `createTable`; this rule is a plain-Node module outside
+ * that package's `rootDir` and cannot import it, so the copy here is pinned
+ * against it by this rule's own test.
+ */
+export const STUBBED_DDL_METHODS = new Set([
+  "createTable",
+  "dropTable",
+  "addIndex",
+  "execute",
+  "schemaCreation",
+  "schemaStatements",
+]);
 
 /** The loader that must not be reached for once a DDL emitter is stubbed. */
 export const BANNED_LOADER = "loadSchema";
@@ -37,7 +53,7 @@ export function namesStubbedDdlMethod(node) {
 }
 
 /**
- * True when a `"createTable"` literal sits in an *interception* position — the
+ * True when a stubbed-DDL-method literal sits in an *interception* position — the
  * Proxy-trap dispatch shapes `prop === "createTable"`, `case "createTable":`,
  * and `["createTable"].includes(prop)`.
  *
@@ -63,7 +79,7 @@ const rule = {
     type: "problem",
     docs: {
       description:
-        "Forbid `loadSchema` in a test file that stubs `createTable`; such arm-content covers must call `loadAdapterSpecificSchema` directly.",
+        "Forbid `loadSchema` in a test file that stubs a DDL emitter; such arm-content covers must call `loadAdapterSpecificSchema` directly.",
     },
     schema: [],
     messages: {

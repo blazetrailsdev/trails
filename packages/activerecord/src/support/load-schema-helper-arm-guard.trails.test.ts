@@ -54,6 +54,55 @@ describe("load_schema arm-probe guard", () => {
     });
   });
 
+  // `createTable` is not the only interception that lays nothing: `runTable`
+  // reaches the database through the SchemaStatements companion, so a cover
+  // that stubs the members *it* goes through is just as unsafe, and just as
+  // invisible outside the PG lane.
+  for (const method of ["dropTable", "addIndex", "execute", "schemaStatements"]) {
+    it(`rejects an adapter whose ${method} a proxy intercepts`, async () => {
+      await withAdapter(async (adapter) => {
+        const probe = new Proxy(adapter, {
+          get(target, prop) {
+            if (prop === method) return async () => {};
+            return Reflect.get(target, prop, target);
+          },
+        });
+
+        await expect(loadSchema(probe as unknown as AbstractAdapter)).rejects.toThrow(
+          new RegExp(`${method} is stubbed`),
+        );
+      });
+    });
+  }
+
+  // `schemaCreation` is an accessor, not a method, so the guard compares what
+  // the real one yields rather than its identity — PostgreSQLAdapter's builds a
+  // fresh visitor per read.
+  it("rejects an adapter whose schemaCreation a proxy intercepts", async () => {
+    await withAdapter(async (adapter) => {
+      const probe = new Proxy(adapter, {
+        get(target, prop) {
+          if (prop === "schemaCreation") return { accept: async () => "" };
+          return Reflect.get(target, prop, target);
+        },
+      });
+
+      await expect(loadSchema(probe as unknown as AbstractAdapter)).rejects.toThrow(
+        /schemaCreation is stubbed/,
+      );
+    });
+  });
+
+  it("rejects an adapter whose execute is assigned over", async () => {
+    await withAdapter(async (adapter) => {
+      (adapter as unknown as { execute: unknown }).execute = async () => [];
+
+      await expect(loadSchema(adapter as unknown as AbstractAdapter)).rejects.toThrow(
+        /execute is stubbed/,
+      );
+    });
+  });
+
   // The counterpart direction: a proxy that only observes must still load, or
   // the guard would break the pooling/logging wrappers that hand `loadSchema` a
   // wrapped connection.

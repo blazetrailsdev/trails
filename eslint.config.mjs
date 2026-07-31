@@ -568,7 +568,9 @@ export default defineConfig(
     },
   },
 
-  // ── no-load-schema-with-stubbed-ddl: a test that stubs `createTable` lays
+  // ── no-load-schema-with-stubbed-ddl: a test that stubs any DDL emitter the
+  //    canonical half goes through (see
+  //    packages/activerecord/src/support/stubbed-ddl-methods.ts) lays
   //    nothing on the database, so `loadSchema`'s canonical half would query
   //    tables that were never created (PR #5676). Those arm-content covers must
   //    call `loadAdapterSpecificSchema` directly. The self-test allowlist in
@@ -578,7 +580,7 @@ export default defineConfig(
   {
     files: ["packages/activerecord/src/**/*.test.ts"],
     // The guard cover is the one file that must do exactly what the rule
-    // forbids: it stubs `createTable` to assert `loadSchema` *refuses* such an
+    // forbids: it stubs those emitters to assert `loadSchema` *refuses* such an
     // adapter (support/load-schema-helper.ts, assertNotArmProbe) instead of
     // running its canonical half.
     ignores: ["packages/activerecord/src/support/load-schema-helper-arm-guard.trails.test.ts"],
