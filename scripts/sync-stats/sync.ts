@@ -1918,24 +1918,7 @@ async function syncJobLogs(mode: "latest" | "refresh" | "backfill"): Promise<num
   return fetched;
 }
 
-async function syncCompareStats(mode: "latest" | "refresh" | "backfill"): Promise<number> {
-  const limitClause = mode === "latest" ? "LIMIT 50" : "";
-  const runsToProcess = await Base.adapter.execute(`
-    SELECT rjl.job_id, rjl.merge_commit_sha, rjl.pr_number
-    FROM raw_job_logs rjl
-    JOIN workflow_jobs wj ON wj.id = rjl.job_id
-    WHERE wj.name = 'Rails API/Test Comparison'
-    AND wj.conclusion = 'success'
-    AND rjl.job_id = (
-      SELECT rjl2.job_id FROM raw_job_logs rjl2
-      JOIN workflow_jobs wj2 ON wj2.id = rjl2.job_id
-      WHERE rjl2.merge_commit_sha = rjl.merge_commit_sha
-      AND wj2.name = 'Rails API/Test Comparison'
-      AND wj2.conclusion = 'success'
-      ORDER BY wj2.completed_at DESC
-      LIMIT 1
-    )
-    AND (
+const MISSING_STATS_PREDICATE = `
       NOT EXISTS (
         SELECT 1 FROM test_compare_stats tcs
         WHERE tcs.merge_commit_sha = rjl.merge_commit_sha
@@ -1967,7 +1950,29 @@ async function syncCompareStats(mode: "latest" | "refresh" | "backfill"): Promis
           ON cl.merge_commit_sha = rjl.merge_commit_sha AND cl.step_name = e.step_name
         WHERE e.required = 1 AND cl.step_name IS NULL
       )
+`;
+
+async function syncCompareStats(
+  mode: "latest" | "refresh" | "backfill" | "reparse",
+): Promise<number> {
+  const limitClause = mode === "latest" ? "LIMIT 50" : "";
+  const missingStatsClause = mode === "reparse" ? "" : `AND (${MISSING_STATS_PREDICATE})`;
+  const runsToProcess = await Base.adapter.execute(`
+    SELECT rjl.job_id, rjl.merge_commit_sha, rjl.pr_number
+    FROM raw_job_logs rjl
+    JOIN workflow_jobs wj ON wj.id = rjl.job_id
+    WHERE wj.name = 'Rails API/Test Comparison'
+    AND wj.conclusion = 'success'
+    AND rjl.job_id = (
+      SELECT rjl2.job_id FROM raw_job_logs rjl2
+      JOIN workflow_jobs wj2 ON wj2.id = rjl2.job_id
+      WHERE rjl2.merge_commit_sha = rjl.merge_commit_sha
+      AND wj2.name = 'Rails API/Test Comparison'
+      AND wj2.conclusion = 'success'
+      ORDER BY wj2.completed_at DESC
+      LIMIT 1
     )
+    ${missingStatsClause}
     ORDER BY rjl.pr_number DESC
     ${limitClause}
   `);
@@ -2332,7 +2337,7 @@ async function main() {
 
     if (reparseLogs) {
       console.log("=== Re-parsing compare stats from stored CI logs ===");
-      const logsParsed = await syncCompareStats("refresh");
+      const logsParsed = await syncCompareStats("reparse");
       console.log(`\nRe-parsed ${logsParsed} job logs.`);
       await printSummary();
       return;
