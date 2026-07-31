@@ -14,8 +14,10 @@
  * database is not freshly created, so it has to be emptied first. Which form
  * that takes is the driver gate (RFC 0002 §Design):
  *   - already laid by this run (`canonicalSchemaUpToDate`) → TRUNCATE, skipping
- *     the canonical DDL only. This is the PG template-clone fast path: a slot DB
- *     cloned from the stamped template already carries the canonical half.
+ *     the canonical DDL only. All three lanes reach it: globalSetup stamps what
+ *     it lays (a PG slot cloned from the stamped template, the sqlite template
+ *     file each worker clones, each MySQL slot DB), and this arm re-stamps, so
+ *     a worker recycled onto a database an earlier worker used takes it too.
  *   - sqlite file → purge (per-worker isolated file; drop+create is safe — no
  *     other worker shares this file path).
  *   - PG/MySQL slot >1 (AR_PG_EXCLUSIVE_DB / AR_MYSQL_EXCLUSIVE_DB set by
@@ -61,6 +63,13 @@ if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
   const conn = await Base.leaseConnection();
   await resetTestTables(conn);
   await loadAdapterSpecificSchema(conn);
+  // Re-stamp: `resetTestTables` drops `ar_internal_metadata` along with the
+  // other bookkeeping tables, so the stamp this boot consumed is gone. What is
+  // left behind is the same state the full-load arm below stamps — canonical
+  // plus adapter-specific, laid and empty — so the next worker recycled onto
+  // this database is entitled to the same fast path. Without this the stamp is
+  // single-use per database and every recycle pays the full purge+reload.
+  await stampCanonicalSchema(conn);
 } else {
   // `DatabaseTasks.purge` re-establishes Base's pool on the recreated database,
   // so the connection has to be leased after it, not before.

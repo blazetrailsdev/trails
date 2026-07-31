@@ -59,12 +59,19 @@ function slotCount(): number {
   return workerForkCount() <= 1 ? 1 : slotPoolSize();
 }
 
+// Lay the canonical schema and stamp it, so the worker that claims this
+// database reports `canonicalSchemaUpToDate` and boots on the TRUNCATE fast
+// path instead of purging and re-laying what globalSetup just laid. The run
+// token is passed explicitly because `RUN_TOKEN_ENV` is only published to the
+// environment after provisioning finishes.
 async function buildTemplateSchema(
   adapter: DatabaseAdapter,
+  runToken: string,
   close: () => Promise<void>,
 ): Promise<void> {
   try {
     await loadSchema(adapter);
+    await stampCanonicalSchema(adapter, runToken);
   } finally {
     await close();
   }
@@ -111,7 +118,9 @@ const sqliteAdapter: DbTemplateAdapter = {
     const templatePath = await templatePathFor(runToken);
 
     const adapter = new BetterSQLite3Adapter(templatePath);
-    await buildTemplateSchema(adapter as unknown as DatabaseAdapter, () => adapter.close());
+    await buildTemplateSchema(adapter as unknown as DatabaseAdapter, runToken, () =>
+      adapter.close(),
+    );
 
     process.env[TEMPLATE_PATH_ENV] = templatePath;
     process.env[RUN_TOKEN_ENV] = runToken;
@@ -306,7 +315,7 @@ const mysqlAdapter: DbTemplateAdapter = {
           connectionLimit: 1,
           flags: ["FOUND_ROWS"],
         }) as unknown as DatabaseAdapter;
-        await buildTemplateSchema(adapter, async () => {
+        await buildTemplateSchema(adapter, runToken, async () => {
           await (adapter as unknown as { disconnect(): Promise<void> }).disconnect?.();
         });
       }),
