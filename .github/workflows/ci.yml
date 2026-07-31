@@ -206,10 +206,9 @@ jobs:
           # it and eslint/rails-private-jsdoc.config.mjs, so an isolated change
           # to the root config must still run the guard.
           # scripts/ci/check-control-bytes.sh is named for the same reason:
-          # eslint/no-raw-control-bytes.drift.test.mjs guards its byte set
-          # against the ESLint rule's, and scripts/ci/ is carved out of the
-          # infra sweep, so an isolated change to the script must still run
-          # the guard.
+          # eslint/no-raw-control-bytes.drift.test.mjs is a drift guard between
+          # its byte set and the ESLint rule's, and scripts/ci/ is carved out
+          # of the infra sweep (INFRA_CARVEOUT_RE).
           UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport)/|eslint/|scripts/(tasks|guides-typecheck|parity|api-compare|test-compare|fixtures-compare|test-deps|rails-find)/|scripts/ci/check-control-bytes\.sh$|scripts/(strip-asany|rails-file-structure-mixins|ci-suite-coverage|deprecated-manifest-diff)(\.test)?\.ts$|eslint\.config\.mjs$|vendor/(sources\.ts|sources\.lock\.json|sources\.test\.ts|fetch\.ts)$)'
           # guides_affected gates the Guides Code Type Check job, which
           # compiles fenced TS blocks in packages/website/docs/guides/**.
