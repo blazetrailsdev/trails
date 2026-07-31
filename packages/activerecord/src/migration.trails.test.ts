@@ -262,9 +262,6 @@ describe("Migration#createTable id option type", () => {
     ]);
   });
 
-  // Rails routes Migration#method_missing through execution_strategy, whose
-  // method_missing forwards to migration.connection. JS has no implicit
-  // method_missing, so the forwarding pair is called explicitly.
   describe("execution strategy", () => {
     class StrategyMigration extends Migration {
       override get connection(): DatabaseAdapter {

@@ -278,7 +278,6 @@ export abstract class Migration {
   protected _connectionOverride?: DatabaseAdapter;
   /** @internal Per-migration pool override — mirrors Rails' @pool ivar. */
   protected _poolOverride?: ConnectionPool;
-  /** @internal Memoized strategy — mirrors Rails' @execution_strategy ivar. */
   private _executionStrategy?: ExecutionStrategy;
   private _recording = false;
   private _recorder = new CommandRecorder();
@@ -1580,8 +1579,6 @@ export abstract class Migration {
       methodMissing?: (name: string, ...args: unknown[]) => unknown;
     };
     if (strategy.respondToMissing?.(name) !== true) {
-      // Rails falls through to `super`, which raises NoMethodError. JS has no
-      // NoMethodError; TypeError is the closest stdlib equivalent.
       throw new TypeError(`undefined method '${name}' for ${this.connection.constructor.name}`);
     }
     return strategy.methodMissing?.(name, ...args);
