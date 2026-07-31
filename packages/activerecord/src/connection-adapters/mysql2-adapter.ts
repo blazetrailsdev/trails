@@ -1382,33 +1382,21 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /**
    * Return the query execution plan. Accepts Rails-style options (e.g.
-   * `["analyze"]` → `EXPLAIN ANALYZE <sql>` on MySQL 8.0.18+). Binds
-   * flow through in the same driver form `execute()` uses
-   * (`mysqlBinds(binds)` — booleans → 1/0), so a collected
-   * prepared-statement SQL with `?` placeholders re-EXPLAINs
-   * correctly.
+   * `["analyze"]` → `EXPLAIN ANALYZE <sql>` on MySQL 8.0.18+). Runs
+   * through `internalExecQuery` as Rails' MySQL `explain` does, so the
+   * EXPLAIN is instrumented and a collected prepared-statement SQL with
+   * `?` placeholders re-EXPLAINs with its binds.
    */
   async explain(
     sql: string,
     binds: unknown[] = [],
     options: ExplainOption[] = [],
   ): Promise<string> {
-    // Rails' MySQL::DatabaseStatements#explain runs through internal_exec_query
-    // and therefore through perform_query, which re-syncs the database timezone.
-    this._syncDatabaseTimezone();
-    const conn = await this.getConn();
     const clause = this._explainStatementClause(options);
     const start = Date.now();
-    // Forward binds in the same driver form execute() uses
-    // (booleans → 1/0). Without this, an EXPLAIN over a bind-
-    // carrying prepared-statement query would fail with a mysql
-    // parameter-count error.
-    const [rows] = await conn.query(`${clause} ${this.mysqlQuote(sql)}`, this.mysqlBinds(binds));
+    const result = await this.internalExecQuery(`${clause} ${sql}`, "EXPLAIN", binds);
     const elapsed = (Date.now() - start) / 1000;
     const printer = new ExplainPrettyPrinter();
-    const typedRows = rows as Array<Record<string, unknown>>;
-    const columns = typedRows.length > 0 ? Object.keys(typedRows[0]) : [];
-    const result = { columns, rows: typedRows.map((r) => columns.map((c) => r[c])) };
     return printer.pp(result, elapsed);
   }
 

@@ -2411,33 +2411,21 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    *
    * Accepts Rails-style options (`["analyze", "verbose"]`) which get
    * composed into the EXPLAIN clause via `buildExplainClause` — e.g.
-   * `EXPLAIN (ANALYZE, VERBOSE) <sql>`. Binds pass through in the
-   * same rewritten form `execute()`/`execQuery()` use (`?` → `$1`
-   * placeholders + the values array) so a collected
-   * prepared-statement query re-EXPLAINs cleanly without pg
-   * rejecting it for "no parameter $1".
+   * `EXPLAIN (ANALYZE, VERBOSE) <sql>`. Runs through
+   * `internalExecQuery` as Rails' PG `explain` does, so the EXPLAIN is
+   * instrumented and binds pass through in the same rewritten form
+   * (`?` → `$1` placeholders + the values array) that
+   * `execute()`/`execQuery()` use.
    */
   async explain(
     sql: string,
     binds: unknown[] = [],
     options: ExplainOption[] = [],
   ): Promise<string> {
-    return this.withRawConnection({}, async (conn) => {
-      const client = conn as unknown as pg.Client;
-      const clause = this._explainStatementClause(options);
-      // Rewrite `?` → `$1` the same way execute/execQuery do, so a
-      // collected query with driver-neutral placeholders (`?`) can be
-      // re-EXPLAIN'd. Bind values pass through to pg as the values
-      // array so `EXPLAIN` with parameters doesn't error with
-      // "there is no parameter $1".
-      const pgBinds = binds.map((v) => this._bindForPg(v));
-      const rewritten = this.rewriteBinds(sql, pgBinds);
-      const result = await this._serializePinnedQuery(client, () =>
-        client.query(`${clause} ${rewritten}`, pgBinds),
-      );
-      const printer = new ExplainPrettyPrinter();
-      return printer.pp(result.rows);
-    });
+    const clause = this._explainStatementClause(options);
+    const result = await this.internalExecQuery(`${clause} ${sql}`, "EXPLAIN", binds);
+    const printer = new ExplainPrettyPrinter();
+    return printer.pp(result.toArray());
   }
 
   /**
