@@ -526,7 +526,7 @@ describe("ConnectionHandlerTest", () => {
     const config = new HashConfig("development", "primary", ambientPoolConfiguration());
     handler.establishConnection(config, { owner: "primary" });
     const pool = handler.retrieveConnectionPool("primary")!;
-    await pool.leaseConnection();
+    await (await pool.leaseConnection()).verifyBang();
     expect(handler.isConnected("primary")).toBe(true);
     pool.releaseConnection();
   });
