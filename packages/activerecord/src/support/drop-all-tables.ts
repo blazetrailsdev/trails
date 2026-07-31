@@ -50,8 +50,7 @@ function bootLaidTableNames(): ReadonlySet<string> {
  * Drops every user table/view/matview in the database. Idempotent; per-DROP
  * errors are swallowed so teardown noise never aborts the sequence.
  * PG covers all schemas in `current_schemas(false)` (not just `public`).
- * MySQL uses a pinned pool connection with `FOREIGN_KEY_CHECKS=0`; sqlite goes
- * through `disableReferentialIntegrity`.
+ * MySQL and sqlite both go through `disableReferentialIntegrity`.
  */
 export async function dropAllTables(adapter: DatabaseAdapter): Promise<void> {
   await resetTables(adapter, "drop-all");
@@ -215,8 +214,7 @@ async function resetMysqlTables(
   // single-connection model (_client). Falls back to adapter.execute /
   // adapter.executeMutation so both paths share one implementation.
   const toTruncate: string[] = [];
-  try {
-    await adapter.execute(`SET FOREIGN_KEY_CHECKS=0`);
+  await adapter.disableReferentialIntegrity(async () => {
     const tableRows = await adapter.execute(
       `SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'`,
     );
@@ -241,12 +239,8 @@ async function resetMysqlTables(
         await adapter.executeMutation(`DROP TABLE IF EXISTS \`${name}\``);
       } catch {}
     }
-    await truncateNonEmpty(adapter, toTruncate);
-  } finally {
-    try {
-      await adapter.execute(`SET FOREIGN_KEY_CHECKS=1`);
-    } catch {}
-  }
+  });
+  await truncateNonEmpty(adapter, toTruncate);
 }
 
 async function resetSqliteTables(
