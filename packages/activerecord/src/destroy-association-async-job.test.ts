@@ -32,8 +32,6 @@ class UnusedHasManyAsync extends Base {
   }
 }
 
-// TS-only: Rails' models resolve their job name through Ruby's real constant
-// table; trails' constantize reads the registry in activesupport/inflector.
 class ResolvableJob {}
 
 class ResolvableJobAsync extends Base {
@@ -94,10 +92,6 @@ describe("DestroyAssociationAsyncJobTest", () => {
     expect((error as Error).message).toMatch(/destroyAssociationAsyncJob/);
   });
 
-  // TS-only: core.rb:27-34 resolves a job configured as a class *name* through
-  // constantize on read and memoizes the class back onto the attribute. Rails
-  // exercises that branch via its own default; trails has no ActiveJob and so
-  // no default (base.ts), leaving the branch otherwise unreached.
   it("resolves a job configured by name and caches the class", () => {
     registerConstant("ResolvableJob", ResolvableJob);
     expect(ResolvableJobAsync.destroyAssociationAsyncJob()).toBe(ResolvableJob);
