@@ -439,9 +439,6 @@ async function singleAggregate(
   const manager = table.project(projection);
   // Rails routes sum/average/maximum/minimum through apply_join_dependency when
   // has_include? — includes().references() promotes to a LEFT OUTER JOIN here.
-  // The eager joins reach the shared `build_joins` port (`_applyJoinsToManager`)
-  // on that relation, so one `AliasTracker` spans the manual joins AND the eager
-  // JD and `walk` dedups a coinciding association.
   eagerJoinedRelation(rel, rel._groupColumns.length === 0)._applyJoinsToManager(manager);
   rel._applyWheresToManager(manager, table);
   applyFromToManager(rel, manager);
@@ -796,17 +793,8 @@ export async function performCount(
   // prevent fan-out. Without this, the INNER JOIN alone would fan-out multiple rows
   // per record when a record has multiple associated records.
   if (hasInclude(this, column ?? null)) {
-    // `apply_join_dependency` returns the relation untouched when it is not
-    // eager loading, so an unchanged identity is the "no eager joins to apply"
-    // signal — the gate Rails gets for free by only reaching here through
-    // `has_include?`.
-    //
-    // Every arm re-derives the eager-joined relation per manager rather than
-    // reusing one: `joinConstraints` aliases the JoinDependency's nodes in
-    // place, so the id and count queries cannot share one instance. The joins
-    // reach the shared `build_joins` port, so one `AliasTracker` spans the
-    // manual joins AND the eager JD and an eager association coinciding with an
-    // explicit join re-aliases at emit-time (`comments_people_2`) via `walk`.
+    // Re-derived per manager: `joinConstraints` aliases the join dependency's
+    // nodes in place, so the id and count queries cannot share one instance.
     const eagerJoined = (): CalculationRelation => eagerJoinedRelation(this, false);
     if (eagerJoined() !== this) {
       const pk = this._modelClass.primaryKey;
