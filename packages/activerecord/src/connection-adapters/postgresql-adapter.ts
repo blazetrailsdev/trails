@@ -3766,10 +3766,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     await this.reloadTypeMap();
   }
 
-  async databaseExists(name: string): Promise<boolean> {
-    return this.pgSchemaStatements().databaseExists(name);
-  }
-
   async indexes(tableName: string): Promise<IndexDefinition[]> {
     return this.pgSchemaStatements().indexes(tableName);
   }

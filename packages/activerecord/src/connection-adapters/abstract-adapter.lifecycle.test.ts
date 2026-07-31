@@ -7,6 +7,7 @@ import {
   ConnectionFailed,
   Deadlocked,
   LockWaitTimeout,
+  NoDatabaseError,
 } from "../errors.js";
 
 describe("AbstractAdapter connection lifecycle privates", () => {
@@ -83,5 +84,33 @@ describe("AbstractAdapter connection lifecycle privates", () => {
     a.checkVersion = () => void (called += 1);
     await a.configureConnection();
     expect(called).toBe(1);
+  });
+});
+
+describe("AbstractAdapter#databaseExists", () => {
+  it("proves the database by connecting, not by a cached handle", async () => {
+    const a = new AbstractAdapter();
+    // Never connected: Rails' `connect!` succeeds against a live database, so
+    // the answer is true even though `_connection` is still null.
+    expect((a as any)._connection).toBe(null);
+    expect(await a.databaseExists()).toBe(true);
+  });
+
+  it("returns false when connect! raises NoDatabaseError", async () => {
+    const a = new AbstractAdapter();
+    a.connectBang = async () => {
+      throw new NoDatabaseError("no such database");
+    };
+    // A stale cached handle must not make this answer true.
+    (a as any)._connection = {};
+    expect(await a.databaseExists()).toBe(false);
+  });
+
+  it("re-raises errors other than NoDatabaseError", async () => {
+    const a = new AbstractAdapter();
+    a.connectBang = async () => {
+      throw new ConnectionFailed("boom");
+    };
+    await expect(a.databaseExists()).rejects.toBeInstanceOf(ConnectionFailed);
   });
 });

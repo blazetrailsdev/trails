@@ -56,18 +56,34 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const dbPath = path.join(nested, "test.db");
     const a = new BetterSQLite3Adapter(dbPath);
     expect(a.isOpen).toBe(true);
+    expect(await BetterSQLite3Adapter.databaseExists({ database: dbPath })).toBe(true);
     await a.close();
     fs.rmSync(baseDir, { recursive: true, force: true });
   });
 
-  it("database exists returns true when database exists", () => {
-    // Our in-memory adapter is always "existing"
-    expect(adapter.isOpen).toBe(true);
+  it("database exists returns false when the database does not exist", async () => {
+    expect(await BetterSQLite3Adapter.databaseExists({ database: "non_extant_db" })).toBe(false);
+  });
+
+  it("database exists returns true when database exists", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const os = await import("os");
+    const dbPath = path.join(os.tmpdir(), `sqlite-exists-${Date.now()}.db`);
+    const a = new BetterSQLite3Adapter(dbPath);
+    try {
+      expect(await BetterSQLite3Adapter.databaseExists({ database: dbPath })).toBe(true);
+      expect(await a.databaseExists()).toBe(true);
+    } finally {
+      await a.close();
+      fs.rmSync(dbPath, { force: true });
+    }
   });
 
   it("database exists returns true for an in memory db", async () => {
+    expect(await BetterSQLite3Adapter.databaseExists({ database: ":memory:" })).toBe(true);
     const memAdapter = new BetterSQLite3Adapter(":memory:");
-    expect(memAdapter).toBeDefined();
+    expect(await memAdapter.databaseExists()).toBe(true);
     await memAdapter.close();
   });
 
