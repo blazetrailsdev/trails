@@ -351,7 +351,8 @@ export const ActiveRecord = {
 
   /**
    * The execution strategy migrations run through. Defaults to
-   * {@link DefaultStrategy}, which runs the migration's `up`/`down` directly.
+   * {@link DefaultStrategy}, which forwards the calls a migration doesn't
+   * implement itself to the connection adapter.
    * Mirrors `ActiveRecord.migration_strategy` (active_record.rb:398-401, default
    * `Migration::DefaultStrategy`).
    */
