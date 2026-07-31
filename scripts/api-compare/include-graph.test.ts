@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildIncludeGraph, includeGraphCallSets, includeGraphEntities } from "./include-graph.js";
+import {
+  buildIncludeGraph,
+  includeGraphCallSets,
+  includeGraphEntities,
+  type GraphEntity,
+} from "./include-graph.js";
 import type { ClassInfo, MethodInfo } from "./types.js";
 
 function method(name: string, calls?: string[]): MethodInfo {
@@ -22,7 +27,7 @@ function entity(
   };
 }
 
-const names = (entities: ClassInfo[]) => entities.map((e) => e.name).sort();
+const names = (entities: GraphEntity[]) => entities.map((e) => e.name).sort();
 
 describe("includeGraphEntities", () => {
   it("reaches an entity through a recorded includes edge", () => {
