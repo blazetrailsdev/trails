@@ -76,17 +76,25 @@ export async function resetTestTables(adapter: DatabaseAdapter): Promise<void> {
 
 type ResetMode = "drop-all" | "reset";
 
+/**
+ * The array {@link resetTables} records dropped names into, or `null` when the
+ * sweep is not being measured — which is the default, and the only state CI
+ * ever runs in. See {@link recordSweptTables}.
+ *
+ * Recording waits for the boot snapshot: `test-setup-dy.ts` runs a reset of its
+ * own between the canonical load and the adapter-specific arm, and what that
+ * one drops (`defaults`, on a worker recycled onto an already-used database) is
+ * boot bookkeeping rather than a test leak. Only between-test sweeps are the
+ * measurement.
+ */
+function sweepCollector(mode: ResetMode): string[] | null {
+  if (mode !== "reset" || _bootLaidTableNames === null) return null;
+  return sweepReportDir() === undefined ? null : [];
+}
+
 async function resetTables(adapter: DatabaseAdapter, mode: ResetMode): Promise<void> {
   const bootLaid = bootLaidTableNames();
-  // Off by default (`AR_SWEEP_REPORT` unset): `swept` stays null and the drop
-  // loops below skip recording entirely. See {@link recordSweptTables}.
-  //
-  // Only *between-test* sweeps are measured, so recording waits until the boot
-  // snapshot exists: `test-setup-dy.ts` runs a reset of its own between the
-  // canonical load and the adapter-specific arm, and everything that one drops
-  // (`defaults` on a recycled worker) is boot bookkeeping, not a test leak.
-  const swept: string[] | null =
-    mode === "reset" && _bootLaidTableNames !== null && sweepReportDir() !== undefined ? [] : null;
+  const swept = sweepCollector(mode);
   switch (adapter.adapterName) {
     case "postgres":
       await resetPgTables(adapter, mode, bootLaid, swept);
@@ -181,9 +189,9 @@ async function _resetPgTablesOnce(
   for (const { schemaname: s, name: n } of (await adapter.execute(
     `SELECT schemaname, matviewname AS name FROM pg_matviews WHERE schemaname = ${schema}`,
   )) as { schemaname: string; name: string }[]) {
-    swept?.push(`matview:${n}`);
     try {
       await adapter.executeMutation(`DROP MATERIALIZED VIEW IF EXISTS "${s}"."${n}" CASCADE`);
+      swept?.push(`matview:${n}`);
     } catch (e) {
       if (_isPgConnectionError(e)) throw e;
     }
@@ -191,9 +199,9 @@ async function _resetPgTablesOnce(
   for (const { schemaname: s, name: n } of (await adapter.execute(
     `SELECT schemaname, viewname AS name FROM pg_views WHERE schemaname = ${schema}`,
   )) as { schemaname: string; name: string }[]) {
-    swept?.push(`view:${n}`);
     try {
       await adapter.executeMutation(`DROP VIEW IF EXISTS "${s}"."${n}" CASCADE`);
+      swept?.push(`view:${n}`);
     } catch (e) {
       if (_isPgConnectionError(e)) throw e;
     }
@@ -211,9 +219,9 @@ async function _resetPgTablesOnce(
       toTruncate.push(t);
       continue;
     }
-    swept?.push(s === "public" ? t : `${s}.${t}`);
     try {
       await adapter.executeMutation(`DROP TABLE IF EXISTS "${s}"."${t}" CASCADE`);
+      swept?.push(s === "public" ? t : `${s}.${t}`);
     } catch (e) {
       if (_isPgConnectionError(e)) throw e;
     }
@@ -237,10 +245,10 @@ async function resetMysqlTables(
     );
     for (const r of viewRows as Array<{ table_name?: string; TABLE_NAME?: string }>) {
       const name = r.table_name ?? r.TABLE_NAME;
-      if (name) swept?.push(`view:${name}`);
       if (name)
         try {
           await adapter.executeMutation(`DROP VIEW IF EXISTS \`${name}\``);
+          swept?.push(`view:${name}`);
         } catch {}
     }
     for (const r of tableRows as Array<{ table_name?: string; TABLE_NAME?: string }>) {
@@ -250,9 +258,9 @@ async function resetMysqlTables(
         toTruncate.push(name);
         continue;
       }
-      swept?.push(name);
       try {
         await adapter.executeMutation(`DROP TABLE IF EXISTS \`${name}\``);
+        swept?.push(name);
       } catch {}
     }
   });
@@ -270,9 +278,9 @@ async function resetSqliteTables(
     for (const { name } of (await adapter.execute(
       `SELECT name FROM sqlite_master WHERE type='view' AND name NOT LIKE 'sqlite_%'`,
     )) as { name: string }[]) {
-      swept?.push(`view:${name}`);
       try {
         await adapter.executeMutation(`DROP VIEW IF EXISTS "${name}"`);
+        swept?.push(`view:${name}`);
       } catch {}
     }
     for (const { name } of (await adapter.execute(
@@ -282,9 +290,9 @@ async function resetSqliteTables(
         toTruncate.push(name);
         continue;
       }
-      swept?.push(name);
       try {
         await adapter.executeMutation(`DROP TABLE IF EXISTS "${name}"`);
+        swept?.push(name);
       } catch {}
     }
   });

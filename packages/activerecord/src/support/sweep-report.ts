@@ -58,6 +58,7 @@ export async function recordSweptTables(
   await flushChain;
 }
 
+/** Never throws: instrumentation must not be able to fail a test run. */
 async function writeReport(dir: string, lane: string, names: readonly string[]): Promise<void> {
   try {
     const fs = await getFsAsync();
@@ -69,7 +70,7 @@ async function writeReport(dir: string, lane: string, names: readonly string[]):
       `${JSON.stringify({ lane, worker, tables: names }, null, 2)}\n`,
     );
   } catch {
-    // Instrumentation must never fail a test run.
+    return;
   }
 }
 
