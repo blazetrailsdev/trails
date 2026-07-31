@@ -36,6 +36,7 @@
     "api:arity": "pnpm tsx scripts/api-compare/lint-arity-excludes.ts",
     "api:pins": "pnpm tsx scripts/api-compare/lint-body-pins.ts",
     "api:pins:all": "API_COMPARE_FORCE=1 pnpm api:compare && pnpm tsx scripts/api-compare/body-pins.ts --pin-all",
+    "bespoke:tables:inventory": "pnpm tsx scripts/bespoke-tables-inventory/inventory.ts",
     "fixtures:adoption:inventory": "pnpm tsx scripts/fixtures-inventory/inventory.ts",
     "fixtures:compare": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/fixtures-compare/compare.ts",
     "schema:compare": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/schema-compare/compare.ts",
