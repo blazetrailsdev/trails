@@ -15,6 +15,7 @@ import {
   TRANSCRIPTION_DIVERGENCE_ALLOW_LIST,
   compareTranscriptions,
   describeSpec,
+  staleDivergenceAllowances,
   unresolvedCallSites,
 } from "./compare.js";
 import { canonicalRegistrySchema } from "../../packages/activerecord/src/support/canonical-schema.js";
@@ -667,6 +668,14 @@ describe("compareTranscriptions", () => {
     expect(compareTranscriptions({}, { [table]: { name: "string" } })).toEqual([]);
   });
 
+  it("flags an allow-list entry the transcriptions have converged on", () => {
+    const table = [...TRANSCRIPTION_DIVERGENCE_ALLOW_LIST.keys()][0]!;
+    const converged = { [table]: { name: "string" } };
+    expect(staleDivergenceAllowances(converged, converged)).toContain(table);
+    // Still divergent (registry-only) — the allowance is doing its job.
+    expect(staleDivergenceAllowances({}, converged)).not.toContain(table);
+  });
+
   it("treats the two spellings of a SQL default as one thing", () => {
     expect(describeSpec({ type: "datetime", defaultFunction: "CURRENT_TIMESTAMP" })).toBe(
       "datetime default=fn",
@@ -697,6 +706,10 @@ describe("against the canonical registry", () => {
 
   it("keeps the two transcriptions of schema.rb in sync", async () => {
     expect(compareTranscriptions(TEST_SCHEMA, await canonicalRegistrySchema())).toEqual([]);
+  });
+
+  it("carries no divergence allowance the transcriptions have outgrown", async () => {
+    expect(staleDivergenceAllowances(TEST_SCHEMA, await canonicalRegistrySchema())).toEqual([]);
   });
 
   it("recovers the declared column shape rather than one adapter's rendering", async () => {

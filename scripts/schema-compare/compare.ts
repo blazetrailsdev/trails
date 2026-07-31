@@ -10,14 +10,17 @@
 // Checking only the first left the one that builds the database unverified, so
 // both are diffed against schema.rb and a third check fails when they disagree.
 //
-// Two verdicts:
-//   INVENTED (fatal)    — a table or column present in TEST_SCHEMA that
+// Three verdicts:
+//   INVENTED (fatal)    — a table or column present in a transcription that
 //                         schema.rb does not declare. This is the guard-rail:
 //                         it is how the `encrypted_posts` near-miss and
 //                         vendor-bump drift get caught mechanically.
+//   TRANSCRIPTION-DRIFT — the two transcriptions disagree about a table or a
+//     (fatal)             column's declared shape. Fatal because they are
+//                         hand-synced: nothing but this check couples them.
 //   SHAPE  (report-only) — a shared table whose column types diverge, or a
-//                         Rails column TEST_SCHEMA has not ported yet. Printed
-//                         but non-fatal; tightening these is follow-up work.
+//                         Rails column a transcription has not ported yet.
+//                         Printed but non-fatal; tightening these is follow-up.
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -400,6 +403,13 @@ export function describeSpec(spec: ColumnSpec): string {
  * {@link TRANSCRIPTION_DIVERGENCE_ALLOW_LIST} documents it — this is what makes
  * the hand-sync requirement enforced rather than merely written down.
  *
+ * Scope is the column shape only. Indexes, foreign keys, and table-level
+ * primary-key metadata are declared in structurally different ways on the two
+ * sides (`t.foreignKey` / `t.index` calls versus a `references:` option and a
+ * separate index list), so diffing them here would manufacture findings rather
+ * than catch drift; they stay uncompared until a later story reconciles the two
+ * spellings.
+ *
  * Pure: the caller supplies both sides.
  */
 export function compareTranscriptions(testSchema: Schema, registry: Schema): string[] {
@@ -440,6 +450,22 @@ export function compareTranscriptions(testSchema: Schema, registry: Schema): str
     }
   }
   return divergences;
+}
+
+/**
+ * Allow-list entries that no longer name a divergence — the two transcriptions
+ * have converged on the table. Reported so the list ratchets down instead of
+ * accumulating stale exemptions, exactly as `stale` does for the invention
+ * baseline.
+ */
+export function staleDivergenceAllowances(testSchema: Schema, registry: Schema): string[] {
+  return [...TRANSCRIPTION_DIVERGENCE_ALLOW_LIST.keys()]
+    .filter((table) => {
+      const both = testSchema[table] !== undefined && registry[table] !== undefined;
+      const neither = testSchema[table] === undefined && registry[table] === undefined;
+      return both || neither;
+    })
+    .sort();
 }
 
 function formatFinding(finding: Finding): string {
@@ -637,7 +663,8 @@ export async function main(): Promise<void> {
   );
   const divergences = compareTranscriptions(TEST_SCHEMA, registry);
 
-  const { regressions, known, stale } = applyBaseline(findings, await readBaseline());
+  const baseline = await readBaseline();
+  const { regressions, known, stale } = applyBaseline(findings, baseline);
   const { shape, option, optionFatal } = partitionFindings(findings);
   const optionCount = findings.filter((f) => f.verdict === "OPTION").length;
 
@@ -679,13 +706,19 @@ export async function main(): Promise<void> {
   // which the two share because they transcribe the same schema.rb. `reseed`
   // only ever writes TEST_SCHEMA's debt, so a registry-only invention cannot be
   // blessed into the baseline: it has to be removed.
-  const registryBaseline = applyBaseline(registryFindings, await readBaseline());
+  const registryBaseline = applyBaseline(registryFindings, baseline);
   const registryOptionFatal = optionRegressions(registryFindings);
   for (const finding of [...registryBaseline.regressions, ...registryOptionFatal]) {
     console.log(formatFinding(finding));
   }
   for (const divergence of divergences) {
     console.log(`FAIL  TRANSCRIPTION-DRIFT ${divergence}`);
+  }
+  for (const table of staleDivergenceAllowances(TEST_SCHEMA, registry)) {
+    console.log(
+      `note  ALLOWANCE-STALE  ${table} — the transcriptions agree; drop it from ` +
+        "TRANSCRIPTION_DIVERGENCE_ALLOW_LIST",
+    );
   }
 
   console.log(
