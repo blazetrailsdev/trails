@@ -128,6 +128,23 @@ describe("Migrator trails extensions", () => {
     expect(ran).toEqual(["2"]);
   });
 
+  it("migrate to a version below the current one reverts through down", async () => {
+    const reverted: string[] = [];
+    const migrations = (): MigrationProxy[] => [
+      makeMigration("1", "M1"),
+      makeMigration("2", "M2", undefined, async () => {
+        reverted.push("2");
+      }),
+      makeMigration("3", "M3", undefined, async () => {
+        reverted.push("3");
+      }),
+    ];
+
+    await new Migrator(adapter, migrations()).up();
+    await new Migrator(adapter, migrations()).migrate(1, (m) => m.version !== "3");
+    expect(reverted).toEqual(["2"]);
+  });
+
   it("down does not stamp the environment", async () => {
     // Rails' record_environment returns early when down? (migration.rb:1511).
     const migrator = new Migrator(adapter, [makeMigration("1", "M1")], { environment: "test" });
