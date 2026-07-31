@@ -540,6 +540,12 @@ jobs:
               | xargs -r -d '\n' npx --yes prettier@3.8.1 --check --ignore-unknown
           fi
 
+      - name: Raw control bytes
+        if: ${{ !cancelled() }}
+        run: |
+          scripts/ci/check-control-bytes.sh --self-test
+          scripts/ci/check-control-bytes.sh
+
       # RFC 0011 Phase 4 guardrail. AR work tracking moved to the tasks repo;
       # `docs/activerecord/` is frozen so the two-source-of-truth split can't
       # self-heal. Fail any PR that adds or modifies a file under that path,

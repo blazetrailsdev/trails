@@ -1833,7 +1833,7 @@ class ApiExtractor
   # `#{name_local}` with a sentinel, then scans for `def <sentinel>` occurrences.
   # The sentinel is NUL (never present in Ruby source), so the `\s+` in the scan
   # can't ambiguously consume it the way a whitespace marker could.
-  SENTINEL = " "
+  SENTINEL = "\0"
   def codegen_def_forms(body, name_local)
     template = codegen_template(body, name_local)
     return [] unless template
