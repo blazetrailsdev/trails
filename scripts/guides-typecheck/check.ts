@@ -188,7 +188,7 @@ export function remapDiagnostics(
   // `path/blocks/<name>__L<start>__<idx>.ts:L:C`. `:L:C` is captured as
   // groups 5/6; `(L,C)` as groups 7/8. Either group pair may be undefined.
   const pattern =
-    /(?:[^\n]*?[\/\\])?blocks[\/\\]([^\n]*?)__L(\d+)__(\d+)\.ts(?::(\d+):(\d+)|\((\d+),(\d+)\))?/g;
+    /(?:[^\n]*?[/\\])?blocks[/\\]([^\n]*?)__L(\d+)__(\d+)\.ts(?::(\d+):(\d+)|\((\d+),(\d+)\))?/g;
   return output.replace(
     pattern,
     (match, _name, _startStr, idxStr, colonL, colonC, parenL, parenC) => {

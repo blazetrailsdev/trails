@@ -21,7 +21,7 @@
 //   SHAPE  (report-only) — a shared table whose column types diverge, or a
 //                         Rails column a transcription has not ported yet.
 //                         Printed but non-fatal; tightening these is follow-up.
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { TEST_SCHEMA } from "../../packages/activerecord/src/test-helpers/test-schema.js";

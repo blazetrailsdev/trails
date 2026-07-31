@@ -975,7 +975,7 @@ export function acquireTasksLock(
       continue;
     } catch (e) {
       if ((e as { code?: string }).code !== "EEXIST") return null; // dir gone — best effort
-      let observed = "";
+      let observed: string;
       try {
         observed = readFileSync(lockPath, "utf8").trim();
       } catch {
@@ -1873,8 +1873,7 @@ export function depCyclePath(index: Index, id: string, newDeps: string[]): strin
   const known = new Set(index.stories.map((s) => s.id));
   const depsOf = (sid: string): string[] =>
     sid === id ? newDeps : (index.stories.find((s) => s.id === sid)?.deps ?? []);
-  const WHITE = 0,
-    GRAY = 1,
+  const GRAY = 1,
     BLACK = 2;
   const color = new Map<string, number>();
   let cycle: string[] | null = null;
@@ -3136,9 +3135,8 @@ function main(): void {
     case "ready": {
       const idx = readIndexSource().index;
       const rows = ready(idx, { rfc: stringFlag(flags, "rfc") });
-      flags.json
-        ? console.log(JSON.stringify(rows, null, 2))
-        : fmt(rows, undefined, rfcPriorityMap(idx));
+      if (flags.json) console.log(JSON.stringify(rows, null, 2));
+      else fmt(rows, undefined, rfcPriorityMap(idx));
       break;
     }
     case "next-bundle": {
@@ -3184,9 +3182,8 @@ function main(): void {
           (s) => s.id,
         ),
       );
-      flags.json
-        ? console.log(JSON.stringify(rows, null, 2))
-        : fmt(rows, staleIds, rfcPriorityMap(idx));
+      if (flags.json) console.log(JSON.stringify(rows, null, 2));
+      else fmt(rows, staleIds, rfcPriorityMap(idx));
       break;
     }
     case "show": {

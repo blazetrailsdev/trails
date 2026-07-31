@@ -6,11 +6,15 @@
 import type { LiteralValue, ParamInfo } from "./types.js";
 import { snakeToCamel } from "./conventions.js";
 
+// ESC is one of the characters being canonicalized, so it belongs in the class.
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS = /[\x1b\r\n\t]/g;
+
 /** Canonicalize so Ruby raw source escapes (`\e`, `\r\n`) and TS resolved control chars compare equal. */
 function canonString(s: string): string {
   const real: Record<string, string> = { "\x1b": "<e>", "\r": "<r>", "\n": "<n>", "\t": "<t>" };
   return s
-    .replace(/[\x1b\r\n\t]/g, (c) => real[c])
+    .replace(CONTROL_CHARS, (c) => real[c])
     .replace(/\\e|\\033|\\x1[bB]|\\u001[bB]/g, "<e>")
     .replace(/\\([rnt])/g, (_, c) => `<${c}>`);
 }

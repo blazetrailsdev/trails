@@ -353,7 +353,7 @@ const SYMBOL_RE = /^:(\w+)$/;
 // often serializes datetimes as plain strings in fixtures (and AR's own
 // fixture loader re-parses them at insert time) — normalize both sides to
 // epoch ms before comparing so 2003-07-16T15:28:11+01:00 ≡ 2003-07-16 14:28:11.
-const DATETIMEISH_RE = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}:\d{2}(\.\d+)?([+\-]\d{2}:?\d{2}|Z)?)?$/i;
+const DATETIMEISH_RE = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}:?\d{2}|Z)?)?$/i;
 // Rails' YAML coder emits `--- <scalar>\n...\n` for `serialize :col` columns
 // stored as YAML literals. The TS fixture carries the deserialized scalar.
 const SERIALIZED_YAML_RE = /^---\s*([\s\S]*?)\n\.\.\.\n?$/;
@@ -378,7 +378,7 @@ function normalizeDatetime(v: unknown): number | null {
   // `t` separators from `yaml` lib's !!timestamp output aren't mistaken
   // for date-only and double-appended.
   if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) iso += "T00:00:00";
-  if (!/[zZ]|[+\-]\d{2}:?\d{2}$/.test(iso)) iso += "Z";
+  if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso)) iso += "Z";
   const t = Date.parse(iso);
   return Number.isFinite(t) ? t : null;
 }

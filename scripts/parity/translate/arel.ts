@@ -131,7 +131,7 @@ function translateQuery(
   // Apply single-expression translations (all rules verified against packages/arel/src/).
   // IMPORTANT: %w[...] rewrite must run before not_in_any wrapping so the wrapping
   // rule sees the expanded array literal, not the %w form.
-  let tsExpr = query
+  const tsExpr = query
     // %w[...] → array literal (runs first so downstream rules see JS array syntax)
     .replace(
       /%w\[([^\]]+)\]/g,

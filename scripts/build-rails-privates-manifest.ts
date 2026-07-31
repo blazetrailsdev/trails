@@ -114,13 +114,17 @@ interface RubyEntity {
   __pkg?: string;
 }
 
+interface RubyPackage {
+  classes?: Record<string, RubyEntity>;
+  modules?: Record<string, RubyEntity>;
+}
 const railsApi = JSON.parse(fs.readFileSync(RAILS_API_PATH, "utf8"));
 
 // Build a global entity index keyed by FQN. We need cross-package
 // lookup so includes like `ActiveModel::API` resolve from activerecord
 // into activemodel.
 const entityByFqn = new Map<string, RubyEntity>();
-for (const [pkg, rubyPkg] of Object.entries<any>(railsApi.packages)) {
+for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
   for (const e of [
     ...Object.values<RubyEntity>(rubyPkg.classes ?? {}),
     ...Object.values<RubyEntity>(rubyPkg.modules ?? {}),
@@ -190,7 +194,7 @@ interface Manifest {
 }
 const manifest: Manifest = { files: {} };
 
-for (const [pkg, rubyPkg] of Object.entries<any>(railsApi.packages)) {
+for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
   const pkgDir = PACKAGE_DIRS[pkg];
   if (!pkgDir) continue;
 

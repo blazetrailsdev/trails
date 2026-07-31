@@ -85,6 +85,7 @@ export async function loadMark(file: string): Promise<number> {
     throw new Error(
       `unreviewed high-water mark: ${file} is missing. It is a committed ratchet file; ` +
         "restore it from git rather than regenerating, or the mark is lost.",
+      { cause: e },
     );
   }
   return parseMark(text);

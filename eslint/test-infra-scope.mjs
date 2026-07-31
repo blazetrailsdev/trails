@@ -40,7 +40,10 @@ export const canonicalLoaderScanRoots = ["packages", "scripts"];
  * widens the other; the pin in `no-internal-canonical-loaders.test.mjs` fails if
  * `eslint.config.mjs` drifts from this list.
  */
-export const canonicalLoaderEnforcedGlobs = ["packages/**/*.test.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"];
+export const canonicalLoaderEnforcedGlobs = [
+  "packages/**/*.test.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+  "scripts/**/*.test.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+];
 
 /**
  * Scan roots ESLint cannot enforce in, because `eslint.config.mjs` puts them in
@@ -48,10 +51,10 @@ export const canonicalLoaderEnforcedGlobs = ["packages/**/*.test.{ts,tsx,mts,cts
  * be a lie. They stay in the discovery scan: a loader *module* relocated into
  * one is still caught and forced into `canonicalLoaderModules`. The pin in
  * `no-internal-canonical-loaders.test.mjs` re-derives this from the config's
- * real ignore list, so un-ignoring `scripts/` fails until enforcement widens
- * with it.
+ * real ignore list, so re-ignoring a scan root fails until enforcement narrows
+ * with it. Empty since `scripts/` came out of the global ignores.
  */
-export const canonicalLoaderUnenforceableRoots = ["scripts"];
+export const canonicalLoaderUnenforceableRoots = [];
 
 /**
  * Test-infra paths exempt from the table-lifecycle rules, relative to

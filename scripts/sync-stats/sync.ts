@@ -243,6 +243,9 @@ class PrTimelineEvent extends Base {
   }
 }
 
+// Retained for the reactions sync #2433 removed: the pr_reactions table is still
+// created and counted, and this is its only typed accessor.
+// eslint-disable-next-line unused-imports/no-unused-vars
 class PrReaction extends Base {
   static {
     this.tableName = "pr_reactions";
@@ -417,7 +420,7 @@ async function columnExists(
 ): Promise<boolean> {
   const quoted = `"${table.replace(/"/g, '""')}"`;
   const cols = await adapter.execute(`PRAGMA table_info(${quoted})`);
-  return cols.some((c: any) => c.name === column);
+  return cols.some((c: { name: string }) => c.name === column);
 }
 
 async function migrateDb(adapter: AbstractSQLite3Adapter) {
@@ -937,6 +940,9 @@ interface GhTimelineEvent {
   body?: string;
 }
 
+// Shape of the GitHub reactions payload the #2433-removed sync consumed; kept
+// alongside PrReaction so restoring that sync does not have to re-derive it.
+// eslint-disable-next-line unused-imports/no-unused-vars
 interface GhReactionData {
   id: number;
   user: { login: string } | null;
@@ -2149,7 +2155,9 @@ async function printSummary() {
   const stateRows = await Base.adapter.execute(
     `SELECT state, COUNT(*) as cnt FROM pull_requests GROUP BY state ORDER BY state`,
   );
-  const stateParts = stateRows.map((r: any) => `${r.cnt} ${r.state}`).join(", ");
+  const stateParts = stateRows
+    .map((r: { cnt: number; state: string }) => `${r.cnt} ${r.state}`)
+    .join(", ");
 
   console.log("\n=== Database Summary ===");
   console.log(`  PRs: ${prCount} (${stateParts})`);
@@ -2427,7 +2435,7 @@ async function main() {
     const runsSynced = await syncWorkflowRuns(fetchMode);
 
     console.log("\n=== Syncing job logs ===");
-    const logsFetched = await syncJobLogs(fetchMode);
+    await syncJobLogs(fetchMode);
 
     console.log("\n=== Syncing compare stats from CI logs ===");
     const logsParsed = await syncCompareStats(fetchMode);

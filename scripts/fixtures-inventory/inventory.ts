@@ -82,23 +82,47 @@ function stripComments(src: string): string {
     const n = src[i + 1];
     const blank = c === "\n" ? "\n" : " ";
     if (state === "code") {
-      if (c === "/" && n === "/") ((state = "line"), (out += "  "), (i += 2));
-      else if (c === "/" && n === "*") ((state = "block"), (out += "  "), (i += 2));
-      else if (c === "'") ((state = "sq"), (out += c), i++);
-      else if (c === '"') ((state = "dq"), (out += c), i++);
-      else if (c === "`") ((state = "tpl"), (out += c), i++);
-      else ((out += c), i++);
+      if (c === "/" && n === "/") {
+        state = "line";
+        out += "  ";
+        i += 2;
+      } else if (c === "/" && n === "*") {
+        state = "block";
+        out += "  ";
+        i += 2;
+      } else if (c === "'" || c === '"' || c === "`") {
+        state = c === "'" ? "sq" : c === '"' ? "dq" : "tpl";
+        out += c;
+        i++;
+      } else {
+        out += c;
+        i++;
+      }
     } else if (state === "line") {
-      if (c === "\n") ((state = "code"), (out += "\n"), i++);
-      else ((out += blank), i++);
+      if (c === "\n") {
+        state = "code";
+        out += "\n";
+        i++;
+      } else {
+        out += blank;
+        i++;
+      }
     } else if (state === "block") {
-      if (c === "*" && n === "/") ((state = "code"), (out += "  "), (i += 2));
-      else ((out += blank), i++);
+      if (c === "*" && n === "/") {
+        state = "code";
+        out += "  ";
+        i += 2;
+      } else {
+        out += blank;
+        i++;
+      }
     } else {
       // inside a string literal: copy verbatim, handle escapes + terminators
       out += c;
-      if (c === "\\" && i + 1 < src.length) ((out += src[i + 1]), (i += 2));
-      else {
+      if (c === "\\" && i + 1 < src.length) {
+        out += src[i + 1];
+        i += 2;
+      } else {
         if (
           (state === "sq" && c === "'") ||
           (state === "dq" && c === '"') ||
@@ -155,7 +179,7 @@ function classify(raw: string, canonical: Set<string>): Omit<Row, "file" | "loc"
 
   let tier: Tier;
   let blocker = "";
-  let estimate = "";
+  let estimate: string;
 
   if (hasUseFixtures) {
     tier = 1;
@@ -326,7 +350,6 @@ async function main(): Promise<void> {
   await writeFile(OUT, renderDoc(rows), "utf8");
   const counts = { 1: 0, 2: 0, 3: 0, 4: 0 } as Record<Tier, number>;
   for (const r of rows) counts[r.tier]++;
-  // eslint-disable-next-line no-console
   console.log(
     `Classified ${rows.length} files → T1=${counts[1]} T2=${counts[2]} ` +
       `T3=${counts[3]} T4=${counts[4]} → ${OUT_REL}`,
@@ -334,7 +357,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err);
   throw err;
 });

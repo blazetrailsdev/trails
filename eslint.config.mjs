@@ -113,7 +113,6 @@ export default defineConfig(
   {
     ignores: [
       "vendor/**",
-      "scripts/**",
       "**/dist/**",
       "packages/website/static/**",
       "packages/website/build/**",
@@ -122,6 +121,11 @@ export default defineConfig(
       "packages/website/vite.sw.config.ts",
       "packages/website/vitest.config.ts",
       "packages/activerecord/src/type-virtualization/fixtures/**",
+      // Input samples for the codemods that read them — `strip-asany`'s fixture
+      // is a file full of `as any` by construction, and the parity fixtures are
+      // snapshots of generated output. Linting either would be linting data.
+      "scripts/__fixtures__/**",
+      "scripts/parity/fixtures/**",
       "packages/activerecord-cli/src/tsc-wrapper/__fixtures__/**",
     ],
   },
@@ -560,8 +564,8 @@ export default defineConfig(
   //    Enforced across every workspace package, not just activerecord: the
   //    loaders are matched by module basename, so a test file in another
   //    package reaching for one would otherwise never be linted at all.
-  //    (scripts/ is in this config's top-level `ignores`, so no rule reaches
-  //    it — see canonicalLoaderUnenforceableRoots.)
+  //    scripts/ is covered too: its tests are as able to reach for a loader as
+  //    a package's, and nothing in the tree is globally ignored any more.
   //    See eslint/no-internal-canonical-loaders.mjs. ──
   {
     files: canonicalLoaderEnforcedGlobs,
@@ -784,6 +788,11 @@ export default defineConfig(
   // ── no-unnecessary-type-assertion: scoped typed-lint block (projectService only, not recommendedTypeChecked) ──
   {
     files: ["**/*.ts"],
+    // `scripts/**` is run by tsx and belongs to no tsconfig program, so the
+    // project service cannot resolve any of its ~500 `.ts` files — each one
+    // would be a parse error rather than a lint result. The tree is linted by
+    // every untyped rule; only this typed block skips it.
+    ignores: ["scripts/**"],
     languageOptions: {
       parserOptions: {
         projectService: {

@@ -620,7 +620,6 @@ function categorize(relPath: string, describeName: string, testName: string): An
 
   // --- YAML column coder ---
   if (p.includes("yaml-column") || p.includes("coders/")) {
-    const file = path.basename(p, ".test.ts");
     return {
       blocked: "serialization — YAML column coder gap",
       rootCause: "coders/yaml-column.ts#YamlColumn missing or incomplete Rails parity",
@@ -680,7 +679,6 @@ function categorize(relPath: string, describeName: string, testName: string): An
 
   // --- Marshal serialization / message pack ---
   if (p === "marshal-serialization.test.ts" || p === "message-pack.test.ts") {
-    const file = path.basename(p, ".test.ts");
     return {
       blocked: "serialization — Ruby Marshal / MessagePack round-trip, no Node.js equivalent",
       rootCause: "Node.js has no Marshal.dump/load or msgpack Ruby object round-trip",
@@ -1155,7 +1153,6 @@ const files = globSync("**/*.test.ts", {
   absolute: true,
 }).filter((f) => !f.includes("/dx-tests/") && !f.includes("/virtualized-dx-tests/"));
 
-let totalFiles = 0;
 let totalChanged = 0;
 let totalSkips = 0;
 
@@ -1168,7 +1165,6 @@ for (const absPath of files) {
   const modified = annotateFile(src, relPath);
 
   if (modified !== null) {
-    totalFiles++;
     // Count only newly-inserted BLOCKED: occurrences (not pre-existing ones)
     const beforeLines = new Set(src.split("\n").filter((l) => /\/\/\s*BLOCKED:/.test(l)));
     const delta = modified

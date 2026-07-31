@@ -39,7 +39,7 @@ const railsApi = JSON.parse(
   fs.readFileSync(path.join(ROOT, "scripts/api-compare/output/rails-api.json"), "utf8"),
 );
 
-const ar = privates.results.find((r: any) => r.package === "activerecord");
+const ar = privates.results.find((r: { package: string }) => r.package === "activerecord");
 if (!ar) throw new Error("no activerecord results");
 
 // Build lookup: fqn -> name -> params
