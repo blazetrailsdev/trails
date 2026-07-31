@@ -1551,7 +1551,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 
   // Both gates are collected before exiting: a tree that is both stale and
   // unclassified should report both in one run, not one CI round trip each.
-  const failures = [];
+  const failures: string[] = [];
   // Stale tags can't be judged when --exclude-glob hides whole TS files: a
   // hidden file drops out of the extras too, so a tag that still flags there
   // reads as stale. Classification is per-tag, and an exclusion can only hide
