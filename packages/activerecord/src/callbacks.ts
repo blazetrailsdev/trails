@@ -165,29 +165,13 @@ export function afterDestroy<T extends ModelCtor>(
   registerCallback(modelClass, "after", "destroy", fn, options);
 }
 
-/**
- * Rejects a `Promise`-returning callback at compile time while leaving every
- * other return type (including value-returning arrows like `(r) => (r.c = "x")`)
- * alone.
- *
- * A plain `void` return type would not work: TypeScript's void-return
- * assignability rule accepts `async (r) => {}` against `(r) => void`, so the
- * guard would silently be a no-op. Constraining `R extends void | boolean`
- * rejects async but also rejects the value-returning arrows real callers use.
- *
- * @internal
- */
+/** @internal */
 type SyncOnly<R> = R extends PromiseLike<unknown> ? never : R;
 
 /**
  * Register an after_find callback. Fires on every record loaded from the DB.
  *
  * Rails defines :find with only: :after, so there is no before_find or around_find.
- *
- * This chain runs synchronously (`strict: "sync"` at every call site in
- * base.ts), because Rails fires it from `init_with` on the hot read path and
- * JS constructors cannot await — so async callbacks are rejected here rather
- * than throwing at runtime on the first record loaded.
  *
  * Mirrors: ActiveRecord::Callbacks.after_find
  */
@@ -203,8 +187,6 @@ export function afterFind<T extends ModelCtor, R>(
  * Register an after_initialize callback. Fires on every new or loaded record.
  *
  * Rails defines :initialize with only: :after, so there is no before_initialize or around_initialize.
- *
- * Runs synchronously — see the note on {@link afterFind}.
  *
  * Mirrors: ActiveRecord::Callbacks.after_initialize
  */

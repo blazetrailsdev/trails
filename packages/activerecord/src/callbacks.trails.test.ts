@@ -1,12 +1,3 @@
-/**
- * Trails-only compile-time tests: `afterInitialize` / `afterFind` are the two
- * AR callback chains trails runs synchronously (`strict: "sync"`), so their
- * registrars must reject `Promise`-returning callbacks at the type level. No
- * Rails counterpart — Ruby has no such distinction.
- *
- * These assertions are checked by `tsc`; the runtime body only exists so the
- * file participates in the typecheck the same way the rest of the suite does.
- */
 import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 import { afterFind, afterInitialize } from "./callbacks.js";
@@ -39,7 +30,6 @@ describe("sync-only callback registrar types", () => {
     afterInitialize(SyncOnlyCallbackModel, () => {
       seen.push("statement-body");
     });
-    // Value-returning arrow, as used by test-helpers/models/bulb.ts.
     afterInitialize(SyncOnlyCallbackModel, (record) => (record.name = "red"));
     afterInitialize(SyncOnlyCallbackModel, () => false);
     afterFind(SyncOnlyCallbackModel, function (record) {
