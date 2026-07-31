@@ -108,6 +108,17 @@ export interface MethodInfo {
    * See extract-ts-api.ts and extra-surface.ts `collectTsFileNames`.
    */
   declaredIn?: string;
+  /**
+   * TS-side only (RFC 0083): the class/module this method forwards to when its
+   * whole body is `return this.<accessor>().<sameName>(...)`. trails does not
+   * mix a Rails module into its host class the way Ruby `include` does — the
+   * PostgreSQL schema-statements port lives in `PostgreSQLSchemaStatements` and
+   * `PostgreSQLAdapter` reaches it through `this.pgSchemaStatements()`. The
+   * target name is resolved from the accessor's RETURN TYPE via the checker,
+   * never from filename proximity (sibling adapters would cross-credit each
+   * other). See extract-ts-api.ts `delegationTargetName`.
+   */
+  delegatesTo?: string;
 }
 
 export interface ClassInfo {
@@ -117,6 +128,14 @@ export interface ClassInfo {
   reExportedFrom?: string;
   includes: string[];
   extends: string[];
+  /**
+   * TS-side only (RFC 0083): sorted union of every `MethodInfo.delegatesTo` on
+   * this class — the accessor-forwarding counterpart of `includes`/`extends`,
+   * recorded so a consumer can walk the delegation graph the same way it walks
+   * the include graph. No consumer reads it yet (compare.ts is untouched);
+   * `resolve-wide-candidates-through-include-graph` is the consumer story.
+   */
+  delegatesTo?: string[];
   instanceMethods: MethodInfo[];
   classMethods: MethodInfo[];
   /**
