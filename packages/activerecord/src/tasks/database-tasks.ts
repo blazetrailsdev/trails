@@ -606,8 +606,8 @@ export class DatabaseTasks {
           const migrator = await this._migratorFor(adapter, config);
           const current = migrator.currentEnvironment;
           const stored = await migrator.lastStoredEnvironment();
-          if (await migrator.protectedEnvironment()) {
-            throw new ProtectedEnvironmentError(stored ?? current);
+          if (stored && (await migrator.protectedEnvironment())) {
+            throw new ProtectedEnvironmentError(stored);
           }
           if (stored && stored !== current) {
             throw new EnvironmentMismatchError(current, stored);
