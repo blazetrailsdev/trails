@@ -1,8 +1,9 @@
 /**
  * The emitter: walks a Prism AST through the {@link Registry}, tracking
  * per-kind coverage. Handled kinds run their handler; unhandled kinds fall to
- * a marked `/* TODO *​/` passthrough that still recurses into children, so
- * nested handled nodes below an unhandled parent are still emitted and
+ * a passthrough marked with a TODO block comment that still recurses into
+ * children, so nested handled nodes below an unhandled parent are still emitted
+ * and
  * counted. This is what makes coverage a fine-grained per-node-instance metric
  * rather than a whole-file pass/fail.
  */
