@@ -109,9 +109,6 @@ export async function dbMigrate(cwd: string, args: string[]): Promise<number> {
   const version = flagValue(args, "--version");
   const previousVersion = getEnv("TRAILS_MIGRATION_VERSION");
   if (version !== undefined) setEnv("TRAILS_MIGRATION_VERSION", version);
-  // `db:migrate` depends on `load_config: :environment` (databases.rake:22, :89),
-  // so app boot has already established Base's connection by the time
-  // `migrate_all` reaches its single-primary fast path.
   try {
     await withEnvironmentConnection(() => DatabaseTasks.migrateAll(), DatabaseTasks.env);
     return 0;
@@ -135,10 +132,7 @@ export async function dbRollback(cwd: string, args: string[]): Promise<number> {
   const step = parseStep(args, 1);
 
   try {
-    // `db:rollback` (databases.rake:263) rolls back through
-    // `migration_connection_pool`, i.e. the pool `load_config: :environment`
-    // established at boot.
-    await withEnvironmentConnection(() => DatabaseTasks.rollback(step));
+    await withEnvironmentConnection(() => DatabaseTasks.rollback(step), DatabaseTasks.env);
     return 0;
   } catch (err) {
     console.error(`ar: db:rollback failed — ${String(err)}`);

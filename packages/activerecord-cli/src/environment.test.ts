@@ -27,7 +27,7 @@ describe("ArEnvironmentTest", () => {
     try {
       Base.removeConnection();
     } catch {
-      // no pool established
+      /* empty */
     }
     DatabaseTasks.databaseConfiguration = null;
   });
