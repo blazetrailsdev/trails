@@ -1,5 +1,6 @@
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
+import { recordSweptTables, sweepReportDir } from "./sweep-report.js";
 
 /**
  * Tables that exist after the schema load but are *not* part of the loaded
@@ -77,17 +78,27 @@ type ResetMode = "drop-all" | "reset";
 
 async function resetTables(adapter: DatabaseAdapter, mode: ResetMode): Promise<void> {
   const bootLaid = bootLaidTableNames();
+  // Off by default (`AR_SWEEP_REPORT` unset): `swept` stays null and the drop
+  // loops below skip recording entirely. See {@link recordSweptTables}.
+  //
+  // Only *between-test* sweeps are measured, so recording waits until the boot
+  // snapshot exists: `test-setup-dy.ts` runs a reset of its own between the
+  // canonical load and the adapter-specific arm, and everything that one drops
+  // (`defaults` on a recycled worker) is boot bookkeeping, not a test leak.
+  const swept: string[] | null =
+    mode === "reset" && _bootLaidTableNames !== null && sweepReportDir() !== undefined ? [] : null;
   switch (adapter.adapterName) {
     case "postgres":
-      await resetPgTables(adapter, mode, bootLaid);
+      await resetPgTables(adapter, mode, bootLaid, swept);
       break;
     case "mysql":
-      await resetMysqlTables(adapter, mode, bootLaid);
+      await resetMysqlTables(adapter, mode, bootLaid, swept);
       break;
     case "sqlite":
-      await resetSqliteTables(adapter, mode, bootLaid);
+      await resetSqliteTables(adapter, mode, bootLaid, swept);
       break;
   }
+  if (swept) await recordSweptTables(adapter.adapterName, swept);
 }
 
 /**
@@ -142,16 +153,17 @@ async function resetPgTables(
   adapter: DatabaseAdapter,
   mode: ResetMode,
   bootLaid: ReadonlySet<string>,
+  swept: string[] | null,
 ): Promise<void> {
   try {
-    await _resetPgTablesOnce(adapter, mode, bootLaid);
+    await _resetPgTablesOnce(adapter, mode, bootLaid, swept);
   } catch (e) {
     // exec() routes through withRawConnection, whose retry loop calls
     // reconnectBang → the PG reconnect() override on a connection error, so
     // _rawConnection is now null and the next _acquireFreshClient() will open a
     // fresh pg.Client. Retry exactly once.
     if (_isPgConnectionError(e)) {
-      await _resetPgTablesOnce(adapter, mode, bootLaid);
+      await _resetPgTablesOnce(adapter, mode, bootLaid, swept);
     } else {
       throw e;
     }
@@ -162,12 +174,14 @@ async function _resetPgTablesOnce(
   adapter: DatabaseAdapter,
   mode: ResetMode,
   bootLaid: ReadonlySet<string>,
+  swept: string[] | null,
 ): Promise<void> {
   const schema = `ANY(current_schemas(false))`;
   // Views/matviews are never canonical — always drop them.
   for (const { schemaname: s, name: n } of (await adapter.execute(
     `SELECT schemaname, matviewname AS name FROM pg_matviews WHERE schemaname = ${schema}`,
   )) as { schemaname: string; name: string }[]) {
+    swept?.push(`matview:${n}`);
     try {
       await adapter.executeMutation(`DROP MATERIALIZED VIEW IF EXISTS "${s}"."${n}" CASCADE`);
     } catch (e) {
@@ -177,6 +191,7 @@ async function _resetPgTablesOnce(
   for (const { schemaname: s, name: n } of (await adapter.execute(
     `SELECT schemaname, viewname AS name FROM pg_views WHERE schemaname = ${schema}`,
   )) as { schemaname: string; name: string }[]) {
+    swept?.push(`view:${n}`);
     try {
       await adapter.executeMutation(`DROP VIEW IF EXISTS "${s}"."${n}" CASCADE`);
     } catch (e) {
@@ -196,6 +211,7 @@ async function _resetPgTablesOnce(
       toTruncate.push(t);
       continue;
     }
+    swept?.push(s === "public" ? t : `${s}.${t}`);
     try {
       await adapter.executeMutation(`DROP TABLE IF EXISTS "${s}"."${t}" CASCADE`);
     } catch (e) {
@@ -209,6 +225,7 @@ async function resetMysqlTables(
   adapter: DatabaseAdapter,
   mode: ResetMode,
   bootLaid: ReadonlySet<string>,
+  swept: string[] | null,
 ): Promise<void> {
   const toTruncate: string[] = [];
   await adapter.disableReferentialIntegrity(async () => {
@@ -220,6 +237,7 @@ async function resetMysqlTables(
     );
     for (const r of viewRows as Array<{ table_name?: string; TABLE_NAME?: string }>) {
       const name = r.table_name ?? r.TABLE_NAME;
+      if (name) swept?.push(`view:${name}`);
       if (name)
         try {
           await adapter.executeMutation(`DROP VIEW IF EXISTS \`${name}\``);
@@ -232,6 +250,7 @@ async function resetMysqlTables(
         toTruncate.push(name);
         continue;
       }
+      swept?.push(name);
       try {
         await adapter.executeMutation(`DROP TABLE IF EXISTS \`${name}\``);
       } catch {}
@@ -244,12 +263,14 @@ async function resetSqliteTables(
   adapter: DatabaseAdapter,
   mode: ResetMode,
   bootLaid: ReadonlySet<string>,
+  swept: string[] | null,
 ): Promise<void> {
   const toTruncate: string[] = [];
   await adapter.disableReferentialIntegrity(async () => {
     for (const { name } of (await adapter.execute(
       `SELECT name FROM sqlite_master WHERE type='view' AND name NOT LIKE 'sqlite_%'`,
     )) as { name: string }[]) {
+      swept?.push(`view:${name}`);
       try {
         await adapter.executeMutation(`DROP VIEW IF EXISTS "${name}"`);
       } catch {}
@@ -261,6 +282,7 @@ async function resetSqliteTables(
         toTruncate.push(name);
         continue;
       }
+      swept?.push(name);
       try {
         await adapter.executeMutation(`DROP TABLE IF EXISTS "${name}"`);
       } catch {}
