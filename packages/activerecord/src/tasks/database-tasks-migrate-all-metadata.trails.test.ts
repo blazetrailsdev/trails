@@ -8,10 +8,6 @@ import { Base } from "../base.js";
 import type { MigrationProxy } from "../migration.js";
 import { anonymousMigration } from "../test-helpers/anonymous-migration.js";
 
-// Rails builds every migrator from the pool (`migration_connection_pool.migration_context`),
-// so `use_metadata_table: false` suppresses the `ar_internal_metadata` stamp no matter which
-// task drove the migration. The fan-out tasks (`migrate_all` / `prepare_all`) used to build
-// their migrators bare, which stamped the table anyway.
 describe("DatabaseTasksMigrateAllMetadataTest", () => {
   const dirs: string[] = [];
 

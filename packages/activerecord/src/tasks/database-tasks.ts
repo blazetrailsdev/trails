@@ -326,12 +326,6 @@ export class DatabaseTasks {
     return this._migrationsByConfig.get(this._migrationsKey(dbConfig)) ?? this._migrations;
   }
 
-  // Rails never builds a migrator by hand: it goes through
-  // `migration_connection_pool.migration_context` (`connection_pool.rb:294-296`),
-  // so the pool's db_config always governs — `InternalMetadata#enabled?` reads
-  // `pool.db_config.use_metadata_table` and the environment stamp comes from the
-  // config, not from the process env. Building every migrator here keeps that
-  // invariant instead of letting Migrator fall back to TRAILS_ENV / NODE_ENV.
   private static async _migratorFor(
     adapter: import("../connection-adapters/abstract-adapter.js").AbstractAdapter,
     dbConfig: DatabaseConfig,
