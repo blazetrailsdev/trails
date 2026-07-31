@@ -404,6 +404,56 @@ describe("body call capture", () => {
     ]);
   });
 
+  it("records the delegation edge of an accessor-forwarding method", () => {
+    // The `PostgreSQLAdapter` → `PostgreSQLSchemaStatements` shape: trails puts
+    // the Rails `PostgreSQL::SchemaStatements` port in its own class and reaches
+    // it through an accessor, so the port is invisible to includes/extends.
+    const cls = extractFromSource(
+      `class PostgreSQLSchemaStatements {
+         indexes(tableName) { return []; }
+         databaseExists(name) { return true; }
+       }
+       class PostgreSQLAdapter {
+         private pgSchemaStatements(): PostgreSQLSchemaStatements { return this.stmts; }
+         indexes(tableName) { return this.pgSchemaStatements().indexes(tableName); }
+         async databaseExists(name) { return await this.pgSchemaStatements().databaseExists(name); }
+       }`,
+      "PostgreSQLAdapter",
+    );
+    const byName = Object.fromEntries(cls.instanceMethods.map((m) => [m.name, m.delegatesTo]));
+    expect(byName["indexes"]).toBe("PostgreSQLSchemaStatements");
+    expect(byName["databaseExists"]).toBe("PostgreSQLSchemaStatements");
+    expect(byName["pgSchemaStatements"]).toBeUndefined();
+    expect(cls.delegatesTo).toEqual(["PostgreSQLSchemaStatements"]);
+  });
+
+  it("records no delegation edge for a differently-named or in-class forward", () => {
+    // Only a SAME-NAMED forward off another object models a moved Rails module;
+    // a rename-forward and plain `this.helper()` dispatch are ordinary bodies.
+    const cls = extractFromSource(
+      `class Helper { indexes(t) { return []; } indexNames(t) { return []; } }
+       class Foo {
+         private helper(): Helper { return this.h; }
+         indexes(t) { return this.helper().indexNames(t); }
+         columns(t) { return this.loadColumns(t); }
+       }`,
+    );
+    expect(cls.instanceMethods.every((m) => m.delegatesTo === undefined)).toBe(true);
+    expect(cls.delegatesTo).toBeUndefined();
+  });
+
+  it("records no delegation edge when the accessor's type is unresolved", () => {
+    // Resolution is checker-only: an accessor with no resolvable declaring type
+    // records nothing rather than falling back to a name- or path-based guess,
+    // which would cross-credit sibling adapter implementations.
+    const cls = extractFromSource(
+      `class Foo {
+         indexes(t) { return this.untyped().indexes(t); }
+       }`,
+    );
+    expect(cls.instanceMethods.find((m) => m.name === "indexes")!.delegatesTo).toBeUndefined();
+  });
+
   it("does NOT suppress a same-named delegation whose receiver is unbound", () => {
     // A receiver that resolves to no symbol (only possible for a genuinely unbound
     // identifier — non-compiling code) fails toward tracking: keep the extracted

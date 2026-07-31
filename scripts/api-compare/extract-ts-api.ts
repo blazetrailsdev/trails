@@ -1790,6 +1790,9 @@ export function extractClass(
   // `Class.helper(...)` call site and must not be merged in.
   const delegations: { method: MethodInfo; helper: string }[] = [];
   const instanceCallsByName = new Map<string, string[]>();
+  // Accessor-forwarding edges (RFC 0083), unioned onto the class alongside
+  // includes/extends. See delegationTargetName.
+  const delegationTargets = new Set<string>();
 
   if (node.heritageClauses) {
     for (const clause of node.heritageClauses) {
@@ -1827,6 +1830,8 @@ export function extractClass(
         namespaceSelfDelegationName(member.body, checker) === memberName
           ? undefined
           : extractCalls(member.body);
+      const delegatesTo = delegationTargetName(member.body, memberName, name, checker);
+      if (delegatesTo) delegationTargets.add(delegatesTo);
       const method: MethodInfo = {
         name: memberName,
         visibility,
@@ -1838,6 +1843,7 @@ export function extractClass(
         ...tagged,
         ...(optionKeys !== undefined ? { optionKeys } : {}),
         ...(calls !== undefined ? { calls } : {}),
+        ...(delegatesTo !== undefined ? { delegatesTo } : {}),
       };
       // Only instance methods are reachable via `this.helper(...)` and only
       // instance methods delegate through it — record both on the instance side.
@@ -1939,6 +1945,7 @@ export function extractClass(
     file,
     includes,
     extends: extendsArr,
+    ...(delegationTargets.size > 0 ? { delegatesTo: [...delegationTargets].sort() } : {}),
     instanceMethods,
     classMethods,
     ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
@@ -2343,6 +2350,67 @@ function extractCalls(node: ts.Node | undefined): string[] | undefined {
  * extracted into a one-line private helper reads as equivalent to inlining it.
  * Concrete repro: `buildStatementPool() { return this.makeStatementPool(c); }`.
  */
+/**
+ * If `body` is a whole-body forward to the SAME-NAMED method of another object
+ * reached off `this` — `return this.acc().name(...)`, its `await` form, or the
+ * property form `return this.acc.name(...)` — return the name of the class /
+ * interface that declares the receiver, else undefined.
+ *
+ * The target is resolved from the accessor's return type through the checker.
+ * Name- or path-based alternatives are unsound here: they would credit
+ * `abstract-mysql-adapter.ts` with calls made in
+ * `postgresql/schema-statements-class.ts` (sibling implementations of one
+ * interface), which is exactly the per-adapter fidelity gap the wide gate
+ * exists to catch. The resolved type must actually declare `name`, so an
+ * accessor whose type the checker cannot resolve records no edge.
+ */
+function delegationTargetName(
+  body: ts.Node | undefined,
+  name: string,
+  hostName: string,
+  checker: ts.TypeChecker,
+): string | undefined {
+  if (!body || !ts.isBlock(body) || body.statements.length !== 1) return undefined;
+  const stmt = body.statements[0];
+  let expr = ts.isReturnStatement(stmt)
+    ? stmt.expression
+    : ts.isExpressionStatement(stmt)
+      ? stmt.expression
+      : undefined;
+  if (expr && ts.isAwaitExpression(expr)) expr = expr.expression;
+  if (!expr || !ts.isCallExpression(expr)) return undefined;
+
+  // Callee must be `<receiver>.<name>` with `<name>` identical to the forwarding
+  // method — a differently-named callee is ordinary collaboration, not the
+  // Rails-module-moved-to-a-class shape this edge models.
+  const callee = expr.expression;
+  if (!ts.isPropertyAccessExpression(callee) || !ts.isIdentifier(callee.name)) return undefined;
+  if (callee.name.text !== name) return undefined;
+
+  // The receiver is `this.acc()` or `this.acc` — never a bare `this` (that is
+  // in-class dispatch) and never a free identifier (namespace delegation, see
+  // namespaceSelfDelegationName).
+  let receiver = callee.expression;
+  if (ts.isCallExpression(receiver) && receiver.arguments.length === 0) {
+    receiver = receiver.expression;
+  }
+  if (
+    !ts.isPropertyAccessExpression(receiver) ||
+    receiver.expression.kind !== ts.SyntaxKind.ThisKeyword
+  ) {
+    return undefined;
+  }
+
+  const type = checker.getTypeAtLocation(callee.expression);
+  if (!type.getProperty(name)) return undefined;
+  const targetName = type.getSymbol()?.getName();
+  if (!targetName || targetName === hostName) return undefined;
+  // Anonymous/structural types carry synthetic symbol names; they name no
+  // declaring module a consumer could resolve.
+  if (targetName.startsWith("__")) return undefined;
+  return targetName;
+}
+
 function delegatedHelper(body: ts.Node | undefined): string | undefined {
   if (!body || !ts.isBlock(body) || body.statements.length !== 1) return undefined;
   const stmt = body.statements[0];
