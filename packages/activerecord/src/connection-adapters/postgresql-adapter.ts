@@ -1525,6 +1525,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     });
     this._maintenanceTail = prev.then(() => gate);
     await prev.catch(() => {});
+    // DEVIATION (converging, RFC 0085): both fields are inventions.
+    // `_queryInFlight` stands in for `@raw_connection.transaction_status`,
+    // `_queryInFlightOwner` for the lock trails releases early — Rails'
+    // `cancel_any_running_query` (postgresql/database_statements.rb:127) needs
+    // neither. Scheduled for deletion; do not build on them. Claimed after the
+    // tail await so the marker names the query actually on the wire rather than
+    // one still queued (#5660) — a placement no test can pin down while these
+    // stand (RFC 0061 pg-in-flight-marker-regression-coverage, wontfix).
     this._queryInFlight = true;
     this._queryInFlightOwner = this._transactionManager.currentLockToken;
     try {
@@ -5087,9 +5095,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   isRetryableQueryError(exception: unknown): boolean {
     // Rails additionally guards on `@raw_connection.transaction_status !=
-    // PG::PQTRANS_INERROR`. node-pg does not expose the PG transaction status
-    // byte, so that guard is omitted; the abstract predicate (Deadlocked |
-    // LockWaitTimeout) is still the authoritative gate.
+    // PG::PQTRANS_INERROR`, omitted here for want of a `transaction_status`
+    // port; the abstract predicate (Deadlocked | LockWaitTimeout) is still the
+    // authoritative gate. Not a hard limit of the driver, as previously noted
+    // here: pg-protocol parses the ReadyForQuery status byte into
+    // `ReadyForQueryMessage.status` ('I' / 'T' / 'E'), emitted on
+    // `client.connection`. Porting it is RFC 0085.
     return super.isRetryableQueryError(exception);
   }
 
