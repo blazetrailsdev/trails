@@ -8,7 +8,7 @@ import rule, {
   isCanonicalSchemaModule,
   moduleBasename,
 } from "./no-internal-canonical-loaders.mjs";
-import { activerecordSrcRoot, canonicalLoaderModules } from "./test-infra-scope.mjs";
+import { canonicalLoaderModules, canonicalLoaderScanRoots } from "./test-infra-scope.mjs";
 
 const FILENAME = "packages/activerecord/src/dirty.test.ts";
 const OWN_TEST = "packages/activerecord/src/support/canonical-schema.test.ts";
@@ -101,19 +101,16 @@ tester.run("no-internal-canonical-loaders", rule, {
   ],
 });
 
-const srcDir = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-  ...activerecordSrcRoot.split("/"),
-);
+const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 /**
- * Modules outside the loader set that legitimately export a BANNED name.
- * `model-schema.ts` is Rails' own `ActiveRecord::ModelSchema#load_schema` —
- * unrelated to `support/load-schema-helper.ts`, and the rule already lets it
- * through because it matches on module basename as well as symbol.
+ * Modules outside the loader set that legitimately export a BANNED name,
+ * repo-relative. `model-schema.ts` is Rails' own
+ * `ActiveRecord::ModelSchema#load_schema` — unrelated to
+ * `support/load-schema-helper.ts`, and the rule already lets it through because
+ * it matches on module basename as well as symbol.
  */
-const nonLoaderBannedExporters = new Set(["model-schema.ts"]);
+const nonLoaderBannedExporters = new Set(["packages/activerecord/src/model-schema.ts"]);
 
 /** Names exported by `source`, covering the export forms used in activerecord. */
 function exportedNames(source) {
@@ -133,34 +130,42 @@ function exportedNames(source) {
   return names;
 }
 
+const SKIPPED_DIRS = new Set(["node_modules", "dist", "vendor", ".git", "coverage"]);
+
 /**
- * Walks the whole activerecord `src/` tree, not just `support/`: the rule
- * matches on basename regardless of directory, so a loader relocated out of
- * `support/` (into `test-helpers/`, say) is exactly the silent-reopen case
- * being guarded — the same hole as `support/<subdir>/`, one level up.
+ * Walks every workspace package and the top-level `scripts/` tree, not just
+ * `packages/activerecord/src`: the rule matches on module basename with no
+ * package anchoring, so a loader relocated into another package (a new
+ * `packages/ar-test-infra/`, say) or into a `scripts/` helper is exactly the
+ * silent-reopen case being guarded — the same hole as `support/<subdir>/`, two
+ * levels up.
  */
-async function* srcSources(dir = srcDir) {
+async function* workspaceSources(dir) {
   for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name !== "node_modules" && entry.name !== "dist") yield* srcSources(full);
-    } else if (entry.name.endsWith(".ts") && !entry.name.endsWith(".test.ts")) {
+      if (!SKIPPED_DIRS.has(entry.name)) yield* workspaceSources(full);
+    } else if (/\.(m?ts|mjs)$/.test(entry.name) && !/\.test\.(m?ts|mjs)$/.test(entry.name)) {
       yield full;
     }
   }
 }
 
 /**
- * src-relative path → the BANNED symbols that module exports, for every module
- * in the tree including the non-loader exporters. Walked once and shared: the
- * tree is ~1550 files, so each extra walk costs real time.
+ * Repo-relative path → the BANNED symbols that module exports, for every module
+ * in the workspace including the non-loader exporters. Walked once and shared:
+ * the scan covers ~2100 files, so each extra walk costs real time.
  */
 const bannedExportsBySrcModule = (async () => {
   const byModule = new Map();
-  for await (const file of srcSources()) {
-    const source = await fs.readFile(file, "utf8");
-    const banned = [...exportedNames(source)].filter((name) => BANNED.has(name)).sort();
-    if (banned.length > 0) byModule.set(path.relative(srcDir, file), banned);
+  for (const root of canonicalLoaderScanRoots) {
+    for await (const file of workspaceSources(path.join(repoRoot, root))) {
+      const source = await fs.readFile(file, "utf8");
+      const banned = [...exportedNames(source)].filter((name) => BANNED.has(name)).sort();
+      if (banned.length > 0) {
+        byModule.set(path.relative(repoRoot, file).replace(/\\/g, "/"), banned);
+      }
+    }
   }
   return byModule;
 })();
@@ -173,10 +178,10 @@ async function loaderCandidates() {
 }
 
 describe("no-internal-canonical-loaders module matcher", () => {
-  it("matches every activerecord module that exports a banned loader", async () => {
+  it("matches every workspace module that exports a banned loader", async () => {
     const unmatched = [];
     for (const [file, banned] of await loaderCandidates()) {
-      if (!isCanonicalSchemaModule(`./${file.replace(/\.ts$/, ".js")}`)) {
+      if (!isCanonicalSchemaModule(`./${file.replace(/\.m?ts$/, ".js")}`)) {
         unmatched.push(`${file} exports ${banned.join(", ")}`);
       }
     }
@@ -185,7 +190,7 @@ describe("no-internal-canonical-loaders module matcher", () => {
 
   it("lists no module that has stopped exporting a banned loader", async () => {
     const found = new Set(
-      (await loaderCandidates()).map(([file]) => moduleBasename(file.replace(/\.ts$/, ""))),
+      (await loaderCandidates()).map(([file]) => moduleBasename(file.replace(/\.m?ts$/, ""))),
     );
     expect(canonicalLoaderModules.filter((module) => !found.has(module))).toEqual([]);
   });

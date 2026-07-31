@@ -19,6 +19,18 @@
 export const activerecordSrcRoot = "packages/activerecord/src";
 
 /**
+ * Repo-relative roots the `no-internal-canonical-loaders` guard test walks when
+ * hunting for modules that export a banned loader.
+ *
+ * `isCanonicalSchemaModule` matches on module basename with no package
+ * anchoring, so a loader relocated into ANY workspace package — or into a
+ * top-level `scripts/` helper — is invisible to the rule's pinned module list
+ * and reopens the ban silently. Scanning only `packages/activerecord/src` left
+ * exactly that hole one level up, so the scan spans the whole workspace.
+ */
+export const canonicalLoaderScanRoots = ["packages", "scripts"];
+
+/**
  * Test-infra paths exempt from the table-lifecycle rules, relative to
  * `activerecordSrcRoot`. `fixtures.ts` / `test-fixtures.ts` are anchored as
  * exact ported files rather than by basename — see no-raw-sql-scope.mjs.
