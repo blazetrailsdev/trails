@@ -2843,19 +2843,8 @@ export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown
       }
     });
 
-    if (
-      namedInner.length === 0 &&
-      rawJoinValues.length === 0 &&
-      this._joinClauses.length === 0 &&
-      this._eagerLoadAssociations.length === 0
-    ) {
-      // Only left outer joins, no inner/explicit joins or eager stash —
-      // short-circuit (query_methods.rb:1838-1842: `if joins_values.empty?`). In
-      // Rails `joins_values` holds both inner association names AND the eager
-      // stash; trails splits those into `_namedInnerJoins` and
-      // `_eagerLoadAssociations`, so both must be empty too — otherwise the
-      // left-outer JD belongs in `stashed_join` (folded below), not `named_join`,
-      // and the inner names would be dropped / double-emitted downstream.
+    if (namedInner.length === 0 && rawJoinValues.length === 0 && this._joinClauses.length === 0) {
+      // query_methods.rb:1838-1842: `if joins_values.empty?`.
       buckets.named_join.push(...namedLeft);
       buckets.stashed_join.push(...stashedLeft);
       return buckets;
@@ -2870,26 +2859,14 @@ export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown
     buckets.stashed_join.push(...stashedLeft);
   }
 
-  // Stashed eager signal: _eagerLoadAssociations (stashed_eager_load equivalent).
-  // _leftOuterJoinsValues is already handled above, so only eager is added here
-  // to avoid double-inclusion. Only push a primary JD when namedEager has at least
-  // one string association — non-string specs (hashes/nested) skip constructJoinDependency
-  // and would produce an empty JD that still sets hasStashed, incorrectly changing routing.
-  if (this._eagerLoadAssociations.length > 0) {
-    const eagerStash: JoinDependency[] = [];
-    const namedEager = selectNamedJoins.call(
-      this,
-      this._eagerLoadAssociations as string[],
-      eagerStash,
-    );
-    const hasJoinableEager = (namedEager as AssociationSpec[]).some((a) => typeof a === "string");
-    if (hasJoinableEager) {
-      const eagerJd = constructJoinDependency.call(this, namedEager as AssociationSpec[], null);
-      eagerStash.unshift(eagerJd);
-    }
-    if (eagerStash.length > 0) buckets.stashed_join.push(...eagerStash);
-  }
-  const hasStashed = buckets.stashed_join.length > 0;
+  // Rails' `stashed_eager_load || stashed_left_joins` (query_methods.rb:1857).
+  // `stashed_eager_load` is the trailing `joins_values` JoinDependency built on
+  // this relation's own model (query_methods.rb:1843-1845) — a cross-klass
+  // merged JoinDependency is NOT it and does not arm this guard.
+  const lastJoinValue = joinsValues[joinsValues.length - 1];
+  const stashedEagerLoad =
+    lastJoinValue instanceof JoinDependency && lastJoinValue.baseKlass === this.model;
+  const hasStashed = buckets.stashed_join.length > 0 || stashedEagerLoad;
 
   for (const v of rawJoinValues) {
     const node: Nodes.Join =

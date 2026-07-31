@@ -4827,19 +4827,11 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Mirror Rails `apply_join_dependency` for subquery embedding: convert the
-   * eager_load/includes associations into LEFT OUTER joins and clear the eager
-   * values, so `arel()` carries the join (with a normal projection) instead of
-   * dropping it. A no-op when the relation is not eager-loading.
-   *
-   * Rails `RelationHandler#call` does `value = value.apply_join_dependency`
-   * before selecting the primary key and reading `value.arel`
-   * (predicate_builder/relation_handler.rb:7); `apply_join_dependency` builds a
-   * JoinDependency over `eager_load_values | includes_values` and returns
-   * `except(:includes, :eager_load, :preload).joins!(join_dependency)`
-   * (finder_methods.rb:457). trails models the same outcome with
-   * `leftOuterJoins` (rendered as OUTER joins by `_applyJoinsToManager`) over
-   * the cleared eager specs.
+   * Mirror Rails `apply_join_dependency` (finder_methods.rb:457-461): build a
+   * JoinDependency over `eager_load_values | includes_values` with an OuterJoin
+   * join type and push it into `joins_values` via `joins!`, on a relation that
+   * has dropped `:includes`, `:eager_load` and `:preload`. A no-op when the
+   * relation is not eager-loading.
    *
    * `eagerLoading` mirrors Rails `apply_join_dependency(eager_loading:
    * group_values.empty?)` (finder_methods.rb:457): when `false` (a grouped
@@ -4853,6 +4845,16 @@ export class Relation<T extends Base> {
     const eagerSpecs = [
       ...new Set([...this._eagerLoadAssociations, ...this._includesAssociations]),
     ];
+    const joinDependency = QueryMethodBangs.constructJoinDependency.call(
+      this as any,
+      eagerSpecs as any,
+      Nodes.OuterJoin,
+    );
+    const rel = this._clone();
+    rel._eagerLoadAssociations = [];
+    rel._includesAssociations = [];
+    rel._preloadAssociations = [];
+    QueryMethodBangs.joinsBang.call(rel as any, joinDependency as any);
 
     // Rails `apply_join_dependency`, for a limit/offset over non-limitable
     // (collection) reflections, replaces the relation with
@@ -4868,7 +4870,10 @@ export class Relation<T extends Base> {
     // claim parity we reject this combination explicitly. Tracked by the
     // `relation-handler-distinct-pk-materialization` continuation story.
     const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
-    if (eagerLoading && hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(eagerSpecs)) {
+    const isLimitable =
+      this.usingLimitableReflections(joinDependency.reflections as never) &&
+      this._joinsReflectionsAreLimitable();
+    if (eagerLoading && hasLimitOrOffset && !isLimitable) {
       // @nie disposition=TODO
       throw new NotImplementedError(
         "Using an eager-loaded relation with a limit/offset over a collection " +
@@ -4880,10 +4885,7 @@ export class Relation<T extends Base> {
       );
     }
 
-    const rel = this._clone();
-    rel._eagerLoadAssociations = [];
-    rel._includesAssociations = [];
-    return rel.leftOuterJoins(eagerSpecs);
+    return rel;
   }
 
   /**

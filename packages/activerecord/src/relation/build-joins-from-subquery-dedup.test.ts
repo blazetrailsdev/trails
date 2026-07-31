@@ -22,6 +22,7 @@ import { fixtures } from "../test-fixtures.js";
 import "../support/canonical-model-index.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
+import { quoteTableName, escapeRegExp } from "../support/quote-regex.js";
 
 describe("build_joins from(subquery) dedup", () => {
   fixtures([]);
@@ -68,5 +69,21 @@ describe("build_joins from(subquery) dedup", () => {
     expect((liveSql.match(/LEFT OUTER JOIN/g) ?? []).length).toBe(2);
     // The whole FROM…joins structure of the live path is the subquery's inner query.
     expect(subSql).toContain(liveSql.slice(liveSql.indexOf('FROM "posts"')));
+  });
+
+  // Rails arms build_join_buckets' raw-join routing on `stashed_eager_load ||
+  // stashed_left_joins` (query_methods.rb:1857), and `stashed_eager_load` is only
+  // the trailing joins_values JoinDependency whose `base_klass == model`
+  // (query_methods.rb:1843-1845). A cross-klass merged JoinDependency (base_klass
+  // Comment, not Post) is not it, so with no left-outer values the guard stays
+  // off and a raw join node goes to `leading_join` — emitted BEFORE the
+  // association joins, not appended after them.
+  it("keeps a raw join leading when the only joins_values JoinDependency is cross-klass", () => {
+    const rel = Post.joins("CROSS JOIN categories").joins("comments").merge(Comment.joins("post"));
+    const sql = (Post.from(rel, "posts") as unknown as { toSql(): string }).toSql();
+    const q = (name: string) => escapeRegExp(quoteTableName(name));
+    expect(sql).toMatch(
+      new RegExp(`FROM ${q("posts")} CROSS JOIN categories INNER JOIN ${q("comments")}`),
+    );
   });
 });
