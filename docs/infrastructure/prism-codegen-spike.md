@@ -18,13 +18,16 @@ handler-registry architecture translate the hardest AR files without drowning,
 and (3) what does the coverage evidence say about productionizing this.
 
 **Verdict:** Feasible as a _scaffolding accelerator_, not a _correctness
-oracle_. `@ruby/prism` works in Node. The registry translates **99.8% of AST
-node instances** across the 10 most-central AR files with a real handler (only
-22 of 9,804 node instances fall to marked passthrough). But node-instance
-coverage measures _handler presence, not semantic correctness_ — the generated
-JS reproduces control-flow and call shape faithfully while systematically
-mistranslating Ruby's metaprogramming and implicit-receiver semantics. See
-[Honest limits](#honest-limits).
+oracle_. `@ruby/prism` works in Node. The AST-building registry (handlers emit
+`ts.factory` nodes, printed by the TypeScript printer — see the re-baseline
+note under [Coverage metric](#coverage-metric-the-feasibility-evidence))
+translates **89.7% of AST node instances** across the 10 most-central AR files
+with a real handler, with **parse-clean output by construction** (0 parse
+errors) and **382/469 defs (81.4%) fully handled** end-to-end. But
+node-instance coverage measures _handler presence, not semantic correctness_ —
+the generated JS reproduces control-flow and call shape faithfully while
+systematically mistranslating Ruby's metaprogramming and implicit-receiver
+semantics. See [Honest limits](#honest-limits).
 
 ## Pipeline (fixed)
 
@@ -32,9 +35,11 @@ mistranslating Ruby's metaprogramming and implicit-receiver semantics. See
    Node via WASI; **no Ruby subprocess**.
 2. **Translate** — deterministic walk of the Prism AST through a handler
    registry. **No LLM.**
-3. **Emit** — plain JavaScript (`.js`, no type annotations); where repo
-   conventions are TS-typed (the `this`-typed mixin pattern), we emit the
-   runtime shape and drop the types.
+3. **Emit** — handlers build TypeScript AST nodes (`ts.factory`), printed by
+   `ts.createPrinter` as plain JavaScript (`.js`, no type annotations); where
+   repo conventions are TS-typed (the `this`-typed mixin pattern), we emit
+   the runtime shape and drop the types. Because nothing can splice raw text
+   into expression position, the output parses by construction.
 
 ### `@ruby/prism`-in-Node feasibility finding
 
@@ -55,16 +60,20 @@ must resolve from the repo `node_modules` (WASI + the bundled `prism.wasm`).
 
 The architectural constraint was: **NOT** a giant switch/if-chain. Dispatch is a
 `Map<nodeKind, Handler>` lookup (`scripts/prism-codegen/registry.ts`). A handler
-is `(node, emitter) => string`. Adding support for a new Ruby construct means
-writing a handler module and calling `registry.on("SomeNode", handler)` — there
-is **no central dispatch block to edit**. Handlers recurse via `emitter.emit()`
-rather than dispatching themselves, so the registry is the single dispatch
-surface and every visited node is counted exactly once.
+is `(node, emitter) => ts.Expression | null` (statement-position kinds register
+a parallel `(node, emitter, isLast) => ts.Statement[] | null`). Adding support
+for a new Ruby construct means writing a handler module and calling
+`registry.on("SomeNode", handler)` — there is **no central dispatch block to
+edit**. Handlers recurse via `emitter.expr()` / `emitter.stmts()` rather than
+dispatching themselves, so the registry is the single dispatch surface and
+every dispatched node is counted exactly once.
 
-Unhandled kinds **degrade gracefully**: the emitter emits a marked
-`/* TODO(NodeKind) */` and _still recurses into children_, so handled
-descendants below an unhandled parent are emitted and counted. A file therefore
-always produces output; the tool never throws on an unknown node.
+Unhandled kinds **degrade gracefully but honestly**: the emitter emits a
+`__PRISM_TODO("NodeKind")` marker call and counts the ENTIRE unhandled subtree
+as passthrough (a handler may also decline a specific case by returning
+`null`, with the same accounting). A file therefore always produces parseable
+output; the tool never throws on an unknown node, and there is no raw-text
+escape hatch through which invalid syntax could leak.
 
 Handler modules (grouped only for readability — the grouping has no dispatch
 role):
@@ -87,41 +96,64 @@ exported free functions (the mixin-as-function runtime shape, TS types dropped);
 ## Coverage metric (the feasibility evidence)
 
 Emitted by `pnpm codegen:generate`. "Handled" = AST node instances that hit a
-real handler; "passthrough" = instances that fell to the marked TODO.
+real handler; "passthrough" = instances that fell to the counted
+`__PRISM_TODO` marker.
+
+> **Re-baseline (AST emitter).** The original string-concatenation emitter
+> reported 99.8% rollup coverage while its output carried **301 parse errors**
+> across the 10 files (`oc.<<(x)`, `yield(...)` in module scope,
+> `super(...arguments)` in free functions, statements inside class bodies):
+> "handled" meant "a handler returned a string", not "valid JS came out". The
+> emitter now builds TypeScript AST nodes (`ts.factory`) and prints them, with
+> NO raw-text escape hatch: a handler either produces a well-formed node with
+> already-decided semantics or declines, and declining counts the whole
+> subtree as passthrough. The numbers below are lower **because they are now
+> true** — and the output is parse-clean by construction (0 parse errors,
+> asserted by `generateFromSource` on every run).
 
 ```text
-file                               handled   nodes    tag
-base.rb                            100.0%      136    pathological
-relation.rb                         99.8%     1694    pathological
-persistence.rb                      99.6%     1045    tractable*
-associations.rb                     99.3%      276    pathological
-relation/query_methods.rb           99.8%     2654    pathological
-core.rb                             99.8%     1142    pathological
-relation/finder_methods.rb         100.0%      833    tractable*
-relation/calculations.rb            99.6%     1093    tractable*
-inheritance.rb                      99.8%      405    pathological
-model_schema.rb                    100.0%      526    pathological
-------------------------------------------------------------------
-ROLLUP (all 10)                     99.8%     9804    handled=9782 passthrough=22
-DEEP-DRILL (tractable*, 3 files)    99.7%     2971    handled=2963 passthrough=8
+file                               handled   nodes   defs=clean/all   tag
+base.rb                             17.1%      187        0/0         pathological
+relation.rb                         85.0%     1981       75/84        pathological
+persistence.rb                      93.0%     1195       45/56        tractable*
+associations.rb                     98.6%      285        8/11        pathological
+relation/query_methods.rb           92.8%     3063       97/127       pathological
+core.rb                             91.6%     1295       45/56        pathological
+relation/finder_methods.rb          90.4%      994       37/43        tractable*
+relation/calculations.rb            94.5%     1244       32/36        tractable*
+inheritance.rb                      89.1%      477       14/23        pathological
+model_schema.rb                     87.4%      613       29/33        pathological
+--------------------------------------------------------------------------
+ROLLUP (all 10)                     89.7%    11334    handled=10170 passthrough=1164
+DEEP-DRILL (tractable*, 3 files)    92.8%     3433    defs 382/469 clean overall
 ```
 
 `tractable*` marks the three deepest-drill targets (chosen by tractability): the
 verdict rests on these, where deterministic codegen shows its ceiling on
 ordinary method-body input — not on the macro-DSL files it drowns in.
+`base.rb`'s 17% is the honesty bar working: its body is macro DSL
+(`include`/`extend` chains inside `class Base`) that has no JS class-member
+image — the old emitter printed it as statements inside a class body, which
+was a parse error.
+
+**`defs=clean/all`** is the new per-method attribution: defs whose body
+emitted with ZERO passthrough nodes. 382/469 (81.4%) of defs are fully
+handled — this set is the trustworthy denominator for any structural
+comparison of generated output against the hand-written port (a diff inside a
+tainted method can blame the generator; a diff inside a clean one cannot).
 
 Dominant passthrough kinds (rollup, self-prioritizing the next handlers to
-build): `RequiredParameterNode` (8, block/lambda param contexts),
-`InterpolatedSymbolNode` (2), `SourceFileNode`/`SourceLineNode` (`__FILE__` /
-`__LINE__`, 2 each), then singletons: `ForwardingArgumentsNode` (`...`),
-`LambdaNode`, `MatchWriteNode`, `InterpolatedRegularExpressionNode`,
-`BackReferenceReadNode`, `NumberedReferenceReadNode`.
+build): `CallNode` (281 — operator methods with no JS image like `<<`/`<=>`,
+and reserved-word bare calls), `ForwardingSuperNode` (34, module-level `super`
+has no image in free functions), plus the argument/statement subtrees under
+those declined parents.
 
-**Caveat the numbers demand:** 99.8% _node-handler_ coverage is not 99.8%
+**Caveat the numbers demand:** _node-handler_ coverage is still not
 _correct output_. Leaf nodes (identifiers, literals, argument lists) dominate
 the instance count and are trivially handled, which inflates the headline
-number. Coverage is the right metric for "which handlers are missing", the wrong
-metric for "is the output right". The honest correctness picture is below.
+number. Coverage is the right metric for "which handlers are missing", the
+wrong metric for "is the output right". The honest correctness picture is
+below.
 
 ## File selection & ranking rationale
 

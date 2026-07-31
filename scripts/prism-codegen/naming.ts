@@ -18,6 +18,71 @@ export function methodName(rubyName: string): string {
 }
 
 /**
+ * JS reserved words (incl. strict-mode, which ES modules always are). A Ruby
+ * method named `delete` maps to a perfectly legal *property* name (`x.delete()`,
+ * class method `delete() {}`) but NOT to a binding name (`function delete`,
+ * `let default`) — the two predicates below keep that distinction.
+ */
+const RESERVED = new Set([
+  "break",
+  "case",
+  "catch",
+  "class",
+  "const",
+  "continue",
+  "debugger",
+  "default",
+  "delete",
+  "do",
+  "else",
+  "enum",
+  "export",
+  "extends",
+  "false",
+  "finally",
+  "for",
+  "function",
+  "if",
+  "import",
+  "in",
+  "instanceof",
+  "new",
+  "null",
+  "return",
+  "super",
+  "switch",
+  "this",
+  "throw",
+  "true",
+  "try",
+  "typeof",
+  "var",
+  "void",
+  "while",
+  "with",
+  "yield",
+  "let",
+  "static",
+  "implements",
+  "interface",
+  "package",
+  "private",
+  "protected",
+  "public",
+  "await",
+]);
+
+/** Syntactically a JS identifier (usable as a property/method name). */
+export function isJsIdentName(s: string): boolean {
+  return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(s);
+}
+
+/** Usable as a BINDING: function/variable/parameter name (not reserved). */
+export function isBindableIdent(s: string): boolean {
+  return isJsIdentName(s) && !RESERVED.has(s);
+}
+
+/**
  * Invert `rubyFileToTs`: given a trails `.ts` path, find the Rails `.rb` file
  * that maps to it. We reuse the forward map rather than build a new one — map
  * each candidate `.rb` and match. The trails path may carry the full

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import ts from "typescript";
 import { generateFromSource } from "./index.js";
 import { summarizeCoverage, mergeCoverages } from "./coverage.js";
 import { Registry } from "./registry.js";
@@ -23,7 +24,7 @@ describe("prism-codegen", () => {
     expect(code).toContain("this.saved = true"); // @ivar → this.
     // Bare receiver-less predicate renders as an identifier — the tool can't
     // deterministically tell a no-arg method call from a local read.
-    expect(code).toContain("if (!(isValid))"); // unless → if (!(...))
+    expect(code).toContain("if (!isValid)"); // unless → if (!...)
   });
 
   it("records handled vs. passthrough coverage per node kind", async () => {
@@ -37,15 +38,16 @@ describe("prism-codegen", () => {
     // BEGIN {} is a rarely-handled kind; the emitter must not throw.
     const { code, coverage } = await generateFromSource(`BEGIN { x }`);
     const s = summarizeCoverage(coverage);
-    expect(code).toContain("TODO(");
+    expect(code).toContain("__PRISM_TODO(");
     expect(s.passthrough).toBeGreaterThan(0);
   });
 
   it("registry supports adding a node handler without central dispatch edits", () => {
     const r = new Registry();
     expect(r.has("FooNode")).toBe(false);
-    r.on("FooNode", () => "ok");
-    expect(r.get("FooNode")?.({} as never, {} as never)).toBe("ok");
+    const lit = ts.factory.createStringLiteral("ok");
+    r.on("FooNode", () => lit);
+    expect(r.get("FooNode")?.({} as never, {} as never)).toBe(lit);
   });
 
   it("renders string/symbol literals from Prism's unescaped object shape", async () => {
@@ -109,6 +111,46 @@ describe("prism-codegen", () => {
     );
     expect(code).toContain("export function syncReader(");
     expect(code).not.toContain("await save");
+  });
+
+  it("emits parse-clean output by construction, even around passthroughs", async () => {
+    // `<<` and `yield` have no decided JS image: the string emitter printed
+    // `oc.<<(x)` / `yield(x)` (both parse errors); the AST emitter must emit a
+    // counted __PRISM_TODO marker instead and still produce parseable JS.
+    const { code, coverage, parseErrorCount } = await generateFromSource(`
+      def push_all(oc)
+        oc << 1
+        yield(oc)
+        oc
+      end
+    `);
+    expect(parseErrorCount).toBe(0);
+    expect(code).not.toContain("<<");
+    expect(code).toContain("__PRISM_TODO(");
+    expect(summarizeCoverage(coverage).passthrough).toBeGreaterThan(0);
+  });
+
+  it("converts Ruby's implicit return on the last statement of a def", async () => {
+    const { code } = await generateFromSource(`
+      def pick(a)
+        if a
+          a
+        else
+          fallback
+        end
+      end
+    `);
+    expect(code).toContain("return a;");
+    expect(code).toContain("return fallback;");
+  });
+
+  it("attributes passthrough to the enclosing def for a trustworthy denominator", async () => {
+    const { perDef } = await generateFromSource(`
+      def clean(a); a + 1; end
+      def dirty(oc); oc << 1; end
+    `);
+    expect(perDef.get("clean")?.passthrough).toBe(0);
+    expect(perDef.get("dirty")?.passthrough).toBeGreaterThan(0);
   });
 
   it("resolves async through Rails-name method maps, wrappers, and alias chains", () => {

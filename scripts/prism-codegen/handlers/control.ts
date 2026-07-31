@@ -1,86 +1,139 @@
 /**
- * Control-flow handlers: if/unless (statement and modifier forms), while/until,
- * case/when, return/next/break, yield, and begin/rescue → try/catch.
+ * Control-flow handlers: if/unless (statement and expression positions),
+ * while/until, case/when, return/next/break, begin/rescue → try/catch, and
+ * statement-position `raise` → `throw`.
+ *
+ * `yield` is a deliberate passthrough now: the old string emitter printed
+ * `yield(...)`, which is a parse error in ES modules (strict mode reserves
+ * the word outside generators) — exactly the class of output the AST emitter
+ * exists to make impossible. The block-call protocol is an unmade semantic
+ * decision, so it stays passthrough until decided.
  */
+import ts from "typescript";
 import type { Emitter, PrismNode } from "../types.js";
 import type { Registry } from "../registry.js";
 
+const f = ts.factory;
+
 export function registerControl(r: Registry): void {
-  r.on("IfNode", (n, e) => emitIf(n, e));
+  r.onStmt("IfNode", (n, e, isLast) => [ifStmt(n, e, isLast, false)]);
+  r.onStmt("UnlessNode", (n, e, isLast) => [ifStmt(n, e, isLast, true)]);
 
-  r.on("UnlessNode", (n, e) => {
-    const cond = e.emit(n.predicate as PrismNode);
-    const body = e.emitBody((n.statements as PrismNode) ?? null);
-    const elseB = n.elseClause ? emitElse(n.elseClause as PrismNode, e) : "";
-    return `if (!(${cond})) {\n${e.indent(body)}\n}${elseB}`;
+  // Expression-position if/unless → conditional expression; needs a single
+  // expression in each branch, otherwise decline.
+  r.onMany(["IfNode", "UnlessNode"], (n, e) => {
+    const neg = n.constructor.name === "UnlessNode";
+    const cons = singleExprOf(n.statements as PrismNode | null, e);
+    const alt = elseSingleExpr(n, e);
+    if (!cons || !alt) return null;
+    let cond = e.expr(n.predicate as PrismNode);
+    if (neg) cond = f.createLogicalNot(cond);
+    return f.createConditionalExpression(
+      cond,
+      f.createToken(ts.SyntaxKind.QuestionToken),
+      cons,
+      f.createToken(ts.SyntaxKind.ColonToken),
+      alt,
+    );
   });
 
-  r.onMany(["WhileNode", "UntilNode"], (n, e) => {
-    const neg = n.constructor.name === "UntilNode";
-    const cond = e.emit(n.predicate as PrismNode);
-    const body = e.emitBody((n.statements as PrismNode) ?? null);
-    return `while (${neg ? "!(" + cond + ")" : cond}) {\n${e.indent(body)}\n}`;
-  });
+  r.onStmt("WhileNode", (n, e) => [loop(n, e, false)]);
+  r.onStmt("UntilNode", (n, e) => [loop(n, e, true)]);
 
-  r.on("CaseNode", (n, e) => emitCase(n, e));
+  r.onStmt("CaseNode", (n, e, isLast) => caseStmt(n, e, isLast));
 
-  r.on("ReturnNode", (n, e) => {
-    const v = firstArg(n.arguments_ as PrismNode | undefined, e);
-    return v ? `return ${v}` : "return";
+  r.onStmt("ReturnNode", (n, e) => {
+    const v = returnValue(n.arguments_ as PrismNode | undefined, e);
+    return [f.createReturnStatement(v)];
   });
-  r.on("NextNode", (n, e) => {
-    const v = firstArg(n.arguments_ as PrismNode | undefined, e);
-    return v ? `return ${v}` : "continue";
+  // `next value` inside a block-as-arrow is that iteration's value → return;
+  // a bare `next` in a loop is continue.
+  r.onStmt("NextNode", (n, e) => {
+    const v = returnValue(n.arguments_ as PrismNode | undefined, e);
+    return [v ? f.createReturnStatement(v) : f.createContinueStatement()];
   });
-  r.on("BreakNode", () => "break");
-  r.on("YieldNode", (n, e) => {
-    const a = ((n.arguments_ as PrismNode)?.arguments_ as PrismNode[]) ?? [];
-    return `yield(${a.map((x) => e.emit(x)).join(", ")})`;
-  });
+  r.onStmt("BreakNode", () => [f.createBreakStatement()]);
 
-  r.on("BeginNode", (n, e) => {
-    const body = e.emitBody((n.statements as PrismNode) ?? null);
-    let out = `try {\n${e.indent(body)}\n}`;
+  r.onStmt("BeginNode", (n, e, isLast) => {
+    const tryBlock = f.createBlock(e.stmts((n.statements as PrismNode) ?? null, isLast), true);
     const rescue = n.rescueClause as PrismNode | undefined;
+    let catchClause: ts.CatchClause | undefined;
     if (rescue) {
-      const rbody = e.emitBody((rescue.statements as PrismNode) ?? null);
+      // Chained `rescue A; rescue B` clauses need per-class re-dispatch — an
+      // unmade decision; decline so the whole begin counts passthrough.
+      if (rescue.subsequent) return null;
       const ref = rescue.reference ? String((rescue.reference as PrismNode).name) : "e";
-      out += ` catch (${ref}) {\n${e.indent(rbody)}\n}`;
+      catchClause = f.createCatchClause(
+        f.createVariableDeclaration(ref),
+        f.createBlock(e.stmts((rescue.statements as PrismNode) ?? null, isLast), true),
+      );
     }
     const ensure = n.ensureClause as PrismNode | undefined;
-    if (ensure) {
-      const ebody = e.emitBody((ensure.statements as PrismNode) ?? null);
-      out += ` finally {\n${e.indent(ebody)}\n}`;
+    const finallyBlock = ensure
+      ? f.createBlock(e.stmts((ensure.statements as PrismNode) ?? null, false), true)
+      : undefined;
+    if (!catchClause && !finallyBlock) {
+      return e.stmts((n.statements as PrismNode) ?? null, isLast);
     }
-    return out;
+    return [f.createTryStatement(tryBlock, catchClause, finallyBlock)];
+  });
+
+  // Statement-position `raise` → `throw` (repo convention: errors are thrown).
+  // `raise Klass, msg` is Ruby for `raise Klass.new(msg)` → `throw new Klass(msg)`.
+  r.onStmt("CallNode", (n, e) => {
+    if (String(n.name) !== "raise" || n.receiver || n.block) return null;
+    const args = ((n.arguments_ as PrismNode | null)?.arguments_ as PrismNode[]) ?? [];
+    if (args.length === 0) return null; // bare re-raise: needs the caught binding
+    if (args.length === 1) return [f.createThrowStatement(e.expr(args[0]))];
+    const head = args[0];
+    const headKind = head.constructor.name;
+    if (headKind === "ConstantReadNode" || headKind === "ConstantPathNode") {
+      return [
+        f.createThrowStatement(
+          f.createNewExpression(
+            e.expr(head),
+            undefined,
+            args.slice(1).map((a) => e.expr(a)),
+          ),
+        ),
+      ];
+    }
+    return null;
   });
 }
 
-function emitIf(n: PrismNode, e: Emitter): string {
-  const cond = e.emit(n.predicate as PrismNode);
-  const body = e.emitBody((n.statements as PrismNode) ?? null);
-  const sub = n.subsequent ? subsequent(n.subsequent as PrismNode, e) : "";
-  return `if (${cond}) {\n${e.indent(body)}\n}${sub}`;
-}
-
-function subsequent(node: PrismNode, e: Emitter): string {
-  if (node.constructor.name === "IfNode") {
-    // elsif
-    return " else " + emitIf(node, e);
+function ifStmt(n: PrismNode, e: Emitter, isLast: boolean, negate: boolean): ts.Statement {
+  let cond = e.expr(n.predicate as PrismNode);
+  if (negate) cond = f.createLogicalNot(cond);
+  const thenB = f.createBlock(e.stmts((n.statements as PrismNode) ?? null, isLast), true);
+  // `subsequent` on IfNode (ElseNode or elsif IfNode); `elseClause` on UnlessNode.
+  const sub = (n.subsequent ?? n.elseClause) as PrismNode | null;
+  let elseB: ts.Statement | undefined;
+  if (sub && sub.constructor.name === "ElseNode") {
+    elseB = f.createBlock(e.stmts((sub.statements as PrismNode) ?? null, isLast), true);
+  } else if (sub && sub.constructor.name === "IfNode") {
+    elseB = ifStmt(sub, e, isLast, false);
   }
-  return emitElse(node, e);
+  return f.createIfStatement(cond, thenB, elseB);
 }
 
-function emitElse(node: PrismNode, e: Emitter): string {
-  const body = e.emitBody((node.statements as PrismNode) ?? null);
-  return ` else {\n${e.indent(body)}\n}`;
+function loop(n: PrismNode, e: Emitter, negate: boolean): ts.Statement {
+  let cond = e.expr(n.predicate as PrismNode);
+  if (negate) cond = f.createLogicalNot(cond);
+  return f.createWhileStatement(
+    cond,
+    f.createBlock(e.stmts((n.statements as PrismNode) ?? null, false), true),
+  );
 }
 
-function emitCase(n: PrismNode, e: Emitter): string {
-  const subject = n.predicate ? e.emit(n.predicate as PrismNode) : "";
+function caseStmt(n: PrismNode, e: Emitter, isLast: boolean): ts.Statement[] | null {
+  const subject = n.predicate ? e.expr(n.predicate as PrismNode) : undefined;
   const conds = (n.conditions as PrismNode[]) ?? [];
-  const branches: string[] = [];
-  for (let i = 0; i < conds.length; i++) {
+  if (conds.some((w) => w.constructor.name !== "WhenNode")) return null; // `in` patterns
+  let out: ts.Statement | undefined = n.elseClause
+    ? f.createBlock(e.stmts((n.elseClause as PrismNode).statements as PrismNode, isLast), true)
+    : undefined;
+  for (let i = conds.length - 1; i >= 0; i--) {
     const w = conds[i];
     // Ruby `case s; when M` evaluates `M === s` (case-equality on the matcher:
     // class membership, range include, regex match, ==), NOT `s === M`. A plain
@@ -89,22 +142,36 @@ function emitCase(n: PrismNode, e: Emitter): string {
     // that mirrors Ruby's `#===`. A subject-less `case; when cond` keeps the
     // bare boolean condition.
     const tests = ((w.conditions as PrismNode[]) ?? []).map((c) =>
-      subject ? `caseEq(${e.emit(c)}, ${subject})` : e.emit(c),
+      subject
+        ? f.createCallExpression(f.createIdentifier("caseEq"), undefined, [e.expr(c), subject])
+        : e.expr(c),
     );
-    const body = e.emitBody((w.statements as PrismNode) ?? null);
-    const kw = i === 0 ? "if" : "else if";
-    branches.push(`${kw} (${tests.join(" || ")}) {\n${e.indent(body)}\n}`);
+    const cond = tests.reduce((a, b) => f.createLogicalOr(a, b));
+    out = f.createIfStatement(
+      cond,
+      f.createBlock(e.stmts((w.statements as PrismNode) ?? null, isLast), true),
+      out,
+    );
   }
-  if (n.elseClause) {
-    const body = e.emitBody((n.elseClause as PrismNode).statements as PrismNode);
-    branches.push(`else {\n${e.indent(body)}\n}`);
-  }
-  return branches.join(" ");
+  return out ? [out] : [];
 }
 
-function firstArg(node: PrismNode | undefined, e: Emitter): string {
+function returnValue(node: PrismNode | undefined, e: Emitter): ts.Expression | undefined {
   const a = (node?.arguments_ as PrismNode[]) ?? [];
-  if (a.length === 0) return "";
-  if (a.length === 1) return e.emit(a[0]);
-  return "[" + a.map((x) => e.emit(x)).join(", ") + "]";
+  if (a.length === 0) return undefined;
+  if (a.length === 1) return e.expr(a[0]);
+  return f.createArrayLiteralExpression(a.map((x) => e.expr(x)));
+}
+
+function singleExprOf(statements: PrismNode | null, e: Emitter): ts.Expression | null {
+  if (!statements) return null;
+  const kids = statements.compactChildNodes();
+  if (kids.length !== 1) return null;
+  return e.expr(kids[0]);
+}
+
+function elseSingleExpr(n: PrismNode, e: Emitter): ts.Expression | null {
+  const sub = (n.subsequent ?? n.elseClause) as PrismNode | null;
+  if (!sub || sub.constructor.name !== "ElseNode") return null;
+  return singleExprOf(sub.statements as PrismNode | null, e);
 }

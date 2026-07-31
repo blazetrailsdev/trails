@@ -1,14 +1,21 @@
 /**
- * The emitter: walks a Prism AST through the {@link Registry}, tracking
- * per-kind coverage. Handled kinds run their handler; unhandled kinds fall to
- * a passthrough marked with a TODO block comment that still recurses into
- * children, so nested handled nodes below an unhandled parent are still emitted
- * and
- * counted. This is what makes coverage a fine-grained per-node-instance metric
- * rather than a whole-file pass/fail.
+ * The emitter: walks a Prism AST through the {@link Registry}, building a
+ * TypeScript AST and tracking per-kind + per-def coverage. Handled kinds run
+ * their handler; unhandled kinds (or handlers that decline with `null`)
+ * become a `__PRISM_TODO("<Kind>")` marker call, with the ENTIRE unhandled
+ * subtree counted as passthrough — the conservative direction, since inline
+ * sub-shapes a handler would have absorbed (hash pairs, params) count against
+ * an unhandled parent but are simply not dispatched under a handled one.
+ *
+ * Because every emitted node comes from `ts.factory`, the printed output is
+ * parseable by construction: there is no code path that can splice raw text
+ * into expression position.
  */
+import ts from "typescript";
 import { Registry } from "./registry.js";
 import type { Coverage, Emitter, PrismNode } from "./types.js";
+
+const f = ts.factory;
 
 class CoverageTally implements Coverage {
   readonly counts = new Map<string, { handled: number; passthrough: number }>();
@@ -20,61 +27,88 @@ class CoverageTally implements Coverage {
   }
 }
 
+/** Name of the def-level bucket for nodes outside any method body. */
+export const TOPLEVEL = "(toplevel)";
+
 export class Codegen implements Emitter {
   readonly coverage = new CoverageTally();
+  readonly perDef = new Map<string, { total: number; passthrough: number }>();
+  currentDef = TOPLEVEL;
   inClass = false;
+  inSingleton = false;
   inAsyncMethod = false;
+  declared = new Set<string>();
   constructor(
     private readonly registry: Registry,
     readonly asyncMethods: ReadonlySet<string> = new Set(),
   ) {}
 
-  emit(node: PrismNode | null | undefined): string {
-    if (!node || !node.constructor) return "";
+  private record(kind: string, handled: boolean): void {
+    this.coverage.record(kind, handled);
+    const d = this.perDef.get(this.currentDef) ?? { total: 0, passthrough: 0 };
+    d.total++;
+    if (!handled) d.passthrough++;
+    this.perDef.set(this.currentDef, d);
+  }
+
+  expr(node: PrismNode | null | undefined): ts.Expression {
+    if (!node || !node.constructor) return f.createNull();
     const kind = node.constructor.name;
     const handler = this.registry.get(kind);
-    this.coverage.record(kind, handler !== undefined);
-    if (handler) return handler(node, this);
+    if (handler) {
+      const built = handler(node, this);
+      if (built) {
+        this.record(kind, true);
+        return built;
+      }
+    }
     return this.passthrough(node, kind);
   }
 
+  stmt(node: PrismNode, isLast: boolean): ts.Statement[] {
+    const kind = node.constructor.name;
+    const handler = this.registry.getStmt(kind);
+    if (handler) {
+      const built = handler(node, this, isLast);
+      if (built) {
+        this.record(kind, true);
+        return built;
+      }
+    }
+    // Fall back to expression position; Ruby's implicit return applies to the
+    // last statement of a method body (never a constructor's).
+    const e = this.expr(node);
+    if (isLast && this.currentDef !== TOPLEVEL && this.currentDef !== "constructor") {
+      return [f.createReturnStatement(e)];
+    }
+    return [f.createExpressionStatement(e)];
+  }
+
+  stmts(node: PrismNode | null | undefined, implicitReturn: boolean): ts.Statement[] {
+    if (!node) return [];
+    let kids: PrismNode[];
+    if (node.constructor?.name === "StatementsNode") {
+      this.record("StatementsNode", true);
+      kids = node.compactChildNodes();
+    } else {
+      kids = [node];
+    }
+    return kids.flatMap((s, i) => this.stmt(s, implicitReturn && i === kids.length - 1));
+  }
+
   /**
-   * Unhandled node: emit a marked TODO but keep walking children so any
-   * handled descendants still contribute output and coverage. Children are
-   * emitted newline-joined inside a comment-tagged block.
+   * Unhandled node: a marker call, never raw text. The whole subtree is
+   * recorded as passthrough — nothing under an unhandled parent is emitted,
+   * so nothing under it may count as handled.
    */
-  private passthrough(node: PrismNode, kind: string): string {
-    const children = node
-      .compactChildNodes()
-      .map((c) => this.emit(c))
-      .filter((s) => s.trim().length > 0);
-    if (children.length === 0) return `/* TODO(${kind}) */`;
-    return `/* TODO(${kind}) */ ${children.join(" ")}`;
+  private passthrough(node: PrismNode, kind: string): ts.Expression {
+    const countSubtree = (n: PrismNode) => {
+      this.record(n.constructor.name, false);
+      for (const c of n.compactChildNodes()) countSubtree(c);
+    };
+    countSubtree(node);
+    return f.createCallExpression(f.createIdentifier("__PRISM_TODO"), undefined, [
+      f.createStringLiteral(kind),
+    ]);
   }
-
-  emitBody(node: PrismNode | null | undefined): string {
-    if (!node) return "";
-    // A StatementsNode holds an ordered list of statements.
-    const kids = node.constructor?.name === "StatementsNode" ? node.compactChildNodes() : [node];
-    return kids
-      .map((s) => {
-        const code = this.emit(s);
-        return endsInBlock(code) ? code : code + ";";
-      })
-      .filter((s) => s.trim().length > 1)
-      .join("\n");
-  }
-
-  indent(src: string): string {
-    return src
-      .split("\n")
-      .map((l) => (l.length ? "  " + l : l))
-      .join("\n");
-  }
-}
-
-/** Statements that already close with `}` or a comment don't get a `;`. */
-function endsInBlock(code: string): boolean {
-  const t = code.trimEnd();
-  return t.endsWith("}") || t.endsWith("*/") || t.length === 0;
 }

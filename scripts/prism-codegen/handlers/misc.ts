@@ -1,87 +1,144 @@
 /**
- * Handlers for the long tail that dominated the passthrough bucket in the first
- * coverage run: splats, `super`, compound-assignment operators, multi-assign
- * targets, `defined?`, regexes, and `alias`. Each is a small, self-contained
- * registration — the point of the registry is that adding these needed no
- * change to any dispatch site.
+ * Handlers for the long tail: splats, `super`, compound-assignment operators,
+ * multi-assign targets, `defined?`, regexes, and `alias`. Each is a small,
+ * self-contained registration — the point of the registry is that adding
+ * these needed no change to any dispatch site.
+ *
+ * `super` is only handled inside a `class` body: the old string emitter
+ * printed `super(...arguments)` into module-level free functions, where it is
+ * a grammar error. Outside a class it declines (→ passthrough) — the mixin
+ * runtime shape has no super chain to call.
  */
+import ts from "typescript";
 import { rubyStr, type Emitter, type PrismNode } from "../types.js";
 import type { Registry } from "../registry.js";
-import { methodName } from "../naming.js";
+import { methodName, isJsIdentName, isBindableIdent } from "../naming.js";
+
+const f = ts.factory;
+
+// Ruby compound-assignment operator → JS compound-assignment token, only where
+// the operator itself has a faithful JS image (see INFIX in expressions.ts).
+const COMPOUND: Record<string, ts.BinaryOperator> = {
+  "+": ts.SyntaxKind.PlusEqualsToken,
+  "-": ts.SyntaxKind.MinusEqualsToken,
+  "*": ts.SyntaxKind.AsteriskEqualsToken,
+  "/": ts.SyntaxKind.SlashEqualsToken,
+  "%": ts.SyntaxKind.PercentEqualsToken,
+};
 
 export function registerMisc(r: Registry): void {
-  r.on("SplatNode", (n, e) => "..." + e.emit((n.expression as PrismNode) ?? null));
+  r.on("SplatNode", (n, e) => f.createSpreadElement(e.expr((n.expression as PrismNode) ?? null)));
 
-  r.on("ForwardingSuperNode", () => "super(...arguments)");
-  r.on("SuperNode", (n, e) => {
-    const a = ((n.arguments_ as PrismNode)?.arguments_ as PrismNode[]) ?? [];
-    return `super(${a.map((x) => e.emit(x)).join(", ")})`;
+  r.onMany(["ForwardingSuperNode", "SuperNode"], (n, e) => {
+    if (!e.inClass) return null; // no super chain in exported mixin functions
+    const args =
+      n.constructor.name === "ForwardingSuperNode"
+        ? [f.createSpreadElement(f.createIdentifier("arguments"))]
+        : (((n.arguments_ as PrismNode | null)?.arguments_ as PrismNode[]) ?? []).map((x) =>
+            e.expr(x),
+          );
+    return f.createCallExpression(f.createSuper(), undefined, args);
   });
 
   // Compound assignment: `x += 1`, `a.b -= 2`, `arr[i] *= 3`.
   r.on("LocalVariableOperatorWriteNode", (n, e) => {
-    return `${n.name} ${op(n.binaryOperator)}= ${e.emit(n.value as PrismNode)}`;
+    const op = COMPOUND[String(n.binaryOperator)];
+    if (!op || !isBindableIdent(String(n.name))) return null;
+    e.declared.add(String(n.name));
+    return f.createBinaryExpression(
+      f.createIdentifier(String(n.name)),
+      op,
+      e.expr(n.value as PrismNode),
+    );
   });
   r.on("InstanceVariableOperatorWriteNode", (n, e) => {
-    return `this.${ivar(n.name)} ${op(n.binaryOperator)}= ${e.emit(n.value as PrismNode)}`;
+    const op = COMPOUND[String(n.binaryOperator)];
+    if (!op) return null;
+    return f.createBinaryExpression(thisProp(n.name), op, e.expr(n.value as PrismNode));
   });
   r.on("CallOperatorWriteNode", (n, e) => {
-    const recv = n.receiver ? e.emit(n.receiver as PrismNode) + "." : "";
-    return `${recv}${methodName(String(n.readName))} ${op(n.binaryOperator)}= ${e.emit(n.value as PrismNode)}`;
+    const op = COMPOUND[String(n.binaryOperator)];
+    if (!op) return null;
+    const prop = methodName(String(n.readName));
+    if (n.receiver ? !isJsIdentName(prop) : !isBindableIdent(prop)) return null;
+    const target = n.receiver
+      ? f.createPropertyAccessExpression(e.expr(n.receiver as PrismNode), prop)
+      : f.createIdentifier(prop);
+    return f.createBinaryExpression(target, op, e.expr(n.value as PrismNode));
   });
   r.on("IndexOperatorWriteNode", (n, e) => {
-    const recv = e.emit(n.receiver as PrismNode);
-    const idx = ((n.arguments_ as PrismNode)?.arguments_ as PrismNode[]) ?? [];
-    return `${recv}[${idx.map((x) => e.emit(x)).join(", ")}] ${op(n.binaryOperator)}= ${e.emit(n.value as PrismNode)}`;
+    const op = COMPOUND[String(n.binaryOperator)];
+    if (!op) return null;
+    return f.createBinaryExpression(indexTarget(n, e), op, e.expr(n.value as PrismNode));
   });
-  r.on("IndexOrWriteNode", (n, e) => {
-    const recv = e.emit(n.receiver as PrismNode);
-    const idx = ((n.arguments_ as PrismNode)?.arguments_ as PrismNode[]) ?? [];
-    return `${recv}[${idx.map((x) => e.emit(x)).join(", ")}] ||= ${e.emit(n.value as PrismNode)}`;
-  });
-
-  // Multi-assign targets: `a, b = ...`.
-  r.onMany(["LocalVariableTargetNode", "ConstantTargetNode"], (n) => String(n.name));
-  r.on("InstanceVariableTargetNode", (n) => "this." + ivar(n.name));
-  r.on(
-    "CallTargetNode",
-    (n, e) => `${e.emit(n.receiver as PrismNode)}.${methodName(String(n.name))}`,
+  r.on("IndexOrWriteNode", (n, e) =>
+    f.createBinaryExpression(
+      indexTarget(n, e),
+      ts.SyntaxKind.BarBarEqualsToken,
+      e.expr(n.value as PrismNode),
+    ),
   );
-  r.on("IndexTargetNode", (n, e) => {
-    const idx = ((n.arguments_ as PrismNode)?.arguments_ as PrismNode[]) ?? [];
-    return `${e.emit(n.receiver as PrismNode)}[${idx.map((x) => e.emit(x)).join(", ")}]`;
-  });
-  r.on("MultiTargetNode", (n, e) => {
-    const lefts = ((n.lefts as PrismNode[]) ?? []).map((l) => e.emit(l));
-    return `[${lefts.join(", ")}]`;
-  });
 
-  r.on("DefinedNode", (n, e) => `(typeof (${e.emit(n.value as PrismNode)}) !== "undefined")`);
+  // Multi-assign targets: `a, b = ...` (elements of the destructuring array).
+  r.onMany(["LocalVariableTargetNode", "ConstantTargetNode"], (n, e) => {
+    if (!isBindableIdent(String(n.name))) return null;
+    e.declared.add(String(n.name));
+    return f.createIdentifier(String(n.name));
+  });
+  r.on("InstanceVariableTargetNode", (n) => thisProp(n.name));
+  r.on("CallTargetNode", (n, e) => {
+    const prop = methodName(String(n.name));
+    if (!isJsIdentName(prop)) return null;
+    return f.createPropertyAccessExpression(e.expr(n.receiver as PrismNode), prop);
+  });
+  r.on("IndexTargetNode", (n, e) => indexTarget(n, e));
+  r.on("MultiTargetNode", (n, e) =>
+    f.createArrayLiteralExpression(((n.lefts as PrismNode[]) ?? []).map((l) => e.expr(l))),
+  );
+
+  r.on("DefinedNode", (n, e) =>
+    f.createBinaryExpression(
+      f.createTypeOfExpression(f.createParenthesizedExpression(e.expr(n.value as PrismNode))),
+      ts.SyntaxKind.ExclamationEqualsEqualsToken,
+      f.createStringLiteral("undefined"),
+    ),
+  );
 
   r.on("RegularExpressionNode", (n) => {
-    const body = rubyStr(n.unescaped).replace(/\//g, "\\/");
-    return `/${body}/`;
+    const body = rubyStr(n.unescaped).replace(/(?<!\\)\//g, "\\/");
+    if (body.includes("\n") || body.length === 0) return null; // Ruby /x/ or empty
+    return f.createRegularExpressionLiteral(`/${body}/`);
   });
 
-  // `alias new old` / `alias_method` — no direct JS statement; emit a legible
-  // assignment marker the mixin layer would realize.
-  r.on("AliasMethodNode", (n, e) => {
-    const nn = symName(n.newName as PrismNode, e);
-    const on = symName(n.oldName as PrismNode, e);
-    return `/* alias */ const ${nn} = ${on}`;
+  // `alias new old` / `alias_method` — no direct JS statement; a const
+  // aliasing assignment the mixin layer would realize.
+  r.onStmt("AliasMethodNode", (n) => {
+    const nn = symName(n.newName as PrismNode);
+    const on = symName(n.oldName as PrismNode);
+    if (!nn || !on) return null;
+    return [
+      f.createVariableStatement(
+        undefined,
+        f.createVariableDeclarationList(
+          [f.createVariableDeclaration(nn, undefined, undefined, f.createIdentifier(on))],
+          ts.NodeFlags.Const,
+        ),
+      ),
+    ];
   });
 }
 
-function op(binaryOperator: unknown): string {
-  const s = String(binaryOperator ?? "+");
-  return s === "==" ? "=" : s;
+function thisProp(name: unknown): ts.PropertyAccessExpression {
+  return f.createPropertyAccessExpression(f.createThis(), String(name).replace(/^@+/, ""));
 }
 
-function ivar(name: unknown): string {
-  return String(name).replace(/^@+/, "");
+function indexTarget(n: PrismNode, e: Emitter): ts.ElementAccessExpression {
+  const idx = ((n.arguments_ as PrismNode | null)?.arguments_ as PrismNode[]) ?? [];
+  return f.createElementAccessExpression(e.expr(n.receiver as PrismNode), e.expr(idx[0]));
 }
 
-function symName(node: PrismNode, e: Emitter): string {
-  if (node && node.constructor.name === "SymbolNode") return methodName(rubyStr(node.unescaped));
-  return e.emit(node);
+function symName(node: PrismNode): string | null {
+  if (!node || node.constructor.name !== "SymbolNode") return null;
+  const s = methodName(rubyStr(node.unescaped));
+  return isBindableIdent(s) ? s : null;
 }

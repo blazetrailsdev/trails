@@ -4,35 +4,49 @@
  * This is the architectural centerpiece of the spike: dispatch is a Map
  * lookup, NOT a switch/if-chain. A new node kind is supported by calling
  * `registry.on("SomeNode", handler)` — no central dispatch block to edit.
- * Unhandled kinds degrade gracefully to a marked passthrough (see
- * `Codegen`), so a file always produces output.
+ * Kinds carry an expression handler, a statement handler, or both (an
+ * `IfNode` is an if-statement at statement position but a conditional
+ * expression at expression position). Unhandled kinds degrade gracefully to
+ * a counted passthrough marker (see `Codegen`), so a file always produces
+ * parseable output.
  */
-import type { Handler } from "./types.js";
+import type { ExprHandler, StmtHandler } from "./types.js";
 
 export class Registry {
-  private readonly handlers = new Map<string, Handler>();
+  private readonly exprHandlers = new Map<string, ExprHandler>();
+  private readonly stmtHandlers = new Map<string, StmtHandler>();
 
-  /** Register (or override) the handler for a Prism node kind. */
-  on(kind: string, handler: Handler): this {
-    this.handlers.set(kind, handler);
+  /** Register (or override) the expression handler for a Prism node kind. */
+  on(kind: string, handler: ExprHandler): this {
+    this.exprHandlers.set(kind, handler);
     return this;
   }
 
-  /** Register many kinds that share one handler (e.g. all literal reads). */
-  onMany(kinds: string[], handler: Handler): this {
+  /** Register many kinds that share one expression handler. */
+  onMany(kinds: string[], handler: ExprHandler): this {
     for (const k of kinds) this.on(k, handler);
     return this;
   }
 
-  get(kind: string): Handler | undefined {
-    return this.handlers.get(kind);
+  /** Register (or override) the statement handler for a Prism node kind. */
+  onStmt(kind: string, handler: StmtHandler): this {
+    this.stmtHandlers.set(kind, handler);
+    return this;
+  }
+
+  get(kind: string): ExprHandler | undefined {
+    return this.exprHandlers.get(kind);
+  }
+
+  getStmt(kind: string): StmtHandler | undefined {
+    return this.stmtHandlers.get(kind);
   }
 
   has(kind: string): boolean {
-    return this.handlers.has(kind);
+    return this.exprHandlers.has(kind) || this.stmtHandlers.has(kind);
   }
 
   get size(): number {
-    return this.handlers.size;
+    return new Set([...this.exprHandlers.keys(), ...this.stmtHandlers.keys()]).size;
   }
 }

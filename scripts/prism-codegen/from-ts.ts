@@ -11,6 +11,7 @@ import * as path from "node:path";
 import { generateFromSource } from "./index.js";
 import { asyncMethodsForRailsFile } from "./async-source.js";
 import { summarizeCoverage } from "./coverage.js";
+import { TOPLEVEL } from "./codegen.js";
 import { tsToRubyFile } from "./naming.js";
 import { resolvePath } from "../../vendor/sources.js";
 
@@ -45,14 +46,17 @@ async function main() {
     process.exit(1);
   }
   const rb = path.join(AR_LIB, rel);
-  const { code, coverage } = await generateFromSource(
+  const { code, coverage, perDef, parseErrorCount } = await generateFromSource(
     readFileSync(rb, "utf8"),
     asyncMethodsForRailsFile(rel),
   );
   const s = summarizeCoverage(coverage);
+  const defs = [...perDef].filter(([name]) => name !== TOPLEVEL);
+  const clean = defs.filter(([, d]) => d.passthrough === 0).length;
   process.stderr.write(
     `// source: ${rb}\n// handler coverage: ${s.handledPct.toFixed(1)}% ` +
-      `(${s.handled}/${s.total} node instances)\n`,
+      `(${s.handled}/${s.total} node instances); defs fully handled: ` +
+      `${clean}/${defs.length}; output parse errors: ${parseErrorCount}\n`,
   );
   process.stdout.write(code);
 }
