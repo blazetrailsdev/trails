@@ -31,6 +31,7 @@ export class Codegen implements Emitter {
   inClass = false;
   inSingleton = false;
   inAsyncMethod = false;
+  inLoop = false;
   declared = new Set<string>();
   constructor(
     private readonly registry: Registry,

@@ -22,22 +22,17 @@ export function registerLiterals(r: Registry): void {
     f.createArrayLiteralExpression(((n.elements as PrismNode[]) ?? []).map((el) => e.expr(el))),
   );
   r.onMany(["HashNode", "KeywordHashNode"], (n, e) => {
-    const props: ts.ObjectLiteralElementLike[] = [];
-    for (const el of (n.elements as PrismNode[]) ?? []) {
+    const elements = (n.elements as PrismNode[]) ?? [];
+    const valid = elements.every((el) => {
       const k = el.constructor.name;
-      if (k === "AssocNode") {
-        props.push(
-          f.createPropertyAssignment(
-            keyName(el.key as PrismNode, e),
-            e.expr(el.value as PrismNode),
-          ),
-        );
-      } else if (k === "AssocSplatNode") {
-        props.push(f.createSpreadAssignment(e.expr(el.value as PrismNode)));
-      } else {
-        return null;
-      }
-    }
+      return k === "AssocNode" || k === "AssocSplatNode";
+    });
+    if (!valid) return null;
+    const props: ts.ObjectLiteralElementLike[] = elements.map((el) =>
+      el.constructor.name === "AssocNode"
+        ? f.createPropertyAssignment(keyName(el.key as PrismNode, e), e.expr(el.value as PrismNode))
+        : f.createSpreadAssignment(e.expr(el.value as PrismNode)),
+    );
     return f.createObjectLiteralExpression(props, false);
   });
   r.on("RangeNode", (n, e) =>

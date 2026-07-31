@@ -138,43 +138,64 @@ function argExprs(node: PrismNode | undefined | null, e: Emitter): ts.Expression
 function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
   const name = String(n.name);
   const argNodes = ((n.arguments_ as PrismNode | null)?.arguments_ as PrismNode[]) ?? [];
-  const recv = n.receiver ? e.expr(n.receiver as PrismNode) : undefined;
-  if (name === "[]" && recv) {
+  const hasRecv = n.receiver != null;
+  const block = n.block as PrismNode | undefined;
+
+  if (name === "[]" && hasRecv) {
     if (argNodes.length !== 1) return null;
-    return f.createElementAccessExpression(recv, e.expr(argNodes[0]));
+    return f.createElementAccessExpression(e.expr(n.receiver as PrismNode), e.expr(argNodes[0]));
   }
-  if (name === "[]=" && recv) {
+  if (name === "[]=" && hasRecv) {
     if (argNodes.length !== 2) return null;
     return f.createAssignment(
-      f.createElementAccessExpression(recv, e.expr(argNodes[0])),
+      f.createElementAccessExpression(e.expr(n.receiver as PrismNode), e.expr(argNodes[0])),
       e.expr(argNodes[1]),
     );
   }
-  if (name === "!" && recv) return f.createLogicalNot(recv);
-  if (name === "-@" && recv) return f.createPrefixUnaryExpression(ts.SyntaxKind.MinusToken, recv);
-  if (name === "+@" && recv) return f.createPrefixUnaryExpression(ts.SyntaxKind.PlusToken, recv);
-  if (recv && INFIX[name] && argNodes.length === 1) {
-    return f.createBinaryExpression(recv, INFIX[name], e.expr(argNodes[0]));
+  if (name === "!" && hasRecv) return f.createLogicalNot(e.expr(n.receiver as PrismNode));
+  if (name === "-@" && hasRecv) {
+    return f.createPrefixUnaryExpression(ts.SyntaxKind.MinusToken, e.expr(n.receiver as PrismNode));
   }
-  if (name === "new" && recv) {
-    return f.createNewExpression(recv, undefined, argExprs(n.arguments_ as PrismNode, e));
+  if (name === "+@" && hasRecv) {
+    return f.createPrefixUnaryExpression(ts.SyntaxKind.PlusToken, e.expr(n.receiver as PrismNode));
   }
+  if (hasRecv && INFIX[name] && argNodes.length === 1) {
+    return f.createBinaryExpression(
+      e.expr(n.receiver as PrismNode),
+      INFIX[name],
+      e.expr(argNodes[0]),
+    );
+  }
+  if (name === "new" && hasRecv) {
+    return f.createNewExpression(
+      e.expr(n.receiver as PrismNode),
+      undefined,
+      argExprs(n.arguments_ as PrismNode, e),
+    );
+  }
+
   const jsName = methodName(name);
-  if (recv ? !isJsIdentName(jsName) : !isBindableIdent(jsName)) return null;
-  const block = n.block as PrismNode | undefined;
-  const callArgs = argExprs(n.arguments_ as PrismNode, e);
+  if (hasRecv ? !isJsIdentName(jsName) : !isBindableIdent(jsName)) return null;
+  let blockParams: string[] | null = null;
   if (block) {
-    if (
-      block.constructor.name === "BlockArgumentNode" &&
-      (block.expression as PrismNode | null)?.constructor.name !== "SymbolNode"
-    ) {
-      callArgs.push(e.expr(block.expression as PrismNode));
-    } else if (block.constructor.name === "BlockNode") {
-      const arrow = blockToArrow(block, e);
-      if (!arrow) return null;
-      callArgs.push(arrow);
+    const blockKind = block.constructor.name;
+    if (blockKind === "BlockArgumentNode") {
+      if ((block.expression as PrismNode | null)?.constructor.name === "SymbolNode") return null;
+    } else if (blockKind === "BlockNode") {
+      blockParams = blockParamNames(block.parameters as PrismNode | undefined);
+      if (!blockParams) return null;
     } else {
       return null;
+    }
+  }
+
+  const recv = hasRecv ? e.expr(n.receiver as PrismNode) : undefined;
+  const callArgs = argExprs(n.arguments_ as PrismNode, e);
+  if (block) {
+    if (block.constructor.name === "BlockArgumentNode") {
+      callArgs.push(e.expr(block.expression as PrismNode));
+    } else {
+      callArgs.push(blockToArrow(block, blockParams ?? [], e));
     }
   }
   const target: ts.Expression = recv
@@ -187,11 +208,12 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
 function hasParens(n: PrismNode): boolean {
   return n.openingLoc != null;
 }
-function blockToArrow(block: PrismNode, e: Emitter): ts.ArrowFunction | null {
-  const names = blockParamNames(block.parameters as PrismNode | undefined);
-  if (!names) return null;
+function blockToArrow(block: PrismNode, names: string[], e: Emitter): ts.ArrowFunction {
   const params = names.map((p) => f.createParameterDeclaration(undefined, undefined, p));
+  const prevLoop = e.inLoop;
+  e.inLoop = false;
   const body = e.stmts((block.body as PrismNode) ?? null, true);
+  e.inLoop = prevLoop;
   if (body.length === 1 && ts.isReturnStatement(body[0]) && body[0].expression) {
     return f.createArrowFunction(
       undefined,

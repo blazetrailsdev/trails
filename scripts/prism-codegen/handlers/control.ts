@@ -7,9 +7,11 @@ export function registerControl(r: Registry): void {
   r.onStmt("UnlessNode", (n, e, isLast) => [ifStmt(n, e, isLast, true)]);
   r.onMany(["IfNode", "UnlessNode"], (n, e) => {
     const neg = n.constructor.name === "UnlessNode";
-    const cons = singleExprOf(n.statements as PrismNode | null, e);
-    const alt = elseSingleExpr(n, e);
-    if (!cons || !alt) return null;
+    const consNode = singleStmtNode(n.statements as PrismNode | null);
+    const altNode = elseSingleStmtNode(n);
+    if (!consNode || !altNode) return null;
+    const cons = e.expr(consNode);
+    const alt = e.expr(altNode);
     let cond = e.expr(n.predicate as PrismNode);
     if (neg) cond = f.createLogicalNot(cond);
     return f.createConditionalExpression(
@@ -28,16 +30,21 @@ export function registerControl(r: Registry): void {
     return [f.createReturnStatement(v)];
   });
   r.onStmt("NextNode", (n, e) => {
+    const argCount = ((n.arguments_ as PrismNode | null)?.arguments_ as PrismNode[])?.length ?? 0;
+    if (e.inLoop) {
+      if (argCount > 0) return null;
+      return [f.createContinueStatement()];
+    }
     const v = returnValue(n.arguments_ as PrismNode | undefined, e);
-    return [v ? f.createReturnStatement(v) : f.createContinueStatement()];
+    return [f.createReturnStatement(v)];
   });
-  r.onStmt("BreakNode", () => [f.createBreakStatement()]);
+  r.onStmt("BreakNode", (n, e) => (e.inLoop ? [f.createBreakStatement()] : null));
   r.onStmt("BeginNode", (n, e, isLast) => {
-    const tryBlock = f.createBlock(e.stmts((n.statements as PrismNode) ?? null, isLast), true);
     const rescue = n.rescueClause as PrismNode | undefined;
+    if (rescue?.subsequent) return null;
+    const tryBlock = f.createBlock(e.stmts((n.statements as PrismNode) ?? null, isLast), true);
     let catchClause: ts.CatchClause | undefined;
     if (rescue) {
-      if (rescue.subsequent) return null;
       const ref = rescue.reference ? String((rescue.reference as PrismNode).name) : "e";
       catchClause = f.createCatchClause(
         f.createVariableDeclaration(ref),
@@ -90,15 +97,16 @@ function ifStmt(n: PrismNode, e: Emitter, isLast: boolean, negate: boolean): ts.
 function loop(n: PrismNode, e: Emitter, negate: boolean): ts.Statement {
   let cond = e.expr(n.predicate as PrismNode);
   if (negate) cond = f.createLogicalNot(cond);
-  return f.createWhileStatement(
-    cond,
-    f.createBlock(e.stmts((n.statements as PrismNode) ?? null, false), true),
-  );
+  const prevLoop = e.inLoop;
+  e.inLoop = true;
+  const body = f.createBlock(e.stmts((n.statements as PrismNode) ?? null, false), true);
+  e.inLoop = prevLoop;
+  return f.createWhileStatement(cond, body);
 }
 function caseStmt(n: PrismNode, e: Emitter, isLast: boolean): ts.Statement[] | null {
-  const subject = n.predicate ? e.expr(n.predicate as PrismNode) : undefined;
   const conds = (n.conditions as PrismNode[]) ?? [];
   if (conds.some((w) => w.constructor.name !== "WhenNode")) return null;
+  const subject = n.predicate ? e.expr(n.predicate as PrismNode) : undefined;
   let out: ts.Statement | undefined = n.elseClause
     ? f.createBlock(e.stmts((n.elseClause as PrismNode).statements as PrismNode, isLast), true)
     : undefined;
@@ -124,14 +132,13 @@ function returnValue(node: PrismNode | undefined, e: Emitter): ts.Expression | u
   if (a.length === 1) return e.expr(a[0]);
   return f.createArrayLiteralExpression(a.map((x) => e.expr(x)));
 }
-function singleExprOf(statements: PrismNode | null, e: Emitter): ts.Expression | null {
+function singleStmtNode(statements: PrismNode | null): PrismNode | null {
   if (!statements) return null;
   const kids = statements.compactChildNodes();
-  if (kids.length !== 1) return null;
-  return e.expr(kids[0]);
+  return kids.length === 1 ? kids[0] : null;
 }
-function elseSingleExpr(n: PrismNode, e: Emitter): ts.Expression | null {
+function elseSingleStmtNode(n: PrismNode): PrismNode | null {
   const sub = (n.subsequent ?? n.elseClause) as PrismNode | null;
   if (!sub || sub.constructor.name !== "ElseNode") return null;
-  return singleExprOf(sub.statements as PrismNode | null, e);
+  return singleStmtNode(sub.statements as PrismNode | null);
 }

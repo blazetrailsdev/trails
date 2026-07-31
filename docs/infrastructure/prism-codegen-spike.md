@@ -21,7 +21,7 @@ and (3) what does the coverage evidence say about productionizing this.
 oracle_. `@ruby/prism` works in Node. The AST-building registry (handlers emit
 `ts.factory` nodes, printed by the TypeScript printer — see the re-baseline
 note under [Coverage metric](#coverage-metric-the-feasibility-evidence))
-translates **86.8% of AST node instances** across the 10 most-central AR files
+translates **86.7% of AST node instances** across the 10 most-central AR files
 with a real handler, with **parse-clean output by construction** (0 parse
 errors) and **363/469 defs (77.4%) fully handled** end-to-end. But
 node-instance coverage measures _handler presence, not semantic correctness_ —
@@ -114,18 +114,18 @@ real handler; "passthrough" = instances that fell to the counted
 ```text
 file                               handled   nodes   defs=clean/all   tag
 base.rb                             17.1%      187        0/0         pathological
-relation.rb                         83.2%     2007       71/84        pathological
-persistence.rb                      89.0%     1227       42/56        tractable*
+relation.rb                         83.0%     1988       71/84        pathological
+persistence.rb                      88.8%     1201       42/56        tractable*
 associations.rb                     98.6%      285        8/11        pathological
-relation/query_methods.rb           92.3%     3067       95/127       pathological
-core.rb                             81.7%     1326       45/56        pathological
-relation/finder_methods.rb          89.6%      999       35/43        tractable*
-relation/calculations.rb            89.6%     1277       30/36        tractable*
-inheritance.rb                      87.2%      485       13/23        pathological
-model_schema.rb                     83.6%      629       24/33        pathological
+relation/query_methods.rb           92.3%     3037       95/127       pathological
+core.rb                             81.6%     1320       45/56        pathological
+relation/finder_methods.rb          89.5%      987       35/43        tractable*
+relation/calculations.rb            89.4%     1258       30/36        tractable*
+inheritance.rb                      87.0%      478       13/23        pathological
+model_schema.rb                     83.4%      619       24/33        pathological
 --------------------------------------------------------------------------
-ROLLUP (all 10)                     86.8%    11489    handled=9977 passthrough=1512
-DEEP-DRILL (tractable*, 3 files)    89.4%     3503    defs 363/469 clean overall
+ROLLUP (all 10)                     86.7%    11360    handled=9848 passthrough=1512
+DEEP-DRILL (tractable*, 3 files)    89.2%     3446    defs 363/469 clean overall
 ```
 
 `tractable*` marks the three deepest-drill targets (chosen by tractability): the

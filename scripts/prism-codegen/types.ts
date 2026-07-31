@@ -37,6 +37,8 @@ export interface Emitter {
   inSingleton: boolean;
   readonly asyncMethods: ReadonlySet<string>;
   inAsyncMethod: boolean;
+
+  inLoop: boolean;
   readonly declared: Set<string>;
 }
 export interface Coverage {

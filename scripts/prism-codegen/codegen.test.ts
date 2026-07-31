@@ -124,6 +124,50 @@ describe("prism-codegen", () => {
     expect(symToProc.code).toContain("__PRISM_TODO(");
   });
 
+  it("counts each node exactly once when a call declines after partial validation", async () => {
+    const { coverage } = await generateFromSource(`def d(list); probe(9, &:name); end`);
+    const int = coverage.counts.get("IntegerNode") ?? { handled: 0, passthrough: 0 };
+    expect(int.handled).toBe(0);
+    expect(int.passthrough).toBe(1);
+  });
+
+  it("distinguishes next/break in native loops from next in block callbacks", async () => {
+    const loop = await generateFromSource(`
+      def scan(xs)
+        i = 0
+        while i < 10
+          i += 1
+          next if i.zero?
+          break if i > 5
+        end
+        i
+      end
+    `);
+    expect(loop.parseErrorCount).toBe(0);
+    expect(loop.code).toContain("continue;");
+    expect(loop.code).toContain("break;");
+
+    const lossyNext = await generateFromSource(`
+      def scan2(xs)
+        while more?
+          next compute if skip?
+          advance
+        end
+      end
+    `);
+    expect(lossyNext.parseErrorCount).toBe(0);
+    expect(lossyNext.code).toContain("__PRISM_TODO(");
+
+    const blockNext = await generateFromSource(`
+      def pluck_all(xs)
+        xs.map { |x| next 0 if x.nil?; x }
+      end
+    `);
+    expect(blockNext.parseErrorCount).toBe(0);
+    expect(blockNext.code).toContain("return 0;");
+    expect(blockNext.code).not.toContain("continue");
+  });
+
   it("declines reserved-word bindings but keeps them as property names", async () => {
     const { code, parseErrorCount } = await generateFromSource(
       `def use(record); record.delete; end
