@@ -396,7 +396,7 @@ export class CollectionAssociation extends Association {
   async concat(...records: Base[]): Promise<Base[] | undefined> {
     const flattened = records.flat();
     if (this.owner.isNewRecord()) {
-      await this.loadTarget();
+      await this.skipStrictLoading(() => this.loadTarget());
       return this.concatRecords(flattened);
     }
     return this.transaction(() => this.concatRecords(flattened));
@@ -760,6 +760,12 @@ export class CollectionAssociation extends Association {
    * relies on the surrounding `raise Rollback` to undo a failed insert), keeping
    * the OO path's membership behavior unchanged. Sync callers (build/replace,
    * no `save`) get the synchronous return.
+   *
+   * Rails passes `replace: replace || association_scope.distinct_value`, so a
+   * `distinct` association scope dedups in place on append rather than
+   * appending the same record twice. As in Rails the scope build is unguarded:
+   * `association_scope` raising here is a real failure, not something
+   * `add_to_target` absorbs into a `false`.
    */
   addToTarget(record: Base, options?: { skipCallbacks?: boolean; replace?: boolean }): Base | null;
   addToTarget(
@@ -772,7 +778,10 @@ export class CollectionAssociation extends Association {
     options: { skipCallbacks?: boolean; replace?: boolean } = {},
     save?: () => Promise<void>,
   ): Base | null | Promise<Base | null> {
-    const { skipCallbacks = false, replace: shouldReplace = false } = options;
+    const { skipCallbacks = false, replace = false } = options;
+    const distinctValue = !!(this.associationScope() as { distinctValue?: boolean } | undefined)
+      ?.distinctValue;
+    const shouldReplace = replace || distinctValue;
     if (save) return replaceOnTargetAsync(this, record, skipCallbacks, shouldReplace, save);
     return replaceOnTarget(this, record, skipCallbacks, shouldReplace);
   }
@@ -911,13 +920,27 @@ export class CollectionAssociation extends Association {
 
   // --- Protected helpers ---
 
+  /**
+   * Mirrors `ForeignAssociation#set_owner_attributes` (foreign_association.rb:22),
+   * which zips `Array(reflection.join_primary_key)` — the child FK columns —
+   * against `Array(reflection.join_foreign_key)`. For a has_many the latter is
+   * `active_record_primary_key`, not the owner's bare `primary_key`: a composite
+   * FK derived from the owner's `query_constraints` (`Sharded::BlogPost`
+   * `[blog_id, id]`) only pairs correctly through that resolver, and
+   * `ctor.primaryKey` would collapse both FK columns onto `id`.
+   */
   protected setOwnerAttributes(record: Base): void {
     if (this.reflection.options.through) return;
 
     const ctor = this.owner.constructor as any;
-    const configuredPk = this.reflection.options.primaryKey ?? ctor.primaryKey ?? "id";
-    const pks = Array.isArray(configuredPk) ? configuredPk : [configuredPk];
     const fks = this.foreignKeyColumns();
+    const richPk = (
+      ctor._reflectOnAssociation?.(this.reflection.name) as
+        | { activeRecordPrimaryKey?: string | string[] }
+        | undefined
+    )?.activeRecordPrimaryKey;
+    const configuredPk = this.reflection.options.primaryKey ?? richPk ?? ctor.primaryKey ?? "id";
+    const pks = Array.isArray(configuredPk) ? configuredPk : [configuredPk];
 
     for (let i = 0; i < fks.length; i++) {
       const pkCol = pks[i] ?? pks[0];
