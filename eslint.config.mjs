@@ -795,11 +795,6 @@ export default defineConfig(
   // ── no-unnecessary-type-assertion: scoped typed-lint block (projectService only, not recommendedTypeChecked) ──
   {
     files: ["**/*.ts"],
-    // `scripts/**` is run by tsx and belongs to no tsconfig program, so the
-    // project service cannot resolve any of its ~500 `.ts` files — each one
-    // would be a parse error rather than a lint result. The tree is linted by
-    // every untyped rule; only this typed block skips it.
-    ignores: ["scripts/**"],
     languageOptions: {
       parserOptions: {
         projectService: {

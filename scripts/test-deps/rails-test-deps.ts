@@ -183,7 +183,7 @@ export function parseSource(src: string): FileDeps {
       const body = lines.slice(r.start, r.end).join("\n");
       const used: Record<string, Set<string>> = {};
       for (const m of body.matchAll(callRe)) {
-        const records = collectRecordArgs(body, m.index! + m[0].length - 1);
+        const records = collectRecordArgs(body, m.index + m[0].length - 1);
         if (records.length === 0) continue;
         const bucket = (used[accessorToDeclared.get(m[1]) ?? m[1]] ??= new Set());
         for (const rec of records) bucket.add(rec);

@@ -22,10 +22,10 @@ describe("parseJsdoc", () => {
     ].join("\n");
     const { rest, entries } = parseJsdoc(comment);
     expect(entries.map((e) => e.call)).toEqual(["default_scoped", "merge!"]);
-    expect(entries[0]!.reason).toBe(
+    expect(entries[0].reason).toBe(
       "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed.",
     );
-    expect(entries[0]!.rawLines).toHaveLength(2);
+    expect(entries[0].rawLines).toHaveLength(2);
     expect(rest.join("\n")).toContain("Mirrors Rails");
     expect(rest.join("\n")).not.toContain("@missingRailsCall");
   });
@@ -56,7 +56,7 @@ describe("parseJsdoc", () => {
 
   it("accepts the generator's placeholder reason", () => {
     const { entries } = parseJsdoc(`/**\n * @missingRailsCall a — ${DEFAULT_TAG_REASON}\n */`);
-    expect(entries[0]!.reason).toBe(DEFAULT_TAG_REASON);
+    expect(entries[0].reason).toBe(DEFAULT_TAG_REASON);
   });
 });
 
@@ -65,7 +65,7 @@ describe("reconcile", () => {
     const { entries } = parseJsdoc("/**\n * @missingRailsCall a — kept note\n */");
     const r = reconcile(entries, new Set(["a", "b"]), reasonFor);
     expect(r.kept.map((e) => e.call)).toEqual(["a"]);
-    expect(r.kept[0]!.reason).toBe("kept note");
+    expect(r.kept[0].reason).toBe("kept note");
     expect(r.added.map((e) => e.call)).toEqual(["b"]);
     expect(r.dropped).toEqual([]);
     const r2 = reconcile(entries, new Set(), reasonFor);
@@ -74,7 +74,7 @@ describe("reconcile", () => {
 
   it("falls back to the placeholder when a curated reason is blank", () => {
     const r = reconcile([], new Set(["a"]), () => "  ");
-    expect(r.added[0]!.reason).toBe(DEFAULT_TAG_REASON);
+    expect(r.added[0].reason).toBe(DEFAULT_TAG_REASON);
   });
 });
 
@@ -147,7 +147,7 @@ describe("reconcileFileText", () => {
     expect(second.text).toBeNull();
     const { entries } = parseJsdoc(first);
     expect(entries).toHaveLength(1);
-    expect(entries[0]!.reason).toContain("@primary_key and calls");
+    expect(entries[0].reason).toContain("@primary_key and calls");
   });
 
   it("tags constructors (Ruby initialize) and reports unmatched expectations", () => {

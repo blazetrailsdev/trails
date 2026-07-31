@@ -136,7 +136,7 @@ export function keyOf(k: CallMismatchKey): string {
 // Ruby call name (the part before the arrow), which is what SIGNIFICANT_CALLS
 // gates and what a burndown story names when it converges.
 export function callOf(missing: string): string {
-  return missing.split("→")[0]!.trim();
+  return missing.split("→")[0].trim();
 }
 
 export function flattenArtifact(artifact: Artifact): CallMismatchKey[] {

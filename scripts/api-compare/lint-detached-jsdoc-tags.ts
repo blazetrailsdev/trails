@@ -140,7 +140,7 @@ function isCommentPosition(sourceFile: ts.SourceFile, pos: number): boolean {
 function describe(node: ts.Node): string {
   const named = ts.isVariableStatement(node) ? node.declarationList.declarations[0] : node;
   const name = (named as { name?: ts.Node }).name;
-  return name && ts.isIdentifier(name as ts.Node) ? (name as ts.Identifier).text : "the code below";
+  return name && ts.isIdentifier(name) ? name.text : "the code below";
 }
 
 export function lintFileText(fileName: string, text: string): Detachment[] {
@@ -164,7 +164,7 @@ export function lintFileText(fileName: string, text: string): Detachment[] {
       line: lineOf(start),
       tags,
       kind: "separated",
-      detail: `${gap.trim().split("\n")[0]!.slice(0, 60)} … separates it from \`${describe(node)}\``,
+      detail: `${gap.trim().split("\n")[0].slice(0, 60)} … separates it from \`${describe(node)}\``,
     });
   }
 

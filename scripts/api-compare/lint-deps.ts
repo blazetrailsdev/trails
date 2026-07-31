@@ -690,7 +690,7 @@ function crossReference(rubyMethods: RubyDepMethod[], tsDepMap: TsDepMap): Cross
       !info.uses &&
       rm.depRefs.some((ref) => {
         const simpleName = ref.split("::").pop() ?? "";
-        return simpleName.toLowerCase() === matchedTsName!.toLowerCase();
+        return simpleName.toLowerCase() === matchedTsName.toLowerCase();
       });
     if (info.uses || implementsProtocol) {
       compliant.push(entry);

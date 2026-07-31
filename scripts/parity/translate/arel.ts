@@ -44,7 +44,7 @@ function parseArgs(): { fixture?: string; dryRun: boolean; force: boolean } {
         process.stderr.write("--fixture requires a fixture name (e.g. --fixture arel-06)\n");
         usage();
       }
-      if (!/^arel-\d{2}$/.test(val!)) {
+      if (!/^arel-\d{2}$/.test(val)) {
         process.stderr.write(`--fixture value must match arel-NN (e.g. arel-06), got: ${val}\n`);
         usage();
       }
@@ -63,7 +63,7 @@ function parseSchemaSql(dir: string): FixtureInfo {
   const sql = readFileSync(join(dir, "schema.sql"), "utf8");
   const fixtureMatch = sql.match(/-- Fixture for statement: (\S+)/);
   const queryMatch = sql.match(/-- Query: (.+)/);
-  const tables = [...sql.matchAll(/CREATE TABLE (\w+)/g)].map((m) => m[1]!.toLowerCase());
+  const tables = [...sql.matchAll(/CREATE TABLE (\w+)/g)].map((m) => m[1].toLowerCase());
 
   if (!fixtureMatch) {
     process.stderr.write(
@@ -77,9 +77,9 @@ function parseSchemaSql(dir: string): FixtureInfo {
   }
 
   // Strip trailing Ruby inline comments (# ...) so they don't land in generated files.
-  const query = queryMatch[1]!.replace(/\s*#.*$/, "").trim();
+  const query = queryMatch[1].replace(/\s*#.*$/, "").trim();
 
-  return { name: fixtureMatch[1]!, query, tables };
+  return { name: fixtureMatch[1], query, tables };
 }
 
 /**

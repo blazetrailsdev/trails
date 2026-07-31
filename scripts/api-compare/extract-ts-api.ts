@@ -1055,7 +1055,7 @@ export function extractFromProgram(
           // Strip `as const` / other type assertions to reach the raw literal.
           let init = valDecl.initializer;
           while (ts.isAsExpression(init) || ts.isSatisfiesExpression(init)) {
-            init = (init as ts.AsExpression | ts.SatisfiesExpression).expression;
+            init = init.expression;
           }
           if (ts.isObjectLiteralExpression(init)) {
             pushMethods(harvestObjectLiteralMethods(init, checker, hostInfo.file ?? ""));
@@ -1171,7 +1171,7 @@ export function extractFromProgram(
         if (valDecl && ts.isVariableDeclaration(valDecl) && valDecl.initializer) {
           let init = valDecl.initializer;
           while (ts.isAsExpression(init) || ts.isSatisfiesExpression(init)) {
-            init = (init as ts.AsExpression | ts.SatisfiesExpression).expression;
+            init = init.expression;
           }
           if (ts.isObjectLiteralExpression(init)) {
             pushMethods(harvestObjectLiteralMethods(init, checker, hostInfo.file ?? ""));

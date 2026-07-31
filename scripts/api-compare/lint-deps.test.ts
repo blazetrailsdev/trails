@@ -425,7 +425,7 @@ describe("collectTaintedSymbols — transitive dep usage", () => {
         new Set(),
         "activesupport",
         consumerSf,
-        checkoutBody!,
+        checkoutBody,
         { checker, taintedSymbols: tainted },
       ),
     ).toBe(true);

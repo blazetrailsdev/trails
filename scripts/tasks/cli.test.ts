@@ -1364,9 +1364,9 @@ describe("commitAndPush (git mutation flow)", () => {
       raceMessage: "should not be reached",
       raceExitCode: 3,
     });
-    const commitCall = execFileSyncMock.mock.calls.find((c) =>
-      (c[1] as string[]).includes("commit"),
-    ) as unknown[] | undefined;
+    const commitCall = execFileSyncMock.mock.calls.find((c) => c[1].includes("commit")) as
+      | unknown[]
+      | undefined;
     expect(commitCall).toBeDefined();
     const opts = commitCall![2] as { env?: Record<string, string> } | undefined;
     expect(opts?.env?.RFCS_NO_AUTOPUSH).toBe("1");

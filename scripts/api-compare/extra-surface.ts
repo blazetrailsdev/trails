@@ -375,7 +375,7 @@ export function collectTaggedEntries(ts: ApiManifest): TaggedEntry[] {
     push(pkg, tsFile, m.name, m.noRailsEquivalent);
   for (const [pkg, tsPkg] of Object.entries(ts.packages)) {
     for (const container of [tsPkg.classes, tsPkg.modules]) {
-      for (const c of Object.values(container) as ClassInfo[]) {
+      for (const c of Object.values(container)) {
         if (!c.file || c.reExportedFrom) continue;
         for (const m of c.instanceMethods) pushMethod(pkg, c.file, m);
         for (const m of c.classMethods) pushMethod(pkg, c.file, m);
@@ -944,7 +944,7 @@ export function buildCrossPackageModules(ruby: ApiManifest): {
   const modules: Record<string, ClassInfo> = {};
   const pkgByFqn: Record<string, string> = {};
   for (const [pkgName, pkg] of Object.entries(ruby.packages)) {
-    for (const [fqn, info] of Object.entries(pkg.modules) as [string, ClassInfo][]) {
+    for (const [fqn, info] of Object.entries(pkg.modules)) {
       modules[fqn] = info;
       pkgByFqn[fqn] = pkgName;
     }
@@ -1058,7 +1058,7 @@ function buildPackageReport(
 
   // Pre-fold ASC's `::ClassMethods` submodules into their parent's
   // classMethods (mirrors compare.ts:759-773). Mutates rubyPkg.modules.
-  const foldedFqns = foldClassMethodsModules(rubyPkg.modules as Record<string, ClassInfo>);
+  const foldedFqns = foldClassMethodsModules(rubyPkg.modules);
 
   const moduleFqnByShort = new Map<string, string[]>();
   for (const fqn of Object.keys(rubyPkg.modules)) {
@@ -1078,22 +1078,22 @@ function buildPackageReport(
   // file's allow-set like any other entity — deliberately NOT mirroring
   // compare.ts's use of the same filter.
   const rubyFiles = new Map<string, RubyEntity[]>();
-  for (const [fqn, info] of Object.entries(rubyPkg.classes) as [string, ClassInfo][]) {
+  for (const [fqn, info] of Object.entries(rubyPkg.classes)) {
     if (!info.file) continue;
     pushTo(rubyFiles, info.file, { fqn, info });
   }
-  for (const [fqn, info] of Object.entries(rubyPkg.modules) as [string, ClassInfo][]) {
+  for (const [fqn, info] of Object.entries(rubyPkg.modules)) {
     if (!info.file) continue;
     pushTo(rubyFiles, info.file, { fqn, info, ...(foldedFqns.has(fqn) ? { nameOnly: true } : {}) });
   }
 
   const tsClassesByFile = new Map<string, ClassInfo[]>();
   const tsModulesByFile = new Map<string, ClassInfo[]>();
-  for (const c of Object.values(tsPkg.classes) as ClassInfo[]) {
+  for (const c of Object.values(tsPkg.classes)) {
     if (!c.file || c.reExportedFrom) continue;
     pushTo(tsClassesByFile, c.file, c);
   }
-  for (const m of Object.values(tsPkg.modules) as ClassInfo[]) {
+  for (const m of Object.values(tsPkg.modules)) {
     if (!m.file || m.reExportedFrom) continue;
     pushTo(tsModulesByFile, m.file, m);
   }
@@ -1140,7 +1140,7 @@ function buildPackageReport(
         : collectAllowedNames(
             rubyFiles.get(rubyFile) ?? [],
             pkg,
-            rubyPkg.modules as Record<string, ClassInfo>,
+            rubyPkg.modules,
             moduleFqnByShort,
             crossPackageModules,
             crossPackagePkgByFqn,

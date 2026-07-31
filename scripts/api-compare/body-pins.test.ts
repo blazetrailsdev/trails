@@ -94,7 +94,7 @@ describe("diffPins", () => {
     const { drift, stale } = diffPins([record({ rubyName: "store" })], [pin()]);
     expect(drift).toEqual([]);
     expect(stale).toHaveLength(1);
-    expect(stale[0]!.rubyName).toBe("save");
+    expect(stale[0].rubyName).toBe("save");
   });
 });
 

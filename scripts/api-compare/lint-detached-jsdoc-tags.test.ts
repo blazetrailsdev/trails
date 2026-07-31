@@ -17,7 +17,7 @@ describe("lintFileText", () => {
       kind: "separated",
       tags: ["internal"],
     });
-    expect(found[0]!.detail).toContain("`a`");
+    expect(found[0].detail).toContain("`a`");
   });
 
   it("flags a detached @noRailsEquivalent block", () => {
@@ -32,7 +32,7 @@ describe("lintFileText", () => {
     );
     expect(found).toHaveLength(1);
     expect(found[0]).toMatchObject({ kind: "separated", tags: ["noRailsEquivalent"] });
-    expect(found[0]!.detail).toContain("`a`");
+    expect(found[0].detail).toContain("`a`");
   });
 
   it("accepts a block flush against its declaration", () => {
