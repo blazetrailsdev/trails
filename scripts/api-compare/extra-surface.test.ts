@@ -2511,21 +2511,39 @@ describe("gateUnclassified", () => {
 });
 
 describe("gateStale", () => {
+  const entry = (pkg: string, name: string): TaggedEntry => ({
+    package: pkg,
+    tsFile: `${name}.ts`,
+    name,
+    reason: "PERMANENT. JS-only.",
+  });
+
+  const summary = (stale: TaggedEntry[]): TaggedSummary => ({
+    total: stale.length + 3,
+    matched: 3,
+    inheritedMatched: 0,
+    stale,
+    classification: {
+      permanent: 3,
+      convergeable: 0,
+      unclassified: 0,
+      unclassifiedByPackage: {},
+      unclassifiedEntries: [],
+    },
+  });
+
   it("passes when no tag is stale", () => {
-    expect(
-      gateStale({
-        total: 3,
-        matched: 3,
-        inheritedMatched: 0,
-        stale: [],
-        classification: {
-          permanent: 3,
-          convergeable: 0,
-          unclassified: 0,
-          unclassifiedByPackage: {},
-          unclassifiedEntries: [],
-        },
-      }),
-    ).toBeNull();
+    expect(gateStale(summary([]))).toBeNull();
+  });
+
+  it("fails and names every stale tag", () => {
+    const message = gateStale(summary([entry("activerecord", "aa"), entry("arel", "bb")]));
+    expect(message).toContain("2 STALE @noRailsEquivalent tag(s)");
+    expect(message).toContain("activerecord  aa.ts  aa");
+    expect(message).toContain("arel  bb.ts  bb");
+  });
+
+  it("says to delete the tag — a stale tag is never fixed by rewording its reason", () => {
+    expect(gateStale(summary([entry("arel", "aa")]))).toContain("Delete the tag");
   });
 });
