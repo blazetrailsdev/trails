@@ -197,6 +197,17 @@ function assertValidLimit(n: number): void {
 }
 
 /** @internal */
+/**
+ * The `HasManyThroughAssociation` surface the proxy's through-writes delegate
+ * to (Rails' `proxy_association`).
+ */
+interface ThroughAssociationHandle {
+  _throughScope?: unknown;
+  concat(...records: Base[]): Promise<Base[] | undefined>;
+  insertRecord(record: Base, validate?: boolean, raise?: boolean): Promise<boolean>;
+  transaction<R>(block: () => Promise<R>): Promise<R | undefined>;
+}
+
 interface StaleWrapper {
   isStaleTarget?: () => boolean;
   resetScope?: () => void;
@@ -2361,27 +2372,39 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * reads back; a scoped create (`AssociationRelation#create`) captured it
    * before this call, so it is lent to the association for this write only.
    */
+  /** @internal The OO association object backing this through-collection. */
+  private _throughAssociation(): ThroughAssociationHandle {
+    return this._record.association(this._assocName) as unknown as ThroughAssociationHandle;
+  }
+
+  /**
+   * @internal Rails' `CollectionAssociation#transaction`, which
+   * `ThroughAssociation` overrides to the *through* model's — the join-row
+   * writes are what has to be atomic, not the target model's.
+   */
+  private _throughTransaction<R>(block: () => Promise<R>): Promise<R | undefined> {
+    return this._throughAssociation().transaction(block);
+  }
+
   private async _pushThrough(
     records: T[],
     skipCallbacks = false,
     throughScope?: unknown,
   ): Promise<void> {
-    const assoc = this._record.association(this._assocName) as unknown as {
-      _throughScope?: unknown;
-      concat(...records: Base[]): Promise<Base[] | undefined>;
-      insertRecord(record: Base, validate?: boolean, raise?: boolean): Promise<boolean>;
-    };
+    const assoc = this._throughAssociation();
     const previousThroughScope = assoc._throughScope;
     if (throughScope != null) assoc._throughScope = throughScope;
     try {
       if (skipCallbacks) {
-        for (const record of records) {
-          await this._addToTarget(
-            record,
-            { skipCallbacks: true, replace: this.distinctValue },
-            () => assoc.insertRecord(record, true, true),
-          );
-        }
+        await this._throughTransaction(async () => {
+          for (const record of records) {
+            await this._addToTarget(
+              record,
+              { skipCallbacks: true, replace: this.distinctValue },
+              () => assoc.insertRecord(record, true, true),
+            );
+          }
+        });
       } else {
         await assoc.concat(...records);
       }
@@ -4001,10 +4024,15 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       if (!assocCallback(this._callbackHost, "beforeAdd", record)) {
         throw new RecordNotSaved("Callback prevented record creation", record);
       }
-      const saved = await record.save();
-      if (!saved) throw new RecordInvalid(record);
+      // Rails' `_create_record` runs the target save INSIDE the transaction —
+      // it is `insert_record`'s `record.save!` (collection_association.rb:361-370)
+      // — so a join-row failure rolls the target row back with it.
       const targetBefore = this._target.length;
-      await this._pushThrough([record], true);
+      await this._throughTransaction(async () => {
+        const saved = await record.save();
+        if (!saved) throw new RecordInvalid(record);
+        await this._pushThrough([record], true);
+      });
       if (this._target.length === targetBefore) {
         throw new RecordNotSaved("Failed to create join record for through association", record);
       }

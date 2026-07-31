@@ -26,6 +26,7 @@ interface AuthorWithCategories {
     target: Base[];
     push(...records: Base[]): Promise<unknown>;
     create(attrs: Record<string, unknown>): Promise<Base>;
+    createBang(attrs: Record<string, unknown>): Promise<Base>;
   };
   association(name: string): ThroughAssociationLike;
 }
@@ -77,6 +78,19 @@ describe("through-collection writes route onto the association's insertRecord", 
     const created = await author.categories.create({ name: "Routed" });
 
     expect(inserted).toEqual([created]);
+  });
+
+  it("createBang rolls the target row back when the join row fails", async () => {
+    const author = (await Author.find(authors("david").id)) as unknown as AuthorWithCategories;
+    const assoc = author.association("categories");
+    assoc.insertRecord = () => Promise.reject(new Error("join row exploded"));
+    const before = await Category.count();
+
+    await expect(author.categories.createBang({ name: "Doomed" })).rejects.toThrow(
+      "join row exploded",
+    );
+
+    expect(await Category.count()).toBe(before);
   });
 
   it("the pushed record lands in the one shared target", async () => {
