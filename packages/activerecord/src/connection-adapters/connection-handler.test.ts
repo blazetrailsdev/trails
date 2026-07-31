@@ -3,6 +3,7 @@ import { ConnectionHandler } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { Base } from "../base.js";
+import { AdapterNotFound } from "../errors.js";
 import { ambientPoolConfiguration } from "../test-adapter.js";
 
 // Mirrors ActiveRecord::TestFixtures#setup_shared_connection_pool (test_fixtures.rb:220).
@@ -79,9 +80,17 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it("validates db configuration and raises on invalid adapter", async () => {
-    expect(() => handler.establishConnection({ database: "test.db" })).toThrow(
-      /does not specify adapter/,
-    );
+    const config = {
+      development: { adapter: "ridiculous" },
+    };
+    const prevConfigs = Base.configurations();
+    Base.configurations(config);
+
+    try {
+      await expect(Base.establishConnection("development")).rejects.toThrow(AdapterNotFound);
+    } finally {
+      Base.configurations(prevConfigs);
+    }
   });
 
   it("not setting writing role while using another named role raises", async () => {
