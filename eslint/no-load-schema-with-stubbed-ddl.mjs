@@ -111,6 +111,26 @@ const COMPARISONS = new Set(["===", "==", "!==", "!="]);
  * Unlike the literal shapes above there is no "interception position" to
  * qualify — a class body that defines `createTable` at all is defining the
  * emitter `runTable` will call.
+ *
+ * **Accepted false-positive surface:** a *delegating* override — a spy that
+ * records its argument and returns `super.execute(...)` — really does lay DDL,
+ * and is reported anyway. `execute` is the generic name here and the one most
+ * likely to be overridden for such a reason. Class bodies defining these
+ * members are not rare in the enforced files (the fake adapters in
+ * `connection-adapters/abstract/schema-statements-on-adapter.test.ts`, the
+ * database-tasks covers), but none of them so much as names `loadSchema`, and
+ * the rule reports only where the two meet — so the surface is empty today
+ * rather than merely tolerable.
+ *
+ * Exempting a body that calls `super.<method>` was considered and declined: the
+ * call can be conditional, wrapped, or dead, so the exemption reads as a
+ * guarantee it cannot make, and a probe would only have to write one to escape
+ * the rule entirely. Inspecting a body for what it really does is the
+ * shape-heuristic detector RFC 0025 abandoned (PR #5204), and this rule exists
+ * precisely because the runtime guard — which sees the real function — cannot
+ * make that call either. A delegating spy that trips this should move its
+ * `loadSchema` call to `loadAdapterSpecificSchema` or, if it genuinely performs
+ * a real load, carry a scoped disable naming the reason.
  */
 export function definesStubbedDdlMember(node) {
   if (node.computed) return false;
