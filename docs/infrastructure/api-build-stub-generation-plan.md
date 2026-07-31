@@ -514,11 +514,23 @@ scheduled the next one, which is how a batch of tags can re-accumulate the
 same debt silently. The standing cadence is therefore:
 
 - **Every two quarters**, or **whenever `tagged.total` grows by 10 or more
-  since the last audit** (whichever comes first), register a re-audit story
-  under RFC 0080 and apply the bar above to every tag added since.
+  since the last audit**, or **whenever
+  `tagged.classification.convergeable` grows by 5 or more since the last
+  audit** (whichever comes first), register a re-audit story under RFC 0080
+  and apply the bar above to every tag added since.
 - The owner is whoever schedules RFC 0080 work; the trigger is checkable from
   the `api:extra` JSON report alone — `tagged.total`, which the stats DB
-  already ingests, plus `tagged.classification.unclassified`.
+  already ingests, plus `tagged.classification.convergeable`, which sits in
+  the same `tagged` object of that report.
+- `tagged.classification.unclassified` is **not** a trigger, even though the
+  report still carries it. The gate above fails any run with a non-zero
+  unclassified count, so the field is pinned at 0 on `main` and can never
+  cross a threshold. `convergeable` replaces it: a CONVERGEABLE tag is a
+  placeholder for registered work, so a rising count is exactly the
+  re-accumulation this cadence exists to catch, and unlike `unclassified` it
+  is deliberately not gated to 0. The lower threshold (5, against 10 for
+  `tagged.total`) reflects that every convergeable tag is known debt, whereas
+  `tagged.total` also counts permanent tags that need no disposition.
 - An audit's output is one disposition per tag and a story per convergeable
   one — never a bulk edit, which is what keeps each removal reviewable.
 
