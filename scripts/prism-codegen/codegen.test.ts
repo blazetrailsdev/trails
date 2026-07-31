@@ -97,14 +97,12 @@ describe("prism-codegen", () => {
   });
   it("emits parse-clean output by construction, even around passthroughs", async () => {
     const { code, coverage, parseErrorCount } = await generateFromSource(`
-      def push_all(oc)
-        oc << 1
-        yield(oc)
-        oc
+      def compare(a, b)
+        a <=> b
       end
     `);
     expect(parseErrorCount).toBe(0);
-    expect(code).not.toContain("<<");
+    expect(code).not.toContain("<=>");
     expect(code).toContain("__PRISM_TODO(");
     expect(summarizeCoverage(coverage).passthrough).toBeGreaterThan(0);
   });
@@ -117,15 +115,59 @@ describe("prism-codegen", () => {
     expect(multiIndex.parseErrorCount).toBe(0);
     expect(multiIndex.code).not.toContain("m[1] = 3");
     expect(multiIndex.code).toContain("__PRISM_TODO(");
+  });
 
-    const symToProc = await generateFromSource(`def i(list); list.map(&:name); end`);
-    expect(symToProc.parseErrorCount).toBe(0);
-    expect(symToProc.code).not.toContain('map("name")');
-    expect(symToProc.code).toContain("__PRISM_TODO(");
+  it("translates the decided block protocol: yield, block_given?, &:sym, <<", async () => {
+    const { code, parseErrorCount } = await generateFromSource(`
+      def each_name(list)
+        return enum_for(:each_name) unless block_given?
+        list.map(&:name).each { |n| yield(n) }
+        names << 1
+      end
+    `);
+    expect(parseErrorCount).toBe(0);
+    expect(code).toContain("eachName(list, block)");
+    expect(code).toContain("block !== undefined");
+    expect(code).toContain("block(n)");
+    expect(code).toContain("x => x.name()");
+    expect(code).toContain("names.push(1)");
+  });
+
+  it("flattens statement-position module super per the composition-point convention", async () => {
+    const { code, parseErrorCount } = await generateFromSource(`
+      module M
+        def init_internals
+          super
+          @association_cache = {}
+        end
+        def value_super
+          x = super
+          x
+        end
+      end
+    `);
+    expect(parseErrorCount).toBe(0);
+    expect(code).not.toContain("super");
+    expect(code).toContain("this.association_cache = {}");
+    expect(code).toContain("__PRISM_TODO("); // value-position super still declines
+  });
+
+  it("imports only the runtime helpers the file actually uses", async () => {
+    const withCase = await generateFromSource(`
+      def kind(scope)
+        case scope
+        when Symbol then a
+        end
+      end
+    `);
+    expect(withCase.code).toContain('import { caseEq } from "./runtime.js";');
+
+    const plain = await generateFromSource(`def f(a); a + 1; end`);
+    expect(plain.code).not.toContain("runtime.js");
   });
 
   it("counts each node exactly once when a call declines after partial validation", async () => {
-    const { coverage } = await generateFromSource(`def d(list); probe(9, &:name); end`);
+    const { coverage } = await generateFromSource(`def d(list); probe(9, &:+); end`);
     const int = coverage.counts.get("IntegerNode") ?? { handled: 0, passthrough: 0 };
     expect(int.handled).toBe(0);
     expect(int.passthrough).toBe(1);
@@ -206,7 +248,7 @@ describe("prism-codegen", () => {
   it("attributes passthrough to the enclosing def for a trustworthy denominator", async () => {
     const { perDef } = await generateFromSource(`
       def clean(a); a + 1; end
-      def dirty(oc); oc << 1; end
+      def dirty(oc); oc <=> 1; end
     `);
     expect(perDef.get("clean")?.passthrough).toBe(0);
     expect(perDef.get("dirty")?.passthrough).toBeGreaterThan(0);

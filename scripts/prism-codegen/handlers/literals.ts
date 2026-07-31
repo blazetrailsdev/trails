@@ -35,12 +35,13 @@ export function registerLiterals(r: Registry): void {
     );
     return f.createObjectLiteralExpression(props, false);
   });
-  r.on("RangeNode", (n, e) =>
-    f.createCallExpression(f.createIdentifier("range"), undefined, [
+  r.on("RangeNode", (n, e) => {
+    e.helpers.add("range");
+    return f.createCallExpression(f.createIdentifier("range"), undefined, [
       e.expr((n.left as PrismNode) ?? null),
       e.expr((n.right as PrismNode) ?? null),
-    ]),
-  );
+    ]);
+  });
 }
 function keyName(key: PrismNode, e: Emitter): ts.PropertyName {
   if (key && key.constructor.name === "SymbolNode") {

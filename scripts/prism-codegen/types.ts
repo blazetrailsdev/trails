@@ -39,6 +39,8 @@ export interface Emitter {
   inAsyncMethod: boolean;
 
   inLoop: boolean;
+
+  readonly helpers: Set<string>;
   readonly declared: Set<string>;
 }
 export interface Coverage {

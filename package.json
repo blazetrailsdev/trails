@@ -61,7 +61,8 @@
     "parity:query": "pnpm tsx scripts/parity/run.ts --type=query",
     "vendor:fetch": "pnpm tsx vendor/fetch.ts",
     "codegen:generate": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/prism-codegen/generate.ts",
-    "codegen:from-ts": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/prism-codegen/from-ts.ts"
+    "codegen:from-ts": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/prism-codegen/from-ts.ts",
+    "codegen:score": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/prism-codegen/score-cli.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -151,6 +151,14 @@ function defParts(
   ).declared = new Set();
   e.inAsyncMethod = isAsync;
   const params = emitParams(n.parameters as PrismNode | undefined, e);
+  if (
+    params !== null &&
+    usesImplicitBlock(n.body as PrismNode | null) &&
+    !e.declared.has("block")
+  ) {
+    params.push(f.createParameterDeclaration(undefined, undefined, "block"));
+    e.declared.add("block");
+  }
   const paramNames = new Set(e.declared);
   const bodyStmts =
     params === null ? [] : e.stmts((n.body as PrismNode) ?? null, defName !== "constructor");
@@ -242,6 +250,14 @@ function emitParams(params: PrismNode | undefined, e: Emitter): ts.ParameterDecl
     declare(bn);
   }
   return out;
+}
+function usesImplicitBlock(n: PrismNode | null): boolean {
+  if (!n) return false;
+  const kind = n.constructor.name;
+  if (kind === "DefNode") return false;
+  if (kind === "YieldNode") return true;
+  if (kind === "CallNode" && String(n.name) === "block_given?" && !n.receiver) return true;
+  return n.compactChildNodes().some((c) => usesImplicitBlock(c));
 }
 function hoistDecl(locals: string[]): ts.Statement[] {
   if (!locals.length) return [];

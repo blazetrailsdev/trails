@@ -18,11 +18,14 @@ async function main() {
   let defsClean = 0;
   for (const f of TARGET_FILES) {
     const src = readFileSync(rubyAbsPath(f), "utf8");
+    const outName = rubyFileToTs(f.ruby.replace(/^active_record\//, "")).replace(/\.ts$/, ".js");
+    const depth = outName.split("/").length - 1;
+    const runtimePath = "../".repeat(depth + 1) + "runtime.js";
     const { code, coverage, perDef, parseErrorCount } = await generateFromSource(
       src,
       asyncMethodsForRailsFile(f.ruby),
+      runtimePath,
     );
-    const outName = rubyFileToTs(f.ruby.replace(/^active_record\//, "")).replace(/\.ts$/, ".js");
     const outPath = path.join(OUT_DIR, outName);
     mkdirSync(path.dirname(outPath), { recursive: true });
     writeFileSync(outPath, code);

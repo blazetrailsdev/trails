@@ -33,6 +33,7 @@ const HEADER =
 export async function generateFromSource(
   rubySource: string,
   asyncMethods: ReadonlySet<string> = new Set(),
+  runtimeImportPath = "./runtime.js",
 ): Promise<GenResult> {
   const parse = await getParser();
   const result = parse(rubySource);
@@ -44,7 +45,12 @@ export async function generateFromSource(
     ts.NodeFlags.None,
   );
   const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed });
-  const code = HEADER + printer.printFile(sourceFile);
+  let helperImport = "";
+  if (gen.helpers.size > 0) {
+    const names = [...gen.helpers].sort().join(", ");
+    helperImport = `import { ${names} } from "${runtimeImportPath}";\n\n`;
+  }
+  const code = HEADER + helperImport + printer.printFile(sourceFile);
   const reparsed = ts.createSourceFile(
     "gen.js",
     code,

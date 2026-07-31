@@ -21,9 +21,9 @@ and (3) what does the coverage evidence say about productionizing this.
 oracle_. `@ruby/prism` works in Node. The AST-building registry (handlers emit
 `ts.factory` nodes, printed by the TypeScript printer — see the re-baseline
 note under [Coverage metric](#coverage-metric-the-feasibility-evidence))
-translates **86.7% of AST node instances** across the 10 most-central AR files
+translates **89.6% of AST node instances** across the 10 most-central AR files
 with a real handler, with **parse-clean output by construction** (0 parse
-errors) and **363/469 defs (77.4%) fully handled** end-to-end. But
+errors) and **406/469 defs (86.6%) fully handled** end-to-end. But
 node-instance coverage measures _handler presence, not semantic correctness_ —
 the generated JS reproduces control-flow and call shape faithfully while
 systematically mistranslating Ruby's metaprogramming and implicit-receiver
@@ -114,18 +114,18 @@ real handler; "passthrough" = instances that fell to the counted
 ```text
 file                               handled   nodes   defs=clean/all   tag
 base.rb                             17.1%      187        0/0         pathological
-relation.rb                         83.0%     1988       71/84        pathological
-persistence.rb                      88.8%     1201       42/56        tractable*
-associations.rb                     98.6%      285        8/11        pathological
-relation/query_methods.rb           92.3%     3037       95/127       pathological
-core.rb                             81.6%     1320       45/56        pathological
-relation/finder_methods.rb          89.5%      987       35/43        tractable*
-relation/calculations.rb            89.4%     1258       30/36        tractable*
-inheritance.rb                      87.0%      478       13/23        pathological
-model_schema.rb                     83.4%      619       24/33        pathological
+relation.rb                         85.6%     1968       81/84        pathological
+persistence.rb                      92.8%     1188       47/56        tractable*
+associations.rb                     99.3%      285       10/11        pathological
+relation/query_methods.rb           95.0%     3012      101/127       pathological
+core.rb                             82.2%     1318       48/56        pathological
+relation/finder_methods.rb          97.9%      956       38/43        tractable*
+relation/calculations.rb            90.8%     1250       32/36        tractable*
+inheritance.rb                      90.9%      473       19/23        pathological
+model_schema.rb                     87.5%      607       30/33        pathological
 --------------------------------------------------------------------------
-ROLLUP (all 10)                     86.7%    11360    handled=9848 passthrough=1512
-DEEP-DRILL (tractable*, 3 files)    89.2%     3446    defs 363/469 clean overall
+ROLLUP (all 10)                     89.6%    11244    handled=10077 passthrough=1167
+DEEP-DRILL (tractable*, 3 files)    93.5%     3394    defs 406/469 clean overall
 ```
 
 `tractable*` marks the three deepest-drill targets (chosen by tractability): the
@@ -137,15 +137,68 @@ image — the old emitter printed it as statements inside a class body, which
 was a parse error.
 
 **`defs=clean/all`** is the new per-method attribution: defs whose body
-emitted with ZERO passthrough nodes. 363/469 (77.4%) of defs are fully
+emitted with ZERO passthrough nodes. 406/469 (86.6%) of defs are fully
 handled — this set is the trustworthy denominator for any structural
 comparison of generated output against the hand-written port (a diff inside a
 tainted method can blame the generator; a diff inside a clean one cannot).
 
+## Decided conventions (round 2)
+
+Four previously-declined constructs now have owner-decided semantics:
+
+1. **Runtime shims are allowed.** `scripts/prism-codegen/runtime.ts` hosts
+   `caseEq` (Ruby `#===` dispatch) and `range`; a generated file imports only
+   the helpers it actually uses.
+2. **`recv << x` → `recv.push(x)`** — the port's established idiom.
+3. **Block protocol**: the implicit Ruby block becomes a trailing `block`
+   parameter (added automatically to any def that yields or checks
+   `block_given?`); `yield(args)` → `block(args)`; `block_given?` →
+   `block !== undefined`; `&:sym` → `x => x.sym()`.
+4. **Statement-position `super` in a module-level def is omitted** — the
+   port flattens super chains at the composition point (e.g. Rails'
+   `Associations#init_internals` body `super; @association_cache = {}`
+   is ported as an `initInternals` free function holding ONLY the module's
+   own contribution, with `base.ts` orchestrating the chain). Value-position
+   `super` (`x = super`) still declines: the value flows, so omission would
+   be lossy.
+
+## Conformance scorer (`pnpm codegen:score`)
+
+The convergence-guard v1: for every **clean** generated def (zero
+passthrough), find its port counterpart (chasing exported functions, the
+`perform*` mixin-map indirection, wrapper calls, and both predicate name
+candidates) and compare normalized body skeletons — control-flow tokens plus
+callee/property reference names, with `perform` prefixes, `is` predicate
+prefixes, and `_` private prefixes stripped on both sides.
+
+Baseline (first run):
+
+```text
+file                        matched divergent missing  conformance
+relation.rb                       5        65      10       7.1%
+persistence.rb                    5        39       3      11.4%
+query_methods.rb                  3        60      37       4.8%
+core.rb                           4        39       5       9.3%
+finder_methods.rb                 0        12      26       0.0%
+calculations.rb                   0        14      17       0.0%
+(others)                          0        53       6       0.0%
+TOTAL                            17       282     104       5.7%
+```
+
+Read this as the guard's review queue, not a failure grade: `divergent`
+means the port's body structure differs from the Rails-faithful skeleton —
+overwhelmingly the port realizing helpers inline (`take` inlining
+`find_take`), reaching internals (`_records`/`_loaded`) the Rails source
+reaches via methods, or receiver-resolution gaps in the generator (roadmap
+item 1). `missing` covers methods ported into a _different_ file plus naming
+paths the resolver does not chase yet. The 17 exact matches are the floor;
+every generator improvement (receiver resolution, stdlib idioms) converts
+divergent-for-generator-reasons rows into genuine signal about the port.
+
 Dominant passthrough kinds (rollup, self-prioritizing the next handlers to
-build): `CallNode` (operator methods with no JS image like `<<`/`<=>`,
-reserved-word bare calls, and lossy shapes the emitter now declines — multi-arg
-indexes, `&:sym` blocks, splat multi-assign), `ForwardingSuperNode` (module-level `super`
+build): `CallNode` (operator methods with no JS image like `<=>`,
+reserved-word bare calls, and lossy shapes the emitter declines — multi-arg
+indexes, splat multi-assign), `ForwardingSuperNode` (value-position `super`
 has no image in free functions), plus the argument/statement subtrees under
 those declined parents.
 

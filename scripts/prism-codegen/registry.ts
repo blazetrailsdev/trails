@@ -14,6 +14,11 @@ export class Registry {
     this.stmtHandlers.set(kind, handler);
     return this;
   }
+
+  onManyStmt(kinds: string[], handler: StmtHandler): this {
+    for (const k of kinds) this.onStmt(k, handler);
+    return this;
+  }
   get(kind: string): ExprHandler | undefined {
     return this.exprHandlers.get(kind);
   }

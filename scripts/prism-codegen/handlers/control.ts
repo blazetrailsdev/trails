@@ -38,6 +38,12 @@ export function registerControl(r: Registry): void {
     const v = returnValue(n.arguments_ as PrismNode | undefined, e);
     return [f.createReturnStatement(v)];
   });
+  r.on("YieldNode", (n, e) => {
+    const args = (((n.arguments_ as PrismNode | null)?.arguments_ as PrismNode[]) ?? []).map((x) =>
+      e.expr(x),
+    );
+    return f.createCallExpression(f.createIdentifier("block"), undefined, args);
+  });
   r.onStmt("BreakNode", (n, e) => {
     const argCount = ((n.arguments_ as PrismNode | null)?.arguments_ as PrismNode[])?.length ?? 0;
     if (!e.inLoop || argCount > 0) return null;
@@ -118,7 +124,8 @@ function caseStmt(n: PrismNode, e: Emitter, isLast: boolean): ts.Statement[] | n
     const w = conds[i];
     const tests = ((w.conditions as PrismNode[]) ?? []).map((c) =>
       subject
-        ? f.createCallExpression(f.createIdentifier("caseEq"), undefined, [e.expr(c), subject])
+        ? (e.helpers.add("caseEq"),
+          f.createCallExpression(f.createIdentifier("caseEq"), undefined, [e.expr(c), subject]))
         : e.expr(c),
     );
     const cond = tests.reduce((a, b) => f.createLogicalOr(a, b));

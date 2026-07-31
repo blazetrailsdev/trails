@@ -12,6 +12,10 @@ const COMPOUND: Record<string, ts.BinaryOperator> = {
 };
 export function registerMisc(r: Registry): void {
   r.on("SplatNode", (n, e) => f.createSpreadElement(e.expr((n.expression as PrismNode) ?? null)));
+  r.onManyStmt(["ForwardingSuperNode", "SuperNode"], (n, e, isLast) => {
+    if (e.inClass || isLast) return null;
+    return [];
+  });
   r.onMany(["ForwardingSuperNode", "SuperNode"], (n, e) => {
     if (!e.inClass) return null;
     const args =

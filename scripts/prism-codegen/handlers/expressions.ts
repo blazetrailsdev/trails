@@ -2,6 +2,7 @@ import ts from "typescript";
 import type { Emitter, PrismNode } from "../types.js";
 import type { Registry } from "../registry.js";
 import { methodName, isJsIdentName, isBindableIdent } from "../naming.js";
+import { rubyStr } from "../types.js";
 const f = ts.factory;
 const INFIX: Record<string, ts.BinaryOperator> = {
   "==": ts.SyntaxKind.EqualsEqualsEqualsToken,
@@ -159,6 +160,13 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
   if (name === "+@" && hasRecv) {
     return f.createPrefixUnaryExpression(ts.SyntaxKind.PlusToken, e.expr(n.receiver as PrismNode));
   }
+  if (name === "<<" && hasRecv && argNodes.length === 1) {
+    return f.createCallExpression(
+      f.createPropertyAccessExpression(e.expr(n.receiver as PrismNode), "push"),
+      undefined,
+      [e.expr(argNodes[0])],
+    );
+  }
   if (hasRecv && INFIX[name] && argNodes.length === 1) {
     return f.createBinaryExpression(
       e.expr(n.receiver as PrismNode),
@@ -174,13 +182,26 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
     );
   }
 
+  if (name === "block_given?" && !hasRecv && argNodes.length === 0 && !n.block) {
+    return f.createBinaryExpression(
+      f.createIdentifier("block"),
+      ts.SyntaxKind.ExclamationEqualsEqualsToken,
+      f.createIdentifier("undefined"),
+    );
+  }
   const jsName = methodName(name);
   if (hasRecv ? !isJsIdentName(jsName) : !isBindableIdent(jsName)) return null;
   let blockParams: string[] | null = null;
+  let symToProc: string | null = null;
   if (block) {
     const blockKind = block.constructor.name;
     if (blockKind === "BlockArgumentNode") {
-      if ((block.expression as PrismNode | null)?.constructor.name === "SymbolNode") return null;
+      const inner = block.expression as PrismNode | null;
+      if (inner?.constructor.name === "SymbolNode") {
+        const sym = methodName(rubyStr(inner.unescaped));
+        if (!isJsIdentName(sym)) return null;
+        symToProc = sym;
+      }
     } else if (blockKind === "BlockNode") {
       blockParams = blockParamNames(block.parameters as PrismNode | undefined);
       if (!blockParams) return null;
@@ -192,7 +213,9 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
   const recv = hasRecv ? e.expr(n.receiver as PrismNode) : undefined;
   const callArgs = argExprs(n.arguments_ as PrismNode, e);
   if (block) {
-    if (block.constructor.name === "BlockArgumentNode") {
+    if (symToProc) {
+      callArgs.push(symToProcArrow(symToProc));
+    } else if (block.constructor.name === "BlockArgumentNode") {
       callArgs.push(e.expr(block.expression as PrismNode));
     } else {
       callArgs.push(blockToArrow(block, blockParams ?? [], e));
@@ -204,6 +227,20 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
   if (!recv && callArgs.length === 0 && !block && !hasParens(n)) return target;
   const call = f.createCallExpression(target, undefined, callArgs);
   return e.inAsyncMethod && e.asyncMethods.has(jsName) ? f.createAwaitExpression(call) : call;
+}
+function symToProcArrow(prop: string): ts.ArrowFunction {
+  return f.createArrowFunction(
+    undefined,
+    undefined,
+    [f.createParameterDeclaration(undefined, undefined, "x")],
+    undefined,
+    undefined,
+    f.createCallExpression(
+      f.createPropertyAccessExpression(f.createIdentifier("x"), prop),
+      undefined,
+      [],
+    ),
+  );
 }
 function hasParens(n: PrismNode): boolean {
   return n.openingLoc != null;
