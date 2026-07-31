@@ -43,10 +43,8 @@ import { foreignKey } from "@blazetrails/activesupport";
  */
 export interface WhereChainScope<R> {
   whereNot(conditions: Record<string, unknown>): R;
-  whereAssociated(associationNames: string[], skipJoinFor?: ReadonlySet<string>): R;
+  whereAssociated(...associationNames: string[]): R;
   whereMissing(...associationNames: string[]): R;
-  joinsValues: unknown[];
-  leftOuterJoinsValues: unknown[];
   exists(conditions?: unknown): Promise<boolean>;
 }
 
@@ -68,21 +66,13 @@ export class WhereChain<R = any> {
   }
 
   associated(...associationNames: string[]): R {
-    // Mirror Rails' guard (query_methods.rb:91): skip the join for any
-    // association already present in joins_values / left_outer_joins_values,
-    // so an already-joined association does not get a duplicate join.
-    const skipJoinFor = new Set<string>();
-    for (const name of associationNames) {
-      const reflection = this.scopeAssociationReflection(name) as { name?: string } | undefined;
-      const reflectionName = reflection?.name ?? name;
-      if (
-        this._scope.joinsValues.includes(reflectionName) ||
-        this._scope.leftOuterJoinsValues.includes(reflectionName)
-      ) {
-        skipJoinFor.add(name);
-      }
-    }
-    return this._scope.whereAssociated(associationNames, skipJoinFor);
+    // The reflection is discarded on purpose: this call is here for Rails'
+    // fail-fast on an unknown association (`scope_association_reflection`
+    // raises, query_methods.rb:90), which happens before any join is built.
+    // `whereAssociated` re-derives it because it needs the *scope's* reflection
+    // as the scope advances. `missing` below has the same shape.
+    for (const name of associationNames) this.scopeAssociationReflection(name);
+    return this._scope.whereAssociated(...associationNames);
   }
 
   missing(...associationNames: string[]): R {

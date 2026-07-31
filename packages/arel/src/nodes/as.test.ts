@@ -33,11 +33,13 @@ describe("As", () => {
 
   describe("#to_cte", () => {
     it("returns a Cte node using the LHS's name and the RHS as the relation", () => {
-      const selectAst = users.project(users.get("id")).ast;
-      const asNode = new Nodes.As(selectAst, new Nodes.SqlLiteral("cte_name"));
-      const cte = asNode.toCte();
-      expect(cte).toBeInstanceOf(Nodes.Cte);
-      expect(cte.name).toBe("cte_name");
+      const table = new Table("users");
+      const asNode = new Nodes.As(table, "foo");
+      const cteNode = asNode.toCte();
+
+      expect(cteNode).toBeInstanceOf(Nodes.Cte);
+      expect(cteNode.name).toBe((asNode.left as Table).name);
+      expect(cteNode.relation).toBe(asNode.right);
     });
   });
 });

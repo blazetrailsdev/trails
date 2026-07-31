@@ -13,13 +13,13 @@ describe("NodesTest", () => {
 
     it("Union supports as() from Binary", () => {
       const sm = new SelectManager(users);
-      const union = sm.union(new SelectManager(users)) as Nodes.Union;
+      const union = sm.union(new SelectManager(users));
       expect(union.as("u")).toBeInstanceOf(Nodes.As);
     });
 
     it("Union supports and() from Binary", () => {
       const sm = new SelectManager(users);
-      const union = sm.union(new SelectManager(users)) as Nodes.Union;
+      const union = sm.union(new SelectManager(users));
       const other = users.get("id").eq(1);
       expect(union.and(other)).toBeInstanceOf(Nodes.And);
     });

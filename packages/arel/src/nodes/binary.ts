@@ -8,6 +8,7 @@ import { Or } from "./or.js";
 import { Not } from "./unary.js";
 import { Grouping } from "./grouping.js";
 import type { Cte } from "./cte.js";
+import type { SelectManager } from "../select-manager.js";
 
 // `ModelAttribute` is not an Arel node but occupies node slots in Rails:
 // `build_quoted` returns one unwrapped into the AST (casted.rb:50), and both
@@ -34,6 +35,12 @@ import type { Cte } from "./cte.js";
 export type NodeOrValue =
   | Node
   | ModelAttribute
+  // A SelectManager occupies node slots in Rails' own CTE idiom —
+  // `Arel::Nodes::As.new(cte_table, select_manager)` (select_manager.rb `#with`
+  // takes those As nodes, and Rails' arel tests build them that way) — and
+  // `visit_Arel_SelectManager` (to_sql.rb:358-361) is a real rendering visitor
+  // that wraps `o.ast` in parens, so nothing here can reach `unsupported`.
+  | SelectManager
   // Rails puts bare Strings in node slots structurally: `Cte#initialize` stores
   // the CTE name as `@left` (cte.rb:10-12), `TableAlias` the alias name as
   // `@right` (table_alias.rb), and Rails' own tests build
@@ -138,20 +145,21 @@ export class Assignment extends Binary {}
 // a hard cycle if `As.toCte` imported it directly. The package entrypoint
 // (`./index.ts`) calls `_registerCteFactory` at load, mirroring the
 // `registerBinaryInversions` / `registerNodeDeps` pattern used elsewhere.
-let cteFactory: ((name: string, relation: Node) => Cte) | null = null;
-export function _registerCteFactory(fn: (name: string, relation: Node) => Cte): void {
+let cteFactory: ((name: string | SqlLiteral, relation: Node) => Cte) | null = null;
+export function _registerCteFactory(fn: (name: string | SqlLiteral, relation: Node) => Cte): void {
   cteFactory = fn;
 }
 
 export class As extends Binary {
+  /** Mirrors: `Arel::Nodes::As#to_cte` (binary.rb:43-45) — `Cte.new(left.name, right)`. */
   toCte(): Cte {
-    const name = this.right instanceof SqlLiteral ? this.right.value : String(this.right);
     if (!cteFactory) {
       throw new Error(
         'As.toCte() requires the Cte factory registry. Import from "@blazetrails/arel" instead of deep-importing node classes.',
       );
     }
-    return cteFactory(name, this.left as Node);
+    const name = (this.left as { name: string | SqlLiteral }).name;
+    return cteFactory(name, this.right as Node);
   }
 }
 

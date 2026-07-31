@@ -2461,11 +2461,15 @@ export class Base extends Model {
     cols: string[],
     tuples: unknown[][],
   ): Relation<InstanceType<T>>;
+  static where<T extends typeof Base>(this: T, node: Nodes.Node): Relation<InstanceType<T>>;
   static where<T extends typeof Base>(
     this: T,
-    conditionsOrSql: Record<string, unknown> | string | string[] | unknown[],
+    conditionsOrSql: Record<string, unknown> | string | string[] | unknown[] | Nodes.Node,
     ...rest: unknown[]
   ): Relation<InstanceType<T>> {
+    if (conditionsOrSql instanceof Nodes.Node) {
+      return this.all().where(conditionsOrSql);
+    }
     if (typeof conditionsOrSql === "string") {
       return this.all().where(conditionsOrSql, ...rest);
     }

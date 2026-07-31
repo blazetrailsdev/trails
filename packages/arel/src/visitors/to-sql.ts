@@ -5,6 +5,7 @@ import { Composite } from "../collectors/composite.js";
 import { SubstituteBinds } from "../collectors/substitute-binds.js";
 import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
+import { SelectManager } from "../select-manager.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
 import { UnsupportedVisitError, NotImplementedError, BindError } from "../errors.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
@@ -77,12 +78,17 @@ const DEFAULT_BIND_BLOCK: (index: number) => string = () => "?";
 
 /**
  * True when a CTE body node renders its own surrounding parentheses (a
- * `Grouping` or a set-operation node), so `visit_Arel_Nodes_Cte` must not add
- * another pair. A bare `SelectStatement` / `SqlLiteral` returns false — those
- * need the explicit `AS (...)` wrap.
+ * `Grouping`, a set-operation node, or a `SelectManager`), so
+ * `visit_Arel_Nodes_Cte` must not add another pair. A bare `SelectStatement` /
+ * `SqlLiteral` returns false — those need the explicit `AS (...)` wrap.
  */
 export function cteRelationSelfWraps(relation: Node): boolean {
   return (
+    // `Arel::Nodes::As.new(cte_table, select_manager)` is Rails' own CTE idiom
+    // and `visit_Arel_SelectManager` (to_sql.rb:358-361) already emits the
+    // parens. A SelectManager is not a Node, so it reaches a CTE body slot as
+    // `NodeOrValue` rather than through the node hierarchy above.
+    (relation as unknown) instanceof SelectManager ||
     relation instanceof Nodes.Grouping ||
     relation instanceof Nodes.Union ||
     relation instanceof Nodes.UnionAll ||

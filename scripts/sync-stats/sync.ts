@@ -420,8 +420,8 @@ async function columnExists(
   column: string,
 ): Promise<boolean> {
   const quoted = `"${table.replace(/"/g, '""')}"`;
-  const cols = await adapter.execute(`PRAGMA table_info(${quoted})`);
-  return cols.some((c: { name: string }) => c.name === column);
+  const cols = (await adapter.execute(`PRAGMA table_info(${quoted})`)) as { name: string }[];
+  return cols.some((c) => c.name === column);
 }
 
 async function migrateDb(adapter: AbstractSQLite3Adapter) {
@@ -1465,7 +1465,7 @@ async function syncPrLinkedIssues() {
       let after: string | null = null;
       let hasNextPage = false;
       do {
-        const afterArg = after ? `, after:"${after}"` : "";
+        const afterArg: string = after ? `, after:"${after}"` : "";
         const resp = ghJson<{
           data: {
             repository: {
@@ -2138,12 +2138,10 @@ async function printSummary() {
     count("raw_job_logs"),
   ]);
 
-  const stateRows = await Base.adapter.execute(
+  const stateRows = (await Base.adapter.execute(
     `SELECT state, COUNT(*) as cnt FROM pull_requests GROUP BY state ORDER BY state`,
-  );
-  const stateParts = stateRows
-    .map((r: { cnt: number; state: string }) => `${r.cnt} ${r.state}`)
-    .join(", ");
+  )) as { cnt: number; state: string }[];
+  const stateParts = stateRows.map((r) => `${r.cnt} ${r.state}`).join(", ");
 
   console.log("\n=== Database Summary ===");
   console.log(`  PRs: ${prCount} (${stateParts})`);
@@ -2460,7 +2458,7 @@ async function main() {
       throw err;
     }
   } finally {
-    adapter.close();
+    await adapter.close();
   }
 }
 

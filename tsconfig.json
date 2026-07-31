@@ -32,7 +32,8 @@
     { "path": "packages/did-you-mean" },
     { "path": "packages/html-sanitizer" },
     { "path": "packages/nokogiri" },
-    { "path": "packages/activerecord-cli" }
+    { "path": "packages/activerecord-cli" },
+    { "path": "scripts" }
   ],
   "exclude": ["node_modules", "dist"]
 }

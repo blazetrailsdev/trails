@@ -65,6 +65,7 @@
     "codegen:score": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/prism-codegen/score-cli.ts"
   },
   "devDependencies": {
+    "@blazetrails/activerecord": "workspace:*",
     "@eslint/js": "^10.0.1",
     "@ruby/prism": "^1.9.0",
     "@sinonjs/fake-timers": "^15.3.2",
