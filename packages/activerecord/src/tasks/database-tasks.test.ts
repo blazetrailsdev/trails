@@ -214,15 +214,12 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
     expect(DatabaseTasks.dumpSchemaFilename()).toBe("alt_schema.rb");
   });
   it("cache dump filename with path from db config", () => {
-    const config = new HashConfig("test", "animals", {
-      adapter: "sqlite3",
-      database: "animals.db",
-    });
-    expect(DatabaseTasks.dumpSchemaFilename(config)).toBe("db/animals_schema.ts");
+    const config = new HashConfig("development", "alternate", { adapter: "abstract" });
+    expect(DatabaseTasks.dumpSchemaFilename(config)).toBe("db/alternate_schema.ts");
   });
   it("cache dump filename with path from the argument has precedence", () => {
     process.env.SCHEMA = "override.rb";
-    const config = new HashConfig("test", "animals", { adapter: "sqlite3" });
+    const config = new HashConfig("development", "primary", { adapter: "abstract" });
     expect(DatabaseTasks.dumpSchemaFilename(config)).toBe("override.rb");
   });
 });
@@ -1312,13 +1309,16 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
   });
 
   it("check dump filename defaults for non primary databases", () => {
-    const config = new HashConfig("test", "animals", { adapter: "sqlite3" });
-    expect(DatabaseTasks.dumpSchemaFilename(config)).toBe("db/animals_schema.ts");
+    const config = new HashConfig("development", "secondary", {
+      adapter: "abstract",
+      database: "secondary-dev-db",
+    });
+    expect(DatabaseTasks.dumpSchemaFilename(config)).toBe("db/secondary_schema.ts");
   });
 
   it("setting schema dump to nil", () => {
     const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
+      adapter: "abstract",
       database: "dev-db",
       schemaDump: false,
     });
@@ -1327,7 +1327,10 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
 
   it("check dump filename with schema env with non primary databases", () => {
     process.env.SCHEMA = "override.rb";
-    const config = new HashConfig("test", "animals", { adapter: "sqlite3" });
+    const config = new HashConfig("development", "secondary", {
+      adapter: "abstract",
+      database: "secondary-dev-db",
+    });
     expect(DatabaseTasks.dumpSchemaFilename(config)).toBe("override.rb");
   });
 });
