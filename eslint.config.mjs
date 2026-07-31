@@ -834,8 +834,6 @@ export default defineConfig(
     files: [
       "packages/activemodel/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
-      // `scripts/**` is full of async fs and `execFile` work, and now has a
-      // program (scripts/tsconfig.json) for these rules to read types from.
       "scripts/**/*.ts",
     ],
     rules: {
