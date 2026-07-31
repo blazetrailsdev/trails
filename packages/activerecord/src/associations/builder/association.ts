@@ -7,7 +7,7 @@
 
 import { ArgumentError } from "@blazetrails/activemodel";
 import { throwAbort } from "@blazetrails/activesupport";
-import { RecordNotDestroyed } from "../../errors.js";
+import { ConfigurationError, RecordNotDestroyed } from "../../errors.js";
 import * as Reflection from "../../reflection.js";
 import { beforeDestroy } from "../../callbacks.js";
 
@@ -260,18 +260,15 @@ export class Association {
   }
 
   static checkDependentOptions(dependent: string, model: any): void {
+    if (dependent === "destroyAsync" && !model.destroyAssociationAsyncJob()) {
+      throw new ConfigurationError(
+        "A valid destroyAssociationAsyncJob is required to use `dependent: destroyAsync` on associations",
+      );
+    }
     const validOptions = this.validDependentOptions();
     if (!validOptions.includes(dependent)) {
       throw new Error(
         `The :dependent option must be one of ${validOptions.join(", ")}, but is :${dependent}`,
-      );
-    }
-    if (
-      dependent === "destroyAsync" &&
-      !(model._destroyAssociationAsyncJob ?? model.destroyAssociationAsyncJob)
-    ) {
-      throw new Error(
-        "A valid destroyAssociationAsyncJob is required to use `dependent: destroyAsync` on associations",
       );
     }
   }

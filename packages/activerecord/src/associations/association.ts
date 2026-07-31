@@ -995,7 +995,7 @@ export class Association {
   }
 
   private enqueueDestroyAssociation(options: Record<string, unknown>): void {
-    const jobClass = (this.owner.constructor as any).destroyAssociationAsyncJob;
+    const jobClass = (this.owner.constructor as any).destroyAssociationAsyncJob();
     if (jobClass) {
       const ownerAny = this.owner as any;
       ownerAny._afterCommitJobs ??= [];

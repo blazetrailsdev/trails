@@ -4375,6 +4375,26 @@ export class Base extends Model {
   // Mirrors: ActiveRecord::Core.shard_selector (core.rb:104).
   static shardSelector: unknown = null;
 
+  // The job class backing `dependent: :destroy_async`, read through the
+  // `destroyAssociationAsyncJob` accessor (core.ts).
+  // Mirrors: ActiveRecord::Core._destroy_association_async_job (core.rb:24),
+  // except for the default: Rails defaults to the class *name*
+  // "ActiveRecord::DestroyAssociationAsyncJob", an ActiveJob::Base subclass.
+  // trails has no ActiveJob, so destroy_association_async_job.rb is unported
+  // (scripts/api-compare/unported-files.ts) and that constant does not exist —
+  // adopting Rails' default would make every read raise NameError. Stays null
+  // until a job framework lands; `dependent: :destroy_async` therefore fails
+  // the validity guard in Builder::Association.checkDependentOptions, which is
+  // exactly what Rails does when the configured job is missing.
+  static _destroyAssociationAsyncJob: unknown = null;
+
+  // Rails defines `def self.destroy_association_async_job` in the `included do`
+  // block (core.rb:27) and only *delegates* the instance reader to it
+  // (core.rb:37). The include() below wires the instance side; the class side
+  // has to be assigned here, or `Model.destroyAssociationAsyncJob` is undefined
+  // and every caller silently reads a missing job as "no job configured".
+  static destroyAssociationAsyncJob = _Core.destroyAssociationAsyncJob;
+
   // Maximum records destroyed per background job by `dependent: :destroy_async`.
   // nil (single job) by default, matching Rails and trails' behavior.
   // Mirrors: ActiveRecord::Core.destroy_association_async_batch_size (core.rb:47).
