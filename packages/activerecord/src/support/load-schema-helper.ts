@@ -591,7 +591,10 @@ function sameKind(seen: unknown, real: unknown): boolean {
  * would reject every real adapter; accepting them lets a probe through. The
  * distinguishing signal is lexical, not runtime — which class body a `.test.ts`
  * file wrote — so `blazetrails/no-load-schema-with-stubbed-ddl` carries that
- * direction instead.
+ * direction instead. That rule runs over the activerecord package's `.test.ts`
+ * files, which is where every arm-content cover lives; a class-body stub
+ * written outside them is caught by neither mechanism, and is the residual
+ * hole the two leave between them.
  */
 function assertNotStubbed(adapter: DatabaseAdapter, method: string): void {
   const seen = (adapter as unknown as Record<string, unknown>)[method];

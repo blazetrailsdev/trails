@@ -81,6 +81,19 @@ tester.run("no-load-schema-with-stubbed-ddl", rule, {
         await loadAdapterSpecificSchema(new Probe(":memory:"));
       `,
     },
+    // An abstract declaration defines no emitter — whichever concrete class
+    // implements it is the one that would lay nothing, and that class body arms
+    // the rule on its own.
+    {
+      filename: "packages/activerecord/src/migration.test.ts",
+      code: `
+        import { loadSchema } from "./support/load-schema-helper.js";
+        abstract class Base {
+          abstract createTable(name: string): Promise<void>;
+        }
+        await loadSchema(adapter);
+      `,
+    },
   ],
   invalid: [
     // The #5676 shape: Proxy trap on createTable + loadSchema.
