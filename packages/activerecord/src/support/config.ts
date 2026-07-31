@@ -162,6 +162,22 @@ function applySlot(database: string, read: EnvReader): string {
 }
 
 /**
+ * Whether this worker's database is its own — no sibling worker and no other
+ * run shares it — which is what licenses the purge-and-reload setup path in
+ * `test-setup-dy.ts` instead of dropping the tables in place.
+ *
+ * This is the exact complement of {@link applySlot}: with a run token stamped,
+ * every slot (slot 1 included) gets a `<base>_<runToken>_<slot>` database of
+ * its own; without one, `applySlot` falls back to the shared base database for
+ * slot 1, which the bootstrap connection and any harness-less consumer also
+ * point at. Reading the same two env vars keeps the two answers from drifting.
+ */
+export function ownsSlotDatabase(read: EnvReader = getEnv): boolean {
+  const slot = intSetting(read, SLOT_ENV, 1);
+  return slot > 1 || present(read, RUN_TOKEN_ENV) !== undefined;
+}
+
+/**
  * The `arunit` database name `ARTest.expand_config` fills in when a connection
  * entry carries none — which is every mysql2 and postgresql entry
  * (`test/support/config.rb:28-31`, `config.example.yml:2-40,74-81`).

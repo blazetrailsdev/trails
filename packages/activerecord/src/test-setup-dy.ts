@@ -20,14 +20,13 @@
  *     a worker recycled onto a database an earlier worker used takes it too.
  *   - sqlite file → purge (per-worker isolated file; drop+create is safe — no
  *     other worker shares this file path).
- *   - PG/MySQL slot >1 (AR_PG_EXCLUSIVE_DB / AR_MYSQL_EXCLUSIVE_DB set by
- *     test-setup-worker-db.ts) → purge; the worker owns its own suffixed DB
- *     (activerecord_unittest_N), so drop+create is safe.
- *   - otherwise (sqlite `:memory:`, PG/MySQL slot 1) → drop every table. The
- *     base URL is unchanged there, and the advisory-lock bootstrap pg.Client /
- *     GET_LOCK connection lives in the same DB as the worker pool, so DROP
- *     DATABASE fails with PG error 55006 and releasing GET_LOCK would allow
- *     slot races on MySQL.
+ *   - PG/MySQL worker-owned DB (AR_PG_EXCLUSIVE_DB / AR_MYSQL_EXCLUSIVE_DB set
+ *     by test-setup-worker-db.ts) → purge; the worker owns its own database
+ *     (activerecord_unittest_<runToken>_N), so drop+create is safe. Every slot
+ *     qualifies once globalSetup stamps a run token — slot 1 included.
+ *   - otherwise (sqlite `:memory:`, or an unstamped PG/MySQL slot 1) → drop
+ *     every table. Without a run token slot 1 *is* the shared base database,
+ *     which other consumers point at too, so it must not be dropped.
  */
 import { connect } from "./support/connection.js";
 import { getEnv } from "@blazetrails/activesupport";

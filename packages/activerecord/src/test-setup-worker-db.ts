@@ -2,7 +2,8 @@
  * Vitest setupFile for the activerecord project: claims this worker's database
  * isolation slot before any test code or import runs.
  *
- * Opens a bootstrap connection to the base DB and tries an advisory lock for
+ * Opens a bootstrap connection to a maintenance DB (never a slot DB, which the
+ * worker may later drop and recreate) and tries an advisory lock for
  * slot N=1..slotPoolSize(). The pool is sized with headroom over the worker
  * count (see support/ar-db-slots.ts), so a worker recycling in between
  * files always finds a free slot. Claims the first free slot, publishes it as
@@ -40,7 +41,7 @@ import mysql from "mysql2/promise";
 import "./sqlite/better-sqlite3.js";
 import { WORKER_DB_ENV, ensureWorkerClone } from "./support/sqlite-template.js";
 import { slotPoolSize, workerForkCount } from "./support/ar-db-slots.js";
-import { SLOT_ENV, mysqlSettings, postgresSettings } from "./support/config.js";
+import { SLOT_ENV, mysqlSettings, ownsSlotDatabase, postgresSettings } from "./support/config.js";
 import { RUN_TOKEN_ENV, mysqlAdvisoryLockName, pgAdvisoryLockKey } from "./support/run-token.js";
 import { activeLane } from "./support/connection.js";
 
@@ -94,8 +95,14 @@ async function acquireAdvisorySlotPg(): Promise<number> {
     return g.__arAdvisorySlotPg;
   }
 
-  const { host, port, user, password, database } = postgresSettings();
-  const client = new pg.Client({ host, port, user, password, database });
+  // Maintenance database, not the worker's own: advisory locks are server-wide,
+  // and a bootstrap session sitting inside the slot database would block the
+  // purge (DROP DATABASE fails with 55006 while a session is connected). Before
+  // the run token was stamped, slot 1 named the shared base database, so this
+  // connection landed in it — which is why slot 1 was excluded from the
+  // exclusive-database flag at all.
+  const { host, port, user, password } = postgresSettings();
+  const client = new pg.Client({ host, port, user, password, database: "postgres" });
   await client.connect();
 
   for (let attempt = 0; attempt < SLOT_RETRY_ATTEMPTS; attempt++) {
@@ -129,13 +136,15 @@ async function acquireAdvisorySlotMysql(): Promise<number> {
     return g.__arAdvisorySlotMysql;
   }
 
-  const { host, port, user, password, database, socket } = mysqlSettings();
+  // No database selected, for the same reason as the PG path above: GET_LOCK is
+  // server-wide, and this session must not sit inside the database the worker
+  // purges.
+  const { host, port, user, password, socket } = mysqlSettings();
   const conn = await mysql.createConnection({
     host,
     port,
     user,
     password,
-    database,
     ...(socket === undefined ? {} : { socketPath: socket }),
   });
 
@@ -164,15 +173,15 @@ const lane = activeLane();
 if (lane === "postgres") {
   const slot = await acquireAdvisorySlotPg();
   process.env[SLOT_ENV] = String(slot);
-  // A slot above 1 means this worker owns an exclusive per-worker DB;
-  // test-setup-dy.ts purges it before the schema load instead of dropping the
-  // tables in place.
-  if (slot > 1) process.env.AR_PG_EXCLUSIVE_DB = "1";
+  // Owning the database — every stamped slot does, and only slots above 1 do
+  // when nothing was stamped — lets test-setup-dy.ts purge it before the schema
+  // load instead of dropping the tables in place.
+  if (ownsSlotDatabase()) process.env.AR_PG_EXCLUSIVE_DB = "1";
 }
 if (lane === "mysql") {
   const slot = await acquireAdvisorySlotMysql();
   process.env[SLOT_ENV] = String(slot);
-  if (slot > 1) process.env.AR_MYSQL_EXCLUSIVE_DB = "1";
+  if (ownsSlotDatabase()) process.env.AR_MYSQL_EXCLUSIVE_DB = "1";
 }
 
 // Phase 0 sqlite template-clone: when globalSetup built a canonical template,
