@@ -67,6 +67,7 @@ export function registerExpressions(r: Registry): void {
   );
   r.on("MultiWriteNode", (n, e) => {
     if (n.rest || !((n.lefts as PrismNode[]) ?? []).every(isEmittableTarget)) return null;
+    for (const l of (n.lefts as PrismNode[]) ?? []) clearAsyncProvenance(l, e);
     const lefts = ((n.lefts as PrismNode[]) ?? []).map((l) => e.expr(l));
     return f.createAssignment(f.createArrayLiteralExpression(lefts), e.expr(n.value as PrismNode));
   });
@@ -134,6 +135,7 @@ function logicalWrite(
   n: PrismNode,
   e: Emitter,
 ): ts.Expression {
+  clearAsyncProvenance(n, e);
   return f.createBinaryExpression(target, op as ts.BinaryOperator, e.expr(n.value as PrismNode));
 }
 function argExprs(node: PrismNode | undefined | null, e: Emitter): ts.Expression[] {
@@ -284,11 +286,10 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
     ? f.createAwaitExpression(call)
     : call;
 }
-/**
- * Record — or retract — the write target's async provenance. A later
- * assignment from a value of unknown type has to clear the key: the receiver
- * is no longer pinned down, so awaiting its calls would be a guess again.
- */
+function clearAsyncProvenance(n: PrismNode, e: Emitter): void {
+  const key = asyncBindingKey(n);
+  if (key) e.asyncBindings.delete(key);
+}
 function trackAsyncProvenance(n: PrismNode, e: Emitter): void {
   const key = asyncBindingKey(n);
   if (!key) return;

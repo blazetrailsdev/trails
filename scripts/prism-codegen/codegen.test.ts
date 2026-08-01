@@ -142,6 +142,19 @@ describe("prism-codegen", () => {
     expect(code).not.toContain("await arg.load()");
     expect(code).not.toContain("await this.other.load()");
   });
+  it("claims no provenance from a paren-less self-call, which emits a method reference", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all
+          @relation = build_relation
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).toContain("this.relation = this.buildRelation;");
+    expect(code).not.toContain("await this.relation.load()");
+  });
   it("stops awaiting a receiver reassigned from an unknown value", async () => {
     const { code } = await generateFromSource(
       `module M
@@ -156,6 +169,30 @@ describe("prism-codegen", () => {
     );
     expect(code).toContain("await this.relation.load()");
     expect(code.match(/await this\.relation\.load\(\)/g)).toHaveLength(1);
+  });
+  it("stops awaiting a receiver rebound by a logical or destructuring write", async () => {
+    const orWrite = await generateFromSource(
+      `module M
+        def load_all(arg)
+          @relation = build_relation()
+          @relation ||= arg
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(orWrite.code).not.toContain("await this.relation.load()");
+    const multiWrite = await generateFromSource(
+      `module M
+        def load_all(arg)
+          rel = build_relation()
+          rel, other = arg
+          rel.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(multiWrite.code).not.toContain("await rel.load()");
   });
   it("does not carry async provenance across defs", async () => {
     const { code } = await generateFromSource(

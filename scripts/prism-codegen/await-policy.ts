@@ -30,6 +30,10 @@ export function shouldAwaitCall(opts: {
  * The provenance-tracking key for a variable read or write: `@name` for an
  * instance variable, `name` for a local. Anything else has no key, so it can
  * neither record nor claim local async provenance.
+ *
+ * Provenance is recorded per write and retracted by a later write whose value
+ * has none: after `@rel = arg` the receiver is unpinned again, so awaiting its
+ * calls would be a guess.
  */
 export function asyncBindingKey(node: PrismNode | null | undefined): string | null {
   const kind = node?.constructor?.name;
@@ -45,6 +49,10 @@ export function asyncBindingKey(node: PrismNode | null | undefined): string | nu
  * a method the async manifest resolves. The receiver of such a call is fixed
  * by the AST, so unlike a bare name the manifest lookup cannot land on an
  * unrelated same-named method.
+ *
+ * A bare, paren-less, argument-less implicit self-call is excluded: the
+ * emitter renders it as a property access rather than a call, so the target
+ * holds a method reference, not the method's resolved value.
  */
 export function hasAsyncProvenance(
   value: PrismNode | null | undefined,
@@ -54,5 +62,8 @@ export function hasAsyncProvenance(
   if (!value || value.constructor?.name !== "CallNode") return false;
   const receiver = value.receiver as PrismNode | null;
   if (receiver && receiver.constructor?.name !== "SelfNode") return false;
+  const invoked =
+    receiver != null || value.openingLoc != null || value.arguments_ != null || value.block != null;
+  if (!invoked) return false;
   return asyncMethods.has(jsNameOf(String(value.name)));
 }
