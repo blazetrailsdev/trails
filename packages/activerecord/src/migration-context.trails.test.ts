@@ -4,7 +4,12 @@
 // the timestamp validation) lives on MigrationContext itself, reading *its own*
 // `migrationsPaths` rather than delegating to Migrator.
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { MigrationContext, Migrator, InvalidMigrationTimestampError } from "./migration.js";
+import {
+  MigrationContext,
+  Migrator,
+  InvalidMigrationTimestampError,
+  UnknownMigrationVersionError,
+} from "./migration.js";
 import { ActiveRecord } from "./ar-config.js";
 import { Base } from "./base.js";
 import { SchemaMigration } from "./schema-migration.js";
@@ -135,6 +140,18 @@ describe("MigrationContext connected surface", () => {
 
   it("lastStoredEnvironment is null until a version has been recorded", async () => {
     expect(await context.lastStoredEnvironment()).toBeNull();
+  });
+
+  it("rollback goes through move, not Migrator's applied-version walk", async () => {
+    await context.schemaMigration.createVersion("9999");
+
+    await expect(context.rollback(1)).rejects.toThrow(UnknownMigrationVersionError);
+  });
+
+  it("forward goes through move, not Migrator's pending-migration walk", async () => {
+    await context.schemaMigration.createVersion("9999");
+
+    await expect(context.forward(1)).rejects.toThrow(UnknownMigrationVersionError);
   });
 
   it("a context built without a schemaMigration raises rather than half-answering", () => {

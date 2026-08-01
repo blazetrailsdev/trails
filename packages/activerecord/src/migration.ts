@@ -1791,14 +1791,26 @@ export class MigrationContext {
     return this.open().down(targetVersion, block);
   }
 
-  /** @internal Mirrors: ActiveRecord::MigrationContext#rollback (`migration.rb:1240-1242`) */
+  /**
+   * @internal Mirrors: ActiveRecord::MigrationContext#rollback
+   * (`migration.rb:1240-1242`) — `move(:down, steps)`, not `Migrator`'s own
+   * `rollback`. The two are not equivalent: `move` indexes into the sorted
+   * migration list from `currentMigration` and raises
+   * `UnknownMigrationVersionError` when the current version has no matching
+   * migration, where `Migrator#rollback` walks the last N *applied* versions
+   * and silently rolls back a different set when migrations ran out of order.
+   */
   async rollback(steps: number = 1): Promise<MigrationProxy[]> {
-    return this.open().rollback(steps);
+    return this.move("down", steps);
   }
 
-  /** @internal Mirrors: ActiveRecord::MigrationContext#forward (`migration.rb:1244-1246`) */
-  async forward(steps: number = 1): Promise<void> {
-    return this.open().forward(steps);
+  /**
+   * @internal Mirrors: ActiveRecord::MigrationContext#forward
+   * (`migration.rb:1244-1246`) — `move(:up, steps)`. See {@link rollback} for
+   * why this does not delegate to `Migrator#forward`.
+   */
+  async forward(steps: number = 1): Promise<MigrationProxy[]> {
+    return this.move("up", steps);
   }
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#run (`migration.rb:1268-1270`) */
@@ -1952,8 +1964,13 @@ export class MigrationContext {
     return Number(version) < limit;
   }
 
-  /** @internal Mirrors: ActiveRecord::MigrationContext#move (`migration.rb:1386-1401`) */
-  async move(direction: "up" | "down", steps: number): Promise<void> {
+  /**
+   * @internal Mirrors: ActiveRecord::MigrationContext#move
+   * (`migration.rb:1386-1401`), whose closing `public_send(direction, version)`
+   * returns whatever `up` / `down` returned — so `rollback` / `forward` answer
+   * the migrations that ran.
+   */
+  async move(direction: "up" | "down", steps: number): Promise<MigrationProxy[]> {
     return this.open().move(direction, steps);
   }
 }
@@ -3002,7 +3019,7 @@ export class Migrator {
 
   // Rails: MigrationContext#move
   /** @internal */
-  async move(direction: "up" | "down", steps: number): Promise<void> {
+  async move(direction: "up" | "down", steps: number): Promise<MigrationProxy[]> {
     const current = await this.currentVersion();
     // Mirror Migrator#migrations: ascending for :up, descending for :down.
     // MigrationContext#move uses migrator.migrations[start_index + steps], so the
@@ -3020,10 +3037,9 @@ export class Migrator {
     const finish = ordered[startIndex + steps];
     const targetVersion = finish ? Number(finish.version) : 0;
     if (direction === "up") {
-      await this.up(targetVersion);
-    } else {
-      await this.down(targetVersion);
+      return this.up(targetVersion);
     }
+    return this.down(targetVersion);
   }
 }
 
