@@ -1,6 +1,7 @@
 import { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
-import { Column } from "../connection-adapters/column.js";
+import { SchemaStatements } from "../connection-adapters/abstract/schema-statements.js";
 import type { SqlTypeMetadata } from "../connection-adapters/sql-type-metadata.js";
+import { Column } from "../connection-adapters/column.js";
 import { register } from "../connection-adapters.js";
 
 export interface MergeColumnOptions {
@@ -57,8 +58,15 @@ export class FakeActiveRecordAdapter extends AbstractAdapter {
     return true;
   }
 
+  // Rails' FakeAdapter gets `fetch_type_metadata` from `include SchemaStatements`.
+  // Here the base body is reached through the module prototype rather than
+  // `super`, because PostgreSQLAdapter redeclares the name with a four-argument
+  // signature, so AbstractAdapter cannot carry this one in its mixin interface.
   private fetchTypeMetadata(sqlType: string | null): SqlTypeMetadata {
-    return this.schemaStatements().fetchTypeMetadata(sqlType);
+    return SchemaStatements.prototype.fetchTypeMetadata.call(
+      this as unknown as SchemaStatements,
+      sqlType,
+    );
   }
 }
 

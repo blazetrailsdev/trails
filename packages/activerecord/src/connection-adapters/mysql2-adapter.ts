@@ -56,7 +56,6 @@ import { abandonRawSocket } from "./abandon-raw-socket.js";
 import {
   indexes as mysqlIndexes,
   parseMysqlName as mysqlParseName,
-  MysqlSchemaStatements,
 } from "./mysql/schema-statements.js";
 
 /**
@@ -1424,10 +1423,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     const dumper = new MysqlSchemaDumper(source, options);
     dumper.connection = this;
     return dumper;
-  }
-
-  override schemaStatements(host?: DatabaseAdapter): MysqlSchemaStatements {
-    return new MysqlSchemaStatements(host ?? this);
   }
 
   // ── Schema DDL ──

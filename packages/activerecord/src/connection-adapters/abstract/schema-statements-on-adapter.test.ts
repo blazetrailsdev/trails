@@ -339,6 +339,25 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(stub.allSql.at(-1)).toMatch(/CHECK \(price > 0\)/);
   });
 
+  it("schemaStatements() is the adapter itself, so Migration#schema reaches adapter overrides", async () => {
+    // Rails has no `schema_statements` accessor: `include SchemaStatements` puts
+    // the bodies on the adapter, and Migration#method_missing hands work to the
+    // connection. trails' accessor is only a typed handle onto the same object,
+    // so an adapter override is what a `schema` handle dispatches to — no
+    // companion instance re-implementing the lookup.
+    class OverridingAdapter extends SqliteCapturingAdapter {
+      renameColumnCalls = 0;
+      async renameColumn(tableName: string, oldName: string, newName: string) {
+        this.renameColumnCalls += 1;
+        return super.renameColumn(tableName, oldName, newName);
+      }
+    }
+    const stub = new OverridingAdapter();
+    expect(stub.schemaStatements()).toBe(stub);
+    await stub.schemaStatements().renameColumn("widgets", "title", "name");
+    expect(stub.renameColumnCalls).toBe(1);
+  });
+
   it("removeForeignKey ifExists probe matches on to_table only, not name (Rails)", async () => {
     // Rails' remove_foreign_key checks existence with only the positional
     // to_table, then resolves the exact constraint (with column/name) via

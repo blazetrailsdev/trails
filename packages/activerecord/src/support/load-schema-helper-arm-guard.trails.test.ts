@@ -116,7 +116,12 @@ describe("load_schema arm-probe guard", () => {
 
     const probe = new Probe(":memory:");
     try {
-      await expect(loadSchema(probe as unknown as AbstractAdapter)).resolves.toBeUndefined();
+      // The override really does take effect on the lay path — `schemaStatements()`
+      // hands back the adapter itself — so the lay dies downstream on the empty
+      // table. What this pins is that it is NOT `assertNotStubbed` that stops it.
+      const err = await loadSchema(probe as unknown as AbstractAdapter).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(Error);
+      expect(String(err)).not.toMatch(/is stubbed/);
     } finally {
       await probe.close();
     }

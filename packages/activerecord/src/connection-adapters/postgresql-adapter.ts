@@ -4542,21 +4542,14 @@ export class PostgreSQLAdapter
   }
 
   /**
-   * @noRailsEquivalent PERMANENT. Rails gains these bodies with `include SchemaStatements` on the
-   *   adapter, so there is no accessor to mirror. Permanent because TypeScript has no `include`:
-   *   the repo's substitute is a `this`-typed function assigned per method, and
-   *   abstract/schema_statements.rb defines 76 of them — that many hand-assigned statics is not a
-   *   readable class, and no future port removes the limitation. trails therefore keeps the module
-   *   as a companion class and `schemaStatements(host?)` returns it bound to a host adapter. It is
-   *   the TS stand-in for the `include`, not new capability — mysql2-adapter.ts overrides it to
-   *   return the MySQL companion the same way Rails includes `MySQL::SchemaStatements`.
+   * The PostgreSQL-specific half of `PostgreSQL::SchemaStatements`, still a companion class
+   * rather than a mixin: every method below delegates into it. Story
+   * `dissolve-the-postgresql-schema-statements-companion` folds it onto the adapter the way
+   * MySQL's is folded on, at which point this accessor goes away.
+   * @internal
    */
-  override schemaStatements(host?: DatabaseAdapter): SchemaStatements {
-    return new PostgreSQLSchemaStatements((host ?? this) as unknown as DatabaseAdapter);
-  }
-
   private pgSchemaStatements(): PostgreSQLSchemaStatements {
-    return this.schemaStatements() as PostgreSQLSchemaStatements;
+    return new PostgreSQLSchemaStatements(this as unknown as DatabaseAdapter);
   }
 
   async dropTable(
@@ -4568,7 +4561,7 @@ export class PostgreSQLAdapter
     // solely from the included `PostgreSQL::SchemaStatements` module. Delegate
     // here so schema-cache eviction + single-statement CASCADE behavior lives
     // in one place (PostgreSQLSchemaStatements#dropTable).
-    await this.schemaStatements().dropTable(...args);
+    await this.pgSchemaStatements().dropTable(...args);
   }
 
   async currentDatabase(): Promise<string> {

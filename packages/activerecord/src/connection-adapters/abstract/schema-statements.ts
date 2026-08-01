@@ -286,8 +286,6 @@ interface SchemaMigrationPool {
 }
 
 export class SchemaStatements {
-  private _schemaCreation?: SchemaCreation;
-
   constructor(protected readonly adapter: DatabaseAdapter & SchemaQuoter) {}
 
   /**
@@ -304,36 +302,9 @@ export class SchemaStatements {
     return this.adapter.adapterName as AdapterName;
   }
 
+  /** Mirrors: SchemaStatements#schema_creation — `SchemaCreation.new(self)`. */
   get schemaCreation(): SchemaCreation {
-    if (!this._schemaCreation) {
-      const adapterSC =
-        (this.adapter as unknown) === (this as unknown)
-          ? undefined
-          : (this.adapter as unknown as { schemaCreation?: unknown }).schemaCreation;
-      this._schemaCreation =
-        adapterSC instanceof SchemaCreation
-          ? adapterSC
-          : new SchemaCreation(this.adapterName, this.adapter);
-    }
-    return this._schemaCreation;
-  }
-
-  /**
-   * The adapter's own override of `name`, or `undefined` when the base body
-   * should run. Dispatch is one-way: mixed into an adapter
-   * (`include(AbstractAdapter, SchemaStatements)`) `this.adapter` is `this`, so
-   * an override reaching this body through `super` must not be sent back to
-   * itself.
-   */
-  protected _adapterOverride<K extends keyof SchemaStatements>(
-    name: K,
-  ): Extract<SchemaStatements[K], (...args: never[]) => unknown> | undefined {
-    const adapter = this.adapter as unknown as Record<PropertyKey, unknown>;
-    if ((adapter as unknown) === (this as unknown)) return undefined;
-    const fn = adapter[name];
-    const base = (SchemaStatements.prototype as unknown as Record<PropertyKey, unknown>)[name];
-    if (typeof fn !== "function" || fn === base) return undefined;
-    return fn.bind(adapter) as Extract<SchemaStatements[K], (...args: never[]) => unknown>;
+    return new SchemaCreation(this.adapterName, this.adapter);
   }
 
   protected _qi(name: string): string {
@@ -546,11 +517,6 @@ export class SchemaStatements {
     if (options.ifExists && !(await this.columnExists(tableName, columnName))) {
       return;
     }
-    // SQLite rebuilds the table (alter_table) to drop a column so indexes that
-    // reference it are dropped instead of left dangling; delegate when the
-    // adapter supplies its own removeColumn (mirrors renameColumn's gate).
-    const override = this._adapterOverride("removeColumn");
-    if (override) return override(tableName, columnName, _type, options);
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     await this.adapter.execute(
       `ALTER TABLE ${this._qi(tableName)} DROP COLUMN ${this._qi(columnName)}`,
@@ -558,12 +524,6 @@ export class SchemaStatements {
   }
 
   async renameColumn(tableName: string, oldName: string, newName: string): Promise<void> {
-    // MySQL/MariaDB need the RENAME-COLUMN/CHANGE branch plus index fixups in
-    // AbstractMysqlAdapter#renameColumn; delegate when the adapter supplies its
-    // own implementation. The gate prevents self-recursion now that
-    // SchemaStatements is mixed into AbstractAdapter (see changeColumn).
-    const override = this._adapterOverride("renameColumn");
-    if (override) return override(tableName, oldName, newName);
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     await this.adapter.execute(
       `ALTER TABLE ${this._qi(tableName)} RENAME COLUMN ${this._qi(oldName)} TO ${this._qi(newName)}`,
@@ -642,12 +602,6 @@ export class SchemaStatements {
     type: ColumnType,
     options: ColumnOptions = {},
   ): Promise<void> {
-    // Adapters that cannot run `ALTER COLUMN ... TYPE` (SQLite) override
-    // changeColumn with a table-rebuild path. Delegate when the adapter supplies
-    // its own implementation; the gate prevents self-recursion now that
-    // SchemaStatements is mixed into AbstractAdapter (see changeColumnDefault).
-    const override = this._adapterOverride("changeColumn");
-    if (override) return override(tableName, columnName, type, options);
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     const sqlType = this.schemaCreation.typeToSql(type, options);
     const table = this._qi(tableName);
@@ -770,12 +724,6 @@ export class SchemaStatements {
     columnName: string,
     options: { from?: unknown; to: unknown } | unknown,
   ): Promise<void> {
-    // Adapters that cannot run `ALTER COLUMN ... SET DEFAULT` (SQLite) override
-    // changeColumnDefault with a table-rebuild path. Delegate when the adapter
-    // supplies its own implementation; the gate prevents self-recursion now
-    // that SchemaStatements is mixed into AbstractAdapter (see addForeignKey).
-    const override = this._adapterOverride("changeColumnDefault");
-    if (override) return override(tableName, columnName, options);
     // Rails unwraps a Hash to its :to only when it carries BOTH :from and :to
     // (extract_new_default_value, schema_statements.rb:1820); a bare structured
     // default like `{ to: 1 }` without :from is the literal default.
@@ -874,13 +822,6 @@ export class SchemaStatements {
     toTable: string,
     options: AddForeignKeyOptions = {},
   ): Promise<void> {
-    // SQLite can't ALTER TABLE ADD CONSTRAINT, so it rebuilds the table in its
-    // own addForeignKey override. When invoked through a SchemaStatements
-    // wrapper (this !== the adapter), delegate to that override. The
-    // `this !== adapter` guard keeps adapters that call `super` (e.g. PostgreSQL)
-    // from re-entering this gate and recursing.
-    const override = this._adapterOverride("addForeignKey");
-    if (override) return override(fromTable, toTable, options);
     // Rails: return unless use_foreign_keys?
     if (!this.isUseForeignKeys()) return;
     // Mirrors Rails' add_foreign_key short-circuit:
@@ -921,8 +862,6 @@ export class SchemaStatements {
     toTableOrOptions?: string | RemoveForeignKeyOptions,
     options: RemoveForeignKeyOptions = {},
   ): Promise<void> {
-    const override = this._adapterOverride("removeForeignKey");
-    if (override) return override(fromTable, toTableOrOptions, options);
     // Rails: return unless use_foreign_keys?
     if (!this.isUseForeignKeys()) return;
     // Mirrors Rails remove_foreign_key(from_table, to_table = nil, **options):
@@ -966,8 +905,6 @@ export class SchemaStatements {
       [key: string]: unknown;
     } = {},
   ): Promise<void> {
-    const override = this._adapterOverride("addCheckConstraint");
-    if (override) return override(tableName, expression, options);
     const support = this.adapter as { supportsCheckConstraints?: () => boolean };
     if (
       typeof support.supportsCheckConstraints === "function" &&
@@ -991,8 +928,6 @@ export class SchemaStatements {
     expressionOrOptions?: string | { name?: string; ifExists?: boolean },
     options: { name?: string; ifExists?: boolean } = {},
   ): Promise<void> {
-    const override = this._adapterOverride("removeCheckConstraint");
-    if (override) return override(tableName, expressionOrOptions, options);
     // Mirrors Rails remove_check_constraint(table, expression = nil, **options):
     // resolve the live constraint via check_constraint_for! (by :name, else the
     // hash of the expression) and drop it by its real name — mirroring how
@@ -1027,8 +962,6 @@ export class SchemaStatements {
   }
 
   async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
-    const override = this._adapterOverride("addTimestamps");
-    if (override) return override(tableName, options);
     const fragments = await this.addTimestampsForAlter(tableName, options);
     await this.adapter.execute(`ALTER TABLE ${this._qt(tableName)} ${fragments.join(", ")}`);
   }
@@ -1142,10 +1075,6 @@ export class SchemaStatements {
         "You must specify at least one column name. Example: remove_columns(:people, :first_name)",
       );
     }
-    const override = this._adapterOverride("removeColumns") as
-      | ((tableName: string, ...columns: string[]) => Promise<void>)
-      | undefined;
-    if (override) return override(tableName, ...columns);
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     const fragments = this.removeColumnsForAlter(tableName, columns, { ...opts } as Record<
       string,
@@ -1445,8 +1374,6 @@ export class SchemaStatements {
   }
 
   async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
-    const override = this._adapterOverride("foreignKeys");
-    if (override) return override(tableName);
     return [];
   }
 
@@ -1817,8 +1744,6 @@ export class SchemaStatements {
   }
 
   async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
-    const override = this._adapterOverride("checkConstraints");
-    if (override) return override(tableName);
     throw new Error("NotImplementedError: checkConstraints is not implemented");
   }
 
