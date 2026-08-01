@@ -25,7 +25,7 @@ export type { AdapterName } from "./connection-adapters/abstract-adapter.js";
 export type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 export type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 export { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
-export { Migration, MigrationContext, SchemaContext } from "./migration.js";
+export { Migration, MigrationContext } from "./migration.js";
 export {
   TableDefinition,
   Table,

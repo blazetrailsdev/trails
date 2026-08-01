@@ -1,6 +1,6 @@
-import type { MigrationContext } from "@blazetrails/activerecord";
+import type { DatabaseAdapter } from "@blazetrails/activerecord";
 
-export default async function defineSchema(ctx: MigrationContext) {
+export default async function defineSchema(ctx: DatabaseAdapter) {
   await ctx.createTable("follows", { force: "cascade" }, (t) => {
     t.integer("follower_id");
     t.integer("followee_id");
