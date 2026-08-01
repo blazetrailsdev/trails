@@ -2515,9 +2515,11 @@ export class Migrator {
     }
     await this._ensureSchemaTable();
     await this.recordEnvironment();
-    return this.isDown()
-      ? this._migrateDown(this._targetVersion)
-      : this._migrateUp(this._targetVersion);
+    const runnable = await this.runnable();
+    for (const proxy of runnable) {
+      await this.executeMigrationInTransaction(proxy);
+    }
+    return runnable;
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#up? */
@@ -2572,11 +2574,8 @@ export class Migrator {
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#execute_migration_in_transaction */
-  async executeMigrationInTransaction(
-    proxy: MigrationProxy,
-    direction: "up" | "down" = "up",
-  ): Promise<void> {
-    await this._runMigration(proxy, direction);
+  async executeMigrationInTransaction(proxy: MigrationProxy): Promise<void> {
+    await this._runMigration(proxy, this._direction);
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#target */
@@ -3045,36 +3044,6 @@ export class Migrator {
     } finally {
       this._invalidateMigrated();
     }
-  }
-
-  private async _migrateUp(targetVersion: number | string | null): Promise<MigrationProxy[]> {
-    const target = targetVersion !== null ? BigInt(targetVersion) : null;
-    const applied = await this.migrated();
-    const ran: MigrationProxy[] = [];
-
-    for (const proxy of this._migrations) {
-      if (applied.has(proxy.version)) continue;
-      if (target !== null && BigInt(proxy.version) > target) break;
-      await this._runMigration(proxy, "up");
-      ran.push(proxy);
-    }
-    return ran;
-  }
-
-  private async _migrateDown(targetVersion: number | string | null): Promise<MigrationProxy[]> {
-    // A null target means "revert everything" (Rails: a `:down` Migrator with no
-    // target_version), which — unlike `down(0)` — also reverts a version-0
-    // migration.
-    const target = targetVersion !== null ? BigInt(targetVersion) : null;
-    const applied = await this.migrated();
-    const toRevert = this._migrations
-      .filter((m) => applied.has(m.version) && (target === null || BigInt(m.version) > target))
-      .reverse();
-
-    for (const proxy of toRevert) {
-      await this._runMigration(proxy, "down");
-    }
-    return toRevert;
   }
 
   private async _runMigration(proxy: MigrationProxy, direction: "up" | "down"): Promise<void> {
