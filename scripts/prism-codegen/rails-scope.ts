@@ -54,7 +54,9 @@ export function mixinPathCandidates(fromRel: string, moduleName: string): string
   return [...new Set([nested, sibling, tail])];
 }
 
-const MODULE_DECL = /^([ \t]*)(?:module|class)[ \t]+([A-Z][\w:]*)[ \t]*(?:<[^<]|#|$)/;
+const MODULE_DECL = /^([ \t]*)(?:module|class)[ \t]+([A-Z][\w:]*)[ \t]*(?:<[^<]|;|$)/;
+const HEREDOC_OPEN = /<<[-~]?([A-Z_]+)/;
+const COMMENT = /#(?!\{).*$/;
 
 /**
  * The full constant paths a Ruby source defines, e.g. `active_record/
@@ -63,15 +65,26 @@ const MODULE_DECL = /^([ \t]*)(?:module|class)[ \t]+([A-Z][\w:]*)[ \t]*(?:<[^<]|
  * consistently, and an `end`-counting scanner has to model every block-opening
  * keyword to stay in sync, where a miscount silently corrupts every later path.
  *
- * The declaration pattern's trailing alternation keeps `class << self` out — a
- * singleton body defines no constant — while admitting the `# :nodoc:` comment
- * most Rails declarations carry and the `< Superclass` of a class.
+ * Comments are stripped before matching and heredoc bodies are skipped
+ * wholesale: a `module Foo` line inside an embedded SQL/Ruby string defines
+ * nothing, and pushing it would corrupt every path derived after it. The
+ * declaration pattern's trailing alternation keeps `class << self` out — a
+ * singleton body defines no constant — while admitting the `< Superclass` of a
+ * class and the `; end` of a one-line declaration.
  */
 function moduleDefinitionPaths(rubySource: string): Set<string> {
   const paths = new Set<string>();
   const stack: { indent: number; name: string }[] = [];
+  let heredoc: string | undefined;
   for (const line of rubySource.split("\n")) {
-    const m = MODULE_DECL.exec(line);
+    if (heredoc !== undefined) {
+      if (line.trim() === heredoc) heredoc = undefined;
+      continue;
+    }
+    const code = line.replace(COMMENT, "");
+    const opened = HEREDOC_OPEN.exec(code);
+    if (opened) heredoc = opened[1];
+    const m = MODULE_DECL.exec(code);
     if (!m) continue;
     const indent = m[1].replace(/\t/g, "  ").length;
     while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();

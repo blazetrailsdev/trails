@@ -108,6 +108,28 @@ describe("prism-codegen rails scope", () => {
     expect(resolveMixinPath("base.rb", "QueryCache::ClassMethods", read)).toBe("query_cache.rb");
   });
 
+  it("ignores a module line inside a heredoc body", () => {
+    const read: RubySourceReader = (rel) =>
+      rel === "sanitization.rb"
+        ? [
+            "module ActiveRecord",
+            "  QUERY = <<~SQL",
+            "module Decoy",
+            "  SQL",
+            "  module Sanitization",
+            "  end",
+            "end",
+          ].join("\n")
+        : undefined;
+    expect(resolveMixinPath("base.rb", "ActiveRecord::Sanitization", read)).toBe("sanitization.rb");
+  });
+
+  it("resolves a one-line module declaration", () => {
+    const read: RubySourceReader = (rel) =>
+      rel === "no_touching.rb" ? "module ActiveRecord\n  module NoTouching; end\nend" : undefined;
+    expect(resolveMixinPath("base.rb", "NoTouching", read)).toBe("no_touching.rb");
+  });
+
   it("reports a mixin constant no file in the corpus defines", () => {
     resetUnresolvedMixins();
     const read: RubySourceReader = () => undefined;
