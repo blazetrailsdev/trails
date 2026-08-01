@@ -28,7 +28,7 @@ import { fixtures } from "./test-fixtures.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 
 /** The env name `record_environment` stamps: `connection.pool.db_config.env_name`. */
-function poolEnvName(adapter: DatabaseAdapter): string {
+function envName(adapter: DatabaseAdapter): string {
   return (adapter.pool as { dbConfig: { envName: string } }).dbConfig.envName;
 }
 
@@ -74,7 +74,7 @@ describe("Migrator trails extensions", () => {
     });
     await migrator.up();
     const env = await migrator.internalMetadata.get("environment");
-    expect(env).toBe(poolEnvName(adapter));
+    expect(env).toBe(envName(adapter));
   });
 
   it("up and down raise UnknownMigrationVersionError for an unknown target", async () => {
