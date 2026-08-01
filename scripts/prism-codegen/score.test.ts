@@ -208,6 +208,17 @@ describe("prism-codegen scorer", () => {
     expect(idx.byName.get("findBy")).toBe(idx.byName.get("performFindBy"));
   });
 
+  it("ignores local helper arrows declared inside a function body", () => {
+    const idx = indexPortFile(`
+      export function loadTarget(this: R): unknown {
+        const findBy = (c: unknown) => this.scope(c);
+        return findBy(1);
+      }
+    `);
+    expect(idx.byName.has("loadTarget")).toBe(true);
+    expect(idx.byName.has("findBy")).toBe(false);
+  });
+
   it("matches a generated body against a const arrow port", async () => {
     const score = await scoreRuby(
       `def take_one(list)
