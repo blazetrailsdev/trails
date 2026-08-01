@@ -181,6 +181,87 @@ describe("prism-codegen scorer", () => {
     ]);
   });
 
+  it("indexes object-literal getters and setters as ports", () => {
+    const idx = indexPortFile(`
+      export const AttributeMethods = {
+        set readonly(value: boolean) {
+          this._readonly = value;
+        },
+        get readonly(): boolean {
+          return this._readonly;
+        },
+        get name(): string { return this._name; },
+      };
+    `);
+    expect(idx.byName.has("name")).toBe(true);
+    expect(idx.byName.get("readonly")!.parameters.length).toBe(0);
+  });
+
+  it("indexes const arrow ports, including through mixin indirection", () => {
+    const idx = indexPortFile(`
+      export const performFindBy = async (this: R, c: unknown): Promise<any> => {
+        return this.where(c).limit(1).toArray();
+      };
+      export const FinderMethods = { findBy: performFindBy };
+    `);
+    expect(idx.byName.has("performFindBy")).toBe(true);
+    expect(idx.byName.get("findBy")).toBe(idx.byName.get("performFindBy"));
+  });
+
+  it("ignores local helper arrows declared inside a function body", () => {
+    const idx = indexPortFile(`
+      export function loadTarget(this: R): unknown {
+        const findBy = (c: unknown) => this.scope(c);
+        return findBy(1);
+      }
+    `);
+    expect(idx.byName.has("loadTarget")).toBe(true);
+    expect(idx.byName.has("findBy")).toBe(false);
+  });
+
+  it("matches a generated body against a const arrow port", async () => {
+    const score = await scoreRuby(
+      `def take_one(list)
+         if list.empty?
+           raise ArgumentError.new("empty")
+         end
+         list.first
+       end`,
+      `export const takeOne = (list: unknown[]): unknown => {
+         if (list.empty()) {
+           throw new ArgumentError("empty");
+         }
+         return list.first;
+       };`,
+    );
+    expect(score.entries).toEqual([
+      expect.objectContaining({ name: "takeOne", status: "matched" }),
+    ]);
+  });
+
+  it("keeps a predicate fallback off an accessor of a different arity", () => {
+    const port = `
+      export const AttributeMethods = {
+        get readonly(): boolean { return this._readonly; },
+      };
+    `;
+    const missing = scoreFile(
+      `function isReadonly(value) { return value; }`,
+      port,
+      new Set(["isReadonly"]),
+    );
+    expect(missing.entries).toEqual([{ name: "isReadonly", status: "missing" }]);
+
+    const hit = scoreFile(
+      `function isReadonly() { return this._readonly; }`,
+      port,
+      new Set(["isReadonly"]),
+    );
+    expect(hit.entries).toEqual([
+      expect.objectContaining({ name: "isReadonly", status: "matched" }),
+    ]);
+  });
+
   it("only scores clean defs — tainted ones stay out of the denominator", async () => {
     const score = await scoreRuby(
       `def tainted(a); a <=> 1; end`,

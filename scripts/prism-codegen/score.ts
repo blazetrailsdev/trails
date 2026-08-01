@@ -25,6 +25,20 @@ interface PortIndex {
   byName: Map<string, ts.FunctionLikeDeclaration>;
 }
 
+/**
+ * True when a variable declaration sits directly in the module body — a local
+ * helper arrow inside some unrelated function is not a port symbol and must not
+ * shadow one.
+ */
+function isTopLevelDeclaration(node: ts.VariableDeclaration): boolean {
+  const statement = node.parent?.parent;
+  return (
+    !!statement &&
+    ts.isVariableStatement(statement) &&
+    (ts.isSourceFile(statement.parent) || ts.isModuleBlock(statement.parent))
+  );
+}
+
 export function indexPortFile(source: string): PortIndex {
   const sf = ts.createSourceFile("port.ts", source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TS);
   const fns = new Map<string, ts.FunctionLikeDeclaration>();
@@ -37,6 +51,26 @@ export function indexPortFile(source: string): PortIndex {
     }
     if (ts.isMethodDeclaration(node) && ts.isIdentifier(node.name) && node.body) {
       if (!byName.has(node.name.text)) byName.set(node.name.text, node);
+    }
+    if (
+      (ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node)) &&
+      ts.isIdentifier(node.name) &&
+      node.body
+    ) {
+      const existing = byName.get(node.name.text);
+      const getterOverSetter =
+        !!existing && ts.isSetAccessorDeclaration(existing) && ts.isGetAccessorDeclaration(node);
+      if (!existing || getterOverSetter) byName.set(node.name.text, node);
+    }
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer)) &&
+      isTopLevelDeclaration(node)
+    ) {
+      fns.set(node.name.text, node.initializer);
+      if (!byName.has(node.name.text)) byName.set(node.name.text, node.initializer);
     }
     ts.forEachChild(node, visit);
   };
