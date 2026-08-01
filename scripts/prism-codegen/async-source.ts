@@ -1,22 +1,15 @@
 import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
 import { rubyFileToTs, methodName } from "./naming.js";
-import { TARGET_FILES, TRAILS_AR_SRC, portTreeFiles, rubyAbsPath, type PortFile } from "./files.js";
+import { TRAILS_AR_SRC, portTreeFiles, type PortFile } from "./files.js";
+import { ownRailsDefs, reachableRailsDefs } from "./rails-scope.js";
 import { resolvePath } from "../../vendor/sources.js";
 const AR_ROOT = resolvePath("activerecord");
 const AR_LIB = path.dirname(AR_ROOT);
-const RUBY_DEF = /^\s*def\s+(?:self\.)?([A-Za-z_][\w]*[?!=]?)/gm;
-export function rubyDefinedMethods(rubySource: string): Set<string> {
-  const defs = new Set<string>();
-  for (const m of rubySource.matchAll(RUBY_DEF)) defs.add(methodName(m[1]));
-  return defs;
-}
+export { rubyDefinedMethods } from "./rails-scope.js";
 function railsSource(railsRelPath: string): string {
   const abs = path.join(AR_LIB, railsRelPath);
   return existsSync(abs) ? readFileSync(abs, "utf8") : "";
-}
-function railsDefinedMethods(railsRelPath: string): Set<string> {
-  return rubyDefinedMethods(railsSource(railsRelPath));
 }
 const ASYNC_DECL = /\basync\s+(?:function\s+)?([A-Za-z_$][\w$]*)\s*[(<]/g;
 const ASYNC_ARROW = /\b(?:export\s+)?const\s+([A-Za-z_$][\w$]*)\s*=\s*async\b/g;
@@ -194,25 +187,6 @@ export function defaultAsyncManifest(): AsyncManifest {
   manifestCache ??= buildAsyncManifest(portTreeFiles());
   return manifestCache;
 }
-let railsCorpusDefsCache: Set<string> | undefined;
-/**
- * Every method Rails defines across the codegen target set. A cross-file async
- * name only earns an await when it is also a Rails method — that keeps
- * incidental TS-only helpers (and same-named library calls) out of the
- * receiver-blind await rule, the same intersect-with-Rails-defs guard the
- * relation.ts supplement has always used.
- */
-function railsCorpusDefs(): Set<string> {
-  if (railsCorpusDefsCache) return railsCorpusDefsCache;
-  const defs = new Set<string>();
-  for (const f of TARGET_FILES) {
-    const abs = rubyAbsPath(f);
-    if (!existsSync(abs)) continue;
-    for (const n of rubyDefinedMethods(readFileSync(abs, "utf8"))) defs.add(n);
-  }
-  railsCorpusDefsCache = defs;
-  return defs;
-}
 export function asyncMethodsForRailsFile(
   railsRelPath: string,
   manifest: AsyncManifest = defaultAsyncManifest(),
@@ -225,8 +199,11 @@ export function asyncMethodsForRailsFile(
   return resolveAsyncNames({
     twinTs,
     relationTs: relationFamily ? readFileOr(path.join(TRAILS_AR_SRC, "relation.ts")) : undefined,
-    ownRubyDefs: relationFamily ? railsDefinedMethods(railsRelPath) : undefined,
-    crossFile: crossFileAsyncNames(manifest, { twinTsPath, railsDefs: railsCorpusDefs() }),
+    ownRubyDefs: relationFamily ? ownRailsDefs(railsRelPath) : undefined,
+    crossFile: crossFileAsyncNames(manifest, {
+      twinTsPath,
+      railsDefs: reachableRailsDefs(railsRelPath),
+    }),
     inferFromRuby: existsSync(twinTsAbs) ? undefined : railsSource(railsRelPath),
   });
 }
