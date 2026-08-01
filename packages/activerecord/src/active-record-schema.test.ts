@@ -72,10 +72,9 @@ describe("ActiveRecordSchemaTest", () => {
   it("schema version accessor", () => {
     // Migration instances have a version property
     class V1 extends Migration {
-      static version = "20230101000000";
       async change() {}
     }
-    const m = new V1();
+    const m = new V1(undefined, "20230101000000");
     expect(m.version).toBe("20230101000000");
   });
 
@@ -128,12 +127,11 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   it("normalize version", () => {
-    // Migration version is derived from static property or class name
+    // Migration version comes from the constructor (Rails: initialize(name, version)).
     class NormalMig extends Migration {
-      static version = "001";
       async change() {}
     }
-    expect(new NormalMig().version).toBe("001");
+    expect(new NormalMig(undefined, "001").version).toBe("001");
   });
 
   it("schema load with multiple indexes for column of different names", async () => {

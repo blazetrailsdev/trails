@@ -1270,11 +1270,10 @@ export abstract class Migration {
   /**
    * Get the migration version. Rails initializes `@version` to nil
    * (`migration.rb:799`) — only `@name` defaults to the class name — so an
-   * unversioned migration has no version. The static hook is the trails path
-   * for compatibility classes that declare one.
+   * unversioned migration has no version.
    */
   get version(): string | undefined {
-    return this._version ?? (this.constructor as any).version;
+    return this._version;
   }
 
   // --- Logging (Rails: Migration#write, #announce, #say, #say_with_time, #suppress_messages) ---

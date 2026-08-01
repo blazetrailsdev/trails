@@ -1933,44 +1933,38 @@ describe("MigrationTest", () => {
   describe("CopyMigrationsTest", () => {
     it("copying migrations without timestamps", () => {
       class CM1 extends Migration {
-        static version = "001";
         async change() {}
       }
-      expect(new CM1().version).toBe("001");
+      expect(new CM1(undefined, "001").version).toBe("001");
     });
 
     it("copying migrations without timestamps from 2 sources", () => {
       class CM1 extends Migration {
-        static version = "001";
         async change() {}
       }
       class CM2 extends Migration {
-        static version = "002";
         async change() {}
       }
-      expect(new CM1().version).toBe("001");
-      expect(new CM2().version).toBe("002");
+      expect(new CM1(undefined, "001").version).toBe("001");
+      expect(new CM2(undefined, "002").version).toBe("002");
     });
 
     it("copying migrations with timestamps", () => {
       class CM1 extends Migration {
-        static version = "20230101120000";
         async change() {}
       }
-      expect(new CM1().version).toBe("20230101120000");
+      expect(new CM1(undefined, "20230101120000").version).toBe("20230101120000");
     });
 
     it("copying migrations with timestamps from 2 sources", () => {
       class CM1 extends Migration {
-        static version = "20230101120000";
         async change() {}
       }
       class CM2 extends Migration {
-        static version = "20230201120000";
         async change() {}
       }
-      expect(new CM1().version).toBe("20230101120000");
-      expect(new CM2().version).toBe("20230201120000");
+      expect(new CM1(undefined, "20230101120000").version).toBe("20230101120000");
+      expect(new CM2(undefined, "20230201120000").version).toBe("20230201120000");
     });
 
     it("copying migrations with timestamps to destination with timestamps in future", async () => {
@@ -2031,10 +2025,9 @@ describe("MigrationTest", () => {
 
     it("skipping migrations", () => {
       class CM1 extends Migration {
-        static version = "001";
         async change() {}
       }
-      expect(new CM1().version).toBe("001");
+      expect(new CM1(undefined, "001").version).toBe("001");
       expect(new CM1().name).toBe("CM1");
     });
 
@@ -2107,7 +2100,6 @@ describe("MigrationTest", () => {
     it("check pending with stdlib logger", async () => {
       const cpAdapter = await freshAdapter();
       class CPM1 extends Migration {
-        static version = "001";
         async change() {
           await this.createTable("pend_t", (t) => {
             t.string("x");
@@ -2115,7 +2107,7 @@ describe("MigrationTest", () => {
         }
       }
       const { MigrationRunner } = await import("./migrator.js");
-      const runner = new MigrationRunner(cpAdapter, [new CPM1()]);
+      const runner = new MigrationRunner(cpAdapter, [new CPM1(undefined, "001")]);
       const status = await runner.status();
       expect(status.length).toBe(1);
       expect(status[0].status).toBe("down");
@@ -2129,10 +2121,9 @@ describe("MigrationTest", () => {
       it("migration raises if timestamp greater than 14 digits", () => {
         // Version strings longer than 14 chars are still stored as-is
         class LongV extends Migration {
-          static version = "123456789012345";
           async change() {}
         }
-        expect(new LongV().version).toBe("123456789012345");
+        expect(new LongV(undefined, "123456789012345").version).toBe("123456789012345");
       });
 
       it("migration raises if timestamp is future date", () => {
@@ -2157,26 +2148,23 @@ describe("MigrationTest", () => {
         const now = Date.now();
         const ts = String(now);
         class FutureM extends Migration {
-          static version = ts;
           async change() {}
         }
-        expect(new FutureM().version).toBe(ts);
+        expect(new FutureM(undefined, ts).version).toBe(ts);
       });
 
       it("migration succeeds despite future timestamp if validate timestamps is false", () => {
         class FutureM2 extends Migration {
-          static version = "99991231235959";
           async change() {}
         }
-        expect(new FutureM2().version).toBe("99991231235959");
+        expect(new FutureM2(undefined, "99991231235959").version).toBe("99991231235959");
       });
 
       it("migration succeeds despite future timestamp if timestamped migrations is false", () => {
         class NoTs extends Migration {
-          static version = "99999999999999";
           async change() {}
         }
-        expect(new NoTs().version).toBe("99999999999999");
+        expect(new NoTs(undefined, "99999999999999").version).toBe("99999999999999");
       });
 
       it("copied migrations at timestamp boundary are valid", async () => {
@@ -2369,9 +2357,8 @@ describeIfMysqlAdapter("BulkAlterTableMigrationsTest", () => {
 function mockMigration(): { migration: Migration; sql: string[] } {
   const sql: string[] = [];
   const migration = new (class extends Migration {
-    static version = "20240101000000";
     async change() {}
-  })();
+  })(undefined, "20240101000000");
   (migration as any).adapter = {
     execute: async () => [],
     executeMutation: async (s: string) => {
