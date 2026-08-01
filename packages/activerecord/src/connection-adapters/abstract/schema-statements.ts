@@ -704,19 +704,19 @@ export class SchemaStatements {
       let rows: Record<string, unknown>[];
       switch (this.adapterName) {
         case "sqlite":
-          rows = await this.adapter.execute(
+          rows = await this.adapter.schemaQuery(
             `SELECT name FROM sqlite_master WHERE type='table' AND name=${quoted}`,
           );
           break;
         case "postgres":
           // Rails' PG data_source_sql scopes to ANY (current_schemas(false))
           // (the active search_path), not a hardcoded 'public'.
-          rows = await this.adapter.execute(
+          rows = await this.adapter.schemaQuery(
             `SELECT 1 FROM information_schema.tables WHERE table_schema = ANY (current_schemas(false)) AND table_name = ${quoted} LIMIT 1`,
           );
           break;
         case "mysql":
-          rows = await this.adapter.execute(
+          rows = await this.adapter.schemaQuery(
             `SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ${quoted} LIMIT 1`,
           );
           break;
@@ -1177,7 +1177,9 @@ export class SchemaStatements {
     switch (this.adapterName) {
       case "sqlite": {
         const { prefix, bare } = this._sqliteSchemaPrefix(tableName);
-        const rows = await this.adapter.execute(`PRAGMA ${prefix}table_info(${this._qi(bare)})`);
+        const rows = await this.adapter.schemaQuery(
+          `PRAGMA ${prefix}table_info(${this._qi(bare)})`,
+        );
         return rows.map((row: any) => {
           const meta = deduplicate(new SqlTypeMetadata({ sqlType: row.type, type: row.type }));
           return new Column(row.name, row.dflt_value, meta, row.notnull === 0, {
@@ -1199,7 +1201,7 @@ export class SchemaStatements {
         } else {
           schemaClause = "ANY (current_schemas(false))";
         }
-        const rows = await this.adapter.execute(
+        const rows = await this.adapter.schemaQuery(
           `SELECT c.column_name, c.data_type, c.udt_name, c.character_maximum_length, c.numeric_precision, c.numeric_scale, c.is_nullable, c.column_default,
             CASE WHEN pk.attname IS NOT NULL THEN true ELSE false END AS is_primary_key
           FROM information_schema.columns c
@@ -1243,7 +1245,7 @@ export class SchemaStatements {
         });
       }
       case "mysql": {
-        const rows = await this.adapter.execute(
+        const rows = await this.adapter.schemaQuery(
           `SELECT column_name, column_key, data_type, character_maximum_length, numeric_precision, numeric_scale, is_nullable, column_default FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? ORDER BY ordinal_position`,
           [tableName],
         );
@@ -1322,7 +1324,7 @@ export class SchemaStatements {
         // key has attnum 0 with no pg_attribute row, so an inner join would drop
         // the entire index. LEFT JOIN keeps the row (attname NULL) so the
         // has_expressions arm can substitute the raw pg_get_indexdef expression.
-        const rows = await this.adapter.execute(
+        const rows = await this.adapter.schemaQuery(
           `SELECT i.relname AS name, ix.indisunique AS unique, array_agg(a.attname ORDER BY k.n) AS columns,
                   bool_or(ix.indexprs IS NOT NULL) AS has_expressions,
                   pg_get_indexdef(i.oid) AS definition
@@ -1379,7 +1381,7 @@ export class SchemaStatements {
         });
       }
       case "mysql": {
-        const rows = await this.adapter.execute(
+        const rows = await this.adapter.schemaQuery(
           `SHOW INDEX FROM ${this._qt(tableName)} WHERE Key_name != 'PRIMARY'`,
         );
         const indexMap = new Map<
@@ -1420,19 +1422,21 @@ export class SchemaStatements {
     switch (this.adapterName) {
       case "sqlite": {
         const { prefix, bare } = this._sqliteSchemaPrefix(tableName);
-        const rows = await this.adapter.execute(`PRAGMA ${prefix}table_info(${this._qi(bare)})`);
+        const rows = await this.adapter.schemaQuery(
+          `PRAGMA ${prefix}table_info(${this._qi(bare)})`,
+        );
         const pk = (rows as any[]).find((r: any) => r.pk > 0);
         return pk ? pk.name : null;
       }
       case "postgres": {
-        const rows = await this.adapter.execute(
+        const rows = await this.adapter.schemaQuery(
           `SELECT a.attname FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) WHERE i.indrelid = to_regclass($1) AND i.indisprimary LIMIT 1`,
           [tableName],
         );
         return rows.length > 0 ? (rows[0] as any).attname : null;
       }
       case "mysql": {
-        const rows = await this.adapter.execute(
+        const rows = await this.adapter.schemaQuery(
           `SHOW KEYS FROM \`${tableName}\` WHERE Key_name = 'PRIMARY'`,
         );
         return rows.length > 0 ? (rows[0] as any).Column_name : null;
@@ -1450,7 +1454,7 @@ export class SchemaStatements {
     let rows: Record<string, unknown>[];
     switch (this.adapterName) {
       case "sqlite":
-        rows = await this.adapter.execute(
+        rows = await this.adapter.schemaQuery(
           `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
         );
         return (rows as any[]).map((r: any) => r.name);
@@ -1460,12 +1464,12 @@ export class SchemaStatements {
         // (relkind 'p') and hardcodes 'public'; pg_class scoped via
         // current_schemas(false) honors the search_path like Rails. No
         // ORDER BY — Rails' data_source_sql emits none.
-        rows = await this.adapter.execute(
+        rows = await this.adapter.schemaQuery(
           `SELECT c.relname AS name FROM pg_class c LEFT JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = ANY (current_schemas(false)) AND c.relkind IN ('r', 'p')`,
         );
         return (rows as any[]).map((r: any) => r.name);
       case "mysql":
-        rows = await this.adapter.execute(
+        rows = await this.adapter.schemaQuery(
           `SELECT table_name AS name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE' ORDER BY table_name`,
         );
         return (rows as any[]).map((r: any) => r.name ?? r.TABLE_NAME);
@@ -1479,17 +1483,17 @@ export class SchemaStatements {
     let rows: Record<string, unknown>[];
     switch (this.adapterName) {
       case "sqlite":
-        rows = await this.adapter.execute(
+        rows = await this.adapter.schemaQuery(
           `SELECT name FROM sqlite_master WHERE type='view' ORDER BY name`,
         );
         return (rows as any[]).map((r: any) => r.name);
       case "postgres":
-        rows = await this.adapter.execute(
+        rows = await this.adapter.schemaQuery(
           `SELECT viewname AS name FROM pg_views WHERE schemaname = 'public' ORDER BY viewname`,
         );
         return (rows as any[]).map((r: any) => r.name);
       case "mysql":
-        rows = await this.adapter.execute(
+        rows = await this.adapter.schemaQuery(
           `SELECT table_name AS name FROM information_schema.views WHERE table_schema = DATABASE() ORDER BY table_name`,
         );
         return (rows as any[]).map((r: any) => r.name ?? r.TABLE_NAME);
