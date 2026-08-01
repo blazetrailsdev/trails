@@ -1750,7 +1750,8 @@ export class SchemaStatements {
   }
 
   async checkConstraints(_tableName: string): Promise<CheckConstraintDefinition[]> {
-    throw new Error("NotImplementedError: checkConstraints is not implemented");
+    // @nie disposition=TODO
+    throw new NotImplementedError();
   }
 
   checkConstraintOptions(
@@ -1781,7 +1782,7 @@ export class SchemaStatements {
         return false;
       });
     } catch (e) {
-      if (e instanceof Error && e.message.startsWith("NotImplementedError")) return false;
+      if (e instanceof NotImplementedError) return false;
       throw e;
     }
   }
