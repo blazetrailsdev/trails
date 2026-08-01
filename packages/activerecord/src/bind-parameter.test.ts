@@ -14,6 +14,7 @@ import { Base, RecordNotFound } from "./index.js";
 import { registerModel } from "./associations.js";
 import { fixtures } from "./test-fixtures.js";
 import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
+import { currentAdapter } from "./support/adapter-helper.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Author } from "./test-helpers/models/author.js";
 import { Post } from "./test-helpers/models/post.js";
@@ -410,9 +411,9 @@ describe("BindParameterTest", () => {
   // Deliberate deviation: trails' `to_sql` always inlines bind values (it mirrors
   // Rails' *unprepared* `to_sql` even when prepared_statements is on — see
   // database-statements.ts), so we drive an inlining SubstituteBinds collector
-  // here regardless of mode. That renders the IN-list the same way `to_sql` does
-  // (`1, 2, 3`) so the expected SQL matches on every adapter.
-  function bindParams(conn: any, ids: number[]): string {
+  // here regardless of mode. That renders the IN-list the same way `to_sql` does,
+  // on every adapter and in both modes.
+  function bindParams(conn: any, ids: (number | string)[]): string {
     const collector = new Collectors.SubstituteBinds(conn, new Collectors.SQLString());
     return conn.visitor.compile(
       ids.map((i) => new Nodes.BindParam(i)),
@@ -436,7 +437,13 @@ describe("BindParameterTest", () => {
     // a distinct gap from this story's bind_params_to_sql collector, tracked
     // separately as story `array-where-integer-range-exclusion`.
 
-    sql = `SELECT ${table}.* FROM ${table} WHERE ${pk} IN (${bindParams(conn, [1, 2, 3])})`;
+    // Rails (bind_parameter_test.rb:240-246): "With MySQL integers are casted as
+    // string for security" — `mysql/quoting.rb#cast_bound_value`, which
+    // `visit_Arel_Nodes_BoundSqlLiteral` applies to every array element.
+    const params = currentAdapter("Mysql2Adapter", "TrilogyAdapter")
+      ? bindParams(conn, ["1", "2", "3"])
+      : bindParams(conn, [1, 2, 3]);
+    sql = `SELECT ${table}.* FROM ${table} WHERE ${pk} IN (${params})`;
     const arelNode = new Nodes.BoundSqlLiteral(
       `SELECT ${table}.* FROM ${table} WHERE ${pk} IN (?)`,
       [[1, 2, 3]],
