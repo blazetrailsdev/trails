@@ -9,7 +9,7 @@ import { AbstractAdapter } from "../abstract-adapter.js";
 import { NotImplementedError } from "../../errors.js";
 
 function makeStatements(adapterOverrides: Record<string, unknown> = {}) {
-  return new SchemaStatements({
+  const adapter: Record<string, unknown> = {
     adapterName: "sqlite" as const,
     quoteIdentifier: (n: string) => `"${n}"`,
     quoteTableName: (n: string) => `"${n}"`,
@@ -22,7 +22,18 @@ function makeStatements(adapterOverrides: Record<string, unknown> = {}) {
     lookupCastType: (sqlType: string | null) => AbstractAdapter.TYPE_MAP.lookup(sqlType),
     config: {},
     ...adapterOverrides,
-  } as any);
+  };
+  // Real hosts inherit AbstractAdapter#schemaQuery, which is `execute` tagged
+  // with the "SCHEMA" query name (Rails' `internal_exec_query(sql, "SCHEMA")`).
+  // Route the stub's through whichever `execute` this call installed so
+  // reflection probes stay visible to per-test `execute` spies.
+  adapter["schemaQuery"] ??= (sql: string, binds: unknown[] = []) =>
+    (adapter["execute"] as (s: string, b?: unknown[], n?: string) => Promise<unknown>)(
+      sql,
+      binds,
+      "SCHEMA",
+    );
+  return new SchemaStatements(adapter as any);
 }
 
 describe("SchemaStatements privates (PR 8)", () => {
