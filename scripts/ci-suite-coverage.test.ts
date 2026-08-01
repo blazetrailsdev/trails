@@ -51,6 +51,11 @@ const GATE_INPUTS: Record<string, string[]> = {
     "vendor/sources.ts",
     "vendor/sources.lock.json",
     "scripts/api-compare/config.ts",
+    // Inputs scripts/mysql-grant-namespaces.test.ts asserts over: the grant
+    // file it derives the namespaces from, and the CLI E2E suites it reads the
+    // ar_cli_e2e database prefix out of.
+    "scripts/db-init/mysql/01-rails-user.sql",
+    "packages/activerecord-cli/src/__e2e__/mysql-happy-path.test.ts",
   ],
 };
 

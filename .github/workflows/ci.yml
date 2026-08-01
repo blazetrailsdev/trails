@@ -107,7 +107,7 @@ jobs:
           # of whichever job runs its tests, or a change confined to it runs
           # nothing; scripts/ci-suite-coverage.test.ts enforces that pairing.
           INFRA_RE='^(pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig[^/]*\.json$|vitest[^/]*\.config\.ts$|scripts/|\.github/workflows/ci\.yml$|\.github/actions/)'
-          INFRA_CARVEOUT_RE='^scripts/((tasks|ci|guides-typecheck|rails-find|sync-stats|phase-g-hunt|fixtures-inventory|test-deps|__fixtures__|api-compare|test-compare|fixtures-compare|schema-compare|parity)/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|strip-asany|ci-suite-coverage|deprecated-manifest-diff)(\.test)?\.ts$)'
+          INFRA_CARVEOUT_RE='^scripts/((tasks|ci|guides-typecheck|rails-find|sync-stats|phase-g-hunt|fixtures-inventory|test-deps|__fixtures__|api-compare|test-compare|fixtures-compare|schema-compare|parity)/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|strip-asany|ci-suite-coverage|deprecated-manifest-diff|mysql-grant-namespaces)(\.test)?\.ts$)'
           # AR workspace deps: arel/activemodel/activesupport/globalid/
           # did-you-mean (per packages/activerecord/package.json). Also
           # consumes @blazetrails/trails-tsc at runtime via the tsc-wrapper
@@ -183,7 +183,7 @@ jobs:
           # eslint/no-raw-control-bytes.drift.test.mjs is a drift guard between
           # its byte set and the ESLint rule's, and scripts/ci/ is carved out
           # of the infra sweep (INFRA_CARVEOUT_RE).
-          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport)/|eslint/|scripts/(tasks|guides-typecheck|parity|api-compare|test-compare|fixtures-compare|test-deps|rails-find|sync-stats|prism-codegen)/|scripts/ci/check-control-bytes\.sh$|scripts/(strip-asany|rails-file-structure-mixins|ci-suite-coverage|deprecated-manifest-diff)(\.test)?\.ts$|eslint\.config\.mjs$|vendor/(sources\.ts|sources\.lock\.json|sources\.test\.ts|fetch\.ts)$)'
+          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport)/|eslint/|scripts/(tasks|guides-typecheck|parity|api-compare|test-compare|fixtures-compare|test-deps|rails-find|sync-stats|prism-codegen)/|scripts/ci/check-control-bytes\.sh$|scripts/(strip-asany|rails-file-structure-mixins|ci-suite-coverage|deprecated-manifest-diff|mysql-grant-namespaces)(\.test)?\.ts$|scripts/db-init/mysql/01-rails-user\.sql$|packages/activerecord-cli/src/__e2e__/|eslint\.config\.mjs$|vendor/(sources\.ts|sources\.lock\.json|sources\.test\.ts|fetch\.ts)$)'
           # guides_affected gates the Guides Code Type Check job, which
           # compiles fenced TS blocks in packages/website/docs/guides/**.
           # Today guides only import @blazetrails/activerecord,
@@ -696,6 +696,7 @@ jobs:
           scripts/rails-file-structure-mixins.test.ts
           scripts/deprecated-manifest-diff.test.ts
           scripts/ci-suite-coverage.test.ts
+          scripts/mysql-grant-namespaces.test.ts
           vendor/sources.test.ts
 
   # Consolidated leaf-test job. The cheapest sub-minute leaf suites — rack
