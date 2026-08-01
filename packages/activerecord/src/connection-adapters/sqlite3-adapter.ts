@@ -2116,10 +2116,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return rows.length > 0;
   }
 
-  async dataSourceExists(name: string): Promise<boolean> {
-    return this.schemaStatements().dataSourceExists(name);
-  }
-
   /**
    * Return the primary key for the named table: a single string for
    * scalar PKs, an array for composite PKs, or null for rowid-only

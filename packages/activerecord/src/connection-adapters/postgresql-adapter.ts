@@ -3509,10 +3509,6 @@ export class PostgreSQLAdapter
     return this.pgSchemaStatements().currentSchema();
   }
 
-  async dataSourceExists(name: string): Promise<boolean> {
-    return this.schemaStatements().dataSourceExists(name);
-  }
-
   quoteColumnName(name: string): string {
     return pgQuoteColumnName(name);
   }

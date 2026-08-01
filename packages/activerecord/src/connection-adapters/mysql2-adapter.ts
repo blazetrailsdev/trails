@@ -1517,10 +1517,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return this.informationSchemaExists(name, "VIEW");
   }
 
-  async dataSourceExists(name: string): Promise<boolean> {
-    return this.schemaStatements().dataSourceExists(name);
-  }
-
   private async informationSchemaExists(
     name: string,
     type: "BASE TABLE" | "VIEW",

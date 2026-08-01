@@ -263,11 +263,6 @@ describe("SQLite3Adapter schema introspection", () => {
 
     expect(await adapter.tableExists("aux.widgets")).toBe(true);
     expect(await adapter.tableExists("aux.missing")).toBe(false);
-
-    // `data_source_exists?` runs Rails' SQLite3 `data_source_sql`, which
-    // matches `pragma_table_list.name` — an unqualified name, listed for
-    // every attached schema. So the bare name resolves against aux while the
-    // qualified spelling never matches any row.
     expect(await adapter.dataSourceExists("widgets")).toBe(true);
     expect(await adapter.dataSourceExists("widget_view")).toBe(true);
     expect(await adapter.dataSourceExists("aux.widgets")).toBe(false);
