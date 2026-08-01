@@ -4,7 +4,12 @@ import {
   canRemoveIndexByName,
   indexNameForRemoveFrom,
 } from "./schema-statements.js";
-import { ForeignKeyDefinition, TableDefinition, type ColumnType } from "./schema-definitions.js";
+import {
+  CheckConstraintDefinition,
+  ForeignKeyDefinition,
+  TableDefinition,
+  type ColumnType,
+} from "./schema-definitions.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { NotImplementedError } from "../../errors.js";
 
@@ -210,7 +215,7 @@ describe("SchemaStatements privates (PR 8)", () => {
     const ss = makeStatements();
     const name = ss.checkConstraintName("users", { expression: "age > 0" });
     vi.spyOn(ss, "checkConstraints").mockResolvedValue([
-      { tableName: "users", expression: "age > 0", name, validate: true } as any,
+      new CheckConstraintDefinition("users", "age > 0", name),
     ]);
     await ss.addCheckConstraint("users", "age > 0", { ifNotExists: true });
     expect((ss as any).adapter.execute).not.toHaveBeenCalled();
