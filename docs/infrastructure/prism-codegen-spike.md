@@ -333,7 +333,11 @@ computes at runtime:
    (`send(:perform_save)`) or named inside a heredoc still reads as a call, and
    the marking is receiver-blind here too. The failure mode is a def marked
    `async` that emits no `await`, and the fixpoint can propagate that to its
-   same-file callers.
+   same-file callers. The body split also assumes a `def` is closed by an `end`
+   at its own column: Ruby's endless-method form (`def name(args) = expr`) has
+   no `end`, so its "body" would run forward to the next same-indent `end` and
+   merge unrelated methods. The vendored Rails corpus has zero such defs today,
+   so this is a latent gap rather than a live one.
 4. **Ruby stdlib idioms pass through untranslated.** `attributes.collect { }`,
    `arr.first`, `Array(x)`, `raise` — emitted verbatim; no runtime shim.
 5. **Metaprogramming is opaque.** `define_method`, `method_missing`, `send`,
