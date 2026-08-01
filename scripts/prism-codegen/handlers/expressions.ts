@@ -4,7 +4,7 @@ import type { Registry } from "../registry.js";
 import { methodName, isJsIdentName, isBindableIdent } from "../naming.js";
 import { rubyStr } from "../types.js";
 import { TOPLEVEL } from "../codegen.js";
-import { shouldAwaitCall } from "../await-policy.js";
+import { asyncBindingKey, hasAsyncProvenance, shouldAwaitCall } from "../await-policy.js";
 const f = ts.factory;
 const INFIX: Record<string, ts.BinaryOperator> = {
   "==": ts.SyntaxKind.EqualsEqualsEqualsToken,
@@ -43,11 +43,13 @@ export function registerExpressions(r: Registry): void {
   r.on("LocalVariableWriteNode", (n, e) => {
     if (!isBindableIdent(String(n.name))) return null;
     e.declared.add(String(n.name));
+    trackAsyncProvenance(n, e);
     return f.createAssignment(f.createIdentifier(String(n.name)), e.expr(n.value as PrismNode));
   });
-  r.on("InstanceVariableWriteNode", (n, e) =>
-    f.createAssignment(thisProp(n.name), e.expr(n.value as PrismNode)),
-  );
+  r.on("InstanceVariableWriteNode", (n, e) => {
+    trackAsyncProvenance(n, e);
+    return f.createAssignment(thisProp(n.name), e.expr(n.value as PrismNode));
+  });
   r.on("ClassVariableWriteNode", (n, e) =>
     f.createAssignment(
       f.createPropertyAccessExpression(
@@ -277,9 +279,24 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
     jsName,
     inAsyncMethod: e.inAsyncMethod,
     asyncMethods: e.asyncMethods,
+    asyncBindings: e.asyncBindings,
   })
     ? f.createAwaitExpression(call)
     : call;
+}
+/**
+ * Record — or retract — the write target's async provenance. A later
+ * assignment from a value of unknown type has to clear the key: the receiver
+ * is no longer pinned down, so awaiting its calls would be a guess again.
+ */
+function trackAsyncProvenance(n: PrismNode, e: Emitter): void {
+  const key = asyncBindingKey(n);
+  if (!key) return;
+  if (hasAsyncProvenance(n.value as PrismNode | null, methodName, e.asyncMethods)) {
+    e.asyncBindings.add(key);
+  } else {
+    e.asyncBindings.delete(key);
+  }
 }
 function symToProcArrow(prop: string): ts.ArrowFunction {
   return f.createArrowFunction(

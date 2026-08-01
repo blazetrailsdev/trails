@@ -56,6 +56,11 @@ export interface Emitter {
 
   blockParamName: string | null;
   readonly declared: Set<string>;
+  /**
+   * Receivers with locally established async provenance, keyed as
+   * `@ivar` / `local`. Scoped to the enclosing def, like `declared`.
+   */
+  readonly asyncBindings: Set<string>;
 }
 export interface Coverage {
   record(kind: string, handled: boolean): void;
