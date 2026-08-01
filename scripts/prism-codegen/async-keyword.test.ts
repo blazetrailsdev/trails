@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateFromSource } from "./index.js";
+import { generateFromSource, countAwaitsOutsideAsync } from "./index.js";
 
 async function gen(ruby: string, asyncMethods: string[]): Promise<string> {
   const { code } = await generateFromSource(ruby, new Set(asyncMethods));
@@ -40,6 +40,14 @@ describe("async keyword", () => {
     const code = await gen(ruby, ["a", "size"]);
     expect(code).toContain("await this.size()");
     expect(code).not.toContain("async a()");
+  });
+
+  it("marks a multi-statement block arrow async when its body awaits", async () => {
+    const ruby = "class R\n  def a\n    tx { assign(1); save() }\n  end\nend\n";
+    const code = await gen(ruby, ["a", "save"]);
+    expect(code).toContain("this.tx(async () => {");
+    expect(code).toContain("return await this.save()");
+    expect(countAwaitsOutsideAsync(code)).toBe(0);
   });
 
   it("leaves a constructor alone", async () => {
