@@ -207,6 +207,7 @@ const TOKEN_CANON: Record<string, string> = {
   toA: "toArray",
   size: "length",
   modelClass: "model",
+  arelTable: "table",
 };
 
 export function normalizeName(name: string): string {
