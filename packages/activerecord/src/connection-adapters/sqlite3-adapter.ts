@@ -2328,9 +2328,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     const caller = (definition: SQLite3TableDefinition): void => {
       for (const fk of fks) {
         const column = typeof fk.column === "string" ? (rename[fk.column] ?? fk.column) : fk.column;
-        // Rails strips the affixes off the reflected (physical) to_table so
-        // that new_foreign_key_definition can re-apply them
-        // (sqlite3_adapter.rb:573-575).
         const toTable = this.schemaStatements().stripTableNamePrefixAndSuffix(fk.toTable);
         definition.foreignKey(toTable, {
           column,
