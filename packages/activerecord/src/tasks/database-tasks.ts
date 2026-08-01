@@ -598,20 +598,19 @@ export class DatabaseTasks {
     }
 
     const { NoDatabaseError } = await import("../errors.js");
-    const { Migrator, EnvironmentMismatchError } = await import("../migration.js");
+    const { EnvironmentMismatchError } = await import("../migration.js");
 
     for (const config of configs) {
       try {
         await this.withTemporaryConnection(config, async (adapter) => {
-          const migrator = new Migrator(adapter, [], {
-            internalMetadataEnabled: config.useMetadataTable,
-          });
+          const migrator = await this._migratorFor(adapter, config);
+          const current = migrator.currentEnvironment;
           const stored = await migrator.lastStoredEnvironment();
-          if (stored && protectedEnvs.includes(stored)) {
+          if (stored && (await migrator.protectedEnvironment())) {
             throw new ProtectedEnvironmentError(stored);
           }
-          if (stored && stored !== envName) {
-            throw new EnvironmentMismatchError(envName, stored);
+          if (stored && stored !== current) {
+            throw new EnvironmentMismatchError(current, stored);
           }
         });
       } catch (error) {
