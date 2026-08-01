@@ -184,18 +184,16 @@ describe("prism-codegen scorer", () => {
   it("indexes object-literal getters and setters as ports", () => {
     const idx = indexPortFile(`
       export const AttributeMethods = {
-        get readonly(): boolean {
-          return this._readonly;
-        },
         set readonly(value: boolean) {
           this._readonly = value;
+        },
+        get readonly(): boolean {
+          return this._readonly;
         },
         get name(): string { return this._name; },
       };
     `);
-    expect(idx.byName.has("readonly")).toBe(true);
     expect(idx.byName.has("name")).toBe(true);
-    // The getter (arity 0) owns the shared name, not the setter.
     expect(idx.byName.get("readonly")!.parameters.length).toBe(0);
   });
 

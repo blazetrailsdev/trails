@@ -38,22 +38,21 @@ export function indexPortFile(source: string): PortIndex {
     if (ts.isMethodDeclaration(node) && ts.isIdentifier(node.name) && node.body) {
       if (!byName.has(node.name.text)) byName.set(node.name.text, node);
     }
-    // Ruby attr-style ports land as accessors. A getter and setter share one
-    // name, so the getter (the reader, arity 0) wins and the setter only fills
-    // an empty slot — resolvePortFn's arity guard sorts out the rest.
-    if (ts.isGetAccessorDeclaration(node) && ts.isIdentifier(node.name) && node.body) {
+    if (
+      (ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node)) &&
+      ts.isIdentifier(node.name) &&
+      node.body
+    ) {
       const existing = byName.get(node.name.text);
-      if (!existing || ts.isSetAccessorDeclaration(existing)) byName.set(node.name.text, node);
-    }
-    if (ts.isSetAccessorDeclaration(node) && ts.isIdentifier(node.name) && node.body) {
-      if (!byName.has(node.name.text)) byName.set(node.name.text, node);
+      const getterOverSetter =
+        !!existing && ts.isSetAccessorDeclaration(existing) && ts.isGetAccessorDeclaration(node);
+      if (!existing || getterOverSetter) byName.set(node.name.text, node);
     }
     if (
       ts.isVariableDeclaration(node) &&
       ts.isIdentifier(node.name) &&
       node.initializer &&
-      (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer)) &&
-      node.initializer.body
+      (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
     ) {
       fns.set(node.name.text, node.initializer);
       if (!byName.has(node.name.text)) byName.set(node.name.text, node.initializer);
