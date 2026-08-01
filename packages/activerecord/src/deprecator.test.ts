@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { MigrationProxy } from "./deprecator.js";
+import { Migration } from "./migration.js";
+
+class CreateUsers extends Migration {
+  async up(): Promise<void> {}
+}
 
 describe("MigrationProxy", () => {
   it("stores name, version, filename, scope", () => {
@@ -42,9 +47,31 @@ describe("MigrationProxy", () => {
     await expect(proxy.loadMigrationAsync()).rejects.toThrow();
   });
 
+  it("delegates migrate, announce, write, and disableDdlTransaction to the loaded migration", async () => {
+    class NoTransaction extends Migration {
+      async up(): Promise<void> {}
+    }
+    NoTransaction.disableDdlTransactionBang();
+    const migration = new NoTransaction("NoTransaction", "1");
+    const migrate = vi.spyOn(migration, "migrate").mockResolvedValue(undefined);
+    const announce = vi.spyOn(migration, "announce").mockImplementation(() => {});
+    const write = vi.spyOn(migration, "write").mockImplementation(() => {});
+    const proxy = new MigrationProxy("NoTransaction", "1", "/fake/path.ts", "");
+    vi.spyOn(proxy, "loadMigrationAsync").mockResolvedValue(migration);
+
+    await proxy.migrate("up");
+    await proxy.announce("hello");
+    await proxy.write("text");
+
+    expect(migrate).toHaveBeenCalledWith("up");
+    expect(announce).toHaveBeenCalledWith("hello");
+    expect(write).toHaveBeenCalledWith("text");
+    expect(proxy.disableDdlTransaction).toBe(true);
+  });
+
   it("migration() caches the result of loadMigration()", async () => {
     const proxy = new MigrationProxy("CreateUsers", "1", "/fake/path.ts", "");
-    const sentinel = {};
+    const sentinel = new CreateUsers("CreateUsers", "1");
     const spy = vi.spyOn(proxy, "loadMigrationAsync").mockResolvedValue(sentinel);
 
     const first = await proxy.migration();
