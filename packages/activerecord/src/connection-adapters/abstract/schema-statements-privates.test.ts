@@ -224,7 +224,12 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect((ss as any).adapter.execute).toHaveBeenCalled();
   });
 
-  it("checkConstraintExists matches by expression when name is present but undefined", async () => {
+  it("checkConstraintExists returns false when an explicit undefined name is supplied", async () => {
+    // Rails: check_constraint_for passes `defined_for?(name: chk_name, **options)`,
+    // where an explicit `name: nil` in options overrides chk_name; defined_for?
+    // then compares `self.name == nil.to_s` ("") — false for any real constraint.
+    // An explicit `undefined` is the JS analogue, so it must not match, and must
+    // not raise on `name.toString()`.
     const ss = makeStatements();
     const name = ss.checkConstraintName("users", { expression: "age > 0" });
     vi.spyOn(ss, "checkConstraints").mockResolvedValue([
@@ -232,7 +237,7 @@ describe("SchemaStatements privates (PR 8)", () => {
     ]);
     expect(
       await ss.checkConstraintExists("users", { name: undefined, expression: "age > 0" }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   // PR 8b helpers

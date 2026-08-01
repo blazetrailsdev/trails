@@ -424,14 +424,18 @@ export class CheckConstraintDefinition {
     return this.name ? !statelessTest(SchemaDumper.chkIgnorePattern, this.name) : false;
   }
 
-  isDefinedFor(options: { name: string; expression?: string; validate?: boolean }): boolean {
+  isDefinedFor(options: {
+    name: string | null | undefined;
+    expression?: string;
+    validate?: boolean;
+  }): boolean {
     // Mirrors Rails CheckConstraintDefinition#defined_for?(name:, expression: nil,
     // ...): it matches on name (and validate) only — the expression is accepted
     // but never compared (it is used upstream to derive the name). A raw-string
     // expression compare would spuriously fail against the adapter's normalized
     // form (e.g. PostgreSQL's `pg_get_constraintdef`).
     return (
-      this.name === options.name.toString() &&
+      this.name === (options.name == null ? "" : options.name.toString()) &&
       (options.validate === undefined || options.validate === this.validate)
     );
   }

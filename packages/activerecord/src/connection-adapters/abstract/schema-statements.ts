@@ -2470,7 +2470,7 @@ export class SchemaStatements {
     }
     const chkName = this.checkConstraintName(tableName, options);
     const constraints = await this.checkConstraints(tableName);
-    return constraints.find((chk) => chk.isDefinedFor({ ...options, name: chkName }));
+    return constraints.find((chk) => chk.isDefinedFor({ name: chkName, ...options }));
   }
 
   /** @internal */
