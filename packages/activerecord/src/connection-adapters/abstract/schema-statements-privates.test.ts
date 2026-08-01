@@ -4,7 +4,12 @@ import {
   canRemoveIndexByName,
   indexNameForRemoveFrom,
 } from "./schema-statements.js";
-import { ForeignKeyDefinition, TableDefinition, type ColumnType } from "./schema-definitions.js";
+import {
+  CheckConstraintDefinition,
+  ForeignKeyDefinition,
+  TableDefinition,
+  type ColumnType,
+} from "./schema-definitions.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { NotImplementedError } from "../../errors.js";
 
@@ -210,13 +215,29 @@ describe("SchemaStatements privates (PR 8)", () => {
     const ss = makeStatements();
     const name = ss.checkConstraintName("users", { expression: "age > 0" });
     vi.spyOn(ss, "checkConstraints").mockResolvedValue([
-      { tableName: "users", expression: "age > 0", name, validate: true } as any,
+      new CheckConstraintDefinition("users", "age > 0", name),
     ]);
     await ss.addCheckConstraint("users", "age > 0", { ifNotExists: true });
     expect((ss as any).adapter.execute).not.toHaveBeenCalled();
 
     await ss.addCheckConstraint("users", "age > 0", {});
     expect((ss as any).adapter.execute).toHaveBeenCalled();
+  });
+
+  it("checkConstraintExists returns false when an explicit undefined name is supplied", async () => {
+    // Rails: check_constraint_for passes `defined_for?(name: chk_name, **options)`,
+    // where an explicit `name: nil` in options overrides chk_name; defined_for?
+    // then compares `self.name == nil.to_s` ("") — false for any real constraint.
+    // An explicit `undefined` is the JS analogue, so it must not match, and must
+    // not raise on `name.toString()`.
+    const ss = makeStatements();
+    const name = ss.checkConstraintName("users", { expression: "age > 0" });
+    vi.spyOn(ss, "checkConstraints").mockResolvedValue([
+      new CheckConstraintDefinition("users", "age > 0", name),
+    ]);
+    expect(
+      await ss.checkConstraintExists("users", { name: undefined, expression: "age > 0" }),
+    ).toBe(false);
   });
 
   // PR 8b helpers

@@ -1772,19 +1772,9 @@ export class SchemaStatements {
     options: { name?: string; expression?: string },
   ): Promise<boolean> {
     if (!options.name && !options.expression) {
-      throw new Error("At least one of :name or :expression must be supplied");
+      throw new ArgumentError("At least one of :name or :expression must be supplied");
     }
-    try {
-      const constraints = await this.checkConstraints(tableName);
-      return constraints.some((c) => {
-        if (options.name && c.name === options.name) return true;
-        if (options.expression && c.expression === options.expression) return true;
-        return false;
-      });
-    } catch (e) {
-      if (e instanceof NotImplementedError) return false;
-      throw e;
-    }
+    return (await this.checkConstraintFor(tableName, options)) !== undefined;
   }
 
   async removeConstraint(tableName: string, constraintName: string): Promise<void> {
