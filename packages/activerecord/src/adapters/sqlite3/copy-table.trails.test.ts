@@ -123,15 +123,8 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
 
   it("addColumn through the rebuild creates an index registered on the definition", async () => {
     await db.addIndex("customers", ["name"]);
-    // `null: false` with no default is an invalid ALTER TABLE ADD type, so this
-    // routes through alterTable's rebuild rather than a plain ADD COLUMN.
-    await db.addColumn("customers", "nickname", "string", {
-      null: false,
-      default: undefined,
-      index: true,
-    });
+    await db.addColumn("customers", "nickname", "string", { null: false, index: true });
     const names = ((await db.indexes("customers")) as Array<{ name: string }>).map((i) => i.name);
-    // The source index round-trips exactly once alongside the pending one.
     expect(names.filter((n) => n === "index_customers_on_name")).toHaveLength(1);
     expect(names).toContain("index_customers_on_nickname");
   });
