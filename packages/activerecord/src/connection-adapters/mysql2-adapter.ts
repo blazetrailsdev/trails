@@ -1510,24 +1510,19 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   async tableExists(name: string): Promise<boolean> {
-    return this.informationSchemaExists(name, "BASE TABLE");
-  }
-
-  private async informationSchemaExists(name: string, type: "BASE TABLE"): Promise<boolean> {
     // Rails' table_exists?(nil) / "" returns false; a null/empty name has no
     // schema to parse, so short-circuit before parseMysqlName (which trims).
     if (!name) return false;
     const { schema, table } = this.parseMysqlName(name);
-    const schemaBind = schema ?? null;
     // Use `schema_placeholder OR database()` via COALESCE so the same
     // query shape serves qualified + unqualified callers.
     const rows = await this.schemaQuery(
       `SELECT 1 AS one FROM information_schema.tables
          WHERE table_schema = COALESCE(?, database())
          AND table_name = ?
-         AND table_type = ?
+         AND table_type = 'BASE TABLE'
          LIMIT 1`,
-      [schemaBind, table, type],
+      [schema ?? null, table],
     );
     return rows.length > 0;
   }

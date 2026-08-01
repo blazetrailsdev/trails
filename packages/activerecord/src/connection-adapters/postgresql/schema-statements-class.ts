@@ -338,9 +338,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   }
 
   /**
-   * Shared helper for the table existence check — Rails' pg_class-based
-   * predicate. Uses
-   * `SELECT 1 ... LIMIT 1` so the planner short-circuits instead of
+   * Backs the table existence check with Rails' pg_class-based predicate.
+   * Uses `SELECT 1 ... LIMIT 1` so the planner short-circuits instead of
    * counting every match.
    */
   private async relkindExists(name: string, relkinds: string[]): Promise<boolean> {

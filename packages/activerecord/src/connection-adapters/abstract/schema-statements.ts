@@ -1509,8 +1509,8 @@ export class SchemaStatements {
     //     views.include?(view_name.to_s)
     //
     // present? covers blank strings including whitespace-only.
-    // The probe goes through schemaQuery (trails' internal_exec_query(..., "SCHEMA"))
-    // so query counting skips it, matching Rails' query_values(..., "SCHEMA").
+    // schemaQuery is trails' internal_exec_query(sql, "SCHEMA") — the "SCHEMA"
+    // name is what keeps the probe out of assertQueries counts.
     if (!isPresent(viewName)) return false;
     try {
       const sql = this.adapter.dataSourceSql(viewName, { type: "VIEW" });

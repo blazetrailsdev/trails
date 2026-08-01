@@ -37,4 +37,10 @@ describe("SchemaStatements#viewExists", () => {
       expect(await conn().viewExists("no_such_view_anywhere")).toBe(false);
     });
   });
+
+  it("treats a blank name as absent, like Rails' present? guard", async () => {
+    expect(await conn().viewExists("")).toBe(false);
+    expect(await conn().viewExists("   ")).toBe(false);
+    expect(await conn().viewExists(null as unknown as string)).toBe(false);
+  });
 });
