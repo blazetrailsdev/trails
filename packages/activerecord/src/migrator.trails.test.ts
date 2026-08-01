@@ -108,13 +108,13 @@ describe("Migrator trails extensions", () => {
     expect(ran).toEqual(["1"]);
   });
 
-  it("pending_migrations on a down migrator returns migrations in reverse order", async () => {
+  it("pendingMigrations on a down migrator returns migrations in reverse order", async () => {
     const migrator = new Migrator(
       adapter,
       [makeMigration("1", "M1"), makeMigration("2", "M2"), makeMigration("3", "M3")],
       { direction: "down" },
     );
-    const schemaMigration = new SchemaMigration(Base.connection);
+    const schemaMigration = new SchemaMigration(adapter);
     await schemaMigration.createTable();
     await schemaMigration.createVersion("2");
 
