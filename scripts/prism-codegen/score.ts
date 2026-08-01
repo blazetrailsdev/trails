@@ -54,6 +54,11 @@ function rubyDefNames(source: string): string[] {
   return out;
 }
 
+/**
+ * Build the ownership index from Rails sources. Method names come from a `def`
+ * scan, which trusts the vendored lib to declare its methods at statement
+ * position — a heredoc line starting `def foo` would claim a name spuriously.
+ */
 export function buildPortOwnership(rubyFiles: { path: string; source: string }[]): PortOwnership {
   const claimedBy = new Map<string, Set<string>>();
   for (const { path: rubyPath, source } of rubyFiles) {
