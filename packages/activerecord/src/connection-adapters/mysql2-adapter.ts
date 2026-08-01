@@ -680,8 +680,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     const payload: Record<string, unknown> = {
       sql: driverSql,
       name: name ?? "SQL",
-      binds: driverBinds,
-      type_casted_binds: this.typeCastedBinds(driverBinds) ?? [],
+      binds: binds ?? [],
+      type_casted_binds: this.typeCastedBinds(binds ?? []) ?? [],
       connection: this,
       row_count: 0,
       transaction: txPublicQuery.isOpen() ? txPublicQuery : null,
