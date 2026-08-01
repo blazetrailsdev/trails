@@ -35,9 +35,12 @@ export function registerStructure(r: Registry): void {
         ]
       : undefined;
     const prev = e.inClass;
+    const prevModule = e.currentModule;
     e.inClass = true;
+    e.currentModule = prevModule ? `${prevModule}::${name}` : name;
     const members = classMembers((n.body as PrismNode) ?? null, e);
     e.inClass = prev;
+    e.currentModule = prevModule;
     return [
       f.createClassDeclaration(
         [f.createToken(ts.SyntaxKind.ExportKeyword)],

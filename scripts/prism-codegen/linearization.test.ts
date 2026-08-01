@@ -79,6 +79,66 @@ describe("super linearization", () => {
     expect(lin.resolve("ActiveModel::Naming", "touch")).toEqual({ kind: "outside-corpus" });
   });
 
+  it("indexes a nested class under its own path, not the enclosing module's", async () => {
+    const defs = await indexModuleDefs([
+      `
+        module ActiveRecord
+          module Core
+            class ExplainProxy
+              def then
+                1
+              end
+            end
+          end
+        end
+      `,
+    ]);
+    expect(defs.get("Core")).toBeUndefined();
+    expect([...(defs.get("Core::ExplainProxy") ?? [])]).toEqual(["then"]);
+  });
+
+  it("keeps singleton methods out of the instance-ancestry index", async () => {
+    const defs = await indexModuleDefs([
+      `
+        module ActiveRecord
+          module Core
+            class << self
+              def touch
+                1
+              end
+            end
+            def self.reset
+              2
+            end
+          end
+        end
+      `,
+    ]);
+    expect(defs.get("Core")).toBeUndefined();
+  });
+
+  it("attributes a super inside a nested class to that class, not the module", async () => {
+    const { code } = await generateFromSource(
+      `
+        module ActiveRecord
+          module Persistence
+            class Proxy
+              def touch(name)
+                x = super
+                x
+              end
+            end
+          end
+        end
+      `,
+      new Set(),
+      "./runtime.js",
+      await linearization(),
+    );
+    expect(code).toContain("super(...arguments)");
+    expect(code).not.toContain(".touch.call(this");
+  });
+
   it("emits a value-position super as a direct next-definer call", async () => {
     const { code } = await generateFromSource(
       TIMESTAMP_RB,

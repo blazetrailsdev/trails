@@ -55,7 +55,11 @@ export class Linearization {
   }
 }
 
-/** Ruby method names defined directly under each `module`/`class` path. */
+/**
+ * Ruby method names defined directly under each `module`/`class` path.
+ * `def self.x` and `class << self` bodies are skipped: singleton methods live
+ * on a separate ancestry from the instance chain `super` resolution walks.
+ */
 export async function indexModuleDefs(
   sources: Iterable<string>,
 ): Promise<Map<string, Set<string>>> {
@@ -83,6 +87,7 @@ function walk(node: PrismNode | null, path: string[], index: Map<string, Set<str
     for (const child of node.compactChildNodes()) walk(child, nested, index);
     return;
   }
+  if (kind === "SingletonClassNode") return;
   if (kind === "DefNode" && !node.receiver && path.length) {
     const owner = normalizeModuleName(path.join("::"));
     const set = index.get(owner) ?? new Set<string>();
