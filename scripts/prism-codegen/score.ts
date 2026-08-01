@@ -39,6 +39,24 @@ function isTopLevelDeclaration(node: ts.VariableDeclaration): boolean {
   );
 }
 
+/**
+ * Peels the type-only wrappers a mixin indirection map may carry — the real
+ * `FinderMethods` map ends `} as const;`, so the declaration's initializer is an
+ * `AsExpression` and the object literal underneath would otherwise be skipped.
+ */
+function unwrapExpression(expr: ts.Expression): ts.Expression {
+  let current = expr;
+  while (
+    ts.isAsExpression(current) ||
+    ts.isSatisfiesExpression(current) ||
+    ts.isParenthesizedExpression(current) ||
+    ts.isTypeAssertionExpression(current)
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
 export function indexPortFile(source: string): PortIndex {
   const sf = ts.createSourceFile("port.ts", source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TS);
   const fns = new Map<string, ts.FunctionLikeDeclaration>();
@@ -85,8 +103,9 @@ export function indexPortFile(source: string): PortIndex {
   };
   const visitMaps = (node: ts.Node) => {
     if (ts.isVariableDeclaration(node) && node.initializer) {
-      if (ts.isObjectLiteralExpression(node.initializer)) {
-        for (const prop of node.initializer.properties) {
+      const initializer = unwrapExpression(node.initializer);
+      if (ts.isObjectLiteralExpression(initializer)) {
+        for (const prop of initializer.properties) {
           if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
             const ref = resolveRef(prop.initializer);
             const target = ref ? fns.get(ref) : undefined;
@@ -95,10 +114,10 @@ export function indexPortFile(source: string): PortIndex {
         }
       }
       if (ts.isIdentifier(node.name)) {
-        const ref = ts.isIdentifier(node.initializer)
-          ? node.initializer.text
-          : ts.isCallExpression(node.initializer)
-            ? resolveRef(node.initializer)
+        const ref = ts.isIdentifier(initializer)
+          ? initializer.text
+          : ts.isCallExpression(initializer)
+            ? resolveRef(initializer)
             : undefined;
         const target = ref ? fns.get(ref) : undefined;
         if (target && !byName.has(node.name.text)) byName.set(node.name.text, target);

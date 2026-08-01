@@ -236,6 +236,30 @@ describe("prism-codegen scorer", () => {
     expect(idx.byName.get("findBy")).toBe(idx.byName.get("performFindBy"));
   });
 
+  it("resolves mixin indirection through an `as const` map", () => {
+    const idx = indexPortFile(`
+      export function performFindByBang(this: R, c: unknown): unknown {
+        return this.findBy(c);
+      }
+      export const FinderMethods = {
+        findByBang: performFindByBang,
+      } as const;
+    `);
+    expect(idx.byName.get("findByBang")).toBe(idx.byName.get("performFindByBang"));
+  });
+
+  it("resolves mixin indirection through a `satisfies` map", () => {
+    const idx = indexPortFile(`
+      export function performTake(this: R): unknown {
+        return this.limit(1);
+      }
+      export const FinderMethods = {
+        take: performTake,
+      } satisfies Record<string, unknown>;
+    `);
+    expect(idx.byName.get("take")).toBe(idx.byName.get("performTake"));
+  });
+
   it("ignores local helper arrows declared inside a function body", () => {
     const idx = indexPortFile(`
       export function loadTarget(this: R): unknown {
