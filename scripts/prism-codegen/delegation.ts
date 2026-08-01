@@ -12,10 +12,13 @@ export type DelegationTable = ReadonlyMap<string, string>;
  *
  * Four kinds of macro contribute nothing to the table, because resolving their
  * calls to `this.<target>.<name>` would be wrong: `to: :class` and `to: :self`
- * (not property reaches on `this`), `prefix:` (the generated method is named
- * `<target>_<name>`, not `<name>`), macros written inside `class << self` (they
- * generate singleton methods), and any name the file also defines with `def` (a
- * real definition wins over the macro-generated one).
+ * (not property reaches on `this`), a truthy `prefix:` (the generated method is
+ * named `<prefix>_<name>`, not `<name>` — `prefix: false` and `prefix: nil` do
+ * prefix nothing, per `activesupport/lib/active_support/delegation.rb:72`),
+ * macros written inside `class << self` (they generate singleton methods), and
+ * any name the file also defines with an instance `def` (a real definition wins
+ * over the macro-generated one). A singleton `def self.x` does not suppress an
+ * instance `delegate :x` — Ruby keeps the two in separate namespaces.
  */
 export function collectDelegations(program: PrismNode): DelegationTable {
   const table = new Map<string, string>();
@@ -40,7 +43,9 @@ function walk(
   inSingleton: boolean,
 ): void {
   const kind = node.constructor?.name;
-  if (kind === "DefNode") defined.add(methodName(String(node.name)));
+  if (kind === "DefNode" && !inSingleton && !node.receiver) {
+    defined.add(methodName(String(node.name)));
+  }
   if (!inSingleton && kind === "CallNode" && String(node.name) === "delegate" && !node.receiver) {
     record(node, table);
   }
@@ -68,7 +73,7 @@ function delegationTarget(node: PrismNode): string | undefined {
     const value = assoc.value as PrismNode | undefined;
     if (key?.constructor?.name !== "SymbolNode") return undefined;
     const option = rubyStr(key.unescaped);
-    if (option === "prefix") return undefined;
+    if (option === "prefix" && isTruthy(value)) return undefined;
     if (option !== "to") continue;
     if (value?.constructor?.name !== "SymbolNode") return undefined;
     const raw = rubyStr(value.unescaped);
@@ -78,4 +83,9 @@ function delegationTarget(node: PrismNode): string | undefined {
     target = name;
   }
   return target;
+}
+
+function isTruthy(node: PrismNode | undefined): boolean {
+  const kind = node?.constructor?.name;
+  return kind !== undefined && kind !== "FalseNode" && kind !== "NilNode";
 }

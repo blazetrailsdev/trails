@@ -463,6 +463,38 @@ describe("prism-codegen", () => {
     expect(code).toContain("this.model.primaryKey");
   });
 
+  it("keeps a falsy prefix option in the table", async () => {
+    const { code } = await generateFromSource(`
+      class Relation
+        delegate :primary_key, to: :model, prefix: false
+        delegate :table_name, to: :model, prefix: nil
+
+        def describe
+          [primary_key, table_name]
+        end
+      end
+    `);
+    expect(code).toContain("this.model.primaryKey");
+    expect(code).toContain("this.model.tableName");
+  });
+
+  it("a singleton def does not suppress an instance delegation of the same name", async () => {
+    const { code } = await generateFromSource(`
+      class Relation
+        delegate :primary_key, to: :model
+
+        def self.primary_key
+          @primary_key
+        end
+
+        def describe
+          primary_key
+        end
+      end
+    `);
+    expect(code).toContain("return this.model.primaryKey;");
+  });
+
   it("leaves a prefixed delegate macro out of the table", async () => {
     const { code } = await generateFromSource(`
       class Relation
