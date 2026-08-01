@@ -11,6 +11,7 @@ import {
   type TargetFile,
 } from "./files.js";
 import { delegationsFromSource, type DelegationTable } from "./index.js";
+import { buildLinearization, type Linearization } from "./linearization.js";
 import { rubyFileToTs } from "./naming.js";
 
 export const SNAPSHOT_DIR = "scripts/prism-codegen/__snapshots__";
@@ -60,6 +61,22 @@ export async function inheritedDelegationsFor(f: TargetFile): Promise<Delegation
   return relationDelegations;
 }
 
+let linearizationPromise: Promise<Linearization> | undefined;
+
+/**
+ * The `super` linearization over the whole target set. It is part of the
+ * generated image, so it is memoized rather than rebuilt per target — every
+ * target must see the same ancestry and def index.
+ */
+export function targetLinearization(): Promise<Linearization> {
+  linearizationPromise ??= (async () => {
+    const sources = await Promise.all(TARGET_FILES.map((t) => fs.readFile(rubyAbsPath(t), "utf8")));
+    const base = TARGET_FILES.findIndex((t) => t.ruby === "active_record/base.rb");
+    return buildLinearization(base < 0 ? "" : sources[base], sources);
+  })();
+  return linearizationPromise;
+}
+
 /** Generate one target file's JS exactly as `pnpm codegen:generate` writes it. */
 export async function generateTarget(f: TargetFile): Promise<GeneratedTarget> {
   const outName = outNameFor(f);
@@ -69,6 +86,7 @@ export async function generateTarget(f: TargetFile): Promise<GeneratedTarget> {
     asyncMethodsForRailsFile(f.ruby),
     runtimeImportPathFor(outName),
     await inheritedDelegationsFor(f),
+    await targetLinearization(),
   );
   return { ...result, file: f, outName };
 }

@@ -54,10 +54,11 @@ export function isAssociationCached(name) {
 }
 export function initializeDup(...rest) {
     this.association_cache = {};
-    return __PRISM_TODO("ForwardingSuperNode");
+    return Inheritance.initializeDup.call(this, ...arguments);
 }
 __PRISM_TODO("CallNode");
 export function initInternals() {
+    Persistence.initInternals.call(this, ...arguments);
     return this.association_cache = {};
 }
 export function associationInstanceGet(name) {

@@ -101,7 +101,7 @@ export function polymorphicClassFor(name) {
 }
 export async function dup() {
     let other;
-    other = __PRISM_TODO("ForwardingSuperNode");
+    other = __PRISM_SUPER_OUTSIDE_CORPUS("Inheritance::ClassMethods#dup");
     other.setBaseClass();
     return other;
 }
@@ -146,7 +146,7 @@ export function discriminateClassForRecord(record) {
         return this.findStiClass(record[this.inheritanceColumn]);
     }
     else {
-        return __PRISM_TODO("ForwardingSuperNode");
+        return __PRISM_SUPER_OUTSIDE_CORPUS("Inheritance::ClassMethods#discriminate_class_for_record");
     }
 }
 export function isUsingSingleTableInheritance(record) {
@@ -180,10 +180,12 @@ export function subclassFromAttributes(attrs) {
     }
 }
 export function initializeDup(other) {
+    Core.initializeDup.call(this, ...arguments);
     return this.ensureProperType;
 }
 __PRISM_TODO("CallNode");
 export function initializeInternalsCallback() {
+    Core.initializeInternalsCallback.call(this, ...arguments);
     return this.ensureProperType;
 }
 export function ensureProperType() {
