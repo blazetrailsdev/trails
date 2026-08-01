@@ -479,6 +479,55 @@ describe("Migrator advisory lock wrapping", () => {
     const migrator = new Migrator(adapter, []);
     expect(migrator.isUseAdvisoryLock()).toBe(false);
   });
+
+  it("reloads the migrated versions after acquiring the advisory lock", async () => {
+    // Regression: `migrated` is memoized (Rails' `@migrated_versions`), so a
+    // migrator that computed its applied set before blocking on the lock would
+    // proceed on a stale view of schema_migrations unless `with_advisory_lock`
+    // reloads it once the lock is held (migration.rb:1601).
+    const adapter = Base.connection;
+    addAdvisoryLockSupport(adapter);
+    adapter.getAdvisoryLock = async () => true;
+    adapter.releaseAdvisoryLock = async () => true;
+    const schemaMigration = new SchemaMigration(adapter);
+    await schemaMigration.createTable();
+
+    const migrator = new Migrator(adapter, [makeMigration("1", "M1")]);
+    expect(await migrator.migrated()).toEqual(new Set());
+
+    // Another process migrates version 1 while we wait for the lock.
+    await schemaMigration.recordVersion("1");
+    expect(await migrator.migrated()).toEqual(new Set());
+
+    let underLock: Set<string> | undefined;
+    await migrator.withAdvisoryLock(async () => {
+      underLock = await migrator.migrated();
+    });
+    expect(underLock).toEqual(new Set(["1"]));
+  });
+
+  it("record_version_state_after_migrating updates the migrated memo in place", async () => {
+    const adapter = Base.connection;
+    const migrator = new Migrator(adapter, [makeMigration("1", "M1")]);
+    await new SchemaMigration(adapter).createTable();
+
+    expect(await migrator.migrated()).toEqual(new Set());
+    await migrator.recordVersionStateAfterMigrating("1", "up");
+    expect(await migrator.migrated()).toEqual(new Set(["1"]));
+    await migrator.recordVersionStateAfterMigrating("1", "down");
+    expect(await migrator.migrated()).toEqual(new Set());
+  });
+
+  it("open returns a fresh Migrator so repeated pending checks are not memoized", async () => {
+    const adapter = Base.connection;
+    const schemaMigration = new SchemaMigration(adapter);
+    await schemaMigration.createTable();
+    const context = new Migrator(adapter, [makeMigration("1", "M1")]);
+
+    expect(await context.open().pendingMigrations()).toHaveLength(1);
+    await schemaMigration.recordVersion("1");
+    expect(await context.open().pendingMigrations()).toHaveLength(0);
+  });
 });
 
 describe("Migrator drives migrations through Migration#migrate", () => {

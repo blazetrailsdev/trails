@@ -1468,9 +1468,22 @@ describe("MigrationTest", () => {
     "advisory_locks",
     "with advisory lock raises the right error when it fails to release lock",
     async () => {
-      const lockAdapter = makeLockAdapter({ acquires: true, releases: false });
-      const migrator = new Migrator(lockAdapter, []);
-      const error = await migrator.withAdvisoryLock(async () => {}).catch((e) => e);
+      // Rails runs this against the real connection and provokes the release
+      // failure by releasing the lock from inside the block, so the migrator's
+      // own release finds nothing to release (migration_test.rb:1107-1124).
+      const realAdapter = Base.connection;
+      const proxy: MigrationProxy = {
+        version: "100",
+        name: "NoOp",
+        migration: () => anonymousMigration("NoOp", "100"),
+      };
+      const migrator = new Migrator(realAdapter, [proxy], { targetVersion: 100 });
+      const lockId = await migrator.generateMigratorAdvisoryLockId();
+      const error = await migrator
+        .withAdvisoryLock(async () => {
+          await realAdapter.releaseAdvisoryLock(lockId);
+        })
+        .catch((e) => e);
       expect(error).toBeInstanceOf(ConcurrentMigrationError);
       expect(error.message).toMatch(ConcurrentMigrationError.RELEASE_LOCK_FAILED_MESSAGE);
     },
