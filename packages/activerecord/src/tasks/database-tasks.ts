@@ -964,9 +964,7 @@ export class DatabaseTasks {
         throw new Error(`Schema file must export a default function (got ${typeof defineSchema})`);
       }
       const adapter = await this._migrationAdapter();
-      const { MigrationContext } = await import("../migration.js");
-      const ctx = new MigrationContext(adapter);
-      await defineSchema(ctx);
+      await defineSchema(adapter);
       // Stamp using the resolved absolute path — `filename` may be
       // relative and `_schemaSha1` reads the file via getFs(), so the
       // path must match what was actually imported.

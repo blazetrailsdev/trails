@@ -20,13 +20,9 @@
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { Base, MigrationContext, association, registerModel } from "../index.js";
+import { Base, association, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
-
-function migrationCtx() {
-  return new MigrationContext(Base.connection);
-}
 
 describe("CollectionProxy#count — disable_joins through", () => {
   fixtures([]);
@@ -53,18 +49,18 @@ describe("CollectionProxy#count — disable_joins through", () => {
   }
 
   beforeAll(async () => {
-    await migrationCtx().createTable("cd_authors", { force: true }, (t: any) => {
+    await Base.connection.createTable("cd_authors", { force: true }, (t: any) => {
       t.string("name");
     });
-    await migrationCtx().createTable("cd_posts", { force: true }, (t: any) => {
+    await Base.connection.createTable("cd_posts", { force: true }, (t: any) => {
       t.integer("cd_author_id");
       t.string("title");
     });
-    await migrationCtx().createTable("cd_comments", { force: true }, (t: any) => {
+    await Base.connection.createTable("cd_comments", { force: true }, (t: any) => {
       t.integer("cd_post_id");
       t.string("body");
     });
-    await migrationCtx().createTable("cd_ratings", { force: true }, (t: any) => {
+    await Base.connection.createTable("cd_ratings", { force: true }, (t: any) => {
       t.integer("cd_comment_id");
       t.integer("value");
     });
@@ -95,7 +91,7 @@ describe("CollectionProxy#count — disable_joins through", () => {
   });
 
   afterAll(async () => {
-    await migrationCtx().dropTable("cd_ratings", "cd_comments", "cd_posts", "cd_authors", {
+    await Base.connection.dropTable("cd_ratings", "cd_comments", "cd_posts", "cd_authors", {
       ifExists: true,
     });
   });

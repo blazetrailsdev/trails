@@ -4,7 +4,6 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { adapterType } from "./test-adapter.js";
-import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./schema-dumper.js";
 import { fixtures } from "./test-fixtures.js";
 import { itIfSupports } from "./support/supports.js";
@@ -21,7 +20,6 @@ describe("TimePrecisionTest", () => {
   // a wrapping (PG-poisoning) transaction.
   fixtures({}, { useTransactionalTests: false });
   let adapter: DatabaseAdapter;
-  let ctx: MigrationContext;
 
   // Rails: `foos` is not a schema.rb fixture table — each test builds it with
   // `create_table(:foos, force: true)` for the precision under test and the
@@ -29,10 +27,9 @@ describe("TimePrecisionTest", () => {
   // here rather than seeding a placeholder into the canonical schema.
   beforeEach(async () => {
     adapter = Base.connection;
-    ctx = new MigrationContext(adapter);
   });
   afterEach(async () => {
-    await ctx.dropTable("foos", { ifExists: true });
+    await adapter.dropTable("foos", { ifExists: true });
   });
   function makeFoo() {
     class Foo extends Base {
@@ -43,9 +40,9 @@ describe("TimePrecisionTest", () => {
   }
 
   itIfSupports("datetime_with_precision", "time data type with precision", async () => {
-    await ctx.createTable("foos", { force: true }, () => {});
-    await ctx.addColumn("foos", "start", "time", { precision: 3 });
-    await ctx.addColumn("foos", "finish", "time", { precision: 6 });
+    await adapter.createTable("foos", { force: true }, () => {});
+    await adapter.addColumn("foos", "start", "time", { precision: 3 });
+    await adapter.addColumn("foos", "finish", "time", { precision: 6 });
     const Foo = makeFoo();
     await Foo.loadSchema();
     expect((Foo.columnsHash() as any)["start"].precision).toBe(3);
@@ -53,9 +50,9 @@ describe("TimePrecisionTest", () => {
   });
 
   itIfSupports("datetime_with_precision", "time precision is truncated on assignment", async () => {
-    await ctx.createTable("foos", { force: true }, () => {});
-    await ctx.addColumn("foos", "start", "time", { precision: 0 });
-    await ctx.addColumn("foos", "finish", "time", { precision: 6 });
+    await adapter.createTable("foos", { force: true }, () => {});
+    await adapter.addColumn("foos", "start", "time", { precision: 0 });
+    await adapter.addColumn("foos", "finish", "time", { precision: 6 });
     const Foo = makeFoo();
     await Foo.loadSchema();
     const time = Temporal.PlainTime.from({
@@ -82,9 +79,9 @@ describe("TimePrecisionTest", () => {
     "datetime_with_precision",
     "no time precision isnt truncated on assignment",
     async () => {
-      await ctx.createTable("foos", { force: true }, () => {});
-      await ctx.addColumn("foos", "start", "time");
-      await ctx.addColumn("foos", "finish", "time", { precision: 6 });
+      await adapter.createTable("foos", { force: true }, () => {});
+      await adapter.addColumn("foos", "start", "time");
+      await adapter.addColumn("foos", "finish", "time", { precision: 6 });
       const Foo = makeFoo();
       await Foo.loadSchema();
       const time = Temporal.PlainTime.from({
@@ -109,7 +106,7 @@ describe("TimePrecisionTest", () => {
     "datetime_with_precision",
     "passing precision to time does not set limit",
     async () => {
-      await ctx.createTable("foos", { force: true }, (t) => {
+      await adapter.createTable("foos", { force: true }, (t) => {
         t.time("start", { precision: 3 });
         t.time("finish", { precision: 6 });
       });
@@ -122,7 +119,7 @@ describe("TimePrecisionTest", () => {
 
   itIfSupports("datetime_with_precision", "invalid time precision raises error", async () => {
     await expect(
-      ctx.createTable("foos", { force: true }, (t) => {
+      adapter.createTable("foos", { force: true }, (t) => {
         t.time("start", { precision: 7 });
         t.time("finish", { precision: 7 });
       }),
@@ -135,7 +132,7 @@ describe("TimePrecisionTest", () => {
   });
 
   itIfSupports("datetime_with_precision", "schema dump includes time precision", async () => {
-    await ctx.createTable("foos", { force: true }, (t) => {
+    await adapter.createTable("foos", { force: true }, (t) => {
       t.time("start", { precision: 4 });
       t.time("finish", { precision: 6 });
     });

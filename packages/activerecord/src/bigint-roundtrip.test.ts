@@ -7,7 +7,6 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "./index.js";
-import { MigrationContext } from "./migration.js";
 import { fixtures } from "./test-fixtures.js";
 
 const BIG = 2n ** 62n; // 4611686018427387904 — above Number.MAX_SAFE_INTEGER
@@ -16,17 +15,14 @@ fixtures([]);
 // `metrics` is a trails-only scratch table (no Rails counterpart). Build it via
 // the migration API and drop it afterward rather than seeding it into the
 // canonical schema, which mirrors only Rails' schema.rb fixture tables.
-function migrationCtx(): MigrationContext {
-  return new MigrationContext(Base.connection);
-}
 beforeAll(async () => {
-  await migrationCtx().createTable("metrics", { force: true }, (t) => {
+  await Base.connection.createTable("metrics", { force: true }, (t) => {
     t.bigint("score");
     t.string("label");
   });
 });
 afterAll(async () => {
-  await migrationCtx().dropTable("metrics", { ifExists: true });
+  await Base.connection.dropTable("metrics", { ifExists: true });
 });
 describe("bigint model round-trip (all adapters)", () => {
   function makeModel() {

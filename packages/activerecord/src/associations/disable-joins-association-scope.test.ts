@@ -1,15 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { Base, MigrationContext, registerModel } from "../index.js";
+import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { findTarget } from "./has-many-association.js";
 import { DisableJoinsAssociationScope } from "./disable-joins-association-scope.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
 import { fixtures } from "../test-fixtures.js";
-
-function migrationCtx() {
-  return new MigrationContext(Base.connection);
-}
 
 describe("DisableJoinsAssociationScope", () => {
   fixtures([]);
@@ -36,14 +32,14 @@ describe("DisableJoinsAssociationScope", () => {
   }
 
   beforeAll(async () => {
-    await migrationCtx().createTable("djs_authors", { force: true }, (t: any) => {
+    await Base.connection.createTable("djs_authors", { force: true }, (t: any) => {
       t.string("name");
     });
-    await migrationCtx().createTable("djs_posts", { force: true }, (t: any) => {
+    await Base.connection.createTable("djs_posts", { force: true }, (t: any) => {
       t.integer("djs_author_id");
       t.string("title");
     });
-    await migrationCtx().createTable("djs_comments", { force: true }, (t: any) => {
+    await Base.connection.createTable("djs_comments", { force: true }, (t: any) => {
       t.integer("djs_post_id");
       t.string("body");
     });
@@ -81,7 +77,7 @@ describe("DisableJoinsAssociationScope", () => {
   });
 
   afterAll(async () => {
-    await migrationCtx().dropTable("djs_comments", "djs_posts", "djs_authors", {
+    await Base.connection.dropTable("djs_comments", "djs_posts", "djs_authors", {
       ifExists: true,
     });
   });

@@ -10,7 +10,6 @@ import { SchemaDumper } from "./schema-dumper.js";
 import type { SchemaSource } from "./schema-dumper.js";
 import { NotNullViolation } from "./errors.js";
 import { adapterType } from "./test-adapter.js";
-import { MigrationContext } from "./migration.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Mysql2Adapter } from "./connection-adapters/mysql2-adapter.js";
 import { describeIfMysqlAdapter } from "./support/describe-if-mysql-adapter.js";
@@ -93,8 +92,7 @@ describe("DefaultNumbersTest", () => {
 
   beforeEach(async () => {
     adapter = Base.connection;
-    const ctx = new MigrationContext(adapter);
-    await ctx.createTable("default_numbers", { force: true }, (t: any) => {
+    await adapter.createTable("default_numbers", { force: true }, (t: any) => {
       t.integer("positive_integer", { default: 7 });
       t.integer("negative_integer", { default: -5 });
       t.decimal("decimal_number", { default: "2.78", precision: 5, scale: 2 });
@@ -108,7 +106,7 @@ describe("DefaultNumbersTest", () => {
   });
 
   afterEach(async () => {
-    await new MigrationContext(adapter).dropTable("default_numbers", { ifExists: true });
+    await adapter.dropTable("default_numbers", { ifExists: true });
   });
 
   it("default positive integer", () => {
@@ -136,8 +134,7 @@ describe("DefaultStringsTest", () => {
 
   beforeEach(async () => {
     adapter = Base.connection;
-    const ctx = new MigrationContext(adapter);
-    await ctx.createTable("default_strings", { force: true }, (t: any) => {
+    await adapter.createTable("default_strings", { force: true }, (t: any) => {
       t.string("string_col", { default: "Smith" });
       t.string("string_col_with_quotes", { default: "O'Connor" });
     });
@@ -150,7 +147,7 @@ describe("DefaultStringsTest", () => {
   });
 
   afterEach(async () => {
-    await new MigrationContext(adapter).dropTable("default_strings", { ifExists: true });
+    await adapter.dropTable("default_strings", { ifExists: true });
   });
 
   it("default strings", () => {
@@ -169,8 +166,7 @@ describe.skipIf(adapterType === "mysql")("DefaultBinaryTest", () => {
 
   beforeEach(async () => {
     adapter = Base.connection;
-    const ctx = new MigrationContext(adapter);
-    await ctx.createTable("default_binaries", { force: true }, (t: any) => {
+    await adapter.createTable("default_binaries", { force: true }, (t: any) => {
       t.binary("varbinary_col", { null: false, limit: 64, default: "varbinary_default" });
       t.binary("varbinary_col_hex_looking", { null: false, limit: 64, default: "0xDEADBEEF" });
     });
@@ -183,7 +179,7 @@ describe.skipIf(adapterType === "mysql")("DefaultBinaryTest", () => {
   });
 
   afterEach(async () => {
-    await new MigrationContext(adapter).dropTable("default_binaries", { ifExists: true });
+    await adapter.dropTable("default_binaries", { ifExists: true });
   });
 
   // Rails asserts string equality; a binary column deserializes to bytes in
@@ -223,8 +219,7 @@ describeIfSupports("text_column_with_default", "DefaultTextTest", () => {
 
   beforeEach(async () => {
     adapter = Base.connection;
-    const ctx = new MigrationContext(adapter);
-    await ctx.createTable("default_texts", { force: true }, (t: any) => {
+    await adapter.createTable("default_texts", { force: true }, (t: any) => {
       t.text("text_col", { default: "Smith" });
       t.text("text_col_with_quotes", { default: "O'Connor" });
     });
@@ -237,7 +232,7 @@ describeIfSupports("text_column_with_default", "DefaultTextTest", () => {
   });
 
   afterEach(async () => {
-    await new MigrationContext(adapter).dropTable("default_texts", { ifExists: true });
+    await adapter.dropTable("default_texts", { ifExists: true });
   });
 
   it("default texts", () => {

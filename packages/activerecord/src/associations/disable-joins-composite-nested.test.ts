@@ -30,14 +30,10 @@
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { Base, MigrationContext, registerModel } from "../index.js";
+import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { findTarget } from "./has-many-association.js";
 import { fixtures } from "../test-fixtures.js";
-
-function migrationCtx() {
-  return new MigrationContext(Base.connection);
-}
 
 describe("DJAS composite-key + nested-through", () => {
   fixtures([]);
@@ -74,10 +70,10 @@ describe("DJAS composite-key + nested-through", () => {
   }
 
   beforeAll(async () => {
-    await migrationCtx().createTable("ckn_shops", { force: true }, (t: any) => {
+    await Base.connection.createTable("ckn_shops", { force: true }, (t: any) => {
       t.string("name");
     });
-    await migrationCtx().createTable(
+    await Base.connection.createTable(
       "ckn_orders",
       { primaryKey: ["shop_id", "order_number"], force: true },
       (t: any) => {
@@ -86,12 +82,12 @@ describe("DJAS composite-key + nested-through", () => {
         t.string("label");
       },
     );
-    await migrationCtx().createTable("ckn_line_items", { force: true }, (t: any) => {
+    await Base.connection.createTable("ckn_line_items", { force: true }, (t: any) => {
       t.integer("ckn_order_shop_id");
       t.integer("ckn_order_number");
       t.string("sku");
     });
-    await migrationCtx().createTable("ckn_tags", { force: true }, (t: any) => {
+    await Base.connection.createTable("ckn_tags", { force: true }, (t: any) => {
       t.integer("ckn_line_item_id");
       t.string("value");
     });
@@ -133,7 +129,7 @@ describe("DJAS composite-key + nested-through", () => {
   });
 
   afterAll(async () => {
-    await migrationCtx().dropTable("ckn_tags", "ckn_line_items", "ckn_orders", "ckn_shops", {
+    await Base.connection.dropTable("ckn_tags", "ckn_line_items", "ckn_orders", "ckn_shops", {
       ifExists: true,
     });
   });

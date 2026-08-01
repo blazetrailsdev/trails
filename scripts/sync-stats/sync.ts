@@ -2,7 +2,7 @@ import { execSync } from "child_process";
 import { mkdirSync, readdirSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { dirname, join } from "path";
-import { Base, MigrationContext } from "@blazetrails/activerecord";
+import { Base } from "@blazetrails/activerecord";
 import type { AbstractSQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js";
 import { parseTestCompareFromLogs } from "./parse-test-compare.js";
@@ -403,7 +403,7 @@ class SyncLog extends Base {
 }
 
 // ---------------------------------------------------------------------------
-// Schema setup via MigrationContext
+// Schema setup via the adapter schema DSL
 // ---------------------------------------------------------------------------
 
 async function tableExists(adapter: AbstractSQLite3Adapter, name: string): Promise<boolean> {
@@ -425,13 +425,11 @@ async function columnExists(
 }
 
 async function migrateDb(adapter: AbstractSQLite3Adapter) {
-  const ctx = new MigrationContext(adapter);
-
   const hasExistingSchema = await tableExists(adapter, "sync_log");
 
   if (hasExistingSchema) {
     if (!(await tableExists(adapter, "compare_logs"))) {
-      await ctx.createTable("compare_logs", {}, (t) => {
+      await adapter.createTable("compare_logs", {}, (t) => {
         t.string("merge_commit_sha");
         t.integer("pr_number");
         t.string("step_name");
@@ -476,7 +474,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
         );
       }
     } else {
-      await ctx.createTable("raw_job_logs", { id: false }, (t) => {
+      await adapter.createTable("raw_job_logs", { id: false }, (t) => {
         t.integer("job_id", { primaryKey: true });
         t.integer("run_id");
         t.string("job_name");
@@ -542,7 +540,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
     }
 
     if (!(await tableExists(adapter, "pr_requested_reviewers"))) {
-      await ctx.createTable("pr_requested_reviewers", {}, (t) => {
+      await adapter.createTable("pr_requested_reviewers", {}, (t) => {
         t.integer("pr_number");
         t.string("reviewer");
         t.string("reviewer_type");
@@ -551,7 +549,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
     }
 
     if (!(await tableExists(adapter, "pr_linked_issues"))) {
-      await ctx.createTable("pr_linked_issues", {}, (t) => {
+      await adapter.createTable("pr_linked_issues", {}, (t) => {
         t.integer("pr_number");
         t.integer("issue_number");
         t.string("issue_title");
@@ -561,7 +559,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
     }
 
     if (!(await tableExists(adapter, "pr_timeline_events"))) {
-      await ctx.createTable("pr_timeline_events", {}, (t) => {
+      await adapter.createTable("pr_timeline_events", {}, (t) => {
         t.integer("pr_number");
         t.string("event_type");
         t.string("actor");
@@ -573,7 +571,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
     }
 
     if (!(await tableExists(adapter, "pr_reactions"))) {
-      await ctx.createTable("pr_reactions", { id: false }, (t) => {
+      await adapter.createTable("pr_reactions", { id: false }, (t) => {
         t.integer("reaction_id", { primaryKey: true });
         t.integer("pr_number");
         t.string("user");
@@ -585,7 +583,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
     }
 
     if (!(await tableExists(adapter, "check_annotations"))) {
-      await ctx.createTable("check_annotations", {}, (t) => {
+      await adapter.createTable("check_annotations", {}, (t) => {
         t.integer("run_id");
         t.integer("job_id");
         t.string("path");
@@ -600,7 +598,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
     }
 
     if (!(await tableExists(adapter, "workflow_steps"))) {
-      await ctx.createTable("workflow_steps", {}, (t) => {
+      await adapter.createTable("workflow_steps", {}, (t) => {
         t.integer("job_id");
         t.string("name");
         t.string("status");
@@ -614,7 +612,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
     }
 
     if (!(await tableExists(adapter, "api_compare_privates_stats"))) {
-      await ctx.createTable("api_compare_privates_stats", {}, (t) => {
+      await adapter.createTable("api_compare_privates_stats", {}, (t) => {
         t.string("merge_commit_sha");
         t.integer("pr_number");
         t.string("package");
@@ -631,7 +629,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
 
   await adapter.beginTransaction();
   try {
-    await ctx.createTable("pull_requests", { id: false }, (t) => {
+    await adapter.createTable("pull_requests", { id: false }, (t) => {
       t.integer("number", { primaryKey: true });
       t.string("title");
       t.string("author");
@@ -659,7 +657,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
       t.integer("reactions_synced", { default: 0 });
     });
 
-    await ctx.createTable("pr_files", {}, (t) => {
+    await adapter.createTable("pr_files", {}, (t) => {
       t.integer("pr_number");
       t.string("filename");
       t.string("status");
@@ -670,7 +668,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
       t.index(["pr_number", "filename"], { unique: true });
     });
 
-    await ctx.createTable("pr_commits", {}, (t) => {
+    await adapter.createTable("pr_commits", {}, (t) => {
       t.integer("pr_number");
       t.string("sha");
       t.text("message");
@@ -679,7 +677,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
       t.index(["pr_number", "sha"], { unique: true });
     });
 
-    await ctx.createTable("pr_comments", { id: false }, (t) => {
+    await adapter.createTable("pr_comments", { id: false }, (t) => {
       t.integer("id", { primaryKey: true });
       t.integer("pr_number");
       t.string("author");
@@ -693,7 +691,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
       t.index(["pr_number"]);
     });
 
-    await ctx.createTable("pr_reviews", { id: false }, (t) => {
+    await adapter.createTable("pr_reviews", { id: false }, (t) => {
       t.integer("id", { primaryKey: true });
       t.integer("pr_number");
       t.string("author");
@@ -706,14 +704,14 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
       t.index(["source_path"], { unique: true });
     });
 
-    await ctx.createTable("pr_requested_reviewers", {}, (t) => {
+    await adapter.createTable("pr_requested_reviewers", {}, (t) => {
       t.integer("pr_number");
       t.string("reviewer");
       t.string("reviewer_type");
       t.index(["pr_number", "reviewer", "reviewer_type"], { unique: true });
     });
 
-    await ctx.createTable("pr_linked_issues", {}, (t) => {
+    await adapter.createTable("pr_linked_issues", {}, (t) => {
       t.integer("pr_number");
       t.integer("issue_number");
       t.string("issue_title");
@@ -721,7 +719,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
       t.index(["pr_number", "issue_number"], { unique: true });
     });
 
-    await ctx.createTable("pr_timeline_events", {}, (t) => {
+    await adapter.createTable("pr_timeline_events", {}, (t) => {
       t.integer("pr_number");
       t.string("event_type");
       t.string("actor");
@@ -731,7 +729,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
       t.index(["pr_number"]);
     });
 
-    await ctx.createTable("pr_reactions", { id: false }, (t) => {
+    await adapter.createTable("pr_reactions", { id: false }, (t) => {
       t.integer("reaction_id", { primaryKey: true });
       t.integer("pr_number");
       t.string("user");
@@ -741,7 +739,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
       t.index(["pr_number"]);
     });
 
-    await ctx.createTable("workflow_runs", { id: false }, (t) => {
+    await adapter.createTable("workflow_runs", { id: false }, (t) => {
       t.integer("id", { primaryKey: true });
       t.string("head_sha");
       t.integer("pr_number");
@@ -757,7 +755,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
       t.index(["head_sha"]);
     });
 
-    await ctx.createTable("workflow_jobs", { id: false }, (t) => {
+    await adapter.createTable("workflow_jobs", { id: false }, (t) => {
       t.integer("id", { primaryKey: true });
       t.integer("run_id");
       t.string("name");
@@ -769,7 +767,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
       t.index(["run_id", "name"]);
     });
 
-    await ctx.createTable("workflow_steps", {}, (t) => {
+    await adapter.createTable("workflow_steps", {}, (t) => {
       t.integer("job_id");
       t.string("name");
       t.string("status");
@@ -781,7 +779,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
       t.index(["job_id", "number"], { unique: true });
     });
 
-    await ctx.createTable("check_annotations", {}, (t) => {
+    await adapter.createTable("check_annotations", {}, (t) => {
       t.integer("run_id");
       t.integer("job_id");
       t.string("path");
@@ -794,7 +792,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
       t.index(["job_id"]);
     });
 
-    await ctx.createTable("test_compare_stats", {}, (t) => {
+    await adapter.createTable("test_compare_stats", {}, (t) => {
       t.string("merge_commit_sha");
       t.integer("pr_number");
       t.string("package");
@@ -808,7 +806,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
       t.index(["merge_commit_sha", "package"], { unique: true });
     });
 
-    await ctx.createTable("api_compare_stats", {}, (t) => {
+    await adapter.createTable("api_compare_stats", {}, (t) => {
       t.string("merge_commit_sha");
       t.integer("pr_number");
       t.string("package");
@@ -820,7 +818,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
       t.index(["merge_commit_sha", "package"], { unique: true });
     });
 
-    await ctx.createTable("api_compare_privates_stats", {}, (t) => {
+    await adapter.createTable("api_compare_privates_stats", {}, (t) => {
       t.string("merge_commit_sha");
       t.integer("pr_number");
       t.string("package");
@@ -831,7 +829,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
       t.index(["merge_commit_sha", "package"], { unique: true });
     });
 
-    await ctx.createTable("compare_logs", {}, (t) => {
+    await adapter.createTable("compare_logs", {}, (t) => {
       t.string("merge_commit_sha");
       t.integer("pr_number");
       t.string("step_name");
@@ -839,7 +837,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
       t.index(["merge_commit_sha", "step_name"], { unique: true });
     });
 
-    await ctx.createTable("raw_job_logs", { id: false }, (t) => {
+    await adapter.createTable("raw_job_logs", { id: false }, (t) => {
       t.integer("job_id", { primaryKey: true });
       t.integer("run_id");
       t.string("job_name");
@@ -850,7 +848,7 @@ async function migrateDb(adapter: AbstractSQLite3Adapter) {
       t.index(["run_id"]);
     });
 
-    await ctx.createTable("sync_log", {}, (t) => {
+    await adapter.createTable("sync_log", {}, (t) => {
       t.string("synced_at");
       t.integer("prs_synced", { default: 0 });
       t.integer("runs_synced", { default: 0 });

@@ -21,14 +21,10 @@
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { Base, MigrationContext, registerModel } from "../index.js";
+import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { findTarget } from "./has-many-association.js";
 import { fixtures } from "../test-fixtures.js";
-
-function migrationCtx() {
-  return new MigrationContext(Base.connection);
-}
 
 describe("DJAS routing widening — nested-through", () => {
   fixtures([]);
@@ -62,18 +58,18 @@ describe("DJAS routing widening — nested-through", () => {
   }
 
   beforeAll(async () => {
-    await migrationCtx().createTable("nt_authors", { force: true }, (t: any) => {
+    await Base.connection.createTable("nt_authors", { force: true }, (t: any) => {
       t.string("name");
     });
-    await migrationCtx().createTable("nt_posts", { force: true }, (t: any) => {
+    await Base.connection.createTable("nt_posts", { force: true }, (t: any) => {
       t.integer("nt_author_id");
       t.string("title");
     });
-    await migrationCtx().createTable("nt_comments", { force: true }, (t: any) => {
+    await Base.connection.createTable("nt_comments", { force: true }, (t: any) => {
       t.integer("nt_post_id");
       t.string("body");
     });
-    await migrationCtx().createTable("nt_ratings", { force: true }, (t: any) => {
+    await Base.connection.createTable("nt_ratings", { force: true }, (t: any) => {
       t.integer("nt_comment_id");
       t.integer("value");
     });
@@ -111,7 +107,7 @@ describe("DJAS routing widening — nested-through", () => {
   });
 
   afterAll(async () => {
-    await migrationCtx().dropTable("nt_ratings", "nt_comments", "nt_posts", "nt_authors", {
+    await Base.connection.dropTable("nt_ratings", "nt_comments", "nt_posts", "nt_authors", {
       ifExists: true,
     });
   });

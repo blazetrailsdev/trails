@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { travel, travelBack } from "@blazetrails/activesupport";
-import { Base, MigrationContext, registerModel } from "./index.js";
+import { Base, registerModel } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import {
   Developer,
@@ -527,13 +527,11 @@ describe("TimestampsWithoutTransactionTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
   afterEach(async () => {
-    const ctx = new MigrationContext(Base.connection);
-    await ctx.dropTable("timestamp_attribute_posts", "foos", { ifExists: true });
+    await Base.connection.dropTable("timestamp_attribute_posts", "foos", { ifExists: true });
   });
 
   it("do not write timestamps on save if they are not attributes", async () => {
-    const ctx = new MigrationContext(Base.connection);
-    await ctx.createTable("timestamp_attribute_posts", { force: true }, (t) => {
+    await Base.connection.createTable("timestamp_attribute_posts", { force: true }, (t) => {
       // Only id column — no created_at / updated_at
     });
 
@@ -559,15 +557,16 @@ describe("TimestampsWithoutTransactionTest", () => {
   });
 
   it("index is created for both timestamps", async () => {
-    const ctx = new MigrationContext(Base.connection);
-    await ctx.createTable("foos", { force: true }, (t) => {
+    await Base.connection.createTable("foos", { force: true }, (t) => {
       t.timestamps({ null: true, index: true });
     });
 
-    const indexes = await ctx.indexes("foos");
+    // AbstractAdapter#indexes is declared `Promise<unknown[]>` (the concrete
+    // IndexDefinition shape lives on the dialect adapters).
+    const indexes = (await Base.connection.indexes("foos")) as { columns: string[] }[];
     const columns = indexes.flatMap((i) => i.columns).sort();
     expect(columns).toEqual(["created_at", "updated_at"]);
 
-    await ctx.dropTable("foos");
+    await Base.connection.dropTable("foos");
   });
 });

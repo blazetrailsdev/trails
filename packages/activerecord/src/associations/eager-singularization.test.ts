@@ -6,63 +6,59 @@
  * (viri/octopi/passes/buses/crises_messes/messes/crises/successes/analyses/
  * dresses/compresses) are deliberately irregular plurals with no schema.rb
  * analog; Rails creates them dynamically in setup and drops them in teardown.
- * We mirror that with MigrationContext createTable/dropTable — the model table
+ * We mirror that with the adapter's createTable/dropTable — the model table
  * names derive from the inflector exactly as in Rails (no _tableName hacks).
  */
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, beforeAll, afterAll, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { MigrationContext } from "../migration.js";
 import { fixtures } from "../test-fixtures.js";
 
 describe("EagerSingularizationTest", () => {
   fixtures([]);
 
-  let ctx: MigrationContext;
-
   beforeAll(async () => {
-    ctx = new MigrationContext(Base.connection);
-    await ctx.createTable("viri", { force: true }, (t) => {
+    await Base.connection.createTable("viri", { force: true }, (t) => {
       t.integer("octopus_id");
       t.string("species");
     });
-    await ctx.createTable("octopi", { force: true }, (t) => {
+    await Base.connection.createTable("octopi", { force: true }, (t) => {
       t.string("species");
     });
-    await ctx.createTable("passes", { force: true }, (t) => {
+    await Base.connection.createTable("passes", { force: true }, (t) => {
       t.integer("bus_id");
       t.integer("rides");
     });
-    await ctx.createTable("buses", { force: true }, (t) => {
+    await Base.connection.createTable("buses", { force: true }, (t) => {
       t.string("name");
     });
-    await ctx.createTable("crises_messes", { id: false, force: true }, (t) => {
+    await Base.connection.createTable("crises_messes", { id: false, force: true }, (t) => {
       t.integer("crisis_id");
       t.integer("mess_id");
     });
-    await ctx.createTable("messes", { force: true }, (t) => {
+    await Base.connection.createTable("messes", { force: true }, (t) => {
       t.string("name");
     });
-    await ctx.createTable("crises", { force: true }, (t) => {
+    await Base.connection.createTable("crises", { force: true }, (t) => {
       t.string("name");
     });
-    await ctx.createTable("successes", { force: true }, (t) => {
+    await Base.connection.createTable("successes", { force: true }, (t) => {
       t.string("name");
     });
-    await ctx.createTable("analyses", { force: true }, (t) => {
+    await Base.connection.createTable("analyses", { force: true }, (t) => {
       t.integer("crisis_id");
       t.integer("success_id");
     });
-    await ctx.createTable("dresses", { force: true }, (t) => {
+    await Base.connection.createTable("dresses", { force: true }, (t) => {
       t.integer("crisis_id");
     });
-    await ctx.createTable("compresses", { force: true }, (t) => {
+    await Base.connection.createTable("compresses", { force: true }, (t) => {
       t.integer("dress_id");
     });
   });
 
   afterAll(async () => {
-    await ctx.dropTable(
+    await Base.connection.dropTable(
       "viri",
       "octopi",
       "passes",
