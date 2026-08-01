@@ -10,6 +10,7 @@
  */
 import { createRequire } from "node:module";
 import { Deprecation, getPath } from "@blazetrails/activesupport";
+import type { Migration } from "./migration.js";
 
 export { Deprecation as Deprecator };
 
@@ -39,6 +40,15 @@ export interface ActiveRecord {
  *
  * Mirrors: ActiveRecord::MigrationProxy (defined in migration.rb,
  * mapped to deprecator.rb by the api:compare extractor)
+ *
+ * This is the file-loading proxy: it resolves `name` out of `filename` and
+ * constructs the migration, mirroring `load_migration`'s
+ * `name.constantize.new(name, version)`. It stays separate from the
+ * `MigrationProxy` interface in `migration.ts` — the already-resolved shape
+ * `Migrator` consumes, whose `loadMigration` is async — because api:compare
+ * buckets the `MigrationProxy` surface under `deprecator.rb` while `Migrator`
+ * must keep its collaborator type in `migration.ts`. Both delegate to a real
+ * `Migration`.
  */
 export class MigrationProxy {
   name: string;
@@ -46,8 +56,8 @@ export class MigrationProxy {
   filename: string;
   scope: string;
 
-  private _migration: object | null = null;
-  private _migrationPromise: Promise<object> | null = null;
+  private _migration: Migration | null = null;
+  private _migrationPromise: Promise<Migration> | null = null;
 
   constructor(name: string, version: string, filename: string, scope: string) {
     this.name = name;
@@ -61,44 +71,47 @@ export class MigrationProxy {
   }
 
   async migrate(direction: "up" | "down"): Promise<void> {
-    return ((await this.migration()) as { migrate(d: "up" | "down"): Promise<void> }).migrate(
-      direction,
-    );
+    return (await this.migration()).migrate(direction);
   }
 
   async announce(message: string): Promise<void> {
-    ((await this.migration()) as { announce(msg: string): void }).announce(message);
+    (await this.migration()).announce(message);
   }
 
   async write(text = ""): Promise<void> {
-    ((await this.migration()) as { write(t: string): void }).write(text);
+    (await this.migration()).write(text);
   }
 
   get disableDdlTransaction(): boolean {
     if (!this._migration)
       throw new Error("MigrationProxy: await migration() before reading disableDdlTransaction");
-    return !!(this._migration as { disableDdlTransaction?: boolean }).disableDdlTransaction;
+    return !!this._migration.disableDdlTransaction;
   }
 
   /** @internal */
-  migration(): Promise<object> {
+  migration(): Promise<Migration> {
     this._migrationPromise ??= this.loadMigrationAsync().then((m) => (this._migration = m));
     return this._migrationPromise;
   }
 
   /** @internal */
-  loadMigration(): object {
+  loadMigration(): Migration {
     const req = createRequire(import.meta.url);
     delete req.cache[req.resolve(this.filename)];
-    const mod = req(this.filename) as Record<string, new (name: string, version: string) => object>;
+    return this._instantiate(req(this.filename) as Record<string, unknown>);
+  }
+
+  /** Mirrors: `name.constantize.new(name, version)` (`migration.rb:1195`). */
+  private _instantiate(mod: Record<string, unknown>, cause?: unknown): Migration {
     const klass = mod[this.name] ?? mod.default;
     if (typeof klass !== "function") {
       throw new Error(
         `Migration ${this.name} could not be loaded from ${this.filename}: ` +
           `no export named "${this.name}" or "default" found`,
+        cause === undefined ? undefined : { cause },
       );
     }
-    return new (klass as new (name: string, version: string) => object)(this.name, this.version);
+    return new (klass as new (name: string, version: string) => Migration)(this.name, this.version);
   }
 
   /**
@@ -106,7 +119,7 @@ export class MigrationProxy {
    * ESM-capable loader. Falls through to `require()` for CJS migrations and
    * uses `import(pathToFileURL(...))` for ESM files (ERR_REQUIRE_ESM).
    */
-  async loadMigrationAsync(): Promise<object> {
+  async loadMigrationAsync(): Promise<Migration> {
     try {
       // require() works for CJS migrations; falls through to import() for ESM.
       return this.loadMigration();
@@ -120,17 +133,9 @@ export class MigrationProxy {
       const { pathToFileURL } = await import("node:url");
       const mod = (await import(/* @vite-ignore */ pathToFileURL(this.filename).href)) as Record<
         string,
-        new (name: string, version: string) => object
+        unknown
       >;
-      const klass = mod[this.name] ?? mod.default;
-      if (typeof klass !== "function") {
-        throw new Error(
-          `Migration ${this.name} could not be loaded from ${this.filename}: ` +
-            `no export named "${this.name}" or "default" found`,
-          { cause: err },
-        );
-      }
-      return new (klass as new (name: string, version: string) => object)(this.name, this.version);
+      return this._instantiate(mod, err);
     }
   }
 }
