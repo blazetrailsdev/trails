@@ -4,7 +4,7 @@ import { methodName } from "./naming.js";
 import { rubyAbsPathFor } from "./files.js";
 
 const RUBY_DEF = /^\s*def\s+(?:self\.)?([A-Za-z_][\w]*[?!=]?)/gm;
-const MIXIN_LINE = /^[ \t]*(?:include|extend)[ \t]+([A-Z][\w:]*)/gm;
+const MIXIN_LINE = /^[ \t]*(?:include|extend)[ \t]+([A-Z][\w:]*(?:[ \t]*,[ \t]*[A-Z][\w:]*)*)/gm;
 
 export function rubyDefinedMethods(rubySource: string): Set<string> {
   const defs = new Set<string>();
@@ -12,9 +12,13 @@ export function rubyDefinedMethods(rubySource: string): Set<string> {
   return defs;
 }
 
-/** The `include Foo` / `extend Foo::Bar` constant names in a Ruby source. */
+/**
+ * The `include Foo` / `extend Foo::Bar` constant names in a Ruby source. One
+ * `include` can name several modules — `Relation` mixes in seven of them on a
+ * single line — so every constant on the line is returned, not just the first.
+ */
 export function parseMixinNames(rubySource: string): string[] {
-  return [...rubySource.matchAll(MIXIN_LINE)].map((m) => m[1]);
+  return [...rubySource.matchAll(MIXIN_LINE)].flatMap((m) => m[1].split(",").map((n) => n.trim()));
 }
 
 function underscore(segment: string): string {
@@ -70,6 +74,10 @@ const reachableCache = new Map<string, Set<string>>();
  * to. Scoping it to the whole target corpus made two same-named Rails methods
  * in unrelated files indistinguishable, and the async one dragged an await
  * onto the sync one's self-call.
+ *
+ * `def`s are collected flat, so a `def` in an inner class (`Relation`'s
+ * `ExplainProxy`) counts as reachable. That errs toward the old, wider scope
+ * and never drops a name the file really can dispatch to.
  */
 export function reachableRailsDefs(railsRelPath: string): Set<string> {
   const cached = reachableCache.get(railsRelPath);

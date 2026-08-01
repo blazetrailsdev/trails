@@ -19,6 +19,7 @@ describe("prism-codegen rails scope", () => {
     expect(names).toEqual([
       "Enumerable",
       "FinderMethods",
+      "Calculations",
       "ActiveRecord::Delegation::DelegateCache",
     ]);
   });
@@ -36,8 +37,11 @@ describe("prism-codegen rails scope", () => {
   it("reaches the defs of the modules a Rails file includes", () => {
     const relation = reachableRailsDefs("active_record/relation.rb");
     expect(relation.has("findBy")).toBe(true);
-    expect(relation.has("pluck")).toBe(true);
+    expect(relation.has("calculate")).toBe(true);
+    expect(relation.has("where")).toBe(true);
+    expect(relation.has("scoping")).toBe(true);
     expect(reachableRailsDefs("active_record/relation/finder_methods.rb").has("pluck")).toBe(false);
+    expect(reachableRailsDefs("active_record/relation/finder_methods.rb").has("where")).toBe(false);
   });
 
   it("declines a cross-file async name the generating Rails file cannot dispatch to", () => {
