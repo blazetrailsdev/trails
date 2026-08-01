@@ -1,5 +1,25 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Base } from "../base.js";
+import { ActiveRecordError } from "../errors.js";
+import type { Base } from "../base.js";
+
+let _base: typeof Base | undefined;
+
+/**
+ * @internal Receives `ActiveRecord::Base` from base.ts at module init. Rails
+ * resolves the constant at call time via autoload (attribute_methods.rb:88), so base.rb
+ * is not required here; in ESM a value import of `base.js` would instead be a
+ * load-time edge putting base.ts in an import cycle, leaving its own
+ * module-evaluation-time mixin wiring dependent on the graph's entry order.
+ */
+export function _registerBase(base: typeof Base): void {
+  _base = base;
+}
+
+function baseClass(): typeof Base {
+  if (!_base) throw new ActiveRecordError("ActiveRecord::Base has not finished loading");
+  return _base;
+}
+
 import { Relation } from "../relation.js";
 import { Default } from "./default.js";
 
@@ -36,7 +56,7 @@ const INTRINSIC_FUNCTION_PROPS = new Set(["length", "name", "prototype"]);
 export function isDangerousClassMethod(name: string): boolean {
   if (RESTRICTED_CLASS_METHODS.has(name)) return true;
   if (INTRINSIC_FUNCTION_PROPS.has(name)) return false;
-  let klass: any = Base;
+  let klass: any = baseClass();
   while (klass && klass !== Function.prototype && klass !== Object.prototype) {
     if (Object.prototype.hasOwnProperty.call(klass, name)) return true;
     klass = Object.getPrototypeOf(klass);

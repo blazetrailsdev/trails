@@ -17,8 +17,19 @@ import {
   stdout,
   stderr,
 } from "@blazetrails/activesupport";
-import { ConnectionNotDefined } from "../errors.js";
-import { Base } from "../base.js";
+import { ActiveRecordError, ConnectionNotDefined } from "../errors.js";
+import type { Base } from "../base.js";
+
+let _base: typeof Base | undefined;
+
+function setModuleBase(base: typeof Base): void {
+  _base = base;
+}
+
+function baseClass(): typeof Base {
+  if (!_base) throw new ActiveRecordError("ActiveRecord::Base has not finished loading");
+  return _base;
+}
 
 /**
  * Raised when a database task is invoked against an adapter that
@@ -1232,9 +1243,17 @@ export class DatabaseTasks {
     return Base;
   }
 
-  /** @internal Called from base.ts at module init so migrationConnection() works before any async method runs. */
+  /**
+   * @internal Receives `ActiveRecord::Base` from base.ts at module init. Rails
+   * resolves the constant at call time via autoload
+   * (database_statements.rb:222-223), so base.rb is not required here; in ESM a
+   * value import of `base.js` would instead be a load-time edge putting base.ts
+   * in an import cycle, leaving its own module-evaluation-time mixin wiring
+   * dependent on the graph's entry order.
+   */
   static _registerBase(base: typeof import("../base.js").Base): void {
     this._baseClass = base;
+    setModuleBase(base);
   }
 
   static migrationConnection():
@@ -1469,11 +1488,12 @@ export function isVerbose(): boolean {
  * internal_metadata.rb:31-32).
  */
 export function metadataTableNames(): Set<string> {
-  const prefix = Base.tableNamePrefix;
-  const suffix = Base.tableNameSuffix;
+  const base = baseClass();
+  const prefix = base.tableNamePrefix;
+  const suffix = base.tableNameSuffix;
   return new Set([
-    `${prefix}${Base.schemaMigrationsTableName}${suffix}`,
-    `${prefix}${Base.internalMetadataTableName}${suffix}`,
+    `${prefix}${base.schemaMigrationsTableName}${suffix}`,
+    `${prefix}${base.internalMetadataTableName}${suffix}`,
   ]);
 }
 

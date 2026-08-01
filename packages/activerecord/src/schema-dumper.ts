@@ -29,7 +29,26 @@ import type {
   Column,
 } from "./connection-adapters/abstract/schema-dumper.js";
 import { SchemaMigration } from "./schema-migration.js";
-import { Base } from "./base.js";
+import { ActiveRecordError } from "./errors.js";
+import type { Base } from "./base.js";
+
+let _base: typeof Base | undefined;
+
+/**
+ * @internal Receives `ActiveRecord::Base` from base.ts at module init. Rails
+ * resolves the constant at call time via autoload (schema_dumper.rb:78-80), so base.rb
+ * is not required here; in ESM a value import of `base.js` would instead be a
+ * load-time edge putting base.ts in an import cycle, leaving its own
+ * module-evaluation-time mixin wiring dependent on the graph's entry order.
+ */
+export function _registerBase(base: typeof Base): void {
+  _base = base;
+}
+
+function baseClass(): typeof Base {
+  if (!_base) throw new ActiveRecordError("ActiveRecord::Base has not finished loading");
+  return _base;
+}
 
 // Lazy-load schema-introspection to break the static cycle
 // (schema-dumper -> schema-introspection -> schema-statements ->
@@ -394,9 +413,10 @@ export class SchemaDumper {
     // Rails seeds @ignore_tables from the configurable bookkeeping table names
     // (schema_dumper.rb:78-80) so a renamed schema_migrations/ar_internal_metadata
     // table is still excluded from the dump.
+    const base = baseClass();
     this._ignoreTables = [
-      Base.schemaMigrationsTableName,
-      Base.internalMetadataTableName,
+      base.schemaMigrationsTableName,
+      base.internalMetadataTableName,
       ...subclassIgnore,
     ];
   }

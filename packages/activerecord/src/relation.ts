@@ -11,7 +11,6 @@ import {
 import type { Base } from "./base.js";
 import { withQueryConnection, threadedConnectionFor } from "./connection-handling.js";
 import { exceedsBindParamsLimit } from "./connection-adapters/abstract/database-limits.js";
-import { _setRelationCtor, _setScopeProxyWrapper, _setRelationClassResolver } from "./base.js";
 import {
   ActiveRecordError,
   ConnectionNotEstablished,
@@ -7746,11 +7745,6 @@ include(Relation, DelegationMethods);
 
 // Thenable: make Relation directly awaitable (delegates to toArray).
 applyThenable(Relation.prototype);
-
-// Register Relation with Base to break the circular dependency.
-_setRelationCtor(Relation as any);
-_setScopeProxyWrapper(wrapWithScopeProxy);
-_setRelationClassResolver(relationClassFor);
 
 /** @internal */
 async function computeCacheKey(

@@ -6,8 +6,9 @@
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { Base } from "./base.js";
+import type { Base } from "./base.js";
 import { EnvironmentStorageError } from "./migration.js";
+import { ActiveRecordError } from "./errors.js";
 import {
   Table,
   SelectManager,
@@ -17,6 +18,24 @@ import {
   Nodes,
   star,
 } from "@blazetrails/arel";
+
+let _base: typeof Base | undefined;
+
+/**
+ * @internal Receives `ActiveRecord::Base` from base.ts at module init. Rails
+ * resolves the constant at call time via autoload (internal_metadata.rb:32), so base.rb
+ * is not required here; in ESM a value import of `base.js` would instead be a
+ * load-time edge putting base.ts in an import cycle, leaving its own
+ * module-evaluation-time mixin wiring dependent on the graph's entry order.
+ */
+export function _registerBase(base: typeof Base): void {
+  _base = base;
+}
+
+function baseClass(): typeof Base {
+  if (!_base) throw new ActiveRecordError("ActiveRecord::Base has not finished loading");
+  return _base;
+}
 
 /**
  * Stand-in for InternalMetadata when metadata storage is disabled
@@ -63,7 +82,8 @@ export class InternalMetadata {
   // Rails: "#{Base.table_name_prefix}#{Base.internal_metadata_table_name}
   // #{Base.table_name_suffix}" (internal_metadata.rb:32).
   get tableName(): string {
-    return `${Base.tableNamePrefix}${Base.internalMetadataTableName}${Base.tableNameSuffix}`;
+    const base = baseClass();
+    return `${base.tableNamePrefix}${base.internalMetadataTableName}${base.tableNameSuffix}`;
   }
 
   private _enabled: boolean;

@@ -3,14 +3,31 @@ import { Nodes, Visitors } from "@blazetrails/arel";
 import { ArgumentError, SerializeCastValue } from "@blazetrails/activemodel";
 import { IndexDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { realPool } from "./connection-adapters/abstract/connection-pool.js";
-import { UnknownAttributeError } from "./errors.js";
+import { ActiveRecordError, UnknownAttributeError } from "./errors.js";
 import type { Base } from "./base.js";
-import { quoteSqlValue } from "./base.js";
+
 import { stiName, isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
 import { Result } from "./result.js";
 import { withPooledOrDirectConnection } from "./connection-handling.js";
+
+let _quoteSqlValue: ((v: unknown, dialect?: AdapterName) => string) | undefined;
+
+/**
+ * @internal Receives base.ts's `quoteSqlValue` at module init. Importing it for
+ * its value would be a load-time edge putting base.ts in an import cycle,
+ * leaving its own module-evaluation-time mixin wiring dependent on the graph's
+ * entry order.
+ */
+export function _registerQuoteSqlValue(fn: (v: unknown, dialect?: AdapterName) => string): void {
+  _quoteSqlValue = fn;
+}
+
+function quoteSqlValue(v: unknown, dialect?: AdapterName): string {
+  if (!_quoteSqlValue) throw new ActiveRecordError("ActiveRecord::Base has not finished loading");
+  return _quoteSqlValue(v, dialect);
+}
 
 type ModelClass = typeof Base;
 type AdapterDialect = AdapterName;
