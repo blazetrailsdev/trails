@@ -7,7 +7,7 @@ require("active_record/insert_all");
 // module ActiveRecord
 extend(ActiveSupport.Concern);
 // module ClassMethods
-export async function create(attributes = null, block) {
+export function create(attributes = null, block) {
     let object;
     if (attributes.isA(Array)) {
         return attributes.collect(attr => await this.create(attr, block));
@@ -18,7 +18,7 @@ export async function create(attributes = null, block) {
         return object;
     }
 }
-export async function createBang(attributes = null, block) {
+export function createBang(attributes = null, block) {
     let object;
     if (attributes.isA(Array)) {
         return attributes.collect(attr => await this.createBang(attr, block));
@@ -42,7 +42,7 @@ export function instantiate(attributes, column_types = {}, block) {
     klass = this.discriminateClassForRecord(attributes);
     return this.instantiateInstanceOf(klass, attributes, column_types, block);
 }
-export async function update(id = "all") {
+export function update(id = "all") {
     let object;
     if (id.isA(Array)) {
         if (id.isAny(ActiveRecord.Base)) {
@@ -62,7 +62,7 @@ export async function update(id = "all") {
         return object;
     }
 }
-export async function updateBang(id = "all") {
+export function updateBang(id = "all") {
     let object;
     if (id.isA(Array)) {
         if (id.isAny(ActiveRecord.Base)) {
@@ -98,7 +98,7 @@ export function queryConstraintsList() {
 export function compositeQueryConstraintsList() {
     return this.composite_query_constraints_list ||= this.queryConstraintsList || this.Array(this.primaryKey);
 }
-export async function _insertRecord(connection, values, returning) {
+export function _insertRecord(connection, values, returning) {
     let primary_key, primary_key_value, im;
     primary_key = this.primaryKey();
     primary_key_value = null;
@@ -114,7 +114,7 @@ export async function _insertRecord(connection, values, returning) {
     }
     return connection.insert(im, `${this} Create`, primary_key || false, primary_key_value, { returning: returning });
 }
-export async function _updateRecord(values, constraints) {
+export function _updateRecord(values, constraints) {
     let default_constraint, current_scope, um;
     constraints = constraints.map((name, value) => __PRISM_TODO("CallNode"));
     default_constraint = this.buildDefaultConstraint;
@@ -129,7 +129,7 @@ export async function _updateRecord(values, constraints) {
     um.wheres = constraints;
     return this.withConnection(c => c.update(um, `${this} Update`));
 }
-export async function _deleteRecord(constraints) {
+export function _deleteRecord(constraints) {
     let default_constraint, current_scope, dm;
     constraints = constraints.map((name, value) => __PRISM_TODO("CallNode"));
     default_constraint = this.buildDefaultConstraint;
@@ -144,7 +144,7 @@ export async function _deleteRecord(constraints) {
     return this.withConnection(c => c.delete(dm, `${this} Destroy`));
 }
 __PRISM_TODO("CallNode");
-export async function inherited(subclass) {
+export function inherited(subclass) {
     return subclass.classEval(() => {
         this._query_constraints_list = null;
         return this.has_query_constraints = false;
@@ -182,7 +182,7 @@ export function isDestroyed() {
 export function isPersisted() {
     return !(this.new_record || this.destroyed);
 }
-export async function save({ ...options } = {}, block) {
+export function save({ ...options } = {}, block) {
     try {
         return this.createOrUpdate({ ...options }, block);
     }
@@ -190,11 +190,11 @@ export async function save({ ...options } = {}, block) {
         return false;
     }
 }
-export async function saveBang({ ...options } = {}, block) {
+export function saveBang({ ...options } = {}, block) {
     return this.createOrUpdate({ ...options }, block) || (() => { throw new RecordNotSaved("Failed to save the record", this); })();
 }
 __PRISM_TODO("DefNode");
-export async function destroy() {
+export function destroy() {
     if (this.isReadonly) {
         this._raiseReadonlyRecordError;
     }
@@ -204,7 +204,7 @@ export async function destroy() {
     this.previously_new_record = false;
     return this.freeze;
 }
-export async function destroyBang() {
+export function destroyBang() {
     return this.destroy || this._raiseRecordNotDestroyed;
 }
 export function becomes(klass) {
@@ -242,13 +242,13 @@ export async function updateAttributeBang(name, value) {
     this.publicSend(`${name}=`, value);
     return await this.saveBang({ validate: false });
 }
-export async function update(attributes) {
+export function update(attributes) {
     return this.withTransactionReturningStatus(() => {
         this.assignAttributes(attributes);
         return this.save;
     });
 }
-export async function updateBang(attributes) {
+export function updateBang(attributes) {
     return this.withTransactionReturningStatus(() => {
         this.assignAttributes(attributes);
         return this.saveBang;
@@ -257,7 +257,7 @@ export async function updateBang(attributes) {
 export async function updateColumn(name, value) {
     return await this.updateColumns({ [name]: value });
 }
-export async function updateColumns(attributes) {
+export function updateColumns(attributes) {
     let name, update_constraints, affected_rows;
     if (this.isNewRecord) {
         throw new ActiveRecordError("cannot update a new record");
@@ -283,7 +283,7 @@ export function increment(attribute, by = 1) {
     this[attribute] += by;
     return this;
 }
-export async function incrementBang(attribute, by = 1, { touch = null } = {}) {
+export function incrementBang(attribute, by = 1, { touch = null } = {}) {
     let change;
     this.increment(attribute, by);
     change = this.publicSend(attribute) - (this.publicSend(__PRISM_TODO("InterpolatedSymbolNode")) || 0);
@@ -301,10 +301,10 @@ export function toggle(attribute) {
     this[attribute] = !this.publicSend(`${attribute}?`);
     return this;
 }
-export async function toggleBang(attribute) {
+export function toggleBang(attribute) {
     return this.toggle(attribute).updateAttribute(attribute, this[attribute]);
 }
-export async function reload(options = null) {
+export function reload(options = null) {
     let fresh_object;
     this.class().connectionPool().clearQueryCache();
     fresh_object = this.isApplyScoping(options) ? this._findRecord((options || {}).merge({ all_queries: true })) : this.class().unscoped(() => this._findRecord(options));
@@ -379,7 +379,7 @@ export function _queryConstraintsHash() {
 }
 export function destroyAssociations() {
 }
-export async function destroyRow() {
+export function destroyRow() {
     return this._deleteRow;
 }
 export function _deleteRow() {
@@ -390,7 +390,7 @@ export function _touchRow(attribute_names, time) {
     attribute_names.each(attr_name => this._writeAttribute(attr_name, time));
     return this._updateRow(attribute_names, "touch");
 }
-export async function _updateRow(attribute_names, attempted_action = "update") {
+export function _updateRow(attribute_names, attempted_action = "update") {
     return this.class()._updateRecord(this.attributesWithValues(attribute_names), this._queryConstraintsHash);
 }
 export function createOrUpdate({ ...opts } = {}, block) {

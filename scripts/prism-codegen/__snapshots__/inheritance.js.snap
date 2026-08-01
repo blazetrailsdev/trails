@@ -99,7 +99,7 @@ export function polymorphicClassFor(name) {
         return this.computeType(name);
     }
 }
-export async function dup() {
+export function dup() {
     let other;
     other = __PRISM_SUPER_OUTSIDE_CORPUS("Inheritance::ClassMethods#dup");
     other.setBaseClass();
@@ -136,7 +136,7 @@ export function setBaseClass() {
     return this.base_class = __PRISM_TODO("IfNode");
 }
 __PRISM_TODO("CallNode");
-export async function inherited(subclass) {
+export function inherited(subclass) {
     subclass.setBaseClass();
     subclass.instanceVariableSet("@_type_candidates_cache", new Concurrent.Map());
     return subclass.classEval(() => this.finder_needs_type_condition = null);

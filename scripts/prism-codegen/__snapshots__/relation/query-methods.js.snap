@@ -38,7 +38,7 @@ export class WhereChain {
         });
         return this.scope;
     }
-    async missing(...associations) {
+    missing(...associations) {
         let reflection, association_conditions;
         associations.each(association => {
             reflection = this.scopeAssociationReflection(association);
@@ -98,7 +98,7 @@ export function eagerLoad(...args) {
     this.checkIfMethodHasArgumentsBang(this.__callee__, args);
     return this.spawn.eagerLoadBang(...args);
 }
-export async function eagerLoadBang(...args) {
+export function eagerLoadBang(...args) {
     __PRISM_TODO("CallOperatorWriteNode");
     return this;
 }
@@ -110,10 +110,10 @@ export function preloadBang(...args) {
     __PRISM_TODO("CallOperatorWriteNode");
     return this;
 }
-export async function extractAssociated(association) {
+export function extractAssociated(association) {
     return this.preload(association).collect(association);
 }
-export async function references(...table_names) {
+export function references(...table_names) {
     this.checkIfMethodHasArgumentsBang(this.__callee__, table_names);
     return this.spawn.referencesBang(...table_names);
 }
@@ -121,7 +121,7 @@ export function referencesBang(...table_names) {
     __PRISM_TODO("CallOperatorWriteNode");
     return this;
 }
-export async function select(...fields, block) {
+export function select(...fields, block) {
     if (block !== undefined) {
         if (fields.isAny()) {
             throw new ArgumentError("`select' with block doesn't take arguments.");
@@ -161,7 +161,7 @@ export function reselectBang(...args) {
     this.selectValues = args;
     return this;
 }
-export async function group(...args) {
+export function group(...args) {
     this.checkIfMethodHasArgumentsBang(this.__callee__, args);
     return this.spawn.groupBang(...args);
 }
@@ -377,7 +377,7 @@ export function offsetBang(value) {
 export function lock(locks = true) {
     return this.spawn.lockBang(locks);
 }
-export async function lockBang(locks = true) {
+export function lockBang(locks = true) {
     if (caseEq(String, locks) || caseEq(TrueClass, locks) || caseEq(NilClass, locks)) {
         this.lockValue = locks || true;
     }
@@ -399,7 +399,7 @@ export function noneBang() {
 export function isNullRelation() {
     return this.none;
 }
-export async function readonly(value = true) {
+export function readonly(value = true) {
     return this.spawn.readonlyBang(value);
 }
 export function readonlyBang(value = true) {
@@ -426,7 +426,7 @@ export function createWithBang(value) {
     }
     return this;
 }
-export async function from(value, subquery_name = null) {
+export function from(value, subquery_name = null) {
     return this.spawn.fromBang(value, subquery_name);
 }
 export function fromBang(value, subquery_name = null) {

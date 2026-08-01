@@ -219,7 +219,7 @@ export function inspectionFilter() {
         return this.inspection_filter ||= __PRISM_TODO("BeginNode");
     }
 }
-export async function inspect() {
+export function inspect() {
     let attr_list;
     if (this === Base || this.isSingletonClass) {
         return __PRISM_SUPER_OUTSIDE_CORPUS("Core::ClassMethods#inspect");
@@ -253,7 +253,7 @@ export function cachedFindByStatement(connection, key, block) {
     return cache.computeIfAbsent(key, () => StatementCache.create(connection, block));
 }
 __PRISM_TODO("CallNode");
-export async function inherited(subclass) {
+export function inherited(subclass) {
     let klass;
     subclass.initializeFindByCache();
     if (!subclass.isBaseClass()) {
@@ -281,7 +281,7 @@ export function relation() {
         return relation;
     }
 }
-export async function cachedFindBy(keys, values) {
+export function cachedFindBy(keys, values) {
     let statement, wheres;
     return this.withConnection(connection => {
         statement = this.cachedFindByStatement(connection, keys, params => {
@@ -359,7 +359,7 @@ export function encodeWith(coder) {
 }
 __PRISM_TODO("DefNode");
 __PRISM_TODO("AliasMethodNode");
-export async function hash() {
+export function hash() {
     let id;
     id = this.id();
     if (this.isPrimaryKeyValuesPresent) {
@@ -377,7 +377,7 @@ export function isFrozen() {
     return this.attributes.isFrozen();
 }
 __PRISM_TODO("DefNode");
-export async function isPresent() {
+export function isPresent() {
     return true;
 }
 export function isBlank() {
@@ -409,13 +409,13 @@ export function readonlyBang() {
 export function connectionHandler() {
     return this.class().connectionHandler();
 }
-export async function inspect() {
+export function inspect() {
     return this.inspectWithAttributes(this.attributesForInspect);
 }
 export function fullInspect() {
     return this.inspectWithAttributes(this.allAttributesForInspect);
 }
-export async function prettyPrint(pp) {
+export function prettyPrint(pp) {
     let attr_names, attr_name, value;
     if (this.isCustomInspectMethodDefined) {
         return __PRISM_SUPER_OUTSIDE_CORPUS("Core#pretty_print");
@@ -465,7 +465,7 @@ export function isCustomInspectMethodDefined() {
     return this.class().instanceMethod("inspect").owner() !== ActiveRecord.Base.instanceMethod("inspect").owner();
 }
 export class InspectionMask extends DelegateClass(String) {
-    async prettyPrint(pp) {
+    prettyPrint(pp) {
         return pp.text(this.__getobj__);
     }
 }

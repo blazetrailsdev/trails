@@ -14,10 +14,10 @@ export async function find(...args, block) {
     }
     return await this.findWithIds(...args);
 }
-export async function findBy(arg, ...args) {
+export function findBy(arg, ...args) {
     return this.where(arg, ...args).take();
 }
-export async function findByBang(arg, ...args) {
+export function findByBang(arg, ...args) {
     return this.where(arg, ...args).takeBang();
 }
 export async function take(limit = null) {
@@ -28,7 +28,7 @@ export async function take(limit = null) {
         return this.findTake;
     }
 }
-export async function takeBang() {
+export function takeBang() {
     return this.take || this.raiseRecordNotFoundExceptionBang;
 }
 export async function sole() {
@@ -44,7 +44,7 @@ export async function sole() {
         throw new ActiveRecord.SoleRecordExceeded(this.model);
     }
 }
-export async function findSoleBy(arg, ...args) {
+export function findSoleBy(arg, ...args) {
     return this.where(arg, ...args).sole();
 }
 export async function first(limit = null) {
@@ -55,7 +55,7 @@ export async function first(limit = null) {
         return await this.findNth(0);
     }
 }
-export async function firstBang() {
+export function firstBang() {
     return this.first || this.raiseRecordNotFoundExceptionBang;
 }
 export async function last(limit = null) {
@@ -72,49 +72,49 @@ export async function last(limit = null) {
         return result.first();
     }
 }
-export async function lastBang() {
+export function lastBang() {
     return this.last || this.raiseRecordNotFoundExceptionBang;
 }
 export async function second() {
     return await this.findNth(1);
 }
-export async function secondBang() {
+export function secondBang() {
     return this.second || this.raiseRecordNotFoundExceptionBang;
 }
 export async function third() {
     return await this.findNth(2);
 }
-export async function thirdBang() {
+export function thirdBang() {
     return this.third || this.raiseRecordNotFoundExceptionBang;
 }
 export async function fourth() {
     return await this.findNth(3);
 }
-export async function fourthBang() {
+export function fourthBang() {
     return this.fourth || this.raiseRecordNotFoundExceptionBang;
 }
 export async function fifth() {
     return await this.findNth(4);
 }
-export async function fifthBang() {
+export function fifthBang() {
     return this.fifth || this.raiseRecordNotFoundExceptionBang;
 }
 export async function fortyTwo() {
     return await this.findNth(41);
 }
-export async function fortyTwoBang() {
+export function fortyTwoBang() {
     return this.fortyTwo || this.raiseRecordNotFoundExceptionBang;
 }
 export async function thirdToLast() {
     return await this.findNthFromLast(3);
 }
-export async function thirdToLastBang() {
+export function thirdToLastBang() {
     return this.thirdToLast || this.raiseRecordNotFoundExceptionBang;
 }
 export async function secondToLast() {
     return await this.findNthFromLast(2);
 }
-export async function secondToLastBang() {
+export function secondToLastBang() {
     return this.secondToLast || this.raiseRecordNotFoundExceptionBang;
 }
 export function isExists(conditions = "none") {
@@ -248,7 +248,7 @@ export async function findWithIds(...ids) {
         return await this.findSome(ids);
     }
 }
-export async function findOne(id) {
+export function findOne(id) {
     let relation, record;
     if (__PRISM_TODO("CallNode")) {
         throw new ArgumentError("            You are passing an instance of ActiveRecord::Base to `find`.\n            Please pass the id of the object by calling `.id`.\n".squish());
@@ -281,7 +281,7 @@ export async function findSome(ids) {
         return this.raiseRecordNotFoundExceptionBang(ids, result.size(), expected_size);
     }
 }
-export async function findSomeOrdered(ids) {
+export function findSomeOrdered(ids) {
     let relation, result;
     ids = ids.slice(this.offsetValue || 0, this.limitValue || ids.size()) || [];
     relation = this.except("limit", "offset");
@@ -297,7 +297,7 @@ export async function findSomeOrdered(ids) {
         return this.raiseRecordNotFoundExceptionBang(ids, result.size(), ids.size());
     }
 }
-export async function findTake() {
+export function findTake() {
     if (this.isLoaded) {
         return this.records.first();
     }
@@ -305,7 +305,7 @@ export async function findTake() {
         return this.take ||= this.limit(1).records().first();
     }
 }
-export async function findTakeWithLimit(limit) {
+export function findTakeWithLimit(limit) {
     if (this.isLoaded) {
         return this.records.take(limit);
     }
@@ -317,7 +317,7 @@ export async function findNth(index) {
     this.offsets ||= {};
     return this.offsets[index] ||= (await this.findNthWithLimit(index, 1)).first();
 }
-export async function findNthWithLimit(index, limit) {
+export function findNthWithLimit(index, limit) {
     let relation;
     if (this.isLoaded) {
         return __PRISM_TODO("CallNode") || [];
@@ -338,7 +338,7 @@ export async function findNthWithLimit(index, limit) {
         }
     }
 }
-export async function findNthFromLast(index) {
+export function findNthFromLast(index) {
     let relation;
     if (this.isLoaded) {
         return this.records[-index];
@@ -353,7 +353,7 @@ export async function findNthFromLast(index) {
         }
     }
 }
-export async function findLast(limit) {
+export function findLast(limit) {
     if (limit) {
         return this.records.last(limit);
     }
