@@ -2334,7 +2334,6 @@ export class Migrator {
       throw new Error(`Invalid steps: ${steps}. Must be a non-negative integer.`);
     }
     await this._withAdvisoryLock(async () => {
-      await this._ensureSchemaTable();
       const pending = await this.pendingMigrations();
       const toRun = pending.slice(0, steps);
 
@@ -2404,7 +2403,6 @@ export class Migrator {
   async recordEnvironment(): Promise<void> {
     if (this.isDown()) return;
     if (this._internalMetadata.enabled) {
-      await this._ensureSchemaTable();
       await this._internalMetadata.set("environment", this._environment);
     }
   }
@@ -2493,7 +2491,6 @@ export class Migrator {
    * Mirrors: ActiveRecord::Migrator.current_version
    */
   async currentVersion(): Promise<number> {
-    await this._ensureSchemaTable();
     const versions = await this.getAllVersions();
     if (versions.length === 0) return 0;
     let max = BigInt(0);
@@ -2801,13 +2798,22 @@ export class Migrator {
     }
   }
 
-  private _schemaTableEnsured = false;
+  private _schemaTablesCreated?: Promise<void>;
 
-  private async _ensureSchemaTable(): Promise<void> {
-    if (this._schemaTableEnsured) return;
-    await this._schemaMigration.createTable();
-    await this._internalMetadata.createTable();
-    this._schemaTableEnsured = true;
+  /**
+   * Rails creates both bookkeeping tables as the last thing `Migrator#initialize`
+   * does (migration.rb:1429-1430), so every method downstream can assume they
+   * exist. `createTable` is async here and a constructor can't await, so the
+   * creation is memoized on the instance and awaited at the entry points
+   * instead. The memo is the deliberate stand-in for Rails' constructor-time
+   * creation: the tables are still created exactly once per Migrator, and a
+   * failure is cached the way a raise from `initialize` would be terminal.
+   */
+  private _ensureSchemaTable(): Promise<void> {
+    return (this._schemaTablesCreated ??= (async () => {
+      await this._schemaMigration.createTable();
+      await this._internalMetadata.createTable();
+    })());
   }
 
   private async _appliedVersions(): Promise<Set<string>> {
