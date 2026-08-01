@@ -1,0 +1,64 @@
+{
+  "packages": {
+    "abstractcontroller": {
+      "assertionCount": 0,
+      "kind": 0,
+      "value": 0
+    },
+    "actioncontroller": {
+      "assertionCount": 0,
+      "kind": 0,
+      "value": 0
+    },
+    "actiondispatch": {
+      "assertionCount": 0,
+      "kind": 0,
+      "value": 0
+    },
+    "actionview": {
+      "assertionCount": 0,
+      "kind": 0,
+      "value": 0
+    },
+    "activemodel": {
+      "assertionCount": 0,
+      "kind": 0,
+      "value": 0
+    },
+    "activerecord": {
+      "assertionCount": 1987,
+      "kind": 4069,
+      "value": 54
+    },
+    "activesupport": {
+      "assertionCount": 0,
+      "kind": 0,
+      "value": 0
+    },
+    "arel": {
+      "assertionCount": 0,
+      "kind": 0,
+      "value": 0
+    },
+    "did-you-mean": {
+      "assertionCount": 0,
+      "kind": 0,
+      "value": 0
+    },
+    "globalid": {
+      "assertionCount": 0,
+      "kind": 0,
+      "value": 0
+    },
+    "rack": {
+      "assertionCount": 0,
+      "kind": 0,
+      "value": 0
+    },
+    "trailties": {
+      "assertionCount": 0,
+      "kind": 0,
+      "value": 0
+    }
+  }
+}
