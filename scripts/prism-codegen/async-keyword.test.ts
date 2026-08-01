@@ -35,6 +35,13 @@ describe("async keyword", () => {
     expect(await gen(ruby, ["a", "size"])).toContain("async a()");
   });
 
+  it("does not count an await that belongs to a nested block", async () => {
+    const ruby = "class R\n  def a\n    xs.collect { |x| size() }\n  end\nend\n";
+    const code = await gen(ruby, ["a", "size"]);
+    expect(code).toContain("await this.size()");
+    expect(code).not.toContain("async a()");
+  });
+
   it("leaves a constructor alone", async () => {
     const code = await gen("class R\n  def initialize\n    @a = 1\n  end\nend\n", ["constructor"]);
     expect(code).not.toContain("async constructor");

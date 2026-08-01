@@ -85,7 +85,7 @@ export class Relation {
     async findOrCreateByBang(attributes, block) {
         return await this.findBy(attributes) || await this.createOrFindByBang(attributes, block);
     }
-    async createOrFindBy(attributes, block) {
+    createOrFindBy(attributes, block) {
         return this.model.withConnection(connection => {
             try {
                 return this.model.transaction({ requires_new: true }, () => await this.create(attributes, block));
@@ -100,7 +100,7 @@ export class Relation {
             }
         });
     }
-    async createOrFindByBang(attributes, block) {
+    createOrFindByBang(attributes, block) {
         return this.model.withConnection(connection => {
             try {
                 return this.model.transaction({ requires_new: true }, () => await this.createBang(attributes, block));
@@ -611,7 +611,7 @@ export class Relation {
         expr = value < 0 ? expr - bind : expr + bind;
         return expr.expr();
     }
-    async execQueries(block) {
+    execQueries(block) {
         let rows, records;
         return this.skipQueryCacheIfNecessary(() => {
             rows = __PRISM_TODO("IfNode");

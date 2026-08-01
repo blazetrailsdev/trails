@@ -7,7 +7,7 @@ require("active_record/insert_all");
 // module ActiveRecord
 extend(ActiveSupport.Concern);
 // module ClassMethods
-export async function create(attributes = null, block) {
+export function create(attributes = null, block) {
     let object;
     if (attributes.isA(Array)) {
         return attributes.collect(attr => await this.create(attr, block));
@@ -18,7 +18,7 @@ export async function create(attributes = null, block) {
         return object;
     }
 }
-export async function createBang(attributes = null, block) {
+export function createBang(attributes = null, block) {
     let object;
     if (attributes.isA(Array)) {
         return attributes.collect(attr => await this.createBang(attr, block));

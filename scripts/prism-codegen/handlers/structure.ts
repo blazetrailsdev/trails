@@ -199,10 +199,20 @@ function defParts(
  * one, the keyword is left describing nothing — and a no-op `async` is not
  * inert here: it makes the def match the manifest's async name on the next
  * regeneration, which is how the async surface widens on its own.
+ *
+ * The walk stops at nested functions: an await inside a block's arrow belongs
+ * to that arrow, not to the method around it. Those arrows are not marked async
+ * today, so the emitted arrow is invalid either way — but scoping the question
+ * correctly here is what keeps this rule right once that gap is closed.
  */
 function containsAwait(node: ts.Node): boolean {
   if (ts.isAwaitExpression(node)) return true;
-  return ts.forEachChild(node, containsAwait) ?? false;
+  return (
+    ts.forEachChild(node, (child) => {
+      if (ts.isFunctionLike(child)) return false;
+      return containsAwait(child);
+    }) ?? false
+  );
 }
 function emitParams(params: PrismNode | undefined, e: Emitter): ts.ParameterDeclaration[] | null {
   if (!params) return [];
