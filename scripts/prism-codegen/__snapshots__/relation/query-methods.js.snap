@@ -38,7 +38,7 @@ export class WhereChain {
         });
         return this.scope;
     }
-    missing(...associations) {
+    async missing(...associations) {
         let reflection, association_conditions;
         associations.each(association => {
             reflection = this.scopeAssociationReflection(association);
@@ -98,7 +98,7 @@ export function eagerLoad(...args) {
     this.checkIfMethodHasArgumentsBang(this.__callee__, args);
     return this.spawn.eagerLoadBang(...args);
 }
-export function eagerLoadBang(...args) {
+export async function eagerLoadBang(...args) {
     __PRISM_TODO("CallOperatorWriteNode");
     return this;
 }
@@ -113,7 +113,7 @@ export function preloadBang(...args) {
 export async function extractAssociated(association) {
     return this.preload(association).collect(association);
 }
-export function references(...table_names) {
+export async function references(...table_names) {
     this.checkIfMethodHasArgumentsBang(this.__callee__, table_names);
     return this.spawn.referencesBang(...table_names);
 }
@@ -121,9 +121,9 @@ export function referencesBang(...table_names) {
     __PRISM_TODO("CallOperatorWriteNode");
     return this;
 }
-export function select(...fields, block) {
+export async function select(...fields, block) {
     if (block !== undefined) {
-        if (fields.isAny()) {
+        if (await fields.isAny()) {
             throw new ArgumentError("`select' with block doesn't take arguments.");
         }
         return __PRISM_TODO("SuperNode");
@@ -161,7 +161,7 @@ export function reselectBang(...args) {
     this.selectValues = args;
     return this;
 }
-export function group(...args) {
+export async function group(...args) {
     this.checkIfMethodHasArgumentsBang(this.__callee__, args);
     return this.spawn.groupBang(...args);
 }
@@ -377,7 +377,7 @@ export function offsetBang(value) {
 export function lock(locks = true) {
     return this.spawn.lockBang(locks);
 }
-export function lockBang(locks = true) {
+export async function lockBang(locks = true) {
     if (caseEq(String, locks) || caseEq(TrueClass, locks) || caseEq(NilClass, locks)) {
         this.lockValue = locks || true;
     }
@@ -399,7 +399,7 @@ export function noneBang() {
 export function isNullRelation() {
     return this.none;
 }
-export function readonly(value = true) {
+export async function readonly(value = true) {
     return this.spawn.readonlyBang(value);
 }
 export function readonlyBang(value = true) {
@@ -426,7 +426,7 @@ export function createWithBang(value) {
     }
     return this;
 }
-export function from(value, subquery_name = null) {
+export async function from(value, subquery_name = null) {
     return this.spawn.fromBang(value, subquery_name);
 }
 export function fromBang(value, subquery_name = null) {
@@ -519,7 +519,7 @@ export function excludingBang(records) {
     return this;
 }
 export function arel(aliases = null) {
-    return this.arel ||= this.withConnection(c => this.buildArel(c, aliases));
+    return this.arel ||= this.model.withConnection(c => this.buildArel(c, aliases));
 }
 export function constructJoinDependency(associations, join_type) {
     return new ActiveRecord.Associations.JoinDependency(this.model, this.table, associations, join_type);
@@ -987,8 +987,8 @@ export function isTableNameMatches(from) {
 }
 export function reverseSqlOrder(order_query) {
     if (order_query.isEmpty()) {
-        if (this.primaryKey) {
-            return [this.table[this.primaryKey].desc()];
+        if (this.model.primaryKey) {
+            return [this.table[this.model.primaryKey].desc()];
         }
         throw new IrreversibleOrderError("Relation has no current order and table has no primary key to be used as default order");
     }

@@ -136,7 +136,7 @@ export function isExists(conditions = "none") {
     if (relation.whereClause().isContradiction()) {
         return false;
     }
-    return this.skipQueryCacheIfNecessary(() => this.withConnection(c => c.selectRows(relation.arel(), `${this.model.name()} Exists?`).size() === 1));
+    return this.skipQueryCacheIfNecessary(() => this.model.withConnection(c => c.selectRows(relation.arel(), `${this.model.name()} Exists?`).size() === 1));
 }
 export function isInclude(record) {
     let id;
@@ -152,7 +152,7 @@ export function isInclude(record) {
     }
 }
 const isMember = isInclude;
-export function raiseRecordNotFoundExceptionBang(ids = null, result_size = null, expected_size = null, key = this.primaryKey, not_found_ids = null) {
+export function raiseRecordNotFoundExceptionBang(ids = null, result_size = null, expected_size = null, key = this.model.primaryKey, not_found_ids = null) {
     let conditions, name, error;
     if (!this.whereClause.isEmpty()) {
         conditions = ` [${this.arel.whereSql(this.model)}]`;
@@ -195,7 +195,7 @@ export function constructRelationForExists(conditions) {
     }
     else {
         if (!(conditions === "none")) {
-            relation.whereBang({ [this.primaryKey]: conditions });
+            relation.whereBang({ [this.model.primaryKey]: conditions });
         }
     }
     return relation;
@@ -219,7 +219,7 @@ export function isUsingLimitableReflections(reflections) {
 }
 export async function findWithIds(...ids) {
     let expects_array, model_name, result, error_message;
-    if (this.primaryKey.nil()) {
+    if (this.model.primaryKey.nil()) {
         throw new UnknownPrimaryKey(this.model);
     }
     expects_array = this.model.isCompositePrimaryKey() ? (await (await ids.first()).first()).isA(Array) : (await ids.first()).isA(Array);
@@ -233,7 +233,7 @@ export async function findWithIds(...ids) {
     model_name = this.model.name();
     if (caseEq(0, ids.size())) {
         error_message = `Couldn't find ${model_name} without an ID`;
-        throw new RecordNotFound(error_message, model_name, this.primaryKey);
+        throw new RecordNotFound(error_message, model_name, this.model.primaryKey);
     }
     else if (caseEq(1, ids.size())) {
         result = await this.findOne(await ids.first());
@@ -253,7 +253,7 @@ export async function findOne(id) {
     if (__PRISM_TODO("CallNode")) {
         throw new ArgumentError("            You are passing an instance of ActiveRecord::Base to `find`.\n            Please pass the id of the object by calling `.id`.\n".squish());
     }
-    relation = this.model.isCompositePrimaryKey() ? this.where(this.primaryKey.zip(id).toH()) : this.where({ [this.primaryKey]: id });
+    relation = this.model.isCompositePrimaryKey() ? this.where(this.model.primaryKey.zip(id).toH()) : this.where({ [this.model.primaryKey]: id });
     record = await relation.take();
     if (!record) {
         this.raiseRecordNotFoundExceptionBang(id, 0, 1);
@@ -262,12 +262,12 @@ export async function findOne(id) {
 }
 export async function findSome(ids) {
     let relation, result, expected_size;
-    if (!this.orderValues.isPresent()) {
+    if (!await this.orderValues.isPresent()) {
         return await this.findSomeOrdered(ids);
     }
-    relation = this.where({ [this.primaryKey]: ids });
+    relation = this.where({ [this.model.primaryKey]: ids });
     if (!this.selectValues.isEmpty()) {
-        relation = relation.select(this.table[this.primaryKey]);
+        relation = await relation.select(this.table[this.model.primaryKey]);
     }
     result = relation.toA();
     expected_size = this.limitValue && ids.size() > this.limitValue ? this.limitValue : ids.size();
@@ -285,13 +285,13 @@ export async function findSomeOrdered(ids) {
     let relation, result;
     ids = ids.slice(this.offsetValue || 0, this.limitValue || ids.size()) || [];
     relation = this.except("limit", "offset");
-    relation = relation.where({ [this.primaryKey]: ids });
+    relation = relation.where({ [this.model.primaryKey]: ids });
     if (!this.selectValues.isEmpty()) {
-        relation = relation.select(this.table[this.primaryKey]);
+        relation = await relation.select(this.table[this.model.primaryKey]);
     }
     result = relation.records();
     if (result.size() === ids.size()) {
-        return result.inOrderOf("id", ids.map(id => this.model.typeForAttribute(this.primaryKey).cast(id)));
+        return result.inOrderOf("id", ids.map(id => this.model.typeForAttribute(this.model.primaryKey).cast(id)));
     }
     else {
         return this.raiseRecordNotFoundExceptionBang(ids, result.size(), ids.size());
@@ -362,7 +362,7 @@ export async function findLast(limit) {
     }
 }
 export function orderedRelation() {
-    if (this.orderValues.isEmpty() && (this.model.implicitOrderColumn() || !this.model.queryConstraintsList().nil() || this.primaryKey)) {
+    if (this.orderValues.isEmpty() && (this.model.implicitOrderColumn() || !this.model.queryConstraintsList().nil() || this.model.primaryKey)) {
         return this.order(this._orderColumns.map(column => this.table[column].asc()));
     }
     else {

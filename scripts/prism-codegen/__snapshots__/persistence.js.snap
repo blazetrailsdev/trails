@@ -45,7 +45,7 @@ export function instantiate(attributes, column_types = {}, block) {
 export async function update(id = "all") {
     let object;
     if (id.isA(Array)) {
-        if (id.isAny(ActiveRecord.Base)) {
+        if (await id.isAny(ActiveRecord.Base)) {
             throw new ArgumentError("You are passing an array of ActiveRecord::Base instances to `update`. Please pass the ids of the objects by calling `pluck(:id)` or `map(&:id)`.");
         }
         return id.map(one_id => this.find(one_id)).eachWithIndex((object, idx) => await object.update(attributes[idx]));
@@ -65,7 +65,7 @@ export async function update(id = "all") {
 export async function updateBang(id = "all") {
     let object;
     if (id.isA(Array)) {
-        if (id.isAny(ActiveRecord.Base)) {
+        if (await id.isAny(ActiveRecord.Base)) {
             throw new ArgumentError("You are passing an array of ActiveRecord::Base instances to `update!`. Please pass the ids of the objects by calling `pluck(:id)` or `map(&:id)`.");
         }
         return id.map(one_id => this.find(one_id)).eachWithIndex((object, idx) => await object.updateBang(attributes[idx]));
@@ -144,7 +144,7 @@ export async function _deleteRecord(constraints) {
     return this.withConnection(c => c.delete(dm, `${this} Destroy`));
 }
 __PRISM_TODO("CallNode");
-export function inherited(subclass) {
+export async function inherited(subclass) {
     return subclass.classEval(() => {
         this._query_constraints_list = null;
         return this.has_query_constraints = false;
@@ -378,7 +378,7 @@ export function _queryConstraintsHash() {
 }
 export function destroyAssociations() {
 }
-export function destroyRow() {
+export async function destroyRow() {
     return this._deleteRow;
 }
 export function _deleteRow() {
@@ -389,8 +389,8 @@ export function _touchRow(attribute_names, time) {
     attribute_names.each(attr_name => this._writeAttribute(attr_name, time));
     return this._updateRow(attribute_names, "touch");
 }
-export function _updateRow(attribute_names, attempted_action = "update") {
-    return this.class()._updateRecord(this.attributesWithValues(attribute_names), this._queryConstraintsHash);
+export async function _updateRow(attribute_names, attempted_action = "update") {
+    return await this.class()._updateRecord(this.attributesWithValues(attribute_names), this._queryConstraintsHash);
 }
 export function createOrUpdate({ ...opts } = {}, block) {
     let result;
@@ -411,7 +411,7 @@ export async function _updateRecord(attribute_names = this.attributeNames(), blo
         this._trigger_update_callback = true;
     }
     else {
-        affected_rows = this._updateRow(attribute_names);
+        affected_rows = await this._updateRow(attribute_names);
         this._trigger_update_callback = affected_rows === 1;
     }
     this.previously_new_record = false;
