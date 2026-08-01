@@ -12,22 +12,31 @@ export interface GeneratedTarget extends GenResult {
   outName: string;
 }
 
+/** Path of the emitted JS relative to the output root, e.g. `relation/query-methods.js`. */
 export function outNameFor(f: TargetFile): string {
   return rubyFileToTs(f.ruby.replace(/^active_record\//, "")).replace(/\.ts$/, ".js");
 }
 
-// The emitted file imports the codegen runtime by relative path, so the depth of
-// the output file decides the prefix — a golden snapshot that regenerated at a
-// different depth would diff on the import line alone.
+/**
+ * Relative specifier the emitted file imports the codegen runtime through. It
+ * depends on the output file's depth, so it is part of the generated image and
+ * has to be computed identically for `codegen:generate` and for the goldens.
+ */
 export function runtimeImportPathFor(outName: string): string {
-  const depth = outName.split("/").length - 1;
-  return "../".repeat(depth + 1) + "runtime.js";
+  return "../".repeat(outName.split("/").length) + "runtime.js";
 }
 
+/** Repo-relative path of a target's checked-in golden image. */
 export function snapshotPathFor(outName: string): string {
   return path.join(SNAPSHOT_DIR, outName + ".snap");
 }
 
+/** Same golden image, relative to this directory — the form `toMatchFileSnapshot` wants. */
+export function snapshotRelPathFor(outName: string): string {
+  return "./" + path.posix.join("__snapshots__", outName + ".snap");
+}
+
+/** Generate one target file's JS exactly as `pnpm codegen:generate` writes it. */
 export async function generateTarget(f: TargetFile): Promise<GeneratedTarget> {
   const outName = outNameFor(f);
   const src = await fs.readFile(rubyAbsPath(f), "utf8");
@@ -39,15 +48,11 @@ export async function generateTarget(f: TargetFile): Promise<GeneratedTarget> {
   return { ...result, file: f, outName };
 }
 
-export async function generateAllTargets(): Promise<GeneratedTarget[]> {
-  const out: GeneratedTarget[] = [];
-  for (const f of TARGET_FILES) out.push(await generateTarget(f));
-  return out;
-}
-
-// The golden suite regenerates from the vendored Rails checkout, which the
-// unit-tests CI job does not fetch. Callers use this to skip there rather than
-// fail on ENOENT; the rails-comparison job fetches vendor/ and runs it for real.
+/**
+ * Whether the vendored Rails checkout the generator reads is present. The golden
+ * suite skips itself when it is not: `unit-tests` runs the rest of this
+ * directory without `vendor/`, and only `rails-comparison` fetches it.
+ */
 export async function vendoredRailsPresent(): Promise<boolean> {
   try {
     await fs.access(rubyAbsPath(TARGET_FILES[0]));
