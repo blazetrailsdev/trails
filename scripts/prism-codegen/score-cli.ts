@@ -21,11 +21,20 @@ import {
   serializeBaseline,
   type ResidueRow,
 } from "./guard.js";
+import {
+  overlapFailureMessage,
+  overlappingSignOffs,
+  parseSignOffs,
+  partitionSignedOff,
+  staleSignOffMessage,
+  staleSignOffs,
+} from "./signoff.js";
 
 const TRAILS_AR_SRC = "packages/activerecord/src";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const API_COMPARE = path.join(HERE, "..", "api-compare");
 const BASELINE_PATH = path.join(HERE, "convergence-baseline.json");
+const SIGNOFF_PATH = path.join(HERE, "convergence-signoff.json");
 
 function portTreeFiles(): { path: string; source: string }[] {
   const out: { path: string; source: string }[] = [];
@@ -94,9 +103,10 @@ async function main() {
   let totDivergent = 0;
   let totMissing = 0;
   let totElsewhere = 0;
+  const signOffs = parseSignOffs(await fs.readFile(SIGNOFF_PATH, "utf8"));
   const catalogued: { row: ResidueRow; reason: string }[] = [];
   const divergentRows: { file: string; entry: ScoreEntry }[] = [];
-  const residue: ResidueRow[] = [];
+  const uncatalogued: ResidueRow[] = [];
 
   console.log(`\nConformance: generated (clean defs only) vs hand-written port\n`);
   console.log(
@@ -140,7 +150,7 @@ async function main() {
             );
       const row: ResidueRow = { rubyFile: f.ruby, name: entry.name, status: entry.status };
       if (reason) catalogued.push({ row, reason });
-      else residue.push(row);
+      else uncatalogued.push(row);
     }
     console.log(
       `  ${short.padEnd(34)} ${String(score.matched).padStart(7)} ${String(score.reordered).padStart(9)} ` +
@@ -163,15 +173,24 @@ async function main() {
       `\n  method ported into a different file, or a naming path the resolver doesn't` +
       `\n  chase yet. Divergent bodies are the convergence-guard review queue.`,
   );
+  const { signedOff, residue } = partitionSignedOff(uncatalogued, signOffs);
   console.log(
     `\n  Deviation catalog: ${catalogued.length} of ${totDivergent + totMissing} divergent+missing ` +
       `rows are catalogued\n  (api-compare SKIP / SCOPED_SKIP, call-mismatches excludes); ` +
-      `${residue.length} rows are residue.`,
+      `${signedOff.length} rows are signed off per-row\n  (convergence-signoff.json); ` +
+      `${residue.length} rows are unreviewed residue.`,
   );
 
   if (verbose && catalogued.length) {
     console.log(`\n  Catalogued rows (subtracted from the guarded residue):`);
     for (const { row, reason } of catalogued) {
+      console.log(`\n  ${row.rubyFile} :: ${row.name} (${row.status})`);
+      console.log(`    ${reason}`);
+    }
+  }
+  if (verbose && signedOff.length) {
+    console.log(`\n  Signed-off rows (reviewed per-row, subtracted from the guarded residue):`);
+    for (const { row, reason } of signedOff) {
       console.log(`\n  ${row.rubyFile} :: ${row.name} (${row.status})`);
       console.log(`    ${reason}`);
     }
@@ -190,6 +209,14 @@ async function main() {
   }
   console.log();
 
+  const stale = staleSignOffs([...catalogued.map((c) => c.row), ...uncatalogued], signOffs);
+  const staleFailure = staleSignOffMessage(stale);
+  if (staleFailure) {
+    console.error(staleFailure);
+    process.exitCode = 1;
+    return;
+  }
+
   if (!guard) return;
   if (write) {
     await fs.writeFile(BASELINE_PATH, serializeBaseline(residue), "utf8");
@@ -197,6 +224,12 @@ async function main() {
     return;
   }
   const baseline = parseBaseline(await fs.readFile(BASELINE_PATH, "utf8"));
+  const overlapFailure = overlapFailureMessage(overlappingSignOffs(baseline, signOffs));
+  if (overlapFailure) {
+    console.error(overlapFailure);
+    process.exitCode = 1;
+    return;
+  }
   const diff = diffBaseline(residue, baseline);
   const failure = guardFailureMessage(diff);
   if (failure) {
@@ -206,7 +239,8 @@ async function main() {
   }
   console.log(
     `  convergence guard: OK — ${residue.length} residue rows, ` +
-      `${diff.removed.length} baseline row(s) converged.\n`,
+      `${diff.removed.length} baseline row(s) converged, ` +
+      `${signedOff.length} signed off.\n`,
   );
 }
 

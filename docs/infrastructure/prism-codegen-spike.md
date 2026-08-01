@@ -372,6 +372,31 @@ catalog entry — are accepted silently, so the baseline only ever shrinks.
 Re-seed it with `pnpm codegen:score --guard --write` after a burndown; never to
 bury a new divergence. `--verbose` prints each catalogued row with the catalog
 reason that excused it, so a subtraction can be audited rather than trusted.
+
+### Per-row sign-off (`convergence-signoff.json`)
+
+The catalog is keyed at the **call** grain, so it can only explain a divergence
+whose every differing token is an individually excluded call. Most real
+divergences differ by several tokens at once (a dropped `if` plus two renamed
+calls), which left a reviewer who had confirmed a whole method as equivalent
+with no way to record that verdict: the row could only leave the residue by
+converging, or stay in the baseline forever indistinguishable from unreviewed
+debt.
+
+`scripts/prism-codegen/convergence-signoff.json` is the missing grain, modeled
+on api-compare's `body-pins.json`: entries of `{ rubyFile, name, reason }`, with
+`reason` mandatory and non-empty. A matching row leaves the guarded residue and
+lands in its own `--verbose` bucket, so the three populations stay distinct —
+**catalogued by call**, **signed off per-row**, and **unreviewed residue** (the
+only one the baseline ratchets). Sign-offs are opt-in and only grow by review;
+there is no `--write` that seeds them.
+
+Two lints keep the manifest honest, mirroring the wide gate's stale half: a
+sign-off whose row no longer appears among the scored divergent+missing rows is
+**stale** and fails (a row the call catalog _also_ explains is redundant, not
+stale), and a row present in both the sign-off manifest and the baseline fails
+— the two files must stay disjoint.
+
 Exclude entries are filtered to the package being scored: a relative `tsFile` is
 not unique across packages (`callbacks.ts` exists under both activerecord and
 abstractcontroller), so an unfiltered catalog would let one package's reviewed
