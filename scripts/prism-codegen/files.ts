@@ -1,3 +1,4 @@
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import * as path from "node:path";
 import { resolvePath } from "../../vendor/sources.js";
 export interface TargetFile {
@@ -80,4 +81,30 @@ export function rubyAbsPath(f: TargetFile): string {
 }
 export function railsLibRelPaths(): string[] {
   return TARGET_FILES.map((f) => f.ruby);
+}
+export const TRAILS_AR_SRC = "packages/activerecord/src";
+export interface PortFile {
+  path: string;
+  source: string;
+}
+/**
+ * Every hand-written port source under `packages/activerecord/src`, keyed by
+ * its path relative to that root. Test helpers and support scaffolding are not
+ * port surface, so they stay out.
+ */
+export function portTreeFiles(): PortFile[] {
+  const out: PortFile[] = [];
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir)) {
+      const full = path.join(dir, entry);
+      if (statSync(full).isDirectory()) {
+        if (entry === "test-helpers" || entry === "support") continue;
+        walk(full);
+      } else if (entry.endsWith(".ts") && !entry.endsWith(".test.ts")) {
+        out.push({ path: path.relative(TRAILS_AR_SRC, full), source: readFileSync(full, "utf8") });
+      }
+    }
+  };
+  walk(TRAILS_AR_SRC);
+  return out;
 }

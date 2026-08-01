@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
 import { rubyFileToTs, methodName } from "./naming.js";
+import { TARGET_FILES, TRAILS_AR_SRC, portTreeFiles, rubyAbsPath, type PortFile } from "./files.js";
 import { resolvePath } from "../../vendor/sources.js";
-const TRAILS_AR_SRC = "packages/activerecord/src";
 const AR_ROOT = resolvePath("activerecord");
 const AR_LIB = path.dirname(AR_ROOT);
 const RUBY_DEF = /^\s*def\s+(?:self\.)?([A-Za-z_][\w]*[?!=]?)/gm;
@@ -50,10 +50,49 @@ export function extractAsyncNames(src: string): Set<string> {
 function readFileOr(tsPath: string): string {
   return existsSync(tsPath) ? readFileSync(tsPath, "utf8") : "";
 }
+/**
+ * Whole-program view of which method names are async somewhere in the port
+ * tree, and in how many files — the same shape the scorer's global fallback
+ * indexes by, so an await decision can be taken on an unambiguous cross-file
+ * hit rather than only on the one twin file.
+ */
+export interface AsyncManifest {
+  byName: Map<string, Set<string>>;
+}
+export function buildAsyncManifest(files: PortFile[]): AsyncManifest {
+  const byName = new Map<string, Set<string>>();
+  for (const { path: file, source } of files) {
+    for (const name of extractAsyncNames(source)) {
+      const seen = byName.get(name) ?? new Set<string>();
+      seen.add(file);
+      byName.set(name, seen);
+    }
+  }
+  return { byName };
+}
+/**
+ * Names the manifest resolves to exactly one async definition outside the twin
+ * file. Ambiguous names (async in several port files) are declined: the await
+ * rule is receiver-blind, so a name that could be two different methods must
+ * not drag an await onto the wrong call.
+ */
+export function crossFileAsyncNames(
+  manifest: AsyncManifest,
+  opts: { twinTsPath: string; railsDefs: ReadonlySet<string> },
+): Set<string> {
+  const names = new Set<string>();
+  for (const name of opts.railsDefs) {
+    const files = manifest.byName.get(name);
+    if (!files || files.size !== 1 || files.has(opts.twinTsPath)) continue;
+    names.add(name);
+  }
+  return names;
+}
 export function resolveAsyncNames(opts: {
   twinTs: string;
   relationTs?: string;
   ownRubyDefs?: ReadonlySet<string>;
+  crossFile?: ReadonlySet<string>;
 }): Set<string> {
   const names = extractAsyncNames(opts.twinTs);
   if (opts.relationTs && opts.ownRubyDefs) {
@@ -61,15 +100,45 @@ export function resolveAsyncNames(opts: {
       if (opts.ownRubyDefs.has(n)) names.add(n);
     }
   }
+  for (const n of opts.crossFile ?? []) names.add(n);
   return names;
 }
-export function asyncMethodsForRailsFile(railsRelPath: string): Set<string> {
+let manifestCache: AsyncManifest | undefined;
+export function defaultAsyncManifest(): AsyncManifest {
+  manifestCache ??= buildAsyncManifest(portTreeFiles());
+  return manifestCache;
+}
+let railsCorpusDefsCache: Set<string> | undefined;
+/**
+ * Every method Rails defines across the codegen target set. A cross-file async
+ * name only earns an await when it is also a Rails method — that keeps
+ * incidental TS-only helpers (and same-named library calls) out of the
+ * receiver-blind await rule, the same intersect-with-Rails-defs guard the
+ * relation.ts supplement has always used.
+ */
+function railsCorpusDefs(): Set<string> {
+  if (railsCorpusDefsCache) return railsCorpusDefsCache;
+  const defs = new Set<string>();
+  for (const f of TARGET_FILES) {
+    const abs = rubyAbsPath(f);
+    if (!existsSync(abs)) continue;
+    for (const n of rubyDefinedMethods(readFileSync(abs, "utf8"))) defs.add(n);
+  }
+  railsCorpusDefsCache = defs;
+  return defs;
+}
+export function asyncMethodsForRailsFile(
+  railsRelPath: string,
+  manifest: AsyncManifest = defaultAsyncManifest(),
+): Set<string> {
   const short = railsRelPath.replace(/^active_record\//, "");
-  const twinTs = readFileOr(path.join(TRAILS_AR_SRC, rubyFileToTs(short)));
+  const twinTsPath = rubyFileToTs(short);
+  const twinTs = readFileOr(path.join(TRAILS_AR_SRC, twinTsPath));
   const relationFamily = short.startsWith("relation/") || short === "relation.rb";
   return resolveAsyncNames({
     twinTs,
     relationTs: relationFamily ? readFileOr(path.join(TRAILS_AR_SRC, "relation.ts")) : undefined,
     ownRubyDefs: relationFamily ? railsDefinedMethods(railsRelPath) : undefined,
+    crossFile: crossFileAsyncNames(manifest, { twinTsPath, railsDefs: railsCorpusDefs() }),
   });
 }

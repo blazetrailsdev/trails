@@ -315,9 +315,13 @@ computes at runtime:
    the method names the Rails file itself `def`s, so generic Relation async
    names the file merely _calls_ on other receivers (`Array#first`, `#one?`) are
    not swept in (the `await` rule is receiver-blind, so an unscoped union would
-   await unrelated same-named calls). Remaining limits: (a) files with no port
-   yet fall back to sync, and (b) `await` placement is file-local — a call to an
-   async method defined in a _different_ file is not awaited.
+   await unrelated same-named calls). Beyond the twin file, a whole-program
+   async manifest over `packages/activerecord/src` (`buildAsyncManifest`) carries
+   `await` across file boundaries: a name that exactly one other port file
+   defines async, and that Rails `def`s somewhere in the target set, is awaited
+   too — the same unambiguous-global-hit rule the scorer's cross-file fallback
+   uses, so a name async in several port files is declined rather than guessed.
+   Remaining limit: files with no port yet fall back to sync.
 4. **Ruby stdlib idioms pass through untranslated.** `attributes.collect { }`,
    `arr.first`, `Array(x)`, `raise` — emitted verbatim; no runtime shim.
 5. **Metaprogramming is opaque.** `define_method`, `method_missing`, `send`,

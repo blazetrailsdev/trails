@@ -1,11 +1,11 @@
 import * as fs from "fs/promises";
-import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { generateFromSource } from "./index.js";
-import { asyncMethodsForRailsFile } from "./async-source.js";
+import { asyncMethodsForRailsFile, buildAsyncManifest } from "./async-source.js";
 import { TOPLEVEL } from "./codegen.js";
-import { TARGET_FILES, rubyAbsPath } from "./files.js";
+import { TARGET_FILES, TRAILS_AR_SRC, portTreeFiles, rubyAbsPath } from "./files.js";
 import { rubyFileToTs } from "./naming.js";
 import { scoreFile, indexPortTree, type ScoreEntry } from "./score.js";
 import {
@@ -30,28 +30,10 @@ import {
   staleSignOffs,
 } from "./signoff.js";
 
-const TRAILS_AR_SRC = "packages/activerecord/src";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const API_COMPARE = path.join(HERE, "..", "api-compare");
 const BASELINE_PATH = path.join(HERE, "convergence-baseline.json");
 const SIGNOFF_PATH = path.join(HERE, "convergence-signoff.json");
-
-function portTreeFiles(): { path: string; source: string }[] {
-  const out: { path: string; source: string }[] = [];
-  const walk = (dir: string) => {
-    for (const e of readdirSync(dir)) {
-      const full = path.join(dir, e);
-      if (statSync(full).isDirectory()) {
-        if (e === "test-helpers" || e === "support") continue;
-        walk(full);
-      } else if (e.endsWith(".ts") && !e.endsWith(".test.ts")) {
-        out.push({ path: path.relative(TRAILS_AR_SRC, full), source: readFileSync(full, "utf8") });
-      }
-    }
-  };
-  walk(TRAILS_AR_SRC);
-  return out;
-}
 
 async function listJsonFiles(dir: string): Promise<string[]> {
   const out: string[] = [];
@@ -110,7 +92,9 @@ async function main() {
   const verbose = process.argv.includes("--verbose");
   const write = process.argv.includes("--write");
   const guard = process.argv.includes("--guard") || write;
-  const globalIndex = indexPortTree(portTreeFiles());
+  const portFiles = portTreeFiles();
+  const globalIndex = indexPortTree(portFiles);
+  const asyncManifest = buildAsyncManifest(portFiles);
   const catalog = buildCatalog(await loadExcludes(), "activerecord");
   let totMatched = 0;
   let totReordered = 0;
@@ -138,7 +122,7 @@ async function main() {
     }
     const { code, perDef } = await generateFromSource(
       readFileSync(rubyAbsPath(f), "utf8"),
-      asyncMethodsForRailsFile(f.ruby),
+      asyncMethodsForRailsFile(f.ruby, asyncManifest),
     );
     const cleanDefs = new Set(
       [...perDef].filter(([n, d]) => n !== TOPLEVEL && d.passthrough === 0).map(([n]) => n),
