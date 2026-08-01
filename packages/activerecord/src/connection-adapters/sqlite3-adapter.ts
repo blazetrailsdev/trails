@@ -2116,29 +2116,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return rows.length > 0;
   }
 
-  async dataSourceExists(name: string): Promise<boolean> {
-    // Rails answers `data_source_exists?` through the base implementation,
-    // which is gated on `if name.present?`; this adapter-local override has to
-    // carry the same gate or a blank name reaches the catalog query.
-    if (!name) return false;
-    if (name.includes(".")) {
-      // Schema-qualified name (e.g. "aux.widgets"). pragma_table_list returns
-      // rows for every attached schema and exposes the schema name as a
-      // column, so we can scope by it directly — keeping the qualified and
-      // bare-name branches on the same exclusion semantics (no virtuals,
-      // no FTS shadow tables).
-      const { schema, bare } = this._splitTableName(name);
-      const rows = (await this.schemaQuery(
-        `SELECT name FROM pragma_table_list WHERE schema = ${sqliteQuoteStringLiteral(schema)} COLLATE NOCASE AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND name = ${sqliteQuoteStringLiteral(bare)} AND type IN ('table','view')`,
-      )) as Array<{ name: string }>;
-      return rows.length > 0;
-    }
-    const rows = (await this.schemaQuery(
-      `SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND name = ${sqliteQuoteStringLiteral(name)} AND type IN ('table','view')`,
-    )) as Array<{ name: string }>;
-    return rows.length > 0;
-  }
-
   /**
    * Return the primary key for the named table: a single string for
    * scalar PKs, an array for composite PKs, or null for rowid-only

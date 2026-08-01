@@ -262,8 +262,9 @@ describe("SQLite3Adapter schema introspection", () => {
     await adapter.executeMutation("CREATE VIEW aux.widget_view AS SELECT id FROM aux.widgets");
 
     expect(await adapter.tableExists("aux.widgets")).toBe(true);
-    expect(await adapter.dataSourceExists("aux.widgets")).toBe(true);
-    expect(await adapter.dataSourceExists("aux.widget_view")).toBe(true);
     expect(await adapter.tableExists("aux.missing")).toBe(false);
+    expect(await adapter.dataSourceExists("widgets")).toBe(true);
+    expect(await adapter.dataSourceExists("widget_view")).toBe(true);
+    expect(await adapter.dataSourceExists("aux.widgets")).toBe(false);
   });
 });

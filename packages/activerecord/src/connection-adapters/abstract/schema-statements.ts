@@ -1639,7 +1639,7 @@ export class SchemaStatements {
     if (!isPresent(name)) return false;
     try {
       const sql = this.adapter.dataSourceSql(name);
-      const rows = await this.adapter.execute(sql);
+      const rows = await this.adapter.schemaQuery(sql);
       return rows.length > 0;
     } catch (error) {
       if (!(error instanceof NotImplementedError)) throw error;
