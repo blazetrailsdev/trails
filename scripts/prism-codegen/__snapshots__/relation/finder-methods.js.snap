@@ -15,10 +15,10 @@ export async function find(...args, block) {
     return await this.findWithIds(...args);
 }
 export async function findBy(arg, ...args) {
-    return await this.where(arg, ...args).take();
+    return this.where(arg, ...args).take();
 }
 export async function findByBang(arg, ...args) {
-    return await this.where(arg, ...args).takeBang();
+    return this.where(arg, ...args).takeBang();
 }
 export async function take(limit = null) {
     if (limit) {
@@ -45,7 +45,7 @@ export async function sole() {
     }
 }
 export async function findSoleBy(arg, ...args) {
-    return await this.where(arg, ...args).sole();
+    return this.where(arg, ...args).sole();
 }
 export async function first(limit = null) {
     if (limit) {
@@ -69,7 +69,7 @@ export async function last(limit = null) {
         return result.reverse();
     }
     else {
-        return await result.first();
+        return result.first();
     }
 }
 export async function lastBang() {
@@ -222,12 +222,12 @@ export async function findWithIds(...ids) {
     if (this.model.primaryKey.nil()) {
         throw new UnknownPrimaryKey(this.model);
     }
-    expects_array = this.model.isCompositePrimaryKey() ? (await (await ids.first()).first()).isA(Array) : (await ids.first()).isA(Array);
-    if (expects_array && (await ids.first()).isEmpty()) {
+    expects_array = this.model.isCompositePrimaryKey() ? ids.first().first().isA(Array) : ids.first().isA(Array);
+    if (expects_array && ids.first().isEmpty()) {
         return [];
     }
     if (expects_array) {
-        ids = await ids.first();
+        ids = ids.first();
     }
     ids = ids.compact().uniq();
     model_name = this.model.name();
@@ -236,7 +236,7 @@ export async function findWithIds(...ids) {
         throw new RecordNotFound(error_message, model_name, this.model.primaryKey);
     }
     else if (caseEq(1, ids.size())) {
-        result = await this.findOne(await ids.first());
+        result = await this.findOne(ids.first());
         if (expects_array) {
             return [result];
         }
@@ -254,7 +254,7 @@ export async function findOne(id) {
         throw new ArgumentError("            You are passing an instance of ActiveRecord::Base to `find`.\n            Please pass the id of the object by calling `.id`.\n".squish());
     }
     relation = this.model.isCompositePrimaryKey() ? this.where(this.model.primaryKey.zip(id).toH()) : this.where({ [this.model.primaryKey]: id });
-    record = await relation.take();
+    record = relation.take();
     if (!record) {
         this.raiseRecordNotFoundExceptionBang(id, 0, 1);
     }
@@ -262,12 +262,12 @@ export async function findOne(id) {
 }
 export async function findSome(ids) {
     let relation, result, expected_size;
-    if (!await this.orderValues.isPresent()) {
+    if (!this.orderValues.isPresent()) {
         return await this.findSomeOrdered(ids);
     }
     relation = this.where({ [this.model.primaryKey]: ids });
     if (!this.selectValues.isEmpty()) {
-        relation = await relation.select(this.table[this.model.primaryKey]);
+        relation = relation.select(this.table[this.model.primaryKey]);
     }
     result = relation.toA();
     expected_size = this.limitValue && ids.size() > this.limitValue ? this.limitValue : ids.size();
@@ -287,7 +287,7 @@ export async function findSomeOrdered(ids) {
     relation = this.except("limit", "offset");
     relation = relation.where({ [this.model.primaryKey]: ids });
     if (!this.selectValues.isEmpty()) {
-        relation = await relation.select(this.table[this.model.primaryKey]);
+        relation = relation.select(this.table[this.model.primaryKey]);
     }
     result = relation.records();
     if (result.size() === ids.size()) {
@@ -299,15 +299,15 @@ export async function findSomeOrdered(ids) {
 }
 export async function findTake() {
     if (this.isLoaded) {
-        return await this.records.first();
+        return this.records.first();
     }
     else {
-        return this.take ||= await this.limit(1).records().first();
+        return this.take ||= this.limit(1).records().first();
     }
 }
 export async function findTakeWithLimit(limit) {
     if (this.isLoaded) {
-        return await this.records.take(limit);
+        return this.records.take(limit);
     }
     else {
         return this.limit(limit).toA();
@@ -315,7 +315,7 @@ export async function findTakeWithLimit(limit) {
 }
 export async function findNth(index) {
     this.offsets ||= {};
-    return this.offsets[index] ||= await (await this.findNthWithLimit(index, 1)).first();
+    return this.offsets[index] ||= (await this.findNthWithLimit(index, 1)).first();
 }
 export async function findNthWithLimit(index, limit) {
     let relation;
@@ -349,16 +349,16 @@ export async function findNthFromLast(index) {
             return relation.records()[-index];
         }
         else {
-            return await relation.reverseOrder().offset(index - 1).first();
+            return relation.reverseOrder().offset(index - 1).first();
         }
     }
 }
 export async function findLast(limit) {
     if (limit) {
-        return await this.records.last(limit);
+        return this.records.last(limit);
     }
     else {
-        return await this.records.last();
+        return this.records.last();
     }
 }
 export function orderedRelation() {

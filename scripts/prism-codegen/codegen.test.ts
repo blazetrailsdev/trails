@@ -91,6 +91,25 @@ describe("prism-codegen", () => {
     expect(code).toContain("export function name(");
     expect(code).not.toContain("await this.log");
   });
+  it("awaits self-calls but leaves a same-named call on an unrelated receiver bare", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all(ids)
+          first
+          self.first
+          ids.first
+          @scope.first
+          ids.first.first
+        end
+      end`,
+      new Set(["first", "loadAll"]),
+    );
+    expect(code).toContain("await this.first()");
+    expect(code).toContain("ids.first()");
+    expect(code).not.toContain("await ids.first()");
+    expect(code).not.toContain("await this.scope.first()");
+    expect(code).not.toContain("await ids.first().first()");
+  });
   it("never awaits async-named calls inside a sync method", async () => {
     const { code } = await generateFromSource(
       `module M

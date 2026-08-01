@@ -123,7 +123,7 @@ export function referencesBang(...table_names) {
 }
 export async function select(...fields, block) {
     if (block !== undefined) {
-        if (await fields.isAny()) {
+        if (fields.isAny()) {
             throw new ArgumentError("`select' with block doesn't take arguments.");
         }
         return __PRISM_TODO("SuperNode");
