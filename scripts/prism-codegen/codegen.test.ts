@@ -10,7 +10,7 @@ import {
   extractAsyncNames,
   inferAsyncFromBodies,
   resolveAsyncNames,
-  rubyDefinedMethods,
+  scopedRubyDefs,
 } from "./async-source.js";
 import type { Coverage } from "./types.js";
 describe("prism-codegen", () => {
@@ -792,7 +792,7 @@ describe("prism-codegen", () => {
     expect(names.has("secondBang")).toBe(true);
     expect(names.has("pluck")).toBe(false);
   });
-  it("scopes the relation.ts supplement to the file's own Rails defs", () => {
+  it("scopes the relation.ts supplement to the file's own Rails defs", async () => {
     const twinTs = `export const Calculations = { count: inQueryConnection(performCount) };
       export async function performCount() {}`;
     const relationTs = `class Relation {
@@ -801,7 +801,7 @@ describe("prism-codegen", () => {
       async first() {}
       async isOne() {}
     }`;
-    const ownRubyDefs = rubyDefinedMethods(`
+    const ownRubyDefs = await scopedRubyDefs(`
       def count; end
       def pluck; end
       def ids; end
@@ -820,7 +820,7 @@ describe("prism-codegen", () => {
     ]);
     const crossFile = crossFileAsyncNames(manifest, {
       twinTsPath: "persistence.ts",
-      railsDefs: rubyDefinedMethods(`def find_by; end\ndef perform_save; end`),
+      railsDefs: await scopedRubyDefs(`def find_by; end\ndef perform_save; end`),
     });
     expect(crossFile.has("findBy")).toBe(true);
     expect(crossFile.has("performSave")).toBe(false);
@@ -851,7 +851,7 @@ end`;
     ]);
     const crossFile = crossFileAsyncNames(manifest, {
       twinTsPath: "touch.ts",
-      railsDefs: rubyDefinedMethods(`def perform_save; end`),
+      railsDefs: await scopedRubyDefs(`def perform_save; end`),
     });
     const names = resolveAsyncNames({ twinTs: "", crossFile, inferFromRuby: ruby });
     expect(names.has("touchLater")).toBe(true);
@@ -917,24 +917,24 @@ end`,
     );
     expect(inferred.size).toBe(0);
   });
-  it("declines the await when a name is async in more than one port file", () => {
+  it("declines the await when a name is async in more than one port file", async () => {
     const manifest = buildAsyncManifest([
       { path: "relation.ts", source: `class R { async reset() {} }` },
       { path: "connection-adapters/pool.ts", source: `class P { async reset() {} }` },
       { path: "persistence.ts", source: `export async function touch() {}` },
     ]);
-    const railsDefs = rubyDefinedMethods(`def reset; end\ndef touch; end`);
+    const railsDefs = await scopedRubyDefs(`def reset; end\ndef touch; end`);
     const crossFile = crossFileAsyncNames(manifest, { twinTsPath: "core.ts", railsDefs });
     expect(crossFile.has("reset")).toBe(false);
     expect(crossFile.has("touch")).toBe(true);
   });
-  it("keeps cross-file async names out unless Rails defines the method", () => {
+  it("keeps cross-file async names out unless Rails defines the method", async () => {
     const manifest = buildAsyncManifest([
       { path: "relation.ts", source: `class R { async then() {} }` },
     ]);
     const crossFile = crossFileAsyncNames(manifest, {
       twinTsPath: "core.ts",
-      railsDefs: rubyDefinedMethods(`def save; end`),
+      railsDefs: await scopedRubyDefs(`def save; end`),
     });
     expect(crossFile.has("then")).toBe(false);
   });

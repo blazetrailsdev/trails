@@ -6,7 +6,7 @@ import { ownRailsDefs, reachableRailsDefs } from "./rails-scope.js";
 import { resolvePath } from "../../vendor/sources.js";
 const AR_ROOT = resolvePath("activerecord");
 const AR_LIB = path.dirname(AR_ROOT);
-export { rubyDefinedMethods } from "./rails-scope.js";
+export { scopedRubyDefs } from "./rails-scope.js";
 function railsSource(railsRelPath: string): string {
   const abs = path.join(AR_LIB, railsRelPath);
   return existsSync(abs) ? readFileSync(abs, "utf8") : "";

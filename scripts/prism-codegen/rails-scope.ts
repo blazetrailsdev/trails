@@ -5,14 +5,7 @@ import { methodName } from "./naming.js";
 import { rubyAbsPathFor } from "./files.js";
 import type { PrismNode } from "./types.js";
 
-const RUBY_DEF = /^\s*def\s+(?:self\.)?([A-Za-z_][\w]*[?!=]?)/gm;
 const MIXIN_LINE = /^[ \t]*(?:include|extend)[ \t]+([A-Z][\w:]*(?:[ \t]*,[ \t]*[A-Z][\w:]*)*)/gm;
-
-export function rubyDefinedMethods(rubySource: string): Set<string> {
-  const defs = new Set<string>();
-  for (const m of rubySource.matchAll(RUBY_DEF)) defs.add(methodName(m[1]));
-  return defs;
-}
 
 let prismParse: Promise<Awaited<ReturnType<typeof loadPrism>>> | undefined;
 
@@ -210,7 +203,7 @@ const readRuby: RubySourceReader = (rel) => {
   return existsSync(abs) ? readFileSync(abs, "utf8") : undefined;
 };
 
-/** Ruby method names defined directly in one Rails file. */
+/** Ruby method names one Rails file defines in its own class/module scope. */
 export function ownRailsDefs(railsRelPath: string): Promise<Set<string>> {
   return scopedRubyDefs(readRuby(stripPrefix(railsRelPath)) ?? "");
 }
