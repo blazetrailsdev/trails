@@ -2152,7 +2152,6 @@ export class Migrator {
   private readonly _options: MigratorOptions;
   private readonly _direction: "up" | "down";
   private readonly _targetVersion: number | string | null;
-  /** Rails: `@migrated_versions` (migration.rb:1479-1485). */
   private _migratedVersions?: Set<string>;
 
   constructor(
@@ -2205,6 +2204,12 @@ export class Migrator {
    * Wrap a block with an advisory lock to prevent concurrent migrations.
    * If the adapter doesn't support advisory locks, runs without locking.
    *
+   * Once the lock is held, `loadMigrated` reloads schema_migrations to be sure
+   * it wasn't changed by another process while we blocked (migration.rb:1601).
+   * Rails' `Migrator` creates the bookkeeping tables in `initialize`; a
+   * constructor cannot await, so they are ensured here before the reload can
+   * query them.
+   *
    * Mirrors: ActiveRecord::Migrator#with_advisory_lock
    */
   private async _withAdvisoryLock<T>(fn: () => Promise<T>): Promise<T> {
@@ -2226,10 +2231,6 @@ export class Migrator {
     if (!locked) {
       throw new ConcurrentMigrationError();
     }
-    // Reload schema_migrations to be sure it wasn't changed by another process
-    // before we got the lock (migration.rb:1601). Rails' Migrator creates the
-    // bookkeeping tables in `initialize`; we can't await in a constructor, so
-    // ensure them here before the reload can query them.
     await this._ensureSchemaTable();
     await this.loadMigrated();
     // Capture fn error so we can release the lock before re-throwing (no-unsafe-finally).
@@ -2960,18 +2961,9 @@ export class Migrator {
       loaded.connection = this._adapter;
       await this._ddlTransaction(loaded, async () => {
         await loaded.migrate(direction);
-        // Track our own writes in the `migrated` memo, as Rails'
-        // record_version_state_after_migrating does (migration.rb:1554-1562).
-        const migrated = await this.migrated();
-        if (direction === "up") {
-          migrated.add(proxy.version);
-          await this._schemaMigration.recordVersion(proxy.version);
-          if (this._internalMetadata.enabled) {
-            await this._internalMetadata.set("environment", this._environment);
-          }
-        } else {
-          migrated.delete(proxy.version);
-          await this._schemaMigration.deleteVersion(proxy.version);
+        await this.recordVersionStateAfterMigrating(proxy.version, direction);
+        if (direction === "up" && this._internalMetadata.enabled) {
+          await this._internalMetadata.set("environment", this._environment);
         }
       });
     } catch (e) {
