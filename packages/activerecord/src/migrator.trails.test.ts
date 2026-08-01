@@ -517,6 +517,17 @@ describe("Migrator advisory lock wrapping", () => {
     await migrator.recordVersionStateAfterMigrating("1", "down");
     expect(await migrator.migrated()).toEqual(new Set());
   });
+
+  it("open returns a fresh Migrator so repeated pending checks are not memoized", async () => {
+    const adapter = Base.connection;
+    const schemaMigration = new SchemaMigration(adapter);
+    await schemaMigration.createTable();
+    const context = new Migrator(adapter, [makeMigration("1", "M1")]);
+
+    expect(await context.open().pendingMigrations()).toHaveLength(1);
+    await schemaMigration.recordVersion("1");
+    expect(await context.open().pendingMigrations()).toHaveLength(0);
+  });
 });
 
 describe("Migrator drives migrations through Migration#migrate", () => {

@@ -3121,18 +3121,25 @@ export class Migrator {
     return this._schemaMigration;
   }
 
+  /**
+   * Mirrors: ActiveRecord::MigrationContext#open (migration.rb:1278-1280).
+   *
+   * Returns a *fresh* Migrator, as Rails does. Callers that read
+   * {@link pendingMigrations} repeatedly (`CheckPending`) rely on this: the
+   * `migrated` memo lives on the per-run Migrator, so a new one is what makes
+   * each read see current schema_migrations.
+   */
   open(): Migrator {
-    return this;
+    return new Migrator(this._adapter, this._migrations, this._runOptions("up", null));
   }
 
   async needsMigration(): Promise<boolean> {
-    const pending = await this.pendingMigrations();
-    return pending.length > 0;
+    return (await this.pendingMigrationVersions()).length > 0;
   }
 
   async pendingMigrationVersions(): Promise<string[]> {
-    const pending = await this.pendingMigrations();
-    return pending.map((m) => m.version);
+    const applied = new Set(await this.getAllVersions());
+    return this._migrations.map((m) => m.version).filter((v) => !applied.has(v));
   }
 
   get currentEnvironment(): string {
@@ -3312,7 +3319,7 @@ export class CheckPending {
 
   async call(env: Record<string, unknown>): Promise<unknown> {
     if (this._migrator) {
-      const pending = await this._migrator.pendingMigrations();
+      const pending = await this._migrator.open().pendingMigrations();
       this._throwIfPending(pending.length);
     } else if (this._pendingConnection) {
       if (this._migrations.length === 0) {
