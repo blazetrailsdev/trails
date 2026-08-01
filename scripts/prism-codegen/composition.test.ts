@@ -20,34 +20,23 @@ const BASE_RB = `
     end
   end
 `;
-const CORE_RB = `
-  module ActiveRecord
-    module Core
-      def initialize_internals_callback
+
+/** A definer of `initialize_internals_callback` with `body` as its statements. */
+function definer(name: string, body: string): string {
+  return `
+    module ActiveRecord
+      module ${name}
+        def initialize_internals_callback
+          ${body}
+        end
       end
     end
-  end
-`;
-const INHERITANCE_RB = `
-  module ActiveRecord
-    module Inheritance
-      def initialize_internals_callback
-        super
-        ensure_proper_type
-      end
-    end
-  end
-`;
-const SCOPING_RB = `
-  module ActiveRecord
-    module Scoping
-      def initialize_internals_callback
-        super
-        populate_with_current_scope_attributes
-      end
-    end
-  end
-`;
+  `;
+}
+
+const CORE_RB = definer("Core", "");
+const INHERITANCE_RB = definer("Inheritance", "super\n          ensure_proper_type");
+const SCOPING_RB = definer("Scoping", "super\n          populate_with_current_scope_attributes");
 const SOURCES = [BASE_RB, CORE_RB, INHERITANCE_RB, SCOPING_RB];
 
 const MARKER =
@@ -107,16 +96,15 @@ describe("composition-point MRO check", () => {
   it("orders pre-super contributions by ancestry", async () => {
     expect(
       await orderFor([
-        SCOPING_RB.replace(
-          "super\n        populate_with_current_scope_attributes",
-          "populate_with_current_scope_attributes\n        super",
-        ),
+        definer("Scoping", "populate_with_current_scope_attributes\n          super"),
       ]),
     ).toEqual(["Scoping", "Inheritance"]);
   });
 
   it("stops the chain at a definer that never calls super", async () => {
-    expect(await orderFor([SCOPING_RB.replace("super\n", "")])).toEqual(["Scoping"]);
+    expect(await orderFor([definer("Scoping", "populate_with_current_scope_attributes")])).toEqual([
+      "Scoping",
+    ]);
   });
 
   it("reads each composition point's own call sites, not the next point's", () => {

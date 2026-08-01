@@ -25,13 +25,14 @@ import { loadPrism } from "@ruby/prism";
 import { constPath, normalizeModuleName, type Linearization } from "./linearization.js";
 import type { PrismNode } from "./types.js";
 
-/** A definer's body relative to its `super` call. */
+/**
+ * A definer's body relative to its `super` call: whether the chain continues
+ * past this module, and whether statements run before it (in ancestry order)
+ * or after it (in reverse).
+ */
 export interface SuperPosition {
-  /** The body calls `super` at all — the chain continues past this module. */
   hasSuper: boolean;
-  /** Statements run before `super` (so: in ancestry order). */
   before: boolean;
-  /** Statements run after `super` (so: in reverse ancestry order). */
   after: boolean;
 }
 
@@ -48,19 +49,14 @@ export interface Contribution {
 }
 
 export interface CompositionMarker {
-  /** Port file the marker lives in, relative to the port root. */
   file: string;
   /** Ruby method name of the chain, e.g. `initialize_internals_callback`. */
   method: string;
   contributions: Contribution[];
-  /** Offset of the marker's end; the realized order is read from here. */
+  /** The marker's own region — `[offset, end)`, ending at the next marker or
+   * the file's end. A file can hold several composition points (base.ts has
+   * one per constructor branch) and each must read only its own call sites. */
   offset: number;
-  /**
-   * Offset the marker's region ends at — the next marker, or the end of the
-   * file. A file can hold several composition points (base.ts has one per
-   * constructor branch) and each must read only its own call sites: an
-   * unbounded scan would let a later point's calls stand in for a missing one.
-   */
   end: number;
 }
 
@@ -78,10 +74,7 @@ export function parseCompositionMarkers(file: string, source: string): Compositi
   }));
 }
 
-/**
- * Where each `Module#method` body puts its `super`. Keyed `Module#method`,
- * mirroring `indexModuleDefs`' module paths so both indexes agree on naming.
- */
+/** Where each body puts its `super`, keyed `Module#method` as `indexModuleDefs` keys modules. */
 export async function indexSuperPositions(
   sources: Iterable<string>,
 ): Promise<Map<string, SuperPosition>> {
@@ -184,22 +177,20 @@ export function checkCompositionPoint(
   const problems: string[] = [];
   if (undeclared.length) {
     problems.push(
-      `  definers reached by the MRO but not declared: ${undeclared.join(", ")} ` +
-        `(declare each as Module=identifier, or Module=~ when it contributes nothing)`,
+      `  reached by the MRO but not declared: ${undeclared.join(", ")} ` +
+        "(declare each as Module=identifier, or Module=~ when it contributes nothing)",
     );
   }
   if (missing.length) {
-    problems.push(
-      `  declared identifiers with no call site below the marker: ${missing.join(", ")}`,
-    );
+    problems.push(`  declared with no call site below the marker: ${missing.join(", ")}`);
   }
-  if (problems.length === 0 && sameOrder(order, expectedRealized)) return undefined;
   if (!sameOrder(order, expectedRealized)) {
     problems.push(
       `  MRO order:      ${expectedRealized.join(" → ") || "(none)"}\n` +
         `  realized order: ${order.join(" → ") || "(none)"}`,
     );
   }
+  if (problems.length === 0) return undefined;
   return (
     `prism-codegen composition point: ${marker.file} :: ${marker.method} drifted ` +
     `from ActiveRecord::Base's MRO.\n${problems.join("\n")}`
@@ -225,8 +216,7 @@ export function rubyPathCandidatesForModule(name: string): string[] {
  * Ancestry entries living in another Rails component, which no path under
  * `activerecord/lib/active_record/` resolves — outside the corpus in the sense
  * `Linearization#resolve` means it. Every OTHER unresolved entry must fail
- * loudly: a definer whose source never loaded is invisible to both indexes, so
- * its contribution would be dropped from the expected order in silence.
+ * loudly: a definer whose source never loaded is invisible to both indexes.
  */
 export function isExternalAncestor(name: string): boolean {
   return /^Active(Model|Support)::/.test(name);
