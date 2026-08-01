@@ -350,6 +350,34 @@ the diff independently re-derives entries the deviation catalog already records,
 which is why item 7 proposes formalizing it as a guard rather than trusting the
 manual pass.
 
+## Golden output snapshots (`pnpm codegen:snapshot`)
+
+Roadmap item 6, shipped. The coverage rollup is a percentage: it can say a
+construct stopped being passthrough, but not that the handler emitted the
+_decided_ image rather than merely a parse-clean one. So the generated JS for
+each of the 10 target files is checked in under
+`scripts/prism-codegen/__snapshots__/<out-name>.js.snap` — the same bytes
+`pnpm codegen:generate` writes to the gitignored `out/` tree, produced through
+the shared `golden.ts` helpers so the CLI and the snapshots can't drift apart.
+
+`scripts/prism-codegen/golden.test.ts` regenerates each target and asserts the
+output equals its snapshot, and separately re-parses the **snapshot content**
+with the TypeScript parser to assert the 0-parse-errors invariant holds for the
+image that is actually checked in (not just for the freshly generated string).
+A handler PR therefore carries a reviewable diff of the JS it changed, and a
+regression that silently re-declines a construct shows up as a snapshot delta
+instead of a rounding change in the rollup.
+
+Update the goldens with `pnpm codegen:snapshot` (it fetches vendor/ first, then
+runs the suite with `-u`) and review the resulting diff as part of the PR.
+
+**CI wiring.** The suite runs in the `rails-comparison` job, right after the
+convergence guard, because regenerating needs the vendored Ruby that only that
+job fetches — the same reason `scripts/schema-compare`'s tests live there.
+`unit-tests` runs the rest of `scripts/prism-codegen` without vendor/, so the
+golden suite skips itself there (`vendoredRailsPresent()`); the pure logic it
+depends on stays unit-tested in that job.
+
 ## Convergence guard (`pnpm codegen:score --guard`)
 
 Roadmap item 7, shipped. The scorer's raw `divergent` + `missing` sets are too
@@ -495,6 +523,8 @@ machinery:
 - TS→JS entrypoint: `pnpm codegen:from-ts <trails.ts>` prints generated JS for
   the corresponding Rails file, resolving via the existing `rubyFileToTs`.
 - Coverage metric: per-file + rollup + passthrough leaders (above).
+- Golden snapshots: `scripts/prism-codegen/__snapshots__/` + `pnpm codegen:snapshot`
+  (above).
 - Convergence guard: `pnpm codegen:score --guard` + the checked-in residue
   baseline (above).
 - This RFC.

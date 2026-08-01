@@ -64,7 +64,8 @@
     "vendor:fetch": "pnpm tsx vendor/fetch.ts",
     "codegen:generate": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/prism-codegen/generate.ts",
     "codegen:from-ts": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/prism-codegen/from-ts.ts",
-    "codegen:score": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/prism-codegen/score-cli.ts"
+    "codegen:score": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/prism-codegen/score-cli.ts",
+    "codegen:snapshot": "pnpm vendor:fetch >/dev/null && pnpm vitest run scripts/prism-codegen/golden.test.ts -u"
   },
   "devDependencies": {
     "@blazetrails/activerecord": "workspace:*",

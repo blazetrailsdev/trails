@@ -51,6 +51,14 @@ export async function generateFromSource(
     helperImport = `import { ${names} } from "${runtimeImportPath}";\n\n`;
   }
   const code = HEADER + helperImport + printer.printFile(sourceFile);
+  return {
+    code,
+    coverage: gen.coverage,
+    perDef: gen.perDef,
+    parseErrorCount: countParseErrors(code),
+  };
+}
+export function countParseErrors(code: string): number {
   const reparsed = ts.createSourceFile(
     "gen.js",
     code,
@@ -58,14 +66,13 @@ export async function generateFromSource(
     true,
     ts.ScriptKind.JS,
   );
-  const parseErrorCount = (
+  return (
     (
       reparsed as unknown as {
         parseDiagnostics?: ts.Diagnostic[];
       }
     ).parseDiagnostics ?? []
   ).length;
-  return { code, coverage: gen.coverage, perDef: gen.perDef, parseErrorCount };
 }
 export { summarizeCoverage } from "./coverage.js";
 export { TARGET_FILES } from "./files.js";
