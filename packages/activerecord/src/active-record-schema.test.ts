@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from "vitest";
 import { Base, Migration, Schema, TableDefinition } from "./index.js";
-import { MigrationContext, Migrator } from "./migration.js";
+import { Migrator } from "./migration.js";
 import { SchemaMigration } from "./schema-migration.js";
 
 import { adapterType } from "./test-adapter.js";
@@ -31,8 +31,7 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   afterEach(async () => {
-    const ctx = new MigrationContext(adapter);
-    await ctx.dropTable(
+    await adapter.dropTable(
       "pk_test",
       "schema_test",
       "fruits",

@@ -8,7 +8,6 @@ import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "./base.js";
 import { adapterType } from "./test-adapter.js";
 import { fixtures } from "./test-fixtures.js";
-import { MigrationContext } from "./migration.js";
 import {
   introspectTables,
   introspectColumns,
@@ -42,11 +41,10 @@ function withoutMethods<A extends object>(adapter: A, hidden: string[]): A {
 // sidecar test pool.
 fixtures({}, { useTransactionalTests: false });
 
-// The tables these tests create via MigrationContext leak into the shared
+// The tables these tests create leak into the shared
 // per-worker DB; drop them by name so they don't collide with sibling files.
 afterEach(async () => {
-  const ctx = new MigrationContext(Base.connection);
-  await ctx.dropTable("widgets", "more_testings", { ifExists: true });
+  await Base.connection.dropTable("widgets", "more_testings", { ifExists: true });
 });
 
 describe("introspectTables", () => {
@@ -67,9 +65,8 @@ describe("introspectTables", () => {
 
   it("falls back to SchemaStatements when the adapter doesn't implement tables()", async () => {
     const realAdapter = Base.connection;
-    const ctx = new MigrationContext(realAdapter);
-    await ctx.createTable("widgets", {}, () => {});
-    await ctx.createTable("more_testings", {}, () => {});
+    await realAdapter.createTable("widgets", {}, () => {});
+    await realAdapter.createTable("more_testings", {}, () => {});
 
     // Strip `tables()` so introspectTables routes through SchemaStatements.
     const stripped = withoutMethods(realAdapter, ["tables"]);
@@ -100,8 +97,7 @@ describe("introspectColumns", () => {
 
   it("falls back to SchemaStatements when the adapter doesn't implement columns()", async () => {
     const realAdapter = Base.connection;
-    const ctx = new MigrationContext(realAdapter);
-    await ctx.createTable("widgets", {}, (t) => {
+    await realAdapter.createTable("widgets", {}, (t) => {
       t.string("name");
       t.integer("age");
     });
@@ -135,11 +131,10 @@ describe("introspectIndexes", () => {
 
   it("falls back to SchemaStatements when the adapter doesn't implement indexes()", async () => {
     const realAdapter = Base.connection;
-    const ctx = new MigrationContext(realAdapter);
-    await ctx.createTable("widgets", {}, (t) => {
+    await realAdapter.createTable("widgets", {}, (t) => {
       t.string("name");
     });
-    await ctx.addIndex("widgets", ["name"], { name: "idx_widgets_name" });
+    await realAdapter.addIndex("widgets", ["name"], { name: "idx_widgets_name" });
 
     const stripped = withoutMethods(realAdapter, ["indexes"]);
 
@@ -154,12 +149,11 @@ describe("introspectIndexes", () => {
   it("surfaces where/orders carried by the fallback SchemaStatements.indexes()", async () => {
     const supportsPartial = adapterType === "sqlite" || adapterType === "postgres";
     const realAdapter = Base.connection;
-    const ctx = new MigrationContext(realAdapter);
-    await ctx.createTable("widgets", {}, (t) => {
+    await realAdapter.createTable("widgets", {}, (t) => {
       t.string("name");
       t.boolean("active");
     });
-    await ctx.addIndex("widgets", ["name"], {
+    await realAdapter.addIndex("widgets", ["name"], {
       name: "idx_widgets_name_partial",
       ...(supportsPartial ? { where: "active" } : {}),
       order: { name: "desc" },
@@ -196,11 +190,10 @@ describe("introspectIndexes", () => {
     "surfaces expression-index columns from the fallback SchemaStatements.indexes()",
     async () => {
       const realAdapter = Base.connection;
-      const ctx = new MigrationContext(realAdapter);
-      await ctx.createTable("widgets", {}, (t) => {
+      await realAdapter.createTable("widgets", {}, (t) => {
         t.string("name");
       });
-      await ctx.addIndex("widgets", "lower(name)", { name: "idx_widgets_lower_name" });
+      await realAdapter.addIndex("widgets", "lower(name)", { name: "idx_widgets_lower_name" });
 
       const stripped = withoutMethods(realAdapter, ["indexes"]);
 
@@ -250,8 +243,7 @@ describe("introspectPrimaryKey", () => {
 
   it("falls back to columns with primaryKey===true when adapter lacks primaryKey()", async () => {
     const realAdapter = Base.connection;
-    const ctx = new MigrationContext(realAdapter);
-    await ctx.createTable("widgets", {}, (t) => {
+    await realAdapter.createTable("widgets", {}, (t) => {
       t.string("name");
     });
 
@@ -312,8 +304,7 @@ describe("introspectForeignKeys", () => {
 
   it("returns [] from the SchemaStatements fallback when adapter lacks foreignKeys()", async () => {
     const realAdapter = Base.connection;
-    const ctx = new MigrationContext(realAdapter);
-    await ctx.createTable("widgets", {}, (t) => {
+    await realAdapter.createTable("widgets", {}, (t) => {
       t.string("name");
     });
 
@@ -329,8 +320,7 @@ describe("introspectForeignKeys", () => {
 
   it("returns [] for a real table with no foreign keys", async () => {
     const realAdapter = Base.connection;
-    const ctx = new MigrationContext(realAdapter);
-    await ctx.createTable("widgets", {}, (t) => {
+    await realAdapter.createTable("widgets", {}, (t) => {
       t.string("name");
     });
 

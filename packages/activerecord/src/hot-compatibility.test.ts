@@ -3,7 +3,6 @@ import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { adapterType } from "./test-adapter.js";
-import { MigrationContext } from "./migration.js";
 import { PreparedStatementCacheExpired } from "./errors.js";
 import type { StatementPool } from "./connection-adapters/postgresql-adapter.js";
 import { fixtures } from "./test-fixtures.js";
@@ -57,8 +56,7 @@ describe("HotCompatibilityTest", () => {
     adapter: DatabaseAdapter;
   }> {
     const adapter = Base.connection;
-    const migration = new MigrationContext(adapter);
-    await migration.createTable("hot_compatibilities", { force: true }, (t) => {
+    await adapter.createTable("hot_compatibilities", { force: true }, (t) => {
       t.string("foo");
       t.string("bar");
     });
@@ -79,7 +77,7 @@ describe("HotCompatibilityTest", () => {
       expect(klass.columns().length).toBe(3);
 
       // remove one of them
-      await new MigrationContext(adapter).removeColumn("hot_compatibilities", "bar");
+      await adapter.removeColumn("hot_compatibilities", "bar");
 
       // we still have 3 columns in the cache
       expect(klass.columns().length).toBe(3);
@@ -90,7 +88,7 @@ describe("HotCompatibilityTest", () => {
       await record.reload();
       expect((record as unknown as { foo: string }).foo).toBe("foo");
     } finally {
-      await new MigrationContext(adapter).dropTable("hot_compatibilities", { ifExists: true });
+      await adapter.dropTable("hot_compatibilities", { ifExists: true });
     }
   });
 
@@ -99,7 +97,7 @@ describe("HotCompatibilityTest", () => {
     try {
       const record = await klass.createBang({ foo: "foo" });
       expect(klass.columns().length).toBe(3);
-      await new MigrationContext(adapter).removeColumn("hot_compatibilities", "bar");
+      await adapter.removeColumn("hot_compatibilities", "bar");
       expect(klass.columns().length).toBe(3);
 
       await record.reload();
@@ -109,7 +107,7 @@ describe("HotCompatibilityTest", () => {
       await record.reload();
       expect((record as unknown as { foo: string }).foo).toBe("bar");
     } finally {
-      await new MigrationContext(adapter).dropTable("hot_compatibilities", { ifExists: true });
+      await adapter.dropTable("hot_compatibilities", { ifExists: true });
     }
   });
 
@@ -123,7 +121,7 @@ describe("HotCompatibilityTest", () => {
     staleReload: (model: typeof Base, record: { reload(): Promise<unknown> }) => Promise<unknown>,
   ): Promise<void> {
     const adapter = Base.connection;
-    await new MigrationContext(adapter).createTable("hot_compatibilities", { force: true }, (t) => {
+    await adapter.createTable("hot_compatibilities", { force: true }, (t) => {
       t.string("foo");
       t.string("bar");
     });
@@ -142,7 +140,7 @@ describe("HotCompatibilityTest", () => {
       expect(preparedStatementCacheSize(adapter)).toBeGreaterThan(0);
 
       // add a new column on the second connection
-      await new MigrationContext(ddlConnection).addColumn("hot_compatibilities", "baz", "string");
+      await ddlConnection.addColumn("hot_compatibilities", "baz", "string");
 
       await expect(staleReload(HotCompatibility, record)).rejects.toBeInstanceOf(
         PreparedStatementCacheExpired,
@@ -150,7 +148,7 @@ describe("HotCompatibilityTest", () => {
 
       expect(preparedStatementCacheSize(adapter)).toBe(0);
     } finally {
-      await new MigrationContext(adapter).dropTable("hot_compatibilities", { ifExists: true });
+      await adapter.dropTable("hot_compatibilities", { ifExists: true });
     }
   }
 

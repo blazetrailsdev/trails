@@ -26,7 +26,6 @@ import { ValueType } from "@blazetrails/activemodel";
 import { TimeWithZone, getZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
-import { MigrationContext } from "./migration.js";
 import { itIfSupports } from "./support/supports.js";
 import { describeIfPg } from "./support/describe-if-pg.js";
 import { withTimezoneConfig } from "./test-helper.js";
@@ -811,15 +810,14 @@ describe("DirtyTest", () => {
     const Testings = class extends Base {
       static tableName = "testings";
     };
-    const ctx = new MigrationContext(Base.connection);
     try {
-      await ctx.createTable("testings", { force: true }, (t) => {
+      await Base.connection.createTable("testings", { force: true }, (t) => {
         t.string("field");
       });
       await Testings.loadSchema();
       expect(() => new Testings().attributes).not.toThrow();
     } finally {
-      await ctx.dropTable("testings", { ifExists: true });
+      await Base.connection.dropTable("testings", { ifExists: true });
     }
   });
 

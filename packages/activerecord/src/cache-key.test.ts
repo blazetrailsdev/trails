@@ -4,7 +4,6 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
 import { adapterType } from "./test-adapter.js";
-import { MigrationContext } from "./migration.js";
 import { fixtures } from "./test-fixtures.js";
 import { ActiveRecord } from "./ar-config.js";
 
@@ -34,16 +33,17 @@ describe("CacheKeyTest", () => {
   // bespoke tables per-test, so opt out of transactional fixtures — the per-test
   // DDL must commit, not roll back inside a wrapping (PG-poisoning) transaction.
   fixtures({}, { useTransactionalTests: false });
-  let ctx: MigrationContext;
 
   beforeEach(async () => {
-    ctx = new MigrationContext(Base.connection);
-    await ctx.createTable("cache_mes", { force: true }, (t: any) => t.timestamps());
-    await ctx.createTable("cache_me_with_versions", { force: true }, (t: any) => t.timestamps());
+    const adapter = Base.connection;
+    await adapter.createTable("cache_mes", { force: true }, (t: any) => t.timestamps());
+    await adapter.createTable("cache_me_with_versions", { force: true }, (t: any) =>
+      t.timestamps(),
+    );
   });
 
   afterEach(async () => {
-    await ctx.dropTable("cache_mes", "cache_me_with_versions", { ifExists: true });
+    await Base.connection.dropTable("cache_mes", "cache_me_with_versions", { ifExists: true });
   });
 
   function cacheMe() {
