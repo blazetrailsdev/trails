@@ -83,11 +83,11 @@ export function ignoredColumns() {
     return this.ignored_columns || this.superclass.ignoredColumns();
 }
 export function ignoredColumns(columns) {
-    this.reloadSchemaFromCache;
+    this.reloadSchemaFromCache();
     return this.ignored_columns = columns.map(x => x.toString()).freeze();
 }
 export function sequenceName() {
-    if (this.isBaseClass) {
+    if (this.isBaseClass()) {
         return this.sequence_name ||= this.resetSequenceName;
     }
     else {
@@ -116,7 +116,7 @@ export function attributesBuilder() {
 }
 export function columnsHash() {
     if (!this.columns_hash) {
-        this.loadSchema;
+        this.loadSchema();
     }
     return this.columns_hash;
 }
@@ -127,14 +127,14 @@ export function _returningColumnsForInsert(connection) {
     return this._returning_columns_for_insert ||= __PRISM_TODO("BeginNode");
 }
 export function yamlEncoder() {
-    return this.yaml_encoder ||= new ActiveModel.AttributeSet.YAMLEncoder(this.attributeTypes);
+    return this.yaml_encoder ||= new ActiveModel.AttributeSet.YAMLEncoder(this.attributeTypes());
 }
 export function columnForAttribute(name) {
     name = name.toString();
     return this.columnsHash.fetch(name, () => new ConnectionAdapters.NullColumn(name));
 }
 export function columnDefaults() {
-    this.loadSchema;
+    this.loadSchema();
     return this.column_defaults ||= this._defaultAttributes.deepDup().toHash().freeze();
 }
 export function columnNames() {
@@ -151,23 +151,23 @@ export function resetColumnInformation() {
     this.connectionPool.activeConnection().clearCacheBang();
     ([this] + this.descendants).each(x => x.undefineAttributeMethods());
     this.schemaCache.clearDataSourceCacheBang(this.tableName);
-    this.reloadSchemaFromCache;
+    this.reloadSchemaFromCache();
     return this.initializeFindByCache;
 }
 export function loadSchema() {
-    if (this.isSchemaLoaded) {
+    if (this.isSchemaLoaded()) {
         return;
     }
     return this.load_schema_monitor.synchronize(() => {
         try {
-            if (this.isSchemaLoaded) {
+            if (this.isSchemaLoaded()) {
                 return;
             }
-            this.loadSchema;
+            this.loadSchema();
             return this.schema_loaded = true;
         }
         catch (e) {
-            this.reloadSchemaFromCache;
+            this.reloadSchemaFromCache();
             return this.raise;
         }
     });
@@ -226,7 +226,7 @@ export function undecoratedTableName(model_name) {
 }
 export function computeTableName() {
     let contained;
-    if (this.isBaseClass) {
+    if (this.isBaseClass()) {
         if (this.moduleParent < Base && !this.moduleParent.isAbstractClass()) {
             contained = this.moduleParent.tableName();
             if (this.moduleParent.pluralizeTableNames()) {

@@ -75,20 +75,28 @@ export function clearAsyncProvenance(
  * by the AST, so unlike a bare name the manifest lookup cannot land on an
  * unrelated same-named method.
  *
- * A bare, paren-less, argument-less implicit self-call is excluded: the
- * emitter renders it as a property access rather than a call, so the target
- * holds a method reference, not the method's resolved value.
+ * A paren-less, argument-less implicit self-call counts only when the port
+ * index says the name is a method, since that is exactly when the emitter
+ * renders it as a call. Without that, the target holds a method reference
+ * rather than the method's resolved value, and awaiting its later calls would
+ * be awaiting the wrong thing.
  */
 export function hasAsyncProvenance(
   value: PrismNode | null | undefined,
   jsNameOf: (rubyName: string) => string,
   asyncMethods: ReadonlySet<string>,
+  portMethods: ReadonlySet<string> = new Set(),
 ): boolean {
   if (!value || value.constructor?.name !== "CallNode") return false;
   const receiver = value.receiver as PrismNode | null;
   if (receiver && receiver.constructor?.name !== "SelfNode") return false;
+  const jsName = jsNameOf(String(value.name));
   const invoked =
-    receiver != null || value.openingLoc != null || value.arguments_ != null || value.block != null;
+    receiver != null ||
+    value.openingLoc != null ||
+    value.arguments_ != null ||
+    value.block != null ||
+    portMethods.has(jsName);
   if (!invoked) return false;
-  return asyncMethods.has(jsNameOf(String(value.name)));
+  return asyncMethods.has(jsName);
 }

@@ -25,17 +25,17 @@ export async function take(limit = null) {
         return await this.findTakeWithLimit(limit);
     }
     else {
-        return this.findTake;
+        return await this.findTake();
     }
 }
 export function takeBang() {
-    return this.take || this.raiseRecordNotFoundExceptionBang;
+    return this.take || this.raiseRecordNotFoundExceptionBang();
 }
 export async function sole() {
     let found, undesired;
     [found, undesired] = await this.first(2);
     if (found.nil()) {
-        return this.raiseRecordNotFoundExceptionBang;
+        return this.raiseRecordNotFoundExceptionBang();
     }
     else if (undesired.nil()) {
         return found;
@@ -56,14 +56,14 @@ export async function first(limit = null) {
     }
 }
 export function firstBang() {
-    return this.first || this.raiseRecordNotFoundExceptionBang;
+    return this.first || this.raiseRecordNotFoundExceptionBang();
 }
 export async function last(limit = null) {
     let result;
     if (this.isLoaded || this.hasLimitOrOffset) {
         return await this.findLast(limit);
     }
-    result = this.orderedRelation.limit(limit);
+    result = this.orderedRelation().limit(limit);
     result = result.reverseOrderBang();
     if (limit) {
         return result.reverse();
@@ -73,49 +73,49 @@ export async function last(limit = null) {
     }
 }
 export function lastBang() {
-    return this.last || this.raiseRecordNotFoundExceptionBang;
+    return this.last || this.raiseRecordNotFoundExceptionBang();
 }
 export async function second() {
     return await this.findNth(1);
 }
 export function secondBang() {
-    return this.second || this.raiseRecordNotFoundExceptionBang;
+    return this.second || this.raiseRecordNotFoundExceptionBang();
 }
 export async function third() {
     return await this.findNth(2);
 }
 export function thirdBang() {
-    return this.third || this.raiseRecordNotFoundExceptionBang;
+    return this.third || this.raiseRecordNotFoundExceptionBang();
 }
 export async function fourth() {
     return await this.findNth(3);
 }
 export function fourthBang() {
-    return this.fourth || this.raiseRecordNotFoundExceptionBang;
+    return this.fourth || this.raiseRecordNotFoundExceptionBang();
 }
 export async function fifth() {
     return await this.findNth(4);
 }
 export function fifthBang() {
-    return this.fifth || this.raiseRecordNotFoundExceptionBang;
+    return this.fifth || this.raiseRecordNotFoundExceptionBang();
 }
 export async function fortyTwo() {
     return await this.findNth(41);
 }
 export function fortyTwoBang() {
-    return this.fortyTwo || this.raiseRecordNotFoundExceptionBang;
+    return this.fortyTwo || this.raiseRecordNotFoundExceptionBang();
 }
 export async function thirdToLast() {
     return await this.findNthFromLast(3);
 }
 export function thirdToLastBang() {
-    return this.thirdToLast || this.raiseRecordNotFoundExceptionBang;
+    return this.thirdToLast || this.raiseRecordNotFoundExceptionBang();
 }
 export async function secondToLast() {
     return await this.findNthFromLast(2);
 }
 export function secondToLastBang() {
-    return this.secondToLast || this.raiseRecordNotFoundExceptionBang;
+    return this.secondToLast || this.raiseRecordNotFoundExceptionBang();
 }
 export function isExists(conditions = "none") {
     let relation;
@@ -155,7 +155,7 @@ const isMember = isInclude;
 export function raiseRecordNotFoundExceptionBang(ids = null, result_size = null, expected_size = null, key = this.model.primaryKey, not_found_ids = null) {
     let conditions, name, error;
     if (!this.whereClause.isEmpty()) {
-        conditions = ` [${this.arel.whereSql(this.model)}]`;
+        conditions = ` [${this.arel().whereSql(this.model)}]`;
     }
     name = this.model.name();
     if (ids.nil()) {
@@ -323,7 +323,7 @@ export function findNthWithLimit(index, limit) {
         return __PRISM_TODO("CallNode") || [];
     }
     else {
-        relation = this.orderedRelation;
+        relation = this.orderedRelation();
         if (this.limitValue) {
             limit = [this.limitValue - index, limit].min();
         }
@@ -344,7 +344,7 @@ export function findNthFromLast(index) {
         return this.records[-index];
     }
     else {
-        relation = this.orderedRelation;
+        relation = this.orderedRelation();
         if (relation.orderValues().isEmpty() || relation.hasLimitOrOffset()) {
             return relation.records()[-index];
         }
@@ -363,7 +363,7 @@ export function findLast(limit) {
 }
 export function orderedRelation() {
     if (this.orderValues.isEmpty() && (this.model.implicitOrderColumn() || !this.model.queryConstraintsList().nil() || this.model.primaryKey)) {
-        return this.order(this._orderColumns.map(column => this.table[column].asc()));
+        return this.order(this._orderColumns().map(column => this.table[column].asc()));
     }
     else {
         return this;

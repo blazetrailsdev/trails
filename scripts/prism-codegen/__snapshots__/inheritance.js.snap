@@ -23,7 +23,7 @@ export function constructor(attributes = null, block) {
         if (subclass.nil() && (scope_attributes = this.currentScope.scopeForCreate())) {
             subclass = this.subclassFromAttributes(scope_attributes);
         }
-        if (subclass.nil() && this.isBaseClass) {
+        if (subclass.nil() && this.isBaseClass()) {
             subclass = this.subclassFromAttributes(this.columnDefaults);
         }
     }
@@ -45,7 +45,7 @@ export function isDescendsFromActiveRecord() {
     }
 }
 export function isFinderNeedsTypeCondition() {
-    return "true" === (this.finder_needs_type_condition ||= this.isDescendsFromActiveRecord ? "false" : "true");
+    return "true" === (this.finder_needs_type_condition ||= this.isDescendsFromActiveRecord() ? "false" : "true");
 }
 attrReader("base_class");
 export function isBaseClass() {
@@ -106,7 +106,7 @@ export function dup() {
     return other;
 }
 export function initializeClone(other) {
-    return this.setBaseClass;
+    return this.setBaseClass();
 }
 __PRISM_TODO("CallNode");
 export function computeType(type_name) {
@@ -181,12 +181,12 @@ export function subclassFromAttributes(attrs) {
 }
 export function initializeDup(other) {
     Core.initializeDup.call(this, ...arguments);
-    return this.ensureProperType;
+    return this.ensureProperType();
 }
 __PRISM_TODO("CallNode");
 export function initializeInternalsCallback() {
     Core.initializeInternalsCallback.call(this, ...arguments);
-    return this.ensureProperType;
+    return this.ensureProperType();
 }
 export function ensureProperType() {
     let klass;

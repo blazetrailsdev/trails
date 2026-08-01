@@ -47,6 +47,12 @@ export interface Emitter {
   inClass: boolean;
   inSingleton: boolean;
   readonly asyncMethods: ReadonlySet<string>;
+  /**
+   * Names the port declares as methods rather than getters. A paren-less,
+   * argument-less self-call is emitted as a call only for these; everything
+   * else stays a property access.
+   */
+  readonly portMethods: ReadonlySet<string>;
   readonly delegations: ReadonlyMap<string, string>;
   inAsyncMethod: boolean;
 

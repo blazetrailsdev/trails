@@ -234,7 +234,7 @@ export function unscopeBang(...args) {
             if (!VALID_UNSCOPING_VALUES.isInclude(scope)) {
                 throw new ArgumentError(`Called unscope() with invalid unscoping argument ':${scope}'. Valid arguments are :${VALID_UNSCOPING_VALUES.toA().join(", :")}.`);
             }
-            this.assertModifiableBang;
+            this.assertModifiableBang();
             return this.values.delete(scope);
         }
         else if (caseEq(Hash, scope)) {
@@ -684,7 +684,7 @@ export function lookupTableKlassFromJoinDependencies(table_name) {
     });
     return null;
 }
-export function eachJoinDependencies(join_dependencies = this.buildJoinDependencies, block) {
+export function eachJoinDependencies(join_dependencies = this.buildJoinDependencies(), block) {
     return join_dependencies.each(join_dependency => join_dependency.each(block));
 }
 export function buildJoinDependencies() {
@@ -731,7 +731,7 @@ export function buildArel(connection, aliases = null) {
     }
     arel.distinct(this.distinctValue);
     if (!this.fromClause.isEmpty()) {
-        arel.from(this.buildFrom);
+        arel.from(this.buildFrom());
     }
     if (this.lockValue) {
         arel.lock(this.lockValue);
@@ -853,7 +853,7 @@ export function buildJoins(join_sources, aliases = null) {
     if (this.joinsValues.isEmpty() && this.leftOuterJoinsValues.isEmpty()) {
         return join_sources;
     }
-    [buckets, join_type] = this.buildJoinBuckets;
+    [buckets, join_type] = this.buildJoinBuckets();
     named_joins = buckets["named_join"];
     stashed_joins = buckets["stashed_join"];
     leading_joins = buckets["leading_join"];
