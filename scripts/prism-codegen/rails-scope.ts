@@ -37,7 +37,8 @@ function stripPrefix(rel: string): string {
  * the constant lexically, which we cannot do from a path alone, so we try the
  * three layouts Rails actually uses: nested under the includer's own file
  * (`relation.rb` → `relation/finder_methods.rb`), a sibling of it, and the
- * `active_record/` root. Non-existent candidates are dropped by the caller.
+ * `active_record/` root. `resolveMixinPath` picks between them by asking which
+ * one really defines the constant.
  */
 export function mixinPathCandidates(fromRel: string, moduleName: string): string[] {
   const segments = moduleName
@@ -53,9 +54,6 @@ export function mixinPathCandidates(fromRel: string, moduleName: string): string
   return [...new Set([nested, sibling, tail])];
 }
 
-// The trailing alternation keeps `class << self` out (a singleton body is not
-// a constant) while admitting the `# :nodoc:` comment most Rails module
-// declarations carry and the `< Superclass` of a class declaration.
 const MODULE_DECL = /^([ \t]*)(?:module|class)[ \t]+([A-Z][\w:]*)[ \t]*(?:<[^<]|#|$)/;
 
 /**
@@ -64,8 +62,12 @@ const MODULE_DECL = /^([ \t]*)(?:module|class)[ \t]+([A-Z][\w:]*)[ \t]*(?:<[^<]|
  * is read off the indentation rather than by matching `end`s: Rails indents
  * consistently, and an `end`-counting scanner has to model every block-opening
  * keyword to stay in sync, where a miscount silently corrupts every later path.
+ *
+ * The declaration pattern's trailing alternation keeps `class << self` out — a
+ * singleton body defines no constant — while admitting the `# :nodoc:` comment
+ * most Rails declarations carry and the `< Superclass` of a class.
  */
-export function moduleDefinitionPaths(rubySource: string): Set<string> {
+function moduleDefinitionPaths(rubySource: string): Set<string> {
   const paths = new Set<string>();
   const stack: { indent: number; name: string }[] = [];
   for (const line of rubySource.split("\n")) {
@@ -122,6 +124,7 @@ export function unresolvedMixinReport(): UnresolvedMixin[] {
   return [...unresolvedMixins.values()];
 }
 
+/** Clears the report — for tests, and for a caller that reports per run. */
 export function resetUnresolvedMixins(): void {
   unresolvedMixins.clear();
 }

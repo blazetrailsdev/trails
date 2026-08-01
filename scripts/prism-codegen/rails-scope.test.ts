@@ -96,8 +96,6 @@ describe("prism-codegen rails scope", () => {
     const read: RubySourceReader = (rel) => sources[rel];
     expect(resolveMixinPath("relation.rb", "Calculations", read)).toBe("relation/calculations.rb");
 
-    // Same constant name, but the nested file defines a different module: the
-    // path guess would take it anyway, so resolution has to fall through.
     sources["relation/calculations.rb"] = railsModule("Relation::Batches", "def find_each; end");
     expect(resolveMixinPath("relation.rb", "Calculations", read)).toBe("calculations.rb");
   });
