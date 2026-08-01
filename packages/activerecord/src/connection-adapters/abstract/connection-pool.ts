@@ -542,7 +542,11 @@ export class ConnectionPool implements ReapablePool {
 
   get migrationContext(): MigrationContext {
     if (!this._migrationContext) {
-      this._migrationContext = new MigrationContext(this._getAdapterProxy());
+      this._migrationContext = new MigrationContext(
+        this.migrationsPaths,
+        this.schemaMigration,
+        this.internalMetadata,
+      );
     }
     return this._migrationContext;
   }
