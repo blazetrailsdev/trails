@@ -8,7 +8,10 @@ import { ForeignKeyDefinition, TableDefinition, type ColumnType } from "./schema
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { NotImplementedError } from "../../errors.js";
 
-function makeStatements(adapterOverrides: Record<string, unknown> = {}) {
+function makeStatements(
+  adapterOverrides: Record<string, unknown> = {},
+  Statements: new (adapter: never) => SchemaStatements = SchemaStatements,
+) {
   const adapter: Record<string, unknown> = {
     adapterName: "sqlite" as const,
     quoteIdentifier: (n: string) => `"${n}"`,
@@ -33,7 +36,7 @@ function makeStatements(adapterOverrides: Record<string, unknown> = {}) {
       binds,
       "SCHEMA",
     );
-  return new SchemaStatements(adapter as any);
+  return new Statements(adapter as never);
 }
 
 describe("SchemaStatements privates (PR 8)", () => {
@@ -916,18 +919,29 @@ describe("SchemaStatements#createTable statement ordering", () => {
   });
 
   it("reads the table comment from the definition rather than the options hash", async () => {
-    const changeTableComment = vi.fn(async () => {});
-    const ss = makeStatements({
-      supportsComments: () => true,
-      supportsCommentsInCreate: () => false,
-      changeTableComment,
-    });
+    class AdapterSettingTheCommentOnTheDefinition extends SchemaStatements {
+      override buildCreateTableDefinition(
+        tableName: string,
+        options: Parameters<SchemaStatements["buildCreateTableDefinition"]>[1] = {},
+        fn?: (td: TableDefinition) => void,
+      ): TableDefinition {
+        return super.buildCreateTableDefinition(
+          tableName,
+          { ...options, comment: "from the definition" },
+          fn,
+        );
+      }
+    }
 
-    // Stands in for an adapter override / normalization that sets the comment on
-    // the definition without it appearing in the raw options hash.
-    const build = ss.buildCreateTableDefinition.bind(ss);
-    ss.buildCreateTableDefinition = ((name: string, options: Record<string, unknown>, fn: any) =>
-      build(name, { ...options, comment: "from the definition" }, fn)) as never;
+    const changeTableComment = vi.fn(async () => {});
+    const ss = makeStatements(
+      {
+        supportsComments: () => true,
+        supportsCommentsInCreate: () => false,
+        changeTableComment,
+      },
+      AdapterSettingTheCommentOnTheDefinition,
+    );
 
     await ss.createTable("things", { id: false }, (t) => {
       t.column("name", "string");

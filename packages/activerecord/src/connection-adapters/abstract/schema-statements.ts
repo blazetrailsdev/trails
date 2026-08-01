@@ -469,8 +469,6 @@ export class SchemaStatements {
     }
 
     if (this.adapter.supportsComments?.() && !this.adapter.supportsCommentsInCreate?.()) {
-      // Rails reads the comment off the definition, not the raw options hash —
-      // buildCreateTableDefinition and adapter overrides may set or normalize it.
       const tableComment = presence(td.comment);
       if (tableComment != null && typeof this.adapter.changeTableComment === "function") {
         await this.adapter.changeTableComment(name, tableComment);
