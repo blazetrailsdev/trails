@@ -57,23 +57,30 @@ export function registerControl(r: Registry): void {
   r.onStmt("BeginNode", (n, e, isLast) => {
     const rescue = n.rescueClause as PrismNode | undefined;
     if (rescue?.subsequent) return null;
-    const tryBlock = f.createBlock(e.stmts((n.statements as PrismNode) ?? null, isLast), true);
+    const ensure = n.ensureClause as PrismNode | undefined;
+    if (!rescue && !ensure) return e.stmts((n.statements as PrismNode) ?? null, isLast);
+    const tryArm = scopeAsyncArm(e.asyncBindings, () =>
+      f.createBlock(e.stmts((n.statements as PrismNode) ?? null, isLast), true),
+    );
     let catchClause: ts.CatchClause | undefined;
+    let catchArm: Set<string> | undefined;
     if (rescue) {
       const ref = rescue.reference ? String((rescue.reference as PrismNode).name) : "e";
-      catchClause = f.createCatchClause(
-        f.createVariableDeclaration(ref),
+      const arm = scopeAsyncArm(e.asyncBindings, () =>
         f.createBlock(e.stmts((rescue.statements as PrismNode) ?? null, isLast), true),
       );
+      catchArm = arm.after;
+      catchClause = f.createCatchClause(f.createVariableDeclaration(ref), arm.value);
     }
-    const ensure = n.ensureClause as PrismNode | undefined;
+    mergeAsyncArms(
+      e.asyncBindings,
+      catchArm ? [tryArm.after, catchArm] : [tryArm.after],
+      catchArm != null,
+    );
     const finallyBlock = ensure
       ? f.createBlock(e.stmts((ensure.statements as PrismNode) ?? null, false), true)
       : undefined;
-    if (!catchClause && !finallyBlock) {
-      return e.stmts((n.statements as PrismNode) ?? null, isLast);
-    }
-    return [f.createTryStatement(tryBlock, catchClause, finallyBlock)];
+    return [f.createTryStatement(tryArm.value, catchClause, finallyBlock)];
   });
   r.onStmt("CallNode", (n, e) => {
     if (String(n.name) !== "raise" || n.receiver || n.block) return null;

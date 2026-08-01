@@ -284,6 +284,22 @@ describe("prism-codegen", () => {
     );
     expect(noElse.code).not.toContain("await this.relation.load()");
   });
+  it("does not leak provenance from a begin body its rescue arm never establishes", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all(arg)
+          begin
+            @relation = build_relation()
+          rescue => e
+            @relation = arg
+          end
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).not.toContain("await this.relation.load()");
+  });
   it("stops awaiting a receiver rebound by an operator write", async () => {
     const ivarWrite = await generateFromSource(
       `module M
