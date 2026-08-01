@@ -77,6 +77,11 @@ import { PostgreSQLSchemaStatements } from "./postgresql/schema-statements-class
 import type {
   JoinTableOptions,
   ValidateConstraintStatements,
+  CommentStatements,
+  ExtensionStatements,
+  EnumStatements,
+  UniqueConstraintStatements,
+  SchemaNamespaceStatements,
 } from "./abstract/schema-statements.js";
 import { SchemaStatements } from "./abstract/schema-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
@@ -176,7 +181,14 @@ function toError(value: unknown): Error {
  */
 export class PostgreSQLAdapter
   extends AbstractAdapter
-  implements DatabaseAdapter, ValidateConstraintStatements
+  implements
+    DatabaseAdapter,
+    ValidateConstraintStatements,
+    CommentStatements,
+    ExtensionStatements,
+    EnumStatements,
+    UniqueConstraintStatements,
+    SchemaNamespaceStatements
 {
   override get adapterName(): AdapterName {
     return "postgres";

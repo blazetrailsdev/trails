@@ -29,7 +29,14 @@ import {
   assertSchemaAdapter,
   type JoinTableOptions,
   type ValidateConstraintStatements,
+  type CommentOrChanges,
+  type CommentStatements,
+  type EnumStatements,
+  type ExtensionStatements,
+  type SchemaNamespaceStatements,
+  type UniqueConstraintStatements,
 } from "./connection-adapters/abstract/schema-statements.js";
+import type { UniqueConstraintOptions } from "./connection-adapters/postgresql/schema-definitions.js";
 import { CommandRecorder } from "./migration/command-recorder.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
@@ -60,9 +67,7 @@ import { ActiveRecord } from "./ar-config.js";
 // Mirrors Rails AbstractAdapter#extract_new_comment_value (alias of extract_new_default_value).
 // For {from,to} hashes, returns `to` (which may be null to clear a comment).
 // `to: undefined` is rejected — a missing value cannot be forwarded to SQL.
-function _extractNewCommentValue(
-  v: string | null | { from?: unknown; to?: unknown },
-): string | null {
+function _extractNewCommentValue(v: CommentOrChanges): string | null {
   if (v !== null && typeof v === "object") {
     if (!("to" in v) || (v as { to: unknown }).to === undefined) {
       throw new ArgumentError("change_column_comment / change_table_comment requires a :to value");
@@ -798,7 +803,7 @@ export abstract class Migration {
   async changeColumnComment(
     tableName: string,
     columnName: string,
-    commentOrChanges: string | null | { from?: unknown; to?: unknown },
+    commentOrChanges: CommentOrChanges,
   ): Promise<void> {
     if (this._recording) {
       this._recorder.record("changeColumnComment", [tableName, columnName, commentOrChanges]);
@@ -806,20 +811,19 @@ export abstract class Migration {
     }
     tableName = this._pt(tableName);
     const resolved = _extractNewCommentValue(commentOrChanges);
-    await (this.connection as any).changeColumnComment(tableName, columnName, resolved);
+    const connection = this.connection as DatabaseAdapter & CommentStatements;
+    await connection.changeColumnComment(tableName, columnName, resolved);
   }
 
-  async changeTableComment(
-    tableName: string,
-    commentOrChanges: string | null | { from?: unknown; to?: unknown },
-  ): Promise<void> {
+  async changeTableComment(tableName: string, commentOrChanges: CommentOrChanges): Promise<void> {
     if (this._recording) {
       this._recorder.record("changeTableComment", [tableName, commentOrChanges]);
       return;
     }
     tableName = this._pt(tableName);
     const resolved = _extractNewCommentValue(commentOrChanges);
-    await (this.connection as any).changeTableComment(tableName, resolved);
+    const connection = this.connection as DatabaseAdapter & CommentStatements;
+    await connection.changeTableComment(tableName, resolved);
   }
 
   async enableExtension(name: string, options?: Record<string, unknown>): Promise<void> {
@@ -827,15 +831,20 @@ export abstract class Migration {
       this._recorder.record("enableExtension", [name, options]);
       return;
     }
-    await (this.connection as any).enableExtension(name, options);
+    const connection = this.connection as DatabaseAdapter & ExtensionStatements;
+    await connection.enableExtension(name, options);
   }
 
-  async disableExtension(name: string, options?: Record<string, unknown>): Promise<void> {
+  async disableExtension(
+    name: string,
+    options?: { force?: "cascade"; schema?: string },
+  ): Promise<void> {
     if (this._recording) {
       this._recorder.record("disableExtension", [name, options]);
       return;
     }
-    await (this.connection as any).disableExtension(name, options);
+    const connection = this.connection as DatabaseAdapter & ExtensionStatements;
+    await connection.disableExtension(name, options);
   }
 
   async createEnum(
@@ -847,13 +856,14 @@ export abstract class Migration {
       this._recorder.record("createEnum", [name, values, options]);
       return;
     }
-    await (this.connection as any).createEnum(name, values, options);
+    const connection = this.connection as DatabaseAdapter & EnumStatements;
+    await connection.createEnum(name, values, options);
   }
 
   async dropEnum(
     name: string,
-    valuesOrOptions?: string[] | Record<string, unknown>,
-    options?: Record<string, unknown>,
+    valuesOrOptions?: string[] | { ifExists?: boolean },
+    options?: { ifExists?: boolean },
   ): Promise<void> {
     // Normalize: if second arg is a plain object it is the options hash (no values).
     // Mirrors Rails drop_enum(name, values = nil, **options) which allows options-only calls.
@@ -869,7 +879,8 @@ export abstract class Migration {
     }
     // values is only captured for recording (so dropEnum can be inverted to createEnum);
     // the adapter's dropEnum(name, options?) doesn't need values for SQL execution.
-    await (this.connection as any).dropEnum(name, opts ?? {});
+    const connection = this.connection as DatabaseAdapter & EnumStatements;
+    await connection.dropEnum(name, opts ?? {});
   }
 
   async renameEnumValue(name: string, options: { from: string; to: string }): Promise<void> {
@@ -877,26 +888,28 @@ export abstract class Migration {
       this._recorder.record("renameEnumValue", [name, options]);
       return;
     }
-    await (this.connection as any).renameEnumValue(name, options);
+    const connection = this.connection as DatabaseAdapter & EnumStatements;
+    await connection.renameEnumValue(name, options);
   }
 
   async addUniqueConstraint(
     tableName: string,
     columnName?: string | string[],
-    options?: Record<string, unknown>,
+    options?: UniqueConstraintOptions,
   ): Promise<void> {
     if (this._recording) {
       this._recorder.record("addUniqueConstraint", [tableName, columnName, options]);
       return;
     }
     tableName = this._pt(tableName);
-    await (this.connection as any).addUniqueConstraint(tableName, columnName, options);
+    const connection = this.connection as DatabaseAdapter & UniqueConstraintStatements;
+    await connection.addUniqueConstraint(tableName, columnName, options);
   }
 
   async removeUniqueConstraint(
     tableName: string,
-    columnNameOrOptions?: string | string[] | Record<string, unknown>,
-    options?: Record<string, unknown>,
+    columnNameOrOptions?: string | string[] | UniqueConstraintOptions,
+    options?: UniqueConstraintOptions,
   ): Promise<void> {
     // Normalize: if second arg is a plain object it is the options hash (no column).
     // Mirrors Rails extract_options! semantics for remove_unique_constraint(table, **opts).
@@ -911,7 +924,8 @@ export abstract class Migration {
       return;
     }
     tableName = this._pt(tableName);
-    await (this.connection as any).removeUniqueConstraint(tableName, columnName, opts);
+    const connection = this.connection as DatabaseAdapter & UniqueConstraintStatements;
+    await connection.removeUniqueConstraint(tableName, columnName, opts);
   }
 
   async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
@@ -1846,7 +1860,8 @@ export class MigrationContext {
   }
 
   async enableExtension(name: string, options?: Record<string, unknown>): Promise<void> {
-    await (this.connection as any).enableExtension?.(name, options);
+    const connection = this.connection as DatabaseAdapter & Partial<ExtensionStatements>;
+    await connection.enableExtension?.(name, options);
   }
 
   async createEnum(
@@ -1854,19 +1869,21 @@ export class MigrationContext {
     values: string[],
     options?: Record<string, unknown>,
   ): Promise<void> {
-    await (this.connection as any).createEnum?.(name, values, options);
+    const connection = this.connection as DatabaseAdapter & Partial<EnumStatements>;
+    await connection.createEnum?.(name, values, options);
   }
 
-  async createSchema(name: string, options?: Record<string, unknown>): Promise<void> {
-    await (this.connection as any).createSchema?.(name, options);
+  async createSchema(
+    name: string,
+    options?: { force?: boolean; ifNotExists?: boolean },
+  ): Promise<void> {
+    const connection = this.connection as DatabaseAdapter & Partial<SchemaNamespaceStatements>;
+    await connection.createSchema?.(name, options);
   }
 
   // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#create_virtual_table
   async createVirtualTable(name: string, moduleName: string, args: string[]): Promise<void> {
-    if (typeof (this.connection as any).createVirtualTable === "function") {
-      await (this.connection as any).createVirtualTable(name, moduleName, args);
-    }
-    // Non-SQLite adapters: no-op; virtual tables are SQLite-specific.
+    await this.connection.createVirtualTable(name, moduleName, args);
   }
 
   async addColumn(
@@ -1929,11 +1946,13 @@ export class MigrationContext {
   }
 
   async changeTableComment(name: string, comment: string | null): Promise<void> {
-    await (this.connection as any).changeTableComment(name, comment);
+    const connection = this.connection as DatabaseAdapter & CommentStatements;
+    await connection.changeTableComment(name, comment);
   }
 
   async changeColumnComment(table: string, col: string, comment: string | null): Promise<void> {
-    await (this.connection as any).changeColumnComment(table, col, comment);
+    const connection = this.connection as DatabaseAdapter & CommentStatements;
+    await connection.changeColumnComment(table, col, comment);
   }
 
   async addIndex(

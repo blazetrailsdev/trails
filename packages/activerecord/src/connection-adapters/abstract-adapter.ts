@@ -2036,7 +2036,11 @@ export class AbstractAdapter implements Quoting {
   // Keep the TS signature permissive to match.
   async renameEnumValue(..._args: unknown[]): Promise<void> {}
 
-  async createVirtualTable(_name: string, _options?: unknown): Promise<void> {}
+  async createVirtualTable(
+    _name: string,
+    _optionsOrModuleName?: unknown,
+    _values?: unknown,
+  ): Promise<void> {}
 
   async dropVirtualTable(_name: string): Promise<void> {}
 

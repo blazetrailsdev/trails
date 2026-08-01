@@ -34,6 +34,7 @@ import {
   type ForeignKeyLookupOptions,
   type RemoveForeignKeyOptions,
 } from "./schema-definitions.js";
+import type { UniqueConstraintOptions } from "../postgresql/schema-definitions.js";
 import { SchemaCreation } from "./schema-creation.js";
 import { maxIdentifierLength } from "./database-limits.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
@@ -209,6 +210,54 @@ export interface ValidateConstraintStatements {
     toTable?: string,
     options?: Omit<ForeignKeyLookupOptions, "toTable">,
   ): Promise<void>;
+}
+
+/** A comment argument: either the new value, or Rails' `{ from:, to: }` change hash. */
+export type CommentOrChanges = string | null | { from?: string | null; to?: string | null };
+
+/**
+ * Comment DDL that only adapters supporting `supportsComments` implement.
+ * Reached from `Migration` the same way as {@link ValidateConstraintStatements}.
+ */
+export interface CommentStatements {
+  changeTableComment(tableName: string, commentOrChanges: CommentOrChanges): Promise<void>;
+  changeColumnComment(
+    tableName: string,
+    columnName: string,
+    commentOrChanges: CommentOrChanges,
+  ): Promise<void>;
+}
+
+/** Extension DDL — PostgreSQL only. */
+export interface ExtensionStatements {
+  enableExtension(name: string, options?: Record<string, unknown>): Promise<void>;
+  disableExtension(name: string, options?: { force?: "cascade"; schema?: string }): Promise<void>;
+}
+
+/** Enum type DDL — PostgreSQL only. */
+export interface EnumStatements {
+  createEnum(name: string, values: string[], options?: Record<string, unknown>): Promise<void>;
+  dropEnum(name: string, options?: { ifExists?: boolean }): Promise<void>;
+  renameEnumValue(name: string, options: { from: string; to: string }): Promise<void>;
+}
+
+/** Unique-constraint DDL — PostgreSQL only. */
+export interface UniqueConstraintStatements {
+  addUniqueConstraint(
+    tableName: string,
+    columnName?: string | string[] | null,
+    options?: UniqueConstraintOptions,
+  ): Promise<void>;
+  removeUniqueConstraint(
+    tableName: string,
+    columnNameOrOptions?: string | string[] | UniqueConstraintOptions | null,
+    options?: UniqueConstraintOptions,
+  ): Promise<void>;
+}
+
+/** Schema (namespace) DDL — PostgreSQL only. */
+export interface SchemaNamespaceStatements {
+  createSchema(name: string, options?: { force?: boolean; ifNotExists?: boolean }): Promise<void>;
 }
 
 /** @internal */
