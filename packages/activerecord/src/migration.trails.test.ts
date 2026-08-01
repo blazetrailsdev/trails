@@ -9,6 +9,7 @@
  * Rails 1:1 while the invariants stay covered.
  */
 import { describe, it, expect } from "vitest";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { MigrationContext, Migrator } from "./index.js";
 import type { MigrationProxy } from "./migration.js";
 import { Migration, IllegalMigrationNameError } from "./migration.js";
@@ -335,8 +336,39 @@ describe("Migration#createTable id option type", () => {
       } finally {
         Migration.verbose = verboseWas;
       }
-      expect(migration.lines[0]).toBe('-- createTable("widgets", {"id":false})');
+      expect(migration.lines[0]).toBe('-- createTable("widgets", {id: false})');
       expect(migration.lines[1]).toMatch(/^ {3}-> \d+\.\d{4}s$/);
+    });
+
+    const announce = async (name: string, ...args: unknown[]): Promise<string> => {
+      const migration = new RecordingMigration();
+      const verboseWas = Migration.verbose;
+      Migration.verbose = true;
+      try {
+        await migration.methodMissing(name, ...args);
+      } finally {
+        Migration.verbose = verboseWas;
+      }
+      return migration.lines[0];
+    };
+
+    it("announces a no-argument call with Ruby's nil last argument", async () => {
+      expect(await announce("createTable")).toBe("-- createTable(nil)");
+    });
+
+    it("announces a non-Hash object last argument through inspect", async () => {
+      expect(await announce("execute", "SELECT 1", Temporal.PlainDate.from("2024-01-01"))).toBe(
+        '-- execute("SELECT 1", 2024-01-01)',
+      );
+    });
+
+    it("drops internal options and renders the rest Ruby-inspect style", async () => {
+      expect(await announce("createTable", "widgets", { _uses_legacy_table_name: true })).toBe(
+        '-- createTable("widgets")',
+      );
+      expect(await announce("createTable", "widgets", { id: false, force: "cascade" })).toBe(
+        '-- createTable("widgets", {id: false, force: "cascade"})',
+      );
     });
 
     it("rewrites the first argument through properTableName", async () => {
