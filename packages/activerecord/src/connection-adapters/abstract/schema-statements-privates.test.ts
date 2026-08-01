@@ -887,13 +887,31 @@ describe("SchemaStatements#createTable statement ordering", () => {
       }),
     });
 
-    // Stub adapter — no database is touched, so there is nothing to tear down.
-    // eslint-disable-next-line blazetrails/require-table-teardown
+    // eslint-disable-next-line blazetrails/require-table-teardown -- stub adapter, no real database
     await ss.createTable("things", { id: false, comment: "a table" }, (t) => {
       t.column("name", "string", { comment: "a column" });
       t.index(["name"]);
     });
 
     expect(order).toEqual(["create", "index", "tableComment", "columnComment"]);
+  });
+
+  it("threads the table definition's ifNotExists into the pending addIndex calls", async () => {
+    const sqls: string[] = [];
+    const ss = makeStatements({
+      execute: vi.fn(async (sql: string) => {
+        sqls.push(sql);
+        return [];
+      }),
+      supportsIndexesInCreate: () => false,
+      quote: (v: unknown) => `'${String(v)}'`,
+    });
+
+    await ss.createTable("things", { id: false, ifNotExists: true }, (t) => {
+      t.column("name", "string");
+      t.index(["name"], { ifNotExists: false });
+    });
+
+    expect(sqls.some((sql) => sql.startsWith("CREATE INDEX IF NOT EXISTS"))).toBe(true);
   });
 });
