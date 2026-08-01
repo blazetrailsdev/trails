@@ -84,45 +84,78 @@ export interface AsyncArm<T = unknown> {
  * `body` is the arm's Ruby body, used to decide whether the arm can fall
  * through into the code after the construct. Omit it for an arm that always
  * can — a loop body reaches past the loop even when it ends in `break`.
+ * `inLoop` is the emitter's loop state at the arm, which decides whether a
+ * trailing `next`/`break` is emitted as real control flow.
  */
 export function scopeAsyncArm<T>(
   bindings: Set<string>,
   emit: () => T,
   body?: PrismNode | null,
+  inLoop = false,
 ): AsyncArm<T> {
   const before = new Set(bindings);
   const value = emit();
   const after = new Set(bindings);
   bindings.clear();
   for (const key of before) bindings.add(key);
-  return { value, after, terminal: !fallsThrough(body) };
+  return { value, after, terminal: !fallsThrough(body, inLoop) };
 }
 
 /**
- * Whether control can reach the statement after `node`. An arm ending in
- * `return`, `next`, `break`, or `raise` cannot, so it is not a path into the
- * code following the branch and must not take part in the merge below.
+ * Whether control can reach the statement after `node`, judged by what the
+ * emitter actually produces rather than by Ruby semantics: a `raise`,
+ * `next`, or `break` the handlers decline to convert is emitted as a plain
+ * expression and does reach the next statement, so treating it as terminal
+ * would drop a live retraction and award a false-positive await.
  *
  * `break`/`next` are terminal relative to the enclosing branch only; a loop
  * body is never handed to this function, since a body ending in `break` does
  * reach the code after the loop.
  */
-export function fallsThrough(node: PrismNode | null | undefined): boolean {
+export function fallsThrough(node: PrismNode | null | undefined, inLoop = false): boolean {
   const kind = node?.constructor?.name;
   if (!node || !kind) return true;
   if (kind === "StatementsNode") {
     const kids = node.compactChildNodes();
-    return kids.length === 0 || fallsThrough(kids[kids.length - 1]);
+    return kids.length === 0 || fallsThrough(kids[kids.length - 1], inLoop);
   }
-  if (kind === "ReturnNode" || kind === "NextNode" || kind === "BreakNode") return false;
-  if (kind === "CallNode") return String(node.name) !== "raise" || node.receiver != null;
+  if (kind === "ReturnNode") return false;
+  if (kind === "NextNode") return inLoop && argumentCount(node) > 0;
+  if (kind === "BreakNode") return !inLoop || argumentCount(node) > 0;
+  if (kind === "CallNode") return !isRaiseThrow(node);
   if (kind === "IfNode" || kind === "UnlessNode") {
     const sub = (node.subsequent ?? node.elseClause) as PrismNode | null;
     if (!sub) return true;
     const elseBody = sub.constructor.name === "ElseNode" ? (sub.statements as PrismNode) : sub;
-    return fallsThrough(node.statements as PrismNode | null) || fallsThrough(elseBody);
+    return (
+      fallsThrough(node.statements as PrismNode | null, inLoop) || fallsThrough(elseBody, inLoop)
+    );
   }
   return true;
+}
+
+/**
+ * Whether a call is a `raise` the emitter renders as a `throw`. Any other
+ * shape — a bare re-raise, a `raise` with a block, a multi-argument `raise`
+ * whose head is not a constant — is emitted as an ordinary call, so it must
+ * not be read as terminating control flow.
+ */
+export function isRaiseThrow(node: PrismNode): boolean {
+  if (node.constructor?.name !== "CallNode") return false;
+  if (String(node.name) !== "raise" || node.receiver || node.block) return false;
+  const args = raiseArguments(node);
+  if (args.length === 0) return false;
+  if (args.length === 1) return true;
+  const head = args[0].constructor.name;
+  return head === "ConstantReadNode" || head === "ConstantPathNode";
+}
+
+export function raiseArguments(node: PrismNode): PrismNode[] {
+  return ((node.arguments_ as PrismNode | null)?.arguments_ as PrismNode[]) ?? [];
+}
+
+function argumentCount(node: PrismNode): number {
+  return raiseArguments(node).length;
 }
 
 /**
