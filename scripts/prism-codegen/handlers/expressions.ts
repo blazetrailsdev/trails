@@ -348,7 +348,6 @@ function asyncModifiers(body: ts.Node): ts.Modifier[] | undefined {
   return containsAwait(body) ? [f.createToken(ts.SyntaxKind.AsyncKeyword)] : undefined;
 }
 
-// Nested functions have their own async scope, so the walk stops at their boundary.
 function containsAwait(node: ts.Node): boolean {
   let found = false;
   const visit = (child: ts.Node): void => {
