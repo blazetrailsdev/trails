@@ -5,7 +5,17 @@ import { IndexDefinition } from "./connection-adapters/abstract/schema-definitio
 import { realPool } from "./connection-adapters/abstract/connection-pool.js";
 import { UnknownAttributeError } from "./errors.js";
 import type { Base } from "./base.js";
-import { quoteSqlValue } from "./base.js";
+
+// `quoteSqlValue` lives in base.ts, but importing it for its value would put a
+// load-time edge back into `base.ts` — and base.ts's own mixin wiring then
+// depends on which module the import graph is entered through. base.ts pushes
+// the helper in at the end of its module body instead.
+let _quoteSqlValue: ((v: unknown, dialect?: AdapterName) => string) | undefined;
+
+/** @internal Called from base.ts at module init. */
+export function _registerQuoteSqlValue(fn: (v: unknown, dialect?: AdapterName) => string): void {
+  _quoteSqlValue = fn;
+}
 import { stiName, isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
@@ -722,7 +732,7 @@ export class Builder implements InsertBuilder {
       if (arrayCols.has(key)) {
         return new Nodes.SqlLiteral(this._insertAll.connection.quote(value));
       }
-      return new Nodes.SqlLiteral(quoteSqlValue(value, this._dialect));
+      return new Nodes.SqlLiteral(_quoteSqlValue!(value, this._dialect));
     });
     return new Nodes.ValuesList(rows);
   }

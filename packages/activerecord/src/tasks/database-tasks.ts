@@ -17,8 +17,25 @@ import {
   stdout,
   stderr,
 } from "@blazetrails/activesupport";
-import { ConnectionNotDefined } from "../errors.js";
-import { Base } from "../base.js";
+import { ActiveRecordError, ConnectionNotDefined } from "../errors.js";
+import type { Base } from "../base.js";
+
+// `base.js` is deliberately NOT imported for its value here. Rails resolves
+// `ActiveRecord::Base` at call time via autoload (database_statements.rb:222-223), so an
+// import edge would be a trails invention — and a load-time edge back into
+// `base.ts` puts it in an import cycle whose evaluation order then decides
+// whether base.ts's own mixin wiring reads initialized bindings. base.ts
+// pushes itself in at the end of its module body instead.
+let _base: typeof Base | undefined;
+
+function setModuleBase(base: typeof Base): void {
+  _base = base;
+}
+
+function baseClass(): typeof Base {
+  if (!_base) throw new ActiveRecordError("ActiveRecord::Base has not finished loading");
+  return _base;
+}
 
 /**
  * Raised when a database task is invoked against an adapter that
@@ -1236,6 +1253,7 @@ export class DatabaseTasks {
   /** @internal Called from base.ts at module init so migrationConnection() works before any async method runs. */
   static _registerBase(base: typeof import("../base.js").Base): void {
     this._baseClass = base;
+    setModuleBase(base);
   }
 
   static migrationConnection():
@@ -1470,11 +1488,12 @@ export function isVerbose(): boolean {
  * internal_metadata.rb:31-32).
  */
 export function metadataTableNames(): Set<string> {
-  const prefix = Base.tableNamePrefix;
-  const suffix = Base.tableNameSuffix;
+  const base = baseClass();
+  const prefix = base.tableNamePrefix;
+  const suffix = base.tableNameSuffix;
   return new Set([
-    `${prefix}${Base.schemaMigrationsTableName}${suffix}`,
-    `${prefix}${Base.internalMetadataTableName}${suffix}`,
+    `${prefix}${base.schemaMigrationsTableName}${suffix}`,
+    `${prefix}${base.internalMetadataTableName}${suffix}`,
   ]);
 }
 

@@ -40,6 +40,12 @@ import { Table, UpdateManager, DeleteManager, Nodes, sql as arelSql } from "@bla
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 import type { Relation } from "./relation.js";
+import { wrapWithScopeProxy, relationClassFor } from "./relation/delegation.js";
+import { _registerBase as _registerBaseWithSchemaMigration } from "./schema-migration.js";
+import { _registerBase as _registerBaseWithInternalMetadata } from "./internal-metadata.js";
+import { _registerBase as _registerBaseWithSchemaDumper } from "./schema-dumper.js";
+import { _registerBase as _registerBaseWithNamedScoping } from "./scoping/named.js";
+import { _registerQuoteSqlValue } from "./insert-all.js";
 import {
   discriminateClassForRecord,
   stiName,
@@ -401,51 +407,21 @@ export type PrimaryKeyScalar = string | number | bigint | null | undefined;
  */
 export type PrimaryKeyValue = PrimaryKeyScalar | PrimaryKeyScalar[];
 
-// Late-bound Relation constructor to break circular dependency.
-// Set by relation.ts when it loads.
-//
-// `var` (rather than `let`) with no initializer is deliberate: these are
-// assigned from other modules' top-level code (relation.ts's
-// `_setRelationCtor(Relation)` call runs during module init). With
-// `extends Relation` chains, base.ts's own imports can trigger that
-// call before base.ts reaches this line. `let` would throw TDZ; `var
-// x = null` would hoist then RESET the value back to null; `var x;`
-// hoists as `undefined` without clobbering a later-set value.
-// eslint-disable-next-line no-var
-var _RelationCtor: (new (modelClass: typeof Base, table?: any) => any) | undefined;
-// eslint-disable-next-line no-var
-var _wrapWithScopeProxy: ((rel: any) => any) | undefined;
-// eslint-disable-next-line no-var
-var _relationClassResolver:
-  | ((model: typeof Base) => new (model: typeof Base, table?: any) => any)
-  | undefined;
-
-/** @internal Called by relation.ts to register itself. */
-export function _setRelationCtor(ctor: new (modelClass: typeof Base) => any): void {
-  _RelationCtor = ctor;
-}
-
-/** @internal Called by relation.ts to register the scope proxy wrapper. */
-export function _setScopeProxyWrapper(wrapper: (rel: any) => any): void {
-  _wrapWithScopeProxy = wrapper;
-}
+// relation.ts used to push `Relation`, `wrapWithScopeProxy` and
+// `relationClassFor` into base.ts from its own module body, which meant
+// relation.ts imported base.js for its value and so formed an import cycle with
+// it — leaving base.ts's mixin wiring below dependent on which module the graph
+// happened to be entered through. base.ts imports them directly now; relation.ts
+// no longer imports base.js for its value, so relation.ts is guaranteed to have
+// finished evaluating by the time this module body runs.
 
 /**
- * @internal Called by relation.ts to register the per-model `Relation`
- * subclass resolver (`relationClassFor`). Base relations are constructed from
- * the returned per-model subclass so generated relation methods resolve as real
- * methods via its prototype carrier (Rails' `relation_class_for`). Falls back to
- * the shared `Relation` ctor until registered.
+ * @internal The per-model `Relation` subclass ctor (Rails' `relation_class_for`).
+ * Base relations are constructed from the per-model subclass so generated
+ * relation methods resolve as real methods via its prototype carrier.
  */
-export function _setRelationClassResolver(
-  resolver: (model: typeof Base) => new (model: typeof Base, table?: any) => any,
-): void {
-  _relationClassResolver = resolver;
-}
-
-/** @internal The per-model `Relation` subclass ctor, or the shared ctor. */
 function _relationCtorFor(this: void, model: typeof Base): new (m: typeof Base, t?: any) => any {
-  return _relationClassResolver ? _relationClassResolver(model) : _RelationCtor!;
+  return relationClassFor(model) as new (m: typeof Base, t?: any) => any;
 }
 
 /**
@@ -2199,9 +2175,6 @@ export class Base extends Model {
    *  classes, so callers like `AssociationScope` get a type-filtered base
    *  without re-adding the condition themselves. */
   static _buildUnscopedRelation(table?: any): any {
-    if (!_RelationCtor) {
-      throw new Error("Relation not loaded. Import relation.ts first.");
-    }
     // `table` lets callers build the relation against a specific Arel table
     // (e.g. an association-scope chain entry's aliased table). Passing it to
     // the ctor means the STI `type_condition` that `_applyStiTypeCondition`
@@ -2209,7 +2182,7 @@ export class Base extends Model {
     // through doesn't end up with the STI predicate on the FROM table and
     // the source-type predicate on the alias.
     const rel = new (_relationCtorFor(this))(this, table);
-    return this._applyStiTypeCondition(_wrapWithScopeProxy ? _wrapWithScopeProxy(rel) : rel);
+    return this._applyStiTypeCondition(wrapWithScopeProxy(rel));
   }
 
   /** @internal Bare relation against an optional Arel table — no default
@@ -2218,11 +2191,8 @@ export class Base extends Model {
    *  later by `join_scope` (qualified by the join's, possibly aliased, table)
    *  rather than baked into the base relation. */
   static _buildBareRelation(table?: any): any {
-    if (!_RelationCtor) {
-      throw new Error("Relation not loaded. Import relation.ts first.");
-    }
     const rel = new (_relationCtorFor(this))(this, table);
-    return _wrapWithScopeProxy ? _wrapWithScopeProxy(rel) : rel;
+    return wrapWithScopeProxy(rel);
   }
 
   /** @internal Re-apply the STI `type_condition` WHERE for subclasses.
@@ -2246,12 +2216,9 @@ export class Base extends Model {
   }
 
   private static _buildDefaultRelation(allQueries?: boolean | null): any {
-    if (!_RelationCtor) {
-      throw new Error("Relation not loaded. Import relation.ts first.");
-    }
     const buildBase = () => {
       const r = new (_relationCtorFor(this))(this);
-      return _wrapWithScopeProxy ? _wrapWithScopeProxy(r) : r;
+      return wrapWithScopeProxy(r);
     };
     const rel = DefaultScoping.buildDefaultScope(this, buildBase, allQueries) ?? buildBase();
     return this._applyStiTypeCondition(rel);
@@ -5284,3 +5251,21 @@ Table.engine = {
     return pool.activeConnection ?? pool.leaseConnectionSync();
   },
 };
+
+// ---------------------------------------------------------------------------
+// Late-bound registrations.
+//
+// Rails resolves `ActiveRecord::Base` at call time through autoload, so none of
+// these modules `require` base.rb. In ESM a value import is a load-time edge,
+// and an edge back into base.ts makes base.ts a cycle member — which decides,
+// purely by which module the graph is entered through, whether the mixin wiring
+// above reads initialized bindings or hits a TDZ ReferenceError. Every consumer
+// that only needs `Base` at call time therefore takes it from here instead, and
+// base.ts (which by construction evaluates after everything it imports) pushes.
+// ---------------------------------------------------------------------------
+
+_registerBaseWithSchemaMigration(Base);
+_registerBaseWithInternalMetadata(Base);
+_registerBaseWithSchemaDumper(Base);
+_registerBaseWithNamedScoping(Base);
+_registerQuoteSqlValue(quoteSqlValue);

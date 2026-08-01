@@ -5,8 +5,27 @@
  */
 
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { Base } from "./base.js";
+import { ActiveRecordError } from "./errors.js";
+import type { Base } from "./base.js";
 import { Table, SelectManager, InsertManager, DeleteManager, Nodes, star } from "@blazetrails/arel";
+
+// `base.js` is deliberately NOT imported for its value here. Rails resolves
+// `ActiveRecord::Base` at call time via autoload (schema_migration.rb:50), so an
+// import edge would be a trails invention — and a load-time edge back into
+// `base.ts` puts it in an import cycle whose evaluation order then decides
+// whether base.ts's own mixin wiring reads initialized bindings. base.ts
+// pushes itself in at the end of its module body instead.
+let _base: typeof Base | undefined;
+
+/** @internal Called from base.ts at module init. */
+export function _registerBase(base: typeof Base): void {
+  _base = base;
+}
+
+function baseClass(): typeof Base {
+  if (!_base) throw new ActiveRecordError("ActiveRecord::Base has not finished loading");
+  return _base;
+}
 
 export class NullSchemaMigration {
   async createTable(): Promise<void> {}
@@ -41,7 +60,8 @@ export class SchemaMigration {
   // Rails: "#{Base.table_name_prefix}#{Base.schema_migrations_table_name}
   // #{Base.table_name_suffix}" (schema_migration.rb:50).
   get tableName(): string {
-    return `${Base.tableNamePrefix}${Base.schemaMigrationsTableName}${Base.tableNameSuffix}`;
+    const base = baseClass();
+    return `${base.tableNamePrefix}${base.schemaMigrationsTableName}${base.tableNameSuffix}`;
   }
 
   // Rails: create_table(table_name, id: false) { |t| t.string :version,
