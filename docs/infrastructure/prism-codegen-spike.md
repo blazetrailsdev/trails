@@ -370,7 +370,12 @@ The residue is ratcheted against `scripts/prism-codegen/convergence-baseline.jso
 the guard; rows that disappear — a method converged, or a deviation earned a
 catalog entry — are accepted silently, so the baseline only ever shrinks.
 Re-seed it with `pnpm codegen:score --guard --write` after a burndown; never to
-bury a new divergence.
+bury a new divergence. `--verbose` prints each catalogued row with the catalog
+reason that excused it, so a subtraction can be audited rather than trusted.
+Exclude entries are filtered to the package being scored: a relative `tsFile` is
+not unique across packages (`callbacks.ts` exists under both activerecord and
+abstractcontroller), so an unfiltered catalog would let one package's reviewed
+call excuse another's divergence.
 
 **CI wiring.** The guard runs as the _Codegen convergence guard_ step of the
 **Rails API/Test Comparison** job (`rails-comparison` in `.github/workflows/ci.yml`),

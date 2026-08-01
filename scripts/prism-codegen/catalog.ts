@@ -21,7 +21,7 @@
  * caller loads the JSON), async fs only.
  */
 
-import { SKIP, SCOPED_SKIP_GROUPS, isScopedSkip } from "../api-compare/conventions.js";
+import { SKIP_GROUPS, SCOPED_SKIP_GROUPS, isScopedSkip } from "../api-compare/conventions.js";
 import { methodName } from "./naming.js";
 import { normalizeName } from "./score.js";
 
@@ -52,10 +52,20 @@ function excludeKey(tsFile: string, tsName: string): string {
   return `${tsFile} ${tsName}`;
 }
 
-export function buildCatalog(excludes: readonly ExcludeEntry[]): Catalog {
+/**
+ * @param excludes merged `call-mismatches` exclude entries, from every package.
+ * @param pkg the package being scored. Exclude entries from other packages are
+ *   dropped rather than keyed in: a relative `tsFile` is not unique across
+ *   packages (`callbacks.ts` exists under both activerecord and
+ *   abstractcontroller), so an unfiltered catalog would let one package's
+ *   reviewed call excuse another package's divergence.
+ */
+export function buildCatalog(excludes: readonly ExcludeEntry[], pkg: string): Catalog {
   const skips = new Map<string, string>();
-  for (const rubyName of SKIP) {
-    skips.set(methodName(rubyName), `api-compare SKIP: ${rubyName}`);
+  for (const group of SKIP_GROUPS) {
+    for (const rubyName of group.names) {
+      skips.set(methodName(rubyName), `api-compare SKIP (${rubyName}): ${group.reason}`);
+    }
   }
 
   const scopedSkips = new Map<string, { rubyName: string; reason: string }[]>();
@@ -63,16 +73,17 @@ export function buildCatalog(excludes: readonly ExcludeEntry[]): Catalog {
     for (const rubyName of group.names) {
       const ts = methodName(rubyName);
       const list = scopedSkips.get(ts) ?? [];
-      list.push({ rubyName, reason: `api-compare SCOPED_SKIP: ${rubyName}` });
+      list.push({ rubyName, reason: `api-compare SCOPED_SKIP (${rubyName}): ${group.reason}` });
       scopedSkips.set(ts, list);
     }
   }
 
   const excludedCalls = new Map<string, Map<string, string>>();
   for (const entry of excludes) {
+    if (entry.package !== pkg) continue;
     const key = excludeKey(entry.tsFile, methodName(entry.rubyName));
     const calls = excludedCalls.get(key) ?? new Map<string, string>();
-    calls.set(callToken(entry.call), entry.reason);
+    calls.set(callToken(entry.call), `${entry.call}: ${entry.reason}`);
     excludedCalls.set(key, calls);
   }
 

@@ -32,13 +32,15 @@ describe("prism-codegen deviation catalog", () => {
   });
 
   it("catalogs a missing def whose Ruby name is on api-compare's SKIP list", () => {
-    const catalog = buildCatalog([]);
-    expect(catalogueMissing(catalog, "dup", "active_record/persistence.rb")).toMatch(/SKIP: dup/);
+    const catalog = buildCatalog([], "activerecord");
+    expect(catalogueMissing(catalog, "dup", "active_record/persistence.rb")).toMatch(
+      /SKIP \(dup\): Ruby core object/,
+    );
     expect(catalogueMissing(catalog, "save", "active_record/persistence.rb")).toBeUndefined();
   });
 
   it("catalogs a divergence whose every differing token is an excluded call", () => {
-    const catalog = buildCatalog([entry(), entry({ call: "touch_later" })]);
+    const catalog = buildCatalog([entry(), entry({ call: "touch_later" })], "activerecord");
     const reason = catalogueDivergent(
       catalog,
       "persistence.ts",
@@ -50,7 +52,7 @@ describe("prism-codegen deviation catalog", () => {
   });
 
   it("keeps a divergence in the residue when one differing token is unexplained", () => {
-    const catalog = buildCatalog([entry()]);
+    const catalog = buildCatalog([entry()], "activerecord");
     expect(
       catalogueDivergent(
         catalog,
@@ -66,8 +68,17 @@ describe("prism-codegen deviation catalog", () => {
     ).toBeUndefined();
   });
 
+  it("drops exclude entries belonging to another package", () => {
+    // `<tsFile> <rubyName>` is not unique across packages, so an unfiltered
+    // catalog would let actionpack's reviewed call excuse an activerecord row.
+    const catalog = buildCatalog([entry({ package: "actionpack" })], "activerecord");
+    expect(
+      catalogueDivergent(catalog, "persistence.ts", "save", "if ref:createOrUpdate", "if"),
+    ).toBeUndefined();
+  });
+
   it("scopes call exclusions to the file the entry was reviewed in", () => {
-    const catalog = buildCatalog([entry()]);
+    const catalog = buildCatalog([entry()], "activerecord");
     expect(
       catalogueDivergent(catalog, "core.ts", "save", "if ref:createOrUpdate", "if"),
     ).toBeUndefined();

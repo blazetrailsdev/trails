@@ -85,16 +85,16 @@ async function loadExcludes(): Promise<ExcludeEntry[]> {
 
 async function main() {
   const verbose = process.argv.includes("--verbose");
-  const guard = process.argv.includes("--guard");
   const write = process.argv.includes("--write");
+  const guard = process.argv.includes("--guard") || write;
   const globalIndex = indexPortTree(portTreeFiles());
-  const catalog = buildCatalog(await loadExcludes());
+  const catalog = buildCatalog(await loadExcludes(), "activerecord");
   let totMatched = 0;
   let totReordered = 0;
   let totDivergent = 0;
   let totMissing = 0;
   let totElsewhere = 0;
-  let totCatalogued = 0;
+  const catalogued: { row: ResidueRow; reason: string }[] = [];
   const divergentRows: { file: string; entry: ScoreEntry }[] = [];
   const residue: ResidueRow[] = [];
 
@@ -138,8 +138,9 @@ async function main() {
               entry.generatedSkeleton ?? "",
               entry.portSkeleton ?? "",
             );
-      if (reason) totCatalogued++;
-      else residue.push({ rubyFile: f.ruby, name: entry.name, status: entry.status });
+      const row: ResidueRow = { rubyFile: f.ruby, name: entry.name, status: entry.status };
+      if (reason) catalogued.push({ row, reason });
+      else residue.push(row);
     }
     console.log(
       `  ${short.padEnd(34)} ${String(score.matched).padStart(7)} ${String(score.reordered).padStart(9)} ` +
@@ -163,11 +164,18 @@ async function main() {
       `\n  chase yet. Divergent bodies are the convergence-guard review queue.`,
   );
   console.log(
-    `\n  Deviation catalog: ${totCatalogued} of ${totDivergent + totMissing} divergent+missing ` +
+    `\n  Deviation catalog: ${catalogued.length} of ${totDivergent + totMissing} divergent+missing ` +
       `rows are catalogued\n  (api-compare SKIP / SCOPED_SKIP, call-mismatches excludes); ` +
       `${residue.length} rows are residue.`,
   );
 
+  if (verbose && catalogued.length) {
+    console.log(`\n  Catalogued rows (subtracted from the guarded residue):`);
+    for (const { row, reason } of catalogued) {
+      console.log(`\n  ${row.rubyFile} :: ${row.name} (${row.status})`);
+      console.log(`    ${reason}`);
+    }
+  }
   if (verbose && divergentRows.length) {
     console.log(`\n  Divergent defs (generated vs port skeleton):`);
     for (const { file, entry } of divergentRows) {
