@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import { SchemaStatements } from "./schema-statements.js";
 
-function makeStatements(options: { migrated?: number[]; versions?: number[] } = {}) {
+function makeStatements(
+  options: { migrated?: Array<number | string>; versions?: Array<number | string> } = {},
+) {
   const executed: string[] = [];
   const adapter = {
     adapterName: "sqlite" as const,
@@ -101,6 +103,30 @@ describe("SchemaStatements#assumeMigratedUptoVersion", () => {
     const { ss, executed } = makeStatements({ migrated: [], versions: [1, 1, 3] });
     await expect(ss.assumeMigratedUptoVersion(3)).rejects.toThrow("Duplicate migration 1.");
     expect(executed).toEqual(['INSERT INTO "schema_migrations" (version) VALUES (3)']);
+  });
+
+  it("backfills string-typed migration versions below the target", async () => {
+    const { ss, executed } = makeStatements({ migrated: [], versions: ["1", "2", "3"] });
+    await ss.assumeMigratedUptoVersion(3);
+    expect(executed).toEqual([
+      'INSERT INTO "schema_migrations" (version) VALUES (3)',
+      'INSERT INTO "schema_migrations" (version) VALUES\n(2),\n(1);',
+    ]);
+  });
+
+  it("treats a string-typed migrated version as already migrated", async () => {
+    const { ss, executed } = makeStatements({ migrated: ["3"], versions: ["3"] });
+    await ss.assumeMigratedUptoVersion(3);
+    expect(executed).toEqual([]);
+  });
+
+  it("excludes string-typed migrated versions from the backfill", async () => {
+    const { ss, executed } = makeStatements({ migrated: ["1"], versions: ["1", "2", "3"] });
+    await ss.assumeMigratedUptoVersion(3);
+    expect(executed).toEqual([
+      'INSERT INTO "schema_migrations" (version) VALUES (3)',
+      'INSERT INTO "schema_migrations" (version) VALUES\n(2);',
+    ]);
   });
 
   it("ignores duplicates that are outside the backfill scope", async () => {
