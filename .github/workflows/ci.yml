@@ -1523,6 +1523,14 @@ jobs:
         # the unit-tests job. A row that leaves the residue is accepted silently
         # — re-seed the shrunken baseline with `pnpm codegen:score --guard --write`.
         run: pnpm exec tsx scripts/prism-codegen/score-cli.ts --guard
+      - name: Codegen golden output snapshots
+        # RFC 0086: regenerates each target Rails file and diffs the emitted JS
+        # against the checked-in image in scripts/prism-codegen/__snapshots__/,
+        # and re-parses that image to hold the 0-parse-errors invariant. Runs
+        # here rather than in unit-tests because regenerating needs the vendored
+        # Ruby fetched above — without it the suite skips itself. Update the
+        # goldens with `pnpm codegen:snapshot` and review the diff.
+        run: pnpm vitest run scripts/prism-codegen/golden.test.ts
       - name: Rails-private JSDoc lint
         # Needs rails-api.json (extracted above) to enforce
         # blazetrails/rails-private-jsdoc. The standalone Lint job has no Ruby

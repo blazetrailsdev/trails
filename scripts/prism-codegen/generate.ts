@@ -1,11 +1,9 @@
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync } from "node:fs";
 import * as path from "node:path";
-import { generateFromSource } from "./index.js";
-import { asyncMethodsForRailsFile } from "./async-source.js";
 import { summarizeCoverage, mergeCoverages } from "./coverage.js";
 import { TOPLEVEL } from "./codegen.js";
-import { TARGET_FILES, rubyAbsPath } from "./files.js";
-import { rubyFileToTs } from "./naming.js";
+import { TARGET_FILES } from "./files.js";
+import { generateTarget } from "./golden.js";
 import type { Coverage } from "./types.js";
 const OUT_DIR = "scripts/prism-codegen/out";
 async function main() {
@@ -17,15 +15,7 @@ async function main() {
   let defsTotal = 0;
   let defsClean = 0;
   for (const f of TARGET_FILES) {
-    const src = readFileSync(rubyAbsPath(f), "utf8");
-    const outName = rubyFileToTs(f.ruby.replace(/^active_record\//, "")).replace(/\.ts$/, ".js");
-    const depth = outName.split("/").length - 1;
-    const runtimePath = "../".repeat(depth + 1) + "runtime.js";
-    const { code, coverage, perDef, parseErrorCount } = await generateFromSource(
-      src,
-      asyncMethodsForRailsFile(f.ruby),
-      runtimePath,
-    );
+    const { code, coverage, perDef, parseErrorCount, outName } = await generateTarget(f);
     const outPath = path.join(OUT_DIR, outName);
     mkdirSync(path.dirname(outPath), { recursive: true });
     writeFileSync(outPath, code);

@@ -1,0 +1,63 @@
+import * as fs from "fs/promises";
+import * as path from "path";
+import { generateFromSource, type GenResult } from "./index.js";
+import { asyncMethodsForRailsFile } from "./async-source.js";
+import { TARGET_FILES, rubyAbsPath, type TargetFile } from "./files.js";
+import { rubyFileToTs } from "./naming.js";
+
+export const SNAPSHOT_DIR = "scripts/prism-codegen/__snapshots__";
+
+export interface GeneratedTarget extends GenResult {
+  file: TargetFile;
+  outName: string;
+}
+
+/** Path of the emitted JS relative to the output root, e.g. `relation/query-methods.js`. */
+export function outNameFor(f: TargetFile): string {
+  return rubyFileToTs(f.ruby.replace(/^active_record\//, "")).replace(/\.ts$/, ".js");
+}
+
+/**
+ * Relative specifier the emitted file imports the codegen runtime through. It
+ * depends on the output file's depth, so it is part of the generated image and
+ * has to be computed identically for `codegen:generate` and for the goldens.
+ */
+export function runtimeImportPathFor(outName: string): string {
+  return "../".repeat(outName.split("/").length) + "runtime.js";
+}
+
+/** Repo-relative path of a target's checked-in golden image. */
+export function snapshotPathFor(outName: string): string {
+  return path.join(SNAPSHOT_DIR, outName + ".snap");
+}
+
+/** Same golden image, relative to this directory — the form `toMatchFileSnapshot` wants. */
+export function snapshotRelPathFor(outName: string): string {
+  return "./" + path.posix.join("__snapshots__", outName + ".snap");
+}
+
+/** Generate one target file's JS exactly as `pnpm codegen:generate` writes it. */
+export async function generateTarget(f: TargetFile): Promise<GeneratedTarget> {
+  const outName = outNameFor(f);
+  const src = await fs.readFile(rubyAbsPath(f), "utf8");
+  const result = await generateFromSource(
+    src,
+    asyncMethodsForRailsFile(f.ruby),
+    runtimeImportPathFor(outName),
+  );
+  return { ...result, file: f, outName };
+}
+
+/**
+ * Whether the vendored Rails checkout the generator reads is present. The golden
+ * suite skips itself when it is not: `unit-tests` runs the rest of this
+ * directory without `vendor/`, and only `rails-comparison` fetches it.
+ */
+export async function vendoredRailsPresent(): Promise<boolean> {
+  try {
+    await fs.access(rubyAbsPath(TARGET_FILES[0]));
+    return true;
+  } catch {
+    return false;
+  }
+}
