@@ -260,10 +260,14 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
       callArgs.push(blockToArrow(block, blockParams ?? [], e));
     }
   }
+  const delegatedTo = selfCall ? e.delegations.get(jsName) : undefined;
+  const self: ts.Expression = delegatedTo
+    ? f.createPropertyAccessExpression(f.createThis(), delegatedTo)
+    : f.createThis();
   const target: ts.Expression = recv
     ? f.createPropertyAccessExpression(recv, jsName)
     : selfCall
-      ? f.createPropertyAccessExpression(f.createThis(), jsName)
+      ? f.createPropertyAccessExpression(self, jsName)
       : f.createIdentifier(jsName);
   if (!recv && callArgs.length === 0 && !block && !hasParens(n)) return target;
   const call = f.createCallExpression(target, undefined, callArgs);

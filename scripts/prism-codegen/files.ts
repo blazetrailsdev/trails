@@ -77,7 +77,15 @@ export const TARGET_FILES: TargetFile[] = [
   },
 ];
 export function rubyAbsPath(f: TargetFile): string {
-  return path.join(AR_ROOT, f.ruby.replace(/^active_record\//, ""));
+  return rubyAbsPathFor(f.ruby);
+}
+export function rubyAbsPathFor(ruby: string): string {
+  return path.join(AR_ROOT, ruby.replace(/^active_record\//, ""));
+}
+/** Rails compiles the Relation delegations from this one file into the family. */
+export const RELATION_DELEGATION_SOURCE = "active_record/relation/delegation.rb";
+export function inheritsRelationDelegation(ruby: string): boolean {
+  return ruby === "active_record/relation.rb" || ruby.startsWith("active_record/relation/");
 }
 export function railsLibRelPaths(): string[] {
   return TARGET_FILES.map((f) => f.ruby);

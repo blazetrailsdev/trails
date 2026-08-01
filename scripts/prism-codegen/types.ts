@@ -36,6 +36,7 @@ export interface Emitter {
   inClass: boolean;
   inSingleton: boolean;
   readonly asyncMethods: ReadonlySet<string>;
+  readonly delegations: ReadonlyMap<string, string>;
   inAsyncMethod: boolean;
 
   inLoop: boolean;

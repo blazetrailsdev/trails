@@ -2,6 +2,7 @@ import { loadPrism } from "@ruby/prism";
 import ts from "typescript";
 import { Codegen } from "./codegen.js";
 import { defaultRegistry } from "./handlers/index.js";
+import { collectDelegations, mergeDelegations, type DelegationTable } from "./delegation.js";
 import type { Coverage, PrismNode } from "./types.js";
 let parsePromise:
   | Promise<
@@ -34,11 +35,14 @@ export async function generateFromSource(
   rubySource: string,
   asyncMethods: ReadonlySet<string> = new Set(),
   runtimeImportPath = "./runtime.js",
+  inheritedDelegations: DelegationTable = new Map(),
 ): Promise<GenResult> {
   const parse = await getParser();
   const result = parse(rubySource);
-  const gen = new Codegen(defaultRegistry(), asyncMethods);
-  const statements = gen.stmt(result.value as PrismNode, false);
+  const program = result.value as PrismNode;
+  const delegations = mergeDelegations(inheritedDelegations, collectDelegations(program));
+  const gen = new Codegen(defaultRegistry(), asyncMethods, delegations);
+  const statements = gen.stmt(program, false);
   const sourceFile = ts.factory.createSourceFile(
     statements,
     ts.factory.createToken(ts.SyntaxKind.EndOfFileToken),
@@ -77,3 +81,10 @@ export function countParseErrors(code: string): number {
 export { summarizeCoverage } from "./coverage.js";
 export { TARGET_FILES } from "./files.js";
 export { asyncMethodsForRailsFile } from "./async-source.js";
+export { type DelegationTable } from "./delegation.js";
+
+/** Standalone pre-pass: the delegation table a file contributes to its family. */
+export async function delegationsFromSource(rubySource: string): Promise<DelegationTable> {
+  const parse = await getParser();
+  return collectDelegations(parse(rubySource).value as PrismNode);
+}

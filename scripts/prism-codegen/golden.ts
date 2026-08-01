@@ -2,7 +2,15 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { generateFromSource, type GenResult } from "./index.js";
 import { asyncMethodsForRailsFile } from "./async-source.js";
-import { TARGET_FILES, rubyAbsPath, type TargetFile } from "./files.js";
+import {
+  TARGET_FILES,
+  rubyAbsPath,
+  rubyAbsPathFor,
+  inheritsRelationDelegation,
+  RELATION_DELEGATION_SOURCE,
+  type TargetFile,
+} from "./files.js";
+import { delegationsFromSource, type DelegationTable } from "./index.js";
 import { rubyFileToTs } from "./naming.js";
 
 export const SNAPSHOT_DIR = "scripts/prism-codegen/__snapshots__";
@@ -36,6 +44,22 @@ export function snapshotRelPathFor(outName: string): string {
   return "./" + path.posix.join("__snapshots__", outName + ".snap");
 }
 
+let relationDelegations: Promise<DelegationTable> | undefined;
+
+/**
+ * The delegation table a target inherits. Rails compiles `relation/delegation.rb`'s
+ * `delegate ... to: :model` / `to: :records` macros into every Relation subclass,
+ * so the whole Relation family resolves those names through their receiver. The
+ * source is parsed once per process and shared by every caller.
+ */
+export async function inheritedDelegationsFor(f: TargetFile): Promise<DelegationTable | undefined> {
+  if (!inheritsRelationDelegation(f.ruby)) return undefined;
+  relationDelegations ??= fs
+    .readFile(rubyAbsPathFor(RELATION_DELEGATION_SOURCE), "utf8")
+    .then(delegationsFromSource);
+  return relationDelegations;
+}
+
 /** Generate one target file's JS exactly as `pnpm codegen:generate` writes it. */
 export async function generateTarget(f: TargetFile): Promise<GeneratedTarget> {
   const outName = outNameFor(f);
@@ -44,6 +68,7 @@ export async function generateTarget(f: TargetFile): Promise<GeneratedTarget> {
     src,
     asyncMethodsForRailsFile(f.ruby),
     runtimeImportPathFor(outName),
+    await inheritedDelegationsFor(f),
   );
   return { ...result, file: f, outName };
 }
