@@ -1477,7 +1477,7 @@ export abstract class Migration {
 
     const copied: MigrationProxy[] = [];
     for (const [scope, sourcePath] of Object.entries(sources)) {
-      // Must round-trip through `Migrator.parseMigrationFilename` (regex
+      // Must round-trip through `MigrationContext#parseMigrationFilename` (regex
       // `[a-z0-9_]*`) or the copied file would be invisible to subsequent
       // discovery via `Migrator.fromPath`.
       if (!/^[a-z0-9_]+$/.test(scope)) {
@@ -1695,6 +1695,17 @@ async function loadMigrationFrom(
 }
 
 /**
+ * Rails' `sort_by(&:version)` over migration proxies: numeric, not
+ * lexicographic, so version 10 sorts after version 2. BigInt because a
+ * timestamp version exceeds `Number.MAX_SAFE_INTEGER`.
+ */
+function byVersion(a: MigrationProxy, b: MigrationProxy): number {
+  const va = BigInt(a.version);
+  const vb = BigInt(b.version);
+  return va < vb ? -1 : va > vb ? 1 : 0;
+}
+
+/**
  * = \Migration \Context
  *
  * MigrationContext sets the context in which a migration is run.
@@ -1708,17 +1719,142 @@ async function loadMigrationFrom(
  */
 export class MigrationContext {
   readonly migrationsPaths: string[];
-  readonly schemaMigration: SchemaMigration;
-  readonly internalMetadata: InternalMetadata;
+  private readonly _schemaMigration?: SchemaMigration;
+  private readonly _internalMetadata?: InternalMetadata;
 
+  /**
+   * Rails defaults `schema_migration` / `internal_metadata` from
+   * `connection_pool` (`migration.rb:1214-1218`); trails has no pool to reach
+   * from here, so they stay optional. A context built without them still
+   * answers the connectionless half — `migrationsPaths`, `migrations` and the
+   * file discovery under it — which is all the CLI's bootstrap needs.
+   */
   constructor(
     migrationsPaths: string[],
-    schemaMigration: SchemaMigration,
-    internalMetadata: InternalMetadata,
+    schemaMigration?: SchemaMigration,
+    internalMetadata?: InternalMetadata,
   ) {
     this.migrationsPaths = migrationsPaths;
-    this.schemaMigration = schemaMigration;
-    this.internalMetadata = internalMetadata;
+    this._schemaMigration = schemaMigration;
+    this._internalMetadata = internalMetadata;
+  }
+
+  /** Mirrors: ActiveRecord::MigrationContext#schema_migration */
+  get schemaMigration(): SchemaMigration {
+    if (!this._schemaMigration) {
+      throw new MigrationError("MigrationContext was built without a schema_migration");
+    }
+    return this._schemaMigration;
+  }
+
+  /** Mirrors: ActiveRecord::MigrationContext#internal_metadata */
+  get internalMetadata(): InternalMetadata {
+    if (!this._internalMetadata) {
+      throw new MigrationError("MigrationContext was built without an internal_metadata");
+    }
+    return this._internalMetadata;
+  }
+
+  /**
+   * @internal The adapter every `Migrator` built here runs against — trails'
+   * stand-in for the `connection_pool` Rails' `MigrationContext` reaches
+   * through `DatabaseTasks` (`migration.rb:1361-1367`).
+   */
+  private get connection(): DatabaseAdapter {
+    return this.schemaMigration.connection;
+  }
+
+  /**
+   * @internal Mirrors: ActiveRecord::MigrationContext#migrate
+   * (`migration.rb:1228-1238`).
+   */
+  async migrate(
+    targetVersion?: number | string | null,
+    block?: (m: MigrationProxy) => boolean,
+  ): Promise<MigrationProxy[]> {
+    return this.open().migrate(targetVersion, block);
+  }
+
+  /** @internal Mirrors: ActiveRecord::MigrationContext#up (`migration.rb:1248-1256`) */
+  async up(
+    targetVersion?: number | string | null,
+    block?: (m: MigrationProxy) => boolean,
+  ): Promise<MigrationProxy[]> {
+    return this.open().up(targetVersion, block);
+  }
+
+  /** @internal Mirrors: ActiveRecord::MigrationContext#down (`migration.rb:1258-1266`) */
+  async down(
+    targetVersion?: number | string | null,
+    block?: (m: MigrationProxy) => boolean,
+  ): Promise<MigrationProxy[]> {
+    return this.open().down(targetVersion, block);
+  }
+
+  /**
+   * @internal Mirrors: ActiveRecord::MigrationContext#rollback
+   * (`migration.rb:1240-1242`) — `move(:down, steps)`, not `Migrator`'s own
+   * `rollback`. The two are not equivalent: `move` indexes into the sorted
+   * migration list from `currentMigration` and raises
+   * `UnknownMigrationVersionError` when the current version has no matching
+   * migration, where `Migrator#rollback` walks the last N *applied* versions
+   * and silently rolls back a different set when migrations ran out of order.
+   */
+  async rollback(steps: number = 1): Promise<MigrationProxy[]> {
+    return this.move("down", steps);
+  }
+
+  /**
+   * @internal Mirrors: ActiveRecord::MigrationContext#forward
+   * (`migration.rb:1244-1246`) — `move(:up, steps)`. See {@link rollback} for
+   * why this does not delegate to `Migrator#forward`.
+   */
+  async forward(steps: number = 1): Promise<MigrationProxy[]> {
+    return this.move("up", steps);
+  }
+
+  /** @internal Mirrors: ActiveRecord::MigrationContext#run (`migration.rb:1268-1270`) */
+  async run(direction: "up" | "down", targetVersion: number | string): Promise<string | undefined> {
+    return this.open().run(direction, targetVersion);
+  }
+
+  /**
+   * @internal Mirrors: ActiveRecord::MigrationContext#open
+   * (`migration.rb:1272-1274`) — a fresh `Migrator` over this context's
+   * migrations, so each read sees current schema_migrations.
+   */
+  open(): Migrator {
+    return new Migrator(this.connection, this.migrations, {
+      direction: "up",
+      targetVersion: null,
+      internalMetadataEnabled: this._internalMetadata?.enabled,
+    });
+  }
+
+  /** @internal Mirrors: ActiveRecord::MigrationContext#migrations_status (`migration.rb:1317-1330`) */
+  async migrationsStatus(): Promise<
+    Array<{ status: "up" | "down"; version: string; name: string }>
+  > {
+    return this.open().migrationsStatus();
+  }
+
+  /**
+   * @internal Mirrors: ActiveRecord::MigrationContext#current_environment
+   * (`migration.rb:1340-1342`) — `ConnectionHandling::DEFAULT_ENV.call`, whose
+   * trails counterpart is {@link DatabaseConfigurations.currentEnv}.
+   */
+  get currentEnvironment(): string {
+    return DatabaseConfigurations.currentEnv();
+  }
+
+  /** @internal Mirrors: ActiveRecord::MigrationContext#protected_environment? (`migration.rb:1344-1346`) */
+  async protectedEnvironment(): Promise<boolean> {
+    return this.open().protectedEnvironment();
+  }
+
+  /** @internal Mirrors: ActiveRecord::MigrationContext#last_stored_environment (`migration.rb:1348-1357`) */
+  async lastStoredEnvironment(): Promise<string | null> {
+    return this.open().lastStoredEnvironment();
   }
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#get_all_versions */
@@ -1759,11 +1895,83 @@ export class MigrationContext {
    * (`migration.rb:1303-1315`). Discovery reads *this context's*
    * `migrationsPaths`, which Rails keeps as per-instance constructor state
    * (`attr_reader :migrations_paths`), so two contexts built for two migration
-   * directories do not collide. The file-scan/parse half still lives on
-   * `Migrator`; `move-migration-context-methods-off-migrator` moves it here.
+   * directories do not collide.
    */
   get migrations(): MigrationProxy[] {
-    return Migrator.discoverMigrations(this.migrationsPaths);
+    const migrations = this.migrationFiles().map((file) => {
+      const parsed = this.parseMigrationFilename(file);
+      if (!parsed) throw new IllegalMigrationNameError(file);
+      const [version, rawName, scope] = parsed;
+      if (this.isValidateTimestamp() && !this.isValidMigrationTimestamp(version)) {
+        throw new InvalidMigrationTimestampError(version, rawName);
+      }
+      const name = camelize(rawName);
+      return {
+        version,
+        name,
+        filename: file,
+        scope: scope || undefined,
+        migration: async (): Promise<Migration> => {
+          const { pathToFileURL } = await import("node:url");
+          const mod = await import(pathToFileURL(file).href);
+          return loadMigrationFrom(mod, name, version);
+        },
+      } satisfies MigrationProxy;
+    });
+
+    return migrations.sort(byVersion);
+  }
+
+  /** @internal Mirrors: ActiveRecord::MigrationContext#migration_files (`migration.rb:1369-1372`) */
+  private migrationFiles(): string[] {
+    const { readdirSync, existsSync } = getFs();
+    const { join } = getPath();
+    const files: string[] = [];
+    const collect = (dir: string): void => {
+      if (!existsSync(dir)) return;
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          collect(full);
+        } else if (/^\d+_.*\.(ts|js)$/.test(entry.name)) {
+          files.push(full);
+        }
+      }
+    };
+    for (const p of this.migrationsPaths) collect(p);
+    return files.sort();
+  }
+
+  /** @internal Mirrors: ActiveRecord::MigrationContext#parse_migration_filename (`migration.rb:1374-1376`) */
+  private parseMigrationFilename(filename: string): [string, string, string] | null {
+    const base = filename.replace(/.*[/\\]/, "").replace(/\.(ts|js)$/, "");
+    const m = base.match(/^(\d+)_([a-z0-9_]*)(?:\.([a-z0-9_]*))?$/);
+    if (!m) return null;
+    return [m[1], m[2], m[3] ?? ""];
+  }
+
+  /** @internal Mirrors: ActiveRecord::MigrationContext#validate_timestamp? (`migration.rb:1378-1380`) */
+  private isValidateTimestamp(): boolean {
+    return ActiveRecord.timestampedMigrations && Migrator.validateMigrationTimestamps;
+  }
+
+  /** @internal Mirrors: ActiveRecord::MigrationContext#valid_migration_timestamp? (`migration.rb:1382-1384`) */
+  private isValidMigrationTimestamp(version: string | number): boolean {
+    const tomorrow = Temporal.Now.plainDateTimeISO("UTC").add({ days: 1 });
+    const limit = Number(
+      `${tomorrow.year}${String(tomorrow.month).padStart(2, "0")}${String(tomorrow.day).padStart(2, "0")}${String(tomorrow.hour).padStart(2, "0")}${String(tomorrow.minute).padStart(2, "0")}${String(tomorrow.second).padStart(2, "0")}`,
+    );
+    return Number(version) < limit;
+  }
+
+  /**
+   * @internal Mirrors: ActiveRecord::MigrationContext#move
+   * (`migration.rb:1386-1401`), whose closing `public_send(direction, version)`
+   * returns whatever `up` / `down` returned — so `rollback` / `forward` answer
+   * the migrations that ran.
+   */
+  async move(direction: "up" | "down", steps: number): Promise<MigrationProxy[]> {
+    return this.open().move(direction, steps);
   }
 }
 
@@ -2421,97 +2629,26 @@ export class Migrator {
    * before invoking `DatabaseTasks.migrate()` or `DatabaseTasks.rollback()`.
    */
   static discoverMigrations(dirs: string[]): MigrationProxy[] {
-    const helper = new Migrator(null as unknown as DatabaseAdapter, []);
-    const proxies: MigrationProxy[] = [];
-    for (const file of helper.migrationFiles(dirs)) {
-      const parsed = helper.parseMigrationFilename(file);
-      if (!parsed) throw new IllegalMigrationNameError(file);
-      const [version, rawName, scope] = parsed;
-      helper._validateLoadedMigration(version, rawName);
-      const name = camelize(rawName);
-      proxies.push({
-        version,
-        name,
-        filename: file,
-        scope: scope || undefined,
-        migration: async () => {
-          const { pathToFileURL } = await import("node:url");
-          const mod = await import(pathToFileURL(file).href);
-          return loadMigrationFrom(mod, name, version);
-        },
-      });
-    }
-    return proxies.sort((a, b) => {
-      const va = BigInt(a.version),
-        vb = BigInt(b.version);
-      return va < vb ? -1 : va > vb ? 1 : 0;
-    });
+    return new MigrationContext(dirs).migrations;
   }
 
   /**
    * Scan `dir` for migration files and build `MigrationProxy[]` (without
-   * wrapping them in a Migrator). Mirrors the discovery half of Rails'
-   * `MigrationContext#migrations`.
+   * wrapping them in a Migrator). Rails has no such entry point — discovery is
+   * `MigrationContext#migrations`, which this now defers to. The adapter is
+   * vestigial: discovery never needed a connection, and the parameter is kept
+   * only so the existing call sites still compile.
+   * `migrator-keeps-only-its-rails-1404-surface` deletes this along with the
+   * rest of the MigrationContext surface `Migrator` should not own.
    *
    * Mirrors: ActiveRecord::MigrationContext#migrations (discovery)
    */
-  static fromPath(dir: string, adapter: DatabaseAdapter): MigrationProxy[] {
-    const helper = new Migrator(adapter, []);
-    const proxies: MigrationProxy[] = [];
-    for (const file of helper.migrationFiles([dir])) {
-      const parsed = helper.parseMigrationFilename(file);
-      if (!parsed) throw new IllegalMigrationNameError(file);
-      const [version, rawName, scope] = parsed;
-      helper._validateLoadedMigration(version, rawName);
-      const name = camelize(rawName);
-      proxies.push({
-        version,
-        name,
-        filename: file,
-        scope: scope || undefined,
-        migration: async () => {
-          const { pathToFileURL } = await import("node:url");
-          const mod = await import(pathToFileURL(file).href);
-          return loadMigrationFrom(mod, name, version);
-        },
-      });
-    }
-    // Rails MigrationContext#migrations: `migrations.sort_by(&:version)` —
-    // numeric (not lexicographic) so "10" sorts after "2".
-    return proxies.sort((a, b) => {
-      const va = BigInt(a.version);
-      const vb = BigInt(b.version);
-      return va < vb ? -1 : va > vb ? 1 : 0;
-    });
+  static fromPath(dir: string, _adapter: DatabaseAdapter): MigrationProxy[] {
+    return new MigrationContext([dir]).migrations;
   }
 
   private _sortMigrations(migrations: MigrationProxy[]): MigrationProxy[] {
-    return [...migrations].sort((a, b) => {
-      const va = BigInt(a.version);
-      const vb = BigInt(b.version);
-      if (va < vb) return -1;
-      if (va > vb) return 1;
-      return 0;
-    });
-  }
-
-  /**
-   * Per-file load-time timestamp validation, mirroring the check Rails runs
-   * inside `MigrationContext#migrations` (migration.rb:1305-1307) as each file
-   * is parsed: when timestamp validation is enabled, reject a version that
-   * isn't a valid migration timestamp. The illegal-name check for an
-   * unparseable filename lives at the parse site (Rails migration.rb:1304).
-   * Runs on the raw (pre-camelize) name so the error names the file like
-   * Rails, and is called from the file-load paths (`fromPath` /
-   * `discoverMigrations`) — not from `validate`, matching Rails' layering
-   * where these checks never live in `Migrator#validate`.
-   *
-   * @internal
-   */
-  private _validateLoadedMigration(version: string, name: string): void {
-    if (this.isValidateTimestamp() && !this.isValidMigrationTimestamp(version)) {
-      throw new InvalidMigrationTimestampError(version, name);
-    }
+    return [...migrations].sort(byVersion);
   }
 
   /** @internal */
@@ -2880,55 +3017,9 @@ export class Migrator {
 
   static migrationsPaths: string[] = [];
 
-  // Rails: MigrationContext#migration_files
-  /** @internal */
-  migrationFiles(paths: string[] = Migrator.migrationsPaths): string[] {
-    const { readdirSync, existsSync } = getFs();
-    const { join } = getPath();
-    const files: string[] = [];
-    const collect = (dir: string) => {
-      if (!existsSync(dir)) return;
-      for (const entry of readdirSync(dir, { withFileTypes: true })) {
-        const full = join(dir, entry.name);
-        if (entry.isDirectory()) {
-          collect(full);
-        } else if (/^\d+_.*\.(ts|js)$/.test(entry.name)) {
-          files.push(full);
-        }
-      }
-    };
-    for (const p of paths) collect(p);
-    return files.sort();
-  }
-
-  // Rails: MigrationContext#parse_migration_filename
-  /** @internal */
-  parseMigrationFilename(filename: string): [string, string, string] | null {
-    const base = filename.replace(/.*[/\\]/, "").replace(/\.(ts|js)$/, "");
-    const m = base.match(/^(\d+)_([a-z0-9_]*)(?:\.([a-z0-9_]*))?$/);
-    if (!m) return null;
-    return [m[1], m[2], m[3] ?? ""];
-  }
-
-  // Rails: MigrationContext#validate_timestamp?
-  /** @internal */
-  isValidateTimestamp(): boolean {
-    return ActiveRecord.timestampedMigrations && Migrator.validateMigrationTimestamps;
-  }
-
-  // Rails: MigrationContext#valid_migration_timestamp?
-  /** @internal */
-  isValidMigrationTimestamp(version: string | number): boolean {
-    const tomorrow = Temporal.Now.plainDateTimeISO("UTC").add({ days: 1 });
-    const limit = Number(
-      `${tomorrow.year}${String(tomorrow.month).padStart(2, "0")}${String(tomorrow.day).padStart(2, "0")}${String(tomorrow.hour).padStart(2, "0")}${String(tomorrow.minute).padStart(2, "0")}${String(tomorrow.second).padStart(2, "0")}`,
-    );
-    return Number(version) < limit;
-  }
-
   // Rails: MigrationContext#move
   /** @internal */
-  async move(direction: "up" | "down", steps: number): Promise<void> {
+  async move(direction: "up" | "down", steps: number): Promise<MigrationProxy[]> {
     const current = await this.currentVersion();
     // Mirror Migrator#migrations: ascending for :up, descending for :down.
     // MigrationContext#move uses migrator.migrations[start_index + steps], so the
@@ -2946,10 +3037,9 @@ export class Migrator {
     const finish = ordered[startIndex + steps];
     const targetVersion = finish ? Number(finish.version) : 0;
     if (direction === "up") {
-      await this.up(targetVersion);
-    } else {
-      await this.down(targetVersion);
+      return this.up(targetVersion);
     }
+    return this.down(targetVersion);
   }
 }
 

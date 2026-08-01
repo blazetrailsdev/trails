@@ -156,13 +156,6 @@
   {
     "package": "activerecord",
     "tsFile": "migration.ts",
-    "rubyName": "forward",
-    "call": "move",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration.ts",
     "rubyName": "generate_migrator_advisory_lock_id",
     "call": "connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -191,22 +184,8 @@
   {
     "package": "activerecord",
     "tsFile": "migration.ts",
-    "rubyName": "migration_files",
-    "call": "migrations_paths",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration.ts",
     "rubyName": "migrations_status",
     "call": "filter_map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration.ts",
-    "rubyName": "migrations_status",
-    "call": "migration_files",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -327,13 +306,6 @@
     "rubyName": "reverting?",
     "call": "connection",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails migration.rb:869-871 probes `connection.respond_to?(:reverting) && connection.reverting`; trails migration.ts:1208-1210 isReverting reads the local `_recording && _recorder.reverting` state — the recorder is held on the migration, not looked up through the connection."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration.ts",
-    "rubyName": "rollback",
-    "call": "move",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
