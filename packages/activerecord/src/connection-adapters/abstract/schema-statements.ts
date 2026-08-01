@@ -1373,8 +1373,9 @@ export class SchemaStatements {
     }
   }
 
-  async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
-    return [];
+  async foreignKeys(_tableName: string): Promise<ForeignKeyDefinition[]> {
+    // @nie disposition=TODO
+    throw new NotImplementedError("foreign_keys is not implemented");
   }
 
   async tables(): Promise<string[]> {
@@ -1743,8 +1744,9 @@ export class SchemaStatements {
     return result;
   }
 
-  async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
-    throw new Error("NotImplementedError: checkConstraints is not implemented");
+  async checkConstraints(_tableName: string): Promise<CheckConstraintDefinition[]> {
+    // @nie disposition=TODO
+    throw new NotImplementedError();
   }
 
   checkConstraintOptions(

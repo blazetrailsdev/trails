@@ -299,15 +299,15 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
       }
     }
     const stub = new FkStub();
-    // foreignKeys base path returns [] when adapter has no override
-    const fks = await stub.foreignKeys("any_table");
-    expect(fks).toEqual([]);
+    // foreignKeys base path raises NotImplementedError (Rails) rather than
+    // recursing when the adapter has no override.
+    await expect(stub.foreignKeys("any_table")).rejects.toThrow(/foreign_keys is not implemented/);
     // removeForeignKey base path resolves the real constraint via
-    // foreign_key_for! (Rails-faithful); against a stub with no foreign keys it
-    // raises ArgumentError promptly rather than recursing into a stack overflow.
+    // foreign_key_for! (Rails-faithful), so it surfaces foreignKeys' own
+    // NotImplementedError promptly rather than recursing into a stack overflow.
     await expect(
       stub.removeForeignKey("products", { name: "fk_products_user_id" }),
-    ).rejects.toThrow(/no foreign key/i);
+    ).rejects.toThrow(/foreign_keys is not implemented/);
   });
 
   it("adapter overrides that call super reach the base body without self-dispatching", async () => {
@@ -340,11 +340,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("schemaStatements() is the adapter itself, so Migration#schema reaches adapter overrides", async () => {
-    // Rails has no `schema_statements` accessor: `include SchemaStatements` puts
-    // the bodies on the adapter, and Migration#method_missing hands work to the
-    // connection. trails' accessor is only a typed handle onto the same object,
-    // so an adapter override is what a `schema` handle dispatches to — no
-    // companion instance re-implementing the lookup.
     class OverridingAdapter extends SqliteCapturingAdapter {
       renameColumnCalls = 0;
       async renameColumn(tableName: string, oldName: string, newName: string) {

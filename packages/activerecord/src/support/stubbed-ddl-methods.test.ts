@@ -74,7 +74,10 @@ async function recordLayPath(): Promise<Set<string>> {
       if (typeof prop !== "string") return Reflect.get(target, prop, receiver);
       touched.add(prop);
       if (prop === "schemaStatements") {
-        return () => new SchemaStatements(proxy as never);
+        return () =>
+          new SchemaStatements(
+            proxy as unknown as ConstructorParameters<typeof SchemaStatements>[0],
+          );
       }
       const value = Reflect.get(target, prop, target) as unknown;
       return typeof value === "function"

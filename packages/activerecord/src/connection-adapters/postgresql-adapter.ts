@@ -83,7 +83,6 @@ import type {
   UniqueConstraintStatements,
   SchemaNamespaceStatements,
 } from "./abstract/schema-statements.js";
-import { SchemaStatements } from "./abstract/schema-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
   transactionIsolationLevels,
@@ -4241,7 +4240,7 @@ export class PostgreSQLAdapter
     // Rails: PostgreSQL::SchemaStatements#add_foreign_key is just
     //   assert_valid_deferrable(options[:deferrable]); super
     this.assertValidDeferrable(options.deferrable);
-    await SchemaStatements.prototype.addForeignKey.call(this, fromTable, toTable, options);
+    await super.addForeignKey(fromTable, toTable, options);
   }
 
   async foreignKeyExists(
