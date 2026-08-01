@@ -365,12 +365,10 @@ describe("SchemaDumperTest", () => {
 // adapter tables / reflection fixes — tracked as follow-up stories under RFC 0048.
 // Nothing drops their bespoke tables between tests, so each case that would
 // collide clears its own up front and the file-level `afterAll` below drops the
-// rest.
-// Each case builds its own bespoke tables and dumps only those —
-// `SchemaDumper.dumpTableSchema(adapter, name)` introspects only the named
-// table (no `tables()` enumeration of the ~330 canonical tables the
-// truncate-reset preserves). So none of them enter the dump's output/timing:
-// no empty-DB precondition (and no drop-all crutch) needed.
+// rest. Each dumps only its own tables — `SchemaDumper.dumpTableSchema(adapter,
+// name)` introspects only the named table (no `tables()` enumeration of the
+// ~330 canonical tables the truncate-reset preserves) — so no empty-DB
+// precondition (and no drop-all crutch) is needed.
 describe("SchemaDumperTest", () => {
   afterEach(() => {
     SchemaDumper.ignoreTables = [];

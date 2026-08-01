@@ -154,7 +154,7 @@ function conciseOptions<T>(
 
 /**
  * Interface for sources that can provide schema information.
- * Database adapters implement this; in-memory/mock sources in tests do too.
+ * Both MigrationContext (sync/in-memory) and database adapters (async) can implement this.
  */
 export interface SchemaSource {
   /** @internal */

@@ -561,8 +561,6 @@ describe("TimestampsWithoutTransactionTest", () => {
       t.timestamps({ null: true, index: true });
     });
 
-    // AbstractAdapter#indexes is declared `Promise<unknown[]>` (the concrete
-    // IndexDefinition shape lives on the dialect adapters).
     const indexes = (await Base.connection.indexes("foos")) as { columns: string[] }[];
     const columns = indexes.flatMap((i) => i.columns).sort();
     expect(columns).toEqual(["created_at", "updated_at"]);
