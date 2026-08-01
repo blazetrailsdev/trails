@@ -78,13 +78,47 @@ export function clearAsyncProvenance(
 export function scopeAsyncArm<T>(
   bindings: Set<string>,
   emit: () => T,
-): { value: T; after: Set<string> } {
+  body?: PrismNode | null,
+): AsyncArm<T> {
   const before = new Set(bindings);
   const value = emit();
   const after = new Set(bindings);
   bindings.clear();
   for (const key of before) bindings.add(key);
-  return { value, after };
+  return { value, after, terminal: body !== undefined && !fallsThrough(body) };
+}
+
+export interface AsyncArm<T = unknown> {
+  value: T;
+  after: Set<string>;
+  terminal: boolean;
+}
+
+/**
+ * Whether control can reach the statement after `node`. An arm ending in
+ * `return`, `next`, `break`, or `raise` cannot, so it is not a path into the
+ * code following the branch and must not take part in the merge below.
+ *
+ * `break`/`next` are terminal relative to the enclosing branch only; a loop
+ * body is never handed to this function, since a body ending in `break` does
+ * reach the code after the loop.
+ */
+export function fallsThrough(node: PrismNode | null | undefined): boolean {
+  const kind = node?.constructor?.name;
+  if (!node || !kind) return true;
+  if (kind === "StatementsNode") {
+    const kids = node.compactChildNodes();
+    return kids.length === 0 || fallsThrough(kids[kids.length - 1]);
+  }
+  if (kind === "ReturnNode" || kind === "NextNode" || kind === "BreakNode") return false;
+  if (kind === "CallNode") return String(node.name) !== "raise" || node.receiver != null;
+  if (kind === "IfNode" || kind === "UnlessNode") {
+    const sub = (node.subsequent ?? node.elseClause) as PrismNode | null;
+    if (!sub) return true;
+    const elseBody = sub.constructor.name === "ElseNode" ? (sub.statements as PrismNode) : sub;
+    return fallsThrough(node.statements as PrismNode | null) || fallsThrough(elseBody);
+  }
+  return true;
 }
 
 /**
@@ -97,12 +131,18 @@ export function scopeAsyncArm<T>(
  * that never assigned, and awaiting there is the false positive the policy
  * exists to avoid. Retraction is the safe direction, so it stays eager: a key
  * dropped by any arm is dropped outright, exhaustive or not.
+ *
+ * Arms that cannot fall through are excluded from both directions: they are
+ * not paths into the code after the construct, so neither what they establish
+ * nor what they retract says anything about it. A branch whose every arm is
+ * terminal therefore leaves the enclosing bindings exactly as they were.
  */
 export function mergeAsyncArms(
   bindings: Set<string>,
-  arms: ReadonlyArray<ReadonlySet<string>>,
+  allArms: ReadonlyArray<{ after: ReadonlySet<string>; terminal?: boolean }>,
   exhaustive: boolean,
 ): void {
+  const arms = allArms.filter((arm) => !arm.terminal).map((arm) => arm.after);
   for (const key of [...bindings]) {
     if (arms.some((arm) => !arm.has(key))) bindings.delete(key);
   }
