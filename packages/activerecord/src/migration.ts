@@ -2932,18 +2932,13 @@ export class Migrator {
   }
 
   private async _runMigration(proxy: MigrationProxy, direction: "up" | "down"): Promise<void> {
-    // Rails resolves the migration lazily inside `execute_migration_in_transaction`
-    // (`migration.rb:1528-1543`) — `MigrationProxy#migration` loads the file at the
-    // moment `migrate` is called, so a file that fails to load is caught by the same
-    // rescue and gets the "all later migrations canceled" framing.
     let migration: Migration | undefined;
     // Rails wraps both the migration execution AND the version
     // stamping inside the same ddl_transaction so they commit/rollback
     // atomically. Without this, a committed migration + failed stamp
     // would leave schema_migrations out of sync.
     try {
-      const loaded = await proxy.migration();
-      migration = loaded;
+      const loaded = (migration = await proxy.migration());
       loaded.connection = this._adapter;
       await this._ddlTransaction(loaded, async () => {
         await loaded.migrate(direction);
@@ -2958,9 +2953,6 @@ export class Migrator {
       });
     } catch (e) {
       // Mirrors: ActiveRecord::Migrator#execute_migration_in_transaction rescue block
-      // A migration that failed to load has no `disable_ddl_transaction` to
-      // consult, so the decision falls to adapter support alone — the same
-      // answer Rails' `use_transaction?` gives for a nil opt-out.
       const useTx = migration
         ? this._useTransaction(migration)
         : (this._adapter.supportsDdlTransactions?.() ?? false);
