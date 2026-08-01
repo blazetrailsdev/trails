@@ -44,6 +44,11 @@ export class Codegen implements Emitter {
     readonly delegations: ReadonlyMap<string, string> = new Map(),
     readonly linearization: Linearization | null = null,
   ) {}
+  private declined = false;
+  decline(kind: string): void {
+    this.declined = true;
+    this.record(kind, false);
+  }
   private record(kind: string, handled: boolean): void {
     this.coverage.record(kind, handled);
     const d = this.perDef.get(this.currentDef) ?? { total: 0, passthrough: 0 };
@@ -58,7 +63,8 @@ export class Codegen implements Emitter {
     if (handler) {
       const built = handler(node, this);
       if (built) {
-        this.record(kind, true);
+        if (this.declined) this.declined = false;
+        else this.record(kind, true);
         return built;
       }
     }

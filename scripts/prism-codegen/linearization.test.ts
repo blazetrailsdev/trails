@@ -110,6 +110,38 @@ describe("super linearization", () => {
     expect(code).toContain('__PRISM_SUPER_OUTSIDE_CORPUS("Persistence#reload_only_here")');
   });
 
+  it("counts an outside-corpus super as a decline, not a clean translation", async () => {
+    const { perDef } = await generateFromSource(
+      PERSISTENCE_RB,
+      new Set(),
+      "./runtime.js",
+      await linearization(),
+    );
+    expect(perDef.get("touch")?.passthrough).toBe(0);
+    expect(perDef.get("reloadOnlyHere")?.passthrough).toBe(1);
+  });
+
+  it("still flattens an unresolvable statement-position super", async () => {
+    const { code } = await generateFromSource(
+      `
+        module ActiveRecord
+          module Core
+            def touch(*names)
+              super
+              1
+            end
+          end
+        end
+      `,
+      new Set(),
+      "./runtime.js",
+      await linearization(),
+    );
+    expect(code).toContain("return 1;");
+    expect(code).not.toContain("OUTSIDE_CORPUS");
+    expect(code).not.toContain(".call(this");
+  });
+
   it("leaves class-position super untouched when no linearization is supplied", async () => {
     const { code } = await generateFromSource(`
       class Widget < Base

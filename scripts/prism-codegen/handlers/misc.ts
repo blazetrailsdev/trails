@@ -15,8 +15,6 @@ export function registerMisc(r: Registry): void {
   r.on("SplatNode", (n, e) => f.createSpreadElement(e.expr((n.expression as PrismNode) ?? null)));
   r.onManyStmt(["ForwardingSuperNode", "SuperNode"], (n, e, isLast) => {
     if (e.inClass || isLast) return null;
-    // A resolvable module-level super is a real call; only unresolvable ones
-    // flatten away (the port realizes those chains at the composition point).
     if (resolveSuper(e)?.kind === "resolved") return null;
     return [];
   });
@@ -26,6 +24,7 @@ export function registerMisc(r: Registry): void {
     const resolution = resolveSuper(e);
     if (!resolution) return null;
     if (resolution.kind === "outside-corpus") {
+      e.decline(n.constructor.name);
       return f.createCallExpression(f.createIdentifier(OUTSIDE_CORPUS), undefined, [
         f.createStringLiteral(`${normalizeModuleName(e.currentModule ?? "")}#${e.currentRubyDef}`),
       ]);

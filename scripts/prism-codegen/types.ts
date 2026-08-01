@@ -26,6 +26,11 @@ export interface Emitter {
   stmt(node: PrismNode, isLast: boolean): ts.Statement[];
   stmts(node: PrismNode | null | undefined, implicitReturn: boolean): ts.Statement[];
   readonly coverage: Coverage;
+  /**
+   * Record a node the handler chose not to translate faithfully. Keeps the
+   * enclosing def out of the "clean" set even though a marker was emitted.
+   */
+  decline(kind: string): void;
   readonly perDef: Map<
     string,
     {
