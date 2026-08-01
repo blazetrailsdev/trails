@@ -1619,12 +1619,9 @@ export class SchemaStatements {
     try {
       const sql = this.adapter.dataSourceSql();
       const rows = await this.adapter.schemaQuery(sql);
-      // query_values projects the first column of each row.
       return rows.map((row) => String(Object.values(row)[0]));
     } catch (error) {
       if (!(error instanceof NotImplementedError)) throw error;
-      // Rails' rescue arm is `tables | views` — Ruby array union, which dedupes
-      // while preserving first-seen order.
       const t = await this.tables();
       const v = await this.views();
       return [...new Set([...t, ...v])];
