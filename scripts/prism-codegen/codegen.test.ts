@@ -4,7 +4,13 @@ import { generateFromSource } from "./index.js";
 import { summarizeCoverage, mergeCoverages } from "./coverage.js";
 import { Registry } from "./registry.js";
 import { tsToRubyFile } from "./naming.js";
-import { extractAsyncNames, resolveAsyncNames, rubyDefinedMethods } from "./async-source.js";
+import {
+  buildAsyncManifest,
+  crossFileAsyncNames,
+  extractAsyncNames,
+  resolveAsyncNames,
+  rubyDefinedMethods,
+} from "./async-source.js";
 import type { Coverage } from "./types.js";
 describe("prism-codegen", () => {
   it("translates class/def shape and method-name conventions", async () => {
@@ -349,6 +355,46 @@ describe("prism-codegen", () => {
     expect(names.has("ids")).toBe(true);
     expect(names.has("first")).toBe(false);
     expect(names.has("isOne")).toBe(false);
+  });
+  it("awaits calls into async methods defined in another port file", async () => {
+    const manifest = buildAsyncManifest([
+      { path: "persistence.ts", source: `export async function performSave() {}` },
+      { path: "relation/finder-methods.ts", source: `export async function findBy() {}` },
+    ]);
+    const crossFile = crossFileAsyncNames(manifest, {
+      twinTsPath: "persistence.ts",
+      railsDefs: rubyDefinedMethods(`def find_by; end\ndef perform_save; end`),
+    });
+    expect(crossFile.has("findBy")).toBe(true);
+    expect(crossFile.has("performSave")).toBe(false);
+    const { code } = await generateFromSource(
+      `module M
+        def reload; self.find_by(1); end
+      end`,
+      resolveAsyncNames({ twinTs: `export async function reload() {}`, crossFile }),
+    );
+    expect(code).toContain("await this.findBy(1)");
+  });
+  it("declines the await when a name is async in more than one port file", () => {
+    const manifest = buildAsyncManifest([
+      { path: "relation.ts", source: `class R { async reset() {} }` },
+      { path: "connection-adapters/pool.ts", source: `class P { async reset() {} }` },
+      { path: "persistence.ts", source: `export async function touch() {}` },
+    ]);
+    const railsDefs = rubyDefinedMethods(`def reset; end\ndef touch; end`);
+    const crossFile = crossFileAsyncNames(manifest, { twinTsPath: "core.ts", railsDefs });
+    expect(crossFile.has("reset")).toBe(false);
+    expect(crossFile.has("touch")).toBe(true);
+  });
+  it("keeps cross-file async names out unless Rails defines the method", () => {
+    const manifest = buildAsyncManifest([
+      { path: "relation.ts", source: `class R { async then() {} }` },
+    ]);
+    const crossFile = crossFileAsyncNames(manifest, {
+      twinTsPath: "core.ts",
+      railsDefs: rubyDefinedMethods(`def save; end`),
+    });
+    expect(crossFile.has("then")).toBe(false);
   });
   it("omits the relation supplement when no defs are provided (Model-side files)", () => {
     const names = resolveAsyncNames({ twinTs: `export async function save() {}` });
