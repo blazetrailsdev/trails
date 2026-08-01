@@ -426,15 +426,14 @@ describe("BindParameterTest", () => {
     const pk = `${table}.${conn.quoteColumnName(Author.primaryKey)}`;
 
     let sql = `SELECT ${table}.* FROM ${table} WHERE (${pk} IN (${bindParams(conn, [1, 2, 3])}) OR ${pk} IS NULL)`;
-    const authors = Author.where({ id: [1, 2, 3, null] });
+    let authors = Author.where({ id: [1, 2, 3, null] });
     expect(conn.toSql(authors.arel())).toBe(sql);
     expect((await authors).length).toBe(3);
 
     sql = `SELECT ${table}.* FROM ${table} WHERE ${pk} IN (${bindParams(conn, [1, 2, 3])})`;
-    // Ruby's Integer is arbitrary-precision; 2**63 needs a JS bigint.
-    const overRange = Author.where({ id: [1, 2, 3, 2n ** 63n] });
-    expect(conn.toSql(overRange.arel())).toBe(sql);
-    expect((await overRange).length).toBe(3);
+    authors = Author.where({ id: [1, 2, 3, 2n ** 63n] });
+    expect(conn.toSql(authors.arel())).toBe(sql);
+    expect((await authors).length).toBe(3);
 
     // Rails (bind_parameter_test.rb:240-246): "With MySQL integers are casted as
     // string for security" — `mysql/quoting.rb#cast_bound_value`, which
