@@ -15,6 +15,11 @@
     "reason": "`@strict_loading_mode == :n_plus_one_only` vs `strictLoadingMode.call(this) === \"n_plus_one_only\"` — the port routes the ivar read through the `strictLoadingMode` accessor, which is the same read."
   },
   {
+    "rubyFile": "active_record/inheritance.rb",
+    "name": "initializeInternalsCallback",
+    "reason": "Rails' body is `super; ensure_proper_type` and the generated def now realizes that super as `Core.initializeInternalsCallback.call(this, ...)`. The port holds only this module's contribution (`ensureProperType.call(this)`, inheritance.ts:824) because base.ts orchestrates the chain explicitly at both constructor branches (base.ts:3212, 3291) — the composition-point pattern from #5727. Same two reaches, one of them relocated to the composition point."
+  },
+  {
     "rubyFile": "active_record/persistence.rb",
     "name": "isNewRecord",
     "reason": "Ruby reads the ivar `@new_record`; the port reads the `_newRecord` field. Same single read — the whole divergence is the ivar spelling."
