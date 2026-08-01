@@ -1611,9 +1611,16 @@ export class SchemaStatements {
   }
 
   async dataSources(): Promise<string[]> {
-    const t = await this.tables();
-    const v = await this.views();
-    return [...new Set([...t, ...v])];
+    try {
+      const sql = this.adapter.dataSourceSql();
+      const rows = await this.adapter.schemaQuery(sql);
+      return rows.map((row) => String(Object.values(row)[0]));
+    } catch (error) {
+      if (!(error instanceof NotImplementedError)) throw error;
+      const t = await this.tables();
+      const v = await this.views();
+      return [...new Set([...t, ...v])];
+    }
   }
 
   async dataSourceExists(name: string): Promise<boolean> {
