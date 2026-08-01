@@ -2,6 +2,7 @@ import { type Type, ValueType, ArgumentError } from "@blazetrails/activemodel";
 import { Nodes, Visitors } from "@blazetrails/arel";
 import { singularize, getCrypto } from "@blazetrails/activesupport";
 import { SchemaStatements } from "../abstract/schema-statements.js";
+import { SchemaCreation as PgSchemaCreation } from "./schema-creation.js";
 import {
   AlterTable,
   ChangeColumnDefinition,
@@ -99,6 +100,11 @@ interface PgSchemaAdapter {
 export class PostgreSQLSchemaStatements extends SchemaStatements {
   private get pg(): PgSchemaAdapter {
     return this.adapter as unknown as PgSchemaAdapter;
+  }
+
+  /** Mirrors: PostgreSQL::SchemaStatements#schema_creation */
+  override get schemaCreation(): PgSchemaCreation {
+    return new PgSchemaCreation(this.adapter);
   }
 
   /** Mirrors: PostgreSQL::SchemaStatements#update_table_definition */

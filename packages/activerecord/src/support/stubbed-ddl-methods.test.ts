@@ -3,6 +3,7 @@ import "../sqlite/better-sqlite3.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import { loadCanonicalSchema } from "./canonical-schema.js";
+import { SchemaStatements } from "../connection-adapters/abstract/schema-statements.js";
 import { STUBBED_DDL_METHODS } from "./stubbed-ddl-methods.js";
 
 /**
@@ -37,28 +38,33 @@ const NON_EMITTING: ReadonlyMap<string, string> = new Map([
     "createTableDefinition",
     "definition factory — a stub returns no TableDefinition and dies at once, so it cannot silently lay nothing",
   ],
+  ["_config", "config read behind supportsForeignKeys/foreign_keys, not a DDL emitter"],
+  ["supportsForeignKeys", "capability read — decides whether an FK clause rides inline"],
+  ["nativeDatabaseTypes", "renderer input — the type map typeToSql resolves a column type against"],
+  ["quoteIdentifier", "renderer input — quotes a column name into the DDL string"],
+  ["quoteTableName", "renderer input — quotes a table name into the DDL string"],
+  ["quoteDefaultExpression", "renderer input — quotes a column default into the DDL string"],
+  ["quotedColumnsForIndex", "renderer input — builds the column list of a CREATE INDEX"],
 ]);
 
 /**
  * Lay the canonical schema through a proxy that records every adapter member
  * the loader reaches for.
  *
- * `schemaStatements(host)` is re-bound to the proxy deliberately: the companion
- * is where the lay path's adapter calls actually come from, and letting the real
- * adapter hand back a companion bound to itself would record none of them.
- * Every other member is handed back bound to the *real* adapter, so calls the
- * adapter makes to itself internally stay unrecorded — the boundary being
- * pinned is the one a cover can intercept.
+ * `schemaStatements()` is answered with a `SchemaStatements` bound to the proxy.
+ * That is instrumentation, not the production shape — in production the accessor
+ * returns the adapter itself and the module bodies are the adapter's own. Binding
+ * a module view to the proxy is what pins the *adapter* boundary specifically:
+ * every `this.adapter.<member>` a module body makes is recorded one hop deep,
+ * while the calls the real adapter then makes to itself stay unrecorded. That
+ * boundary — the one a cover can intercept — is the whole scope of this guard.
  *
- * That boundary is the whole scope, and the `schemaCreation` hop shows where it
- * stops: the getter hands back the *real* adapter's SchemaCreation instance, so
- * every quoting/type call it makes while rendering DDL (`quoteColumnName`,
- * `quoteDefaultExpression`, `lookupCastType`, …) resolves against the real
- * adapter and is invisible here. The `schemaCreation` access is recorded; what
- * happens downstream of it is not. That is deliberate — a cover intercepts an
- * adapter member, and nothing downstream of `schemaCreation` is reachable that
- * way — but it means the floor assertions below pin the boundary, not the full
- * DDL-rendering call graph.
+ * `schemaCreation` is the one member the device cannot see: a module view builds
+ * its own SchemaCreation (Rails' `SchemaCreation.new(self)`), where in production
+ * the adapter's own getter is what the mixed-in bodies hit. It stays in the
+ * guarded set for that reason. The renderer's own quoting/type reads
+ * (`quoteIdentifier`, `quoteDefaultExpression`, `nativeDatabaseTypes`, …) do come
+ * back through the proxy and are exempted below as renderer inputs.
  */
 async function recordLayPath(): Promise<Set<string>> {
   const real = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
@@ -68,7 +74,10 @@ async function recordLayPath(): Promise<Set<string>> {
       if (typeof prop !== "string") return Reflect.get(target, prop, receiver);
       touched.add(prop);
       if (prop === "schemaStatements") {
-        return (host?: AbstractAdapter) => target.schemaStatements(host ?? proxy);
+        return () =>
+          new SchemaStatements(
+            proxy as unknown as ConstructorParameters<typeof SchemaStatements>[0],
+          );
       }
       const value = Reflect.get(target, prop, target) as unknown;
       return typeof value === "function"
@@ -110,7 +119,7 @@ describe("STUBBED_DDL_METHODS", () => {
     // vacuously.
     expect(touched.has("execute")).toBe(true);
     expect(touched.has("schemaStatements")).toBe(true);
-    expect(touched.has("schemaCreation")).toBe(true);
+    expect(touched.has("createTableDefinition")).toBe(true);
 
     const unaccounted = [...touched]
       .filter((name) => !STUBBED_DDL_METHODS.includes(name) && !NON_EMITTING.has(name))

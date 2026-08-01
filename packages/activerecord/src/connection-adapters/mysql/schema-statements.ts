@@ -22,7 +22,8 @@ import type { AddIndexOptions, SchemaStatementsLike } from "../abstract/schema-d
  * the `temporary: true` option, which emits `DROP TEMPORARY TABLE` — a MySQL/MariaDB
  * extension required to drop temporary tables without affecting base tables.
  *
- * Returned by `Mysql2Adapter#schemaStatements()` so Migration#schema picks it up.
+ * Mixed into AbstractMysqlAdapter at the bottom of `abstract-mysql-adapter.ts`,
+ * mirroring `include MySQL::SchemaStatements`.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements (partial)
  */

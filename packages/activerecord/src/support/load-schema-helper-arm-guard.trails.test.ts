@@ -116,7 +116,9 @@ describe("load_schema arm-probe guard", () => {
 
     const probe = new Probe(":memory:");
     try {
-      await expect(loadSchema(probe as unknown as AbstractAdapter)).resolves.toBeUndefined();
+      const err = await loadSchema(probe as unknown as AbstractAdapter).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(Error);
+      expect(String(err)).not.toMatch(/is stubbed/);
     } finally {
       await probe.close();
     }

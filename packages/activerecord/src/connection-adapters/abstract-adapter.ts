@@ -1474,17 +1474,15 @@ export class AbstractAdapter implements Quoting {
   }
 
   /**
-   * @noRailsEquivalent PERMANENT. Rails gains these bodies with `include SchemaStatements` on the
-   *   adapter, so there is no accessor to mirror. Permanent because TypeScript has no `include`:
-   *   the repo's substitute is a `this`-typed function assigned per method, and
-   *   abstract/schema_statements.rb defines 76 of them — that many hand-assigned statics is not a
-   *   readable class, and no future port removes the limitation. trails therefore keeps the module
-   *   as a companion class and `schemaStatements(host?)` returns it bound to a host adapter. It is
-   *   the TS stand-in for the `include`, not new capability — mysql2-adapter.ts overrides it to
-   *   return the MySQL companion the same way Rails includes `MySQL::SchemaStatements`.
+   * @noRailsEquivalent CONVERGEABLE. Rails gains these bodies with `include SchemaStatements` on
+   *   the adapter, so there is no accessor to mirror; `include(AbstractAdapter, SchemaStatements)`
+   *   below is trails' equivalent and dispatch is plain prototype lookup + `super`, exactly as in
+   *   Ruby. That leaves this an identity function whose remaining job is typing the mixed-in
+   *   bodies at the call site. Story `delete-the-schema-statements-accessor` retires it and points
+   *   every caller at the adapter member directly.
    */
-  schemaStatements(host?: AbstractAdapter): SchemaStatements {
-    return new SchemaStatements((host ?? this) as unknown as AbstractAdapter);
+  schemaStatements(): SchemaStatements {
+    return this as unknown as SchemaStatements;
   }
 
   get schemaCache(): SchemaCache {

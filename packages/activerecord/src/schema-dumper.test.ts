@@ -445,15 +445,12 @@ describe("SchemaDumperTest", () => {
   });
 
   itIfSupports("check_constraints", "schema dumps check constraints", async () => {
-    const { SchemaStatements } =
-      await import("./connection-adapters/abstract/schema-statements.js");
     const testAdapter = Base.connection;
     await testAdapter.createTable("products", { force: true }, (t) => {
       t.decimal("price");
       t.decimal("discounted_price");
     });
-    const ss = new SchemaStatements(testAdapter as any);
-    await ss.addCheckConstraint("products", "price > discounted_price", {
+    await testAdapter.addCheckConstraint("products", "price > discounted_price", {
       name: "products_price_check",
     });
     const output = await SchemaDumper.dumpTableSchema(testAdapter, "products");
