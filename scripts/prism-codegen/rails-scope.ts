@@ -53,6 +53,102 @@ export function mixinPathCandidates(fromRel: string, moduleName: string): string
   return [...new Set([nested, sibling, tail])];
 }
 
+// The trailing alternation keeps `class << self` out (a singleton body is not
+// a constant) while admitting the `# :nodoc:` comment most Rails module
+// declarations carry and the `< Superclass` of a class declaration.
+const MODULE_DECL = /^([ \t]*)(?:module|class)[ \t]+([A-Z][\w:]*)[ \t]*(?:<[^<]|#|$)/;
+
+/**
+ * The full constant paths a Ruby source defines, e.g. `active_record/
+ * relation/calculations.rb` → `ActiveRecord::Relation::Calculations`. Nesting
+ * is read off the indentation rather than by matching `end`s: Rails indents
+ * consistently, and an `end`-counting scanner has to model every block-opening
+ * keyword to stay in sync, where a miscount silently corrupts every later path.
+ */
+export function moduleDefinitionPaths(rubySource: string): Set<string> {
+  const paths = new Set<string>();
+  const stack: { indent: number; name: string }[] = [];
+  for (const line of rubySource.split("\n")) {
+    const m = MODULE_DECL.exec(line);
+    if (!m) continue;
+    const indent = m[1].replace(/\t/g, "  ").length;
+    while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
+    stack.push({ indent, name: m[2] });
+    paths.add(stack.map((s) => s.name).join("::"));
+  }
+  return paths;
+}
+
+function definesModule(rubySource: string, moduleName: string): boolean {
+  const wanted = moduleName.replace(/^::/, "");
+  for (const defined of moduleDefinitionPaths(rubySource)) {
+    if (defined === wanted || defined.endsWith(`::${wanted}`)) return true;
+  }
+  return false;
+}
+
+/**
+ * Every file that could define `moduleName`, nearest lexical scope first. A
+ * nested constant is often defined inside its parent's file rather than a file
+ * of its own (`QueryCache::ClassMethods` lives in `query_cache.rb`), so the
+ * paths of the enclosing constants are candidates too — with the full name
+ * still required, so `query_cache.rb` only answers for what it really defines.
+ */
+function resolutionCandidates(fromRel: string, moduleName: string): string[] {
+  const segments = moduleName.split("::");
+  const candidates = [
+    stripPrefix(fromRel),
+    ...segments.flatMap((_, i) =>
+      mixinPathCandidates(fromRel, segments.slice(0, segments.length - i).join("::")),
+    ),
+  ];
+  return [...new Set(candidates)];
+}
+
+/** An `include`/`extend` constant no file in the corpus was found to define. */
+export interface UnresolvedMixin {
+  fromRel: string;
+  moduleName: string;
+}
+
+const unresolvedMixins = new Map<string, UnresolvedMixin>();
+
+/**
+ * Every mixin constant that resolved to no file, deduplicated by call site.
+ * An unresolvable constant under-scopes the await decision for the file that
+ * includes it, so the misses are reported rather than silently dropped.
+ */
+export function unresolvedMixinReport(): UnresolvedMixin[] {
+  return [...unresolvedMixins.values()];
+}
+
+export function resetUnresolvedMixins(): void {
+  unresolvedMixins.clear();
+}
+
+/**
+ * The file a mixin constant referenced from `fromRel` resolves to, or
+ * `undefined` when nothing in the corpus defines it. The candidates are tried
+ * nearest-first, which is the order Ruby's lexical lookup uses, and each one
+ * has to actually define the constant — existing on disk is not enough, since
+ * Rails has same-named constants at different nesting levels.
+ */
+export function resolveMixinPath(
+  fromRel: string,
+  moduleName: string,
+  readSource: RubySourceReader,
+): string | undefined {
+  for (const candidate of resolutionCandidates(fromRel, moduleName)) {
+    const source = readSource(candidate);
+    if (source !== undefined && definesModule(source, moduleName)) return candidate;
+  }
+  unresolvedMixins.set(`${stripPrefix(fromRel)} :: ${moduleName}`, {
+    fromRel: stripPrefix(fromRel),
+    moduleName,
+  });
+  return undefined;
+}
+
 /** Reads one Rails source by its `active_record/`-relative path. */
 export type RubySourceReader = (railsRelPath: string) => string | undefined;
 
@@ -100,9 +196,8 @@ export function reachableRailsDefs(
     if (source === undefined) continue;
     for (const name of rubyDefinedMethods(source)) defs.add(name);
     for (const mixin of parseMixinNames(source)) {
-      for (const candidate of mixinPathCandidates(rel, mixin)) {
-        if (!seen.has(candidate) && readSource(candidate) !== undefined) queue.push(candidate);
-      }
+      const resolved = resolveMixinPath(rel, mixin, readSource);
+      if (resolved !== undefined && !seen.has(resolved)) queue.push(resolved);
     }
   }
   if (readSource === readRuby) reachableCache.set(railsRelPath, defs);
