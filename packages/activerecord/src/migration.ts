@@ -61,7 +61,7 @@ export {
   type Compatibility,
 } from "./migration/compatibility.js";
 
-import { ActiveRecordError } from "./errors.js";
+import { ActiveRecordError, NoDatabaseError } from "./errors.js";
 import { ActiveRecord } from "./ar-config.js";
 
 // Mirrors Rails AbstractAdapter#extract_new_comment_value (alias of extract_new_default_value).
@@ -1676,7 +1676,7 @@ export abstract class Migration {
  * adapter-wrapping schema DSL object — `MigrationContext` is a migration-file
  * runner (`migration.rb:1211`) and the schema DSL lives on the connection.
  * This class is the `defineSchema(ctx)` receiver RFC 0059 is retiring; it held
- * the `MigrationContext` name until this story reclaimed it for the real port.
+ * the `MigrationContext` name until the real port took it back.
  */
 export class SchemaContext {
   private _tableNamePrefix: string | null = null;
@@ -2162,10 +2162,17 @@ export class MigrationContext {
     return [];
   }
 
-  /** @internal Mirrors: ActiveRecord::MigrationContext#current_version */
-  async currentVersion(): Promise<number> {
-    const versions = await this.getAllVersions();
-    return versions.length > 0 ? Math.max(...versions) : 0;
+  /**
+   * @internal Mirrors: ActiveRecord::MigrationContext#current_version
+   * (`migration.rb:1292-1295`), whose bare `rescue NoDatabaseError` returns nil.
+   */
+  async currentVersion(): Promise<number | undefined> {
+    try {
+      return (await this.getAllVersions()).reduce((max, v) => (v > max ? v : max), 0);
+    } catch (error) {
+      if (error instanceof NoDatabaseError) return undefined;
+      throw error;
+    }
   }
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#needs_migration? */
@@ -2181,12 +2188,11 @@ export class MigrationContext {
 
   /**
    * @internal Mirrors: ActiveRecord::MigrationContext#migrations
-   *
-   * Discovery reads *this context's* `migrationsPaths` — Rails keeps them as
-   * per-instance constructor state (`attr_reader :migrations_paths`), so two
-   * contexts built for two different migration directories do not collide.
-   * The file-scan/parse half still lives on `Migrator`; moving it here is
-   * tracked by `move-migration-context-methods-off-migrator`.
+   * (`migration.rb:1303-1315`). Discovery reads *this context's*
+   * `migrationsPaths`, which Rails keeps as per-instance constructor state
+   * (`attr_reader :migrations_paths`), so two contexts built for two migration
+   * directories do not collide. The file-scan/parse half still lives on
+   * `Migrator`; `move-migration-context-methods-off-migrator` moves it here.
    */
   get migrations(): MigrationProxy[] {
     return Migrator.discoverMigrations(this.migrationsPaths);

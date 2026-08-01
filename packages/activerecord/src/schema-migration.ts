@@ -58,14 +58,13 @@ export class SchemaMigration {
   }
 
   /**
-   * Rails' `SchemaMigration` holds a connection *pool* and reaches a connection
-   * through `@pool.with_connection` (schema_migration.rb:12-17); trails hands it
-   * an adapter, and the one a pool supplies is the pool's dispatch proxy, whose
-   * every member resolves through `withConnection` and so answers a Promise even
-   * for Rails' synchronous `to_sql`. Await it here so the pool-backed instance
-   * behind `pool.migrationContext` builds real SQL instead of feeding `execute`
-   * a Promise (which `tableExists` then swallows into a silent "no table").
-   * @internal
+   * @internal Rails' `SchemaMigration` holds a connection *pool* and reaches a
+   * connection through `@pool.with_connection` (schema_migration.rb:12-17);
+   * trails hands it an adapter, and the one a pool supplies is the pool's
+   * dispatch proxy, whose members all resolve through `withConnection` and so
+   * answer a Promise even for Rails' synchronous `to_sql`. Awaiting is what
+   * keeps a pool-backed instance from feeding `execute` a Promise — which
+   * `tableExists` swallowed into a silent "no table".
    */
   private async _toSql(manager: { toSql?: unknown }): Promise<string> {
     return await (this._adapter.toSql(manager as never) as string | Promise<string>);
