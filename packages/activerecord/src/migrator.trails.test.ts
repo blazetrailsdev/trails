@@ -108,6 +108,23 @@ describe("Migrator trails extensions", () => {
     expect(ran).toEqual(["1"]);
   });
 
+  it("pendingMigrations on a down migrator returns migrations in reverse order", async () => {
+    const migrator = new Migrator(
+      adapter,
+      [makeMigration("1", "M1"), makeMigration("2", "M2"), makeMigration("3", "M3")],
+      { direction: "down" },
+    );
+    const schemaMigration = new SchemaMigration(adapter);
+    await schemaMigration.createTable();
+    await schemaMigration.createVersion("2");
+
+    const pending = await migrator.pendingMigrations();
+    expect(pending.map((m) => m.version)).toEqual(["3", "1"]);
+
+    const pendingReadOnly = await migrator.pendingMigrationsReadOnly();
+    expect(pendingReadOnly.map((m) => m.version)).toEqual(["3", "1"]);
+  });
+
   it("migrate returns [] when both the current and target version are 0", async () => {
     const ran: string[] = [];
     const migrator = new Migrator(adapter, [
