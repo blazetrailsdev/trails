@@ -92,6 +92,20 @@ async function loadExcludes(): Promise<ExcludeEntry[]> {
   return out;
 }
 
+async function readSignOffSource(): Promise<string> {
+  try {
+    return await fs.readFile(SIGNOFF_PATH, "utf8");
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+    throw new Error(
+      `Missing ${path.relative(".", SIGNOFF_PATH)} — the per-row sign-off manifest is ` +
+        "checked in and drives the guard; restore it rather than letting the scorer " +
+        "treat every signed-off row as unreviewed residue.",
+      { cause: e },
+    );
+  }
+}
+
 async function main() {
   const verbose = process.argv.includes("--verbose");
   const write = process.argv.includes("--write");
@@ -103,7 +117,7 @@ async function main() {
   let totDivergent = 0;
   let totMissing = 0;
   let totElsewhere = 0;
-  const signOffs = parseSignOffs(await fs.readFile(SIGNOFF_PATH, "utf8"));
+  const signOffs = parseSignOffs(await readSignOffSource());
   const catalogued: { row: ResidueRow; reason: string }[] = [];
   const divergentRows: { file: string; entry: ScoreEntry }[] = [];
   const uncatalogued: ResidueRow[] = [];
