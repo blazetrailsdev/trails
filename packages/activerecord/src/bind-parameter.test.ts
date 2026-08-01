@@ -438,10 +438,8 @@ describe("BindParameterTest", () => {
     // separately as story `array-where-integer-range-exclusion`.
 
     // Rails (bind_parameter_test.rb:240-246): "With MySQL integers are casted as
-    // string for security" — `mysql/quoting.rb#cast_bound_value` stringifies every
-    // Numeric, and `visit_Arel_Nodes_BoundSqlLiteral` runs each array element
-    // through it, so the MySQL IN-list is `'1', '2', '3'`. Every other adapter's
-    // `cast_bound_value` is the identity and renders `1, 2, 3`.
+    // string for security" — `mysql/quoting.rb#cast_bound_value`, which
+    // `visit_Arel_Nodes_BoundSqlLiteral` applies to every array element.
     const params = currentAdapter("Mysql2Adapter", "TrilogyAdapter")
       ? bindParams(conn, ["1", "2", "3"])
       : bindParams(conn, [1, 2, 3]);
