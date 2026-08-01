@@ -10,7 +10,7 @@ extend(ActiveSupport.Concern);
 export function create(attributes = null, block) {
     let object;
     if (attributes.isA(Array)) {
-        return attributes.collect(attr => await this.create(attr, block));
+        return attributes.collect(async (attr) => await this.create(attr, block));
     }
     else {
         object = this.constructor(attributes, block);
@@ -21,7 +21,7 @@ export function create(attributes = null, block) {
 export function createBang(attributes = null, block) {
     let object;
     if (attributes.isA(Array)) {
-        return attributes.collect(attr => await this.createBang(attr, block));
+        return attributes.collect(async (attr) => await this.createBang(attr, block));
     }
     else {
         object = this.constructor(attributes, block);
