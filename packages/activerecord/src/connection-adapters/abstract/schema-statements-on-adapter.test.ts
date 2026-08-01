@@ -299,15 +299,15 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
       }
     }
     const stub = new FkStub();
-    // foreignKeys base path raises NotImplementedError (Rails) rather than
-    // recursing when the adapter has no override.
-    await expect(stub.foreignKeys("any_table")).rejects.toThrow(/foreign_keys is not implemented/);
+    // foreignKeys base path returns [] when adapter has no override
+    const fks = await stub.foreignKeys("any_table");
+    expect(fks).toEqual([]);
     // removeForeignKey base path resolves the real constraint via
-    // foreign_key_for! (Rails-faithful), so it surfaces foreignKeys' own
-    // NotImplementedError promptly rather than recursing into a stack overflow.
+    // foreign_key_for! (Rails-faithful); against a stub with no foreign keys it
+    // raises ArgumentError promptly rather than recursing into a stack overflow.
     await expect(
       stub.removeForeignKey("products", { name: "fk_products_user_id" }),
-    ).rejects.toThrow(/foreign_keys is not implemented/);
+    ).rejects.toThrow(/no foreign key/i);
   });
 
   it("adapter overrides that call super reach the base body without self-dispatching", async () => {

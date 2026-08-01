@@ -1373,9 +1373,11 @@ export class SchemaStatements {
     }
   }
 
+  // Rails raises `NotImplementedError, "foreign_keys is not implemented"` here
+  // (schema_statements.rb:1103). trails' `introspectForeignKeys` is built on the
+  // `[]`; story `converge-schema-statements-not-implemented-bodies` retires it.
   async foreignKeys(_tableName: string): Promise<ForeignKeyDefinition[]> {
-    // @nie disposition=TODO
-    throw new NotImplementedError("foreign_keys is not implemented");
+    return [];
   }
 
   async tables(): Promise<string[]> {
@@ -1468,18 +1470,21 @@ export class SchemaStatements {
   async indexExists(
     tableName: string,
     columnName: string | string[] | null | undefined,
-    options?: { unique?: boolean; name?: string; valid?: boolean },
+    options?: { unique?: boolean; name?: string; valid?: boolean; column?: string | string[] },
   ): Promise<boolean> {
     const allIndexes = await this.adapterIndexes(tableName);
-    // Rails `defined_for?`: the column check only applies when columns are
-    // present (`columns.blank?` — nil, "", and [] are all absent), so
-    // `index_exists?(:t, nil, name: ...)` matches on name alone (used to
-    // reverse a named expression index).
-    const hasColumn =
-      columnName != null &&
-      columnName !== "" &&
-      !(Array.isArray(columnName) && columnName.length === 0);
-    const targetCols = hasColumn ? (Array.isArray(columnName) ? columnName : [columnName]) : null;
+    // Rails `defined_for?`: `columns = options[:column] if columns.blank?`, then
+    // the column check only applies when columns are present (`columns.blank?` —
+    // nil, "", and [] are all absent), so `index_exists?(:t, nil, name: ...)`
+    // matches on name alone (used to reverse a named expression index).
+    const isBlank = (c: string | string[] | null | undefined): boolean =>
+      c == null || c === "" || (Array.isArray(c) && c.length === 0);
+    const columns = isBlank(columnName) ? options?.column : columnName;
+    const targetCols = isBlank(columns)
+      ? null
+      : Array.isArray(columns)
+        ? columns
+        : [columns as string];
 
     return allIndexes.some((idx) => {
       if (options?.name && idx.name !== options.name) return false;
@@ -1745,8 +1750,7 @@ export class SchemaStatements {
   }
 
   async checkConstraints(_tableName: string): Promise<CheckConstraintDefinition[]> {
-    // @nie disposition=TODO
-    throw new NotImplementedError();
+    throw new Error("NotImplementedError: checkConstraints is not implemented");
   }
 
   checkConstraintOptions(
