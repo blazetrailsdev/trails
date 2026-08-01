@@ -300,6 +300,22 @@ describe("prism-codegen", () => {
     );
     expect(code).not.toContain("await this.relation.load()");
   });
+  it("carries provenance past a begin/ensure with no rescue, which cannot branch", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all
+          begin
+            @relation = build_relation()
+          ensure
+            log
+          end
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).toContain("await this.relation.load()");
+  });
   it("stops awaiting a receiver rebound by an operator write", async () => {
     const ivarWrite = await generateFromSource(
       `module M

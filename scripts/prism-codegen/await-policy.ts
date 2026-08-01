@@ -91,8 +91,9 @@ export function scopeAsyncArm<T>(
  * Fold the arms of a branch back into the enclosing binding set.
  *
  * Provenance established inside an arm only survives when the branch is
- * exhaustive (an `if`/`else`, a `case` with an `else`) and every arm
- * establishes it — otherwise the code after the construct may have run a path
+ * exhaustive — an `if`/`else`, a `case` with an `else`, or a construct whose
+ * single arm is the only route past it, like a `begin`/`ensure` with no
+ * `rescue` — and every arm establishes it — otherwise the code after the construct may have run a path
  * that never assigned, and awaiting there is the false positive the policy
  * exists to avoid. Retraction is the safe direction, so it stays eager: a key
  * dropped by any arm is dropped outright, exhaustive or not.

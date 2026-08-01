@@ -72,11 +72,7 @@ export function registerControl(r: Registry): void {
       catchArm = arm.after;
       catchClause = f.createCatchClause(f.createVariableDeclaration(ref), arm.value);
     }
-    mergeAsyncArms(
-      e.asyncBindings,
-      catchArm ? [tryArm.after, catchArm] : [tryArm.after],
-      catchArm != null,
-    );
+    mergeAsyncArms(e.asyncBindings, catchArm ? [tryArm.after, catchArm] : [tryArm.after], true);
     const finallyBlock = ensure
       ? f.createBlock(e.stmts((ensure.statements as PrismNode) ?? null, false), true)
       : undefined;
