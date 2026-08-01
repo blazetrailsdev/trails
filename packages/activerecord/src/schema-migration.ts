@@ -53,6 +53,18 @@ export class SchemaMigration {
     this.arelTable = new Table(this.tableName);
   }
 
+  /**
+   * @internal The adapter this instance runs against. Rails keeps the
+   * equivalent state as `@pool` and hands it to collaborators that need a
+   * connection of their own — `MigrationContext` builds its `Migrator`s from
+   * `schema_migration`'s pool (`migration.rb:1260-1280`, via
+   * `DatabaseTasks.migration_connection_pool`). trails threads an adapter, so
+   * that is what is exposed here.
+   */
+  get connection(): DatabaseAdapter {
+    return this._adapter;
+  }
+
   get primaryKey(): string {
     return "version";
   }
