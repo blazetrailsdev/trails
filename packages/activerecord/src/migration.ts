@@ -1878,7 +1878,6 @@ export class MigrationContext {
 
   // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#create_virtual_table
   async createVirtualTable(name: string, moduleName: string, args: string[]): Promise<void> {
-    // Non-SQLite adapters inherit AbstractAdapter#createVirtualTable, a no-op.
     await this.connection.createVirtualTable(name, moduleName, args);
   }
 
