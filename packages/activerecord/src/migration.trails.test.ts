@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { MigrationContext, Migrator } from "./index.js";
+import { SchemaContext, Migrator } from "./index.js";
 import type { MigrationProxy } from "./migration.js";
 import { Migration, IllegalMigrationNameError } from "./migration.js";
 import { DefaultStrategy } from "./migration/default-strategy.js";
@@ -96,7 +96,7 @@ describe("MigrationTest", () => {
   });
 
   it("addIndex delegates the un-arrayified expression column to the adapter", async () => {
-    // Regression: MigrationContext#addIndex delegates the DDL to the adapter
+    // Regression: SchemaContext#addIndex delegates the DDL to the adapter
     // without pre-arrayifying an expression column. `indexNameOptions` only
     // reduces an expression column ("lower(email)" → "lower_email") when it sees
     // a bare String — a pre-arrayified `["lower(email)"]` fails its
@@ -114,20 +114,20 @@ describe("MigrationTest", () => {
         ss.indexName(t, o),
       indexNameOptions: (c: string | string[]) => ss.indexNameOptions(c),
     };
-    const ctx = new MigrationContext(stub as unknown as DatabaseAdapter);
+    const ctx = new SchemaContext(stub as unknown as DatabaseAdapter);
     await ctx.addIndex("users", "lower(email)");
     // The adapter (and thus the real DDL) receives the un-arrayified column.
     expect(ddlColumns[0]).toBe("lower(email)");
   });
 
   it("columnExists forwards type and columnOptionsKeys to the adapter", async () => {
-    // Regression: MigrationContext#columnExists is the live adapter-backed
+    // Regression: SchemaContext#columnExists is the live adapter-backed
     // introspection path, so it must expose Rails' full
     // `column_exists?(table, column, type = nil, **options)` surface and forward
     // `type` + the columnOptionsKeys (schema_statements.rb:132-141) rather than
     // matching on name alone. Ride the canonical `people` table
     // (`first_name` string, null: false — schema.rb:933).
-    const ctx = new MigrationContext(Base.connection);
+    const ctx = new SchemaContext(Base.connection);
     expect(await ctx.columnExists("people", "first_name")).toBe(true);
     expect(await ctx.columnExists("people", "first_name", "string")).toBe(true);
     expect(await ctx.columnExists("people", "first_name", "integer")).toBe(false);
@@ -136,7 +136,7 @@ describe("MigrationTest", () => {
   });
 
   it("dropTable delegates to the adapter drop_table, forwarding options", async () => {
-    // Regression: MigrationContext#dropTable routes through `this.connection`
+    // Regression: SchemaContext#dropTable routes through `this.connection`
     // (the adapter's own drop_table) rather than a bare SchemaStatements
     // instance, so the dialect overrides that emit `temporary:`/`force:
     // "cascade"` (e.g. MySQL's `DROP TEMPORARY TABLE ... CASCADE`) are reached.
@@ -147,7 +147,7 @@ describe("MigrationTest", () => {
         calls.push(args);
       },
     };
-    const ctx = new MigrationContext(stub as unknown as DatabaseAdapter);
+    const ctx = new SchemaContext(stub as unknown as DatabaseAdapter);
     await ctx.dropTable("widgets");
     await ctx.dropTable("a", "b", { ifExists: true, force: "cascade", temporary: true });
     expect(calls).toEqual([
@@ -157,11 +157,11 @@ describe("MigrationTest", () => {
   });
 
   it("renameTable delegates to the adapter rename_table, applying prefix/suffix", async () => {
-    // Regression: MigrationContext#renameTable routes through `this.connection`
+    // Regression: SchemaContext#renameTable routes through `this.connection`
     // (the adapter's own rename_table) so the dialect side effects — MySQL's
     // `RENAME TABLE` + rename_table_indexes, PostgreSQL's PK sequence/index
     // rename — are preserved, not the abstract `ALTER TABLE ... RENAME` fallback.
-    // MigrationContext still applies the tableNamePrefix/suffix the adapters do
+    // SchemaContext still applies the tableNamePrefix/suffix the adapters do
     // not.
     const calls: [string, string][] = [];
     const stub = {
@@ -169,7 +169,7 @@ describe("MigrationTest", () => {
         calls.push([from, to]);
       },
     };
-    const ctx = new MigrationContext(stub as unknown as DatabaseAdapter);
+    const ctx = new SchemaContext(stub as unknown as DatabaseAdapter);
     ctx.tableNamePrefix = "pre_";
     ctx.tableNameSuffix = "_suf";
     await ctx.renameTable("old", "new");

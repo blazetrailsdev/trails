@@ -521,7 +521,11 @@ export class ConnectionPool implements ReapablePool {
   }
 
   get migrationsPaths(): string[] {
-    return (this.dbConfig as any).migrationsPaths ?? ["db/migrate"];
+    // `DatabaseConfig#migrationsPaths` answers a bare string for a single-path
+    // config; Rails wraps in `Array(migrations_paths)` before globbing
+    // (migration.rb:1369), and without that a string iterates per character.
+    const paths = (this.dbConfig as any).migrationsPaths ?? ["db/migrate"];
+    return Array.isArray(paths) ? paths : [paths];
   }
 
   get schemaMigration(): SchemaMigration {
@@ -542,7 +546,11 @@ export class ConnectionPool implements ReapablePool {
 
   get migrationContext(): MigrationContext {
     if (!this._migrationContext) {
-      this._migrationContext = new MigrationContext(this._getAdapterProxy());
+      this._migrationContext = new MigrationContext(
+        this.migrationsPaths,
+        this.schemaMigration,
+        this.internalMetadata,
+      );
     }
     return this._migrationContext;
   }

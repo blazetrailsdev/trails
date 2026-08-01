@@ -57,6 +57,19 @@ export class SchemaMigration {
     return "version";
   }
 
+  /**
+   * @internal Rails' `SchemaMigration` holds a connection *pool* and reaches a
+   * connection through `@pool.with_connection` (schema_migration.rb:12-17);
+   * trails hands it an adapter, and the one a pool supplies is the pool's
+   * dispatch proxy, whose members all resolve through `withConnection` and so
+   * answer a Promise even for Rails' synchronous `to_sql`. Awaiting is what
+   * keeps a pool-backed instance from feeding `execute` a Promise — which
+   * `tableExists` swallowed into a silent "no table".
+   */
+  private async _toSql(manager: { toSql?: unknown }): Promise<string> {
+    return await (this._adapter.toSql(manager as never) as string | Promise<string>);
+  }
+
   // Rails: "#{Base.table_name_prefix}#{Base.schema_migrations_table_name}
   // #{Base.table_name_suffix}" (schema_migration.rb:50).
   get tableName(): string {
@@ -86,7 +99,7 @@ export class SchemaMigration {
   async createVersion(version: string): Promise<string> {
     const im = new InsertManager(this.arelTable);
     im.insert([[this.arelTable.get(this.primaryKey), version]]);
-    await this._adapter.execute(this._adapter.toSql(im));
+    await this._adapter.execute(await this._toSql(im));
     return version;
   }
 
@@ -94,7 +107,7 @@ export class SchemaMigration {
     const dm = new DeleteManager();
     dm.from(this.arelTable);
     dm.where(this.arelTable.get(this.primaryKey).eq(version));
-    await this._adapter.execute(this._adapter.toSql(dm));
+    await this._adapter.execute(await this._toSql(dm));
   }
 
   async deleteAllVersions(): Promise<void> {
@@ -108,7 +121,7 @@ export class SchemaMigration {
     const sm = new SelectManager(this.arelTable);
     sm.project(this.arelTable.get(this.primaryKey));
     sm.order(this.arelTable.get(this.primaryKey).asc());
-    const rows = await this._adapter.execute(this._adapter.toSql(sm));
+    const rows = await this._adapter.execute(await this._toSql(sm));
     return rows.map((row) => String(row[this.primaryKey]).trim());
   }
 
@@ -119,7 +132,7 @@ export class SchemaMigration {
   async count(): Promise<number> {
     const sm = new SelectManager(this.arelTable);
     sm.project(new Nodes.NamedFunction("COUNT", [star]).as("cnt"));
-    const rows = await this._adapter.execute(this._adapter.toSql(sm));
+    const rows = await this._adapter.execute(await this._toSql(sm));
     return Number(rows[0]?.cnt ?? 0);
   }
 
@@ -128,7 +141,7 @@ export class SchemaMigration {
       const sm = new SelectManager(this.arelTable);
       sm.project(new Nodes.Quoted(1));
       sm.take(1);
-      await this._adapter.execute(this._adapter.toSql(sm));
+      await this._adapter.execute(await this._toSql(sm));
       return true;
     } catch {
       return false;

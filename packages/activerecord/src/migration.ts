@@ -61,7 +61,7 @@ export {
   type Compatibility,
 } from "./migration/compatibility.js";
 
-import { ActiveRecordError } from "./errors.js";
+import { ActiveRecordError, NoDatabaseError } from "./errors.js";
 import { ActiveRecord } from "./ar-config.js";
 
 // Mirrors Rails AbstractAdapter#extract_new_comment_value (alias of extract_new_default_value).
@@ -1663,25 +1663,29 @@ export abstract class Migration {
 }
 
 /**
- * MigrationContext — wraps an adapter with schema-aware migration methods
+ * SchemaContext — wraps an adapter with schema-aware migration methods
  * and async schema inspection, for use in tests and programmatic migrations.
  *
  * The `columns()`/`indexes()`/`tables()`/`columnExists()`/`tableExists()`/
  * `indexExists()` readers delegate to the connection's real
  * `SchemaStatements` introspection (Rails' `new_column_from_field` et al.)
  * rather than any in-memory declared-schema bookkeeping, so a
- * MigrationContext reflects the live database exactly as the adapter does.
+ * SchemaContext reflects the live database exactly as the adapter does.
  *
- * Mirrors: ActiveRecord::MigrationContext
+ * @noRailsEquivalent CONVERGEABLE (RFC 0059 drop-defineschema-mirror-create-table). Rails has no
+ * adapter-wrapping schema DSL object — `MigrationContext` is a migration-file
+ * runner (`migration.rb:1211`) and the schema DSL lives on the connection.
+ * This class is the `defineSchema(ctx)` receiver RFC 0059 is retiring; it held
+ * the `MigrationContext` name until the real port took it back.
  */
-export class MigrationContext {
+export class SchemaContext {
   private _tableNamePrefix: string | null = null;
   private _tableNameSuffix: string | null = null;
 
   /**
    * Effective table-name prefix. Defaults to `Migration.tableNameOptions().tableNamePrefix`
    * (i.e. the configured `ActiveRecord::Base.table_name_prefix` value) when no explicit
-   * value has been assigned to this context. Mirrors Rails, where `MigrationContext`
+   * value has been assigned to this context. Mirrors Rails, where `SchemaContext`
    * does not carry its own prefix and reads from the active record config at use time.
    */
   get tableNamePrefix(): string {
@@ -1703,29 +1707,12 @@ export class MigrationContext {
 
   constructor(private connection: DatabaseAdapter) {}
 
-  /** Mirrors: ActiveRecord::MigrationContext#schema_migration */
-  get schemaMigration(): SchemaMigration {
-    return new SchemaMigration(this.connection);
-  }
-
-  /** Mirrors: ActiveRecord::MigrationContext#get_all_versions */
-  async getAllVersions(): Promise<number[]> {
-    const schemaMigration = this.schemaMigration;
-    if (await schemaMigration.tableExists()) return schemaMigration.integerVersions();
-    return [];
-  }
-
-  /** Mirrors: ActiveRecord::MigrationContext#migrations */
-  get migrations(): MigrationProxy[] {
-    return Migrator.discoverMigrations(Migrator.migrationsPaths);
-  }
-
   private _schema?: SchemaStatements;
   private _schemaConn?: DatabaseAdapter;
 
   /**
    * The connection's real `SchemaStatements` — the single Rails-faithful source
-   * of DDL/type generation. Mirrors {@link Migration.schema}; MigrationContext
+   * of DDL/type generation. Mirrors {@link Migration.schema}; SchemaContext
    * routes its schema-DSL methods through this instead of hand-rolling SQL so
    * there is one source of truth as in Rails.
    */
@@ -1991,7 +1978,7 @@ export class MigrationContext {
     // Warm the cached database version before issuing the index DDL. PostgreSQL's
     // `supportsIndexInclude` (≥ 11) and `supportsNullsNotDistinct` (≥ 15) *throw*
     // when the version is unset, and the adapter's addIndex reads them to emit
-    // `INCLUDE`/`NULLS NOT DISTINCT`. MigrationContext#addIndex runs on the
+    // `INCLUDE`/`NULLS NOT DISTINCT`. SchemaContext#addIndex runs on the
     // shared-worker schema-reconstruct path on a freshly-leased connection whose
     // version is still cold, so warm it here for every adapter.
     await this.connection.getDatabaseVersion?.();
@@ -2027,7 +2014,7 @@ export class MigrationContext {
     // renames the PK sequence/index after `ALTER TABLE`; SQLite emits
     // `ALTER TABLE ... RENAME TO`. Routing through `this.connection` (not a
     // bare SchemaStatements instance, whose abstract fallback misses those
-    // side effects) is what reaches those overrides. MigrationContext keeps the
+    // side effects) is what reaches those overrides. SchemaContext keeps the
     // prefix/suffix application the adapters do not perform.
     await this.connection.renameTable(fullFrom, fullTo);
   }
@@ -2058,7 +2045,7 @@ export class MigrationContext {
   // — the single Rails-faithful reflection path (`columns` →
   // `new_column_from_field` → `fetch_type_metadata`, so catalog types are
   // normalized through the adapter's type map; `indexes`, `data_source_exists?`
-  // …) — so a MigrationContext reflects the live database rather than any
+  // …) — so a SchemaContext reflects the live database rather than any
   // declared-schema bookkeeping.
 
   async tableExists(name: string): Promise<boolean> {
@@ -2138,6 +2125,79 @@ async function loadMigrationFrom(
     return new (exported as new (name?: string, version?: string) => Migration)(name, version);
   }
   throw new Error(`Migration ${name} must export a Migration class named "${name}"`);
+}
+
+/**
+ * = \Migration \Context
+ *
+ * MigrationContext sets the context in which a migration is run.
+ *
+ * A migration context requires the path to the migrations is set in the
+ * `migrationsPaths` parameter. Optionally a `schemaMigration` object can be
+ * provided. Multiple database applications will instantiate a
+ * `SchemaMigration` object per database.
+ *
+ * Mirrors: ActiveRecord::MigrationContext (migration.rb:1211)
+ */
+export class MigrationContext {
+  readonly migrationsPaths: string[];
+  readonly schemaMigration: SchemaMigration;
+  readonly internalMetadata: InternalMetadata;
+
+  constructor(
+    migrationsPaths: string[],
+    schemaMigration: SchemaMigration,
+    internalMetadata: InternalMetadata,
+  ) {
+    this.migrationsPaths = migrationsPaths;
+    this.schemaMigration = schemaMigration;
+    this.internalMetadata = internalMetadata;
+  }
+
+  /** @internal Mirrors: ActiveRecord::MigrationContext#get_all_versions */
+  async getAllVersions(): Promise<number[]> {
+    if (await this.schemaMigration.tableExists()) {
+      return this.schemaMigration.integerVersions();
+    }
+    return [];
+  }
+
+  /**
+   * @internal Mirrors: ActiveRecord::MigrationContext#current_version
+   * (`migration.rb:1292-1295`), whose bare `rescue NoDatabaseError` returns nil.
+   */
+  async currentVersion(): Promise<number | undefined> {
+    try {
+      const versions = await this.getAllVersions();
+      return versions.length > 0 ? Math.max(...versions) : 0;
+    } catch (error) {
+      if (error instanceof NoDatabaseError) return undefined;
+      throw error;
+    }
+  }
+
+  /** @internal Mirrors: ActiveRecord::MigrationContext#needs_migration? */
+  async needsMigration(): Promise<boolean> {
+    return (await this.pendingMigrationVersions()).length > 0;
+  }
+
+  /** @internal Mirrors: ActiveRecord::MigrationContext#pending_migration_versions */
+  async pendingMigrationVersions(): Promise<number[]> {
+    const applied = new Set(await this.getAllVersions());
+    return this.migrations.map((m) => Number(m.version)).filter((v) => !applied.has(v));
+  }
+
+  /**
+   * @internal Mirrors: ActiveRecord::MigrationContext#migrations
+   * (`migration.rb:1303-1315`). Discovery reads *this context's*
+   * `migrationsPaths`, which Rails keeps as per-instance constructor state
+   * (`attr_reader :migrations_paths`), so two contexts built for two migration
+   * directories do not collide. The file-scan/parse half still lives on
+   * `Migrator`; `move-migration-context-methods-off-migrator` moves it here.
+   */
+  get migrations(): MigrationProxy[] {
+    return Migrator.discoverMigrations(this.migrationsPaths);
+  }
 }
 
 /**
