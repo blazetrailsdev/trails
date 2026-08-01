@@ -272,9 +272,15 @@ function expandIndexOption<T>(opt: Record<string, T> | T, columns: string[]): Re
  * (schema_statements.rb:1356-1370), so a mis-wired pool raises here rather
  * than degrading to a bare `schema_migrations` literal.
  *
- * Versions are strings here where Rails' `Migrator.get_all_versions` and
- * `MigrationProxy#version` hand back integers, so callers comparing against a
- * numeric target coerce them. @internal
+ * Versions are strings here where Rails' `MigrationContext#get_all_versions`
+ * (`migration.rb:1282`) and `#migrations` (`:1303`) hand back integers, so
+ * callers comparing against a numeric target coerce them.
+ *
+ * `migrationContext` describes the Rails surface, not what the pool currently
+ * returns: trails' `MigrationContext` is a schema-DSL class, and carries
+ * `getAllVersions` / `migrations` over on `Migrator` instead.
+ * Story `pool-migration-context-is-not-rails-migration-context` re-layers it.
+ * @internal
  */
 interface SchemaMigrationPool {
   schemaMigration: { tableName: string; versions(): Promise<Array<string | number>> };
