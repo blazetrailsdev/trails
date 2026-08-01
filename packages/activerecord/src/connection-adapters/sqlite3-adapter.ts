@@ -2388,6 +2388,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         // buffer — that is where alter_table's whole point lives, and the buffer's
         // reflection would have lost the pending changes.
         await this.execCopyTable(createTableSql);
+        await this.schemaStatements()._addPendingIndexes(tableName, definition);
         await this.copyTableIndexes(alteredTableName, tableName);
         await this.copyTableContents(alteredTableName, tableName, originalColNames.map(renamed));
         await this.execCopyTable(`DROP TABLE ${quoteTableName(alteredTableName)}`);

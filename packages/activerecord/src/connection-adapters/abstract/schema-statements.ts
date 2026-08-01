@@ -442,24 +442,35 @@ export class SchemaStatements {
       }
     }
 
-    if (!this.adapter.supportsIndexesInCreate?.()) {
-      for (const idx of td.indexes) {
-        await this.addIndex(name, idx.columns, {
-          unique: idx.unique,
-          name: idx.name,
-          where: idx.where,
-          order: expandIndexOption(idx.orders, idx.columns),
-          using: idx.using,
-          type: idx.type,
-          comment: idx.comment,
-          length: expandIndexOption(idx.lengths, idx.columns),
-          opclass: expandIndexOption(idx.opclasses, idx.columns),
-          include: idx.include,
-          nullsNotDistinct: idx.nullsNotDistinct,
-          algorithm: idx.algorithm,
-          ifNotExists: idx.ifNotExists,
-        });
-      }
+    await this._addPendingIndexes(name, td);
+  }
+
+  /**
+   * Rails inlines this loop at the tail of `create_table`
+   * (`abstract/schema_statements.rb:312-313`). It lives in its own method here
+   * so SQLite's `alter_table`, which renders the definition itself instead of
+   * routing the rebuilt table through `create_table`, can emit the same
+   * pending indexes.
+   * @internal
+   */
+  async _addPendingIndexes(name: string, td: TableDefinition): Promise<void> {
+    if (this.adapter.supportsIndexesInCreate?.()) return;
+    for (const idx of td.indexes) {
+      await this.addIndex(name, idx.columns, {
+        unique: idx.unique,
+        name: idx.name,
+        where: idx.where,
+        order: expandIndexOption(idx.orders, idx.columns),
+        using: idx.using,
+        type: idx.type,
+        comment: idx.comment,
+        length: expandIndexOption(idx.lengths, idx.columns),
+        opclass: expandIndexOption(idx.opclasses, idx.columns),
+        include: idx.include,
+        nullsNotDistinct: idx.nullsNotDistinct,
+        algorithm: idx.algorithm,
+        ifNotExists: idx.ifNotExists,
+      });
     }
   }
 
