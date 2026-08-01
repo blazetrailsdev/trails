@@ -9,6 +9,7 @@ import {
   shrunk,
   violations,
 } from "./assertion-ratchet.js";
+import { NO_REGEN_FLAG, REGEN_SKIP_ENV, shouldRegenerate } from "./lint-assertion-mismatches.js";
 
 const mark: AssertionMark = {
   packages: {
@@ -151,5 +152,20 @@ describe("renderExceeded", () => {
     );
     expect(text).toContain("assertion-kind-mismatch: 25 (mark 20, +5)");
     expect(text).toContain("only shrinks");
+  });
+});
+
+describe("shouldRegenerate", () => {
+  it("regenerates the artifact for a plain local run", () => {
+    expect(shouldRegenerate([], {})).toBe(true);
+  });
+
+  it("does not regenerate under CI, which writes the artifact in its own step", () => {
+    expect(shouldRegenerate([], { CI: "true" })).toBe(false);
+  });
+
+  it("does not regenerate under --no-regen or the skip env", () => {
+    expect(shouldRegenerate([NO_REGEN_FLAG], {})).toBe(false);
+    expect(shouldRegenerate([], { [REGEN_SKIP_ENV]: "1" })).toBe(false);
   });
 });

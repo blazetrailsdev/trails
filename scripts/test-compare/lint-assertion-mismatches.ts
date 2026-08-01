@@ -87,13 +87,18 @@ async function loadArtifact(): Promise<ComparisonArtifact> {
   return JSON.parse(text) as ComparisonArtifact;
 }
 
+/**
+ * Gate (or, under `write`, reseed) the mark against the artifact on disk.
+ * Returns the exit code.
+ *
+ * A marked package missing from the artifact means a partial-scope run, and
+ * reseeding from one would drop that package's mark entirely — so both arms
+ * bail on it before either touches the file.
+ */
 export async function main(write: boolean): Promise<number> {
   const current = countsFromArtifact(await loadArtifact());
   const mark = await loadMark(MARK_PATH);
 
-  // A marked package that vanished means the artifact was written by a
-  // partial-scope run; reseeding from it would drop that package's mark
-  // entirely. Fail before either arm touches the file.
   const missing = missingFromArtifact(current, mark);
   if (missing.length > 0) {
     console.error(renderMissing(missing, MARK_REL));

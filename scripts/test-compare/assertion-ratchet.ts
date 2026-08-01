@@ -104,14 +104,17 @@ export function parseMark(text: string): AssertionMark {
   return { packages: out };
 }
 
+/**
+ * Read the committed mark. A missing file is reported as the disarmed ratchet
+ * it is — deleting it is how the gate would be silently switched off — rather
+ * than as a bare ENOENT.
+ */
 export async function loadMark(file: string): Promise<AssertionMark> {
   let text: string;
   try {
     text = await fs.readFile(file, "utf-8");
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
-    // Deleting the mark is how this ratchet would be silently disarmed, so name
-    // it rather than surfacing a bare ENOENT.
     throw new Error(
       `assertion high-water mark: ${file} is missing. It is a committed ratchet file; ` +
         "restore it from git rather than regenerating, or the mark is lost.",
