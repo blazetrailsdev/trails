@@ -1,9 +1,8 @@
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
 import { rubyFileToTs, methodName } from "./naming.js";
-import { TARGET_FILES, rubyAbsPath } from "./files.js";
+import { TARGET_FILES, TRAILS_AR_SRC, portTreeFiles, rubyAbsPath, type PortFile } from "./files.js";
 import { resolvePath } from "../../vendor/sources.js";
-const TRAILS_AR_SRC = "packages/activerecord/src";
 const AR_ROOT = resolvePath("activerecord");
 const AR_LIB = path.dirname(AR_ROOT);
 const RUBY_DEF = /^\s*def\s+(?:self\.)?([A-Za-z_][\w]*[?!=]?)/gm;
@@ -60,7 +59,7 @@ function readFileOr(tsPath: string): string {
 export interface AsyncManifest {
   byName: Map<string, Set<string>>;
 }
-export function buildAsyncManifest(files: { path: string; source: string }[]): AsyncManifest {
+export function buildAsyncManifest(files: PortFile[]): AsyncManifest {
   const byName = new Map<string, Set<string>>();
   for (const { path: file, source } of files) {
     for (const name of extractAsyncNames(source)) {
@@ -82,10 +81,9 @@ export function crossFileAsyncNames(
   opts: { twinTsPath: string; railsDefs: ReadonlySet<string> },
 ): Set<string> {
   const names = new Set<string>();
-  for (const [name, files] of manifest.byName) {
-    if (files.size !== 1) continue;
-    if (files.has(opts.twinTsPath)) continue;
-    if (!opts.railsDefs.has(name)) continue;
+  for (const name of opts.railsDefs) {
+    const files = manifest.byName.get(name);
+    if (!files || files.size !== 1 || files.has(opts.twinTsPath)) continue;
     names.add(name);
   }
   return names;
@@ -104,25 +102,6 @@ export function resolveAsyncNames(opts: {
   }
   for (const n of opts.crossFile ?? []) names.add(n);
   return names;
-}
-function portTreeFiles(): { path: string; source: string }[] {
-  const out: { path: string; source: string }[] = [];
-  const walk = (dir: string) => {
-    for (const entry of readdirSync(dir)) {
-      const full = path.join(dir, entry);
-      if (statSync(full).isDirectory()) {
-        if (entry === "test-helpers" || entry === "support") continue;
-        walk(full);
-      } else if (entry.endsWith(".ts") && !entry.endsWith(".test.ts")) {
-        out.push({
-          path: path.relative(TRAILS_AR_SRC, full),
-          source: readFileSync(full, "utf8"),
-        });
-      }
-    }
-  };
-  walk(TRAILS_AR_SRC);
-  return out;
 }
 let manifestCache: AsyncManifest | undefined;
 export function defaultAsyncManifest(): AsyncManifest {
