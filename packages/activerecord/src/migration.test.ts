@@ -1030,9 +1030,9 @@ describe("MigrationTest", () => {
     await adapter.dropTable("wtx_test", { ifExists: true });
   });
 
-  it("migration that fails to load is canceled with the later-migrations message", async () => {
+  it("migration that fails to load escapes the canceled message", async () => {
     const adapter = await freshAdapter();
-    const loadError = new Error("Unexpected token '}'");
+    const loadError = new Error("uninitialized constant MigThatFailsToLoad");
     const proxy: MigrationProxy = {
       version: "102",
       name: "MigThatFailsToLoad",
@@ -1045,12 +1045,12 @@ describe("MigrationTest", () => {
     } catch (e) {
       err = e as Error;
     }
-    expect(err).toBeInstanceOf(Error);
-    const useTx = adapter.supportsDdlTransactions?.() ?? false;
-    expect(err.message).toBe(
-      `An error has occurred, ${useTx ? "this and " : ""}all later migrations canceled:\n\nUnexpected token '}'`,
-    );
-    expect(err.cause).toBe(loadError);
+    // Rails' rescue calls use_transaction? -> MigrationProxy#disable_ddl_transaction,
+    // which re-runs the failed load and raises out of the rescue itself, so the
+    // "all later migrations canceled" wrapper never gets built.
+    expect(err).toBe(loadError);
+    const versions = await migrator.getAllVersions();
+    expect(versions).not.toContain("102");
   });
 
   it("internal metadata table name", async () => {

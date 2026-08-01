@@ -2953,9 +2953,10 @@ export class Migrator {
       });
     } catch (e) {
       // Mirrors: ActiveRecord::Migrator#execute_migration_in_transaction rescue block
-      const useTx = migration
-        ? this._useTransaction(migration)
-        : (this._adapter.supportsDdlTransactions?.() ?? false);
+      // Rails re-resolves the proxy here (`migration.rb:1540` → `use_transaction?`
+      // → `MigrationProxy#disable_ddl_transaction`), so a migration that failed to
+      // load raises again from inside the rescue and escapes unwrapped.
+      const useTx = this._useTransaction(migration ?? (await proxy.migration()));
       // Ruby's `#{e}` interpolates Exception#to_s — the bare message, without
       // the `Error: ` prefix JS String(e) would add.
       const msg = `An error has occurred, ${useTx ? "this and " : ""}all later migrations canceled:\n\n${e instanceof Error ? e.message : e}`;
