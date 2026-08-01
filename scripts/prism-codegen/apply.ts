@@ -1,5 +1,11 @@
 import ts from "typescript";
-import { indexPortFile, nameCandidates, type GlobalPortIndex } from "./score.js";
+import {
+  crossFileHits,
+  indexPortFile,
+  resolvePortFn,
+  type GlobalPortIndex,
+  type PortIndex,
+} from "./score.js";
 
 /**
  * The draft marker. It is deliberately loud and greppable: a scaffolded body is
@@ -17,13 +23,21 @@ export interface ApplyRequest {
   portFile: string;
   methodName: string;
   globalIndex?: GlobalPortIndex;
+  /** `__PRISM_TODO` passthrough count for this def, from the generator's `perDef` tally. */
+  passthrough?: number;
 }
 
 export type ApplyPlan =
   | { status: "applied"; source: string; insertedAfter?: string; insertedBefore?: string }
   | { status: "refused"; reason: string };
 
-function generatedFunctions(generatedCode: string): { name: string; text: string }[] {
+interface GeneratedDef {
+  name: string;
+  text: string;
+  fn: ts.FunctionLikeDeclaration;
+}
+
+function generatedFunctions(generatedCode: string): GeneratedDef[] {
   const sf = ts.createSourceFile(
     "gen.js",
     generatedCode,
@@ -31,7 +45,7 @@ function generatedFunctions(generatedCode: string): { name: string; text: string
     true,
     ts.ScriptKind.JS,
   );
-  const out: { name: string; text: string }[] = [];
+  const out: GeneratedDef[] = [];
   const visit = (node: ts.Node) => {
     if (
       (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) &&
@@ -39,7 +53,7 @@ function generatedFunctions(generatedCode: string): { name: string; text: string
       ts.isIdentifier(node.name) &&
       node.body
     ) {
-      out.push({ name: node.name.text, text: node.getText(sf).trim() });
+      out.push({ name: node.name.text, text: node.getText(sf).trim(), fn: node });
     }
     ts.forEachChild(node, visit);
   };
@@ -58,29 +72,9 @@ function topLevelStatement(fn: ts.Node): ts.Node {
   return node;
 }
 
-function findLocal(
-  port: ReturnType<typeof indexPortFile>,
-  name: string,
-): ts.FunctionLikeDeclaration | undefined {
-  for (const candidate of nameCandidates(name)) {
-    const found = port.byName.get(candidate);
-    if (found) return found;
-  }
-  return undefined;
-}
-
-function elsewhereHit(
-  globalIndex: GlobalPortIndex | undefined,
-  portFile: string,
-  name: string,
-): string | undefined {
-  if (!globalIndex) return undefined;
-  for (const candidate of nameCandidates(name)) {
-    for (const hit of globalIndex.byName.get(candidate) ?? []) {
-      if (hit.file !== portFile) return hit.file;
-    }
-  }
-  return undefined;
+function localHit(port: PortIndex, def: GeneratedDef): ts.FunctionLikeDeclaration | undefined {
+  const resolved = resolvePortFn(def.name, def.fn, port);
+  return resolved?.fn;
 }
 
 /**
@@ -101,39 +95,53 @@ export function planApply(req: ApplyRequest): ApplyPlan {
     };
   }
 
+  if (req.passthrough) {
+    return {
+      status: "refused",
+      reason:
+        `${req.methodName} generated with ${req.passthrough} passthrough node(s) — the ` +
+        `draft would be riddled with __PRISM_TODO. Port it by hand.`,
+    };
+  }
+
   const port = indexPortFile(req.portSource);
-  if (findLocal(port, req.methodName)) {
+  const target = generated[targetIndex];
+  if (resolvePortFn(target.name, target.fn, port)) {
     return {
       status: "refused",
       reason: `${req.methodName} is already defined in ${req.portFile}.`,
     };
   }
-  const elsewhere = elsewhereHit(req.globalIndex, req.portFile, req.methodName);
-  if (elsewhere) {
+  const elsewhere = req.globalIndex
+    ? [
+        ...new Set(crossFileHits(target.name, target.fn, req.globalIndex).map((h) => h.file)),
+      ].filter((file) => file !== req.portFile)
+    : [];
+  if (elsewhere.length) {
     return {
       status: "refused",
       reason:
-        `${req.methodName} is already ported in ${elsewhere} — scaffolding it into ` +
-        `${req.portFile} would duplicate it.`,
+        `${req.methodName} is already ported in ${elsewhere.join(", ")} — scaffolding it ` +
+        `into ${req.portFile} would duplicate it.`,
     };
   }
 
   const anchorBefore = (() => {
     for (let i = targetIndex - 1; i >= 0; i--) {
-      const fn = findLocal(port, generated[i].name);
+      const fn = localHit(port, generated[i]);
       if (fn) return { name: generated[i].name, fn };
     }
     return undefined;
   })();
   const anchorAfter = (() => {
     for (let i = targetIndex + 1; i < generated.length; i++) {
-      const fn = findLocal(port, generated[i].name);
+      const fn = localHit(port, generated[i]);
       if (fn) return { name: generated[i].name, fn };
     }
     return undefined;
   })();
 
-  const block = `${APPLY_MARKER}\n${generated[targetIndex].text}`;
+  const block = `${APPLY_MARKER}\n${target.text}`;
   if (anchorBefore) {
     const at = topLevelStatement(anchorBefore.fn).getEnd();
     const source = `${req.portSource.slice(0, at)}\n\n${block}${req.portSource.slice(at)}`;

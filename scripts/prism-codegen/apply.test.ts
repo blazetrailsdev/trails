@@ -91,6 +91,42 @@ describe("prism-codegen apply", () => {
     });
   });
 
+  it("scaffolds past a fallback candidate whose arity disagrees", () => {
+    const result = planApply({
+      generatedCode: "function isReadonly() {\n  return true;\n}",
+      portSource: "export function readonly(value) {}\n",
+      portFile: "core.ts",
+      methodName: "isReadonly",
+    });
+    expect(result.status).toBe("applied");
+  });
+
+  it("refuses on an ambiguous cross-file name rather than scaffolding a duplicate", () => {
+    const result = plan("export function first() {}\n", "second", [
+      { path: "persistence.ts", source: "export function first() {}\n" },
+      { path: "relation/calculations.ts", source: "export function second() {}\n" },
+      { path: "relation/finder_methods.ts", source: "export function second() {}\n" },
+    ]);
+    expect(result.status).toBe("refused");
+    if (result.status !== "refused") return;
+    expect(result.reason).toContain(
+      "already ported in relation/calculations.ts, relation/finder_methods.ts",
+    );
+  });
+
+  it("refuses a def the generator could not translate cleanly", () => {
+    const result = planApply({
+      generatedCode: generated,
+      portSource: "export function first() {}\n",
+      portFile: "persistence.ts",
+      methodName: "second",
+      passthrough: 3,
+    });
+    expect(result.status).toBe("refused");
+    if (result.status !== "refused") return;
+    expect(result.reason).toContain("3 passthrough node(s)");
+  });
+
   it("refuses a method the generator does not emit", () => {
     const result = plan("export function first() {}\n", "fourth");
     expect(result.status).toBe("refused");

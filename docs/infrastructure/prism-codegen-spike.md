@@ -470,10 +470,14 @@ step:
 - It never stages, commits, or formats anything, and it must **never** be wired
   into an autofix step, a lint-staged entry, or a git hook. Nothing in CI runs
   it.
-- It refuses rather than duplicating: if the method already exists in the twin
-  file, or if the global port index resolves it in any other file, the command
-  exits non-zero with the resolving file named. This is what the cross-file
-  resolver in the scorer buys us.
+- It refuses rather than duplicating, reusing the scorer's own `resolvePortFn`
+  so the two agree on what "already ported" means — including the arity guard on
+  the `isX` → `x` fallback candidate. If the method resolves in the twin file, or
+  if the global index has any cross-file hit under those same candidate rules,
+  the command exits non-zero naming the file(s). Note the deliberate asymmetry
+  with the scorer: an _ambiguous_ cross-file name (several files, so the scorer
+  leaves the row `missing`) still refuses here, because scaffolding on top of a
+  collision is how a duplicate gets written.
 - It refuses defs the generator could not translate cleanly (any
   `__PRISM_TODO` passthrough) — those are hand-port work.
 

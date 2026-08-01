@@ -21,7 +21,7 @@ export interface GlobalPortIndex {
   byName: Map<string, { fn: ts.FunctionLikeDeclaration; file: string }[]>;
 }
 
-interface PortIndex {
+export interface PortIndex {
   byName: Map<string, ts.FunctionLikeDeclaration>;
 }
 
@@ -313,7 +313,33 @@ export function scoreFile(
   };
 }
 
-function resolvePortFn(
+/**
+ * Every cross-file port symbol a generated def could plausibly be, under the same
+ * name-candidate and arity rules as {@link resolvePortFn}. `resolvePortFn` only
+ * *resolves* an unambiguous hit; `codegen:apply` also needs the ambiguous ones,
+ * so it can refuse instead of scaffolding a probable duplicate.
+ */
+export function crossFileHits(
+  name: string,
+  genFn: ts.FunctionLikeDeclaration,
+  globalIndex: GlobalPortIndex,
+): { fn: ts.FunctionLikeDeclaration; file: string }[] {
+  const out: { fn: ts.FunctionLikeDeclaration; file: string }[] = [];
+  const candidates = nameCandidates(name);
+  for (let i = 0; i < candidates.length; i++) {
+    for (const hit of globalIndex.byName.get(candidates[i]) ?? []) {
+      if (i === 0 || paramCount(hit.fn) === paramCount(genFn)) out.push(hit);
+    }
+  }
+  return out;
+}
+
+/**
+ * The single resolution rule shared by the scorer and `codegen:apply`: a
+ * primary-name hit in the twin file wins, then an arity-agreeing fallback
+ * candidate, then an unambiguous cross-file hit.
+ */
+export function resolvePortFn(
   name: string,
   genFn: ts.FunctionLikeDeclaration,
   port: PortIndex,

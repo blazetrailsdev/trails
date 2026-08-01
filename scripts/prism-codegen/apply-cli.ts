@@ -59,22 +59,13 @@ async function main() {
     await fs.readFile(rubyAbsPath(target), "utf8"),
     asyncMethodsForRailsFile(target.ruby),
   );
-  const def = perDef.get(methodName);
-  if (def && def.passthrough > 0) {
-    console.error(
-      `${methodName} generated with ${def.passthrough} passthrough node(s) — the draft ` +
-        `would be riddled with __PRISM_TODO. Port it by hand.`,
-    );
-    process.exitCode = 1;
-    return;
-  }
-
   const plan = planApply({
     generatedCode: code,
     portSource,
     portFile: tsFile,
     methodName,
     globalIndex: indexPortTree(portTreeFiles()),
+    passthrough: perDef.get(methodName)?.passthrough,
   });
   if (plan.status === "refused") {
     console.error(`refused: ${plan.reason}`);
