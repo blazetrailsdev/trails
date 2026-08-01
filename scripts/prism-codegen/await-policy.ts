@@ -68,12 +68,22 @@ export function clearAsyncProvenance(
   }
 }
 
+export interface AsyncArm<T = unknown> {
+  value: T;
+  after: Set<string>;
+  terminal: boolean;
+}
+
 /**
  * Emit one arm of a branching construct against a private copy of the binding
  * set, and hand back both the emitted value and the bindings the arm ended
  * with. The caller's set is left exactly as it was, so sibling arms all start
  * from the same state and nothing an arm did escapes until
  * {@link mergeAsyncArms} decides what survives.
+ *
+ * `body` is the arm's Ruby body, used to decide whether the arm can fall
+ * through into the code after the construct. Omit it for an arm that always
+ * can — a loop body reaches past the loop even when it ends in `break`.
  */
 export function scopeAsyncArm<T>(
   bindings: Set<string>,
@@ -85,13 +95,7 @@ export function scopeAsyncArm<T>(
   const after = new Set(bindings);
   bindings.clear();
   for (const key of before) bindings.add(key);
-  return { value, after, terminal: body !== undefined && !fallsThrough(body) };
-}
-
-export interface AsyncArm<T = unknown> {
-  value: T;
-  after: Set<string>;
-  terminal: boolean;
+  return { value, after, terminal: !fallsThrough(body) };
 }
 
 /**

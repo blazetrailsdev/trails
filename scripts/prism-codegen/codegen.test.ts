@@ -381,6 +381,34 @@ describe("prism-codegen", () => {
     );
     expect(code).toContain("await this.relation.load()");
   });
+  it("keeps provenance across a guard clause that returns", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all(flag, arg)
+          @relation = build_relation()
+          return nil if flag
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).toContain("await this.relation.load()");
+  });
+  it("awards no await from provenance established only in an arm that returns", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all(flag)
+          if flag
+            @relation = build_relation()
+            return nil
+          end
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).not.toContain("await this.relation.load()");
+  });
   it("leaves bindings untouched when every arm of a branch returns", async () => {
     const { code } = await generateFromSource(
       `module M
