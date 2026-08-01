@@ -68,6 +68,17 @@ describe("prism-codegen deviation catalog", () => {
     ).toBeUndefined();
   });
 
+  it("catalogs a skipped predicate under every TS spelling the port could have used", () => {
+    // `methodName` takes only the FIRST candidate; a port that chose the bare
+    // spelling would otherwise read as an uncatalogued residue row.
+    const catalog = buildCatalog([entry({ rubyName: "exists?", call: "find_by" })], "activerecord");
+    for (const name of ["isExists", "exists"]) {
+      expect(catalogueDivergent(catalog, "persistence.ts", name, "ref:findBy", "")).toContain(
+        "RFC 0044",
+      );
+    }
+  });
+
   it("drops exclude entries belonging to another package", () => {
     // `<tsFile> <rubyName>` is not unique across packages, so an unfiltered
     // catalog would let actionpack's reviewed call excuse an activerecord row.

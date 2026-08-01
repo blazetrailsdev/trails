@@ -21,7 +21,12 @@
  * caller loads the JSON), async fs only.
  */
 
-import { SKIP_GROUPS, SCOPED_SKIP_GROUPS, isScopedSkip } from "../api-compare/conventions.js";
+import {
+  SKIP_GROUPS,
+  SCOPED_SKIP_GROUPS,
+  isScopedSkip,
+  rubyMethodToTsIgnoringSkip,
+} from "../api-compare/conventions.js";
 import { methodName } from "./naming.js";
 import { normalizeName } from "./score.js";
 
@@ -35,9 +40,9 @@ export interface ExcludeEntry {
 }
 
 export interface Catalog {
-  /** Ruby methods with no expected TS surface, keyed by their TS name. */
+  /** Ruby methods with no expected TS surface, keyed by every TS name candidate. */
   skips: Map<string, string>;
-  /** Scoped skips: TS name → the Ruby names (with reason) skipped per file. */
+  /** Scoped skips: TS name candidate → the Ruby names (with reason) skipped per file. */
   scopedSkips: Map<string, { rubyName: string; reason: string }[]>;
   /** `<tsFile> <tsName>` → skeleton call token → reason. */
   excludedCalls: Map<string, Map<string, string>>;
@@ -53,6 +58,23 @@ function excludeKey(tsFile: string, tsName: string): string {
 }
 
 /**
+ * Every TS spelling a Ruby name may have been ported under. `...IgnoringSkip` is
+ * the right entry point precisely because half the catalog IS the SKIP list —
+ * `rubyMethodToTs` returns null for a skipped name (conventions.ts:638-641),
+ * which would collapse every skip back to the single fallback spelling.
+ *
+ * The generator picks
+ * `methodName`'s first candidate, but the port is free to have chosen a later
+ * one (`exists?` → `isExists` | `exists`), so a catalog keyed only on the first
+ * would silently miss the row it was written to explain. Keying on all of them
+ * is safe here: a catalog hit still has to match the scored def's own name.
+ */
+function tsNameCandidates(rubyName: string): string[] {
+  const candidates = rubyMethodToTsIgnoringSkip(rubyName) ?? [];
+  return [...new Set([methodName(rubyName), ...candidates])];
+}
+
+/**
  * @param excludes merged `call-mismatches` exclude entries, from every package.
  * @param pkg the package being scored. Exclude entries from other packages are
  *   dropped rather than keyed in: a relative `tsFile` is not unique across
@@ -64,27 +86,32 @@ export function buildCatalog(excludes: readonly ExcludeEntry[], pkg: string): Ca
   const skips = new Map<string, string>();
   for (const group of SKIP_GROUPS) {
     for (const rubyName of group.names) {
-      skips.set(methodName(rubyName), `api-compare SKIP (${rubyName}): ${group.reason}`);
+      for (const ts of tsNameCandidates(rubyName)) {
+        skips.set(ts, `api-compare SKIP (${rubyName}): ${group.reason}`);
+      }
     }
   }
 
   const scopedSkips = new Map<string, { rubyName: string; reason: string }[]>();
   for (const group of SCOPED_SKIP_GROUPS) {
     for (const rubyName of group.names) {
-      const ts = methodName(rubyName);
-      const list = scopedSkips.get(ts) ?? [];
-      list.push({ rubyName, reason: `api-compare SCOPED_SKIP (${rubyName}): ${group.reason}` });
-      scopedSkips.set(ts, list);
+      for (const ts of tsNameCandidates(rubyName)) {
+        const list = scopedSkips.get(ts) ?? [];
+        list.push({ rubyName, reason: `api-compare SCOPED_SKIP (${rubyName}): ${group.reason}` });
+        scopedSkips.set(ts, list);
+      }
     }
   }
 
   const excludedCalls = new Map<string, Map<string, string>>();
   for (const entry of excludes) {
     if (entry.package !== pkg) continue;
-    const key = excludeKey(entry.tsFile, methodName(entry.rubyName));
-    const calls = excludedCalls.get(key) ?? new Map<string, string>();
-    calls.set(callToken(entry.call), `${entry.call}: ${entry.reason}`);
-    excludedCalls.set(key, calls);
+    for (const ts of tsNameCandidates(entry.rubyName)) {
+      const key = excludeKey(entry.tsFile, ts);
+      const calls = excludedCalls.get(key) ?? new Map<string, string>();
+      calls.set(callToken(entry.call), `${entry.call}: ${entry.reason}`);
+      excludedCalls.set(key, calls);
+    }
   }
 
   return { skips, scopedSkips, excludedCalls };
