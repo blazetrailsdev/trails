@@ -270,7 +270,11 @@ function expandIndexOption<T>(opt: Record<string, T> | T, columns: string[]): Re
  * The pool surface the schema_migrations statements reach for. Rails calls
  * `pool.schema_migration` / `pool.migration_context` unguarded
  * (schema_statements.rb:1356-1370), so a mis-wired pool raises here rather
- * than degrading to a bare `schema_migrations` literal. @internal
+ * than degrading to a bare `schema_migrations` literal.
+ *
+ * Versions are strings here where Rails' `Migrator.get_all_versions` and
+ * `MigrationProxy#version` hand back integers, so callers comparing against a
+ * numeric target coerce them. @internal
  */
 interface SchemaMigrationPool {
   schemaMigration: { tableName: string; versions(): Promise<Array<string | number>> };
@@ -1874,8 +1878,6 @@ export class SchemaStatements {
     const smTable = this._qt(pool.schemaMigration.tableName);
 
     const migrationContext = pool.migrationContext;
-    // Rails' Migrator.get_all_versions yields integers; our MigrationContext
-    // yields the raw string versions, so coerce before comparing to `verNum`.
     const migrated = (await migrationContext.getAllVersions()).map(Number);
     const allVersions = migrationContext.migrations.map((m) => Number(m.version));
 
