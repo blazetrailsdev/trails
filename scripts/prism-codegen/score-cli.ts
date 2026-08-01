@@ -1,13 +1,31 @@
+import * as fs from "fs/promises";
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import { generateFromSource } from "./index.js";
 import { asyncMethodsForRailsFile } from "./async-source.js";
 import { TOPLEVEL } from "./codegen.js";
 import { TARGET_FILES, rubyAbsPath } from "./files.js";
 import { rubyFileToTs } from "./naming.js";
 import { scoreFile, indexPortTree, type ScoreEntry } from "./score.js";
+import {
+  buildCatalog,
+  catalogueDivergent,
+  catalogueMissing,
+  type ExcludeEntry,
+} from "./catalog.js";
+import {
+  diffBaseline,
+  guardFailureMessage,
+  parseBaseline,
+  serializeBaseline,
+  type ResidueRow,
+} from "./guard.js";
 
 const TRAILS_AR_SRC = "packages/activerecord/src";
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const API_COMPARE = path.join(HERE, "..", "api-compare");
+const BASELINE_PATH = path.join(HERE, "convergence-baseline.json");
 
 function portTreeFiles(): { path: string; source: string }[] {
   const out: { path: string; source: string }[] = [];
@@ -26,15 +44,59 @@ function portTreeFiles(): { path: string; source: string }[] {
   return out;
 }
 
+async function listJsonFiles(dir: string): Promise<string[]> {
+  const out: string[] = [];
+  let dirents;
+  try {
+    dirents = await fs.readdir(dir, { withFileTypes: true });
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return out;
+    throw e;
+  }
+  for (const d of dirents) {
+    const full = path.join(dir, d.name);
+    if (d.isDirectory()) out.push(...(await listJsonFiles(full)));
+    else if (d.name.endsWith(".json")) out.push(full);
+  }
+  return out;
+}
+
+// The deviation catalog's call half: the flat exclude list plus every file of
+// the split wide exclude tree. Both share the entry shape, so the scorer sees
+// one merged list.
+async function loadExcludes(): Promise<ExcludeEntry[]> {
+  const files = [
+    path.join(API_COMPARE, "call-mismatches-exclude.json"),
+    ...(await listJsonFiles(path.join(API_COMPARE, "call-mismatches-wide-exclude"))),
+  ];
+  const out: ExcludeEntry[] = [];
+  for (const file of files) {
+    let source;
+    try {
+      source = await fs.readFile(file, "utf8");
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === "ENOENT") continue;
+      throw e;
+    }
+    out.push(...(JSON.parse(source) as ExcludeEntry[]));
+  }
+  return out;
+}
+
 async function main() {
   const verbose = process.argv.includes("--verbose");
+  const write = process.argv.includes("--write");
+  const guard = process.argv.includes("--guard") || write;
   const globalIndex = indexPortTree(portTreeFiles());
+  const catalog = buildCatalog(await loadExcludes(), "activerecord");
   let totMatched = 0;
   let totReordered = 0;
   let totDivergent = 0;
   let totMissing = 0;
   let totElsewhere = 0;
+  const catalogued: { row: ResidueRow; reason: string }[] = [];
   const divergentRows: { file: string; entry: ScoreEntry }[] = [];
+  const residue: ResidueRow[] = [];
 
   console.log(`\nConformance: generated (clean defs only) vs hand-written port\n`);
   console.log(
@@ -44,7 +106,8 @@ async function main() {
 
   for (const f of TARGET_FILES) {
     const short = f.ruby.replace(/^active_record\//, "");
-    const portPath = path.join(TRAILS_AR_SRC, rubyFileToTs(short));
+    const tsFile = rubyFileToTs(short);
+    const portPath = path.join(TRAILS_AR_SRC, tsFile);
     if (!existsSync(portPath)) {
       console.log(`  ${short.padEnd(34)} (no port file: ${portPath})`);
       continue;
@@ -64,6 +127,20 @@ async function main() {
     for (const entry of score.entries) {
       if (entry.portFile) totElsewhere++;
       if (entry.status === "divergent") divergentRows.push({ file: short, entry });
+      if (entry.status !== "divergent" && entry.status !== "missing") continue;
+      const reason =
+        entry.status === "missing"
+          ? catalogueMissing(catalog, entry.name, f.ruby)
+          : catalogueDivergent(
+              catalog,
+              tsFile,
+              entry.name,
+              entry.generatedSkeleton ?? "",
+              entry.portSkeleton ?? "",
+            );
+      const row: ResidueRow = { rubyFile: f.ruby, name: entry.name, status: entry.status };
+      if (reason) catalogued.push({ row, reason });
+      else residue.push(row);
     }
     console.log(
       `  ${short.padEnd(34)} ${String(score.matched).padStart(7)} ${String(score.reordered).padStart(9)} ` +
@@ -86,6 +163,19 @@ async function main() {
       `\n  method ported into a different file, or a naming path the resolver doesn't` +
       `\n  chase yet. Divergent bodies are the convergence-guard review queue.`,
   );
+  console.log(
+    `\n  Deviation catalog: ${catalogued.length} of ${totDivergent + totMissing} divergent+missing ` +
+      `rows are catalogued\n  (api-compare SKIP / SCOPED_SKIP, call-mismatches excludes); ` +
+      `${residue.length} rows are residue.`,
+  );
+
+  if (verbose && catalogued.length) {
+    console.log(`\n  Catalogued rows (subtracted from the guarded residue):`);
+    for (const { row, reason } of catalogued) {
+      console.log(`\n  ${row.rubyFile} :: ${row.name} (${row.status})`);
+      console.log(`    ${reason}`);
+    }
+  }
   if (verbose && divergentRows.length) {
     console.log(`\n  Divergent defs (generated vs port skeleton):`);
     for (const { file, entry } of divergentRows) {
@@ -99,6 +189,25 @@ async function main() {
     );
   }
   console.log();
+
+  if (!guard) return;
+  if (write) {
+    await fs.writeFile(BASELINE_PATH, serializeBaseline(residue), "utf8");
+    console.log(`  wrote ${residue.length} residue rows to ${path.relative(".", BASELINE_PATH)}\n`);
+    return;
+  }
+  const baseline = parseBaseline(await fs.readFile(BASELINE_PATH, "utf8"));
+  const diff = diffBaseline(residue, baseline);
+  const failure = guardFailureMessage(diff);
+  if (failure) {
+    console.error(failure);
+    process.exitCode = 1;
+    return;
+  }
+  console.log(
+    `  convergence guard: OK — ${residue.length} residue rows, ` +
+      `${diff.removed.length} baseline row(s) converged.\n`,
+  );
 }
 
 main().catch((err) => {

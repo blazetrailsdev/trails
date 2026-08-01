@@ -239,7 +239,7 @@ jobs:
           # explicitly: all are carved out of the infra sweep
           # (INFRA_CARVEOUT_RE), so this clause is the only thing that still
           # runs rails-comparison on a change confined to them.
-          COMPARISON_RE='^(packages/|scripts/((api|test|fixtures|schema)-compare/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|deprecated-manifest-diff)\.ts$)|vendor/|docs/ruby-ts-conventions\.md$|eslint/rails-deprecated-methods\.json$)'
+          COMPARISON_RE='^(packages/|scripts/((api|test|fixtures|schema)-compare/|prism-codegen/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|deprecated-manifest-diff)\.ts$)|vendor/|docs/ruby-ts-conventions\.md$|eslint/rails-deprecated-methods\.json$)'
           force_all_affected() {
             echo "activerecord_affected=true" >> "$GITHUB_OUTPUT"
             echo "db_adapter_affected=true"   >> "$GITHUB_OUTPUT"
@@ -1458,6 +1458,17 @@ jobs:
         run: pnpm vitest run scripts/schema-compare
       - name: Dependency lint
         run: pnpm exec tsx scripts/api-compare/lint-deps.ts
+      - name: Codegen convergence guard
+        # RFC 0086: `codegen:score --guard` regenerates each target Rails file
+        # with scripts/prism-codegen, scores the clean generated defs against
+        # the port, subtracts the deviation catalog (api-compare SKIP /
+        # SCOPED_SKIP + the call-mismatches exclude lists), and ratchets the
+        # uncatalogued residue against scripts/prism-codegen/convergence-baseline.json.
+        # Runs here rather than in unit-tests because it needs the vendored Ruby
+        # fetched above; the pure logic (catalog.ts / guard.ts) is unit-tested in
+        # the unit-tests job. A row that leaves the residue is accepted silently
+        # — re-seed the shrunken baseline with `pnpm codegen:score --guard --write`.
+        run: pnpm exec tsx scripts/prism-codegen/score-cli.ts --guard
       - name: Rails-private JSDoc lint
         # Needs rails-api.json (extracted above) to enforce
         # blazetrails/rails-private-jsdoc. The standalone Lint job has no Ruby

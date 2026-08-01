@@ -350,6 +350,48 @@ the diff independently re-derives entries the deviation catalog already records,
 which is why item 7 proposes formalizing it as a guard rather than trusting the
 manual pass.
 
+## Convergence guard (`pnpm codegen:score --guard`)
+
+Roadmap item 7, shipped. The scorer's raw `divergent` + `missing` sets are too
+big to review (292 + 79 on the current corpus), so the guard subtracts the
+**deviation catalog** and ratchets only what is left:
+
+- A `missing` def is expected when its Ruby name is on api-compare's `SKIP`, or
+  on `SCOPED_SKIP` for the Rails file it was generated from.
+- A `divergent` def is expected when **every** token that differs between the
+  generated and port skeletons is a Ruby call that `call-mismatches-exclude.json`
+  or the split `call-mismatches-wide-exclude/` tree already accepts for that
+  (`tsFile`, method). One unexplained token — a dropped `if`, an extra `throw`,
+  an un-excluded call — keeps the whole row in the residue; partial credit would
+  let a real regression ride in behind a reviewed one.
+
+The residue is ratcheted against `scripts/prism-codegen/convergence-baseline.json`
+(one `<rubyFile>::<name>::<divergent|missing>` id per line). A **new** row fails
+the guard; rows that disappear — a method converged, or a deviation earned a
+catalog entry — are accepted silently, so the baseline only ever shrinks.
+Re-seed it with `pnpm codegen:score --guard --write` after a burndown; never to
+bury a new divergence. `--verbose` prints each catalogued row with the catalog
+reason that excused it, so a subtraction can be audited rather than trusted.
+Exclude entries are filtered to the package being scored: a relative `tsFile` is
+not unique across packages (`callbacks.ts` exists under both activerecord and
+abstractcontroller), so an unfiltered catalog would let one package's reviewed
+call excuse another's divergence.
+
+**CI wiring.** The guard runs as the _Codegen convergence guard_ step of the
+**Rails API/Test Comparison** job (`rails-comparison` in `.github/workflows/ci.yml`),
+which is where the vendored Ruby is fetched — the generator needs the real Rails
+sources, so it cannot live in `unit-tests`. The job is gated on
+`comparison_affected`, whose filter now includes `scripts/prism-codegen/` next to
+`packages/` and the other compare trees, so a change to either the port or the
+generator re-runs the guard. The pure logic — `catalog.ts` (catalog subtraction)
+and `guard.ts` (baseline ratchet) — is unit-tested in the `unit-tests` job, which
+already runs `scripts/prism-codegen`.
+
+Current split: 11 of the 371 divergent+missing rows are catalogued, leaving 360
+residue rows in the seeded baseline. That number is the burndown target, not a
+verdict: most rows differ by several tokens at once, which the per-call exclude
+lists cannot explain on their own.
+
 ## Productionization roadmap
 
 Pursue only if the scaffolding value justifies it. Sequenced by the coverage
@@ -428,5 +470,7 @@ machinery:
 - TS→JS entrypoint: `pnpm codegen:from-ts <trails.ts>` prints generated JS for
   the corresponding Rails file, resolving via the existing `rubyFileToTs`.
 - Coverage metric: per-file + rollup + passthrough leaders (above).
+- Convergence guard: `pnpm codegen:score --guard` + the checked-in residue
+  baseline (above).
 - This RFC.
 - Follow-up stories: RFC 0065 epic (`tasks` repo).
