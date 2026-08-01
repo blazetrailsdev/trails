@@ -206,10 +206,6 @@ const TOKEN_CANON: Record<string, string> = {
   inject: "reduce",
   toA: "toArray",
   size: "length",
-  // relation.rb:71 reads `attr_reader :table, :model, ...` — the port spells that
-  // same pair `_modelClass.arelTable`, so both readers need canonicalizing or the
-  // skeleton diff shows a pure-naming `ref:` mismatch on every def that reaches
-  // the relation's Arel table.
   modelClass: "model",
   arelTable: "table",
 };
