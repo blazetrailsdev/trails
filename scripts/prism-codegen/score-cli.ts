@@ -3,7 +3,7 @@ import { readFileSync, existsSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { generateFromSource } from "./index.js";
-import { asyncMethodsForRailsFile } from "./async-source.js";
+import { asyncMethodsForRailsFile, buildAsyncManifest } from "./async-source.js";
 import { TOPLEVEL } from "./codegen.js";
 import { TARGET_FILES, TRAILS_AR_SRC, portTreeFiles, rubyAbsPath } from "./files.js";
 import { rubyFileToTs } from "./naming.js";
@@ -92,7 +92,9 @@ async function main() {
   const verbose = process.argv.includes("--verbose");
   const write = process.argv.includes("--write");
   const guard = process.argv.includes("--guard") || write;
-  const globalIndex = indexPortTree(portTreeFiles());
+  const portFiles = portTreeFiles();
+  const globalIndex = indexPortTree(portFiles);
+  const asyncManifest = buildAsyncManifest(portFiles);
   const catalog = buildCatalog(await loadExcludes(), "activerecord");
   let totMatched = 0;
   let totReordered = 0;
@@ -120,7 +122,7 @@ async function main() {
     }
     const { code, perDef } = await generateFromSource(
       readFileSync(rubyAbsPath(f), "utf8"),
-      asyncMethodsForRailsFile(f.ruby),
+      asyncMethodsForRailsFile(f.ruby, asyncManifest),
     );
     const cleanDefs = new Set(
       [...perDef].filter(([n, d]) => n !== TOPLEVEL && d.passthrough === 0).map(([n]) => n),
