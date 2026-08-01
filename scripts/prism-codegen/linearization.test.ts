@@ -133,6 +133,7 @@ describe("super linearization", () => {
       `,
       new Set(),
       "./runtime.js",
+      new Map(),
       await linearization(),
     );
     expect(code).toContain("super(...arguments)");
@@ -144,6 +145,7 @@ describe("super linearization", () => {
       TIMESTAMP_RB,
       new Set(),
       "./runtime.js",
+      new Map(),
       await linearization(),
     );
     expect(code).toContain("x = Persistence.touch.call(this, name);");
@@ -155,6 +157,7 @@ describe("super linearization", () => {
       PERSISTENCE_RB,
       new Set(),
       "./runtime.js",
+      new Map(),
       await linearization(),
     );
     expect(code).toContain("Core.touch.call(this, ...arguments)");
@@ -165,6 +168,7 @@ describe("super linearization", () => {
       PERSISTENCE_RB,
       new Set(),
       "./runtime.js",
+      new Map(),
       await linearization(),
     );
     expect(code).toContain('__PRISM_SUPER_OUTSIDE_CORPUS("Persistence#reload_only_here")');
@@ -175,6 +179,7 @@ describe("super linearization", () => {
       PERSISTENCE_RB,
       new Set(),
       "./runtime.js",
+      new Map(),
       await linearization(),
     );
     expect(perDef.get("touch")?.passthrough).toBe(0);
@@ -195,6 +200,7 @@ describe("super linearization", () => {
       `,
       new Set(),
       "./runtime.js",
+      new Map(),
       await linearization(),
     );
     expect(code).toContain("return 1;");
