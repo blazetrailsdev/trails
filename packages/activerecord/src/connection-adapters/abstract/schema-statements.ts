@@ -1774,11 +1774,7 @@ export class SchemaStatements {
     if (!options.name && !options.expression) {
       throw new ArgumentError("At least one of :name or :expression must be supplied");
     }
-    // Only pass `name` when present: checkConstraintFor derives one from the
-    // expression, and an explicit `name: undefined` would clobber it.
-    const lookup: { name?: string; expression?: string } = { expression: options.expression };
-    if (options.name !== undefined) lookup.name = options.name;
-    return (await this.checkConstraintFor(tableName, lookup)) !== undefined;
+    return (await this.checkConstraintFor(tableName, options)) !== undefined;
   }
 
   async removeConstraint(tableName: string, constraintName: string): Promise<void> {
@@ -2474,7 +2470,7 @@ export class SchemaStatements {
     }
     const chkName = this.checkConstraintName(tableName, options);
     const constraints = await this.checkConstraints(tableName);
-    return constraints.find((chk) => chk.isDefinedFor({ name: chkName, ...options }));
+    return constraints.find((chk) => chk.isDefinedFor({ ...options, name: chkName }));
   }
 
   /** @internal */
