@@ -266,10 +266,42 @@ function expandIndexOption<T>(opt: Record<string, T> | T, columns: string[]): Re
   return Object.fromEntries(columns.map((c) => [c, opt])) as Record<string, T>;
 }
 
+/**
+ * The pool surface the schema_migrations statements reach for. Rails calls
+ * `pool.schema_migration` / `pool.migration_context` unguarded
+ * (schema_statements.rb:1356-1370), so a mis-wired pool raises here rather
+ * than degrading to a bare `schema_migrations` literal.
+ *
+ * Versions are strings here where Rails' `MigrationContext#get_all_versions`
+ * (`migration.rb:1282`) and `#migrations` (`:1303`) hand back integers, so
+ * callers comparing against a numeric target coerce them.
+ *
+ * The class behind `migrationContext` is still trails' schema-DSL context
+ * squatting the ported Rails name, with a parallel copy of these members on
+ * `Migrator`; story `pool-migration-context-is-not-rails-migration-context`
+ * re-layers the two.
+ * @internal
+ */
+interface SchemaMigrationPool {
+  schemaMigration: { tableName: string; versions(): Promise<Array<string | number>> };
+  migrationContext: {
+    getAllVersions(): Promise<Array<string | number>>;
+    migrations: ReadonlyArray<{ version: string | number }>;
+  };
+}
+
 export class SchemaStatements {
   private _schemaCreation?: SchemaCreation;
 
   constructor(protected readonly adapter: DatabaseAdapter & SchemaQuoter) {}
+
+  /**
+   * `AbstractAdapter#pool` is typed `unknown` (it holds a NullPool until a real
+   * ConnectionPool claims the connection); narrow it once here. @internal
+   */
+  private get _pool(): SchemaMigrationPool {
+    return this.adapter.pool as SchemaMigrationPool;
+  }
 
   protected get adapterName(): AdapterName {
     // Base AbstractAdapter#adapterName is typed `string` (Rails-faithful
@@ -1824,26 +1856,9 @@ export class SchemaStatements {
   }
 
   async dumpSchemaInformation(): Promise<string | null> {
-    const smTable = (this.adapter as any).pool?.schemaMigration;
-    if (!smTable) return null;
-    const versions: string[] =
-      typeof smTable.versions === "function" ? await smTable.versions() : (smTable.versions ?? []);
+    const versions = await this._pool.schemaMigration.versions();
     if (versions.length === 0) return null;
-    return this._insertVersionsSql(smTable.tableName ?? "schema_migrations", versions);
-  }
-
-  private _insertVersionsSql(
-    tableName: string,
-    versions: string | number | Array<string | number>,
-  ): string {
-    const smTable = this._qt(tableName);
-    if (Array.isArray(versions)) {
-      // Ruby's Array#reverse returns a new array; copy before reversing so we
-      // don't mutate the caller's array (e.g. pool.schemaMigration.versions).
-      const rows = [...versions].reverse().map((v) => `(${this.adapter.quote(v)})`);
-      return `INSERT INTO ${smTable} (version) VALUES\n${rows.join(",\n")};`;
-    }
-    return `INSERT INTO ${smTable} (version) VALUES (${this.adapter.quote(versions)});`;
+    return this.insertVersionsSql(versions);
   }
 
   internalStringOptionsForPrimaryKey(): Record<string, unknown> {
@@ -1854,19 +1869,12 @@ export class SchemaStatements {
     const leading = /^\s*([+-]?\d+(?:_\d+)*)/.exec(String(version));
     const verNum = leading ? parseInt(leading[1].replace(/_/g, ""), 10) : 0;
 
-    const pool = (this.adapter as any).pool;
-    const smTableName = pool?.schemaMigration?.tableName ?? "schema_migrations";
-    const smTable = this._qt(smTableName);
+    const pool = this._pool;
+    const smTable = this._qt(pool.schemaMigration.tableName);
 
-    const migrationContext = pool?.migrationContext;
-    const migrated: number[] = migrationContext
-      ? typeof migrationContext.getAllVersions === "function"
-        ? await migrationContext.getAllVersions()
-        : []
-      : [];
-    const allVersions: number[] = migrationContext
-      ? (migrationContext.migrations ?? []).map((m: { version: number }) => m.version)
-      : [];
+    const migrationContext = pool.migrationContext;
+    const migrated = (await migrationContext.getAllVersions()).map(Number);
+    const allVersions = migrationContext.migrations.map((m) => Number(m.version));
 
     // Insert the target version if not already migrated. Rails passes the
     // numeric `version.to_i` to `quote`, emitting an unquoted numeric literal —
@@ -1886,7 +1894,7 @@ export class SchemaStatements {
           `Duplicate migration ${duplicate}. Please renumber your migrations to resolve the conflict.`,
         );
       }
-      await this.adapter.execute(this._insertVersionsSql(smTableName, inserting));
+      await this.adapter.execute(this.insertVersionsSql(inserting));
     }
   }
 
@@ -2683,10 +2691,16 @@ export class SchemaStatements {
   }
 
   /** @internal */
-  insertVersionsSql(versions: string | string[]): string {
-    const smTableName =
-      (this.adapter as any).pool?.schemaMigration?.tableName ?? "schema_migrations";
-    return this._insertVersionsSql(smTableName, versions);
+  insertVersionsSql(versions: string | number | Array<string | number>): string {
+    const smTable = this._qt(this._pool.schemaMigration.tableName);
+
+    if (Array.isArray(versions)) {
+      // Ruby's Array#reverse returns a new array; copy before reversing so we
+      // don't mutate the caller's array (e.g. pool.schemaMigration.versions).
+      const rows = [...versions].reverse().map((v) => `(${this.adapter.quote(v)})`);
+      return `INSERT INTO ${smTable} (version) VALUES\n${rows.join(",\n")};`;
+    }
+    return `INSERT INTO ${smTable} (version) VALUES (${this.adapter.quote(versions)});`;
   }
 
   /** @internal */

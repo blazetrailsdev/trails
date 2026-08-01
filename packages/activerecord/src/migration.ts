@@ -1703,6 +1703,23 @@ export class MigrationContext {
 
   constructor(private connection: DatabaseAdapter) {}
 
+  /** Mirrors: ActiveRecord::MigrationContext#schema_migration */
+  get schemaMigration(): SchemaMigration {
+    return new SchemaMigration(this.connection);
+  }
+
+  /** Mirrors: ActiveRecord::MigrationContext#get_all_versions */
+  async getAllVersions(): Promise<number[]> {
+    const schemaMigration = this.schemaMigration;
+    if (await schemaMigration.tableExists()) return schemaMigration.integerVersions();
+    return [];
+  }
+
+  /** Mirrors: ActiveRecord::MigrationContext#migrations */
+  get migrations(): MigrationProxy[] {
+    return Migrator.discoverMigrations(Migrator.migrationsPaths);
+  }
+
   private _schema?: SchemaStatements;
   private _schemaConn?: DatabaseAdapter;
 
