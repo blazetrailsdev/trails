@@ -80,7 +80,7 @@ export async function sum(initial_value_or_column = 0, block) {
 export function asyncSum(identity_or_column = null) {
     return this.async.sum(identity_or_column);
 }
-export async function calculate(operation, column_name) {
+export function calculate(operation, column_name) {
     let result, relation;
     operation = operation.toString().downcase();
     if (this.none) {
@@ -110,7 +110,7 @@ export async function calculate(operation, column_name) {
         return this.performCalculation(operation, column_name);
     }
 }
-export async function pluck(...column_names) {
+export function pluck(...column_names) {
     let result, relation, columns;
     if (this.none) {
         if (this.async) {
@@ -152,7 +152,7 @@ export async function pluck(...column_names) {
 export function asyncPluck(...column_names) {
     return this.async.pluck(...column_names);
 }
-export async function pick(...column_names) {
+export function pick(...column_names) {
     let result;
     if (this.isLoaded && this.isAllAttributes(column_names)) {
         result = this.records.pick(...column_names);
@@ -163,7 +163,7 @@ export async function pick(...column_names) {
 export function asyncPick(...column_names) {
     return this.async.pick(...column_names);
 }
-export async function ids() {
+export function ids() {
     let primary_key_array, result, relation, columns;
     primary_key_array = this.Array(this.model.primaryKey);
     if (this.isLoaded) {
@@ -247,7 +247,7 @@ export function operationOverAggregateColumn(column, operation, distinct) {
         return column.publicSend(operation);
     }
 }
-export async function executeSimpleCalculation(operation, column_name, distinct) {
+export function executeSimpleCalculation(operation, column_name, distinct) {
     let relation, query_builder, column, select_value, query_result, type;
     if (this.isBuildCountSubquery(operation, column_name, distinct)) {
         if (this.limitValue === 0) {
@@ -277,7 +277,7 @@ export async function executeSimpleCalculation(operation, column_name, distinct)
         return this.typeCastCalculatedValue(result.castValues().first(), operation, type);
     });
 }
-export async function executeGroupedCalculation(operation, column_name, distinct) {
+export function executeGroupedCalculation(operation, column_name, distinct) {
     let group_fields, association, associated, relation, column_alias_tracker, group_aliases, field, group_columns, column, column_alias, select_value, select_values, aliaz, result, key_ids, key_records, key_types, hash_rows, type, key;
     group_fields = this.groupValues;
     if (group_fields.size() > 1) {
@@ -348,7 +348,7 @@ export async function executeGroupedCalculation(operation, column_name, distinct
         });
     });
 }
-export async function typeFor(field, block) {
+export function typeFor(field, block) {
     let field_name;
     field_name = field.respondTo("name") ? field.name().toString() : field.toString().split(".").last();
     return this.model.typeForAttribute(field_name, block);
