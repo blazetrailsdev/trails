@@ -300,6 +300,22 @@ describe("prism-codegen", () => {
     );
     expect(code).not.toContain("await this.relation.load()");
   });
+  it("awaits after a begin/rescue whose body and rescue arm both establish provenance", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all
+          begin
+            @relation = build_relation()
+          rescue => e
+            @relation = self.build_relation()
+          end
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).toContain("await this.relation.load()");
+  });
   it("carries provenance past a begin/ensure with no rescue, which cannot branch", async () => {
     const { code } = await generateFromSource(
       `module M
