@@ -1,11 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { SchemaStatements } from "./schema-statements.js";
 
-// Rails has no test for `assume_migrated_upto_version`, but it is the
-// production path behind `ActiveRecord::Schema#define` (schema.ts:98), so the
-// three behaviours it encodes — the duplicate-check scope, the `detect`/`count`
-// selection, and the reversed single INSERT from `insert_versions_sql` — are
-// pinned here against schema_statements.rb:1364-1384 and :1881-1884.
 function makeStatements(options: { migrated?: number[]; versions?: number[] } = {}) {
   const executed: string[] = [];
   const adapter = {
@@ -48,14 +43,21 @@ describe("SchemaStatements#assumeMigratedUptoVersion", () => {
     expect(executed).toEqual([]);
   });
 
+  it("coerces a string version with to_i semantics", async () => {
+    const { ss, executed } = makeStatements({ migrated: [], versions: [1, 2] });
+    await ss.assumeMigratedUptoVersion("3_foo");
+    expect(executed).toEqual([
+      'INSERT INTO "schema_migrations" (version) VALUES (3)',
+      'INSERT INTO "schema_migrations" (version) VALUES\n(2),\n(1);',
+    ]);
+  });
+
   it("backfills only the known migrations below the target version", async () => {
     const { ss, executed } = makeStatements({
       migrated: [20240101000000],
       versions: [1, 2, 20240101000000, 20250101000000],
     });
     await ss.assumeMigratedUptoVersion(20240101000000);
-    // Only the backfill statement runs: the target is already migrated, and
-    // the later migration is excluded by `select { |v| v < version }`.
     expect(executed).toEqual(['INSERT INTO "schema_migrations" (version) VALUES\n(2),\n(1);']);
   });
 
@@ -77,6 +79,12 @@ describe("SchemaStatements#assumeMigratedUptoVersion", () => {
     ]);
   });
 
+  it("issues no backfill statement when nothing is left to insert", async () => {
+    const { ss, executed } = makeStatements({ migrated: [1, 2, 3], versions: [1, 2, 3] });
+    await ss.assumeMigratedUptoVersion(3);
+    expect(executed).toEqual([]);
+  });
+
   it("raises on a duplicate migration version", async () => {
     const { ss } = makeStatements({ migrated: [], versions: [1, 1, 3] });
     await expect(ss.assumeMigratedUptoVersion(3)).rejects.toThrow(
@@ -84,16 +92,18 @@ describe("SchemaStatements#assumeMigratedUptoVersion", () => {
     );
   });
 
-  it("cites the first repeating version in `inserting` order", async () => {
-    // `detect { |v| inserting.count(v) > 1 }` scans in order, so [B, A, A, B]
-    // cites B — a first-adjacent-pair scan would wrongly cite A.
+  it("cites the first repeating version in inserting order", async () => {
     const { ss } = makeStatements({ migrated: [], versions: [7, 5, 5, 7, 9] });
     await expect(ss.assumeMigratedUptoVersion(9)).rejects.toThrow("Duplicate migration 7.");
   });
 
+  it("raises before issuing the backfill statement", async () => {
+    const { ss, executed } = makeStatements({ migrated: [], versions: [1, 1, 3] });
+    await expect(ss.assumeMigratedUptoVersion(3)).rejects.toThrow("Duplicate migration 1.");
+    expect(executed).toEqual(['INSERT INTO "schema_migrations" (version) VALUES (3)']);
+  });
+
   it("ignores duplicates that are outside the backfill scope", async () => {
-    // The duplicate check runs on `inserting`, not on all known versions: both
-    // an already-migrated pair and a pair above the target must pass.
     const { ss, executed } = makeStatements({ migrated: [1], versions: [1, 1, 2, 9, 9] });
     await ss.assumeMigratedUptoVersion(3);
     expect(executed).toEqual([
