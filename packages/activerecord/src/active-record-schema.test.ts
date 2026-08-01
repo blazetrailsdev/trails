@@ -127,7 +127,6 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   it("normalize version", () => {
-    // Migration version comes from the constructor (Rails: initialize(name, version)).
     class NormalMig extends Migration {
       async change() {}
     }

@@ -235,8 +235,6 @@ export class MigrationGenerator extends GeneratorBase {
       `import { Migration } from "@blazetrails/activerecord";
 
 export class ${className} extends Migration {
-  static version = "${timestamp}";
-
   async change()${returnType} {
 ${body}
   }
