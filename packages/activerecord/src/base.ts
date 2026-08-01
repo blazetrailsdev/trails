@@ -3199,8 +3199,10 @@ export class Base extends Model {
       // Re-snapshot so mp attrs are part of the initial clean state.
       (this as any)._dirty.snapshot((this as any)._attributes);
       if (!wasSuppressed) {
-        // Mirrors Rails' initialize_internals_callback chain order:
-        //   populate_with_current_scope_attributes (scoping) → ensure_proper_type (STI)
+        // prism-mro: initialize_internals_callback
+        //   Inheritance=inheritanceInitializeInternalsCallback
+        //   Scoping=_applyScopeAttributes Core=~
+        inheritanceInitializeInternalsCallback.call(this as any);
         // Guard before allocating the Set — the no-scope case is the hot path.
         if (_shouldApplyScopeAttributes(ctor)) {
           _applyScopeAttributes(
@@ -3209,7 +3211,6 @@ export class Base extends Model {
             new Set([...Object.keys(multiparams), ...Object.keys(regular)]),
           );
         }
-        inheritanceInitializeInternalsCallback.call(this as any);
         // Re-snapshot so internals writes are part of the initial clean state.
         (this as any)._dirty.snapshot((this as any)._attributes);
         if (assocPending) {
@@ -3282,13 +3283,14 @@ export class Base extends Model {
       _Core.initInternals.call(this as any);
       _applyCompositePrimaryKey(this as unknown as Base, ctor2, attrs);
       if (!wasSuppressed2) {
-        // Mirrors Rails' initialize_internals_callback chain order:
-        //   populate_with_current_scope_attributes (scoping) → ensure_proper_type (STI)
+        // prism-mro: initialize_internals_callback
+        //   Inheritance=inheritanceInitializeInternalsCallback
+        //   Scoping=_applyScopeAttributes Core=~
+        inheritanceInitializeInternalsCallback.call(this as any);
         // Guard before allocating the Set — the no-scope case is the hot path.
         if (_shouldApplyScopeAttributes(ctor2)) {
           _applyScopeAttributes(ctor2, this as any, new Set(Object.keys(attrs)));
         }
-        inheritanceInitializeInternalsCallback.call(this as any);
         // Re-snapshot so internals writes are part of the initial clean state.
         (this as any)._dirty.snapshot((this as any)._attributes);
         // Assign store accessor keys after the clean baseline so they appear

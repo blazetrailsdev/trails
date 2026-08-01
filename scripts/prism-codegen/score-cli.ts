@@ -5,7 +5,22 @@ import { fileURLToPath } from "node:url";
 import { generateFromSource } from "./index.js";
 import { asyncMethodsForRailsFile, buildAsyncManifest } from "./async-source.js";
 import { TOPLEVEL } from "./codegen.js";
-import { TARGET_FILES, TRAILS_AR_SRC, portTreeFiles, rubyAbsPath } from "./files.js";
+import {
+  TARGET_FILES,
+  TRAILS_AR_SRC,
+  portTreeFiles,
+  rubyAbsPath,
+  rubyAbsPathFor,
+} from "./files.js";
+import {
+  checkCompositionPoint,
+  compositionFailureMessage,
+  indexSuperPositions,
+  parseCompositionMarkers,
+  rubyPathCandidatesForModule,
+  unresolvedAncestryMessage,
+} from "./composition.js";
+import { buildLinearization, parseIncludeOrder } from "./linearization.js";
 import {
   inheritedDelegationsFor,
   outNameFor,
@@ -92,6 +107,49 @@ async function readSignOffSource(): Promise<string> {
       { cause: e },
     );
   }
+}
+
+/** The first of `candidates` that exists under the vendored ActiveRecord tree. */
+async function firstReadable(candidates: readonly string[]): Promise<string | undefined> {
+  for (const candidate of candidates) {
+    try {
+      return await fs.readFile(rubyAbsPathFor(candidate), "utf8");
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Every `prism-mro:` marker in the port tree, checked against the ancestry of
+ * `ActiveRecord::Base`. Built from the ancestry's own sources rather than the
+ * codegen target set: a chain's definers (e.g. `Scoping`) are often not
+ * targets, and a missing body would silently drop a contribution.
+ */
+async function compositionCheck(): Promise<{ points: number; failure?: string }> {
+  const baseSource = await fs.readFile(rubyAbsPathFor("active_record/base.rb"), "utf8");
+  const sources = [baseSource];
+  const unresolved: string[] = [];
+  for (const module of parseIncludeOrder(baseSource)) {
+    const source = await firstReadable(rubyPathCandidatesForModule(module));
+    if (source === undefined) unresolved.push(module);
+    else sources.push(source);
+  }
+  const unresolvedFailure = unresolvedAncestryMessage(unresolved);
+  if (unresolvedFailure) return { points: 0, failure: unresolvedFailure };
+  const linearization = await buildLinearization(baseSource, sources);
+  const positions = await indexSuperPositions(sources);
+  const failures: string[] = [];
+  let points = 0;
+  for (const { path: file, source } of portTreeFiles()) {
+    for (const marker of parseCompositionMarkers(file, source)) {
+      points++;
+      const failure = checkCompositionPoint(marker, source, linearization, positions);
+      if (failure) failures.push(failure);
+    }
+  }
+  return { points, failure: compositionFailureMessage(failures) };
 }
 
 async function main() {
@@ -215,6 +273,14 @@ async function main() {
     );
   }
   console.log();
+
+  const composition = await compositionCheck();
+  if (composition.failure) {
+    console.error(composition.failure);
+    process.exitCode = 1;
+    return;
+  }
+  console.log(`  composition points: ${composition.points} checked against Base's MRO — OK\n`);
 
   const stale = staleSignOffs([...catalogued.map((c) => c.row), ...uncatalogued], signOffs);
   const staleFailure = staleSignOffMessage(stale);

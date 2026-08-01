@@ -17,7 +17,7 @@
   {
     "rubyFile": "active_record/inheritance.rb",
     "name": "initializeInternalsCallback",
-    "reason": "Rails' body is `super; ensure_proper_type` and the generated def now realizes that super as `Core.initializeInternalsCallback.call(this, ...)`. The port holds only this module's contribution (`ensureProperType.call(this)`, inheritance.ts:824) because base.ts orchestrates the chain explicitly at both constructor branches (base.ts:3212, 3291) — the composition-point pattern from #5727. Same two reaches, one of them relocated to the composition point."
+    "reason": "Rails' body is `super; ensure_proper_type` and the generated def now realizes that super as `Core.initializeInternalsCallback.call(this, ...)`. The port holds only this module's contribution (`ensureProperType.call(this)`, inheritance.ts:824) because base.ts orchestrates the chain explicitly at both constructor branches — the composition-point pattern from #5727. Same two reaches, one of them relocated to the composition point, whose order is now machine-checked against Base's MRO by the `prism-mro:` markers there (composition.ts)."
   },
   {
     "rubyFile": "active_record/persistence.rb",

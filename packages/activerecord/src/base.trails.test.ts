@@ -171,8 +171,14 @@ describe("_applyScopeAttributes — multiparameter path", () => {
   });
 });
 
-describe("_applyScopeAttributes — STI type column wins over scope", () => {
-  it("STI type column is not overwritten by a scope that sets type", async () => {
+describe("_applyScopeAttributes — a scope that sets type wins over the STI default", () => {
+  // Rails' MRO decides this. base.rb:303-304 includes Inheritance before
+  // Scoping, so Scoping is nearer, and both bodies are `super; <contribution>`
+  // (inheritance.rb:349-352, scoping.rb:53-56) — the unwind runs
+  // ensure_proper_type first and populate_with_current_scope_attributes last,
+  // so the scope's type overwrites the STI class name. This test used to
+  // assert the reverse, pinning the port's hand-rolled composition order.
+  it("scope that sets type overwrites the STI type column", async () => {
     class Vehicle extends Base {
       static {
         this._tableName = "vehicles";
@@ -183,11 +189,10 @@ describe("_applyScopeAttributes — STI type column wins over scope", () => {
     Vehicle.inheritanceColumn = "type";
     class Car extends Vehicle {}
 
-    // Scope includes type: "Vehicle" — but new Car() should still have type: "Car"
     const rel = Vehicle.where({ type: "Vehicle" });
     await Vehicle.scoping(rel, async () => {
       const car = new Car({});
-      expect(car.readAttribute("type")).toBe("Car");
+      expect(car.readAttribute("type")).toBe("Vehicle");
     });
   });
 });
