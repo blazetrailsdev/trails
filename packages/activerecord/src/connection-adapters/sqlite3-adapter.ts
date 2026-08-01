@@ -2077,13 +2077,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   /**
-   * Tables + views, deduped. Mirrors AbstractAdapter#data_sources.
-   */
-  async dataSources(): Promise<string[]> {
-    return [...new Set([...(await this.tables()), ...(await this.views())])];
-  }
-
-  /**
    * Resolve the sqlite_master reference for a possibly-schema-qualified
    * name. SQLite stores each attached DB's schema in its own
    * `<schema>.sqlite_master`; `aux.widgets` is row `name='widgets'` in

@@ -313,17 +313,6 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   }
 
   /**
-   * Tables + views, deduped. Mirrors AbstractAdapter#data_sources. The
-   * name is what SchemaCache.addAll queries to build the initial
-   * dump — without this method the PG adapter is rejected by
-   * DatabaseTasks.dumpSchemaCache's capability check.
-   */
-  async dataSources(): Promise<string[]> {
-    const [tables, views] = await Promise.all([this.tables(), this.views()]);
-    return Array.from(new Set([...tables, ...views]));
-  }
-
-  /**
    * Table-only existence check (no views). Mirrors Rails'
    * `table_exists?` vs `data_source_exists?` distinction: a table is a
    * data source but a data source isn't always a table. SchemaCache

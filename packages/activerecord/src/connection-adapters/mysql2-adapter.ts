@@ -1493,22 +1493,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return rows.map((r) => (r.name ?? r.NAME ?? r.TABLE_NAME) as string);
   }
 
-  /**
-   * Tables + views, deduped. Matches Rails'
-   * `AbstractAdapter#data_sources` — the name SchemaCache.addAll calls
-   * through. information_schema.tables already returns distinct rows
-   * within a schema, but the Set pass is defensive + keeps the
-   * contract explicit for future callers.
-   */
-  async dataSources(): Promise<string[]> {
-    const rows = await this.schemaQuery(
-      `SELECT table_name AS name FROM information_schema.tables
-         WHERE table_schema = database()
-         ORDER BY table_name`,
-    );
-    return [...new Set(rows.map((r) => (r.name ?? r.NAME ?? r.TABLE_NAME) as string))];
-  }
-
   async tableExists(name: string): Promise<boolean> {
     return this.informationSchemaExists(name, "BASE TABLE");
   }

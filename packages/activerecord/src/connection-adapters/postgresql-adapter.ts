@@ -4125,10 +4125,6 @@ export class PostgreSQLAdapter
     return this.pgSchemaStatements().views();
   }
 
-  async dataSources(): Promise<string[]> {
-    return this.pgSchemaStatements().dataSources();
-  }
-
   async tableExists(name: string): Promise<boolean> {
     return this.pgSchemaStatements().tableExists(name);
   }
