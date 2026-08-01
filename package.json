@@ -49,6 +49,8 @@
     "api:conventions": "pnpm tsx scripts/api-compare/conventions-doc.ts",
     "lint:deps": "pnpm vendor:fetch && LIB_PATHS_JSON=$(pnpm -s vendor:fetch --print-lib-paths) LOCKFILE_PATH=$PWD/vendor/sources.lock.json ruby scripts/api-compare/extract-ruby-api.rb && pnpm tsx scripts/api-compare/lint-deps.ts",
     "test:compare": "bash scripts/test-compare/run.sh",
+    "test:assertions:ratchet": "pnpm tsx scripts/test-compare/lint-assertion-mismatches.ts",
+    "test:assertions:ratchet:reseed": "pnpm tsx scripts/test-compare/lint-assertion-mismatches.ts --write",
     "rails:find": "bash scripts/rails-find/run.sh",
     "test:deps": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/test-deps/rails-test-deps.ts",
     "fixture-baseline:refresh": "pnpm test:deps >/dev/null && pnpm tsx scripts/test-deps/build-fixture-baseline.ts",

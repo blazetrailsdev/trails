@@ -132,6 +132,47 @@ and the two ratchets gate different artifacts against different baselines; a
 combined `api:gates` wrapper was considered and declined as premature — the doc
 pointer above is the intended fix.
 
+### Assertion-mismatch ratchet
+
+`pnpm test:compare` measures three assertion-level divergences _inside_
+name-matched tests — the pair asserts a different **number** of things
+(`totalAssertionMismatch`), the same number but different **kinds**
+(`totalKindMismatch`), or the same kinds with different literal **expected
+values** (`totalValueMismatch`). Without a gate, a newly ported test can assert
+less than its Rails counterpart and still count as matched, so those totals are
+pinned by an only-shrink ratchet (RFC 0025):
+
+```sh
+pnpm test:assertions:ratchet          # gate
+pnpm test:assertions:ratchet:reseed   # lower the mark after convergence
+```
+
+The high-water mark is `scripts/test-compare/assertion-mismatch-mark.json`: one
+entry per package, three counters each. CI runs the gate in the
+`rails-comparison` job ("Assertion-mismatch ratchet"). Like the wide-call
+unreviewed counter, the arm is **aggregate** — the guarantee is "assertion-level
+debt never grows", not that every remaining mismatch has been reviewed.
+Converging one test while porting another that asserts less is a neutral trade
+the gate lets through; the reviewer of the diff enforces the stronger rule.
+Shrinkage is auto-acknowledged: `--write` (the `:reseed` script) lowers each
+counter to its current value and never raises one, so a run that grew a counter
+cannot buy headroom by reseeding.
+
+**The stale-artifact trap**: the counts are read from
+`scripts/test-compare/output/convention-comparison.json` — no second extractor.
+Gating a file written before a sibling PR's tests landed reports movement that
+never happened, and reseeding would commit that fiction as the new mark. So a
+plain local run regenerates the artifact itself (`pnpm test:compare --json`)
+before gating. `--no-regen` (what CI uses, since it writes the artifact in the
+preceding step) gates whatever is on disk. A partial-scope run is caught
+separately: if a package in the mark is missing from the artifact — a
+`--package` filter, an unfetched vendor source — the lint fails rather than
+letting the reseed drop that package's mark.
+
+Once the counters are pinned their burn rate is measurable, which is what the
+ActiveRecord release estimate needs to price promoting this from a ratchet to a
+hard release gate (the path `gates.ts` already took: advisory → ratchet → zero).
+
 The advisory **arity** check has its own reasoned suppression file,
 `scripts/api-compare/arity-exclude.json` (RFC 0072), keyed by
 `package + rubyFile + rubyName` with a mandatory `reason` per entry. `pnpm

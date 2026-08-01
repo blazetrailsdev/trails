@@ -1493,6 +1493,13 @@ jobs:
         # fails the step if activerecord's gate-mismatch count is non-zero
         # (hard zero, no baseline — RFC 0032 ar-gate-fidelity-burndown).
         run: pnpm exec tsx scripts/test-compare/extract-ts-tests.ts && pnpm exec tsx scripts/test-compare/test-compare.ts --gates --check
+      - name: Assertion-mismatch ratchet
+        # Only-shrink gate on the assertion-count / kind / value totals inside
+        # name-matched tests (RFC 0025). Reads output/convention-comparison.json
+        # written by the step above — --no-regen because CI must not pay for the
+        # extraction twice. Reseed after convergence with
+        # `pnpm test:assertions:ratchet:reseed`.
+        run: pnpm exec tsx scripts/test-compare/lint-assertion-mismatches.ts --no-regen
       - name: Fixtures comparison
         run: pnpm exec tsx scripts/fixtures-compare/compare.ts --package activerecord --ci
       - name: Models comparison
