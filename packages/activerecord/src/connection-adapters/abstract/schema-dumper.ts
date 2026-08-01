@@ -287,8 +287,7 @@ export function validType(this: SchemaDumperMixinHost, type: string | null | und
  * schemaDefault, etc.) take effect. Mirrors the column-emission half of Rails'
  * `SchemaDumper#table`, whose `@connection.column_spec` is the adapter's
  * mixed-in method. Every dump reaches it — the single dumper class assigns this
- * onto its prototype, including the in-memory SchemaContext and mock-source
- * paths.
+ * onto its prototype, including the mock-source paths.
  *
  * Builds into a local buffer so a raise mid-table discards the partial
  * `create_table` body (Rails writes into its own `tbl` StringIO and only prints

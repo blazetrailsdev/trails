@@ -154,7 +154,7 @@ function conciseOptions<T>(
 
 /**
  * Interface for sources that can provide schema information.
- * Both SchemaContext (sync/in-memory) and database adapters (async) can implement this.
+ * Database adapters (async) and the dumper's test mock sources (sync) both implement it.
  */
 export interface SchemaSource {
   /** @internal */
