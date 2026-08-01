@@ -110,7 +110,10 @@ function defAsMember(n: PrismNode, e: Emitter): ts.ClassElement | null {
   const isStatic =
     e.inSingleton ||
     (n.receiver != null && (n.receiver as PrismNode).constructor.name === "SelfNode");
+  const prevSingleton = e.inSingleton;
+  e.inSingleton = isStatic;
   const { params, body, isAsync } = defParts(n, e, isCtor ? "constructor" : name);
+  e.inSingleton = prevSingleton;
   if (!params) return null;
   e.coverage.record("DefNode", true);
   if (isCtor && !isStatic) {

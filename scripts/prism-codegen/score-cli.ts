@@ -7,6 +7,7 @@ import { asyncMethodsForRailsFile, buildAsyncManifest } from "./async-source.js"
 import { TOPLEVEL } from "./codegen.js";
 import { TARGET_FILES, TRAILS_AR_SRC, portTreeFiles, rubyAbsPath } from "./files.js";
 import { rubyFileToTs } from "./naming.js";
+import { inheritedDelegationsFor } from "./golden.js";
 import { scoreFile, indexPortTree, type ScoreEntry } from "./score.js";
 import {
   buildCatalog,
@@ -123,6 +124,8 @@ async function main() {
     const { code, perDef } = await generateFromSource(
       readFileSync(rubyAbsPath(f), "utf8"),
       asyncMethodsForRailsFile(f.ruby, asyncManifest),
+      undefined,
+      await inheritedDelegationsFor(f),
     );
     const cleanDefs = new Set(
       [...perDef].filter(([n, d]) => n !== TOPLEVEL && d.passthrough === 0).map(([n]) => n),

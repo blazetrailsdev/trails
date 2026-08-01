@@ -114,7 +114,7 @@ export function isTableExists() {
 export function attributesBuilder() {
     return this.attributes_builder ||= __PRISM_TODO("BeginNode");
 }
-export function columnsHash() {
+export async function columnsHash() {
     if (!this.columns_hash) {
         this.loadSchema;
     }
@@ -129,7 +129,7 @@ export function _returningColumnsForInsert(connection) {
 export function yamlEncoder() {
     return this.yaml_encoder ||= new ActiveModel.AttributeSet.YAMLEncoder(this.attributeTypes);
 }
-export function columnForAttribute(name) {
+export async function columnForAttribute(name) {
     name = name.toString();
     return this.columnsHash.fetch(name, () => new ConnectionAdapters.NullColumn(name));
 }
@@ -194,7 +194,7 @@ export function reloadSchemaFromCache(recursive = true) {
     }
 }
 __PRISM_TODO("CallNode");
-export function inherited(child_class) {
+export async function inherited(child_class) {
     child_class.initializeLoadSchemaMonitor();
     child_class.reloadSchemaFromCache(false);
     return child_class.classEval(() => this.ignored_columns = null);

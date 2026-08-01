@@ -38,6 +38,7 @@ export class Codegen implements Emitter {
   constructor(
     private readonly registry: Registry,
     readonly asyncMethods: ReadonlySet<string> = new Set(),
+    readonly delegations: ReadonlyMap<string, string> = new Map(),
   ) {}
   private record(kind: string, handled: boolean): void {
     this.coverage.record(kind, handled);

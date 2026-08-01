@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import ts from "typescript";
-import { generateFromSource } from "./index.js";
+import { generateFromSource, delegationsFromSource } from "./index.js";
 import { summarizeCoverage, mergeCoverages } from "./coverage.js";
 import { Registry } from "./registry.js";
 import { tsToRubyFile } from "./naming.js";
@@ -411,5 +411,124 @@ describe("prism-codegen", () => {
     expect(merged.handled).toBe(18);
     expect(merged.passthrough).toBe(2);
     expect(merged.handledPct).toBeCloseTo(90);
+  });
+
+  it("resolves a delegate macro's methods through their receiver, not this", async () => {
+    const { code } = await generateFromSource(`
+      class Relation
+        delegate :primary_key, :table_name, to: :model
+        delegate :length, to: :records
+
+        def describe
+          "#{table_name}.#{primary_key} (#{length})"
+        end
+      end
+    `);
+    expect(code).toContain("this.model.tableName");
+    expect(code).toContain("this.model.primaryKey");
+    expect(code).toContain("this.records.length");
+  });
+
+  it("lets a real definition win over the delegate macro of the same name", async () => {
+    const { code } = await generateFromSource(`
+      class Relation
+        delegate :primary_key, to: :model
+
+        def primary_key
+          @primary_key
+        end
+
+        def describe
+          primary_key
+        end
+      end
+    `);
+    expect(code).toContain("return this.primaryKey;");
+    expect(code).not.toContain("this.model.primaryKey");
+  });
+
+  it("delegation tables inherit into the file family they are compiled into", async () => {
+    const inherited = await delegationsFromSource(`
+      module Delegation
+        delegate :primary_key, to: :model
+      end
+    `);
+    expect([...inherited]).toEqual([["primaryKey", "model"]]);
+    const { code } = await generateFromSource(
+      `class Relation; def describe; primary_key; end; end`,
+      undefined,
+      undefined,
+      inherited,
+    );
+    expect(code).toContain("this.model.primaryKey");
+  });
+
+  it("keeps a falsy prefix option in the table", async () => {
+    const { code } = await generateFromSource(`
+      class Relation
+        delegate :primary_key, to: :model, prefix: false
+        delegate :table_name, to: :model, prefix: nil
+
+        def describe
+          [primary_key, table_name]
+        end
+      end
+    `);
+    expect(code).toContain("this.model.primaryKey");
+    expect(code).toContain("this.model.tableName");
+  });
+
+  it("a singleton def does not suppress an instance delegation of the same name", async () => {
+    const { code } = await generateFromSource(`
+      class Relation
+        delegate :primary_key, to: :model
+
+        def self.primary_key
+          @primary_key
+        end
+
+        def describe
+          primary_key
+        end
+      end
+    `);
+    expect(code).toContain("return this.model.primaryKey;");
+  });
+
+  it("leaves a prefixed delegate macro out of the table", async () => {
+    const { code } = await generateFromSource(`
+      class Relation
+        delegate :primary_key, to: :model, prefix: true
+
+        def describe
+          primary_key
+        end
+      end
+    `);
+    expect(code).toContain("return this.primaryKey;");
+    expect(code).not.toContain("this.model.primaryKey");
+  });
+
+  it("resolves an instance delegation only for instance methods", async () => {
+    const { code } = await generateFromSource(`
+      class Relation
+        delegate :primary_key, to: :model
+
+        def self.describe
+          primary_key
+        end
+
+        class << self
+          delegate :table_name, to: :arel_table
+        end
+
+        def name
+          table_name
+        end
+      end
+    `);
+    expect(code).toContain("static describe()");
+    expect(code).not.toContain("this.model.primaryKey");
+    expect(code).not.toContain("this.arelTable.tableName");
   });
 });

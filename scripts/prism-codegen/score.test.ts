@@ -283,4 +283,22 @@ describe("prism-codegen scorer", () => {
     );
     expect(score.entries).toEqual([]);
   });
+
+  it("scores a delegated self-call as matched against the port's receiver reach", async () => {
+    const score = await scoreRuby(
+      `
+      class Relation
+        delegate :primary_key, to: :model
+
+        def find_key
+          where(primary_key)
+        end
+      end
+    `,
+      `export function findKey(this: R) { return this.where(this.model.primaryKey); }`,
+    );
+    expect(score.entries).toEqual([
+      expect.objectContaining({ name: "findKey", status: "matched" }),
+    ]);
+  });
 });
