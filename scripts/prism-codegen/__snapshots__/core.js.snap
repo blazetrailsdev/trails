@@ -167,25 +167,25 @@ export function initializeFindByCache() {
 export async function find(...ids, block) {
     let id;
     if (!(ids.length() === 1)) {
-        return __PRISM_TODO("ForwardingSuperNode");
+        return __PRISM_SUPER_OUTSIDE_CORPUS("Core::ClassMethods#find");
     }
     if (block !== undefined || this.primaryKey.nil() || this.isScopeAttributes) {
-        return __PRISM_TODO("ForwardingSuperNode");
+        return __PRISM_SUPER_OUTSIDE_CORPUS("Core::ClassMethods#find");
     }
     id = ids.first();
     if (StatementCache.isUnsupportedValue(id)) {
-        return __PRISM_TODO("ForwardingSuperNode");
+        return __PRISM_SUPER_OUTSIDE_CORPUS("Core::ClassMethods#find");
     }
     return await this.cachedFindBy([this.primaryKey], [id]) || (() => { throw new RecordNotFound(`Couldn't find ${this.name} with '${this.primaryKey}'=${id}`, this.name, this.primaryKey, id); })();
 }
 export async function findBy(...args) {
     let hash;
     if (this.isScopeAttributes) {
-        return __PRISM_TODO("ForwardingSuperNode");
+        return __PRISM_SUPER_OUTSIDE_CORPUS("Core::ClassMethods#find_by");
     }
     hash = args.first();
     if (!__PRISM_TODO("CallNode")) {
-        return __PRISM_TODO("ForwardingSuperNode");
+        return __PRISM_SUPER_OUTSIDE_CORPUS("Core::ClassMethods#find_by");
     }
     hash = __PRISM_TODO("CallNode");
     return await this.cachedFindBy(hash.keys(), hash.values());
@@ -222,20 +222,20 @@ export function inspectionFilter() {
 export async function inspect() {
     let attr_list;
     if (this === Base || this.isSingletonClass) {
-        return __PRISM_TODO("ForwardingSuperNode");
+        return __PRISM_SUPER_OUTSIDE_CORPUS("Core::ClassMethods#inspect");
     }
     else if (this.isAbstractClass) {
-        return `${__PRISM_TODO("ForwardingSuperNode")}(abstract)`;
+        return `${__PRISM_SUPER_OUTSIDE_CORPUS("Core::ClassMethods#inspect")}(abstract)`;
     }
     else if (!this.isSchemaLoaded && !this.isConnected) {
-        return `${__PRISM_TODO("ForwardingSuperNode")} (call '${__PRISM_TODO("ForwardingSuperNode")}.load_schema' to load schema informations)`;
+        return `${__PRISM_SUPER_OUTSIDE_CORPUS("Core::ClassMethods#inspect")} (call '${__PRISM_SUPER_OUTSIDE_CORPUS("Core::ClassMethods#inspect")}.load_schema' to load schema informations)`;
     }
     else if (this.isTableExists) {
         attr_list = this.attributeTypes.map((name, type) => `${name}: ${type.type()}`) * ", ";
-        return `${__PRISM_TODO("ForwardingSuperNode")}(${attr_list})`;
+        return `${__PRISM_SUPER_OUTSIDE_CORPUS("Core::ClassMethods#inspect")}(${attr_list})`;
     }
     else {
-        return `${__PRISM_TODO("ForwardingSuperNode")}(Table doesn't exist)`;
+        return `${__PRISM_SUPER_OUTSIDE_CORPUS("Core::ClassMethods#inspect")}(Table doesn't exist)`;
     }
 }
 export function arelTable() {
@@ -339,7 +339,7 @@ export function initializeDup(other) {
     this.previously_new_record = false;
     this.destroyed = false;
     this._start_transaction_state = null;
-    return __PRISM_TODO("ForwardingSuperNode");
+    return __PRISM_SUPER_OUTSIDE_CORPUS("Core#initialize_dup");
 }
 export function initAttributes(_) {
     let attrs;
@@ -366,7 +366,7 @@ export async function hash() {
         return __PRISM_TODO("CallNode");
     }
     else {
-        return __PRISM_TODO("ForwardingSuperNode");
+        return __PRISM_SUPER_OUTSIDE_CORPUS("Core#hash");
     }
 }
 export function freeze() {
@@ -418,7 +418,7 @@ export function fullInspect() {
 export async function prettyPrint(pp) {
     let attr_names, attr_name, value;
     if (this.isCustomInspectMethodDefined) {
-        return __PRISM_TODO("ForwardingSuperNode");
+        return __PRISM_SUPER_OUTSIDE_CORPUS("Core#pretty_print");
     }
     return pp.objectAddressGroup(this, () => {
         if (this.attributes) {

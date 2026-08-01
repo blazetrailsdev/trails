@@ -7,6 +7,7 @@
   "active_record/associations.rb::hasAndBelongsToMany::divergent",
   "active_record/associations.rb::hasMany::divergent",
   "active_record/associations.rb::hasOne::divergent",
+  "active_record/associations.rb::initializeDup::divergent",
   "active_record/associations.rb::initInternals::divergent",
   "active_record/associations.rb::isAssociationCached::divergent",
   "active_record/core.rb::allAttributesForInspect::divergent",

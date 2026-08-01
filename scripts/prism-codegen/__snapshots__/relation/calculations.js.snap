@@ -42,7 +42,7 @@ export async function count(column_name = null, block) {
         if (!column_name.nil()) {
             throw new ArgumentError("Column name argument is not supported when a block is passed.");
         }
-        return __PRISM_TODO("SuperNode");
+        return __PRISM_SUPER_OUTSIDE_CORPUS("Calculations#count");
     }
     else {
         return await this.calculate("count", column_name);

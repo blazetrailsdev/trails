@@ -3,6 +3,7 @@ import ts from "typescript";
 import { Codegen } from "./codegen.js";
 import { defaultRegistry } from "./handlers/index.js";
 import { collectDelegations, mergeDelegations, type DelegationTable } from "./delegation.js";
+import type { Linearization } from "./linearization.js";
 import type { Coverage, PrismNode } from "./types.js";
 let parsePromise:
   | Promise<
@@ -36,12 +37,13 @@ export async function generateFromSource(
   asyncMethods: ReadonlySet<string> = new Set(),
   runtimeImportPath = "./runtime.js",
   inheritedDelegations: DelegationTable = new Map(),
+  linearization: Linearization | null = null,
 ): Promise<GenResult> {
   const parse = await getParser();
   const result = parse(rubySource);
   const program = result.value as PrismNode;
   const delegations = mergeDelegations(inheritedDelegations, collectDelegations(program));
-  const gen = new Codegen(defaultRegistry(), asyncMethods, delegations);
+  const gen = new Codegen(defaultRegistry(), asyncMethods, delegations, linearization);
   const statements = gen.stmt(program, false);
   const sourceFile = ts.factory.createSourceFile(
     statements,
@@ -82,6 +84,7 @@ export { summarizeCoverage } from "./coverage.js";
 export { TARGET_FILES } from "./files.js";
 export { asyncMethodsForRailsFile } from "./async-source.js";
 export { type DelegationTable } from "./delegation.js";
+export { buildLinearization, Linearization, parseIncludeOrder } from "./linearization.js";
 
 /** Standalone pre-pass: the delegation table a file contributes to its family. */
 export async function delegationsFromSource(rubySource: string): Promise<DelegationTable> {

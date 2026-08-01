@@ -340,6 +340,7 @@ export function touch(...names, { time = null } = {}) {
 }
 __PRISM_TODO("CallNode");
 export function initInternals() {
+    Core.initInternals.call(this, ...arguments);
     this._trigger_destroy_callback = this._trigger_update_callback = null;
     return this.previously_new_record = false;
 }

@@ -126,7 +126,7 @@ export async function select(...fields, block) {
         if (fields.isAny()) {
             throw new ArgumentError("`select' with block doesn't take arguments.");
         }
-        return __PRISM_TODO("SuperNode");
+        return __PRISM_SUPER_OUTSIDE_CORPUS("QueryMethods#select");
     }
     this.checkIfMethodHasArgumentsBang(this.__callee__, fields, "Call `select' with at least one field.");
     fields = this.processSelectArgs(fields);
