@@ -27,6 +27,11 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { fixtures } from "./test-fixtures.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 
+/** The env name `record_environment` stamps: `connection.pool.db_config.env_name`. */
+function poolEnvName(adapter: DatabaseAdapter): string {
+  return (adapter.pool as { dbConfig: { envName: string } }).dbConfig.envName;
+}
+
 function makeMigration(
   version: string,
   name: string,
@@ -69,7 +74,7 @@ describe("Migrator trails extensions", () => {
     });
     await migrator.up();
     const env = await migrator.internalMetadata.get("environment");
-    expect(env).toBe("test");
+    expect(env).toBe(poolEnvName(adapter));
   });
 
   it("up and down raise UnknownMigrationVersionError for an unknown target", async () => {
@@ -162,6 +167,7 @@ describe("Migrator trails extensions", () => {
       environment: "production",
     });
     await migrator1.up();
+    await migrator1.internalMetadata.set("environment", "production");
 
     const migrator2 = new Migrator(adapter, [makeMigration("1", "M1")], {
       environment: "development",
@@ -174,6 +180,7 @@ describe("Migrator trails extensions", () => {
       environment: "development",
     });
     await migrator.up();
+    await migrator.internalMetadata.set("environment", "development");
     await expect(migrator.checkEnvironment()).resolves.toBeUndefined();
   });
 
@@ -182,6 +189,7 @@ describe("Migrator trails extensions", () => {
       environment: "production",
     });
     await migrator.up();
+    await migrator.internalMetadata.set("environment", "production");
     await expect(migrator.checkProtectedEnvironments()).rejects.toThrow(ProtectedEnvironmentError);
   });
 
@@ -202,6 +210,7 @@ describe("Migrator trails extensions", () => {
       environment: "development",
     });
     await migrator.up();
+    await migrator.internalMetadata.set("environment", "development");
     await expect(migrator.checkProtectedEnvironments()).resolves.toBeUndefined();
   });
 

@@ -63,6 +63,11 @@ async function freshAdapterWithPeople(): Promise<DatabaseAdapter> {
 // — the trails equivalent of Rails' anonymous `Class.new(Migration) { def
 // migrate(x); … end }` migrations that the people-migration tests feed to a
 // `Migrator`.
+/** Mirrors migration_test.rb:1165's private `env_name(pool)` helper. */
+function envName(adapter: DatabaseAdapter): string {
+  return (adapter.pool as { dbConfig: { envName: string } }).dbConfig.envName;
+}
+
 function migrateProxy(version: number, body: (m: Migration) => Promise<void>): MigrationProxy {
   return {
     version: String(version),
@@ -1094,13 +1099,13 @@ describe("MigrationTest", () => {
       name: "Failing",
       migration: () => new FailingMigration(),
     };
-    const migrator = new Migrator(adapter, [proxy], { environment: "test" });
+    const migrator = new Migrator(adapter, [proxy]);
     await migrator.up().catch(() => {});
     const env = await im.get("environment");
     // Rails stamps the environment in `record_environment` BEFORE running the
     // migrations, so a failing migration still leaves it recorded
     // (migration_test.rb:697-711).
-    expect(env).toBe("test");
+    expect(env).toBe(envName(adapter));
   });
 
   it("internal metadata stores environment when other data exists", async () => {
@@ -1115,9 +1120,9 @@ describe("MigrationTest", () => {
       name: "M1",
       migration: () => anonymousMigration("M1", "1"),
     };
-    const migrator = new Migrator(adapter, [proxy], { environment: "staging" });
+    const migrator = new Migrator(adapter, [proxy]);
     await migrator.up();
-    expect(await im.get("environment")).toBe("staging");
+    expect(await im.get("environment")).toBe(envName(adapter));
     expect(await im.get("custom_key")).toBe("custom_value");
   });
 
