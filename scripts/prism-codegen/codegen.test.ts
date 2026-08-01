@@ -8,6 +8,7 @@ import {
   buildAsyncManifest,
   crossFileAsyncNames,
   extractAsyncNames,
+  inferAsyncFromBodies,
   resolveAsyncNames,
   rubyDefinedMethods,
 } from "./async-source.js";
@@ -374,6 +375,45 @@ describe("prism-codegen", () => {
       resolveAsyncNames({ twinTs: `export async function reload() {}`, crossFile }),
     );
     expect(code).toContain("await this.findBy(1)");
+  });
+  it("marks a def in an unported file async when its body reaches a known-async name", async () => {
+    const ruby = `module Touch
+  def touch_later(*names)
+    perform_save(names)
+  end
+
+  def touch_all(*names)
+    touch_later(names)
+  end
+
+  def normalize(names)
+    names.map(&:to_s)
+  end
+end`;
+    const manifest = buildAsyncManifest([
+      { path: "persistence.ts", source: `export async function performSave() {}` },
+    ]);
+    const crossFile = crossFileAsyncNames(manifest, {
+      twinTsPath: "touch.ts",
+      railsDefs: rubyDefinedMethods(`def perform_save; end`),
+    });
+    const names = resolveAsyncNames({ twinTs: "", crossFile, inferFromRuby: ruby });
+    expect(names.has("touchLater")).toBe(true);
+    expect(names.has("touchAll")).toBe(true);
+    expect(names.has("normalize")).toBe(false);
+    const { code } = await generateFromSource(ruby, names);
+    expect(code).toContain("export async function touchLater");
+    expect(code).toContain("await this.performSave(names)");
+    expect(code).toContain("await this.touchLater(names)");
+  });
+  it("infers nothing when no body reaches an unambiguous async name", () => {
+    const inferred = inferAsyncFromBodies(
+      `def reset
+  clear_cache
+end`,
+      new Set(),
+    );
+    expect(inferred.size).toBe(0);
   });
   it("declines the await when a name is async in more than one port file", () => {
     const manifest = buildAsyncManifest([
