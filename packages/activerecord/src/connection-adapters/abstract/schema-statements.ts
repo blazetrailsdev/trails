@@ -446,6 +446,28 @@ export class SchemaStatements {
     await this.adapter.getDatabaseVersion?.();
     await this.adapter.execute(await this.schemaCreation.accept(td));
 
+    if (!this.adapter.supportsIndexesInCreate?.()) {
+      for (const idx of td.indexes) {
+        await this.addIndex(name, idx.columns, {
+          unique: idx.unique,
+          name: idx.name,
+          where: idx.where,
+          order: expandIndexOption(idx.orders, idx.columns),
+          using: idx.using,
+          type: idx.type,
+          comment: idx.comment,
+          length: expandIndexOption(idx.lengths, idx.columns),
+          opclass: expandIndexOption(idx.opclasses, idx.columns),
+          include: idx.include,
+          nullsNotDistinct: idx.nullsNotDistinct,
+          algorithm: idx.algorithm,
+          // Rails overrides any per-index `if_not_exists:` with the table
+          // definition's, since it splats `**index_options` first.
+          ifNotExists: td.ifNotExists,
+        });
+      }
+    }
+
     // Rails: if supports_comments? && !supports_comments_in_create?
     //   change_table_comment(table_name, comment) if options[:comment].present?
     if (this.adapter.supportsComments?.() && !this.adapter.supportsCommentsInCreate?.()) {
@@ -471,26 +493,6 @@ export class SchemaStatements {
             await commentAdapter.changeColumnComment(name, column.name, columnComment);
           }
         }
-      }
-    }
-
-    if (!this.adapter.supportsIndexesInCreate?.()) {
-      for (const idx of td.indexes) {
-        await this.addIndex(name, idx.columns, {
-          unique: idx.unique,
-          name: idx.name,
-          where: idx.where,
-          order: expandIndexOption(idx.orders, idx.columns),
-          using: idx.using,
-          type: idx.type,
-          comment: idx.comment,
-          length: expandIndexOption(idx.lengths, idx.columns),
-          opclass: expandIndexOption(idx.opclasses, idx.columns),
-          include: idx.include,
-          nullsNotDistinct: idx.nullsNotDistinct,
-          algorithm: idx.algorithm,
-          ifNotExists: idx.ifNotExists,
-        });
       }
     }
   }
