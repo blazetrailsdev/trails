@@ -195,6 +195,143 @@ describe("prism-codegen", () => {
     );
     expect(multiWrite.code).not.toContain("await rel.load()");
   });
+  it("does not award an await from provenance established in only one branch", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all(flag, arg)
+          @relation = arg
+          if flag
+            @relation = build_relation()
+          end
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).toContain("this.relation.load()");
+    expect(code).not.toContain("await this.relation.load()");
+  });
+  it("awaits after a branch whose every arm establishes provenance", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all(flag)
+          if flag
+            @relation = build_relation()
+          else
+            @relation = self.build_relation()
+          end
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).toContain("await this.relation.load()");
+  });
+  it("applies a retraction inside a single branch arm eagerly", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all(flag, arg)
+          @relation = build_relation()
+          if flag
+            @relation = arg
+          end
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).not.toContain("await this.relation.load()");
+  });
+  it("does not leak provenance established inside a loop body", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all(flag)
+          while flag
+            @relation = build_relation()
+          end
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).not.toContain("await this.relation.load()");
+  });
+  it("awaits after a case whose every arm, including else, establishes provenance", async () => {
+    const both = await generateFromSource(
+      `module M
+        def load_all(kind)
+          case kind
+          when :a then @relation = build_relation()
+          else @relation = self.build_relation()
+          end
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(both.code).toContain("await this.relation.load()");
+    const noElse = await generateFromSource(
+      `module M
+        def load_all(kind, arg)
+          @relation = arg
+          case kind
+          when :a then @relation = build_relation()
+          end
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(noElse.code).not.toContain("await this.relation.load()");
+  });
+  it("does not leak provenance from a begin body its rescue arm never establishes", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all(arg)
+          begin
+            @relation = build_relation()
+          rescue => e
+            @relation = arg
+          end
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).not.toContain("await this.relation.load()");
+  });
+  it("awaits after a begin/rescue whose body and rescue arm both establish provenance", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all
+          begin
+            @relation = build_relation()
+          rescue => e
+            @relation = self.build_relation()
+          end
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).toContain("await this.relation.load()");
+  });
+  it("carries provenance past a begin/ensure with no rescue, which cannot branch", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all
+          begin
+            @relation = build_relation()
+          ensure
+            log
+          end
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).toContain("await this.relation.load()");
+  });
   it("stops awaiting a receiver rebound by an operator write", async () => {
     const ivarWrite = await generateFromSource(
       `module M

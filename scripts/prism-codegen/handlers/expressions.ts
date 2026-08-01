@@ -8,6 +8,8 @@ import {
   asyncBindingKey,
   clearAsyncProvenance,
   hasAsyncProvenance,
+  mergeAsyncArms,
+  scopeAsyncArm,
   shouldAwaitCall,
 } from "../await-policy.js";
 const f = ts.factory;
@@ -337,8 +339,12 @@ function blockToArrow(block: PrismNode, names: string[], e: Emitter): ts.ArrowFu
   const params = names.map((p) => f.createParameterDeclaration(undefined, undefined, p));
   const prevLoop = e.inLoop;
   e.inLoop = false;
-  const body = e.stmts((block.body as PrismNode) ?? null, true);
+  const arm = scopeAsyncArm(e.asyncBindings, () =>
+    e.stmts((block.body as PrismNode) ?? null, true),
+  );
+  const body = arm.value;
   e.inLoop = prevLoop;
+  mergeAsyncArms(e.asyncBindings, [arm.after], false);
   if (body.length === 1 && ts.isReturnStatement(body[0]) && body[0].expression) {
     return f.createArrowFunction(
       asyncModifiers(body[0].expression),
