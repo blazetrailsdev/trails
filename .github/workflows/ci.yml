@@ -13,6 +13,10 @@ on:
     #                         main / the weekly sweep / workflow_dispatch).
     #                         Opting in also gates the merge on it: the job is
     #                         in the `ci` aggregator's `needs:`.
+    #   run-mysql-prepared  — the MYSQL_PREPARED_STATEMENTS AR suite (otherwise
+    #                         only main / the weekly sweep / workflow_dispatch).
+    #                         Opting in also gates the merge on it: the job is
+    #                         in the `ci` aggregator's `needs:`.
     #   run-db-adapters     — force the PostgreSQL + MariaDB AR suites on a
     #                         draft PR that doesn't touch adapter paths; they
     #                         run unconditionally once it is ready for review.
@@ -1309,16 +1313,19 @@ jobs:
         env:
           MYSQL_TEST_URL: mysql://rails@localhost:3306/activerecord_unittest
 
-  # ADVISORY: deliberately absent from the `ci` aggregator's `needs` list, so a
-  # red leg reports without blocking merge. Runner budget is why it is also
-  # unsharded (hence the wider timeout) — the required maria-tests lane already
-  # burns two runners per PR.
+  # A second full pass over the AR suite, so not on every PR: it runs on `main`,
+  # on the Monday sweep, on `workflow_dispatch`, and on a PR labelled
+  # `run-mysql-prepared`. It is in the `ci` aggregator's `needs:`, so whenever it
+  # does run a failure blocks the merge. Unsharded (hence the wider timeout):
+  # off the per-PR critical path, one runner is the cheaper trade.
   maria-prepared-tests:
     name: Active Record MariaDB Tests (prepared statements)
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
-      needs.changes.outputs.activerecord_affected == 'true'
+      needs.changes.outputs.activerecord_affected == 'true' &&
+      (github.event_name != 'pull_request' ||
+       contains(github.event.pull_request.labels.*.name, 'run-mysql-prepared'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
@@ -1761,6 +1768,7 @@ jobs:
       - trailties-tests
       - sqlite-tests
       - sqlite-mem-tests
+      - maria-prepared-tests
       - postgres-tests
       - mysql-tests
       - maria-tests
@@ -1797,6 +1805,7 @@ jobs:
           PARITY_POSTGRES: ${{ needs.changes.outputs.parity_postgres }}
           PARITY_MYSQL: ${{ needs.changes.outputs.parity_mysql }}
           SQLITE_MEM_UNLABELLED: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'run-sqlite-mem') }}
+          MYSQL_PREPARED_UNLABELLED: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'run-mysql-prepared') }}
           DB_ADAPTERS_DRAFT_DEFERRED: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft && needs.changes.outputs.db_adapter_affected != 'true' && !contains(github.event.pull_request.labels.*.name, 'run-db-adapters') }}
         run: |
           set -euo pipefail
@@ -1856,6 +1865,12 @@ jobs:
                 sqlite-mem-tests)
                   if [ "$AR_AFFECTED" = "false" ] || \
                      [ "$SQLITE_MEM_UNLABELLED" = "true" ]; then
+                    continue
+                  fi
+                  ;;
+                maria-prepared-tests)
+                  if [ "$AR_AFFECTED" = "false" ] || \
+                     [ "$MYSQL_PREPARED_UNLABELLED" = "true" ]; then
                     continue
                   fi
                   ;;
