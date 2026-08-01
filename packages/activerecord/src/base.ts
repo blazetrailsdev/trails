@@ -3199,9 +3199,6 @@ export class Base extends Model {
       // Re-snapshot so mp attrs are part of the initial clean state.
       (this as any)._dirty.snapshot((this as any)._attributes);
       if (!wasSuppressed) {
-        // Rails realizes this chain through `super`; the port calls each
-        // module's contribution here, so this call order IS the MRO and the
-        // marker below is checked against it by `pnpm codegen:score`.
         // prism-mro: initialize_internals_callback
         //   Inheritance=inheritanceInitializeInternalsCallback
         //   Scoping=_applyScopeAttributes Core=~

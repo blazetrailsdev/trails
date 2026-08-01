@@ -127,6 +127,13 @@ describe("composition-point MRO check", () => {
     ]);
   });
 
+  it("reads each composition point's own call sites, not the next point's", () => {
+    const source = `${CONVERGED}\n${REORDERED}`;
+    const [first, second] = parseCompositionMarkers("base.ts", source);
+    expect(realizedCompositionOrder(first, source).order).toEqual(["Inheritance", "Scoping"]);
+    expect(realizedCompositionOrder(second, source).order).toEqual(["Scoping", "Inheritance"]);
+  });
+
   it("passes when the composition point matches the MRO", async () => {
     const { linearization, positions } = await inputs();
     expect(

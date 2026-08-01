@@ -59,12 +59,20 @@ export interface CompositionMarker {
   /** Ruby method name of the chain, e.g. `initialize_internals_callback`. */
   method: string;
   contributions: Contribution[];
-  /** Offset of the marker in the source; the realized order is read below it. */
+  /** Offset of the marker's end; the realized order is read from here. */
   offset: number;
+  /**
+   * Offset the marker's region ends at — the next marker, or the end of the
+   * file. A file can hold several composition points (base.ts has one per
+   * constructor branch) and each must read only its own call sites: an
+   * unbounded scan would let a later point's calls stand in for a missing one.
+   */
+  end: number;
 }
 
 export function parseCompositionMarkers(file: string, source: string): CompositionMarker[] {
-  return [...source.matchAll(MARKER)].map((m) => ({
+  const matches = [...source.matchAll(MARKER)];
+  return matches.map((m, i) => ({
     file,
     method: m[1],
     contributions: [...m[2].matchAll(BINDING)].map((b) => ({
@@ -72,6 +80,7 @@ export function parseCompositionMarkers(file: string, source: string): Compositi
       identifier: b[2],
     })),
     offset: m.index + m[0].length,
+    end: matches[i + 1]?.index ?? source.length,
   }));
 }
 
@@ -144,12 +153,13 @@ export function realizedCompositionOrder(
   marker: CompositionMarker,
   source: string,
 ): { order: string[]; missing: string[] } {
-  const below = source.slice(marker.offset);
+  const below = source.slice(marker.offset, marker.end);
   const order: { module: string; at: number }[] = [];
   const missing: string[] = [];
   for (const { module, identifier } of marker.contributions) {
     if (identifier === UNREALIZED) continue;
-    const at = below.search(new RegExp(`\\b${identifier}\\b[\\s(.]`));
+    const escaped = identifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const at = below.search(new RegExp(`\\b${escaped}\\b[\\s(.]`));
     if (at < 0) missing.push(identifier);
     else order.push({ module, at });
   }
