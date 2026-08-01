@@ -2324,17 +2324,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // rejected.
     const alteredTableName = `a${bareTable}`;
 
-    // No explicit missing-table guard: `columns` reaches table_structure, which
-    // already raises StatementInvalid naming the table (foreign_key_test.rb:322).
-    // Rails reads the FK/check lists up front, before the first move drops the
-    // source table (sqlite3_adapter.rb:562-565 default args).
+    // No explicit missing-table guard: the first move's `columns` reaches
+    // table_structure, which already raises StatementInvalid naming the table
+    // (foreign_key_test.rb:322).
     const fks = overrideForeignKeys ?? (await this.foreignKeys(tableName));
     const checks = overrideCheckConstraints ?? (await this.checkConstraints(tableName));
 
-    // Rails' alter_table caller lambda (sqlite3_adapter.rb:568-583): the FKs and
-    // checks are layered on after copy_table has added the buffer's columns, and
-    // the block runs last — that ordering is what lets remove_column delete the
-    // FKs it orphans.
+    // Rails' alter_table caller lambda (sqlite3_adapter.rb:568-583). The block
+    // running last is what lets remove_column delete the FKs it orphans.
     const caller = (definition: SQLite3TableDefinition): void => {
       definition.foreignKeys.push(
         ...fks.map((fk) => {
@@ -2372,12 +2369,12 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     });
 
     this.schemaCache.clear();
-    // The rebuild issues its index/drop/copy DDL via driver.exec (to manage
-    // savepoint nesting), bypassing the executeMutation path that
-    // dirtiesQueryCache wraps. Rails'
-    // alter_table dirties the cache as a side effect of copy_table, which runs
-    // create_table/drop_table through `execute` and copy_table_contents through
-    // `internal_exec_query` — both in the dirties set — so clear it here to match.
+    // The rebuild issues its index, DROP TABLE and content-copy DDL via
+    // driver.exec (to manage savepoint nesting), bypassing the executeMutation
+    // path that dirtiesQueryCache wraps. Rails' alter_table dirties the cache as
+    // a side effect of copy_table, which runs create_table/drop_table through
+    // `execute` and copy_table_contents through `internal_exec_query` — both in
+    // the dirties set — so clear it here to match.
     this.clearQueryCache();
   }
 
