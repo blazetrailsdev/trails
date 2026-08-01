@@ -93,6 +93,16 @@ export function crossFileAsyncNames(
 const DEF_LINE = /^(\s*)def\s+(?:self\.)?([A-Za-z_][\w]*[?!=]?)(.*)$/;
 const RUBY_CALL = /[A-Za-z_][\w]*[?!]?/g;
 const RUBY_COMMENT = /#(?!\{).*$/gm;
+const RUBY_DQ_STRING = /"(?:[^"\\]|\\.)*"/g;
+const RUBY_SQ_STRING = /'(?:[^'\\]|\\.)*'/g;
+const RUBY_INTERPOLATION = /#\{([^}]*)\}/g;
+function stripStringLiterals(source: string): string {
+  return source
+    .replace(RUBY_DQ_STRING, (lit) =>
+      [...lit.matchAll(RUBY_INTERPOLATION)].map((m) => m[1]).join(" "),
+    )
+    .replace(RUBY_SQ_STRING, "");
+}
 export interface RubyDefBody {
   name: string;
   body: string;
@@ -103,10 +113,12 @@ export interface RubyDefBody {
  * own column). Rails source is uniformly formatted, so this is enough to ask
  * "what does this method call?" without a parse. A single-line `def x; ...;
  * end` closes on its own line rather than running to the next same-column
- * `end`, and comments are dropped so prose can never name an async method.
+ * `end`. Comments and string literals are dropped first so prose can never
+ * name an async method, but `#{}` interpolation survives — that is real code
+ * and a call inside it is a genuine call.
  */
 export function rubyDefBodies(rubySource: string): RubyDefBody[] {
-  const lines = rubySource.replace(RUBY_COMMENT, "").split("\n");
+  const lines = rubySource.replace(RUBY_COMMENT, "").split("\n").map(stripStringLiterals);
   const bodies: RubyDefBody[] = [];
   for (let i = 0; i < lines.length; i++) {
     const m = DEF_LINE.exec(lines[i]);
@@ -207,13 +219,14 @@ export function asyncMethodsForRailsFile(
 ): Set<string> {
   const short = railsRelPath.replace(/^active_record\//, "");
   const twinTsPath = rubyFileToTs(short);
-  const twinTs = readFileOr(path.join(TRAILS_AR_SRC, twinTsPath));
+  const twinTsAbs = path.join(TRAILS_AR_SRC, twinTsPath);
+  const twinTs = readFileOr(twinTsAbs);
   const relationFamily = short.startsWith("relation/") || short === "relation.rb";
   return resolveAsyncNames({
     twinTs,
     relationTs: relationFamily ? readFileOr(path.join(TRAILS_AR_SRC, "relation.ts")) : undefined,
     ownRubyDefs: relationFamily ? railsDefinedMethods(railsRelPath) : undefined,
     crossFile: crossFileAsyncNames(manifest, { twinTsPath, railsDefs: railsCorpusDefs() }),
-    inferFromRuby: twinTs === "" ? railsSource(railsRelPath) : undefined,
+    inferFromRuby: existsSync(twinTsAbs) ? undefined : railsSource(railsRelPath),
   });
 }

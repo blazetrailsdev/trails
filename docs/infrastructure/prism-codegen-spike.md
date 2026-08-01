@@ -327,7 +327,13 @@ computes at runtime:
    itself async, taken to a fixpoint so the marking propagates up chains of
    same-file callers. The seed is exactly the unambiguous manifest set above, so
    the receiver-blind guard still holds; the pass is skipped whenever a twin
-   exists, since there the port is the authority.
+   exists, since there the port is the authority. The body scan is textual, not
+   a parse: comments and string literals are stripped (`#{}` interpolation is
+   kept — it is real code), but a name reached only through metaprogramming
+   (`send(:perform_save)`) or named inside a heredoc still reads as a call, and
+   the marking is receiver-blind here too. The failure mode is a def marked
+   `async` that emits no `await`, and the fixpoint can propagate that to its
+   same-file callers.
 4. **Ruby stdlib idioms pass through untranslated.** `attributes.collect { }`,
    `arr.first`, `Array(x)`, `raise` — emitted verbatim; no runtime shim.
 5. **Metaprogramming is opaque.** `define_method`, `method_missing`, `send`,

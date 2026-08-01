@@ -430,6 +430,28 @@ end`,
     );
     expect(inferred.size).toBe(0);
   });
+  it("ignores an async name that only appears inside a string literal", () => {
+    const inferred = inferAsyncFromBodies(
+      `def reset
+  raise ArgumentError, "cannot perform_save while resetting"
+end
+
+def label
+  'perform_save'
+end`,
+      new Set(["performSave"]),
+    );
+    expect(inferred.size).toBe(0);
+  });
+  it("still infers from a call inside string interpolation", () => {
+    const inferred = inferAsyncFromBodies(
+      `def describe
+  "saved as #{perform_save}"
+end`,
+      new Set(["performSave"]),
+    );
+    expect(inferred.has("describe")).toBe(true);
+  });
   it("infers nothing when no body reaches an unambiguous async name", () => {
     const inferred = inferAsyncFromBodies(
       `def reset
