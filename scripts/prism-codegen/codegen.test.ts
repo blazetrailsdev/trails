@@ -111,6 +111,142 @@ describe("prism-codegen", () => {
     expect(code).not.toContain("await this.scope.first()");
     expect(code).not.toContain("await ids.first().first()");
   });
+  it("awaits through a receiver assigned from an async self-call", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all
+          @relation = build_relation()
+          @relation.load
+          rel = self.build_relation
+          rel.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).toContain("this.relation = await this.buildRelation()");
+    expect(code).toContain("await this.relation.load()");
+    expect(code).toContain("await rel.load()");
+  });
+  it("leaves a receiver of unknown provenance bare", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all(arg)
+          @relation.load
+          arg.load
+          @other = arg
+          @other.load
+        end
+      end`,
+      new Set(["load", "loadAll"]),
+    );
+    expect(code).not.toContain("await this.relation.load()");
+    expect(code).not.toContain("await arg.load()");
+    expect(code).not.toContain("await this.other.load()");
+  });
+  it("claims no provenance from a paren-less self-call, which emits a method reference", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all
+          @relation = build_relation
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).toContain("this.relation = this.buildRelation;");
+    expect(code).not.toContain("await this.relation.load()");
+  });
+  it("stops awaiting a receiver reassigned from an unknown value", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all(arg)
+          @relation = build_relation()
+          @relation.load
+          @relation = arg
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).toContain("await this.relation.load()");
+    expect(code.match(/await this\.relation\.load\(\)/g)).toHaveLength(1);
+  });
+  it("stops awaiting a receiver rebound by a logical or destructuring write", async () => {
+    const orWrite = await generateFromSource(
+      `module M
+        def load_all(arg)
+          @relation = build_relation()
+          @relation ||= arg
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(orWrite.code).not.toContain("await this.relation.load()");
+    const multiWrite = await generateFromSource(
+      `module M
+        def load_all(arg)
+          rel = build_relation()
+          rel, other = arg
+          rel.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(multiWrite.code).not.toContain("await rel.load()");
+  });
+  it("stops awaiting a receiver rebound by an operator write", async () => {
+    const ivarWrite = await generateFromSource(
+      `module M
+        def load_all(arg)
+          @relation = build_relation()
+          @relation += arg
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(ivarWrite.code).not.toContain("await this.relation.load()");
+    const localWrite = await generateFromSource(
+      `module M
+        def load_all(arg)
+          rel = build_relation()
+          rel += arg
+          rel.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(localWrite.code).not.toContain("await rel.load()");
+  });
+  it("stops awaiting a receiver rebound by a nested destructuring target", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all(arg)
+          rel = build_relation()
+          first, (rel, _rest) = arg
+          rel.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).not.toContain("await rel.load()");
+  });
+  it("does not carry async provenance across defs", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all
+          @relation = build_relation()
+          @relation.load
+        end
+        def reload_all
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "reloadAll", "buildRelation"]),
+    );
+    expect(code.match(/await this\.relation\.load\(\)/g)).toHaveLength(1);
+  });
   it("never awaits async-named calls inside a sync method", async () => {
     const { code } = await generateFromSource(
       `module M

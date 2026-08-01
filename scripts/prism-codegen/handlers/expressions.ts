@@ -4,7 +4,12 @@ import type { Registry } from "../registry.js";
 import { methodName, isJsIdentName, isBindableIdent } from "../naming.js";
 import { rubyStr } from "../types.js";
 import { TOPLEVEL } from "../codegen.js";
-import { shouldAwaitCall } from "../await-policy.js";
+import {
+  asyncBindingKey,
+  clearAsyncProvenance,
+  hasAsyncProvenance,
+  shouldAwaitCall,
+} from "../await-policy.js";
 const f = ts.factory;
 const INFIX: Record<string, ts.BinaryOperator> = {
   "==": ts.SyntaxKind.EqualsEqualsEqualsToken,
@@ -43,11 +48,13 @@ export function registerExpressions(r: Registry): void {
   r.on("LocalVariableWriteNode", (n, e) => {
     if (!isBindableIdent(String(n.name))) return null;
     e.declared.add(String(n.name));
+    trackAsyncProvenance(n, e);
     return f.createAssignment(f.createIdentifier(String(n.name)), e.expr(n.value as PrismNode));
   });
-  r.on("InstanceVariableWriteNode", (n, e) =>
-    f.createAssignment(thisProp(n.name), e.expr(n.value as PrismNode)),
-  );
+  r.on("InstanceVariableWriteNode", (n, e) => {
+    trackAsyncProvenance(n, e);
+    return f.createAssignment(thisProp(n.name), e.expr(n.value as PrismNode));
+  });
   r.on("ClassVariableWriteNode", (n, e) =>
     f.createAssignment(
       f.createPropertyAccessExpression(
@@ -65,6 +72,7 @@ export function registerExpressions(r: Registry): void {
   );
   r.on("MultiWriteNode", (n, e) => {
     if (n.rest || !((n.lefts as PrismNode[]) ?? []).every(isEmittableTarget)) return null;
+    for (const l of (n.lefts as PrismNode[]) ?? []) clearAsyncProvenance(l, e.asyncBindings);
     const lefts = ((n.lefts as PrismNode[]) ?? []).map((l) => e.expr(l));
     return f.createAssignment(f.createArrayLiteralExpression(lefts), e.expr(n.value as PrismNode));
   });
@@ -132,6 +140,7 @@ function logicalWrite(
   n: PrismNode,
   e: Emitter,
 ): ts.Expression {
+  clearAsyncProvenance(n, e.asyncBindings);
   return f.createBinaryExpression(target, op as ts.BinaryOperator, e.expr(n.value as PrismNode));
 }
 function argExprs(node: PrismNode | undefined | null, e: Emitter): ts.Expression[] {
@@ -277,9 +286,19 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
     jsName,
     inAsyncMethod: e.inAsyncMethod,
     asyncMethods: e.asyncMethods,
+    asyncBindings: e.asyncBindings,
   })
     ? f.createAwaitExpression(call)
     : call;
+}
+function trackAsyncProvenance(n: PrismNode, e: Emitter): void {
+  const key = asyncBindingKey(n);
+  if (!key) return;
+  if (hasAsyncProvenance(n.value as PrismNode | null, methodName, e.asyncMethods)) {
+    e.asyncBindings.add(key);
+  } else {
+    e.asyncBindings.delete(key);
+  }
 }
 function symToProcArrow(prop: string): ts.ArrowFunction {
   return f.createArrowFunction(

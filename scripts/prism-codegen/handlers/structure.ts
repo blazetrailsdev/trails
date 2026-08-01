@@ -162,6 +162,12 @@ function defParts(
       declared: Set<string>;
     }
   ).declared = new Set();
+  const prevBindings = e.asyncBindings;
+  (
+    e as {
+      asyncBindings: Set<string>;
+    }
+  ).asyncBindings = new Set();
   e.inAsyncMethod = isAsync;
   e.inLoop = false;
   const params = emitParams(n.parameters as PrismNode | undefined, e);
@@ -188,6 +194,11 @@ function defParts(
       declared: Set<string>;
     }
   ).declared = prevDeclared;
+  (
+    e as {
+      asyncBindings: Set<string>;
+    }
+  ).asyncBindings = prevBindings;
   e.inAsyncMethod = prevAsync;
   e.inLoop = prevLoop;
   e.blockParamName = prevBlockName;

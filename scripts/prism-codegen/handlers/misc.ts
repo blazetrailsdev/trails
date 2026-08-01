@@ -2,6 +2,7 @@ import ts from "typescript";
 import { rubyStr, type Emitter, type PrismNode } from "../types.js";
 import type { Registry } from "../registry.js";
 import { methodName, isJsIdentName, isBindableIdent } from "../naming.js";
+import { clearAsyncProvenance } from "../await-policy.js";
 import { normalizeModuleName, OUTSIDE_CORPUS, type SuperResolution } from "../linearization.js";
 const f = ts.factory;
 const COMPOUND: Record<string, ts.BinaryOperator> = {
@@ -42,6 +43,7 @@ export function registerMisc(r: Registry): void {
     const op = COMPOUND[String(n.binaryOperator)];
     if (!op || !isBindableIdent(String(n.name))) return null;
     e.declared.add(String(n.name));
+    clearAsyncProvenance(n, e.asyncBindings);
     return f.createBinaryExpression(
       f.createIdentifier(String(n.name)),
       op,
@@ -51,6 +53,7 @@ export function registerMisc(r: Registry): void {
   r.on("InstanceVariableOperatorWriteNode", (n, e) => {
     const op = COMPOUND[String(n.binaryOperator)];
     if (!op) return null;
+    clearAsyncProvenance(n, e.asyncBindings);
     return f.createBinaryExpression(thisProp(n.name), op, e.expr(n.value as PrismNode));
   });
   r.on("CallOperatorWriteNode", (n, e) => {

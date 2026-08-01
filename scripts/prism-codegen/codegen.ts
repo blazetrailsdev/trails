@@ -38,6 +38,7 @@ export class Codegen implements Emitter {
   readonly helpers = new Set<string>();
   blockParamName: string | null = null;
   declared = new Set<string>();
+  asyncBindings = new Set<string>();
   constructor(
     private readonly registry: Registry,
     readonly asyncMethods: ReadonlySet<string> = new Set(),
