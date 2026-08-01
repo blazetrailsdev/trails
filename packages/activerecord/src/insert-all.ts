@@ -6,13 +6,14 @@ import { realPool } from "./connection-adapters/abstract/connection-pool.js";
 import { UnknownAttributeError } from "./errors.js";
 import type { Base } from "./base.js";
 
-// `quoteSqlValue` lives in base.ts, but importing it for its value would put a
-// load-time edge back into `base.ts` — and base.ts's own mixin wiring then
-// depends on which module the import graph is entered through. base.ts pushes
-// the helper in at the end of its module body instead.
 let _quoteSqlValue: ((v: unknown, dialect?: AdapterName) => string) | undefined;
 
-/** @internal Called from base.ts at module init. */
+/**
+ * @internal Receives base.ts's `quoteSqlValue` at module init. Importing it for
+ * its value would be a load-time edge putting base.ts in an import cycle,
+ * leaving its own module-evaluation-time mixin wiring dependent on the graph's
+ * entry order.
+ */
 export function _registerQuoteSqlValue(fn: (v: unknown, dialect?: AdapterName) => string): void {
   _quoteSqlValue = fn;
 }

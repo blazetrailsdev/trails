@@ -407,14 +407,6 @@ export type PrimaryKeyScalar = string | number | bigint | null | undefined;
  */
 export type PrimaryKeyValue = PrimaryKeyScalar | PrimaryKeyScalar[];
 
-// relation.ts used to push `Relation`, `wrapWithScopeProxy` and
-// `relationClassFor` into base.ts from its own module body, which meant
-// relation.ts imported base.js for its value and so formed an import cycle with
-// it — leaving base.ts's mixin wiring below dependent on which module the graph
-// happened to be entered through. base.ts imports them directly now; relation.ts
-// no longer imports base.js for its value, so relation.ts is guaranteed to have
-// finished evaluating by the time this module body runs.
-
 /**
  * @internal The per-model `Relation` subclass ctor (Rails' `relation_class_for`).
  * Base relations are constructed from the per-model subclass so generated
@@ -5252,17 +5244,12 @@ Table.engine = {
   },
 };
 
-// ---------------------------------------------------------------------------
-// Late-bound registrations.
-//
 // Rails resolves `ActiveRecord::Base` at call time through autoload, so none of
 // these modules `require` base.rb. In ESM a value import is a load-time edge,
-// and an edge back into base.ts makes base.ts a cycle member — which decides,
-// purely by which module the graph is entered through, whether the mixin wiring
-// above reads initialized bindings or hits a TDZ ReferenceError. Every consumer
-// that only needs `Base` at call time therefore takes it from here instead, and
-// base.ts (which by construction evaluates after everything it imports) pushes.
-// ---------------------------------------------------------------------------
+// and an edge back into base.ts would make base.ts a cycle member — deciding,
+// purely by the graph's entry point, whether the mixin wiring above reads
+// initialized bindings or hits a TDZ ReferenceError. Consumers that only need
+// `Base` at call time take it from here instead.
 
 _registerBaseWithSchemaMigration(Base);
 _registerBaseWithInternalMetadata(Base);

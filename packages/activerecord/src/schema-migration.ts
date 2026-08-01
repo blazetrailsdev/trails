@@ -9,15 +9,15 @@ import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
 import { Table, SelectManager, InsertManager, DeleteManager, Nodes, star } from "@blazetrails/arel";
 
-// `base.js` is deliberately NOT imported for its value here. Rails resolves
-// `ActiveRecord::Base` at call time via autoload (schema_migration.rb:50), so an
-// import edge would be a trails invention — and a load-time edge back into
-// `base.ts` puts it in an import cycle whose evaluation order then decides
-// whether base.ts's own mixin wiring reads initialized bindings. base.ts
-// pushes itself in at the end of its module body instead.
 let _base: typeof Base | undefined;
 
-/** @internal Called from base.ts at module init. */
+/**
+ * @internal Receives `ActiveRecord::Base` from base.ts at module init. Rails
+ * resolves the constant at call time via autoload (schema_migration.rb:50), so base.rb
+ * is not required here; in ESM a value import of `base.js` would instead be a
+ * load-time edge putting base.ts in an import cycle, leaving its own
+ * module-evaluation-time mixin wiring dependent on the graph's entry order.
+ */
 export function _registerBase(base: typeof Base): void {
   _base = base;
 }
