@@ -80,6 +80,36 @@ export function countParseErrors(code: string): number {
     ).parseDiagnostics ?? []
   ).length;
 }
+/** Awaits that land in a function not marked `async` — invalid JS the printer cannot catch. */
+export function countAwaitsOutsideAsync(code: string): number {
+  const source = ts.createSourceFile(
+    "gen.js",
+    code,
+    ts.ScriptTarget.ESNext,
+    true,
+    ts.ScriptKind.JS,
+  );
+  let count = 0;
+  const walk = (node: ts.Node, inAsync: boolean): void => {
+    if (ts.isAwaitExpression(node) && !inAsync) count += 1;
+    const isFunction =
+      ts.isFunctionDeclaration(node) ||
+      ts.isFunctionExpression(node) ||
+      ts.isArrowFunction(node) ||
+      ts.isMethodDeclaration(node) ||
+      ts.isGetAccessorDeclaration(node) ||
+      ts.isSetAccessorDeclaration(node) ||
+      ts.isConstructorDeclaration(node);
+    const scope = isFunction
+      ? ((node as { modifiers?: readonly ts.ModifierLike[] }).modifiers ?? []).some(
+          (m) => m.kind === ts.SyntaxKind.AsyncKeyword,
+        )
+      : inAsync;
+    node.forEachChild((child) => walk(child, scope));
+  };
+  walk(source, true);
+  return count;
+}
 export { summarizeCoverage } from "./coverage.js";
 export { TARGET_FILES } from "./files.js";
 export { asyncMethodsForRailsFile } from "./async-source.js";
