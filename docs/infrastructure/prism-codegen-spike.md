@@ -449,6 +449,36 @@ residue rows in the seeded baseline. That number is the burndown target, not a
 verdict: most rows differ by several tokens at once, which the per-call exclude
 lists cannot explain on their own.
 
+## Scaffolding accelerator (`pnpm codegen:apply`)
+
+```
+pnpm codegen:apply <rails-file> <method> [--dry-run]
+```
+
+Inserts the generated body for one clean def into the Rails twin port file, at
+the Rails-layout position — immediately after the nearest preceding generated
+def that is already ported, or before the nearest following one, or at end of
+file when no sibling is ported yet.
+
+**Draft-only contract.** The command is a typing accelerator, not a porting
+step:
+
+- It writes an unreviewed machine draft carrying a loud
+  `// PRISM-CODEGEN DRAFT` marker. The porting agent finishes the body against
+  `vendor/rails` under normal `test:compare` discipline and deletes the marker
+  before committing.
+- It never stages, commits, or formats anything, and it must **never** be wired
+  into an autofix step, a lint-staged entry, or a git hook. Nothing in CI runs
+  it.
+- It refuses rather than duplicating: if the method already exists in the twin
+  file, or if the global port index resolves it in any other file, the command
+  exits non-zero with the resolving file named. This is what the cross-file
+  resolver in the scorer buys us.
+- It refuses defs the generator could not translate cleanly (any
+  `__PRISM_TODO` passthrough) — those are hand-port work.
+
+`--dry-run` reports the insertion point without touching the file.
+
 ## Productionization roadmap
 
 Pursue only if the scaffolding value justifies it. Sequenced by the coverage
@@ -529,6 +559,8 @@ machinery:
 - Coverage metric: per-file + rollup + passthrough leaders (above).
 - Golden snapshots: `scripts/prism-codegen/__snapshots__/` + `pnpm codegen:snapshot`
   (above).
+- Scaffolding accelerator: `pnpm codegen:apply <rails-file> <method>` (draft
+  only — see above).
 - Convergence guard: `pnpm codegen:score --guard` + the checked-in residue
   baseline (above).
 - This RFC.
