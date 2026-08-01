@@ -3,11 +3,26 @@
  * pins the generic-option narrowing of `foreign_key_for!` / `defined_for?`
  * (`schema_statements.rb:1214-1224`, `schema_definitions.rb:161-167`), so this
  * lives outside the ported foreign-key.test.ts.
+ *
+ * The same goes for the SQLite3 `remove_column` composite-fk case at the
+ * bottom: `definition.foreign_keys.delete_if { |fk| fk.column == column_name }`
+ * (`sqlite3_adapter.rb:349-363`) compares the whole value, and a composite fk's
+ * `column` is an Array, so a member name never matches and the fk is carried
+ * into the rebuilt table — SQLite then rejects the CREATE TABLE because the
+ * child column is gone, which is the observable proof the fk was preserved.
+ * SQLite3-only: PostgreSQL and MySQL drop any fk covering a dropped column
+ * server-side, so there is no Ruby-side comparison to pin.
  */
 import { describe, it, expect } from "vitest";
+import { StatementInvalid } from "../errors.js";
 import { fixtures } from "../test-fixtures.js";
-import { ambientConnection, withRocketTables } from "../support/rocket-tables.js";
+import {
+  ambientConnection,
+  withCompositeRocketTables,
+  withRocketTables,
+} from "../support/rocket-tables.js";
 import { Base } from "../base.js";
+import { adapterType } from "../test-adapter.js";
 
 describe("removeForeignKey option narrowing", () => {
   fixtures([], { useTransactionalTests: false });
@@ -71,5 +86,30 @@ describe("renameColumn under a table_name_prefix", () => {
       await conn.dropTable("p_astronauts", "p_rockets", { ifExists: true });
       Base.tableNamePrefix = "";
     }
+  });
+});
+
+describe.skipIf(adapterType !== "sqlite")("removeColumn against a composite foreign key", () => {
+  fixtures([], { useTransactionalTests: false });
+
+  it("keeps the composite foreign key when a member column is removed", async () => {
+    const conn = await ambientConnection();
+    await withCompositeRocketTables(conn, async () => {
+      await conn.addForeignKey("astronauts", "rockets", { primaryKey: ["tenant_id", "id"] });
+
+      const error = await conn.removeColumn("astronauts", "rocket_tenant_id").then(
+        () => undefined,
+        (err: unknown) => err,
+      );
+
+      expect(error).toBeInstanceOf(StatementInvalid);
+      expect((error as Error).message).toMatch(
+        /unknown column "rocket_tenant_id" in foreign key definition/,
+      );
+
+      const foreignKeys = await conn.foreignKeys("astronauts");
+      expect(foreignKeys.length).toBe(1);
+      expect(foreignKeys[0].column).toEqual(["rocket_tenant_id", "rocket_id"]);
+    });
   });
 });
