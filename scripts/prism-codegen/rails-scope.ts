@@ -53,21 +53,25 @@ export function mixinPathCandidates(fromRel: string, moduleName: string): string
   return [...new Set([nested, sibling, tail])];
 }
 
+/** Reads one Rails source by its `active_record/`-relative path. */
+export type RubySourceReader = (railsRelPath: string) => string | undefined;
+
+const readRuby: RubySourceReader = (rel) => {
+  const abs = rubyAbsPathFor(rel);
+  return existsSync(abs) ? readFileSync(abs, "utf8") : undefined;
+};
+
 /** Ruby method names defined directly in one Rails file. */
 export function ownRailsDefs(railsRelPath: string): Set<string> {
   return rubyDefinedMethods(readRuby(stripPrefix(railsRelPath)) ?? "");
-}
-
-function readRuby(rel: string): string | undefined {
-  const abs = rubyAbsPathFor(rel);
-  return existsSync(abs) ? readFileSync(abs, "utf8") : undefined;
 }
 
 const reachableCache = new Map<string, Set<string>>();
 
 /**
  * Every Ruby method name reachable from `railsRelPath` — the file's own `def`s
- * plus those of the modules it includes/extends, transitively.
+ * plus those of the modules it includes/extends, transitively. `readSource`
+ * defaults to the vendored Rails checkout.
  *
  * The await rule is taken on a bare callee name, so the set it consults has to
  * be the set of methods the generated file's `self` could actually dispatch
@@ -79,8 +83,11 @@ const reachableCache = new Map<string, Set<string>>();
  * `ExplainProxy`) counts as reachable. That errs toward the old, wider scope
  * and never drops a name the file really can dispatch to.
  */
-export function reachableRailsDefs(railsRelPath: string): Set<string> {
-  const cached = reachableCache.get(railsRelPath);
+export function reachableRailsDefs(
+  railsRelPath: string,
+  readSource: RubySourceReader = readRuby,
+): Set<string> {
+  const cached = readSource === readRuby ? reachableCache.get(railsRelPath) : undefined;
   if (cached) return cached;
   const defs = new Set<string>();
   const seen = new Set<string>();
@@ -89,15 +96,15 @@ export function reachableRailsDefs(railsRelPath: string): Set<string> {
     const rel = queue.shift() as string;
     if (seen.has(rel)) continue;
     seen.add(rel);
-    const source = readRuby(rel);
+    const source = readSource(rel);
     if (source === undefined) continue;
     for (const name of rubyDefinedMethods(source)) defs.add(name);
     for (const mixin of parseMixinNames(source)) {
       for (const candidate of mixinPathCandidates(rel, mixin)) {
-        if (!seen.has(candidate) && existsSync(rubyAbsPathFor(candidate))) queue.push(candidate);
+        if (!seen.has(candidate) && readSource(candidate) !== undefined) queue.push(candidate);
       }
     }
   }
-  reachableCache.set(railsRelPath, defs);
+  if (readSource === readRuby) reachableCache.set(railsRelPath, defs);
   return defs;
 }

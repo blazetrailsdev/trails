@@ -1,10 +1,37 @@
 import { describe, it, expect } from "vitest";
-import { mixinPathCandidates, parseMixinNames, reachableRailsDefs } from "./rails-scope.js";
 import {
-  asyncMethodsForRailsFile,
-  buildAsyncManifest,
-  crossFileAsyncNames,
-} from "./async-source.js";
+  mixinPathCandidates,
+  parseMixinNames,
+  reachableRailsDefs,
+  type RubySourceReader,
+} from "./rails-scope.js";
+import { buildAsyncManifest, crossFileAsyncNames } from "./async-source.js";
+
+/**
+ * Rails' own layout, trimmed to the shape that matters: `relation.rb` mixes in
+ * seven modules on one `include` line (relation.rb:68), and `finder_methods.rb`
+ * mixes in nothing.
+ */
+const RAILS: Record<string, string> = {
+  "relation.rb": `
+    module ActiveRecord
+      class Relation
+        include Enumerable
+        include FinderMethods, Calculations, SpawnMethods, QueryMethods, Batches, Explain, Delegation
+        def scoping; end
+      end
+    end
+  `,
+  "relation/finder_methods.rb": `def find_by; end\ndef find; end`,
+  "relation/calculations.rb": `def calculate; end\ndef pluck; end`,
+  "relation/query_methods.rb": `def where; end`,
+  "relation/spawn_methods.rb": `def merge; end`,
+  "relation/batches.rb": `def find_each; end`,
+  "relation/explain.rb": `def explain; end`,
+  "relation/delegation.rb": `def klass; end`,
+};
+
+const reader: RubySourceReader = (rel) => RAILS[rel];
 
 describe("prism-codegen rails scope", () => {
   it("reads the include/extend constants out of a Ruby source", () => {
@@ -34,14 +61,19 @@ describe("prism-codegen rails scope", () => {
     ).toEqual(["relation/query_methods/core.rb", "relation/core.rb", "core.rb"]);
   });
 
-  it("reaches the defs of the modules a Rails file includes", () => {
-    const relation = reachableRailsDefs("active_record/relation.rb");
+  it("reaches the defs of every module a Rails file includes", () => {
+    const relation = reachableRailsDefs("active_record/relation.rb", reader);
+    expect(relation.has("scoping")).toBe(true);
     expect(relation.has("findBy")).toBe(true);
     expect(relation.has("calculate")).toBe(true);
     expect(relation.has("where")).toBe(true);
-    expect(relation.has("scoping")).toBe(true);
-    expect(reachableRailsDefs("active_record/relation/finder_methods.rb").has("pluck")).toBe(false);
-    expect(reachableRailsDefs("active_record/relation/finder_methods.rb").has("where")).toBe(false);
+    expect(relation.has("merge")).toBe(true);
+    expect(relation.has("findEach")).toBe(true);
+
+    const finderMethods = reachableRailsDefs("active_record/relation/finder_methods.rb", reader);
+    expect(finderMethods.has("find")).toBe(true);
+    expect(finderMethods.has("where")).toBe(false);
+    expect(finderMethods.has("pluck")).toBe(false);
   });
 
   it("declines a cross-file async name the generating Rails file cannot dispatch to", () => {
@@ -49,19 +81,13 @@ describe("prism-codegen rails scope", () => {
       { path: "relation/calculations.ts", source: `class C { async pluck() {} }` },
     ]);
     const scoped = (railsRelPath: string, twinTsPath: string) =>
-      crossFileAsyncNames(manifest, { twinTsPath, railsDefs: reachableRailsDefs(railsRelPath) });
+      crossFileAsyncNames(manifest, {
+        twinTsPath,
+        railsDefs: reachableRailsDefs(railsRelPath, reader),
+      });
     expect(scoped("active_record/relation.rb", "relation.ts").has("pluck")).toBe(true);
     expect(
       scoped("active_record/relation/finder_methods.rb", "relation/finder-methods.ts").has("pluck"),
     ).toBe(false);
-  });
-
-  it("keeps a name async where Rails defines it and sync where it does not", () => {
-    expect(asyncMethodsForRailsFile("active_record/relation/calculations.rb").has("pluck")).toBe(
-      true,
-    );
-    expect(asyncMethodsForRailsFile("active_record/relation/finder_methods.rb").has("pluck")).toBe(
-      false,
-    );
   });
 });
