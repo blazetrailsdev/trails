@@ -141,8 +141,8 @@ describe("prism-codegen rails scope", () => {
     expect(unresolvedMixinReport()).toEqual([]);
   });
 
-  it("reaches the defs of every module a Rails file includes", () => {
-    const relation = reachableRailsDefs("active_record/relation.rb", reader);
+  it("reaches the defs of every module a Rails file includes", async () => {
+    const relation = await reachableRailsDefs("active_record/relation.rb", reader);
     expect(relation.has("scoping")).toBe(true);
     expect(relation.has("findBy")).toBe(true);
     expect(relation.has("calculate")).toBe(true);
@@ -150,24 +150,54 @@ describe("prism-codegen rails scope", () => {
     expect(relation.has("merge")).toBe(true);
     expect(relation.has("findEach")).toBe(true);
 
-    const finderMethods = reachableRailsDefs("active_record/relation/finder_methods.rb", reader);
+    const finderMethods = await reachableRailsDefs(
+      "active_record/relation/finder_methods.rb",
+      reader,
+    );
     expect(finderMethods.has("find")).toBe(true);
     expect(finderMethods.has("where")).toBe(false);
     expect(finderMethods.has("pluck")).toBe(false);
   });
 
-  it("declines a cross-file async name the generating Rails file cannot dispatch to", () => {
+  it("leaves an inner class's defs out of the enclosing file's scope", async () => {
+    const withInnerClass: RubySourceReader = (rel) =>
+      rel === "relation.rb"
+        ? `
+          module ActiveRecord
+            class Relation
+              class ExplainProxy
+                def explain_proxy_only; end
+              end
+              module ClassMethods
+                def mixed_in; end
+              end
+              def scoping; end
+              def self.create; end
+            end
+          end
+        `
+        : undefined;
+    const defs = await reachableRailsDefs("active_record/relation.rb", withInnerClass);
+    expect(defs.has("scoping")).toBe(true);
+    expect(defs.has("create")).toBe(true);
+    expect(defs.has("mixedIn")).toBe(true);
+    expect(defs.has("explainProxyOnly")).toBe(false);
+  });
+
+  it("declines a cross-file async name the generating Rails file cannot dispatch to", async () => {
     const manifest = buildAsyncManifest([
       { path: "relation/calculations.ts", source: `class C { async pluck() {} }` },
     ]);
-    const scoped = (railsRelPath: string, twinTsPath: string) =>
+    const scoped = async (railsRelPath: string, twinTsPath: string) =>
       crossFileAsyncNames(manifest, {
         twinTsPath,
-        railsDefs: reachableRailsDefs(railsRelPath, reader),
+        railsDefs: await reachableRailsDefs(railsRelPath, reader),
       });
-    expect(scoped("active_record/relation.rb", "relation.ts").has("pluck")).toBe(true);
+    expect((await scoped("active_record/relation.rb", "relation.ts")).has("pluck")).toBe(true);
     expect(
-      scoped("active_record/relation/finder_methods.rb", "relation/finder-methods.ts").has("pluck"),
+      (await scoped("active_record/relation/finder_methods.rb", "relation/finder-methods.ts")).has(
+        "pluck",
+      ),
     ).toBe(false);
   });
 });

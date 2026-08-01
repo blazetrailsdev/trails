@@ -203,7 +203,7 @@ async function main() {
     }
     const { code, perDef } = await generateFromSource(
       readFileSync(rubyAbsPath(f), "utf8"),
-      asyncMethodsForRailsFile(f.ruby, asyncManifest),
+      await asyncMethodsForRailsFile(f.ruby, asyncManifest),
       runtimeImportPathFor(outNameFor(f)),
       await inheritedDelegationsFor(f),
       await targetLinearization(),
