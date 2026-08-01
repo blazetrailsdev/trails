@@ -2,7 +2,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { generateFromSource, type GenResult } from "./index.js";
 import { asyncMethodsForRailsFile } from "./async-source.js";
-import { portMethodsForRailsFile } from "./port-symbols.js";
+import { portMethodNames } from "./port-symbols.js";
 import {
   TARGET_FILES,
   rubyAbsPath,
@@ -88,7 +88,7 @@ export async function generateTarget(f: TargetFile): Promise<GeneratedTarget> {
     runtimeImportPathFor(outName),
     await inheritedDelegationsFor(f),
     await targetLinearization(),
-    portMethodsForRailsFile(f.ruby),
+    portMethodNames(),
   );
   return { ...result, file: f, outName };
 }

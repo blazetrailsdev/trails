@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { generateFromSource } from "./index.js";
-import { buildPortSymbolManifest, extractPortSymbols, resolvePortMethods } from "./port-symbols.js";
+import { callableNames, extractPortSymbols, mergePortSymbols } from "./port-symbols.js";
 
 describe("port symbols", () => {
   it("splits a port file into callables and readables", () => {
@@ -20,25 +20,15 @@ describe("port symbols", () => {
   });
 
   it("declines a name the port spells as a getter anywhere in the tree", () => {
-    const manifest = buildPortSymbolManifest([
-      { path: "core.ts", source: `export function arelTable(this: Host): Table {}` },
-      { path: "base.ts", source: `export class Base { static get arelTable(): Table {} }` },
-      { path: "relation.ts", source: `export function buildRelation(this: Host) {}` },
-    ]);
-    const names = resolvePortMethods({ twinTs: "", manifest });
+    const names = callableNames(
+      mergePortSymbols([
+        { path: "core.ts", source: `export function arelTable(this: Host): Table {}` },
+        { path: "base.ts", source: `export class Base { static get arelTable(): Table {} }` },
+        { path: "relation.ts", source: `export function buildRelation(this: Host) {}` },
+      ]),
+    );
     expect(names.has("buildRelation")).toBe(true);
     expect(names.has("arelTable")).toBe(false);
-  });
-
-  it("declines a name the twin file itself spells as a getter", () => {
-    const manifest = buildPortSymbolManifest([
-      { path: "core.ts", source: `export function tableName(this: Host): string {}` },
-    ]);
-    const names = resolvePortMethods({
-      twinTs: `export class Relation { get tableName(): string {} }`,
-      manifest,
-    });
-    expect(names.has("tableName")).toBe(false);
   });
 
   it("emits a call for a paren-less self-call the port declares as a method", async () => {

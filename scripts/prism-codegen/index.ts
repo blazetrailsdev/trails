@@ -84,7 +84,7 @@ export function countParseErrors(code: string): number {
 export { summarizeCoverage } from "./coverage.js";
 export { TARGET_FILES } from "./files.js";
 export { asyncMethodsForRailsFile } from "./async-source.js";
-export { portMethodsForRailsFile } from "./port-symbols.js";
+export { portMethodNames } from "./port-symbols.js";
 export { type DelegationTable } from "./delegation.js";
 export { buildLinearization, Linearization, parseIncludeOrder } from "./linearization.js";
 

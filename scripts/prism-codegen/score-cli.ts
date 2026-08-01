@@ -2,7 +2,7 @@ import * as fs from "fs/promises";
 import { readFileSync, existsSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { portMethodsForRailsFile } from "./port-symbols.js";
+import { portMethodNames } from "./port-symbols.js";
 import { generateFromSource } from "./index.js";
 import { asyncMethodsForRailsFile, buildAsyncManifest } from "./async-source.js";
 import { TOPLEVEL } from "./codegen.js";
@@ -133,7 +133,7 @@ async function main() {
       runtimeImportPathFor(outNameFor(f)),
       await inheritedDelegationsFor(f),
       await targetLinearization(),
-      portMethodsForRailsFile(f.ruby),
+      portMethodNames(),
     );
     const cleanDefs = new Set(
       [...perDef].filter(([n, d]) => n !== TOPLEVEL && d.passthrough === 0).map(([n]) => n),
