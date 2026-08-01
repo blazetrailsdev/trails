@@ -174,7 +174,7 @@ const TOKEN_CANON: Record<string, string> = {
   size: "length",
 };
 
-function normalizeName(name: string): string {
+export function normalizeName(name: string): string {
   let n = name.replace(/^_+/, "");
   const perform = /^perform([A-Z])(.*)$/.exec(n);
   if (perform) n = perform[1].toLowerCase() + perform[2];
