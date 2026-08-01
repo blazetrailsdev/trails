@@ -2152,6 +2152,8 @@ export class Migrator {
   private readonly _options: MigratorOptions;
   private readonly _direction: "up" | "down";
   private readonly _targetVersion: number | string | null;
+  /** Rails: `@migrated_versions` (migration.rb:1479-1485). */
+  private _migratedVersions?: Set<string>;
 
   constructor(
     adapter: DatabaseAdapter,
@@ -2224,6 +2226,12 @@ export class Migrator {
     if (!locked) {
       throw new ConcurrentMigrationError();
     }
+    // Reload schema_migrations to be sure it wasn't changed by another process
+    // before we got the lock (migration.rb:1601). Rails' Migrator creates the
+    // bookkeeping tables in `initialize`; we can't await in a constructor, so
+    // ensure them here before the reload can query them.
+    await this._ensureSchemaTable();
+    await this.loadMigrated();
     // Capture fn error so we can release the lock before re-throwing (no-unsafe-finally).
     // Release errors are swallowed when fn itself failed so the migration error wins.
     const _sentinel = Symbol();
@@ -2288,6 +2296,17 @@ export class Migrator {
   }
 
   /**
+   * Rails builds a fresh `Migrator` for every `up` / `down` / `run`, so the
+   * caller's own `@migrated_versions` memo can never go stale. Our `Migrator`
+   * doubles as `MigrationContext` and is read again after delegating, so the
+   * memo has to be dropped once a per-run migrator has changed
+   * schema_migrations underneath it.
+   */
+  private _invalidateMigrated(): void {
+    this._migratedVersions = undefined;
+  }
+
+  /**
    * Run all pending migrations up to the target version (or all if no target).
    *
    * Mirrors: ActiveRecord::Migrator.up
@@ -2303,7 +2322,11 @@ export class Migrator {
       this._selectedMigrations(block),
       this._runOptions("up", targetVersion ?? null),
     );
-    return migrator._withAdvisoryLock(() => migrator.migrateWithoutLock());
+    try {
+      return await migrator._withAdvisoryLock(() => migrator.migrateWithoutLock());
+    } finally {
+      this._invalidateMigrated();
+    }
   }
 
   /**
@@ -2322,7 +2345,11 @@ export class Migrator {
       this._selectedMigrations(block),
       this._runOptions("down", targetVersion ?? null),
     );
-    return migrator._withAdvisoryLock(() => migrator.migrateWithoutLock());
+    try {
+      return await migrator._withAdvisoryLock(() => migrator.migrateWithoutLock());
+    } finally {
+      this._invalidateMigrated();
+    }
   }
 
   /**
@@ -2337,7 +2364,7 @@ export class Migrator {
     let rolledBack: MigrationProxy[] = [];
     await this._withAdvisoryLock(async () => {
       await this._ensureSchemaTable();
-      const applied = await this._appliedVersions();
+      const applied = await this.migrated();
       const appliedMigrations = this._migrations.filter((m) => applied.has(m.version)).reverse();
       const toRollback = appliedMigrations.slice(0, steps);
 
@@ -2394,7 +2421,7 @@ export class Migrator {
     const proxy = this._migrations.find((m) => m.version === key);
     if (!proxy) throw new UnknownMigrationVersionError(targetVersion);
     await this.recordEnvironment();
-    const applied = await this._appliedVersions();
+    const applied = await this.migrated();
     if (this.isUp() && applied.has(key)) return undefined;
     if (this.isDown() && !applied.has(key)) return undefined;
     await this._runMigration(proxy, this._direction);
@@ -2434,7 +2461,7 @@ export class Migrator {
 
   /** @internal Mirrors: ActiveRecord::Migrator#ran? */
   async isRan(proxy: MigrationProxy): Promise<boolean> {
-    const applied = await this._appliedVersions();
+    const applied = await this.migrated();
     return applied.has(proxy.version);
   }
 
@@ -2457,9 +2484,12 @@ export class Migrator {
     version: string,
     direction: "up" | "down" = "up",
   ): Promise<void> {
+    const migrated = await this.migrated();
     if (direction === "up") {
+      migrated.add(version);
       await this._schemaMigration.recordVersion(version);
     } else {
+      migrated.delete(version);
       await this._schemaMigration.deleteVersion(version);
     }
   }
@@ -2599,7 +2629,7 @@ export class Migrator {
    */
   async pendingMigrations(): Promise<MigrationProxy[]> {
     await this._ensureSchemaTable();
-    const applied = await this._appliedVersions();
+    const applied = await this.migrated();
     return this._migrations.filter((m) => !applied.has(m.version));
   }
 
@@ -2882,12 +2912,16 @@ export class Migrator {
       this._migrations,
       this._runOptions(direction, targetVersion),
     );
-    return migrator._withAdvisoryLock(() => migrator.runWithoutLock());
+    try {
+      return await migrator._withAdvisoryLock(() => migrator.runWithoutLock());
+    } finally {
+      this._invalidateMigrated();
+    }
   }
 
   private async _migrateUp(targetVersion: number | string | null): Promise<MigrationProxy[]> {
     const target = targetVersion !== null ? BigInt(targetVersion) : null;
-    const applied = await this._appliedVersions();
+    const applied = await this.migrated();
     const ran: MigrationProxy[] = [];
 
     for (const proxy of this._migrations) {
@@ -2904,7 +2938,7 @@ export class Migrator {
     // target_version), which — unlike `down(0)` — also reverts a version-0
     // migration.
     const target = targetVersion !== null ? BigInt(targetVersion) : null;
-    const applied = await this._appliedVersions();
+    const applied = await this.migrated();
     const toRevert = this._migrations
       .filter((m) => applied.has(m.version) && (target === null || BigInt(m.version) > target))
       .reverse();
@@ -2926,12 +2960,17 @@ export class Migrator {
       loaded.connection = this._adapter;
       await this._ddlTransaction(loaded, async () => {
         await loaded.migrate(direction);
+        // Track our own writes in the `migrated` memo, as Rails'
+        // record_version_state_after_migrating does (migration.rb:1554-1562).
+        const migrated = await this.migrated();
         if (direction === "up") {
+          migrated.add(proxy.version);
           await this._schemaMigration.recordVersion(proxy.version);
           if (this._internalMetadata.enabled) {
             await this._internalMetadata.set("environment", this._environment);
           }
         } else {
+          migrated.delete(proxy.version);
           await this._schemaMigration.deleteVersion(proxy.version);
         }
       });
@@ -3157,11 +3196,11 @@ export class Migrator {
   }
 
   async migrated(): Promise<Set<string>> {
-    return this._appliedVersions();
+    return this._migratedVersions ?? this.loadMigrated();
   }
 
   async loadMigrated(): Promise<Set<string>> {
-    return this._appliedVersions();
+    return (this._migratedVersions = await this._appliedVersions());
   }
 
   static migrationsPaths: string[] = [];
