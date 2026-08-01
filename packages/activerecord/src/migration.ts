@@ -2798,19 +2798,18 @@ export class Migrator {
     }
   }
 
-  private _schemaTablesCreated?: Promise<void>;
+  private _schemaTablesEnsured?: Promise<void>;
 
   /**
-   * Rails creates both bookkeeping tables as the last thing `Migrator#initialize`
-   * does (migration.rb:1429-1430), so every method downstream can assume they
-   * exist. `createTable` is async here and a constructor can't await, so the
-   * creation is memoized on the instance and awaited at the entry points
-   * instead. The memo is the deliberate stand-in for Rails' constructor-time
-   * creation: the tables are still created exactly once per Migrator, and a
-   * failure is cached the way a raise from `initialize` would be terminal.
+   * Deliberate stand-in for Rails' constructor-time creation: `initialize`
+   * creates both bookkeeping tables as its last act (migration.rb:1429-1430),
+   * so everything downstream may assume they exist. `createTable` is async and
+   * a constructor cannot await, so the creation is memoized here and awaited at
+   * the entry points instead — still exactly once per Migrator, and a failure
+   * stays terminal the way a raise from `initialize` would.
    */
   private _ensureSchemaTable(): Promise<void> {
-    return (this._schemaTablesCreated ??= (async () => {
+    return (this._schemaTablesEnsured ??= (async () => {
       await this._schemaMigration.createTable();
       await this._internalMetadata.createTable();
     })());
