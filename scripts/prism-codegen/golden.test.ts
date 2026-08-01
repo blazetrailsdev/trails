@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as fs from "fs/promises";
-import { countParseErrors } from "./index.js";
+import { countAwaitsOutsideAsync, countParseErrors } from "./index.js";
 import {
   generateTarget,
   outNameFor,
@@ -24,6 +24,11 @@ describe.skipIf(!vendored)("prism-codegen golden output", () => {
     it(`has zero parse errors in the checked-in image for ${f.ruby}`, async () => {
       const snapshot = await fs.readFile(snapshotPathFor(outName), "utf8");
       expect(countParseErrors(snapshot)).toBe(0);
+    });
+
+    it(`has no await outside an async function in the checked-in image for ${f.ruby}`, async () => {
+      const snapshot = await fs.readFile(snapshotPathFor(outName), "utf8");
+      expect(countAwaitsOutsideAsync(snapshot)).toBe(0);
     });
   }
 });

@@ -247,6 +247,21 @@ describe("prism-codegen", () => {
     );
     expect(code.match(/await this\.relation\.load\(\)/g)).toHaveLength(1);
   });
+  it("marks a block arrow async when its own body awaits, not when only a nested one does", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def create(attrs)
+          attrs.collect { |attr| save(attr) }
+          attrs.each { |attr| attr.each { |x| save(x) } }
+          attrs.each { |attr| attr.size }
+        end
+      end`,
+      new Set(["save", "create"]),
+    );
+    expect(code).toContain("attrs.collect(async (attr) => await this.save(attr))");
+    expect(code).toContain("attrs.each(attr => attr.each(async (x) => await this.save(x)))");
+    expect(code).toContain("attrs.each(attr => attr.size())");
+  });
   it("never awaits async-named calls inside a sync method", async () => {
     const { code } = await generateFromSource(
       `module M

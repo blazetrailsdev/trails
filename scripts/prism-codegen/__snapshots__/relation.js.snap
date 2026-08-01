@@ -54,7 +54,7 @@ export class Relation {
     }
     async create(attributes = null, block) {
         if (attributes.isA(Array)) {
-            return attributes.collect(attr => await this.create(attr, block));
+            return attributes.collect(async (attr) => await this.create(attr, block));
         }
         else {
             block = this.currentScopeRestoringBlock(block);
@@ -63,7 +63,7 @@ export class Relation {
     }
     async createBang(attributes = null, block) {
         if (attributes.isA(Array)) {
-            return attributes.collect(attr => await this.createBang(attr, block));
+            return attributes.collect(async (attr) => await this.createBang(attr, block));
         }
         else {
             block = this.currentScopeRestoringBlock(block);
@@ -86,9 +86,9 @@ export class Relation {
         return await this.findBy(attributes) || await this.createOrFindByBang(attributes, block);
     }
     createOrFindBy(attributes, block) {
-        return this.model.withConnection(connection => {
+        return this.model.withConnection(async (connection) => {
             try {
-                return this.model.transaction({ requires_new: true }, () => await this.create(attributes, block));
+                return this.model.transaction({ requires_new: true }, async () => await this.create(attributes, block));
             }
             catch (e) {
                 if (connection.isTransactionOpen()) {
@@ -101,9 +101,9 @@ export class Relation {
         });
     }
     createOrFindByBang(attributes, block) {
-        return this.model.withConnection(connection => {
+        return this.model.withConnection(async (connection) => {
             try {
-                return this.model.transaction({ requires_new: true }, () => await this.createBang(attributes, block));
+                return this.model.transaction({ requires_new: true }, async () => await this.createBang(attributes, block));
             }
             catch (e) {
                 if (connection.isTransactionOpen()) {
@@ -613,7 +613,7 @@ export class Relation {
     }
     execQueries(block) {
         let rows, records;
-        return this.skipQueryCacheIfNecessary(() => {
+        return this.skipQueryCacheIfNecessary(async () => {
             rows = __PRISM_TODO("IfNode");
             records = this.instantiateRecords(rows, block);
             if (!this.skipPreloadingValue) {

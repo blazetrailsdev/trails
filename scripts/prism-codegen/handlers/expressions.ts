@@ -325,7 +325,7 @@ function blockToArrow(block: PrismNode, names: string[], e: Emitter): ts.ArrowFu
   e.inLoop = prevLoop;
   if (body.length === 1 && ts.isReturnStatement(body[0]) && body[0].expression) {
     return f.createArrowFunction(
-      undefined,
+      asyncModifiers(body[0].expression),
       undefined,
       params,
       undefined,
@@ -333,14 +333,43 @@ function blockToArrow(block: PrismNode, names: string[], e: Emitter): ts.ArrowFu
       body[0].expression,
     );
   }
+  const blockBody = f.createBlock(body, true);
   return f.createArrowFunction(
-    undefined,
+    asyncModifiers(blockBody),
     undefined,
     params,
     undefined,
     undefined,
-    f.createBlock(body, true),
+    blockBody,
   );
+}
+
+function asyncModifiers(body: ts.Node): ts.Modifier[] | undefined {
+  return containsAwait(body) ? [f.createToken(ts.SyntaxKind.AsyncKeyword)] : undefined;
+}
+
+function containsAwait(node: ts.Node): boolean {
+  let found = false;
+  const visit = (child: ts.Node): void => {
+    if (found) return;
+    if (ts.isAwaitExpression(child)) {
+      found = true;
+      return;
+    }
+    if (
+      ts.isFunctionDeclaration(child) ||
+      ts.isFunctionExpression(child) ||
+      ts.isArrowFunction(child) ||
+      ts.isMethodDeclaration(child) ||
+      ts.isClassDeclaration(child) ||
+      ts.isClassExpression(child)
+    ) {
+      return;
+    }
+    ts.forEachChild(child, visit);
+  };
+  visit(node);
+  return found;
 }
 function blockParamNames(params: PrismNode | undefined): string[] | null {
   if (!params) return [];
