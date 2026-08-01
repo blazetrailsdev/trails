@@ -1,0 +1,32 @@
+[
+  {
+    "rubyFile": "active_record/core.rb",
+    "name": "isStrictLoading",
+    "reason": "Ruby reads the ivar `@strict_loading`; the port reads the `_strictLoading` field. Same single read, no branch — the whole divergence is the ivar spelling."
+  },
+  {
+    "rubyFile": "active_record/core.rb",
+    "name": "isStrictLoadingAll",
+    "reason": "`@strict_loading_mode == :all` vs `strictLoadingMode.call(this) === \"all\"` — the port routes the ivar read through the `strictLoadingMode` accessor, which is the same read."
+  },
+  {
+    "rubyFile": "active_record/core.rb",
+    "name": "isStrictLoadingNPlusOneOnly",
+    "reason": "`@strict_loading_mode == :n_plus_one_only` vs `strictLoadingMode.call(this) === \"n_plus_one_only\"` — the port routes the ivar read through the `strictLoadingMode` accessor, which is the same read."
+  },
+  {
+    "rubyFile": "active_record/persistence.rb",
+    "name": "isNewRecord",
+    "reason": "Ruby reads the ivar `@new_record`; the port reads the `_newRecord` field. Same single read — the whole divergence is the ivar spelling."
+  },
+  {
+    "rubyFile": "active_record/persistence.rb",
+    "name": "isPersisted",
+    "reason": "`!(@new_record || @destroyed)` vs `!this._newRecord && !this._destroyed` — De Morgan over the same two ivar reads, still bypassing any subclass override of new_record?/destroyed? as Rails does."
+  },
+  {
+    "rubyFile": "active_record/persistence.rb",
+    "name": "isPreviouslyNewRecord",
+    "reason": "Ruby reads the ivar `@previously_new_record`; the port reads the `_previouslyNewRecord` field. Same single read — the whole divergence is the ivar spelling."
+  }
+]
