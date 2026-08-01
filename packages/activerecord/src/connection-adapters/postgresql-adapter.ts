@@ -4129,10 +4129,6 @@ export class PostgreSQLAdapter
     return this.pgSchemaStatements().tableExists(name);
   }
 
-  async viewExists(name: string): Promise<boolean> {
-    return this.pgSchemaStatements().viewExists(name);
-  }
-
   async addIndex(
     tableName: string,
     columns: string | string[],
