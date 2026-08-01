@@ -867,3 +867,33 @@ describe("assumeMigratedUptoVersion", () => {
     ]);
   });
 });
+
+describe("SchemaStatements#createTable statement ordering", () => {
+  it("emits pending indexes before the comment block", async () => {
+    const order: string[] = [];
+    const ss = makeStatements({
+      execute: vi.fn(async (sql: string) => {
+        order.push(sql.startsWith("CREATE INDEX") ? "index" : "create");
+        return [];
+      }),
+      supportsComments: () => true,
+      supportsCommentsInCreate: () => false,
+      supportsIndexesInCreate: () => false,
+      changeTableComment: vi.fn(async () => {
+        order.push("tableComment");
+      }),
+      changeColumnComment: vi.fn(async () => {
+        order.push("columnComment");
+      }),
+    });
+
+    // Stub adapter — no database is touched, so there is nothing to tear down.
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await ss.createTable("things", { id: false, comment: "a table" }, (t) => {
+      t.column("name", "string", { comment: "a column" });
+      t.index(["name"]);
+    });
+
+    expect(order).toEqual(["create", "index", "tableComment", "columnComment"]);
+  });
+});
