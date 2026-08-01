@@ -332,6 +332,155 @@ describe("prism-codegen", () => {
     );
     expect(code).toContain("await this.relation.load()");
   });
+  it("awaits after a branch whose other arm returns instead of falling through", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all(flag)
+          if flag
+            return nil
+          else
+            @relation = build_relation()
+          end
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).toContain("await this.relation.load()");
+  });
+  it("awaits after a case whose only non-returning arm establishes provenance", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all(flag)
+          case flag
+          when :skip
+            return nil
+          else
+            @relation = build_relation()
+          end
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).toContain("await this.relation.load()");
+  });
+  it("ignores a retraction inside an arm that raises instead of falling through", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all(flag, arg)
+          @relation = build_relation()
+          if flag
+            @relation = arg
+            raise ArgumentError, "no"
+          end
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).toContain("await this.relation.load()");
+  });
+  it("treats a raise the emitter does not turn into a throw as falling through", async () => {
+    for (const tail of ["raise", "raise error_class, 1, 2"]) {
+      const { code } = await generateFromSource(
+        `module M
+          def load_all(flag, arg)
+            @relation = build_relation()
+            if flag
+              @relation = arg
+              ${tail}
+            end
+            @relation.load
+          end
+        end`,
+        new Set(["load", "loadAll", "buildRelation"]),
+      );
+      expect(code).not.toContain("throw");
+      expect(code).not.toContain("await this.relation.load()");
+    }
+  });
+  it("treats a next carrying a value as falling through, since no continue is emitted", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all(flag, arg)
+          @relation = build_relation()
+          while flag
+            if flag
+              @relation = arg
+              next 5
+            end
+          end
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).not.toContain("continue");
+    expect(code).not.toContain("await this.relation.load()");
+  });
+  it("treats a break outside a loop as falling through, since no break is emitted", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all(flag, arg)
+          @relation = build_relation()
+          if flag
+            @relation = arg
+            break
+          end
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).not.toContain("await this.relation.load()");
+  });
+  it("keeps provenance across a guard clause that returns", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all(flag, arg)
+          @relation = build_relation()
+          return nil if flag
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).toContain("await this.relation.load()");
+  });
+  it("awards no await from provenance established only in an arm that returns", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all(flag)
+          if flag
+            @relation = build_relation()
+            return nil
+          end
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).not.toContain("await this.relation.load()");
+  });
+  it("leaves bindings untouched when every arm of a branch returns", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all(flag, arg)
+          @relation = build_relation()
+          if flag
+            @relation = arg
+            return nil
+          else
+            return arg
+          end
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).toContain("await this.relation.load()");
+  });
   it("stops awaiting a receiver rebound by an operator write", async () => {
     const ivarWrite = await generateFromSource(
       `module M

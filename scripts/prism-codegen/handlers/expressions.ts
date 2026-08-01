@@ -344,7 +344,7 @@ function blockToArrow(block: PrismNode, names: string[], e: Emitter): ts.ArrowFu
   );
   const body = arm.value;
   e.inLoop = prevLoop;
-  mergeAsyncArms(e.asyncBindings, [arm.after], false);
+  mergeAsyncArms(e.asyncBindings, [arm], false);
   if (body.length === 1 && ts.isReturnStatement(body[0]) && body[0].expression) {
     return f.createArrowFunction(
       asyncModifiers(body[0].expression),

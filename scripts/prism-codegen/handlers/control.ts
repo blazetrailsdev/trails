@@ -1,7 +1,8 @@
 import ts from "typescript";
 import type { Emitter, PrismNode } from "../types.js";
 import type { Registry } from "../registry.js";
-import { mergeAsyncArms, scopeAsyncArm } from "../await-policy.js";
+import type { AsyncArm } from "../await-policy.js";
+import { isRaiseThrow, mergeAsyncArms, raiseArguments, scopeAsyncArm } from "../await-policy.js";
 const f = ts.factory;
 export function registerControl(r: Registry): void {
   r.onStmt("IfNode", (n, e, isLast) => [ifStmt(n, e, isLast, false)]);
@@ -13,9 +14,9 @@ export function registerControl(r: Registry): void {
     if (!consNode || !altNode) return null;
     let cond = e.expr(n.predicate as PrismNode);
     if (neg) cond = f.createLogicalNot(cond);
-    const consArm = scopeAsyncArm(e.asyncBindings, () => e.expr(consNode));
-    const altArm = scopeAsyncArm(e.asyncBindings, () => e.expr(altNode));
-    mergeAsyncArms(e.asyncBindings, [consArm.after, altArm.after], true);
+    const consArm = scopeAsyncArm(e.asyncBindings, () => e.expr(consNode), consNode, e.inLoop);
+    const altArm = scopeAsyncArm(e.asyncBindings, () => e.expr(altNode), altNode, e.inLoop);
+    mergeAsyncArms(e.asyncBindings, [consArm, altArm], true);
     const cons = consArm.value;
     const alt = altArm.value;
     return f.createConditionalExpression(
@@ -59,66 +60,67 @@ export function registerControl(r: Registry): void {
     if (rescue?.subsequent) return null;
     const ensure = n.ensureClause as PrismNode | undefined;
     if (!rescue && !ensure) return e.stmts((n.statements as PrismNode) ?? null, isLast);
-    const tryArm = scopeAsyncArm(e.asyncBindings, () =>
-      f.createBlock(e.stmts((n.statements as PrismNode) ?? null, isLast), true),
+    const tryArm = scopeAsyncArm(
+      e.asyncBindings,
+      () => f.createBlock(e.stmts((n.statements as PrismNode) ?? null, isLast), true),
+      (n.statements as PrismNode) ?? null,
+      e.inLoop,
     );
     let catchClause: ts.CatchClause | undefined;
-    let catchArm: Set<string> | undefined;
+    let catchArm: AsyncArm<ts.Block> | undefined;
     if (rescue) {
       const ref = rescue.reference ? String((rescue.reference as PrismNode).name) : "e";
-      const arm = scopeAsyncArm(e.asyncBindings, () =>
-        f.createBlock(e.stmts((rescue.statements as PrismNode) ?? null, isLast), true),
+      catchArm = scopeAsyncArm(
+        e.asyncBindings,
+        () => f.createBlock(e.stmts((rescue.statements as PrismNode) ?? null, isLast), true),
+        (rescue.statements as PrismNode) ?? null,
+        e.inLoop,
       );
-      catchArm = arm.after;
-      catchClause = f.createCatchClause(f.createVariableDeclaration(ref), arm.value);
+      catchClause = f.createCatchClause(f.createVariableDeclaration(ref), catchArm.value);
     }
-    mergeAsyncArms(e.asyncBindings, catchArm ? [tryArm.after, catchArm] : [tryArm.after], true);
+    mergeAsyncArms(e.asyncBindings, catchArm ? [tryArm, catchArm] : [tryArm], true);
     const finallyBlock = ensure
       ? f.createBlock(e.stmts((ensure.statements as PrismNode) ?? null, false), true)
       : undefined;
     return [f.createTryStatement(tryArm.value, catchClause, finallyBlock)];
   });
   r.onStmt("CallNode", (n, e) => {
-    if (String(n.name) !== "raise" || n.receiver || n.block) return null;
-    const args = ((n.arguments_ as PrismNode | null)?.arguments_ as PrismNode[]) ?? [];
-    if (args.length === 0) return null;
+    if (!isRaiseThrow(n)) return null;
+    const args = raiseArguments(n);
     if (args.length === 1) return [f.createThrowStatement(e.expr(args[0]))];
-    const head = args[0];
-    const headKind = head.constructor.name;
-    if (headKind === "ConstantReadNode" || headKind === "ConstantPathNode") {
-      return [
-        f.createThrowStatement(
-          f.createNewExpression(
-            e.expr(head),
-            undefined,
-            args.slice(1).map((a) => e.expr(a)),
-          ),
+    return [
+      f.createThrowStatement(
+        f.createNewExpression(
+          e.expr(args[0]),
+          undefined,
+          args.slice(1).map((a) => e.expr(a)),
         ),
-      ];
-    }
-    return null;
+      ),
+    ];
   });
 }
 function ifStmt(n: PrismNode, e: Emitter, isLast: boolean, negate: boolean): ts.Statement {
   let cond = e.expr(n.predicate as PrismNode);
   if (negate) cond = f.createLogicalNot(cond);
-  const thenArm = scopeAsyncArm(e.asyncBindings, () =>
-    f.createBlock(e.stmts((n.statements as PrismNode) ?? null, isLast), true),
+  const thenArm = scopeAsyncArm(
+    e.asyncBindings,
+    () => f.createBlock(e.stmts((n.statements as PrismNode) ?? null, isLast), true),
+    (n.statements as PrismNode) ?? null,
+    e.inLoop,
   );
   const sub = (n.subsequent ?? n.elseClause) as PrismNode | null;
-  let elseArm: { value: ts.Statement; after: Set<string> } | undefined;
+  let elseArm: AsyncArm<ts.Statement> | undefined;
   if (sub && sub.constructor.name === "ElseNode") {
-    elseArm = scopeAsyncArm(e.asyncBindings, () =>
-      f.createBlock(e.stmts((sub.statements as PrismNode) ?? null, isLast), true),
+    elseArm = scopeAsyncArm(
+      e.asyncBindings,
+      () => f.createBlock(e.stmts((sub.statements as PrismNode) ?? null, isLast), true),
+      (sub.statements as PrismNode) ?? null,
+      e.inLoop,
     );
   } else if (sub && sub.constructor.name === "IfNode") {
-    elseArm = scopeAsyncArm(e.asyncBindings, () => ifStmt(sub, e, isLast, false));
+    elseArm = scopeAsyncArm(e.asyncBindings, () => ifStmt(sub, e, isLast, false), sub, e.inLoop);
   }
-  mergeAsyncArms(
-    e.asyncBindings,
-    elseArm ? [thenArm.after, elseArm.after] : [thenArm.after],
-    elseArm != null,
-  );
+  mergeAsyncArms(e.asyncBindings, elseArm ? [thenArm, elseArm] : [thenArm], elseArm != null);
   return f.createIfStatement(cond, thenArm.value, elseArm?.value);
 }
 function loop(n: PrismNode, e: Emitter, negate: boolean): ts.Statement {
@@ -130,20 +132,24 @@ function loop(n: PrismNode, e: Emitter, negate: boolean): ts.Statement {
     f.createBlock(e.stmts((n.statements as PrismNode) ?? null, false), true),
   );
   e.inLoop = prevLoop;
-  mergeAsyncArms(e.asyncBindings, [body.after], false);
+  mergeAsyncArms(e.asyncBindings, [body], false);
   return f.createWhileStatement(cond, body.value);
 }
 function caseStmt(n: PrismNode, e: Emitter, isLast: boolean): ts.Statement[] | null {
   const conds = (n.conditions as PrismNode[]) ?? [];
   if (conds.some((w) => w.constructor.name !== "WhenNode")) return null;
   const subject = n.predicate ? e.expr(n.predicate as PrismNode) : undefined;
-  const arms: Set<string>[] = [];
+  const arms: AsyncArm<ts.Block>[] = [];
   let out: ts.Statement | undefined;
   if (n.elseClause) {
-    const elseArm = scopeAsyncArm(e.asyncBindings, () =>
-      f.createBlock(e.stmts((n.elseClause as PrismNode).statements as PrismNode, isLast), true),
+    const elseArm = scopeAsyncArm(
+      e.asyncBindings,
+      () =>
+        f.createBlock(e.stmts((n.elseClause as PrismNode).statements as PrismNode, isLast), true),
+      (n.elseClause as PrismNode).statements as PrismNode,
+      e.inLoop,
     );
-    arms.push(elseArm.after);
+    arms.push(elseArm);
     out = elseArm.value;
   }
   for (let i = conds.length - 1; i >= 0; i--) {
@@ -155,10 +161,13 @@ function caseStmt(n: PrismNode, e: Emitter, isLast: boolean): ts.Statement[] | n
         : e.expr(c),
     );
     const cond = tests.reduce((a, b) => f.createLogicalOr(a, b));
-    const arm = scopeAsyncArm(e.asyncBindings, () =>
-      f.createBlock(e.stmts((w.statements as PrismNode) ?? null, isLast), true),
+    const arm = scopeAsyncArm(
+      e.asyncBindings,
+      () => f.createBlock(e.stmts((w.statements as PrismNode) ?? null, isLast), true),
+      (w.statements as PrismNode) ?? null,
+      e.inLoop,
     );
-    arms.push(arm.after);
+    arms.push(arm);
     out = f.createIfStatement(cond, arm.value, out);
   }
   mergeAsyncArms(e.asyncBindings, arms, n.elseClause != null);
