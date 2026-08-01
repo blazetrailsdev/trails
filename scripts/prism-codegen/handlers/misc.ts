@@ -2,6 +2,7 @@ import ts from "typescript";
 import { rubyStr, type Emitter, type PrismNode } from "../types.js";
 import type { Registry } from "../registry.js";
 import { methodName, isJsIdentName, isBindableIdent } from "../naming.js";
+import { normalizeModuleName, OUTSIDE_CORPUS, type SuperResolution } from "../linearization.js";
 const f = ts.factory;
 const COMPOUND: Record<string, ts.BinaryOperator> = {
   "+": ts.SyntaxKind.PlusEqualsToken,
@@ -14,17 +15,29 @@ export function registerMisc(r: Registry): void {
   r.on("SplatNode", (n, e) => f.createSpreadElement(e.expr((n.expression as PrismNode) ?? null)));
   r.onManyStmt(["ForwardingSuperNode", "SuperNode"], (n, e, isLast) => {
     if (e.inClass || isLast) return null;
+    // A resolvable module-level super is a real call; only unresolvable ones
+    // flatten away (the port realizes those chains at the composition point).
+    if (resolveSuper(e)?.kind === "resolved") return null;
     return [];
   });
   r.onMany(["ForwardingSuperNode", "SuperNode"], (n, e) => {
-    if (!e.inClass) return null;
-    const args =
-      n.constructor.name === "ForwardingSuperNode"
-        ? [f.createSpreadElement(f.createIdentifier("arguments"))]
-        : (((n.arguments_ as PrismNode | null)?.arguments_ as PrismNode[]) ?? []).map((x) =>
-            e.expr(x),
-          );
-    return f.createCallExpression(f.createSuper(), undefined, args);
+    const args = superArgs(n, e);
+    if (e.inClass) return f.createCallExpression(f.createSuper(), undefined, args);
+    const resolution = resolveSuper(e);
+    if (!resolution) return null;
+    if (resolution.kind === "outside-corpus") {
+      return f.createCallExpression(f.createIdentifier(OUTSIDE_CORPUS), undefined, [
+        f.createStringLiteral(`${normalizeModuleName(e.currentModule ?? "")}#${e.currentRubyDef}`),
+      ]);
+    }
+    const target = f.createPropertyAccessExpression(
+      f.createIdentifier(resolution.module.split("::").join("$")),
+      methodName(resolution.method),
+    );
+    return f.createCallExpression(f.createPropertyAccessExpression(target, "call"), undefined, [
+      f.createThis(),
+      ...args,
+    ]);
   });
   r.on("LocalVariableOperatorWriteNode", (n, e) => {
     const op = COMPOUND[String(n.binaryOperator)];
@@ -121,4 +134,16 @@ function symName(node: PrismNode): string | null {
   if (!node || node.constructor.name !== "SymbolNode") return null;
   const s = methodName(rubyStr(node.unescaped));
   return isBindableIdent(s) ? s : null;
+}
+function resolveSuper(e: Emitter): SuperResolution | null {
+  if (!e.linearization || !e.currentModule) return null;
+  return e.linearization.resolve(e.currentModule, e.currentRubyDef);
+}
+function superArgs(n: PrismNode, e: Emitter): ts.Expression[] {
+  if (n.constructor.name === "ForwardingSuperNode") {
+    return [f.createSpreadElement(f.createIdentifier("arguments"))];
+  }
+  return (((n.arguments_ as PrismNode | null)?.arguments_ as PrismNode[]) ?? []).map((x) =>
+    e.expr(x),
+  );
 }

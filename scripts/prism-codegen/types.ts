@@ -1,4 +1,5 @@
 import type ts from "typescript";
+import type { Linearization } from "./linearization.js";
 export interface PrismNode {
   constructor: {
     name: string;
@@ -33,6 +34,11 @@ export interface Emitter {
     }
   >;
   currentDef: string;
+  /** The Ruby name of the enclosing `def`, before name-convention mapping. */
+  currentRubyDef: string;
+  /** `::`-joined path of the enclosing `module`/`class`, if any. */
+  currentModule: string | null;
+  readonly linearization: Linearization | null;
   inClass: boolean;
   inSingleton: boolean;
   readonly asyncMethods: ReadonlySet<string>;

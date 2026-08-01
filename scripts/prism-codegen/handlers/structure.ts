@@ -10,7 +10,10 @@ export function registerStructure(r: Registry): void {
   });
   r.onStmt("ModuleNode", (n, e) => {
     const name = constName(n.constantPath as PrismNode, n.name);
+    const prevModule = e.currentModule;
+    e.currentModule = prevModule ? `${prevModule}::${name}` : name;
     const body = topLevel((n.body as PrismNode) ?? null, e);
+    e.currentModule = prevModule;
     if (body.length) {
       ts.addSyntheticLeadingComment(
         body[0],
@@ -144,6 +147,8 @@ function defParts(
 } {
   const isAsync = defName !== "constructor" && e.asyncMethods.has(defName);
   const prevDef = e.currentDef;
+  const prevRubyDef = e.currentRubyDef;
+  e.currentRubyDef = String(n.name);
   const prevDeclared = e.declared;
   const prevAsync = e.inAsyncMethod;
   const prevLoop = e.inLoop;
@@ -173,6 +178,7 @@ function defParts(
   const locals = [...e.declared].filter((d) => !paramNames.has(d));
   const body = f.createBlock([...hoistDecl(locals), ...bodyStmts], true);
   e.currentDef = prevDef;
+  e.currentRubyDef = prevRubyDef;
   (
     e as {
       declared: Set<string>;

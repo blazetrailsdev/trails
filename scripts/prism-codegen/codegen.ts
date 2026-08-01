@@ -1,5 +1,6 @@
 import ts from "typescript";
 import { Registry } from "./registry.js";
+import type { Linearization } from "./linearization.js";
 import type { Coverage, Emitter, PrismNode } from "./types.js";
 const f = ts.factory;
 class CoverageTally implements Coverage {
@@ -28,6 +29,8 @@ export class Codegen implements Emitter {
     }
   >();
   currentDef = TOPLEVEL;
+  currentRubyDef = TOPLEVEL;
+  currentModule: string | null = null;
   inClass = false;
   inSingleton = false;
   inAsyncMethod = false;
@@ -39,6 +42,7 @@ export class Codegen implements Emitter {
     private readonly registry: Registry,
     readonly asyncMethods: ReadonlySet<string> = new Set(),
     readonly delegations: ReadonlyMap<string, string> = new Map(),
+    readonly linearization: Linearization | null = null,
   ) {}
   private record(kind: string, handled: boolean): void {
     this.coverage.record(kind, handled);
