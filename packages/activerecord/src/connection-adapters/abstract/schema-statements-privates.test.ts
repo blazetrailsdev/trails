@@ -621,6 +621,43 @@ describe("tableExists NotImplementedError fallback", () => {
   });
 });
 
+describe("dataSources NotImplementedError fallback", () => {
+  it("answers from one data_source_sql query when the adapter implements it", async () => {
+    const execute = vi.fn().mockResolvedValue([{ name: "posts" }, { name: "comments" }]);
+    const dataSourceSql = vi.fn(() => "SELECT name FROM catalog");
+    const ss = makeStatements({ execute, dataSourceSql });
+    const tables = vi.spyOn(ss, "tables");
+    const views = vi.spyOn(ss, "views");
+
+    expect(await ss.dataSources()).toEqual(["posts", "comments"]);
+    expect(dataSourceSql).toHaveBeenCalledTimes(1);
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(tables).not.toHaveBeenCalled();
+    expect(views).not.toHaveBeenCalled();
+  });
+
+  it("falls back to tables | views when the data-source path is not implemented", async () => {
+    const ss = makeStatements({
+      dataSourceSql: () => {
+        throw new NotImplementedError("#data_source_sql is not implemented");
+      },
+    });
+    vi.spyOn(ss, "tables").mockResolvedValue(["posts", "comments"]);
+    vi.spyOn(ss, "views").mockResolvedValue(["comments", "recent_posts"]);
+
+    expect(await ss.dataSources()).toEqual(["posts", "comments", "recent_posts"]);
+  });
+
+  it("propagates errors other than NotImplementedError", async () => {
+    const ss = makeStatements({
+      dataSourceSql: () => "SELECT name FROM catalog",
+      execute: vi.fn().mockRejectedValue(new Error("connection lost")),
+    });
+
+    await expect(ss.dataSources()).rejects.toThrow("connection lost");
+  });
+});
+
 describe("dataSourceExists NotImplementedError fallback", () => {
   it("returns false for a blank data source name without querying", async () => {
     const execute = vi.fn().mockResolvedValue([]);
