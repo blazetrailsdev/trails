@@ -4,7 +4,12 @@ import type { Registry } from "../registry.js";
 import { methodName, isJsIdentName, isBindableIdent } from "../naming.js";
 import { rubyStr } from "../types.js";
 import { TOPLEVEL } from "../codegen.js";
-import { asyncBindingKey, hasAsyncProvenance, shouldAwaitCall } from "../await-policy.js";
+import {
+  asyncBindingKey,
+  clearAsyncProvenance,
+  hasAsyncProvenance,
+  shouldAwaitCall,
+} from "../await-policy.js";
 const f = ts.factory;
 const INFIX: Record<string, ts.BinaryOperator> = {
   "==": ts.SyntaxKind.EqualsEqualsEqualsToken,
@@ -67,7 +72,7 @@ export function registerExpressions(r: Registry): void {
   );
   r.on("MultiWriteNode", (n, e) => {
     if (n.rest || !((n.lefts as PrismNode[]) ?? []).every(isEmittableTarget)) return null;
-    for (const l of (n.lefts as PrismNode[]) ?? []) clearAsyncProvenance(l, e);
+    for (const l of (n.lefts as PrismNode[]) ?? []) clearAsyncProvenance(l, e.asyncBindings);
     const lefts = ((n.lefts as PrismNode[]) ?? []).map((l) => e.expr(l));
     return f.createAssignment(f.createArrayLiteralExpression(lefts), e.expr(n.value as PrismNode));
   });
@@ -135,7 +140,7 @@ function logicalWrite(
   n: PrismNode,
   e: Emitter,
 ): ts.Expression {
-  clearAsyncProvenance(n, e);
+  clearAsyncProvenance(n, e.asyncBindings);
   return f.createBinaryExpression(target, op as ts.BinaryOperator, e.expr(n.value as PrismNode));
 }
 function argExprs(node: PrismNode | undefined | null, e: Emitter): ts.Expression[] {
@@ -285,10 +290,6 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
   })
     ? f.createAwaitExpression(call)
     : call;
-}
-function clearAsyncProvenance(n: PrismNode, e: Emitter): void {
-  const key = asyncBindingKey(n);
-  if (key) e.asyncBindings.delete(key);
 }
 function trackAsyncProvenance(n: PrismNode, e: Emitter): void {
   const key = asyncBindingKey(n);

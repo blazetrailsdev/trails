@@ -194,6 +194,43 @@ describe("prism-codegen", () => {
     );
     expect(multiWrite.code).not.toContain("await rel.load()");
   });
+  it("stops awaiting a receiver rebound by an operator write", async () => {
+    const ivarWrite = await generateFromSource(
+      `module M
+        def load_all(arg)
+          @relation = build_relation()
+          @relation += arg
+          @relation.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(ivarWrite.code).not.toContain("await this.relation.load()");
+    const localWrite = await generateFromSource(
+      `module M
+        def load_all(arg)
+          rel = build_relation()
+          rel += arg
+          rel.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(localWrite.code).not.toContain("await rel.load()");
+  });
+  it("stops awaiting a receiver rebound by a nested destructuring target", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def load_all(arg)
+          rel = build_relation()
+          first, (rel, _rest) = arg
+          rel.load
+        end
+      end`,
+      new Set(["load", "loadAll", "buildRelation"]),
+    );
+    expect(code).not.toContain("await rel.load()");
+  });
   it("does not carry async provenance across defs", async () => {
     const { code } = await generateFromSource(
       `module M

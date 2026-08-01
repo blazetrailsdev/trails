@@ -44,6 +44,31 @@ export function asyncBindingKey(node: PrismNode | null | undefined): string | nu
 }
 
 /**
+ * Drop the write target's async provenance, recursing into the nested targets
+ * of a destructuring write. Every rebind that does not itself establish
+ * provenance has to go through here.
+ */
+export function clearAsyncProvenance(
+  target: PrismNode | null | undefined,
+  bindings: Set<string>,
+): void {
+  if (!target) return;
+  const key = asyncBindingKey(target);
+  if (key) {
+    bindings.delete(key);
+    return;
+  }
+  if (target.constructor?.name !== "MultiTargetNode") return;
+  for (const nested of [
+    ...((target.lefts as PrismNode[]) ?? []),
+    ...((target.rights as PrismNode[]) ?? []),
+    (target.rest as PrismNode | null) ?? null,
+  ]) {
+    clearAsyncProvenance(nested, bindings);
+  }
+}
+
+/**
  * Whether an assigned value pins the target's type down well enough to award
  * awaits on its later use: a self-call (implicit, or explicit `self.`) naming
  * a method the async manifest resolves. The receiver of such a call is fixed
