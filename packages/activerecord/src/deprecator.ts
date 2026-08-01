@@ -42,13 +42,13 @@ export interface ActiveRecord {
  * mapped to deprecator.rb by the api:compare extractor)
  *
  * This is the file-loading proxy: it resolves `name` out of `filename` and
- * constructs the migration, mirroring `MigrationProxy#load_migration`'s
+ * constructs the migration, mirroring `load_migration`'s
  * `name.constantize.new(name, version)`. It stays separate from the
- * `MigrationProxy` interface in `migration.ts` — which is the already-resolved
- * shape `Migrator` consumes, whose `loadMigration` is async — because
- * api:compare buckets the `MigrationProxy` surface under `deprecator.rb` while
- * `Migrator` must keep its collaborator type in `migration.ts`. Both now
- * delegate to a real `Migration`.
+ * `MigrationProxy` interface in `migration.ts` — the already-resolved shape
+ * `Migrator` consumes, whose `loadMigration` is async — because api:compare
+ * buckets the `MigrationProxy` surface under `deprecator.rb` while `Migrator`
+ * must keep its collaborator type in `migration.ts`. Both delegate to a real
+ * `Migration`.
  */
 export class MigrationProxy {
   name: string;
@@ -101,18 +101,14 @@ export class MigrationProxy {
     return this._instantiate(req(this.filename) as Record<string, unknown>);
   }
 
-  /**
-   * Mirrors: `name.constantize.new(name, version)` — the module export named
-   * after the migration is the class, and the instance always carries the
-   * proxy's name and version.
-   */
+  /** Mirrors: `name.constantize.new(name, version)` (`migration.rb:1195`). */
   private _instantiate(mod: Record<string, unknown>, cause?: unknown): Migration {
     const klass = mod[this.name] ?? mod.default;
     if (typeof klass !== "function") {
       throw new Error(
         `Migration ${this.name} could not be loaded from ${this.filename}: ` +
           `no export named "${this.name}" or "default" found`,
-        { cause },
+        cause === undefined ? undefined : { cause },
       );
     }
     return new (klass as new (name: string, version: string) => Migration)(this.name, this.version);
