@@ -2457,8 +2457,29 @@ export class Migrator {
   async recordEnvironment(): Promise<void> {
     if (this.isDown()) return;
     if (this._internalMetadata.enabled) {
-      await this._internalMetadata.set("environment", this._environment);
+      await this._internalMetadata.set("environment", this._recordedEnvironment());
     }
+  }
+
+  /**
+   * The env name stamped into `ar_internal_metadata`. Rails writes
+   * `connection.pool.db_config.env_name` straight through; a Migrator built on
+   * a bare adapter carries a NullPool, whose config answers nil for every key
+   * (Rails' `NullConfig#method_missing`), so fall back to the env name the
+   * Migrator resolved at construction rather than stamping undefined.
+   */
+  private _recordedEnvironment(): string {
+    const pool = this.connection.pool as { dbConfig?: { envName?: string } } | null;
+    return pool?.dbConfig?.envName ?? this._environment;
+  }
+
+  /**
+   * @internal Mirrors: ActiveRecord::Migrator#connection — Rails reaches for
+   * `DatabaseTasks.migration_connection`; trails takes the adapter as a
+   * constructor argument, so this exposes it under Rails' name.
+   */
+  private get connection(): DatabaseAdapter {
+    return this._adapter;
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#ran? */
@@ -2992,7 +3013,7 @@ export class Migrator {
         await loaded.migrate(direction);
         await this.recordVersionStateAfterMigrating(proxy.version, direction);
         if (direction === "up" && this._internalMetadata.enabled) {
-          await this._internalMetadata.set("environment", this._environment);
+          await this._internalMetadata.set("environment", this._recordedEnvironment());
         }
       });
     } catch (e) {
