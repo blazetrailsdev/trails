@@ -32,10 +32,6 @@ import { connect } from "./support/connection.js";
 import { getEnv } from "@blazetrails/activesupport";
 import { Base } from "./base.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
-// Registers _RelationCtor so Model.first()/.all()/.where() etc. work in
-// test files that import base.js directly rather than index.js (which
-// re-exports relation.js as a side effect).
-import "./relation.js";
 
 const { adapter, envConfig } = await connect();
 

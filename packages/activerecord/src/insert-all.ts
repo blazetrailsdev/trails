@@ -3,8 +3,14 @@ import { Nodes, Visitors } from "@blazetrails/arel";
 import { ArgumentError, SerializeCastValue } from "@blazetrails/activemodel";
 import { IndexDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { realPool } from "./connection-adapters/abstract/connection-pool.js";
-import { UnknownAttributeError } from "./errors.js";
+import { ActiveRecordError, UnknownAttributeError } from "./errors.js";
 import type { Base } from "./base.js";
+
+import { stiName, isFinderNeedsTypeCondition } from "./inheritance.js";
+import type { Relation } from "./relation.js";
+import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
+import { Result } from "./result.js";
+import { withPooledOrDirectConnection } from "./connection-handling.js";
 
 let _quoteSqlValue: ((v: unknown, dialect?: AdapterName) => string) | undefined;
 
@@ -17,11 +23,11 @@ let _quoteSqlValue: ((v: unknown, dialect?: AdapterName) => string) | undefined;
 export function _registerQuoteSqlValue(fn: (v: unknown, dialect?: AdapterName) => string): void {
   _quoteSqlValue = fn;
 }
-import { stiName, isFinderNeedsTypeCondition } from "./inheritance.js";
-import type { Relation } from "./relation.js";
-import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
-import { Result } from "./result.js";
-import { withPooledOrDirectConnection } from "./connection-handling.js";
+
+function quoteSqlValue(v: unknown, dialect?: AdapterName): string {
+  if (!_quoteSqlValue) throw new ActiveRecordError("ActiveRecord::Base has not finished loading");
+  return _quoteSqlValue(v, dialect);
+}
 
 type ModelClass = typeof Base;
 type AdapterDialect = AdapterName;
@@ -733,7 +739,7 @@ export class Builder implements InsertBuilder {
       if (arrayCols.has(key)) {
         return new Nodes.SqlLiteral(this._insertAll.connection.quote(value));
       }
-      return new Nodes.SqlLiteral(_quoteSqlValue!(value, this._dialect));
+      return new Nodes.SqlLiteral(quoteSqlValue(value, this._dialect));
     });
     return new Nodes.ValuesList(rows);
   }

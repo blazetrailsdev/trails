@@ -40,6 +40,10 @@ import { Table, UpdateManager, DeleteManager, Nodes, sql as arelSql } from "@bla
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 import type { Relation } from "./relation.js";
+// Side-effect import: relation.ts registers the `Relation` family slot that
+// `relationClassFor` builds every per-model relation subclass from. relation.ts
+// no longer imports base.js for its value, so this edge is one-way.
+import "./relation.js";
 import { wrapWithScopeProxy, relationClassFor } from "./relation/delegation.js";
 import { _registerBase as _registerBaseWithSchemaMigration } from "./schema-migration.js";
 import { _registerBase as _registerBaseWithInternalMetadata } from "./internal-metadata.js";
