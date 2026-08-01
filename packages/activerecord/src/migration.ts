@@ -2687,7 +2687,7 @@ export class Migrator {
     const applied = (await this._schemaMigration.tableExists())
       ? await this._appliedVersions()
       : new Set<string>();
-    return this._migrations.filter((m) => !applied.has(m.version));
+    return this.migrations.filter((m) => !applied.has(m.version));
   }
 
   /**
@@ -2698,7 +2698,7 @@ export class Migrator {
   async pendingMigrations(): Promise<MigrationProxy[]> {
     await this._ensureSchemaTable();
     const applied = await this.migrated();
-    return this._migrations.filter((m) => !applied.has(m.version));
+    return this.migrations.filter((m) => !applied.has(m.version));
   }
 
   /**
