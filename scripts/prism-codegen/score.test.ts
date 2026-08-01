@@ -380,6 +380,21 @@ describe("prism-codegen scorer", () => {
     expect(owned.entries).toEqual([{ name: "initializeDup", status: "missing" }]);
   });
 
+  it("claims a Rails def under the TS spelling of its own nested twin", () => {
+    const ownership = buildPortOwnership([
+      {
+        path: "active_record/connection_adapters/schema_cache.rb",
+        source: "  def initialize_dup(other)\n  end\n  def data_source_exists?(name)\n  end\n",
+      },
+    ]);
+    expect(ownership.claimedBy.get("initializeDup")).toEqual(
+      new Set(["connection-adapters/schema-cache.ts"]),
+    );
+    expect(ownership.claimedBy.get("isDataSourceExists")).toEqual(
+      new Set(["connection-adapters/schema-cache.ts"]),
+    );
+  });
+
   it("still borrows a cross-file symbol no other Rails file claims", () => {
     const globalIndex = indexPortTree([
       { path: "base.ts", source: `export function ensureProperType() { this.writeAttribute(); }` },

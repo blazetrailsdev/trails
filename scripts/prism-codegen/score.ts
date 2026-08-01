@@ -36,6 +36,10 @@ export interface PortIndex {
  * defines `initialize_dup` just as `Associations` does; without ownership the
  * scorer resolved `associations.rb::initializeDup` to schema-cache.ts and
  * reported an unrelated body as a divergence.
+ *
+ * A def can never be blocked from its own twin: {@link resolvePortFn} searches
+ * the twin's index first and only falls back cross-file when that misses, so a
+ * hit the source file itself owns is already resolved by then.
  */
 export interface PortOwnership {
   claimedBy: Map<string, Set<string>>;
