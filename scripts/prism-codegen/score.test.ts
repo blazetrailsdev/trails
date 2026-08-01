@@ -141,6 +141,22 @@ describe("prism-codegen scorer", () => {
     ]);
   });
 
+  it("canonicalizes the port's `arelTable` reach against Rails' `table` reader", async () => {
+    const score = await scoreRuby(
+      `def order_column
+         table[primary_key]
+       end`,
+      `export function orderColumn(this: R): unknown {
+         return this._modelClass.arelTable.get(this.primaryKey);
+       }`,
+    );
+    expect(score.entries).toEqual([
+      expect.objectContaining({ name: "orderColumn", status: "divergent" }),
+    ]);
+    expect(score.entries[0].portSkeleton).toContain("ref:table");
+    expect(score.entries[0].portSkeleton).not.toContain("ref:arelTable");
+  });
+
   it("rejects a predicate fallback candidate that collides with a different-arity method", async () => {
     // Rails readonly? (0 args) must NOT match the port of Rails readonly(value).
     const score = await scoreRuby(
