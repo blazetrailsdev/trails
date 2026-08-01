@@ -310,6 +310,41 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     ).rejects.toThrow(/no foreign key/i);
   });
 
+  it("adapter overrides that call super reach the base body without self-dispatching", async () => {
+    // Regression guard for the whole dispatch shim, not just removeForeignKey:
+    // when SchemaStatements is mixed into AbstractAdapter, `this.adapter` is the
+    // adapter itself, so an override reaching the base body through `super` used
+    // to be dispatched straight back into the override and spin forever. Every
+    // shim site now carries the `adapter !== this` guard, so `super` lands in the
+    // base body.
+    class SuperCallingAdapter extends SqliteCapturingAdapter {
+      changeColumnDefaultCalls = 0;
+      addCheckConstraintCalls = 0;
+      supportsCheckConstraints() {
+        return true;
+      }
+      quoteColumnName(name: string) {
+        return `"${name}"`;
+      }
+      async changeColumnDefault(tableName: string, columnName: string, options: any) {
+        this.changeColumnDefaultCalls += 1;
+        return super.changeColumnDefault(tableName, columnName, options);
+      }
+      async addCheckConstraint(tableName: string, expression: string, options: any = {}) {
+        this.addCheckConstraintCalls += 1;
+        return super.addCheckConstraint(tableName, expression, options);
+      }
+    }
+    const stub = new SuperCallingAdapter();
+    await stub.changeColumnDefault("widgets", "title", { from: null, to: "hi" });
+    expect(stub.changeColumnDefaultCalls).toBe(1);
+    expect(stub.allSql.at(-1)).toMatch(/ALTER TABLE "widgets" ALTER COLUMN "title" SET DEFAULT/);
+
+    await stub.addCheckConstraint("widgets", "price > 0", { name: "price_check" });
+    expect(stub.addCheckConstraintCalls).toBe(1);
+    expect(stub.allSql.at(-1)).toMatch(/CHECK \(price > 0\)/);
+  });
+
   it("removeForeignKey ifExists probe matches on to_table only, not name (Rails)", async () => {
     // Rails' remove_foreign_key checks existence with only the positional
     // to_table, then resolves the exact constraint (with column/name) via

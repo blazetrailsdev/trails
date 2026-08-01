@@ -279,7 +279,13 @@ export class SchemaStatements {
 
   get schemaCreation(): SchemaCreation {
     if (!this._schemaCreation) {
-      const adapterSC = (this.adapter as unknown as { schemaCreation?: unknown }).schemaCreation;
+      // Same one-way dispatch as the method shims below: mixed into an adapter
+      // `this.adapter` is `this`, so reading `.schemaCreation` off it would
+      // re-enter this getter forever.
+      const adapterSC =
+        (this.adapter as unknown) === (this as unknown)
+          ? undefined
+          : (this.adapter as unknown as { schemaCreation?: unknown }).schemaCreation;
       this._schemaCreation =
         adapterSC instanceof SchemaCreation
           ? adapterSC
@@ -525,6 +531,7 @@ export class SchemaStatements {
     // SchemaStatements is mixed into AbstractAdapter (see changeColumn).
     const adapter = this.adapter as any;
     if (
+      adapter !== (this as unknown) &&
       typeof adapter.renameColumn === "function" &&
       adapter.renameColumn !== SchemaStatements.prototype.renameColumn
     ) {
@@ -614,6 +621,7 @@ export class SchemaStatements {
     // SchemaStatements is mixed into AbstractAdapter (see changeColumnDefault).
     const adapter = this.adapter as any;
     if (
+      adapter !== (this as unknown) &&
       typeof adapter.changeColumn === "function" &&
       adapter.changeColumn !== SchemaStatements.prototype.changeColumn
     ) {
@@ -747,6 +755,7 @@ export class SchemaStatements {
     // that SchemaStatements is mixed into AbstractAdapter (see addForeignKey).
     const adapter = this.adapter as any;
     if (
+      adapter !== (this as unknown) &&
       typeof adapter.changeColumnDefault === "function" &&
       adapter.changeColumnDefault !== SchemaStatements.prototype.changeColumnDefault
     ) {
@@ -961,6 +970,7 @@ export class SchemaStatements {
   ): Promise<void> {
     const adapter = this.adapter as any;
     if (
+      adapter !== (this as unknown) &&
       typeof adapter.addCheckConstraint === "function" &&
       adapter.addCheckConstraint !== SchemaStatements.prototype.addCheckConstraint
     ) {
@@ -990,6 +1000,7 @@ export class SchemaStatements {
   ): Promise<void> {
     const adapter = this.adapter as any;
     if (
+      adapter !== (this as unknown) &&
       typeof adapter.removeCheckConstraint === "function" &&
       adapter.removeCheckConstraint !== SchemaStatements.prototype.removeCheckConstraint
     ) {
@@ -1457,6 +1468,7 @@ export class SchemaStatements {
       foreignKeys?: (t: string) => Promise<ForeignKeyDefinition[]>;
     };
     if (
+      (adapter as unknown) !== (this as unknown) &&
       typeof adapter.foreignKeys === "function" &&
       (adapter.foreignKeys as unknown) !== SchemaStatements.prototype.foreignKeys
     ) {
@@ -1827,6 +1839,7 @@ export class SchemaStatements {
   async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
     const adapter = this.adapter as any;
     if (
+      adapter !== (this as unknown) &&
       typeof adapter.checkConstraints === "function" &&
       adapter.checkConstraints !== SchemaStatements.prototype.checkConstraints
     ) {
