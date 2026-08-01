@@ -2916,15 +2916,16 @@ export class Migrator {
   }
 
   private async _runMigration(proxy: MigrationProxy, direction: "up" | "down"): Promise<void> {
-    const migration = await proxy.migration();
-    migration.connection = this._adapter;
+    let migration: Migration | undefined;
     // Rails wraps both the migration execution AND the version
     // stamping inside the same ddl_transaction so they commit/rollback
     // atomically. Without this, a committed migration + failed stamp
     // would leave schema_migrations out of sync.
     try {
-      await this._ddlTransaction(migration, async () => {
-        await migration.migrate(direction);
+      const loaded = (migration = await proxy.migration());
+      loaded.connection = this._adapter;
+      await this._ddlTransaction(loaded, async () => {
+        await loaded.migrate(direction);
         if (direction === "up") {
           await this._schemaMigration.recordVersion(proxy.version);
           if (this._internalMetadata.enabled) {
@@ -2936,7 +2937,10 @@ export class Migrator {
       });
     } catch (e) {
       // Mirrors: ActiveRecord::Migrator#execute_migration_in_transaction rescue block
-      const useTx = this._useTransaction(migration);
+      // Rails re-resolves the proxy here (`migration.rb:1540` → `use_transaction?`
+      // → `MigrationProxy#disable_ddl_transaction`), so a migration that failed to
+      // load raises again from inside the rescue and escapes unwrapped.
+      const useTx = this._useTransaction(migration ?? (await proxy.migration()));
       // Ruby's `#{e}` interpolates Exception#to_s — the bare message, without
       // the `Error: ` prefix JS String(e) would add.
       const msg = `An error has occurred, ${useTx ? "this and " : ""}all later migrations canceled:\n\n${e instanceof Error ? e.message : e}`;

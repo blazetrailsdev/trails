@@ -1030,6 +1030,29 @@ describe("MigrationTest", () => {
     await adapter.dropTable("wtx_test", { ifExists: true });
   });
 
+  it("migration that fails to load escapes the canceled message", async () => {
+    const adapter = await freshAdapter();
+    const loadError = new Error("uninitialized constant MigThatFailsToLoad");
+    const proxy: MigrationProxy = {
+      version: "102",
+      name: "MigThatFailsToLoad",
+      migration: () => Promise.reject(loadError),
+    };
+    const migrator = new Migrator(adapter, [proxy]);
+    let err!: Error;
+    try {
+      await migrator.migrate();
+    } catch (e) {
+      err = e as Error;
+    }
+    // Rails' rescue calls use_transaction? -> MigrationProxy#disable_ddl_transaction,
+    // which re-runs the failed load and raises out of the rescue itself, so the
+    // "all later migrations canceled" wrapper never gets built.
+    expect(err).toBe(loadError);
+    const versions = await migrator.getAllVersions();
+    expect(versions).not.toContain("102");
+  });
+
   it("internal metadata table name", async () => {
     const { adapter } = await freshContext();
     const { InternalMetadata } = await import("./internal-metadata.js");
