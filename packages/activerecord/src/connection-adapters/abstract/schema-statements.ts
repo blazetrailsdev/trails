@@ -276,10 +276,10 @@ function expandIndexOption<T>(opt: Record<string, T> | T, columns: string[]): Re
  * (`migration.rb:1282`) and `#migrations` (`:1303`) hand back integers, so
  * callers comparing against a numeric target coerce them.
  *
- * `migrationContext` describes the Rails surface, not what the pool currently
- * returns: trails' `MigrationContext` is a schema-DSL class, and carries
- * `getAllVersions` / `migrations` over on `Migrator` instead.
- * Story `pool-migration-context-is-not-rails-migration-context` re-layers it.
+ * The class behind `migrationContext` is still trails' schema-DSL context
+ * squatting the ported Rails name, with a parallel copy of these members on
+ * `Migrator`; story `pool-migration-context-is-not-rails-migration-context`
+ * re-layers the two.
  * @internal
  */
 interface SchemaMigrationPool {
