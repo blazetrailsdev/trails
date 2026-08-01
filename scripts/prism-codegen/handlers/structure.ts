@@ -212,9 +212,8 @@ function defParts(
  * regeneration, which is how the async surface widens on its own.
  *
  * The walk stops at nested functions: an await inside a block's arrow belongs
- * to that arrow, not to the method around it. Those arrows are not marked async
- * today, so the emitted arrow is invalid either way — but scoping the question
- * correctly here is what keeps this rule right once that gap is closed.
+ * to that arrow, not to the method around it — `blockToArrow` marks such an
+ * arrow async itself, so the await is already inside an async function.
  */
 function containsAwait(node: ts.Node): boolean {
   if (ts.isAwaitExpression(node)) return true;

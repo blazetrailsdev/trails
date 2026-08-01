@@ -243,13 +243,13 @@ export async function updateAttributeBang(name, value) {
     return await this.saveBang({ validate: false });
 }
 export function update(attributes) {
-    return this.withTransactionReturningStatus(() => {
+    return this.withTransactionReturningStatus(async () => {
         this.assignAttributes(attributes);
         return await this.save();
     });
 }
 export function updateBang(attributes) {
-    return this.withTransactionReturningStatus(() => {
+    return this.withTransactionReturningStatus(async () => {
         this.assignAttributes(attributes);
         return await this.saveBang();
     });
