@@ -338,17 +338,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   }
 
   /**
-   * View-only existence check. Mirrors Rails'
-   * `SchemaStatements#view_exists?` which treats both views and
-   * materialized views as "view".
-   */
-  async viewExists(name: string): Promise<boolean> {
-    return this.relkindExists(name, ["v", "m"]);
-  }
-
-  /**
-   * Shared helper for table/view existence checks — lets both
-   * methods share Rails' pg_class-based predicate. Uses
+   * Shared helper for the table existence check — Rails' pg_class-based
+   * predicate. Uses
    * `SELECT 1 ... LIMIT 1` so the planner short-circuits instead of
    * counting every match.
    */

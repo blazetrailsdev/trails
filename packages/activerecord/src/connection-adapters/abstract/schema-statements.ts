@@ -1509,16 +1509,16 @@ export class SchemaStatements {
     //     views.include?(view_name.to_s)
     //
     // present? covers blank strings including whitespace-only.
-    // dataSourceSql dispatches through this.adapter so PG's override fires;
-    // MySQL/SQLite don't override → NotImplementedError → views() fallback.
-    if (!viewName || viewName.trim().length === 0) return false;
+    // The probe goes through schemaQuery (trails' internal_exec_query(..., "SCHEMA"))
+    // so query counting skips it, matching Rails' query_values(..., "SCHEMA").
+    if (!isPresent(viewName)) return false;
     try {
       const sql = this.adapter.dataSourceSql(viewName, { type: "VIEW" });
-      const rows = await this.adapter.execute(sql);
+      const rows = await this.adapter.schemaQuery(sql);
       return rows.length > 0;
     } catch (e) {
       if (e instanceof NotImplementedError) {
-        return (await this.views()).includes(viewName);
+        return (await this.views()).includes(String(viewName));
       }
       throw e;
     }

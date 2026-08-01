@@ -1513,14 +1513,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return this.informationSchemaExists(name, "BASE TABLE");
   }
 
-  async viewExists(name: string): Promise<boolean> {
-    return this.informationSchemaExists(name, "VIEW");
-  }
-
-  private async informationSchemaExists(
-    name: string,
-    type: "BASE TABLE" | "VIEW",
-  ): Promise<boolean> {
+  private async informationSchemaExists(name: string, type: "BASE TABLE"): Promise<boolean> {
     // Rails' table_exists?(nil) / "" returns false; a null/empty name has no
     // schema to parse, so short-circuit before parseMysqlName (which trims).
     if (!name) return false;
