@@ -2168,7 +2168,8 @@ export class MigrationContext {
    */
   async currentVersion(): Promise<number | undefined> {
     try {
-      return (await this.getAllVersions()).reduce((max, v) => (v > max ? v : max), 0);
+      const versions = await this.getAllVersions();
+      return versions.length > 0 ? Math.max(...versions) : 0;
     } catch (error) {
       if (error instanceof NoDatabaseError) return undefined;
       throw error;

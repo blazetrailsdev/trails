@@ -1873,7 +1873,7 @@ export class AbstractAdapter implements Quoting {
   // (schema_dumper.rb#indexes: `... if !default_index_type?(index)`). PostgreSQL
   // and MySQL override to also treat `:btree` as the default; SQLite inherits
   // this nil-only check (so a non-nil `using` on sqlite still dumps). Surfaced
-  // here so `MigrationContext#addIndex` gates the stored `using` on the same
+  // here so `SchemaContext#addIndex` gates the stored `using` on the same
   // per-adapter predicate the dumper reads, rather than an adapter-name check.
   defaultIndexType(using?: string): boolean {
     return using == null;
