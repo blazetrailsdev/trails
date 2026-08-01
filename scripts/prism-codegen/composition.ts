@@ -1,21 +1,19 @@
 /**
  * Composition-point ↔ MRO check (RFC 0086).
  *
- * Rails realizes a chain like `initialize_internals_callback` through `super`:
- * each module in `ActiveRecord::Base`'s ancestry contributes a fragment, and
- * the execution order falls out of the include order plus where each body puts
- * its `super`. The port has no `super` chain — `base.ts` calls the
- * contributions explicitly at a *composition point*, in an order that is
- * hand-maintained and can silently drift from `base.rb`. A composition point
- * declares itself with a marker:
+ * Rails realizes a chain like `initialize_internals_callback` through `super`,
+ * so its execution order falls out of `Base`'s include order plus where each
+ * body puts its `super`. The port has no `super` chain — `base.ts` calls the
+ * contributions explicitly at a *composition point*, in a hand-maintained
+ * order that can silently drift. A composition point declares itself with a
+ * marker:
  *
  *   // prism-mro: initialize_internals_callback Inheritance=ensureProperType \
  *   //   Scoping=_applyScopeAttributes Core=~
  *
  * `Module=identifier` binds a definer to the port symbol realizing it;
- * `Module=~` records a definer whose Ruby body contributes nothing (Rails'
- * `Core#initialize_internals_callback` is empty). Every definer the MRO
- * reaches must be declared — omission is drift, not silence.
+ * `Module=~` records a definer whose Ruby body contributes nothing. Every
+ * definer the MRO reaches must be declared — omission is drift, not silence.
  *
  * Hard rules: no node:* imports, no process.*, async fs only — this module is
  * pure (prism aside); score-cli.ts supplies the sources.
