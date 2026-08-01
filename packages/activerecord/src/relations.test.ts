@@ -139,14 +139,12 @@ describe("RelationTest", () => {
   });
 
   it("two scopes with includes should not drop any include", () => {
-    // If you use a query like Model.scope1.scope2 where scope1 and scope2
-    // have the same included associations, the includes should not be deduplicated
-    const car = Car.all();
-    const relation = car.includes("funkyBulbs").includes("funkyBulbs");
-    expect((relation as any)._includesAssociations.map(String)).toEqual([
-      "funkyBulbs",
-      "funkyBulbs",
-    ]);
+    // Chaining two scopes that each add a different include must keep both, so
+    // the loaded record answers `tyres`/`engines` without another query (Rails'
+    // Car.incl_engines.incl_tyres). Rails' includes! unions (`|=`), so a repeat
+    // of the SAME include folds to one — only distinct ones accumulate.
+    const relation = (Car.inclEngines() as any).inclTyres();
+    expect(relation._includesAssociations.map(String)).toEqual(["engines", "tyres"]);
   });
 
   it("dynamic finder", () => {

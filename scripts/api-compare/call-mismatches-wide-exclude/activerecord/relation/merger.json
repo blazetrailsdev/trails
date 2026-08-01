@@ -72,55 +72,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
-    "rubyName": "merge_preloads",
-    "call": "find",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails merger.rb:96-115; trails merger.ts:92-94 delegates to foldMergePreloads (relation/merge-preloads.ts), which performs the same body: length===0 empty? guards, same-model union via unionAppend, else reflectOnAllAssociations().find on className with preload/includes nesting — the reads happen on `_preloadAssociations`/`_includesAssociations` fields inside the helper."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/merger.ts",
-    "rubyName": "merge_preloads",
-    "call": "includes!",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails merger.rb:96-115; trails merger.ts:92-94 delegates to foldMergePreloads (relation/merge-preloads.ts), which performs the same body: length===0 empty? guards, same-model union via unionAppend, else reflectOnAllAssociations().find on className with preload/includes nesting — the reads happen on `_preloadAssociations`/`_includesAssociations` fields inside the helper."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/merger.ts",
-    "rubyName": "merge_preloads",
-    "call": "includes_values",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails merger.rb:96-115; trails merger.ts:92-94 delegates to foldMergePreloads (relation/merge-preloads.ts), which performs the same body: length===0 empty? guards, same-model union via unionAppend, else reflectOnAllAssociations().find on className with preload/includes nesting — the reads happen on `_preloadAssociations`/`_includesAssociations` fields inside the helper."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/merger.ts",
-    "rubyName": "merge_preloads",
-    "call": "model",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails merger.rb:96-115; trails merger.ts:92-94 delegates to foldMergePreloads (relation/merge-preloads.ts), which performs the same body: length===0 empty? guards, same-model union via unionAppend, else reflectOnAllAssociations().find on className with preload/includes nesting — the reads happen on `_preloadAssociations`/`_includesAssociations` fields inside the helper."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/merger.ts",
-    "rubyName": "merge_preloads",
-    "call": "preload!",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails merger.rb:96-115; trails merger.ts:92-94 delegates to foldMergePreloads (relation/merge-preloads.ts), which performs the same body: length===0 empty? guards, same-model union via unionAppend, else reflectOnAllAssociations().find on className with preload/includes nesting — the reads happen on `_preloadAssociations`/`_includesAssociations` fields inside the helper."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/merger.ts",
-    "rubyName": "merge_preloads",
-    "call": "preload_values",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails merger.rb:96-115; trails merger.ts:92-94 delegates to foldMergePreloads (relation/merge-preloads.ts), which performs the same body: length===0 empty? guards, same-model union via unionAppend, else reflectOnAllAssociations().find on className with preload/includes nesting — the reads happen on `_preloadAssociations`/`_includesAssociations` fields inside the helper."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/merger.ts",
-    "rubyName": "merge_preloads",
-    "call": "reflect_on_all_associations",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails merger.rb:96-115; trails merger.ts:92-94 delegates to foldMergePreloads (relation/merge-preloads.ts), which performs the same body: length===0 empty? guards, same-model union via unionAppend, else reflectOnAllAssociations().find on className with preload/includes nesting — the reads happen on `_preloadAssociations`/`_includesAssociations` fields inside the helper."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/merger.ts",
     "rubyName": "merge_select_values",
     "call": "select_values",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
