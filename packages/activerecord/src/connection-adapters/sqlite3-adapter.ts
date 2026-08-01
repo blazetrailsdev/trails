@@ -2326,26 +2326,18 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // Rails' alter_table caller lambda (sqlite3_adapter.rb:568-583). The block
     // running last is what lets remove_column delete the FKs it orphans.
     const caller = (definition: SQLite3TableDefinition): void => {
-      definition.foreignKeys.push(
-        ...fks.map((fk) => {
-          const column =
-            typeof fk.column === "string" ? (rename[fk.column] ?? fk.column) : fk.column;
-          return column === fk.column
-            ? fk
-            : new ForeignKeyDefinition(
-                fk.fromTable,
-                fk.toTable,
-                column,
-                fk.primaryKey,
-                fk.name,
-                fk.onDelete,
-                fk.onUpdate,
-                fk.deferrable,
-                fk.storesValidate ? fk.validate : undefined,
-                fk.storedOptionKeys,
-              );
-        }),
-      );
+      for (const fk of fks) {
+        const column = typeof fk.column === "string" ? (rename[fk.column] ?? fk.column) : fk.column;
+        const toTable = this.schemaStatements().stripTableNamePrefixAndSuffix(fk.toTable);
+        definition.foreignKey(toTable, {
+          column,
+          primaryKey: fk.primaryKey,
+          onDelete: fk.onDelete,
+          onUpdate: fk.onUpdate,
+          deferrable: fk.deferrable,
+          validate: fk.storesValidate ? fk.validate : undefined,
+        });
+      }
       definition.checkConstraints.push(...checks);
       block?.(definition);
     };
