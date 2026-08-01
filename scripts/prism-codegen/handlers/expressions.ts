@@ -273,7 +273,7 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
   if (!recv && callArgs.length === 0 && !block && !hasParens(n)) return target;
   const call = f.createCallExpression(target, undefined, callArgs);
   return shouldAwaitCall({
-    receiver: hasRecv ? (n.receiver as PrismNode) : null,
+    receiver: n.receiver as PrismNode | null,
     jsName,
     inAsyncMethod: e.inAsyncMethod,
     asyncMethods: e.asyncMethods,
