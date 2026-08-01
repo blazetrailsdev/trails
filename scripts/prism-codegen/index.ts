@@ -38,12 +38,13 @@ export async function generateFromSource(
   runtimeImportPath = "./runtime.js",
   inheritedDelegations: DelegationTable = new Map(),
   linearization: Linearization | null = null,
+  portMethods: ReadonlySet<string> = new Set(),
 ): Promise<GenResult> {
   const parse = await getParser();
   const result = parse(rubySource);
   const program = result.value as PrismNode;
   const delegations = mergeDelegations(inheritedDelegations, collectDelegations(program));
-  const gen = new Codegen(defaultRegistry(), asyncMethods, delegations, linearization);
+  const gen = new Codegen(defaultRegistry(), asyncMethods, delegations, linearization, portMethods);
   const statements = gen.stmt(program, false);
   const sourceFile = ts.factory.createSourceFile(
     statements,
@@ -113,6 +114,7 @@ export function countAwaitsOutsideAsync(code: string): number {
 export { summarizeCoverage } from "./coverage.js";
 export { TARGET_FILES } from "./files.js";
 export { asyncMethodsForRailsFile } from "./async-source.js";
+export { portMethodNames } from "./port-symbols.js";
 export { type DelegationTable } from "./delegation.js";
 export { buildLinearization, Linearization, parseIncludeOrder } from "./linearization.js";
 

@@ -51,7 +51,7 @@ export function update(id = "all") {
         return id.map(one_id => this.find(one_id)).eachWithIndex((object, idx) => object.update(attributes[idx]));
     }
     else if (id === "all") {
-        return this.all.each(record => record.update(attributes));
+        return this.all().each(record => record.update(attributes));
     }
     else {
         if (__PRISM_TODO("CallNode")) {
@@ -71,7 +71,7 @@ export function updateBang(id = "all") {
         return id.map(one_id => this.find(one_id)).eachWithIndex((object, idx) => object.updateBang(attributes[idx]));
     }
     else if (id === "all") {
-        return this.all.each(record => record.updateBang(attributes));
+        return this.all().each(record => record.updateBang(attributes));
     }
     else {
         if (__PRISM_TODO("CallNode")) {
@@ -93,10 +93,10 @@ export function hasQueryConstraints() {
     return this.has_query_constraints;
 }
 export function queryConstraintsList() {
-    return this.query_constraints_list ||= this.isBaseClass || this.primaryKey !== this.baseClass.primaryKey() ? __PRISM_TODO("IfNode") : this.baseClass.queryConstraintsList();
+    return this.query_constraints_list ||= this.isBaseClass() || this.primaryKey !== this.baseClass.primaryKey() ? __PRISM_TODO("IfNode") : this.baseClass.queryConstraintsList();
 }
 export function compositeQueryConstraintsList() {
-    return this.composite_query_constraints_list ||= this.queryConstraintsList || this.Array(this.primaryKey);
+    return this.composite_query_constraints_list ||= this.queryConstraintsList() || this.Array(this.primaryKey);
 }
 export function _insertRecord(connection, values, returning) {
     let primary_key, primary_key_value, im;
@@ -117,7 +117,7 @@ export function _insertRecord(connection, values, returning) {
 export function _updateRecord(values, constraints) {
     let default_constraint, current_scope, um;
     constraints = constraints.map((name, value) => __PRISM_TODO("CallNode"));
-    default_constraint = this.buildDefaultConstraint;
+    default_constraint = this.buildDefaultConstraint();
     if (default_constraint) {
         constraints.push(default_constraint);
     }
@@ -132,7 +132,7 @@ export function _updateRecord(values, constraints) {
 export function _deleteRecord(constraints) {
     let default_constraint, current_scope, dm;
     constraints = constraints.map((name, value) => __PRISM_TODO("CallNode"));
-    default_constraint = this.buildDefaultConstraint;
+    default_constraint = this.buildDefaultConstraint();
     if (default_constraint) {
         constraints.push(default_constraint);
     }
@@ -194,18 +194,18 @@ export function saveBang({ ...options } = {}, block) {
     return this.createOrUpdate({ ...options }, block) || (() => { throw new RecordNotSaved("Failed to save the record", this); })();
 }
 __PRISM_TODO("DefNode");
-export function destroy() {
+export async function destroy() {
     if (this.isReadonly) {
-        this._raiseReadonlyRecordError;
+        this._raiseReadonlyRecordError();
     }
-    this.destroyAssociations;
-    this._trigger_destroy_callback ||= this.isPersisted && this.destroyRow > 0;
+    this.destroyAssociations();
+    this._trigger_destroy_callback ||= this.isPersisted && await this.destroyRow() > 0;
     this.destroyed = true;
     this.previously_new_record = false;
     return this.freeze;
 }
-export function destroyBang() {
-    return this.destroy || this._raiseRecordNotDestroyed;
+export async function destroyBang() {
+    return await this.destroy() || this._raiseRecordNotDestroyed();
 }
 export function becomes(klass) {
     let became;
@@ -245,13 +245,13 @@ export async function updateAttributeBang(name, value) {
 export function update(attributes) {
     return this.withTransactionReturningStatus(() => {
         this.assignAttributes(attributes);
-        return this.save;
+        return await this.save();
     });
 }
 export function updateBang(attributes) {
     return this.withTransactionReturningStatus(() => {
         this.assignAttributes(attributes);
-        return this.saveBang;
+        return await this.saveBang();
     });
 }
 export async function updateColumn(name, value) {
@@ -266,14 +266,14 @@ export function updateColumns(attributes) {
         throw new ActiveRecordError("cannot update a destroyed record");
     }
     if (this.isReadonly) {
-        this._raiseReadonlyRecordError;
+        this._raiseReadonlyRecordError();
     }
     attributes = attributes.transformKeys(key => {
         name = key.toString();
         name = this.class().attributeAliases()[name] || name;
         return this.verifyReadonlyAttribute(name) || name;
     });
-    update_constraints = this._queryConstraintsHash;
+    update_constraints = this._queryConstraintsHash();
     attributes = __PRISM_TODO("CallNode");
     affected_rows = this.class()._updateRecord(attributes, update_constraints);
     return affected_rows === 1;
@@ -318,12 +318,12 @@ export function reload(options = null) {
 export function touch(...names, { time = null } = {}) {
     let attribute_names, name, affected_rows;
     if (!this.isPersisted) {
-        this._raiseRecordNotTouchedError;
+        this._raiseRecordNotTouchedError();
     }
     if (this.isReadonly) {
-        this._raiseReadonlyRecordError;
+        this._raiseReadonlyRecordError();
     }
-    attribute_names = this.timestampAttributesForUpdateInModel;
+    attribute_names = this.timestampAttributesForUpdateInModel();
     attribute_names = (__PRISM_TODO("CallNode")).mapBang(name => {
         name = name.toString();
         name = this.class().attributeAliases()[name] || name;
@@ -350,12 +350,12 @@ export function strictLoadedAssociations() {
 export function _findRecord(options) {
     let all_queries, base;
     all_queries = options ? options["all_queries"] : null;
-    base = this.class().all({ all_queries: all_queries }).preload(this.strictLoadedAssociations);
+    base = this.class().all({ all_queries: all_queries }).preload(this.strictLoadedAssociations());
     if (options && options["lock"]) {
-        return base.lock(options["lock"]).findByBang(this._inMemoryQueryConstraintsHash);
+        return base.lock(options["lock"]).findByBang(this._inMemoryQueryConstraintsHash());
     }
     else {
-        return base.findByBang(this._inMemoryQueryConstraintsHash);
+        return base.findByBang(this._inMemoryQueryConstraintsHash());
     }
 }
 export function _inMemoryQueryConstraintsHash() {
@@ -371,7 +371,7 @@ export function isApplyScoping(options) {
 }
 export function _queryConstraintsHash() {
     if (this.class().queryConstraintsList().nil()) {
-        return { [this.primary_key]: this.idInDatabase };
+        return { [this.primary_key]: this.idInDatabase() };
     }
     else {
         return this.class().queryConstraintsList().indexWith(column_name => this.attributeInDatabase(column_name));
@@ -380,23 +380,23 @@ export function _queryConstraintsHash() {
 export function destroyAssociations() {
 }
 export function destroyRow() {
-    return this._deleteRow;
+    return this._deleteRow();
 }
 export function _deleteRow() {
-    return this.class()._deleteRecord(this._queryConstraintsHash);
+    return this.class()._deleteRecord(this._queryConstraintsHash());
 }
 export function _touchRow(attribute_names, time) {
-    time ||= this.currentTimeFromProperTimezone;
+    time ||= this.currentTimeFromProperTimezone();
     attribute_names.each(attr_name => this._writeAttribute(attr_name, time));
     return this._updateRow(attribute_names, "touch");
 }
 export function _updateRow(attribute_names, attempted_action = "update") {
-    return this.class()._updateRecord(this.attributesWithValues(attribute_names), this._queryConstraintsHash);
+    return this.class()._updateRecord(this.attributesWithValues(attribute_names), this._queryConstraintsHash());
 }
 export function createOrUpdate({ ...opts } = {}, block) {
     let result;
     if (this.isReadonly) {
-        this._raiseReadonlyRecordError;
+        this._raiseReadonlyRecordError();
     }
     if (this.isDestroyed) {
         return false;

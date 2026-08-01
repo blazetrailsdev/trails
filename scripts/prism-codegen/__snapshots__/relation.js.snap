@@ -25,7 +25,7 @@ export class Relation {
     }
     initializeCopy(other) {
         this.values = this.values.dup();
-        return this.reset;
+        return this.reset();
     }
     bindAttribute(name, value, block) {
         let reflection, attr, bind;
@@ -124,8 +124,8 @@ export class Relation {
     toAry() {
         return this.records.dup();
     }
-    records() {
-        this.load;
+    async records() {
+        await this.load();
         return this.records;
     }
     encodeWith(coder) {
@@ -147,7 +147,7 @@ export class Relation {
             return this.records.isEmpty();
         }
         else {
-            return !this.isExists;
+            return !this.isExists();
         }
     }
     isNone(...args, block) {
@@ -178,7 +178,7 @@ export class Relation {
         if (this.isLoaded) {
             return this.records.isOne();
         }
-        return this.limitedCount === 1;
+        return this.limitedCount() === 1;
     }
     isMany(block) {
         if (this.none) {
@@ -190,7 +190,7 @@ export class Relation {
         if (this.isLoaded) {
             return this.records.isMany();
         }
-        return this.limitedCount > 1;
+        return this.limitedCount() > 1;
     }
     cacheKey(timestamp_column = "updated_at") {
         this.cache_keys ||= {};
@@ -198,7 +198,7 @@ export class Relation {
     }
     async computeCacheKey(timestamp_column = "updated_at") {
         let query_signature, key;
-        query_signature = ActiveSupport.Digest.hexdigest(this.toSql);
+        query_signature = ActiveSupport.Digest.hexdigest(this.toSql());
         key = `${this.model.modelName().cacheKey()}/query-${query_signature}`;
         if (this.model.collectionCacheVersioning()) {
             return key;
@@ -223,7 +223,7 @@ export class Relation {
             }
         }
         else {
-            collection = this.isEagerLoading ? this.applyJoinDependency : this;
+            collection = this.isEagerLoading ? this.applyJoinDependency() : this;
             this.model.withConnection(c => {
                 column = c.visitor().compile(this.table[timestamp_column]);
                 select_values = `COUNT(*) AS ${this.model.adapterClass().quoteColumnName("size")}, MAX(%s) AS timestamp`;
@@ -299,7 +299,7 @@ export class Relation {
             values = Arel.sql(this.model.sanitizeSqlForAssignment(updates, this.table.name()));
         }
         return this.model.withConnection(c => {
-            arel = this.isEagerLoading ? this.applyJoinDependency.arel() : this.buildArel(c);
+            arel = this.isEagerLoading ? this.applyJoinDependency().arel() : this.buildArel(c);
             arel.source().left = this.table;
             group_values_arel_columns = this.arelColumns(this.groupValues.uniq());
             if (!this.havingClause.isEmpty()) {
@@ -307,7 +307,7 @@ export class Relation {
             }
             key = this.model.isCompositePrimaryKey() ? this.model.primaryKey.map(pk => this.table[pk]) : this.table[this.model.primaryKey];
             stmt = arel.compileUpdate(values, key, having_clause_ast, group_values_arel_columns);
-            return c.update(stmt, `${this.model} Update All`).tap(() => this.reset);
+            return c.update(stmt, `${this.model} Update All`).tap(() => this.reset());
         });
     }
     update(id = "all") {
@@ -369,7 +369,7 @@ export class Relation {
         return await this.updateAll(this.model.touchAttributesWithTime(...names, { time: time }));
     }
     destroyAll() {
-        return this.records.each(x => x.destroy()).tap(() => this.reset);
+        return this.records.each(x => x.destroy()).tap(() => this.reset());
     }
     deleteAll() {
         let invalid_methods, value, arel, group_values_arel_columns, having_clause_ast, key, stmt;
@@ -389,7 +389,7 @@ export class Relation {
             throw new ActiveRecordError(`delete_all doesn't support ${invalid_methods.join(", ")}`);
         }
         return this.model.withConnection(c => {
-            arel = this.isEagerLoading ? this.applyJoinDependency.arel() : this.buildArel(c);
+            arel = this.isEagerLoading ? this.applyJoinDependency().arel() : this.buildArel(c);
             arel.source().left = this.table;
             group_values_arel_columns = this.arelColumns(this.groupValues.uniq());
             if (!this.havingClause.isEmpty()) {
@@ -397,7 +397,7 @@ export class Relation {
             }
             key = this.model.isCompositePrimaryKey() ? this.model.primaryKey.map(pk => this.table[pk]) : this.table[this.model.primaryKey];
             stmt = arel.compileDelete(key, having_clause_ast, group_values_arel_columns);
-            return c.delete(stmt, `${this.model} Delete All`).tap(() => this.reset);
+            return c.delete(stmt, `${this.model} Delete All`).tap(() => this.reset());
         });
     }
     delete(id_or_array) {
@@ -426,7 +426,7 @@ export class Relation {
         let result;
         this.model.withConnection(c => {
             if (!c.isAsyncEnabled()) {
-                return this.load;
+                return this.load();
             }
             if (!this.isLoaded) {
                 result = this.execMainQuery({ async: !c.currentTransaction().isJoinable() });
@@ -459,9 +459,9 @@ export class Relation {
         }
         return this;
     }
-    reload() {
-        this.reset;
-        return this.load;
+    async reload() {
+        this.reset();
+        return await this.load();
     }
     reset() {
         this.future_result.cancel();
@@ -479,7 +479,7 @@ export class Relation {
         return this.to_sql ||= this.isEagerLoading ? this.applyJoinDependency((relation, join_dependency) => {
             relation = join_dependency.applyColumnAliases(relation);
             return relation.toSql();
-        }) : this.model.withConnection(conn => conn.unpreparedStatement(() => conn.toSql(this.arel)));
+        }) : this.model.withConnection(conn => conn.unpreparedStatement(() => conn.toSql(this.arel())));
     }
     whereValuesHash(relation_table_name = this.model.tableName()) {
         return this.whereClause.toH(relation_table_name);
@@ -655,7 +655,7 @@ export class Relation {
                 }));
             }
             else {
-                return this.model.withConnection(c => this.model._queryBySql(c, this.arel, { async: async }));
+                return this.model.withConnection(c => this.model._queryBySql(c, this.arel(), { async: async }));
             }
         });
     }

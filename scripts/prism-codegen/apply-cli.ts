@@ -1,5 +1,6 @@
 import * as fs from "fs/promises";
 import * as path from "node:path";
+import { portMethodNames } from "./port-symbols.js";
 import { generateFromSource } from "./index.js";
 import { asyncMethodsForRailsFile } from "./async-source.js";
 import { TOPLEVEL } from "./codegen.js";
@@ -58,6 +59,10 @@ async function main() {
   const { code, perDef } = await generateFromSource(
     await fs.readFile(rubyAbsPath(target), "utf8"),
     asyncMethodsForRailsFile(target.ruby),
+    undefined,
+    undefined,
+    undefined,
+    portMethodNames(),
   );
   const plan = planApply({
     generatedCode: code,

@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import * as path from "node:path";
 import { generateFromSource } from "./index.js";
 import { asyncMethodsForRailsFile } from "./async-source.js";
+import { portMethodNames } from "./port-symbols.js";
 import { summarizeCoverage } from "./coverage.js";
 import { TOPLEVEL } from "./codegen.js";
 import { tsToRubyFile } from "./naming.js";
@@ -35,6 +36,10 @@ async function main() {
   const { code, coverage, perDef, parseErrorCount } = await generateFromSource(
     readFileSync(rb, "utf8"),
     asyncMethodsForRailsFile(rel),
+    undefined,
+    undefined,
+    undefined,
+    portMethodNames(),
   );
   const s = summarizeCoverage(coverage);
   const defs = [...perDef].filter(([name]) => name !== TOPLEVEL);

@@ -279,7 +279,15 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
     : selfCall
       ? f.createPropertyAccessExpression(self, jsName)
       : f.createIdentifier(jsName);
-  if (!recv && callArgs.length === 0 && !block && !hasParens(n)) return target;
+  if (
+    !recv &&
+    callArgs.length === 0 &&
+    !block &&
+    !hasParens(n) &&
+    !emitsCall(jsName, selfCall, e)
+  ) {
+    return target;
+  }
   const call = f.createCallExpression(target, undefined, callArgs);
   return shouldAwaitCall({
     receiver: n.receiver as PrismNode | null,
@@ -291,10 +299,18 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
     ? f.createAwaitExpression(call)
     : call;
 }
+/**
+ * Whether a paren-less, argument-less self-call is rendered as a call. Ruby
+ * makes no distinction, so the port index decides: a name it declares as a
+ * method is invoked, a getter or an unknown name is read as a property.
+ */
+function emitsCall(jsName: string, selfCall: boolean, e: Emitter): boolean {
+  return selfCall && e.portMethods.has(jsName);
+}
 function trackAsyncProvenance(n: PrismNode, e: Emitter): void {
   const key = asyncBindingKey(n);
   if (!key) return;
-  if (hasAsyncProvenance(n.value as PrismNode | null, methodName, e.asyncMethods)) {
+  if (hasAsyncProvenance(n.value as PrismNode | null, methodName, e.asyncMethods, e.portMethods)) {
     e.asyncBindings.add(key);
   } else {
     e.asyncBindings.delete(key);

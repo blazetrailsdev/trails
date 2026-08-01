@@ -65,46 +65,46 @@ included(() => {
         return ActiveSupport.IsolatedExecutionState["active_record_connection_handler"] = handler;
     }
     export function asynchronousQueriesSession() {
-        return this.asynchronousQueriesTracker.currentSession();
+        return this.asynchronousQueriesTracker().currentSession();
     }
     export function asynchronousQueriesTracker() {
         return ActiveSupport.IsolatedExecutionState["active_record_asynchronous_queries_tracker"] ||= new AsynchronousQueriesTracker();
     }
     export function currentRole() {
-        this.connectedToStack.reverseEach(hash => {
+        this.connectedToStack().reverseEach(hash => {
             if (hash["role"] && hash["klasses"].isInclude(Base)) {
                 return hash["role"];
             }
-            if (hash["role"] && hash["klasses"].isInclude(this.connectionClassForSelf)) {
+            if (hash["role"] && hash["klasses"].isInclude(this.connectionClassForSelf())) {
                 return hash["role"];
             }
         });
         return this.defaultRole;
     }
     export function currentShard() {
-        this.connectedToStack.reverseEach(hash => {
+        this.connectedToStack().reverseEach(hash => {
             if (hash["shard"] && hash["klasses"].isInclude(Base)) {
                 return hash["shard"];
             }
-            if (hash["shard"] && hash["klasses"].isInclude(this.connectionClassForSelf)) {
+            if (hash["shard"] && hash["klasses"].isInclude(this.connectionClassForSelf())) {
                 return hash["shard"];
             }
         });
         return this.defaultShard;
     }
     export function currentPreventingWrites() {
-        this.connectedToStack.reverseEach(hash => {
+        this.connectedToStack().reverseEach(hash => {
             if (!hash["prevent_writes"].nil() && hash["klasses"].isInclude(Base)) {
                 return hash["prevent_writes"];
             }
-            if (!hash["prevent_writes"].nil() && hash["klasses"].isInclude(this.connectionClassForSelf)) {
+            if (!hash["prevent_writes"].nil() && hash["klasses"].isInclude(this.connectionClassForSelf())) {
                 return hash["prevent_writes"];
             }
         });
         return false;
     }
     export function isPreventingWrites(class_name) {
-        this.connectedToStack.reverseEach(hash => {
+        this.connectedToStack().reverseEach(hash => {
             if (!hash["prevent_writes"].nil() && hash["klasses"].isInclude(Base)) {
                 return hash["prevent_writes"];
             }
@@ -194,7 +194,7 @@ export async function findByBang(...args) {
     return await this.findBy(...args) || this.where(...args).raiseRecordNotFoundExceptionBang();
 }
 export function initializeGeneratedModules() {
-    return this.generatedAssociationMethods;
+    return this.generatedAssociationMethods();
 }
 export function generatedAssociationMethods() {
     return this.generated_association_methods ||= __PRISM_TODO("BeginNode");
@@ -227,11 +227,11 @@ export function inspect() {
     else if (this.isAbstractClass) {
         return `${__PRISM_SUPER_OUTSIDE_CORPUS("Core::ClassMethods#inspect")}(abstract)`;
     }
-    else if (!this.isSchemaLoaded && !this.isConnected) {
+    else if (!this.isSchemaLoaded() && !this.isConnected) {
         return `${__PRISM_SUPER_OUTSIDE_CORPUS("Core::ClassMethods#inspect")} (call '${__PRISM_SUPER_OUTSIDE_CORPUS("Core::ClassMethods#inspect")}.load_schema' to load schema informations)`;
     }
     else if (this.isTableExists) {
-        attr_list = this.attributeTypes.map((name, type) => `${name}: ${type.type()}`) * ", ";
+        attr_list = this.attributeTypes().map((name, type) => `${name}: ${type.type()}`) * ", ";
         return `${__PRISM_SUPER_OUTSIDE_CORPUS("Core::ClassMethods#inspect")}(${attr_list})`;
     }
     else {
@@ -274,8 +274,8 @@ export function inherited(subclass) {
 export function relation() {
     let relation;
     relation = Relation.create(this);
-    if (this.isFinderNeedsTypeCondition && !this.isIgnoreDefaultScope) {
-        return relation.whereBang(this.typeCondition);
+    if (this.isFinderNeedsTypeCondition() && !this.isIgnoreDefaultScope()) {
+        return relation.whereBang(this.typeCondition());
     }
     else {
         return relation;
@@ -308,8 +308,8 @@ export function cachedFindBy(keys, values) {
 export function constructor(attributes = null, block) {
     this.new_record = true;
     this.attributes = this.class()._defaultAttributes().deepDup();
-    this.initInternals;
-    this.initializeInternalsCallback;
+    this.initInternals();
+    this.initializeInternalsCallback();
     if (block !== undefined) {
         block(this);
     }
@@ -324,7 +324,7 @@ export function initWith(coder, block) {
 export function initWithAttributes(attributes, new_record = false, block) {
     this.new_record = new_record;
     this.attributes = attributes;
-    this.initInternals;
+    this.initInternals();
     if (block !== undefined) {
         block(this);
     }
@@ -362,7 +362,7 @@ __PRISM_TODO("AliasMethodNode");
 export function hash() {
     let id;
     id = this.id();
-    if (this.isPrimaryKeyValuesPresent) {
+    if (this.isPrimaryKeyValuesPresent()) {
         return __PRISM_TODO("CallNode");
     }
     else {
@@ -410,19 +410,19 @@ export function connectionHandler() {
     return this.class().connectionHandler();
 }
 export function inspect() {
-    return this.inspectWithAttributes(this.attributesForInspect);
+    return this.inspectWithAttributes(this.attributesForInspect());
 }
 export function fullInspect() {
-    return this.inspectWithAttributes(this.allAttributesForInspect);
+    return this.inspectWithAttributes(this.allAttributesForInspect());
 }
 export function prettyPrint(pp) {
     let attr_names, attr_name, value;
-    if (this.isCustomInspectMethodDefined) {
+    if (this.isCustomInspectMethodDefined()) {
         return __PRISM_SUPER_OUTSIDE_CORPUS("Core#pretty_print");
     }
     return pp.objectAddressGroup(this, () => {
         if (this.attributes) {
-            attr_names = this.attributesForInspect.select(name => this.is_hasAttribute(name.toString()));
+            attr_names = this.attributesForInspect().select(name => this.is_hasAttribute(name.toString()));
             return pp.seplist(attr_names, this.proc(() => pp.text(",")), attr_name => {
                 attr_name = attr_name.toString();
                 pp.breakable(" ");
@@ -485,7 +485,7 @@ export function inspectWithAttributes(attributes_to_list) {
 }
 export function attributesForInspect() {
     if (this.class().attributesForInspect() === "all") {
-        return this.allAttributesForInspect;
+        return this.allAttributesForInspect();
     }
     else {
         return this.class().attributesForInspect();
@@ -495,5 +495,5 @@ export function allAttributesForInspect() {
     if (!this.attributes) {
         return [];
     }
-    return this.attributeNames;
+    return this.attributeNames();
 }
