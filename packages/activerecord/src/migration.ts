@@ -2455,11 +2455,9 @@ export class Migrator {
     }
     await this._ensureSchemaTable();
     await this.recordEnvironment();
-    // Rails returns `runnable.each(...)`, i.e. the runnable list; trails callers
-    // assert on its length, so return the same array we ran.
     const runnable = await this.runnable();
     for (const proxy of runnable) {
-      await this.executeMigrationInTransaction(proxy, this._direction);
+      await this.executeMigrationInTransaction(proxy);
     }
     return runnable;
   }
@@ -2516,11 +2514,8 @@ export class Migrator {
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#execute_migration_in_transaction */
-  async executeMigrationInTransaction(
-    proxy: MigrationProxy,
-    direction: "up" | "down" = "up",
-  ): Promise<void> {
-    await this._runMigration(proxy, direction);
+  async executeMigrationInTransaction(proxy: MigrationProxy): Promise<void> {
+    await this._runMigration(proxy, this._direction);
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#target */
