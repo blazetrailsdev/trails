@@ -1030,6 +1030,29 @@ describe("MigrationTest", () => {
     await adapter.dropTable("wtx_test", { ifExists: true });
   });
 
+  it("migration that fails to load is canceled with the later-migrations message", async () => {
+    const adapter = await freshAdapter();
+    const loadError = new Error("Unexpected token '}'");
+    const proxy: MigrationProxy = {
+      version: "102",
+      name: "MigThatFailsToLoad",
+      migration: () => Promise.reject(loadError),
+    };
+    const migrator = new Migrator(adapter, [proxy]);
+    let err!: Error;
+    try {
+      await migrator.migrate();
+    } catch (e) {
+      err = e as Error;
+    }
+    expect(err).toBeInstanceOf(Error);
+    const useTx = adapter.supportsDdlTransactions?.() ?? false;
+    expect(err.message).toBe(
+      `An error has occurred, ${useTx ? "this and " : ""}all later migrations canceled:\n\nUnexpected token '}'`,
+    );
+    expect(err.cause).toBe(loadError);
+  });
+
   it("internal metadata table name", async () => {
     const { adapter } = await freshContext();
     const { InternalMetadata } = await import("./internal-metadata.js");
