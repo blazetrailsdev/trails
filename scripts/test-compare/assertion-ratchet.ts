@@ -1,27 +1,19 @@
 /**
  * Only-shrink ratchet for the ASSERTION-LEVEL fidelity counters (RFC 0025).
  *
- * `pnpm test:compare` already measures three divergences inside name-MATCHED
- * tests and writes them to output/convention-comparison.json as per-package
- * totals: `totalAssertionMismatch` (the pair makes a different NUMBER of
- * assertions), `totalKindMismatch` (same count, divergent KINDS — Rails
- * `assert_equal` vs a trails `toBeTruthy`), `totalValueMismatch` (same kinds,
- * divergent literal EXPECTED VALUES).
+ * `pnpm test:compare` measures three divergences inside name-MATCHED tests and
+ * writes them to output/convention-comparison.json as per-package totals:
+ * `totalAssertionMismatch` (different NUMBER of assertions), `totalKindMismatch`
+ * (same count, divergent KINDS), `totalValueMismatch` (same kinds, divergent
+ * literal EXPECTED VALUES). They were advisory, so a newly ported test could
+ * assert less than its Rails counterpart and still count as matched.
  *
- * Those numbers were advisory: nothing failed when they grew, so a newly ported
- * test could assert less than its Rails counterpart and still count as matched.
- * This module pins them, mirroring the wide call-mismatch ratchet's AGGREGATE
- * contract (RFC 0083): a committed high-water mark per package per counter,
- * which `--write` lowers and never raises. The guarantee is "assertion-level
- * debt never grows", NOT "every remaining mismatch has been reviewed" —
- * committing the per-pair population instead would mirror data
- * convention-comparison.json already carries and churn on every test rename.
- *
- * There is no second extractor; the mark is compared against that artifact's
- * totals. A STALE artifact is the trap (see lint-assertion-mismatches.ts, which
- * regenerates it first). A package present in the artifact but absent from the
- * mark is an ERROR, not an implicit zero: admitting one silently would let its
- * whole assertion debt in unmeasured. Seed it with `--write`.
+ * This pins them the way the wide call-mismatch ratchet pins its unreviewed
+ * count (RFC 0083): a committed high-water mark per package per counter, which
+ * `--write` lowers and never raises. The arm is AGGREGATE — the guarantee is
+ * "assertion-level debt never grows", not "every remaining mismatch was
+ * reviewed". See CONTRIBUTING.md "Measuring progress" for the full contract and
+ * the stale-artifact trap.
  *
  * Hard rules: no node:* imports, no process.*, async fs.
  */
@@ -188,21 +180,6 @@ export function missingFromArtifact(
     .sort();
 }
 
-/** Counters that came in UNDER the mark, i.e. real convergence to acknowledge. */
-export function shrunk(current: Record<string, Counts>, mark: AssertionMark): Violation[] {
-  const out: Violation[] = [];
-  for (const pkg of Object.keys(current).sort()) {
-    const prior = mark.packages[pkg];
-    if (!prior) continue;
-    for (const counter of COUNTERS) {
-      if (current[pkg][counter] < prior[counter]) {
-        out.push({ package: pkg, counter, current: current[pkg][counter], mark: prior[counter] });
-      }
-    }
-  }
-  return out;
-}
-
 export function renderExceeded(exceeded: Violation[], markPath: string): string {
   return [
     "",
@@ -238,19 +215,6 @@ export function renderMissing(missing: string[], markPath: string): string {
     ...missing.map((p) => `  ${p}`),
     "That is a partial-scope run (a `--package` filter, an unfetched vendor source), not",
     `convergence. Re-run the full comparison before trusting ${markPath}.`,
-  ].join("\n");
-}
-
-export function renderShrunk(rows: Violation[], markPath: string): string {
-  return [
-    "",
-    `${rows.length} counter(s) came in under the mark:`,
-    ...rows.map(
-      (v) =>
-        `  ${v.package}  ${COUNTER_LABELS[v.counter]}: ${v.current} (was ${v.mark}, ` +
-        `\u2212${v.mark - v.current})`,
-    ),
-    `Run \`pnpm test:assertions:ratchet:reseed\` to lower ${markPath}.`,
   ].join("\n");
 }
 
