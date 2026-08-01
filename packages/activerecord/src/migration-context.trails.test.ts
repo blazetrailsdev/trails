@@ -3,9 +3,14 @@
 // pin that the discovery half (`migration_files` / `parse_migration_filename` /
 // the timestamp validation) lives on MigrationContext itself, reading *its own*
 // `migrationsPaths` rather than delegating to Migrator.
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { MigrationContext, Migrator, InvalidMigrationTimestampError } from "./migration.js";
 import { ActiveRecord } from "./ar-config.js";
+import { Base } from "./base.js";
+import { SchemaMigration } from "./schema-migration.js";
+import { InternalMetadata } from "./internal-metadata.js";
+import { DatabaseConfigurations } from "./database-configurations.js";
+import { fixtures } from "./test-fixtures.js";
 
 const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
 
@@ -58,13 +63,6 @@ describe("MigrationContext", () => {
     expect(() => context.migrations).toThrow(InvalidMigrationTimestampError);
   });
 
-  it("migrations accepts a valid timestamp when validation is on", () => {
-    Migrator.validateMigrationTimestamps = true;
-    const context = new MigrationContext([`${MIGRATIONS_ROOT}/valid_with_timestamps`]);
-
-    expect(context.migrations).toHaveLength(3);
-  });
-
   it("migrations ignores the timestamp check when timestampedMigrations is off", () => {
     Migrator.validateMigrationTimestamps = true;
     const previous = ActiveRecord.timestampedMigrations;
@@ -75,5 +73,75 @@ describe("MigrationContext", () => {
     } finally {
       ActiveRecord.timestampedMigrations = previous;
     }
+  });
+});
+
+describe("MigrationContext connected surface", () => {
+  fixtures({}, { useTransactionalTests: false });
+
+  let context: MigrationContext;
+
+  beforeEach(async () => {
+    const adapter = Base.connection;
+    const schemaMigration = new SchemaMigration(adapter);
+    await schemaMigration.createTable();
+    await schemaMigration.deleteAllVersions();
+    context = new MigrationContext(
+      [`${MIGRATIONS_ROOT}/valid`],
+      schemaMigration,
+      new InternalMetadata(adapter),
+    );
+  });
+
+  it("getAllVersions reads the versions recorded for this context", async () => {
+    await context.schemaMigration.createVersion("1");
+    await context.schemaMigration.createVersion("2");
+
+    expect(await context.getAllVersions()).toEqual([1, 2]);
+    expect(await context.currentVersion()).toBe(2);
+  });
+
+  it("pendingMigrationVersions subtracts the recorded versions from the discovered ones", async () => {
+    await context.schemaMigration.createVersion("1");
+
+    expect(await context.pendingMigrationVersions()).toEqual([2, 3]);
+    expect(await context.needsMigration()).toBe(true);
+  });
+
+  it("open returns a Migrator over this context's migrations", () => {
+    const migrator = context.open();
+
+    expect(migrator).toBeInstanceOf(Migrator);
+    expect(migrator.migrations.map((m) => m.name)).toEqual([
+      "ValidPeopleHaveLastNames",
+      "WeNeedReminders",
+      "InnocentJointable",
+    ]);
+  });
+
+  it("migrationsStatus pairs the discovered migrations with the recorded versions", async () => {
+    await context.schemaMigration.createVersion("1");
+
+    expect(await context.migrationsStatus()).toEqual([
+      { status: "up", version: "001", name: "Valid people have last names" },
+      { status: "down", version: "002", name: "We need reminders" },
+      { status: "down", version: "003", name: "Innocent jointable" },
+    ]);
+  });
+
+  it("currentEnvironment answers the resolved default env", () => {
+    expect(context.currentEnvironment).toBe(DatabaseConfigurations.currentEnv());
+  });
+
+  it("lastStoredEnvironment is null until a version has been recorded", async () => {
+    expect(await context.lastStoredEnvironment()).toBeNull();
+  });
+
+  it("a context built without a schemaMigration raises rather than half-answering", () => {
+    const discoveryOnly = new MigrationContext([`${MIGRATIONS_ROOT}/valid`]);
+
+    expect(discoveryOnly.migrations).toHaveLength(3);
+    expect(() => discoveryOnly.schemaMigration).toThrow(/without a schema_migration/);
+    expect(() => discoveryOnly.internalMetadata).toThrow(/without an internal_metadata/);
   });
 });

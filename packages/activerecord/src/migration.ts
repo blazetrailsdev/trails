@@ -1695,6 +1695,17 @@ async function loadMigrationFrom(
 }
 
 /**
+ * Rails' `sort_by(&:version)` over migration proxies: numeric, not
+ * lexicographic, so version 10 sorts after version 2. BigInt because a
+ * timestamp version exceeds `Number.MAX_SAFE_INTEGER`.
+ */
+function byVersion(a: MigrationProxy, b: MigrationProxy): number {
+  const va = BigInt(a.version);
+  const vb = BigInt(b.version);
+  return va < vb ? -1 : va > vb ? 1 : 0;
+}
+
+/**
  * = \Migration \Context
  *
  * MigrationContext sets the context in which a migration is run.
@@ -1713,11 +1724,10 @@ export class MigrationContext {
 
   /**
    * Rails defaults `schema_migration` / `internal_metadata` from
-   * `connection_pool` (`migration.rb:1214-1218`). trails has no pool to reach
-   * from here, so they stay optional: a context built without them can still
-   * answer the connectionless half of the surface (`migrationsPaths`,
-   * `migrations` and the file discovery under it), which is what the CLI's
-   * bootstrap discovery needs.
+   * `connection_pool` (`migration.rb:1214-1218`); trails has no pool to reach
+   * from here, so they stay optional. A context built without them still
+   * answers the connectionless half — `migrationsPaths`, `migrations` and the
+   * file discovery under it — which is all the CLI's bootstrap needs.
    */
   constructor(
     migrationsPaths: string[],
@@ -1816,9 +1826,13 @@ export class MigrationContext {
     return this.open().migrationsStatus();
   }
 
-  /** @internal Mirrors: ActiveRecord::MigrationContext#current_environment (`migration.rb:1340-1342`) */
+  /**
+   * @internal Mirrors: ActiveRecord::MigrationContext#current_environment
+   * (`migration.rb:1340-1342`) — `ConnectionHandling::DEFAULT_ENV.call`, whose
+   * trails counterpart is {@link DatabaseConfigurations.currentEnv}.
+   */
   get currentEnvironment(): string {
-    return getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? DatabaseConfigurations.defaultEnv;
+    return DatabaseConfigurations.currentEnv();
   }
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#protected_environment? (`migration.rb:1344-1346`) */
@@ -1893,13 +1907,7 @@ export class MigrationContext {
       } satisfies MigrationProxy;
     });
 
-    // Rails: `migrations.sort_by(&:version)` — numeric (not lexicographic), so
-    // "10" sorts after "2".
-    return migrations.sort((a, b) => {
-      const va = BigInt(a.version);
-      const vb = BigInt(b.version);
-      return va < vb ? -1 : va > vb ? 1 : 0;
-    });
+    return migrations.sort(byVersion);
   }
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#migration_files (`migration.rb:1369-1372`) */
@@ -2609,8 +2617,12 @@ export class Migrator {
 
   /**
    * Scan `dir` for migration files and build `MigrationProxy[]` (without
-   * wrapping them in a Migrator). Mirrors the discovery half of Rails'
-   * `MigrationContext#migrations`.
+   * wrapping them in a Migrator). Rails has no such entry point — discovery is
+   * `MigrationContext#migrations`, which this now defers to. The adapter is
+   * vestigial: discovery never needed a connection, and the parameter is kept
+   * only so the existing call sites still compile.
+   * `migrator-keeps-only-its-rails-1404-surface` deletes this along with the
+   * rest of the MigrationContext surface `Migrator` should not own.
    *
    * Mirrors: ActiveRecord::MigrationContext#migrations (discovery)
    */
@@ -2619,13 +2631,7 @@ export class Migrator {
   }
 
   private _sortMigrations(migrations: MigrationProxy[]): MigrationProxy[] {
-    return [...migrations].sort((a, b) => {
-      const va = BigInt(a.version);
-      const vb = BigInt(b.version);
-      if (va < vb) return -1;
-      if (va > vb) return 1;
-      return 0;
-    });
+    return [...migrations].sort(byVersion);
   }
 
   /** @internal */
