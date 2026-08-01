@@ -593,7 +593,7 @@ describe("Migrator runnable direction awareness", () => {
     adapter = Base.connection;
   });
 
-  it("migrations is ascending going up and reversed going down", async () => {
+  it("migrations is ascending going up and reversed going down", () => {
     const migrations = three();
     const up = new Migrator(adapter, migrations);
     expect(up.migrations.map((m) => m.version)).toEqual(["1", "2", "3"]);
@@ -608,6 +608,17 @@ describe("Migrator runnable direction awareness", () => {
 
     const migrator = new Migrator(adapter, migrations, { direction: "up" });
     expect((await migrator.runnable()).map((m) => m.version)).toEqual(["3"]);
+  });
+
+  it("runnable going up stops at the target version", async () => {
+    const migrations = three();
+    await new Migrator(adapter, migrations).migrate(1);
+
+    const migrator = new Migrator(adapter, migrations, {
+      direction: "up",
+      targetVersion: 2,
+    });
+    expect((await migrator.runnable()).map((m) => m.version)).toEqual(["2"]);
   });
 
   it("runnable going down to a target skips the target migration", async () => {

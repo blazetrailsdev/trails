@@ -3191,7 +3191,6 @@ export class Migrator {
       }
       return kept;
     }
-    // skip the last migration if we're headed down, but not ALL the way down
     if (this.target()) runnable.pop();
     for (const m of runnable) {
       if (await this.isRan(m)) kept.push(m);
