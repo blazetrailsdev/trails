@@ -430,12 +430,11 @@ describe("BindParameterTest", () => {
     expect(conn.toSql(authors.arel())).toBe(sql);
     expect((await authors).length).toBe(3);
 
-    // Rails' middle assertion (`where(id: [1, 2, 3, 2**63])` → `IN (1, 2, 3)`)
-    // tests that an over-range integer is excluded from the array condition.
-    // trails' ArrayHandler doesn't yet drop out-of-range values from `IN`
-    // (the integer type's range check isn't applied per-element there) — that is
-    // a distinct gap from this story's bind_params_to_sql collector, tracked
-    // separately as story `array-where-integer-range-exclusion`.
+    sql = `SELECT ${table}.* FROM ${table} WHERE ${pk} IN (${bindParams(conn, [1, 2, 3])})`;
+    // Ruby's Integer is arbitrary-precision; 2**63 needs a JS bigint.
+    const overRange = Author.where({ id: [1, 2, 3, 2n ** 63n] });
+    expect(conn.toSql(overRange.arel())).toBe(sql);
+    expect((await overRange).length).toBe(3);
 
     // Rails (bind_parameter_test.rb:240-246): "With MySQL integers are casted as
     // string for security" — `mysql/quoting.rb#cast_bound_value`, which
