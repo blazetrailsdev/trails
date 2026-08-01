@@ -311,12 +311,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("adapter overrides that call super reach the base body without self-dispatching", async () => {
-    // Regression guard for the whole dispatch shim, not just removeForeignKey:
-    // when SchemaStatements is mixed into AbstractAdapter, `this.adapter` is the
-    // adapter itself, so an override reaching the base body through `super` used
-    // to be dispatched straight back into the override and spin forever. Every
-    // shim site now carries the `adapter !== this` guard, so `super` lands in the
-    // base body.
     class SuperCallingAdapter extends SqliteCapturingAdapter {
       changeColumnDefaultCalls = 0;
       addCheckConstraintCalls = 0;
