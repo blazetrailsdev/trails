@@ -49,10 +49,17 @@ export function mixinPathCandidates(fromRel: string, moduleName: string): string
   return [...new Set([nested, sibling, tail])];
 }
 
+/** Ruby method names defined directly in one Rails file. */
+export function ownRailsDefs(railsRelPath: string): Set<string> {
+  return rubyDefinedMethods(readRuby(stripPrefix(railsRelPath)) ?? "");
+}
+
 function readRuby(rel: string): string | undefined {
   const abs = rubyAbsPathFor(rel);
   return existsSync(abs) ? readFileSync(abs, "utf8") : undefined;
 }
+
+const reachableCache = new Map<string, Set<string>>();
 
 /**
  * Every Ruby method name reachable from `railsRelPath` — the file's own `def`s
@@ -65,6 +72,8 @@ function readRuby(rel: string): string | undefined {
  * onto the sync one's self-call.
  */
 export function reachableRailsDefs(railsRelPath: string): Set<string> {
+  const cached = reachableCache.get(railsRelPath);
+  if (cached) return cached;
   const defs = new Set<string>();
   const seen = new Set<string>();
   const queue = [stripPrefix(railsRelPath)];
@@ -81,5 +90,6 @@ export function reachableRailsDefs(railsRelPath: string): Set<string> {
       }
     }
   }
+  reachableCache.set(railsRelPath, defs);
   return defs;
 }

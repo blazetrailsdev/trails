@@ -67,9 +67,9 @@ export function buildAsyncManifest(files: PortFile[]): AsyncManifest {
 }
 /**
  * Names the manifest resolves to exactly one async definition outside the twin
- * file. Ambiguous names (async in several port files) are declined: the await
- * rule is receiver-blind, so a name that could be two different methods must
- * not drag an await onto the wrong call.
+ * file, restricted to the `railsDefs` the calling file can actually dispatch
+ * to. Ambiguous names (async in several port files) are declined: a name that
+ * could be two different methods must not drag an await onto the wrong call.
  */
 export function crossFileAsyncNames(
   manifest: AsyncManifest,
