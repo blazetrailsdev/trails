@@ -321,7 +321,13 @@ computes at runtime:
    defines async, and that Rails `def`s somewhere in the target set, is awaited
    too — the same unambiguous-global-hit rule the scorer's cross-file fallback
    uses, so a name async in several port files is declined rather than guessed.
-   Remaining limit: files with no port yet fall back to sync.
+   A file with no twin `.ts` at all — the population codegen is most useful for
+   — has no port to read, so it earns its async marking from its own bodies
+   instead (`inferAsyncFromBodies`): a `def` that reaches a known-async name is
+   itself async, taken to a fixpoint so the marking propagates up chains of
+   same-file callers. The seed is exactly the unambiguous manifest set above, so
+   the receiver-blind guard still holds; the pass is skipped whenever a twin
+   exists, since there the port is the authority.
 4. **Ruby stdlib idioms pass through untranslated.** `attributes.collect { }`,
    `arr.first`, `Array(x)`, `raise` — emitted verbatim; no runtime shim.
 5. **Metaprogramming is opaque.** `define_method`, `method_missing`, `send`,

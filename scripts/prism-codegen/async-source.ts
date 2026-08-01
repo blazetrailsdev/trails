@@ -92,6 +92,7 @@ export function crossFileAsyncNames(
 }
 const DEF_LINE = /^(\s*)def\s+(?:self\.)?([A-Za-z_][\w]*[?!=]?)(.*)$/;
 const RUBY_CALL = /[A-Za-z_][\w]*[?!]?/g;
+const RUBY_COMMENT = /#(?!\{).*$/gm;
 export interface RubyDefBody {
   name: string;
   body: string;
@@ -100,10 +101,12 @@ export interface RubyDefBody {
  * Each `def` in a Ruby file paired with its body text, split on Ruby's
  * indentation discipline (the `end` that closes a `def` sits at the `def`'s
  * own column). Rails source is uniformly formatted, so this is enough to ask
- * "what does this method call?" without a parse.
+ * "what does this method call?" without a parse. A single-line `def x; ...;
+ * end` closes on its own line rather than running to the next same-column
+ * `end`, and comments are dropped so prose can never name an async method.
  */
 export function rubyDefBodies(rubySource: string): RubyDefBody[] {
-  const lines = rubySource.split("\n");
+  const lines = rubySource.replace(RUBY_COMMENT, "").split("\n");
   const bodies: RubyDefBody[] = [];
   for (let i = 0; i < lines.length; i++) {
     const m = DEF_LINE.exec(lines[i]);
@@ -111,9 +114,11 @@ export function rubyDefBodies(rubySource: string): RubyDefBody[] {
     const [, indent, rubyName, rest] = m;
     const collected = [rest];
     const closer = new RegExp(`^${indent}end\\b`);
-    for (let j = i + 1; j < lines.length; j++) {
-      if (closer.test(lines[j])) break;
-      collected.push(lines[j]);
+    if (!/(^|;)\s*end\s*$/.test(rest)) {
+      for (let j = i + 1; j < lines.length; j++) {
+        if (closer.test(lines[j])) break;
+        collected.push(lines[j]);
+      }
     }
     bodies.push({ name: methodName(rubyName), body: collected.join("\n") });
   }
@@ -148,6 +153,11 @@ export function inferAsyncFromBodies(rubySource: string, seed: ReadonlySet<strin
   }
   return inferred;
 }
+/**
+ * The async name set for one Rails file. `inferFromRuby` opts the file into
+ * the body pass and is passed only when the file has no twin `.ts`: with a
+ * port present the port itself is the authority on which defs are async.
+ */
 export function resolveAsyncNames(opts: {
   twinTs: string;
   relationTs?: string;
@@ -204,8 +214,6 @@ export function asyncMethodsForRailsFile(
     relationTs: relationFamily ? readFileOr(path.join(TRAILS_AR_SRC, "relation.ts")) : undefined,
     ownRubyDefs: relationFamily ? railsDefinedMethods(railsRelPath) : undefined,
     crossFile: crossFileAsyncNames(manifest, { twinTsPath, railsDefs: railsCorpusDefs() }),
-    // Only an unported file needs the body pass: with a twin `.ts` the port
-    // itself is the authority on which defs are async.
     inferFromRuby: twinTs === "" ? railsSource(railsRelPath) : undefined,
   });
 }

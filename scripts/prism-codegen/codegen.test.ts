@@ -406,6 +406,30 @@ end`;
     expect(code).toContain("await this.performSave(names)");
     expect(code).toContain("await this.touchLater(names)");
   });
+  it("keeps a single-line def's body from running on to the next def", () => {
+    const inferred = inferAsyncFromBodies(
+      `module M
+  def cached?; @cached; end
+
+  def reload
+    perform_save
+  end
+end`,
+      new Set(["performSave"]),
+    );
+    expect(inferred.has("reload")).toBe(true);
+    expect(inferred.has("isCached")).toBe(false);
+  });
+  it("ignores an async name that only appears in a comment", () => {
+    const inferred = inferAsyncFromBodies(
+      `def reset
+  # unlike perform_save, this never touches the database
+  @cache = nil
+end`,
+      new Set(["performSave"]),
+    );
+    expect(inferred.size).toBe(0);
+  });
   it("infers nothing when no body reaches an unambiguous async name", () => {
     const inferred = inferAsyncFromBodies(
       `def reset
