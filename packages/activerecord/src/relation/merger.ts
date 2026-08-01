@@ -86,41 +86,33 @@ export class Merger {
   }
 
   // Rails merges :eager_load as a NORMAL_VALUE through Merger#merge's generic
-  // loop (merger.rb:52-68) — it is NOT part of merge_preloads. eager_load!
-  // (query_methods.rb:295-297) always unions (`eager_load_values |= args`),
-  // never gated on model equality and never nested under a reflection, so it
-  // crosses the model boundary untouched.
+  // loop (`relation.eager_load!(*value)`, merger.rb:52-68), not as part of
+  // merge_preloads — it crosses the model boundary untouched.
   private mergeEagerLoad(rel: any): void {
-    const otherEagerLoad = this.other.eagerLoadValues ?? [];
+    const otherEagerLoad = this.other.eagerLoadValues;
     if (otherEagerLoad.length > 0) rel.eagerLoadBang(...otherEagerLoad);
   }
 
-  // Mirrors Rails' Merger#merge_preloads (merger.rb:96-115). Same-model merges
-  // union the preload/includes values straight across (`|=`). A cross-model
-  // merge (e.g. Comment.joins(:post).merge(Post.preload(:readers))) instead
-  // nests them under the reflection on the receiver whose class_name is the
-  // other model's name, so Comment preloads `{ post: [:readers] }` — carrying
-  // Post's preload through the association boundary rather than asking Comment
-  // to preload `:readers`.
   private mergePreloads(rel: any): void {
-    const otherPreloads = this.other.preloadValues ?? [];
-    const otherIncludes = this.other.includesValues ?? [];
-    if (otherPreloads.length === 0 && otherIncludes.length === 0) return;
+    if (this.other.preloadValues.length === 0 && this.other.includesValues.length === 0) return;
 
     if (this.other.model === rel.model) {
-      if (otherPreloads.length > 0) rel.preloadBang(...otherPreloads);
-      if (otherIncludes.length > 0) rel.includesBang(...otherIncludes);
+      if (this.other.preloadValues.length > 0) rel.preloadBang(...this.other.preloadValues);
+      if (this.other.includesValues.length > 0) rel.includesBang(...this.other.includesValues);
       return;
     }
 
-    const otherName = this.other.model?.name;
     const reflection = rel.model
       .reflectOnAllAssociations()
-      .find((r: { className: string }) => r.className === otherName);
+      .find((r: { className: string }) => r.className === this.other.model.name);
     if (!reflection) return;
 
-    if (otherPreloads.length > 0) rel.preloadBang({ [reflection.name]: otherPreloads });
-    if (otherIncludes.length > 0) rel.includesBang({ [reflection.name]: otherIncludes });
+    if (this.other.preloadValues.length > 0) {
+      rel.preloadBang({ [reflection.name]: this.other.preloadValues });
+    }
+    if (this.other.includesValues.length > 0) {
+      rel.includesBang({ [reflection.name]: this.other.includesValues });
+    }
   }
 
   private mergeJoins(rel: any): void {
