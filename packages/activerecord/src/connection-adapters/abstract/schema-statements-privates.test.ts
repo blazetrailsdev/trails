@@ -224,6 +224,17 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect((ss as any).adapter.execute).toHaveBeenCalled();
   });
 
+  it("checkConstraintExists matches by expression when name is present but undefined", async () => {
+    const ss = makeStatements();
+    const name = ss.checkConstraintName("users", { expression: "age > 0" });
+    vi.spyOn(ss, "checkConstraints").mockResolvedValue([
+      new CheckConstraintDefinition("users", "age > 0", name),
+    ]);
+    expect(
+      await ss.checkConstraintExists("users", { name: undefined, expression: "age > 0" }),
+    ).toBe(true);
+  });
+
   // PR 8b helpers
   it("validateIndexLengthBang throws when name too long", () => {
     const ss = makeStatements();
