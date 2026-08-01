@@ -2332,7 +2332,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         definition.foreignKey(toTable, {
           column,
           primaryKey: fk.primaryKey,
-          name: fk.name,
           onDelete: fk.onDelete,
           onUpdate: fk.onUpdate,
           deferrable: fk.deferrable,
