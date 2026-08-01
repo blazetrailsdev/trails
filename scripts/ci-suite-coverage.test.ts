@@ -51,6 +51,9 @@ const GATE_INPUTS: Record<string, string[]> = {
     "vendor/sources.ts",
     "vendor/sources.lock.json",
     "scripts/api-compare/config.ts",
+    "scripts/db-init/mysql/01-rails-user.sql",
+    "packages/activerecord-cli/src/__e2e__/mysql-happy-path.test.ts",
+    "packages/activerecord-cli/src/__e2e__/postgres-happy-path.test.ts",
   ],
 };
 
