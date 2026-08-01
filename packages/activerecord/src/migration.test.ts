@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach, afterAll, afterEach, vi } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { Base, MigrationContext, Migrator, RecordNotUnique, StatementInvalid } from "./index.js";
+import { Base, Migrator, RecordNotUnique, StatementInvalid } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
 import { ConcurrentMigrationError } from "./migration.js";
@@ -42,12 +42,6 @@ import { Mysql2Adapter } from "./connection-adapters/mysql2-adapter.js";
 import { describeIfMysqlAdapter } from "./support/describe-if-mysql-adapter.js";
 import { leaseMysqlAdapter } from "./adapters/abstract-mysql-adapter/test-helper.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
-
-async function freshContext(): Promise<{ adapter: DatabaseAdapter; ctx: MigrationContext }> {
-  const adapter = Base.connection;
-  const ctx = new MigrationContext(adapter);
-  return { adapter, ctx };
-}
 
 // The migration-on-`people` tests (Rails runs `add_column/remove_column
 // "people", "last_name"` through a `Migrator`) need the canonical `people`
@@ -101,8 +95,8 @@ async function personColumnNames(adp: DatabaseAdapter): Promise<string[]> {
 // Rails runs every migration test on `ActiveRecord::Base.connection`; ride the
 // schema-loaded primary pool established by `fixtures()` rather than a
 // sidecar `_pool` lease (RFC 0059). Nothing clears tables between tests, so
-// this file owns the per-test cleanup of the bespoke tables its
-// `MigrationContext` sub-describes create — see the afterEach/afterAll below
+// this file owns the per-test cleanup of the bespoke tables its DDL
+// sub-describes create — see the afterEach/afterAll below
 // and each test's own `finally`.
 fixtures({}, { useTransactionalTests: false });
 
@@ -111,15 +105,9 @@ fixtures({}, { useTransactionalTests: false });
 // clears recorded versions — so sibling files see the pristine canonical shape.
 afterEach(async () => {
   const adapter = Base.connection;
-  const ctx = new MigrationContext(adapter);
   try {
-    // Gate the drop on the ADAPTER's live introspection, not `removeColumn`'s
-    // own `ifExists` short-circuit: the MigrationContext column cache may be
-    // empty for the freshly created `people` table, so an
-    // `ifExists` check would consult that empty cache, conclude last_name is
-    // absent, skip the drop, and leak the column into the next test.
     if (await (adapter as any).columnExists("people", "last_name")) {
-      await ctx.removeColumn("people", "last_name");
+      await adapter.removeColumn("people", "last_name");
     }
   } catch {
     /* column absent / adapter without the column — nothing to strip */
@@ -134,7 +122,7 @@ afterEach(async () => {
     // truncate-only reset never clears it; the InternalMetadata tests below
     // each build it fresh and assert on its rows/existence, so drop it between
     // tests (Rails' teardown does the same) to keep them independent.
-    await ctx.dropTable("ar_internal_metadata", { ifExists: true });
+    await adapter.dropTable("ar_internal_metadata", { ifExists: true });
   } catch {
     /* nothing to strip */
   }
@@ -148,37 +136,37 @@ afterEach(async () => {
 // `memberships`, `values`, …) are deliberately NOT in this list: dropping a
 // canonical table would corrupt siblings that ride it.
 afterAll(async () => {
-  const { ctx } = await freshContext();
+  const adapter = Base.connection;
   const o = { ifExists: true } as const;
-  await ctx.dropTable("big_numbers", o);
-  await ctx.dropTable("binary_testings", o);
-  await ctx.dropTable("bk1", o);
-  await ctx.dropTable("bk2", o);
-  await ctx.dropTable("bk3", o);
-  await ctx.dropTable("bk4", o);
-  await ctx.dropTable("bk5", o);
-  await ctx.dropTable("bk6", o);
-  await ctx.dropTable("bk7", o);
-  await ctx.dropTable("bk_idx", o);
-  await ctx.dropTable("nonexistent", o);
-  await ctx.dropTable("old_name", o);
-  await ctx.dropTable("pend_t", o);
-  await ctx.dropTable("people_src", o);
-  await ctx.dropTable("people_src2", o);
-  await ctx.dropTable("pre_new_suf", o);
-  await ctx.dropTable("pre_old_suf", o);
-  await ctx.dropTable("rv_bulk", o);
-  await ctx.dropTable("something", o);
-  await ctx.dropTable("table_from_query_testings", o);
-  await ctx.dropTable("table_from_query_testings2", o);
-  await ctx.dropTable("test_binary_limits", o);
-  await ctx.dropTable("test_integer_limits", o);
-  await ctx.dropTable("test_text_limits", o);
-  await ctx.dropTable("test_text_sizes", o);
-  await ctx.dropTable("testings", o);
-  await ctx.dropTable("things", o);
-  await ctx.dropTable("widgets", o);
-  await ctx.dropTable("wtx_test", o);
+  await adapter.dropTable("big_numbers", o);
+  await adapter.dropTable("binary_testings", o);
+  await adapter.dropTable("bk1", o);
+  await adapter.dropTable("bk2", o);
+  await adapter.dropTable("bk3", o);
+  await adapter.dropTable("bk4", o);
+  await adapter.dropTable("bk5", o);
+  await adapter.dropTable("bk6", o);
+  await adapter.dropTable("bk7", o);
+  await adapter.dropTable("bk_idx", o);
+  await adapter.dropTable("nonexistent", o);
+  await adapter.dropTable("old_name", o);
+  await adapter.dropTable("pend_t", o);
+  await adapter.dropTable("people_src", o);
+  await adapter.dropTable("people_src2", o);
+  await adapter.dropTable("pre_new_suf", o);
+  await adapter.dropTable("pre_old_suf", o);
+  await adapter.dropTable("rv_bulk", o);
+  await adapter.dropTable("something", o);
+  await adapter.dropTable("table_from_query_testings", o);
+  await adapter.dropTable("table_from_query_testings2", o);
+  await adapter.dropTable("test_binary_limits", o);
+  await adapter.dropTable("test_integer_limits", o);
+  await adapter.dropTable("test_text_limits", o);
+  await adapter.dropTable("test_text_sizes", o);
+  await adapter.dropTable("testings", o);
+  await adapter.dropTable("things", o);
+  await adapter.dropTable("widgets", o);
+  await adapter.dropTable("wtx_test", o);
 });
 
 function internalMetadataExistsSql(kind: typeof adapterType): string {
@@ -226,15 +214,18 @@ describe("MigrationTest", () => {
   });
 
   it("rename table with prefix and suffix", async () => {
-    const { adapter, ctx } = await freshContext();
-    ctx.tableNamePrefix = "pre_";
-    ctx.tableNameSuffix = "_suf";
+    const adapter = Base.connection;
+    const migration = anonymousMigration();
+    Base.tableNamePrefix = "pre_";
+    Base.tableNameSuffix = "_suf";
     // Own the scratch tables for the whole test: nothing clears tables between
     // tests, so a leaked `pre_old_suf`/`pre_new_suf` would break the
     // create/rename below, so clear any leak up front and drop in the finally.
-    await ctx.dropTable("pre_old_suf", "pre_new_suf", { ifExists: true });
+    await adapter.dropTable("pre_old_suf", "pre_new_suf", { ifExists: true });
     try {
-      await ctx.createTable("pre_old_suf", {}, (t) => {
+      // Dropped in the finally under its prefixed/suffixed name.
+      // eslint-disable-next-line blazetrails/require-table-teardown
+      await migration.createTable("old", {}, (t) => {
         t.string("content");
       });
       await adapter.executeMutation(
@@ -245,11 +236,13 @@ describe("MigrationTest", () => {
       );
       expect(before[0].content).toBe("hello world");
 
-      await ctx.renameTable("old", "new");
+      await migration.renameTable("old", "new");
       const after = await adapter.execute(`SELECT * FROM ${adapter.quoteTableName("pre_new_suf")}`);
       expect(after[0].content).toBe("hello world");
     } finally {
-      await ctx.dropTable("pre_old_suf", "pre_new_suf", { ifExists: true });
+      Base.tableNamePrefix = "";
+      Base.tableNameSuffix = "";
+      await adapter.dropTable("pre_old_suf", "pre_new_suf", { ifExists: true });
     }
   });
 
@@ -277,22 +270,21 @@ describe("MigrationTest", () => {
       };
       await adapter.createSchema("my_schema");
       try {
-        const ctx = new MigrationContext(adapter);
         // Torn down via dropSchema("my_schema") in the finally below (which
         // drops the schema and its tables); the lint rule only tracks dropTable.
         // eslint-disable-next-line blazetrails/require-table-teardown
-        await ctx.createTable("my_schema.values", { force: true }, (t) => {
+        await adapter.createTable("my_schema.values", { force: true }, (t) => {
           t.integer("value");
         });
 
         // Assert through the adapter's live `index_exists?` (Rails uses
-        // `connection.index_exists?`), not MigrationContext's in-memory
+        // `connection.index_exists?`), not any in-memory
         // bookkeeping, so a schema-qualified adapter bug can't slip past a
         // stale-but-correct cache.
-        await ctx.addIndex("my_schema.values", "value");
+        await adapter.addIndex("my_schema.values", "value");
         expect(await adapter.indexExists("my_schema.values", "value")).toBe(true);
 
-        await ctx.removeIndex("my_schema.values", { column: "value" });
+        await adapter.removeIndex("my_schema.values", { column: "value" });
         expect(await adapter.indexExists("my_schema.values", "value")).toBe(false);
       } finally {
         await adapter.dropSchema("my_schema");
@@ -315,7 +307,7 @@ async function freshAdapter(): Promise<DatabaseAdapter> {
 // ==========================================================================
 // D-1 partial conversion: columnsHash()-only tests drop their adapter assignment
 // (adapter-independent). The 3 DB-operation tests and the DDL sub-describes retain
-// freshAdapterWithPeople()/await freshContext() isolation.
+// freshAdapterWithPeople() isolation.
 describe("MigrationTest", () => {
   let adapter: DatabaseAdapter;
 
@@ -330,18 +322,18 @@ describe("MigrationTest", () => {
   });
 
   it("create table raises if already exists", async () => {
-    const { ctx } = await freshContext();
+    const adapter = Base.connection;
     try {
-      await ctx.createTable("testings", { force: true }, (t) => {
+      await adapter.createTable("testings", { force: true }, (t) => {
         t.string("foo");
       });
       await expect(
-        ctx.createTable("testings", {}, (t) => {
+        adapter.createTable("testings", {}, (t) => {
           t.string("foo");
         }),
       ).rejects.toThrow(StatementInvalid);
     } finally {
-      await ctx.dropTable("testings", { ifExists: true });
+      await adapter.dropTable("testings", { ifExists: true });
     }
   });
 
@@ -367,10 +359,10 @@ describe("MigrationTest", () => {
     // `big_numbers` with decimal columns carrying explicit precision/scale, then
     // a BigNumber row is persisted and read back to assert the per-adapter
     // value/type semantics (the part the old columnsHash() stub dropped).
-    const { adapter, ctx } = await freshContext();
-    await ctx.dropTable("big_numbers", { ifExists: true });
+    const adapter = Base.connection;
+    await adapter.dropTable("big_numbers", { ifExists: true });
     // GiveMeBigNumbers.up
-    await ctx.createTable("big_numbers", {}, (t) => {
+    await adapter.createTable("big_numbers", {}, (t) => {
       t.column("bank_balance", "decimal", { precision: 10, scale: 2 });
       t.column("big_bank_balance", "decimal", { precision: 15, scale: 2 });
       t.column("world_population", "decimal", { precision: 20 });
@@ -379,7 +371,7 @@ describe("MigrationTest", () => {
     });
 
     // The persisted column precision/scale survive the create_table path.
-    const cols = await ctx.columns("big_numbers");
+    const cols = await adapter.columns("big_numbers");
     const byName = (n: string) => cols.find((c) => c.name === n)!;
     expect(byName("bank_balance").precision).toBe(10);
     expect(byName("bank_balance").scale).toBe(2);
@@ -458,7 +450,7 @@ describe("MigrationTest", () => {
         expect(valueOfE).toBe(2);
       }
     } finally {
-      await ctx.dropTable("big_numbers", { ifExists: true });
+      await adapter.dropTable("big_numbers", { ifExists: true });
     }
   });
 
@@ -498,7 +490,7 @@ describe("MigrationTest", () => {
   });
 
   it("schema migrations table name", async () => {
-    const { adapter } = await freshContext();
+    const adapter = Base.connection;
     const schemaMigration = new SchemaMigration(adapter);
     const originalTableName = Base.schemaMigrationsTableName;
     const savedPrefix = Base.tableNamePrefix;
@@ -528,32 +520,31 @@ describe("MigrationTest", () => {
 
   it.skipIf(adapterType === "sqlite")("out of range integer limit should raise", async () => {
     const adapter = await freshAdapter();
-    const ctx = new MigrationContext(adapter);
-    const error = await ctx
+    const error = await adapter
       .createTable("test_integer_limits", { force: true }, (t) => {
         t.column("bigone", "integer", { limit: 10 });
       })
       .catch((e) => e);
     expect(error).toBeInstanceOf(ArgumentError);
     expect(error.message).toContain("No integer type has byte size 10");
-    await ctx.dropTable("test_integer_limits", { ifExists: true });
+    await adapter.dropTable("test_integer_limits", { ifExists: true });
   });
 
   it("create table with binary column", async () => {
     // Rails creates `binary_testings` with a `t.column "data", :binary,
     // null: false` and asserts the persisted column's default is nil. Drive the
     // live create_table path and introspect the column.
-    const { ctx } = await freshContext();
-    await ctx.dropTable("binary_testings", { ifExists: true });
-    await ctx.createTable("binary_testings", {}, (t) => {
+    const adapter = Base.connection;
+    await adapter.dropTable("binary_testings", { ifExists: true });
+    await adapter.createTable("binary_testings", {}, (t) => {
       t.column("data", "binary", { null: false });
     });
-    const cols = await ctx.columns("binary_testings");
+    const cols = await adapter.columns("binary_testings");
     const dataColumn = cols.find((c) => c.name === "data");
     expect(dataColumn).toBeDefined();
     expect(dataColumn!.type).toBe("binary");
     expect(dataColumn!.default ?? null).toBeNull();
-    await ctx.dropTable("binary_testings", { ifExists: true });
+    await adapter.dropTable("binary_testings", { ifExists: true });
   });
 
   it("proper table name on migration", () => {
@@ -771,65 +762,65 @@ describe("MigrationTest", () => {
   });
 
   it("create table with if not exists true", async () => {
-    const { ctx } = await freshContext();
+    const adapter = Base.connection;
     // Nothing clears tables between tests, so a leaked `things` from
     // a sibling file would make the first, non-ifNotExists create raise; clear
     // any leak up front and drop in the finally so DDL stays confined here.
-    await ctx.dropTable("things", { ifExists: true });
+    await adapter.dropTable("things", { ifExists: true });
     try {
-      await ctx.createTable("things", {}, (t) => {
+      await adapter.createTable("things", {}, (t) => {
         t.string("name");
       });
-      await ctx.createTable("things", { ifNotExists: true }, (t) => {
+      await adapter.createTable("things", { ifNotExists: true }, (t) => {
         t.string("name");
       });
-      expect(await ctx.tableExists("things")).toBe(true);
+      expect(await adapter.tableExists("things")).toBe(true);
     } finally {
-      await ctx.dropTable("things", { ifExists: true });
+      await adapter.dropTable("things", { ifExists: true });
     }
   });
 
   it("create table raises for long table names", async () => {
-    const { ctx } = await freshContext();
+    const adapter = Base.connection;
     const longName = "a".repeat(65);
-    await expect(ctx.createTable(longName, {})).rejects.toThrow(/too long/);
+    await expect(adapter.createTable(longName, {})).rejects.toThrow(/too long/);
   });
 
   it("create table with force and if not exists", async () => {
-    const { ctx } = await freshContext();
-    await expect(ctx.createTable("things", { force: true, ifNotExists: true })).rejects.toThrow(
+    const adapter = Base.connection;
+    await expect(adapter.createTable("things", { force: true, ifNotExists: true })).rejects.toThrow(
       /cannot be used simultaneously/i,
     );
   });
 
   it("create table with indexes and if not exists true", async () => {
-    const { ctx } = await freshContext();
+    const adapter = Base.connection;
     // Own the scratch table for the whole test: nothing clears tables between
     // tests, so a leaked `things`
     // would make the first, non-ifNotExists create raise. Clear any leak up
     // front and drop in the finally so DDL stays confined to this test.
-    await ctx.dropTable("things", { ifExists: true });
+    await adapter.dropTable("things", { ifExists: true });
     try {
-      await ctx.createTable("things", {}, (t) => {
+      await adapter.createTable("things", {}, (t) => {
         t.string("name");
       });
-      await ctx.addIndex("things", "name");
-      await ctx.createTable("things", { ifNotExists: true }, (t) => {
+      await adapter.addIndex("things", "name");
+      await adapter.createTable("things", { ifNotExists: true }, (t) => {
         t.string("name");
       });
-      expect(await ctx.tableExists("things")).toBe(true);
+      expect(await adapter.tableExists("things")).toBe(true);
     } finally {
-      await ctx.dropTable("things", { ifExists: true });
+      await adapter.dropTable("things", { ifExists: true });
     }
   });
 
   it("create table with force true does not drop nonexisting table", async () => {
-    const { ctx } = await freshContext();
-    expect(await ctx.tableExists("nonexistent")).toBe(false);
-    await ctx.createTable("nonexistent", { force: true }, (t) => {
+    const adapter = Base.connection;
+    expect(await adapter.tableExists("nonexistent")).toBe(false);
+    await adapter.createTable("nonexistent", { force: true }, (t) => {
       t.string("name");
     });
-    expect(await ctx.tableExists("nonexistent")).toBe(true);
+    expect(await adapter.tableExists("nonexistent")).toBe(true);
   });
 
   it("remove column with if exists set", async () => {
@@ -1059,7 +1050,7 @@ describe("MigrationTest", () => {
   });
 
   it("internal metadata table name", async () => {
-    const { adapter } = await freshContext();
+    const adapter = Base.connection;
     const { InternalMetadata } = await import("./internal-metadata.js");
     const internalMetadata = new InternalMetadata(adapter);
     const originalTableName = Base.internalMetadataTableName;
@@ -1083,7 +1074,7 @@ describe("MigrationTest", () => {
   });
 
   it("internal metadata stores environment when migration fails", async () => {
-    const { adapter } = await freshContext();
+    const adapter = Base.connection;
     const { InternalMetadata } = await import("./internal-metadata.js");
     const im = new InternalMetadata(adapter);
     await im.createTable();
@@ -1109,7 +1100,7 @@ describe("MigrationTest", () => {
   });
 
   it("internal metadata stores environment when other data exists", async () => {
-    const { adapter } = await freshContext();
+    const adapter = Base.connection;
     const { InternalMetadata } = await import("./internal-metadata.js");
     const im = new InternalMetadata(adapter);
     await im.createTable();
@@ -1127,7 +1118,7 @@ describe("MigrationTest", () => {
   });
 
   it("internal metadata not used when not enabled", async () => {
-    const { adapter } = await freshContext();
+    const adapter = Base.connection;
     const { InternalMetadata } = await import("./internal-metadata.js");
 
     const im = new InternalMetadata(adapter, { enabled: false });
@@ -1149,7 +1140,7 @@ describe("MigrationTest", () => {
   });
 
   it("inserting a new entry into internal metadata", async () => {
-    const { adapter } = await freshContext();
+    const adapter = Base.connection;
     const { InternalMetadata } = await import("./internal-metadata.js");
     const im = new InternalMetadata(adapter);
     await im.createTable();
@@ -1162,7 +1153,7 @@ describe("MigrationTest", () => {
   });
 
   it("updating an existing entry into internal metadata", async () => {
-    const { adapter } = await freshContext();
+    const adapter = Base.connection;
     const { InternalMetadata } = await import("./internal-metadata.js");
     const im = new InternalMetadata(adapter);
     await im.createTable();
@@ -1176,7 +1167,7 @@ describe("MigrationTest", () => {
     // invalidated after DDL rollback. Our tableExists() queries live (no cache),
     // so we verify the idempotent commit path instead — the underlying invariant
     // (no stale cache blocking re-creation) holds trivially in our implementation.
-    const { adapter } = await freshContext();
+    const adapter = Base.connection;
     const { InternalMetadata } = await import("./internal-metadata.js");
     const im = new InternalMetadata(adapter);
 
@@ -1211,7 +1202,7 @@ describe("MigrationTest", () => {
     // tableExists() queries live (no schema cache), so create_table is always
     // re-entrant across transactions. Verify that successive createTable() +
     // createVersion() pairs work correctly — the IF NOT EXISTS guard is idempotent.
-    const { adapter } = await freshContext();
+    const adapter = Base.connection;
     const sm = new SchemaMigration(adapter);
 
     // First transaction: create + write + commit
@@ -1306,35 +1297,33 @@ describe("MigrationTest", () => {
 
   it("create table with query", async () => {
     const adapter = await freshAdapter();
-    const ctx = new MigrationContext(adapter);
-    await ctx.createTable("people_src", {}, (t) => {
+    await adapter.createTable("people_src", {}, (t) => {
       t.integer("person_id");
     });
     // Unquoted lowercase identifiers parse identically on PG/SQLite/MySQL;
     // Rails-style `"…"` quoting is a string literal on MySQL.
     await adapter.executeMutation(`INSERT INTO people_src (person_id) VALUES (1)`);
 
-    await ctx.createTable("table_from_query_testings", {
+    await adapter.createTable("table_from_query_testings", {
       as: `SELECT person_id FROM people_src WHERE person_id = 1`,
     });
     const rows = await adapter.execute(`SELECT * FROM table_from_query_testings`);
     expect(rows).toHaveLength(1);
-    expect(await ctx.columnExists("table_from_query_testings", "person_id")).toBe(true);
+    expect(await adapter.columnExists("table_from_query_testings", "person_id")).toBe(true);
 
     // The CTAS column derivation reads back through the adapter's own
     // `columns()` (Rails `new_column_from_field`), so the persisted type is the
     // Rails-canonical name (not the raw catalog string).
-    const cols = await ctx.columns("table_from_query_testings");
+    const cols = await adapter.columns("table_from_query_testings");
     const pid = cols.find((c) => c.name === "person_id");
     expect(pid?.type).toBe("integer");
 
-    await ctx.dropTable("table_from_query_testings", "people_src");
+    await adapter.dropTable("table_from_query_testings", "people_src");
   });
 
   it("create table with query from relation", async () => {
     const adapter = await freshAdapter();
-    const ctx = new MigrationContext(adapter);
-    await ctx.createTable("people_src2", {}, (t) => {
+    await adapter.createTable("people_src2", {}, (t) => {
       t.integer("person_id");
     });
     await adapter.executeMutation(`INSERT INTO people_src2 (person_id) VALUES (1)`);
@@ -1344,29 +1333,28 @@ describe("MigrationTest", () => {
     const t = adapter.quoteTableName("people_src2");
     const c = `${t}.${adapter.quoteColumnName("person_id")}`;
     const sql = `SELECT ${c} FROM ${t} WHERE ${c} = 1`;
-    await ctx.createTable("table_from_query_testings2", { as: sql });
+    await adapter.createTable("table_from_query_testings2", { as: sql });
     const rows = await adapter.execute(`SELECT * FROM table_from_query_testings2`);
     expect(rows).toHaveLength(1);
 
-    await ctx.dropTable("table_from_query_testings2", "people_src2");
+    await adapter.dropTable("table_from_query_testings2", "people_src2");
   });
 
   it.skipIf(adapterType !== "sqlite")(
     "allows sqlite3 rollback on invalid column type",
     async () => {
       const adapter = await freshAdapter();
-      const ctx = new MigrationContext(adapter);
-      await ctx.createTable("something", { force: true }, (t) => {
+      await adapter.createTable("something", { force: true }, (t) => {
         t.integer("number");
         t.string("name");
         t.column("foo", "bar" as any);
       });
-      expect(await ctx.columnExists("something", "foo")).toBe(true);
-      await ctx.removeColumn("something", "foo");
-      expect(await ctx.columnExists("something", "foo")).toBe(false);
-      expect(await ctx.columnExists("something", "name")).toBe(true);
-      expect(await ctx.columnExists("something", "number")).toBe(true);
-      await ctx.dropTable("something");
+      expect(await adapter.columnExists("something", "foo")).toBe(true);
+      await adapter.removeColumn("something", "foo");
+      expect(await adapter.columnExists("something", "foo")).toBe(false);
+      expect(await adapter.columnExists("something", "name")).toBe(true);
+      expect(await adapter.columnExists("something", "number")).toBe(true);
+      await adapter.dropTable("something");
     },
   );
 
@@ -1496,34 +1484,31 @@ describe("MigrationTest", () => {
 
   it.skipIf(adapterType === "sqlite")("out of range text limit should raise", async () => {
     const adapter = await freshAdapter();
-    const ctx = new MigrationContext(adapter);
-    const error = await ctx
+    const error = await adapter
       .createTable("test_text_limits", { force: true }, (t) => {
         t.text("bigtext", { limit: 0xfffffffff });
       })
       .catch((e) => e);
     expect(error).toBeInstanceOf(ArgumentError);
     expect(error.message).toContain(`No text type has byte size ${0xfffffffff}`);
-    await ctx.dropTable("test_text_limits", { ifExists: true });
+    await adapter.dropTable("test_text_limits", { ifExists: true });
   });
 
   it.skipIf(adapterType === "sqlite")("out of range binary limit should raise", async () => {
     const adapter = await freshAdapter();
-    const ctx = new MigrationContext(adapter);
-    const error = await ctx
+    const error = await adapter
       .createTable("test_binary_limits", { force: true }, (t) => {
         t.binary("bigbinary", { limit: 0xfffffffff });
       })
       .catch((e) => e);
     expect(error).toBeInstanceOf(ArgumentError);
     expect(error.message).toContain(`No binary type has byte size ${0xfffffffff}`);
-    await ctx.dropTable("test_binary_limits", { ifExists: true });
+    await adapter.dropTable("test_binary_limits", { ifExists: true });
   });
 
   it.skipIf(adapterType !== "mysql")("invalid text size should raise", async () => {
     const adapter = await freshAdapter();
-    const ctx = new MigrationContext(adapter);
-    const error = await ctx
+    const error = await adapter
       .createTable("test_text_sizes", { force: true }, (t) => {
         t.text("bigtext", { size: 0xfffffffff } as any);
       })
@@ -1532,7 +1517,7 @@ describe("MigrationTest", () => {
     expect(error.message).toBe(
       `${0xfffffffff} is invalid :size value. Only :tiny, :medium, and :long are allowed.`,
     );
-    await ctx.dropTable("test_text_sizes", { ifExists: true });
+    await adapter.dropTable("test_text_sizes", { ifExists: true });
   });
   describe("ReservedWordsMigrationTest", () => {
     it("drop index from table named values", async () => {

@@ -41,7 +41,7 @@ import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { Column } from "../column.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { deduplicate } from "../deduplicable.js";
-import { singularize, pluralize, getCrypto, isPresent } from "@blazetrails/activesupport";
+import { singularize, pluralize, getCrypto, isPresent, presence } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
 import { rubyInspect } from "../../relation/ruby-inspect.js";
 import { Utils as PgUtils } from "../postgresql/utils.js";
@@ -396,12 +396,9 @@ export class SchemaStatements {
     // Rails: if supports_comments? && !supports_comments_in_create?
     //   change_table_comment(table_name, comment) if options[:comment].present?
     if (this.adapter.supportsComments?.() && !this.adapter.supportsCommentsInCreate?.()) {
-      if (
-        options.comment != null &&
-        options.comment.length > 0 &&
-        typeof this.adapter.changeTableComment === "function"
-      ) {
-        await this.adapter.changeTableComment(name, options.comment);
+      const tableComment = presence(options.comment);
+      if (tableComment != null && typeof this.adapter.changeTableComment === "function") {
+        await this.adapter.changeTableComment(name, tableComment);
       }
       // Mirrors Rails: adapters that can't inline column comments in CREATE
       // emit a COMMENT ON COLUMN per column so inline `comment:` options
@@ -416,8 +413,8 @@ export class SchemaStatements {
           name: string;
           options?: { comment?: string | null };
         }>) {
-          const columnComment = column.options?.comment;
-          if (columnComment != null && String(columnComment).length > 0) {
+          const columnComment = presence(column.options?.comment);
+          if (columnComment != null) {
             await commentAdapter.changeColumnComment(name, column.name, columnComment);
           }
         }

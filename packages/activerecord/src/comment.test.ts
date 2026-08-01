@@ -5,7 +5,6 @@
 import { describe, beforeEach, afterEach, expect } from "vitest";
 import { Base } from "./index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { MigrationContext } from "./migration.js";
 import { adapterType } from "./test-adapter.js";
 import { fixtures } from "./test-fixtures.js";
 import { itIfSupports } from "./support/supports.js";
@@ -19,20 +18,24 @@ describe("CommentTest", () => {
   // a wrapping (PG-poisoning) transaction.
   fixtures({}, { useTransactionalTests: false });
   let adapter: DatabaseAdapter;
-  let ctx: MigrationContext;
 
   beforeEach(async () => {
     adapter = Base.connection;
-    ctx = new MigrationContext(adapter);
-    await ctx.createTable("commenteds", { comment: "A table with comment", force: true }, (t) => {
-      t.string("name", { comment: "Comment should help clarify the column purpose" });
-      t.boolean("obvious", { comment: "Question is: should you comment obviously named objects?" });
-      t.string("content");
-      t.index(["name"], {
-        comment: '"Very important" index that powers all the performance.\nAnd it\'s fun!',
-      });
-    });
-    await ctx.createTable("blank_comments", { comment: " ", force: true }, (t) => {
+    await adapter.createTable(
+      "commenteds",
+      { comment: "A table with comment", force: true },
+      (t) => {
+        t.string("name", { comment: "Comment should help clarify the column purpose" });
+        t.boolean("obvious", {
+          comment: "Question is: should you comment obviously named objects?",
+        });
+        t.string("content");
+        t.index(["name"], {
+          comment: '"Very important" index that powers all the performance.\nAnd it\'s fun!',
+        });
+      },
+    );
+    await adapter.createTable("blank_comments", { comment: " ", force: true }, (t) => {
       t.string("space_comment", { comment: " " });
       t.string("empty_comment", { comment: "" });
       t.string("nil_comment", { comment: null as any });
@@ -42,7 +45,7 @@ describe("CommentTest", () => {
       t.index(["nil_comment"], { comment: null as any });
       t.index(["absent_comment"]);
     });
-    await ctx.createTable(
+    await adapter.createTable(
       "pk_commenteds",
       { comment: "Table comment", id: false, force: true } as any,
       (t) => {
@@ -52,7 +55,7 @@ describe("CommentTest", () => {
   });
 
   afterEach(async () => {
-    await ctx.dropTable("commenteds", "blank_comments", "pk_commenteds", { ifExists: true });
+    await adapter.dropTable("commenteds", "blank_comments", "pk_commenteds", { ifExists: true });
   });
 
   itIfSupports("comments", "default primary key comment", async () => {
@@ -76,7 +79,7 @@ describe("CommentTest", () => {
   });
 
   itIfSupports("comments", "add column with comment later", async () => {
-    await ctx.addColumn("commenteds", "rating", "integer", {
+    await adapter.addColumn("commenteds", "rating", "integer", {
       comment: "I am running out of imagination",
     });
     const cols = await (adapter as any).columns("commenteds");
@@ -86,7 +89,7 @@ describe("CommentTest", () => {
   });
 
   itIfSupports("comments", "add index with comment later", async () => {
-    await ctx.addIndex("commenteds", "obvious", {
+    await adapter.addIndex("commenteds", "obvious", {
       name: "idx_obvious",
       comment: "We need to see obvious comments",
     });
@@ -103,7 +106,7 @@ describe("CommentTest", () => {
   });
 
   itIfSupports("comments", "add comment to column", async () => {
-    await ctx.changeColumn("commenteds", "content", "string", {
+    await adapter.changeColumn("commenteds", "content", "string", {
       comment: "Whoa, content describes itself!",
     });
     const cols = await (adapter as any).columns("commenteds");
@@ -113,7 +116,7 @@ describe("CommentTest", () => {
   });
 
   itIfSupports("comments", "remove comment from column", async () => {
-    await ctx.changeColumn("commenteds", "obvious", "string", { comment: null as any });
+    await adapter.changeColumn("commenteds", "obvious", "string", { comment: null as any });
     const cols = await (adapter as any).columns("commenteds");
     const col = cols.find((c: any) => c.name === "obvious")!;
     expect(col.type).toBe("string");
@@ -121,10 +124,10 @@ describe("CommentTest", () => {
   });
 
   itIfSupports("comments", "rename column preserves comment", async () => {
-    await ctx.addColumn("commenteds", "rating", "string", {
+    await adapter.addColumn("commenteds", "rating", "string", {
       comment: "I am running out of imagination",
     });
-    await ctx.renameColumn("commenteds", "rating", "new_rating");
+    await adapter.renameColumn("commenteds", "rating", "new_rating");
     const cols = await (adapter as any).columns("commenteds");
     const col = cols.find((c: any) => c.name === "new_rating")!;
     expect(col.type).toBe("string");
@@ -139,13 +142,13 @@ describe("CommentTest", () => {
     "comments",
     "schema dump with comments",
     async () => {
-      await ctx.addColumn("commenteds", "rating", "integer", {
+      await adapter.addColumn("commenteds", "rating", "integer", {
         comment: "I am running out of imagination",
       });
-      await ctx.changeColumn("commenteds", "content", "string", {
+      await adapter.changeColumn("commenteds", "content", "string", {
         comment: "Whoa, content describes itself!",
       });
-      await ctx.changeColumn("commenteds", "obvious", "string", { comment: null as any });
+      await adapter.changeColumn("commenteds", "obvious", "string", { comment: null as any });
       // Scope to the table under assertion so the dump stays cheap on a cold
       // schema cache (the truncate-reset leaves the ~330 canonical tables in place).
       const output = await SchemaDumper.dumpTableSchema(adapter, "commenteds");
@@ -180,19 +183,19 @@ describe("CommentTest", () => {
   );
 
   itIfSupports("comments", "change table comment", async () => {
-    await (ctx as any).changeTableComment("commenteds", "Edited table comment");
+    await (adapter as any).changeTableComment("commenteds", "Edited table comment");
     const tableComment = await (adapter as any).tableComment("commenteds");
     expect(tableComment).toBe("Edited table comment");
   });
 
   itIfSupports("comments", "change table comment to nil", async () => {
-    await (ctx as any).changeTableComment("commenteds", null);
+    await (adapter as any).changeTableComment("commenteds", null);
     const tableComment = await (adapter as any).tableComment("commenteds");
     expect(tableComment).toBeNull();
   });
 
   itIfSupports("comments", "change column comment", async () => {
-    await (ctx as any).changeColumnComment("commenteds", "id", "Edited column comment");
+    await (adapter as any).changeColumnComment("commenteds", "id", "Edited column comment");
     const col = (await (adapter as any).columns("commenteds")).find((c: any) => c.name === "id")!;
     expect(col.comment).toBe("Edited column comment");
     if (adapterType === "mysql") {
@@ -201,7 +204,7 @@ describe("CommentTest", () => {
   });
 
   itIfSupports("comments", "change column comment to nil", async () => {
-    await (ctx as any).changeColumnComment("commenteds", "name", null);
+    await (adapter as any).changeColumnComment("commenteds", "name", null);
     const col = (await (adapter as any).columns("commenteds")).find((c: any) => c.name === "name")!;
     expect(col.comment).toBeNull();
   });
