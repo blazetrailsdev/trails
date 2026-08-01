@@ -2868,20 +2868,6 @@ export class Migrator {
     return !this._migrations.some((m) => m.version === key);
   }
 
-  private _validateTargetVersion(v: number | string): void {
-    if (typeof v === "string") {
-      if (!/^\d+$/.test(v)) {
-        throw new MigrationError(
-          `Invalid target version: ${v}. Must be a non-negative numeric value.`,
-        );
-      }
-    } else {
-      if (!Number.isInteger(v) || v < 0) {
-        throw new MigrationError(`Invalid target version: ${v}. Must be a non-negative integer.`);
-      }
-    }
-  }
-
   /**
    * Run exactly one migration (identified by `targetVersion`) in the given
    * direction. Used by the `db:migrate:up` / `db:migrate:down` CLI paths
@@ -2900,7 +2886,6 @@ export class Migrator {
   }
 
   private async _migrateUp(targetVersion: number | string | null): Promise<MigrationProxy[]> {
-    if (targetVersion !== null) this._validateTargetVersion(targetVersion);
     const target = targetVersion !== null ? BigInt(targetVersion) : null;
     const applied = await this._appliedVersions();
     const ran: MigrationProxy[] = [];
@@ -2918,7 +2903,6 @@ export class Migrator {
     // A null target means "revert everything" (Rails: a `:down` Migrator with no
     // target_version), which — unlike `down(0)` — also reverts a version-0
     // migration.
-    if (targetVersion !== null) this._validateTargetVersion(targetVersion);
     const target = targetVersion !== null ? BigInt(targetVersion) : null;
     const applied = await this._appliedVersions();
     const toRevert = this._migrations
