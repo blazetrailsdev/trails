@@ -34,8 +34,8 @@ eagerAutoload(() => {
     autoload("AliasTracker");
 });
 export async function eagerLoadBang() {
-    await Preloader.eagerLoadBang();
-    return await JoinDependency.eagerLoadBang();
+    Preloader.eagerLoadBang();
+    return JoinDependency.eagerLoadBang();
 }
 export function association(name) {
     let association, reflection;

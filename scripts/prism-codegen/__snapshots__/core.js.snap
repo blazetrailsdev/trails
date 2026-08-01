@@ -422,11 +422,11 @@ export async function prettyPrint(pp) {
     }
     return pp.objectAddressGroup(this, () => {
         if (this.attributes) {
-            attr_names = await this.attributesForInspect.select(name => this.is_hasAttribute(name.toString()));
+            attr_names = this.attributesForInspect.select(name => this.is_hasAttribute(name.toString()));
             return pp.seplist(attr_names, this.proc(() => pp.text(",")), attr_name => {
                 attr_name = attr_name.toString();
                 pp.breakable(" ");
-                return await pp.group(1, () => {
+                return pp.group(1, () => {
                     pp.text(attr_name);
                     pp.text(":");
                     pp.breakable();

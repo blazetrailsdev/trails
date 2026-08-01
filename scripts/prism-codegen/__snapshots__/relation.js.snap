@@ -92,7 +92,7 @@ export class Relation {
             }
             catch (e) {
                 if (connection.isTransactionOpen()) {
-                    return await this.where(attributes).lock().findByBang(attributes);
+                    return this.where(attributes).lock().findByBang(attributes);
                 }
                 else {
                     return await this.findByBang(attributes);
@@ -107,7 +107,7 @@ export class Relation {
             }
             catch (e) {
                 if (connection.isTransactionOpen()) {
-                    return await this.where(attributes).lock().findByBang(attributes);
+                    return this.where(attributes).lock().findByBang(attributes);
                 }
                 else {
                     return await this.findByBang(attributes);
@@ -133,7 +133,7 @@ export class Relation {
     }
     async size() {
         if (this.isLoaded) {
-            return await this.records.length();
+            return this.records.length();
         }
         else {
             return this.count("all");
@@ -144,7 +144,7 @@ export class Relation {
             return true;
         }
         if (this.isLoaded) {
-            return await this.records.isEmpty();
+            return this.records.isEmpty();
         }
         else {
             return !this.isExists;
@@ -154,7 +154,7 @@ export class Relation {
         if (this.none) {
             return true;
         }
-        if (await args.isPresent() || block !== undefined) {
+        if (args.isPresent() || block !== undefined) {
             return super(...arguments);
         }
         return this.isEmpty;
@@ -163,7 +163,7 @@ export class Relation {
         if (this.none) {
             return false;
         }
-        if (await args.isPresent() || block !== undefined) {
+        if (args.isPresent() || block !== undefined) {
             return super(...arguments);
         }
         return !this.isEmpty;
@@ -172,11 +172,11 @@ export class Relation {
         if (this.none) {
             return false;
         }
-        if (await args.isPresent() || block !== undefined) {
+        if (args.isPresent() || block !== undefined) {
             return super(...arguments);
         }
         if (this.isLoaded) {
-            return await this.records.isOne();
+            return this.records.isOne();
         }
         return this.limitedCount === 1;
     }
@@ -188,7 +188,7 @@ export class Relation {
             return super(...arguments);
         }
         if (this.isLoaded) {
-            return await this.records.isMany();
+            return this.records.isMany();
         }
         return this.limitedCount > 1;
     }
@@ -199,7 +199,7 @@ export class Relation {
     async computeCacheKey(timestamp_column = "updated_at") {
         let query_signature, key;
         query_signature = ActiveSupport.Digest.hexdigest(this.toSql);
-        key = `${await this.model.modelName().cacheKey()}/query-${query_signature}`;
+        key = `${this.model.modelName().cacheKey()}/query-${query_signature}`;
         if (this.model.collectionCacheVersioning()) {
             return key;
         }
@@ -217,7 +217,7 @@ export class Relation {
         let size, timestamp, collection, column, select_values, query, subquery_alias, subquery_column, arel, column_type;
         timestamp_column = timestamp_column.toString();
         if (this.isLoaded) {
-            size = await this.records.size();
+            size = this.records.size();
             if (size > 0) {
                 timestamp = this.records.map(record => record.readAttribute(timestamp_column)).max();
             }
@@ -228,9 +228,9 @@ export class Relation {
                 column = c.visitor().compile(this.table[timestamp_column]);
                 select_values = `COUNT(*) AS ${this.model.adapterClass().quoteColumnName("size")}, MAX(%s) AS timestamp`;
                 if (collection.hasLimitOrOffset()) {
-                    query = await collection.select(`${column} AS collection_cache_key_timestamp`);
-                    if (this.distinctValue && await collection.selectValues().isEmpty()) {
-                        query._selectBang(this.table[await Arel.star()]);
+                    query = collection.select(`${column} AS collection_cache_key_timestamp`);
+                    if (this.distinctValue && collection.selectValues().isEmpty()) {
+                        query._selectBang(this.table[Arel.star()]);
                     }
                     subquery_alias = "subquery_for_cache_key";
                     subquery_column = `${subquery_alias}.collection_cache_key_timestamp`;
@@ -241,7 +241,7 @@ export class Relation {
                     query.selectValues = [select_values % column];
                     arel = query.arel();
                 }
-                [size, timestamp] = await c.selectRows(arel, null).first();
+                [size, timestamp] = c.selectRows(arel, null).first();
                 if (size) {
                     column_type = this.model.typeForAttribute(timestamp_column);
                     return timestamp = column_type.deserialize(timestamp);
@@ -282,7 +282,7 @@ export class Relation {
     }
     async updateAll(updates) {
         let attr, values, arel, group_values_arel_columns, having_clause_ast, key, stmt;
-        if (await updates.isBlank()) {
+        if (updates.isBlank()) {
             throw new ArgumentError("Empty list of attributes to change");
         }
         if (this.none) {
@@ -302,28 +302,28 @@ export class Relation {
             arel = this.isEagerLoading ? this.applyJoinDependency.arel() : this.buildArel(c);
             arel.source().left = this.table;
             group_values_arel_columns = this.arelColumns(this.groupValues.uniq());
-            if (!await this.havingClause.isEmpty()) {
+            if (!this.havingClause.isEmpty()) {
                 having_clause_ast = this.havingClause.ast();
             }
             key = this.model.isCompositePrimaryKey() ? this.model.primaryKey.map(pk => this.table[pk]) : this.table[this.model.primaryKey];
             stmt = arel.compileUpdate(values, key, having_clause_ast, group_values_arel_columns);
-            return (await c.update(stmt, `${this.model} Update All`)).tap(() => this.reset);
+            return c.update(stmt, `${this.model} Update All`).tap(() => this.reset);
         });
     }
     async update(id = "all") {
         if (id === "all") {
-            return this.records.each(record => await record.update(attributes));
+            return this.records.each(record => record.update(attributes));
         }
         else {
-            return await this.model.update(id, attributes);
+            return this.model.update(id, attributes);
         }
     }
     async updateBang(id = "all") {
         if (id === "all") {
-            return this.records.each(record => await record.updateBang(attributes));
+            return this.records.each(record => record.updateBang(attributes));
         }
         else {
-            return await this.model.updateBang(id, attributes);
+            return this.model.updateBang(id, attributes);
         }
     }
     async insert(attributes, { returning = null, unique_by = null, record_timestamps = null } = {}) {
@@ -346,7 +346,7 @@ export class Relation {
     }
     async updateCounters(counters) {
         let touch, updates, attr, names, options, touch_updates;
-        touch = await counters.delete("touch");
+        touch = counters.delete("touch");
         updates = {};
         counters.each((counter_name, value) => {
             attr = this.table[counter_name];
@@ -359,7 +359,7 @@ export class Relation {
             names = Array.wrap(names);
             options = names.extractOptionsBang();
             touch_updates = this.model.touchAttributesWithTime(...names, { ...options });
-            if (!await touch_updates.isEmpty()) {
+            if (!touch_updates.isEmpty()) {
                 updates.mergeBang(touch_updates);
             }
         }
@@ -376,51 +376,51 @@ export class Relation {
         if (this.none) {
             return 0;
         }
-        invalid_methods = await INVALID_METHODS_FOR_DELETE_ALL.select(method => {
+        invalid_methods = INVALID_METHODS_FOR_DELETE_ALL.select(method => {
             value = this.values[method];
             if (method === "distinct") {
                 return value;
             }
             else {
-                return await value.isAny();
+                return value.isAny();
             }
         });
-        if (await invalid_methods.isAny()) {
+        if (invalid_methods.isAny()) {
             throw new ActiveRecordError(`delete_all doesn't support ${invalid_methods.join(", ")}`);
         }
         return this.model.withConnection(c => {
             arel = this.isEagerLoading ? this.applyJoinDependency.arel() : this.buildArel(c);
             arel.source().left = this.table;
             group_values_arel_columns = this.arelColumns(this.groupValues.uniq());
-            if (!await this.havingClause.isEmpty()) {
+            if (!this.havingClause.isEmpty()) {
                 having_clause_ast = this.havingClause.ast();
             }
             key = this.model.isCompositePrimaryKey() ? this.model.primaryKey.map(pk => this.table[pk]) : this.table[this.model.primaryKey];
             stmt = arel.compileDelete(key, having_clause_ast, group_values_arel_columns);
-            return (await c.delete(stmt, `${this.model} Delete All`)).tap(() => this.reset);
+            return c.delete(stmt, `${this.model} Delete All`).tap(() => this.reset);
         });
     }
     async delete(id_or_array) {
-        if (id_or_array.nil() || (id_or_array.isA(Array) && await id_or_array.isEmpty())) {
+        if (id_or_array.nil() || (id_or_array.isA(Array) && id_or_array.isEmpty())) {
             return 0;
         }
-        return await this.where({ [this.model.primaryKey()]: id_or_array }).deleteAll();
+        return this.where({ [this.model.primaryKey()]: id_or_array }).deleteAll();
     }
     async destroy(id) {
         let multiple_ids;
-        multiple_ids = this.model.isCompositePrimaryKey() ? (await id.first()).isA(Array) : id.isA(Array);
+        multiple_ids = this.model.isCompositePrimaryKey() ? id.first().isA(Array) : id.isA(Array);
         if (multiple_ids) {
             return this.find(id).each(x => x.destroy());
         }
         else {
-            return await this.find(id).destroy();
+            return this.find(id).destroy();
         }
     }
     async destroyBy(...args) {
-        return await this.where(...args).destroyAll();
+        return this.where(...args).destroyAll();
     }
     async deleteBy(...args) {
-        return await this.where(...args).deleteAll();
+        return this.where(...args).deleteAll();
     }
     loadAsync() {
         let result;
@@ -502,19 +502,19 @@ export class Relation {
         let subject, entries;
         subject = this.isLoaded ? this.records : this.annotate("loading for pp");
         entries = subject.take([this.limitValue, 11].compact().min());
-        if (await entries.size() === 11) {
+        if (entries.size() === 11) {
             entries[10] = "...";
         }
         return pp.pp(entries);
     }
     async isBlank() {
-        return await this.records.isBlank();
+        return this.records.isBlank();
     }
     isReadonly() {
         return this.readonlyValue;
     }
     async values() {
-        return await this.values.dup();
+        return this.values.dup();
     }
     valuesForQueries() {
         return this.values.except("extending", "skip_query_cache", "strict_loading");
@@ -523,7 +523,7 @@ export class Relation {
         let subject, entries;
         subject = this.isLoaded ? this.records : this.annotate("loading for inspect");
         entries = subject.take([this.limitValue, 11].compact().min()).mapBang(x => x.inspect());
-        if (await entries.size() === 11) {
+        if (entries.size() === 11) {
             entries[10] = "...";
         }
         return `#<${this.class().name()} [${entries.join(", ")}]>`;

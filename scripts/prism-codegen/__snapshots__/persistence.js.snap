@@ -14,7 +14,7 @@ export async function create(attributes = null, block) {
     }
     else {
         object = this.constructor(attributes, block);
-        await object.save();
+        object.save();
         return object;
     }
 }
@@ -25,7 +25,7 @@ export async function createBang(attributes = null, block) {
     }
     else {
         object = this.constructor(attributes, block);
-        await object.saveBang();
+        object.saveBang();
         return object;
     }
 }
@@ -45,40 +45,40 @@ export function instantiate(attributes, column_types = {}, block) {
 export async function update(id = "all") {
     let object;
     if (id.isA(Array)) {
-        if (await id.isAny(ActiveRecord.Base)) {
+        if (id.isAny(ActiveRecord.Base)) {
             throw new ArgumentError("You are passing an array of ActiveRecord::Base instances to `update`. Please pass the ids of the objects by calling `pluck(:id)` or `map(&:id)`.");
         }
-        return id.map(one_id => this.find(one_id)).eachWithIndex((object, idx) => await object.update(attributes[idx]));
+        return id.map(one_id => this.find(one_id)).eachWithIndex((object, idx) => object.update(attributes[idx]));
     }
     else if (id === "all") {
-        return this.all.each(record => await record.update(attributes));
+        return this.all.each(record => record.update(attributes));
     }
     else {
         if (__PRISM_TODO("CallNode")) {
             throw new ArgumentError("You are passing an instance of ActiveRecord::Base to `update`. Please pass the id of the object by calling `.id`.");
         }
         object = this.find(id);
-        await object.update(attributes);
+        object.update(attributes);
         return object;
     }
 }
 export async function updateBang(id = "all") {
     let object;
     if (id.isA(Array)) {
-        if (await id.isAny(ActiveRecord.Base)) {
+        if (id.isAny(ActiveRecord.Base)) {
             throw new ArgumentError("You are passing an array of ActiveRecord::Base instances to `update!`. Please pass the ids of the objects by calling `pluck(:id)` or `map(&:id)`.");
         }
-        return id.map(one_id => this.find(one_id)).eachWithIndex((object, idx) => await object.updateBang(attributes[idx]));
+        return id.map(one_id => this.find(one_id)).eachWithIndex((object, idx) => object.updateBang(attributes[idx]));
     }
     else if (id === "all") {
-        return this.all.each(record => await record.updateBang(attributes));
+        return this.all.each(record => record.updateBang(attributes));
     }
     else {
         if (__PRISM_TODO("CallNode")) {
             throw new ArgumentError("You are passing an instance of ActiveRecord::Base to `update!`. Please pass the id of the object by calling `.id`.");
         }
         object = this.find(id);
-        await object.updateBang(attributes);
+        object.updateBang(attributes);
         return object;
     }
 }
@@ -127,7 +127,7 @@ export async function _updateRecord(values, constraints) {
     um = new Arel.UpdateManager(this.arelTable);
     um.set(values.transformKeys(name => this.arelTable[name]));
     um.wheres = constraints;
-    return this.withConnection(c => await c.update(um, `${this} Update`));
+    return this.withConnection(c => c.update(um, `${this} Update`));
 }
 export async function _deleteRecord(constraints) {
     let default_constraint, current_scope, dm;
@@ -275,7 +275,7 @@ export async function updateColumns(attributes) {
     });
     update_constraints = this._queryConstraintsHash;
     attributes = __PRISM_TODO("CallNode");
-    affected_rows = await this.class()._updateRecord(attributes, update_constraints);
+    affected_rows = this.class()._updateRecord(attributes, update_constraints);
     return affected_rows === 1;
 }
 export function increment(attribute, by = 1) {
@@ -302,7 +302,7 @@ export function toggle(attribute) {
     return this;
 }
 export async function toggleBang(attribute) {
-    return await this.toggle(attribute).updateAttribute(attribute, this[attribute]);
+    return this.toggle(attribute).updateAttribute(attribute, this[attribute]);
 }
 export async function reload(options = null) {
     let fresh_object;
@@ -390,7 +390,7 @@ export function _touchRow(attribute_names, time) {
     return this._updateRow(attribute_names, "touch");
 }
 export async function _updateRow(attribute_names, attempted_action = "update") {
-    return await this.class()._updateRecord(this.attributesWithValues(attribute_names), this._queryConstraintsHash);
+    return this.class()._updateRecord(this.attributesWithValues(attribute_names), this._queryConstraintsHash);
 }
 export function createOrUpdate({ ...opts } = {}, block) {
     let result;

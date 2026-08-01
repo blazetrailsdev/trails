@@ -4,6 +4,7 @@ import type { Registry } from "../registry.js";
 import { methodName, isJsIdentName, isBindableIdent } from "../naming.js";
 import { rubyStr } from "../types.js";
 import { TOPLEVEL } from "../codegen.js";
+import { shouldAwaitCall } from "../await-policy.js";
 const f = ts.factory;
 const INFIX: Record<string, ts.BinaryOperator> = {
   "==": ts.SyntaxKind.EqualsEqualsEqualsToken,
@@ -271,7 +272,14 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
       : f.createIdentifier(jsName);
   if (!recv && callArgs.length === 0 && !block && !hasParens(n)) return target;
   const call = f.createCallExpression(target, undefined, callArgs);
-  return e.inAsyncMethod && e.asyncMethods.has(jsName) ? f.createAwaitExpression(call) : call;
+  return shouldAwaitCall({
+    receiver: hasRecv ? (n.receiver as PrismNode) : null,
+    jsName,
+    inAsyncMethod: e.inAsyncMethod,
+    asyncMethods: e.asyncMethods,
+  })
+    ? f.createAwaitExpression(call)
+    : call;
 }
 function symToProcArrow(prop: string): ts.ArrowFunction {
   return f.createArrowFunction(

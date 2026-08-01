@@ -71,7 +71,7 @@ export function asyncMaximum(column_name) {
 }
 export async function sum(initial_value_or_column = 0, block) {
     if (block !== undefined) {
-        return await this.map(block).sum(initial_value_or_column);
+        return this.map(block).sum(initial_value_or_column);
     }
     else {
         return await this.calculate("sum", initial_value_or_column);
@@ -85,11 +85,11 @@ export async function calculate(operation, column_name) {
     operation = operation.toString().downcase();
     if (this.none) {
         if (caseEq("count", operation) || caseEq("sum", operation)) {
-            result = await this.groupValues.isAny() ? new Hash() : 0;
+            result = this.groupValues.isAny() ? new Hash() : 0;
             return this.async ? new Promise.Complete(result) : result;
         }
         else if (caseEq("average", operation) || caseEq("minimum", operation) || caseEq("maximum", operation)) {
-            result = await this.groupValues.isAny() ? new Hash() : null;
+            result = this.groupValues.isAny() ? new Hash() : null;
             return this.async ? new Promise.Complete(result) : result;
         }
     }
@@ -104,7 +104,7 @@ export async function calculate(operation, column_name) {
                 relation.orderValues = [];
             }
         }
-        return await relation.calculate(operation, column_name);
+        return relation.calculate(operation, column_name);
     }
     else {
         return this.performCalculation(operation, column_name);
@@ -121,7 +121,7 @@ export async function pluck(...column_names) {
         }
     }
     if (this.isLoaded && this.isAllAttributes(column_names)) {
-        result = await this.records.pluck(...column_names);
+        result = this.records.pluck(...column_names);
         if (this.async) {
             return new Promise.Complete(result);
         }
@@ -131,7 +131,7 @@ export async function pluck(...column_names) {
     }
     if (this.hasInclude(column_names.first())) {
         relation = this.applyJoinDependency;
-        return await relation.pluck(...column_names);
+        return relation.pluck(...column_names);
     }
     else {
         this.model.disallowRawSqlBang(this.flattenedArgs(column_names));
@@ -155,10 +155,10 @@ export function asyncPluck(...column_names) {
 export async function pick(...column_names) {
     let result;
     if (this.isLoaded && this.isAllAttributes(column_names)) {
-        result = await this.records.pick(...column_names);
+        result = this.records.pick(...column_names);
         return this.async ? new Promise.Complete(result) : result;
     }
-    return (await this.limit(1).pluck(...column_names)).then(x => x.first());
+    return this.limit(1).pluck(...column_names).then(x => x.first());
 }
 export function asyncPick(...column_names) {
     return this.async.pick(...column_names);
@@ -168,7 +168,7 @@ export async function ids() {
     primary_key_array = this.Array(this.model.primaryKey);
     if (this.isLoaded) {
         result = this.records.map(record => {
-            if (await primary_key_array.isOne()) {
+            if (primary_key_array.isOne()) {
                 return record._readAttribute(primary_key_array.first());
             }
             else {
@@ -178,8 +178,8 @@ export async function ids() {
         return this.async ? new Promise.Complete(result) : result;
     }
     if (this.hasInclude(this.model.primaryKey)) {
-        relation = await this.applyJoinDependency.group(...primary_key_array);
-        return await relation.ids();
+        relation = this.applyJoinDependency.group(...primary_key_array);
+        return relation.ids();
     }
     columns = this.arelColumns(primary_key_array);
     relation = this.spawn;
