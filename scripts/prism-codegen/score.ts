@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { methodName, rubyFileToTs } from "./naming.js";
+import { methodNameCandidates, rubyFileToTs } from "./naming.js";
 
 export interface ScoreEntry {
   name: string;
@@ -45,12 +45,17 @@ export interface PortOwnership {
   claimedBy: Map<string, Set<string>>;
 }
 
-/** Every `def name` in a Rails source, mapped to the TS spelling. */
+/**
+ * Every `def name` in a Rails source, under every TS spelling it may be ported
+ * as. A predicate like `has_one?` is legitimately `hasOne` or `isHasOne`, and
+ * {@link resolvePortFn} tries both when resolving — so ownership has to claim
+ * both, or the fallback spelling slips past the guard.
+ */
 function rubyDefNames(source: string): string[] {
   const out: string[] = [];
   const re = /^\s*def\s+(?:self\.)?([A-Za-z_][A-Za-z0-9_]*[?!=]?)/gm;
   let m;
-  while ((m = re.exec(source))) out.push(methodName(m[1]));
+  while ((m = re.exec(source))) out.push(...methodNameCandidates(m[1]));
   return out;
 }
 

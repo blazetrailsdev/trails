@@ -395,6 +395,16 @@ describe("prism-codegen scorer", () => {
     );
   });
 
+  it("claims both spellings of an already-predicate Ruby name", () => {
+    // `has_one?` ports as `hasOne` or the disambiguating `isHasOne`; the
+    // resolver tries both candidates, so ownership has to claim both.
+    const ownership = buildPortOwnership([
+      { path: "active_record/reflection.rb", source: "  def has_one?\n  end\n" },
+    ]);
+    expect(ownership.claimedBy.get("hasOne")).toEqual(new Set(["reflection.ts"]));
+    expect(ownership.claimedBy.get("isHasOne")).toEqual(new Set(["reflection.ts"]));
+  });
+
   it("still borrows a cross-file symbol no other Rails file claims", () => {
     const globalIndex = indexPortTree([
       { path: "base.ts", source: `export function ensureProperType() { this.writeAttribute(); }` },

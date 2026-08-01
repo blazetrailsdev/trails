@@ -1,9 +1,17 @@
 import { rubyMethodToTs, snakeToCamel, rubyFileToTs } from "../api-compare/conventions.js";
 export { snakeToCamel, rubyFileToTs };
 export function methodName(rubyName: string): string {
+  return methodNameCandidates(rubyName)[0];
+}
+/**
+ * Every TS spelling a Ruby method may legitimately be ported under. Predicates
+ * carry both the camel and `is`-prefixed forms, so a caller that has to reason
+ * about *any* spelling of a name (rather than pick one) must see all of them.
+ */
+export function methodNameCandidates(rubyName: string): string[] {
   const candidates = rubyMethodToTs(rubyName);
-  if (candidates && candidates.length) return candidates[0];
-  return snakeToCamel(rubyName.replace(/[?!=]/g, ""));
+  if (candidates && candidates.length) return candidates;
+  return [snakeToCamel(rubyName.replace(/[?!=]/g, ""))];
 }
 const RESERVED = new Set([
   "break",
