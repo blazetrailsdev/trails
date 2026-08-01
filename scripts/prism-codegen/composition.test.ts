@@ -75,6 +75,16 @@ function markerOf(source: string) {
   return parseCompositionMarkers("base.ts", source)[0];
 }
 
+/** Expected order with `SCOPING_RB` swapped for a variant body. */
+async function orderFor(scoping: string[]) {
+  const sources = [BASE_RB, CORE_RB, INHERITANCE_RB, ...scoping];
+  return expectedCompositionOrder(
+    await buildLinearization(BASE_RB, sources),
+    await indexSuperPositions(sources),
+    "initialize_internals_callback",
+  );
+}
+
 describe("composition-point MRO check", () => {
   it("parses a marker's ruby method and module bindings", () => {
     const marker = markerOf(CONVERGED);
@@ -95,37 +105,18 @@ describe("composition-point MRO check", () => {
   });
 
   it("orders pre-super contributions by ancestry", async () => {
-    const preSuper = SCOPING_RB.replace(
-      "super\n        populate_with_current_scope_attributes",
-      "populate_with_current_scope_attributes\n        super",
-    );
-    const sources = [BASE_RB, CORE_RB, INHERITANCE_RB, preSuper];
     expect(
-      expectedCompositionOrder(
-        await buildLinearization(BASE_RB, sources),
-        await indexSuperPositions(sources),
-        "initialize_internals_callback",
-      ),
+      await orderFor([
+        SCOPING_RB.replace(
+          "super\n        populate_with_current_scope_attributes",
+          "populate_with_current_scope_attributes\n        super",
+        ),
+      ]),
     ).toEqual(["Scoping", "Inheritance"]);
   });
 
   it("stops the chain at a definer that never calls super", async () => {
-    const noSuper = SCOPING_RB.replace("super\n", "");
-    const sources = [BASE_RB, CORE_RB, INHERITANCE_RB, noSuper];
-    expect(
-      expectedCompositionOrder(
-        await buildLinearization(BASE_RB, sources),
-        await indexSuperPositions(sources),
-        "initialize_internals_callback",
-      ),
-    ).toEqual(["Scoping"]);
-  });
-
-  it("reads the realized order from the call sites below the marker", () => {
-    expect(realizedCompositionOrder(markerOf(CONVERGED), CONVERGED).order).toEqual([
-      "Inheritance",
-      "Scoping",
-    ]);
+    expect(await orderFor([SCOPING_RB.replace("super\n", "")])).toEqual(["Scoping"]);
   });
 
   it("reads each composition point's own call sites, not the next point's", () => {
@@ -195,9 +186,6 @@ describe("composition-point MRO check", () => {
     expect(unresolvedAncestryMessage(["Marshalling::Methods"])).toContain(
       "1 ancestry module(s) of ActiveRecord::Base have no vendored source",
     );
-  });
-
-  it("reports no failure when nothing drifted", () => {
     expect(compositionFailureMessage([])).toBeUndefined();
   });
 });

@@ -241,7 +241,7 @@ export function unresolvedAncestryMessage(unresolved: readonly string[]): string
     "",
     "Their bodies are invisible to the check, so a contribution they make to a",
     "guarded chain would be dropped without a word. Fix the path derivation, or",
-    "teach `isExternalAncestor` about the component the module really lives in.",
+    "teach `isExternalAncestor` where the module really lives.",
     "",
     ...real.map((name) => `  ${name} → ${rubyPathCandidatesForModule(name).join(", ")}`),
   ].join("\n");
@@ -252,9 +252,9 @@ export function compositionFailureMessage(failures: readonly string[]): string |
   return [
     `prism-codegen composition check: ${failures.length} composition point(s) drifted.`,
     "",
-    "The port calls each module's contribution explicitly where Rails uses `super`,",
-    "so the call order at the composition point IS the MRO. Reorder the calls (or",
-    "the marker's bindings) to match, or fix the marker if the chain changed.",
+    "The port calls each contribution explicitly where Rails uses `super`, so the",
+    "call order at a composition point IS the MRO. Reorder the calls to match, or",
+    "fix the marker if the chain itself changed.",
     "",
     ...failures,
   ].join("\n");
