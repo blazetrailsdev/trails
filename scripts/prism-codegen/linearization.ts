@@ -98,7 +98,8 @@ function walk(node: PrismNode | null, path: string[], index: Map<string, Set<str
   for (const child of node.compactChildNodes()) walk(child, path, index);
 }
 
-function constPath(path: PrismNode | undefined, name: unknown): string {
+/** Full constant path of a `module`/`class` node, e.g. `ActiveRecord::Scoping`. */
+export function constPath(path: PrismNode | undefined, name: unknown): string {
   if (path?.constructor.name === "ConstantPathNode") {
     const parts: string[] = [];
     let cur: PrismNode | undefined = path;
