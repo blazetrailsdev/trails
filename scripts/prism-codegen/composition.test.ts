@@ -6,7 +6,8 @@ import {
   indexSuperPositions,
   parseCompositionMarkers,
   realizedCompositionOrder,
-  rubyPathForModule,
+  rubyPathCandidatesForModule,
+  unresolvedAncestryMessage,
 } from "./composition.js";
 import { buildLinearization } from "./linearization.js";
 
@@ -166,10 +167,33 @@ describe("composition-point MRO check", () => {
     );
   });
 
-  it("maps an ancestry entry to its vendored source path", () => {
-    expect(rubyPathForModule("Scoping")).toBe("active_record/scoping.rb");
-    expect(rubyPathForModule("ActiveRecord::Locking::Optimistic")).toBe(
+  it("treats a bare reference as no call site", async () => {
+    const { linearization, positions } = await inputs();
+    const source = CONVERGED.replace(
+      "applyScopeAttributes(ctor, this)",
+      "const contribution = applyScopeAttributes",
+    );
+    expect(checkCompositionPoint(markerOf(source), source, linearization, positions)).toContain(
+      "no call site below the marker: applyScopeAttributes",
+    );
+  });
+
+  it("maps an ancestry entry to its vendored source paths, parent file last", () => {
+    expect(rubyPathCandidatesForModule("Scoping")).toEqual(["active_record/scoping.rb"]);
+    expect(rubyPathCandidatesForModule("ActiveRecord::Locking::Optimistic")).toEqual([
       "active_record/locking/optimistic.rb",
+      "active_record/locking.rb",
+    ]);
+    expect(rubyPathCandidatesForModule("Marshalling::Methods")).toContain(
+      "active_record/marshalling.rb",
+    );
+  });
+
+  it("fails when an ancestry module's source did not load", () => {
+    expect(unresolvedAncestryMessage([])).toBeUndefined();
+    expect(unresolvedAncestryMessage(["ActiveModel::API"])).toBeUndefined();
+    expect(unresolvedAncestryMessage(["Marshalling::Methods"])).toContain(
+      "1 ancestry module(s) of ActiveRecord::Base have no vendored source",
     );
   });
 

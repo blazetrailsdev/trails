@@ -17,7 +17,8 @@ import {
   compositionFailureMessage,
   indexSuperPositions,
   parseCompositionMarkers,
-  rubyPathForModule,
+  rubyPathCandidatesForModule,
+  unresolvedAncestryMessage,
 } from "./composition.js";
 import { buildLinearization, parseIncludeOrder } from "./linearization.js";
 import {
@@ -108,6 +109,18 @@ async function readSignOffSource(): Promise<string> {
   }
 }
 
+/** The first of `candidates` that exists under the vendored ActiveRecord tree. */
+async function firstReadable(candidates: readonly string[]): Promise<string | undefined> {
+  for (const candidate of candidates) {
+    try {
+      return await fs.readFile(rubyAbsPathFor(candidate), "utf8");
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+    }
+  }
+  return undefined;
+}
+
 /**
  * Every `prism-mro:` marker in the port tree, checked against the ancestry of
  * `ActiveRecord::Base`. Built from the ancestry's own sources rather than the
@@ -117,13 +130,14 @@ async function readSignOffSource(): Promise<string> {
 async function compositionCheck(): Promise<{ points: number; failure?: string }> {
   const baseSource = await fs.readFile(rubyAbsPathFor("active_record/base.rb"), "utf8");
   const sources = [baseSource];
+  const unresolved: string[] = [];
   for (const module of parseIncludeOrder(baseSource)) {
-    try {
-      sources.push(await fs.readFile(rubyAbsPathFor(rubyPathForModule(module)), "utf8"));
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
-    }
+    const source = await firstReadable(rubyPathCandidatesForModule(module));
+    if (source === undefined) unresolved.push(module);
+    else sources.push(source);
   }
+  const unresolvedFailure = unresolvedAncestryMessage(unresolved);
+  if (unresolvedFailure) return { points: 0, failure: unresolvedFailure };
   const linearization = await buildLinearization(baseSource, sources);
   const positions = await indexSuperPositions(sources);
   const failures: string[] = [];

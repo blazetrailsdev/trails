@@ -2,26 +2,20 @@
  * Composition-point ↔ MRO check (RFC 0086).
  *
  * Rails realizes a chain like `initialize_internals_callback` through `super`:
- * every module in `ActiveRecord::Base`'s ancestry contributes a fragment, and
+ * each module in `ActiveRecord::Base`'s ancestry contributes a fragment, and
  * the execution order falls out of the include order plus where each body puts
- * its `super`. The port has no `super` chain — `base.ts` calls each module's
- * contribution explicitly at a *composition point*. That call order is
- * hand-maintained and can silently drift from `base.rb`'s include order; until
- * now the only record of a realized chain was a per-row sign-off.
- *
- * A composition point declares itself in the port source with a marker:
+ * its `super`. The port has no `super` chain — `base.ts` calls the
+ * contributions explicitly at a *composition point*, in an order that is
+ * hand-maintained and can silently drift from `base.rb`. A composition point
+ * declares itself with a marker:
  *
  *   // prism-mro: initialize_internals_callback Inheritance=ensureProperType \
  *   //   Scoping=_applyScopeAttributes Core=~
  *
- * `Module=identifier` binds a definer to the port symbol that realizes its
- * contribution; `Module=~` records a definer whose body contributes nothing
- * (Rails' `Core#initialize_internals_callback` is empty). Every definer the
- * MRO reaches must be declared — omission is drift, not silence.
- *
- * The check derives the expected execution order from the ancestry and the
- * super position of each Ruby body, reads the realized order out of the port
- * source below the marker, and fails when they differ.
+ * `Module=identifier` binds a definer to the port symbol realizing it;
+ * `Module=~` records a definer whose Ruby body contributes nothing (Rails'
+ * `Core#initialize_internals_callback` is empty). Every definer the MRO
+ * reaches must be declared — omission is drift, not silence.
  *
  * Hard rules: no node:* imports, no process.*, async fs only — this module is
  * pure (prism aside); score-cli.ts supplies the sources.
@@ -100,12 +94,10 @@ export async function indexSuperPositions(
 }
 
 /**
- * The order the contributions to `method` actually run in, nearest-definer
- * first. A body's pre-`super` statements run on the way down the ancestry and
- * its post-`super` statements on the way back up, so the expected order is the
- * pre-super definers in ancestry order followed by the post-super definers in
- * reverse. The walk stops at the first definer that never calls `super`: the
- * rest of the ancestry is unreachable.
+ * The order the contributions to `method` run in. A body's pre-`super`
+ * statements run on the way down the ancestry and its post-`super` statements
+ * on the way back up, so it is the pre-super definers in ancestry order
+ * followed by the post-super definers in reverse.
  */
 export function expectedCompositionOrder(
   linearization: Linearization,
@@ -123,10 +115,10 @@ export function expectedCompositionOrder(
 }
 
 /**
- * Every module the chain actually dispatches through, nearest first —
- * contributing ones and no-ops alike (Rails' `Core#initialize_internals_callback`
- * is empty). The port must declare all of them, so that a body growing a
- * contribution cannot slip in unnoticed.
+ * Every module the chain dispatches through, nearest first — contributing ones
+ * and no-ops alike, so a body that grows a contribution cannot slip in
+ * unnoticed. Stops at the first definer that never calls `super`: the rest of
+ * the ancestry is unreachable.
  */
 export function reachedDefiners(
   linearization: Linearization,
@@ -145,9 +137,10 @@ export function reachedDefiners(
 }
 
 /**
- * The order the port realizes the contributions in: the declared identifiers
- * sorted by where they are first called below the marker. Identifiers bound to
- * `~` have no call site and are not part of the realized order.
+ * The declared identifiers, ordered by where they are first *called* in the
+ * marker's region. A bare reference (`const cb = ensureProperType`) is not a
+ * call site: what the MRO orders is when each contribution runs, and only an
+ * invocation places one in that order. `~` bindings have no call site.
  */
 export function realizedCompositionOrder(
   marker: CompositionMarker,
@@ -159,7 +152,7 @@ export function realizedCompositionOrder(
   for (const { module, identifier } of marker.contributions) {
     if (identifier === UNREALIZED) continue;
     const escaped = identifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const at = below.search(new RegExp(`\\b${escaped}\\b[\\s(.]`));
+    const at = below.search(new RegExp(`\\b${escaped}\\s*(?:\\(|\\.(?:call|apply)\\s*\\()`));
     if (at < 0) missing.push(identifier);
     else order.push({ module, at });
   }
@@ -214,16 +207,44 @@ export function checkCompositionPoint(
 }
 
 /**
- * Vendored path a `Base` ancestry entry's source lives at, by Rails' own
- * file-per-module convention (`Locking::Optimistic` → `locking/optimistic.rb`).
- * The check needs every ancestor's body, not just the codegen target set:
- * `Scoping` contributes to `initialize_internals_callback` and is not a target.
+ * Vendored paths a `Base` ancestry entry's source may live at, most specific
+ * first: Rails is mostly file-per-module (`Locking::Optimistic` →
+ * `locking/optimistic.rb`), but a nested module can also be declared in its
+ * parent's file (`Marshalling::Methods` lives in `marshalling.rb`). The check
+ * needs every ancestor's body, not just the codegen target set — `Scoping`
+ * contributes to `initialize_internals_callback` and is not a target.
  */
-export function rubyPathForModule(name: string): string {
+export function rubyPathCandidatesForModule(name: string): string[] {
   const parts = normalizeModuleName(name)
     .split("::")
     .map((part) => part.replace(/([a-z\d])([A-Z])/g, "$1_$2").toLowerCase());
-  return `active_record/${parts.join("/")}.rb`;
+  return parts.map((_, i) => `active_record/${parts.slice(0, parts.length - i).join("/")}.rb`);
+}
+
+/**
+ * Ancestry entries living in another Rails component, which no path under
+ * `activerecord/lib/active_record/` resolves — outside the corpus in the sense
+ * `Linearization#resolve` means it. Every OTHER unresolved entry must fail
+ * loudly: a definer whose source never loaded is invisible to both indexes, so
+ * its contribution would be dropped from the expected order in silence.
+ */
+export function isExternalAncestor(name: string): boolean {
+  return /^Active(Model|Support)::/.test(name);
+}
+
+export function unresolvedAncestryMessage(unresolved: readonly string[]): string | undefined {
+  const real = unresolved.filter((name) => !isExternalAncestor(name));
+  if (real.length === 0) return undefined;
+  return [
+    `prism-codegen composition check: ${real.length} ancestry module(s) of ` +
+      "ActiveRecord::Base have no vendored source at the path derived for them.",
+    "",
+    "Their bodies are invisible to the check, so a contribution they make to a",
+    "guarded chain would be dropped without a word. Fix the path derivation, or",
+    "teach `isExternalAncestor` about the component the module really lives in.",
+    "",
+    ...real.map((name) => `  ${name} → ${rubyPathCandidatesForModule(name).join(", ")}`),
+  ].join("\n");
 }
 
 export function compositionFailureMessage(failures: readonly string[]): string | undefined {
