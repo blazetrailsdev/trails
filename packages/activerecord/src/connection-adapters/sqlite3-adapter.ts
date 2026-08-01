@@ -2411,6 +2411,12 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         // buffer — that is where alter_table's whole point lives, and the buffer's
         // reflection would have lost the pending changes.
         await this.execCopyTable(createTableSql);
+        // Rails reaches the rebuilt table through create_table, which emits the
+        // definition's pending indexes after the CREATE
+        // (abstract/schema_statements.rb:312-313). Rendering the definition by
+        // hand skips that, so anything registered on the definition inside the
+        // alter_table block (e.g. add_column with `index: true`) would be lost.
+        await this.schemaStatements()._addPendingIndexes(tableName, definition);
         await this.copyTableIndexes(alteredTableName, tableName);
         await this.copyTableContents(alteredTableName, tableName, originalColNames.map(renamed));
         await this.execCopyTable(`DROP TABLE ${quoteTableName(alteredTableName)}`);

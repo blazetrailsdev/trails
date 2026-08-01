@@ -121,6 +121,28 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
     expect(names).not.toContain("index_customers_on_name");
   });
 
+  it("addColumn through the rebuild creates an index registered on the definition", async () => {
+    await db.addIndex("customers", ["name"]);
+    // `null: false` with no default is an invalid ALTER TABLE ADD type, so this
+    // routes through alterTable's rebuild rather than a plain ADD COLUMN.
+    await db.addColumn("customers", "nickname", "string", {
+      null: false,
+      default: undefined,
+      index: true,
+    });
+    const names = ((await db.indexes("customers")) as Array<{ name: string }>).map((i) => i.name);
+    // The source index round-trips exactly once alongside the pending one.
+    expect(names.filter((n) => n === "index_customers_on_name")).toHaveLength(1);
+    expect(names).toContain("index_customers_on_nickname");
+  });
+
+  it("addColumn of a primary_key through the rebuild creates the definition's index", async () => {
+    await db.exec('CREATE TABLE "customers2" ("name" TEXT)');
+    await db.addColumn("customers2", "id", "primary_key", { index: true });
+    const names = ((await db.indexes("customers2")) as Array<{ name: string }>).map((i) => i.name);
+    expect(names).toContain("index_customers2_on_id");
+  });
+
   it("alterTable keeps the primary key of a lowercase integer-like declared type", async () => {
     await db.exec('CREATE TABLE "customers2" ("id" bigint PRIMARY KEY, "name" TEXT)');
     await db.removeColumn("customers2", "name");
