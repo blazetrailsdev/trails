@@ -77,7 +77,7 @@ export function hasOne(name, scope = null, { ...options } = {}) {
     reflection = Builder.HasOne.build(this, name, scope, options);
     return Reflection.addReflection(this, name, reflection);
 }
-export function belongsTo(name, scope = null, { ...options } = {}) {
+export async function belongsTo(name, scope = null, { ...options } = {}) {
     let reflection;
     reflection = Builder.BelongsTo.build(this, name, scope, options);
     return Reflection.addReflection(this, name, reflection);

@@ -262,12 +262,12 @@ export async function findOne(id) {
 }
 export async function findSome(ids) {
     let relation, result, expected_size;
-    if (!this.orderValues.isPresent()) {
+    if (!await this.orderValues.isPresent()) {
         return await this.findSomeOrdered(ids);
     }
     relation = this.where({ [this.primaryKey]: ids });
     if (!this.selectValues.isEmpty()) {
-        relation = relation.select(this.table[this.primaryKey]);
+        relation = await relation.select(this.table[this.primaryKey]);
     }
     result = relation.toA();
     expected_size = this.limitValue && ids.size() > this.limitValue ? this.limitValue : ids.size();
@@ -287,7 +287,7 @@ export async function findSomeOrdered(ids) {
     relation = this.except("limit", "offset");
     relation = relation.where({ [this.primaryKey]: ids });
     if (!this.selectValues.isEmpty()) {
-        relation = relation.select(this.table[this.primaryKey]);
+        relation = await relation.select(this.table[this.primaryKey]);
     }
     result = relation.records();
     if (result.size() === ids.size()) {

@@ -85,11 +85,11 @@ export async function calculate(operation, column_name) {
     operation = operation.toString().downcase();
     if (this.none) {
         if (caseEq("count", operation) || caseEq("sum", operation)) {
-            result = this.groupValues.isAny() ? new Hash() : 0;
+            result = await this.groupValues.isAny() ? new Hash() : 0;
             return this.async ? new Promise.Complete(result) : result;
         }
         else if (caseEq("average", operation) || caseEq("minimum", operation) || caseEq("maximum", operation)) {
-            result = this.groupValues.isAny() ? new Hash() : null;
+            result = await this.groupValues.isAny() ? new Hash() : null;
             return this.async ? new Promise.Complete(result) : result;
         }
     }
@@ -168,7 +168,7 @@ export async function ids() {
     primary_key_array = this.Array(this.primaryKey);
     if (this.isLoaded) {
         result = this.records.map(record => {
-            if (primary_key_array.isOne()) {
+            if (await primary_key_array.isOne()) {
                 return record._readAttribute(primary_key_array.first());
             }
             else {
@@ -178,7 +178,7 @@ export async function ids() {
         return this.async ? new Promise.Complete(result) : result;
     }
     if (this.hasInclude(this.primaryKey)) {
-        relation = this.applyJoinDependency.group(...primary_key_array);
+        relation = await this.applyJoinDependency.group(...primary_key_array);
         return await relation.ids();
     }
     columns = this.arelColumns(primary_key_array);
@@ -348,7 +348,7 @@ export async function executeGroupedCalculation(operation, column_name, distinct
         });
     });
 }
-export function typeFor(field, block) {
+export async function typeFor(field, block) {
     let field_name;
     field_name = field.respondTo("name") ? field.name().toString() : field.toString().split(".").last();
     return this.model.typeForAttribute(field_name, block);

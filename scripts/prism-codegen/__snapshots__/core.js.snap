@@ -178,7 +178,7 @@ export async function find(...ids, block) {
     }
     return await this.cachedFindBy([this.primaryKey], [id]) || (() => { throw new RecordNotFound(`Couldn't find ${this.name} with '${this.primaryKey}'=${id}`, this.name, this.primaryKey, id); })();
 }
-export function findBy(...args) {
+export async function findBy(...args) {
     let hash;
     if (this.isScopeAttributes) {
         return __PRISM_TODO("ForwardingSuperNode");
@@ -188,10 +188,10 @@ export function findBy(...args) {
         return __PRISM_TODO("ForwardingSuperNode");
     }
     hash = __PRISM_TODO("CallNode");
-    return this.cachedFindBy(hash.keys(), hash.values());
+    return await this.cachedFindBy(hash.keys(), hash.values());
 }
-export function findByBang(...args) {
-    return this.findBy(...args) || this.where(...args).raiseRecordNotFoundExceptionBang();
+export async function findByBang(...args) {
+    return await this.findBy(...args) || this.where(...args).raiseRecordNotFoundExceptionBang();
 }
 export function initializeGeneratedModules() {
     return this.generatedAssociationMethods;
@@ -219,7 +219,7 @@ export function inspectionFilter() {
         return this.inspection_filter ||= __PRISM_TODO("BeginNode");
     }
 }
-export function inspect() {
+export async function inspect() {
     let attr_list;
     if (this === Base || this.isSingletonClass) {
         return __PRISM_TODO("ForwardingSuperNode");
@@ -253,7 +253,7 @@ export function cachedFindByStatement(connection, key, block) {
     return cache.computeIfAbsent(key, () => StatementCache.create(connection, block));
 }
 __PRISM_TODO("CallNode");
-export function inherited(subclass) {
+export async function inherited(subclass) {
     let klass;
     subclass.initializeFindByCache();
     if (!subclass.isBaseClass()) {
@@ -359,7 +359,7 @@ export function encodeWith(coder) {
 }
 __PRISM_TODO("DefNode");
 __PRISM_TODO("AliasMethodNode");
-export function hash() {
+export async function hash() {
     let id;
     id = this.id();
     if (this.isPrimaryKeyValuesPresent) {
@@ -377,7 +377,7 @@ export function isFrozen() {
     return this.attributes.isFrozen();
 }
 __PRISM_TODO("DefNode");
-export function isPresent() {
+export async function isPresent() {
     return true;
 }
 export function isBlank() {
@@ -409,7 +409,7 @@ export function readonlyBang() {
 export function connectionHandler() {
     return this.class().connectionHandler();
 }
-export function inspect() {
+export async function inspect() {
     return this.inspectWithAttributes(this.attributesForInspect);
 }
 export function fullInspect() {
@@ -422,11 +422,11 @@ export async function prettyPrint(pp) {
     }
     return pp.objectAddressGroup(this, () => {
         if (this.attributes) {
-            attr_names = this.attributesForInspect.select(name => this.is_hasAttribute(name.toString()));
+            attr_names = await this.attributesForInspect.select(name => this.is_hasAttribute(name.toString()));
             return pp.seplist(attr_names, this.proc(() => pp.text(",")), attr_name => {
                 attr_name = attr_name.toString();
                 pp.breakable(" ");
-                return pp.group(1, () => {
+                return await pp.group(1, () => {
                     pp.text(attr_name);
                     pp.text(":");
                     pp.breakable();

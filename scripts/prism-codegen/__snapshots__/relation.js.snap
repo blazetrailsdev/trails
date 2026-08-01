@@ -80,10 +80,10 @@ export class Relation {
         return this.first || this.constructor(attributes, block);
     }
     async findOrCreateBy(attributes, block) {
-        return this.findBy(attributes) || await this.createOrFindBy(attributes, block);
+        return await this.findBy(attributes) || await this.createOrFindBy(attributes, block);
     }
-    findOrCreateByBang(attributes, block) {
-        return this.findBy(attributes) || this.createOrFindByBang(attributes, block);
+    async findOrCreateByBang(attributes, block) {
+        return await this.findBy(attributes) || await this.createOrFindByBang(attributes, block);
     }
     async createOrFindBy(attributes, block) {
         return this.withConnection(connection => {
@@ -92,31 +92,31 @@ export class Relation {
             }
             catch (e) {
                 if (connection.isTransactionOpen()) {
-                    return this.where(attributes).lock().findByBang(attributes);
+                    return await this.where(attributes).lock().findByBang(attributes);
                 }
                 else {
-                    return this.findByBang(attributes);
+                    return await this.findByBang(attributes);
                 }
             }
         });
     }
-    createOrFindByBang(attributes, block) {
+    async createOrFindByBang(attributes, block) {
         return this.withConnection(connection => {
             try {
-                return this.transaction({ requires_new: true }, () => this.createBang(attributes, block));
+                return this.transaction({ requires_new: true }, () => await this.createBang(attributes, block));
             }
             catch (e) {
                 if (connection.isTransactionOpen()) {
-                    return this.where(attributes).lock().findByBang(attributes);
+                    return await this.where(attributes).lock().findByBang(attributes);
                 }
                 else {
-                    return this.findByBang(attributes);
+                    return await this.findByBang(attributes);
                 }
             }
         });
     }
     async findOrInitializeBy(attributes, block) {
-        return this.findBy(attributes) || this.constructor(attributes, block);
+        return await this.findBy(attributes) || this.constructor(attributes, block);
     }
     async explain(...options) {
         return new ExplainProxy(this, options);
@@ -228,7 +228,7 @@ export class Relation {
                 column = c.visitor().compile(this.table[timestamp_column]);
                 select_values = `COUNT(*) AS ${this.model.adapterClass().quoteColumnName("size")}, MAX(%s) AS timestamp`;
                 if (collection.hasLimitOrOffset()) {
-                    query = collection.select(`${column} AS collection_cache_key_timestamp`);
+                    query = await collection.select(`${column} AS collection_cache_key_timestamp`);
                     if (this.distinctValue && await collection.selectValues().isEmpty()) {
                         query._selectBang(this.table[await Arel.star()]);
                     }
@@ -376,7 +376,7 @@ export class Relation {
         if (this.none) {
             return 0;
         }
-        invalid_methods = INVALID_METHODS_FOR_DELETE_ALL.select(method => {
+        invalid_methods = await INVALID_METHODS_FOR_DELETE_ALL.select(method => {
             value = this.values[method];
             if (method === "distinct") {
                 return value;
@@ -514,16 +514,16 @@ export class Relation {
         return this.readonlyValue;
     }
     async values() {
-        return this.values.dup();
+        return await this.values.dup();
     }
     valuesForQueries() {
         return this.values.except("extending", "skip_query_cache", "strict_loading");
     }
-    inspect() {
+    async inspect() {
         let subject, entries;
         subject = this.isLoaded ? this.records : this.annotate("loading for inspect");
         entries = subject.take([this.limitValue, 11].compact().min()).mapBang(x => x.inspect());
-        if (entries.size() === 11) {
+        if (await entries.size() === 11) {
             entries[10] = "...";
         }
         return `#<${this.class().name()} [${entries.join(", ")}]>`;
@@ -546,7 +546,7 @@ export class Relation {
         scope = this.strictLoadingValue ? StrictLoadingScope : null;
         return preload.each(associations => new ActiveRecord.Associations.Preloader({ records: records, associations: associations, scope: scope }).call());
     }
-    loadRecords(records) {
+    async loadRecords(records) {
         this.records = records.freeze();
         return this.loaded = true;
     }
