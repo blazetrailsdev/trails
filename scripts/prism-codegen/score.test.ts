@@ -127,6 +127,20 @@ describe("prism-codegen scorer", () => {
     expect(score.entries).toEqual([expect.objectContaining({ name: "tally", status: "matched" })]);
   });
 
+  it("canonicalizes the port's `_modelClass` backing field against Rails' `model`", async () => {
+    const score = await scoreRuby(
+      `def table_name
+         model.table_name
+       end`,
+      `export function tableName(this: R): string {
+         return this._modelClass.tableName;
+       }`,
+    );
+    expect(score.entries).toEqual([
+      expect.objectContaining({ name: "tableName", status: "matched" }),
+    ]);
+  });
+
   it("rejects a predicate fallback candidate that collides with a different-arity method", async () => {
     // Rails readonly? (0 args) must NOT match the port of Rails readonly(value).
     const score = await scoreRuby(

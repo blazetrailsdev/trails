@@ -206,6 +206,12 @@ const TOKEN_CANON: Record<string, string> = {
   inject: "reduce",
   toA: "toArray",
   size: "length",
+  // Relation's reach for its model class. Rails spells it `model` (relation.rb
+  // `attr_reader :model`, plus `delegate ..., to: :model`); the port's public
+  // accessor is also `model`, but internal call sites read the private backing
+  // field `_modelClass`, which normalizes to `modelClass`. Same receiver, two
+  // spellings — canonicalize so skeleton diffs show only real divergences.
+  modelClass: "model",
 };
 
 export function normalizeName(name: string): string {
