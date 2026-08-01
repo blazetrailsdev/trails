@@ -462,4 +462,41 @@ describe("prism-codegen", () => {
     );
     expect(code).toContain("this.model.primaryKey");
   });
+
+  it("leaves a prefixed delegate macro out of the table", async () => {
+    const { code } = await generateFromSource(`
+      class Relation
+        delegate :primary_key, to: :model, prefix: true
+
+        def describe
+          primary_key
+        end
+      end
+    `);
+    expect(code).toContain("return this.primaryKey;");
+    expect(code).not.toContain("this.model.primaryKey");
+  });
+
+  it("resolves an instance delegation only for instance methods", async () => {
+    const { code } = await generateFromSource(`
+      class Relation
+        delegate :primary_key, to: :model
+
+        def self.describe
+          primary_key
+        end
+
+        class << self
+          delegate :table_name, to: :arel_table
+        end
+
+        def name
+          table_name
+        end
+      end
+    `);
+    expect(code).toContain("static describe()");
+    expect(code).not.toContain("this.model.primaryKey");
+    expect(code).not.toContain("this.arelTable.tableName");
+  });
 });
