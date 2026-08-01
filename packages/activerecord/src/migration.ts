@@ -66,9 +66,7 @@ import { ActiveRecord } from "./ar-config.js";
 // Mirrors Rails AbstractAdapter#extract_new_comment_value (alias of extract_new_default_value).
 // For {from,to} hashes, returns `to` (which may be null to clear a comment).
 // `to: undefined` is rejected — a missing value cannot be forwarded to SQL.
-function _extractNewCommentValue(
-  v: string | null | { from?: unknown; to?: unknown },
-): string | null {
+function _extractNewCommentValue(v: CommentOrChanges): string | null {
   if (v !== null && typeof v === "object") {
     if (!("to" in v) || (v as { to: unknown }).to === undefined) {
       throw new ArgumentError("change_column_comment / change_table_comment requires a :to value");
