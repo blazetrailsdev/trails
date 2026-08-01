@@ -2316,88 +2316,65 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   ): Promise<void> {
     await this.ensureConnected();
     const rename = options.rename ?? {};
-    const renamed = (name: string): string => rename[name] ?? name;
     const { bare: bareTable } = this._splitTableName(tableName);
-
-    // No explicit missing-table guard: `columns` reaches table_structure, which
-    // already raises StatementInvalid naming the table (foreign_key_test.rb:322).
-    const fromPrimaryKey = await this.primaryKey(tableName);
-    const sourceColumns = (await this.columns(tableName)) as Sqlite3Column[];
-    const definition = new SQLite3TableDefinition(tableName, {
-      id: false,
-      adapter: this,
-      ...(Array.isArray(fromPrimaryKey) ? { primaryKey: fromPrimaryKey.map(renamed) } : {}),
-    });
-    this.copyTableColumns(definition, fromPrimaryKey, sourceColumns, rename);
-
-    // Attached before the block runs, as in Rails' alter_table lambda
-    // (sqlite3_adapter.rb:566-583) — that ordering is what lets remove_column
-    // delete the FKs it orphans.
-    const fks = overrideForeignKeys ?? (await this.foreignKeys(tableName));
-    const checks = overrideCheckConstraints ?? (await this.checkConstraints(tableName));
-    definition.foreignKeys.push(
-      ...fks.map((fk) => {
-        const column = typeof fk.column === "string" ? (rename[fk.column] ?? fk.column) : fk.column;
-        return column === fk.column
-          ? fk
-          : new ForeignKeyDefinition(
-              fk.fromTable,
-              fk.toTable,
-              column,
-              fk.primaryKey,
-              fk.name,
-              fk.onDelete,
-              fk.onUpdate,
-              fk.deferrable,
-              fk.storesValidate ? fk.validate : undefined,
-              fk.storedOptionKeys,
-            );
-      }),
-    );
-    definition.checkConstraints.push(...checks);
-
-    block?.(definition);
 
     // Rails: altered_table_name = "a#{table_name}" (sqlite3_adapter.rb:566).
     // Kept bare even for a schema-qualified table: the buffer is a TEMPORARY
     // table, which always lives in the `temp` schema, so a qualifier would be
     // rejected.
     const alteredTableName = `a${bareTable}`;
-    const colNames = definition.columns.map((c) => c.name);
 
-    const createTableSql = await this.schemaCreation.accept(definition);
+    // No explicit missing-table guard: `columns` reaches table_structure, which
+    // already raises StatementInvalid naming the table (foreign_key_test.rb:322).
+    // Rails reads the FK/check lists up front, before the first move drops the
+    // source table (sqlite3_adapter.rb:562-565 default args).
+    const fks = overrideForeignKeys ?? (await this.foreignKeys(tableName));
+    const checks = overrideCheckConstraints ?? (await this.checkConstraints(tableName));
 
-    // Generated columns can't be inserted into — exclude them from the copy
-    // (Rails: columns_to_copy rejects columns with an :as option,
-    // sqlite3_adapter.rb:645).
-    const originalColNames = sourceColumns
-      .filter((c) => !c.isVirtual())
-      .map((c) => c.name)
-      .filter((n) => colNames.includes(renamed(n)));
+    // Rails' alter_table caller lambda (sqlite3_adapter.rb:568-583): the FKs and
+    // checks are layered on after copy_table has added the buffer's columns, and
+    // the block runs last — that ordering is what lets remove_column delete the
+    // FKs it orphans.
+    const caller = (definition: SQLite3TableDefinition): void => {
+      definition.foreignKeys.push(
+        ...fks.map((fk) => {
+          const column =
+            typeof fk.column === "string" ? (rename[fk.column] ?? fk.column) : fk.column;
+          return column === fk.column
+            ? fk
+            : new ForeignKeyDefinition(
+                fk.fromTable,
+                fk.toTable,
+                column,
+                fk.primaryKey,
+                fk.name,
+                fk.onDelete,
+                fk.onUpdate,
+                fk.deferrable,
+                fk.storesValidate ? fk.validate : undefined,
+                fk.storedOptionKeys,
+              );
+        }),
+      );
+      definition.checkConstraints.push(...checks);
+      block?.(definition);
+    };
 
     await this.transaction(async () => {
       await this.disableReferentialIntegrity(async () => {
         // Rails' alter_table is two move_table calls, each copy_table + drop_table
-        // (sqlite3_adapter.rb:585-596). The first move is Rails' verbatim: the
-        // throwaway "a"-prefixed buffer is built by copy_table off the source
-        // table's own reflection, so it carries the full column definitions
-        // rather than a hand-concatenated CREATE TABLE.
+        // (sqlite3_adapter.rb:585-596). `options` — and with it `:rename` — goes to
+        // the first move only; the second re-reflects the "a"-prefixed buffer and
+        // layers the caller's FKs / checks / `modify` on top of it.
         await this.moveTable(tableName, alteredTableName, { temporary: true, rename });
-        // The second move is copy_table + drop_table with the definition supplied
-        // by the caller above (fks/checks/`modify`) instead of re-derived from the
-        // buffer — that is where alter_table's whole point lives, and the buffer's
-        // reflection would have lost the pending changes.
-        await this.execCopyTable(createTableSql);
-        await this.schemaStatements()._addPendingIndexes(tableName, definition);
-        await this.copyTableIndexes(alteredTableName, tableName);
-        await this.copyTableContents(alteredTableName, tableName, originalColNames.map(renamed));
-        await this.execCopyTable(`DROP TABLE ${quoteTableName(alteredTableName)}`);
+        await this.moveTable(alteredTableName, tableName, {}, caller);
       });
     });
 
     this.schemaCache.clear();
-    // The rebuild issues its DDL via driver.exec (to manage savepoint nesting),
-    // bypassing the executeMutation path that dirtiesQueryCache wraps. Rails'
+    // The rebuild issues its index/drop/copy DDL via driver.exec (to manage
+    // savepoint nesting), bypassing the executeMutation path that
+    // dirtiesQueryCache wraps. Rails'
     // alter_table dirties the cache as a side effect of copy_table, which runs
     // create_table/drop_table through `execute` and copy_table_contents through
     // `internal_exec_query` — both in the dirties set — so clear it here to match.
