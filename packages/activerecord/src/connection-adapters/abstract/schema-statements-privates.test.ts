@@ -914,4 +914,25 @@ describe("SchemaStatements#createTable statement ordering", () => {
 
     expect(sqls.some((sql) => sql.startsWith("CREATE INDEX IF NOT EXISTS"))).toBe(true);
   });
+
+  it("reads the table comment from the definition rather than the options hash", async () => {
+    const changeTableComment = vi.fn(async () => {});
+    const ss = makeStatements({
+      supportsComments: () => true,
+      supportsCommentsInCreate: () => false,
+      changeTableComment,
+    });
+
+    // Stands in for an adapter override / normalization that sets the comment on
+    // the definition without it appearing in the raw options hash.
+    const build = ss.buildCreateTableDefinition.bind(ss);
+    ss.buildCreateTableDefinition = ((name: string, options: Record<string, unknown>, fn: any) =>
+      build(name, { ...options, comment: "from the definition" }, fn)) as never;
+
+    await ss.createTable("things", { id: false }, (t) => {
+      t.column("name", "string");
+    });
+
+    expect(changeTableComment).toHaveBeenCalledWith("things", "from the definition");
+  });
 });

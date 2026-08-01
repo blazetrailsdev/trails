@@ -468,10 +468,10 @@ export class SchemaStatements {
       }
     }
 
-    // Rails: if supports_comments? && !supports_comments_in_create?
-    //   change_table_comment(table_name, comment) if options[:comment].present?
     if (this.adapter.supportsComments?.() && !this.adapter.supportsCommentsInCreate?.()) {
-      const tableComment = presence(options.comment);
+      // Rails reads the comment off the definition, not the raw options hash —
+      // buildCreateTableDefinition and adapter overrides may set or normalize it.
+      const tableComment = presence(td.comment);
       if (tableComment != null && typeof this.adapter.changeTableComment === "function") {
         await this.adapter.changeTableComment(name, tableComment);
       }
