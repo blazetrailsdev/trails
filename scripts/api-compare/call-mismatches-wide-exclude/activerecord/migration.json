@@ -296,6 +296,13 @@
   {
     "package": "activerecord",
     "tsFile": "migration.ts",
+    "rubyName": "record_environment",
+    "call": "connection",
+    "reason": "Equivalent: Rails reads `connection.pool.db_config.env_name` at record time; trails resolves the same env name once in the constructor into `_environment` and stores that."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "migration.ts",
     "rubyName": "record_version_state_after_migrating",
     "call": "create_version",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
