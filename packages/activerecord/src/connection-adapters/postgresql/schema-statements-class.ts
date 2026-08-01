@@ -323,23 +323,6 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     return Array.from(new Set([...tables, ...views]));
   }
 
-  async dataSourceExists(name: string): Promise<boolean> {
-    // Rails answers `data_source_exists?` through the base implementation,
-    // which is gated on `if name.present?`; this adapter-local override has to
-    // carry the same gate or a blank name reaches the catalog query.
-    if (!name) return false;
-    const [schema, table] = this.pg.extractSchemaQualifiedName(name);
-    if (schema) {
-      const rows = await this.pg.schemaQuery(
-        `SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = $1 AND table_name = $2`,
-        [schema, table],
-      );
-      return Number(rows[0].count) > 0;
-    }
-    const rows = await this.pg.schemaQuery(`SELECT to_regclass($1) AS oid`, [name]);
-    return rows[0].oid != null;
-  }
-
   /**
    * Table-only existence check (no views). Mirrors Rails'
    * `table_exists?` vs `data_source_exists?` distinction: a table is a
