@@ -5,7 +5,6 @@
 // round-trips. Kept out of the Rails-mirrored schema-dumper.test.ts so
 // test:compare maps cleanly.
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import { Base } from "./base.js";
 import { fixtures } from "./test-fixtures.js";
@@ -208,16 +207,14 @@ describe("SchemaDumperAdapterTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
   let adapter: DatabaseAdapter;
-  let ctx: MigrationContext;
 
   beforeEach(() => {
     adapter = Base.connection;
-    ctx = new MigrationContext(adapter);
   });
 
   it("dumps schema from adapter introspection", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
-    await ctx.createTable("horses", {}, (t) => {
+    await adapter.createTable("horses", {}, (t) => {
       t.string("title", { null: false });
       t.text("body");
     });
@@ -229,10 +226,10 @@ describe("SchemaDumperAdapterTest", () => {
 
   it("dumps schema with indexes from adapter", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
-    await ctx.createTable("testings", {}, (t) => {
+    await adapter.createTable("testings", {}, (t) => {
       t.integer("post_id");
     });
-    await ctx.addIndex("testings", "post_id", { name: "index_testings_on_post_id" });
+    await adapter.addIndex("testings", "post_id", { name: "index_testings_on_post_id" });
     const result = await TopLevelDumper.dumpTableSchema(adapter, "testings");
     expect(result).toContain("addIndex");
     expect(result).toContain("index_testings_on_post_id");
@@ -240,7 +237,7 @@ describe("SchemaDumperAdapterTest", () => {
 
   it("adapter-backed dump emits precision: null for datetime column without precision", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
-    await ctx.createTable("octopi", {}, (t) => {
+    await adapter.createTable("octopi", {}, (t) => {
       t.datetime("happened_at", { precision: null });
     });
     const result = await TopLevelDumper.dumpTableSchema(adapter, "octopi");
@@ -251,9 +248,9 @@ describe("SchemaDumperAdapterTest", () => {
     // Guards the U2 type/sqlType split: emitTable resolves the limit from the
     // dsl/raw type carried by AdapterSchemaSource. A live introspected column's
     // limit must survive the round-trip on the adapter path (not just the
-    // in-memory MigrationContext path).
+    // in-memory schema-statements path).
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
-    await ctx.createTable("barcodes", {}, (t) => {
+    await adapter.createTable("barcodes", {}, (t) => {
       t.string("code", { limit: 10 });
     });
     const result = await TopLevelDumper.dumpTableSchema(adapter, "barcodes");
@@ -266,7 +263,7 @@ describe("SchemaDumperAdapterTest", () => {
     const { InternalMetadata } = await import("./internal-metadata.js");
     await new SchemaMigration(adapter).createTable();
     await new InternalMetadata(adapter).createTable();
-    await ctx.createTable("reminders", {}, (t) => {
+    await adapter.createTable("reminders", {}, (t) => {
       t.string("name");
     });
     const result = await TopLevelDumper.dump(adapter);
@@ -366,13 +363,12 @@ describe("SchemaDumperAdapterTest", () => {
   // Nothing drops them between tests, so drop them per test (not just in
   // afterAll) to keep the shared-DB exposure window one test wide.
   afterEach(async () => {
-    const cleanupCtx = new MigrationContext(Base.connection);
     const o = { ifExists: true } as const;
-    await cleanupCtx.dropTable("barcodes", o);
-    await cleanupCtx.dropTable("horses", o);
-    await cleanupCtx.dropTable("octopi", o);
-    await cleanupCtx.dropTable("reminders", o);
-    await cleanupCtx.dropTable("testings", o);
+    await Base.connection.dropTable("barcodes", o);
+    await Base.connection.dropTable("horses", o);
+    await Base.connection.dropTable("octopi", o);
+    await Base.connection.dropTable("reminders", o);
+    await Base.connection.dropTable("testings", o);
   });
 });
 

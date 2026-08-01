@@ -859,7 +859,7 @@ export class CreatePosts extends Migration {
 
 describe("schema dump and load", () => {
   it("dumps schema from SQLite and loads it into a fresh database", async () => {
-    const { SchemaDumper, MigrationContext } = await import("@blazetrails/activerecord");
+    const { SchemaDumper } = await import("@blazetrails/activerecord");
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
     const { AdapterSchemaSource } = await import("../schema-source.js");
@@ -868,8 +868,7 @@ describe("schema dump and load", () => {
     const targetAdapter = new BetterSQLite3Adapter(":memory:");
     try {
       // Create a database with a table
-      const ctx = new MigrationContext(sourceAdapter);
-      await ctx.createTable("users", {}, (t) => {
+      await sourceAdapter.createTable("users", {}, (t) => {
         t.string("name");
         t.integer("age");
       });
@@ -883,7 +882,6 @@ describe("schema dump and load", () => {
       expect(schema).toContain("createTable");
 
       // Load into a fresh database
-      const targetCtx = new MigrationContext(targetAdapter);
       const defineSchema = new Function(
         "ctx",
         schema
@@ -898,7 +896,7 @@ describe("schema dump and load", () => {
           )
           .replace(/}$/, "})();"),
       );
-      await defineSchema(targetCtx);
+      await defineSchema(targetAdapter);
 
       // Verify table exists in target
       const tables = await targetAdapter.execute(

@@ -72,9 +72,9 @@ describe("generateSchemaFile", () => {
     expect(await fs.exists(filePath)).toBe(true);
   });
 
-  it("exports a default async function accepting MigrationContext", () => {
+  it("exports a default async function accepting DatabaseAdapter", () => {
     expect(content).toContain("export default async function defineSchema");
-    expect(content).toContain("MigrationContext");
+    expect(content).toContain("DatabaseAdapter");
   });
 
   it("emits createTable for every table in the schema", () => {

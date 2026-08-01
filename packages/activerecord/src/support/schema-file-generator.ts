@@ -1,7 +1,7 @@
 /**
  * Generates a loadable schema-file module from `TEST_SCHEMA` at runtime,
  * once per Vitest worker. The generated file exports a default function
- * `(ctx: MigrationContext) => Promise<void>` that drives
+ * `(ctx: DatabaseAdapter) => Promise<void>` that drives
  * `DatabaseTasks.loadSchema`, giving that path the same coverage it gets
  * in a Rails `db:test:prepare` flow without requiring a checked-in artifact.
  *
@@ -121,9 +121,9 @@ function generateCode(
   supportsExpressionIndex?: boolean,
 ): string {
   const lines: string[] = [
-    `import type { MigrationContext } from "@blazetrails/activerecord";`,
+    `import type { DatabaseAdapter } from "@blazetrails/activerecord";`,
     ``,
-    `export default async function defineSchema(ctx: MigrationContext): Promise<void> {`,
+    `export default async function defineSchema(ctx: DatabaseAdapter): Promise<void> {`,
   ];
 
   // PG/MySQL: loadSchema runs on a shared database that other workers may already

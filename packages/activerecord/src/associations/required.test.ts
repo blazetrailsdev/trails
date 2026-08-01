@@ -5,22 +5,19 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { MigrationContext } from "../migration.js";
 import { fixtures } from "../test-fixtures.js";
 import { rebuildCanonicalTables } from "../support/canonical-table-rebuild.js";
 
 describe("RequiredAssociationsTest", () => {
   fixtures([]);
-  let ctx: MigrationContext;
   beforeAll(async () => {
-    ctx = new MigrationContext(Base.connection);
-    await ctx.createTable("parents", { force: true }, () => {});
-    await ctx.createTable("children", { force: true }, (t) => {
+    await Base.connection.createTable("parents", { force: true }, () => {});
+    await Base.connection.createTable("children", { force: true }, (t) => {
       t.integer("parent_id");
     });
   });
   afterAll(async () => {
-    await ctx.dropTable("children", "parents", { ifExists: true });
+    await Base.connection.dropTable("children", "parents", { ifExists: true });
     await rebuildCanonicalTables(Base.connection, ["children"]);
   });
 

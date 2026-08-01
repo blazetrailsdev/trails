@@ -16,15 +16,11 @@
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { Base, MigrationContext, registerModel } from "../index.js";
+import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { findTarget } from "./has-many-association.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
 import { fixtures } from "../test-fixtures.js";
-
-function migrationCtx() {
-  return new MigrationContext(Base.connection);
-}
 
 describe("DJAS — composite key support", () => {
   fixtures([]);
@@ -54,10 +50,10 @@ describe("DJAS — composite key support", () => {
   }
 
   beforeAll(async () => {
-    await migrationCtx().createTable("ck_shops", { force: true }, (t: any) => {
+    await Base.connection.createTable("ck_shops", { force: true }, (t: any) => {
       t.string("name");
     });
-    await migrationCtx().createTable(
+    await Base.connection.createTable(
       "ck_orders",
       { primaryKey: ["shop_id", "order_number"], force: true },
       (t: any) => {
@@ -66,7 +62,7 @@ describe("DJAS — composite key support", () => {
         t.string("name");
       },
     );
-    await migrationCtx().createTable("ck_line_items", { force: true }, (t: any) => {
+    await Base.connection.createTable("ck_line_items", { force: true }, (t: any) => {
       t.integer("ck_order_shop_id");
       t.integer("ck_order_number");
       t.string("sku");
@@ -95,7 +91,7 @@ describe("DJAS — composite key support", () => {
   });
 
   afterAll(async () => {
-    await migrationCtx().dropTable("ck_line_items", "ck_orders", "ck_shops", { ifExists: true });
+    await Base.connection.dropTable("ck_line_items", "ck_orders", "ck_shops", { ifExists: true });
   });
 
   afterEach(() => {

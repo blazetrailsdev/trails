@@ -179,7 +179,7 @@ export interface SchemaDumperOptions {
  * or adapter-specific subclasses (e.g. PG range helpers in
  * connection-adapters/postgresql/schema-definitions.ts). Types mapped
  * to names outside this set are emitted as `t.column(name, sqlType,
- * options)` so the dumped schema loads through MigrationContext
+ * options)` so the dumped schema loads through the adapter DSL
  * without a ReferenceError.
  */
 const DSL_HELPER_METHODS = new Set([
@@ -653,11 +653,11 @@ export class SchemaDumper {
     if (params) lines.push(`// ${params}`);
     lines.push("");
     if (this._language === "ts") {
-      lines.push(`import type { MigrationContext } from "@blazetrails/activerecord";`);
+      lines.push(`import type { DatabaseAdapter } from "@blazetrails/activerecord";`);
       lines.push("");
-      lines.push("export default async function defineSchema(ctx: MigrationContext) {");
+      lines.push("export default async function defineSchema(ctx: DatabaseAdapter) {");
     } else {
-      lines.push("/** @param {import('@blazetrails/activerecord').MigrationContext} ctx */");
+      lines.push("/** @param {import('@blazetrails/activerecord').DatabaseAdapter} ctx */");
       lines.push("export default async function defineSchema(ctx) {");
     }
   }

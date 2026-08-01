@@ -11,7 +11,6 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, registerModel, AssociationNotFoundError } from "../index.js";
-import { MigrationContext } from "../migration.js";
 import { fixtures } from "../test-fixtures.js";
 
 describe("Base#loadBelongsTo / Base#loadHasOne", () => {
@@ -19,10 +18,9 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
   // `_pool` lease. `fixtures({})` establishes the handler and per-test
   // transactional rollback (no seed rows). The `lo_*` tables are genuinely
   // bespoke (no canonical equivalent), so they're still laid via
-  // MigrationContext and dropped in afterAll — but on the primary boot
+  // the adapter and dropped in afterAll — but on the primary boot
   // connection.
   fixtures({});
-  let ctx: MigrationContext;
 
   class LoAuthor extends Base {
     declare name: string;
@@ -54,15 +52,14 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
   LoPost.belongsTo("loAuthor", { className: "LoAuthor" });
 
   beforeAll(async () => {
-    ctx = new MigrationContext(Base.connection);
-    await ctx.createTable("lo_authors", { force: true }, (t) => {
+    await Base.connection.createTable("lo_authors", { force: true }, (t) => {
       t.string("name");
     });
-    await ctx.createTable("lo_posts", { force: true }, (t) => {
+    await Base.connection.createTable("lo_posts", { force: true }, (t) => {
       t.string("title");
       t.integer("lo_author_id");
     });
-    await ctx.createTable("lo_profiles", { force: true }, (t) => {
+    await Base.connection.createTable("lo_profiles", { force: true }, (t) => {
       t.string("bio");
       t.integer("lo_author_id");
     });
@@ -71,7 +68,7 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
     registerModel(LoProfile);
   });
   afterAll(async () => {
-    await ctx.dropTable("lo_profiles", "lo_posts", "lo_authors", { ifExists: true });
+    await Base.connection.dropTable("lo_profiles", "lo_posts", "lo_authors", { ifExists: true });
   });
   it("loadBelongsTo returns the associated record", async () => {
     const author = new LoAuthor({ name: "dean" });

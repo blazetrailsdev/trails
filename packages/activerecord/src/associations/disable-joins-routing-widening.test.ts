@@ -20,14 +20,10 @@
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { Base, MigrationContext, registerModel } from "../index.js";
+import { Base, registerModel } from "../index.js";
 import { Associations, association } from "../associations.js";
 import { findTarget } from "./has-many-association.js";
 import { fixtures } from "../test-fixtures.js";
-
-function migrationCtx() {
-  return new MigrationContext(Base.connection);
-}
 
 describe("DJAS routing widening — sourceType + polymorphic source", () => {
   fixtures([]);
@@ -60,18 +56,18 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
   }
 
   beforeAll(async () => {
-    await migrationCtx().createTable("rw_authors", { force: true }, (t: any) => {
+    await Base.connection.createTable("rw_authors", { force: true }, (t: any) => {
       t.string("name");
     });
-    await migrationCtx().createTable("rw_comments", { force: true }, (t: any) => {
+    await Base.connection.createTable("rw_comments", { force: true }, (t: any) => {
       t.integer("rw_author_id");
       t.integer("origin_id");
       t.string("origin_type");
     });
-    await migrationCtx().createTable("rw_members", { force: true }, (t: any) => {
+    await Base.connection.createTable("rw_members", { force: true }, (t: any) => {
       t.string("name");
     });
-    await migrationCtx().createTable("rw_other_origins", { force: true }, (t: any) => {
+    await Base.connection.createTable("rw_other_origins", { force: true }, (t: any) => {
       t.string("label");
     });
     registerModel("RwAuthor", RwAuthor);
@@ -111,7 +107,7 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
   });
 
   afterAll(async () => {
-    await migrationCtx().dropTable("rw_other_origins", "rw_members", "rw_comments", "rw_authors", {
+    await Base.connection.dropTable("rw_other_origins", "rw_members", "rw_comments", "rw_authors", {
       ifExists: true,
     });
   });
