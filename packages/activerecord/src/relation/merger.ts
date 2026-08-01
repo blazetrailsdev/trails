@@ -9,7 +9,6 @@ import {
   QueryMethodBangs,
   structuralUnionEq,
 } from "./query-methods.js";
-import { foldMergeEagerLoad, foldMergePreloads } from "./merge-preloads.js";
 
 /**
  * Merges two Relations together, combining their conditions,
@@ -86,15 +85,34 @@ export class Merger {
     rel._selectBang(...columns);
   }
 
-  // Thin wrappers over the folders (merge-preloads.ts); api:compare still maps
-  // merger.rb's merge_preloads to this file. Both merge() and merge!() run
-  // through Merger#merge, so these fire on every merge.
+  // Rails merges :eager_load as a NORMAL_VALUE through Merger#merge's generic
+  // loop (`relation.eager_load!(*value)`, merger.rb:52-68), not as part of
+  // merge_preloads — it crosses the model boundary untouched.
   private mergeEagerLoad(rel: any): void {
-    foldMergeEagerLoad(rel, this.other);
+    const otherEagerLoad = this.other.eagerLoadValues;
+    if (otherEagerLoad.length > 0) rel.eagerLoadBang(...otherEagerLoad);
   }
 
   private mergePreloads(rel: any): void {
-    foldMergePreloads(rel, this.other);
+    if (this.other.preloadValues.length === 0 && this.other.includesValues.length === 0) return;
+
+    if (this.other.model === rel.model) {
+      if (this.other.preloadValues.length > 0) rel.preloadBang(...this.other.preloadValues);
+      if (this.other.includesValues.length > 0) rel.includesBang(...this.other.includesValues);
+      return;
+    }
+
+    const reflection = rel.model
+      .reflectOnAllAssociations()
+      .find((r: { className: string }) => r.className === this.other.model.name);
+    if (!reflection) return;
+
+    if (this.other.preloadValues.length > 0) {
+      rel.preloadBang({ [reflection.name]: this.other.preloadValues });
+    }
+    if (this.other.includesValues.length > 0) {
+      rel.includesBang({ [reflection.name]: this.other.includesValues });
+    }
   }
 
   private mergeJoins(rel: any): void {

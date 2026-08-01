@@ -247,18 +247,31 @@ function resolveOrderMatcher(model: QueryMethodsHost["model"]): RegExp {
 // The non-bang version calls `spawn.foo!` (clone then mutate).
 // ---------------------------------------------------------------------------
 
+// Rails' includes!/eager_load!/preload! union (`|=`) rather than append, which
+// dedups by eql?/hash — structural for Symbol/String/Hash specs alike. Mirror
+// that with structuralUnionEq so a repeated `includes(:x)`/`preload(:x)` folds
+// to one spec instead of making the preloader load it twice.
+function unionAppendAssociations(
+  target: AssociationSpec[],
+  incoming: readonly AssociationSpec[],
+): void {
+  for (const spec of incoming) {
+    if (!target.some((seen) => structuralUnionEq(seen, spec))) target.push(spec);
+  }
+}
+
 function includesBang(this: QueryMethodsHost, ...associations: AssociationSpec[]): any {
-  this._includesAssociations.push(...associations);
+  unionAppendAssociations(this._includesAssociations, associations);
   return this;
 }
 
 function eagerLoadBang(this: QueryMethodsHost, ...associations: AssociationSpec[]): any {
-  this._eagerLoadAssociations.push(...associations);
+  unionAppendAssociations(this._eagerLoadAssociations, associations);
   return this;
 }
 
 function preloadBang(this: QueryMethodsHost, ...associations: AssociationSpec[]): any {
-  this._preloadAssociations.push(...associations);
+  unionAppendAssociations(this._preloadAssociations, associations);
   return this;
 }
 
