@@ -2179,8 +2179,9 @@ export class Migrator {
     this._migrations = this._sortMigrations(normalized);
   }
 
+  /** @internal Mirrors: ActiveRecord::Migrator#migrations */
   get migrations(): MigrationProxy[] {
-    return [...this._migrations];
+    return this.isDown() ? [...this._migrations].reverse() : this._sortMigrations(this._migrations);
   }
 
   /**
@@ -2450,6 +2451,34 @@ export class Migrator {
     direction: "up" | "down" = "up",
   ): Promise<void> {
     await this._runMigration(proxy, direction);
+  }
+
+  /** @internal Mirrors: ActiveRecord::Migrator#target */
+  private target(): MigrationProxy | undefined {
+    if (this._targetVersion === null) return undefined;
+    let key: string;
+    try {
+      key = String(BigInt(this._targetVersion));
+    } catch {
+      return undefined;
+    }
+    return this.migrations.find((m) => m.version === key);
+  }
+
+  /** @internal Mirrors: ActiveRecord::Migrator#finish */
+  private finish(): number {
+    const migrations = this.migrations;
+    const target = this.target();
+    const index = target ? migrations.findIndex((m) => m.version === target.version) : -1;
+    return index === -1 ? migrations.length - 1 : index;
+  }
+
+  /** @internal Mirrors: ActiveRecord::Migrator#start */
+  private async start(): Promise<number> {
+    if (this.isUp()) return 0;
+    const current = await this.current();
+    const index = current ? this.migrations.findIndex((m) => m.version === current.version) : -1;
+    return index === -1 ? 0 : index;
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#record_version_state_after_migrating */
@@ -3152,8 +3181,22 @@ export class Migrator {
     return this.currentMigration();
   }
 
+  /** @internal Mirrors: ActiveRecord::Migrator#runnable */
   async runnable(): Promise<MigrationProxy[]> {
-    return this.pendingMigrations();
+    const runnable = this.migrations.slice(await this.start(), this.finish() + 1);
+    const kept: MigrationProxy[] = [];
+    if (this.isUp()) {
+      for (const m of runnable) {
+        if (!(await this.isRan(m))) kept.push(m);
+      }
+      return kept;
+    }
+    // skip the last migration if we're headed down, but not ALL the way down
+    if (this.target()) runnable.pop();
+    for (const m of runnable) {
+      if (await this.isRan(m)) kept.push(m);
+    }
+    return kept;
   }
 
   async migrated(): Promise<Set<string>> {

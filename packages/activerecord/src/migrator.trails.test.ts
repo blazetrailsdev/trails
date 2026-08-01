@@ -576,3 +576,70 @@ describe("Migrator drives migrations through Migration#migrate", () => {
     }
   });
 });
+
+// Rails has no direct migrator_test.rb coverage for Migrator#runnable /
+// #migrations, so the direction-awareness ported from migration.rb:1466-1480
+// (and the start/finish/target helpers at 1538-1546) is exercised here.
+describe("Migrator runnable direction awareness", () => {
+  let adapter: DatabaseAdapter;
+
+  const three = (): MigrationProxy[] => [
+    makeMigration("1", "M1"),
+    makeMigration("2", "M2"),
+    makeMigration("3", "M3"),
+  ];
+
+  beforeEach(() => {
+    adapter = Base.connection;
+  });
+
+  it("migrations is ascending going up and reversed going down", async () => {
+    const migrations = three();
+    const up = new Migrator(adapter, migrations);
+    expect(up.migrations.map((m) => m.version)).toEqual(["1", "2", "3"]);
+
+    const down = new Migrator(adapter, migrations, { direction: "down" });
+    expect(down.migrations.map((m) => m.version)).toEqual(["3", "2", "1"]);
+  });
+
+  it("runnable going up returns only unapplied migrations", async () => {
+    const migrations = three();
+    await new Migrator(adapter, migrations).migrate(2);
+
+    const migrator = new Migrator(adapter, migrations, { direction: "up" });
+    expect((await migrator.runnable()).map((m) => m.version)).toEqual(["3"]);
+  });
+
+  it("runnable going down to a target skips the target migration", async () => {
+    const migrations = three();
+    await new Migrator(adapter, migrations).migrate();
+
+    const migrator = new Migrator(adapter, migrations, {
+      direction: "down",
+      targetVersion: 1,
+    });
+    expect((await migrator.runnable()).map((m) => m.version)).toEqual(["3", "2"]);
+  });
+
+  it("runnable going all the way down keeps every applied migration", async () => {
+    const migrations = three();
+    await new Migrator(adapter, migrations).migrate();
+
+    const migrator = new Migrator(adapter, migrations, {
+      direction: "down",
+      targetVersion: 0,
+    });
+    expect((await migrator.runnable()).map((m) => m.version)).toEqual(["3", "2", "1"]);
+  });
+
+  it("runnable going down ignores migrations that never ran", async () => {
+    const migrations = three();
+    await new Migrator(adapter, migrations).migrate(2);
+
+    const migrator = new Migrator(adapter, migrations, {
+      direction: "down",
+      targetVersion: 0,
+    });
+    expect((await migrator.runnable()).map((m) => m.version)).toEqual(["2", "1"]);
+  });
+});
