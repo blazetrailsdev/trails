@@ -307,8 +307,8 @@ async function withRegisteredConfigurations<T>(
  * Run Rails' `check_protected_environments!` guard with a temporarily-
  * registered `DatabaseTasks.databaseConfiguration` so it actually consults
  * the stored env in `ar_internal_metadata`. Without the registration the
- * guard falls back to checking only the current env name, which misses
- * `EnvironmentMismatchError` and the protected-stamp case.
+ * guard has no configs to loop over and silently checks nothing, which
+ * misses `EnvironmentMismatchError` and the protected-stamp case.
  */
 async function runProtectedEnvCheck(config: HashConfig, envName: string): Promise<void> {
   const { DatabaseConfigurations } = await import("@blazetrails/activerecord");

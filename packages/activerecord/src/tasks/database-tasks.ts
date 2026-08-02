@@ -592,13 +592,8 @@ export class DatabaseTasks {
    * exactly:
    *   - If DISABLE_DATABASE_ENVIRONMENT_CHECK is set in the environment,
    *     this is a no-op (escape hatch for intentional production ops).
-   *   - For each config in the target environment, read the stored
-   *     `environment` key from InternalMetadata.
-   *   - Raise ProtectedEnvironmentError if that stored env is in
-   *     Base.protectedEnvironments.
-   *   - Raise EnvironmentMismatchError if a stored env exists but differs
-   *     from the current env.
-   *   - Swallow NoDatabaseError (can't check a database that isn't there).
+   *   - Otherwise run {@link checkCurrentProtectedEnvironmentBang} against
+   *     every config in the target environment.
    */
   static async checkProtectedEnvironmentsBang(environment?: string): Promise<void> {
     // Rails: `return if ENV["DISABLE_DATABASE_ENVIRONMENT_CHECK"]`.
@@ -608,35 +603,7 @@ export class DatabaseTasks {
     if (proc?.env?.DISABLE_DATABASE_ENVIRONMENT_CHECK !== undefined) return;
 
     const envName = this._normalizeEnv(environment);
-    const { Base } = await import("../base.js");
-    this._baseClass = Base;
-    const protectedEnvs = Base.protectedEnvironments ?? ["production"];
-
-    // Include hidden / `databaseTasks: false` / replica configs so the
-    // guard is a superset of everything a destructive task might touch —
-    // a hidden config stamped as production should still
-    // block the operation even though the regular configsFor filter
-    // would have hidden it.
-    const configs = this.databaseConfiguration
-      ? this.databaseConfiguration.configsFor({ envName, includeHidden: true })
-      : [];
-    if (configs.length === 0) {
-      // Two reasons configsFor can come back empty:
-      //   (a) DatabaseTasks.databaseConfiguration was never set (e.g.
-      //       in-memory tests or a stand-alone CLI invocation with
-      //       just DatabaseTasks.env). Fall back to an env-name-only
-      //       check so a flat "production" still raises.
-      //   (b) DatabaseConfigurations is registered but has no entries
-      //       for this env. Rails' check_protected_environments! loops
-      //       over 0 configs and performs no checks — don't raise just
-      //       because the requested env is in the protected list.
-      if (!this.databaseConfiguration && protectedEnvs.includes(envName)) {
-        throw new ProtectedEnvironmentError(envName);
-      }
-      return;
-    }
-
-    for (const config of configs) {
+    for (const config of this.configsFor(envName)) {
       await checkCurrentProtectedEnvironmentBang(config);
     }
   }
