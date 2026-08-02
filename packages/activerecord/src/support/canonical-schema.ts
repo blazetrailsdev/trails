@@ -66,8 +66,8 @@ interface IndexOpts {
  * Thin `create_table` block builder. Each `t.<type>()` maps to the same
  * `t.column(name, mappedType, options)` call `defineSchema` emits — including
  * the per-adapter type map, the single-column serial PK emitted inline at its
- * declared offset and the MySQL `DATETIME(6)` upgrade —
- * so the resulting DDL is identical. Indexes are collected and applied after the
+ * declared offset and the MySQL `DATETIME(6)` upgrade — so the resulting DDL is
+ * identical. Indexes are collected and applied after the
  * table is created (with the same expression-index / MySQL-length gating).
  */
 class TableBuilder {
@@ -100,13 +100,11 @@ class TableBuilder {
     } else if (o.default !== undefined) {
       options["default"] = o.default;
     }
-    // No NOT NULL is forced on composite-PK columns: Rails'
-    // visit_PrimaryKeyDefinition (schema_creation.rb:79-81) emits only
-    // `PRIMARY KEY (a, b)`, and schema.rb:243-250 declares cpk_books.author_id
-    // as a bare `t.integer`. SQLite does admit NULLs in a non-INTEGER primary
-    // key, so its cpk tables really are laxer than PG/MySQL's — but that is
-    // Rails' own SQLite behaviour, which its suite runs against unchanged, so
-    // reconciling it here would be a trails deviation, not a transcription.
+    // Composite-PK columns get no forced NOT NULL: schema.rb:243-250 declares
+    // them bare and visit_PrimaryKeyDefinition (schema_creation.rb:79-81) emits
+    // only `PRIMARY KEY (a, b)`. SQLite does admit NULLs in a non-INTEGER PK,
+    // but Rails runs its own suite against that, so adding one here to match
+    // PG/MySQL would be a deviation, not a transcription.
     // MySQL DATETIME without precision = DATETIME(0); upgrade to DATETIME(6)
     // unless an explicit precision (incl. null) opted out.
     if (
@@ -2191,9 +2189,8 @@ export async function canonicalRegistrySchema(): Promise<Schema> {
       assertSerialPkIsPlainInteger(def.name, def.meta.serialPk, columns[def.meta.serialPk]);
     }
     if (def.meta.primaryKey !== undefined && def.meta.serialPk === undefined) {
-      // Nothing to reconcile — `col` leaves composite-PK columns as declared —
-      // but a `primaryKey:` naming a column the block never declares is still a
-      // typo worth raising on, which is exactly what declaredSpec does.
+      // `col` leaves these as declared, so nothing to reconcile; declaredSpec
+      // still raises when `primaryKey:` names a column the block never declared.
       for (const column of def.meta.primaryKey) declaredSpec(def.name, column, columns[column]);
     }
     schema[def.name] = columns;
