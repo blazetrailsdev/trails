@@ -127,8 +127,6 @@ import * as Inheritance from "./inheritance.js";
 import * as SignedId from "./signed-id.js";
 import {
   signedId as _signedId,
-  signedIdVerifierSecret as _signedIdVerifierSecret,
-  setSignedIdVerifierSecret as _setSignedIdVerifierSecret,
   findSigned as _findSigned,
   findSignedBang as _findSignedBang,
 } from "./signed-id.js";
@@ -1021,6 +1019,9 @@ export class Base extends Model {
   /** Mirrors: ActiveRecord::SignedId::ClassMethods#signed_id_verifier */
   declare static signedIdVerifier: _MessageVerifier;
 
+  /** Mirrors: ActiveRecord::SignedId#signed_id_verifier_secret */
+  declare static signedIdVerifierSecret: string | (() => string | null | undefined) | null;
+
   static _requireConcreteClass(): void {
     // Rails: `abstract_class? || self == Base` (inheritance.rb:57) — Base
     // itself is not abstract_class? but still cannot be instantiated.
@@ -1818,19 +1819,6 @@ export class Base extends Model {
     options?: Parameters<typeof _NestedAttributes.acceptsNestedAttributesFor>[2],
   ): void {
     _NestedAttributes.acceptsNestedAttributesFor(this, associationName, options);
-  }
-
-  /**
-   * Secret backing signed_id_verifier (process-global in trails).
-   *
-   * Mirrors: ActiveRecord::Base.signed_id_verifier_secret
-   */
-  static get signedIdVerifierSecret(): string | (() => string | null | undefined) | null {
-    return _signedIdVerifierSecret();
-  }
-
-  static set signedIdVerifierSecret(value: string | (() => string | null | undefined) | null) {
-    _setSignedIdVerifierSecret(value);
   }
 
   /** Mirrors: ActiveRecord.verbose_query_logs, verbose_query_logs= */
