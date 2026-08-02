@@ -7,6 +7,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
+import { Reply } from "./test-helpers/models/reply.js";
 import { Base } from "./index.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
@@ -197,5 +198,11 @@ describe("compare", () => {
     // A persisted record against a new one is `nil <=> [1]` — incomparable.
     expect(first.compare(new Topic({ title: "a" }))).toBeUndefined();
     expect(first.compare("not a topic")).toBeUndefined();
+
+    // `is_a?(self.class)` is subclass-permissive in one direction only: a Reply
+    // is_a? Topic, but a Topic is not is_a? Reply.
+    const reply = await Reply.find(2);
+    expect(first.compare(reply)).toBe(-1);
+    expect(reply.compare(first)).toBeUndefined();
   });
 });
