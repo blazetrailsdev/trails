@@ -41,6 +41,21 @@ describe("prism-codegen stdlib idiom mapping", () => {
     expect(code).toContain("v instanceof Relation");
   });
 
+  it("keeps instance_of? exact-class, distinct from is_a?'s subclass-including images", async () => {
+    const { code } = await gen(`
+      def exact(v)
+        return 1 if v.instance_of?(Relation)
+        return 2 if v.instance_of?(Array)
+        v.instance_of?(String)
+      end
+    `);
+    expect(code).toContain("v.constructor === Relation");
+    expect(code).toContain("v.constructor === Array");
+    expect(code).toContain('typeof v === "string"');
+    expect(code).not.toContain("instanceof");
+    expect(code).not.toContain("Array.isArray");
+  });
+
   it("maps .class to .constructor", async () => {
     const { code } = await gen(`
       def type_of(record)

@@ -50,7 +50,13 @@ export function stdlibRename(name: string, hasBlock: boolean): string | undefine
  * Ruby stdlib idioms with a decided whole-expression JS image. Returns
  * undefined when the call is not one of them so `emitCall` continues with the
  * generic path. Symbols map to strings in trails, so `is_a?(Symbol)` shares
- * String's typeof image. `Kernel#Array` maps to the wrap ternary
+ * String's typeof image; a typeof check is also exact-class for
+ * `instance_of?`, since JS primitives have no subclasses (a Ruby String
+ * subclass like SqlLiteral is an object in trails). For non-primitive
+ * classes, `instance_of?` keeps Ruby's exact-class semantics as a
+ * `constructor ===` check, distinct from `is_a?`/`kind_of?`'s
+ * subclass-including `instanceof`/`Array.isArray`. `Kernel#Array` maps to
+ * the wrap ternary
  * (`v == null ? [] : Array.isArray(v) ? v : [v]`), which reads its argument
  * three times — only side-effect-free simple reads take that image.
  */
@@ -68,18 +74,25 @@ export function stdlibImage(n: PrismNode, e: Emitter): ts.Expression | undefined
   ) {
     const klass = String(argNodes[0].name);
     const recv = e.expr(n.receiver as PrismNode);
-    if (klass === "Array") {
-      return f.createCallExpression(
-        f.createPropertyAccessExpression(f.createIdentifier("Array"), "isArray"),
-        undefined,
-        [recv],
-      );
-    }
     if (Object.hasOwn(TYPEOF_IMAGE, klass)) {
       return f.createBinaryExpression(
         f.createTypeOfExpression(recv),
         ts.SyntaxKind.EqualsEqualsEqualsToken,
         f.createStringLiteral(TYPEOF_IMAGE[klass]),
+      );
+    }
+    if (name === "instance_of?") {
+      return f.createBinaryExpression(
+        f.createPropertyAccessExpression(recv, "constructor"),
+        ts.SyntaxKind.EqualsEqualsEqualsToken,
+        f.createIdentifier(klass),
+      );
+    }
+    if (klass === "Array") {
+      return f.createCallExpression(
+        f.createPropertyAccessExpression(f.createIdentifier("Array"), "isArray"),
+        undefined,
+        [recv],
       );
     }
     return f.createBinaryExpression(
