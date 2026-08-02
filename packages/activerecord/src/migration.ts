@@ -320,17 +320,10 @@ export abstract class Migration {
     return this.connection.adapterName as "sqlite" | "postgres" | "mysql";
   }
 
-  private _schema?: SchemaStatements;
-  private _schemaConn?: DatabaseAdapter;
-
   get schema(): SchemaStatements {
     const conn = this.connection;
-    if (!this._schema || this._schemaConn !== conn) {
-      assertSchemaAdapter(conn);
-      this._schema = conn as unknown as SchemaStatements;
-      this._schemaConn = conn;
-    }
-    return this._schema;
+    assertSchemaAdapter(conn);
+    return conn as unknown as SchemaStatements;
   }
 
   /**
