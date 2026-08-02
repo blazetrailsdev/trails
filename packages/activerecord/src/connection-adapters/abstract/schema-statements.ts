@@ -1364,22 +1364,12 @@ export class SchemaStatements {
     }
   }
 
-  // The adapter's own `indexes()` parses index columns fully (e.g. PostgreSQL's
-  // `array_agg`/`pg_get_indexdef` columns), unlike the lighter SchemaStatements
-  // `indexes()` helper whose columns don't round-trip cleanly on every adapter.
-  // Used by the index-name resolution / existence paths that compare columns.
-  private adapterIndexes(tableName: string): Promise<IndexDefinitionRow[]> {
-    return (this as unknown as { indexes(t: string): Promise<IndexDefinitionRow[]> }).indexes(
-      tableName,
-    );
-  }
-
   async indexExists(
     tableName: string,
     columnName: string | string[] | null | undefined,
     options?: { unique?: boolean; name?: string; valid?: boolean; column?: string | string[] },
   ): Promise<boolean> {
-    const allIndexes = await this.adapterIndexes(tableName);
+    const allIndexes = await this.indexes(tableName);
     // Rails `defined_for?`: `columns = options[:column] if columns.blank?`, then
     // the column check only applies when columns are present (`columns.blank?` —
     // nil, "", and [] are all absent), so `index_exists?(:t, nil, name: ...)`
@@ -2122,7 +2112,7 @@ export class SchemaStatements {
 
     if (checks.length === 0) throw new ArgumentError("No name or columns specified");
 
-    const allIndexes = await this.adapterIndexes(tableName);
+    const allIndexes = await this.indexes(tableName);
     const matching = allIndexes.filter((i) => checks.every((c) => c(i)));
 
     if (matching.length > 1) {
