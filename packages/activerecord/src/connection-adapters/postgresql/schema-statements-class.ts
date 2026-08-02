@@ -219,9 +219,6 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       }
 
       return new IndexDefinition(
-        // Rails builds the definition from the `table_name` ARGUMENT
-        // (postgresql/schema_statements.rb:137), so a schema-qualified lookup
-        // keeps its qualifier instead of collapsing to `pg_class.relname`.
         tableName,
         row.index_name as string,
         row.is_unique as boolean,
