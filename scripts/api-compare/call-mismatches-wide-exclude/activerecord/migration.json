@@ -341,12 +341,5 @@
     "rubyName": "validate",
     "call": "find",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration.ts",
-    "rubyName": "with_advisory_lock",
-    "call": "connection",
-    "reason": "Rails reaches the lock through the `connection` reader; trails' Migrator holds the adapter as `_adapter` and calls `getAdvisoryLock` / `releaseAdvisoryLock` on it directly."
   }
 ]
