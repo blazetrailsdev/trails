@@ -13,6 +13,7 @@ import { Column as MysqlColumn } from "./mysql/column.js";
 import { isSchemaCacheIgnoredTable } from "../ar-config.js";
 import { StatementInvalid } from "../errors.js";
 import { poolAbsent } from "./abstract/connection-pool.js";
+import type { IndexDefinitionRow } from "./abstract/schema-definitions.js";
 
 // ---------------------------------------------------------------------------
 // Helper: run callback inside pool.withConnection if available
@@ -74,7 +75,7 @@ export class SchemaCache {
   private _columnsHash = new Map<string, Record<string, Column>>();
   private _primaryKeys = new Map<string, string | string[] | null>();
   private _dataSourceExists = new Map<string, boolean>();
-  private _indexes = new Map<string, unknown[]>();
+  private _indexes = new Map<string, IndexDefinitionRow[]>();
   private _version: string | number | null = null;
   // When non-null, records the name of every table passed to
   // `clearDataSourceCacheBang` — i.e. every table touched by DDL
@@ -163,9 +164,11 @@ export class SchemaCache {
     }
 
     if (coder["indexes"] instanceof Map) {
-      this._indexes = coder["indexes"] as Map<string, unknown[]>;
+      this._indexes = coder["indexes"] as Map<string, IndexDefinitionRow[]>;
     } else if (coder["indexes"] && typeof coder["indexes"] === "object") {
-      this._indexes = new Map(Object.entries(coder["indexes"] as Record<string, unknown[]>));
+      this._indexes = new Map(
+        Object.entries(coder["indexes"] as Record<string, IndexDefinitionRow[]>),
+      );
     }
 
     this._version = (coder["version"] as string | number) ?? null;
@@ -374,7 +377,7 @@ export class SchemaCache {
     return pkCols.length === 1 ? pkCols[0] : pkCols;
   }
 
-  async indexes(pool: unknown, tableName: string): Promise<unknown[]> {
+  async indexes(pool: unknown, tableName: string): Promise<IndexDefinitionRow[]> {
     if (this._indexes.has(tableName)) {
       return this._indexes.get(tableName)!;
     }
@@ -638,7 +641,9 @@ export class SchemaCache {
     this._dataSourceExists = new Map(
       Object.entries((dataSources as Record<string, boolean>) ?? {}),
     );
-    this._indexes = new Map(Object.entries((indexes as Record<string, unknown[]>) ?? {}));
+    this._indexes = new Map(
+      Object.entries((indexes as Record<string, IndexDefinitionRow[]>) ?? {}),
+    );
 
     this.deriveColumnsHashAndDeduplicateValues();
   }
@@ -851,7 +856,7 @@ export class SchemaReflection {
     return this._cache?.isColumnsHash(pool, tableName) ?? false;
   }
 
-  async indexes(pool: unknown, tableName: string): Promise<unknown[]> {
+  async indexes(pool: unknown, tableName: string): Promise<IndexDefinitionRow[]> {
     return (await this.cache(pool)).indexes(pool, tableName);
   }
 
@@ -1038,7 +1043,7 @@ export class BoundSchemaReflection {
     return this._schemaReflection.isColumnsHash(this._pool, tableName);
   }
 
-  async indexes(tableName: string): Promise<unknown[]> {
+  async indexes(tableName: string): Promise<IndexDefinitionRow[]> {
     return this._schemaReflection.indexes(this._pool, tableName);
   }
 
