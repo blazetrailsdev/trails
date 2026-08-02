@@ -19,7 +19,8 @@ import type { Result } from "../../result.js";
 import { Column } from "./column.js";
 import { quoteColumnName as pgQuoteColumnName } from "./quoting.js";
 import { unquoteIdentifier, splitQuotedIdentifier, Name, Utils } from "./utils.js";
-import type { CreateDatabaseOptions, PgIndexDefinition } from "./schema-statements.js";
+import type { CreateDatabaseOptions } from "./schema-statements.js";
+import { IndexDefinition } from "../abstract/schema-definitions.js";
 import {
   type AlterTable as PgAlterTable,
   Table as PgTable,
@@ -124,7 +125,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   // Indexes
   // ---------------------------------------------------------------------------
 
-  async indexes(tableName: string): Promise<PgIndexDefinition[]> {
+  async indexes(tableName: string): Promise<IndexDefinition[]> {
     // supportsIndexInclude() reads databaseVersion; ensure it's populated.
     await this.pg.getDatabaseVersion();
     const [schema, table] = this.pg.extractSchemaQualifiedName(tableName);
@@ -214,43 +215,26 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         }
       }
 
-      // concise_options: collapse to a single scalar when all key columns share the same value.
-      // `columns` is already key-only because the SQL limits to ix.indnkeyatts.
-      let opclasses: Record<string, string> | string | undefined;
-      const opclassVals = Object.values(opclassesMap);
-      if (opclassVals.length > 0) {
-        if (columns.length === opclassVals.length && new Set(opclassVals).size === 1) {
-          opclasses = opclassVals[0];
-        } else {
-          opclasses = opclassesMap;
-        }
-      }
-
-      let orders: Record<string, string> | string | undefined;
-      const orderVals = Object.values(ordersMap);
-      if (orderVals.length > 0) {
-        if (columns.length === orderVals.length && new Set(orderVals).size === 1) {
-          orders = orderVals[0];
-        } else {
-          orders = ordersMap;
-        }
-      }
-
-      return {
-        table: row.table_name as string,
-        name: row.index_name as string,
-        unique: row.is_unique as boolean,
+      return new IndexDefinition(
+        row.table_name as string,
+        row.index_name as string,
+        row.is_unique as boolean,
         columns,
-        using: row.using as string,
-        orders,
-        opclasses,
-        include,
-        where,
-        nullsNotDistinct,
-        // Mirrors Rails' `comment.presence` — blank (incl. whitespace-only) → nil.
-        comment: (row.comment as string | null)?.trim() ? (row.comment as string) : undefined,
-        valid: row.is_valid as boolean,
-      };
+        {
+          using: row.using as string,
+          // conciseOptions collapses these maps to a single scalar when every
+          // key column shares the same value; `columns` is already key-only
+          // because the SQL limits to ix.indnkeyatts.
+          orders: ordersMap,
+          opclasses: opclassesMap,
+          include,
+          where,
+          nullsNotDistinct,
+          // Mirrors Rails' `comment.presence` — blank (incl. whitespace-only) → nil.
+          comment: (row.comment as string | null)?.trim() ? (row.comment as string) : undefined,
+          valid: row.is_valid as boolean,
+        },
+      );
     });
   }
 

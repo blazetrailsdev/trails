@@ -88,7 +88,7 @@ describe("SQLite3Adapter schema introspection", () => {
     // Only the explicitly-created index should surface; the auto-index for
     // UNIQUE(email) and the primary-key rowid mapping are filtered out
     // (their names start with `sqlite_`, matching Rails' filter).
-    expect(indexes).toEqual([
+    expect(indexes).toMatchObject([
       {
         table: "widgets",
         name: "widgets_on_owner",
@@ -111,7 +111,7 @@ describe("SQLite3Adapter schema introspection", () => {
       columns: string[];
       orders: Record<string, string>;
     }>;
-    expect(indexes).toEqual([
+    expect(indexes).toMatchObject([
       {
         table: "widgets",
         name: "widgets_on_name_weight",
@@ -171,7 +171,7 @@ describe("SQLite3Adapter schema introspection", () => {
       columns: string[];
       orders: Record<string, string>;
     }>;
-    expect(indexes).toEqual([
+    expect(indexes).toMatchObject([
       {
         table: "widgets",
         name: "widgets_on_name",
@@ -213,7 +213,9 @@ describe("SQLite3Adapter schema introspection", () => {
     expect(byName["widgets_on_lower_name"]?.columns).toBe("lower(name)");
     expect(byName["widgets_on_code"]?.unique).toBe(true);
     expect(byName["widgets_on_code"]?.where).toBe("code IS NOT NULL");
-    expect(byName["widgets_on_name_desc"]?.orders).toEqual({ name: "desc" });
+    // conciseOptions collapses the single-column order map to a bare direction,
+    // mirroring Rails' IndexDefinition.
+    expect(byName["widgets_on_name_desc"]?.orders).toBe("desc");
   });
 
   it("alterTable rebuilds a schema-qualified table whose index has a custom name", async () => {

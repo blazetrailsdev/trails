@@ -603,7 +603,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     expect(uniqueIndex.unique).toBe(true);
 
     const orderedIndex = indexes.find((idx) => idx.name === "ordered");
-    expect(orderedIndex.orders).toEqual({ code: "desc" });
+    expect(orderedIndex.orders).toBe("desc");
   });
 
   it("auto increment preserved on table changes", async () => {

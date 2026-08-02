@@ -10,10 +10,8 @@
 
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
-import type {
-  CheckConstraintDefinition,
-  IndexDefinitionRow,
-} from "../abstract/schema-definitions.js";
+import type { CheckConstraintDefinition } from "../abstract/schema-definitions.js";
+import { IndexDefinition } from "../abstract/schema-definitions.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { SchemaCreation } from "./schema-creation.js";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
@@ -106,21 +104,14 @@ const INDEX_ON_REGEX =
 export async function indexes(
   adapter: DatabaseAdapter,
   tableName: string,
-): Promise<IndexDefinitionRow[]> {
+): Promise<IndexDefinition[]> {
   const { schema, bare } = splitTableName(tableName);
   const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
   const rows = (await adapter.schemaQuery(
     `PRAGMA ${pragmaPrefix}index_list(${quoteColumnName(bare)})`,
   )) as Array<{ name: string; unique: number; origin: string }>;
   const sqliteMaster = schema ? `${quoteColumnName(schema)}.sqlite_master` : "sqlite_master";
-  const result: Array<{
-    table: string;
-    name: string;
-    columns: string[] | string;
-    unique: boolean;
-    where?: string;
-    orders: Record<string, string>;
-  }> = [];
+  const result: IndexDefinition[] = [];
   for (const idx of rows) {
     // Skip SQLite's internal auto-indexes (named `sqlite_*`); user-visible
     // PK/UNIQUE-backed indexes (origin "pk"/"u") are kept, matching Rails.
@@ -162,14 +153,7 @@ export async function indexes(
       }
     }
 
-    result.push({
-      table: bare,
-      name: idx.name,
-      columns,
-      unique: idx.unique !== 0,
-      orders,
-      ...(where != null ? { where } : {}),
-    });
+    result.push(new IndexDefinition(bare, idx.name, idx.unique !== 0, columns, { orders, where }));
   }
   return result;
 }

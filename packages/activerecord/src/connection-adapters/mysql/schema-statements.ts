@@ -13,7 +13,11 @@ import { TableDefinition, Table as MysqlTable } from "./schema-definitions.js";
 import { Column } from "./column.js";
 import { SchemaStatements as BaseSchemaStatements } from "../abstract/schema-statements.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./schema-creation.js";
-import { CreateIndexDefinition, ForeignKeyDefinition } from "../abstract/schema-definitions.js";
+import {
+  CreateIndexDefinition,
+  ForeignKeyDefinition,
+  IndexDefinition,
+} from "../abstract/schema-definitions.js";
 import { quoteColumnName, unquoteIdentifier } from "./quoting.js";
 import type { AddIndexOptions, SchemaStatementsLike } from "../abstract/schema-definitions.js";
 
@@ -608,22 +612,7 @@ interface IndexesHost {
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#indexes
  */
-export async function indexes(
-  this: IndexesHost,
-  tableName: string,
-): Promise<
-  Array<{
-    table: string;
-    name: string;
-    columns: string[] | string;
-    unique: boolean;
-    using?: string;
-    type?: string;
-    comment?: string;
-    lengths?: Record<string, number>;
-    orders?: Record<string, string>;
-  }>
-> {
+export async function indexes(this: IndexesHost, tableName: string): Promise<IndexDefinition[]> {
   let rows: Array<Record<string, unknown>>;
   try {
     rows = await this.schemaQuery(`SHOW KEYS FROM ${this.quoteTableName(tableName)}`);
@@ -706,14 +695,6 @@ export async function indexes(
   }
   return Array.from(byIndex.entries()).map(
     ([name, { columns, unique, using, type, comment, lengths, orders, expressions }]) => {
-      const base = {
-        table: tableName,
-        name,
-        unique,
-        ...(using !== undefined ? { using } : {}),
-        ...(type !== undefined ? { type } : {}),
-        ...(comment !== undefined ? { comment } : {}),
-      };
       // Mirrors Rails' final `.map`: a functional (expression) index collapses
       // its columns array into a single SQL string via addOptionsForIndexColumns,
       // baking prefix length and DESC/ASC order inline. Non-expression columns
@@ -728,14 +709,21 @@ export async function indexes(
           { order: orders, length: lengths },
           this.supportsIndexSortOrder(),
         );
-        return { ...base, columns: Array.from(quotedColumns.values()).join(", ") };
+        return new IndexDefinition(
+          tableName,
+          name,
+          unique,
+          Array.from(quotedColumns.values()).join(", "),
+          { using, type, comment },
+        );
       }
-      return {
-        ...base,
-        columns,
-        ...(Object.keys(lengths).length > 0 ? { lengths } : {}),
-        ...(Object.keys(orders).length > 0 ? { orders } : {}),
-      };
+      return new IndexDefinition(tableName, name, unique, columns, {
+        lengths,
+        orders,
+        using,
+        type,
+        comment,
+      });
     },
   );
 }

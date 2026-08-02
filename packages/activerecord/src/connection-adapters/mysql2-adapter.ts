@@ -2,6 +2,7 @@ import mysql from "mysql2/promise";
 import { Notifications } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
+import type { IndexDefinition } from "./abstract/schema-definitions.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import { sqlForInsert } from "./abstract/database-statements.js";
 import type { MysqlAdapterOptions } from "./pool-config.js";
@@ -1529,19 +1530,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /** Delegates to {@link mysqlIndexes} in `mysql/schema-statements.ts`. */
-  async indexes(tableName: string): Promise<
-    Array<{
-      table: string;
-      name: string;
-      columns: string[] | string;
-      unique: boolean;
-      using?: string;
-      type?: string;
-      comment?: string;
-      lengths?: Record<string, number>;
-      orders?: Record<string, string>;
-    }>
-  > {
+  async indexes(tableName: string): Promise<IndexDefinition[]> {
     return mysqlIndexes.call(
       {
         schemaQuery: this.schemaQuery.bind(this),

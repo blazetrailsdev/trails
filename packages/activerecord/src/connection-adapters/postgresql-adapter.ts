@@ -112,7 +112,7 @@ import {
   handleWarnings,
   returningColumnValues as pgReturningColumnValues,
 } from "./postgresql/database-statements.js";
-import type { CreateDatabaseOptions, PgIndexDefinition } from "./postgresql/schema-statements.js";
+import type { CreateDatabaseOptions } from "./postgresql/schema-statements.js";
 import {
   ExclusionConstraintDefinition,
   UniqueConstraintDefinition,
@@ -4713,7 +4713,7 @@ export interface PostgreSQLAdapter {
 
   columnsForDistinct(columns: string | string[], orders?: (string | Nodes.Node)[]): string;
 
-  indexes(tableName: string): Promise<PgIndexDefinition[]>;
+  indexes(tableName: string): Promise<AbstractIndexDefinition[]>;
 
   indexNameExists(tableName: string, indexName: string): Promise<boolean>;
 
@@ -5042,7 +5042,7 @@ export interface PostgreSQLAdapter {
   >;
 }
 
-export type IndexDefinition = PgIndexDefinition;
+export type IndexDefinition = AbstractIndexDefinition;
 
 /**
  * A prepared-statement entry tracked in the per-client pool. `name` is

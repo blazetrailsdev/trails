@@ -113,7 +113,7 @@ import {
   type ColumnOptions,
   type RemoveForeignKeyOptions,
   type ForeignKeyLookupOptions,
-  type IndexDefinitionRow,
+  type IndexDefinition,
 } from "./abstract/schema-definitions.js";
 import { Base } from "../base.js";
 import { Column } from "./column.js";
@@ -2148,7 +2148,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return fields.map((field) => newColumnFromField(this, tableName, field, fields));
   }
 
-  async indexes(tableName: string): Promise<IndexDefinitionRow[]> {
+  async indexes(tableName: string): Promise<IndexDefinition[]> {
     return sqliteIndexes(this, tableName);
   }
 
@@ -2559,13 +2559,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     to: string,
     rename: Record<string, string> = {},
   ): Promise<void> {
-    const idxRows = (await this.indexes(from)) as Array<{
-      name: string;
-      columns: string[] | string;
-      unique: boolean;
-      where?: string;
-      orders?: Record<string, string>;
-    }>;
+    const idxRows = await this.indexes(from);
     const { bare: bareFrom } = this._splitTableName(from);
     const { bare: bareTo } = this._splitTableName(to);
     for (const idx of idxRows) {
@@ -2596,7 +2590,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       // hand-built CREATE INDEX stands in for add_index, so it must stay
       // value-agnostic: `indexes()` only records "desc" today, but an "asc" or
       // upper-cased entry must not be silently dropped.
-      const orders = idx.orders ?? {};
+      // Mirrors Rails' options_for_index_columns: IndexDefinition#conciseOptions
+      // collapses a uniform order map to a bare direction, which add_index then
+      // applies to every column.
+      const rawOrders = idx.orders;
+      const orders: Record<string, string> =
+        typeof rawOrders === "string"
+          ? Object.fromEntries((Array.isArray(cols) ? cols : [cols]).map((c) => [c, rawOrders]))
+          : rawOrders;
       const colSql = Array.isArray(cols)
         ? cols
             .map((c) => `${quoteColumnName(c)}${orders[c] ? ` ${orders[c].toUpperCase()}` : ""}`)

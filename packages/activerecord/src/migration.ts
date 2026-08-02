@@ -23,7 +23,7 @@ import {
   type ForeignKeyLookupOptions,
   type AddIndexOptions,
   type IdHashOptions,
-  type IndexDefinitionRow,
+  type IndexDefinition,
 } from "./connection-adapters/abstract/schema-definitions.js";
 import {
   type JoinTableOptions,
@@ -1055,7 +1055,7 @@ export abstract class Migration {
     return this.connection.columns(this._pt(tableName));
   }
 
-  async indexes(tableName: string): Promise<IndexDefinitionRow[]> {
+  async indexes(tableName: string): Promise<IndexDefinition[]> {
     return this.connection.indexes(this._pt(tableName));
   }
 
