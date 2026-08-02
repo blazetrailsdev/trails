@@ -1488,18 +1488,17 @@ jobs:
         run: pnpm exec tsx scripts/api-compare/lint-call-mismatches-wide.ts
       - name: Wide ratchet baseline reseed drift
         # RFC 0083. The ratchet above only READS the committed baseline, so a
-        # change that converges or seeds rows can pass the ratchet and still
-        # leave the baseline stale; detected only on `main`, every branch cut
-        # afterwards inherits the failure (#5869 paid for that diagnosis on 5
-        # unrelated STALE rows). So this runs on every event, `pull_request`
-        # included, and fails the PR that introduces the drift instead of the
-        # `main` run after it merges. The old `main`-only arm is deliberately
-        # gone rather than kept as a backstop: `main` runs the identical step,
-        # so a separate gated copy would only duplicate it. `--write` mutates
-        # the baseline in the workspace, hence its position AFTER the ratchet —
-        # reseeding first would make the ratchet gate its own output. `--write`
-        # skips its own regeneration under CI, so this reuses the artifact the
-        # extraction step above wrote.
+        # change that converges or seeds rows passes it and still leaves the
+        # baseline stale. Runs on every event, `pull_request` included, so the
+        # PR that introduces the drift fails rather than the `main` run after
+        # it merges — every branch cut after that merge inherits the failure
+        # (#5869 paid for that diagnosis on 5 unrelated STALE rows). No
+        # separate `main`-only arm: `main` runs this identical step, so a
+        # gated copy would only duplicate it. Ordered AFTER the ratchet
+        # because `--write` mutates the baseline in the workspace; reseeding
+        # first would make the ratchet gate its own output. `--write` skips
+        # its own regeneration under CI, reusing the extraction step's
+        # artifact.
         run: |
           set -euo pipefail
           pnpm exec tsx scripts/api-compare/lint-call-mismatches-wide.ts --write
@@ -1513,7 +1512,7 @@ jobs:
             echo "Wide ratchet baseline is in sync with a clean reseed."
             exit 0
           fi
-          echo "::error title=Wide ratchet baseline drift::This branch leaves the committed wide call-mismatch baseline out of sync with a clean reseed. Run \`pnpm api:calls:wide:reseed\` and commit the result."
+          echo "::error title=Wide ratchet baseline drift::This branch leaves the committed wide call-mismatch baseline out of sync with a clean reseed. Prefer the reviewable fix shown in the diff below — delete the stale \`call-mismatches-wide-exclude/\` entries your change converged, and give any newly seeded rows a real reason. \`pnpm api:calls:wide:reseed\` produces the same end state mechanically, at the cost of reordering untouched packages (see CONTRIBUTING.md)."
           git --no-pager diff --stat -- "$baseline" "$mark"
           git --no-pager diff -- "$baseline" "$mark"
           exit 1
