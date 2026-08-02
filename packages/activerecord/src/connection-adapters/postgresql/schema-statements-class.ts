@@ -96,6 +96,10 @@ interface PgSchemaAdapter {
   _schemaSearchPathMemo: string | null;
 }
 
+function toS(value: unknown): string {
+  return value == null ? "" : String(value);
+}
+
 export class PostgreSQLSchemaStatements extends SchemaStatements {
   private get pg(): PgSchemaAdapter {
     return this as unknown as PgSchemaAdapter;
@@ -536,25 +540,25 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     for (const [key, value] of Object.entries(mergedOptions)) {
       switch (key) {
         case "owner":
-          optionString += ` OWNER = "${String(value)}"`;
+          optionString += ` OWNER = "${toS(value)}"`;
           break;
         case "template":
-          optionString += ` TEMPLATE = "${String(value)}"`;
+          optionString += ` TEMPLATE = "${toS(value)}"`;
           break;
         case "encoding":
-          optionString += ` ENCODING = '${String(value)}'`;
+          optionString += ` ENCODING = '${toS(value)}'`;
           break;
         case "collation":
-          optionString += ` LC_COLLATE = '${String(value)}'`;
+          optionString += ` LC_COLLATE = '${toS(value)}'`;
           break;
         case "ctype":
-          optionString += ` LC_CTYPE = '${String(value)}'`;
+          optionString += ` LC_CTYPE = '${toS(value)}'`;
           break;
         case "tablespace":
-          optionString += ` TABLESPACE = "${String(value)}"`;
+          optionString += ` TABLESPACE = "${toS(value)}"`;
           break;
         case "connectionLimit":
-          optionString += ` CONNECTION LIMIT = ${String(value)}`;
+          optionString += ` CONNECTION LIMIT = ${toS(value)}`;
           break;
         default:
           break;
