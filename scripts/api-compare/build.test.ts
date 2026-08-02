@@ -329,7 +329,7 @@ describe("buildExpectations", () => {
     );
     expect(tagged).toEqual([]);
     expect(skipped).toEqual(["save"]);
-    expect(text ?? FILE).not.toContain("RFC 0044");
+    expect(text ?? "").not.toContain(NARROW_DEFAULT_REASON);
   });
 
   it("records every Ruby name that lands on one TS method", () => {

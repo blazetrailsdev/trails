@@ -67,8 +67,6 @@ export const DEFAULT_TAG_REASON = DEFAULT_REASON;
 // harvest report.
 const PLACEHOLDER_REASONS = new Set([
   DEFAULT_TAG_REASON,
-  // The narrow baseline's seed: a tag can only ever have carried it by being
-  // minted from a narrow row's prose, and it justifies nothing either.
   NARROW_DEFAULT_REASON,
   "unported (api:build stub)",
 ]);
