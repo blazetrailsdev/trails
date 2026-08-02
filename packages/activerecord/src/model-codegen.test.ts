@@ -137,8 +137,8 @@ describe("generateModels", () => {
   });
 
   it("skips tables with an empty-array primary key (introspection's no-PK shape)", () => {
-    // schema-introspection.introspectPrimaryKey() normalises adapter-level
-    // null to []. Callers who feed that output straight in should still
+    // Callers that normalise the adapter's `primaryKey()` null to [] should
+    // still
     // get view-filtering.
     const out = generateModels(
       [table("real_table"), table("v_users_summary", { primaryKey: [] })],
@@ -401,7 +401,7 @@ describe("generateModels", () => {
   it("resolves schema-qualified FK targets from the PG adapter", () => {
     // PostgreSQL's FK introspection renders the target via `regclass::text`,
     // which returns "schema.table" for tables in a non-default schema.
-    // introspectTables() returns unqualified names, so the class map is
+    // `tables()` returns unqualified names, so the class map is
     // keyed by "authors" (not "other_schema.authors"). The codegen layer
     // must strip the schema prefix on lookup or the association and its
     // inverse has_many both silently drop.
