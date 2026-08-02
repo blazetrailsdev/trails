@@ -40,13 +40,14 @@ function parse(fileName: string, source: string): ts.SourceFile {
 }
 
 /**
- * Type text with every space and leading union pipe removed, so the two
- * declarations compare on what they mean rather than on how Prettier happened
- * to wrap them.
+ * Type text with every space, leading union pipe, and trailing type-literal
+ * member separator removed — all three are things Prettier adds or drops when a
+ * type wraps, so the two declarations compare on what they mean rather than on
+ * how they happened to be formatted.
  */
 function typeText(node: ts.TypeNode | undefined): string | null {
   if (!node) return null;
-  return node.getText().replace(/\s+/g, "").replace(/^\|/, "").replace(/;\}/g, "}"); // trailing member separator Prettier adds when a type literal wraps
+  return node.getText().replace(/\s+/g, "").replace(/^\|/, "").replace(/;\}/g, "}");
 }
 
 /**
