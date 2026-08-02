@@ -91,6 +91,42 @@ export function renderDroppedReviewed(dropped: ExcludeEntry[]): string {
   ].join("\n");
 }
 
+/**
+ * Baseline rows this reseed dropped that still carried the seed reason. These
+ * are the same two-cause ambiguity as {@link droppedReviewed} — converged port
+ * vs. widened gate — but nobody ever wrote prose for them, so listing every key
+ * would bury the reviewed listing (seeded rows are the overwhelming majority of
+ * the baseline). They are reported as a COUNT by default, with the keys behind
+ * a flag: a widened gate that silently clears hundreds of rows shows up as a
+ * number nobody expected, which is the signal that was missing in PR #5869.
+ */
+export function droppedSeeded(
+  next: ExcludeEntry[],
+  prior: ExcludeEntry[],
+  defaultReason: string,
+): ExcludeEntry[] {
+  const kept = new Set(next.map(keyOf));
+  return unreviewedEntries(prior, defaultReason).filter((e) => !kept.has(keyOf(e)));
+}
+
+export const DROPPED_SEEDED_KEYS_ARG = "--show-dropped-seeded";
+
+export function renderDroppedSeeded(dropped: ExcludeEntry[], showKeys: boolean): string {
+  if (dropped.length === 0) return "";
+  const lines = [
+    ``,
+    `${dropped.length} seeded entr(ies) (reason never reviewed) no longer flag and were dropped.`,
+    `A widened resolution gate clears rows exactly like a converged port does; if that count is ` +
+      `larger than the change you made, it is the gate, not the port.`,
+  ];
+  if (showKeys) {
+    lines.push(...dropped.map((e) => `  - ${e.package}  ${e.tsFile}  ${e.rubyName}  ${e.call}`));
+  } else {
+    lines.push(`  Re-run with \`${DROPPED_SEEDED_KEYS_ARG}\` to list the keys.`);
+  }
+  return lines.join("\n");
+}
+
 export function parseMark(text: string): number {
   const parsed = JSON.parse(text) as unknown;
   const max = (parsed as UnreviewedMark | null)?.max;

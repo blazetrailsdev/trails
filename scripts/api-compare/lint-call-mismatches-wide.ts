@@ -84,7 +84,10 @@
  *
  * `--write` regenerates the baseline from the current wide artifact, preserving
  * the `reason` of entries that still flag and dropping stale rows, then
- * repartitions it across the split files (adding/removing files as needed).
+ * repartitions it across the split files (adding/removing files as needed). It
+ * reports the rows it dropped so the author can tell a converged port from a
+ * widened resolution gate: reviewed rows are listed individually, seeded rows
+ * are counted, and `--show-dropped-seeded` lists the seeded keys too.
  *
  * Hard rules: no node:* imports, no process.* in the library surface (the CLI
  * entry guard is the sole exception, matching lint-call-mismatches.ts), async fs.
@@ -114,8 +117,11 @@ import {
   nextMark,
   renderExcess,
   droppedReviewed,
+  droppedSeeded,
   markSlack,
   renderDroppedReviewed,
+  renderDroppedSeeded,
+  DROPPED_SEEDED_KEYS_ARG,
   renderSlack,
   renderWriteSummary,
   unreviewedEntries,
@@ -445,7 +451,7 @@ async function readJsonIfPresent<T>(file: string): Promise<T | undefined> {
   }
 }
 
-async function main(write: boolean): Promise<number> {
+async function main(write: boolean, showSeededKeys: boolean): Promise<number> {
   const baseline = await loadBaseline();
   const artifact = await loadArtifact();
   const current = flattenArtifact(artifact);
@@ -491,6 +497,11 @@ async function main(write: boolean): Promise<number> {
     console.log(renderWriteSummary(count, newly, mark, path.relative(ROOT_DIR, MARK_PATH)));
     const dropped = renderDroppedReviewed(droppedReviewed(next, baseline, DEFAULT_REASON));
     if (dropped) console.log(dropped);
+    const seeded = renderDroppedSeeded(
+      droppedSeeded(next, baseline, DEFAULT_REASON),
+      showSeededKeys,
+    );
+    if (seeded) console.log(seeded);
     return 0;
   }
 
@@ -618,7 +629,7 @@ async function runAsScript(): Promise<void> {
         process.exit(2);
       }
     }
-    process.exit(await main(argv.includes("--write")));
+    process.exit(await main(argv.includes("--write"), argv.includes(DROPPED_SEEDED_KEYS_ARG)));
   }
   let top: number;
   try {

@@ -5,6 +5,9 @@ import * as path from "path";
 import type { ExcludeEntry } from "./lint-call-mismatches.js";
 import {
   droppedReviewed,
+  droppedSeeded,
+  renderDroppedSeeded,
+  DROPPED_SEEDED_KEYS_ARG,
   loadMark,
   newlySeeded,
   renderDroppedReviewed,
@@ -170,6 +173,38 @@ describe("droppedReviewed", () => {
   it("names each dropped reviewed row so the author can spot-check it", () => {
     const msg = renderDroppedReviewed([entry("a", "verified: real divergence")]);
     expect(msg).toContain("1 reviewed entr(ies)");
+    expect(msg).toContain("activerecord  relation.ts  load  a");
+  });
+});
+
+describe("droppedSeeded", () => {
+  it("reports a seeded row that stopped flagging", () => {
+    const prior = [entry("a"), entry("b")];
+    expect(droppedSeeded([entry("b")], prior, SEED).map((e) => e.call)).toEqual(["a"]);
+  });
+
+  it("leaves dropped hand-reviewed rows to droppedReviewed", () => {
+    expect(droppedSeeded([], [entry("a", "verified: real divergence")], SEED)).toEqual([]);
+  });
+
+  it("ignores seeded rows that still flag", () => {
+    expect(droppedSeeded([entry("a")], [entry("a")], SEED)).toEqual([]);
+  });
+
+  it("says nothing when no seeded row was dropped", () => {
+    expect(renderDroppedSeeded([], true)).toBe("");
+  });
+
+  it("reports a count and points at the flag when keys are not requested", () => {
+    const msg = renderDroppedSeeded([entry("a"), entry("b")], false);
+    expect(msg).toContain("2 seeded entr(ies)");
+    expect(msg).toContain(DROPPED_SEEDED_KEYS_ARG);
+    expect(msg).not.toContain("relation.ts");
+  });
+
+  it("names each dropped seeded row when the keys are requested", () => {
+    const msg = renderDroppedSeeded([entry("a")], true);
+    expect(msg).toContain("1 seeded entr(ies)");
     expect(msg).toContain("activerecord  relation.ts  load  a");
   });
 });
