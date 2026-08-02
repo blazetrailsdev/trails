@@ -1115,7 +1115,7 @@ function invertWhereBang(this: QueryMethodsHost): any {
  * catch it the same way they would catch Rails' ArgumentError
  * (`catch err if err.name === 'ArgumentError'`). Exported so other
  * modules (PredicateBuilder, Relation public methods, Base.where /
- * Base.whereNot, etc.) can raise the same shape without
+ * WhereChain#not, etc.) can raise the same shape without
  * re-declaring the helper.
  */
 export function argumentError(message: string): Error {
