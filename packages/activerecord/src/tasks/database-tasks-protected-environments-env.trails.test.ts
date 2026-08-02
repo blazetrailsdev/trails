@@ -50,30 +50,34 @@ describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => 
   }
 
   it.skipIf(adapterType !== "sqlite" || inMemoryDb())(
-    "compares the stored environment against the config's own environment",
+    "compares the stored environment against the global default environment",
     async () => {
-      expect(DatabaseTasks.env).not.toBe(env);
-      await stampedConfig();
+      // Rails compares `migration_context.current_environment`
+      // (`DEFAULT_ENV.call`) rather than the db_config's own env, so a config
+      // under `storyenv` stamped with the global default env passes.
+      await stampedConfig(DatabaseConfigurations.currentEnv());
       await DatabaseTasks.checkProtectedEnvironmentsBang(env);
     },
   );
 
   it.skipIf(adapterType !== "sqlite" || inMemoryDb())(
-    "reports the config's own environment as current on a mismatch",
+    "reports the global default environment as current on a mismatch",
     async () => {
+      const current = DatabaseConfigurations.currentEnv();
+      expect(current).not.toBe(env);
       await stampedConfig("otherenv");
       const error = await DatabaseTasks.checkProtectedEnvironmentsBang(env).catch(
         (e: unknown) => e,
       );
       expect(error).toBeInstanceOf(EnvironmentMismatchError);
       expect((error as Error).message).toMatch(
-        new RegExp(`last run in \`otherenv\`[\\s\\S]*running in \`${env}\``),
+        new RegExp(`last run in \`otherenv\`[\\s\\S]*running in \`${current}\``),
       );
     },
   );
 
   it.skipIf(adapterType !== "sqlite" || inMemoryDb())(
-    "raises when the config's own environment is protected",
+    "raises when the stored environment is protected",
     async () => {
       const protectedEnvironments = Base.protectedEnvironments;
       await stampedConfig();
