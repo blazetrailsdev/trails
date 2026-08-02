@@ -66,8 +66,7 @@ const NON_EMITTING: ReadonlyMap<string, string> = new Map([
  * view, so the `this.<member>` calls the mixed-in body makes are recorded one
  * hop deep, while the calls that view then makes to the real adapter stay
  * unrecorded. `this.adapter` — how a mixed-in body names the adapter, which is
- * itself — is answered with the same view so that hop stays recorded. That boundary — the one a cover can intercept — is the whole
- * scope of this guard.
+ * itself — is answered with the same view so that hop stays recorded.
  *
  * Getters are the second half of the boundary. A getter read off the view is
  * evaluated with the view as receiver, not the real adapter, so whatever it
@@ -103,7 +102,6 @@ async function recordLayPath(): Promise<Set<string>> {
         try {
           value = Reflect.get(target, prop, self);
         } catch {
-          // Getter over a private field: the brand check rejects the proxy.
           value = Reflect.get(target, prop, target);
         }
         return typeof value === "function"
@@ -133,12 +131,12 @@ async function recordLayPath(): Promise<Set<string>> {
  *
  * SQLite is the lane here because it needs no server, and the lay path it walks
  * is the shared abstract one. The companions do override members (MySQL:
- * `addIndex`, `dropTable`; PostgreSQL: `dropTable`, `createTableDefinition` —
- * not an exhaustive list, check the class before relying on it), but none of
- * those overrides changes what this pins: `dropTable` is off the lay path for
- * every adapter (the canonical loader passes no `force:`), `createTableDefinition`
- * is exempt whichever adapter's override runs, and MySQL's `addIndex` reaches the
- * database through the same `adapter.execute` this records.
+ * `addIndex`, `dropTable`; PostgreSQL: `dropTable`, `schemaCreation` — not an
+ * exhaustive list, check the class before relying on it), but none of those
+ * overrides changes what this pins: `dropTable` is off the lay path for every
+ * adapter (the canonical loader passes no `force:`), MySQL's `addIndex` reaches
+ * the database through the same `adapter.execute` this records, and every
+ * adapter's `schemaCreation` renderer reads back through the same boundary.
  */
 describe("STUBBED_DDL_METHODS", () => {
   test("covers every adapter member the canonical lay path touches", async () => {
@@ -149,9 +147,7 @@ describe("STUBBED_DDL_METHODS", () => {
     expect(touched.has("execute")).toBe(true);
     expect(touched.has("createTable")).toBe(true);
     expect(touched.has("addIndex")).toBe(true);
-    // Floor: the renderer boundary. These come back only when the schemaCreation
-    // getter is evaluated on the recording view, so losing that depth again is a
-    // failure here rather than a silently shallower trace.
+    // Floor: these come back only through the renderer boundary.
     expect(touched.has("quoteTableName")).toBe(true);
     expect(touched.has("nativeDatabaseTypes")).toBe(true);
 
