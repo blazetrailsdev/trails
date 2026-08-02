@@ -1387,12 +1387,14 @@ export function main() {
     // Same signatures, but ONLY from this package — no dep packages. Feeds the
     // calls-parity ported-with-args gate; see resolvePortedWithArgsSigs.
     const tsParamsByNameInPkg = new Map<string, ParamInfo[][]>();
-    // Per-(file, name) counterpart. Separate from tsParamsByFileName, which
-    // also holds dep-package files: relative paths collide across packages
-    // (`attribute-methods.ts` exists in both activemodel and activerecord), so
-    // a same-file lookup there would still let a dep signature open the gate.
+    // Per-(file, name) counterpart, package-only: relative paths collide across
+    // packages (`attribute-methods.ts` exists in both activemodel and
+    // activerecord), so a same-file map that also held dep-package files would
+    // still let a dep signature open the gate. Feeds the ported-with-args gate
+    // and the literal-default check.
     const tsParamsByFileNameInPkg = new Map<string, Map<string, ParamInfo[][]>>();
-    // Per-(file, name) resolved options-object keys (null = uncheckable).
+    // Per-(file, name) resolved options-object keys (null = uncheckable),
+    // package-only for the same collision reason as tsParamsByFileNameInPkg.
     // Scoped per-FILE — unlike arity's global pool — so a sibling adapter's
     // same-named method (e.g. PostgreSQL `createDatabase`) can't lend its keys
     // to a different adapter's Ruby method and manufacture a cross-adapter
@@ -1401,8 +1403,6 @@ export function main() {
     // against the file the method actually MATCHED in (the real-type file for
     // include-chain matches), where the union within that file still applies.
     const tsOptionKeysByFileName = new Map<string, Map<string, (string[] | null)[]>>();
-    // Literal-default candidates scoped per (file, name) — unlike arity's global pool.
-    const tsParamsByFileName = new Map<string, Map<string, ParamInfo[][]>>();
     // Body call-sets scoped per (file, name) for the advisory calls-parity check.
     const tsCallsByFileName = new Map<string, Map<string, string[][]>>();
     const tsMissingCallTagsByFileName = new Map<string, Map<string, Set<string>>>();
@@ -1459,14 +1459,11 @@ export function main() {
         const pkgByName = tsParamsByFileNameInPkg.get(file) ?? new Map<string, ParamInfo[][]>();
         pkgByName.set(m.name, [...(pkgByName.get(m.name) ?? []), m.params]);
         tsParamsByFileNameInPkg.set(file, pkgByName);
-      }
-      const byName = tsParamsByFileName.get(file) ?? new Map<string, ParamInfo[][]>();
-      byName.set(m.name, [...(byName.get(m.name) ?? []), m.params]);
-      tsParamsByFileName.set(file, byName);
-      if (m.optionKeys !== undefined) {
-        const byName = tsOptionKeysByFileName.get(file) ?? new Map<string, (string[] | null)[]>();
-        byName.set(m.name, [...(byName.get(m.name) ?? []), m.optionKeys]);
-        tsOptionKeysByFileName.set(file, byName);
+        if (m.optionKeys !== undefined) {
+          const byName = tsOptionKeysByFileName.get(file) ?? new Map<string, (string[] | null)[]>();
+          byName.set(m.name, [...(byName.get(m.name) ?? []), m.optionKeys]);
+          tsOptionKeysByFileName.set(file, byName);
+        }
       }
       if (m.missingRailsCalls !== undefined) {
         const byName = tsMissingCallTagsByFileName.get(file) ?? new Map<string, Set<string>>();
@@ -1891,7 +1888,7 @@ export function main() {
       const checkLiterals = (rubyName: string, tsName: string, tsFile: string) => {
         const rubyParams = rubyParamsByName.get(rubyName);
         if (!rubyParams) return;
-        const candidates = tsParamsByFileName.get(tsFile)?.get(tsName) ?? [];
+        const candidates = tsParamsByFileNameInPkg.get(tsFile)?.get(tsName) ?? [];
         if (candidates.length === 0) return;
         const res = compareDefaults(rubyParams, candidates);
         literalsCompared += res.compared;
