@@ -539,56 +539,24 @@ async function runDrop(opts: DatabaseOpts = {}): Promise<void> {
 }
 
 /**
- * Shared helper for migrate/rollback/forward — discover migrations for
- * the named DB, construct a Migrator, run the caller-provided operation,
- * log output, and dump the schema. Extracts the pattern so the three
- * commands can't drift.
- */
-async function withMigratorForDb(
-  ctx: {
-    adapter: DatabaseAdapter;
-    raw: RawConfig;
-    name: string;
-    prefix: string;
-    config: HashConfig;
-  },
-  operation: (migrator: Migrator) => Promise<void>,
-  opts?: {
-    skipDump?: boolean;
-    /** Called after migration completes — use for messages that
-     *  should appear after the migration output. */
-    afterOutput?: (migrator: Migrator) => void | Promise<void>;
-  },
-): Promise<void> {
-  const mDirs = await migrationsDirsForConfig(ctx.name, ctx.raw);
-  const migrations = await discoverMigrationsFromDirs(mDirs);
-  if (migrations.length === 0) {
-    console.log(`${ctx.prefix}No migrations found.`);
-    return;
-  }
-  const migrator = new Migrator(ctx.adapter, migrations, {
-    environment: ctx.config.envName,
-    internalMetadataEnabled: ctx.config.useMetadataTable,
-  });
-  await withPrefixedStdout(ctx.prefix, async () => {
-    await operation(migrator);
-    if (opts?.afterOutput) await opts.afterOutput(migrator);
-  });
-  if (!opts?.skipDump) await dumpSchemaAfterMigrate(ctx.raw, ctx.config);
-}
-
-/**
  * Migration output goes to stdout (Rails' Migration#write is `puts`), so the
  * per-database prefix is applied by swapping in a stdout-wrapping process
  * adapter for the duration of the run.
+ *
+ * A callback prefix is resolved per write, for runs like `migrate_all` that
+ * interleave databases within one wrapped block and so have no single prefix.
  */
-async function withPrefixedStdout(prefix: string, fn: () => Promise<void>): Promise<void> {
-  const prevAdapter = prefix ? getProcessAdapter() : null;
+async function withPrefixedStdout(
+  prefix: string | (() => string),
+  fn: () => Promise<void>,
+): Promise<void> {
+  const resolvePrefix = typeof prefix === "function" ? prefix : () => prefix;
+  const prevAdapter = prefix === "" ? null : getProcessAdapter();
   if (prevAdapter) {
     registerProcessAdapter({
       ...prevAdapter,
       stdout: {
-        write: (chunk) => prevAdapter.stdout.write(`${prefix}${chunk}`),
+        write: (chunk) => prevAdapter.stdout.write(`${resolvePrefix()}${chunk}`),
         get isTTY() {
           return prevAdapter.stdout.isTTY;
         },
@@ -617,11 +585,11 @@ async function withMigrationTasksForDb(
     config: HashConfig;
   },
   operation: () => Promise<void>,
-  opts?: { afterPending?: (pending: number) => void },
+  opts?: { afterPending?: (pending: number) => void; runWhenEmpty?: boolean },
 ): Promise<void> {
   const mDirs = await migrationsDirsForConfig(ctx.name, ctx.raw);
   const migrations = await discoverMigrationsFromDirs(mDirs);
-  if (migrations.length === 0) {
+  if (migrations.length === 0 && !opts?.runWhenEmpty) {
     console.log(`${ctx.prefix}No migrations found.`);
     return;
   }
@@ -639,6 +607,69 @@ async function withMigrationTasksForDb(
   await dumpSchemaAfterMigrate(ctx.raw, ctx.config);
 }
 
+/**
+ * `db:migrate` — `DatabaseTasks.migrate_all` followed by `db:_dump`
+ * (`railties/databases.rake:88-92`). `migrate_all` owns the multi-database
+ * routing (single-primary fast path, then `db_configs_with_versions` sorted so
+ * one timestamp runs across every config before the next), so the migrations
+ * for each config are registered up front and the whole run happens inside a
+ * single `configs_for` registration rather than a per-database loop.
+ */
+async function runMigrateAll(targetVersion: string | null): Promise<void> {
+  const envName = resolveEnv();
+  const entries = await taskableDatabaseEntries({}, envName);
+  const migrationsFor = new Map<string, Awaited<ReturnType<typeof discoverMigrations>>>();
+  for (const { name, raw, hashConfig } of entries) {
+    const migrations = await discoverMigrationsFromDirs(await migrationsDirsForConfig(name, raw));
+    migrationsFor.set(name, migrations);
+    DatabaseTasks.registerMigrations(migrations, hashConfig);
+  }
+  if ([...migrationsFor.values()].every((m) => m.length === 0)) {
+    console.log("No migrations found.");
+    return;
+  }
+
+  // Rails' `load_config` leaves the primary connection established, which is
+  // what `migrate_all`'s single-primary fast path migrates directly. The dump
+  // stays inside that same scope so a `:memory:` database — whose data dies
+  // with its pool — is dumped from the connection that was just migrated.
+  const primary = entries.find((e) => e.name === "primary") ?? entries[0];
+  const configs = entries.map((e) => e.hashConfig);
+  const multiDb = entries.length > 1;
+  // migrate_all interleaves databases by version, so the prefix has to follow
+  // whichever config it currently has established rather than being fixed for
+  // the whole run.
+  const { Base } = await import("@blazetrails/activerecord");
+  const currentDbPrefix = (): string => {
+    if (!multiDb) return "";
+    try {
+      const name = Base.connectionDbConfig()?.name;
+      return name ? `[${name}] ` : "";
+    } catch {
+      return "";
+    }
+  };
+
+  await withRegisteredConfigurations(configs, envName, () =>
+    DatabaseTasks.withTemporaryPool(primary.hashConfig, async () => {
+      await withPrefixedStdout(currentDbPrefix, () => DatabaseTasks.migrateAll({ targetVersion }));
+      for (const { name, raw, hashConfig } of entries) {
+        const prefix = multiDb ? `[${name}] ` : "";
+        await DatabaseTasks.withTemporaryPool(hashConfig, async (pool) => {
+          const migrations = migrationsFor.get(name) ?? [];
+          const migrator = new Migrator(await pool.leaseConnection(), migrations, {
+            environment: hashConfig.envName,
+            internalMetadataEnabled: hashConfig.useMetadataTable,
+          });
+          const pending = await migrator.pendingMigrations();
+          if (pending.length === 0) console.log(`${prefix}All migrations are up to date.`);
+          await dumpSchemaAfterMigrate(raw, hashConfig);
+        });
+      }
+    }),
+  );
+}
+
 export function dbCommand(): Command {
   const cmd = new Command("db");
   cmd.description("Database management commands");
@@ -654,16 +685,17 @@ export function dbCommand(): Command {
       // to null so an empty VERSION="" doesn't fail BigInt parsing.
       const rawVersion = opts.version != null ? String(opts.version).trim() : env.VERSION?.trim();
       const targetVersion = rawVersion && rawVersion.length > 0 ? rawVersion : null;
+      if (opts.database === undefined) {
+        await runMigrateAll(targetVersion);
+        return;
+      }
       await forEachDatabase(opts, async (ctx) => {
-        await withMigratorForDb(
+        await withMigrationTasksForDb(
           ctx,
-          async (migrator) => {
-            await migrator.migrate(targetVersion);
-          },
+          () => DatabaseTasks.migrate(undefined, { targetVersion }),
           {
-            afterOutput: async (migrator) => {
-              const pending = await migrator.pendingMigrations();
-              if (pending.length === 0) {
+            afterPending: (pending) => {
+              if (pending === 0) {
                 console.log(`${ctx.prefix}All migrations are up to date.`);
               }
             },
@@ -803,12 +835,10 @@ export function dbCommand(): Command {
     .requiredOption("--version <version>", "Migration version to run up")
     .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
-      await forEachDatabase(opts, async ({ adapter, raw, name, prefix, config }) => {
-        const mDirs = await migrationsDirsForConfig(name, raw);
-        const migrations = await discoverMigrationsFromDirs(mDirs);
-        const migrator = createMigrator(adapter, migrations, raw);
-        await migrator.run("up", opts.version);
-        await dumpSchemaAfterMigrate(raw, config);
+      await forEachDatabase(opts, async (ctx) => {
+        await withMigrationTasksForDb(ctx, () => DatabaseTasks.runMigration("up", opts.version), {
+          runWhenEmpty: true,
+        });
       });
     });
 
@@ -818,12 +848,10 @@ export function dbCommand(): Command {
     .requiredOption("--version <version>", "Migration version to run down")
     .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
-      await forEachDatabase(opts, async ({ adapter, raw, name, prefix, config }) => {
-        const mDirs = await migrationsDirsForConfig(name, raw);
-        const migrations = await discoverMigrationsFromDirs(mDirs);
-        const migrator = createMigrator(adapter, migrations, raw);
-        await migrator.run("down", opts.version);
-        await dumpSchemaAfterMigrate(raw, config);
+      await forEachDatabase(opts, async (ctx) => {
+        await withMigrationTasksForDb(ctx, () => DatabaseTasks.runMigration("down", opts.version), {
+          runWhenEmpty: true,
+        });
       });
     });
 
@@ -1035,9 +1063,7 @@ export function dbCommand(): Command {
       await runDrop(primary);
       await runCreate(primary);
       await forEachDatabase(primary, async (ctx) => {
-        await withMigratorForDb(ctx, async (migrator) => {
-          await migrator.migrate(null);
-        });
+        await withMigrationTasksForDb(ctx, () => DatabaseTasks.migrate());
         await withSeedAdapter(ctx.adapter, () => runSeed(ctx.prefix));
       });
     });
@@ -1049,9 +1075,7 @@ export function dbCommand(): Command {
       const primary: DatabaseOpts = { database: "primary" };
       await runCreate(primary);
       await forEachDatabase(primary, async (ctx) => {
-        await withMigratorForDb(ctx, async (migrator) => {
-          await migrator.migrate(null);
-        });
+        await withMigrationTasksForDb(ctx, () => DatabaseTasks.migrate());
         await withSeedAdapter(ctx.adapter, () => runSeed(ctx.prefix));
       });
     });

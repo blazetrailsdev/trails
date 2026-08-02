@@ -376,11 +376,23 @@ export class DatabaseTasks {
     });
   }
 
+  /**
+   * @param version Exact-version *filter* — only the migration with this
+   *   version runs (`db:migrate:up` / `:down` semantics). Rails' `db:migrate`
+   *   rake task never passes it.
+   * @param options.targetVersion "Migrate up to here", the in-process stand-in
+   *   for Rails' `ENV["VERSION"]` that {@link targetVersion} reads. trails has
+   *   no env writer, so a CLI `--version` flag hands the target down through
+   *   this option instead of the `version` argument, which would filter.
+   */
   static async migrate(
     version?: number | string,
-    { skipInitialize = false }: { skipInitialize?: boolean } = {},
+    {
+      skipInitialize = false,
+      targetVersion,
+    }: { skipInitialize?: boolean; targetVersion?: number | string | null } = {},
   ): Promise<void> {
-    const raw = version ?? this.targetVersion();
+    const raw = version ?? targetVersion ?? this.targetVersion();
     const effectiveVersion = typeof raw === "string" ? raw.trim() || null : raw;
     this.checkTargetVersion(effectiveVersion ?? undefined);
 
@@ -452,6 +464,21 @@ export class DatabaseTasks {
   /** @internal Same deviation as {@link rollback}, for `db:forward` (`databases.rake:279`). */
   static async forward(steps: number = 1): Promise<void> {
     await this._stepMigrations("forward", steps);
+  }
+
+  /**
+   * @internal Same deviation as {@link rollback}: `db:migrate:up` /
+   * `db:migrate:down` (`railties/databases.rake:174-177`, `:205-208`) inline
+   * `migration_connection_pool.migration_context.run(direction, target_version)`.
+   * The body lives here because the CLI has no pool handle of its own.
+   */
+  static async runMigration(direction: "up" | "down", version: number | string): Promise<void> {
+    this.checkTargetVersion(version);
+    const pool = await this.migrationConnectionPool();
+    const adapter = await pool.leaseConnection();
+    const context = await this._migrationContextFor(adapter, pool.dbConfig);
+    await context.run(direction, version);
+    adapter.schemaCache?.clear();
   }
 
   private static async _stepMigrations(
@@ -1037,7 +1064,14 @@ export class DatabaseTasks {
     return migrator.currentVersionReadOnly();
   }
 
-  static async migrateAll(): Promise<void> {
+  /**
+   * @param options.targetVersion "Migrate up to here" — the in-process
+   *   stand-in for Rails' `ENV["VERSION"]`, which `migrate_all` reads through
+   *   `target_version` in `db_configs_with_versions`. See {@link migrate}.
+   */
+  static async migrateAll({
+    targetVersion,
+  }: { targetVersion?: number | string | null } = {}): Promise<void> {
     const configs = this.configsFor(this._normalizeEnv());
 
     // Rails: initialize_database for every config before the single-primary fast path or version loop.
@@ -1052,11 +1086,11 @@ export class DatabaseTasks {
     // (TS: `isPrimary()`) lives on HashConfig/UrlConfig, not the abstract
     // DatabaseConfig, so reach it structurally off the concrete instance.
     if (configs.length === 1 && (configs[0] as { isPrimary?(): boolean }).isPrimary?.()) {
-      await this.migrate(undefined, { skipInitialize: true });
+      await this.migrate(undefined, { skipInitialize: true, targetVersion });
       return;
     }
 
-    const mappedVersions = await this.dbConfigsWithVersions();
+    const mappedVersions = await this.dbConfigsWithVersions(undefined, targetVersion);
     const sorted = Array.from(mappedVersions.entries()).sort(([a], [b]) =>
       BigInt(String(a)) < BigInt(String(b)) ? -1 : BigInt(String(a)) > BigInt(String(b)) ? 1 : 0,
     );
@@ -1112,12 +1146,22 @@ export class DatabaseTasks {
     if (seed && this.seedLoader) await this.loadSeed();
   }
 
+  /**
+   * @param targetVersionOverride In-process stand-in for Rails'
+   *   `ENV["VERSION"]`, which this reads through {@link targetVersion} when
+   *   not supplied. See {@link migrate}.
+   */
   static async dbConfigsWithVersions(
     environment?: string,
+    targetVersionOverride?: number | string | null,
   ): Promise<Map<string | number, DatabaseConfig[]>> {
     const dbConfigsWithVersions = new Map<string | number, DatabaseConfig[]>();
     const env = this._normalizeEnv(environment);
-    const targetVersion = this.targetVersion();
+    const explicit =
+      typeof targetVersionOverride === "string"
+        ? targetVersionOverride.trim() || null
+        : (targetVersionOverride ?? null);
+    const targetVersion = explicit === null ? this.targetVersion() : Number(explicit);
     for (const config of this.configsFor(env)) {
       await this.withTemporaryPool(config, async (pool) => {
         const context = await this._migrationContextFor(await pool.leaseConnection(), config);

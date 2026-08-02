@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { env, setEnv } from "@blazetrails/activesupport/process-adapter";
+import {
+  env,
+  setEnv,
+  getProcessAdapter,
+  registerProcessAdapter,
+} from "@blazetrails/activesupport/process-adapter";
 import { createProgram } from "../cli.js";
 import {
   loadDatabaseConfig,
@@ -1066,6 +1071,56 @@ export class CreatePosts extends Migration {
     }
   });
 
+  it("db migrate:up raises for an unknown version when no migrations exist", async () => {
+    await expect(runDb(["migrate:up", "--version=20260101000000"])).rejects.toThrow(
+      /No migration with version number 20260101000000/,
+    );
+  });
+
+  it("db migrate --version migrates up to that version, not only that version", async () => {
+    // Guards the DatabaseTasks.migrate seam: an explicit positional argument
+    // there is an exact-version *filter* (migrate:up semantics), so --version
+    // has to travel as the target version instead. With three migrations and
+    // a target of the second, target semantics runs the first two.
+    const dbFile = path.join(tmpDir, "test.sqlite3");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+  test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+};`,
+    );
+    for (const [version, table, cls] of [
+      ["20260101000000", "posts", "CreatePosts"],
+      ["20260101000001", "comments", "CreateComments"],
+      ["20260101000002", "authors", "CreateAuthors"],
+    ]) {
+      fs.writeFileSync(
+        path.join(tmpDir, "db", "migrations", `${version}-create-${table}.ts`),
+        `import { Migration } from "@blazetrails/activerecord";
+export class ${cls} extends Migration {
+  async up() { await this.createTable(${JSON.stringify(table)}, (t) => { t.string("title"); }); }
+  async down() { await this.dropTable(${JSON.stringify(table)}); }
+}`,
+      );
+    }
+
+    await runDb(["migrate", "--version=20260101000001"]);
+
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    const a = new BetterSQLite3Adapter(dbFile);
+    try {
+      const rows = (await a.execute(
+        `SELECT name FROM sqlite_master WHERE type='table' AND name IN ('posts','comments','authors')`,
+      )) as Array<{ name: string }>;
+      const names = rows.map((r) => r.name).sort();
+      expect(names).toEqual(["comments", "posts"]);
+    } finally {
+      await a.close();
+    }
+  });
+
   it("db migrate:down reverts the named migration", async () => {
     const dbFile = path.join(tmpDir, "test.sqlite3");
     fs.writeFileSync(
@@ -2054,6 +2109,78 @@ export class CreateDogs extends Migration {
     expect(await tableExists(animalsDb, "dogs")).toBe(true);
     expect(await tableExists(primaryDb, "users")).toBe(true);
     expect(logs).toContain("All migrations are up to date.");
+  });
+
+  it("db:migrate respects timestamp ordering across databases", async () => {
+    const primaryDb = path.join(tmpDir, "ordering-primary.sqlite3");
+    const animalsDb = path.join(tmpDir, "ordering-animals.sqlite3");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: {
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+  },
+  test: {
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+  },
+};`,
+    );
+    fs.mkdirSync(path.join(tmpDir, "db", "migrations_animals"), { recursive: true });
+    const migration = (cls: string, table: string) =>
+      `import { Migration } from "@blazetrails/activerecord";
+export class ${cls} extends Migration {
+  async up() { await this.createTable(${JSON.stringify(table)}, (t) => { t.string("name"); }); }
+  async down() { await this.dropTable(${JSON.stringify(table)}); }
+}`;
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations", "20260101000001-one-migration.ts"),
+      migration("OneMigration", "ones"),
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations_animals", "20260101000002-two-migration.ts"),
+      migration("TwoMigration", "twos"),
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations", "20260101000003-three-migration.ts"),
+      migration("ThreeMigration", "threes"),
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations_animals", "20260101000004-four-migration.ts"),
+      migration("FourMigration", "fours"),
+    );
+
+    await runDb(["create"]);
+
+    const previous = getProcessAdapter();
+    let output = "";
+    registerProcessAdapter({
+      ...previous,
+      stdout: {
+        ...previous.stdout,
+        write: (chunk: string) => {
+          output += chunk;
+          return true;
+        },
+      },
+    });
+    try {
+      await runDb(["migrate"]);
+    } finally {
+      registerProcessAdapter(previous);
+    }
+
+    const entries = [...output.matchAll(/^\[(\w+)\] == (\d+).+migrated/gm)].map((m) => [
+      m[1],
+      m[2],
+    ]);
+    expect(entries).toEqual([
+      ["primary", "20260101000001"],
+      ["animals", "20260101000002"],
+      ["primary", "20260101000003"],
+      ["animals", "20260101000004"],
+    ]);
   });
 
   it("db migrate --database=animals targets only the named DB", async () => {
