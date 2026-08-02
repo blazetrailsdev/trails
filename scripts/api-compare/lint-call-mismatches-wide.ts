@@ -19,9 +19,10 @@
  *   - any STALE `@missingRailsCall` tag whose call no longer flags (RFC 0083 —
  *     the tag is the OTHER place a wide deviation can be justified, and it
  *     shrinks by the same rule; see missing-rails-call-tags.ts);
- *   - more entries still carrying the seeded {@link DEFAULT_REASON} than the
- *     committed high-water mark in call-mismatches-wide-unreviewed.json
- *     (RFC 0083 — see unreviewed-ratchet.ts for why that is a second ratchet);
+ *   - any source file carrying more entries with the seeded {@link DEFAULT_REASON}
+ *     than its committed high-water mark under call-mismatches-wide-unreviewed/
+ *     (RFC 0083 — see unreviewed-ratchet.ts for why that is a second ratchet,
+ *     and why the mark is sharded per source file like the baseline itself);
  *   - a high-water mark left ABOVE what a clean reseed would write (RFC 0083 —
  *     see unreviewed-ratchet.ts#markSlack). The other arms all pass on a
  *     stale-HIGH mark, so drift used to surface only when the next story
@@ -76,6 +77,11 @@
  * CI runs the extraction step separately and must not pay for it twice. The
  * partial-scope determinism guard runs unchanged either way.
  *
+ * The unreviewed high-water marks are sharded the same way, under
+ * call-mismatches-wide-unreviewed/ with the identical
+ * `<package>/<tsFile .ts→.json>` key, so reviewing a seeded reason rewrites one
+ * small file instead of a repo-wide counter every concurrent PR conflicts on.
+ *
  * `--report` (RFC 0083) groups the baselined population by package, source
  * file, Ruby call name, and derived cause bucket, so a burndown story can be
  * scoped off a coherent slice instead of a 4794-line flat list. It never writes
@@ -109,23 +115,32 @@ import {
   reseed,
   type StaleTag,
 } from "./lint-call-mismatches.js";
-import { reportNonCanonicalBaselines, serializeBaseline } from "./baseline-json.js";
+import {
+  listJsonFiles,
+  pruneEmptyDirs,
+  reportNonCanonicalBaselines,
+  serializeBaseline,
+} from "./baseline-json.js";
 import { NO_REGEN_FLAG, regenerateArtifact, shouldRegenerate } from "./gate-regen.js";
 import {
-  loadMark,
+  excessByPath,
+  heldOutCounts,
+  loadMarks,
   newlySeeded,
-  nextMark,
+  nextMarks,
   renderExcess,
   droppedReviewed,
   droppedSeeded,
-  markSlack,
   renderDroppedReviewed,
   renderDroppedSeeded,
   DROPPED_SEEDED_KEYS_ARG,
   renderSlack,
   renderWriteSummary,
+  slackByPath,
+  totalMark,
+  unreviewedCounts,
   unreviewedEntries,
-  writeMark,
+  writeMarks,
 } from "./unreviewed-ratchet.js";
 import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "./conventions.js";
 import { DEFAULT_REASON, TAG } from "./missing-rails-call-tags.js";
@@ -158,36 +173,18 @@ export function relPathFor(k: CallMismatchKey): string {
 // throughout the compare tooling (mirrors lint-call-mismatches.ts).
 const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-mismatches-wide.json");
 
-// Committed high-water mark for the unreviewed-reason counter (RFC 0083); see
-// unreviewed-ratchet.ts.
-const MARK_PATH = path.join(
+// Committed high-water marks for the unreviewed-reason counter (RFC 0083),
+// sharded per source file exactly like the baseline above so the two trees
+// share one merge-conflict boundary; see unreviewed-ratchet.ts.
+const MARK_DIR = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
-  "call-mismatches-wide-unreviewed.json",
+  "call-mismatches-wide-unreviewed",
 );
 
 export { DEFAULT_REASON } from "./missing-rails-call-tags.js";
 
 async function readJson<T>(file: string): Promise<T> {
   return JSON.parse(await fs.readFile(file, "utf-8")) as T;
-}
-
-// Recursively list *.json files under `dir` as absolute paths (empty if the
-// directory does not exist yet).
-async function listJsonFiles(dir: string): Promise<string[]> {
-  const out: string[] = [];
-  let dirents;
-  try {
-    dirents = await fs.readdir(dir, { withFileTypes: true });
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "ENOENT") return out;
-    throw e;
-  }
-  for (const d of dirents) {
-    const full = path.join(dir, d.name);
-    if (d.isDirectory()) out.push(...(await listJsonFiles(full)));
-    else if (d.name.endsWith(".json")) out.push(full);
-  }
-  return out;
 }
 
 // Concatenate every per-file baseline array under `dir` into one merged,
@@ -229,28 +226,6 @@ export async function writeSplitBaseline(entries: ExcludeEntry[], dir: string): 
   // Whatever remains in `existing` no longer has any entries — delete it.
   for (const rel of existing) await fs.rm(path.join(dir, rel));
   await pruneEmptyDirs(dir);
-}
-
-// Recursively remove empty subdirectories under `dir` (keeps `dir` itself).
-async function pruneEmptyDirs(dir: string): Promise<boolean> {
-  let dirents;
-  try {
-    dirents = await fs.readdir(dir, { withFileTypes: true });
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "ENOENT") return true;
-    throw e;
-  }
-  let empty = true;
-  for (const d of dirents) {
-    if (d.isDirectory()) {
-      const sub = path.join(dir, d.name);
-      if (await pruneEmptyDirs(sub)) await fs.rmdir(sub);
-      else empty = false;
-    } else {
-      empty = false;
-    }
-  }
-  return empty;
 }
 
 async function loadArtifact(): Promise<Artifact> {
@@ -458,11 +433,12 @@ async function main(write: boolean, showSeededKeys: boolean): Promise<number> {
 
     const count = unreviewedCount(next);
     const newly = sortKeys(newlySeeded(next, baseline, DEFAULT_REASON));
-    // Rows this reseed just seeded are held out of the mark, so a reseed can
-    // never buy unreviewed headroom (see unreviewed-ratchet.ts header).
-    const mark = nextMark(count - newly.length, await loadMark(MARK_PATH));
-    await writeMark(MARK_PATH, mark);
-    console.log(renderWriteSummary(count, newly, mark, path.relative(ROOT_DIR, MARK_PATH)));
+    // Rows this reseed just seeded are held out of their own file's mark, so a
+    // reseed can never buy unreviewed headroom (see unreviewed-ratchet.ts).
+    const counts = unreviewedCounts(next, DEFAULT_REASON, relPathFor);
+    const marks = nextMarks(heldOutCounts(counts, newly, relPathFor), await loadMarks(MARK_DIR));
+    await writeMarks(MARK_DIR, marks);
+    console.log(renderWriteSummary(count, newly, marks, path.relative(ROOT_DIR, MARK_DIR)));
     const dropped = renderDroppedReviewed(droppedReviewed(next, baseline, DEFAULT_REASON));
     if (dropped) console.log(dropped);
     const seeded = renderDroppedSeeded(
@@ -473,9 +449,9 @@ async function main(write: boolean, showSeededKeys: boolean): Promise<number> {
     return 0;
   }
 
-  // The mark is committed and `--write`-generated like the split baseline
-  // files, so it is held to the same canonical form.
-  const files = [...(await listJsonFiles(BASELINE_DIR)), MARK_PATH];
+  // The marks are committed and `--write`-generated like the split baseline
+  // files, so they are held to the same canonical form.
+  const files = [...(await listJsonFiles(BASELINE_DIR)), ...(await listJsonFiles(MARK_DIR))];
   if (await reportNonCanonicalBaselines(files, "wide call-mismatches ratchet")) return 1;
 
   const { added, stale } = diffAgainstBaseline(current, baseline);
@@ -484,17 +460,22 @@ async function main(write: boolean, showSeededKeys: boolean): Promise<number> {
   if (staleTagReport) console.error(staleTagReport);
 
   const unreviewed = unreviewedCount(baseline);
-  const mark = await loadMark(MARK_PATH);
-  const overMark = unreviewed > mark;
-  if (overMark) console.error(renderExcess(unreviewed, mark, path.relative(ROOT_DIR, MARK_PATH)));
-  const slack = markSlack(unreviewed, mark);
-  if (slack > 0) console.error(renderSlack(unreviewed, mark, path.relative(ROOT_DIR, MARK_PATH)));
+  const counts = unreviewedCounts(baseline, DEFAULT_REASON, relPathFor);
+  const marks = await loadMarks(MARK_DIR);
+  const markDir = path.relative(ROOT_DIR, MARK_DIR);
+  // Both arms are PER FILE: a review in one source can no longer pay for a
+  // seeded row added in another, and one stale-high shard is enough to fail.
+  const excess = excessByPath(counts, marks);
+  if (excess.length > 0) console.error(renderExcess(excess, markDir));
+  const slack = slackByPath(counts, marks);
+  if (slack.length > 0) console.error(renderSlack(slack, markDir));
 
   if (added.length === 0 && stale.length === 0 && staleTags.length === 0) {
-    if (overMark || slack > 0) return 1;
+    if (excess.length > 0 || slack.length > 0) return 1;
     console.log(
       `wide call-mismatches ratchet: OK (${baseline.length} baselined, ` +
-        `${unreviewed} unreviewed, mark ${mark} tight)`,
+        `${unreviewed} unreviewed, ${marks.size} per-file mark(s) totalling ` +
+        `${totalMark(marks)} tight)`,
     );
     return 0;
   }
@@ -535,8 +516,8 @@ async function reportMain(top: number, unreviewedOnly: boolean): Promise<number>
   if (unreviewedOnly) {
     console.log(
       `wide call-mismatches: ${unreviewedCount(baseline)} of ${baseline.length} baselined ` +
-        `entr(ies) still carry the seeded default reason (unreviewed); high-water mark ` +
-        `${await loadMark(MARK_PATH)}.`,
+        `entr(ies) still carry the seeded default reason (unreviewed); per-file high-water ` +
+        `marks total ${totalMark(await loadMarks(MARK_DIR))}.`,
     );
     return 0;
   }
@@ -561,7 +542,7 @@ async function reportMain(top: number, unreviewedOnly: boolean): Promise<number>
       sortKeys(entries),
       manifest && indexTsMembers(manifest),
       top,
-      await loadMark(MARK_PATH),
+      totalMark(await loadMarks(MARK_DIR)),
     ),
   );
   return 0;

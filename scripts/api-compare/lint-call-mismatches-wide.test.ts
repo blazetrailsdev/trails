@@ -2,7 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
+import { fileURLToPath } from "url";
 import { findDuplicateKeys, keyOf, type ExcludeEntry } from "./lint-call-mismatches.js";
+import { excessByPath, loadMarks, unreviewedCounts } from "./unreviewed-ratchet.js";
 import {
   DEFAULT_REASON,
   bucketFor,
@@ -340,5 +342,37 @@ describe("renderStaleTags", () => {
     ])!;
     expect(out).toContain("1 STALE @missingRailsCall tag(s)");
     expect(out).toContain("  - activerecord  relation.ts  load  synchronize");
+  });
+});
+
+// The two committed trees are keyed identically by construction (both go
+// through `relPathFor`), which is the whole point of sharding the mark: a PR
+// that reviews reasons in one source rewrites one small file that no sibling PR
+// touches. Pins that the shards stay in step with the baseline they measure.
+describe("the committed per-file unreviewed marks", () => {
+  const HERE = path.dirname(fileURLToPath(import.meta.url));
+  const load = async () => ({
+    counts: unreviewedCounts(
+      await loadSplitBaseline(path.join(HERE, "call-mismatches-wide-exclude")),
+      DEFAULT_REASON,
+      relPathFor,
+    ),
+    marks: await loadMarks(path.join(HERE, "call-mismatches-wide-unreviewed")),
+  });
+
+  it("sit at or below their own source file's seeded-reason count", async () => {
+    const { counts, marks } = await load();
+    expect(excessByPath(counts, marks)).toEqual([]);
+  });
+
+  // The slack arm of the gate, run without needing a compare artifact.
+  it("are tight — no shard claims more unreviewed rows than the baseline carries", async () => {
+    const { counts, marks } = await load();
+    expect([...marks].filter(([rel, max]) => max > (counts.get(rel) ?? 0))).toEqual([]);
+  });
+
+  it("key every shard to a source the baseline still has entries for", async () => {
+    const { counts, marks } = await load();
+    expect([...marks.keys()].filter((rel) => !counts.has(rel))).toEqual([]);
   });
 });

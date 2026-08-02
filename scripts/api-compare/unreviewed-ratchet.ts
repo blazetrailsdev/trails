@@ -13,39 +13,89 @@
  * with a reviewed one lowers the count; `--write` lowers the mark to match and
  * never raises it.
  *
+ * ── The mark is SHARDED, one file per source ────────────────────────────────
+ * It is not one number: it mirrors the split exclude baseline exactly, at
+ * `call-mismatches-wide-unreviewed/<package>/<tsFile with .ts→.json>`, each
+ * file holding `{"max": N}` for that ONE source file. A single repo-wide
+ * `{"max": N}` made every PR that reviewed a reason rewrite the same file, so
+ * any two concurrent PRs conflicted on it — a serialization point for the whole
+ * repo. Sharded, a PR converging relation.ts touches only relation.json's mark.
+ *
+ * Every rule below binds PER FILE: each source's count is compared against its
+ * own mark, `--write` lowers each mark independently, and a source whose mark
+ * reaches 0 has its file deleted rather than left as `{"max": 0}` (same rule as
+ * the exclude tree, so a post-reseed diff shows only real changes). The
+ * aggregate the gate reports is the SUM of the shards.
+ *
  * ── Why newly-seeded rows are held out ──────────────────────────────────────
  * A reseed gives every genuinely-new mismatch the default reason. If those
  * counted toward the lowered mark, an agent could reseed a batch of fresh
  * unreviewed rows into the mark and the counter would report progress that
- * never happened. So `--write` lowers the mark using only the rows that were
- * ALREADY in the baseline, and lists the newly-seeded keys separately. The
- * gate then fails on the excess until those new rows carry a real reason.
+ * never happened. So `--write` lowers each file's mark using only the rows that
+ * were ALREADY in that file's baseline, and lists the newly-seeded keys
+ * separately. The gate then fails on the excess until those rows carry a real
+ * reason.
  *
  * ── What the gate actually enforces (and what it does not) ──────────────────
- * The gate arm is AGGREGATE: it compares one number, `unreviewedCount(baseline)`,
- * against the mark. It holds no record of WHICH keys were seeded when the mark
- * was set — that would mean committing a second ~270KB mirror of the 4441
- * seeded keys, duplicating data the baseline already carries.
+ * The gate arm is aggregate WITHIN each source file: it compares one number per
+ * file, that file's unreviewed count, against that file's mark. It holds no
+ * record of WHICH keys were seeded when the mark was set — that would mean
+ * committing a second ~270KB mirror of the seeded keys, duplicating data the
+ * baseline already carries. (Sharding tightens the old repo-wide arm: a review
+ * in one file can no longer pay for a seeded row added in another.)
  *
  * The per-key rule therefore binds only through `--write`, which does have both
  * states in hand: reseeding after adding a mismatch lowers the mark by the
  * newly-seeded rows, so the gate goes red until they are given real reasons.
  * A HAND-EDITED baseline is caught only in aggregate: adding one row with the
- * seed string while reviewing one old row leaves the count unchanged, and the
- * gate passes. That swap is a strictly-neutral trade (unreviewed debt is
- * conserved, never grown), which is the contract to rely on — not "every new
- * entry is individually forced to carry a real reason". The reviewer of the
- * baseline diff is what enforces the stronger rule; this counter guarantees
- * only that the total never rises.
+ * seed string while reviewing one old row OF THE SAME SOURCE FILE leaves that
+ * file's count unchanged, and the gate passes. That swap is a strictly-neutral
+ * trade (unreviewed debt is conserved, never grown), which is the contract to
+ * rely on — not "every new entry is individually forced to carry a real
+ * reason". The reviewer of the baseline diff is what enforces the stronger
+ * rule; this counter guarantees only that no file's total ever rises.
  *
  * Hard rules: no node:* imports, no process.*, async fs.
  */
 import * as fs from "fs/promises";
-import { serializeBaseline } from "./baseline-json.js";
+import * as path from "path";
+import { listJsonFiles, pruneEmptyDirs, serializeBaseline } from "./baseline-json.js";
 import { keyOf, type CallMismatchKey, type ExcludeEntry } from "./lint-call-mismatches.js";
 
 export interface UnreviewedMark {
   max: number;
+}
+
+/**
+ * The sharded mark: one `{"max": N}` per source file, keyed by the SAME
+ * relative path the split exclude baseline uses (`<package>/<tsFile .ts→.json>`).
+ * Sources with no unreviewed rows are absent from the map — and from disk.
+ */
+export type MarkSet = Map<string, number>;
+
+/** Sum of the shards: the one number the console reports as the total. */
+export function totalMark(marks: MarkSet): number {
+  let sum = 0;
+  for (const n of marks.values()) sum += n;
+  return sum;
+}
+
+/**
+ * Unreviewed rows per source file, keyed like {@link MarkSet}. `pathFor` is
+ * injected rather than imported so this module stays free of the gate that
+ * consumes it (lint-call-mismatches-wide.ts owns `relPathFor`).
+ */
+export function unreviewedCounts(
+  entries: ExcludeEntry[],
+  defaultReason: string,
+  pathFor: (k: CallMismatchKey) => string,
+): MarkSet {
+  const counts: MarkSet = new Map();
+  for (const e of unreviewedEntries(entries, defaultReason)) {
+    const rel = pathFor(e);
+    counts.set(rel, (counts.get(rel) ?? 0) + 1);
+  }
+  return counts;
 }
 
 export function unreviewedEntries(entries: ExcludeEntry[], defaultReason: string): ExcludeEntry[] {
@@ -138,43 +188,98 @@ export function parseMark(text: string): number {
   return max;
 }
 
-export async function loadMark(file: string): Promise<number> {
-  let text: string;
-  try {
-    text = await fs.readFile(file, "utf-8");
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
-    // Deleting the mark is how the ratchet would be silently disarmed, so say
-    // what it is rather than surfacing a bare ENOENT.
+/**
+ * Read every shard under `dir`. A source with no mark file is reported as 0 —
+ * the strict reading, so a deleted shard reds the gate on its file's first
+ * unreviewed row rather than silently granting headroom. Losing the WHOLE tree
+ * is the silent-disarm case, so that one is named loudly.
+ */
+export async function loadMarks(dir: string): Promise<MarkSet> {
+  const files = await listJsonFiles(dir);
+  if (files.length === 0) {
     throw new Error(
-      `unreviewed high-water mark: ${file} is missing. It is a committed ratchet file; ` +
-        "restore it from git rather than regenerating, or the mark is lost.",
-      { cause: e },
+      `unreviewed high-water mark: ${dir} holds no mark files. It is a committed ratchet ` +
+        "tree; restore it from git rather than regenerating, or the marks are lost.",
     );
   }
-  return parseMark(text);
+  const marks: MarkSet = new Map();
+  for (const f of files.sort()) {
+    marks.set(path.relative(dir, f), parseMark(await fs.readFile(f, "utf-8")));
+  }
+  return marks;
 }
 
-// Only-shrink: the stored mark never rises, so a reseed that adds unreviewed
-// rows cannot buy headroom.
-export function nextMark(current: number, mark: number): number {
-  return Math.min(current, mark);
+/**
+ * Per-file unreviewed counts with the rows THIS reseed seeded subtracted, which
+ * is what `--write` lowers each mark to: a reseed can never buy headroom for the
+ * source it just seeded rows into (see the held-out rationale in the header).
+ */
+export function heldOutCounts(
+  counts: MarkSet,
+  newly: CallMismatchKey[],
+  pathFor: (k: CallMismatchKey) => string,
+): MarkSet {
+  const held = new Map(counts);
+  for (const k of newly) {
+    const rel = pathFor(k);
+    held.set(rel, (held.get(rel) ?? 0) - 1);
+  }
+  return held;
 }
 
-export async function writeMark(file: string, max: number): Promise<void> {
-  await fs.writeFile(file, serializeBaseline({ max } satisfies UnreviewedMark));
+// Only-shrink, per file: a source's stored mark never rises, so a reseed that
+// adds unreviewed rows cannot buy headroom — in that file or any other. A
+// source absent from `counts` drops out entirely (its mark is now 0).
+export function nextMarks(counts: MarkSet, marks: MarkSet): MarkSet {
+  const next: MarkSet = new Map();
+  for (const [rel, count] of counts) {
+    const max = Math.min(count, marks.get(rel) ?? Number.POSITIVE_INFINITY);
+    // A source at 0 leaves the tree entirely rather than carrying `{"max": 0}`.
+    if (max > 0) next.set(rel, max);
+  }
+  return next;
 }
 
-export function renderExcess(count: number, mark: number, markPath: string): string {
-  const excess = count - mark;
+/**
+ * Write the sharded mark under `dir`: one `{"max": N}` per source, deleting the
+ * shards of sources that reached 0 (never leaving `{"max": 0}` behind) and
+ * pruning the directories those deletions emptied.
+ */
+export async function writeMarks(dir: string, marks: MarkSet): Promise<void> {
+  const existing = new Set((await listJsonFiles(dir)).map((f) => path.relative(dir, f)));
+  for (const [rel, max] of [...marks].sort()) {
+    if (max === 0) continue;
+    const dest = path.join(dir, rel);
+    await fs.mkdir(path.dirname(dest), { recursive: true });
+    await fs.writeFile(dest, serializeBaseline({ max } satisfies UnreviewedMark));
+    existing.delete(rel);
+  }
+  for (const rel of existing) await fs.rm(path.join(dir, rel));
+  await pruneEmptyDirs(dir);
+}
+
+/** Sources whose unreviewed count sits ABOVE their own mark, worst first. */
+export function excessByPath(counts: MarkSet, marks: MarkSet): [string, number, number][] {
+  const out: [string, number, number][] = [];
+  for (const [rel, count] of counts) {
+    const mark = marks.get(rel) ?? 0;
+    if (count > mark) out.push([rel, count, mark]);
+  }
+  return out.sort((a, b) => b[1] - b[2] - (a[1] - a[2]) || (a[0] < b[0] ? -1 : 1));
+}
+
+export function renderExcess(excess: [string, number, number][], markDir: string): string {
+  const total = excess.reduce((n, [, count, mark]) => n + count - mark, 0);
   return (
-    `\nwide call-mismatches unreviewed ratchet: ${count} baselined entr(ies) still carry the ` +
-    `seeded default reason, ${excess} more than the committed high-water mark of ${mark}.\n` +
-    `That means ${excess} row(s) gained the placeholder reason since the mark was set — either ` +
+    `\nwide call-mismatches unreviewed ratchet: ${total} baselined entr(ies) across ` +
+    `${excess.length} source file(s) carry the seeded default reason beyond that file's ` +
+    "committed high-water mark.\n" +
+    `That means ${total} row(s) gained the placeholder reason since the mark was set — either ` +
     "newly seeded by a reseed, or a reviewed reason reverted to the seed. A baseline entry must " +
     "be reviewed as it is added, not inherited as unreviewed debt: replace each placeholder " +
-    `\`reason\` with a real one-line explanation, then re-run \`--write\` to lower ${markPath}.\n` +
-    "(The mark only shrinks; reseeding can never raise it.)"
+    `\`reason\` with a real one-line explanation, then re-run \`--write\` to lower ${markDir}/.\n` +
+    "(Each mark only shrinks; reseeding can never raise one.)\n" +
+    excess.map(([rel, count, mark]) => `  + ${rel}  ${count} unreviewed, mark ${mark}`).join("\n")
   );
 }
 
@@ -193,32 +298,50 @@ export function renderExcess(count: number, mark: number, markPath: string): str
  * legitimately-reseeded tree has zero slack by construction.
  *
  * Negative slack (count above the mark) is the excess arm's job; this returns 0.
+ *
+ * Sharded, this also covers the ORPHAN shard: a mark file whose source has no
+ * unreviewed rows left (or no baseline file at all) is a count of 0 under a
+ * positive mark, i.e. pure slack, and is deleted by the next `--write`.
  */
 export function markSlack(count: number, mark: number): number {
   return Math.max(0, mark - count);
 }
 
-export function renderSlack(count: number, mark: number, markPath: string): string {
+/** Sources whose own mark sits ABOVE their unreviewed count, slackest first. */
+export function slackByPath(counts: MarkSet, marks: MarkSet): [string, number, number][] {
+  const out: [string, number, number][] = [];
+  for (const [rel, mark] of marks) {
+    const count = counts.get(rel) ?? 0;
+    if (mark > count) out.push([rel, count, mark]);
+  }
+  return out.sort((a, b) => b[2] - b[1] - (a[2] - a[1]) || (a[0] < b[0] ? -1 : 1));
+}
+
+export function renderSlack(slack: [string, number, number][], markDir: string): string {
+  const total = slack.reduce((n, [, count, mark]) => n + mark - count, 0);
   return (
-    `\nwide call-mismatches unreviewed ratchet: STALE high-water mark — ${markPath} says ` +
-    `${mark}, but only ${count} baselined entr(ies) still carry the seeded default reason ` +
-    `(${markSlack(count, mark)} of slack).\n` +
-    "The mark is a measurement of remaining unreviewed debt; left high it hands the next " +
+    `\nwide call-mismatches unreviewed ratchet: STALE high-water mark — ${slack.length} file(s) ` +
+    `under ${markDir}/ claim more unreviewed entr(ies) than the baseline still carries ` +
+    `(${total} of slack).\n` +
+    "A mark is a measurement of remaining unreviewed debt; left high it hands the next " +
     "story a “before” value no clean tree produces, and the drift is discovered only " +
-    "when someone reseeds. The mark only shrinks, so tightening is always safe:\n" +
-    "  pnpm api:calls:wide:reseed\n"
+    "when someone reseeds. A mark only shrinks, so tightening is always safe:\n" +
+    "  pnpm api:calls:wide:reseed\n" +
+    slack
+      .map(([rel, count, mark]) => `  - ${rel}  mark ${mark}, only ${count} unreviewed`)
+      .join("\n")
   );
 }
 
 export function renderWriteSummary(
   count: number,
   newly: CallMismatchKey[],
-  mark: number,
-  markPath: string,
+  marks: MarkSet,
+  markDir: string,
 ): string {
   const lines = [
-    `Wrote ${markPath}: unreviewed high-water mark ${mark} (${count} entr(ies) carry the seeded ` +
-      "default reason).",
+    `Wrote ${markDir}/: ${marks.size} per-file unreviewed high-water mark(s) totalling ` +
+      `${totalMark(marks)} (${count} entr(ies) carry the seeded default reason).`,
   ];
   if (newly.length > 0) {
     lines.push(

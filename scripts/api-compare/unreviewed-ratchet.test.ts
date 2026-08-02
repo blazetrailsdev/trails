@@ -8,28 +8,44 @@ import {
   droppedSeeded,
   renderDroppedSeeded,
   DROPPED_SEEDED_KEYS_ARG,
-  loadMark,
+  excessByPath,
+  heldOutCounts,
+  loadMarks,
   newlySeeded,
   renderDroppedReviewed,
-  nextMark,
+  nextMarks,
   parseMark,
   markSlack,
   renderExcess,
   renderSlack,
   renderWriteSummary,
+  slackByPath,
+  totalMark,
+  unreviewedCounts,
   unreviewedEntries,
-  writeMark,
+  writeMarks,
+  type MarkSet,
 } from "./unreviewed-ratchet.js";
 
 const SEED = "seeded default reason";
 
-const entry = (call: string, reason = SEED): ExcludeEntry => ({
+const entry = (call: string, reason = SEED, tsFile = "relation.ts"): ExcludeEntry => ({
   package: "activerecord",
-  tsFile: "relation.ts",
+  tsFile,
   rubyName: "load",
   call,
   reason,
 });
+
+// The sharded key: the same `<package>/<tsFile .ts→.json>` the split exclude
+// baseline uses (relPathFor in lint-call-mismatches-wide.ts), injected here so
+// this module never depends on the gate that consumes it.
+const pathFor = (k: { package: string; tsFile: string }): string =>
+  path.join(k.package, k.tsFile.replace(/\.ts$/, ".json"));
+
+const REL = path.join("activerecord", "relation.json");
+const MODEL = path.join("activerecord", "model.json");
+const marks = (entries: Record<string, number>): MarkSet => new Map(Object.entries(entries));
 
 describe("unreviewedEntries", () => {
   it("selects only entries whose reason is verbatim the seed", () => {
@@ -51,43 +67,104 @@ describe("newlySeeded", () => {
   });
 });
 
-describe("nextMark", () => {
-  it("lowers the mark to the current count", () => {
-    expect(nextMark(4400, 4441)).toBe(4400);
+describe("unreviewedCounts", () => {
+  it("tallies seeded rows per source file, skipping reviewed ones", () => {
+    const rows = [entry("a"), entry("b"), entry("c", "reviewed"), entry("d", SEED, "model.ts")];
+    expect([...unreviewedCounts(rows, SEED, pathFor)]).toEqual([
+      [REL, 2],
+      [MODEL, 1],
+    ]);
   });
 
-  it("never raises it", () => {
-    expect(nextMark(4600, 4441)).toBe(4441);
+  it("omits a source whose every row is reviewed rather than recording a zero", () => {
+    expect([...unreviewedCounts([entry("a", "reviewed")], SEED, pathFor)]).toEqual([]);
   });
 });
 
-describe("the aggregate contract", () => {
-  // Pins the documented limit (unreviewed-ratchet.ts header): the gate compares
-  // one number, so a hand-edited baseline that swaps a reviewed row for a newly
-  // seeded one passes. The guarantee is that the total never rises, NOT that
-  // every new entry individually carries a real reason.
-  it("passes a one-for-one swap of a reviewed reason for a newly seeded row", () => {
-    const before = [entry("a"), entry("b")];
-    const mark = unreviewedEntries(before, SEED).length;
-    const after = [entry("a", "reviewed: satisfied by Arel"), entry("b"), entry("c")];
-    expect(unreviewedEntries(after, SEED).length).toBe(mark);
+describe("nextMarks", () => {
+  it("lowers each file's mark to that file's own count", () => {
+    expect([
+      ...nextMarks(marks({ [REL]: 130, [MODEL]: 4 }), marks({ [REL]: 131, [MODEL]: 9 })),
+    ]).toEqual([
+      [REL, 130],
+      [MODEL, 4],
+    ]);
   });
 
-  it("still fails when the swap grows the total", () => {
+  it("never raises a file's mark", () => {
+    expect(nextMarks(marks({ [REL]: 140 }), marks({ [REL]: 131 })).get(REL)).toBe(131);
+  });
+
+  it("drops a source that reached zero rather than storing {max: 0}", () => {
+    expect([...nextMarks(marks({}), marks({ [REL]: 131 }))]).toEqual([]);
+  });
+
+  it("takes the count itself for a source that had no mark yet", () => {
+    expect(nextMarks(marks({ [MODEL]: 3 }), marks({ [REL]: 1 })).get(MODEL)).toBe(3);
+  });
+});
+
+describe("heldOutCounts", () => {
+  it("subtracts this reseed's newly-seeded rows from their own file's count", () => {
+    const counts = marks({ [REL]: 3, [MODEL]: 2 });
+    const held = heldOutCounts(counts, [entry("c"), entry("d", SEED, "model.ts")], pathFor);
+    expect([...held]).toEqual([
+      [REL, 2],
+      [MODEL, 1],
+    ]);
+  });
+
+  // The whole point of the shard: a reseed into model.ts must not lower — or be
+  // paid for by — relation.ts's mark.
+  it("leaves an untouched file's count alone", () => {
+    expect(
+      heldOutCounts(marks({ [REL]: 3 }), [entry("x", SEED, "model.ts")], pathFor).get(REL),
+    ).toBe(3);
+  });
+});
+
+describe("totalMark", () => {
+  it("sums the shards into the one number the console reports", () => {
+    expect(totalMark(marks({ [REL]: 131, [MODEL]: 4 }))).toBe(135);
+  });
+});
+
+describe("the per-file aggregate contract", () => {
+  // Pins the documented limit (unreviewed-ratchet.ts header): the gate compares
+  // one number PER SOURCE FILE, so a hand-edited baseline that swaps a reviewed
+  // row for a newly seeded one IN THE SAME FILE passes. The guarantee is that
+  // the file's total never rises, NOT that every new entry individually carries
+  // a real reason.
+  it("passes a one-for-one same-file swap of a reviewed reason for a newly seeded row", () => {
+    const after = [entry("a", "reviewed: satisfied by Arel"), entry("b"), entry("c")];
+    expect(excessByPath(unreviewedCounts(after, SEED, pathFor), marks({ [REL]: 2 }))).toEqual([]);
+  });
+
+  it("still fails when the swap grows that file's total", () => {
     const after = [entry("a"), entry("b"), entry("c")];
-    expect(unreviewedEntries(after, SEED).length).toBeGreaterThan(2);
+    expect(excessByPath(unreviewedCounts(after, SEED, pathFor), marks({ [REL]: 2 }))).toEqual([
+      [REL, 3, 2],
+    ]);
   });
 
   // `--write` DOES have both states, so the per-key rule binds on the reseed
   // path: the new row is held out of the lowered mark and the gate goes red.
-  it("holds a newly seeded row out of the mark on the reseed path", () => {
+  it("holds a newly seeded row out of its own file's mark on the reseed path", () => {
     const prior = [entry("a"), entry("b")];
     const next = [entry("a", "reviewed"), entry("b"), entry("c")];
     const newly = newlySeeded(next, prior, SEED);
-    const count = unreviewedEntries(next, SEED).length;
+    const counts = unreviewedCounts(next, SEED, pathFor);
     expect(newly.map((k) => k.call)).toEqual(["c"]);
-    expect(nextMark(count - newly.length, 2)).toBe(1);
-    expect(count).toBeGreaterThan(1);
+    expect(counts.get(REL)).toBe(2);
+    expect(nextMarks(heldOutCounts(counts, newly, pathFor), marks({ [REL]: 2 })).get(REL)).toBe(1);
+  });
+
+  // A review in one source can no longer pay for a seeded row added in another
+  // — the arm the single repo-wide number could not make.
+  it("fails a cross-file swap that the old repo-wide number would have passed", () => {
+    const counts = unreviewedCounts([entry("a"), entry("b", SEED, "model.ts")], SEED, pathFor);
+    const committed = marks({ [REL]: 2, [MODEL]: 0 });
+    expect(excessByPath(counts, committed).map(([rel]) => rel)).toEqual([MODEL]);
   });
 });
 
@@ -104,7 +181,7 @@ describe("parseMark", () => {
   );
 });
 
-describe("loadMark / writeMark", () => {
+describe("loadMarks / writeMarks", () => {
   let dir: string;
 
   beforeEach(async () => {
@@ -115,39 +192,90 @@ describe("loadMark / writeMark", () => {
     await fs.rm(dir, { recursive: true, force: true });
   });
 
-  it("round-trips through the canonical baseline serialization", async () => {
-    const file = path.join(dir, "mark.json");
-    await writeMark(file, 7);
-    expect(await fs.readFile(file, "utf-8")).toBe('{\n  "max": 7\n}\n');
-    expect(await loadMark(file)).toBe(7);
+  it("round-trips each shard through the canonical baseline serialization", async () => {
+    await writeMarks(dir, marks({ [REL]: 7, [MODEL]: 2 }));
+    expect(await fs.readFile(path.join(dir, REL), "utf-8")).toBe('{\n  "max": 7\n}\n');
+    expect([...(await loadMarks(dir))]).toEqual([
+      [MODEL, 2],
+      [REL, 7],
+    ]);
   });
 
-  it("names the missing ratchet file rather than surfacing a bare ENOENT", async () => {
-    await expect(loadMark(path.join(dir, "gone.json"))).rejects.toThrow(/committed ratchet file/);
+  it("mirrors the source tree, creating parent dirs for a nested source", async () => {
+    const nested = path.join("activerecord", "connection-adapters/sqlite3/statements.json");
+    await writeMarks(dir, marks({ [nested]: 3 }));
+    expect((await loadMarks(dir)).get(nested)).toBe(3);
+  });
+
+  // Same rule as the exclude tree: a converged source leaves no `{"max": 0}`
+  // residue, so a post-reseed diff shows only real changes.
+  it("deletes a shard that reached zero and prunes the dirs it emptied", async () => {
+    const nested = path.join("activerecord", "connection-adapters/sqlite3/statements.json");
+    await writeMarks(dir, marks({ [REL]: 7, [nested]: 3 }));
+    await writeMarks(dir, marks({ [REL]: 7 }));
+    expect([...(await loadMarks(dir))]).toEqual([[REL, 7]]);
+    await expect(
+      fs.readdir(path.join(dir, "activerecord", "connection-adapters")),
+    ).rejects.toThrow();
+  });
+
+  it("never writes a zero shard even when handed one", async () => {
+    await writeMarks(dir, marks({ [REL]: 7, [MODEL]: 0 }));
+    expect([...(await loadMarks(dir))]).toEqual([[REL, 7]]);
+  });
+
+  // A source with no shard reads as 0 — the strict direction, so a deleted
+  // shard reds the gate on its file's first unreviewed row.
+  it("reports a source with no shard as zero, not as unbounded headroom", async () => {
+    await writeMarks(dir, marks({ [REL]: 7 }));
+    const loaded = await loadMarks(dir);
+    expect(excessByPath(marks({ [MODEL]: 1 }), loaded)).toEqual([[MODEL, 1, 0]]);
+  });
+
+  it("names the emptied ratchet tree rather than silently disarming", async () => {
+    await expect(loadMarks(dir)).rejects.toThrow(/committed ratchet tree/);
+  });
+});
+
+describe("excessByPath", () => {
+  it("reports only the files over their own mark, worst overshoot first", () => {
+    const over = excessByPath(marks({ [REL]: 5, [MODEL]: 9 }), marks({ [REL]: 4, [MODEL]: 4 }));
+    expect(over).toEqual([
+      [MODEL, 9, 4],
+      [REL, 5, 4],
+    ]);
+  });
+
+  it("treats a file with no committed shard as a mark of zero", () => {
+    expect(excessByPath(marks({ [MODEL]: 2 }), marks({}))).toEqual([[MODEL, 2, 0]]);
+  });
+
+  it("says nothing about a file sitting at or under its mark", () => {
+    expect(excessByPath(marks({ [REL]: 4 }), marks({ [REL]: 4 }))).toEqual([]);
   });
 });
 
 describe("renderExcess", () => {
-  it("names the excess as the newly-seeded rows held out of the mark", () => {
-    const msg = renderExcess(4445, 4441, "scripts/api-compare/mark.json");
-    expect(msg).toContain("4445");
-    expect(msg).toContain("4 more than the committed high-water mark of 4441");
+  it("names the excess as the newly-seeded rows held out of each file's mark", () => {
+    const msg = renderExcess([[REL, 133, 131]], "scripts/api-compare/marks");
+    expect(msg).toContain("2 baselined entr(ies) across 1 source file(s)");
     // Both ways a row can gain the placeholder — a reseed, or a reverted reason.
     expect(msg).toContain("reverted to the seed");
     expect(msg).toContain("only shrinks");
+    expect(msg).toContain(`  + ${REL}  133 unreviewed, mark 131`);
   });
 });
 
 describe("renderWriteSummary", () => {
-  it("lists newly-seeded keys separately from the mark", () => {
-    const msg = renderWriteSummary(10, [entry("c")], 9, "mark.json");
-    expect(msg).toContain("unreviewed high-water mark 9");
+  it("lists newly-seeded keys separately from the marks it wrote", () => {
+    const msg = renderWriteSummary(10, [entry("c")], marks({ [REL]: 7, [MODEL]: 2 }), "marks");
+    expect(msg).toContain("2 per-file unreviewed high-water mark(s) totalling 9");
     expect(msg).toContain("1 of those were seeded by THIS reseed");
     expect(msg).toContain("activerecord  relation.ts  load  c");
   });
 
   it("says nothing about newly-seeded rows when there are none", () => {
-    expect(renderWriteSummary(10, [], 10, "mark.json")).not.toContain("THIS reseed");
+    expect(renderWriteSummary(10, [], marks({ [REL]: 10 }), "marks")).not.toContain("THIS reseed");
   });
 });
 
@@ -223,13 +351,32 @@ describe("markSlack", () => {
   });
 });
 
+describe("slackByPath", () => {
+  it("reports each file whose own mark sits above its count, slackest first", () => {
+    expect(slackByPath(marks({ [REL]: 130 }), marks({ [REL]: 131, [MODEL]: 4 }))).toEqual([
+      [MODEL, 0, 4],
+      [REL, 130, 131],
+    ]);
+  });
+
+  // An orphan shard — a mark whose source converged out of the baseline
+  // entirely — is pure slack, and the next `--write` deletes it.
+  it("catches an orphan shard whose source has no unreviewed rows left", () => {
+    expect(slackByPath(marks({}), marks({ [MODEL]: 4 }))).toEqual([[MODEL, 0, 4]]);
+  });
+
+  it("leaves a file above its mark to the excess arm", () => {
+    expect(slackByPath(marks({ [REL]: 132 }), marks({ [REL]: 131 }))).toEqual([]);
+  });
+});
+
 describe("renderSlack", () => {
-  it("names both numbers, the slack, and the one-command fix", () => {
-    const msg = renderSlack(2787, 2837, "scripts/api-compare/mark.json");
+  it("names the files, the slack, and the one-command fix", () => {
+    const msg = renderSlack([[REL, 2787, 2837]], "scripts/api-compare/marks");
     expect(msg).toContain("STALE high-water mark");
-    expect(msg).toContain("2837");
-    expect(msg).toContain("2787");
-    expect(msg).toContain("50 of slack");
+    expect(msg).toContain("1 file(s)");
+    expect(msg).toContain("2837 of slack".replace("2837", "50"));
+    expect(msg).toContain(`  - ${REL}  mark 2837, only 2787 unreviewed`);
     expect(msg).toContain("pnpm api:calls:wide:reseed");
   });
 });
