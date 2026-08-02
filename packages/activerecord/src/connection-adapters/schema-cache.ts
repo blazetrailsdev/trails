@@ -12,7 +12,7 @@ import type { ColumnJSON } from "./column.js";
 import { Column as MysqlColumn } from "./mysql/column.js";
 import { isSchemaCacheIgnoredTable } from "../ar-config.js";
 import { StatementInvalid } from "../errors.js";
-import { poolAbsent } from "./abstract/connection-pool.js";
+import { NullPool } from "./abstract/connection-pool.js";
 import { IndexDefinition } from "./abstract/schema-definitions.js";
 
 // ---------------------------------------------------------------------------
@@ -302,11 +302,13 @@ export class SchemaCache {
       return this._columns.get(tableName);
     }
 
-    // Null-pool guard: callers (e.g. `columnForAttribute` before a pool is
-    // attached) may pass `pool: null` to consult only the warm cache. Don't
-    // attempt to acquire a connection in that case — return undefined and
-    // let the caller fall back to the schema-less NullColumn shape.
-    if (poolAbsent(pool)) return undefined;
+    // Null-pool guard: a caller may pass `null` (or the NullPool a standalone
+    // adapter carries) to consult only the warm cache. Neither can yield a
+    // connection — Rails never gets here because `AbstractAdapter#schema_cache`
+    // binds a `FakePool` over the adapter itself when `pool.schema_cache` is
+    // nil (abstract_adapter.rb:298) — so return undefined and let the caller
+    // fall back to the schema-less NullColumn shape.
+    if (pool == null || pool instanceof NullPool) return undefined;
 
     return withConnection(pool, async (connection) => {
       if (typeof connection.columns === "function") {
@@ -524,13 +526,10 @@ export class SchemaCache {
    * only population path is `add(pool, table_name)`, which issues the
    * introspection queries itself behind `pool.with_connection`.
    *
-   * That is exactly why the one production caller cannot use `add()`: it has no
-   * pool. `AbstractAdapter#columnForAttribute`'s bare-adapter branch
-   * (`abstract-adapter.ts`, the `poolAbsent(this.pool)` fallback) runs on a
-   * standalone adapter, where `add()` and the `columnsHash` DB fallback both
-   * bail on the null-pool guard. It calls the adapter's own `columns()`
-   * directly and seeds the result here, then reads it straight back via
-   * {@link getCachedColumnsHash}.
+   * It survives as the write half of the sync readers below: `columns()` seeds
+   * every reflection through it, so `getCachedColumnsHash` and friends can
+   * answer query-free. Rails needs no such writer because its readers may block
+   * on a checkout.
    *
    * Also warms `_dataSourceExists` — a table whose columns just came back
    * demonstrably exists — which is what lets the sync readers above answer
@@ -538,8 +537,8 @@ export class SchemaCache {
    *
    * @noRailsEquivalent CONVERGEABLE (story: retire-schema-cache-sync-and-ledger-shims).
    * Rails populates only via `add(pool, table_name)`,
-   * which needs a pool; the one caller is the bare-adapter path that has
-   * none. See above.
+   * which issues the introspection queries itself; trails needs a sync writer
+   * to back its sync, query-free readers. See above.
    */
   setColumns(tableName: string, cols: Column[]): void {
     this.reconcilePrimaryKeyFlags(tableName, cols);

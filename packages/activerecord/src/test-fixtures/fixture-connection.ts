@@ -1,6 +1,6 @@
 import { Base } from "../base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import { realPool, type ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
+import { NullPool, type ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 
 /**
  * The connection the fixture machinery seeds and pins through.
@@ -37,13 +37,14 @@ export function leaseFixtureConnection(): DatabaseAdapter {
  * model (join-table/tableless sets), the model is one of the lightweight
  * `{ tableName, ... }` stubs some infra tests pass, or it has no pool
  * established (a directly-assigned `Model.adapter`, whose `connectionPool()`
- * throws).
+ * throws), or it carries the NullPool a standalone adapter is born with.
  */
 function modelFixturePool(model: unknown): ConnectionPool | null {
   const host = model as { connectionPool?: () => ConnectionPool } | null;
   if (host === null || typeof host.connectionPool !== "function") return null;
   try {
-    return realPool(host.connectionPool()) as ConnectionPool | null;
+    const pool = host.connectionPool();
+    return pool == null || pool instanceof NullPool ? null : pool;
   } catch {
     return null;
   }
@@ -71,7 +72,11 @@ export async function leaseFixtureConnectionFor(
 ): Promise<DatabaseAdapter> {
   const modelPool = modelFixturePool(model);
   if (modelPool === null) return fixtureConnection;
-  const fixturePool = realPool(fixtureConnection.pool) as ConnectionPool | null;
+  const rawFixturePool = fixtureConnection.pool;
+  const fixturePool =
+    rawFixturePool == null || rawFixturePool instanceof NullPool
+      ? null
+      : (rawFixturePool as ConnectionPool);
   if (fixturePool === null || fixturePool === modelPool) return fixtureConnection;
   return await modelPool.leaseConnection();
 }

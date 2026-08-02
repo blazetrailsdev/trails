@@ -19,7 +19,6 @@ import {
 } from "./inheritance.js";
 import { singularize } from "@blazetrails/activesupport";
 import { modelRegistry } from "./associations.js";
-import { realPool } from "./connection-adapters/abstract/connection-pool.js";
 import { TableNotSpecified } from "./errors.js";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { isWrappedType } from "./encryption/wrapped-type.js";
@@ -1243,17 +1242,12 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   const cache = startingAdapter.schemaCache;
   if (!cache) return;
   const table = this.tableName;
-  // Resolve a target for schemaCache lookups. If `.pool` is an actual ConnectionPool
-  // (has `withConnection`), wrap startingAdapter in a FakePool — mirroring
-  // Rails' BoundSchemaReflection.for_lone_connection. On lone-connection
-  // pools (SQLite :memory: + size 1) the connection is already permanently
-  // checked out, so calling pool.withConnection would deadlock; FakePool
-  // yields the connection we already hold.
-  const candidate = realPool(startingAdapter.pool) ?? startingAdapter;
-  const pool =
-    candidate && typeof (candidate as { withConnection?: unknown }).withConnection === "function"
-      ? new FakePool(startingAdapter)
-      : candidate;
+  // Resolve the schemaCache target the way Rails does for a lone connection:
+  // `BoundSchemaReflection.for_lone_connection` wraps the connection we already
+  // hold in a FakePool (schema_cache.rb:155). That matters here beyond fidelity
+  // — on lone-connection pools (SQLite :memory: + size 1) the connection is
+  // permanently checked out, so routing through pool.withConnection deadlocks.
+  const pool = new FakePool(startingAdapter);
 
   if (typeof cache.dataSourceExists === "function") {
     const exists = await cache.dataSourceExists(pool, table);
@@ -1329,12 +1323,7 @@ async function reflectColumnNames(host: SchemaHost): Promise<Set<string> | null>
     // doesn't deadlock on withConnection.
     const cache = conn.schemaCache;
     if (cache && typeof cache.columnsHash === "function") {
-      const candidate = realPool(conn.pool) ?? conn;
-      const pool =
-        candidate &&
-        typeof (candidate as { withConnection?: unknown }).withConnection === "function"
-          ? new FakePool(conn)
-          : candidate;
+      const pool = new FakePool(conn);
       const hash = (await cache.columnsHash(pool, table)) as Record<string, unknown> | undefined;
       if (hash) {
         const names = Object.keys(hash);
@@ -1542,8 +1531,7 @@ export async function tableExists(this: SchemaHost): Promise<boolean> {
   const conn = reflectionAdapter(this);
   const cache = conn.schemaCache;
   if (!cache || typeof cache.dataSourceExists !== "function") return true;
-  const pool = realPool(conn.pool) ?? conn;
-  const exists = await cache.dataSourceExists(pool, this.tableName);
+  const exists = await cache.dataSourceExists(new FakePool(conn), this.tableName);
   return exists !== false;
 }
 
