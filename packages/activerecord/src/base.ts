@@ -168,11 +168,11 @@ import {
   hasAttribute as _hasAttribute,
   _hasAttribute as _privateHasAttribute,
   attributePresent as _attributePresent,
-  attributeNamesList as _attributeNamesList,
+  attributeNames as _attributeNames,
   accessedFields as _accessedFields,
   attributesForCreate as _attributesForCreate,
   attributesForUpdate as _attributesForUpdate,
-  attributeNames as _attributeNames,
+  ClassMethods as AttributeMethodsClassMethods,
   isAttributeMethod as _isAttributeMethod,
   isDangerousAttributeMethod as _isDangerousAttributeMethod,
   defineAttributeMethods as _defineAttributeMethods,
@@ -4176,12 +4176,12 @@ export class Base extends Model {
   /** @internal */
   declare storeAccessorFor: (storeAttribute: string) => typeof import("./store.js").HashAccessor;
 
-  get attributeNamesList(): string[] {
-    return _attributeNamesList.call(this as any);
+  attributeNames(): string[] {
+    return _attributeNames.call(this as any);
   }
 
   static attributeNames(): string[] {
-    return _attributeNames.call(this);
+    return AttributeMethodsClassMethods.attributeNames.call(this);
   }
 
   /**
